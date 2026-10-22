@@ -10,10 +10,10 @@ pub const World = struct {
   gpa:std.mem.Allocator,
   seed:u64,
   map:std.AutoHashMapUnmanaged(Coord, *Chunk) = .empty,
+  /// chunks loaded by the last `stream` call.
+  fresh:std.ArrayList(*Chunk) = .empty,
   /// gpu slots of chunks that were unloaded; the renderer drains this.
   evicted:std.ArrayList(u32) = .empty,
-  /// chunks generated this frame (stats).
-  generated:u32 = 0,
 
   pub fn init(gpa:std.mem.Allocator, seed:u64) World { return .{.gpa = gpa, .seed = seed}; }
 
@@ -21,6 +21,7 @@ pub const World = struct {
     var it = w.map.valueIterator();
     while (it.next()) |c| w.gpa.destroy(c.*);
     w.map.deinit(w.gpa);
+    w.fresh.deinit(w.gpa);
     w.evicted.deinit(w.gpa);
   }
 
@@ -28,22 +29,65 @@ pub const World = struct {
 
   pub fn chunkOfTile(w:*const World, wx:i32, wy:i32) ?*Chunk { return w.map.get(Coord.ofTile(wx, wy)); }
 
+  /// occupant of a tile (NONE if empty or not loaded).
+  pub fn occAt(w:*const World, wx:i32, wy:i32) u32 {
+    const c = w.chunkOfTile(wx, wy) orelse return ck.NONE;
+    return c.occ[ck.localIndex(wx, wy)];
+  }
+
+  /// claim (or release, with NONE) a size x size footprint anchored at
+  /// (wx, wy), pinning/unpinning each chunk once per tile.
+  pub fn setFootprint(w:*World, wx:i32, wy:i32, size:u8, o:u32) void {
+    for (0..size) |dy| for (0..size) |dx| {
+      const x = wx + @as(i32, @intCast(dx));
+      const y = wy + @as(i32, @intCast(dy));
+      const c = w.chunkOfTile(x, y) orelse continue;
+      const t = ck.localIndex(x, y);
+      if (c.occ[t] == ck.NONE and o != ck.NONE) c.pins += 1;
+      if (c.occ[t] != ck.NONE and o == ck.NONE) c.pins -= 1;
+      c.occ[t] = o;
+    };
+  }
+
+  /// re-point an existing footprint at a new occupant id (after a swap-remove).
+  pub fn moveFootprint(w:*World, wx:i32, wy:i32, size:u8, o:u32) void {
+    for (0..size) |dy| for (0..size) |dx| {
+      const x = wx + @as(i32, @intCast(dx));
+      const y = wy + @as(i32, @intCast(dy));
+      if (w.chunkOfTile(x, y)) |c| c.occ[ck.localIndex(x, y)] = o;
+    };
+  }
+
+  /// a footprint is free if every tile is loaded, unoccupied, level with the
+  /// anchor and passes `ok` (e.g. fertile for roots, dry for structures).
+  pub fn footprintFree(w:*const World, wx:i32, wy:i32, size:u8, comptime ok:fn (ck.Kind) bool) bool {
+    const c0 = w.chunkOfTile(wx, wy) orelse return false;
+    const h0 = c0.height[ck.localIndex(wx, wy)];
+    for (0..size) |dy| for (0..size) |dx| {
+      const x = wx + @as(i32, @intCast(dx));
+      const y = wy + @as(i32, @intCast(dy));
+      const c = w.chunkOfTile(x, y) orelse return false;
+      const t = ck.localIndex(x, y);
+      if (c.occ[t] != ck.NONE or !ok(c.kind[t]) or c.height[t] != h0) return false;
+    };
+    return true;
+  }
+
   fn load(w:*World, at:Coord) !*Chunk {
     const c = try w.gpa.create(Chunk);
-    c.* = .{.at = at, .height = undefined, .kind = undefined, .ley = undefined, .ley_cap = undefined, .plant = undefined};
+    errdefer w.gpa.destroy(c);
+    c.* = ck.blank(at);
     gen.generate(w.seed, c);
     try w.map.put(w.gpa, at, c);
-    w.generated += 1;
+    try w.fresh.append(w.gpa, c);
     return c;
   }
 
-  /// generate missing chunks nearest-first (at most `budget` per call) and
-  /// unload empty chunks well outside `radius`. Chunks holding plants stay
-  /// resident so the ecosystem keeps simulating off-screen.
+  /// generate missing chunks nearest-first, at most `budget` per call.
   pub fn stream(w:*World, focus:Coord, radius:i32, budget:u32) !void {
-    w.generated = 0;
+    w.fresh.clearRetainingCapacity();
     var r:i32 = 0;
-    ring: while (r <= radius) : (r += 1) {
+    while (r <= radius) : (r += 1) {
       var dy:i32 = -r;
       while (dy <= r) : (dy += 1) {
         var dx:i32 = -r;
@@ -51,26 +95,30 @@ pub const World = struct {
           if (@max(@abs(dx), @abs(dy)) != r) continue;
           const at:Coord = .{.x = focus.x + dx, .y = focus.y + dy};
           if (w.map.contains(at)) continue;
-          if (w.generated >= budget) break :ring;
+          if (w.fresh.items.len >= budget) return;
           _ = try w.load(at);
         }
       }
     }
+  }
 
+  /// unpinned chunks well outside `radius`, ready to `unload`.
+  pub fn far(w:*World, focus:Coord, radius:i32, out:*std.ArrayList(*Chunk)) !void {
+    out.clearRetainingCapacity();
     const keep = radius + 2;
-    var drop:std.ArrayList(Coord) = .empty;
-    defer drop.deinit(w.gpa);
-    var it = w.map.iterator();
-    while (it.next()) |e| {
-      const at = e.key_ptr.*;
-      if (e.value_ptr.*.plants > 0) continue;
-      if (@max(@abs(at.x - focus.x), @abs(at.y - focus.y)) > keep) try drop.append(w.gpa, at);
+    var it = w.map.valueIterator();
+    while (it.next()) |cp| {
+      const c = cp.*;
+      if (c.pins > 0) continue;
+      if (@max(@abs(c.at.x - focus.x), @abs(c.at.y - focus.y)) > keep) try out.append(w.gpa, c);
     }
-    for (drop.items) |at| {
-      const c = w.map.fetchRemove(at).?.value;
-      if (c.gpu_slot != ck.NONE) try w.evicted.append(w.gpa, c.gpu_slot);
-      w.gpa.destroy(c);
-    }
+  }
+
+  pub fn unload(w:*World, c:*Chunk) !void {
+    std.debug.assert(c.pins == 0);
+    _ = w.map.remove(c.at);
+    if (c.gpu_slot != ck.NONE) try w.evicted.append(w.gpa, c.gpu_slot);
+    w.gpa.destroy(c);
   }
 };
 
@@ -79,6 +127,10 @@ test "stream loads and unloads" {
   defer w.deinit();
   try w.stream(.{.x = 0, .y = 0}, 1, 100);
   try std.testing.expectEqual(@as(u32, 9), w.map.count());
-  try w.stream(.{.x = 50, .y = 0}, 0, 100);
-  try std.testing.expectEqual(@as(u32, 1), w.map.count());
+  var far:std.ArrayList(*Chunk) = .empty;
+  defer far.deinit(std.testing.allocator);
+  try w.far(.{.x = 50, .y = 0}, 0, &far);
+  try std.testing.expectEqual(@as(usize, 9), far.items.len);
+  for (far.items) |c| try w.unload(c);
+  try std.testing.expectEqual(@as(u32, 0), w.map.count());
 }

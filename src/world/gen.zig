@@ -3,11 +3,12 @@
 const std = @import("std");
 const noise = @import("../core/noise.zig");
 const ck = @import("chunk.zig");
+const rng = @import("../core/rng.zig");
 
 pub const TERRACE = 0.35;
 pub const WATER_H = 0.0;
 
-pub const Sample = struct { height:f32, kind:ck.Kind, ley:f32 };
+pub const Sample = struct { height:f32, kind:ck.Kind, ley:f32, res:u8 = 0 };
 
 pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
   const x:f32 = @floatFromInt(wx);
@@ -27,7 +28,12 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
     else if (wet > 0.05) .moss
     else .soil;
   const ley = 0.2 + vein * vein * vein * (if (kind == .ley) @as(f32, 4) else 1);
-  return .{.height = height, .kind = kind, .ley = ley};
+
+  // resource nodes cluster in noisy patches. No flora: every plant is seeded.
+  const h = rng.unit(rng.hash2(seed +% 7, wx, wy));
+  const patch = noise.fbm(seed +% 5, x / 16, y / 16, 2);
+  const res:u8 = if (patch > 0.42 and h < 0.6) @intFromFloat(6 + h * 20) else 0;
+  return .{.height = height, .kind = kind, .ley = ley, .res = res};
 }
 
 pub fn heightAt(seed:u64, wx:i32, wy:i32) f32 { return sample(seed, wx, wy).height; }
@@ -42,12 +48,14 @@ pub fn generate(seed:u64, c:*ck.Chunk) void {
     c.kind[i] = s.kind;
     c.ley[i] = s.ley;
     c.ley_cap[i] = s.ley;
-    c.plant[i] = ck.NONE;
+    c.res[i] = s.res;
+
+    c.occ[i] = ck.NONE;
   };
 }
 
 test "generation is deterministic" {
-  var a:ck.Chunk = .{.at = .{.x = -3, .y = 7}, .height = undefined, .kind = undefined, .ley = undefined, .ley_cap = undefined, .plant = undefined};
+  var a = ck.blank(.{.x = -3, .y = 7});
   var b = a;
   generate(1234, &a);
   generate(1234, &b);

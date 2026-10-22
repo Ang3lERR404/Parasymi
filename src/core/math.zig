@@ -63,6 +63,40 @@ pub fn lookAt(eye:V3, at:V3, up:V3) M4 {
   };
 }
 
+pub fn translate(t:V3) M4 {
+  return .{.{1, 0, 0, 0}, .{0, 1, 0, 0}, .{0, 0, 1, 0}, .{t[0], t[1], t[2], 1}};
+}
+pub fn scale3(s:V3) M4 {
+  return .{.{s[0], 0, 0, 0}, .{0, s[1], 0, 0}, .{0, 0, s[2], 0}, .{0, 0, 0, 1}};
+}
+pub fn rotX(a:f32) M4 {
+  const c = @cos(a); const s = @sin(a);
+  return .{.{1, 0, 0, 0}, .{0, c, s, 0}, .{0, -s, c, 0}, .{0, 0, 0, 1}};
+}
+pub fn rotY(a:f32) M4 {
+  const c = @cos(a); const s = @sin(a);
+  return .{.{c, 0, -s, 0}, .{0, 1, 0, 0}, .{s, 0, c, 0}, .{0, 0, 0, 1}};
+}
+pub fn rotZ(a:f32) M4 {
+  const c = @cos(a); const s = @sin(a);
+  return .{.{c, s, 0, 0}, .{-s, c, 0, 0}, .{0, 0, 1, 0}, .{0, 0, 0, 1}};
+}
+/// chain transforms parent-first: chain(.{a, b, c}) == a * b * c.
+pub fn chain(ms:anytype) M4 {
+  var r:M4 = identity;
+  inline for (ms) |x| r = mul(r, x);
+  return r;
+}
+pub fn origin(a:M4) V3 { return .{a[3][0], a[3][1], a[3][2]}; }
+
+/// critically damped spring step (for procedural secondary motion).
+pub fn spring(pos:*f32, vel:*f32, target:f32, freq:f32, dt:f32) void {
+  const k = freq * freq;
+  const d = 2 * freq;
+  vel.* += (k * (target - pos.*) - d * vel.*) * dt;
+  pos.* += vel.* * dt;
+}
+
 /// general 4x4 inverse (cofactor expansion), used for mouse picking.
 pub fn inverse(m:M4) M4 {
   var a:[16]f32 = undefined;

@@ -1,0 +1,87 @@
+//! weaving: turning gathered matter into seeds and structure bulbs. The wolf
+//! weaves by hand; a germinator runs the same recipes by itself. Ingredients
+//! leave the inventory when a weave is queued (like Factorio hand crafting)
+//! and the result appears when it finishes.
+const std = @import("std");
+const items = @import("../sim/items.zig");
+const prog = @import("progression.zig");
+
+pub const Recipe = struct {
+  out:items.Item,
+  n:u16 = 1,
+  in:[]const items.Ingredient,
+  time:f32,
+  /// research that must be known before this can be woven
+  needs:?prog.Id = null,
+
+  pub fn unlocked(r:Recipe, g:*const prog.Progression) bool {
+    return if (r.needs) |id| g.done.contains(id) else true;
+  }
+};
+
+/// everything that can be woven. Seeds first (a germinator only weaves those).
+pub const hand = [_]Recipe{
+  .{.out = .seed_lumenroot, .in = &.{.{.item = .fibre, .n = 2}, .{.item = .starlight, .n = 1}}, .time = 1.5},
+  .{.out = .seed_thornleech, .in = &.{.{.item = .grit, .n = 2}, .{.item = .ley_shard, .n = 1}, .{.item = .starlight, .n = 1}}, .time = 1.5},
+  .{.out = .seed_driftwisp, .in = &.{.{.item = .starlight, .n = 1}, .{.item = .ley_shard, .n = 1}, .{.item = .fibre, .n = 1}}, .time = 2, .needs = .drift_spores},
+  .{.out = .seed_hollowheart, .in = &.{.{.item = .essence, .n = 4}, .{.item = .fibre, .n = 3}, .{.item = .grit, .n = 2}}, .time = 3, .needs = .canopy_weaving},
+  .{.out = .conduit, .n = 2, .in = &.{.{.item = .fibre, .n = 2}, .{.item = .grit, .n = 1}}, .time = 1},
+  .{.out = .sap_cache, .in = &.{.{.item = .fibre, .n = 4}, .{.item = .grit, .n = 4}}, .time = 2},
+  .{.out = .germinator, .in = &.{.{.item = .fibre, .n = 6}, .{.item = .grit, .n = 4}, .{.item = .essence, .n = 2}, .{.item = .starlight, .n = 2}}, .time = 3},
+  .{.out = .research_bloom, .in = &.{.{.item = .fibre, .n = 8}, .{.item = .grit, .n = 6}, .{.item = .essence, .n = 4}, .{.item = .starlight, .n = 4}, .{.item = .ley_shard, .n = 2}}, .time = 4},
+};
+
+pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
+
+pub const Crafter = struct {
+  queue:[8]u8 = undefined,
+  len:usize = 0,
+  t:f32 = 0,
+
+  pub fn can(inv:anytype, r:Recipe) bool {
+    for (r.in) |ing| if (inv.count(ing.item) < ing.n) return false;
+    return true;
+  }
+
+  /// takes the ingredients now; false if missing or the queue is full.
+  pub fn push(c:*Crafter, inv:anytype, idx:usize) bool {
+    const r = hand[idx];
+    if (c.len == c.queue.len or !can(inv, r)) return false;
+    for (r.in) |ing| _ = inv.take(ing.item, ing.n);
+    c.queue[c.len] = @intCast(idx);
+    c.len += 1;
+    return true;
+  }
+
+  pub fn busy(c:*const Crafter) bool { return c.len > 0; }
+  pub fn progress(c:*const Crafter) f32 { return if (c.len == 0) 0 else c.t / hand[c.queue[0]].time; }
+
+  /// returns the item finished this step, if any. A result that does not fit
+  /// waits in the weave until there is room.
+  pub fn tick(c:*Crafter, inv:anytype, dt:f32) ?items.Item {
+    if (c.len == 0) return null;
+    const r = hand[c.queue[0]];
+    c.t = @min(c.t + dt, r.time);
+    if (c.t < r.time) return null;
+    if (inv.add(r.out, r.n) < r.n) return null;
+    std.mem.copyForwards(u8, c.queue[0 .. c.len - 1], c.queue[1..c.len]);
+    c.len -= 1;
+    c.t = 0;
+    return r.out;
+  }
+};
+
+test "weaving takes ingredients up front and yields after its time" {
+  var inv:items.Inventory(8) = .{};
+  var c:Crafter = .{};
+  try std.testing.expect(!c.push(&inv, 0));
+  _ = inv.add(.fibre, 4);
+  _ = inv.add(.starlight, 1);
+  try std.testing.expect(c.push(&inv, 0));
+  try std.testing.expect(!c.push(&inv, 0)); // only one starlight
+  try std.testing.expectEqual(@as(u32, 2), inv.count(.fibre));
+  try std.testing.expect(c.tick(&inv, 1.0) == null);
+  try std.testing.expect(c.tick(&inv, 1.0) == .seed_lumenroot);
+  try std.testing.expectEqual(@as(u32, 1), inv.count(.seed_lumenroot));
+  try std.testing.expect(!c.busy());
+}

@@ -4,18 +4,22 @@ layout(push_constant) uniform Push {
   vec4 eye_time;  // xyz camera eye, w time (s)
   vec4 fog;       // rgb fog/sky colour (linear), w fog density
   vec4 misc;      // x veil 0..1, y ley sight 0/1, zw hovered tile (x,z)
+  vec4 sun;       // xyz direction toward the key light (sun or moon), w daylight 0..1
 } pc;
 
-const vec3 SUN = normalize(vec3(0.45, 0.85, 0.30));
+#define SUN pc.sun.xyz
 
 vec3 srgb2lin(vec3 c) { return pow(c, vec3(2.2)); }
 
 vec3 shade(vec3 albedo, vec3 n, vec3 wpos) {
   float ndl = max(dot(n, SUN), 0.0);
+  float day = pc.sun.w;
   vec3 sky = mix(vec3(0.35, 0.40, 0.50), vec3(0.45, 0.30, 0.65), pc.misc.x);
-  vec3 ground = vec3(0.12, 0.10, 0.08);
+  sky = mix(vec3(0.07, 0.09, 0.18), sky, day);
+  vec3 ground = vec3(0.12, 0.10, 0.08) * mix(0.3, 1.0, day);
   vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * 0.55;
-  vec3 sun = vec3(1.0, 0.95, 0.85) * ndl * 1.1;
+  vec3 light = mix(vec3(0.35, 0.45, 0.8) * 0.35, vec3(1.0, 0.95, 0.85) * 1.1, day);
+  vec3 sun = light * ndl;
   return albedo * (amb + sun);
 }
 

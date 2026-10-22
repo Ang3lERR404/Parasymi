@@ -7,7 +7,7 @@ const vertex = @import("vertex.zig");
 const species = @import("../sim/species.zig");
 
 const V3 = m.V3;
-const PV = vertex.Plant;
+const PV = vertex.Mesh;
 
 pub const Builder = struct {
   gpa:std.mem.Allocator,
@@ -19,7 +19,23 @@ pub const Builder = struct {
     try b.v.append(b.gpa, .{.pos = p, .nrm = m.norm(n), .col = col, .tu = .{t, u}, .part = @intFromEnum(part)});
   }
 
-  fn tri(b:*Builder, a:[3]PV) !void { try b.v.appendSlice(b.gpa, &a); }
+  /// apply a transform to every vertex added since `start` (build in a unit
+  /// space, then place/scale into the final part space).
+  pub fn xform(b:*Builder, start:usize, mat:m.M4) void {
+    const nm = m.inverse(mat); // normals use the inverse-transpose
+    for (b.v.items[start..]) |*v| {
+      const p = m.mulV(mat, .{v.pos[0], v.pos[1], v.pos[2], 1});
+      v.pos = .{p[0], p[1], p[2]};
+      const n:m.V3 = .{
+        nm[0][0] * v.nrm[0] + nm[0][1] * v.nrm[1] + nm[0][2] * v.nrm[2],
+        nm[1][0] * v.nrm[0] + nm[1][1] * v.nrm[1] + nm[1][2] * v.nrm[2],
+        nm[2][0] * v.nrm[0] + nm[2][1] * v.nrm[1] + nm[2][2] * v.nrm[2],
+      };
+      v.nrm = m.norm(n);
+    }
+  }
+
+  pub fn mark(b:*const Builder) usize { return b.v.items.len; }
 
   /// tube along a spine, `sides` facets, radius tapering from r0 to r1.
   pub fn tube(b:*Builder, spine:[]const V3, ts:[]const f32, r0:f32, r1:f32, col:[4]u8, part:vertex.Part, sides:u32) !void {
@@ -97,7 +113,66 @@ pub const Builder = struct {
   }
 };
 
-fn rgb(c:[3]f32, a:u8) [4]u8 {
+pub const Ellipsoid = struct {
+  center:V3,
+  radii:V3,
+  col:[4]u8,
+  part:vertex.Part = .stem,
+  rings:u32 = 8,
+  segs:u32 = 10,
+  /// value written to tu.x (e.g. height along a body part)
+  t:f32 = 0,
+};
+
+pub fn ellipsoid(b:*Builder, e:Ellipsoid) !void {
+  const R = e.rings;
+  const S = e.segs;
+  for (0..R) |ri| for (0..S) |si| {
+    var q:[4]V3 = undefined;
+    var n:[4]V3 = undefined;
+    const corners = [4][2]u32{.{0, 0}, .{1, 0}, .{1, 1}, .{0, 1}};
+    for (corners, 0..) |cn, k| {
+      const th = @as(f32, @floatFromInt(ri + cn[0])) / @as(f32, @floatFromInt(R)) * std.math.pi;
+      const ph = @as(f32, @floatFromInt(si + cn[1])) / @as(f32, @floatFromInt(S)) * std.math.tau;
+      const u = m.v3(@sin(th) * @cos(ph), @cos(th), @sin(th) * @sin(ph));
+      q[k] = e.center + u * e.radii;
+      n[k] = u / e.radii;
+    }
+    for ([_]usize{0, 1, 2, 0, 2, 3}) |k| try b.put(q[k], n[k], e.col, e.t, 0, e.part);
+  };
+}
+
+/// a woven bundle of vines along +Y from 0 to 1: a darker core wrapped by
+/// `strands` helical vines. `profile(k)` gives the bundle radius at height k.
+pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32, core:[4]u8, vine:[4]u8) !void {
+  const N = 10;
+  var spine:[N + 1]V3 = undefined;
+  var ts:[N + 1]f32 = undefined;
+  for (0..N + 1) |i| {
+    const k = @as(f32, @floatFromInt(i)) / N;
+    spine[i] = m.v3(0, k, 0);
+    ts[i] = k;
+  }
+  // core: a tube whose radius follows the profile (built ring by ring)
+  for (0..N) |i| {
+    const k0 = ts[i];
+    const k1 = ts[i + 1];
+    try b.tube(spine[i .. i + 2], ts[i .. i + 2], profile(k0) * 0.72, profile(k1) * 0.72, core, .stem, 8);
+  }
+  for (0..strands) |s| {
+    const a0 = @as(f32, @floatFromInt(s)) / @as(f32, @floatFromInt(strands)) * std.math.tau;
+    var path:[N + 1]V3 = undefined;
+    for (0..N + 1) |i| {
+      const k = ts[i];
+      const a = a0 + k * twist;
+      const r = profile(k) * 0.8;
+      path[i] = m.v3(@cos(a) * r, k, @sin(a) * r);
+    }
+    for (0..N) |i| try b.tube(path[i .. i + 2], ts[i .. i + 2], profile(ts[i]) * 0.26, profile(ts[i + 1]) * 0.26, vine, .stem, 5);
+  }
+}
+
+pub fn rgb(c:[3]f32, a:u8) [4]u8 {
   return .{@intFromFloat(m.clamp01(c[0]) * 255), @intFromFloat(m.clamp01(c[1]) * 255), @intFromFloat(m.clamp01(c[2]) * 255), a};
 }
 fn mixCol(a:[4]u8, b:[4]u8, t:f32) [4]u8 {

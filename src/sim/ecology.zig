@@ -15,14 +15,17 @@ pub const Mods = struct {
   link2:bool = false,
   drain_mult:f32 = 1,
   yield_mult:[species.count]f32 = @splat(1),
+  /// how dark it is (0 day .. 1 night); floating plants drink starlight.
+  night:f32 = 0,
 };
 
 pub const Events = struct {
-  essence:f64 = 0,
   died:u32 = 0,
   /// a mature symbiote touched a mature parasite this tick.
   convergence:bool = false,
 };
+
+pub const MAX_SEEDS = 3;
 
 pub const Ecology = struct {
   dm:std.ArrayList(f32) = .empty,
@@ -53,6 +56,8 @@ pub const Ecology = struct {
     const health = s.items(.health);
     const chunks = s.items(.chunk);
     const tiles = s.items(.tile);
+    const essence = s.items(.essence);
+    const seeds = s.items(.seeds);
     const n1 = s.items(.n1);
     const n2 = s.items(.n2);
 
@@ -65,9 +70,14 @@ pub const Ecology = struct {
       // ley field under the plant: draw, then let it slowly refill.
       const c = chunks[i];
       const t = tiles[i];
-      const got = @min(c.ley[t], sp.ley_draw * dt);
-      c.ley[t] += (c.ley_cap[t] - c.ley[t]) * 0.15 * dt - got;
-      dm[i] += got;
+      if (sp.floating) {
+        // floaters never touch the ley: they drink the night sky
+        dm[i] += sp.ley_draw * (0.1 + 0.9 * mods.night) * dt;
+      } else {
+        const got = @min(c.ley[t], sp.ley_draw * dt);
+        c.ley[t] += (c.ley_cap[t] - c.ley[t]) * 0.15 * dt - got;
+        dm[i] += got;
+      }
 
       var kin:f32 = 0;
       if (sp.share > 0) {
@@ -108,9 +118,12 @@ pub const Ecology = struct {
       if (growth[i] < 1) {
         growth[i] = @min(1, growth[i] + dt / sp.mature_time * (0.3 + 0.7 * fill) * health[i] * (1 + 0.15 * kin));
       } else {
-        const conv = @min(mana[i], sp.yield * fill * dt);
+        // mana condenses into essence held by the plant until harvested.
+        const room = cap - essence[i];
+        const conv = @min(@min(mana[i], sp.yield * fill * dt), room);
         dm[i] -= conv;
-        ev.essence += conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + 0.1 * kin);
+        essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + 0.1 * kin));
+        if (health[i] > 0.5) seeds[i] = @min(MAX_SEEDS, seeds[i] + dt / sp.seed_time);
         if (lin == .symbiotic) for (n1[i]) |j| {
           if (j == NONE) break;
           if (species.get(sps[j]).lineage == .parasitic and growth[j] >= 1) ev.convergence = true;
@@ -129,7 +142,7 @@ pub const Ecology = struct {
       if (health[i] <= 0) try e.dead.append(gpa, @intCast(i));
     }
     var k = e.dead.items.len;
-    while (k > 0) { k -= 1; p.remove(e.dead.items[k]); }
+    while (k > 0) { k -= 1; p.remove(w, e.dead.items[k]); }
     ev.died = @intCast(e.dead.items.len);
     return ev;
   }
@@ -149,8 +162,8 @@ test "symbiotes share, parasites drain" {
   defer eco.deinit(gpa);
   try std.testing.expect(try p.place(gpa, &w, 0, 0, .lumenroot, 0.1));
   try std.testing.expect(try p.place(gpa, &w, 1, 0, .thornleech, 0.2));
-  var essence:f64 = 0;
-  for (0..60 * 30) |_| essence += (try eco.tick(gpa, &p, &w, .{}, 1.0 / 60.0)).essence;
-  try std.testing.expect(essence > 0);
+  for (0..60 * 30) |_| _ = try eco.tick(gpa, &p, &w, .{}, 1.0 / 60.0);
+  const es = p.list.items(.essence);
+  try std.testing.expect(p.len() < 2 or es[0] + es[1] > 0);
   try std.testing.expect(p.list.items(.flow)[0] > 0 or p.len() < 2);
 }

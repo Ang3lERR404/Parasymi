@@ -10,6 +10,7 @@ const Buffer = @import("../gfx/buffer.zig").Buffer;
 const pipeline = @import("../gfx/pipeline.zig");
 const vertex = @import("../gfx/vertex.zig");
 const meshgen = @import("../gfx/meshgen.zig");
+const meshlib = @import("../gfx/meshlib.zig");
 const species = @import("../sim/species.zig");
 const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
@@ -18,12 +19,14 @@ const terrain_mesh = @import("terrain_mesh.zig");
 pub const FRAMES = 2;
 pub const MAX_INSTANCES = 1 << 16;
 pub const MAX_UI_VERTS = 1 << 17;
+pub const MAX_PARTS = 1 << 15;
 
 pub const WorldPush = extern struct {
   vp:m.M4,
   eye_time:[4]f32,
   fog:[4]f32,
   misc:[4]f32,
+  sun:[4]f32,
 };
 
 pub const Scene = struct {
@@ -31,10 +34,12 @@ pub const Scene = struct {
   clear:[3]f32,
   /// plant instances grouped by species.
   instances:[species.count][]const vertex.PlantInstance,
+  /// rigid part instances grouped by mesh (player, nodes, motes, ...).
+  parts:[meshlib.count][]const vertex.PartInstance,
   ui:[]const vertex.Ui,
 };
 
-pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, meshed:u32 = 0 };
+pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0 };
 
 const Frame = struct {
   pool:vk.CommandPool,
@@ -42,6 +47,7 @@ const Frame = struct {
   fence:vk.Fence,
   acquired:vk.Semaphore,
   inst:Buffer,
+  parts:Buffer,
   ui:Buffer,
   /// buffers retired while this frame was in flight; freed when it comes round again.
   garbage:std.ArrayList(Buffer) = .empty,
@@ -61,11 +67,14 @@ pub const Renderer = struct {
   ui_layout:vk.PipelineLayout,
   terrain_pipe:vk.Pipeline,
   plant_pipe:vk.Pipeline,
+  part_pipe:vk.Pipeline,
   ui_pipe:vk.Pipeline,
   slots:std.ArrayList(Slot) = .empty,
   free_slots:std.ArrayList(u32) = .empty,
-  plant_mesh:Buffer,
+  /// every built-once mesh (plant species + part library) in one buffer.
+  meshes:Buffer,
   ranges:[species.count][2]u32,
+  part_ranges:[meshlib.count][2]u32,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   stats:Stats = .{},
 
@@ -93,20 +102,21 @@ pub const Renderer = struct {
         .fence = try c.device.createFence(&.{.flags = .{.signaled = true}}, null),
         .acquired = try c.device.createSemaphore(&.{}, null),
         .inst = try Buffer.init(c, MAX_INSTANCES * @sizeOf(vertex.PlantInstance), .{.vertex_buffer = true}),
+        .parts = try Buffer.init(c, MAX_PARTS * @sizeOf(vertex.PartInstance), .{.vertex_buffer = true}),
         .ui = try Buffer.init(c, MAX_UI_VERTS * @sizeOf(vertex.Ui), .{.vertex_buffer = true}),
       };
       try c.device.allocateCommandBuffers(&.{.command_pool = f.pool, .level = .primary, .command_buffer_count = 1}, @ptrCast(&f.cmd));
     }
 
     try r.createPipelines();
-    try r.buildPlantMeshes();
+    try r.buildMeshes();
     return r;
   }
 
   fn createPipelines(r:*Renderer) !void {
     const c = &r.ctx;
     r.world_layout = try pipeline.layout(c, @sizeOf(WorldPush));
-    r.ui_layout = try pipeline.layout(c, 8);
+    r.ui_layout = try pipeline.layout(c, 16);
     const fmt = r.sc.format.format;
 
     {
@@ -124,11 +134,23 @@ pub const Renderer = struct {
       const fs = try c.shader("plant.frag");
       defer c.device.destroyShaderModule(fs, null);
       const binds = [_]vk.VertexInputBindingDescription{
-        pipeline.binding(vertex.Plant, 0, .vertex),
+        pipeline.binding(vertex.Mesh, 0, .vertex),
         pipeline.binding(vertex.PlantInstance, 1, .instance),
       };
-      const at = comptime pipeline.attrs(vertex.Plant, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5);
+      const at = comptime pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5);
       r.plant_pipe = try pipeline.create(c, .{.vert = vs, .frag = fs, .bindings = &binds, .attrs = &at, .layout = r.world_layout, .color_format = fmt, .cull = false});
+    }
+    {
+      const vs = try c.shader("part.vert");
+      defer c.device.destroyShaderModule(vs, null);
+      const fs = try c.shader("part.frag");
+      defer c.device.destroyShaderModule(fs, null);
+      const binds = [_]vk.VertexInputBindingDescription{
+        pipeline.binding(vertex.Mesh, 0, .vertex),
+        pipeline.binding(vertex.PartInstance, 1, .instance),
+      };
+      const at = comptime pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5);
+      r.part_pipe = try pipeline.create(c, .{.vert = vs, .frag = fs, .bindings = &binds, .attrs = &at, .layout = r.world_layout, .color_format = fmt, .cull = false});
     }
     {
       const vs = try c.shader("ui.vert");
@@ -141,8 +163,8 @@ pub const Renderer = struct {
     }
   }
 
-  /// grow every species' mesh once into one shared vertex buffer.
-  fn buildPlantMeshes(r:*Renderer) !void {
+  /// grow every species' mesh and every library part once into one buffer.
+  fn buildMeshes(r:*Renderer) !void {
     var b:meshgen.Builder = .{.gpa = r.gpa};
     defer b.deinit();
     inline for (0..species.count) |i| {
@@ -150,9 +172,10 @@ pub const Renderer = struct {
       try meshgen.plant(&b, @enumFromInt(i));
       r.ranges[i] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
     }
+    try meshlib.build(&b, &r.part_ranges);
     const bytes = std.mem.sliceAsBytes(b.v.items);
-    r.plant_mesh = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
-    r.plant_mesh.write(0, bytes);
+    r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
+    r.meshes.write(0, bytes);
   }
 
   pub fn deinit(r:*Renderer) void {
@@ -162,6 +185,7 @@ pub const Renderer = struct {
       for (f.garbage.items) |*b| b.deinit(c);
       f.garbage.deinit(r.gpa);
       f.inst.deinit(c);
+      f.parts.deinit(c);
       f.ui.deinit(c);
       c.device.destroySemaphore(f.acquired, null);
       c.device.destroyFence(f.fence, null);
@@ -171,9 +195,10 @@ pub const Renderer = struct {
     r.slots.deinit(r.gpa);
     r.free_slots.deinit(r.gpa);
     r.scratch.deinit(r.gpa);
-    r.plant_mesh.deinit(c);
+    r.meshes.deinit(c);
     c.device.destroyPipeline(r.terrain_pipe, null);
     c.device.destroyPipeline(r.plant_pipe, null);
+    c.device.destroyPipeline(r.part_pipe, null);
     c.device.destroyPipeline(r.ui_pipe, null);
     c.device.destroyPipelineLayout(r.world_layout, null);
     c.device.destroyPipelineLayout(r.ui_layout, null);
@@ -260,6 +285,16 @@ pub const Renderer = struct {
       first[i] = ninst;
       f.inst.write(ninst * @sizeOf(vertex.PlantInstance), std.mem.sliceAsBytes(list[0..n]));
       ninst += n;
+    }
+    var nparts:u32 = 0;
+    var pfirst:[meshlib.count]u32 = undefined;
+    var pcount:[meshlib.count]u32 = undefined;
+    for (scene.parts, 0..) |list, i| {
+      const n:u32 = @intCast(@min(list.len, MAX_PARTS - nparts));
+      pfirst[i] = nparts;
+      pcount[i] = n;
+      f.parts.write(nparts * @sizeOf(vertex.PartInstance), std.mem.sliceAsBytes(list[0..n]));
+      nparts += n;
     }
     const nui:u32 = @intCast(@min(scene.ui.len, MAX_UI_VERTS));
     f.ui.write(0, std.mem.sliceAsBytes(scene.ui[0..nui]));
@@ -349,7 +384,7 @@ pub const Renderer = struct {
     if (ninst > 0) {
       cmd.bindPipeline(.graphics, r.plant_pipe);
       cmd.pushConstants(r.world_layout, stages, 0, @sizeOf(WorldPush), &scene.push);
-      const bufs = [_]vk.Buffer{r.plant_mesh.buf, f.inst.buf};
+      const bufs = [_]vk.Buffer{r.meshes.buf, f.inst.buf};
       const offs = [_]vk.DeviceSize{0, 0};
       cmd.bindVertexBuffers(0, &bufs, &offs);
       for (scene.instances, 0..) |list, i| {
@@ -360,10 +395,25 @@ pub const Renderer = struct {
       stats.instances = ninst;
     }
 
+    if (nparts > 0) {
+      cmd.bindPipeline(.graphics, r.part_pipe);
+      cmd.pushConstants(r.world_layout, stages, 0, @sizeOf(WorldPush), &scene.push);
+      const bufs = [_]vk.Buffer{r.meshes.buf, f.parts.buf};
+      const offs = [_]vk.DeviceSize{0, 0};
+      cmd.bindVertexBuffers(0, &bufs, &offs);
+      for (0..meshlib.count) |i| {
+        if (pcount[i] == 0) continue;
+        cmd.draw(r.part_ranges[i][1], pcount[i], r.part_ranges[i][0], pfirst[i]);
+        stats.draws += 1;
+      }
+      stats.parts = nparts;
+    }
+
     if (nui > 0) {
       cmd.bindPipeline(.graphics, r.ui_pipe);
-      const screen = r.extent();
-      cmd.pushConstants(r.ui_layout, stages, 0, 8, &screen);
+      const sz = r.extent();
+      const ui_push = [4]f32{sz[0], sz[1], scene.push.eye_time[3], 0};
+      cmd.pushConstants(r.ui_layout, stages, 0, 16, &ui_push);
       cmd.bindVertexBuffers(0, &.{f.ui.buf}, &zero);
       cmd.draw(nui, 1, 0, 0);
       stats.draws += 1;

@@ -10,9 +10,10 @@ pub const Terrain = extern struct {
   info:[4]u8,
 };
 
+/// shading role of a vertex; shaders key secondary motion and glow off it.
 pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril };
 
-pub const Plant = extern struct {
+pub const Mesh = extern struct {
   pos:[3]f32,
   nrm:[3]f32,
   col:[4]u8,
@@ -29,11 +30,30 @@ pub const PlantInstance = extern struct {
   b:[4]f32,
 };
 
+/// a rigid procedural part (creature limb, resource node, mote, structure piece).
+pub const PartInstance = extern struct {
+  /// model matrix columns
+  c0:[4]f32,
+  c1:[4]f32,
+  c2:[4]f32,
+  c3:[4]f32,
+  /// x glow, y flutter (leaf secondary motion), z phase 0..1, w alpha-ish fade
+  p:[4]f32,
+  /// rgb colour multiply, w blend amount
+  tint:[4]f32,
+};
+
 pub const Ui = extern struct {
   pos:[2]f32,
-  /// glyph-cell coordinates (0..6, 0..8) for bitmap lookup
+  /// local coordinates inside the quad: glyph cells (0..6, 0..8) for text,
+  /// pixels (0..size) for shapes
   uv:[2]f32,
+  /// quad size in pixels (shapes need it for aspect-correct distance fields)
+  size:[2]f32,
   col:[4]u8,
-  /// 5x7 glyph bitmap packed row-major (bit 0 = top-left); all ones = solid quad
+  /// glyph: 5x7 bitmap packed row-major (bit 0 = top-left).
+  /// shape: x = 0xffffffff, y = shape kind (see ui/draw.zig `Shape`)
   bits:[2]u32,
+  /// shape parameters: x value/selection 0..1, y phase/seed
+  param:[2]f32,
 };

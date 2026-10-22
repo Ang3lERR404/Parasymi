@@ -7,6 +7,7 @@ const Build = std.Build;
 const shaders = [_][]const u8{
   "terrain.vert", "terrain.frag",
   "plant.vert", "plant.frag",
+  "part.vert", "part.frag",
   "ui.vert", "ui.frag",
 };
 

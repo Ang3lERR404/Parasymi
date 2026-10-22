@@ -15,11 +15,13 @@ pub fn main(init:std.process.Init) !void {
   var vsync = true;
   var demo = false;
   var stress = false;
+  var tod:?f32 = null;
   var seed:u64 = 0x5EED_0F_11FE;
   for (args[1..]) |a| {
     if (std.mem.eql(u8, a, "--novsync")) vsync = false;
     if (std.mem.eql(u8, a, "--demo")) demo = true;
     if (std.mem.eql(u8, a, "--stress")) stress = true;
+    if (std.mem.startsWith(u8, a, "--tod=")) tod = try std.fmt.parseFloat(f32, a[6..]);
     if (std.mem.startsWith(u8, a, "--seed=")) seed = try std.fmt.parseInt(u64, a[7..], 0);
   }
 
@@ -40,6 +42,7 @@ pub fn main(init:std.process.Init) !void {
   defer game.deinit();
   if (demo) try game.demo(25);
   if (stress) try game.stress(120);
+  if (tod) |t| game.sky.tod = t;
 
   var last = glfw.getTime();
   while (!window.shouldClose()) {
