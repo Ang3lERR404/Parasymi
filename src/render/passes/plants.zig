@@ -1,4 +1,4 @@
-//! plants: every species' grown mesh, instanced; animation lives in plant.vert.
+//! plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
 const std = @import("std");
 const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
@@ -7,7 +7,6 @@ const pipeline = @import("../../gfx/pipeline.zig");
 const ctx = @import("../../gfx/ctx.zig");
 const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
-const species = @import("../../sim/species.zig");
 const pass = @import("../pass.zig");
 const R = @import("../renderer.zig");
 
@@ -28,8 +27,8 @@ pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
 
 pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   var n:u32 = 0;
-  var first:[species.count]u32 = undefined;
-  var counts:[species.count]u32 = undefined;
+  var first:[R.PLANT_MESHES]u32 = undefined;
+  var counts:[R.PLANT_MESHES]u32 = undefined;
   for (scene.instances, 0..) |list, i| {
     const k:u32 = @intCast(@min(list.len, MAX - n));
     first[i] = n;
@@ -41,7 +40,7 @@ pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R
   cmd.bindPipeline(.graphics, r.pipe(.plants));
   cmd.pushConstants(r.layout(desc.layout), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
   cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf}, &.{0, 0});
-  for (0..species.count) |i| {
+  for (0..R.PLANT_MESHES) |i| {
     if (counts[i] == 0) continue;
     cmd.draw(r.plant_ranges[i][1], counts[i], r.plant_ranges[i][0], first[i]);
     stats.draws += 1;

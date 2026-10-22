@@ -33,10 +33,14 @@ pub const Lineage = enum(u8) {
 
 /// procedural mesh parameters (see gfx/meshgen.zig).
 pub const Genome = struct {
-  stem_h:f32, stem_r:f32, segments:u8, curl:f32,
+  /// the stem grows as a vine (gfx/meshgen.zig `Growth`): `segments`+1
+  /// control points, `curl` spiral (0 none .. 0.5 tight), `wobble` noise.
+  stem_h:f32, stem_r:f32, segments:u8, curl:f32, wobble:f32 = 0.1,
   leaves:u8, leaf_len:f32, leaf_w:f32, leaf_droop:f32,
   petals:u8, bloom_r:f32,
   thorns:u8, tendrils:u8,
+  /// tendrils are grown vines too: they coil as they reach for the ground
+  tendril_curl:f32 = 0.4, tendril_wobble:f32 = 0.2,
   stem_col:[3]f32, leaf_col:[3]f32, bloom_col:[3]f32,
 };
 

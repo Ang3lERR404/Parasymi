@@ -17,6 +17,8 @@ pub const wolf_core = color.rgb(.{0.23, 0.20, 0.14}, 255);
 pub const wolf_vine = color.rgb(.{0.34, 0.38, 0.26}, 255);
 pub const wolf_leaf_dark = color.rgb(.{0.22, 0.29, 0.19}, 255);
 pub const wolf_leaf_lite = color.rgb(.{0.37, 0.42, 0.29}, 255);
+/// the wolf's body strands are woven by something alive, not a lathe
+pub const STRAND_WOBBLE:f32 = 0.03;
 pub const wolf_claw = color.rgb(.{0.58, 0.54, 0.44}, 255);
 
 /// the same mesh always grows the same way.

@@ -42,6 +42,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = try g.plants.place(g.gpa, &g.world, cx - 6, cz + 6, .hollowheart, 0.7);
   _ = try g.plants.place(g.gpa, &g.world, cx - 5, cz - 1, .driftwisp, 0.8);
   _ = try g.plants.place(g.gpa, &g.world, cx - 4, cz + 2, .driftwisp, 0.9);
+  try digger(g, cx, cz);
 
   var t:f32 = 0;
   while (t < seconds) : (t += play.TICK) try g.step();
@@ -50,6 +51,42 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = g.player.inv.add(.starlight, 7);
   _ = g.player.inv.add(.seed_lumenroot, 5);
   _ = g.player.inv.add(.conduit, 6);
+  _ = g.player.inv.add(.root_digger, 2);
+}
+
+/// the nearest free spot beside a resource node gets a root-digger, with a
+/// sap cache next to it to fill.
+fn digger(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  g.prog.done.insert(.deep_rooting);
+  var r:i32 = 2;
+  while (r < 12) : (r += 1) {
+    var dz:i32 = -r;
+    while (dz <= r) : (dz += 1) {
+      var dx:i32 = -r;
+      while (dx <= r) : (dx += 1) {
+        if (@max(@abs(dx), @abs(dz)) != r) continue;
+        const x = cx + dx;
+        const z = cz + dz;
+        if (!nodeBeside(g, x, z) or !g.structs.canPlace(&g.world, x, z, .root_digger)) continue;
+        _ = try g.structs.place(g.gpa, &g.world, x, z, .root_digger, 0, 0.6);
+        for (0..4) |k| {
+          const v = m.dirVec(@intCast(k));
+          if (try g.structs.place(g.gpa, &g.world, x + v[0], z + v[1], .sap_cache, 0, 0.7)) return;
+        }
+        return;
+      }
+    }
+  }
+}
+
+fn nodeBeside(g:*const Game, x:i32, z:i32) bool {
+  for (0..4) |k| {
+    const v = m.dirVec(@intCast(k));
+    const c = g.world.chunkOfTile(x + v[0], z + v[1]) orelse continue;
+    const t = ck.localIndex(x + v[0], z + v[1]);
+    if (c.res[t] > 0 and c.occ[t] == .none and c.kind[t] != .water) return true;
+  }
+  return false;
 }
 
 /// fill a side x side field with the three first species at random (perf testing).

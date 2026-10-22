@@ -7,6 +7,8 @@ const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const items = @import("../sim/items.zig");
 const World = @import("../world/world.zig").World;
+const mg = @import("../gfx/meshgen.zig");
+const pal = @import("../gfx/meshes/palette.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
 
@@ -20,6 +22,11 @@ const SHIN:f32 = 0.14;
 const META:f32 = 0.56;
 /// the belly's sap at its centre lets the body behind show through faintly
 const SAP_OPACITY:f32 = 0.72;
+/// the tail: spring-steered joints, each this long, and how finely the vine
+/// woven through them is sampled.
+const TAIL_JOINTS = 3;
+const TAIL_SEG:f32 = 0.16;
+const TAIL_RES = 20;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -118,7 +125,9 @@ pub const Player = struct {
     const root = m.chain(.{T(p.pos), m.rotY(p.facing)});
     const hips = m.chain(.{root, T(v3(0, hip_y, 0))});
     const torso = m.chain(.{hips, m.rotY(@sin(p.phase) * 0.08 * st), m.rotX(lean)});
-    const breath = 1 + 0.025 * @sin(t * 1.7);
+    // the surface breathes: the torso swells 2%, the limbs 1% a beat later
+    const breath = 1 + 0.02 * @sin(t * 1.7);
+    const lb = 1 + 0.01 * @sin(t * 1.7 + 0.5);
     const vine_look:parts.Look = .{.glow = 0.25, .phase = 0.1};
 
     try out.emit(.wolf_torso, m.chain(.{torso, S(v3(breath, 1, breath))}), vine_look);
@@ -146,10 +155,10 @@ pub const Player = struct {
       const a = m.lerp(swing, dig, p.reach);
       const shoulder = m.chain(.{torso, T(v3(side * 0.19, 0.43, 0)), m.rotZ(side * 0.15), m.rotX(a)});
       try joint(out, shoulder, 0.075);
-      try out.emit(.wolf_limb, m.chain(.{shoulder, m.rotX(m.pi), S(v3(0.13, 0.25, 0.13))}), vine_look);
+      try out.emit(.wolf_limb, m.chain(.{shoulder, m.rotX(m.pi), S(v3(0.13 * lb, 0.25, 0.13 * lb))}), vine_look);
       const elbow = m.chain(.{shoulder, T(v3(0, -0.25, 0)), m.rotX(-(0.3 + 0.35 * st * @max(0, -swing)) - p.reach * 0.7)});
       try joint(out, elbow, 0.058);
-      try out.emit(.wolf_limb, m.chain(.{elbow, m.rotX(m.pi), S(v3(0.1, 0.23, 0.1))}), vine_look);
+      try out.emit(.wolf_limb, m.chain(.{elbow, m.rotX(m.pi), S(v3(0.1 * lb, 0.23, 0.1 * lb))}), vine_look);
       const wrist = m.chain(.{elbow, T(v3(0, -0.24, 0))});
       try joint(out, wrist, 0.042);
       try out.emit(.wolf_paw, m.chain(.{wrist, m.rotX(1.2)}), vine_look);
@@ -164,13 +173,13 @@ pub const Player = struct {
       const mt = -1.6 - 0.4 * lift - 0.25 * p.reach;
       const thigh = m.chain(.{hips, T(v3(side * 0.1, 0, 0)), m.rotX(th)});
       try joint(out, thigh, 0.095);
-      try out.emit(.wolf_limb, m.chain(.{thigh, m.rotX(m.pi), S(v3(0.18, THIGH, 0.18))}), vine_look);
+      try out.emit(.wolf_limb, m.chain(.{thigh, m.rotX(m.pi), S(v3(0.18 * lb, THIGH, 0.18 * lb))}), vine_look);
       const knee = m.chain(.{thigh, T(v3(0, -THIGH, 0)), m.rotX(kn)});
       try joint(out, knee, 0.075);
-      try out.emit(.wolf_limb, m.chain(.{knee, m.rotX(m.pi), S(v3(0.13, SHIN, 0.13))}), vine_look);
+      try out.emit(.wolf_limb, m.chain(.{knee, m.rotX(m.pi), S(v3(0.13 * lb, SHIN, 0.13 * lb))}), vine_look);
       const hock = m.chain(.{knee, T(v3(0, -SHIN, 0)), m.rotX(mt)});
       try joint(out, hock, 0.058);
-      try out.emit(.wolf_limb, m.chain(.{hock, m.rotX(m.pi), S(v3(0.095, META, 0.095))}), vine_look);
+      try out.emit(.wolf_limb, m.chain(.{hock, m.rotX(m.pi), S(v3(0.095 * lb, META, 0.095 * lb))}), vine_look);
       const heel = m.chain(.{hock, T(v3(0, -META, 0))});
       try joint(out, heel, 0.038);
       const paw = m.chain(.{heel, m.rotX(-(th + kn + mt))});
@@ -179,16 +188,33 @@ pub const Player = struct {
       feet[if (side > 0) 1 else 0] = v3(c[0], c[1], c[2]);
     }
 
-    // tail: three segments, each bending by its spring, ending in a leaf tuft
+    // tail: the spring-steered joint chain gives the control points, and a
+    // grown vine is woven through them afresh every frame, so it lags and
+    // curves like a living thing instead of a row of rigid rods.
     var seg = m.chain(.{hips, T(v3(0, 0.03, -0.1)), m.rotX(-1.25 + 0.15 * st)});
-    for (0..3) |i| {
-      const fi = m.f(i);
-      seg = m.chain(.{seg, m.rotZ(p.tail[i]), m.rotX(-0.18)});
-      try joint(out, seg, 0.065 - 0.014 * fi);
-      try out.emit(.wolf_limb, m.chain(.{seg, S(v3(0.12 - 0.025 * fi, 0.17, 0.12 - 0.025 * fi))}), vine_look);
-      seg = m.chain(.{seg, T(v3(0, 0.16, 0))});
+    try joint(out, seg, 0.065);
+    var ctrl:[TAIL_JOINTS + 1]V3 = undefined;
+    ctrl[0] = m.origin(seg);
+    for (0..TAIL_JOINTS) |i| {
+      seg = m.chain(.{seg, m.rotZ(p.tail[i]), m.rotX(-0.18), T(v3(0, TAIL_SEG, 0))});
+      ctrl[i + 1] = m.origin(seg);
     }
-    try out.emit(.leaf_tuft, m.chain(.{seg, m.rotX(-0.6), S(v3(1.3, 1.3, 1.3))}), .{.flutter = 1.5, .phase = 0.7});
+    mg.grow(&ctrl, .{
+      .start = ctrl[0], .direction = m.norm(ctrl[TAIL_JOINTS] - ctrl[0]), .length = TAIL_SEG * TAIL_JOINTS,
+      .wobble = 0.06, .curl = 0.15, .taper = 0.2, .seed = 0x7A11,
+    });
+    var path:[TAIL_RES]V3 = undefined;
+    m.splineResample(&ctrl, &path);
+    var ts:[TAIL_RES]f32 = undefined;
+    for (&ts, 0..) |*k, i| k.* = m.ratio(i, TAIL_RES - 1);
+    var radii:[TAIL_RES]f32 = undefined;
+    mg.taperRadii(0.06, 0.2, &radii);
+    try mg.braid(&out.live, &path, &ts, &radii, 3, 4.0, pal.STRAND_WOBBLE, 0x7A11, pal.wolf_core, pal.wolf_vine);
+    out.live_look = vine_look;
+    // the tuft keeps the last joint's frame (smooth, no roll flips), moved
+    // onto the vine's actual tip, which growth shifted slightly off the joint
+    const tip = m.chain(.{T(path[TAIL_RES - 1] - m.origin(seg)), seg});
+    try out.emit(.leaf_tuft, m.chain(.{tip, m.rotX(-0.6), S(v3(1.3, 1.3, 1.3))}), .{.flutter = 1.5, .phase = 0.7});
     return feet;
   }
 

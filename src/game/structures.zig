@@ -10,6 +10,7 @@
 //!   configure(s, g)             the player's "C" interaction
 //!   emit(s, out, ctr, tf)       extra visuals beyond its mesh
 //!   describe(s, d, g, x, y)     one line of hover text
+//!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
 //! Missing hooks fall back to doing nothing. A new structure is one new file
 //! plus one line in `kinds`.
 const std = @import("std");
@@ -33,6 +34,7 @@ const kinds = struct {
   pub const sap_cache = @import("structures/sap_cache.zig");
   pub const germinator = @import("structures/germinator.zig");
   pub const research_bloom = @import("structures/research_bloom.zig");
+  pub const root_digger = @import("structures/root_digger.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -100,7 +102,9 @@ pub const Structures = struct {
   pub fn get(ss:*Structures, id:Id) *Structure { return &ss.list.items[id.idx()]; }
 
   pub fn canPlace(_:*const Structures, w:*const World, wx:i32, wy:i32, k:Kind) bool {
-    return w.footprintFree(wx, wy, defs.get(k).size, dry);
+    return switch (k) {
+      inline else => |t| w.footprintFree(wx, wy, defs.get(t).size, if (comptime reg.has(t, "ground")) reg.module(t).ground else dry),
+    };
   }
 
   pub fn place(ss:*Structures, gpa:Allocator, w:*World, wx:i32, wy:i32, k:Kind, dir:m.Dir, seed:f32) Allocator.Error!bool {

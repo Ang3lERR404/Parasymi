@@ -30,10 +30,10 @@ const actions = @import("actions.zig");
 pub const TICK = 1.0 / 60.0;
 const STREAM_RADIUS = 4;
 
-/// everything the wolf can put into the world, in hotbar key order 1..9.
+/// everything the wolf can put into the world, in hotbar key order 1..9, 0.
 pub const hotbar = [_]items.Item{
   .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
-  .conduit, .sap_cache, .germinator, .research_bloom,
+  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger,
 };
 
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
@@ -98,7 +98,7 @@ pub const Game = struct {
   sim_ms:f32 = 0,
   frame_ms:f32 = 16,
   ticks:u64 = 0,
-  inst:[species.count]std.ArrayList(vertex.PlantInstance) = @splat(.empty),
+  inst:[renderer.PLANT_MESHES]std.ArrayList(vertex.PlantInstance) = @splat(.empty),
   far:std.ArrayList(*ck.Chunk) = .empty,
   render_stats:renderer.Stats = .{},
 
@@ -109,7 +109,7 @@ pub const Game = struct {
       .rng = Rng.init(seed ^ 0xA11CE),
       .stars = .{.rng = Rng.init(seed ^ 0x57A2)},
       .player = .{.pos = m.v3(0.5, 0, 0.5)},
-      .parts = .{.gpa = gpa},
+      .parts = Parts.init(gpa),
       .ui = .{.gpa = gpa},
     };
     // start on dry land: spiral out from the origin until a fertile tile shows up.
@@ -194,7 +194,7 @@ pub const Game = struct {
     if (in.pressed(.r)) g.place_dir +%= 1;
     const nums = [_]bool{
       in.pressed(.one), in.pressed(.two), in.pressed(.three), in.pressed(.four), in.pressed(.five),
-      in.pressed(.six), in.pressed(.seven), in.pressed(.eight), in.pressed(.nine),
+      in.pressed(.six), in.pressed(.seven), in.pressed(.eight), in.pressed(.nine), in.pressed(.zero),
     };
     for (nums, 0..) |p, i| {
       if (!p) continue;

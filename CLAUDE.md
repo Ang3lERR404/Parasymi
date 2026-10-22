@@ -49,7 +49,7 @@ optional (`reg.has(k, "hook")`).
 |---|---|---|
 | species | `sim/species.zig` -> `sim/species/*.zig` | `def` |
 | meshes | `gfx/meshlib.zig` -> `gfx/meshes/*.zig` | `build(b)` |
-| structures | `game/structures.zig` -> `game/structures/*.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe` |
+| structures | `game/structures.zig` -> `game/structures/*.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground` |
 | research | `game/progression.zig` -> `game/research/*.zig` | `def`, `apply`, `unlocks`, `completed`, `veil` |
 | hud panels | `game/hud.zig` -> `game/hud/*.zig` | `draw`, `visible` (draw order = declaration order) |
 | render passes | `render/renderer.zig` -> `render/passes/*.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (record order = declaration order) |

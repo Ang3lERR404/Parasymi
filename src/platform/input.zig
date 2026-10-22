@@ -6,7 +6,7 @@ pub const Button = glfw.MouseButton;
 
 const tracked = [_]Key{
   .w, .a, .s, .d, .q, .e, .r, .f, .t, .c, .up, .down, .left, .right,
-  .one, .two, .three, .four, .five, .six, .seven, .eight, .nine,
+  .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .zero,
   .tab, .escape, .F3, .F5, .F9, .F11, .left_shift, .space,
 };
 const buttons = [_]Button{.left, .right, .middle};

@@ -34,6 +34,8 @@ const reg = registry.Registry(passes);
 pub const Pass = reg.Id;
 
 pub const FRAMES = 2;
+/// every grown plant mesh: each species in each of its variants.
+pub const PLANT_MESHES = species.count * meshgen.VARIANTS;
 
 /// the renderer fails the way the graphics layer does.
 pub const Error = ctx.Error;
@@ -51,10 +53,13 @@ pub const WorldPush = extern struct {
 pub const Scene = struct {
   push:WorldPush,
   clear:[3]f32,
-  /// plant instances grouped by species.
-  instances:[species.count][]const vertex.PlantInstance,
+  /// plant instances grouped by mesh variant (see meshgen.plantSlot).
+  instances:[PLANT_MESHES][]const vertex.PlantInstance,
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
   parts:[meshlib.count][]const vertex.PartInstance,
+  /// world-space part geometry rebuilt this frame, and the instance it draws with
+  live:[]const vertex.Mesh,
+  live_inst:vertex.PartInstance,
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)
   ui_time:f32,
@@ -91,7 +96,7 @@ pub const Renderer = struct {
   free_slots:std.ArrayList(ck.MeshSlot) = .empty,
   /// every built-once mesh (plant species + part library) in one buffer.
   meshes:Buffer = .{},
-  plant_ranges:[species.count][2]u32 = undefined,
+  plant_ranges:[PLANT_MESHES][2]u32 = undefined,
   part_ranges:[meshlib.count][2]u32 = undefined,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   stats:Stats = .{},
@@ -144,11 +149,11 @@ pub const Renderer = struct {
     var arena = ArenaAllocator.init(r.gpa);
     defer arena.deinit();
     var b:meshgen.Builder = .{.gpa = arena.allocator()};
-    for (species.ids) |id| {
+    for (species.ids) |id| for (0..meshgen.VARIANTS) |v| {
       const first:u32 = @intCast(b.v.items.len);
-      try meshgen.plant(&b, id);
-      r.plant_ranges[@intFromEnum(id)] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
-    }
+      try meshgen.plant(&b, id, @intCast(v));
+      r.plant_ranges[meshgen.plantSlot(id, @intCast(v))] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
+    };
     try meshlib.build(&b, &r.part_ranges);
     const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});

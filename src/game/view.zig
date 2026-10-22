@@ -8,6 +8,7 @@ const rng = @import("../core/rng.zig");
 const ck = @import("../world/chunk.zig");
 const species = @import("../sim/species.zig");
 const renderer = @import("../render/renderer.zig");
+const meshgen = @import("../gfx/meshgen.zig");
 const st = @import("structures.zig");
 const resources = @import("resources.zig");
 const actions = @import("actions.zig");
@@ -49,6 +50,8 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
     .clear = sky,
     .instances = undefined,
     .parts = g.parts.slices(),
+    .live = g.parts.live.v.items,
+    .live_inst = g.parts.liveInstance(),
     .ui = g.ui.v.items,
     .ui_time = @floatCast(@mod(g.ui_time, 3600)),
   };
@@ -56,7 +59,8 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   return out;
 }
 
-/// plant instances near the camera, grouped by species.
+/// plant instances near the camera, grouped by mesh: each plant's variant
+/// comes from its tile, so it always regrows the same shape.
 fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   for (&g.inst) |*l| l.clearRetainingCapacity();
   const s = g.plants.list.slice();
@@ -68,7 +72,8 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     var y = s.items(.chunk)[i].height[s.items(.tile)[i]];
     // floaters drift above whatever is beneath them
     if (def.floating) y = @max(y, 0) + 1.15 + 0.12 * @sin(tf * 1.3 + s.items(.seed)[i] * 10);
-    try g.inst[@intFromEnum(sp)].append(g.gpa, .{
+    const variant:u32 = @intCast(rng.hash2(0x7A11, s.items(.x)[i], s.items(.y)[i]) % meshgen.VARIANTS);
+    try g.inst[meshgen.plantSlot(sp, variant)].append(g.gpa, .{
       .pos = .{ctr[0], y, ctr[1]},
       .a = .{s.items(.growth)[i], s.items(.mana)[i] / def.mana_cap, s.items(.seed)[i], def.lineage.affinity()},
       .b = .{s.items(.flow)[i], s.items(.health)[i], 0, 0},

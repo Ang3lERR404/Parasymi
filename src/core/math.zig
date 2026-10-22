@@ -5,6 +5,7 @@
 const std = @import("std");
 const math = std.math;
 const testing = std.testing;
+const assert = std.debug.assert;
 
 pub const V2 = @Vector(2, f32);
 pub const V3 = @Vector(3, f32);
@@ -78,6 +79,53 @@ pub fn alongPath(path:[]const V3, k:f32) V3 {
   return lerpV(path[i], path[i + 1], pos - f(i));
 }
 
+// ---- splines ----
+
+/// the Catmull-Rom curve between `p1` (t=0) and `p2` (t=1); `p0` and `p3`
+/// shape the tangents at either end.
+pub fn catmullRom(p0:V3, p1:V3, p2:V3, p3:V3, t:f32) V3 {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return (p1 * splat(2) + (p2 - p0) * splat(t) +
+    (p0 * splat(2) - p1 * splat(5) + p2 * splat(4) - p3) * splat(t2) +
+    (p1 * splat(3) - p0 - p2 * splat(3) + p3) * splat(t3)) * splat(0.5);
+}
+
+pub const MAX_SPLINE = 64;
+const DENSE = 8;
+
+/// resample the Catmull-Rom spline through every point of `pts` into `out`,
+/// evenly spaced by arc length. The end points repeat as their own outer
+/// control points, so the curve starts and ends exactly on them.
+pub fn splineResample(pts:[]const V3, out:[]V3) void {
+  assert(pts.len >= 2 and pts.len <= MAX_SPLINE and out.len >= 2);
+  const n = pts.len;
+  // dense samples along the curve, with cumulative length
+  var dense:[(MAX_SPLINE - 1) * DENSE + 1]V3 = undefined;
+  var at:[(MAX_SPLINE - 1) * DENSE + 1]f32 = undefined;
+  var k:usize = 0;
+  for (0..n - 1) |seg| {
+    const p0 = pts[if (seg == 0) 0 else seg - 1];
+    const p3 = pts[@min(seg + 2, n - 1)];
+    for (0..DENSE) |j| {
+      dense[k] = catmullRom(p0, pts[seg], pts[seg + 1], p3, ratio(j, DENSE));
+      k += 1;
+    }
+  }
+  dense[k] = pts[n - 1];
+  at[0] = 0;
+  for (1..k + 1) |i| at[i] = at[i - 1] + len(dense[i] - dense[i - 1]);
+  const total = at[k];
+  // walk the dense polyline, emitting a point every total/(out.len-1)
+  var i:usize = 0;
+  for (out, 0..) |*o, j| {
+    const want = total * ratio(j, out.len - 1);
+    while (i + 1 < k and at[i + 1] < want) i += 1;
+    const span = at[i + 1] - at[i];
+    o.* = lerpV(dense[i], dense[i + 1], if (span > 1e-8) clamp01((want - at[i]) / span) else 0);
+  }
+}
+
 pub const identity:M4 = .{
   .{1, 0, 0, 0}, .{0, 1, 0, 0}, .{0, 0, 1, 0}, .{0, 0, 0, 1},
 };
@@ -144,6 +192,14 @@ pub fn chain(ms:anytype) M4 {
   return r;
 }
 pub fn origin(a:M4) V3 { return .{a[3][0], a[3][1], a[3][2]}; }
+
+/// a rotation taking +Y onto `dir` (a unit vector); the roll around it is arbitrary.
+pub fn alignY(dir:V3) M4 {
+  const ref = if (@abs(dir[2]) < 0.9) v3(0, 0, 1) else v3(1, 0, 0);
+  const x = norm(cross(dir, ref));
+  const z = cross(x, dir);
+  return .{.{x[0], x[1], x[2], 0}, .{dir[0], dir[1], dir[2], 0}, .{z[0], z[1], z[2], 0}, .{0, 0, 0, 1}};
+}
 
 /// critically damped spring step (for procedural secondary motion).
 /// Uses the exact closed-form solution, so it is stable for any `dt`: a long
@@ -245,4 +301,38 @@ test "affine and rigid inverses" {
   inline for (0..4) |c| inline for (0..4) |r| {
     try testing.expectApproxEqAbs(ig[c][r], ia[c][r], 1e-4);
   };
+}
+
+test "catmull-rom passes through its inner points" {
+  const a = v3(0, 0, 0);
+  const b = v3(1, 2, 0);
+  const c = v3(3, 2, 1);
+  const d = v3(4, 0, 1);
+  try testing.expectEqual(b, catmullRom(a, b, c, d, 0));
+  const e = catmullRom(a, b, c, d, 1);
+  try testing.expect(len(e - c) < 1e-5);
+  // evenly spaced collinear points give a straight, uniformly paced line
+  const mid = catmullRom(v3(0, 0, 0), v3(1, 0, 0), v3(2, 0, 0), v3(3, 0, 0), 0.5);
+  try testing.expect(len(mid - v3(1.5, 0, 0)) < 1e-5);
+}
+
+test "spline resampling keeps the ends and evens the spacing" {
+  const pts = [_]V3{v3(0, 0, 0), v3(0, 1, 0), v3(0.2, 3, 0), v3(1, 3.5, 0.5)};
+  var out:[16]V3 = undefined;
+  splineResample(&pts, &out);
+  try testing.expect(len(out[0] - pts[0]) < 1e-5);
+  try testing.expect(len(out[15] - pts[3]) < 1e-4);
+  const step = len(out[1] - out[0]);
+  for (1..out.len) |i| try testing.expectApproxEqAbs(step, len(out[i] - out[i - 1]), step * 0.1);
+}
+
+test "alignY maps +Y onto the direction, orthonormally" {
+  for ([_]V3{v3(0, 1, 0), v3(0, 0, 1), norm(v3(1, -2, 0.5))}) |d| {
+    const r = alignY(d);
+    const y = mulV(r, .{0, 1, 0, 0});
+    try testing.expect(len(v3(y[0], y[1], y[2]) - d) < 1e-5);
+    const x = v3(r[0][0], r[0][1], r[0][2]);
+    const z = v3(r[2][0], r[2][1], r[2][2]);
+    try testing.expectApproxEqAbs(@as(f32, 1), dot(cross(x, d), z), 1e-5);
+  }
 }

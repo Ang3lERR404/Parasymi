@@ -10,5 +10,5 @@ const vine = pal.wolf_vine;
 fn limbProfile(k:f32) f32 { return 0.5 * (1 - 0.3 * k); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  try mg.bundle(b, limbProfile, 4, 2.0, core, vine);
+  try mg.bundle(b, limbProfile, 4, 2.0, pal.STRAND_WOBBLE, 0x11B, core, vine);
 }

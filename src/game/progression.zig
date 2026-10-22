@@ -24,6 +24,7 @@ const items = @import("../sim/items.zig");
 
 const techs = struct {
   pub const ley_sight = @import("research/ley_sight.zig");
+  pub const deep_rooting = @import("research/deep_rooting.zig");
   pub const drift_spores = @import("research/drift_spores.zig");
   pub const root_communion = @import("research/root_communion.zig");
   pub const canopy_weaving = @import("research/canopy_weaving.zig");

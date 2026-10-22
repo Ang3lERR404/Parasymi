@@ -3,6 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const meshlib = @import("../gfx/meshlib.zig");
+const Builder = @import("../gfx/meshgen.zig").Builder;
 const PartInstance = @import("../gfx/vertex.zig").PartInstance;
 
 pub const Look = struct {
@@ -16,17 +17,28 @@ pub const Look = struct {
 pub const Parts = struct {
   gpa:Allocator,
   lists:[meshlib.count]std.ArrayList(PartInstance) = @splat(.empty),
+  /// geometry grown afresh every frame, already in world space (the wolf's
+  /// tail follows its joints as one smooth vine), drawn with `live_look`.
+  live:Builder,
+  live_look:Look = .{},
 
-  pub fn deinit(p:*Parts) void { for (&p.lists) |*l| l.deinit(p.gpa); }
-  pub fn clear(p:*Parts) void { for (&p.lists) |*l| l.clearRetainingCapacity(); }
+  pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa, .live = .{.gpa = gpa}}; }
+  pub fn deinit(p:*Parts) void {
+    for (&p.lists) |*l| l.deinit(p.gpa);
+    p.live.deinit();
+  }
+  pub fn clear(p:*Parts) void {
+    for (&p.lists) |*l| l.clearRetainingCapacity();
+    p.live.v.clearRetainingCapacity();
+  }
 
   pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look:Look) Allocator.Error!void {
-    try p.lists[@intFromEnum(id)].append(p.gpa, .{
-      .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
-      .p = .{look.glow, look.flutter, look.phase, look.fade},
-      .tint = look.tint,
-    });
+    try p.lists[@intFromEnum(id)].append(p.gpa, instance(mat, look));
   }
+
+  /// the single instance the live geometry is drawn with.
+  pub fn liveInstance(p:*const Parts) PartInstance { return instance(m.identity, p.live_look); }
+
 
   pub fn slices(p:*const Parts) [meshlib.count][]const PartInstance {
     var out:[meshlib.count][]const PartInstance = undefined;
@@ -34,3 +46,11 @@ pub const Parts = struct {
     return out;
   }
 };
+
+fn instance(mat:m.M4, look:Look) PartInstance {
+  return .{
+    .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
+    .p = .{look.glow, look.flutter, look.phase, look.fade},
+    .tint = look.tint,
+  };
+}

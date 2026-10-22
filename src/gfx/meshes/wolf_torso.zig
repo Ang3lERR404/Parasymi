@@ -18,7 +18,7 @@ fn torsoProfile(k:f32) f32 {
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   const s = b.mark();
-  try mg.bundle(b, torsoProfile, 7, 2.4, core, vine);
+  try mg.bundle(b, torsoProfile, 7, 2.4, pal.STRAND_WOBBLE, 0x7055, core, vine);
   b.xform(s, m.scale3(v3(1.25, 0.5, 0.95)));
   // pectorals: broad leaf-plated muscles over the ribcage
   for ([_]f32{-1, 1}) |side| {

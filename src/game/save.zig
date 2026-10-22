@@ -28,7 +28,7 @@ const Belly = @FieldType(player_mod.Player, "inv");
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 1;
+const VERSION:u32 = 2;
 
 /// everything saving and loading can fail with; file-system errors are
 /// folded into these at the boundary.

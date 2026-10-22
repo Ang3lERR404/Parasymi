@@ -31,6 +31,8 @@ const parts = struct {
   pub const research_bloom = @import("meshes/research_bloom.zig");
   pub const research_orb = @import("meshes/research_orb.zig");
   pub const item_pod = @import("meshes/item_pod.zig");
+  pub const root_digger = @import("meshes/root_digger.zig");
+  pub const digger_root = @import("meshes/digger_root.zig");
 };
 const reg = registry.Registry(parts);
 

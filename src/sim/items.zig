@@ -10,7 +10,7 @@ pub const Item = enum(u8) {
   grit, fibre, ley_shard, starlight, essence,
   seed_lumenroot, seed_thornleech, seed_vesper, seed_driftwisp, seed_hollowheart,
   // structure bulbs: woven, then planted to grow a structure
-  conduit, sap_cache, germinator, research_bloom,
+  conduit, sap_cache, germinator, research_bloom, root_digger,
 
   pub fn info(i:Item) Info { return infos.get(i); }
 
@@ -36,6 +36,7 @@ const infos = EnumArray(Item, Info).init(.{
   .sap_cache = .{.name = "SAP CACHE", .short = "SC", .col = .{210, 160, 70, 255}, .stack = 10},
   .germinator = .{.name = "GERMINATOR", .short = "GM", .col = .{140, 220, 140, 255}, .stack = 5},
   .research_bloom = .{.name = "RESEARCH BLOOM", .short = "RB", .col = .{200, 150, 255, 255}, .stack = 5},
+  .root_digger = .{.name = "ROOT-DIGGER", .short = "RD", .col = .{190, 140, 90, 255}, .stack = 10},
 });
 
 pub const Stack = struct { item:Item, n:u16 };
@@ -102,6 +103,13 @@ pub fn Inventory(comptime slots:usize) type {
     pub fn add(inv:*Self, item:Item, n:u16) u16 { return inv.bag().add(item, n); }
     pub fn take(inv:*Self, item:Item, n:u32) bool { return inv.bag().take(item, n); }
     pub fn count(inv:*const Self, item:Item) u32 { return countIn(&inv.slot, item); }
+
+    /// every item held, whatever it is.
+    pub fn total(inv:*const Self) u32 {
+      var c:u32 = 0;
+      for (inv.slot) |s| if (s) |st| { c += st.n; };
+      return c;
+    }
 
     /// 0..1, how full the inventory is (by stack fraction).
     pub fn fill(inv:*const Self) f32 {

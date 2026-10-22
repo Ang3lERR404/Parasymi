@@ -14,4 +14,5 @@ test {
   _ = @import("game/structures.zig");
   _ = @import("game/play.zig");
   _ = @import("game/save.zig");
+  _ = @import("gfx/meshgen.zig");
 }
