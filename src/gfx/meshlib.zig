@@ -23,6 +23,7 @@ const parts = struct {
   pub const wolf_calf = @import("meshes/wolf_calf.zig");
   pub const wolf_rump_l = @import("meshes/wolf_rump_l.zig");
   pub const wolf_rump_r = @import("meshes/wolf_rump_r.zig");
+  pub const wolf_tailbone = @import("meshes/wolf_tailbone.zig");
   pub const wolf_joint = @import("meshes/wolf_joint.zig");
   pub const wolf_paw = @import("meshes/wolf_paw.zig");
   pub const leaf_tuft = @import("meshes/leaf_tuft.zig");

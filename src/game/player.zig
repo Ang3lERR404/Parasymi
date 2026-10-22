@@ -14,6 +14,7 @@ const torso_mesh = @import("../gfx/meshes/wolf_torso.zig");
 const rump_mesh = @import("../gfx/meshes/wolf_rump.zig");
 const thigh_mesh = @import("../gfx/meshes/wolf_thigh.zig");
 const calf_mesh = @import("../gfx/meshes/wolf_calf.zig");
+const tailbone = @import("../gfx/meshes/wolf_tailbone.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
@@ -74,6 +75,11 @@ const Spring3 = struct { pos:V3 = v3(0, 0, 0), vel:V3 = v3(0, 0, 0) };
 const TAIL_JOINTS = 3;
 const TAIL_SEG:f32 = 0.16;
 const TAIL_RES = 20;
+/// the tail leaves the tailbone up and back, 30 degrees above horizontal
+/// (the angle that turns +Y onto that direction), lifting a little with stride
+const TAIL_ROOT_TILT:f32 = -(m.pi / 2.0 - m.pi / 6.0);
+/// the tailbone's sap node is mostly see-through
+const TAILBONE_SAP_OPACITY:f32 = 0.3;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -304,8 +310,8 @@ pub const Player = struct {
     // tail: the spring-steered joint chain gives the control points, and a
     // grown vine is woven through them afresh every frame, so it lags and
     // curves like a living thing instead of a row of rigid rods.
-    var seg = m.chain(.{hips, T(v3(0, 0.03, -0.1)), m.rotX(-1.25 + 0.15 * st)});
-    try joint(out, seg, 0.065);
+    try out.emit(.wolf_tailbone, m.chain(.{hips, T(tailbone.at)}), .{.glow = 0.25, .phase = 0.15, .fade = TAILBONE_SAP_OPACITY});
+    var seg = m.chain(.{hips, T(tailbone.at), m.rotX(TAIL_ROOT_TILT + 0.15 * st)});
     var ctrl:[TAIL_JOINTS + 1]V3 = undefined;
     ctrl[0] = m.origin(seg);
     for (0..TAIL_JOINTS) |i| {
@@ -366,4 +372,21 @@ test "belly contents lag a sprint, overshoot a stop, then settle" {
   for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + 1e-4);
   for (p.pec) |q| try testing.expect(m.len(q.pos) <= PEC_MAX + 1e-5);
   for (p.rump) |q| try testing.expect(m.len(q.pos) <= RUMP_MAX + 1e-5);
+}
+
+test "the tail's root clears the rear lobes" {
+  // its first 0.1 runs straight out of the tailbone along the root tilt,
+  // at rest and in full stride
+  for ([_]f32{0, 1}) |st| {
+    const r = m.rotX(TAIL_ROOT_TILT + 0.15 * st);
+    const d4 = m.mulV(r, .{0, 1, 0, 0});
+    const dir = v3(d4[0], d4[1], d4[2]);
+    for (0..11) |i| {
+      const p = tailbone.at + dir * m.splat(0.01 * m.f(i));
+      for ([_]f32{-1, 1}) |side| {
+        const q = (p - rump_mesh.centre * v3(side, 1, 1)) / rump_mesh.radii;
+        try testing.expect(m.dot(q, q) > 1);
+      }
+    }
+  }
 }
