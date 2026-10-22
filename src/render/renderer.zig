@@ -1,9 +1,14 @@
-//! frame orchestration: terrain chunk meshes, instanced procedural plants and
-//! the UI batch, drawn with dynamic rendering into the swapchain.
+//! frame orchestration: acquire, record every pass inside one dynamic
+//! rendering scope, submit, present. What gets drawn lives in the pass
+//! modules under `passes/` (see render/pass.zig); they record in the order
+//! listed in `passes`. A new pass is one new file plus one line.
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
 const glfw = @import("zglfw");
 const m = @import("../core/math.zig");
+const registry = @import("../core/registry.zig");
 const Ctx = @import("../gfx/ctx.zig").Ctx;
 const sw = @import("../gfx/swapchain.zig");
 const Buffer = @import("../gfx/buffer.zig").Buffer;
@@ -15,11 +20,18 @@ const species = @import("../sim/species.zig");
 const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
 const terrain_mesh = @import("terrain_mesh.zig");
+const pass = @import("pass.zig");
+
+const passes = struct {
+  pub const terrain = @import("passes/terrain.zig");
+  pub const plants = @import("passes/plants.zig");
+  pub const parts = @import("passes/parts.zig");
+  pub const ui = @import("passes/ui.zig");
+};
+const reg = registry.Registry(passes);
+pub const Pass = reg.Id;
 
 pub const FRAMES = 2;
-pub const MAX_INSTANCES = 1 << 16;
-pub const MAX_UI_VERTS = 1 << 17;
-pub const MAX_PARTS = 1 << 15;
 
 pub const WorldPush = extern struct {
   vp:m.M4,
@@ -37,6 +49,8 @@ pub const Scene = struct {
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
   parts:[meshlib.count][]const vertex.PartInstance,
   ui:[]const vertex.Ui,
+  /// UI clock (keeps running while the world is paused)
+  ui_time:f32,
 };
 
 pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0 };
@@ -46,39 +60,35 @@ const Frame = struct {
   cmd:vk.CommandBuffer,
   fence:vk.Fence,
   acquired:vk.Semaphore,
-  inst:Buffer,
-  parts:Buffer,
-  ui:Buffer,
+  /// each pass's per-frame resources, side by side
+  pass:reg.Struct("Frame"),
   /// buffers retired while this frame was in flight; freed when it comes round again.
   garbage:std.ArrayList(Buffer) = .empty,
 };
 
-const Slot = struct { buf:Buffer = .{}, count:u32 = 0, live:bool = false };
+pub const Slot = struct { buf:Buffer = .{}, count:u32 = 0, live:bool = false };
 
 pub const Renderer = struct {
-  gpa:std.mem.Allocator,
+  gpa:Allocator,
   window:*glfw.Window,
   ctx:Ctx,
   sc:sw.Swapchain,
   vsync:bool,
   frames:[FRAMES]Frame,
   fi:usize = 0,
-  world_layout:vk.PipelineLayout,
-  ui_layout:vk.PipelineLayout,
-  terrain_pipe:vk.Pipeline,
-  plant_pipe:vk.Pipeline,
-  part_pipe:vk.Pipeline,
-  ui_pipe:vk.Pipeline,
+  layouts:[2]vk.PipelineLayout,
+  pipes:[reg.count]vk.Pipeline,
+  /// terrain chunk meshes (see syncWorld)
   slots:std.ArrayList(Slot) = .empty,
   free_slots:std.ArrayList(u32) = .empty,
   /// every built-once mesh (plant species + part library) in one buffer.
   meshes:Buffer,
-  ranges:[species.count][2]u32,
+  plant_ranges:[species.count][2]u32,
   part_ranges:[meshlib.count][2]u32,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   stats:Stats = .{},
 
-  pub fn init(gpa:std.mem.Allocator, window:*glfw.Window, vsync:bool) !*Renderer {
+  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool) !*Renderer {
     const r = try gpa.create(Renderer);
     errdefer gpa.destroy(r);
     r.* = undefined;
@@ -101,79 +111,38 @@ pub const Renderer = struct {
         .cmd = undefined,
         .fence = try c.device.createFence(&.{.flags = .{.signaled = true}}, null),
         .acquired = try c.device.createSemaphore(&.{}, null),
-        .inst = try Buffer.init(c, MAX_INSTANCES * @sizeOf(vertex.PlantInstance), .{.vertex_buffer = true}),
-        .parts = try Buffer.init(c, MAX_PARTS * @sizeOf(vertex.PartInstance), .{.vertex_buffer = true}),
-        .ui = try Buffer.init(c, MAX_UI_VERTS * @sizeOf(vertex.Ui), .{.vertex_buffer = true}),
+        .pass = undefined,
       };
+      inline for (reg.ids) |id| {
+        if (comptime reg.has(id, "Frame")) @field(f.pass, @tagName(id)) = try reg.module(id).initFrame(c);
+      }
       try c.device.allocateCommandBuffers(&.{.command_pool = f.pool, .level = .primary, .command_buffer_count = 1}, @ptrCast(&f.cmd));
     }
 
-    try r.createPipelines();
+    r.layouts[@intFromEnum(pass.Layout.world)] = try pipeline.layout(c, @sizeOf(WorldPush));
+    r.layouts[@intFromEnum(pass.Layout.ui)] = try pipeline.layout(c, @sizeOf(passes.ui.Push));
+    inline for (reg.ids) |id| {
+      const d = reg.module(id).desc;
+      r.pipes[@intFromEnum(id)] = try pass.create(c, d, r.layout(d.layout), r.sc.format.format);
+    }
     try r.buildMeshes();
     return r;
   }
 
-  fn createPipelines(r:*Renderer) !void {
-    const c = &r.ctx;
-    r.world_layout = try pipeline.layout(c, @sizeOf(WorldPush));
-    r.ui_layout = try pipeline.layout(c, 16);
-    const fmt = r.sc.format.format;
-
-    {
-      const vs = try c.shader("terrain.vert");
-      defer c.device.destroyShaderModule(vs, null);
-      const fs = try c.shader("terrain.frag");
-      defer c.device.destroyShaderModule(fs, null);
-      const binds = [_]vk.VertexInputBindingDescription{pipeline.binding(vertex.Terrain, 0, .vertex)};
-      const at = comptime pipeline.attrs(vertex.Terrain, 0, 0);
-      r.terrain_pipe = try pipeline.create(c, .{.vert = vs, .frag = fs, .bindings = &binds, .attrs = &at, .layout = r.world_layout, .color_format = fmt, .cull = false});
-    }
-    {
-      const vs = try c.shader("plant.vert");
-      defer c.device.destroyShaderModule(vs, null);
-      const fs = try c.shader("plant.frag");
-      defer c.device.destroyShaderModule(fs, null);
-      const binds = [_]vk.VertexInputBindingDescription{
-        pipeline.binding(vertex.Mesh, 0, .vertex),
-        pipeline.binding(vertex.PlantInstance, 1, .instance),
-      };
-      const at = comptime pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5);
-      r.plant_pipe = try pipeline.create(c, .{.vert = vs, .frag = fs, .bindings = &binds, .attrs = &at, .layout = r.world_layout, .color_format = fmt, .cull = false});
-    }
-    {
-      const vs = try c.shader("part.vert");
-      defer c.device.destroyShaderModule(vs, null);
-      const fs = try c.shader("part.frag");
-      defer c.device.destroyShaderModule(fs, null);
-      const binds = [_]vk.VertexInputBindingDescription{
-        pipeline.binding(vertex.Mesh, 0, .vertex),
-        pipeline.binding(vertex.PartInstance, 1, .instance),
-      };
-      const at = comptime pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5);
-      r.part_pipe = try pipeline.create(c, .{.vert = vs, .frag = fs, .bindings = &binds, .attrs = &at, .layout = r.world_layout, .color_format = fmt, .cull = false});
-    }
-    {
-      const vs = try c.shader("ui.vert");
-      defer c.device.destroyShaderModule(vs, null);
-      const fs = try c.shader("ui.frag");
-      defer c.device.destroyShaderModule(fs, null);
-      const binds = [_]vk.VertexInputBindingDescription{pipeline.binding(vertex.Ui, 0, .vertex)};
-      const at = comptime pipeline.attrs(vertex.Ui, 0, 0);
-      r.ui_pipe = try pipeline.create(c, .{.vert = vs, .frag = fs, .bindings = &binds, .attrs = &at, .layout = r.ui_layout, .color_format = fmt, .depth = false, .blend = true, .cull = false});
-    }
-  }
+  pub fn pipe(r:*const Renderer, p:Pass) vk.Pipeline { return r.pipes[@intFromEnum(p)]; }
+  pub fn layout(r:*const Renderer, l:pass.Layout) vk.PipelineLayout { return r.layouts[@intFromEnum(l)]; }
 
   /// grow every species' mesh and every library part once into one buffer.
   fn buildMeshes(r:*Renderer) !void {
     var b:meshgen.Builder = .{.gpa = r.gpa};
     defer b.deinit();
-    inline for (0..species.count) |i| {
+    for (species.ids) |id| {
       const first:u32 = @intCast(b.v.items.len);
-      try meshgen.plant(&b, @enumFromInt(i));
-      r.ranges[i] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
+      try meshgen.plant(&b, id);
+      r.plant_ranges[@intFromEnum(id)] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
     }
     try meshlib.build(&b, &r.part_ranges);
-    const bytes = std.mem.sliceAsBytes(b.v.items);
+    const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
     r.meshes.write(0, bytes);
   }
@@ -184,9 +153,9 @@ pub const Renderer = struct {
     for (&r.frames) |*f| {
       for (f.garbage.items) |*b| b.deinit(c);
       f.garbage.deinit(r.gpa);
-      f.inst.deinit(c);
-      f.parts.deinit(c);
-      f.ui.deinit(c);
+      inline for (reg.ids) |id| {
+        if (comptime reg.has(id, "Frame")) reg.module(id).deinitFrame(&@field(f.pass, @tagName(id)), c);
+      }
       c.device.destroySemaphore(f.acquired, null);
       c.device.destroyFence(f.fence, null);
       c.device.destroyCommandPool(f.pool, null);
@@ -196,12 +165,8 @@ pub const Renderer = struct {
     r.free_slots.deinit(r.gpa);
     r.scratch.deinit(r.gpa);
     r.meshes.deinit(c);
-    c.device.destroyPipeline(r.terrain_pipe, null);
-    c.device.destroyPipeline(r.plant_pipe, null);
-    c.device.destroyPipeline(r.part_pipe, null);
-    c.device.destroyPipeline(r.ui_pipe, null);
-    c.device.destroyPipelineLayout(r.world_layout, null);
-    c.device.destroyPipelineLayout(r.ui_layout, null);
+    for (r.pipes) |p| c.device.destroyPipeline(p, null);
+    for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
     r.sc.deinit(c, r.gpa, false);
     r.ctx.deinit(r.gpa);
     r.gpa.destroy(r);
@@ -210,6 +175,13 @@ pub const Renderer = struct {
   fn retire(r:*Renderer, b:Buffer) !void {
     if (b.buf == .null_handle) return;
     try r.frames[r.fi].garbage.append(r.gpa, b);
+  }
+
+  /// forget every chunk mesh: the world was replaced (e.g. a save was loaded).
+  pub fn dropWorld(r:*Renderer) !void {
+    for (r.slots.items) |s| try r.retire(s.buf);
+    r.slots.clearRetainingCapacity();
+    r.free_slots.clearRetainingCapacity();
   }
 
   /// upload meshes for new/dirty chunks (at most `budget`) and drop evicted ones.
@@ -228,7 +200,7 @@ pub const Renderer = struct {
       if (!c.dirty) continue;
       if (r.stats.meshed >= budget) break;
       try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch);
-      const bytes = std.mem.sliceAsBytes(r.scratch.items);
+      const bytes = sliceAsBytes(r.scratch.items);
       var buf = try Buffer.init(&r.ctx, @max(bytes.len, 64), .{.vertex_buffer = true});
       buf.write(0, bytes);
       if (c.gpu_slot == ck.NONE) {
@@ -259,50 +231,52 @@ pub const Renderer = struct {
   }
 
   pub fn extent(r:*const Renderer) [2]f32 {
-    return .{@floatFromInt(r.sc.extent.width), @floatFromInt(r.sc.extent.height)};
+    return .{m.f(r.sc.extent.width), m.f(r.sc.extent.height)};
   }
 
   pub fn draw(r:*Renderer, scene:*const Scene, resized:bool) !void {
     const c = &r.ctx;
     const f = &r.frames[r.fi];
-    _ = try c.device.waitForFences(&.{f.fence}, .true, std.math.maxInt(u64));
+    _ = try c.device.waitForFences(&.{f.fence}, .true, m.maxInt(u64));
     for (f.garbage.items) |*b| b.deinit(c);
     f.garbage.clearRetainingCapacity();
 
     if (resized) { try r.recreate(); return; }
-    const acq = c.device.acquireNextImageKHR(r.sc.handle, std.math.maxInt(u64), f.acquired, .null_handle) catch |e| switch (e) {
+    const acq = c.device.acquireNextImageKHR(r.sc.handle, m.maxInt(u64), f.acquired, .null_handle) catch |e| switch (e) {
       error.OutOfDateKHR => { try r.recreate(); return; },
       else => return e,
     };
     const img = acq.image_index;
     try c.device.resetFences(&.{f.fence});
 
-    // per-frame streams
-    var ninst:u32 = 0;
-    var first:[species.count]u32 = undefined;
-    for (scene.instances, 0..) |list, i| {
-      const n:u32 = @intCast(@min(list.len, MAX_INSTANCES - ninst));
-      first[i] = ninst;
-      f.inst.write(ninst * @sizeOf(vertex.PlantInstance), std.mem.sliceAsBytes(list[0..n]));
-      ninst += n;
-    }
-    var nparts:u32 = 0;
-    var pfirst:[meshlib.count]u32 = undefined;
-    var pcount:[meshlib.count]u32 = undefined;
-    for (scene.parts, 0..) |list, i| {
-      const n:u32 = @intCast(@min(list.len, MAX_PARTS - nparts));
-      pfirst[i] = nparts;
-      pcount[i] = n;
-      f.parts.write(nparts * @sizeOf(vertex.PartInstance), std.mem.sliceAsBytes(list[0..n]));
-      nparts += n;
-    }
-    const nui:u32 = @intCast(@min(scene.ui.len, MAX_UI_VERTS));
-    f.ui.write(0, std.mem.sliceAsBytes(scene.ui[0..nui]));
-
     const cmd = vk.CommandBufferProxy.init(f.cmd, c.vkd);
     try cmd.resetCommandBuffer(.{});
     try cmd.beginCommandBuffer(&.{.flags = .{.one_time_submit = true}});
+    r.begin(cmd, img, scene.clear);
 
+    var stats:Stats = .{.meshed = r.stats.meshed};
+    inline for (reg.ids) |id| try reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
+
+    r.end(cmd, img);
+    try cmd.endCommandBuffer();
+    try r.submit(f, img);
+    const pres = c.device.queuePresentKHR(c.queue, &.{
+      .wait_semaphore_count = 1,
+      .p_wait_semaphores = @ptrCast(&r.sc.done[img]),
+      .swapchain_count = 1,
+      .p_swapchains = @ptrCast(&r.sc.handle),
+      .p_image_indices = @ptrCast(&img),
+    }) catch |e| switch (e) {
+      error.OutOfDateKHR => vk.Result.error_out_of_date_khr,
+      else => return e,
+    };
+    r.fi = (r.fi + 1) % FRAMES;
+    r.stats = stats;
+    if (pres != .success or acq.result == .suboptimal_khr) try r.recreate();
+  }
+
+  /// transition the targets and open the dynamic-rendering scope.
+  fn begin(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32, clear:[3]f32) void {
     const pre = [_]vk.ImageMemoryBarrier2{
       .{
         .src_stage_mask = .{.color_attachment_output = true},
@@ -338,7 +312,7 @@ pub const Renderer = struct {
       .resolve_image_layout = .undefined,
       .load_op = .clear,
       .store_op = .store,
-      .clear_value = .{.color = .{.float_32 = .{scene.clear[0], scene.clear[1], scene.clear[2], 1}}},
+      .clear_value = .{.color = .{.float_32 = .{clear[0], clear[1], clear[2], 1}}},
     }};
     const depth:vk.RenderingAttachmentInfo = .{
       .image_view = r.sc.depth_view,
@@ -358,68 +332,18 @@ pub const Renderer = struct {
       .p_color_attachments = &color,
       .p_depth_attachment = &depth,
     });
-    const vp = [_]vk.Viewport{.{
+    cmd.setViewport(0, &.{.{
       .x = 0, .y = 0,
-      .width = @floatFromInt(r.sc.extent.width),
-      .height = @floatFromInt(r.sc.extent.height),
+      .width = m.f(r.sc.extent.width),
+      .height = m.f(r.sc.extent.height),
       .min_depth = 0, .max_depth = 1,
-    }};
-    cmd.setViewport(0, &vp);
+    }});
     cmd.setScissor(0, &.{area});
+  }
 
-    var stats:Stats = .{.meshed = r.stats.meshed};
-    const zero = [_]vk.DeviceSize{0};
-    const stages:vk.ShaderStageFlags = .{.vertex = true, .fragment = true};
-
-    cmd.bindPipeline(.graphics, r.terrain_pipe);
-    cmd.pushConstants(r.world_layout, stages, 0, @sizeOf(WorldPush), &scene.push);
-    for (r.slots.items) |s| {
-      if (!s.live or s.count == 0) continue;
-      cmd.bindVertexBuffers(0, &.{s.buf.buf}, &zero);
-      cmd.draw(s.count, 1, 0, 0);
-      stats.draws += 1;
-      stats.chunks += 1;
-    }
-
-    if (ninst > 0) {
-      cmd.bindPipeline(.graphics, r.plant_pipe);
-      cmd.pushConstants(r.world_layout, stages, 0, @sizeOf(WorldPush), &scene.push);
-      const bufs = [_]vk.Buffer{r.meshes.buf, f.inst.buf};
-      const offs = [_]vk.DeviceSize{0, 0};
-      cmd.bindVertexBuffers(0, &bufs, &offs);
-      for (scene.instances, 0..) |list, i| {
-        if (list.len == 0) continue;
-        cmd.draw(r.ranges[i][1], @intCast(list.len), r.ranges[i][0], first[i]);
-        stats.draws += 1;
-      }
-      stats.instances = ninst;
-    }
-
-    if (nparts > 0) {
-      cmd.bindPipeline(.graphics, r.part_pipe);
-      cmd.pushConstants(r.world_layout, stages, 0, @sizeOf(WorldPush), &scene.push);
-      const bufs = [_]vk.Buffer{r.meshes.buf, f.parts.buf};
-      const offs = [_]vk.DeviceSize{0, 0};
-      cmd.bindVertexBuffers(0, &bufs, &offs);
-      for (0..meshlib.count) |i| {
-        if (pcount[i] == 0) continue;
-        cmd.draw(r.part_ranges[i][1], pcount[i], r.part_ranges[i][0], pfirst[i]);
-        stats.draws += 1;
-      }
-      stats.parts = nparts;
-    }
-
-    if (nui > 0) {
-      cmd.bindPipeline(.graphics, r.ui_pipe);
-      const sz = r.extent();
-      const ui_push = [4]f32{sz[0], sz[1], scene.push.eye_time[3], 0};
-      cmd.pushConstants(r.ui_layout, stages, 0, 16, &ui_push);
-      cmd.bindVertexBuffers(0, &.{f.ui.buf}, &zero);
-      cmd.draw(nui, 1, 0, 0);
-      stats.draws += 1;
-    }
+  /// close the rendering scope and hand the image to presentation.
+  fn end(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32) void {
     cmd.endRendering();
-
     const post = [_]vk.ImageMemoryBarrier2{.{
       .src_stage_mask = .{.color_attachment_output = true},
       .src_access_mask = .{.color_attachment_write = true},
@@ -433,8 +357,10 @@ pub const Renderer = struct {
       .subresource_range = sw.colorRange(),
     }};
     cmd.pipelineBarrier2(&.{.image_memory_barrier_count = post.len, .p_image_memory_barriers = &post});
-    try cmd.endCommandBuffer();
+  }
 
+  fn submit(r:*Renderer, f:*Frame, img:u32) !void {
+    const c = &r.ctx;
     const wait = [_]vk.SemaphoreSubmitInfo{.{.semaphore = f.acquired, .value = 0, .stage_mask = .{.color_attachment_output = true}, .device_index = 0}};
     const signal = [_]vk.SemaphoreSubmitInfo{.{.semaphore = r.sc.done[img], .value = 0, .stage_mask = .{.all_commands = true}, .device_index = 0}};
     const cbi = [_]vk.CommandBufferSubmitInfo{.{.command_buffer = f.cmd, .device_mask = 0}};
@@ -446,19 +372,5 @@ pub const Renderer = struct {
       .signal_semaphore_info_count = signal.len,
       .p_signal_semaphore_infos = &signal,
     }}, f.fence);
-
-    const pres = c.device.queuePresentKHR(c.queue, &.{
-      .wait_semaphore_count = 1,
-      .p_wait_semaphores = @ptrCast(&r.sc.done[img]),
-      .swapchain_count = 1,
-      .p_swapchains = @ptrCast(&r.sc.handle),
-      .p_image_indices = @ptrCast(&img),
-    }) catch |e| switch (e) {
-      error.OutOfDateKHR => vk.Result.error_out_of_date_khr,
-      else => return e,
-    };
-    r.fi = (r.fi + 1) % FRAMES;
-    r.stats = stats;
-    if (pres != .success or acq.result == .suboptimal_khr) try r.recreate();
   }
 };

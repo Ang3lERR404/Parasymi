@@ -4,25 +4,40 @@
 //! layers (each only imports the ones above it):
 //!   core -> platform -> gfx -> world -> sim -> game/render/ui -> main
 const std = @import("std");
+const Allocator = std.mem.Allocator;
+const Io = std.Io;
+const parseFloat = std.fmt.parseFloat;
+const parseInt = std.fmt.parseInt;
+const eql = std.mem.eql;
+const startsWith = std.mem.startsWith;
+const Init = std.process.Init;
+const log = std.log;
 const glfw = @import("zglfw");
 const Input = @import("platform/input.zig").Input;
+const Display = @import("platform/display.zig").Display;
 const Renderer = @import("render/renderer.zig").Renderer;
 const Game = @import("game/play.zig").Game;
+const view = @import("game/view.zig");
+const setups = @import("game/setups.zig");
+const save = @import("game/save.zig");
 
-pub fn main(init:std.process.Init) !void {
+pub fn main(init:Init) !void {
   const gpa = init.gpa;
+  const io = init.io;
   const args = try init.minimal.args.toSlice(init.arena.allocator());
   var vsync = true;
   var demo = false;
   var stress = false;
+  var load = false;
   var tod:?f32 = null;
   var seed:u64 = 0x5EED_0F_11FE;
   for (args[1..]) |a| {
-    if (std.mem.eql(u8, a, "--novsync")) vsync = false;
-    if (std.mem.eql(u8, a, "--demo")) demo = true;
-    if (std.mem.eql(u8, a, "--stress")) stress = true;
-    if (std.mem.startsWith(u8, a, "--tod=")) tod = try std.fmt.parseFloat(f32, a[6..]);
-    if (std.mem.startsWith(u8, a, "--seed=")) seed = try std.fmt.parseInt(u64, a[7..], 0);
+    if (eql(u8, a, "--novsync")) vsync = false;
+    if (eql(u8, a, "--demo")) demo = true;
+    if (eql(u8, a, "--stress")) stress = true;
+    if (eql(u8, a, "--load")) load = true;
+    if (startsWith(u8, a, "--tod=")) tod = try parseFloat(f32, a[6..]);
+    if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a[7..], 0);
   }
 
   try glfw.init();
@@ -34,37 +49,64 @@ pub fn main(init:std.process.Init) !void {
 
   var input:Input = .{.win = window};
   input.attach();
+  var display:Display = .{.win = window};
 
   const r = try Renderer.init(gpa, window, vsync);
   defer r.deinit();
 
   var game = try Game.init(gpa, seed);
   defer game.deinit();
-  if (demo) try game.demo(25);
-  if (stress) try game.stress(120);
+  if (load) try restore(gpa, io, &game, r);
+  if (demo) try setups.demo(&game, 25);
+  if (stress) try setups.stress(&game, 120);
   if (tod) |t| game.sky.tod = t;
 
   var last = glfw.getTime();
   while (!window.shouldClose()) {
     glfw.pollEvents();
     input.update();
-    if (input.pressed(.escape)) window.setShouldClose(true);
 
     const now = glfw.getTime();
-    const dt = now - last;
+    // a stalled frame (window drag, hitch) must not fling animation or movement
+    const dt = @min(now - last, 0.1);
     last = now;
 
     const screen = r.extent();
     try game.update(&input, @floatCast(dt), screen);
+    if (game.request) |rq| {
+      game.request = null;
+      switch (rq) {
+        .save => if (save.save(&game, gpa, io)) game.prog.say("THE GARDEN IS SAVED", .{}) else |e| game.prog.say("SAVE FAILED: {t}", .{e}),
+        .load => try restore(gpa, io, &game, r),
+        .fullscreen => display.toggle() catch |e| game.prog.say("NO FULLSCREEN: {t}", .{e}),
+        .quit => {
+          save.save(&game, gpa, io) catch |e| log.err("save failed: {t}", .{e});
+          window.setShouldClose(true);
+        },
+      }
+    }
     const t0 = glfw.getTime();
     try game.simulate(dt);
     game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * 1000)) - game.sim_ms) * 0.05;
     try r.syncWorld(&game.world, 6);
     game.render_stats = r.stats;
 
-    const scene = try game.scene(screen);
+    const scene = try view.scene(&game, screen);
     const resized = input.resized;
     input.resized = false;
     try r.draw(&scene, resized);
   }
+}
+
+/// replace the running game with the saved one (keeping it on failure).
+fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer) !void {
+  var loaded = save.load(gpa, io) catch |e| {
+    game.prog.say("NO GARDEN TO RETURN TO: {t}", .{e});
+    return;
+  };
+  // the old world's meshes belong to chunks that are about to disappear
+  try r.dropWorld();
+  game.deinit();
+  game.* = loaded;
+  loaded = undefined;
 }

@@ -1,0 +1,13 @@
+//! SEED SPLICING: where the lineages touch, harvests yield Vesper seeds.
+//! Needs both lineages studied, and their convergence witnessed.
+const prog = @import("../progression.zig");
+const species = @import("../../sim/species.zig");
+
+pub const def:prog.Research = .{
+  .name = "SEED SPLICING", .desc = "HARVEST VESPER SEEDS WHERE LINEAGES TOUCH",
+  .per_unit = &.{.{.item = .essence, .n = 3}, .{.item = .starlight, .n = 1}, .{.item = .ley_shard, .n = 1}},
+  .units = 30, .unit_time = 8,
+  .prereq = &.{.root_communion, .hungering_tendrils}, .needs = .convergence,
+};
+
+pub const unlocks = [_]species.Id{.vesper};

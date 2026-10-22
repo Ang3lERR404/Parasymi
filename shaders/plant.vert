@@ -39,7 +39,8 @@ void main() {
   if (aff < 0.0 || part == 4u) {
     float hunger = max(-aff, 0.35) * (0.3 + flow);
     if (part == 4u) p.xz = rot(sin(t * 3.0 + tu.x * 7.0 + seed * 9.0) * 0.35 * hunger) * p.xz;
-    if (part == 3u) p += n * 0.015 * hunger * sin(t * 23.0 + seed * 40.0);
+    // thorns quiver at the tip only (tu.y = 0 at the base), along a shared axis
+    if (part == 3u) p.y += 0.02 * hunger * tu.y * sin(t * 23.0 + seed * 40.0 + tu.x * 7.0);
   }
   // convergent: blooms slowly orbit
   if (abs(aff) < 0.5 && part == 2u) p.xz = rot(t * 0.4 + seed * 6.28) * p.xz;

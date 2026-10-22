@@ -26,9 +26,11 @@ void main() {
   float t = pc.eye_time.w;
   mat4 M = mat4(c0, c1, c2, c3);
   vec3 p = pos;
-  // secondary motion: leaves flutter, roots creep
-  if (part == 1u) p += nrm * 0.012 * ip.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 6.0);
-  if (part == 4u) p += nrm * 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
+  // secondary motion. Offsets must be identical for every copy of a shared
+  // vertex (faceted parts carry different normals per face), so they use a
+  // fixed axis scaled by position along the leaf: tips move, bases stay put.
+  if (part == 1u) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
+  if (part == 4u) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
 
   vec4 w = M * vec4(p, 1.0);
   v_pos = w.xyz;

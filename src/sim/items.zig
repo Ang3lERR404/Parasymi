@@ -1,6 +1,9 @@
 //! physical items and inventories. There is no global stockpile: every item
 //! lives in some inventory (the player, later structures) or in the world.
 const std = @import("std");
+const m = @import("../core/math.zig");
+const EnumArray = std.enums.EnumArray;
+const testing = std.testing;
 const species = @import("species.zig");
 
 pub const Item = enum(u8) {
@@ -11,24 +14,14 @@ pub const Item = enum(u8) {
 
   pub fn info(i:Item) Info { return infos.get(i); }
 
-  pub fn seedOf(sp:species.Id) Item {
-    return switch (sp) {
-      .lumenroot => .seed_lumenroot, .thornleech => .seed_thornleech, .vesper => .seed_vesper,
-      .driftwisp => .seed_driftwisp, .hollowheart => .seed_hollowheart,
-    };
-  }
-  pub fn plants(i:Item) ?species.Id {
-    return switch (i) {
-      .seed_lumenroot => .lumenroot, .seed_thornleech => .thornleech, .seed_vesper => .vesper,
-      .seed_driftwisp => .driftwisp, .seed_hollowheart => .hollowheart,
-      else => null,
-    };
-  }
+  /// the mapping lives with each species (its `def.seed`).
+  pub fn seedOf(sp:species.Id) Item { return species.get(sp).seed; }
+  pub fn plants(i:Item) ?species.Id { return species.fromSeed(i); }
 };
 
 pub const Info = struct { name:[]const u8, short:[]const u8, col:[4]u8, stack:u16 = 50 };
 
-const infos = std.enums.EnumArray(Item, Info).init(.{
+const infos = EnumArray(Item, Info).init(.{
   .grit = .{.name = "MINERAL GRIT", .short = "GR", .col = .{150, 140, 130, 255}},
   .fibre = .{.name = "ROOT FIBRE", .short = "FB", .col = .{120, 170, 90, 255}},
   .ley_shard = .{.name = "LEY SHARD", .short = "LY", .col = .{170, 120, 255, 255}, .stack = 20},
@@ -100,19 +93,19 @@ pub fn Inventory(comptime slots:usize) type {
     /// 0..1, how full the inventory is (by stack fraction).
     pub fn fill(inv:*const Self) f32 {
       var f:f32 = 0;
-      for (inv.slot) |s| if (s) |st| { f += @as(f32, @floatFromInt(st.n)) / @as(f32, @floatFromInt(st.item.info().stack)); };
-      return f / @as(f32, @floatFromInt(slots));
+      for (inv.slot) |s| if (s) |st| { f += m.ratio(st.n, st.item.info().stack); };
+      return f / m.f(slots);
     }
   };
 }
 
 test "inventory stacks and takes" {
   var inv:Inventory(4) = .{};
-  try std.testing.expectEqual(@as(u16, 70), inv.add(.grit, 70));
-  try std.testing.expectEqual(@as(u32, 70), inv.count(.grit));
-  try std.testing.expect(inv.take(.grit, 60));
-  try std.testing.expectEqual(@as(u32, 10), inv.count(.grit));
-  try std.testing.expect(!inv.take(.grit, 11));
+  try testing.expectEqual(@as(u16, 70), inv.add(.grit, 70));
+  try testing.expectEqual(@as(u32, 70), inv.count(.grit));
+  try testing.expect(inv.take(.grit, 60));
+  try testing.expectEqual(@as(u32, 10), inv.count(.grit));
+  try testing.expect(!inv.take(.grit, 11));
   // 3 free slots of 20 starlight each
-  try std.testing.expectEqual(@as(u16, 60), inv.add(.starlight, 200));
+  try testing.expectEqual(@as(u16, 60), inv.add(.starlight, 200));
 }

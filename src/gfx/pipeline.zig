@@ -2,6 +2,7 @@
 //! derived at comptime from plain extern structs, so a vertex type is the
 //! single source of truth for its GPU layout.
 const std = @import("std");
+const zeroes = std.mem.zeroes;
 const vk = @import("vulkan");
 const Ctx = @import("ctx.zig").Ctx;
 const swapchain = @import("swapchain.zig");
@@ -95,8 +96,8 @@ pub fn create(c:*const Ctx, d:Desc) !vk.Pipeline {
     .depth_compare_op = .less_or_equal,
     .depth_bounds_test_enable = .false,
     .stencil_test_enable = .false,
-    .front = std.mem.zeroes(vk.StencilOpState),
-    .back = std.mem.zeroes(vk.StencilOpState),
+    .front = zeroes(vk.StencilOpState),
+    .back = zeroes(vk.StencilOpState),
     .min_depth_bounds = 0,
     .max_depth_bounds = 1,
   };

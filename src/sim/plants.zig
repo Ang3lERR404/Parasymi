@@ -4,6 +4,9 @@
 //! Neighbour links are cached as plain indices and rebuilt only when the
 //! topology changes, so the per-tick ecology loop never touches a hash map.
 const std = @import("std");
+const m = @import("../core/math.zig");
+const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("species.zig");
@@ -39,7 +42,7 @@ pub const Plants = struct {
   floaters:std.AutoHashMapUnmanaged([2]i32, u32) = .empty,
   topology_dirty:bool = false,
 
-  pub fn deinit(p:*Plants, gpa:std.mem.Allocator) void {
+  pub fn deinit(p:*Plants, gpa:Allocator) void {
     p.list.deinit(gpa);
     p.floaters.deinit(gpa);
   }
@@ -51,12 +54,12 @@ pub const Plants = struct {
     return w.footprintFree(wx, wy, def.size, ck.Kind.fertile);
   }
 
-  pub fn place(p:*Plants, gpa:std.mem.Allocator, w:*World, wx:i32, wy:i32, sp:species.Id, seed:f32) !bool {
+  pub fn place(p:*Plants, gpa:Allocator, w:*World, wx:i32, wy:i32, sp:species.Id, seed:f32) !bool {
     return p.placeEx(gpa, w, wx, wy, .{.sp = sp, .seed = seed, .x = wx, .y = wy, .chunk = undefined, .tile = undefined});
   }
 
   /// place a fully specified plant (x/y/chunk/tile are filled in here).
-  pub fn placeEx(p:*Plants, gpa:std.mem.Allocator, w:*World, wx:i32, wy:i32, proto:Plant) !bool {
+  pub fn placeEx(p:*Plants, gpa:Allocator, w:*World, wx:i32, wy:i32, proto:Plant) !bool {
     if (!p.canPlace(w, wx, wy, proto.sp)) return false;
     const def = species.get(proto.sp);
     const c = w.chunkOfTile(wx, wy).?;
@@ -111,8 +114,8 @@ pub const Plants = struct {
   /// world-space centre of a plant's footprint (x, z).
   pub fn centre(p:*const Plants, i:usize) [2]f32 {
     const s = p.list.slice();
-    const size:f32 = @floatFromInt(species.get(s.items(.sp)[i]).size);
-    return .{@as(f32, @floatFromInt(s.items(.x)[i])) + size / 2, @as(f32, @floatFromInt(s.items(.y)[i])) + size / 2};
+    const c = m.footprintCentre(s.items(.x)[i], s.items(.y)[i], species.get(s.items(.sp)[i]).size, 0);
+    return .{c[0], c[2]};
   }
 
   pub fn rebuildLinks(p:*Plants, w:*World) void {
@@ -171,7 +174,7 @@ pub const Plants = struct {
 };
 
 test "footprints, floaters and links" {
-  const gpa = std.testing.allocator;
+  const gpa = testing.allocator;
   var w = World.init(gpa, 5);
   defer w.deinit();
   try w.stream(.{.x = 0, .y = 0}, 1, 100);
@@ -179,20 +182,20 @@ test "footprints, floaters and links" {
   for (0..5) |y| for (0..5) |x| { c.kind[y * ck.SIZE + x] = .soil; c.height[y * ck.SIZE + x] = 1; };
   var p:Plants = .{};
   defer p.deinit(gpa);
-  try std.testing.expect(try p.place(gpa, &w, 1, 1, .hollowheart, 0.5));
+  try testing.expect(try p.place(gpa, &w, 1, 1, .hollowheart, 0.5));
   // the heart covers (1..2, 1..2): nothing else may root there
-  try std.testing.expect(!try p.place(gpa, &w, 2, 2, .lumenroot, 0.5));
-  try std.testing.expect(try p.place(gpa, &w, 3, 1, .lumenroot, 0.5));
+  try testing.expect(!try p.place(gpa, &w, 2, 2, .lumenroot, 0.5));
+  try testing.expect(try p.place(gpa, &w, 3, 1, .lumenroot, 0.5));
   // a floater may hover over the heart itself, but not over another floater
-  try std.testing.expect(try p.place(gpa, &w, 2, 2, .driftwisp, 0.5));
-  try std.testing.expect(!try p.place(gpa, &w, 2, 2, .driftwisp, 0.5));
+  try testing.expect(try p.place(gpa, &w, 2, 2, .driftwisp, 0.5));
+  try testing.expect(!try p.place(gpa, &w, 2, 2, .driftwisp, 0.5));
   p.rebuildLinks(&w);
   var links:usize = 0;
   for (p.list.items(.n1)[0]) |e| if (e != NONE) { links += 1; };
-  try std.testing.expectEqual(@as(usize, 2), links);
+  try testing.expectEqual(@as(usize, 2), links);
   // 4 heart tiles + 1 root + 1 floater
-  try std.testing.expectEqual(@as(u32, 6), c.pins);
+  try testing.expectEqual(@as(u32, 6), c.pins);
   p.remove(&w, 0);
-  try std.testing.expectEqual(@as(u32, 2), c.pins);
-  try std.testing.expect(p.at(&w, 3, 1) != null and p.at(&w, 2, 2) != null);
+  try testing.expectEqual(@as(u32, 2), c.pins);
+  try testing.expect(p.at(&w, 3, 1) != null and p.at(&w, 2, 2) != null);
 }

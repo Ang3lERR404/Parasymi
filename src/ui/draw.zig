@@ -3,6 +3,9 @@
 //! in shaders/ui.frag (living membranes, seed pods, growing tendrils, glows),
 //! and glyph bitmaps travel in the vertex stream, so no textures are needed.
 const std = @import("std");
+const m = @import("../core/math.zig");
+const bufPrint = std.fmt.bufPrint;
+const Allocator = std.mem.Allocator;
 const font = @import("font.zig");
 const UV = @import("../gfx/vertex.zig").Ui;
 
@@ -23,13 +26,16 @@ pub const Shape = enum(u32) {
 const shape_mark:u32 = 0xffff_ffff;
 
 pub const Draw = struct {
-  gpa:std.mem.Allocator,
+  gpa:Allocator,
   v:std.ArrayList(UV) = .empty,
 
   pub fn deinit(d:*Draw) void { d.v.deinit(d.gpa); }
   pub fn clear(d:*Draw) void { d.v.clearRetainingCapacity(); }
 
-  fn quad(d:*Draw, x:f32, y:f32, w:f32, h:f32, uw:f32, uh:f32, col:Color, bits:[2]u32, param:[2]f32) !void {
+  fn quad(d:*Draw, x0:f32, y0:f32, w:f32, h:f32, uw:f32, uh:f32, col:Color, bits:[2]u32, param:[2]f32) !void {
+    // snap to whole pixels so edges never land between texels and crawl
+    const x = @round(x0);
+    const y = @round(y0);
     const p = [4][2]f32{.{x, y}, .{x + w, y}, .{x + w, y + h}, .{x, y + h}};
     const uv = [4][2]f32{.{0, 0}, .{uw, 0}, .{uw, uh}, .{0, uh}};
     for ([_]usize{0, 1, 2, 0, 2, 3}) |i| {
@@ -39,7 +45,7 @@ pub const Draw = struct {
 
   /// shapes get a margin so wobble/glow can spill past the nominal bounds.
   fn shape(d:*Draw, kind:Shape, x:f32, y:f32, w:f32, h:f32, col:Color, param:[2]f32) !void {
-    const pad:f32 = 14;
+    const pad:f32 = 28;
     try d.quad(x - pad, y - pad, w + 2 * pad, h + 2 * pad, w + 2 * pad, h + 2 * pad, col, .{shape_mark, @intFromEnum(kind)}, param);
   }
 
@@ -50,7 +56,7 @@ pub const Draw = struct {
     try d.shape(.pod, cx - r, cy - r, 2 * r, 2 * r, col, .{lit, seed});
   }
   pub fn tendril(d:*Draw, x:f32, y:f32, w:f32, h:f32, col:Color, value:f32, seed:f32) !void {
-    try d.shape(.tendril, x, y, w, h, col, .{std.math.clamp(value, 0, 1), seed});
+    try d.shape(.tendril, x, y, w, h, col, .{m.clamp(value, 0, 1), seed});
   }
   pub fn glow(d:*Draw, cx:f32, cy:f32, r:f32, col:Color) !void {
     try d.shape(.glow, cx - r, cy - r, 2 * r, 2 * r, col, .{0, 0});
@@ -66,11 +72,11 @@ pub const Draw = struct {
     return cx;
   }
 
-  pub fn width(str:[]const u8, s:f32) f32 { return @as(f32, @floatFromInt(str.len)) * 6 * s; }
+  pub fn width(str:[]const u8, s:f32) f32 { return m.f(str.len) * 6 * s; }
 
   pub fn print(d:*Draw, x:f32, y:f32, s:f32, col:Color, comptime fmt:[]const u8, args:anytype) !f32 {
     var buf:[256]u8 = undefined;
-    const str:[]const u8 = std.fmt.bufPrint(&buf, fmt, args) catch &buf;
+    const str:[]const u8 = bufPrint(&buf, fmt, args) catch &buf;
     return d.text(x, y, s, col, str);
   }
 };

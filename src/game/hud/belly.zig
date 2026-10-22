@@ -1,0 +1,72 @@
+//! the sap belly (Tab): the wolf's inventory, and the weave list below it.
+const play = @import("../play.zig");
+const player_mod = @import("../player.zig");
+const prog = @import("../progression.zig");
+const craft = @import("../craft.zig");
+const Draw = @import("../../ui/draw.zig").Draw;
+const s = @import("style.zig");
+const m = @import("../../core/math.zig");
+
+const cols = 6;
+const rows = player_mod.SLOTS / cols;
+const gap:f32 = 64;
+const pw:f32 = 780;
+
+pub fn visible(g:*const play.Game) bool { return g.show_inv; }
+
+pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) !void {
+  const weave_rows = (craft.hand.len + 1) / 2;
+  const ph = gap * rows + 110 + 52 * m.f(weave_rows);
+  const px = (W - pw) / 2;
+  const py = (H - ph) / 2 - 30;
+  try d.membrane(px, py, pw, ph, .{30, 22, 40, 225}, 0.33);
+  _ = try d.text(px + 72, py + 30, 2.5, s.gold, "SAP BELLY");
+  _ = try d.print(px + pw - 200, py + 38, 1.5, s.dim, "{d:.0}% FULL", .{g.player.inv.fill() * 100});
+  try slots(g, d, px, py);
+  try weaves(g, d, px, py + 72 + gap * m.f(rows) + 6);
+}
+
+fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) !void {
+  const gx = px + (pw - gap * cols) / 2;
+  for (g.player.inv.slot, 0..) |slot, i| {
+    const cx = gx + gap * (m.f(i % cols) + 0.5);
+    const cy = py + 72 + gap * (m.f(i / cols) + 0.5);
+    if (slot) |st| {
+      const info = st.item.info();
+      const full = m.ratio(st.n, info.stack);
+      try d.pod(cx, cy, 24, info.col, 0.3 + 0.7 * full, m.f(i) * 0.13);
+      _ = try d.text(cx - 12, cy - 12, 2, s.dark, info.short);
+      _ = try d.print(cx - 10, cy + 8, 1.25, s.white, "{d}", .{st.n});
+    } else {
+      try d.pod(cx, cy, 19, .{40, 55, 45, 160}, 0, m.f(i) * 0.13);
+    }
+  }
+}
+
+/// two columns of recipes; locked ones shown as unknown.
+fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) !void {
+  _ = try d.text(px + 72, wy, 2, s.gold, "WEAVE");
+  if (g.weave.busy()) {
+    try d.tendril(px + 130, wy + 6, 200, 14, s.gold, g.weave.progress(), 0.4);
+    _ = try d.print(px + 346, wy + 2, 1.25, s.dim, "{d} QUEUED", .{g.weave.len});
+  }
+  for (craft.hand, 0..) |r, i| {
+    const colx = px + 70 + m.f(i % 2) * ((pw - 60) / 2);
+    const y = wy + 42 + 52 * m.f(i / 2);
+    const open = r.unlocked(&g.prog);
+    const ok = open and craft.Crafter.can(&g.player.inv, r);
+    const info = r.out.info();
+    try d.pod(colx + 16, y, 15, if (open) info.col else s.unknown, if (ok) 0.9 else 0.1, m.f(i) * 0.5);
+    if (!open) {
+      _ = try d.print(colx + 40, y - 14, 1.4, s.unknown, "{d} ??? (NEEDS {s})", .{i + 1, prog.tree.get(r.needs.?).name});
+      continue;
+    }
+    _ = try d.print(colx + 40, y - 14, 1.4, if (ok) s.white else s.dim, "{d} {s}{s}", .{i + 1, info.name, if (r.n > 1) " X2" else ""});
+    var x = colx + 44;
+    for (r.in) |ing| {
+      const have = g.player.inv.count(ing.item) >= ing.n;
+      try d.pod(x + 6, y + 10, 6, ing.item.info().col, if (have) 0.7 else 0.05, x * 0.01);
+      x = try d.print(x + 14, y + 5, 1.15, if (have) s.white else s.dim, "{d}{s}", .{ing.n, ing.item.info().short}) + 10;
+    }
+  }
+}

@@ -1,6 +1,7 @@
 //! built-in 5x7 bitmap font, defined in code. Each glyph is 7 rows of 5 bits
 //! (MSB = leftmost column). Uppercase, digits and basic punctuation.
 const std = @import("std");
+const toUpper = std.ascii.toUpper;
 
 pub const W = 5;
 pub const H = 7;
@@ -70,7 +71,7 @@ const table = blk: {
 
 /// packed bits for the shader: bit (row*5 + col), col 0 = leftmost.
 pub fn bits(ch:u8) [2]u32 {
-  const c = std.ascii.toUpper(ch);
+  const c = toUpper(ch);
   const glyph = table[if (c < 128) c else '?'];
   var v:u64 = 0;
   for (glyph, 0..) |row, r| for (0..W) |col| {

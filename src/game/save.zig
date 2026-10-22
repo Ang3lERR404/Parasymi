@@ -1,0 +1,218 @@
+//! saving and restoring the garden. The world itself is never stored: it is
+//! regenerated from the seed, and only what the gardener changed is kept:
+//! the wolf and its belly, research, the weave queue, every plant and
+//! structure, and resource nodes that were gathered.
+//!
+//! Format: a small header (magic, version, layout fingerprint) followed by
+//! plain-old-data records. The fingerprint changes whenever a stored type's
+//! size changes, so an incompatible save is refused instead of misread.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const Io = std.Io;
+const asBytes = std.mem.asBytes;
+const eql = std.mem.eql;
+const testing = std.testing;
+const m = @import("../core/math.zig");
+const Rng = @import("../core/rng.zig").Rng;
+const ck = @import("../world/chunk.zig");
+const gen = @import("../world/gen.zig");
+const species = @import("../sim/species.zig");
+const prog = @import("progression.zig");
+const craft = @import("craft.zig");
+const st = @import("structures.zig");
+const player_mod = @import("player.zig");
+const play = @import("play.zig");
+
+const Game = play.Game;
+
+pub const PATH = "parasymi.sav";
+const MAGIC = "PRSY".*;
+const VERSION:u32 = 1;
+
+/// one plant, without its runtime links (rebuilt on load).
+const PlantRec = extern struct {
+  x:i32, y:i32,
+  sp:u32,
+  growth:f32, mana:f32, health:f32, seed:f32, flow:f32, essence:f32, seeds:f32,
+};
+
+/// one chunk whose resource nodes differ from what the generator made.
+const NodesRec = struct { at:ck.Coord, res:[ck.N]u8 };
+
+const Header = extern struct {
+  magic:[4]u8,
+  version:u32,
+  layout:u64,
+  seed:u64,
+};
+
+/// changes whenever any stored record's layout changes.
+const layout_fingerprint = blk: {
+  var h:u64 = 0xA5;
+  for ([_]usize{
+    @sizeOf(PlantRec), @sizeOf(NodesRec), @sizeOf(st.Structure),
+    @sizeOf(prog.Progression), @sizeOf(craft.Crafter), @sizeOf(@TypeOf(@as(player_mod.Player, undefined).inv)),
+    @sizeOf(Rng), species.count, st.defs.values.len,
+  }) |n| h = h *% 0x100000001B3 ^ n;
+  break :blk h;
+};
+
+const Writer = struct {
+  gpa:Allocator,
+  buf:std.ArrayList(u8) = .empty,
+  fn put(w:*Writer, v:anytype) !void { try w.buf.appendSlice(w.gpa, asBytes(&v)); }
+};
+
+const Reader = struct {
+  data:[]const u8,
+  pos:usize = 0,
+  fn get(r:*Reader, comptime T:type) !T {
+    if (r.pos + @sizeOf(T) > r.data.len) return error.CorruptSave;
+    var v:T = undefined;
+    @memcpy(asBytes(&v), r.data[r.pos..][0..@sizeOf(T)]);
+    r.pos += @sizeOf(T);
+    return v;
+  }
+};
+
+pub fn encode(gpa:Allocator, g:*const Game) ![]u8 {
+  var w:Writer = .{.gpa = gpa};
+  errdefer w.buf.deinit(gpa);
+  try w.put(Header{.magic = MAGIC, .version = VERSION, .layout = layout_fingerprint, .seed = g.world.seed});
+
+  // the gardener and what it knows
+  try w.put(g.rng);
+  try w.put(g.sky.tod);
+  try w.put(g.time);
+  try w.put(@as(u32, @intCast(g.hot)));
+  try w.put(g.place_dir);
+  try w.put(g.player.pos);
+  try w.put(g.player.facing);
+  try w.put(g.player.inv);
+  try w.put(g.weave);
+  try w.put(g.prog);
+
+  // everything it grew
+  const s = g.plants.list.slice();
+  try w.put(@as(u32, @intCast(g.plants.len())));
+  for (0..g.plants.len()) |i| try w.put(PlantRec{
+    .x = s.items(.x)[i], .y = s.items(.y)[i], .sp = @intFromEnum(s.items(.sp)[i]),
+    .growth = s.items(.growth)[i], .mana = s.items(.mana)[i], .health = s.items(.health)[i],
+    .seed = s.items(.seed)[i], .flow = s.items(.flow)[i], .essence = s.items(.essence)[i], .seeds = s.items(.seeds)[i],
+  });
+  try w.put(@as(u32, @intCast(g.structs.list.items.len)));
+  for (g.structs.list.items) |it| try w.put(it);
+
+  // gathered resource nodes (only chunks that differ from generation)
+  var touched:std.ArrayList(*const ck.Chunk) = .empty;
+  defer touched.deinit(gpa);
+  var it = g.world.map.valueIterator();
+  while (it.next()) |c| if (gathered(g.world.seed, c.*)) try touched.append(gpa, c.*);
+  try w.put(@as(u32, @intCast(touched.items.len)));
+  for (touched.items) |c| try w.put(NodesRec{.at = c.at, .res = c.res});
+
+  return w.buf.toOwnedSlice(gpa);
+}
+
+fn gathered(seed:u64, c:*const ck.Chunk) bool {
+  for (0..ck.N) |t| {
+    const s = gen.sample(seed, c.originX() + @as(i32, @intCast(t % ck.SIZE)), c.originY() + @as(i32, @intCast(t / ck.SIZE)));
+    if (s.res != c.res[t]) return true;
+  }
+  return false;
+}
+
+/// rebuild a game from bytes produced by `encode`.
+pub fn decode(gpa:Allocator, data:[]const u8) !Game {
+  var r:Reader = .{.data = data};
+  const h = try r.get(Header);
+  if (!eql(u8, &h.magic, &MAGIC)) return error.NotASave;
+  if (h.version != VERSION or h.layout != layout_fingerprint) return error.IncompatibleSave;
+
+  var g = try Game.init(gpa, h.seed);
+  errdefer g.deinit();
+  g.rng = try r.get(Rng);
+  g.sky.tod = try r.get(f32);
+  g.time = try r.get(f64);
+  g.hot = try r.get(u32);
+  g.place_dir = try r.get(m.Dir);
+  g.player.pos = try r.get(m.V3);
+  g.player.facing = try r.get(f32);
+  g.player.inv = try r.get(@TypeOf(g.player.inv));
+  g.weave = try r.get(craft.Crafter);
+  g.prog = try r.get(prog.Progression);
+  g.cam.target = g.player.pos;
+
+  const plants = try r.get(u32);
+  for (0..plants) |_| {
+    const p = try r.get(PlantRec);
+    if (p.sp >= species.count) return error.CorruptSave;
+    const sp:species.Id = @enumFromInt(p.sp);
+    try ensureFootprint(&g, p.x, p.y, species.get(sp).size);
+    _ = try g.plants.placeEx(gpa, &g.world, p.x, p.y, .{
+      .x = p.x, .y = p.y, .chunk = undefined, .tile = undefined, .sp = sp,
+      .growth = p.growth, .mana = p.mana, .health = p.health, .seed = p.seed,
+      .flow = p.flow, .essence = p.essence, .seeds = p.seeds,
+    });
+  }
+  const structs = try r.get(u32);
+  for (0..structs) |_| {
+    const s = try r.get(st.Structure);
+    try ensureFootprint(&g, s.x, s.y, s.def().size);
+    if (try g.structs.place(gpa, &g.world, s.x, s.y, s.kind(), s.dir, s.seed)) {
+      g.structs.list.items[g.structs.list.items.len - 1] = s;
+    }
+  }
+  const nodes = try r.get(u32);
+  for (0..nodes) |_| {
+    const n = try r.get(NodesRec);
+    const c = try g.world.ensure(n.at);
+    c.res = n.res;
+  }
+  g.prog.say("THE GARDEN REMEMBERS", .{});
+  return g;
+}
+
+fn ensureFootprint(g:*Game, x:i32, y:i32, size:u8) !void {
+  const far = @as(i32, size) - 1;
+  for ([_][2]i32{.{x, y}, .{x + far, y}, .{x, y + far}, .{x + far, y + far}}) |t| {
+    _ = try g.world.ensure(ck.Coord.ofTile(t[0], t[1]));
+  }
+}
+
+pub fn save(g:*Game, gpa:Allocator, io:Io) !void {
+  const bytes = try encode(gpa, g);
+  defer gpa.free(bytes);
+  try Io.Dir.cwd().writeFile(io, .{.sub_path = PATH, .data = bytes});
+}
+
+pub fn load(gpa:Allocator, io:Io) !Game {
+  const bytes = try Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(64 << 20));
+  defer gpa.free(bytes);
+  return decode(gpa, bytes);
+}
+
+test "a garden survives a save round trip" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  defer g.deinit();
+  try @import("setups.zig").demo(&g, 3);
+  // gather from some node so a depleted chunk is stored too
+  const c = g.world.chunkOfTile(m.tileOf(g.player.pos[0]), m.tileOf(g.player.pos[2])).?;
+  for (&c.res) |*r| if (r.* > 0) { r.* -= 1; break; };
+
+  const bytes = try encode(gpa, &g);
+  defer gpa.free(bytes);
+  var back = try decode(gpa, bytes);
+  defer back.deinit();
+
+  try testing.expectEqual(g.plants.len(), back.plants.len());
+  try testing.expectEqual(g.structs.list.items.len, back.structs.list.items.len);
+  try testing.expectEqual(g.player.inv.count(.grit), back.player.inv.count(.grit));
+  try testing.expect(back.prog.done.contains(.root_communion));
+  try testing.expectEqual(g.player.pos, back.player.pos);
+  const c2 = back.world.chunkOfTile(m.tileOf(g.player.pos[0]), m.tileOf(g.player.pos[2])).?;
+  try testing.expectEqualSlices(u8, &c.res, &c2.res);
+  // a structure's per-kind state comes back intact
+  for (g.structs.list.items, 0..) |s, i| try testing.expectEqual(s.kind(), back.structs.list.items[i].kind());
+}

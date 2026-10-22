@@ -1,5 +1,7 @@
 //! swapchain + matching depth buffer. Recreated whenever the window resizes.
 const std = @import("std");
+const m = @import("../core/math.zig");
+const Allocator = std.mem.Allocator;
 const vk = @import("vulkan");
 const Ctx = @import("ctx.zig").Ctx;
 
@@ -17,12 +19,12 @@ pub const Swapchain = struct {
   depth_mem:vk.DeviceMemory = .null_handle,
   depth_view:vk.ImageView = .null_handle,
 
-  pub fn init(c:*const Ctx, gpa:std.mem.Allocator, w:u32, h:u32, vsync:bool, old:vk.SwapchainKHR) !Swapchain {
+  pub fn init(c:*const Ctx, gpa:Allocator, w:u32, h:u32, vsync:bool, old:vk.SwapchainKHR) !Swapchain {
     var s:Swapchain = .{};
     const caps = try c.instance.getPhysicalDeviceSurfaceCapabilitiesKHR(c.pdev, c.surface);
-    s.extent = if (caps.current_extent.width != std.math.maxInt(u32)) caps.current_extent else .{
-      .width = std.math.clamp(w, caps.min_image_extent.width, caps.max_image_extent.width),
-      .height = std.math.clamp(h, caps.min_image_extent.height, caps.max_image_extent.height),
+    s.extent = if (caps.current_extent.width != m.maxInt(u32)) caps.current_extent else .{
+      .width = m.clamp(w, caps.min_image_extent.width, caps.max_image_extent.width),
+      .height = m.clamp(h, caps.min_image_extent.height, caps.max_image_extent.height),
     };
 
     const formats = try c.instance.getPhysicalDeviceSurfaceFormatsAllocKHR(c.pdev, c.surface, gpa);
@@ -34,7 +36,7 @@ pub const Swapchain = struct {
     if (!vsync) {
       const modes = try c.instance.getPhysicalDeviceSurfacePresentModesAllocKHR(c.pdev, c.surface, gpa);
       defer gpa.free(modes);
-      for (modes) |m| if (m == .mailbox_khr or (m == .immediate_khr and mode != .mailbox_khr)) { mode = m; };
+      for (modes) |md| if (md == .mailbox_khr or (md == .immediate_khr and mode != .mailbox_khr)) { mode = md; };
     }
 
     var count = caps.min_image_count + 1;
@@ -97,7 +99,7 @@ pub const Swapchain = struct {
     return s;
   }
 
-  pub fn deinit(s:*Swapchain, c:*const Ctx, gpa:std.mem.Allocator, keep_handle:bool) void {
+  pub fn deinit(s:*Swapchain, c:*const Ctx, gpa:Allocator, keep_handle:bool) void {
     c.device.destroyImageView(s.depth_view, null);
     c.device.destroyImage(s.depth, null);
     c.device.freeMemory(s.depth_mem, null);

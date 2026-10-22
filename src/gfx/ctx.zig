@@ -1,6 +1,11 @@
 //! Vulkan instance + device bring-up. Function pointers are loaded through
 //! GLFW (which loads vulkan-1.dll itself), so nothing links against the SDK.
 const std = @import("std");
+const log = std.log;
+const Allocator = std.mem.Allocator;
+const eql = std.mem.eql;
+const sliceAsBytes = std.mem.sliceAsBytes;
+const sliceTo = std.mem.sliceTo;
 const builtin = @import("builtin");
 const vk = @import("vulkan");
 const glfw = @import("zglfw");
@@ -24,7 +29,7 @@ pub const Ctx = struct {
   family:u32,
   queue:vk.Queue,
 
-  pub fn init(gpa:std.mem.Allocator, window:*glfw.Window) !Ctx {
+  pub fn init(gpa:Allocator, window:*glfw.Window) !Ctx {
     var c:Ctx = undefined;
     c.messenger = .null_handle;
     c.vkb = vk.BaseWrapper.load(glfwGetInstanceProcAddress);
@@ -39,7 +44,7 @@ pub const Ctx = struct {
       try layers.append(gpa, validation_layer);
       try exts.append(gpa, vk.extensions.ext_debug_utils.name);
     } else if (validate) {
-      std.log.warn("validation layer not found; running without it", .{});
+      log.warn("validation layer not found; running without it", .{});
     }
 
     const app:vk.ApplicationInfo = .{
@@ -87,11 +92,11 @@ pub const Ctx = struct {
     c.vkd.* = vk.DeviceWrapper.load(dev, c.vki.dispatch.vkGetDeviceProcAddr.?);
     c.device = vk.DeviceProxy.init(dev, c.vkd);
     c.queue = c.device.getDeviceQueue(c.family, 0);
-    std.log.info("gpu: {s}", .{std.mem.sliceTo(&c.props.device_name, 0)});
+    log.info("gpu: {s}", .{sliceTo(&c.props.device_name, 0)});
     return c;
   }
 
-  pub fn deinit(c:*Ctx, gpa:std.mem.Allocator) void {
+  pub fn deinit(c:*Ctx, gpa:Allocator) void {
     c.device.destroyDevice(null);
     c.instance.destroySurfaceKHR(c.surface, null);
     if (c.messenger != .null_handle) c.instance.destroyDebugUtilsMessengerEXT(c.messenger, null);
@@ -101,7 +106,7 @@ pub const Ctx = struct {
   }
 
   /// prefer a discrete GPU with a graphics+present queue and Vulkan 1.3.
-  fn pickDevice(c:*Ctx, gpa:std.mem.Allocator) !void {
+  fn pickDevice(c:*Ctx, gpa:Allocator) !void {
     const devs = try c.instance.enumeratePhysicalDevicesAlloc(gpa);
     defer gpa.free(devs);
     var best:i32 = -1;
@@ -141,17 +146,17 @@ pub const Ctx = struct {
     const words = comptime blk: {
       const spv = @embedFile(name);
       var w:[spv.len / 4]u32 = undefined;
-      @memcpy(std.mem.sliceAsBytes(&w), spv);
+      @memcpy(sliceAsBytes(&w), spv);
       break :blk w;
     };
     return c.device.createShaderModule(&.{.code_size = words.len * 4, .p_code = &words}, null);
   }
 };
 
-fn hasLayer(gpa:std.mem.Allocator, vkb:vk.BaseWrapper, name:[]const u8) !bool {
+fn hasLayer(gpa:Allocator, vkb:vk.BaseWrapper, name:[]const u8) !bool {
   const props = try vkb.enumerateInstanceLayerPropertiesAlloc(gpa);
   defer gpa.free(props);
-  for (props) |p| if (std.mem.eql(u8, std.mem.sliceTo(&p.layer_name, 0), name)) return true;
+  for (props) |p| if (eql(u8, sliceTo(&p.layer_name, 0), name)) return true;
   return false;
 }
 
@@ -162,6 +167,6 @@ fn onDebug(
   _:?*anyopaque,
 ) callconv(vk.vulkan_call_conv) vk.Bool32 {
   const msg = if (data) |d| (d.p_message orelse "?") else "?";
-  if (sev.error_ext) std.log.err("vk: {s}", .{msg}) else std.log.warn("vk: {s}", .{msg});
+  if (sev.error_ext) log.err("vk: {s}", .{msg}) else log.warn("vk: {s}", .{msg});
   return .false;
 }

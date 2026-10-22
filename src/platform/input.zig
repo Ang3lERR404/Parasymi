@@ -1,5 +1,4 @@
 //! per-frame input snapshot with edge detection, fed by GLFW.
-const std = @import("std");
 const glfw = @import("zglfw");
 
 pub const Key = glfw.Key;
@@ -8,7 +7,7 @@ pub const Button = glfw.MouseButton;
 const tracked = [_]Key{
   .w, .a, .s, .d, .q, .e, .r, .f, .t, .c, .up, .down, .left, .right,
   .one, .two, .three, .four, .five, .six, .seven, .eight, .nine,
-  .tab, .escape, .F3, .F5, .left_shift, .space,
+  .tab, .escape, .F3, .F5, .F9, .F11, .left_shift, .space,
 };
 const buttons = [_]Button{.left, .right, .middle};
 

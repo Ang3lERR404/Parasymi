@@ -1,9 +1,9 @@
 //! a 32x32 block of tiles, stored as struct-of-arrays so hot loops stay linear.
-const std = @import("std");
+const m = @import("../core/math.zig");
 
 pub const SIZE = 32;
 pub const N = SIZE * SIZE;
-pub const NONE:u32 = std.math.maxInt(u32);
+pub const NONE:u32 = m.maxInt(u32);
 
 pub const Kind = enum(u8) {
   water, soil, moss, stone, ley,

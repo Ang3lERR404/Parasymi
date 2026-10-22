@@ -1,6 +1,8 @@
 //! world generation: a pure function of (seed, tile coordinate). Chunks never
 //! depend on neighbours being loaded, so meshing and streaming stay order-free.
 const std = @import("std");
+const testing = std.testing;
+const m = @import("../core/math.zig");
 const noise = @import("../core/noise.zig");
 const ck = @import("chunk.zig");
 const rng = @import("../core/rng.zig");
@@ -11,8 +13,8 @@ pub const WATER_H = 0.0;
 pub const Sample = struct { height:f32, kind:ck.Kind, ley:f32, res:u8 = 0 };
 
 pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
-  const x:f32 = @floatFromInt(wx);
-  const y:f32 = @floatFromInt(wy);
+  const x = m.f(wx);
+  const y = m.f(wy);
   // domain warp keeps coastlines and ridges organic instead of blobby.
   const wx2 = x + 14 * noise.fbm(seed +% 11, x / 90, y / 90, 3);
   const wy2 = y + 14 * noise.fbm(seed +% 12, x / 90, y / 90, 3);
@@ -59,6 +61,6 @@ test "generation is deterministic" {
   var b = a;
   generate(1234, &a);
   generate(1234, &b);
-  try std.testing.expectEqualSlices(f32, &a.height, &b.height);
-  try std.testing.expectEqualSlices(ck.Kind, &a.kind, &b.kind);
+  try testing.expectEqualSlices(f32, &a.height, &b.height);
+  try testing.expectEqualSlices(ck.Kind, &a.kind, &b.kind);
 }

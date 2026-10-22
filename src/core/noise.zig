@@ -1,12 +1,14 @@
 //! 2D gradient noise + fractal variants. Output of `grad` is roughly -1..1.
 const std = @import("std");
+const m = @import("math.zig");
+const testing = std.testing;
 const rng = @import("rng.zig");
 
 inline fn fade(t:f32) f32 { return t * t * t * (t * (t * 6 - 15) + 10); }
 
 inline fn gdot(seed:u64, ix:i32, iy:i32, fx:f32, fy:f32) f32 {
   const h = rng.hash2(seed, ix, iy);
-  const a = @as(f32, @floatFromInt(h & 0xffff)) * (std.math.tau / 65536.0);
+  const a = m.f(h & 0xffff) * (m.tau / 65536.0);
   return @cos(a) * fx + @sin(a) * fy;
 }
 
@@ -55,7 +57,7 @@ test "noise range + determinism" {
   var x:f32 = -50;
   while (x < 50) : (x += 0.37) {
     const n = fbm(42, x, x * 0.7, 4);
-    try std.testing.expect(n >= -1.5 and n <= 1.5);
-    try std.testing.expectEqual(n, fbm(42, x, x * 0.7, 4));
+    try testing.expect(n >= -1.5 and n <= 1.5);
+    try testing.expectEqual(n, fbm(42, x, x * 0.7, 4));
   }
 }

@@ -1,0 +1,14 @@
+//! HOLLOWHEART: a 2x2 heart-tree. A deep mana reservoir that feeds
+//! everything around its footprint.
+const species = @import("../species.zig");
+
+pub const def:species.Species = .{
+  .name = "HOLLOWHEART", .lineage = .symbiotic, .seed = .seed_hollowheart, .size = 2,
+  .mature_time = 45, .mana_cap = 60, .ley_draw = 2.4, .share = 0.9, .drain = 0, .yield = 0.5, .seed_time = 60,
+  .genome = .{
+    .stem_h = 2.1, .stem_r = 0.16, .segments = 12, .curl = 0.35,
+    .leaves = 20, .leaf_len = 0.75, .leaf_w = 0.24, .leaf_droop = 0.45,
+    .petals = 7, .bloom_r = 0.4, .thorns = 0, .tendrils = 6,
+    .stem_col = .{0.3, 0.24, 0.18}, .leaf_col = .{0.25, 0.65, 0.4}, .bloom_col = .{1.0, 0.8, 0.5},
+  },
+};

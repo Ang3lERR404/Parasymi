@@ -2,6 +2,7 @@
 //! everything, written directly by the CPU. (Later: device-local + staging and
 //! sub-allocation from large blocks.)
 const std = @import("std");
+const assert = std.debug.assert;
 const vk = @import("vulkan");
 const Ctx = @import("ctx.zig").Ctx;
 
@@ -34,7 +35,7 @@ pub const Buffer = struct {
   }
 
   pub fn write(b:*Buffer, offset:usize, bytes:[]const u8) void {
-    std.debug.assert(offset + bytes.len <= b.size);
+    assert(offset + bytes.len <= b.size);
     @memcpy(b.map[offset .. offset + bytes.len], bytes);
   }
 };

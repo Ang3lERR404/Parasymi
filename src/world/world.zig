@@ -1,5 +1,8 @@
 //! the infinite world: a sparse map of generated chunks streamed around a focus.
 const std = @import("std");
+const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const ck = @import("chunk.zig");
 const gen = @import("gen.zig");
 
@@ -7,7 +10,7 @@ pub const Chunk = ck.Chunk;
 pub const Coord = ck.Coord;
 
 pub const World = struct {
-  gpa:std.mem.Allocator,
+  gpa:Allocator,
   seed:u64,
   map:std.AutoHashMapUnmanaged(Coord, *Chunk) = .empty,
   /// chunks loaded by the last `stream` call.
@@ -15,7 +18,7 @@ pub const World = struct {
   /// gpu slots of chunks that were unloaded; the renderer drains this.
   evicted:std.ArrayList(u32) = .empty,
 
-  pub fn init(gpa:std.mem.Allocator, seed:u64) World { return .{.gpa = gpa, .seed = seed}; }
+  pub fn init(gpa:Allocator, seed:u64) World { return .{.gpa = gpa, .seed = seed}; }
 
   pub fn deinit(w:*World) void {
     var it = w.map.valueIterator();
@@ -83,6 +86,9 @@ pub const World = struct {
     return c;
   }
 
+  /// the chunk at `at`, generating it first if it is not resident.
+  pub fn ensure(w:*World, at:Coord) !*Chunk { return w.map.get(at) orelse w.load(at); }
+
   /// generate missing chunks nearest-first, at most `budget` per call.
   pub fn stream(w:*World, focus:Coord, radius:i32, budget:u32) !void {
     w.fresh.clearRetainingCapacity();
@@ -115,7 +121,7 @@ pub const World = struct {
   }
 
   pub fn unload(w:*World, c:*Chunk) !void {
-    std.debug.assert(c.pins == 0);
+    assert(c.pins == 0);
     _ = w.map.remove(c.at);
     if (c.gpu_slot != ck.NONE) try w.evicted.append(w.gpa, c.gpu_slot);
     w.gpa.destroy(c);
@@ -123,14 +129,14 @@ pub const World = struct {
 };
 
 test "stream loads and unloads" {
-  var w = World.init(std.testing.allocator, 9);
+  var w = World.init(testing.allocator, 9);
   defer w.deinit();
   try w.stream(.{.x = 0, .y = 0}, 1, 100);
-  try std.testing.expectEqual(@as(u32, 9), w.map.count());
+  try testing.expectEqual(@as(u32, 9), w.map.count());
   var far:std.ArrayList(*Chunk) = .empty;
-  defer far.deinit(std.testing.allocator);
+  defer far.deinit(testing.allocator);
   try w.far(.{.x = 50, .y = 0}, 0, &far);
-  try std.testing.expectEqual(@as(usize, 9), far.items.len);
+  try testing.expectEqual(@as(usize, 9), far.items.len);
   for (far.items) |c| try w.unload(c);
-  try std.testing.expectEqual(@as(u32, 0), w.map.count());
+  try testing.expectEqual(@as(u32, 0), w.map.count());
 }

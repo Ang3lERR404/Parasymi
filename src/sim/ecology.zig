@@ -2,6 +2,9 @@
 //! parasitic draining, growth, essence and death. Two-phase (accumulate
 //! deltas, then apply) so the result never depends on plant order.
 const std = @import("std");
+const m = @import("../core/math.zig");
+const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const species = @import("species.zig");
 const plants_mod = @import("plants.zig");
 const World = @import("../world/world.zig").World;
@@ -33,11 +36,11 @@ pub const Ecology = struct {
   df:std.ArrayList(f32) = .empty,
   dead:std.ArrayList(u32) = .empty,
 
-  pub fn deinit(e:*Ecology, gpa:std.mem.Allocator) void {
+  pub fn deinit(e:*Ecology, gpa:Allocator) void {
     e.dm.deinit(gpa); e.dh.deinit(gpa); e.df.deinit(gpa); e.dead.deinit(gpa);
   }
 
-  pub fn tick(e:*Ecology, gpa:std.mem.Allocator, p:*Plants, w:*World, mods:Mods, dt:f32) !Events {
+  pub fn tick(e:*Ecology, gpa:Allocator, p:*Plants, w:*World, mods:Mods, dt:f32) !Events {
     var ev:Events = .{};
     if (p.topology_dirty) p.rebuildLinks(w);
     const n = p.len();
@@ -136,8 +139,8 @@ pub const Ecology = struct {
     e.dead.clearRetainingCapacity();
     for (0..n) |i| {
       const cap = species.get(sps[i]).mana_cap;
-      mana[i] = std.math.clamp(mana[i] + dm[i], 0, cap);
-      health[i] = std.math.clamp(health[i] + dh[i], 0, 1);
+      mana[i] = m.clamp(mana[i] + dm[i], 0, cap);
+      health[i] = m.clamp(health[i] + dh[i], 0, 1);
       flow[i] += (df[i] / dt / cap * 4 - flow[i]) * 0.05;
       if (health[i] <= 0) try e.dead.append(gpa, @intCast(i));
     }
@@ -149,7 +152,7 @@ pub const Ecology = struct {
 };
 
 test "symbiotes share, parasites drain" {
-  const gpa = std.testing.allocator;
+  const gpa = testing.allocator;
   var w = World.init(gpa, 5);
   defer w.deinit();
   try w.stream(.{.x = 0, .y = 0}, 1, 100);
@@ -160,10 +163,10 @@ test "symbiotes share, parasites drain" {
   defer p.deinit(gpa);
   var eco:Ecology = .{};
   defer eco.deinit(gpa);
-  try std.testing.expect(try p.place(gpa, &w, 0, 0, .lumenroot, 0.1));
-  try std.testing.expect(try p.place(gpa, &w, 1, 0, .thornleech, 0.2));
+  try testing.expect(try p.place(gpa, &w, 0, 0, .lumenroot, 0.1));
+  try testing.expect(try p.place(gpa, &w, 1, 0, .thornleech, 0.2));
   for (0..60 * 30) |_| _ = try eco.tick(gpa, &p, &w, .{}, 1.0 / 60.0);
   const es = p.list.items(.essence);
-  try std.testing.expect(p.len() < 2 or es[0] + es[1] > 0);
-  try std.testing.expect(p.list.items(.flow)[0] > 0 or p.len() < 2);
+  try testing.expect(p.len() < 2 or es[0] + es[1] > 0);
+  try testing.expect(p.list.items(.flow)[0] > 0 or p.len() < 2);
 }

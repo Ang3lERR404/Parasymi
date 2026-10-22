@@ -1,5 +1,6 @@
 //! per-frame collector of rigid part instances, grouped by library mesh.
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const PartInstance = @import("../gfx/vertex.zig").PartInstance;
@@ -13,7 +14,7 @@ pub const Look = struct {
 };
 
 pub const Parts = struct {
-  gpa:std.mem.Allocator,
+  gpa:Allocator,
   lists:[meshlib.count]std.ArrayList(PartInstance) = @splat(.empty),
 
   pub fn deinit(p:*Parts) void { for (&p.lists) |*l| l.deinit(p.gpa); }

@@ -1,5 +1,4 @@
 //! angled top-down camera: pans over the ground plane, zooms along its view ray.
-const std = @import("std");
 const m = @import("../core/math.zig");
 
 pub const Camera = struct {
@@ -28,7 +27,7 @@ pub const Camera = struct {
   }
 
   pub fn zoom(c:*Camera, steps:f32) void {
-    c.dist = std.math.clamp(c.dist * std.math.pow(f32, 0.88, steps), 4, 120);
+    c.dist = m.clamp(c.dist * m.pow(f32, 0.88, steps), 4, 120);
   }
 
   /// world-space ray through a pixel.

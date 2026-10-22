@@ -1,11 +1,63 @@
-//! SIMD-friendly vector/matrix helpers. Column-major 4x4, Vulkan clip space
-//! (y down, depth 0..1). World: x east, y up, z south; 1 tile = 1 unit.
+//! the one place for numeric helpers: scalars, angles, tile/world
+//! coordinates, SIMD vectors and column-major 4x4 matrices (Vulkan clip
+//! space: y down, depth 0..1). World: x east, y up, z south; 1 tile = 1 unit.
+//! Game code uses this instead of reaching into std.math directly.
 const std = @import("std");
+const math = std.math;
+const testing = std.testing;
 
 pub const V2 = @Vector(2, f32);
 pub const V3 = @Vector(3, f32);
 pub const V4 = @Vector(4, f32);
 pub const M4 = [4]V4;
+
+// ---- scalars ----
+
+pub const pi = math.pi;
+pub const tau = math.tau;
+pub const clamp = math.clamp;
+pub const pow = math.pow;
+pub const maxInt = math.maxInt;
+
+/// integer (or comptime number) to f32: the cast written everywhere else.
+pub inline fn f(x:anytype) f32 { return @floatFromInt(x); }
+pub inline fn lerp(a:f32, b:f32, t:f32) f32 { return a + (b - a) * t; }
+pub inline fn clamp01(x:f32) f32 { return math.clamp(x, 0, 1); }
+pub inline fn smooth(t:f32) f32 { return t * t * (3 - 2 * t); }
+/// whole units of a non-negative float (e.g. ripe seeds) as integer type T.
+pub inline fn floorTo(comptime T:type, x:f32) T { return @intFromFloat(@floor(x)); }
+/// fraction of `a` over `b` as f32 (e.g. progress counters).
+pub inline fn ratio(a:anytype, b:anytype) f32 { return f(a) / f(b); }
+
+// ---- angles ----
+
+pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
+/// shortest signed difference `to - from`, wrapped into -pi..pi.
+pub inline fn angleDiff(from:f32, to:f32) f32 { return atan2(@sin(to - from), @cos(to - from)); }
+
+// ---- tiles ----
+
+/// the tile containing a world coordinate.
+pub inline fn tileOf(x:f32) i32 { return @intFromFloat(@floor(x)); }
+/// the tile (x, z) under a world position.
+pub inline fn tileAt(p:V3) [2]i32 { return .{tileOf(p[0]), tileOf(p[2])}; }
+/// world-space centre of a size x size footprint anchored at tile (x, z).
+pub inline fn footprintCentre(x:i32, z:i32, size:u8, y:f32) V3 {
+  const half = f(size) / 2;
+  return .{f(x) + half, y, f(z) + half};
+}
+/// world-space centre of tile (x, z) at height y.
+pub inline fn tileCentre(x:i32, z:i32, y:f32) V3 { return footprintCentre(x, z, 1, y); }
+
+/// one of four facings: +x (east), +z (south), -x (west), -z (north).
+pub const Dir = u2;
+pub fn dirVec(d:Dir) [2]i32 {
+  return switch (d) { 0 => .{1, 0}, 1 => .{0, 1}, 2 => .{-1, 0}, 3 => .{0, -1} };
+}
+/// yaw that turns a +x-facing model to face `d`.
+pub inline fn dirYaw(d:Dir) f32 { return -f(d) * pi / 2.0; }
+
+// ---- vectors ----
 
 pub inline fn v3(x:f32, y:f32, z:f32) V3 { return .{x, y, z}; }
 pub inline fn splat(s:f32) V3 { return @splat(s); }
@@ -18,9 +70,13 @@ pub inline fn norm(a:V3) V3 {
 pub inline fn cross(a:V3, b:V3) V3 {
   return .{a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]};
 }
-pub inline fn lerp(a:f32, b:f32, t:f32) f32 { return a + (b - a) * t; }
-pub inline fn clamp01(x:f32) f32 { return std.math.clamp(x, 0, 1); }
-pub inline fn smooth(t:f32) f32 { return t * t * (3 - 2 * t); }
+pub inline fn lerpV(a:V3, b:V3, t:f32) V3 { return a + (b - a) * splat(t); }
+/// a point at fraction `k` (0..1) along a polyline.
+pub fn alongPath(path:[]const V3, k:f32) V3 {
+  const pos = k * f(path.len - 1);
+  const i:usize = @min(@as(usize, @intFromFloat(pos)), path.len - 2);
+  return lerpV(path[i], path[i + 1], pos - f(i));
+}
 
 pub const identity:M4 = .{
   .{1, 0, 0, 0}, .{0, 1, 0, 0}, .{0, 0, 1, 0}, .{0, 0, 0, 1},
@@ -42,24 +98,24 @@ pub fn mulV(m:M4, v:V4) V4 {
 
 /// right-handed perspective for Vulkan (y flipped, depth 0..1).
 pub fn perspective(fovy:f32, aspect:f32, near:f32, far:f32) M4 {
-  const f = 1 / @tan(fovy * 0.5);
+  const k = 1 / @tan(fovy * 0.5);
   return .{
-    .{f / aspect, 0, 0, 0},
-    .{0, -f, 0, 0},
+    .{k / aspect, 0, 0, 0},
+    .{0, -k, 0, 0},
     .{0, 0, far / (near - far), -1},
     .{0, 0, near * far / (near - far), 0},
   };
 }
 
 pub fn lookAt(eye:V3, at:V3, up:V3) M4 {
-  const f = norm(at - eye);
-  const s = norm(cross(f, up));
-  const u = cross(s, f);
+  const fw = norm(at - eye);
+  const s = norm(cross(fw, up));
+  const u = cross(s, fw);
   return .{
-    .{s[0], u[0], -f[0], 0},
-    .{s[1], u[1], -f[1], 0},
-    .{s[2], u[2], -f[2], 0},
-    .{-dot(s, eye), -dot(u, eye), dot(f, eye), 1},
+    .{s[0], u[0], -fw[0], 0},
+    .{s[1], u[1], -fw[1], 0},
+    .{s[2], u[2], -fw[2], 0},
+    .{-dot(s, eye), -dot(u, eye), dot(fw, eye), 1},
   };
 }
 
@@ -90,11 +146,22 @@ pub fn chain(ms:anytype) M4 {
 pub fn origin(a:M4) V3 { return .{a[3][0], a[3][1], a[3][2]}; }
 
 /// critically damped spring step (for procedural secondary motion).
+/// Uses the exact closed-form solution, so it is stable for any `dt`: a long
+/// frame can never make it overshoot or blow up.
 pub fn spring(pos:*f32, vel:*f32, target:f32, freq:f32, dt:f32) void {
-  const k = freq * freq;
-  const d = 2 * freq;
-  vel.* += (k * (target - pos.*) - d * vel.*) * dt;
-  pos.* += vel.* * dt;
+  const x = pos.* - target;
+  const j = vel.* + freq * x;
+  const e = @exp(-freq * dt);
+  pos.* = target + (x + j * dt) * e;
+  vel.* = (vel.* - freq * j * dt) * e;
+}
+
+test "spring is stable for huge steps" {
+  var p:f32 = 0;
+  var v:f32 = 50;
+  for (0..20) |_| spring(&p, &v, 1, 7, 0.75);
+  try testing.expectApproxEqAbs(@as(f32, 1), p, 1e-3);
+  try testing.expect(@abs(v) < 1e-2);
 }
 
 /// general 4x4 inverse (cofactor expansion), used for mouse picking.
@@ -129,6 +196,6 @@ test "inverse roundtrip" {
   const p = mul(perspective(0.8, 1.5, 0.1, 100), lookAt(v3(3, 10, 8), v3(0, 0, 0), v3(0, 1, 0)));
   const i = mul(inverse(p), p);
   inline for (0..4) |c| inline for (0..4) |r| {
-    try std.testing.expectApproxEqAbs(identity[c][r], i[c][r], 1e-3);
+    try testing.expectApproxEqAbs(identity[c][r], i[c][r], 1e-3);
   };
 }

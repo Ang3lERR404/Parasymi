@@ -3,6 +3,8 @@
 //! leave the inventory when a weave is queued (like Factorio hand crafting)
 //! and the result appears when it finishes.
 const std = @import("std");
+const copyForwards = std.mem.copyForwards;
+const testing = std.testing;
 const items = @import("../sim/items.zig");
 const prog = @import("progression.zig");
 
@@ -64,7 +66,7 @@ pub const Crafter = struct {
     c.t = @min(c.t + dt, r.time);
     if (c.t < r.time) return null;
     if (inv.add(r.out, r.n) < r.n) return null;
-    std.mem.copyForwards(u8, c.queue[0 .. c.len - 1], c.queue[1..c.len]);
+    copyForwards(u8, c.queue[0 .. c.len - 1], c.queue[1..c.len]);
     c.len -= 1;
     c.t = 0;
     return r.out;
@@ -74,14 +76,14 @@ pub const Crafter = struct {
 test "weaving takes ingredients up front and yields after its time" {
   var inv:items.Inventory(8) = .{};
   var c:Crafter = .{};
-  try std.testing.expect(!c.push(&inv, 0));
+  try testing.expect(!c.push(&inv, 0));
   _ = inv.add(.fibre, 4);
   _ = inv.add(.starlight, 1);
-  try std.testing.expect(c.push(&inv, 0));
-  try std.testing.expect(!c.push(&inv, 0)); // only one starlight
-  try std.testing.expectEqual(@as(u32, 2), inv.count(.fibre));
-  try std.testing.expect(c.tick(&inv, 1.0) == null);
-  try std.testing.expect(c.tick(&inv, 1.0) == .seed_lumenroot);
-  try std.testing.expectEqual(@as(u32, 1), inv.count(.seed_lumenroot));
-  try std.testing.expect(!c.busy());
+  try testing.expect(c.push(&inv, 0));
+  try testing.expect(!c.push(&inv, 0)); // only one starlight
+  try testing.expectEqual(@as(u32, 2), inv.count(.fibre));
+  try testing.expect(c.tick(&inv, 1.0) == null);
+  try testing.expect(c.tick(&inv, 1.0) == .seed_lumenroot);
+  try testing.expectEqual(@as(u32, 1), inv.count(.seed_lumenroot));
+  try testing.expect(!c.busy());
 }
