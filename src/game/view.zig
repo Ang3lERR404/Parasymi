@@ -18,13 +18,13 @@ const play = @import("play.zig");
 const Game = play.Game;
 
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
-  const reach = g.cam.dist * 2.2 + 12;
+  const reach = g.cam.reach(play.DRAW_LIMIT);
   const tf:f32 = @floatCast(@mod(g.time, 3600));
 
   try plants(g, reach, tf);
   g.parts.clear();
   const feet = try g.player.rig(&g.parts);
-  try nodes(g, @intFromFloat(@min(reach, 40)));
+  try nodes(g, @intFromFloat(reach));
   try structures(g, reach, tf);
   try ghost(g, tf);
   try motes(g);
@@ -42,6 +42,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
       .fog = .{sky[0], sky[1], sky[2], 1.0 / (32 * ck.SIZE / 8 + g.cam.dist)},
       .misc = .{veil, if (g.prog.done.contains(.ley_sight)) 1 else 0, hv[0], hv[1]},
       .sun = .{ld[0], ld[1], ld[2], g.sky.daylight()},
+      .view = .{g.cam.target[0], g.cam.target[2], reach * 0.7, reach},
       .feet = .{
         .{feet[0][0], feet[0][1], feet[0][2], g.player.facing},
         .{feet[1][0], feet[1][1], feet[1][2], g.player.facing},

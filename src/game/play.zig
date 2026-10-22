@@ -29,6 +29,9 @@ const actions = @import("actions.zig");
 
 pub const TICK = 1.0 / 60.0;
 const STREAM_RADIUS = 4;
+/// nothing is drawn further than this from the camera target (inside the
+/// streamed radius, so a low camera never runs off the generated world)
+pub const DRAW_LIMIT:f32 = (STREAM_RADIUS - 0.5) * ck.SIZE;
 
 /// everything the wolf can put into the world, in hotbar key order 1..9, 0.
 pub const hotbar = [_]items.Item{
@@ -209,10 +212,18 @@ pub const Game = struct {
     // movement relative to the camera
     var mx:f32 = 0;
     var mz:f32 = 0;
+    // decision: Ctrl+W/S tilts the camera (Shift is already sprint); W/S do
+    // not move the wolf while Ctrl is held.
+    const tilting = in.down(.left_control);
     if (in.down(.a) or in.down(.left)) mx -= 1;
     if (in.down(.d) or in.down(.right)) mx += 1;
-    if (in.down(.w) or in.down(.up)) mz += 1;
-    if (in.down(.s) or in.down(.down)) mz -= 1;
+    if (tilting) {
+      if (in.down(.w) or in.down(.up)) g.cam.tilt(dt * 1.2);
+      if (in.down(.s) or in.down(.down)) g.cam.tilt(-dt * 1.2);
+    } else {
+      if (in.down(.w) or in.down(.up)) mz += 1;
+      if (in.down(.s) or in.down(.down)) mz -= 1;
+    }
     const yaw = g.cam.yaw;
     var wish = [2]f32{@cos(yaw) * mx - @sin(yaw) * mz, -@sin(yaw) * mx - @cos(yaw) * mz};
     const wl = @sqrt(wish[0] * wish[0] + wish[1] * wish[1]);

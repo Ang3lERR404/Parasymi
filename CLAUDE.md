@@ -4,7 +4,8 @@
 
 Player-centric Factorio-like automation game. Magically infused plants (parasitic +
 symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig, Windows, no asset
-files (everything procedural). 2.5D top-down 3D, fixed 50–60° pitch, no rotation.
+files (everything procedural). 2.5D top-down 3D. Adjustable pitch (30°–85°,
+default 55°, Ctrl+W/S), yaw via Q/E. No free rotation.
 
 ## Build
 

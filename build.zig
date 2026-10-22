@@ -9,6 +9,7 @@ const shaders = [_][]const u8{
   "plant.vert", "plant.frag",
   "part.vert", "part.frag",
   "ui.vert", "ui.frag",
+  "sky.vert", "sky.frag",
 };
 
 pub fn build(b:*Build) !void {

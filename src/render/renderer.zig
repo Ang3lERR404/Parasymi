@@ -25,6 +25,7 @@ const terrain_mesh = @import("terrain_mesh.zig");
 const pass = @import("pass.zig");
 
 const passes = struct {
+  pub const sky = @import("passes/sky.zig");
   pub const terrain = @import("passes/terrain.zig");
   pub const plants = @import("passes/plants.zig");
   pub const parts = @import("passes/parts.zig");
@@ -48,6 +49,9 @@ pub const WorldPush = extern struct {
   sun:[4]f32,
   /// the wolf's paws for contact shadows: world x, y, z, facing yaw
   feet:[2][4]f32,
+  /// x,z: what the camera looks at; z,w: horizontal distance from it where
+  /// fog starts closing in and where the world is fully hidden
+  view:[4]f32,
 };
 
 pub const Scene = struct {

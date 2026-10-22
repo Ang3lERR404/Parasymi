@@ -6,6 +6,7 @@ layout(push_constant) uniform Push {
   vec4 misc;      // x veil 0..1, y ley sight 0/1, zw hovered tile (x,z)
   vec4 sun;       // xyz direction toward the key light (sun or moon), w daylight 0..1
   vec4 feet[2];   // the wolf's paws: xyz world position, w facing yaw
+  vec4 view;      // xy camera target (x,z), z fog-out start, w fog-out end (horizontal)
 } pc;
 
 #define SUN pc.sun.xyz
@@ -27,5 +28,8 @@ vec3 shade(vec3 albedo, vec3 n, vec3 wpos) {
 vec3 applyFog(vec3 c, vec3 wpos) {
   float d = length(wpos - pc.eye_time.xyz);
   float f = 1.0 - exp(-pow(d * pc.fog.w, 2.0));
+  // the drawn world ends a little before the streamed one: close it into the
+  // horizon so a low camera never sees an edge
+  f = max(f, smoothstep(pc.view.z, pc.view.w, length(wpos.xz - pc.view.xy)));
   return mix(c, pc.fog.rgb, clamp(f, 0.0, 1.0));
 }
