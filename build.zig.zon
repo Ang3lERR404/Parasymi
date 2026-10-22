@@ -1,0 +1,11 @@
+.{
+    .name = .Parasymi,
+    .version = "0.0.1",
+    .fingerprint = 0x39ea09728227867e,
+    .minimum_zig_version = "0.16.0",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+    },
+}
