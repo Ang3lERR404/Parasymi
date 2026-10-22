@@ -103,6 +103,10 @@ pub const Renderer = struct {
   plant_ranges:[PLANT_MESHES][2]u32 = undefined,
   part_ranges:[meshlib.count][2]u32 = undefined,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
+  /// buffers retired since the last frame began; any frame still in flight
+  /// may use them, so they join the next frame's garbage (freed only once
+  /// that frame, and every frame before it, has finished on the GPU).
+  pending:std.ArrayList(Buffer) = .empty,
   stats:Stats = .{},
 
   pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool) Error!*Renderer {
@@ -178,6 +182,10 @@ pub const Renderer = struct {
     for (&r.frames) |*f| {
       for (f.garbage.items) |*b| b.deinit(c);
       f.garbage.deinit(r.gpa);
+    }
+    for (r.pending.items) |*b| b.deinit(c);
+    r.pending.deinit(r.gpa);
+    for (&r.frames) |*f| {
       inline for (reg.ids) |id| {
         if (comptime reg.has(id, "Frame")) reg.module(id).deinitFrame(&@field(f.pass, @tagName(id)), c);
       }
@@ -197,7 +205,7 @@ pub const Renderer = struct {
 
   fn retire(r:*Renderer, b:Buffer) Allocator.Error!void {
     if (b.buf == .null_handle) return;
-    try r.frames[r.fi].garbage.append(r.gpa, b);
+    try r.pending.append(r.gpa, b);
   }
 
   /// forget every chunk mesh: the world was replaced (e.g. a save was loaded).
@@ -270,6 +278,8 @@ pub const Renderer = struct {
     _ = try c.device.waitForFences(&.{f.fence}, .true, m.maxInt(u64));
     for (f.garbage.items) |*b| b.deinit(c);
     f.garbage.clearRetainingCapacity();
+    try f.garbage.appendSlice(r.gpa, r.pending.items);
+    r.pending.clearRetainingCapacity();
 
     if (resized) { try r.recreate(); return; }
     const acq = c.device.acquireNextImageKHR(r.sc.handle, m.maxInt(u64), f.acquired, .null_handle) catch |e| switch (e) {
