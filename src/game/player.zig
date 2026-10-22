@@ -11,6 +11,10 @@ const World = @import("../world/world.zig").World;
 const mg = @import("../gfx/meshgen.zig");
 const pal = @import("../gfx/meshes/palette.zig");
 const torso_mesh = @import("../gfx/meshes/wolf_torso.zig");
+const rump_mesh = @import("../gfx/meshes/wolf_rump.zig");
+const thigh_mesh = @import("../gfx/meshes/wolf_thigh.zig");
+const calf_mesh = @import("../gfx/meshes/wolf_calf.zig");
+const meshlib = @import("../gfx/meshlib.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
 
@@ -19,8 +23,8 @@ pub const REACH:f32 = 2.4;
 const STEP_UP:f32 = 0.45;
 /// leg segment lengths: upper leg (thigh + shin, hip to hock) 0.32, lower
 /// leg (metatarsal + paw, hock to toe) ~0.66, about twice as long.
-const THIGH:f32 = 0.18;
-const SHIN:f32 = 0.14;
+const THIGH = thigh_mesh.LEN;
+const SHIN = calf_mesh.LEN;
 const META:f32 = 0.56;
 /// the belly's sap at its centre lets the body behind show through faintly;
 /// the pectorals are solidified sap, 30% less see-through.
@@ -55,6 +59,13 @@ const PEC_K = [2]f32{60, 55};
 const PEC_C:f32 = 6;
 const PEC_MASS:f32 = 0.8;
 const PEC_MAX:f32 = 0.02;
+/// the rear: structural vine with a little sap, firmer than the chest and
+/// never idly moving
+const RUMP_K:f32 = 80;
+const RUMP_C:f32 = 7;
+const RUMP_MAX:f32 = 0.015;
+/// the rear's sap nodes are mostly see-through
+const RUMP_SAP_OPACITY:f32 = 0.4;
 
 /// a point mass on a spring: offset from its rest place and velocity.
 const Spring3 = struct { pos:V3 = v3(0, 0, 0), vel:V3 = v3(0, 0, 0) };
@@ -92,6 +103,7 @@ pub const Player = struct {
   /// give (relative to their rest)
   lump:[lumps.len]Spring3 = @splat(.{}),
   pec:[2]Spring3 = @splat(.{}),
+  rump:[2]Spring3 = @splat(.{}),
   tail:[3]f32 = @splat(0),
   tail_v:[3]f32 = @splat(0),
   /// 0..1 blend toward the work gesture (gathering, planting, harvesting)
@@ -183,6 +195,11 @@ pub const Player = struct {
       const d = m.len(s.pos);
       if (d > PEC_MAX) s.pos *= m.splat(PEC_MAX / d);
     }
+    for (&p.rump) |*s| {
+      m.springDamper(&s.pos, &s.vel, v3(0, 0, 0), RUMP_K, RUMP_C, PEC_MASS, -p.accel * m.splat(PEC_MASS * SLOSH), dt);
+      const d = m.len(s.pos);
+      if (d > RUMP_MAX) s.pos *= m.splat(RUMP_MAX / d);
+    }
   }
 
   fn bellyScale(p:*const Player) f32 { return 1 + p.fullness * BELLY_GROW; }
@@ -230,6 +247,11 @@ pub const Player = struct {
       const at = torso_mesh.pec_centre * v3(side * breath, 1, breath) + p.pec[i].pos + idle;
       try out.emit(.wolf_pec, m.chain(.{torso, T(at), S(torso_mesh.pec_radii)}), .{.glow = 0.3, .phase = 0.6, .fade = PEC_OPACITY});
     }
+    // the rear: two knotted lobes of dense vine behind the hips
+    for ([_]meshlib.Id{.wolf_rump_l, .wolf_rump_r}, [_]f32{-1, 1}, 0..) |id, side, i| {
+      const at = rump_mesh.centre * v3(side, 1, 1) + p.rump[i].pos;
+      try out.emit(id, m.chain(.{hips, T(at)}), .{.glow = 0.25, .phase = 0.15, .fade = RUMP_SAP_OPACITY});
+    }
 
     // head looks down into the work, nods with breath
     const nod = @sin(t * 1.7) * 0.03 + p.reach * 0.35 - lean * 0.8;
@@ -264,10 +286,10 @@ pub const Player = struct {
       const mt = -1.6 - 0.4 * lift - 0.25 * p.reach;
       const thigh = m.chain(.{hips, T(v3(side * 0.1, 0, 0)), m.rotX(th)});
       try joint(out, thigh, 0.095);
-      try out.emit(.wolf_limb, m.chain(.{thigh, m.rotX(m.pi), S(v3(0.18 * lb, THIGH, 0.18 * lb))}), vine_look);
+      try out.emit(.wolf_thigh, m.chain(.{thigh, m.rotX(m.pi), S(v3(lb, 1, lb))}), vine_look);
       const knee = m.chain(.{thigh, T(v3(0, -THIGH, 0)), m.rotX(kn)});
       try joint(out, knee, 0.075);
-      try out.emit(.wolf_limb, m.chain(.{knee, m.rotX(m.pi), S(v3(0.13 * lb, SHIN, 0.13 * lb))}), vine_look);
+      try out.emit(.wolf_calf, m.chain(.{knee, m.rotX(m.pi), S(v3(lb, 1, lb))}), vine_look);
       const hock = m.chain(.{knee, T(v3(0, -SHIN, 0)), m.rotX(mt)});
       try joint(out, hock, 0.058);
       try out.emit(.wolf_limb, m.chain(.{hock, m.rotX(m.pi), S(v3(0.095 * lb, META, 0.095 * lb))}), vine_look);
@@ -343,4 +365,5 @@ test "belly contents lag a sprint, overshoot a stop, then settle" {
   // and it never leaves the sac
   for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + 1e-4);
   for (p.pec) |q| try testing.expect(m.len(q.pos) <= PEC_MAX + 1e-5);
+  for (p.rump) |q| try testing.expect(m.len(q.pos) <= RUMP_MAX + 1e-5);
 }
