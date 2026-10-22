@@ -104,9 +104,8 @@ pub const Progression = struct {
     }
   }
 
-  /// advance one research structure. `inv` is the structure's own inventory
-  /// (anything with count/take, see sim/items.zig).
-  pub fn labTick(g:*Progression, lab:*Lab, inv:anytype, dt:f32) void {
+  /// advance one research structure. `inv` is the structure's own inventory.
+  pub fn labTick(g:*Progression, lab:*Lab, inv:items.Bag, dt:f32) void {
     const id = g.current orelse return;
     const r = tree.get(id);
     if (!lab.busy) {
@@ -184,11 +183,11 @@ test "labs consume ingredients unit by unit" {
   g.select(.ley_sight);
   try testing.expect(g.current == .ley_sight);
   // no ingredients: nothing happens
-  g.labTick(&lab, &inv, 10);
+  g.labTick(&lab, inv.bag(), 10);
   try testing.expect(!lab.busy);
   _ = inv.add(.starlight, 20);
   var t:f32 = 0;
-  while (t < 60) : (t += 0.1) g.labTick(&lab, &inv, 0.1);
+  while (t < 60) : (t += 0.1) g.labTick(&lab, inv.bag(), 0.1);
   try testing.expect(g.done.contains(.ley_sight));
   try testing.expectEqual(@as(u32, 10), inv.count(.starlight));
   try testing.expect(g.current == null);

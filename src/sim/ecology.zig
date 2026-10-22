@@ -10,7 +10,7 @@ const plants_mod = @import("plants.zig");
 const World = @import("../world/world.zig").World;
 
 const Plants = plants_mod.Plants;
-const NONE = plants_mod.NONE;
+const Id = plants_mod.Id;
 
 /// knobs that progression turns. The sim never imports game code.
 pub const Mods = struct {
@@ -34,13 +34,13 @@ pub const Ecology = struct {
   dm:std.ArrayList(f32) = .empty,
   dh:std.ArrayList(f32) = .empty,
   df:std.ArrayList(f32) = .empty,
-  dead:std.ArrayList(u32) = .empty,
+  dead:std.ArrayList(Id) = .empty,
 
   pub fn deinit(e:*Ecology, gpa:Allocator) void {
     e.dm.deinit(gpa); e.dh.deinit(gpa); e.df.deinit(gpa); e.dead.deinit(gpa);
   }
 
-  pub fn tick(e:*Ecology, gpa:Allocator, p:*Plants, w:*World, mods:Mods, dt:f32) !Events {
+  pub fn tick(e:*Ecology, gpa:Allocator, p:*Plants, w:*World, mods:Mods, dt:f32) Allocator.Error!Events {
     var ev:Events = .{};
     if (p.topology_dirty) p.rebuildLinks(w);
     const n = p.len();
@@ -86,9 +86,10 @@ pub const Ecology = struct {
       if (sp.share > 0) {
         const rings = if (mods.link2) @as(usize, 2) else 1;
         for (0..rings) |ring| {
-          const ns:[]const u32 = if (ring == 0) &n1[i] else &n2[i];
-          for (ns) |j| {
-            if (j == NONE) break;
+          const ns:[]const Id = if (ring == 0) &n1[i] else &n2[i];
+          for (ns) |id| {
+            if (id == .none) break;
+            const j = id.idx();
             const sj = species.get(sps[j]);
             if (sj.lineage == .parasitic) continue;
             kin += 1;
@@ -102,8 +103,9 @@ pub const Ecology = struct {
         }
       }
       if (sp.drain > 0) {
-        for (n1[i]) |j| {
-          if (j == NONE) break;
+        for (n1[i]) |id| {
+          if (id == .none) break;
+          const j = id.idx();
           const lj = species.get(sps[j]).lineage;
           const prey = switch (lin) {
             .parasitic => lj != .parasitic,
@@ -127,8 +129,9 @@ pub const Ecology = struct {
         dm[i] -= conv;
         essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + 0.1 * kin));
         if (health[i] > 0.5) seeds[i] = @min(MAX_SEEDS, seeds[i] + dt / sp.seed_time);
-        if (lin == .symbiotic) for (n1[i]) |j| {
-          if (j == NONE) break;
+        if (lin == .symbiotic) for (n1[i]) |id| {
+          if (id == .none) break;
+          const j = id.idx();
           if (species.get(sps[j]).lineage == .parasitic and growth[j] >= 1) ev.convergence = true;
         };
       }
@@ -142,7 +145,7 @@ pub const Ecology = struct {
       mana[i] = m.clamp(mana[i] + dm[i], 0, cap);
       health[i] = m.clamp(health[i] + dh[i], 0, 1);
       flow[i] += (df[i] / dt / cap * 4 - flow[i]) * 0.05;
-      if (health[i] <= 0) try e.dead.append(gpa, @intCast(i));
+      if (health[i] <= 0) try e.dead.append(gpa, .of(i));
     }
     var k = e.dead.items.len;
     while (k > 0) { k -= 1; p.remove(w, e.dead.items[k]); }

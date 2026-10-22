@@ -1,5 +1,6 @@
 //! the hotbar: one pod per placeable item, with counts and the selection's name.
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const bufPrint = std.fmt.bufPrint;
 const play = @import("../play.zig");
@@ -8,7 +9,7 @@ const s = @import("style.zig");
 
 const facing = [_][]const u8{"EAST", "SOUTH", "WEST", "NORTH"};
 
-pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) !void {
+pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const n = play.hotbar.len;
   const gap:f32 = 64;
   const x0 = W / 2 - gap * m.f(n - 1) / 2;

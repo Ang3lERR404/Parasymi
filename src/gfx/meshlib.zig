@@ -5,6 +5,8 @@
 //! procedural animation is just transform math.
 //!
 //! A new mesh is one new file plus one line in `parts`.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const mg = @import("meshgen.zig");
 const registry = @import("../core/registry.zig");
 
@@ -36,7 +38,7 @@ pub const Id = reg.Id;
 pub const count = reg.count;
 
 /// build every mesh into `b`, recording each one's (first vertex, count).
-pub fn build(b:*mg.Builder, ranges:*[count][2]u32) !void {
+pub fn build(b:*mg.Builder, ranges:*[count][2]u32) Allocator.Error!void {
   inline for (reg.ids) |id| {
     const first = b.mark();
     try reg.module(id).build(b);

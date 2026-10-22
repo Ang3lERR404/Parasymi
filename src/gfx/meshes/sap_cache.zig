@@ -1,4 +1,6 @@
 //! mesh: SAP CACHE
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -11,7 +13,7 @@ const leaf_dark = pal.leaf_dark;
 const leaf_lite = pal.leaf_lite;
 const sap = pal.sap;
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.ellipsoid(b, .{.center = v3(0, 0.3, 0), .radii = v3(0.33, 0.32, 0.33), .col = color.rgb(.{0.55, 0.38, 0.18}, 255), .rings = 9, .segs = 12, .t = 0.4});
   try mg.ellipsoid(b, .{.center = v3(0, 0.3, 0.27), .radii = v3(0.13, 0.15, 0.08), .col = sap, .part = .bloom, .t = 0.4});
   for (0..5) |i| {

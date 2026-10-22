@@ -1,5 +1,7 @@
 //! the research tree (T): every technology with its per-unit ingredients,
 //! units, status and a tendril of progress; 1-n chooses what blooms study.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const prog = @import("../progression.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
@@ -8,9 +10,9 @@ const m = @import("../../core/math.zig");
 
 const pw:f32 = 720;
 
-pub fn visible(g:*const play.Game) bool { return g.show_research; }
+pub fn visible(g:*const play.Game) bool { return g.mode == .research; }
 
-pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) !void {
+pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const n = m.f(prog.tree.values.len);
   const ph = 100 + 70 * n;
   const px = W - pw - 24;

@@ -20,7 +20,7 @@ pub const Parts = struct {
   pub fn deinit(p:*Parts) void { for (&p.lists) |*l| l.deinit(p.gpa); }
   pub fn clear(p:*Parts) void { for (&p.lists) |*l| l.clearRetainingCapacity(); }
 
-  pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look:Look) !void {
+  pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look:Look) Allocator.Error!void {
     try p.lists[@intFromEnum(id)].append(p.gpa, .{
       .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
       .p = .{look.glow, look.flutter, look.phase, look.fade},

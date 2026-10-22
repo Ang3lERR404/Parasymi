@@ -1,4 +1,6 @@
 //! mesh: GERMINATOR
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -11,7 +13,7 @@ const vine = pal.vine;
 const leaf_dark = pal.leaf_dark;
 const leaf_lite = pal.leaf_lite;
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.ellipsoid(b, .{.center = v3(0, 0.05, 0), .radii = v3(0.95, 0.12, 0.95), .col = core, .rings = 5, .segs = 16});
   for (0..9) |i| {
     const a = m.f(i) / 9 * m.tau;

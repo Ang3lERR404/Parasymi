@@ -3,7 +3,7 @@
 //! Each kind is its own module under `structures/` declaring:
 //!   def:Def                     name, bulb item, footprint, mesh   (required)
 //!   State                       per-kind data (optional, see `State` union)
-//!   tick(ctx, i, dt) bool       advance; returns whether it is active
+//!   tick(ctx, id, dt) bool      advance; returns whether it is active
 //!   wants(s, g, item) u32       how many of `item` it will still take in
 //!   output(s) ?Item             what may leave it (pulled by conduits)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
@@ -36,8 +36,11 @@ const kinds = struct {
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
+const PlantId = ck.PlantId;
 
 pub const Kind = reg.Id;
+/// a placed structure's slot in `Structures.list`.
+pub const Id = ck.StructId;
 
 pub const Def = struct {
   name:[]const u8,
@@ -59,7 +62,7 @@ pub const SLOTS = 16;
 
 pub const Structure = struct {
   x:i32, y:i32,
-  dir:u2 = 0,
+  dir:m.Dir = 0,
   seed:f32,
   inv:items.Inventory(SLOTS) = .{},
   state:State,
@@ -94,68 +97,67 @@ pub const Structures = struct {
 
   pub fn deinit(ss:*Structures, gpa:Allocator) void { ss.list.deinit(gpa); }
 
-  pub fn get(ss:*Structures, i:u32) *Structure { return &ss.list.items[i]; }
+  pub fn get(ss:*Structures, id:Id) *Structure { return &ss.list.items[id.idx()]; }
 
   pub fn canPlace(_:*const Structures, w:*const World, wx:i32, wy:i32, k:Kind) bool {
     return w.footprintFree(wx, wy, defs.get(k).size, dry);
   }
 
-  pub fn place(ss:*Structures, gpa:Allocator, w:*World, wx:i32, wy:i32, k:Kind, dir:u2, seed:f32) !bool {
+  pub fn place(ss:*Structures, gpa:Allocator, w:*World, wx:i32, wy:i32, k:Kind, dir:m.Dir, seed:f32) Allocator.Error!bool {
     if (!ss.canPlace(w, wx, wy, k)) return false;
-    const idx:u32 = @intCast(ss.list.items.len);
+    const idx = Id.of(ss.list.items.len);
     try ss.list.append(gpa, .{.x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k)});
     w.setFootprint(wx, wy, defs.get(k).size, Occ.structure(idx));
     return true;
   }
 
-  pub fn at(_:*const Structures, w:*const World, wx:i32, wy:i32) ?u32 {
-    const o = w.occAt(wx, wy);
-    return if (Occ.isStructure(o)) Occ.index(o) else null;
+  pub fn at(_:*const Structures, w:*const World, wx:i32, wy:i32) ?Id {
+    return w.occAt(wx, wy).asStructure();
   }
 
   /// swap-remove; returns the removed structure so its contents can be refunded.
-  pub fn remove(ss:*Structures, w:*World, i:u32) Structure {
-    const s = ss.list.items[i];
-    w.setFootprint(s.x, s.y, s.def().size, ck.NONE);
-    const last:u32 = @intCast(ss.list.items.len - 1);
-    if (i != last) {
+  pub fn remove(ss:*Structures, w:*World, id:Id) Structure {
+    const s = ss.get(id).*;
+    w.setFootprint(s.x, s.y, s.def().size, .none);
+    const last = ss.list.items.len - 1;
+    if (id.idx() != last) {
       const l = ss.list.items[last];
-      w.moveFootprint(l.x, l.y, l.def().size, Occ.structure(i));
+      w.moveFootprint(l.x, l.y, l.def().size, Occ.structure(id));
     }
-    _ = ss.list.swapRemove(i);
+    _ = ss.list.swapRemove(id.idx());
     return s;
   }
 
   // ---- hook dispatch: one comptime switch each, no per-kind code here ----
 
-  pub fn wants(ss:*Structures, g:*const prog.Progression, i:u32, item:items.Item) u32 {
-    const s = ss.get(i);
+  pub fn wants(ss:*Structures, g:*const prog.Progression, id:Id, item:items.Item) u32 {
+    const s = ss.get(id);
     return switch (s.kind()) {
       inline else => |k| if (comptime reg.has(k, "wants")) reg.module(k).wants(s, g, item) else 0,
     };
   }
 
-  pub fn output(ss:*Structures, i:u32) ?items.Item {
-    const s = ss.get(i);
+  pub fn output(ss:*Structures, id:Id) ?items.Item {
+    const s = ss.get(id);
     return switch (s.kind()) {
       inline else => |k| if (comptime reg.has(k, "output")) reg.module(k).output(s) else null,
     };
   }
 
-  pub fn insert(ss:*Structures, g:*const prog.Progression, i:u32, item:items.Item, n:u16) u16 {
-    const k:u16 = @intCast(@min(n, ss.wants(g, i, item)));
+  pub fn insert(ss:*Structures, g:*const prog.Progression, id:Id, item:items.Item, n:u16) u16 {
+    const k:u16 = @intCast(@min(n, ss.wants(g, id, item)));
     if (k == 0) return 0;
-    return ss.get(i).inv.add(item, k);
+    return ss.get(id).inv.add(item, k);
   }
 
   pub fn tick(ss:*Structures, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) void {
     const ctx:Ctx = .{.w = w, .plants = plants, .g = g, .ss = ss};
     for (0..ss.list.items.len) |idx| {
-      const i:u32 = @intCast(idx);
-      const active = switch (ss.get(i).kind()) {
-        inline else => |k| if (comptime reg.has(k, "tick")) reg.module(k).tick(ctx, i, dt) else false,
+      const id = Id.of(idx);
+      const active = switch (ss.get(id).kind()) {
+        inline else => |k| if (comptime reg.has(k, "tick")) reg.module(k).tick(ctx, id, dt) else false,
       };
-      const s = ss.get(i);
+      const s = ss.get(id);
       s.activity += ((if (active) @as(f32, 1) else 0) - s.activity) * @min(1, dt * 3);
     }
   }
@@ -173,20 +175,21 @@ pub fn configure(s:*Structure, g:*prog.Progression) void {
   }
 }
 
-pub fn emit(s:*const Structure, out:*Parts, ctr:m.V3, tf:f32) !void {
+pub fn emit(s:*const Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   switch (s.kind()) {
     inline else => |k| if (comptime reg.has(k, "emit")) try reg.module(k).emit(s, out, ctr, tf),
   }
 }
 
-pub fn describe(s:*const Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) !void {
+pub fn describe(s:*const Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   switch (s.kind()) {
     inline else => |k| if (comptime reg.has(k, "describe")) try reg.module(k).describe(s, d, g, x, y),
   }
 }
 
 /// take one ripe unit from a mature plant: its yield first, then a seed.
-pub fn harvestOne(plants:*Plants, p:u32) ?items.Item {
+pub fn harvestOne(plants:*Plants, id:PlantId) ?items.Item {
+  const p = id.idx();
   const s = plants.list.slice();
   if (s.items(.growth)[p] < 1) return null;
   const sp = s.items(.sp)[p];

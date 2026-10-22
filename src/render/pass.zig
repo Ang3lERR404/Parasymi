@@ -1,11 +1,13 @@
 //! the shape of a render pass module (see render/passes/). Each pass declares
 //!   desc:Desc                          its shaders, vertex layout and state
 //!   Frame                              per-frame resources (optional)
-//!   initFrame(c) !Frame / deinitFrame(*Frame, c)
-//!   record(r, *Frame, rec) !void       upload this frame's data, draw it
+//!   initFrame(c) Error!Frame / deinitFrame(*Frame, c)
+//!                                      (Frame fields default to empty)
+//!   record(r, *Frame, cmd, scene, stats) upload this frame's data, draw it
 //! Passes record in declaration order inside one dynamic-rendering scope.
 const vk = @import("vulkan");
-const Ctx = @import("../gfx/ctx.zig").Ctx;
+const ctx = @import("../gfx/ctx.zig");
+const Ctx = ctx.Ctx;
 const pipeline = @import("../gfx/pipeline.zig");
 
 /// which push-constant block the pass uses.
@@ -23,7 +25,7 @@ pub const Desc = struct {
 
 pub const stages:vk.ShaderStageFlags = .{.vertex = true, .fragment = true};
 
-pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, fmt:vk.Format) !vk.Pipeline {
+pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, fmt:vk.Format) ctx.Error!vk.Pipeline {
   const vs = try c.shader(d.vert);
   defer c.device.destroyShaderModule(vs, null);
   const fs = try c.shader(d.frag);

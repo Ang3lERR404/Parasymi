@@ -24,10 +24,24 @@ const player_mod = @import("player.zig");
 const play = @import("play.zig");
 
 const Game = play.Game;
+const Belly = @FieldType(player_mod.Player, "inv");
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
 const VERSION:u32 = 1;
+
+/// everything saving and loading can fail with; file-system errors are
+/// folded into these at the boundary.
+pub const Error = error{
+  /// there is no save file yet
+  NoSave,
+  SaveUnreadable,
+  SaveUnwritable,
+  NotASave,
+  /// written by a build whose stored layout differs
+  IncompatibleSave,
+  CorruptSave,
+} || Allocator.Error;
 
 /// one plant, without its runtime links (rebuilt on load).
 const PlantRec = extern struct {
@@ -51,7 +65,7 @@ const layout_fingerprint = blk: {
   var h:u64 = 0xA5;
   for ([_]usize{
     @sizeOf(PlantRec), @sizeOf(NodesRec), @sizeOf(st.Structure),
-    @sizeOf(prog.Progression), @sizeOf(craft.Crafter), @sizeOf(@TypeOf(@as(player_mod.Player, undefined).inv)),
+    @sizeOf(prog.Progression), @sizeOf(craft.Crafter), @sizeOf(Belly),
     @sizeOf(Rng), species.count, st.defs.values.len,
   }) |n| h = h *% 0x100000001B3 ^ n;
   break :blk h;
@@ -60,13 +74,13 @@ const layout_fingerprint = blk: {
 const Writer = struct {
   gpa:Allocator,
   buf:std.ArrayList(u8) = .empty,
-  fn put(w:*Writer, v:anytype) !void { try w.buf.appendSlice(w.gpa, asBytes(&v)); }
+  fn put(w:*Writer, comptime T:type, v:T) Allocator.Error!void { try w.buf.appendSlice(w.gpa, asBytes(&v)); }
 };
 
 const Reader = struct {
   data:[]const u8,
   pos:usize = 0,
-  fn get(r:*Reader, comptime T:type) !T {
+  fn get(r:*Reader, comptime T:type) Error!T {
     if (r.pos + @sizeOf(T) > r.data.len) return error.CorruptSave;
     var v:T = undefined;
     @memcpy(asBytes(&v), r.data[r.pos..][0..@sizeOf(T)]);
@@ -75,41 +89,41 @@ const Reader = struct {
   }
 };
 
-pub fn encode(gpa:Allocator, g:*const Game) ![]u8 {
+pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
   var w:Writer = .{.gpa = gpa};
   errdefer w.buf.deinit(gpa);
-  try w.put(Header{.magic = MAGIC, .version = VERSION, .layout = layout_fingerprint, .seed = g.world.seed});
+  try w.put(Header, .{.magic = MAGIC, .version = VERSION, .layout = layout_fingerprint, .seed = g.world.seed});
 
   // the gardener and what it knows
-  try w.put(g.rng);
-  try w.put(g.sky.tod);
-  try w.put(g.time);
-  try w.put(@as(u32, @intCast(g.hot)));
-  try w.put(g.place_dir);
-  try w.put(g.player.pos);
-  try w.put(g.player.facing);
-  try w.put(g.player.inv);
-  try w.put(g.weave);
-  try w.put(g.prog);
+  try w.put(Rng, g.rng);
+  try w.put(f32, g.sky.tod);
+  try w.put(f64, g.time);
+  try w.put(u32, @intCast(g.hot));
+  try w.put(m.Dir, g.place_dir);
+  try w.put(m.V3, g.player.pos);
+  try w.put(f32, g.player.facing);
+  try w.put(Belly, g.player.inv);
+  try w.put(craft.Crafter, g.weave);
+  try w.put(prog.Progression, g.prog);
 
   // everything it grew
   const s = g.plants.list.slice();
-  try w.put(@as(u32, @intCast(g.plants.len())));
-  for (0..g.plants.len()) |i| try w.put(PlantRec{
+  try w.put(u32, @intCast(g.plants.len()));
+  for (0..g.plants.len()) |i| try w.put(PlantRec, .{
     .x = s.items(.x)[i], .y = s.items(.y)[i], .sp = @intFromEnum(s.items(.sp)[i]),
     .growth = s.items(.growth)[i], .mana = s.items(.mana)[i], .health = s.items(.health)[i],
     .seed = s.items(.seed)[i], .flow = s.items(.flow)[i], .essence = s.items(.essence)[i], .seeds = s.items(.seeds)[i],
   });
-  try w.put(@as(u32, @intCast(g.structs.list.items.len)));
-  for (g.structs.list.items) |it| try w.put(it);
+  try w.put(u32, @intCast(g.structs.list.items.len));
+  for (g.structs.list.items) |it| try w.put(st.Structure, it);
 
   // gathered resource nodes (only chunks that differ from generation)
   var touched:std.ArrayList(*const ck.Chunk) = .empty;
   defer touched.deinit(gpa);
   var it = g.world.map.valueIterator();
   while (it.next()) |c| if (gathered(g.world.seed, c.*)) try touched.append(gpa, c.*);
-  try w.put(@as(u32, @intCast(touched.items.len)));
-  for (touched.items) |c| try w.put(NodesRec{.at = c.at, .res = c.res});
+  try w.put(u32, @intCast(touched.items.len));
+  for (touched.items) |c| try w.put(NodesRec, .{.at = c.at, .res = c.res});
 
   return w.buf.toOwnedSlice(gpa);
 }
@@ -123,7 +137,7 @@ fn gathered(seed:u64, c:*const ck.Chunk) bool {
 }
 
 /// rebuild a game from bytes produced by `encode`.
-pub fn decode(gpa:Allocator, data:[]const u8) !Game {
+pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
   var r:Reader = .{.data = data};
   const h = try r.get(Header);
   if (!eql(u8, &h.magic, &MAGIC)) return error.NotASave;
@@ -135,10 +149,11 @@ pub fn decode(gpa:Allocator, data:[]const u8) !Game {
   g.sky.tod = try r.get(f32);
   g.time = try r.get(f64);
   g.hot = try r.get(u32);
+  if (g.hot >= play.hotbar.len) return error.CorruptSave;
   g.place_dir = try r.get(m.Dir);
   g.player.pos = try r.get(m.V3);
   g.player.facing = try r.get(f32);
-  g.player.inv = try r.get(@TypeOf(g.player.inv));
+  g.player.inv = try r.get(Belly);
   g.weave = try r.get(craft.Crafter);
   g.prog = try r.get(prog.Progression);
   g.cam.target = g.player.pos;
@@ -173,21 +188,25 @@ pub fn decode(gpa:Allocator, data:[]const u8) !Game {
   return g;
 }
 
-fn ensureFootprint(g:*Game, x:i32, y:i32, size:u8) !void {
+fn ensureFootprint(g:*Game, x:i32, y:i32, size:u8) Allocator.Error!void {
   const far = @as(i32, size) - 1;
   for ([_][2]i32{.{x, y}, .{x + far, y}, .{x, y + far}, .{x + far, y + far}}) |t| {
     _ = try g.world.ensure(ck.Coord.ofTile(t[0], t[1]));
   }
 }
 
-pub fn save(g:*Game, gpa:Allocator, io:Io) !void {
+pub fn save(g:*Game, gpa:Allocator, io:Io) Error!void {
   const bytes = try encode(gpa, g);
   defer gpa.free(bytes);
-  try Io.Dir.cwd().writeFile(io, .{.sub_path = PATH, .data = bytes});
+  Io.Dir.cwd().writeFile(io, .{.sub_path = PATH, .data = bytes}) catch return error.SaveUnwritable;
 }
 
-pub fn load(gpa:Allocator, io:Io) !Game {
-  const bytes = try Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(64 << 20));
+pub fn load(gpa:Allocator, io:Io) Error!Game {
+  const bytes = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(64 << 20)) catch |e| return switch (e) {
+    error.FileNotFound => error.NoSave,
+    error.OutOfMemory => error.OutOfMemory,
+    else => error.SaveUnreadable,
+  };
   defer gpa.free(bytes);
   return decode(gpa, bytes);
 }

@@ -2,6 +2,7 @@
 //! recipes the wolf weaves by hand (only the seed ones), at its own pace.
 const std = @import("std");
 const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
 const prog = @import("../progression.zig");
@@ -20,12 +21,12 @@ pub const State = struct {
   weave:craft.Crafter = .{},
 };
 
-pub fn tick(ctx:st.Ctx, i:u32, dt:f32) bool {
+pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const s = ctx.ss.get(i);
   const g = &s.state.germinator;
   const r = craft.hand[g.recipe];
-  if (!g.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(&s.inv, r)) _ = g.weave.push(&s.inv, g.recipe);
-  _ = g.weave.tick(&s.inv, dt * SPEED);
+  if (!g.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(s.inv.bag(), r)) _ = g.weave.push(s.inv.bag(), g.recipe);
+  _ = g.weave.tick(s.inv.bag(), dt * SPEED);
   return g.weave.busy();
 }
 
@@ -55,7 +56,7 @@ pub fn configure(s:*st.Structure, g:*prog.Progression) void {
   g.say("GERMINATOR NOW WEAVES {s}", .{craft.hand[r].out.info().name});
 }
 
-pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) !void {
+pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const gs = &s.state.germinator;
   _ = try d.print(x, y, 1.4, .{235, 240, 225, 255}, "WEAVES {s} (C)", .{craft.hand[gs.recipe].out.info().name});
   try d.tendril(x + 250, y + 2, 110, 12, .{255, 215, 130, 255}, gs.weave.progress(), 0.3);

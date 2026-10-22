@@ -1,6 +1,8 @@
 //! what gets drawn: turns the game state into a render Scene (plant
 //! instances, rigid parts, HUD, sky/fog/light push constants). Read-only with
 //! respect to the simulation.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const rng = @import("../core/rng.zig");
 const ck = @import("../world/chunk.zig");
@@ -14,13 +16,13 @@ const play = @import("play.zig");
 
 const Game = play.Game;
 
-pub fn scene(g:*Game, screen:[2]f32) !renderer.Scene {
+pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.dist * 2.2 + 12;
   const tf:f32 = @floatCast(@mod(g.time, 3600));
 
   try plants(g, reach, tf);
   g.parts.clear();
-  try g.player.rig(&g.parts);
+  const feet = try g.player.rig(&g.parts);
   try nodes(g, @intFromFloat(@min(reach, 40)));
   try structures(g, reach, tf);
   try ghost(g, tf);
@@ -39,6 +41,10 @@ pub fn scene(g:*Game, screen:[2]f32) !renderer.Scene {
       .fog = .{sky[0], sky[1], sky[2], 1.0 / (32 * ck.SIZE / 8 + g.cam.dist)},
       .misc = .{veil, if (g.prog.done.contains(.ley_sight)) 1 else 0, hv[0], hv[1]},
       .sun = .{ld[0], ld[1], ld[2], g.sky.daylight()},
+      .feet = .{
+        .{feet[0][0], feet[0][1], feet[0][2], g.player.facing},
+        .{feet[1][0], feet[1][1], feet[1][2], g.player.facing},
+      },
     },
     .clear = sky,
     .instances = undefined,
@@ -51,7 +57,7 @@ pub fn scene(g:*Game, screen:[2]f32) !renderer.Scene {
 }
 
 /// plant instances near the camera, grouped by species.
-fn plants(g:*Game, reach:f32, tf:f32) !void {
+fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   for (&g.inst) |*l| l.clearRetainingCapacity();
   const s = g.plants.list.slice();
   for (0..g.plants.len()) |i| {
@@ -76,7 +82,7 @@ fn structCentre(g:*const Game, s:*const st.Structure) m.V3 {
 
 /// structures breathe and glow with their activity; each kind adds its own
 /// extras through its `emit` hook.
-fn structures(g:*Game, reach:f32, tf:f32) !void {
+fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   for (g.structs.list.items) |*s| {
     const ctr = structCentre(g, s);
     if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[2] - g.cam.target[2]) > reach) continue;
@@ -89,10 +95,10 @@ fn structures(g:*Game, reach:f32, tf:f32) !void {
 }
 
 /// a tinted, pulsing preview of the structure about to be grown.
-fn ghost(g:*Game, tf:f32) !void {
+fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   const h = g.hover orelse return;
   const k = st.kindOf(play.hotbar[g.hot]) orelse return;
-  if (g.show_inv or g.show_research) return;
+  if (g.mode != .roam) return;
   const def = st.defs.get(k);
   const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(def.item) > 0;
   const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + 0.02);
@@ -101,7 +107,7 @@ fn ghost(g:*Game, tf:f32) !void {
 }
 
 /// resource nodes within `nr` tiles of the camera focus.
-fn nodes(g:*Game, nr:i32) !void {
+fn nodes(g:*Game, nr:i32) Allocator.Error!void {
   const cx, const cz = m.tileAt(g.cam.target);
   const lo = ck.Coord.ofTile(cx - nr, cz - nr);
   const hi = ck.Coord.ofTile(cx + nr, cz + nr);
@@ -126,7 +132,7 @@ fn nodes(g:*Game, nr:i32) !void {
   }
 }
 
-fn motes(g:*Game) !void {
+fn motes(g:*Game) Allocator.Error!void {
   for (g.stars.motes.items) |mo| {
     const spin = @as(f32, @floatCast(g.time)) * 1.5 + mo.phase * 10;
     const fade = m.clamp01(mo.life);

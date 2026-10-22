@@ -5,6 +5,7 @@ layout(push_constant) uniform Push {
   vec4 fog;       // rgb fog/sky colour (linear), w fog density
   vec4 misc;      // x veil 0..1, y ley sight 0/1, zw hovered tile (x,z)
   vec4 sun;       // xyz direction toward the key light (sun or moon), w daylight 0..1
+  vec4 feet[2];   // the wolf's paws: xyz world position, w facing yaw
 } pc;
 
 #define SUN pc.sun.xyz

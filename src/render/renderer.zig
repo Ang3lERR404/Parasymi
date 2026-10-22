@@ -5,11 +5,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const sliceAsBytes = std.mem.sliceAsBytes;
+const ArenaAllocator = std.heap.ArenaAllocator;
 const vk = @import("vulkan");
 const glfw = @import("zglfw");
 const m = @import("../core/math.zig");
 const registry = @import("../core/registry.zig");
-const Ctx = @import("../gfx/ctx.zig").Ctx;
+const ctx = @import("../gfx/ctx.zig");
+const Ctx = ctx.Ctx;
 const sw = @import("../gfx/swapchain.zig");
 const Buffer = @import("../gfx/buffer.zig").Buffer;
 const pipeline = @import("../gfx/pipeline.zig");
@@ -33,12 +35,17 @@ pub const Pass = reg.Id;
 
 pub const FRAMES = 2;
 
+/// the renderer fails the way the graphics layer does.
+pub const Error = ctx.Error;
+
 pub const WorldPush = extern struct {
   vp:m.M4,
   eye_time:[4]f32,
   fog:[4]f32,
   misc:[4]f32,
   sun:[4]f32,
+  /// the wolf's paws for contact shadows: world x, y, z, facing yaw
+  feet:[2][4]f32,
 };
 
 pub const Scene = struct {
@@ -56,12 +63,13 @@ pub const Scene = struct {
 pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0 };
 
 const Frame = struct {
-  pool:vk.CommandPool,
-  cmd:vk.CommandBuffer,
-  fence:vk.Fence,
-  acquired:vk.Semaphore,
+  pool:vk.CommandPool = .null_handle,
+  /// freed with its pool
+  cmd:vk.CommandBuffer = undefined,
+  fence:vk.Fence = .null_handle,
+  acquired:vk.Semaphore = .null_handle,
   /// each pass's per-frame resources, side by side
-  pass:reg.Struct("Frame"),
+  pass:reg.Struct("Frame") = undefined,
   /// buffers retired while this frame was in flight; freed when it comes round again.
   garbage:std.ArrayList(Buffer) = .empty,
 };
@@ -74,45 +82,44 @@ pub const Renderer = struct {
   ctx:Ctx,
   sc:sw.Swapchain,
   vsync:bool,
-  frames:[FRAMES]Frame,
+  frames:[FRAMES]Frame = @splat(.{}),
   fi:usize = 0,
-  layouts:[2]vk.PipelineLayout,
-  pipes:[reg.count]vk.Pipeline,
+  layouts:[2]vk.PipelineLayout = @splat(.null_handle),
+  pipes:[reg.count]vk.Pipeline = @splat(.null_handle),
   /// terrain chunk meshes (see syncWorld)
   slots:std.ArrayList(Slot) = .empty,
-  free_slots:std.ArrayList(u32) = .empty,
+  free_slots:std.ArrayList(ck.MeshSlot) = .empty,
   /// every built-once mesh (plant species + part library) in one buffer.
-  meshes:Buffer,
-  plant_ranges:[species.count][2]u32,
-  part_ranges:[meshlib.count][2]u32,
+  meshes:Buffer = .{},
+  plant_ranges:[species.count][2]u32 = undefined,
+  part_ranges:[meshlib.count][2]u32 = undefined,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   stats:Stats = .{},
 
-  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool) !*Renderer {
+  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool) Error!*Renderer {
     const r = try gpa.create(Renderer);
     errdefer gpa.destroy(r);
-    r.* = undefined;
-    r.gpa = gpa;
-    r.window = window;
-    r.vsync = vsync;
-    r.fi = 0;
-    r.slots = .empty;
-    r.free_slots = .empty;
-    r.scratch = .empty;
-    r.stats = .{};
+    r.* = .{.gpa = gpa, .window = window, .vsync = vsync, .ctx = undefined, .sc = .{}};
+    for (&r.frames) |*f| inline for (reg.ids) |id| {
+      if (comptime reg.has(id, "Frame")) @field(f.pass, @tagName(id)) = .{};
+    };
     r.ctx = try Ctx.init(gpa, window);
+    errdefer r.ctx.deinit(gpa);
+    // everything below starts null, so a half-built renderer frees cleanly
+    errdefer r.release();
+    r.build() catch |e| return ctx.fold(e);
+    return r;
+  }
+
+  fn build(r:*Renderer) !void {
     const c = &r.ctx;
-    const fb = window.getFramebufferSize();
-    r.sc = try sw.Swapchain.init(c, gpa, @intCast(fb[0]), @intCast(fb[1]), vsync, .null_handle);
+    const fb = r.window.getFramebufferSize();
+    r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, .null_handle);
 
     for (&r.frames) |*f| {
-      f.* = .{
-        .pool = try c.device.createCommandPool(&.{.flags = .{.reset_command_buffer = true}, .queue_family_index = c.family}, null),
-        .cmd = undefined,
-        .fence = try c.device.createFence(&.{.flags = .{.signaled = true}}, null),
-        .acquired = try c.device.createSemaphore(&.{}, null),
-        .pass = undefined,
-      };
+      f.pool = try c.device.createCommandPool(&.{.flags = .{.reset_command_buffer = true}, .queue_family_index = c.family}, null);
+      f.fence = try c.device.createFence(&.{.flags = .{.signaled = true}}, null);
+      f.acquired = try c.device.createSemaphore(&.{}, null);
       inline for (reg.ids) |id| {
         if (comptime reg.has(id, "Frame")) @field(f.pass, @tagName(id)) = try reg.module(id).initFrame(c);
       }
@@ -126,16 +133,17 @@ pub const Renderer = struct {
       r.pipes[@intFromEnum(id)] = try pass.create(c, d, r.layout(d.layout), r.sc.format.format);
     }
     try r.buildMeshes();
-    return r;
   }
 
   pub fn pipe(r:*const Renderer, p:Pass) vk.Pipeline { return r.pipes[@intFromEnum(p)]; }
   pub fn layout(r:*const Renderer, l:pass.Layout) vk.PipelineLayout { return r.layouts[@intFromEnum(l)]; }
 
   /// grow every species' mesh and every library part once into one buffer.
-  fn buildMeshes(r:*Renderer) !void {
-    var b:meshgen.Builder = .{.gpa = r.gpa};
-    defer b.deinit();
+  fn buildMeshes(r:*Renderer) Error!void {
+    // the builder's vertices are scratch: one arena, freed in one go once uploaded
+    var arena = ArenaAllocator.init(r.gpa);
+    defer arena.deinit();
+    var b:meshgen.Builder = .{.gpa = arena.allocator()};
     for (species.ids) |id| {
       const first:u32 = @intCast(b.v.items.len);
       try meshgen.plant(&b, id);
@@ -148,8 +156,16 @@ pub const Renderer = struct {
   }
 
   pub fn deinit(r:*Renderer) void {
+    // nothing to recover: teardown proceeds even if the device was lost
+    r.ctx.device.deviceWaitIdle() catch {};
+    r.release();
+    r.ctx.deinit(r.gpa);
+    r.gpa.destroy(r);
+  }
+
+  /// free every GPU object the renderer made (null handles are skipped).
+  fn release(r:*Renderer) void {
     const c = &r.ctx;
-    c.device.deviceWaitIdle() catch {};
     for (&r.frames) |*f| {
       for (f.garbage.items) |*b| b.deinit(c);
       f.garbage.deinit(r.gpa);
@@ -168,27 +184,26 @@ pub const Renderer = struct {
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
     r.sc.deinit(c, r.gpa, false);
-    r.ctx.deinit(r.gpa);
-    r.gpa.destroy(r);
   }
 
-  fn retire(r:*Renderer, b:Buffer) !void {
+  fn retire(r:*Renderer, b:Buffer) Allocator.Error!void {
     if (b.buf == .null_handle) return;
     try r.frames[r.fi].garbage.append(r.gpa, b);
   }
 
   /// forget every chunk mesh: the world was replaced (e.g. a save was loaded).
-  pub fn dropWorld(r:*Renderer) !void {
+  pub fn dropWorld(r:*Renderer) Allocator.Error!void {
     for (r.slots.items) |s| try r.retire(s.buf);
     r.slots.clearRetainingCapacity();
     r.free_slots.clearRetainingCapacity();
   }
 
   /// upload meshes for new/dirty chunks (at most `budget`) and drop evicted ones.
-  pub fn syncWorld(r:*Renderer, w:*World, budget:u32) !void {
+  pub fn syncWorld(r:*Renderer, w:*World, budget:u32) Error!void {
     for (w.evicted.items) |si| {
-      try r.retire(r.slots.items[si].buf);
-      r.slots.items[si] = .{};
+      const i = @intFromEnum(si);
+      try r.retire(r.slots.items[i].buf);
+      r.slots.items[i] = .{};
       try r.free_slots.append(r.gpa, si);
     }
     w.evicted.clearRetainingCapacity();
@@ -203,19 +218,21 @@ pub const Renderer = struct {
       const bytes = sliceAsBytes(r.scratch.items);
       var buf = try Buffer.init(&r.ctx, @max(bytes.len, 64), .{.vertex_buffer = true});
       buf.write(0, bytes);
-      if (c.gpu_slot == ck.NONE) {
-        c.gpu_slot = r.free_slots.pop() orelse blk: {
-          try r.slots.append(r.gpa, .{});
-          break :blk @intCast(r.slots.items.len - 1);
-        };
-      } else try r.retire(r.slots.items[c.gpu_slot].buf);
-      r.slots.items[c.gpu_slot] = .{.buf = buf, .count = @intCast(r.scratch.items.len), .live = true};
+      errdefer buf.deinit(&r.ctx);
+      const slot = if (c.gpu_slot) |s| s else r.free_slots.pop() orelse blk: {
+        try r.slots.append(r.gpa, .{});
+        break :blk @as(ck.MeshSlot, @enumFromInt(r.slots.items.len - 1));
+      };
+      const at = @intFromEnum(slot);
+      if (c.gpu_slot != null) try r.retire(r.slots.items[at].buf);
+      c.gpu_slot = slot;
+      r.slots.items[at] = .{.buf = buf, .count = @intCast(r.scratch.items.len), .live = true};
       c.dirty = false;
       r.stats.meshed += 1;
     }
   }
 
-  fn recreate(r:*Renderer) !void {
+  fn recreate(r:*Renderer) Error!void {
     const c = &r.ctx;
     var fb = r.window.getFramebufferSize();
     while (fb[0] == 0 or fb[1] == 0) {
@@ -223,7 +240,7 @@ pub const Renderer = struct {
       fb = r.window.getFramebufferSize();
       if (r.window.shouldClose()) return;
     }
-    try c.device.deviceWaitIdle();
+    c.device.deviceWaitIdle() catch |e| return ctx.fold(e);
     const old = r.sc;
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, old.handle);
     var o = old;
@@ -234,7 +251,11 @@ pub const Renderer = struct {
     return .{m.f(r.sc.extent.width), m.f(r.sc.extent.height)};
   }
 
-  pub fn draw(r:*Renderer, scene:*const Scene, resized:bool) !void {
+  pub fn draw(r:*Renderer, scene:*const Scene, resized:bool) Error!void {
+    r.frame(scene, resized) catch |e| return ctx.fold(e);
+  }
+
+  fn frame(r:*Renderer, scene:*const Scene, resized:bool) !void {
     const c = &r.ctx;
     const f = &r.frames[r.fi];
     _ = try c.device.waitForFences(&.{f.fence}, .true, m.maxInt(u64));
@@ -255,7 +276,7 @@ pub const Renderer = struct {
     r.begin(cmd, img, scene.clear);
 
     var stats:Stats = .{.meshed = r.stats.meshed};
-    inline for (reg.ids) |id| try reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
+    inline for (reg.ids) |id| reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
 
     r.end(cmd, img);
     try cmd.endCommandBuffer();

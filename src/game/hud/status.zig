@@ -1,9 +1,11 @@
 //! time of day (a sun or moon pod) and how full the wolf's sap belly is.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("style.zig");
 
-pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) !void {
+pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
   try d.membrane(16, 14, 300, 74, s.skin, 0.1);
   const day = g.sky.daylight();
   const orb = if (day > 0.5) [4]u8{255, 210, 120, 255} else [4]u8{170, 190, 255, 255};

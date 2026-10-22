@@ -3,7 +3,8 @@ const std = @import("std");
 const m = @import("../core/math.zig");
 const Allocator = std.mem.Allocator;
 const vk = @import("vulkan");
-const Ctx = @import("ctx.zig").Ctx;
+const ctx = @import("ctx.zig");
+const Ctx = ctx.Ctx;
 
 pub const depth_format:vk.Format = .d32_sfloat;
 
@@ -19,8 +20,17 @@ pub const Swapchain = struct {
   depth_mem:vk.DeviceMemory = .null_handle,
   depth_view:vk.ImageView = .null_handle,
 
-  pub fn init(c:*const Ctx, gpa:Allocator, w:u32, h:u32, vsync:bool, old:vk.SwapchainKHR) !Swapchain {
+  pub fn init(c:*const Ctx, gpa:Allocator, w:u32, h:u32, vsync:bool, old:vk.SwapchainKHR) ctx.Error!Swapchain {
     var s:Swapchain = .{};
+    s.create(c, gpa, w, h, vsync, old) catch |e| {
+      s.deinit(c, gpa, false);
+      return ctx.fold(e);
+    };
+    return s;
+  }
+
+  /// on failure leaves `s` holding only what was made, for `deinit` to free.
+  fn create(s:*Swapchain, c:*const Ctx, gpa:Allocator, w:u32, h:u32, vsync:bool, old:vk.SwapchainKHR) !void {
     const caps = try c.instance.getPhysicalDeviceSurfaceCapabilitiesKHR(c.pdev, c.surface);
     s.extent = if (caps.current_extent.width != m.maxInt(u32)) caps.current_extent else .{
       .width = m.clamp(w, caps.min_image_extent.width, caps.max_image_extent.width),
@@ -59,7 +69,9 @@ pub const Swapchain = struct {
 
     s.images = try c.device.getSwapchainImagesAllocKHR(s.handle, gpa);
     s.views = try gpa.alloc(vk.ImageView, s.images.len);
+    @memset(s.views, .null_handle);
     s.done = try gpa.alloc(vk.Semaphore, s.images.len);
+    @memset(s.done, .null_handle);
     for (s.images, s.views, s.done) |img, *v, *d| {
       v.* = try c.device.createImageView(&.{
         .image = img,
@@ -96,17 +108,15 @@ pub const Swapchain = struct {
       .components = .{.r = .identity, .g = .identity, .b = .identity, .a = .identity},
       .subresource_range = depthRange(),
     }, null);
-    return s;
   }
 
   pub fn deinit(s:*Swapchain, c:*const Ctx, gpa:Allocator, keep_handle:bool) void {
     c.device.destroyImageView(s.depth_view, null);
     c.device.destroyImage(s.depth, null);
     c.device.freeMemory(s.depth_mem, null);
-    for (s.views, s.done) |v, d| {
-      c.device.destroyImageView(v, null);
-      c.device.destroySemaphore(d, null);
-    }
+    // null handles are no-ops, so a half-built swapchain frees cleanly too
+    for (s.views) |v| c.device.destroyImageView(v, null);
+    for (s.done) |d| c.device.destroySemaphore(d, null);
     gpa.free(s.views);
     gpa.free(s.done);
     gpa.free(s.images);

@@ -20,7 +20,7 @@ pub const Builder = struct {
 
   pub fn deinit(b:*Builder) void { b.v.deinit(b.gpa); }
 
-  fn put(b:*Builder, p:V3, n:V3, col:[4]u8, t:f32, u:f32, part:vertex.Part) !void {
+  fn put(b:*Builder, p:V3, n:V3, col:[4]u8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
     try b.v.append(b.gpa, .{.pos = p, .nrm = m.norm(n), .col = col, .tu = .{t, u}, .part = @intFromEnum(part)});
   }
 
@@ -43,7 +43,7 @@ pub const Builder = struct {
   pub fn mark(b:*const Builder) usize { return b.v.items.len; }
 
   /// tube along a spine, `sides` facets, radius tapering from r0 to r1.
-  pub fn tube(b:*Builder, spine:[]const V3, ts:[]const f32, r0:f32, r1:f32, col:[4]u8, part:vertex.Part, sides:u32) !void {
+  pub fn tube(b:*Builder, spine:[]const V3, ts:[]const f32, r0:f32, r1:f32, col:[4]u8, part:vertex.Part, sides:u32) Allocator.Error!void {
     var radii:[MAX_SPINE]f32 = undefined;
     const last = m.f(spine.len - 1);
     for (0..spine.len) |i| radii[i] = m.lerp(r0, r1, m.f(i) / last);
@@ -53,7 +53,7 @@ pub const Builder = struct {
   /// watertight tube: one ring per spine point, oriented by a frame carried
   /// smoothly along the curve (parallel transport) so consecutive segments
   /// share their rings exactly, with both ends capped.
-  pub fn tubeR(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, col:[4]u8, part:vertex.Part, sides:u32) !void {
+  pub fn tubeR(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, col:[4]u8, part:vertex.Part, sides:u32) Allocator.Error!void {
     assert(spine.len >= 2 and spine.len <= MAX_SPINE and sides <= MAX_SIDES);
     var rings:[MAX_SPINE][MAX_SIDES]V3 = undefined;
     var norms:[MAX_SPINE][MAX_SIDES]V3 = undefined;
@@ -96,7 +96,7 @@ pub const Builder = struct {
   }
 
   /// curved blade (leaf/petal). `dir` horizontal outward, droops along its length.
-  pub fn blade(b:*Builder, base:V3, dir:V3, len:f32, width:f32, droop:f32, col:[4]u8, tip:[4]u8, t:f32, part:vertex.Part) !void {
+  pub fn blade(b:*Builder, base:V3, dir:V3, len:f32, width:f32, droop:f32, col:[4]u8, tip:[4]u8, t:f32, part:vertex.Part) Allocator.Error!void {
     const segs = 8;
     const side = m.norm(m.cross(dir, m.v3(0, 1, 0)));
     // rows of (left, centre, right) shared between neighbouring quads, with one
@@ -134,7 +134,7 @@ pub const Builder = struct {
     }
   }
 
-  pub fn cone(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:[4]u8, t:f32, part:vertex.Part) !void {
+  pub fn cone(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:[4]u8, t:f32, part:vertex.Part) Allocator.Error!void {
     const side = m.norm(m.cross(dir, if (@abs(dir[1]) > 0.9) m.v3(1, 0, 0) else m.v3(0, 1, 0)));
     const up = m.cross(side, dir);
     const tip = base + dir * m.splat(len);
@@ -166,7 +166,7 @@ pub const Ellipsoid = struct {
   t:f32 = 0,
 };
 
-pub fn ellipsoid(b:*Builder, e:Ellipsoid) !void {
+pub fn ellipsoid(b:*Builder, e:Ellipsoid) Allocator.Error!void {
   const R = e.rings;
   const S = e.segs;
   for (0..R) |ri| for (0..S) |si| {
@@ -186,7 +186,7 @@ pub fn ellipsoid(b:*Builder, e:Ellipsoid) !void {
 
 /// a woven bundle of vines along +Y from 0 to 1: a darker core wrapped by
 /// `strands` helical vines. `profile(k)` gives the bundle radius at height k.
-pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32, core:[4]u8, vine:[4]u8) !void {
+pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32, core:[4]u8, vine:[4]u8) Allocator.Error!void {
   const N = 18;
   var spine:[N + 1]V3 = undefined;
   var ts:[N + 1]f32 = undefined;
@@ -215,7 +215,7 @@ pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32,
 }
 
 /// grow a species' mesh from its genome. Deterministic per species.
-pub fn plant(b:*Builder, id:species.Id) !void {
+pub fn plant(b:*Builder, id:species.Id) Allocator.Error!void {
   const g = species.get(id).genome;
   var rng = Rng.init(@as(u64, @intFromEnum(id)) + 77);
   const golden = 2.39996;

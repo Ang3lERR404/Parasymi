@@ -6,7 +6,8 @@ const vk = @import("vulkan");
 const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
 const meshlib = @import("../../gfx/meshlib.zig");
-const Ctx = @import("../../gfx/ctx.zig").Ctx;
+const ctx = @import("../../gfx/ctx.zig");
+const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
 const pass = @import("../pass.zig");
 const R = @import("../renderer.zig");
@@ -17,16 +18,18 @@ pub const desc:pass.Desc = .{
   .vert = "part.vert", .frag = "part.frag",
   .bindings = &.{pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PartInstance, 1, .instance)},
   .attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5)),
+  // everything is opaque except translucent sap (instance fade < 1)
+  .blend = true,
 };
 
-pub const Frame = struct { inst:Buffer };
+pub const Frame = struct { inst:Buffer = .{} };
 
-pub fn initFrame(c:*const Ctx) !Frame {
+pub fn initFrame(c:*const Ctx) ctx.Error!Frame {
   return .{.inst = try Buffer.init(c, MAX * @sizeOf(vertex.PartInstance), .{.vertex_buffer = true})};
 }
 pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
 
-pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) !void {
+pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   var n:u32 = 0;
   var first:[meshlib.count]u32 = undefined;
   var counts:[meshlib.count]u32 = undefined;

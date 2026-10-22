@@ -4,7 +4,8 @@ const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
 const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
-const Ctx = @import("../../gfx/ctx.zig").Ctx;
+const ctx = @import("../../gfx/ctx.zig");
+const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
 const pass = @import("../pass.zig");
 const R = @import("../renderer.zig");
@@ -21,14 +22,14 @@ pub const desc:pass.Desc = .{
 /// screen size and time for the animated shapes
 pub const Push = extern struct { screen:[2]f32, time:f32, pad:f32 = 0 };
 
-pub const Frame = struct { verts:Buffer };
+pub const Frame = struct { verts:Buffer = .{} };
 
-pub fn initFrame(c:*const Ctx) !Frame {
+pub fn initFrame(c:*const Ctx) ctx.Error!Frame {
   return .{.verts = try Buffer.init(c, MAX * @sizeOf(vertex.Ui), .{.vertex_buffer = true})};
 }
 pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.verts.deinit(c); }
 
-pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) !void {
+pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   const n:u32 = @intCast(@min(scene.ui.len, MAX));
   if (n == 0) return;
   f.verts.write(0, sliceAsBytes(scene.ui[0..n]));

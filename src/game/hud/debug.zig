@@ -1,11 +1,13 @@
 //! F3: frame/sim timings and world counts.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("style.zig");
 
 pub fn visible(g:*const play.Game) bool { return g.debug; }
 
-pub fn draw(g:*play.Game, d:*Draw, W:f32, _:f32) !void {
+pub fn draw(g:*play.Game, d:*Draw, W:f32, _:f32) Allocator.Error!void {
   const rs = g.render_stats;
   const bx = W - 380;
   try d.membrane(bx, 14, 364, 150, s.skin, 0.8);

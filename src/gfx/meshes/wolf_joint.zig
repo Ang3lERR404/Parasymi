@@ -1,14 +1,16 @@
 //! mesh: WOLF JOINT. unit-radius knot of vines that hides the seam where two limbs meet
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
-const core = pal.core;
-const vine = pal.vine;
+const core = pal.wolf_core;
+const vine = pal.wolf_vine;
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.ellipsoid(b, .{.center = v3(0, 0, 0), .radii = v3(1, 1, 1), .col = core, .rings = 8, .segs = 10, .t = 0.5});
   for (0..3) |i| {
     const tilt = m.f(i) * 1.05;

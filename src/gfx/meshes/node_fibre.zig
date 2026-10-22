@@ -1,4 +1,6 @@
 //! mesh: NODE FIBRE
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -7,7 +9,7 @@ const color = @import("../../core/color.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("node_fibre");
   for (0..7) |_| {
     const a = rng.range(0, m.tau);

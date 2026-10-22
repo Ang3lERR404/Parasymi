@@ -1,4 +1,6 @@
 //! the pause menu (Esc): the world holds its breath behind a soft veil.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
@@ -12,9 +14,9 @@ const options = [_][2][]const u8{
   .{"Q", "SAVE AND LEAVE"},
 };
 
-pub fn visible(g:*const play.Game) bool { return g.paused; }
+pub fn visible(g:*const play.Game) bool { return g.mode == .paused; }
 
-pub fn draw(_:*play.Game, d:*Draw, W:f32, H:f32) !void {
+pub fn draw(_:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   // a radial veil dims the world without drawing any edge
   try d.glow(W / 2, H / 2, @max(W, H) * 0.75, .{4, 6, 10, 200});
   const pw:f32 = 480;

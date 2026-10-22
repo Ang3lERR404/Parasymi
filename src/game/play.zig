@@ -41,18 +41,24 @@ pub fn known(g:*const Game, item:items.Item) bool {
   return if (item.plants()) |sp| g.prog.canPlant(sp) else true;
 }
 
-/// terrain queries for movement/starfall: height of a loaded, dry tile.
-pub const Ground = struct {
-  w:*const World,
-  pub fn walkable(g:Ground, wx:i32, wz:i32) ?f32 {
-    const c = g.w.chunkOfTile(wx, wz) orelse return null;
-    const t = ck.localIndex(wx, wz);
-    return if (c.kind[t] == .water) null else c.height[t];
-  }
-  pub fn heightAt(g:Ground, wx:i32, wz:i32) ?f32 { return g.walkable(wx, wz); }
+pub const Request = enum { save, load, fullscreen, quit };
+
+/// what has the wolf's attention; only one at a time.
+pub const Mode = enum {
+  /// out in the garden: moving, gathering, placing
+  roam,
+  /// the belly is open (Tab): weaving by hand
+  belly,
+  /// the research list is open (T)
+  research,
+  /// the world is frozen and the pause menu is open (Esc)
+  paused,
+
+  /// the world keeps moving underneath (everything but the pause menu)
+  pub fn live(md:Mode) bool { return md != .paused; }
 };
 
-pub const Request = enum { save, load, fullscreen, quit };
+const Error = Allocator.Error;
 
 pub const Game = struct {
   gpa:Allocator,
@@ -70,8 +76,7 @@ pub const Game = struct {
   ui:Draw,
   weave:craft.Crafter = .{},
 
-  /// the world is frozen and the pause menu is open.
-  paused:bool = false,
+  mode:Mode = .roam,
   /// something only main can do (it owns the window and the file system).
   request:?Request = null,
   /// keeps running while paused, so the UI still breathes.
@@ -79,9 +84,7 @@ pub const Game = struct {
 
   hot:usize = 0,
   /// facing for the next structure placed (R rotates)
-  place_dir:u2 = 0,
-  show_inv:bool = false,
-  show_research:bool = false,
+  place_dir:m.Dir = 0,
   debug:bool = false,
   hover:?[2]i32 = null,
   /// progress of the current gather, and a short linger for one-off gestures
@@ -99,7 +102,7 @@ pub const Game = struct {
   far:std.ArrayList(*ck.Chunk) = .empty,
   render_stats:renderer.Stats = .{},
 
-  pub fn init(gpa:Allocator, seed:u64) !Game {
+  pub fn init(gpa:Allocator, seed:u64) Error!Game {
     var g:Game = .{
       .gpa = gpa,
       .world = World.init(gpa, seed),
@@ -146,8 +149,6 @@ pub const Game = struct {
     return ck.Coord.ofTile(t[0], t[1]);
   }
 
-  pub fn ground(g:*const Game) Ground { return .{.w = &g.world}; }
-
   pub fn heightAt(g:*const Game, wx:i32, wy:i32) f32 {
     if (g.world.chunkOfTile(wx, wy)) |c| return c.height[ck.localIndex(wx, wy)];
     return gen.heightAt(g.world.seed, wx, wy);
@@ -165,7 +166,7 @@ pub const Game = struct {
     return null;
   }
 
-  pub fn update(g:*Game, in:*const Input, dt:f32, screen:[2]f32) !void {
+  pub fn update(g:*Game, in:*const Input, dt:f32, screen:[2]f32) Error!void {
     g.ui_time += dt;
     g.frame_ms += (dt * 1000 - g.frame_ms) * 0.05;
     g.cam.aspect = screen[0] / @max(screen[1], 1);
@@ -174,13 +175,11 @@ pub const Game = struct {
     if (in.pressed(.F5)) g.request = .save;
     if (in.pressed(.F9)) g.request = .load;
     if (in.pressed(.F11)) g.request = .fullscreen;
-    if (in.pressed(.escape)) {
-      if (g.show_inv or g.show_research) {
-        g.show_inv = false;
-        g.show_research = false;
-      } else g.paused = !g.paused;
-    }
-    if (g.paused) {
+    if (in.pressed(.escape)) g.mode = switch (g.mode) {
+      .roam => .paused,
+      .belly, .research, .paused => .roam,
+    };
+    if (!g.mode.live()) {
       if (in.pressed(.q)) g.request = .quit;
       return;
     }
@@ -189,8 +188,8 @@ pub const Game = struct {
     g.sky.update(dt);
 
     // panels and selection
-    if (in.pressed(.tab)) g.show_inv = !g.show_inv;
-    if (in.pressed(.t)) g.show_research = !g.show_research;
+    if (in.pressed(.tab)) g.mode = if (g.mode == .belly) .roam else .belly;
+    if (in.pressed(.t)) g.mode = if (g.mode == .research) .roam else .research;
     if (in.pressed(.F3)) g.debug = !g.debug;
     if (in.pressed(.r)) g.place_dir +%= 1;
     const nums = [_]bool{
@@ -199,11 +198,12 @@ pub const Game = struct {
     };
     for (nums, 0..) |p, i| {
       if (!p) continue;
-      if (g.show_research) {
-        if (i < prog.tree.values.len) g.prog.select(@enumFromInt(i));
-      } else if (g.show_inv) {
-        if (i < craft.hand.len) actions.weaveByHand(g, i);
-      } else if (i < hotbar.len) g.hot = i;
+      switch (g.mode) {
+        .research => if (i < prog.tree.values.len) g.prog.select(@enumFromInt(i)),
+        .belly => if (i < craft.hand.len) actions.weaveByHand(g, i),
+        .roam => if (i < hotbar.len) { g.hot = i; },
+        .paused => unreachable,
+      }
     }
 
     // movement relative to the camera
@@ -225,6 +225,7 @@ pub const Game = struct {
     // interaction with the hovered tile
     g.hover = g.pick(in, screen);
     var working = false;
+    var work:?m.V3 = null;
     g.plant_cd -= dt;
     g.linger -= dt;
     if (!in.held(.left)) {
@@ -235,7 +236,7 @@ pub const Game = struct {
       const t = ck.localIndex(h[0], h[1]);
       const on_struct = g.structs.at(&g.world, h[0], h[1]);
       if (in.held(.left) and on_struct == null) {
-        if (c.res[t] > 0 and c.occ[t] == ck.NONE) working = actions.gather(g, c, t, dt)
+        if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
       }
       if (in.pressed(.f)) {
@@ -249,24 +250,21 @@ pub const Game = struct {
         else if (g.plants.removeAt(&g.world, h[0], h[1])) _ = g.player.inv.add(.fibre, 1);
         g.linger = 0.35;
       }
-      if (working or g.linger > 0) {
-        g.player.work_at = m.tileCentre(h[0], h[1], c.height[t]);
-      }
+      if (working or g.linger > 0) work = m.tileCentre(h[0], h[1], c.height[t]);
     };
     // weaving: hands work at the chest while the queue runs
-    if (g.weave.tick(&g.player.inv, dt)) |made| g.prog.say("WOVE A {s}", .{made.info().name});
-    if (g.weave.busy() and !working) {
-      working = true;
-      g.player.work_at = g.player.pos + m.v3(@sin(g.player.facing), 0, @cos(g.player.facing));
-    }
-    g.player.working = working or g.linger > 0;
+    if (g.weave.tick(g.player.inv.bag(), dt)) |made| g.prog.say("WOVE A {s}", .{made.info().name});
+    if (g.weave.busy() and !working) work = g.player.pos + m.v3(@sin(g.player.facing), 0, @cos(g.player.facing));
+    // a one-off gesture keeps facing where it happened
+    if (work == null and g.linger > 0) work = g.player.work;
+    g.player.work = work;
 
-    g.player.move(wish, in.down(.left_shift), g.ground(), dt);
+    g.player.move(wish, in.down(.left_shift), &g.world, dt);
     g.player.animate(dt);
     const follow = g.player.pos + m.v3(0, 0.6, 0);
     g.cam.target += (follow - g.cam.target) * m.splat(@min(1, dt * 6));
 
-    try g.stars.update(g.gpa, &g.sky, g.player.pos, g.ground(), dt);
+    try g.stars.update(g.gpa, &g.sky, g.player.pos, &g.world, dt);
     actions.catchStarlight(g, dt);
 
     // stream the world around the player; chunks holding what we grew stay
@@ -276,15 +274,15 @@ pub const Game = struct {
   }
 
   /// fixed-step simulation; never more than 8 catch-up ticks per frame.
-  pub fn simulate(g:*Game, frame_dt:f64) !void {
-    if (g.paused) return;
+  pub fn simulate(g:*Game, frame_dt:f64) Error!void {
+    if (!g.mode.live()) return;
     g.acc = @min(g.acc + frame_dt, TICK * 8);
     while (g.acc >= TICK) : (g.acc -= TICK) try g.step();
   }
 
   /// one fixed tick of everything that lives: ecology, progression, structures.
   /// (see the test below for the headless harness)
-  pub fn step(g:*Game) !void {
+  pub fn step(g:*Game) Error!void {
     var mods = g.prog.mods();
     mods.night = 1 - g.sky.daylight();
     const ev = try g.eco.tick(g.gpa, &g.plants, &g.world, mods, TICK);

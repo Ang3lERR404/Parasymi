@@ -12,6 +12,24 @@ const glfw = @import("zglfw");
 
 extern fn glfwGetInstanceProcAddress(instance:?vk.Instance, name:[*:0]const u8) vk.PfnVoidFunction;
 
+/// what the graphics layer fails with. Vulkan's and GLFW's long error sets
+/// are folded into these at each public entry point (see `fold`).
+pub const Error = error{OutOfMemory, DeviceLost, SurfaceLost, NoVulkan, NoSuitableGpu, NoMemoryType, GpuFailure};
+
+/// translate a Vulkan/GLFW error into `Error`, logging any detail it loses.
+pub fn fold(e:anytype) Error {
+  const name = @errorName(e);
+  const known = .{
+    .{"OutOfMemory", error.OutOfMemory}, .{"OutOfHostMemory", error.OutOfMemory}, .{"OutOfDeviceMemory", error.OutOfMemory},
+    .{"DeviceLost", error.DeviceLost}, .{"SurfaceLostKHR", error.SurfaceLost},
+    .{"IncompatibleDriver", error.NoVulkan}, .{"InitializationFailed", error.NoVulkan}, .{"APIUnavailable", error.NoVulkan},
+    .{"NoSuitableGpu", error.NoSuitableGpu}, .{"NoMemoryType", error.NoMemoryType},
+  };
+  inline for (known) |k| if (eql(u8, name, k[0])) return k[1];
+  log.err("gpu: {s}", .{name});
+  return error.GpuFailure;
+}
+
 const validate = builtin.mode == .Debug;
 const validation_layer = "VK_LAYER_KHRONOS_validation";
 
@@ -29,8 +47,13 @@ pub const Ctx = struct {
   family:u32,
   queue:vk.Queue,
 
-  pub fn init(gpa:Allocator, window:*glfw.Window) !Ctx {
+  pub fn init(gpa:Allocator, window:*glfw.Window) Error!Ctx {
     var c:Ctx = undefined;
+    c.bringUp(gpa, window) catch |e| return fold(e);
+    return c;
+  }
+
+  fn bringUp(c:*Ctx, gpa:Allocator, window:*glfw.Window) !void {
     c.messenger = .null_handle;
     c.vkb = vk.BaseWrapper.load(glfwGetInstanceProcAddress);
 
@@ -62,6 +85,7 @@ pub const Ctx = struct {
       .pp_enabled_layer_names = layers.items.ptr,
     }, null);
     c.vki = try gpa.create(vk.InstanceWrapper);
+    errdefer gpa.destroy(c.vki);
     c.vki.* = vk.InstanceWrapper.load(inst, c.vkb.dispatch.vkGetInstanceProcAddr.?);
     c.instance = vk.InstanceProxy.init(inst, c.vki);
     errdefer c.instance.destroyInstance(null);
@@ -73,8 +97,10 @@ pub const Ctx = struct {
         .pfn_user_callback = &onDebug,
       }, null);
     }
+    errdefer if (c.messenger != .null_handle) c.instance.destroyDebugUtilsMessengerEXT(c.messenger, null);
 
     try glfw.createWindowSurface(inst, window, null, &c.surface);
+    errdefer c.instance.destroySurfaceKHR(c.surface, null);
     try c.pickDevice(gpa);
 
     const prio = [_]f32{1};
@@ -93,7 +119,6 @@ pub const Ctx = struct {
     c.device = vk.DeviceProxy.init(dev, c.vkd);
     c.queue = c.device.getDeviceQueue(c.family, 0);
     log.info("gpu: {s}", .{sliceTo(&c.props.device_name, 0)});
-    return c;
   }
 
   pub fn deinit(c:*Ctx, gpa:Allocator) void {
@@ -134,7 +159,7 @@ pub const Ctx = struct {
     c.mem_props = c.instance.getPhysicalDeviceMemoryProperties(c.pdev);
   }
 
-  pub fn memType(c:*const Ctx, bits:u32, want:vk.MemoryPropertyFlags) !u32 {
+  pub fn memType(c:*const Ctx, bits:u32, want:vk.MemoryPropertyFlags) Error!u32 {
     for (c.mem_props.memory_types[0..c.mem_props.memory_type_count], 0..) |t, i| {
       if (bits & (@as(u32, 1) << @intCast(i)) != 0 and t.property_flags.contains(want)) return @intCast(i);
     }
@@ -142,14 +167,14 @@ pub const Ctx = struct {
   }
 
   /// `name` is a build-time compiled shader (see build.zig `shaders`).
-  pub fn shader(c:*const Ctx, comptime name:[]const u8) !vk.ShaderModule {
+  pub fn shader(c:*const Ctx, comptime name:[]const u8) Error!vk.ShaderModule {
     const words = comptime blk: {
       const spv = @embedFile(name);
       var w:[spv.len / 4]u32 = undefined;
       @memcpy(sliceAsBytes(&w), spv);
       break :blk w;
     };
-    return c.device.createShaderModule(&.{.code_size = words.len * 4, .p_code = &words}, null);
+    return c.device.createShaderModule(&.{.code_size = words.len * 4, .p_code = &words}, null) catch |e| fold(e);
   }
 };
 

@@ -2,6 +2,8 @@
 //! whatever is behind it (a structure's output, or a mature plant, which
 //! harvests it) and passes it forward to the next conduit or structure.
 const m = @import("../../core/math.zig");
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
 const prog = @import("../progression.zig");
@@ -20,7 +22,7 @@ pub const State = struct {
   move_t:f32 = 0,
 };
 
-pub fn tick(ctx:st.Ctx, i:u32, dt:f32) bool {
+pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const ss = ctx.ss;
   const s = ss.get(i);
   const v = m.dirVec(s.dir);
@@ -65,7 +67,7 @@ pub fn release(s:*st.Structure) ?items.Item {
 }
 
 /// the item in transit, gliding along the conduit.
-pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) !void {
+pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   const item = s.state.conduit.held orelse return;
   const v = m.dirVec(s.dir);
   const k = s.state.conduit.move_t - 0.5;
@@ -77,6 +79,6 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) !void {
   });
 }
 
-pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) !void {
+pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   _ = try d.print(x, y, 1.4, .{235, 240, 225, 255}, "CARRIES {s}", .{if (s.state.conduit.held) |it| it.info().name else "NOTHING"});
 }

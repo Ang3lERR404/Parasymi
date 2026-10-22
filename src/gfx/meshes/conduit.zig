@@ -1,4 +1,6 @@
 //! mesh: CONDUIT. structures: built around the footprint centre, +X is "forward" for conduits
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -12,7 +14,7 @@ const sap = pal.sap;
 
 fn evenProfile(_:f32) f32 { return 0.5; }
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   const s = b.mark();
   try mg.bundle(b, evenProfile, 3, 3.0, core, color.rgb(.{0.5, 0.38, 0.22}, 255));
   b.xform(s, m.chain(.{m.translate(v3(-0.5, 0.1, 0)), m.rotZ(-m.pi / 2.0), m.scale3(v3(0.2, 1, 0.2))}));

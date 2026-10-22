@@ -52,7 +52,7 @@ pub fn generate(seed:u64, c:*ck.Chunk) void {
     c.ley_cap[i] = s.ley;
     c.res[i] = s.res;
 
-    c.occ[i] = ck.NONE;
+    c.occ[i] = .none;
   };
 }
 

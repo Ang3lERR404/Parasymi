@@ -1,4 +1,6 @@
 //! mesh: RESEARCH BLOOM
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -9,7 +11,7 @@ const core = pal.core;
 
 fn stalkProfile(k:f32) f32 { return 0.14 * (1 - 0.45 * k) + 0.05 * @exp(-k * 12); }
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.ellipsoid(b, .{.center = v3(0, 0.05, 0), .radii = v3(0.9, 0.12, 0.9), .col = core, .rings = 5, .segs = 16});
   const s = b.mark();
   try mg.bundle(b, stalkProfile, 6, 3.2, core, color.rgb(.{0.42, 0.3, 0.6}, 255));

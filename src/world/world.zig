@@ -8,6 +8,8 @@ const gen = @import("gen.zig");
 
 pub const Chunk = ck.Chunk;
 pub const Coord = ck.Coord;
+pub const Occ = ck.Occ;
+const Error = Allocator.Error;
 
 pub const World = struct {
   gpa:Allocator,
@@ -16,7 +18,7 @@ pub const World = struct {
   /// chunks loaded by the last `stream` call.
   fresh:std.ArrayList(*Chunk) = .empty,
   /// gpu slots of chunks that were unloaded; the renderer drains this.
-  evicted:std.ArrayList(u32) = .empty,
+  evicted:std.ArrayList(ck.MeshSlot) = .empty,
 
   pub fn init(gpa:Allocator, seed:u64) World { return .{.gpa = gpa, .seed = seed}; }
 
@@ -32,33 +34,40 @@ pub const World = struct {
 
   pub fn chunkOfTile(w:*const World, wx:i32, wy:i32) ?*Chunk { return w.map.get(Coord.ofTile(wx, wy)); }
 
-  /// occupant of a tile (NONE if empty or not loaded).
-  pub fn occAt(w:*const World, wx:i32, wy:i32) u32 {
-    const c = w.chunkOfTile(wx, wy) orelse return ck.NONE;
+  /// occupant of a tile (none if empty or not loaded).
+  pub fn occAt(w:*const World, wx:i32, wy:i32) Occ {
+    const c = w.chunkOfTile(wx, wy) orelse return .none;
     return c.occ[ck.localIndex(wx, wy)];
   }
 
-  /// claim (or release, with NONE) a size x size footprint anchored at
+  /// claim (or release, with .none) a size x size footprint anchored at
   /// (wx, wy), pinning/unpinning each chunk once per tile.
-  pub fn setFootprint(w:*World, wx:i32, wy:i32, size:u8, o:u32) void {
+  pub fn setFootprint(w:*World, wx:i32, wy:i32, size:u8, o:Occ) void {
     for (0..size) |dy| for (0..size) |dx| {
       const x = wx + @as(i32, @intCast(dx));
       const y = wy + @as(i32, @intCast(dy));
       const c = w.chunkOfTile(x, y) orelse continue;
       const t = ck.localIndex(x, y);
-      if (c.occ[t] == ck.NONE and o != ck.NONE) c.pins += 1;
-      if (c.occ[t] != ck.NONE and o == ck.NONE) c.pins -= 1;
+      if (c.occ[t] == .none and o != .none) c.pins += 1;
+      if (c.occ[t] != .none and o == .none) c.pins -= 1;
       c.occ[t] = o;
     };
   }
 
   /// re-point an existing footprint at a new occupant id (after a swap-remove).
-  pub fn moveFootprint(w:*World, wx:i32, wy:i32, size:u8, o:u32) void {
+  pub fn moveFootprint(w:*World, wx:i32, wy:i32, size:u8, o:Occ) void {
     for (0..size) |dy| for (0..size) |dx| {
       const x = wx + @as(i32, @intCast(dx));
       const y = wy + @as(i32, @intCast(dy));
       if (w.chunkOfTile(x, y)) |c| c.occ[ck.localIndex(x, y)] = o;
     };
+  }
+
+  /// height of a loaded tile something can stand on (null over water or void).
+  pub fn walkable(w:*const World, wx:i32, wy:i32) ?f32 {
+    const c = w.chunkOfTile(wx, wy) orelse return null;
+    const t = ck.localIndex(wx, wy);
+    return if (c.kind[t] == .water) null else c.height[t];
   }
 
   /// a footprint is free if every tile is loaded, unoccupied, level with the
@@ -71,12 +80,12 @@ pub const World = struct {
       const y = wy + @as(i32, @intCast(dy));
       const c = w.chunkOfTile(x, y) orelse return false;
       const t = ck.localIndex(x, y);
-      if (c.occ[t] != ck.NONE or !ok(c.kind[t]) or c.height[t] != h0) return false;
+      if (c.occ[t] != .none or !ok(c.kind[t]) or c.height[t] != h0) return false;
     };
     return true;
   }
 
-  fn load(w:*World, at:Coord) !*Chunk {
+  fn load(w:*World, at:Coord) Error!*Chunk {
     const c = try w.gpa.create(Chunk);
     errdefer w.gpa.destroy(c);
     c.* = ck.blank(at);
@@ -87,10 +96,10 @@ pub const World = struct {
   }
 
   /// the chunk at `at`, generating it first if it is not resident.
-  pub fn ensure(w:*World, at:Coord) !*Chunk { return w.map.get(at) orelse w.load(at); }
+  pub fn ensure(w:*World, at:Coord) Error!*Chunk { return w.map.get(at) orelse w.load(at); }
 
   /// generate missing chunks nearest-first, at most `budget` per call.
-  pub fn stream(w:*World, focus:Coord, radius:i32, budget:u32) !void {
+  pub fn stream(w:*World, focus:Coord, radius:i32, budget:u32) Error!void {
     w.fresh.clearRetainingCapacity();
     var r:i32 = 0;
     while (r <= radius) : (r += 1) {
@@ -109,7 +118,7 @@ pub const World = struct {
   }
 
   /// unpinned chunks well outside `radius`, ready to `unload`.
-  pub fn far(w:*World, focus:Coord, radius:i32, out:*std.ArrayList(*Chunk)) !void {
+  pub fn far(w:*World, focus:Coord, radius:i32, out:*std.ArrayList(*Chunk)) Error!void {
     out.clearRetainingCapacity();
     const keep = radius + 2;
     var it = w.map.valueIterator();
@@ -120,10 +129,10 @@ pub const World = struct {
     }
   }
 
-  pub fn unload(w:*World, c:*Chunk) !void {
+  pub fn unload(w:*World, c:*Chunk) Error!void {
     assert(c.pins == 0);
     _ = w.map.remove(c.at);
-    if (c.gpu_slot != ck.NONE) try w.evicted.append(w.gpa, c.gpu_slot);
+    if (c.gpu_slot) |s| try w.evicted.append(w.gpa, s);
     w.gpa.destroy(c);
   }
 };

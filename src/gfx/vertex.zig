@@ -11,7 +11,8 @@ pub const Terrain = extern struct {
 };
 
 /// shading role of a vertex; shaders key secondary motion and glow off it.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril };
+/// `ear`: a leaf whose inner face (opposite its normal) is lined with sap.
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear };
 
 pub const Mesh = extern struct {
   pos:[3]f32,

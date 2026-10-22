@@ -20,12 +20,12 @@ fn baseColor(k:ck.Kind) [3]f32 {
   };
 }
 
-fn quad(out:*std.ArrayList(TV), gpa:Allocator, p:[4][3]f32, n:[3]f32, c:[4]u8, info:[4]u8) !void {
+fn quad(out:*std.ArrayList(TV), gpa:Allocator, p:[4][3]f32, n:[3]f32, c:[4]u8, info:[4]u8) Allocator.Error!void {
   const idx = [_]usize{0, 1, 2, 0, 2, 3};
   for (idx) |i| try out.append(gpa, .{.pos = p[i], .nrm = n, .col = c, .info = info});
 }
 
-pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV)) !void {
+pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV)) Allocator.Error!void {
   out.clearRetainingCapacity();
   const ox = c.originX();
   const oy = c.originY();

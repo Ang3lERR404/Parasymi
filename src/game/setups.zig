@@ -1,5 +1,7 @@
 //! prepared worlds for showcasing and testing (`--demo`, `--stress`).
 //! Not part of play: they place things on the gardener's behalf.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const ck = @import("../world/chunk.zig");
 const species = @import("../sim/species.zig");
 const prog = @import("progression.zig");
@@ -9,7 +11,7 @@ const m = @import("../core/math.zig");
 const Game = play.Game;
 
 /// a starter garden around the player plus the first automation, fast-forwarded.
-pub fn demo(g:*Game, seconds:f32) !void {
+pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   const cx, const cz = m.tileAt(g.player.pos);
   var dz:i32 = -4;
   while (dz <= 4) : (dz += 1) {
@@ -51,7 +53,7 @@ pub fn demo(g:*Game, seconds:f32) !void {
 }
 
 /// fill a side x side field with the three first species at random (perf testing).
-pub fn stress(g:*Game, side:i32) !void {
+pub fn stress(g:*Game, side:i32) Allocator.Error!void {
   const cx, const cz = m.tileAt(g.player.pos);
   const r = @divFloor(side, 2);
   try g.world.stream(g.focus(), @divFloor(r, ck.SIZE) + 2, 1 << 20);

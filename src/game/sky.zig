@@ -4,6 +4,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
+const World = @import("../world/world.zig").World;
 
 pub const DAY_LEN:f32 = 300;
 
@@ -61,8 +62,8 @@ pub const Starfall = struct {
 
   pub fn deinit(sf:*Starfall, gpa:Allocator) void { sf.motes.deinit(gpa); }
 
-  /// `ground` provides `heightAt(wx, wz) ?f32` (null where nothing can land).
-  pub fn update(sf:*Starfall, gpa:Allocator, sky:*const Sky, around:m.V3, ground:anytype, dt:f32) !void {
+  /// motes land only on walkable tiles.
+  pub fn update(sf:*Starfall, gpa:Allocator, sky:*const Sky, around:m.V3, ground:*const World, dt:f32) Allocator.Error!void {
     const night = 1 - sky.daylight();
     if (night > 0.6 and sf.motes.items.len < MAX) {
       sf.acc += dt * 2.5 * night;
@@ -71,14 +72,14 @@ pub const Starfall = struct {
         const r = sf.rng.range(2, 16);
         const x = around[0] + @cos(a) * r;
         const z = around[2] + @sin(a) * r;
-        const h = ground.heightAt(m.tileOf(x), m.tileOf(z)) orelse continue;
+        const h = ground.walkable(m.tileOf(x), m.tileOf(z)) orelse continue;
         try sf.motes.append(gpa, .{.pos = m.v3(x, h + 7, z), .vy = -sf.rng.range(0.8, 1.6), .phase = sf.rng.float()});
       }
     }
     var i:usize = 0;
     while (i < sf.motes.items.len) {
       const mo = &sf.motes.items[i];
-      const h = ground.heightAt(m.tileOf(mo.pos[0]), m.tileOf(mo.pos[2])) orelse mo.pos[1];
+      const h = ground.walkable(m.tileOf(mo.pos[0]), m.tileOf(mo.pos[2])) orelse mo.pos[1];
       const rest = h + 0.35 + 0.08 * @sin(mo.phase * 40 + mo.pos[0]);
       if (mo.pos[1] > rest) {
         mo.pos[1] = @max(rest, mo.pos[1] + mo.vy * dt);

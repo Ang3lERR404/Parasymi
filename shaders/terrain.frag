@@ -28,6 +28,22 @@ void main() {
     // hovered tile
     if (all(equal(floor(v_pos.xz), pc.misc.zw))) c += vec3(0.25, 0.25, 0.2) * (0.7 + 0.3 * sin(t * 6.0));
   }
+  // contact shadows: a soft ellipse under each paw, long along the facing,
+  // spreading and fading as the paw lifts. Only upward faces at or below the
+  // paw receive one.
+  if (n.y > 0.5) for (int i = 0; i < 2; i++) {
+    vec4 f = pc.feet[i];
+    float lift = f.y - v_pos.y;
+    if (lift < -0.05) continue;
+    lift = max(lift, 0.0);
+    vec2 d = v_pos.xz - f.xz;
+    float s = sin(f.w), co = cos(f.w);
+    vec2 local = vec2(d.x * co - d.y * s, d.x * s + d.y * co); // (side, forward)
+    vec2 radii = vec2(0.12, 0.18) * (1.0 + lift * 3.0);
+    float e = length(local / radii);
+    float strength = 0.7 / ((1.0 + lift * 5.0) * (1.0 + lift * 5.0));
+    c *= 1.0 - strength * (1.0 - smoothstep(0.1, 1.0, e));
+  }
   if (kind == 0) {
     float spec = pow(max(dot(reflect(-SUN, n), normalize(pc.eye_time.xyz - v_pos)), 0.0), 40.0);
     c += vec3(0.6, 0.7, 0.8) * spec * 0.4;

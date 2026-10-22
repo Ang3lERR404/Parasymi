@@ -4,7 +4,8 @@
 const std = @import("std");
 const zeroes = std.mem.zeroes;
 const vk = @import("vulkan");
-const Ctx = @import("ctx.zig").Ctx;
+const ctx = @import("ctx.zig");
+const Ctx = ctx.Ctx;
 const swapchain = @import("swapchain.zig");
 
 fn formatOf(comptime T:type) vk.Format {
@@ -49,16 +50,18 @@ pub const Desc = struct {
   cull:bool = true,
 };
 
-pub fn layout(c:*const Ctx, push_size:u32) !vk.PipelineLayout {
+pub fn layout(c:*const Ctx, push_size:u32) ctx.Error!vk.PipelineLayout {
+  // 128 bytes is all Vulkan guarantees; desktop GPUs offer 256
+  if (push_size > c.props.limits.max_push_constants_size) return error.NoSuitableGpu;
   const range = [_]vk.PushConstantRange{.{
     .stage_flags = .{.vertex = true, .fragment = true},
     .offset = 0,
     .size = push_size,
   }};
-  return c.device.createPipelineLayout(&.{.push_constant_range_count = 1, .p_push_constant_ranges = &range}, null);
+  return c.device.createPipelineLayout(&.{.push_constant_range_count = 1, .p_push_constant_ranges = &range}, null) catch |e| ctx.fold(e);
 }
 
-pub fn create(c:*const Ctx, d:Desc) !vk.Pipeline {
+pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
   const stages = [_]vk.PipelineShaderStageCreateInfo{
     .{.stage = .{.vertex = true}, .module = d.vert, .p_name = "main"},
     .{.stage = .{.fragment = true}, .module = d.frag, .p_name = "main"},
@@ -129,7 +132,7 @@ pub fn create(c:*const Ctx, d:Desc) !vk.Pipeline {
     .stencil_attachment_format = .undefined,
   };
   var p:vk.Pipeline = undefined;
-  _ = try c.device.createGraphicsPipelines(.null_handle, &.{.{
+  _ = c.device.createGraphicsPipelines(.null_handle, &.{.{
     .p_next = &rendering,
     .stage_count = stages.len,
     .p_stages = &stages,
@@ -144,6 +147,6 @@ pub fn create(c:*const Ctx, d:Desc) !vk.Pipeline {
     .layout = d.layout,
     .subpass = 0,
     .base_pipeline_index = -1,
-  }}, null, @ptrCast(&p));
+  }}, null, @ptrCast(&p)) catch |e| return ctx.fold(e);
   return p;
 }

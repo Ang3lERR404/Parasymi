@@ -1,4 +1,6 @@
 //! mesh: NODE LEY
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -6,7 +8,7 @@ const color = @import("../../core/color.zig");
 
 const v3 = m.v3;
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("node_ley");
   for (0..5) |_| {
     const base = v3(rng.range(-0.22, 0.22), -0.02, rng.range(-0.22, 0.22));

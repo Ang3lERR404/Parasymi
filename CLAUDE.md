@@ -1,5 +1,4 @@
 # Parasymi
-
 A player-centric, Factorio-like automation game about magically infused plants
 (parasitic and symbiotic lineages that eventually converge). Zig 0.16, GLFW
 (zglfw) + Vulkan 1.3 (vulkan-zig, bindings generated from the SDK's `vk.xml`),
@@ -40,7 +39,6 @@ main      wiring and the frame loop
 ```
 
 ## Registries: one module per thing
-
 Every domain is a registry (`core/registry.zig`): a namespace lists one module
 per part, the enum is derived from it with `std.meta.DeclEnum`, tables, tagged
 unions and structs are gathered from the modules, and behaviour dispatches
@@ -63,7 +61,6 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data
 tables on purpose.
 
 ## Conventions
-
 - Style: 2-space indent, `name:Type` with no space after the colon, terse doc
   comments (`//!` per file, `///` per decl). LF line endings.
 - Math lives in `core/math.zig` (imported as `m`): use `m.f(int)` for
@@ -80,10 +77,40 @@ tables on purpose.
   glows as SDFs in `shaders/ui.frag`.
 
 ## Design direction
-
 - No global resources: items live in the player's belly and in structures;
   essence and seeds live in plants until harvested.
 - Every plant is seeded by the player; plants grow before they are usable.
 - Research is Factorio-style: research blooms consume ingredients fed to them.
 - Plants have footprints (multi-tile or floating), sharing occupancy with structures.
 - Everything is player-centric and builds toward full automation.
+
+## Zig 0.16 API notes
+
+- `std.Io` replaces all old I/O (`GenericReader`, `AnyReader`, `FixedBufferStream`, `std.net` gone). Pass an `Io` instance like an allocator. `std.Io.Threaded` for thread-pool I/O.
+- "Juicy Main": `main` accepts injected params (process, allocator). No global env/args.
+- `@Type` removed. Use `@Pointer`, `@ErrorUnion`, explicit `error{...}` sets.
+- `ArrayList{}` → `.empty`.
+- `ArenaAllocator` is lock-free and thread-safe. `ThreadSafeAllocator` wrapper removed.
+- Build: `root_module` + `Module` methods. Deps in `zig-pkg/`, not `.zig-cache`.
+- Incremental compilation is real (~30 ms small rebuilds).
+
+## Code design
+- **Tagged unions** for mutually exclusive states. Never a struct with multiple nullable fields.
+- **Explicit error sets** in public APIs. Never `anyerror` on a signature.
+- **`comptime T: type`** over `anytype` unless you need polymorphism.
+- **Distinct types** for domain IDs so the compiler catches mix-ups.
+- **Exhaustive `switch`** with `else => unreachable` or error.
+- **Pass allocators explicitly.** No global allocator.
+- **`defer deinit()`** immediately after acquisition. `errdefer` for error paths.
+- **Arena allocators** for batch/temporary work (e.g. chunk mesh gen, then free the whole arena).
+- **`std.testing.allocator`** in tests (reports leaks with stack traces).
+- **Vtable pattern** for many-method interfaces (one shared const table per type).
+- **SoA for hot loops.** AoS only for small, cohesive per-entity state.
+- **Registry + comptime dispatch** (`std.meta.DeclEnum` + `inline else`) for plugin-style extensibility.
+- **Larger cohesive files** are idiomatic. Tests alongside implementation. Don't over-fragment.
+- **`try` by default.** `catch` only with a genuine recovery strategy.
+- **Translate errors at module boundaries:** map a dependency's error set onto your stable public set.
+- **`defer task.cancel(io)`** for idempotent cancellation in concurrent code.
+- Never hand-roll linear algebra. Matrix/vec ops are methods on `M4`/`Vec3`
+  in `core/math.zig`. A call site should read `m.inverse(a)`, not a 20-line
+  cofactor expansion. If the method doesn't exist, add it + a test first.

@@ -1,4 +1,6 @@
 //! SAP CACHE: plain storage. Takes anything, gives anything.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
 const prog = @import("../progression.zig");
@@ -18,6 +20,6 @@ pub fn output(s:*const st.Structure) ?items.Item {
   return null;
 }
 
-pub fn describe(_:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) !void {
+pub fn describe(_:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   _ = try d.text(x, y, 1.4, .{150, 170, 150, 255}, "HOLDS ANYTHING. FEED (F), TAKE (SHIFT+F)");
 }

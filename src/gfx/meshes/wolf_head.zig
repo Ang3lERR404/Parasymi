@@ -1,19 +1,21 @@
 //! mesh: WOLF HEAD. neck joint at origin, snout along +Z
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("../../core/color.zig");
 
 const v3 = m.v3;
-const core = pal.core;
-const vine = pal.vine;
-const leaf_dark = pal.leaf_dark;
-const leaf_lite = pal.leaf_lite;
+const core = pal.wolf_core;
+const vine = pal.wolf_vine;
+const leaf_dark = pal.wolf_leaf_dark;
+const leaf_lite = pal.wolf_leaf_lite;
 const sap = pal.sap;
 
 fn snoutProfile(k:f32) f32 { return 0.055 * (1 - 0.45 * k); }
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("wolf_head");
   try mg.ellipsoid(b, .{.center = v3(0, 0.08, 0.0), .radii = v3(0.1, 0.095, 0.11), .col = core, .t = 1});
   const s = b.mark();
@@ -23,8 +25,8 @@ pub fn build(b:*mg.Builder) !void {
   for ([_]f32{-1, 1}) |side| {
     // glowing sap eyes
     try mg.ellipsoid(b, .{.center = v3(side * 0.055, 0.12, 0.085), .radii = v3(0.02, 0.016, 0.014), .col = sap, .part = .bloom, .rings = 5, .segs = 7, .t = 1});
-    // ears: upright curled leaves
-    try b.blade(v3(side * 0.06, 0.16, -0.01), m.norm(v3(side * 0.35, 0, -0.25)), 0.15, 0.055, -2.2, leaf_dark, leaf_lite, 1, .leaf);
+    // ears: upright curled leaves, sap-lined inside
+    try b.blade(v3(side * 0.06, 0.16, -0.01), m.norm(v3(side * 0.35, 0, -0.25)), 0.15, 0.055, -2.2, leaf_dark, leaf_lite, 1, .ear);
   }
   // mane: leaves sweeping back off the skull
   for (0..6) |i| {

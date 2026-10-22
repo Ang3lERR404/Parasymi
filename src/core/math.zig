@@ -192,10 +192,57 @@ pub fn inverse(m:M4) M4 {
   return r;
 }
 
+/// a matrix whose upper 3x3 has rows `r0..r2` (inverse of the linear part)
+/// and translation `-R * t`, undoing a translation `t`.
+fn fromRows(r0:V3, r1:V3, r2:V3, t:V3) M4 {
+  return .{
+    .{r0[0], r1[0], r2[0], 0},
+    .{r0[1], r1[1], r2[1], 0},
+    .{r0[2], r1[2], r2[2], 0},
+    .{-dot(r0, t), -dot(r1, t), -dot(r2, t), 1},
+  };
+}
+
+fn column(m:M4, c:usize) V3 { return .{m[c][0], m[c][1], m[c][2]}; }
+
+/// inverse of an affine transform (any rotation/scale/shear + translation;
+/// bottom row 0 0 0 1). The 3x3 inverts by cofactors: its rows are the
+/// cross products of the columns over the determinant.
+pub fn inverseAffine(m:M4) M4 {
+  const c0 = column(m, 0);
+  const c1 = column(m, 1);
+  const c2 = column(m, 2);
+  const x12 = cross(c1, c2);
+  const det = dot(c0, x12);
+  const id = splat(if (det != 0) 1 / det else 0);
+  return fromRows(x12 * id, cross(c2, c0) * id, cross(c0, c1) * id, column(m, 3));
+}
+
+/// inverse of a rigid transform (rotation + translation only): the rotation
+/// transposes.
+pub fn inverseRigid(m:M4) M4 {
+  return fromRows(column(m, 0), column(m, 1), column(m, 2), column(m, 3));
+}
+
 test "inverse roundtrip" {
   const p = mul(perspective(0.8, 1.5, 0.1, 100), lookAt(v3(3, 10, 8), v3(0, 0, 0), v3(0, 1, 0)));
   const i = mul(inverse(p), p);
   inline for (0..4) |c| inline for (0..4) |r| {
     try testing.expectApproxEqAbs(identity[c][r], i[c][r], 1e-3);
+  };
+}
+
+test "affine and rigid inverses" {
+  const aff = chain(.{translate(v3(3, -2, 5)), rotY(0.7), rotX(-0.4), scale3(v3(2, 0.5, 1.5))});
+  const rig = chain(.{translate(v3(-1, 4, 2)), rotY(1.9), rotZ(0.3)});
+  for ([_]M4{mul(inverseAffine(aff), aff), mul(aff, inverseAffine(aff)), mul(inverseRigid(rig), rig)}) |i| {
+    inline for (0..4) |c| inline for (0..4) |r| {
+      try testing.expectApproxEqAbs(identity[c][r], i[c][r], 1e-4);
+    };
+  }
+  const ia = inverseAffine(aff);
+  const ig = inverse(aff);
+  inline for (0..4) |c| inline for (0..4) |r| {
+    try testing.expectApproxEqAbs(ig[c][r], ia[c][r], 1e-4);
   };
 }

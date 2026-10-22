@@ -11,8 +11,9 @@ const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("species.zig");
 
-pub const NONE = ck.NONE;
+pub const Id = ck.PlantId;
 const Occ = ck.Occ;
+const Error = Allocator.Error;
 /// neighbours touching the footprint (ring 1) and one tile further (ring 2).
 pub const R1 = 12;
 pub const R2 = 20;
@@ -33,13 +34,13 @@ pub const Plant = struct {
   /// harvestable stores: the species' yield condensed from mana, and ripening seeds.
   essence:f32 = 0,
   seeds:f32 = 0,
-  n1:[R1]u32 = @splat(NONE),
-  n2:[R2]u32 = @splat(NONE),
+  n1:[R1]Id = @splat(.none),
+  n2:[R2]Id = @splat(.none),
 };
 
 pub const Plants = struct {
   list:std.MultiArrayList(Plant) = .empty,
-  floaters:std.AutoHashMapUnmanaged([2]i32, u32) = .empty,
+  floaters:std.AutoHashMapUnmanaged([2]i32, Id) = .empty,
   topology_dirty:bool = false,
 
   pub fn deinit(p:*Plants, gpa:Allocator) void {
@@ -54,16 +55,16 @@ pub const Plants = struct {
     return w.footprintFree(wx, wy, def.size, ck.Kind.fertile);
   }
 
-  pub fn place(p:*Plants, gpa:Allocator, w:*World, wx:i32, wy:i32, sp:species.Id, seed:f32) !bool {
+  pub fn place(p:*Plants, gpa:Allocator, w:*World, wx:i32, wy:i32, sp:species.Id, seed:f32) Error!bool {
     return p.placeEx(gpa, w, wx, wy, .{.sp = sp, .seed = seed, .x = wx, .y = wy, .chunk = undefined, .tile = undefined});
   }
 
   /// place a fully specified plant (x/y/chunk/tile are filled in here).
-  pub fn placeEx(p:*Plants, gpa:Allocator, w:*World, wx:i32, wy:i32, proto:Plant) !bool {
+  pub fn placeEx(p:*Plants, gpa:Allocator, w:*World, wx:i32, wy:i32, proto:Plant) Error!bool {
     if (!p.canPlace(w, wx, wy, proto.sp)) return false;
     const def = species.get(proto.sp);
     const c = w.chunkOfTile(wx, wy).?;
-    const idx:u32 = @intCast(p.list.len);
+    const idx = Id.of(p.list.len);
     var pl = proto;
     pl.x = wx;
     pl.y = wy;
@@ -79,9 +80,8 @@ pub const Plants = struct {
   }
 
   /// the plant at a tile: a rooted one first, else one floating over it.
-  pub fn at(p:*const Plants, w:*const World, wx:i32, wy:i32) ?u32 {
-    const o = w.occAt(wx, wy);
-    if (Occ.isPlant(o)) return Occ.index(o);
+  pub fn at(p:*const Plants, w:*const World, wx:i32, wy:i32) ?Id {
+    if (w.occAt(wx, wy).asPlant()) |i| return i;
     return p.floaters.get(.{wx, wy});
   }
 
@@ -92,20 +92,21 @@ pub const Plants = struct {
   }
 
   /// swap-remove; re-points the footprint of the plant that moved into slot `i`.
-  pub fn remove(p:*Plants, w:*World, i:u32) void {
+  pub fn remove(p:*Plants, w:*World, id:Id) void {
+    const i = id.idx();
     const s = p.list.slice();
     const def = species.get(s.items(.sp)[i]);
     if (def.floating) {
       _ = p.floaters.remove(.{s.items(.x)[i], s.items(.y)[i]});
       s.items(.chunk)[i].pins -= 1;
-    } else w.setFootprint(s.items(.x)[i], s.items(.y)[i], def.size, NONE);
-    const last:u32 = @intCast(p.list.len - 1);
+    } else w.setFootprint(s.items(.x)[i], s.items(.y)[i], def.size, .none);
+    const last = p.list.len - 1;
     if (i != last) {
       const ld = species.get(s.items(.sp)[last]);
       const lx = s.items(.x)[last];
       const ly = s.items(.y)[last];
-      if (ld.floating) p.floaters.getPtr(.{lx, ly}).?.* = i
-      else w.moveFootprint(lx, ly, ld.size, Occ.plant(i));
+      if (ld.floating) p.floaters.getPtr(.{lx, ly}).?.* = id
+      else w.moveFootprint(lx, ly, ld.size, Occ.plant(id));
     }
     p.list.swapRemove(i);
     p.topology_dirty = true;
@@ -127,8 +128,8 @@ pub const Plants = struct {
     const n2 = s.items(.n2);
     const any_floaters = p.floaters.count() > 0;
     for (0..p.list.len) |i| {
-      n1[i] = @splat(NONE);
-      n2[i] = @splat(NONE);
+      n1[i] = @splat(.none);
+      n2[i] = @splat(.none);
       const def = species.get(sps[i]);
       const size:i32 = if (def.floating) 1 else def.size;
       var dy:i32 = -2;
@@ -141,8 +142,7 @@ pub const Plants = struct {
           const ring = @max(@max(rx, ry), 1);
           const wx = xs[i] + dx;
           const wy = ys[i] + dy;
-          const o = w.occAt(wx, wy);
-          if (Occ.isPlant(o)) link(n1, n2, i, Occ.index(o), ring);
+          if (w.occAt(wx, wy).asPlant()) |j| link(n1, n2, i, j, ring);
           if (any_floaters) if (p.floaters.get(.{wx, wy})) |f| link(n1, n2, i, f, ring);
         }
       }
@@ -150,12 +150,12 @@ pub const Plants = struct {
     p.topology_dirty = false;
   }
 
-  fn link(n1:[][R1]u32, n2:[][R2]u32, i:usize, j:u32, ring:i32) void {
-    if (j == i) return;
+  fn link(n1:[][R1]Id, n2:[][R2]Id, i:usize, j:Id, ring:i32) void {
+    if (j.idx() == i) return;
     // a multi-tile neighbour shows up on several tiles: keep it once, in the nearest ring
     for (n1[i]) |e| if (e == j) return;
     if (ring == 1) {
-      for (&n2[i]) |*e| if (e.* == j) { e.* = NONE; };
+      for (&n2[i]) |*e| if (e.* == j) { e.* = .none; };
       compact(&n2[i]);
       put(&n1[i], j);
     } else {
@@ -163,13 +163,13 @@ pub const Plants = struct {
       put(&n2[i], j);
     }
   }
-  fn put(arr:anytype, j:u32) void {
-    for (arr) |*e| if (e.* == NONE) { e.* = j; return; };
+  fn put(arr:[]Id, j:Id) void {
+    for (arr) |*e| if (e.* == .none) { e.* = j; return; };
   }
-  fn compact(arr:anytype) void {
+  fn compact(arr:[]Id) void {
     var k:usize = 0;
-    for (arr.*) |e| if (e != NONE) { arr[k] = e; k += 1; };
-    while (k < arr.len) : (k += 1) arr[k] = NONE;
+    for (arr) |e| if (e != .none) { arr[k] = e; k += 1; };
+    while (k < arr.len) : (k += 1) arr[k] = .none;
   }
 };
 
@@ -191,11 +191,11 @@ test "footprints, floaters and links" {
   try testing.expect(!try p.place(gpa, &w, 2, 2, .driftwisp, 0.5));
   p.rebuildLinks(&w);
   var links:usize = 0;
-  for (p.list.items(.n1)[0]) |e| if (e != NONE) { links += 1; };
+  for (p.list.items(.n1)[0]) |e| if (e != .none) { links += 1; };
   try testing.expectEqual(@as(usize, 2), links);
   // 4 heart tiles + 1 root + 1 floater
   try testing.expectEqual(@as(u32, 6), c.pins);
-  p.remove(&w, 0);
+  p.remove(&w, .of(0));
   try testing.expectEqual(@as(u32, 2), c.pins);
   try testing.expect(p.at(&w, 3, 1) != null and p.at(&w, 2, 2) != null);
 }

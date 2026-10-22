@@ -1,4 +1,6 @@
 //! the sap belly (Tab): the wolf's inventory, and the weave list below it.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const player_mod = @import("../player.zig");
 const prog = @import("../progression.zig");
@@ -12,9 +14,9 @@ const rows = player_mod.SLOTS / cols;
 const gap:f32 = 64;
 const pw:f32 = 780;
 
-pub fn visible(g:*const play.Game) bool { return g.show_inv; }
+pub fn visible(g:*const play.Game) bool { return g.mode == .belly; }
 
-pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) !void {
+pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const weave_rows = (craft.hand.len + 1) / 2;
   const ph = gap * rows + 110 + 52 * m.f(weave_rows);
   const px = (W - pw) / 2;
@@ -26,7 +28,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) !void {
   try weaves(g, d, px, py + 72 + gap * m.f(rows) + 6);
 }
 
-fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) !void {
+fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) Allocator.Error!void {
   const gx = px + (pw - gap * cols) / 2;
   for (g.player.inv.slot, 0..) |slot, i| {
     const cx = gx + gap * (m.f(i % cols) + 0.5);
@@ -44,7 +46,7 @@ fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) !void {
 }
 
 /// two columns of recipes; locked ones shown as unknown.
-fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) !void {
+fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
   _ = try d.text(px + 72, wy, 2, s.gold, "WEAVE");
   if (g.weave.busy()) {
     try d.tendril(px + 130, wy + 6, 200, 14, s.gold, g.weave.progress(), 0.4);
@@ -54,7 +56,7 @@ fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) !void {
     const colx = px + 70 + m.f(i % 2) * ((pw - 60) / 2);
     const y = wy + 42 + 52 * m.f(i / 2);
     const open = r.unlocked(&g.prog);
-    const ok = open and craft.Crafter.can(&g.player.inv, r);
+    const ok = open and craft.Crafter.can(g.player.inv.bag(), r);
     const info = r.out.info();
     try d.pod(colx + 16, y, 15, if (open) info.col else s.unknown, if (ok) 0.9 else 0.1, m.f(i) * 0.5);
     if (!open) {

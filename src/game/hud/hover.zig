@@ -1,5 +1,7 @@
 //! what is under the cursor: a structure (its own description and contents),
 //! or the tile with its resource node and any plant growing there.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const ck = @import("../../world/chunk.zig");
 const species = @import("../../sim/species.zig");
 const play = @import("../play.zig");
@@ -14,7 +16,7 @@ const top:f32 = 116;
 
 pub fn visible(g:*const play.Game) bool { return g.hover != null; }
 
-pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) !void {
+pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
   const h = g.hover.?;
   const c = g.world.chunkOfTile(h[0], h[1]) orelse return;
   const near = g.player.inReach(h[0], h[1]);
@@ -22,7 +24,7 @@ pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) !void {
   return tile(g, d, c, ck.localIndex(h[0], h[1]), h, near);
 }
 
-fn structure(g:*play.Game, d:*Draw, sp:*const st.Structure, near:bool) !void {
+fn structure(g:*play.Game, d:*Draw, sp:*const st.Structure, near:bool) Allocator.Error!void {
   try d.membrane(16, 104, 400, 150, s.skin, 0.6);
   _ = try d.text(x, top, 1.75, s.gold, sp.def().name);
   if (!near) _ = try d.text(x + 290, top, 1.25, s.dim, "TOO FAR");
@@ -39,10 +41,10 @@ fn structure(g:*play.Game, d:*Draw, sp:*const st.Structure, near:bool) !void {
   if (k == 0) _ = try d.text(x, y + 6, 1.25, s.dim, "EMPTY");
 }
 
-fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) !void {
+fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Allocator.Error!void {
   const pi = g.plants.at(&g.world, h[0], h[1]);
   try d.membrane(16, 104, 360, if (pi != null) 112 else 60, s.skin, 0.6);
-  if (c.res[t] > 0 and c.occ[t] == ck.NONE) {
+  if (c.res[t] > 0 and c.occ[t] == .none) {
     const item = resources.of(c.kind[t]).?.item;
     _ = try d.print(x, top, 1.75, item.info().col, "{s} X{d}", .{item.info().name, c.res[t]});
   } else {
@@ -50,7 +52,7 @@ fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) !void 
   }
   if (!near) _ = try d.text(x + 248, top + 2, 1.25, s.dim, "TOO FAR");
   const i = pi orelse return;
-  const p = g.plants.list.get(i);
+  const p = g.plants.list.get(i.idx());
   const def = species.get(p.sp);
   var y = top + 26;
   _ = try d.text(x, y, 1.75, s.white, def.name);

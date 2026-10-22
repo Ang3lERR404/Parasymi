@@ -2,14 +2,24 @@
 //! Movement is tile-aware (no wading, one terrace step at a time) and every
 //! motion is procedural: a digitigrade gait, counter-swinging arms, a spring
 //! driven tail, breathing, and a sap belly that swells with what it carries.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const items = @import("../sim/items.zig");
+const World = @import("../world/world.zig").World;
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
 
 pub const SLOTS = 24;
 pub const REACH:f32 = 2.4;
 const STEP_UP:f32 = 0.45;
+/// leg segment lengths: upper leg (thigh + shin, hip to hock) 0.32, lower
+/// leg (metatarsal + paw, hock to toe) ~0.66, about twice as long.
+const THIGH:f32 = 0.18;
+const SHIN:f32 = 0.14;
+const META:f32 = 0.56;
+/// the belly's sap at its centre lets the body behind show through faintly
+const SAP_OPACITY:f32 = 0.72;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -38,16 +48,16 @@ pub const Player = struct {
   /// 0..1 blend toward the work gesture (gathering, planting, harvesting)
   reach:f32 = 0,
   reach_v:f32 = 0,
-  working:bool = false,
-  work_at:?V3 = null,
+  /// where the hands are busy (gathering, weaving, ...); null while idle
+  work:?V3 = null,
 
-  /// `ground` provides `walkable(wx, wz) ?f32` (height, or null for water/void).
-  pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:anytype, dt:f32) void {
+  /// tile-aware: no wading, one terrace step at a time.
+  pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:*const World, dt:f32) void {
     const speed:f32 = if (sprint) 6.5 else 4.0;
     const target = v3(wish[0] * speed, 0, wish[1] * speed);
     const k = @min(1, dt * 12);
     p.vel += (target - p.vel) * m.splat(k);
-    if (p.working) p.vel *= m.splat(0.85);
+    if (p.work != null) p.vel *= m.splat(0.85);
 
     const here = ground.walkable(m.tileOf(p.pos[0]), m.tileOf(p.pos[2])) orelse p.pos[1];
     // resolve each axis separately so the wolf slides along cliffs and shores
@@ -65,8 +75,8 @@ pub const Player = struct {
 
     // face where we move, or what we work on
     var want = p.facing;
-    if (p.working) {
-      if (p.work_at) |w| want = m.atan2(w[0] - p.pos[0], w[2] - p.pos[2]);
+    if (p.work) |w| {
+      want = m.atan2(w[0] - p.pos[0], w[2] - p.pos[2]);
     } else if (@abs(p.vel[0]) + @abs(p.vel[2]) > 0.3) {
       want = m.atan2(p.vel[0], p.vel[2]);
     }
@@ -88,7 +98,7 @@ pub const Player = struct {
     const fill = @sqrt(p.inv.fill());
     m.spring(&p.belly, &p.belly_v, fill, 4, dt);
     m.spring(&p.jig, &p.jig_v, 0, 9, dt);
-    m.spring(&p.reach, &p.reach_v, if (p.working) 1 else 0, 10, dt);
+    m.spring(&p.reach, &p.reach_v, if (p.work != null) 1 else 0, 10, dt);
 
     // tail: each segment chases the one before it, steered by turning and gait
     var target = m.clamp(-p.turn * 0.12, -0.8, 0.8) + @sin(p.t * 2.3) * 0.25 * (1 - p.stride) + @sin(p.phase) * 0.15 * p.stride;
@@ -98,7 +108,9 @@ pub const Player = struct {
     }
   }
 
-  pub fn rig(p:*const Player, out:*Parts) !void {
+  /// emit every part; returns where each paw (left, right) touches down.
+  pub fn rig(p:*const Player, out:*Parts) Allocator.Error![2]V3 {
+    var feet:[2]V3 = undefined;
     const t = p.t;
     const st = p.stride;
     const lean = 0.14 * st + 0.35 * p.reach;
@@ -117,7 +129,7 @@ pub const Player = struct {
     try out.emit(.wolf_belly, m.chain(.{
       torso, T(v3(0, 0.16 - 0.02 * b, 0.05 + 0.07 * b)),
       S(v3(0.1 * bs * (1 - p.jig * 0.08), 0.095 * bs * (1 + p.jig * 0.1), 0.095 * bs * (1 - p.jig * 0.05))),
-    }), .{.glow = 0.35 + 0.65 * b, .phase = 0.3});
+    }), .{.glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY});
 
     // head looks down into the work, nods with breath
     const nod = @sin(t * 1.7) * 0.03 + p.reach * 0.35 - lean * 0.8;
@@ -142,24 +154,29 @@ pub const Player = struct {
       try joint(out, wrist, 0.042);
       try out.emit(.wolf_paw, m.chain(.{wrist, m.rotX(1.2)}), vine_look);
 
-      // digitigrade legs: thigh forward, shin back, long foot forward again
+      // digitigrade legs: a short upper leg (thigh forward, shin back to the
+      // hock, which bends backward) over a lower leg (long metatarsal + paw)
+      // about twice its length. At rest the paw lands under the hip.
       const lp = p.phase + (if (side > 0) m.pi else @as(f32, 0));
       const lift = @max(0, @cos(lp)) * st;
-      const th = -0.35 - @sin(lp) * 0.5 * st + 0.25 * p.reach;
-      const kn = 0.9 + 0.5 * lift + 0.3 * p.reach;
-      const mt = -0.7 - 0.35 * lift - 0.25 * p.reach;
+      const th = -0.65 - @sin(lp) * 0.45 * st + 0.25 * p.reach;
+      const kn = 1.85 + 0.55 * lift + 0.3 * p.reach;
+      const mt = -1.6 - 0.4 * lift - 0.25 * p.reach;
       const thigh = m.chain(.{hips, T(v3(side * 0.1, 0, 0)), m.rotX(th)});
       try joint(out, thigh, 0.095);
-      try out.emit(.wolf_limb, m.chain(.{thigh, m.rotX(m.pi), S(v3(0.17, 0.3, 0.17))}), vine_look);
-      const knee = m.chain(.{thigh, T(v3(0, -0.3, 0)), m.rotX(kn)});
-      try joint(out, knee, 0.065);
-      try out.emit(.wolf_limb, m.chain(.{knee, m.rotX(m.pi), S(v3(0.11, 0.28, 0.11))}), vine_look);
-      const ankle = m.chain(.{knee, T(v3(0, -0.28, 0)), m.rotX(mt)});
-      try joint(out, ankle, 0.047);
-      try out.emit(.wolf_limb, m.chain(.{ankle, m.rotX(m.pi), S(v3(0.08, 0.16, 0.08))}), vine_look);
-      const heel = m.chain(.{ankle, T(v3(0, -0.16, 0))});
-      try joint(out, heel, 0.036);
-      try out.emit(.wolf_paw, m.chain(.{heel, m.rotX(-(th + kn + mt))}), vine_look);
+      try out.emit(.wolf_limb, m.chain(.{thigh, m.rotX(m.pi), S(v3(0.18, THIGH, 0.18))}), vine_look);
+      const knee = m.chain(.{thigh, T(v3(0, -THIGH, 0)), m.rotX(kn)});
+      try joint(out, knee, 0.075);
+      try out.emit(.wolf_limb, m.chain(.{knee, m.rotX(m.pi), S(v3(0.13, SHIN, 0.13))}), vine_look);
+      const hock = m.chain(.{knee, T(v3(0, -SHIN, 0)), m.rotX(mt)});
+      try joint(out, hock, 0.058);
+      try out.emit(.wolf_limb, m.chain(.{hock, m.rotX(m.pi), S(v3(0.095, META, 0.095))}), vine_look);
+      const heel = m.chain(.{hock, T(v3(0, -META, 0))});
+      try joint(out, heel, 0.038);
+      const paw = m.chain(.{heel, m.rotX(-(th + kn + mt))});
+      try out.emit(.wolf_paw, paw, vine_look);
+      const c = m.mulV(paw, .{0, 0, 0.03, 1});
+      feet[if (side > 0) 1 else 0] = v3(c[0], c[1], c[2]);
     }
 
     // tail: three segments, each bending by its spring, ending in a leaf tuft
@@ -172,6 +189,7 @@ pub const Player = struct {
       seg = m.chain(.{seg, T(v3(0, 0.16, 0))});
     }
     try out.emit(.leaf_tuft, m.chain(.{seg, m.rotX(-0.6), S(v3(1.3, 1.3, 1.3))}), .{.flutter = 1.5, .phase = 0.7});
+    return feet;
   }
 
   pub fn chest(p:*const Player) V3 { return p.pos + v3(0, 1.0, 0); }
@@ -185,6 +203,6 @@ pub const Player = struct {
 };
 
 /// a woven knot where two parts meet, so bent joints never show a seam.
-fn joint(out:*Parts, at:m.M4, r:f32) !void {
+fn joint(out:*Parts, at:m.M4, r:f32) Allocator.Error!void {
   try out.emit(.wolf_joint, m.chain(.{at, S(m.splat(r))}), .{.glow = 0.25, .phase = 0.1});
 }

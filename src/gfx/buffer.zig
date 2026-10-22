@@ -4,7 +4,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const vk = @import("vulkan");
-const Ctx = @import("ctx.zig").Ctx;
+const ctx = @import("ctx.zig");
+const Ctx = ctx.Ctx;
 
 pub const Buffer = struct {
   buf:vk.Buffer = .null_handle,
@@ -12,7 +13,11 @@ pub const Buffer = struct {
   size:u64 = 0,
   map:[*]u8 = undefined,
 
-  pub fn init(c:*const Ctx, size:u64, usage:vk.BufferUsageFlags) !Buffer {
+  pub fn init(c:*const Ctx, size:u64, usage:vk.BufferUsageFlags) ctx.Error!Buffer {
+    return create(c, size, usage) catch |e| ctx.fold(e);
+  }
+
+  fn create(c:*const Ctx, size:u64, usage:vk.BufferUsageFlags) !Buffer {
     var b:Buffer = .{.size = size};
     b.buf = try c.device.createBuffer(&.{.size = size, .usage = usage, .sharing_mode = .exclusive}, null);
     errdefer c.device.destroyBuffer(b.buf, null);

@@ -6,6 +6,8 @@
 //!   visible(g) bool              (optional; always drawn when absent)
 //! Panels draw in declaration order, so later ones sit on top. A new panel is
 //! one new file plus one line in `panels`.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const registry = @import("../core/registry.zig");
 const play = @import("play.zig");
 
@@ -22,7 +24,7 @@ const panels = struct {
 };
 const reg = registry.Registry(panels);
 
-pub fn build(g:*play.Game, screen:[2]f32) !void {
+pub fn build(g:*play.Game, screen:[2]f32) Allocator.Error!void {
   const d = &g.ui;
   d.clear();
   inline for (reg.ids) |id| {

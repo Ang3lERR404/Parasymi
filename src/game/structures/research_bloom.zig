@@ -1,6 +1,8 @@
 //! RESEARCH BLOOM: the lab. Studies the chosen technology, eating the
 //! per-unit ingredients it is fed, one unit at a time. Its orb spins faster
 //! while it works.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
@@ -15,9 +17,9 @@ const STOCK = 20;
 
 pub const State = struct { lab:prog.Lab = .{} };
 
-pub fn tick(ctx:st.Ctx, i:u32, dt:f32) bool {
+pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const s = ctx.ss.get(i);
-  ctx.g.labTick(&s.state.research_bloom.lab, &s.inv, dt);
+  ctx.g.labTick(&s.state.research_bloom.lab, s.inv.bag(), dt);
   return s.state.research_bloom.lab.busy;
 }
 
@@ -30,7 +32,7 @@ pub fn wants(s:*const st.Structure, g:*const prog.Progression, item:items.Item) 
 }
 
 /// the orb hovering over the bloom: bobs, and spins with the work.
-pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) !void {
+pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   const a = s.activity;
   const bob = 0.12 * @sin(tf * 1.4 + s.seed * 5);
   try out.emit(.research_orb, m.chain(.{
@@ -38,7 +40,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) !void {
   }), .{.glow = 0.7 + 1.5 * a, .phase = s.seed});
 }
 
-pub fn describe(_:*const st.Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) !void {
+pub fn describe(_:*const st.Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const id = g.current orelse {
     _ = try d.text(x, y, 1.4, .{150, 170, 150, 255}, "CHOOSE WHAT TO STUDY (T)");
     return;

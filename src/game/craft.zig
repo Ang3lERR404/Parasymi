@@ -40,13 +40,13 @@ pub const Crafter = struct {
   len:usize = 0,
   t:f32 = 0,
 
-  pub fn can(inv:anytype, r:Recipe) bool {
+  pub fn can(inv:items.Bag, r:Recipe) bool {
     for (r.in) |ing| if (inv.count(ing.item) < ing.n) return false;
     return true;
   }
 
   /// takes the ingredients now; false if missing or the queue is full.
-  pub fn push(c:*Crafter, inv:anytype, idx:usize) bool {
+  pub fn push(c:*Crafter, inv:items.Bag, idx:usize) bool {
     const r = hand[idx];
     if (c.len == c.queue.len or !can(inv, r)) return false;
     for (r.in) |ing| _ = inv.take(ing.item, ing.n);
@@ -60,7 +60,7 @@ pub const Crafter = struct {
 
   /// returns the item finished this step, if any. A result that does not fit
   /// waits in the weave until there is room.
-  pub fn tick(c:*Crafter, inv:anytype, dt:f32) ?items.Item {
+  pub fn tick(c:*Crafter, inv:items.Bag, dt:f32) ?items.Item {
     if (c.len == 0) return null;
     const r = hand[c.queue[0]];
     c.t = @min(c.t + dt, r.time);
@@ -76,14 +76,14 @@ pub const Crafter = struct {
 test "weaving takes ingredients up front and yields after its time" {
   var inv:items.Inventory(8) = .{};
   var c:Crafter = .{};
-  try testing.expect(!c.push(&inv, 0));
+  try testing.expect(!c.push(inv.bag(), 0));
   _ = inv.add(.fibre, 4);
   _ = inv.add(.starlight, 1);
-  try testing.expect(c.push(&inv, 0));
-  try testing.expect(!c.push(&inv, 0)); // only one starlight
+  try testing.expect(c.push(inv.bag(), 0));
+  try testing.expect(!c.push(inv.bag(), 0)); // only one starlight
   try testing.expectEqual(@as(u32, 2), inv.count(.fibre));
-  try testing.expect(c.tick(&inv, 1.0) == null);
-  try testing.expect(c.tick(&inv, 1.0) == .seed_lumenroot);
+  try testing.expect(c.tick(inv.bag(), 1.0) == null);
+  try testing.expect(c.tick(inv.bag(), 1.0) == .seed_lumenroot);
   try testing.expectEqual(@as(u32, 1), inv.count(.seed_lumenroot));
   try testing.expect(!c.busy());
 }

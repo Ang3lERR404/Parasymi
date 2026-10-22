@@ -4,7 +4,8 @@ const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
 const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
-const Ctx = @import("../../gfx/ctx.zig").Ctx;
+const ctx = @import("../../gfx/ctx.zig");
+const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
 const species = @import("../../sim/species.zig");
 const pass = @import("../pass.zig");
@@ -18,14 +19,14 @@ pub const desc:pass.Desc = .{
   .attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5)),
 };
 
-pub const Frame = struct { inst:Buffer };
+pub const Frame = struct { inst:Buffer = .{} };
 
-pub fn initFrame(c:*const Ctx) !Frame {
+pub fn initFrame(c:*const Ctx) ctx.Error!Frame {
   return .{.inst = try Buffer.init(c, MAX * @sizeOf(vertex.PlantInstance), .{.vertex_buffer = true})};
 }
 pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
 
-pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) !void {
+pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   var n:u32 = 0;
   var first:[species.count]u32 = undefined;
   var counts:[species.count]u32 = undefined;

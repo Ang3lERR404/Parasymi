@@ -1,20 +1,22 @@
 //! mesh: WOLF TORSO. hips at origin, chest top at y=0.5, forward is +Z
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 
 const v3 = m.v3;
-const core = pal.core;
-const vine = pal.vine;
-const leaf_dark = pal.leaf_dark;
-const leaf_lite = pal.leaf_lite;
+const core = pal.wolf_core;
+const vine = pal.wolf_vine;
+const leaf_dark = pal.wolf_leaf_dark;
+const leaf_lite = pal.wolf_leaf_lite;
 
 fn torsoProfile(k:f32) f32 {
   // narrow waist at the hips, broad ribcage, tapering into the neck
   return 0.085 + 0.05 * @sin(k * m.pi * 0.85) + 0.02 * k;
 }
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   const s = b.mark();
   try mg.bundle(b, torsoProfile, 7, 2.4, core, vine);
   b.xform(s, m.scale3(v3(1.25, 0.5, 0.95)));

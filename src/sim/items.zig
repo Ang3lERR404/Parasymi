@@ -43,52 +43,65 @@ pub const Stack = struct { item:Item, n:u16 };
 /// an amount of an item consumed by a recipe or research unit.
 pub const Ingredient = struct { item:Item, n:u16 };
 
+/// any inventory seen through its slots, whatever its size. Recipes and
+/// research take a Bag so they work on the wolf's belly and structures alike.
+pub const Bag = struct {
+  slot:[]?Stack,
+
+  /// adds as many as fit; returns how many were added.
+  pub fn add(b:Bag, item:Item, n:u16) u16 {
+    var left = n;
+    const max = item.info().stack;
+    for (b.slot) |*s| if (s.*) |*st| if (st.item == item and st.n < max) {
+      const k = @min(left, max - st.n);
+      st.n += k;
+      left -= k;
+      if (left == 0) return n;
+    };
+    for (b.slot) |*s| if (s.* == null) {
+      const k = @min(left, max);
+      s.* = .{.item = item, .n = k};
+      left -= k;
+      if (left == 0) return n;
+    };
+    return n - left;
+  }
+
+  pub fn count(b:Bag, item:Item) u32 { return countIn(b.slot, item); }
+
+  /// removes exactly `n` or nothing.
+  pub fn take(b:Bag, item:Item, n:u32) bool {
+    if (b.count(item) < n) return false;
+    var left = n;
+    var i = b.slot.len;
+    while (i > 0 and left > 0) {
+      i -= 1;
+      if (b.slot[i]) |*st| if (st.item == item) {
+        const k:u16 = @intCast(@min(left, st.n));
+        st.n -= k;
+        left -= k;
+        if (st.n == 0) b.slot[i] = null;
+      };
+    }
+    return true;
+  }
+};
+
+fn countIn(slot:[]const ?Stack, item:Item) u32 {
+  var c:u32 = 0;
+  for (slot) |s| if (s) |st| if (st.item == item) { c += st.n; };
+  return c;
+}
+
 pub fn Inventory(comptime slots:usize) type {
   return struct {
     const Self = @This();
     slot:[slots]?Stack = @splat(null),
 
-    /// adds as many as fit; returns how many were added.
-    pub fn add(inv:*Self, item:Item, n:u16) u16 {
-      var left = n;
-      const max = item.info().stack;
-      for (&inv.slot) |*s| if (s.*) |*st| if (st.item == item and st.n < max) {
-        const k = @min(left, max - st.n);
-        st.n += k;
-        left -= k;
-        if (left == 0) return n;
-      };
-      for (&inv.slot) |*s| if (s.* == null) {
-        const k = @min(left, max);
-        s.* = .{.item = item, .n = k};
-        left -= k;
-        if (left == 0) return n;
-      };
-      return n - left;
-    }
-
-    pub fn count(inv:*const Self, item:Item) u32 {
-      var c:u32 = 0;
-      for (inv.slot) |s| if (s) |st| if (st.item == item) { c += st.n; };
-      return c;
-    }
-
-    /// removes exactly `n` or nothing.
-    pub fn take(inv:*Self, item:Item, n:u32) bool {
-      if (inv.count(item) < n) return false;
-      var left = n;
-      var i = slots;
-      while (i > 0 and left > 0) {
-        i -= 1;
-        if (inv.slot[i]) |*st| if (st.item == item) {
-          const k:u16 = @intCast(@min(left, st.n));
-          st.n -= k;
-          left -= k;
-          if (st.n == 0) inv.slot[i] = null;
-        };
-      }
-      return true;
-    }
+    pub fn bag(inv:*Self) Bag { return .{.slot = &inv.slot}; }
+    pub fn add(inv:*Self, item:Item, n:u16) u16 { return inv.bag().add(item, n); }
+    pub fn take(inv:*Self, item:Item, n:u32) bool { return inv.bag().take(item, n); }
+    pub fn count(inv:*const Self, item:Item) u32 { return countIn(&inv.slot, item); }
 
     /// 0..1, how full the inventory is (by stack fraction).
     pub fn fill(inv:*const Self) f32 {

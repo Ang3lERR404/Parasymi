@@ -32,7 +32,7 @@ pub const Draw = struct {
   pub fn deinit(d:*Draw) void { d.v.deinit(d.gpa); }
   pub fn clear(d:*Draw) void { d.v.clearRetainingCapacity(); }
 
-  fn quad(d:*Draw, x0:f32, y0:f32, w:f32, h:f32, uw:f32, uh:f32, col:Color, bits:[2]u32, param:[2]f32) !void {
+  fn quad(d:*Draw, x0:f32, y0:f32, w:f32, h:f32, uw:f32, uh:f32, col:Color, bits:[2]u32, param:[2]f32) Allocator.Error!void {
     // snap to whole pixels so edges never land between texels and crawl
     const x = @round(x0);
     const y = @round(y0);
@@ -44,26 +44,26 @@ pub const Draw = struct {
   }
 
   /// shapes get a margin so wobble/glow can spill past the nominal bounds.
-  fn shape(d:*Draw, kind:Shape, x:f32, y:f32, w:f32, h:f32, col:Color, param:[2]f32) !void {
+  fn shape(d:*Draw, kind:Shape, x:f32, y:f32, w:f32, h:f32, col:Color, param:[2]f32) Allocator.Error!void {
     const pad:f32 = 28;
     try d.quad(x - pad, y - pad, w + 2 * pad, h + 2 * pad, w + 2 * pad, h + 2 * pad, col, .{shape_mark, @intFromEnum(kind)}, param);
   }
 
-  pub fn membrane(d:*Draw, x:f32, y:f32, w:f32, h:f32, col:Color, seed:f32) !void {
+  pub fn membrane(d:*Draw, x:f32, y:f32, w:f32, h:f32, col:Color, seed:f32) Allocator.Error!void {
     try d.shape(.membrane, x, y, w, h, col, .{0, seed});
   }
-  pub fn pod(d:*Draw, cx:f32, cy:f32, r:f32, col:Color, lit:f32, seed:f32) !void {
+  pub fn pod(d:*Draw, cx:f32, cy:f32, r:f32, col:Color, lit:f32, seed:f32) Allocator.Error!void {
     try d.shape(.pod, cx - r, cy - r, 2 * r, 2 * r, col, .{lit, seed});
   }
-  pub fn tendril(d:*Draw, x:f32, y:f32, w:f32, h:f32, col:Color, value:f32, seed:f32) !void {
+  pub fn tendril(d:*Draw, x:f32, y:f32, w:f32, h:f32, col:Color, value:f32, seed:f32) Allocator.Error!void {
     try d.shape(.tendril, x, y, w, h, col, .{m.clamp(value, 0, 1), seed});
   }
-  pub fn glow(d:*Draw, cx:f32, cy:f32, r:f32, col:Color) !void {
+  pub fn glow(d:*Draw, cx:f32, cy:f32, r:f32, col:Color) Allocator.Error!void {
     try d.shape(.glow, cx - r, cy - r, 2 * r, 2 * r, col, .{0, 0});
   }
 
   /// returns the x after the last glyph.
-  pub fn text(d:*Draw, x:f32, y:f32, s:f32, col:Color, str:[]const u8) !f32 {
+  pub fn text(d:*Draw, x:f32, y:f32, s:f32, col:Color, str:[]const u8) Allocator.Error!f32 {
     var cx = x;
     for (str) |ch| {
       if (ch != ' ') try d.quad(cx, y, 6 * s, 8 * s, 6, 8, col, font.bits(ch), .{0, cx * 0.01});
@@ -74,7 +74,7 @@ pub const Draw = struct {
 
   pub fn width(str:[]const u8, s:f32) f32 { return m.f(str.len) * 6 * s; }
 
-  pub fn print(d:*Draw, x:f32, y:f32, s:f32, col:Color, comptime fmt:[]const u8, args:anytype) !f32 {
+  pub fn print(d:*Draw, x:f32, y:f32, s:f32, col:Color, comptime fmt:[]const u8, args:anytype) Allocator.Error!f32 {
     var buf:[256]u8 = undefined;
     const str:[]const u8 = bufPrint(&buf, fmt, args) catch &buf;
     return d.text(x, y, s, col, str);

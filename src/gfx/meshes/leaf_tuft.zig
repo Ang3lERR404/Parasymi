@@ -1,13 +1,15 @@
 //! mesh: LEAF TUFT
+const std = @import("std");
+const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 
 const v3 = m.v3;
-const leaf_dark = pal.leaf_dark;
-const leaf_lite = pal.leaf_lite;
+const leaf_dark = pal.wolf_leaf_dark;
+const leaf_lite = pal.wolf_leaf_lite;
 
-pub fn build(b:*mg.Builder) !void {
+pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("leaf_tuft");
   for (0..5) |i| {
     const a = m.f(i) / 5 * m.tau;

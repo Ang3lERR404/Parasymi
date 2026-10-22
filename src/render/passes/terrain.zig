@@ -11,7 +11,7 @@ pub const desc:pass.Desc = .{
   .attrs = &pipeline.attrs(vertex.Terrain, 0, 0),
 };
 
-pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) !void {
+pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   cmd.bindPipeline(.graphics, r.pipe(.terrain));
   cmd.pushConstants(r.layout(desc.layout), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
   const zero = [_]vk.DeviceSize{0};
