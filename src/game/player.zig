@@ -4,11 +4,13 @@
 //! driven tail, breathing, and a sap belly that swells with what it carries.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const m = @import("../core/math.zig");
 const items = @import("../sim/items.zig");
 const World = @import("../world/world.zig").World;
 const mg = @import("../gfx/meshgen.zig");
 const pal = @import("../gfx/meshes/palette.zig");
+const torso_mesh = @import("../gfx/meshes/wolf_torso.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
 
@@ -20,8 +22,42 @@ const STEP_UP:f32 = 0.45;
 const THIGH:f32 = 0.18;
 const SHIN:f32 = 0.14;
 const META:f32 = 0.56;
-/// the belly's sap at its centre lets the body behind show through faintly
+/// the belly's sap at its centre lets the body behind show through faintly;
+/// the pectorals are solidified sap, 30% less see-through.
 const SAP_OPACITY:f32 = 0.72;
+const PEC_OPACITY:f32 = 1 - (1 - SAP_OPACITY) * 0.7;
+/// the empty belly's radii (torso space); full, it is 35% larger and sags
+const BELLY_R = v3(0.13, 0.12, 0.12);
+const BELLY_GROW:f32 = 0.35;
+const BELLY_SAG:f32 = 0.12;
+/// how strongly the wolf's acceleration is felt by what hangs in and on its
+/// body (m/s^2 down to a few centimetres of lag)
+const SLOSH:f32 = 0.05;
+/// a footfall drops the belly's contents a little
+const STEP_KICK:f32 = 0.18;
+
+/// one of the heavier things carried, hanging in the sap on its own spring.
+const Lump = struct {
+  /// rest place within the belly (unit ball, scaled by the room inside)
+  rest:V3,
+  k:f32, c:f32, mass:f32,
+};
+const lumps = [_]Lump{
+  .{.rest = v3(0.35, -0.3, 0.3), .k = 55, .c = 5, .mass = 0.7},
+  .{.rest = v3(-0.4, -0.35, 0.15), .k = 70, .c = 6, .mass = 0.9},
+  .{.rest = v3(0.05, -0.6, -0.1), .k = 40, .c = 4, .mass = 1.0},
+  .{.rest = v3(0.4, 0.15, -0.2), .k = 80, .c = 7, .mass = 0.5},
+  .{.rest = v3(-0.25, 0.05, 0.45), .k = 62, .c = 5.5, .mass = 0.6},
+};
+const LUMP_R:f32 = 0.06;
+/// the pectorals: dense gel on a spring each (left, right)
+const PEC_K = [2]f32{60, 55};
+const PEC_C:f32 = 6;
+const PEC_MASS:f32 = 0.8;
+const PEC_MAX:f32 = 0.02;
+
+/// a point mass on a spring: offset from its rest place and velocity.
+const Spring3 = struct { pos:V3 = v3(0, 0, 0), vel:V3 = v3(0, 0, 0) };
 /// the tail: spring-steered joints, each this long, and how finely the vine
 /// woven through them is sampled.
 const TAIL_JOINTS = 3;
@@ -46,10 +82,16 @@ pub const Player = struct {
   t:f32 = 0,
   phase:f32 = 0,
   stride:f32 = 0,
-  belly:f32 = 0,
-  belly_v:f32 = 0,
-  jig:f32 = 0,
-  jig_v:f32 = 0,
+  /// how full the belly looks, easing toward the inventory's fill
+  fullness:f32 = 0,
+  /// velocity last frame and the acceleration felt since, in the wolf's own
+  /// frame (x right, z forward)
+  last_vel:V3 = v3(0, 0, 0),
+  accel:V3 = v3(0, 0, 0),
+  /// what hangs in the belly (relative to its centre) and the pectorals'
+  /// give (relative to their rest)
+  lump:[lumps.len]Spring3 = @splat(.{}),
+  pec:[2]Spring3 = @splat(.{}),
   tail:[3]f32 = @splat(0),
   tail_v:[3]f32 = @splat(0),
   /// 0..1 blend toward the work gesture (gathering, planting, harvesting)
@@ -99,13 +141,18 @@ pub const Player = struct {
     const prev = p.phase;
     p.phase += spd * dt * 2.6;
     p.stride += (m.clamp01(spd / 4.0) - p.stride) * @min(1, dt * 8);
-    // a footfall every half cycle kicks the belly
-    if (@floor(prev / m.pi) != @floor(p.phase / m.pi)) p.jig_v -= 2.2 * p.stride;
+    // a footfall every half cycle drops what the belly carries
+    const step = @floor(prev / m.pi) != @floor(p.phase / m.pi);
 
-    const fill = @sqrt(p.inv.fill());
-    m.spring(&p.belly, &p.belly_v, fill, 4, dt);
-    m.spring(&p.jig, &p.jig_v, 0, 9, dt);
+    p.fullness += (p.inv.fill() - p.fullness) * @min(1, dt * 2);
     m.spring(&p.reach, &p.reach_v, if (p.work != null) 1 else 0, 10, dt);
+
+    // what the body feels: its acceleration, turned into its own frame
+    const a = (p.vel - p.last_vel) / m.splat(@max(dt, 1e-4));
+    p.last_vel = p.vel;
+    const al = m.mulV(m.rotY(-p.facing), .{a[0], a[1], a[2], 0});
+    p.accel = v3(al[0], al[1], al[2]);
+    p.slosh(step, dt);
 
     // tail: each segment chases the one before it, steered by turning and gait
     var target = m.clamp(-p.turn * 0.12, -0.8, 0.8) + @sin(p.t * 2.3) * 0.25 * (1 - p.stride) + @sin(p.phase) * 0.15 * p.stride;
@@ -113,6 +160,37 @@ pub const Player = struct {
       m.spring(&p.tail[i], &p.tail_v[i], target, 7 - m.f(i) * 1.5, dt);
       target = p.tail[i];
     }
+  }
+
+  /// the belly's lumps and the pectorals lag behind the body's acceleration
+  /// (inertia), overshoot when it stops, and settle back on their springs.
+  fn slosh(p:*Player, step:bool, dt:f32) void {
+    const room = p.bellyRoom();
+    for (&p.lump, lumps) |*s, l| {
+      if (step) s.vel[1] -= STEP_KICK * p.stride;
+      const force = -p.accel * m.splat(l.mass * SLOSH);
+      m.springDamper(&s.pos, &s.vel, l.rest * m.splat(room), l.k, l.c, l.mass, force, dt);
+      // stay inside the sac; hitting its wall stops the outward motion
+      const d = m.len(s.pos);
+      if (d > room) {
+        const n = s.pos / m.splat(d);
+        s.pos = n * m.splat(room);
+        s.vel -= n * m.splat(@max(m.dot(s.vel, n), 0));
+      }
+    }
+    for (&p.pec, PEC_K) |*s, k| {
+      m.springDamper(&s.pos, &s.vel, v3(0, 0, 0), k, PEC_C, PEC_MASS, -p.accel * m.splat(PEC_MASS * SLOSH), dt);
+      const d = m.len(s.pos);
+      if (d > PEC_MAX) s.pos *= m.splat(PEC_MAX / d);
+    }
+  }
+
+  fn bellyScale(p:*const Player) f32 { return 1 + p.fullness * BELLY_GROW; }
+  fn lumpRadius(p:*const Player) f32 { return LUMP_R * p.bellyScale() / (1 + BELLY_GROW); }
+  /// how far a lump's centre may stray from the belly's centre: within 80%
+  /// of the sac, and never poking through it
+  fn bellyRoom(p:*const Player) f32 {
+    return @max(@reduce(.Min, BELLY_R) * p.bellyScale() * 0.8 - p.lumpRadius(), 0.01);
   }
 
   /// emit every part; returns where each paw (left, right) touches down.
@@ -132,13 +210,26 @@ pub const Player = struct {
 
     try out.emit(.wolf_torso, m.chain(.{torso, S(v3(breath, 1, breath))}), vine_look);
 
-    // the belly: a sap sac that swells forward with the inventory and jiggles
-    const b = p.belly;
-    const bs = (0.75 + 0.95 * b);
-    try out.emit(.wolf_belly, m.chain(.{
-      torso, T(v3(0, 0.16 - 0.02 * b, 0.05 + 0.07 * b)),
-      S(v3(0.1 * bs * (1 - p.jig * 0.08), 0.095 * bs * (1 + p.jig * 0.1), 0.095 * bs * (1 - p.jig * 0.05))),
-    }), .{.glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY});
+    // the belly: a sap sac that inflates with the inventory, drops and sags
+    // as it fills, with the heavier things inside showing through as shadows
+    const b = p.fullness;
+    const belly = m.chain(.{torso, T(v3(0, 0.16 - 0.04 * b, 0.05 + 0.05 * b))});
+    var held:usize = 0;
+    for (p.inv.slot) |slot| if (slot != null) { held += 1; };
+    for (p.lump[0..@min(held, lumps.len)]) |l| {
+      try out.emit(.belly_lump, m.chain(.{belly, T(l.pos), S(m.splat(p.lumpRadius()))}), .{.glow = 0.25, .phase = 0.3});
+    }
+    try out.emit(.wolf_belly, m.chain(.{belly, S(BELLY_R * m.splat(p.bellyScale()))}), .{
+      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .sag = BELLY_SAG * b,
+    });
+
+    // pectorals: plump lobes of solidified sap, giving like dense gel and
+    // never quite still
+    for ([_]f32{-1, 1}, 0..) |side, i| {
+      const idle = v3(0, 0.003 * @sin(t * m.tau / 3 + side * 1.3), 0);
+      const at = torso_mesh.pec_centre * v3(side * breath, 1, breath) + p.pec[i].pos + idle;
+      try out.emit(.wolf_pec, m.chain(.{torso, T(at), S(torso_mesh.pec_radii)}), .{.glow = 0.3, .phase = 0.6, .fade = PEC_OPACITY});
+    }
 
     // head looks down into the work, nods with breath
     const nod = @sin(t * 1.7) * 0.03 + p.reach * 0.35 - lean * 0.8;
@@ -231,4 +322,25 @@ pub const Player = struct {
 /// a woven knot where two parts meet, so bent joints never show a seam.
 fn joint(out:*Parts, at:m.M4, r:f32) Allocator.Error!void {
   try out.emit(.wolf_joint, m.chain(.{at, S(m.splat(r))}), .{.glow = 0.25, .phase = 0.1});
+}
+
+test "belly contents lag a sprint, overshoot a stop, then settle" {
+  var p:Player = .{.pos = v3(0, 0, 0)};
+  _ = p.inv.add(.grit, 50);
+  const dt:f32 = 1.0 / 60.0;
+  for (0..120) |_| p.animate(dt);
+  const rest = p.lump[0].pos;
+  // a burst of speed forward (+z): the lump swings back
+  p.vel = v3(0, 0, 4);
+  p.animate(dt);
+  for (0..3) |_| p.animate(dt);
+  try testing.expect(p.lump[0].pos[2] < rest[2] - 0.005);
+  // run steadily, then stop dead: it overshoots forward
+  for (0..120) |_| p.animate(dt);
+  p.vel = v3(0, 0, 0);
+  for (0..4) |_| p.animate(dt);
+  try testing.expect(p.lump[0].pos[2] > rest[2] + 0.005);
+  // and it never leaves the sac
+  for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + 1e-4);
+  for (p.pec) |q| try testing.expect(m.len(q.pos) <= PEC_MAX + 1e-5);
 }

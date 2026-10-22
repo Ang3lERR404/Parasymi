@@ -13,6 +13,7 @@ test {
   _ = @import("sim/plants.zig");
   _ = @import("game/structures.zig");
   _ = @import("game/play.zig");
+  _ = @import("game/player.zig");
   _ = @import("game/save.zig");
   _ = @import("gfx/meshgen.zig");
 }

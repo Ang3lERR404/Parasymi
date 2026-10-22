@@ -212,6 +212,27 @@ pub fn spring(pos:*f32, vel:*f32, target:f32, freq:f32, dt:f32) void {
   vel.* = (vel.* - freq * j * dt) * e;
 }
 
+/// a damped spring-mass pulling `pos` toward `rest` under an extra `force`:
+/// `m a = -k (pos - rest) - c v + force`. Substepped so stiff springs stay
+/// stable over long frames.
+pub fn springDamper(pos:*V3, vel:*V3, rest:V3, k:f32, c:f32, mass:f32, force:V3, dt:f32) void {
+  const n = @max(@as(u32, @intFromFloat(@ceil(dt * 240))), 1);
+  const h = dt / f(n);
+  for (0..n) |_| {
+    const acc = (force - (pos.* - rest) * splat(k) - vel.* * splat(c)) / splat(mass);
+    vel.* += acc * splat(h);
+    pos.* += vel.* * splat(h);
+  }
+}
+
+test "spring-damper settles where its force balances" {
+  var p = v3(0, 0, 0);
+  var v = v3(1, 0, 0);
+  for (0..120) |_| springDamper(&p, &v, v3(0, 1, 0), 60, 6, 0.8, v3(0, 0, 3), 1.0 / 30.0);
+  try testing.expect(len(p - v3(0, 1, 0.05)) < 1e-3);
+  try testing.expect(len(v) < 1e-3);
+}
+
 test "spring is stable for huge steps" {
   var p:f32 = 0;
   var v:f32 = 50;

@@ -42,6 +42,8 @@ pub const PartInstance = extern struct {
   p:[4]f32,
   /// rgb colour multiply, w blend amount
   tint:[4]f32,
+  /// x sag: outward bulge of a sac, heavier at its bottom and front (0 = none)
+  q:[4]f32,
 };
 
 pub const Ui = extern struct {

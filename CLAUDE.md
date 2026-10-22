@@ -124,7 +124,9 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   sway. Parasitic: desaturated reds/oranges. Symbiotic: greens/teals.
 - Sky: gradient dome, sun/moon, dusk glow, starlight motes at night.
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow. 150 ms anim.
-- Wolf: translucent fresnel belly (amber), contact shadows under feet,
+- Wolf: translucent fresnel belly (amber) that inflates (+35%), drops and sags
+  with fill, heavy contents jostling inside on springs; sap pectorals (denser
+  sap, sprung gel) with chest vines tucked behind; contact shadows under feet,
   accent discipline (amber only on belly/eyes/inner ear, rest muted),
   anisotropic vine highlight along tube tangent.
 - "Celestial / beyond comprehension" is the next phase target.

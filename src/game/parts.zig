@@ -12,6 +12,8 @@ pub const Look = struct {
   phase:f32 = 0,
   fade:f32 = 1,
   tint:[4]f32 = .{1, 1, 1, 0},
+  /// how far a sac sags outward under its own weight (unit-radius units)
+  sag:f32 = 0,
 };
 
 pub const Parts = struct {
@@ -52,5 +54,6 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
     .p = .{look.glow, look.flutter, look.phase, look.fade},
     .tint = look.tint,
+    .q = .{look.sag, 0, 0, 0},
   };
 }

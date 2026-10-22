@@ -13,7 +13,10 @@ const registry = @import("../core/registry.zig");
 const parts = struct {
   // the vine-wolf
   pub const wolf_torso = @import("meshes/wolf_torso.zig");
+  // drawn before the belly so the translucent sac blends over them
+  pub const belly_lump = @import("meshes/belly_lump.zig");
   pub const wolf_belly = @import("meshes/wolf_belly.zig");
+  pub const wolf_pec = @import("meshes/wolf_pec.zig");
   pub const wolf_head = @import("meshes/wolf_head.zig");
   pub const wolf_limb = @import("meshes/wolf_limb.zig");
   pub const wolf_joint = @import("meshes/wolf_joint.zig");
