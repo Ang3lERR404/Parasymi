@@ -1,11 +1,11 @@
 # CLAUDE.md
 
 ## What this is
-Player-centric Factorio-like automation game. Magically infused plants (parasitic +
-symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3),
-Windows, no asset files (every mesh, the font and all UI shapes are procedural).
-2.5D top-down 3D. Adjustable pitch (30°–85°, default 55°), yaw via Q/E. No free
-rotation in play; a free inspection camera is always available (Ctrl+F).
+Player-centric Factorio-like automation game: magically infused plants
+(parasitic + symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig
+(Vulkan 1.3), Windows, no asset files (every mesh, the font and all UI shapes
+are procedural). 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
+free rotation in play; free inspection camera on Ctrl+F.
 
 ## Build
 ```
@@ -18,43 +18,40 @@ zig build run -- --novsync --seed=0x1234
 zig build run -- --load           # load save
 zig build test                    # headless logic tests (no window/GPU)
 ```
-
 Needs `VULKAN_SDK` (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`,
-zglfw `f04fdbf`. Upstream heads need 0.17. A stray `CPATH` breaks GLFW's C build.
+zglfw `f04fdbf` (upstream heads need 0.17). A stray `CPATH` breaks GLFW's C
+build. New shaders go in `build.zig`'s list.
 
 ## Controls
 WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
-RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate, 1–9/0/- hotbar
-(only), click a research node or weave recipe in its panel,
-Tab belly (weave), T research, F3 debug. Esc closes a panel, else pauses (Q in
-pause = save and quit). F5 save, F9 load, F11 fullscreen.
-Free cam (Ctrl+F): click to look, WASD fly (Shift fast), Space/Ctrl+Space
-rise/sink, Q/E roll, wheel dolly, unclamped; eases back in 0.3 s.
+RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate. 1–9/0/- pick
+hotbar slots only; research nodes and weave recipes are clicked in their
+panels. Tab belly (weave), T research, F3 debug, Esc closes a panel else
+pauses (Q in pause = save and quit), F5 save, F9 load, F11 fullscreen.
+Free cam: click to look, WASD fly (Shift fast), Space/Ctrl+Space rise/sink,
+Q/E roll, wheel dolly; eases back in 0.3 s.
 
-## Performance targets
-- 8 ms frame (120 FPS), RTX 3060-class, validation ON.
-- 30 Hz fixed sim tick, decoupled from render (currently 60 Hz, `play.TICK`).
-- Chunk: 64×64 tiles, < 2 ms gen+upload, queue-based (currently 32×32).
-- < 200 draw calls at stress. Instancing expected.
+## Performance
+- Target 8 ms (120 FPS), RTX 3060-class, validation on; 30 Hz fixed sim
+  tick (currently 60 Hz, `play.TICK`); chunks 64×64 (currently 32×32),
+  < 2 ms gen+upload; < 200 draw calls at stress.
+- Measured release (4060 Ti, 1600×900, no vsync): demo ~3.0 ms, stress
+  ~2.5 ms. Streaming meshes at most `MESH_MS` (3 ms) of chunks a frame.
+- **Computation-heavy work goes on the GPU**: dense or per-element visual
+  work (grass, scatter, particles, procedural detail, deformation, animation
+  fields) is generated in shaders (instancing, vertex/fragment fields,
+  compute), never built on the CPU per frame or per chunk. The CPU keeps
+  state and sim and sends small records (a tile's corners, a mote's state,
+  four control points).
 - Level of detail: every plant and library mesh is built at `meshgen.LODS`
-  (3) levels; each level keeps every other ring/row along a surface and
-  half its sides (`Builder.lod`, applied inside the primitives, so new
-  meshes get it for free). Plants and parts pick their level by eye
-  distance (`meshgen.lodAt`, `LOD_AT` 36 / 70). Plant slots are
-  (species, variant, lod); part slots `meshlib.slot(id, lod)`.
-- Culling: only what the camera sees is drawn: chunks (terrain and detail
-  passes, `CHUNK_RADIUS`), plants and parts (`m.Frustum` from the
-  view-projection; `Parts.look` sets the frame's eye and view).
-- Release (RTX 4060 Ti, 1600x900, no vsync): demo ~2.9 ms, stress ~2.5 ms.
-- **Computation-heavy work goes on the GPU.** Dense or per-element visual
-  work (grass, scatter, particles, procedural detail, deformation,
-  animation fields) is generated or evaluated in shaders (instancing,
-  vertex/fragment fields, compute), not built on the CPU per frame or per
-  chunk. The CPU keeps game state and sim logic (it sends small records:
-  a tile's corners, a mote's state, the tail's four control points).
+  (3) levels by `Builder.lod` inside the primitives (each level keeps every
+  other ring/row and half the sides), so new meshes get it free. Picked by
+  eye distance (`lodAt`, `LOD_AT` 36/70). Plant slots (species, variant,
+  lod); part slots `meshlib.slot(id, lod)`.
+- Culling: chunks (`CHUNK_RADIUS`), plants and parts are culled to the view
+  frustum (`m.Frustum`; `Parts.look` sets the frame's eye and view).
 
 ## Layers (import only downward)
-
 ```
 core      math, color, rng, noise, registry
 platform  input, display (fullscreen)
@@ -62,16 +59,16 @@ gfx       Vulkan ctx, swapchain, buffers, pipelines, meshgen, meshlib
 world     chunks (tile SoA + occupancy), generation, streaming
 sim       items, species, plants (footprints, floaters), ecology tick
 game      player, actions, structures, research, craft, sky, hud, view, play, save
-render    renderer + passes, terrain meshing, camera
+render    renderer + passes, post (bloom), terrain meshing, camera
 ui        SDF draw batch, font
 main      wiring, frame loop, save/load/fullscreen requests
 ```
 
 ## Registries
-One module per thing. Enum via `std.meta.DeclEnum`, dispatch via
-`switch (id) { inline else => |k| reg.module(k).hook(...) }`; hooks optional
-(`reg.has`). Adding a thing = one file + one line in the namespace. Never add a
-`switch` over registry kinds outside the registry file; add a hook.
+One module per thing; enum via `std.meta.DeclEnum`, dispatch via
+`switch (id) { inline else => |k| reg.module(k).hook(...) }`, hooks optional
+(`reg.has`). Adding a thing = one file + one line. Never `switch` over
+registry kinds outside the registry file; add a hook.
 
 | Domain | Entry | Hooks |
 |---|---|---|
@@ -80,312 +77,206 @@ One module per thing. Enum via `std.meta.DeclEnum`, dispatch via
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground` |
 | research | `game/progression.zig` | `def`, `apply`, `unlocks`, `completed`, `veil` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
-| render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, plants, parts, ui) |
+| render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, ui) |
 
-Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tables.
+Items (`sim/items.zig`, ids stored by value: new items go last) and weave
+recipes (`game/craft.zig`) are plain data tables.
 
 ## Conventions
-- 2-space indent, `name:Type` (no space after colon), terse `//!`/`///` docs, LF.
-- All math via `core/math.zig` (alias `m`): scalars, tiles, `m.dirVec`/`dirYaw`,
-  vectors/matrices, `m.spring` (exact critically damped), `m.springDamper`
-  (substepped spring-mass), `m.catmullRom`/`splineResample`, `m.alignY`.
-  Colours via `core/color.zig`. Never reach into `std.math` or hand-roll casts.
-- No inline `std.ns.Name` — alias at file top.
-- **Never hand-roll linear algebra.** Use `m.inverseRigid` (rotation +
-  translation), `m.inverseAffine` (scaled), `m.inverse` only as fallback. If a
-  method is missing, add it + a test. A singular matrix is a bug: `@panic` in
-  debug, don't silently return zero.
-- **All geometry watertight and seamless:** tubes share rings (parallel
-  transport), bundles continuous, cones/lofts capped, sheets shared-vertex.
-  Deform meshes only with smooth position fields so shared vertices move alike.
-- **Grown vines use Catmull-Rom splines** with `growthPath()`/`grow()`
-  (wobble, curl, taper, seed; the root never moves). Never a straight line or
-  simple arc.
-- meshgen primitives: `tubeR`, `vine`, `braid`/`braidTurned`, `bundle`, `loft`
-  (any cross-section), `patch` (grid sheet), `blade`/`bladeAlong`, `bands`
-  (vines over an ellipsoid), `ellipsoid`, `cone`.
-- Translucent sap: part `.bloom` with instance `fade < 1` → fresnel (amber at
-  grazing angles, see-through centre); hue follows vertex colour, so instance
-  `tint` shifts it. Part `.ear` inner face does the same.
-- Push constants: `WorldPush` is 176 bytes (limit checked at pipeline creation).
-- UI: organic, animated, no boxes. SDFs in `shaders/ui.frag`.
-- Edits: write to files, pass files to scripts. No inline heredocs.
+- 2-space indent, `name:Type`, terse `//!`/`///` docs, LF.
+- All math via `core/math.zig` (`m`): scalars, tiles, `dirVec`/`dirYaw`,
+  vectors/matrices, `spring`, `springDamper`, `catmullRom`/`splineResample`,
+  `alignY`, `Frustum`. Colours via `core/color.zig`. Never reach into
+  `std.math` or hand-roll casts. No inline `std.ns.Name`: alias at file top.
+- **Never hand-roll linear algebra**: `m.inverseRigid`, `m.inverseAffine`,
+  `m.inverse` only as fallback; add missing methods with a test. A singular
+  matrix is a bug (`@panic` in debug).
+- **Geometry watertight and seamless**: shared rings (parallel transport),
+  capped cones/lofts, shared-vertex sheets; deform only with smooth position
+  fields so shared vertices move alike.
+- **Grown vines are Catmull-Rom splines** via `growthPath()`/`grow()` (the
+  root never moves), never a straight line or simple arc, and taper to a
+  point at both ends (no hard cuts).
+- meshgen primitives: `tubeR`/`tubeC`, `vine`, `braid`/`braidTurned`, `bundle`,
+  `loft`, `patch`, `blade`/`bladeAlong`, `petal`, `leavesAlong`, `bands`,
+  `ellipsoid`, `cone`. Shared kits: `structure_kit`, `wolf_kit` (`form`,
+  `leaf`, `digit`, `claw`, `limbCore`, `muscle`, `tendon`), `mineral_kit`.
+- Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from
+  vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
+- `WorldPush` is 176 bytes (limit checked at pipeline creation).
+- UI: organic, animated, no boxes; SDFs in `shaders/ui.frag`.
+- Edits: write to files, pass files to scripts; no inline heredocs.
 
-## Zig 0.16 API notes
-- `std.Io` replaces all old I/O. Pass an `Io` instance like an allocator.
-- "Juicy Main": `main` accepts injected params. No global env/args.
-- `@Type` removed. Use `@Pointer`, `@ErrorUnion`, explicit `error{...}` sets.
-- `ArrayList{}` → `.empty`. `ArenaAllocator` is lock-free.
-- Build: `root_module` + `Module`. Deps in `zig-pkg/`.
+## Zig 0.16 notes
+`std.Io` replaces old I/O (pass an `Io` like an allocator). "Juicy Main":
+injected params, no global env/args. `@Type` removed (`@Pointer`,
+`@ErrorUnion`, explicit `error{...}`). `ArrayList{}` → `.empty`;
+`ArenaAllocator` is lock-free. Build: `root_module` + `Module`; deps in `zig-pkg/`.
 
 ## Code design
 - Tagged unions for exclusive states (`Game.mode`, `Camera.view`,
-  `Display.mode`, `Occ.get()`). Explicit error sets in public APIs
-  (`Allocator.Error`, `save.Error`, `gfx.Error` folded via `ctx.fold`).
-- `comptime T: type` over `anytype`. Distinct types for domain IDs
-  (`PlantId`, `StructId`, `MeshSlot`, `Occ`).
-- Exhaustive `switch`. Pass allocators explicitly. `defer deinit()` immediately;
-  `errdefer` on init paths (half-built renderer frees cleanly).
-- Arena allocators for batch work. `std.testing.allocator` in tests.
-- Vtable pattern for many-method interfaces. SoA for hot loops.
-- `try` by default. Translate errors at module boundaries.
+  `Display.mode`, `Occ.get()`); explicit error sets in public APIs (folded
+  via `ctx.fold`); distinct ID types (`PlantId`, `StructId`, `MeshSlot`, `Occ`).
+- `comptime T: type` over `anytype`; exhaustive `switch`; explicit
+  allocators; `defer deinit()` at once, `errdefer` on init paths; arenas
+  for batch work; `std.testing.allocator` in tests; SoA for hot loops;
+  `try` by default, translate errors at module boundaries.
 - GPU buffers retired mid-frame wait in `Renderer.pending` until every frame
   in flight is done.
 
 ## Design
-- No global resources. Items live in the player's belly, in structures, or
-  in plants until harvested.
-- Every plant is player-seeded and must grow before use.
-- Research: Factorio-lab model. A structure consumes ingredients unit by unit.
-- Hand-weaving is the bootstrap (wolf weaves seeds from gathered matter + starlight).
-- Plants and structures share occupancy. Footprints: 1×1, 2×2, or floating.
-- Player-centric, builds toward full automation.
+- No global resources: items live in the belly, structures or plants.
+  Every plant is player-seeded and grows before use. Research is the
+  Factorio-lab model (structures consume ingredients unit by unit).
+  Hand-weaving bootstraps (seeds from gathered matter + starlight).
+  Plants and structures share occupancy; footprints 1×1, 2×2 or floating.
 - Structures: conduit (pulls from behind, pushes forward; grows a side root
-  to any plant beside or behind it and harvests it once the root arrives),
-  sap cache, germinator, research bloom, root-digger.
-- Root-digger: 1×1 on soil/moss, digs an adjacent node 1 item/4s into an
-  8-item buffer, feeds adjacent structures (conduits pull from it), idles when
-  no node. Recipe: 3 fibre + 2 grit + 1 ley shard. Gated by "Deep Rooting".
-- Confluence (convergence hybrid, `game/convergence.zig`): a mature symbiote
-  and mature parasite within 2 tiles (or joined by a conduit chain) root a
-  2×2 confluence beside them unless one already holds them. Never sown
-  (`seed = null`); grows 1.5× the slower parent (per-plant `span`) in 4
-  stages; yields convergence essence + its parents' seeds; mature, it halves
-  parasite drain within 3 tiles. Discovery-gated; "Convergence Theory" only
-  reveals its yield in the HUD.
-- Celestial bloom (`species/bloom.zig`, `ecology.Radiance`): a sown,
-  floating symbiote (hover 3.2, above the motes) that yields nothing and
-  radiates a field of celestial energy (3.5 tiles). Blooms within 10 tiles
-  link into networks; a network radiates when it holds a mature bloom, and
-  then all its blooms (growing ones too) hold their fields, so uprooting a
-  linking bloom cuts off the blooms beyond it. Plants with
-  `needs_radiance` (the vesper bloom, for now) halt and wither (0.06 HP/s)
-  outside every field. Worked out each tick from the blooms only (pairwise
-  links, then each radiating bloom's tiles), like containment. The hover
-  panel shows RADIATING/DARK and links, DRAWING RADIANCE/WITHERING. Seed:
-  3 starlight + 1 ley shard + 2 essence (hotbar `-`).
-  Visual (form `.radiant`, `meshgen.radiant`): a structure of light, not a
-  flower: a faceted luminous core with a brighter nucleus, spires above
-  and below, a ring of lens plates and a looser ring of crystal shards
-  orbiting at their own paces (counter to each other), a tilted halo.
-  Each fragment carries its assembly order (tu.x), ring (tu.y) and bearing
-  (colour alpha): plant.vert drifts it in from its bearing and locks it in
-  as growth passes its order (it assembles, never scales up), and the
-  bloom drifts and bobs instead of bending. plant.frag: the only true
-  glow, light carried in thin tissue (fresnel, core, pulse, bubbles),
-  translucent, fragments fading in as they lock. Beams (meshlib
-  `bloom_thread`, part `.thread`): a flat ribbon carried on the GPU through
-  the parts pass (curve mode, `e.y` how far it reaches) from bloom core to
-  core, running true, its width turned to face the eye; a bright near-white
-  core falling off to a warm faintly iridescent halo, pulses of light
-  running along it, fading into each core; bright (it blooms) when its
-  network radiates, a faint trace when dark; it reaches out from the more
-  grown bloom as that bloom finishes assembling.
-- Item ids are stored by value: new items go at the end of `items.Item`.
-- Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the seed;
-  only the gardener's changes are stored. Bump `VERSION` when a stored layout
-  changes (the fingerprint checks sizes only).
+  to a plant beside/behind it and harvests it once the root arrives), sap
+  cache, germinator, research bloom, root-digger (1×1 on soil/moss, digs an
+  adjacent node 1 item/4 s into an 8-item buffer, feeds neighbours, idles
+  with no node; 3 fibre + 2 grit + 1 ley shard; "Deep Rooting"). Put down,
+  they grow (`Def.grow`: germinator 6 s, research bloom 8, sap cache and
+  digger 4, conduit 1.5) and do no work until grown.
+- Confluence (`game/convergence.zig`): a mature symbiote and parasite within
+  2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
+  unless one already holds them. Never sown; grows 1.5× the slower parent
+  (`span`) in 4 stages; yields convergence essence + its parents' seeds;
+  mature, halves parasite drain within 3 tiles. "Convergence Theory" only
+  reveals its yield.
+- Celestial bloom (`species/bloom.zig`, `ecology.Radiance`): sown, floating
+  (hover 3.2), yields nothing; radiates a 3.5-tile field. Blooms within 10
+  tiles link into networks; a network radiates when it holds a mature bloom
+  (then all its blooms do), so uprooting a linking bloom cuts off those
+  beyond it. Plants with `needs_radiance` (vesper, for now) halt and
+  wither (0.06 HP/s) outside every field. Worked out per tick from blooms
+  only (pairwise links, then each radiating bloom's tiles). Hover panel
+  shows RADIATING/DARK + links, DRAWING RADIANCE/WITHERING. Seed: 3
+  starlight + 1 ley shard + 2 essence (hotbar `-`).
+- Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the
+  seed; only the gardener's changes are stored. Bump `VERSION` when a stored
+  layout changes (the fingerprint checks sizes only).
 
 ## Visual (current)
-- Terrain (`render/terrain_mesh.zig`): smooth ground, no walls or ramps.
-  Each tile is a fan of four triangles: its centre at the tile's height
-  (everything on it stands there), corners shared with its neighbours
-  (average height, colour and ley, from a per-chunk grid worked out once),
-  smooth normals; land dips under the water at the
-  shore. Detail is grown on the GPU (detail pass, `shaders/detail.vert`):
-  each tile with any gets one `DetailTile` record (corner heights, colour,
-  kind, blade count) and runs 60 vertices: thin grass blades on every tile
-  but water and soil (tile-coloured, swayed by the garden wind), or a clod
-  and a stone (faceted lumps) on soil, all hashed from the tile; drawn on
-  chunks within `DETAIL_R` (28 tiles) of the view's focus. Ley lines carry a faint plexus of drifting
-  points joined by threads (terrain.frag); ley sight glows smoothly across
-  tile borders. info.z = 255 marks the ground's top surface. Streaming
-  meshes at most `MESH_MS` (3 ms) of chunks a frame. Fog closes in
-  before the drawn edge; contact shadows under the wolf's feet.
-- Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
-  tile). Motion (plant.vert) is rooted and heavy: points bend about the root
-  in the wind's plane (h², tips lagging), one garden-wide wind with slow
-  gusts rolling across as a wave, per-species `sway` (heavy trees 0.6,
-  floaters 1.8); leaves lift a little; parasite fronds curl slowly; hanging
-  filaments trail downwind. Material (plant.frag) is the wolf's vocabulary:
-  muted skin with a fibre sheen, old growth near the ground densifying to
-  root brown, colour carried by sap seen through thin/young tissue (back
-  light, grazing angles), no self-glow (rim only at night). Growth read:
-  plants scale up as they grow; parasites come up with their fronds closed
-  and open as they mature. `v_young` (newest growth and tips thinner, more translucent). Petals see-
-  through face-on. Holding a seed shows its grown plant as a ghost on the
-  hovered tile (green fits, red not). Parasitic: alien, not hostile: pale pearl/lilac with a
-  thin-film iridescent sap. Symbiotic: greens/teals.
-- Plant silhouettes: symbiotes (`herb`) flare into short roots, carry their
-  leaves on one vase envelope (`leaf_from` lifts it into a crown for trees),
-  and bloom from a calyx with sepals: two cupped whorls of real petals
-  (`meshgen.petal`: narrow claw, broad, rounded tip). Parasites (`coil`):
-  twisted 3-strand stalk on a bulbous foot, small bladders up it, a crown
-  of fronds curling into spirals around a bulb; no leaves or spikes.
-  Symbiote vines (tendrils, the confluence's green vine length) grow small
-  leaves along them (`leavesAlong`); plant.vert holds every leaf's base
-  (breathing/unfurling weighted by tu.y), and only parasites writhe.
-- Grown structures speak the plants' language (`meshes/structure_kit.zig`):
-  woven root mats, grown vines with leaves along them, real petals, and
-  pods of the wolf's resin sap (part `.resin`, instance fade `Def.sap`;
-  no light of their own). Germinator: resin pod with a seed inside, cradled
-  by vines. Research bloom: woven stalk, broad violet flower, banded resin orb.
-  Sap cache: clear resin pod in a woven vine basket, what it holds hanging
-  inside. Conduit: a gnarled root surfacing over its tile and sinking at its
-  far edge into the next (`conduit.rise`), rootlets forking into the soil,
-  side roots (`conduit_tap`) creeping out to plants. Structures breathe at a
-  fixed tempo (activity deepens it, never retimes it).
-  Standing structures (germinator, research bloom, sap cache, root-digger;
-  `Def.sway`; conduits hug the ground and do not sway, so chains stay joined)
-  move like plants in part.vert: they bend from the root in the same
-  garden wind (`gardenWind`/`bendIn` in common.glsl), leaves and petals
-  breathe and lift; what hangs on them (orb, stored items) sways with them
-  (`Look.drop`).
-  Put down by the gardener they grow (`Def.grow` s; germinator 6, research
-  bloom 8, sap cache and digger 4, conduit 1.5) and do no work until grown: they shoot
-  up first and fill out after (`Structure.grownScale`), leaves and petals
-  unfold bottom-up (part.vert), the research orb forms last.
-- Floaters (`drift`): a translucent sap float, a wide catcher dish above,
-  filaments trailing beneath (tips sway most); they rise and fall slowly
-  and drift over a soft ground shadow (part `.shadow`, meshlib `shadow`).
-- Confluence: 8 growth keys with one vertex layout, blended per vertex in
-  plant.vert (binding 2 reads the next key), so it grows without stepping;
-  each braid strand gathers at the crown and runs on as its red vine in one
-  tube (vertex-colour gradient, ±10° hue drift in the zone); leader crowned by translucent violet petals with amber
-  fresnel (plants pass blends; only these petals have alpha < 1). Sway ×1.5.
-- Post-processing (`render/post.zig`, the one post effect so far): world
-  passes draw into an HDR image (`post.HDR_FORMAT`); what is brighter than
-  white blooms: a 13-tap filtered chain of 5 half-size levels down (the
-  first with a soft-knee threshold and a brightness-weighted average
-  against fireflies) and a tent filter additively back up; the composite
-  lays the glow over the scene (intensity 0.7), rolls highlights off above
-  0.8 (below it the look is untouched) and adds a faint vignette, onto the
-  swapchain; passes with `Desc.screen` (the UI) draw on top. ~0.1 ms.
-  What glows is what is drawn brighter than 1: celestial blooms and their
-  beams, motes, sap glow, ley crystals, highlights.
-- Sky: gradient dome pass (fog colour at the horizon), sun/moon, stars,
-  starlight motes (a faceted bipyramid of light, a tilted ring and four
-  needle rays; they turn slowly, twinkle, hover breathing, and trail fading
-  echoes while falling, all in part.vert's mote mode: the CPU sends each
-  mote's centre, phase, life and echo).
-- part.vert places an instance by `PartInstance.e.x`: 0 its matrix, 1 a
-  curve (the tail), 2 a star mote.
-- Resource nodes (`meshes/mineral_kit.zig`: flat-faceted crystals and
-  stones): ley shards a violet crystal cluster on a dark stone root; grit
-  faceted stones half sunk with quartz chips; fibre a clump of arching
-  stalks (green to straw) on a root tuft that sways (`resources.Node.sway`).
-- Sap (all sap materials: sacs, resin, inner ears, plant sap) is alive:
-  bubbles drift up inside it and beads of it slide down its surface
-  (`sapBubbles`/`sapDroplets` in common.glsl, in mesh space so they ride
-  with the body). Low pitch widens the view and lifts it toward the horizon.
-- UI: wobbling membranes, seed-pod slots, tendril bars, soft glow. 150 ms anim.
-- Wolf (rigid joint skeleton, organic surface; `game/player.zig` rig):
-  - Muted greens/browns; amber only on belly, eyes, inner ears (and beans).
-  - Head: one closed surface of planes (`wolf_head.point`): broad cranium
-    with sloping temples, brow ridges hooding the eyes, a stop down to a
-    long wedge muzzle (narrow flat bridge, sides falling away) tapering to
-    the nose bean, cheekbones flaring below the eyes, jaw line chamfered
-    back from the chin over a separate lower jaw. Ears: thick (sap inner
-    face 50% over a vine back shell, joined by a rolled rim), cupped with an
-    inner fold, base flaring wide and sunk into the skull (`ear_root`),
-    leaning 12 degrees forward and out, no flutter. Fur: leaves lie back
-    over the skull behind the ears in staggered rows, lengthening into a
-    ruff over the nape (`wolf_kit.leaf`: base flush, lifting off, tip
-    curling back); small leaves emerge along each cheekbone. Leaf tufts
-    (shoulders, tail tip) are whorls of the same fur leaves.
-  - Forms of planes (`wolf_kit.form`, superellipsoids): joints are squared
-    knuckles with a condyle at each end of the hinge and tendon straps over
-    front and back; the deltoid is a squared cap with front and rear heads
-    draping into a tendon down the upper arm.
-  - Hands and feet (`wolf_kit.digit`/`claw`): a squared back of the hand /
-    long squared foot with a raised arch, vine tendons over the top to four
-    knuckled digits arching down to curved claws (a dewclaw high on each
-    hand); sap beans under both (palm/central pad and four digit pads).
-  - Limbs (`wolf_kit.limbCore`/`muscle`/`tendon`): squared cores (lofted
-    rounded-square sections) with distinct muscle forms (bicep/tricep,
-    brachioradialis, quadriceps/hamstring, gastrocnemius) and vine tendons
-    (Achilles, down the forearm and metatarsal); thighs and calves keep
-    grown vine wraps. Torso weave over trapezius and lat forms; rump lobes
-    are squared forms; fur leaves ring the tail, lying back toward its tip.
-    Every vine on the body is a grown vine: it tapers to a point at both
-    ends (torso weave strands staggered and tucking into the core, belly
-    net, collarbone, leg wraps, `mg.bands`), never a hard cut, and the
-    torso weave and belly net carry small fur leaves along their length.
-  - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
-    hips); pectorals are broad dishes of resin sap (wider top edge, areola +
-    nipple below the crown), base held on the chest, surface sprung; chest
-    vines tucked behind.
-  - Belly (`wolf_belly.zig`, torso units): a teardrop sac, a full gut
-    drawing in along a concave flank into a tongue that runs up between the
-    pectorals; translucent sap (72%). Filling swells only the gut (tu.x),
-    most low and forward (part.vert, `Look.sag`), the tongue stays on the
-    chest; a belly button sunk in the sap surfaces and pops out as it fills
-    (tu.y 2, fill in `give[0]`). Up to 5 dark lumps inside on
-    spring-dampers driven by acceleration.
-  - Arms: deltoid caps, bicep/tricep forms, forearm tapering 1.1→0.7.
-  - Rear: two squared vine lobes pressed together at the cleft, sap nodes (40%), firm springs;
-    tailbone knot above them; tail (`wolf_tail`, braid + fur leaves, built
-    once straight over 0..1) is bent on the GPU along the Catmull-Rom curve
-    through the rig's spring-steered joints (part.vert curve mode).
-  - Legs: anthro digitigrade (vertical thigh, calf back to a high hock with a
-    +25% swell, forward metatarsal), long feet, sap beans (80%, browner),
-    central pad flattens 10% when planted.
-  - Breathing 2% torso / 1% limbs (CPU instance scale); body strands wobble
-    0.03; anisotropic sheen along vine tangents.
+- Motion and wind: one garden-wide wind (`gardenWind`/`bendIn`,
+  common.glsl), slow gusts rolling across as a wave. Everything grown bends
+  from its root in it (h², tips lagging), per-thing `sway`; leaves breathe
+  and lift a little; only parasites writhe.
+- Terrain (`render/terrain_mesh.zig`): smooth, no walls; each tile a fan of
+  four triangles, centre at the tile's height, corners shared (height,
+  colour, ley averaged), smooth normals; land dips under water at the shore.
+  Detail grown on the GPU (detail pass, `detail.vert`) from one `DetailTile`
+  per tile: grass blades on all but water/soil (tile-coloured, wind-swayed),
+  clods and stones on soil; within `DETAIL_R` (28 tiles). Ley lines carry a
+  faint drifting plexus; ley sight glows smoothly across tiles. info.z = 255
+  marks the top surface. Fog closes in before the edge; paw contact shadows.
+- Plants: 4 variants per species (by tile). Material (plant.frag) is the
+  wolf's vocabulary: muted skin, fibre sheen, old growth densifying to root
+  brown, colour carried by sap through thin/young tissue (`v_young`), no
+  self-glow (rim at night), see-through petals. Plants scale up as they
+  grow; parasites open their closed crowns. Holding a seed shows a ghost of
+  the grown plant (green fits, red not). Forms (`species.Form`: herb 0,
+  coil 1, drift 2, confluence 3, radiant 4): symbiotes (`herb`) flare into
+  roots, one vase leaf envelope (`leaf_from` for tree crowns), calyx and two
+  whorls of real petals; vines grow leaves along them. Parasites (`coil`):
+  alien not hostile, pale pearl/lilac with thin-film sap: twisted 3-strand
+  stalk on a bulbous foot, bladders, fronds curling around a bulb.
+  Floaters (`drift`): sap float, catcher dish, trailing filaments, slow bob
+  over a ground shadow. Confluence: 8 growth keys of one vertex layout
+  blended in plant.vert (binding 2), braid strands running on into red
+  vines, translucent violet petals, sway ×1.5.
+- Celestial bloom (`radiant`): a structure of light: faceted luminous core,
+  spires, a ring of lens plates and a counter-orbiting ring of crystal
+  shards, tilted halo. Fragments carry assembly order (tu.x), ring (tu.y)
+  and bearing (colour alpha): plant.vert drifts each in and locks it as
+  growth passes it (it assembles, never scales), rings orbit, it bobs and
+  never bends. The garden's only true glow (light in thin tissue). Beams
+  between linked blooms (`bloom_thread`, part `.thread`): a camera-facing
+  ribbon bent in part.vert curve mode, bright near-white core, warm halo,
+  pulses running along; dim when the network is dark; extends from the more
+  grown bloom as it finishes.
+- Structures (`structure_kit`) speak the plants' language: woven root mats,
+  leafy vines, real petals, pods of resin sap (`Def.sap`, no own light).
+  Germinator: resin pod with a seed, cradled by vines. Research bloom: woven
+  stalk, violet flower, banded resin orb (forms last). Sap cache: clear pod
+  in a vine basket, contents hanging inside. Conduit: a gnarled root
+  surfacing and sinking (`conduit.rise`), rootlets, side roots
+  (`conduit_tap`). Standing structures sway (`Def.sway`; conduits don't, so
+  chains stay joined; hung parts follow via `Look.drop`), breathe at a fixed
+  tempo, and grow in (shoot up, fill out, leaves unfold).
+- Resource nodes (`mineral_kit`, flat facets): ley shards a violet crystal
+  cluster; grit faceted stones with quartz chips; fibre a swaying clump of
+  arching stalks.
+- Sap everywhere is alive: bubbles rise inside, beads slide down its surface
+  (`sapBubbles`/`sapDroplets`, mesh space).
+- Sky: gradient dome, sun/moon, stars; star motes (faceted core, ring,
+  needle rays) turn, twinkle, hover and trail echoes while falling. Low
+  pitch widens the view toward the horizon.
+- part.vert placement by `PartInstance.e.x`: 0 matrix, 1 curve (tail, beams;
+  `e.y` reach), 2 star mote.
+- Post-processing (`render/post.zig`): world passes draw into an HDR image;
+  brighter-than-white light blooms (5-level 13-tap down chain with soft-knee
+  threshold and anti-firefly weighting, tent filter back up); composite
+  adds the glow (0.7), rolls highlights off above 0.8 and a faint vignette;
+  `Desc.screen` passes (UI) draw on top. ~0.1 ms.
+- UI: wobbling membranes, seed-pod slots, tendril bars, soft glow; 150 ms anim.
+- Wolf (`game/player.zig` rig; muted greens/browns, amber only on belly,
+  eyes, inner ears, beans):
+  - Built of planes (`wolf_kit`): head one closed surface (`wolf_head.point`:
+    cranium, brow ridges, stop, long wedge muzzle, cheekbones, chamfered jaw
+    over a lower jaw); thick ears (sap inner face, vine back, rolled rim,
+    inner fold, base sunk in the skull, 12° forward/out, no flutter);
+    squared joints (condyles, tendon straps), deltoids, limb cores with
+    distinct muscles and vine tendons; hands and feet with knuckled digits,
+    curved claws, dewclaws, sap beans.
+  - Fur leaves (`wolf_kit.leaf`): rows over the skull into a nape ruff,
+    along the cheekbones, tail rings, shoulder/tail tufts, along the torso
+    weave and belly net.
+  - Torso: loose-woven chest, vine-corset waist, hips, over trapezius/lat
+    forms; pectorals are sprung dishes of resin sap (areola, nipple).
+  - Belly (`wolf_belly.zig`): teardrop sac whose tongue runs up between the
+    pectorals; filling swells only the gut, low and forward (`Look.sag`);
+    the belly button surfaces and pops out as it fills; up to 5 lumps inside
+    on spring-dampers.
+  - Rear: squared lobes pressed together, tailbone knot; tail (`wolf_tail`)
+    built once and bent on the GPU through the spring-steered joints.
+  - Legs digitigrade (high hock, long feet, central pad flattens planted).
+    Breathing 2% torso / 1% limbs; anisotropic sheen along vines.
 - "Celestial / beyond comprehension" is the next phase target.
 
-## Scope guard
-Do NOT build without explicit direction: audio, multiplayer, PBR/IBL, further
-post-processing (bloom was asked for), Linux/macOS. Flag and stop if a task drifts toward these.
-
-## Decision authority
-Changes a layer boundary or build/run interface → stop and ask.
-Otherwise decide and note with `// decision:` comment.
+## Rules
+- **Scope guard**: no audio, multiplayer, PBR/IBL, further post-processing
+  (bloom was asked for) or Linux/macOS without explicit direction; flag and
+  stop if a task drifts there.
+- **Decision authority**: a layer boundary or build/run interface change →
+  stop and ask; otherwise decide and note with `// decision:`.
+- **Plant rule**: everything grown has a proper growing animation, is moved
+  by the garden's sway and matches the current plant quality, unless the
+  user says otherwise.
+- **Cohesion rule**: each visual overhaul sets the bar for everything of its
+  kind; the whole wolf and all plants/structures are kept up with it; new
+  grown things follow the current look, motion and growth via the shared
+  kits, never older primitives.
+- **Visual authority**: the user is the artist; their word on proportions,
+  silhouette, material and "does this read as X" is final. "Off", "weak",
+  "generic", "too X" is the acceptance criterion: implement their fix.
+- **Finish line**: work until the phase's criteria are met; take the next
+  step instead of "next I would…"; stop only for a blocking decision or
+  phase completion.
+- **Working**: commit and push `devel` after every verified change (builds,
+  tests pass) without asking; never commit `parasymi.sav`; report broken
+  work, don't commit it. Reports: a short list of changes, a real deviation
+  or blocker as one bullet. Verify visual work in the running game (scratch
+  copies may move the camera) and say what was not checked.
 
 ## Current state
 Done: engine, terrain, streaming, plants + 7 species, ecology, structures,
 footprints/floaters, research (9 nodes), hand weaving, save/load, pause,
-fullscreen, root-digger, spline vines, adjustable/free camera, sky dome, wolf
-anatomy + "alive" passes, convergence hybrid (confluence).
-**Next (post-prototype / vertical slice):**
+fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
+planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
+LOD + culling, bloom post-processing.
+**Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes
 3. First world event (something that *happens*, not just a research unlock)
-4. Bloom + one "wow" visual moment (sky shift at convergence)
+4. One "wow" visual moment (sky shift at convergence)
 Target: a stranger plays 2 hours and says "I want to see what happens next."
-
-## Finish line
-Work until the current phase's acceptance criteria are met. Don't end with
-"next I would…" — take the next step. Stop only for a blocking decision or
-phase completion.
-
-## Plant rule
-Everything grown (plants, grown structures, anything plant-like) must have a
-proper growing animation, be moved by the garden's sway, and match the
-current quality of the rest of the plants in game, unless the user specifies
-otherwise. A new or changed grown thing is not done without all three.
-
-## Cohesion rule
-Every major visual overhaul sets the bar for everything of its kind: the
-rest of the wolf's body is brought up to match each upgrade (forms of planes,
-fur leaves, sap material), and the plants and grown structures stay
-consistent with each other. New plants (and anything new that is grown)
-follow the current look, motion and growth by default, built from the shared
-kits (`meshgen` plant forms, `structure_kit`, `wolf_kit`), never from older,
-cruder primitives.
-
-## Visual authority
-The user is the artist. On all visual/aesthetic decisions (proportions,
-silhouette, material feel, "does this read as X"), their word is final.
-If they say something looks "off," "weak," "generic," or "too X," that
-is the acceptance criterion — implement the fix they describe, don't
-propose alternatives or ask for justification.
-
-## Working rules
-- Commit and push `devel` after every verified change (builds, tests pass),
-  without asking. Never commit `parasymi.sav`. Broken work is reported, not
-  committed.
-- Reports: no commentary. End a task with a short list of changes only;
-  a real deviation or blocker is one bullet.
-- Verify visual work in the running game (a scratch copy may move the camera);
-  say what was not checked.
