@@ -18,10 +18,50 @@ pub const BLADE_SEGS = 8;
 pub const VARIANTS = 4;
 const MAX_SIDES = 16;
 const MAX_LOFT = 24;
+/// most rows or columns a patch may have
+const MAX_PATCH = 128;
+
+/// levels of detail every mesh is built at: 0 full, then each level keeps
+/// every other ring/row along a surface and half its sides around (see
+/// `Builder.lod`), so far things draw with a fraction of the vertices.
+pub const LODS = 3;
+/// eye distance at which each level after the first takes over
+pub const LOD_AT = [LODS - 1]f32{36, 70};
+
+/// the level of detail for something `dist` from the eye.
+pub fn lodAt(dist:f32) u32 {
+  var l:u32 = 0;
+  for (LOD_AT) |d| {
+    if (dist > d) l += 1;
+  }
+  return l;
+}
+
+/// indices 0, s, 2s, .. and always the last, for keeping every s-th of `n`
+/// points along a surface (s = 1 keeps them all). Returns how many.
+pub fn stride(n:usize, s:usize, out:[]usize) usize {
+  var k:usize = 0;
+  var i:usize = 0;
+  while (i < n - 1) : (i += s) {
+    out[k] = i;
+    k += 1;
+  }
+  out[k] = n - 1;
+  return k + 1;
+}
 
 pub const Builder = struct {
   gpa:Allocator,
   v:std.ArrayList(PV) = .empty,
+  /// the level of detail being built (0 full): primitives keep every
+  /// `step()`-th ring along their length and `around()` of their sides, the
+  /// same way every time, so growth keys built at one level still match
+  lod:u32 = 0,
+
+  /// how many points along a surface to step over at this level
+  pub fn step(b:*const Builder) usize { return @as(usize, 1) << @intCast(b.lod); }
+  /// how many sides a ring keeps at this level (never fewer than `min`)
+  pub fn around(b:*const Builder, sides:u32, min:u32) u32 { return @max(@min(sides, min), sides >> @intCast(b.lod)); }
 
   pub fn deinit(b:*Builder) void { b.v.deinit(b.gpa); }
 
@@ -66,8 +106,9 @@ pub const Builder = struct {
 
   /// `tubeR` with a colour per ring (a gradient along the tube, shared rings
   /// so it never steps), and optionally `us[i]` written to tu.y.
-  pub fn tubeC(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, cols:[]const color.Rgba8, us:?[]const f32, part:vertex.Part, sides:u32) Allocator.Error!void {
-    assert(spine.len >= 2 and spine.len <= MAX_SPINE and sides <= MAX_SIDES and cols.len == spine.len);
+  pub fn tubeC(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, cols:[]const color.Rgba8, us:?[]const f32, part:vertex.Part, full_sides:u32) Allocator.Error!void {
+    assert(spine.len >= 2 and spine.len <= MAX_SPINE and full_sides <= MAX_SIDES and cols.len == spine.len);
+    const sides = b.around(full_sides, 3);
     var rings:[MAX_SPINE][MAX_SIDES]V3 = undefined;
     var norms:[MAX_SPINE][MAX_SIDES]V3 = undefined;
     const n = spine.len;
@@ -82,10 +123,13 @@ pub const Builder = struct {
         rings[i][k] = spine[i] + dir * m.splat3(radii[i]);
       }
     }
-    for (0..n - 1) |i| for (0..sides) |k| {
+    // rings kept at this level of detail (the frames came from all of them)
+    var keep:[MAX_SPINE]usize = undefined;
+    const kn = stride(n, b.step(), &keep);
+    for (0..kn - 1) |j| for (0..sides) |k| {
       const k1 = (k + 1) % sides;
       const q = [4]usize{k, k1, k1, k};
-      const r = [4]usize{i, i, i + 1, i + 1};
+      const r = [4]usize{keep[j], keep[j], keep[j + 1], keep[j + 1]};
       for ([_]usize{0, 1, 2, 0, 2, 3}) |c| try b.put(rings[r[c]][q[c]], norms[r[c]][q[c]], cols[r[c]], ts[r[c]], uOf(us, r[c]), part);
     };
     // caps (skipped where the tube tapers to a point anyway)
@@ -133,22 +177,26 @@ pub const Builder = struct {
       const tan = cs[@min(i + 1, segs)] - cs[if (i == 0) 0 else i - 1];
       ns[i] = m.norm(m.cross(tan, side));
     }
-    for (0..segs) |i| {
+    var keep:[segs + 1]usize = undefined;
+    const kn = stride(segs + 1, b.step(), &keep);
+    for (0..kn - 1) |j| {
+      const i = keep[j];
+      const ia = keep[j + 1];
       const k0 = m.f(i) / segs;
-      const k1 = m.f(i + 1) / segs;
+      const k1 = m.f(ia) / segs;
       // a slight raised midrib keeps the blade from reading as a flat card
       const rib0 = cs[i] + ns[i] * m.splat3(ws[i] * 0.25);
-      const rib1 = cs[i + 1] + ns[i + 1] * m.splat3(ws[i + 1] * 0.25);
+      const rib1 = cs[ia] + ns[ia] * m.splat3(ws[ia] * 0.25);
       const quads = [2][4]V3{
-        .{cs[i] + side * m.splat3(ws[i]), rib0, rib1, cs[i + 1] + side * m.splat3(ws[i + 1])},
-        .{rib0, cs[i] - side * m.splat3(ws[i]), cs[i + 1] - side * m.splat3(ws[i + 1]), rib1},
+        .{cs[i] + side * m.splat3(ws[i]), rib0, rib1, cs[ia] + side * m.splat3(ws[ia])},
+        .{rib0, cs[i] - side * m.splat3(ws[i]), cs[ia] - side * m.splat3(ws[ia]), rib1},
       };
       const c0 = color.mix(col, tip, k0);
       const c1 = color.mix(col, tip, k1);
       for (quads) |q| {
         const cols = [4]color.Rgba8{c0, c0, c1, c1};
         const kk = [4]f32{k0, k0, k1, k1};
-        const nn = [4]V3{ns[i], ns[i], ns[i + 1], ns[i + 1]};
+        const nn = [4]V3{ns[i], ns[i], ns[ia], ns[ia]};
         for ([_]usize{0, 1, 2, 0, 2, 3}) |v| try b.put(q[v], nn[v], cols[v], t, kk[v], part);
       }
     }
@@ -303,8 +351,9 @@ pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f
 /// 0..tau, roughly unit size, counter-clockwise when seen from the spine's
 /// start) scaled by `widths`/`heights`, upright toward `up`. Rings are
 /// shared and both ends capped, so it is watertight like `tubeR`.
-pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, heights:[]const f32, up:V3, comptime shape:fn (f32) [2]f32, col:color.Rgba8, part:vertex.Part, sides:u32) Allocator.Error!void {
-  assert(spine.len >= 2 and spine.len <= MAX_SPINE and sides <= MAX_LOFT);
+pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, heights:[]const f32, up:V3, comptime shape:fn (f32) [2]f32, col:color.Rgba8, part:vertex.Part, full_sides:u32) Allocator.Error!void {
+  assert(spine.len >= 2 and spine.len <= MAX_SPINE and full_sides <= MAX_LOFT);
+  const sides = b.around(full_sides, 6);
   const n = spine.len;
   var rings:[MAX_SPINE][MAX_LOFT]V3 = undefined;
   var norms:[MAX_SPINE][MAX_LOFT]V3 = undefined;
@@ -325,10 +374,12 @@ pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, he
       rings[i][k] = spine[i] + side * m.splat3(p[0] * widths[i]) + u * m.splat3(p[1] * heights[i]);
     }
   }
-  for (0..n - 1) |i| for (0..sides) |k| {
+  var keep:[MAX_SPINE]usize = undefined;
+  const kn = stride(n, b.step(), &keep);
+  for (0..kn - 1) |j| for (0..sides) |k| {
     const k1 = (k + 1) % sides;
     const q = [4]usize{k, k1, k1, k};
-    const r = [4]usize{i, i, i + 1, i + 1};
+    const r = [4]usize{keep[j], keep[j], keep[j + 1], keep[j + 1]};
     for ([_]usize{0, 1, 2, 0, 2, 3}) |c| try b.put(rings[r[c]][q[c]], norms[r[c]][q[c]], col, ts[r[c]], 0, part);
   };
   for ([_]usize{0, n - 1}) |i| {
@@ -346,8 +397,17 @@ pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, he
 /// between neighbours. Normals, colours and `us` (written to tu.y) are per point.
 pub fn patch(b:*Builder, rows:usize, cols:usize, pts:[]const V3, nrms:[]const V3, cols_rgba:[]const color.Rgba8, us:[]const f32, t:f32, part:vertex.Part) Allocator.Error!void {
   assert(pts.len == rows * cols and nrms.len == pts.len and cols_rgba.len == pts.len and us.len == pts.len);
-  for (0..rows - 1) |r| for (0..cols - 1) |c| {
-    const q = [4]usize{r * cols + c, r * cols + c + 1, (r + 1) * cols + c + 1, (r + 1) * cols + c};
+  // rows and columns kept at this level of detail
+  var kr:[MAX_PATCH]usize = undefined;
+  var kc:[MAX_PATCH]usize = undefined;
+  const nr = stride(rows, b.step(), &kr);
+  const nc = stride(cols, b.step(), &kc);
+  for (0..nr - 1) |ri| for (0..nc - 1) |ci| {
+    const r0 = kr[ri];
+    const r1 = kr[ri + 1];
+    const c0 = kc[ci];
+    const c1 = kc[ci + 1];
+    const q = [4]usize{r0 * cols + c0, r0 * cols + c1, r1 * cols + c1, r1 * cols + c0};
     for ([_]usize{0, 1, 2, 0, 2, 3}) |v| try b.put(pts[q[v]], nrms[q[v]], cols_rgba[q[v]], t, us[q[v]], part);
   };
 }
@@ -459,8 +519,8 @@ pub const Ellipsoid = struct {
 };
 
 pub fn ellipsoid(b:*Builder, e:Ellipsoid) Allocator.Error!void {
-  const R = e.rings;
-  const S = e.segs;
+  const R = b.around(e.rings, 3);
+  const S = b.around(e.segs, 4);
   for (0..R) |ri| for (0..S) |si| {
     var q:[4]V3 = undefined;
     var n:[4]V3 = undefined;
@@ -1014,8 +1074,8 @@ pub fn growthKey(id:species.Id, growth:f32) ?Key {
 /// slots per species in per-variant tables (the most any species uses).
 pub const MAX_VARIANTS = @max(VARIANTS, KEYS);
 
-/// where a (species, variant) mesh sits in per-variant tables.
-pub fn plantSlot(id:species.Id, variant:u32) usize { return @as(usize, @intFromEnum(id)) * MAX_VARIANTS + variant; }
+/// where a (species, variant, level of detail) mesh sits in per-variant tables.
+pub fn plantSlot(id:species.Id, variant:u32, lod:u32) usize { return (@as(usize, @intFromEnum(id)) * MAX_VARIANTS + variant) * LODS + lod; }
 
 test "grown vines keep their root and regrow identically" {
   const g:Growth = .{.start = m.v3(1, 0, 2), .direction = m.v3(0, 1, 0), .length = 1, .wobble = 0.2, .curl = 0.4, .seed = 9};

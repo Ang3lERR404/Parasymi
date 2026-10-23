@@ -36,6 +36,16 @@ rise/sink, Q/E roll, wheel dolly, unclamped; eases back in 0.3 s.
 - 30 Hz fixed sim tick, decoupled from render (currently 60 Hz, `play.TICK`).
 - Chunk: 64×64 tiles, < 2 ms gen+upload, queue-based (currently 32×32).
 - < 200 draw calls at stress. Instancing expected.
+- Level of detail: every plant and library mesh is built at `meshgen.LODS`
+  (3) levels; each level keeps every other ring/row along a surface and
+  half its sides (`Builder.lod`, applied inside the primitives, so new
+  meshes get it for free). Plants and parts pick their level by eye
+  distance (`meshgen.lodAt`, `LOD_AT` 36 / 70). Plant slots are
+  (species, variant, lod); part slots `meshlib.slot(id, lod)`.
+- Culling: only what the camera sees is drawn: chunks (terrain and detail
+  passes, `CHUNK_RADIUS`), plants and parts (`m.Frustum` from the
+  view-projection; `Parts.look` sets the frame's eye and view).
+- Release (RTX 4060 Ti, 1600x900, no vsync): demo ~2.9 ms, stress ~2.5 ms.
 - **Computation-heavy work goes on the GPU.** Dense or per-element visual
   work (grass, scatter, particles, procedural detail, deformation,
   animation fields) is generated or evaluated in shaders (instancing,

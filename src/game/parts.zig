@@ -3,7 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const meshlib = @import("../gfx/meshlib.zig");
-const Builder = @import("../gfx/meshgen.zig").Builder;
+const mg = @import("../gfx/meshgen.zig");
 const PartInstance = @import("../gfx/vertex.zig").PartInstance;
 
 pub const Look = struct {
@@ -31,7 +31,11 @@ pub const Look = struct {
 
 pub const Parts = struct {
   gpa:Allocator,
-  lists:[meshlib.count]std.ArrayList(PartInstance) = @splat(.empty),
+  lists:[meshlib.SLOTS]std.ArrayList(PartInstance) = @splat(.empty),
+  /// where the eye is this frame and what it sees: parts are drawn at the
+  /// level of detail their distance calls for, and not at all out of view
+  eye:m.V3 = .{0, 0, 0},
+  view:?m.Frustum = null,
   pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa}; }
   pub fn deinit(p:*Parts) void {
     for (&p.lists) |*l| l.deinit(p.gpa);
@@ -40,22 +44,38 @@ pub const Parts = struct {
     for (&p.lists) |*l| l.clearRetainingCapacity();
   }
 
-  pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look:Look) Allocator.Error!void {
-    try p.lists[@intFromEnum(id)].append(p.gpa, instance(mat, look));
+  /// set this frame's eye and view before emitting
+  pub fn look(p:*Parts, eye:m.V3, view:m.Frustum) void {
+    p.eye = eye;
+    p.view = view;
+  }
+
+  /// a mesh placed by its matrix: skipped when out of view (a sphere a few
+  /// times its scale), at the level of detail for its distance.
+  pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look_:Look) Allocator.Error!void {
+    const at = m.v3(mat[3][0], mat[3][1], mat[3][2]);
+    const scale = @max(m.len(m.v3(mat[0][0], mat[0][1], mat[0][2])), @max(m.len(m.v3(mat[1][0], mat[1][1], mat[1][2])), m.len(m.v3(mat[2][0], mat[2][1], mat[2][2]))));
+    if (p.view) |v| if (!v.sphere(at, 2.5 * scale + 0.5)) return;
+    try p.add(id, at, instance(mat, look_));
+  }
+
+  fn add(p:*Parts, id:meshlib.Id, at:m.V3, inst:PartInstance) Allocator.Error!void {
+    const lod = mg.lodAt(m.len(at - p.eye));
+    try p.lists[meshlib.slot(id, lod)].append(p.gpa, inst);
   }
 
   /// a mesh built straight up +Y over 0..1, bent on the GPU along the
   /// Catmull-Rom curve through `ctrl`, its x laid toward `side`; `len` is
   /// the length the mesh was built at.
-  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl:[4]m.V3, side:m.V3, len:f32, look:Look) Allocator.Error!void {
-    var inst = instance(m.identity, look);
+  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl:[4]m.V3, side:m.V3, len:f32, look_:Look) Allocator.Error!void {
+    var inst = instance(m.identity, look_);
     inst.c0 = .{ctrl[0][0], ctrl[0][1], ctrl[0][2], 1};
     inst.c1 = .{ctrl[1][0], ctrl[1][1], ctrl[1][2], 1};
     inst.c2 = .{ctrl[2][0], ctrl[2][1], ctrl[2][2], 1};
     inst.c3 = .{ctrl[3][0], ctrl[3][1], ctrl[3][2], 1};
     inst.tint = .{side[0], side[1], side[2], 0};
     inst.e = .{1, 0, 0, len};
-    try p.lists[@intFromEnum(id)].append(p.gpa, inst);
+    try p.add(id, ctrl[0], inst);
   }
 
   /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
@@ -63,12 +83,13 @@ pub const Parts = struct {
   pub fn emitMote(p:*Parts, at:m.V3, phase:f32, life:f32, echo:f32, glow:f32) Allocator.Error!void {
     var inst = instance(m.translate(at), .{.glow = glow, .phase = phase});
     inst.e = .{2, phase, life, echo};
-    try p.lists[@intFromEnum(meshlib.Id.mote)].append(p.gpa, inst);
+    if (p.view) |v| if (!v.sphere(at, 0.6)) return;
+    try p.add(.mote, at, inst);
   }
 
 
-  pub fn slices(p:*const Parts) [meshlib.count][]const PartInstance {
-    var out:[meshlib.count][]const PartInstance = undefined;
+  pub fn slices(p:*const Parts) [meshlib.SLOTS][]const PartInstance {
+    var out:[meshlib.SLOTS][]const PartInstance = undefined;
     for (&out, p.lists) |*o, l| o.* = l.items;
     return out;
   }

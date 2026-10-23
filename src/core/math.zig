@@ -357,6 +357,36 @@ pub fn inverse(m:M4) M4 {
 
 // ---- tests ----
 
+/// the six planes of what a view-projection matrix sees (each xyz its
+/// inward normal, w its offset), for culling what lies outside it.
+pub const Frustum = struct {
+  planes:[6]V4,
+
+  /// planes from a (Vulkan, depth 0..1) view-projection matrix
+  pub fn of(vp:M4) Frustum {
+    var row:[4]V4 = undefined;
+    inline for (0..4) |i| row[i] = .{vp[0][i], vp[1][i], vp[2][i], vp[3][i]};
+    var fr:Frustum = .{.planes = .{
+      row[3] + row[0], row[3] - row[0],
+      row[3] + row[1], row[3] - row[1],
+      row[2], row[3] - row[2],
+    }};
+    for (&fr.planes) |*pl| {
+      const l = len(v3(pl[0], pl[1], pl[2]));
+      pl.* = pl.* / splat4(l);
+    }
+    return fr;
+  }
+
+  /// whether any of a sphere at `c` with radius `r` can be seen
+  pub fn sphere(fr:*const Frustum, c:V3, r:f32) bool {
+    for (fr.planes) |pl| {
+      if (pl[0] * c[0] + pl[1] * c[1] + pl[2] * c[2] + pl[3] < -r) return false;
+    }
+    return true;
+  }
+};
+
 test "spring-damper settles where its force balances" {
   var p = v3(0, 0, 0);
   var v = v3(1, 0, 0);
@@ -440,3 +470,10 @@ test "Path.at gives evenly spaced points" {
   try testing.expectApproxEqAbs(@as(f32, 1.5), p.at(0.5)[0], 1e-5);
   try testing.expectApproxEqAbs(@as(f32, 3.0), p.at(1.0)[0], 1e-5);
 }   
+test "a frustum keeps what is inside it and culls what is not" {
+  const fr = Frustum.of(identity);
+  try std.testing.expect(fr.sphere(v3(0, 0, 0.5), 0.1));
+  try std.testing.expect(!fr.sphere(v3(3, 0, 0.5), 0.5));
+  try std.testing.expect(fr.sphere(v3(1.3, 0, 0.5), 0.5));
+  try std.testing.expect(!fr.sphere(v3(0, 0, -1), 0.5));
+}

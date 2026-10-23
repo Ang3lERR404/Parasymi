@@ -37,7 +37,7 @@ pub const Pass = reg.Id;
 
 pub const FRAMES = 2;
 /// every grown plant mesh: each species in each of its variants.
-pub const PLANT_MESHES = species.count * meshgen.MAX_VARIANTS;
+pub const PLANT_MESHES = species.count * meshgen.MAX_VARIANTS * meshgen.LODS;
 
 /// the renderer fails the way the graphics layer does.
 pub const Error = ctx.Error;
@@ -61,7 +61,7 @@ pub const Scene = struct {
   /// plant instances grouped by mesh variant (see meshgen.plantSlot).
   instances:[PLANT_MESHES][]const vertex.PlantInstance,
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
-  parts:[meshlib.count][]const vertex.PartInstance,
+  parts:[meshlib.SLOTS][]const vertex.PartInstance,
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)
   ui_time:f32,
@@ -80,6 +80,10 @@ const Frame = struct {
   /// buffers retired while this frame was in flight; freed when it comes round again.
   garbage:std.ArrayList(Buffer) = .empty,
 };
+
+/// a sphere around a chunk (from its centre, 1.5 up) holding all of it, its
+/// terraces and what grows on its tiles, for culling it to the view
+pub const CHUNK_RADIUS:f32 = @as(f32, @floatFromInt(ck.SIZE)) * 0.71 + 2;
 
 /// milliseconds a frame may spend meshing streamed chunks
 const MESH_MS:f64 = 3;
@@ -117,7 +121,7 @@ pub const Renderer = struct {
   /// per plant slot, the byte offset from its mesh to the next growth key's
   /// (the plant shader blends toward it); 0 where a species has no keys
   plant_morph:[PLANT_MESHES]u64 = @splat(0),
-  part_ranges:[meshlib.count][2]u32 = undefined,
+  part_ranges:[meshlib.SLOTS][2]u32 = undefined,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   detail_scratch:std.ArrayList(vertex.DetailTile) = .empty,
   /// buffers retired since the last frame began; any frame still in flight
@@ -174,22 +178,25 @@ pub const Renderer = struct {
     var arena = ArenaAllocator.init(r.gpa);
     defer arena.deinit();
     var b:meshgen.Builder = .{.gpa = arena.allocator()};
-    for (species.ids) |id| {
+    for (species.ids) |id| for (0..meshgen.LODS) |l| {
+      const lod:u32 = @intCast(l);
+      b.lod = lod;
       const n = meshgen.variants(id);
       for (0..n) |v| {
         const first:u32 = @intCast(b.v.items.len);
         try meshgen.plant(&b, id, @intCast(v));
-        r.plant_ranges[meshgen.plantSlot(id, @intCast(v))] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
+        r.plant_ranges[meshgen.plantSlot(id, @intCast(v), lod)] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
       }
       // growth keys blend vertex for vertex into the next key
       if (meshgen.growthKey(id, 0) == null) continue;
       for (0..n - 1) |v| {
-        const a = r.plant_ranges[meshgen.plantSlot(id, @intCast(v))];
-        const z = r.plant_ranges[meshgen.plantSlot(id, @intCast(v + 1))];
+        const a = r.plant_ranges[meshgen.plantSlot(id, @intCast(v), lod)];
+        const z = r.plant_ranges[meshgen.plantSlot(id, @intCast(v + 1), lod)];
         if (a[1] != z[1]) @panic("growth keys differ in vertex count");
-        r.plant_morph[meshgen.plantSlot(id, @intCast(v))] = @as(u64, z[0] - a[0]) * @sizeOf(vertex.Mesh);
+        r.plant_morph[meshgen.plantSlot(id, @intCast(v), lod)] = @as(u64, z[0] - a[0]) * @sizeOf(vertex.Mesh);
       }
-    }
+    };
+    b.lod = 0;
     try meshlib.build(&b, &r.part_ranges);
     const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});

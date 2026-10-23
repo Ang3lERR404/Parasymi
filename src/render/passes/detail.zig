@@ -8,6 +8,7 @@ const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
 const pass = @import("../pass.zig");
 const R = @import("../renderer.zig");
+const m = @import("../../core/math.zig");
 const ck = @import("../../world/chunk.zig");
 
 pub const desc:pass.Desc = .{
@@ -30,8 +31,10 @@ pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.
   cmd.pushConstants(r.layout(desc.layout), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
   const zero = [_]vk.DeviceSize{0};
   const focus = [2]f32{scene.push.view[0], scene.push.view[1]};
+  const view = m.Frustum.of(scene.push.vp);
   for (r.slots.items) |s| {
     if (!s.live or s.tiles == 0) continue;
+    if (!view.sphere(m.v3(s.centre[0], 1.5, s.centre[1]), R.CHUNK_RADIUS)) continue;
     const dx = @max(@abs(s.centre[0] - focus[0]) - HALF, 0);
     const dz = @max(@abs(s.centre[1] - focus[1]) - HALF, 0);
     if (dx * dx + dz * dz > DETAIL_R * DETAIL_R) continue;

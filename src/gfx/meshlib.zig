@@ -61,10 +61,21 @@ pub const Id = reg.Id;
 pub const count = reg.count;
 
 /// build every mesh into `b`, recording each one's (first vertex, count).
-pub fn build(b:*mg.Builder, ranges:*[count][2]u32) Allocator.Error!void {
-  inline for (reg.ids) |id| {
-    const first = b.mark();
-    try reg.module(id).build(b);
-    ranges[@intFromEnum(id)] = .{@intCast(first), @intCast(b.mark() - first)};
+/// every library mesh at each level of detail (one slot per mesh and level,
+/// see `slot`).
+pub const SLOTS = count * mg.LODS;
+
+/// where a mesh at a level of detail sits in per-slot tables.
+pub fn slot(id:Id, lod:u32) usize { return @as(usize, @intFromEnum(id)) * mg.LODS + lod; }
+
+pub fn build(b:*mg.Builder, ranges:*[SLOTS][2]u32) Allocator.Error!void {
+  for (0..mg.LODS) |l| {
+    b.lod = @intCast(l);
+    inline for (reg.ids) |id| {
+      const first = b.mark();
+      try reg.module(id).build(b);
+      ranges[slot(id, @intCast(l))] = .{@intCast(first), @intCast(b.mark() - first)};
+    }
   }
+  b.lod = 0;
 }

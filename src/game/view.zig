@@ -21,8 +21,11 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
   const tf:f32 = @floatCast(@mod(g.time, 3600));
 
-  // parts first: plants add parts of their own (shadows under floaters)
+  // parts first: plants add parts of their own (shadows under floaters).
+  // Everything is culled to what the camera sees and drawn at the level of
+  // detail its distance from the eye calls for.
   g.parts.clear();
+  g.parts.look(g.cam.viewEye(), m.Frustum.of(g.cam.viewProj()));
   try plants(g, reach, tf);
   const feet = try g.player.rig(&g.parts);
   try nodes(g, @intFromFloat(reach));
@@ -85,6 +88,10 @@ const Drawn = struct {
 
 fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   const def = species.get(d.sp);
+  const foot = m.footprintCentre(d.x, d.y, def.size, d.ground);
+  const reach = 1.2 + m.f(def.size);
+  if (g.parts.view) |v| if (!v.sphere(foot + m.v3(0, reach * 0.6, 0), reach)) return;
+  const lod = meshgen.lodAt(m.len(foot - g.parts.eye));
   var at = m.footprintCentre(d.x, d.y, def.size, 0);
   var y = d.ground;
   if (def.floating) {
@@ -102,7 +109,7 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   const key = meshgen.growthKey(d.sp, d.growth) orelse meshgen.Key{
     .v = @intCast(rng.hash2(0x7A11, d.x, d.y) % meshgen.VARIANTS), .f = 0,
   };
-  try g.inst[meshgen.plantSlot(d.sp, key.v)].append(g.gpa, .{
+  try g.inst[meshgen.plantSlot(d.sp, key.v, lod)].append(g.gpa, .{
     .pos = .{at[0], y, at[2]},
     .a = .{d.growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
     .b = .{d.flow, d.health, def.sway, m.f(@intFromEnum(def.genome.form))},

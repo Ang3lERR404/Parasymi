@@ -32,8 +32,8 @@ pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
 
 pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   var n:u32 = 0;
-  var first:[meshlib.count]u32 = undefined;
-  var counts:[meshlib.count]u32 = undefined;
+  var first:[meshlib.SLOTS]u32 = undefined;
+  var counts:[meshlib.SLOTS]u32 = undefined;
   for (scene.parts, 0..) |list, i| {
     const k:u32 = @intCast(@min(list.len, MAX - n));
     first[i] = n;
@@ -45,7 +45,7 @@ pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R
   cmd.bindPipeline(.graphics, r.pipe(.parts));
   cmd.pushConstants(r.layout(desc.layout), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
   cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf}, &.{0, 0});
-  for (0..meshlib.count) |i| {
+  for (0..meshlib.SLOTS) |i| {
     if (counts[i] == 0) continue;
     cmd.draw(r.part_ranges[i][1], counts[i], r.part_ranges[i][0], first[i]);
     stats.draws += 1;
