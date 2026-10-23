@@ -41,6 +41,13 @@ void main() {
   // instance tint (paw beans, nose) can make it denser and browner
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
   bool inner_ear = part == 5 && dot(raw, V) < 0.0;
+  if (part == 7) {
+    // a soft shadow on the ground: darkest at its centre, gone at its rim
+    float r = clamp(v_t, 0.0, 1.0);
+    float a = v_fade * pow(1.0 - r, 1.6);
+    o = vec4(applyFog(vec3(0.015, 0.015, 0.025), v_pos), a);
+    return;
+  }
   if (part == 6) {
     // solidified sap, thick as resin: dense and dark where it meets the body
     // (v_u 0), thinning toward its surface (v_u 1). No light of its own:

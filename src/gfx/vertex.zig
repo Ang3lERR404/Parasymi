@@ -16,7 +16,9 @@ pub const Terrain = extern struct {
 /// `resin`: solidified sap, thick and dense at its base (tu.y 0) thinning
 /// toward its surface (tu.y 1); the instance's `give` moves the surface
 /// while the base holds.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin };
+/// `shadow`: a soft dark patch on the ground under something floating
+/// (tu.x its radial fraction; instance fade its darkness).
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow };
 
 pub const Mesh = extern struct {
   pos:[3]f32,

@@ -41,6 +41,10 @@ pub const Form = enum(u8) {
   /// bladders (`thorns`) up it and a crown of curling fronds (`tendrils`)
   /// around a bulb (`bloom_r`); no leaves or petals
   coil,
+  /// a floater: a translucent float (sized by `bloom_r`), a short neck
+  /// (`stem_h`) lifting a wide catcher dish (`petals`), and filaments
+  /// (`tendrils`) trailing beneath; nothing reaches the ground
+  drift,
   /// a symbiotic braid below that frays into parasitic vines above, crowned
   /// by translucent sap petals: both lineages in one body
   confluence,

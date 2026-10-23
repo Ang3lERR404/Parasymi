@@ -157,6 +157,12 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   (`meshgen.petal`: narrow claw, broad, rounded tip). Parasites (`coil`):
   twisted 3-strand stalk on a bulbous foot, small bladders up it, a crown
   of fronds curling into spirals around a bulb; no leaves or spikes.
+  Symbiote vines (tendrils, the confluence's green vine length) grow small
+  leaves along them (`leavesAlong`); plant.vert holds every leaf's base
+  (breathing/unfurling weighted by tu.y), and only parasites writhe.
+- Floaters (`drift`): a translucent sap float, a wide catcher dish above,
+  filaments trailing beneath (tips sway most); they rise and fall slowly
+  and drift over a soft ground shadow (part `.shadow`, meshlib `shadow`).
 - Confluence: 8 growth keys with one vertex layout, blended per vertex in
   plant.vert (binding 2 reads the next key), so it grows without stepping;
   each braid strand gathers at the crown and runs on as its red vine in one

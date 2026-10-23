@@ -21,8 +21,9 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
   const tf:f32 = @floatCast(@mod(g.time, 3600));
 
-  try plants(g, reach, tf);
+  // parts first: plants add parts of their own (shadows under floaters)
   g.parts.clear();
+  try plants(g, reach, tf);
   const feet = try g.player.rig(&g.parts);
   try nodes(g, @intFromFloat(reach));
   try structures(g, reach, tf);
@@ -71,8 +72,18 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     const sp = s.items(.sp)[i];
     const def = species.get(sp);
     var y = s.items(.chunk)[i].height[s.items(.tile)[i]];
-    // floaters drift above whatever is beneath them
-    if (def.floating) y = @max(y, 0) + 1.15 + 0.12 * @sin(tf * 1.3 + s.items(.seed)[i] * 10);
+    var at = ctr;
+    if (def.floating) {
+      // floaters hang in the air: a slow rise and fall and a lazy drift,
+      // never a bounce, over a soft shadow that shrinks as they rise
+      const sd = s.items(.seed)[i];
+      const ground = @max(y, 0);
+      const lift = 0.07 * @sin(tf * 0.5 + sd * 10) + 0.025 * @sin(tf * 1.13 + sd * 4);
+      y = ground + 1.15 + lift;
+      at = .{ctr[0] + 0.05 * @sin(tf * 0.31 + sd * 7), ctr[1] + 0.05 * @cos(tf * 0.27 + sd * 5)};
+      const r = 0.42 - 0.6 * lift;
+      try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + 0.03, at[1])), m.scale3(m.v3(r, 1, r))}), .{.fade = 0.6});
+    }
     // a confluence grows through its keys, blending from one to the next;
     // other plants pick a shape by tile
     const growth = s.items(.growth)[i];
@@ -80,7 +91,7 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
       .v = @intCast(rng.hash2(0x7A11, s.items(.x)[i], s.items(.y)[i]) % meshgen.VARIANTS), .f = 0,
     };
     try g.inst[meshgen.plantSlot(sp, key.v)].append(g.gpa, .{
-      .pos = .{ctr[0], y, ctr[1]},
+      .pos = .{at[0], y, at[1]},
       .a = .{growth, s.items(.mana)[i] / def.mana_cap, s.items(.seed)[i], def.lineage.affinity()},
       .b = .{s.items(.flow)[i], s.items(.health)[i], def.sway, m.f(@intFromEnum(def.genome.form))},
       .c = .{key.f, 0, 0, 0},

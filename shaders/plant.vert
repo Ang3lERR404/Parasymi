@@ -48,17 +48,18 @@ void main() {
   // growth: whole-plant scale, then leaves/petals unfurl as it matures
   float g = smoothstep(0.0, 1.0, growth);
   float open = part == 2u ? smoothstep(0.75, 1.0, growth) : smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth);
-  // (a confluence's canopy opens in its growth keys instead, on its leader)
-  if ((part == 1u || part == 2u) && !confluence) p.xz *= mix(0.25, 1.0, open);
+  // (a confluence's canopy opens in its growth keys instead, on its leader).
+  // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
+  // where it grows from, on the stem or along a vine.
+  if ((part == 1u || part == 2u) && !confluence) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
 
-  // symbiotic breathing: slow, shared rhythm
-  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.07 * aff * sin(t * 1.6 + seed * 6.28);
-  // parasitic hunger: tendrils writhe and thorns twitch harder while feeding
-  if (aff < 0.0 || part == 4u) {
-    float hunger = max(-aff, 0.35) * (0.3 + flow);
-    // a confluence's vines are held by its braid until they peel away (tu.y along the vine)
-    float held = confluence ? smoothstep(0.1, 0.45, tu.y) : 1.0;
-    if (part == 4u) p.xz = rot(sin(t * 3.0 + tu.x * 7.0 + seed * 9.0) * 0.35 * hunger * held) * p.xz;
+  // symbiotic breathing: slow, shared rhythm, the leaf tips moving
+  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.07 * aff * tu.y * sin(t * 1.6 + seed * 6.28);
+  // parasitic hunger: a parasite's fronds writhe and thorns twitch harder
+  // while feeding (other lineages' vines carry leaves and stay put)
+  if (aff < -0.5) {
+    float hunger = -aff * (0.3 + flow);
+    if (part == 4u) p.xz = rot(sin(t * 3.0 + tu.x * 7.0 + seed * 9.0) * 0.35 * hunger) * p.xz;
     // thorns quiver at the tip only (tu.y = 0 at the base), along a shared axis
     if (part == 3u) p.y += 0.02 * hunger * tu.y * sin(t * 23.0 + seed * 40.0 + tu.x * 7.0);
   }

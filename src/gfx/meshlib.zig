@@ -11,6 +11,8 @@ const mg = @import("meshgen.zig");
 const registry = @import("../core/registry.zig");
 
 const parts = struct {
+  // drawn first: a flat soft patch on the ground under floaters
+  pub const shadow = @import("meshes/shadow.zig");
   // the vine-wolf
   pub const wolf_torso = @import("meshes/wolf_torso.zig");
   // drawn before the belly so the translucent sac blends over them

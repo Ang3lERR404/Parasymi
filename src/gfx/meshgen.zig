@@ -502,6 +502,7 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
   switch (g.form) {
     .herb => try herb(b, g, seed + @as(u64, variant) * 131, variant, !def.floating),
     .coil => try coil(b, g, seed + @as(u64, variant) * 131, variant),
+    .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
     // a confluence's variants are its growth keys, all grown from one seed
     .confluence => try confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
   }
@@ -575,23 +576,35 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32, rooted:bool) Alloca
   }
 
   // tendrils: rooted plants put down prop roots from low on the stem, close
-  // around the foot; a floater trails them beneath it
+  // around the foot; a floater trails them beneath it. Both grow small
+  // leaves along their length, like any vine.
   const start = m.alongPath(&spine, if (rooted) 0.2 else 0.35);
   for (0..g.tendrils) |i| {
     const ang = m.ratio(i, g.tendrils) * m.tau + 0.4 + 0.3 * m.f(variant);
     const spread:f32 = if (rooted) g.stem_r * 3 + g.stem_h * 0.12 else 0.35;
     const reach = m.v3(@cos(ang) * spread, -start[1] * 0.98, @sin(ang) * spread);
-    try vine(b, .{
+    var tc:[7]V3 = undefined;
+    growthPath(.{
       .start = start, .direction = m.norm(reach), .length = m.len(reach),
-      .wobble = g.tendril_wobble, .curl = g.tendril_curl, .taper = 0.3, .seed = seed +% i * 31,
-    }, 7, 24, if (rooted) g.stem_r * 0.4 else 0.014, g.stem_col.toRgba8(255), .tendril, 4, if (rooted) 0.2 else 0.35, if (rooted) 0.05 else 1);
+      .wobble = g.tendril_wobble, .curl = g.tendril_curl, .seed = seed +% i * 31,
+    }, &tc);
+    var tp:[20]V3 = undefined;
+    m.splineResample(&tc, &tp);
+    var tt:[20]f32 = undefined;
+    var tr:[20]f32 = undefined;
+    const t0:f32 = if (rooted) 0.2 else 0.35;
+    const t1:f32 = if (rooted) 0.05 else 1;
+    taperRadii(if (rooted) g.stem_r * 0.4 else 0.014, 0.3, &tr);
+    for (&tt, 0..) |*t, j| t.* = m.lerp(t0, t1, m.ratio(j, 19));
+    try b.tubeR(&tp, &tt, &tr, g.stem_col.toRgba8(255), .tendril, 4);
+    try leavesAlong(b, &tp, 3, g.leaf_len * 0.4, g.leaf_w * 0.55, 0.12, 0.6, t0, t1, color.shade(g.leaf_col, 0.6), g.leaf_col.toRgba8(255), seed +% i * 13);
   }
 
   // bloom: a calyx swelling at the tip with sepals folded back beneath it,
   // and the petals rising from it into a cup
   const top = spine[RES - 1];
   const axis = m.norm(spine[RES - 1] - spine[RES - 4]);
-  const calyx = g.bloom_r * 0.18 + g.stem_r * 0.9;
+  const calyx = g.bloom_r * 0.12 + g.stem_r * 0.6;
   try ellipsoid(b, .{
     .center = top + axis * m.splat3(calyx * 0.4), .radii = m.v3(calyx, calyx * 0.85, calyx),
     .col = g.stem_col.toRgba8(255), .part = .stem, .rings = 6, .segs = 8, .t = 1,
@@ -614,6 +627,28 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32, rooted:bool) Alloca
       .rise = if (outer) 0.8 else 1.2, .flare = if (outer) 0.95 else 0.55, .cup = if (outer) 0.35 else 0.5,
       .col = color.shade(g.bloom_col, 0.8), .tip = g.bloom_col.toRgba8(255),
     });
+  }
+}
+
+/// `n` small leaves grown along a vine between fractions `k0`..`k1` of
+/// `path`: turning around it leaf by leaf, lifting toward the light, smaller
+/// toward the tip. `t0`..`t1` is the vine's tu.x over its length.
+fn leavesAlong(b:*Builder, path:[]const V3, n:u32, len:f32, width:f32, k0:f32, k1:f32, t0:f32, t1:f32, col:color.Rgba8, tip:color.Rgba8, seed:u64) Allocator.Error!void {
+  var rng = Rng.init(seed);
+  for (0..n) |i| {
+    const k = m.lerp(k0, k1, (m.f(i) + 0.5) / m.f(n));
+    const at = m.alongPath(path, k);
+    const tan = m.norm(m.alongPath(path, @min(k + 0.03, 1)) - m.alongPath(path, @max(k - 0.03, 0)));
+    const ref = if (@abs(tan[1]) > 0.9) m.v3(1, 0, 0) else m.v3(0, 1, 0);
+    const s1 = m.norm(m.cross(tan, ref));
+    const s2 = m.cross(tan, s1);
+    const a = m.f(i) * 2.4 + rng.range(-0.3, 0.3) + m.f(seed % 7);
+    var out = s1 * m.splat3(@cos(a)) + s2 * m.splat3(@sin(a)) + m.v3(0, 0.5, 0) + tan * m.splat3(0.3);
+    // a blade needs some sideways lean to find its width
+    out[1] = m.clamp(out[1], -0.6, 0.7);
+    out = m.norm(out);
+    const l = len * m.lerp(1, 0.6, k) * rng.range(0.85, 1.15);
+    try b.blade(at, out, l, width * m.lerp(1, 0.7, k), 0.35, col, tip, m.lerp(t0, t1, k), .leaf);
   }
 }
 
@@ -697,6 +732,70 @@ fn coil(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!voi
     .center = top + m.v3(0, g.bloom_r * 0.5, 0), .radii = m.v3(g.bloom_r, g.bloom_r * 1.25, g.bloom_r),
     .col = g.bloom_col.toRgba8(255), .part = .bloom, .rings = 7, .segs = 9, .t = 1,
   });
+}
+
+/// a floater: nothing reaches the ground. A translucent sap float holds it
+/// up; above it a short neck lifts a wide catcher dish open to the sky (it
+/// drinks starlight); beneath it long filaments trail down toward the
+/// ground, swaying most at their tips, so it hangs in the air rather than
+/// standing on it. The origin is the float's centre.
+fn drift(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!void {
+  var rng = Rng.init(seed);
+  const float_r = g.bloom_r * 0.62;
+
+  // the float
+  try ellipsoid(b, .{
+    .center = m.v3(0, 0, 0), .radii = m.v3(float_r, float_r * 0.8, float_r),
+    .col = color.shade(g.bloom_col, 0.85), .part = .bloom, .rings = 7, .segs = 10, .t = 0.5,
+  });
+
+  // the neck and the catcher dish: two whorls opening wide and shallow
+  const neck = m.v3(rng.range(-0.02, 0.02), float_r * 0.7 + g.stem_h, rng.range(-0.02, 0.02));
+  var nc:[4]V3 = undefined;
+  growthPath(.{.start = m.v3(0, float_r * 0.5, 0), .direction = m.norm(neck - m.v3(0, float_r * 0.5, 0)), .length = m.len(neck - m.v3(0, float_r * 0.5, 0)), .wobble = g.wobble, .seed = seed ^ 0x57E4}, &nc);
+  var np:[8]V3 = undefined;
+  m.splineResample(&nc, &np);
+  var nt:[8]f32 = undefined;
+  var nr:[8]f32 = undefined;
+  for (&nt, &nr, 0..) |*t, *r, i| {
+    const k = m.ratio(i, 7);
+    t.* = m.lerp(0.55, 0.9, k);
+    r.* = g.stem_r * m.lerp(1.3, 0.8, k);
+  }
+  try b.tubeR(&np, &nt, &nr, g.stem_col.toRgba8(255), .stem, 6);
+  const inner = @max(g.petals / 2, 3);
+  for (0..g.petals + inner) |i| {
+    const outer = i < g.petals;
+    const ang = if (outer) m.ratio(i, g.petals) * m.tau + m.f(variant) else (m.f(i - g.petals) + 0.5) / m.f(inner) * m.tau;
+    try petal(b, .{
+      .base = np[7], .out = m.v3(@cos(ang), 0, @sin(ang)),
+      .len = g.bloom_r * (if (outer) @as(f32, 1) else 0.6),
+      .width = g.bloom_r * (if (outer) @as(f32, 0.5) else 0.42),
+      .rise = if (outer) 0.55 else 1.0, .flare = if (outer) 0.35 else 0.4, .cup = 0.45,
+      .col = color.shade(g.bloom_col, 0.8), .tip = g.bloom_col.toRgba8(255),
+    });
+  }
+
+  // trailing filaments from the underside of the float
+  for (0..g.tendrils) |i| {
+    const a = m.ratio(i, g.tendrils) * m.tau + rng.range(-0.25, 0.25);
+    const from = m.v3(@cos(a) * float_r * 0.55, -float_r * 0.5, @sin(a) * float_r * 0.55);
+    const len = rng.range(0.55, 0.9);
+    const to = from + m.v3(@cos(a) * 0.12, -len, @sin(a) * 0.12);
+    var fc:[6]V3 = undefined;
+    growthPath(.{.start = from, .direction = m.norm(to - from), .length = m.len(to - from), .wobble = g.tendril_wobble, .curl = g.tendril_curl, .seed = seed +% i * 31}, &fc);
+    var fp:[16]V3 = undefined;
+    m.splineResample(&fc, &fp);
+    var ft:[16]f32 = undefined;
+    var fr:[16]f32 = undefined;
+    for (&ft, &fr, 0..) |*t, *r, j| {
+      const k = m.ratio(j, 15);
+      // tu.x rises toward the tips so they sway most, like a pendulum
+      t.* = m.lerp(0.3, 1, k);
+      r.* = g.stem_r * m.lerp(0.55, 0.12, k);
+    }
+    try b.tubeR(&fp, &ft, &fr, g.leaf_col.toRgba8(255), .tendril, 4);
+  }
 }
 
 /// tu.x where the confluence's braid gives way to its vines.
@@ -861,6 +960,9 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
       cols[at] = color.mix(warm, red, m.smooth(m.clamp01((k - 0.45) / 0.45)));
     }
     try b.tubeC(&path, &pt, &pr, &cols, &pu, .tendril, 6);
+    // the green, braid-side length of each vine grows leaves like any vine
+    // (sized by growth, never absent, so every key keeps one layout)
+    try leavesAlong(b, path[RES - 1 ..], 3, @max(g.stem_r * 1.5 * gr.reach, 0.01), g.stem_r * 0.5 * @max(gr.reach, 0.2), 0.06, 0.38, pt[RES - 1], pt[N - 1], color.shade(g.stem_col, 0.9), color.shade(g.stem_col, 1.4), seed +% si * 17);
     if (leader) leader_tip = path[N - 1];
   }
 
@@ -889,7 +991,7 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
 /// confluence its growth keys.
 pub fn variants(id:species.Id) u32 {
   return switch (species.get(id).genome.form) {
-    .herb, .coil => VARIANTS,
+    .herb, .coil, .drift => VARIANTS,
     .confluence => KEYS,
   };
 }
@@ -899,7 +1001,7 @@ pub fn variants(id:species.Id) u32 {
 pub const Key = struct { v:u32, f:f32 };
 pub fn growthKey(id:species.Id, growth:f32) ?Key {
   switch (species.get(id).genome.form) {
-    .herb, .coil => return null,
+    .herb, .coil, .drift => return null,
     .confluence => {
       const x = m.clamp01(growth) * (KEYS - 1);
       const v = @min(m.floorTo(u32, x), KEYS - 2);
