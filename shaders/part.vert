@@ -25,7 +25,8 @@ layout(location = 3) out float v_glow;
 layout(location = 4) flat out float v_part;
 layout(location = 5) out float v_t;         // position along the part (tube tangent source)
 layout(location = 6) flat out float v_fade; // opacity of translucent sap at its centre
-layout(location = 7) out float v_u;         // across a leaf; through a resin part (0 base .. 1 surface)
+layout(location = 7) out float v_u;
+layout(location = 8) out vec3 v_obj;       // mesh-space point (sap bubbles ride with the body)         // across a leaf; through a resin part (0 base .. 1 surface)
 
 void main() {
   float t = pc.eye_time.w;
@@ -33,10 +34,16 @@ void main() {
   vec3 p = pos;
   // a full sac sags: pushed out along its radius, most at the bottom and
   // front. A field of position, so the vine net on it follows the surface.
+  // a filling sac swells from its centre, most low and forward, only where
+  // it is gut (tu.x), so its tongue stays put on the chest; a smooth field
+  // of position, so the net and leaves on it move with it
   if (iq.x > 0.0) {
-    vec3 r = normalize(pos);
-    p += r * iq.x * max((1.0 - r.y) * 0.7 + r.z * 0.3, 0.0);
+    vec3 r = normalize(pos + vec3(0.0, 0.0, 1e-4));
+    p += r * iq.x * tu.x * (0.6 + 0.6 * max(-r.y, 0.0) + 0.4 * max(r.z, 0.0));
   }
+  // the belly button (tu.y 2) surfaces from inside the sap as the belly
+  // fills (fill in iq.y), and pops out past it when full
+  if (tu.y > 1.5) p.z += 0.04 * pow(clamp(iq.y, 0.0, 1.0), 1.5);
   // secondary motion. Offsets must be identical for every copy of a shared
   // vertex (faceted parts carry different normals per face), so they use a
   // fixed axis scaled by position along the leaf: tips move, bases stay put.
@@ -82,5 +89,6 @@ void main() {
   v_t = tu.x;
   v_fade = ip.w;
   v_u = tu.y;
+  v_obj = p;
   gl_Position = pc.vp * w;
 }

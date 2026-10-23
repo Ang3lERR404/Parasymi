@@ -13,7 +13,8 @@ pub const Look = struct {
   fade:f32 = 1,
   /// rgb tint + weight (weight 0 = no tint, 1 = full tint)
   tint:[4]f32 = .{1, 1, 1, 0},
-  /// how far a sac sags outward under its own weight (unit-radius units)
+  /// how far a sac swells outward as it fills, most low and forward
+  /// (mesh units, weighted by each vertex's tu.x)
   sag:f32 = 0,
   /// how far a resin part's surface is pushed off its rest (mesh space);
   /// its base on the body stays put (see vertex.Part.resin)

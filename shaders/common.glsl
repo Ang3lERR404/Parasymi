@@ -34,6 +34,52 @@ vec3 bendIn(vec3 v, vec2 wdir, float ang) {
   return v;
 }
 
+vec3 hash33(vec3 p) {
+  p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+  p += dot(p, p.yxz + 33.33);
+  return fract((p.xxy + p.yxx) * p.zyx);
+}
+
+// bubbles floating up through sap: a rim-lit ring mask, sampled at two
+// depths behind the surface along the view so they hang inside it. `obj`
+// is the mesh-space point (they ride with the body), `view` toward the eye.
+float sapBubbles(vec3 obj, vec3 view, float t) {
+  float b = 0.0;
+  for (int l = 0; l < 2; l++) {
+    float fl = float(l);
+    vec3 q = (obj - view * (0.012 + 0.02 * fl)) * (36.0 - 10.0 * fl) - vec3(0.0, t * (0.3 + 0.12 * fl), 0.0);
+    vec3 id = floor(q);
+    vec3 h = hash33(id + fl * 19.0);
+    if (h.x > 0.3) continue;
+    vec3 c = id + 0.3 + 0.4 * h.yzx;
+    c.x += 0.1 * sin(t * 0.8 + h.z * 6.28);
+    float r = 0.08 + 0.14 * h.y;
+    float d = length(q - c);
+    // a thin bright skin, a clear middle
+    b += (smoothstep(r, r * 0.78, d) - 0.7 * smoothstep(r * 0.72, r * 0.35, d)) * (1.0 - 0.45 * fl);
+  }
+  return b;
+}
+
+// beads of sap clinging to a surface, sliding slowly down it: x the bead,
+// y its glint (a dome lit off-centre by `light`)
+vec2 sapDroplets(vec3 obj, vec3 n, vec3 light, vec3 view, float t) {
+  vec3 q = obj * 52.0 + vec3(0.0, t * 0.1, 0.0);
+  vec3 id = floor(q);
+  vec3 h = hash33(id + 7.0);
+  if (h.x > 0.4) return vec2(0.0);
+  vec3 c = id + 0.28 + 0.44 * h.yzx;
+  float r = 0.14 + 0.16 * h.z;
+  // drawn out down the surface, heavier at the bottom
+  vec3 d = q - c;
+  d.y *= d.y > 0.0 ? 1.4 : 0.8;
+  float l = length(d);
+  float bead = smoothstep(r, r * 0.7, l);
+  vec3 bn = normalize(n + (d / r) * 0.9);
+  float glint = pow(max(dot(reflect(-light, bn), view), 0.0), 48.0);
+  return vec2(bead, bead * glint);
+}
+
 vec3 srgb2lin(vec3 c) { return pow(c, vec3(2.2)); }
 
 vec3 shade(vec3 albedo, vec3 n, vec3 wpos) {

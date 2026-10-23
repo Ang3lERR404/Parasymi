@@ -10,6 +10,7 @@ layout(location = 4) flat in float v_part;
 layout(location = 5) in float v_t;
 layout(location = 6) flat in float v_fade;
 layout(location = 7) in float v_u;
+layout(location = 8) in vec3 v_obj;
 layout(location = 0) out vec4 o;
 
 const vec3 SAP = vec3(1.0, 0.43, 0.08);       // linear amber, the only accent
@@ -26,6 +27,19 @@ vec3 surfaceTangent() {
   vec3 r2 = cross(sn, dpx);
   float det = dot(dpx, r1);
   return abs(det) < 1e-12 ? vec3(0.0) : (r1 * dFdx(v_t) + r2 * dFdy(v_t)) / det;
+}
+
+// sap is alive: bubbles drifting up inside it, beads sliding down its
+// surface. Added to every sap material.
+vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, inout float alpha) {
+  float t = pc.eye_time.w;
+  vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0), pc.sun.w);
+  float bub = sapBubbles(v_obj, V, t) * inside;
+  c += mix(sapc, vec3(1.0, 0.95, 0.85), 0.35) * bub * 0.45 * lit;
+  vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
+  c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + lit * drop.y * 0.9;
+  alpha = max(alpha, drop.x * 0.85);
+  return c;
 }
 
 void main() {
@@ -73,6 +87,7 @@ void main() {
     c += lit * pow(max(dot(raw, H), 0.0), 90.0) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN));
     // denser at the base: nearly opaque there, see-through only toward the face
     alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
+    c = sapLife(c, sap, raw, V, h * (1.0 - fres), alpha);
     o = vec4(applyFog(c, v_pos), alpha);
     return;
   }
@@ -84,6 +99,7 @@ void main() {
     vec3 deep = SAP_DEEP * hue * (0.6 + 0.8 * v_glow);
     c = shade(deep, raw, v_pos) + mix(deep, SAP * hue * 2.2, fres) * (0.35 + v_glow);
     alpha = mix(v_fade, 1.0, fres);
+    c = sapLife(c, SAP * hue, raw, V, 1.0 - fres, alpha);
   } else if (inner_ear && v_fade < 0.999) {
     // the inner ear is a sheet of sap: glowing at grazing angles, faintly
     // see-through face-on (the outer face stays solid vine)
@@ -92,6 +108,7 @@ void main() {
     c = shade(deep, -raw, v_pos) + mix(deep, SAP * 1.8, fres) * 0.5;
     c += SAP * max(dot(raw, SUN), 0.0) * 0.25; // light through the ear
     alpha = mix(v_fade, 1.0, fres);
+    c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), alpha);
   } else {
     vec3 albedo = v_col;
     float inner = 0.0;

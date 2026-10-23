@@ -53,6 +53,8 @@ pub const Mote = struct {
   vy:f32,
   life:f32 = 1,
   phase:f32,
+  /// still falling (it trails light) rather than resting over the ground
+  falling:bool = true,
 };
 
 /// starfall tuning (tune here, not scattered through update)
@@ -97,6 +99,7 @@ pub const Starfall = struct {
       const mo = &sf.motes.items[i];
       const h = ground.walkable(m.tileOf(mo.pos[0]), m.tileOf(mo.pos[2])) orelse mo.pos[1];
       const rest = h + REST_HOVER + HOVER_AMP * @sin(mo.phase * 40 + mo.pos[0]);
+      mo.falling = mo.pos[1] > rest + 0.05;
       if (mo.pos[1] > rest) {
         mo.pos[1] = @max(rest, mo.pos[1] + mo.vy * dt);
         mo.pos[0] += @sin(mo.phase * 20 + mo.pos[1]) * DRIFT * dt;

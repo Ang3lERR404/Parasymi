@@ -26,6 +26,7 @@ layout(location = 7) out float v_young;       // 0 old, dense growth .. 1 newest
 layout(location = 4) flat out vec4 v_inst; // affinity, seed, health, part
 layout(location = 5) flat out float v_form;
 layout(location = 8) flat out vec2 v_ghost; // a placement preview, and whether it fits
+layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubbles ride with it)
 
 mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 
@@ -120,6 +121,7 @@ void main() {
   }
   v_form = ib.w;
   v_ghost = ic.yz;
+  v_obj = p;
   // sap moving through the plant travels up it as a slow pulse
   v_sap = vec2(fill, clamp(flow, 0.0, 1.0) * (0.5 + 0.5 * sin(t * 2.0 - h * 6.0 + seed * 12.0)));
   v_t = h;

@@ -1,18 +1,38 @@
-//! mesh: NODE GRIT. resource nodes, in tile space centred on the tile
+//! mesh: NODE GRIT. mineral grit breaking out of the ground: a cluster of
+//! faceted stones half sunk in the soil, grit and pebbles heaped around
+//! them, and pale quartz chips glinting out of the cracks. Tile space,
+//! centred on the tile.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("../../core/color.zig");
+const kit = @import("mineral_kit.zig");
 
 const v3 = m.v3;
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("node_grit");
-  for (0..6) |_| {
-    const r = rng.range(0.06, 0.14);
-    const col = color.rgb(rng.range(0.45, 0.6), rng.range(0.42, 0.52), rng.range(0.4, 0.48)).toRgba8(255);
-    try mg.ellipsoid(b, .{.center = v3(rng.range(-0.3, 0.3), r * 0.4, rng.range(-0.3, 0.3)), .radii = v3(r, r * 0.7, r * rng.range(0.8, 1.2)), .col = col, .rings = 3, .segs = 5});
+  // the big stones, then a scatter of grit around them
+  for (0..13) |i| {
+    const big = i < 4;
+    const a = rng.range(0, m.tau);
+    const d = if (big) rng.range(0.0, 0.2) else rng.range(0.18, 0.38);
+    const r = if (big) rng.range(0.09, 0.15) else rng.range(0.025, 0.05);
+    const g = rng.range(0.42, 0.56);
+    const col = color.rgb(g + 0.04, g, g - 0.03).toRgba8(255);
+    const lite = color.rgb(g + 0.16, g + 0.13, g + 0.1).toRgba8(255);
+    try kit.stone(b, v3(@cos(a) * d, -0.01, @sin(a) * d), r, if (big) rng.range(0.7, 1.0) else 0.6, col, lite, &rng);
+  }
+  // quartz chips in the cracks between the stones
+  for (0..5) |_| {
+    const a = rng.range(0, m.tau);
+    const d = rng.range(0.06, 0.22);
+    try kit.crystal(b, .{
+      .base = v3(@cos(a) * d, 0.0, @sin(a) * d), .dir = m.norm(v3(@cos(a) * 0.5, 1, @sin(a) * 0.5)),
+      .len = rng.range(0.06, 0.12), .r = rng.range(0.012, 0.02), .sides = 5,
+      .col = color.rgb(0.78, 0.76, 0.72).toRgba8(255), .tip = color.rgb(0.95, 0.94, 0.9).toRgba8(255), .part = .thorn,
+    }, &rng);
   }
 }

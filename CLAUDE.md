@@ -142,8 +142,16 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   changes (the fingerprint checks sizes only).
 
 ## Visual (current)
-- Terrain: flat, biome-tinted tiles, one directional + ambient, flat shading.
-  Fog closes in before the drawn edge; contact shadows under the wolf's feet.
+- Terrain (`render/terrain_mesh.zig`): smooth ground, no walls or ramps.
+  Each tile is a 3x3 grid: its centre at the tile's height (everything on
+  it stands there), edges and corners shared with its neighbours (average
+  height, colour and ley), smooth normals; land dips under the water at the
+  shore. Thin grass blades on every tile but water and soil (tile-coloured,
+  swayed by the garden wind in terrain.vert, info.w = height up the blade);
+  clods and small stones on soil. Ley lines carry a faint plexus of drifting
+  points joined by threads (terrain.frag); ley sight glows smoothly across
+  tile borders. info.z = 255 marks the ground's top surface. Fog closes in
+  before the drawn edge; contact shadows under the wolf's feet.
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
   tile). Motion (plant.vert) is rooted and heavy: points bend about the root
   in the wind's plane (h², tips lagging), one garden-wide wind with slow
@@ -196,7 +204,17 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   tube (vertex-colour gradient, ±10° hue drift in the zone); leader crowned by translucent violet petals with amber
   fresnel (plants pass blends; only these petals have alpha < 1). Sway ×1.5.
 - Sky: gradient dome pass (fog colour at the horizon), sun/moon, stars,
-  starlight motes. Low pitch widens the view and lifts it toward the horizon.
+  starlight motes (a faceted bipyramid of light, a tilted ring and four
+  needle rays; they turn slowly, twinkle, hover breathing, and trail fading
+  echoes while falling).
+- Resource nodes (`meshes/mineral_kit.zig`: flat-faceted crystals and
+  stones): ley shards a violet crystal cluster on a dark stone root; grit
+  faceted stones half sunk with quartz chips; fibre a clump of arching
+  stalks (green to straw) on a root tuft that sways (`resources.Node.sway`).
+- Sap (all sap materials: sacs, resin, inner ears, plant sap) is alive:
+  bubbles drift up inside it and beads of it slide down its surface
+  (`sapBubbles`/`sapDroplets` in common.glsl, in mesh space so they ride
+  with the body). Low pitch widens the view and lifts it toward the horizon.
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow. 150 ms anim.
 - Wolf (rigid joint skeleton, organic surface; `game/player.zig` rig):
   - Muted greens/browns; amber only on belly, eyes, inner ears (and beans).
@@ -234,8 +252,13 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
     hips); pectorals are broad dishes of resin sap (wider top edge, areola +
     nipple below the crown), base held on the chest, surface sprung; chest
     vines tucked behind.
-  - Belly: translucent sap (72%), inflates +35% and drops/sags with fill;
-    up to 5 dark lumps inside on spring-dampers driven by acceleration.
+  - Belly (`wolf_belly.zig`, torso units): a teardrop sac, a full gut
+    drawing in along a concave flank into a tongue that runs up between the
+    pectorals; translucent sap (72%). Filling swells only the gut (tu.x),
+    most low and forward (part.vert, `Look.sag`), the tongue stays on the
+    chest; a belly button sunk in the sap surfaces and pops out as it fills
+    (tu.y 2, fill in `give[0]`). Up to 5 dark lumps inside on
+    spring-dampers driven by acceleration.
   - Arms: deltoid caps, bicep/tricep forms, forearm tapering 1.1→0.7.
   - Rear: two squared vine lobes pressed together at the cleft, sap nodes (40%), firm springs;
     tailbone knot above them; tail is a braided spline rebuilt each frame.

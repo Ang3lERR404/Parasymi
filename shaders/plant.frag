@@ -18,6 +18,7 @@ layout(location = 5) flat in float v_form;
 layout(location = 6) in float v_t;
 layout(location = 7) in float v_young;
 layout(location = 8) flat in vec2 v_ghost; // a placement preview, and whether it fits
+layout(location = 9) in vec3 v_obj;
 layout(location = 0) out vec4 o;
 
 const vec3 AMBER = vec3(1.0, 0.43, 0.08);
@@ -100,6 +101,11 @@ void main() {
   c += sap * lit * (through * 0.8 + fres * 0.45 + wrap * 0.22) * show * health;
   // sap moving through the plant (sharing, draining) brightens it as it passes
   c += sap * lit * moving * 0.3 * show;
+  // sap is alive: bubbles drifting up inside thin growth, beads of it
+  // sliding down the skin of a full plant
+  c += mix(sap, vec3(1.0), 0.3) * sapBubbles(v_obj, V, pc.eye_time.w) * show * lit * 0.4;
+  vec2 drop = sapDroplets(v_obj * 0.8, n, SUN, V, pc.eye_time.w) * (0.25 + 0.75 * fill) * health;
+  c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + lit * drop.y * 0.7;
   // thin sap-filled growth has a polished face
   vec3 Hs = normalize(SUN + V);
   c += lit * pow(max(dot(n, Hs), 0.0), 60.0) * 0.25 * thin * smoothstep(0.0, 0.2, dot(n, SUN));

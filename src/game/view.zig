@@ -176,16 +176,29 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
         try g.parts.emit(node.mesh, m.chain(&.{
           m.translate(m.tileCentre(wx, wz, c.height[t])),
           m.rotY(hsh * m.tau), m.scale3(m.splat3(sc)),
-        }), .{.glow = node.glow, .phase = hsh});
+        }), .{.glow = node.glow, .phase = hsh, .sway = node.sway, .tall = node.tall * sc});
       }
     }
   }
 }
 
+/// fallen starlight: each mote turns slowly and twinkles, hovering with a
+/// slow breath over the ground; while it falls, fading echoes of it trail
+/// above, a streak of light.
 fn motes(g:*Game) Allocator.Error!void {
+  const t:f32 = @floatCast(@mod(g.time, 3600));
   for (g.stars.motes.items) |mo| {
-    const spin = @as(f32, @floatCast(g.time)) * 1.5 + mo.phase * 10;
     const fade = m.clamp01(mo.life);
-    try g.parts.emit(.mote, m.chain(&.{m.translate(mo.pos), m.rotY(spin), m.rotX(spin * 0.7), m.scale3(m.splat3(0.6 + 0.6 * fade))}), .{.glow = 1.6 * fade, .phase = mo.phase});
+    const twinkle = 0.75 + 0.25 * @sin(t * 3.1 + mo.phase * 40) * @sin(t * 1.7 + mo.phase * 13);
+    const turn = t * 0.35 + mo.phase * m.tau;
+    const hover = if (mo.falling) 0 else 0.05 * @sin(t * 1.1 + mo.phase * 30);
+    const at = mo.pos + m.v3(0, hover, 0);
+    const size = (0.55 + 0.55 * fade) * (0.9 + 0.1 * twinkle);
+    try g.parts.emit(.mote, m.chain(&.{m.translate(at), m.rotY(turn), m.rotZ(0.25 * @sin(t * 0.5 + mo.phase * 9)), m.scale3(m.splat3(size))}), .{.glow = 1.8 * fade * twinkle, .phase = mo.phase});
+    if (!mo.falling) continue;
+    for (1..4) |k| {
+      const e = m.f(k);
+      try g.parts.emit(.mote, m.chain(&.{m.translate(at + m.v3(0, 0.16 * e, 0)), m.rotY(turn - 0.3 * e), m.scale3(m.splat3(size * (1 - 0.22 * e)))}), .{.glow = 1.2 * fade / (1 + e), .phase = mo.phase});
+    }
   }
 }

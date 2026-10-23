@@ -1,30 +1,48 @@
-//! mesh: NODE FIBRE
+//! mesh: NODE FIBRE. a clump of fibre plant: long fibrous stalks rising
+//! from a tuft of roots in a loose vase, arching out under their own weight,
+//! green at the root and drying to straw at their tapering tips, small
+//! leaves along a few of them. It sways like any plant (the instance's
+//! sway). Tile space, centred on the tile.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("../../core/color.zig");
+const kit = @import("structure_kit.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("node_fibre");
-  for (0..7) |_| {
-    const a = rng.range(0, m.tau);
-    const r0 = rng.range(0.05, 0.2);
-    const r1 = r0 + rng.range(0.12, 0.25);
-    const h = rng.range(0.08, 0.2);
-    var path:[6]V3 = undefined;
-    var ts:[6]f32 = undefined;
-    for (0..6) |j| {
-      const k = m.f(j) / 5;
-      const r = m.lerp(r0, r1, k);
-      path[j] = v3(@cos(a + k * 0.6) * r, @sin(k * m.pi) * h - 0.02, @sin(a + k * 0.6) * r);
-      ts[j] = k;
+  try kit.rootMat(b, 5, 0.22, 0.025, 0x1F1B);
+  const straw = color.rgb(0.62, 0.52, 0.3).toRgba8(255);
+  const green = color.rgb(0.32, 0.5, 0.24).toRgba8(255);
+  for (0..16) |i| {
+    const a = m.ratio(i, 16) * m.tau + rng.range(-0.2, 0.2);
+    const out = v3(@cos(a), 0, @sin(a));
+    const len = rng.range(0.28, 0.5);
+    const lean = rng.range(0.25, 0.7);
+    var c:[6]V3 = undefined;
+    mg.growthPath(.{.start = out * m.splat3(0.02), .direction = m.norm(out * m.splat3(lean) + v3(0, 1, 0)), .length = len, .wobble = 0.2, .curl = 0.05, .seed = 0xF1B0 +% i}, &c);
+    // they arch out and over as they go (the root stays put)
+    for (c[1..], 1..) |*p, j| {
+      const k = m.ratio(j, 5);
+      p.* += out * m.splat3(0.12 * k * k * lean) - v3(0, 0.08 * k * k * k * lean, 0);
     }
-    try b.tube(&path, &ts, 0.022, 0.012, color.rgb(0.55, 0.45, 0.28).toRgba8(255), .tendril, 4);
+    var p:[14]V3 = undefined;
+    m.splineResample(&c, &p);
+    var ts:[14]f32 = undefined;
+    var rs:[14]f32 = undefined;
+    var cs:[14]color.Rgba8 = undefined;
+    for (&ts, &rs, &cs, 0..) |*t, *r, *cc, j| {
+      const k = m.ratio(j, 13);
+      t.* = k;
+      r.* = @max(0.011 * (1 - k * 0.9), 0.0007);
+      cc.* = color.mix(green, straw, m.smooth(k));
+    }
+    try b.tubeC(&p, &ts, &rs, &cs, null, .stem, 4);
+    if (i % 3 == 0) try mg.leavesAlong(b, &p, 3, 0.09, 0.025, 0.2, 0.7, 0.2, 0.7, pal.leaf_dark, pal.leaf_lite, 0xF1C0 +% i);
   }
-  try mg.ellipsoid(b, .{.center = v3(0, 0.02, 0), .radii = v3(0.09, 0.05, 0.09), .col = color.rgb(0.3, 0.5, 0.22).toRgba8(255), .rings = 4, .segs = 7});
 }

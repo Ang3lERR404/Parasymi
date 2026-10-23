@@ -56,7 +56,8 @@ const PEC_OPACITY:f32 = 1 - (1 - SAP_OPACITY) * 0.7;
 /// the empty belly's radii (torso space); full, it is 35% larger and sags
 const BELLY_R = v3(0.13, 0.12, 0.12);
 const BELLY_GROW:f32 = 0.35;
-const BELLY_SAG:f32 = 0.12;
+/// how far the full gut swells out (torso units), most down and forward
+const BELLY_SWELL:f32 = 0.065;
 /// how strongly the wolf's acceleration is felt by what hangs in and on its
 /// body (m/s^2 down to a few centimetres of lag)
 const SLOSH:f32 = 0.05;
@@ -272,14 +273,17 @@ pub const Player = struct {
     // the belly: a sap sac that inflates with the inventory, drops and sags
     // as it fills, with the heavier things inside showing through as shadows
     const b = p.fullness;
-    const belly = m.chain(&.{ torso, T(v3(0, 0.16 - 0.04 * b, 0.05 + 0.05 * b)) });
+    // the sac stays on the chest (its tongue between the pectorals); its gut
+    // swells, drops and pushes forward in the shader, and the lumps with it
+    const sac = m.chain(&.{ torso, T(v3(0, 0.16, 0.05)) });
+    const belly = m.chain(&.{ sac, T(v3(0, -0.04 * b, 0.05 * b)) });
     var held:usize = 0;
     for (p.inv.slot) |slot| if (slot != null) { held += 1; };
     for (p.lump[0..@min(held, lumps.len)]) |l| {
       try out.emit(.belly_lump, m.chain(&.{ belly, T(l.pos), S(m.splat3(p.lumpRadius())) }), .{ .glow = 0.25, .phase = 0.3 });
     }
-    try out.emit(.wolf_belly, m.chain(&.{ belly, S(BELLY_R * m.splat3(p.bellyScale())) }), .{
-      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .sag = BELLY_SAG * b,
+    try out.emit(.wolf_belly, sac, .{
+      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .sag = BELLY_SWELL * b, .give = .{ b, 0, 0 },
     });
 
     // pectorals: broad dishes of solidified sap. Their bases sit on the
