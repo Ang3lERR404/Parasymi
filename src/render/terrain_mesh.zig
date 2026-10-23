@@ -44,6 +44,11 @@ fn blades(k:ck.Kind) u32 {
 
 /// where the land meets the water it dips just under the surface
 const SHORE = gen.WATER_H - 0.14;
+/// each tile's colour varies by `JITTER` about `JITTER_MIN` of its kind's
+const JITTER_MIN:f32 = 0.9;
+const JITTER:f32 = 0.2;
+/// a tile is a fan of four triangles
+const VERTS_PER_TILE = 4 * 3;
 
 /// the tiles around a chunk, one ring beyond it, read once
 const Ring = struct {
@@ -72,14 +77,14 @@ fn fill(r:*Ring, seed:u64, c:*const ck.Chunk) void {
         const t:usize = @intCast(ly * ck.SIZE + lx);
         r.h[i] = c.height[t];
         r.kind[i] = c.kind[t];
-        r.ley[i] = m.clamp(c.ley_cap[t] / 4.2, 0, 1);
+        r.ley[i] = m.clamp01(c.ley_cap[t] / gen.LEY_MAX);
       } else {
         const s = gen.sample(seed, wx, wy);
         r.h[i] = s.height;
         r.kind[i] = s.kind;
-        r.ley[i] = m.clamp(s.ley / 4.2, 0, 1);
+        r.ley[i] = m.clamp01(s.ley / gen.LEY_MAX);
       }
-      const jitter = 0.9 + 0.2 * rng.unit(rng.hash2(seed ^ 0xC0101, wx, wy));
+      const jitter = JITTER_MIN + JITTER * rng.unit(rng.hash2(seed ^ 0xC0101, wx, wy));
       const b = baseColor(r.kind[i]);
       r.col[i] = color.rgb(b.r * jitter, b.g * jitter, b.b * jitter);
     }
@@ -159,7 +164,7 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
   out.clearRetainingCapacity();
   detail.clearRetainingCapacity();
   // room for the whole chunk up front: no regrowing mid-build
-  try out.ensureTotalCapacity(gpa, ck.N * 12);
+  try out.ensureTotalCapacity(gpa, ck.N * VERTS_PER_TILE);
   try detail.ensureTotalCapacity(gpa, ck.N);
   var r:Ring = .{};
   fill(&r, seed, c);
@@ -176,7 +181,7 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
     const k = r.kind[i];
     const wx = ox + lx;
     const wy = oy + ly;
-    const ley:u8 = @intFromFloat(m.clamp(c.ley_cap[t] / 4.2, 0, 1) * 255);
+    const ley:u8 = @intFromFloat(m.clamp01(c.ley_cap[t] / gen.LEY_MAX) * 255);
     // info.z: 255 marks the ground's top surface (read back as 1.0)
     const info:[4]u8 = .{@intFromEnum(k), ley, 255, 0};
 

@@ -112,7 +112,7 @@ fn spot(w:*const World, p:*const Plants, a:Rect, b:Rect) ?[2]i32 {
   const size = species.get(HYBRID).size;
   const r:i32 = species.get(HYBRID).contain;
   var best:?[2]i32 = null;
-  var score:i32 = 1 << 30;
+  var score:i32 = m.maxInt(i32);
   var y = a.y - r - size + 1;
   while (y < a.y + a.size + r) : (y += 1) {
     var x = a.x - r - size + 1;

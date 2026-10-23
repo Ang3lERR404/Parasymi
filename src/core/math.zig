@@ -29,6 +29,9 @@ const SPLINE_DENSE:usize = 8;
 /// max control points per spline path (vine, tail, etc).
 pub const MAX_SPLINE:usize = 64;
 
+/// milliseconds per second (frame timings are shown and budgeted in ms).
+pub const MS_PER_S = 1000;
+
 // ---- scalars ----
 
 pub const pi = math.pi;
@@ -53,6 +56,8 @@ pub inline fn ratio(a:anytype, b:anytype) f32 { return f(a) / f(b); }
 pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
 pub inline fn asin(x:f32) f32 { return math.asin(clamp(x, -1, 1)); }
 pub inline fn sign(x:f32) f32 { return math.sign(x); }
+/// degrees to radians.
+pub inline fn rad(deg:f32) f32 { return deg * (pi / 180.0); }
 /// shortest signed difference `to - from`, wrapped into -pi..pi.
 pub inline fn angleDiff(from:f32, to:f32) f32 { return atan2(@sin(to - from), @cos(to - from)); }
 
@@ -99,6 +104,8 @@ pub inline fn cross(a:V3, b:V3) V3 {
   return .{a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]};
 }
 pub inline fn lerpV(a:V3, b:V3, t:f32) V3 { return a + (b - a) * splat3(t); }
+/// the centre of a triangle.
+pub inline fn centroid(a:V3, b:V3, c:V3) V3 { return (a + b + c) * splat3(1.0 / 3.0); }
 /// a point at fraction `k` (0..1) along a polyline, by point index (for
 /// evenly resampled paths; see `Path` for arc length on uneven ones).
 pub fn alongPath(path:[]const V3, k:f32) V3 {
@@ -476,4 +483,11 @@ test "a frustum keeps what is inside it and culls what is not" {
   try std.testing.expect(!fr.sphere(v3(3, 0, 0.5), 0.5));
   try std.testing.expect(fr.sphere(v3(1.3, 0, 0.5), 0.5));
   try std.testing.expect(!fr.sphere(v3(0, 0, -1), 0.5));
+}
+test "degrees to radians, and a triangle's centroid" {
+  try testing.expectApproxEqAbs(pi / 2.0, rad(90), 1e-6);
+  const c = centroid(v3(0, 0, 0), v3(3, 0, 0), v3(0, 3, 6));
+  try testing.expectApproxEqAbs(@as(f32, 1), c[0], 1e-6);
+  try testing.expectApproxEqAbs(@as(f32, 1), c[1], 1e-6);
+  try testing.expectApproxEqAbs(@as(f32, 2), c[2], 1e-6);
 }

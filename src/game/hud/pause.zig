@@ -30,11 +30,11 @@ pub fn draw(_:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
   try d.membrane(px, py, pw, ph, s.pause_panel, 0.55);
-  _ = try d.text(W / 2 - Draw.width("PAUSED", 3.5) / 2, py + 30, 3.5, s.gold, "PAUSED");
+  _ = try d.text(W / 2 - Draw.width("PAUSED", s.text_banner) / 2, py + 30, s.text_banner, s.gold, "PAUSED");
   for (options, 0..) |o, i| {
     const y = py + header_h + option_h * m.f(i);
     try d.pod(px + pod_x, y + 8, 9, s.gold, 0.5, m.f(i) * 0.4);
-    _ = try d.text(px + key_x, y, 1.75, s.dim, o[0]);
-    _ = try d.text(px + label_x, y, 1.75, s.white, o[1]);
+    _ = try d.text(px + key_x, y, s.text_label, s.dim, o[0]);
+    _ = try d.text(px + label_x, y, s.text_label, s.white, o[1]);
   }
 }

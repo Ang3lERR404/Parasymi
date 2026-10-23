@@ -16,10 +16,21 @@ const glfw = @import("zglfw");
 const Input = @import("platform/input.zig").Input;
 const Display = @import("platform/display.zig").Display;
 const Renderer = @import("render/renderer.zig").Renderer;
-const Game = @import("game/play.zig").Game;
+const play = @import("game/play.zig");
+const Game = play.Game;
 const view = @import("game/view.zig");
 const setups = @import("game/setups.zig");
 const save = @import("game/save.zig");
+const m = @import("core/math.zig");
+
+/// a stalled frame (window drag, hitch) counts as at most this long (s)
+const MAX_FRAME_DT:f64 = 0.1;
+/// `--demo` fast-forwards its garden this many seconds; `--stress` sows a
+/// field this many tiles on a side
+const DEMO_FORWARD = 25;
+const STRESS_SIDE = 120;
+/// most streamed chunks meshed in one frame (`MESH_MS` also caps it)
+const MESH_BUDGET = 6;
 
 pub fn main(init:Init) !void {
   const gpa = init.gpa;
@@ -30,21 +41,21 @@ pub fn main(init:Init) !void {
   var stress = false;
   var load = false;
   var tod:?f32 = null;
-  var seed:u64 = 0x5EED_0F_11FE;
+  var seed:u64 = play.DEFAULT_SEED;
   for (args[1..]) |a| {
     if (eql(u8, a, "--novsync")) vsync = false;
     if (eql(u8, a, "--demo")) demo = true;
     if (eql(u8, a, "--stress")) stress = true;
     if (eql(u8, a, "--load")) load = true;
-    if (startsWith(u8, a, "--tod=")) tod = try parseFloat(f32, a[6..]);
-    if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a[7..], 0);
+    if (startsWith(u8, a, "--tod=")) tod = try parseFloat(f32, a["--tod=".len..]);
+    if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a["--seed=".len..], 0);
   }
 
   try glfw.init();
   defer glfw.terminate();
   if (!glfw.isVulkanSupported()) return error.VulkanUnsupported;
   glfw.windowHint(.client_api, .no_api);
-  const window = try glfw.createWindow(1600, 900, "Parasymi", null, null);
+  const window = try glfw.createWindow(play.WINDOW[0], play.WINDOW[1], "Parasymi", null, null);
   defer window.destroy();
 
   var input:Input = .{.win = window};
@@ -57,8 +68,8 @@ pub fn main(init:Init) !void {
   var game = try Game.init(gpa, seed);
   defer game.deinit();
   if (load) try restore(gpa, io, &game, r);
-  if (demo) try setups.demo(&game, 25);
-  if (stress) try setups.stress(&game, 120);
+  if (demo) try setups.demo(&game, DEMO_FORWARD);
+  if (stress) try setups.stress(&game, STRESS_SIDE);
   if (tod) |t| game.sky.tod = t;
 
   var last = glfw.getTime();
@@ -67,8 +78,8 @@ pub fn main(init:Init) !void {
     input.update();
 
     const now = glfw.getTime();
-    // a stalled frame (window drag, hitch) must not fling animation or movement
-    const dt = @min(now - last, 0.1);
+    // a stalled frame must not fling animation or movement
+    const dt = @min(now - last, MAX_FRAME_DT);
     last = now;
 
     const screen = r.extent();
@@ -87,8 +98,8 @@ pub fn main(init:Init) !void {
     }
     const t0 = glfw.getTime();
     try game.simulate(dt);
-    game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * 1000)) - game.sim_ms) * 0.05;
-    try r.syncWorld(&game.world, 6);
+    game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * m.MS_PER_S)) - game.sim_ms) * play.TIMING_EASE;
+    try r.syncWorld(&game.world, MESH_BUDGET);
     game.render_stats = r.stats;
 
     const scene = try view.scene(&game, screen);

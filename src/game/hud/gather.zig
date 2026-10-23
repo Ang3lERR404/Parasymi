@@ -8,7 +8,7 @@ const s = @import("../style.zig");
 const m = @import("../../core/math.zig");
 
 const tendril_w:f32 = 120;
-const tendril_h:f32 = 14;
+const tendril_h = s.bar_h_bold;
 const above_head:f32 = 120;
 
 pub fn visible(g:*const play.Game) bool { return g.gather_t > 0 and g.hover != null; }

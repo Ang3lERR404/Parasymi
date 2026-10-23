@@ -32,6 +32,10 @@ const convergence = @import("convergence.zig");
 const hud = @import("hud.zig");
 
 pub const TICK = 1.0 / 60.0;
+/// the world every new game grows from, unless `--seed=` says otherwise
+pub const DEFAULT_SEED:u64 = 0x5EED_0F_11FE;
+/// the window's size when it opens
+pub const WINDOW = [2]u16{ 1600, 900 };
 const STREAM_RADIUS = 4;
 /// nothing is drawn further than this from the camera target (inside the
 /// streamed radius, so a low camera never runs off the generated world)
@@ -46,7 +50,19 @@ const STREAM_FRAME = 4;
 const YAW_SPEED:f32 = 1.5;
 const TILT_SPEED:f32 = 1.2;
 const FOLLOW_LERP:f32 = 6;
-const FPS_LERP:f32 = 0.05;
+/// the camera follows a point this far above the wolf's feet
+const FOLLOW_HEIGHT:f32 = 0.6;
+/// how quickly the shown frame and sim timings follow the measured ones
+pub const TIMING_EASE:f32 = 0.05;
+/// free camera: Shift multiplies the fly speed; the wheel dollies this much a notch
+const FLY_FAST:f32 = 3;
+const DOLLY_PER_NOTCH:f32 = 0.4;
+
+/// the simulation never runs more than this many catch-up ticks a frame
+const MAX_CATCHUP = 8;
+/// the spawn search spirals out to this radius in steps of this many tiles
+const SPAWN_SEARCH = 400;
+const SPAWN_STEP = 3;
 
 /// ray-march parameters for ground picking
 const PICK_STEP:f32 = 0.1;
@@ -143,9 +159,9 @@ pub const Game = struct {
     };
     // start on dry land: spiral out from the origin until a fertile tile shows up.
     var r:i32 = 0;
-    find: while (r < 400) : (r += 3) {
+    find: while (r < SPAWN_SEARCH) : (r += SPAWN_STEP) {
       var a:i32 = -r;
-      while (a <= r) : (a += 3) {
+      while (a <= r) : (a += SPAWN_STEP) {
         const z = r - @divFloor(r, 2);
         const s = gen.sample(seed, a, z);
         if (s.kind.fertile()) {
@@ -198,7 +214,7 @@ pub const Game = struct {
 
   pub fn update(g:*Game, in:*const Input, dt:f32, screen:[2]f32) Error!void {
     g.ui_time += dt;
-    g.frame_ms += (dt * 1000 - g.frame_ms) * FPS_LERP;
+    g.frame_ms += (dt * m.MS_PER_S - g.frame_ms) * TIMING_EASE;
     g.cam.aspect = screen[0] / @max(screen[1], 1);
 
     // system keys work everywhere; Esc closes a panel first, then pauses
@@ -305,7 +321,7 @@ pub const Game = struct {
       if (in.clicked(.right)) {
         if (on_struct) |j| actions.unbuild(g, j)
         else if (g.plants.removeAt(&g.world, h[0], h[1])) _ = g.player.inv.add(.fibre, 1);
-        g.linger = 0.35;
+        g.linger = actions.LINGER_PUT;
       }
       if (working or g.linger > 0) work = m.tileCentre(h[0], h[1], c.height[t]);
     };
@@ -318,7 +334,7 @@ pub const Game = struct {
 
     g.player.move(wish, in.down(.left_shift), &g.world, dt);
     g.player.animate(dt);
-    const follow = g.player.pos + m.v3(0, 0.6, 0);
+    const follow = g.player.pos + m.v3(0, FOLLOW_HEIGHT, 0);
     g.cam.target += (follow - g.cam.target) * m.splat3(@min(1, dt * FOLLOW_LERP));
 
     try g.stars.update(g.gpa, &g.sky, g.player.pos, &g.world, dt);
@@ -359,7 +375,7 @@ pub const Game = struct {
     } else if (f.captured or in.held(.left)) {
       look = .{ -in.mouse_delta[0] * camera.LOOK, -in.mouse_delta[1] * camera.LOOK };
     }
-    const speed = camera.FLY * dt * @as(f32, if (in.down(.left_shift)) 3 else 1);
+    const speed = camera.FLY * dt * @as(f32, if (in.down(.left_shift)) FLY_FAST else 1);
     var move = m.v3(0, 0, 0);
     if (in.down(.w) or in.down(.up)) move[2] += speed;
     if (in.down(.s) or in.down(.down)) move[2] -= speed;
@@ -369,13 +385,13 @@ pub const Game = struct {
     var roll:f32 = 0;
     if (in.down(.q)) roll -= camera.ROLL * dt;
     if (in.down(.e)) roll += camera.ROLL * dt;
-    g.cam.fly(look, move, roll, in.scroll * 0.4);
+    g.cam.fly(look, move, roll, in.scroll * DOLLY_PER_NOTCH);
   }
 
-  /// fixed-step simulation; never more than 8 catch-up ticks per frame.
+  /// fixed-step simulation; never more than `MAX_CATCHUP` ticks per frame.
   pub fn simulate(g:*Game, frame_dt:f64) Error!void {
     if (!g.mode.live()) return;
-    g.acc = @min(g.acc + frame_dt, TICK * 8);
+    g.acc = @min(g.acc + frame_dt, TICK * MAX_CATCHUP);
     while (g.acc >= TICK) : (g.acc -= TICK) try g.step();
   }
 
@@ -393,26 +409,29 @@ pub const Game = struct {
   }
 };
 
+/// tests draw to a window of the default size
+const TEST_SCREEN = [2]f32{ m.f(WINDOW[0]), m.f(WINDOW[1]) };
+
 test "the wolf stays put without input" {
   const gpa = testing.allocator;
-  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   try @import("setups.zig").demo(&g, 5);
   var in:Input = .{ .win = undefined };
   in.mouse = .{ -1e4, -1e4 };
   const start = g.player.pos;
   for (0..300) |_| {
-    try g.update(&in, 1.0 / 60.0, .{ 1600, 900 });
-    try g.simulate(1.0 / 60.0);
+    try g.update(&in, TICK, TEST_SCREEN);
+    try g.simulate(TICK);
   }
   try testing.expectApproxEqAbs(start[0], g.player.pos[0], 0.05);
   try testing.expectApproxEqAbs(start[2], g.player.pos[2], 0.05);
 }
 test "clicking a research node or weave recipe picks it; number keys only pick the hotbar" {
   const gpa = testing.allocator;
-  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
-  const screen = [2]f32{1600, 900};
+  const screen = TEST_SCREEN;
   var in:Input = .{.win = undefined};
   const click = struct {
     /// press the left button over the middle of the first row picking `want`
@@ -423,7 +442,7 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
         i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
         i.bprev[0] = false;
         i.bcur[0] = true;
-        try gg.update(i, 1.0 / 60.0, sc);
+        try gg.update(i, TICK, sc);
         i.bcur[0] = false;
         i.bprev[0] = true;
         return;
@@ -448,7 +467,7 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   in.prev = @splat(false);
   in.cur = @splat(false);
   in.cur[Input.idx(.three)] = true;
-  try g.update(&in, 1.0 / 60.0, screen);
+  try g.update(&in, TICK, screen);
   try testing.expectEqual(@as(usize, 2), g.hot);
   try testing.expectEqual(@as(usize, 1), g.weave.len);
 }

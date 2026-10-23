@@ -68,7 +68,7 @@ void main() {
   // grown structures move as the plants do: leaves and petals breathe
   // slowly and lift a little in the gusts, tips most, bases held
   if (sway > 0.0 && (part == 1u || part == 5u)) {
-    p.y += tu.y * tu.y * (0.012 * wind.z * sin(t * 1.7 + ip.z * 11.0 + tu.x * 3.0) + 0.01 * sin(t * 0.9 + ip.z * 6.28));
+    p.y += tu.y * tu.y * (0.012 * wind.z * sin(t * 1.7 + ip.z * 11.0 + tu.x * 3.0) + 0.01 * sin(t * 0.9 + ip.z * TAU));
   } else if (part == 1u || part == 5u) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
   if (part == 4u) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
   // resin gives like dense gel: its surface follows the spring, its base on
@@ -113,7 +113,7 @@ void main() {
     float ph = ie.y;
     float echo = ie.w;
     twinkle = 0.75 + 0.25 * sin(t * 3.1 + ph * 40.0) * sin(t * 1.7 + ph * 13.0);
-    float turn = t * 0.35 + ph * 6.2832 - max(echo, 0.0) * 0.3;
+    float turn = t * 0.35 + ph * TAU - max(echo, 0.0) * 0.3;
     float tilt = echo > 0.5 ? 0.0 : 0.25 * sin(t * 0.5 + ph * 9.0);
     float size = (0.55 + 0.55 * ie.z) * (0.9 + 0.1 * twinkle) * (1.0 - 0.22 * max(echo, 0.0));
     float hover = echo < 0.0 ? 0.05 * sin(t * 1.1 + ph * 30.0) : 0.0;
@@ -132,7 +132,7 @@ void main() {
   if (sway > 0.0) {
     vec3 root = c3.xyz - vec3(0.0, iw.z, 0.0);
     float h = clamp((w.y - root.y) / iw.y, 0.0, 1.5);
-    float own = sin(t * 0.85 - wind.w * 0.3 + ip.z * 6.28 - h * 0.9);
+    float own = sin(t * 0.85 - wind.w * 0.3 + ip.z * TAU - h * 0.9);
     float ang = sway * (0.05 * wind.z + 0.025 * (0.4 + wind.z) * own) * h * h;
     w.xyz = root + bendIn(w.xyz - root, wind.xy, ang);
     wn = bendIn(wn, wind.xy, ang);
@@ -142,7 +142,7 @@ void main() {
   vec3 c = srgb2lin(col.rgb);
   v_col = mode == 1 ? c : mix(c, c * tint.rgb, tint.w);
   // sap pulses travel along the part
-  float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * 6.28);
+  float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
   v_part = float(part);
   v_t = tu.x;

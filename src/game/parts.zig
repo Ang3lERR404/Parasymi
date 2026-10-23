@@ -6,6 +6,18 @@ const meshlib = @import("../gfx/meshlib.zig");
 const mg = @import("../gfx/meshgen.zig");
 const PartInstance = @import("../gfx/vertex.zig").PartInstance;
 
+/// how part.vert places an instance (`PartInstance.e.x`): by its matrix,
+/// bent along a curve, or as a star mote
+const PLACE_CURVE:f32 = 1;
+const PLACE_MOTE:f32 = 2;
+/// culling spheres: a mesh reaches `BOUND` times its scale plus
+/// `BOUND_PAD` from its origin; a mote `MOTE_BOUND`
+const BOUND:f32 = 2.5;
+const BOUND_PAD:f32 = 0.5;
+const MOTE_BOUND:f32 = 0.6;
+/// a curve is always drawn at least this far along
+const MIN_REACH:f32 = 1e-3;
+
 pub const Look = struct {
   glow:f32 = 0,
   flutter:f32 = 0,
@@ -55,7 +67,7 @@ pub const Parts = struct {
   pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look_:Look) Allocator.Error!void {
     const at = m.v3(mat[3][0], mat[3][1], mat[3][2]);
     const scale = @max(m.len(m.v3(mat[0][0], mat[0][1], mat[0][2])), @max(m.len(m.v3(mat[1][0], mat[1][1], mat[1][2])), m.len(m.v3(mat[2][0], mat[2][1], mat[2][2]))));
-    if (p.view) |v| if (!v.sphere(at, 2.5 * scale + 0.5)) return;
+    if (p.view) |v| if (!v.sphere(at, BOUND * scale + BOUND_PAD)) return;
     try p.add(id, at, instance(mat, look_));
   }
 
@@ -75,7 +87,7 @@ pub const Parts = struct {
     inst.c2 = .{ctrl[2][0], ctrl[2][1], ctrl[2][2], 1};
     inst.c3 = .{ctrl[3][0], ctrl[3][1], ctrl[3][2], 1};
     inst.tint = .{side[0], side[1], side[2], 0};
-    inst.e = .{1, @max(reach, 1e-3), 0, len};
+    inst.e = .{PLACE_CURVE, @max(reach, MIN_REACH), 0, len};
     try p.add(id, ctrl[0], inst);
   }
 
@@ -83,8 +95,8 @@ pub const Parts = struct {
   /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
   pub fn emitMote(p:*Parts, at:m.V3, phase:f32, life:f32, echo:f32, glow:f32) Allocator.Error!void {
     var inst = instance(m.translate(at), .{.glow = glow, .phase = phase});
-    inst.e = .{2, phase, life, echo};
-    if (p.view) |v| if (!v.sphere(at, 0.6)) return;
+    inst.e = .{PLACE_MOTE, phase, life, echo};
+    if (p.view) |v| if (!v.sphere(at, MOTE_BOUND)) return;
     try p.add(.mote, at, inst);
   }
 

@@ -20,7 +20,7 @@ pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.
   const view = m.Frustum.of(scene.push.vp);
   for (r.slots.items) |s| {
     if (!s.live or s.count == 0) continue;
-    if (!view.sphere(m.v3(s.centre[0], 1.5, s.centre[1]), R.CHUNK_RADIUS)) continue;
+    if (!view.sphere(m.v3(s.centre[0], R.CHUNK_MID_Y, s.centre[1]), R.CHUNK_RADIUS)) continue;
     cmd.bindVertexBuffers(0, &.{s.buf.buf}, &zero);
     cmd.draw(s.count, 1, 0, 0);
     stats.draws += 1;

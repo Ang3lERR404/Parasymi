@@ -82,12 +82,16 @@ const Frame = struct {
   garbage:std.ArrayList(Buffer) = .empty,
 };
 
-/// a sphere around a chunk (from its centre, 1.5 up) holding all of it, its
-/// terraces and what grows on its tiles, for culling it to the view
-pub const CHUNK_RADIUS:f32 = @as(f32, @floatFromInt(ck.SIZE)) * 0.71 + 2;
+/// a sphere around a chunk (from its centre, `CHUNK_MID_Y` up) holding all
+/// of it, its terraces and what grows on its tiles, for culling it to the
+/// view: half its diagonal (rounded up) and a margin
+pub const CHUNK_MID_Y:f32 = 1.5;
+pub const CHUNK_RADIUS:f32 = m.f(ck.SIZE) * 0.71 + 2;
 
 /// milliseconds a frame may spend meshing streamed chunks
 const MESH_MS:f64 = 3;
+/// smallest buffer made for a chunk (an empty chunk still gets one)
+const MIN_CHUNK_BYTES = 64;
 
 pub const Slot = struct {
   /// the chunk's ground mesh
@@ -279,14 +283,14 @@ pub const Renderer = struct {
       // at most `budget` chunks, and no more once a frame's share of time
       // is spent (at least one, so streaming always moves on)
       if (r.stats.meshed >= budget) break;
-      if (r.stats.meshed > 0 and (glfw.getTime() - start) * 1000 > MESH_MS) break;
+      if (r.stats.meshed > 0 and (glfw.getTime() - start) * m.MS_PER_S > MESH_MS) break;
       try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch, &r.detail_scratch);
       const bytes = sliceAsBytes(r.scratch.items);
-      var buf = try Buffer.init(&r.ctx, @max(bytes.len, 64), .{.vertex_buffer = true});
+      var buf = try Buffer.init(&r.ctx, @max(bytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});
       errdefer buf.deinit(&r.ctx);
       buf.write(0, bytes);
       const dbytes = sliceAsBytes(r.detail_scratch.items);
-      var detail = try Buffer.init(&r.ctx, @max(dbytes.len, 64), .{.vertex_buffer = true});
+      var detail = try Buffer.init(&r.ctx, @max(dbytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});
       errdefer detail.deinit(&r.ctx);
       detail.write(0, dbytes);
       const slot = if (c.gpu_slot) |s| s else r.free_slots.pop() orelse blk: {

@@ -30,6 +30,33 @@ pub const Events = struct {
 pub const MAX_SEEDS = 3;
 /// health lost per second by a plant that needs radiance and has none
 const UNPOWERED_WITHER:f32 = 0.06;
+/// floaters drink this share of their draw by day, all of it at full night
+const DAY_DRINK:f32 = 0.1;
+/// a drawn ley tile refills this share of its deficit per second
+const LEY_REFILL:f32 = 0.15;
+/// symbiotes pass on this share of their fill difference (times share and
+/// cap) per second; the receiver heals a little for it
+const SHARE_RATE:f32 = 0.5;
+const SHARE_HEAL:f32 = 0.02;
+/// a parasite keeps this share of what it drains; prey below `STARVED` of
+/// its cap loses health
+const DRAIN_KEEP:f32 = 0.85;
+const STARVED:f32 = 0.1;
+const STARVE_HURT:f32 = 0.08;
+/// growth: a starved plant still grows at `GROW_MIN` of its pace; each kin
+/// linked speeds it (and its yield) up
+const GROW_MIN:f32 = 0.3;
+const KIN_GROW:f32 = 0.15;
+const KIN_YIELD:f32 = 0.1;
+/// a mature plant sets seed while healthier than this
+const SEED_HEALTH:f32 = 0.5;
+/// health per second: a mature plant nearly out of mana fades, others heal
+const EMPTY:f32 = 0.05;
+const FADE:f32 = 0.05;
+const HEAL:f32 = 0.02;
+/// the drawn sap flow: mana moved per cap, scaled, and eased per tick
+const FLOW_GAIN:f32 = 4;
+const FLOW_EASE:f32 = 0.05;
 
 /// celestial energy (the blooms'). Blooms link with every bloom of their
 /// kind within `link` tiles into networks; a network radiates when it holds
@@ -198,10 +225,10 @@ pub const Ecology = struct {
       const t = tiles[i];
       if (sp.floating) {
         // floaters never touch the ley: they drink the night sky
-        dm[i] += sp.ley_draw * (0.1 + 0.9 * mods.night) * dt;
+        dm[i] += sp.ley_draw * (DAY_DRINK + (1 - DAY_DRINK) * mods.night) * dt;
       } else {
         const got = @min(c.ley[t], sp.ley_draw * dt);
-        c.ley[t] += (c.ley_cap[t] - c.ley[t]) * 0.15 * dt - got;
+        c.ley[t] += (c.ley_cap[t] - c.ley[t]) * LEY_REFILL * dt - got;
         dm[i] += got;
       }
 
@@ -218,10 +245,10 @@ pub const Ecology = struct {
             kin += 1;
             const diff = fill - mana[j] / sj.mana_cap;
             if (diff <= 0) continue;
-            const f = diff * sp.share * cap * 0.5 * dt;
+            const f = diff * sp.share * cap * SHARE_RATE * dt;
             dm[i] -= f; dm[j] += f;
             df[i] += f; df[j] += f;
-            dh[j] += 0.02 * dt;
+            dh[j] += SHARE_HEAL * dt;
           }
         }
       }
@@ -237,9 +264,9 @@ pub const Ecology = struct {
           };
           if (!prey) continue;
           const take = @min(mana[j], sp.drain * mods.drain_mult * calm[i] * dt);
-          dm[j] -= take; dm[i] += take * 0.85;
+          dm[j] -= take; dm[i] += take * DRAIN_KEEP;
           df[i] += take; df[j] += take;
-          if (mana[j] < 0.1 * species.get(sps[j]).mana_cap) dh[j] -= 0.08 * dt;
+          if (mana[j] < STARVED * species.get(sps[j]).mana_cap) dh[j] -= STARVE_HURT * dt;
         }
       }
 
@@ -250,16 +277,16 @@ pub const Ecology = struct {
       }
       if (growth[i] < 1) {
         const mature = if (span[i] > 0) span[i] else sp.mature_time;
-        growth[i] = @min(1, growth[i] + dt / mature * (0.3 + 0.7 * fill) * health[i] * (1 + 0.15 * kin));
+        growth[i] = @min(1, growth[i] + dt / mature * (GROW_MIN + (1 - GROW_MIN) * fill) * health[i] * (1 + KIN_GROW * kin));
       } else {
         // mana condenses into essence held by the plant until harvested.
         const room = cap - essence[i];
         const conv = @min(@min(mana[i], sp.yield * fill * dt), room);
         dm[i] -= conv;
-        essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + 0.1 * kin));
-        if (health[i] > 0.5) seeds[i] = @min(MAX_SEEDS, seeds[i] + dt / sp.seed_time);
+        essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + KIN_YIELD * kin));
+        if (health[i] > SEED_HEALTH) seeds[i] = @min(MAX_SEEDS, seeds[i] + dt / sp.seed_time);
       }
-      dh[i] += if (fill < 0.05 and growth[i] >= 1) -0.05 * dt else 0.02 * dt;
+      dh[i] += if (fill < EMPTY and growth[i] >= 1) -FADE * dt else HEAL * dt;
     }
 
     const flow = s.items(.flow);
@@ -268,7 +295,7 @@ pub const Ecology = struct {
       const cap = species.get(sps[i]).mana_cap;
       mana[i] = m.clamp(mana[i] + dm[i], 0, cap);
       health[i] = m.clamp(health[i] + dh[i], 0, 1);
-      flow[i] += (df[i] / dt / cap * 4 - flow[i]) * 0.05;
+      flow[i] += (df[i] / dt / cap * FLOW_GAIN - flow[i]) * FLOW_EASE;
       if (health[i] <= 0) try e.dead.append(gpa, .of(i));
     }
     var k = e.dead.items.len;
@@ -277,6 +304,10 @@ pub const Ecology = struct {
     return ev;
   }
 };
+
+/// tests run the sim at 60 Hz (the sim never imports game's `play.TICK`)
+const TEST_HZ = 60;
+const TEST_DT:f32 = 1.0 / m.f(TEST_HZ);
 
 test "symbiotes share, parasites drain" {
   const gpa = testing.allocator;
@@ -292,7 +323,7 @@ test "symbiotes share, parasites drain" {
   defer eco.deinit(gpa);
   try testing.expect(try p.place(gpa, &w, 0, 0, .lumenroot, 0.1));
   try testing.expect(try p.place(gpa, &w, 1, 0, .thornleech, 0.2));
-  for (0..60 * 30) |_| _ = try eco.tick(gpa, &p, &w, .{}, 1.0 / 60.0);
+  for (0..TEST_HZ * 30) |_| _ = try eco.tick(gpa, &p, &w, .{}, TEST_DT);
   const es = p.list.items(.essence);
   try testing.expect(p.len() < 2 or es[0] + es[1] > 0);
   try testing.expect(p.list.items(.flow)[0] > 0 or p.len() < 2);
@@ -344,7 +375,7 @@ test "blooms power plants in range, link into networks, and uprooting cuts them 
   try testing.expect(try p.place(gpa, &w, 11, 0, .vesper, 0.4));
   const near = p.at(&w, 0, 0).?;
   const far = p.at(&w, 11, 0).?;
-  for (0..60) |_| _ = try eco.tick(gpa, &p, &w, .{}, 1.0 / 60.0);
+  for (0..TEST_HZ) |_| _ = try eco.tick(gpa, &p, &w, .{}, TEST_DT);
   // the first draws from the mature bloom; the second from the young one,
   // which radiates because it is linked to a network with a mature bloom
   try testing.expect(eco.radiance.powered.items[near.idx()]);
@@ -357,7 +388,7 @@ test "blooms power plants in range, link into networks, and uprooting cuts them 
   // now, so nothing radiates, and both vespers halt and wither
   try testing.expect(p.removeAt(&w, 2, 0));
   const growth_before = p.list.items(.growth)[p.at(&w, 0, 0).?.idx()];
-  for (0..60 * 5) |_| _ = try eco.tick(gpa, &p, &w, .{}, 1.0 / 60.0);
+  for (0..TEST_HZ * 5) |_| _ = try eco.tick(gpa, &p, &w, .{}, TEST_DT);
   const a = p.at(&w, 0, 0).?.idx();
   const b = p.at(&w, 11, 0).?.idx();
   try testing.expect(!eco.radiance.powered.items[a] and !eco.radiance.powered.items[b]);

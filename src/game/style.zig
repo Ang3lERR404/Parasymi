@@ -1,5 +1,29 @@
-//! shared HUD colours. Muted greens/browns base, amber accents.
+//! shared HUD colours, type scale and bar sizes. Muted greens/browns base,
+//! amber accents.
 const C = [4]u8;
+
+/// type scale (text size multipliers), largest first
+pub const text_banner:f32 = 3.5;
+pub const text_title:f32 = 2.5;
+pub const text_heading:f32 = 2;
+pub const text_label:f32 = 1.75;
+pub const text_row:f32 = 1.6;
+pub const text_sub:f32 = 1.5;
+/// a structure's or plant's description line
+pub const text_body:f32 = 1.4;
+pub const text_note:f32 = 1.25;
+pub const text_small:f32 = 1.2;
+pub const text_fine:f32 = 1.15;
+pub const text_tiny:f32 = 1.1;
+/// tendril (progress bar) thickness, slim and bold
+pub const bar_h:f32 = 12;
+pub const bar_h_bold:f32 = 14;
+/// left-edge panels sit this far in from the screen's edge
+pub const edge:f32 = 16;
+/// a structure's description bar: offset from the text and width
+pub const desc_bar_x:f32 = 250;
+pub const desc_bar_w:f32 = 110;
+
 pub const white:C = .{235, 240, 225, 255};
 pub const dim:C = .{150, 170, 150, 255};
 pub const gold:C = .{255, 215, 130, 255};

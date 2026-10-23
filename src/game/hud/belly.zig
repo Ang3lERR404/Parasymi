@@ -31,8 +31,8 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
 
   try d.membrane(px, py, pw, ph, s.membrane, 0.33);
   g.rows.add(px, py, pw, ph, .panel);
-  _ = try d.text(px + 72, py + 30, 2.5, s.gold, "SAP BELLY");
-  _ = try d.print(px + pw - 200, py + 38, 1.5, s.dim, "{d:.0}% FULL", .{g.player.inv.fill() * 100});
+  _ = try d.text(px + 72, py + 30, s.text_title, s.gold, "SAP BELLY");
+  _ = try d.print(px + pw - 200, py + 38, s.text_sub, s.dim, "{d:.0}% FULL", .{g.player.inv.fill() * 100});
 
   var y = py + header_h;
   try slots(g, d, px, y);
@@ -49,8 +49,8 @@ fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) Allocator.Error!void {
       const info = st.item.info();
       const full = m.ratio(st.n, info.stack);
       try d.pod(cx, cy, 24, info.col, 0.3 + 0.7 * full, m.f(i) * 0.13);
-      _ = try d.text(cx - 12, cy - 12, 2, s.dark, info.short);
-      _ = try d.print(cx - 10, cy + 8, 1.25, s.white, "{d}", .{st.n});
+      _ = try d.text(cx - 12, cy - 12, s.text_heading, s.dark, info.short);
+      _ = try d.print(cx - 10, cy + 8, s.text_note, s.white, "{d}", .{st.n});
     } else {
       try d.pod(cx, cy, 19, s.pod_empty, 0, m.f(i) * 0.13);
     }
@@ -59,11 +59,11 @@ fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) Allocator.Error!void {
 
 /// two columns of recipes; locked ones shown as unknown. Clicking one weaves it.
 fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
-  _ = try d.text(px + 72, wy, 2, s.gold, "WEAVE");
-  _ = try d.text(px + pw - 260, wy + 6, 1.15, s.dim, "CLICK A RECIPE TO WEAVE IT");
+  _ = try d.text(px + 72, wy, s.text_heading, s.gold, "WEAVE");
+  _ = try d.text(px + pw - 260, wy + 6, s.text_fine, s.dim, "CLICK A RECIPE TO WEAVE IT");
   if (g.weave.busy()) {
-    try d.tendril(px + 130, wy + 6, 200, 14, s.gold, g.weave.progress(), 0.4);
-    _ = try d.print(px + 346, wy + 2, 1.25, s.dim, "{d} QUEUED", .{g.weave.len});
+    try d.tendril(px + 130, wy + 6, 200, s.bar_h_bold, s.gold, g.weave.progress(), 0.4);
+    _ = try d.print(px + 346, wy + 2, s.text_note, s.dim, "{d} QUEUED", .{g.weave.len});
   }
   const col_w = (pw - 60) / 2;
   for (craft.hand, 0..) |r, i| {
@@ -76,15 +76,15 @@ fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
     try d.pod(colx + 16, y, 15, if (open) info.col else s.unknown, if (ok) 0.9 else 0.1, m.f(i) * 0.5);
     if (!open) {
       const need_name = if (r.needs) |n| prog.tree.get(n).name else "???";
-      _ = try d.print(colx + 40, y - 14, 1.4, s.unknown, "??? (NEEDS {s})", .{need_name});
+      _ = try d.print(colx + 40, y - 14, s.text_body, s.unknown, "??? (NEEDS {s})", .{need_name});
       continue;
     }
-    _ = try d.print(colx + 40, y - 14, 1.4, if (ok) s.white else s.dim, "{s}{s}", .{info.name, if (r.n > 1) " X2" else ""});
+    _ = try d.print(colx + 40, y - 14, s.text_body, if (ok) s.white else s.dim, "{s}{s}", .{info.name, if (r.n > 1) " X2" else ""});
     var x = colx + 44;
     for (r.in, 0..) |ing, j| {
       const have = g.player.inv.count(ing.item) >= ing.n;
       try d.pod(x + 6, y + 10, 6, ing.item.info().col, if (have) 0.7 else 0.05, m.f(j) * 0.3);
-      x = try d.print(x + 14, y + 5, 1.15, if (have) s.white else s.dim, "{d}{s}", .{ing.n, ing.item.info().short}) + 10;
+      x = try d.print(x + 14, y + 5, s.text_fine, if (have) s.white else s.dim, "{d}{s}", .{ing.n, ing.item.info().short}) + 10;
     }
   }
 }   

@@ -65,7 +65,7 @@ void main() {
     float u = v_u;
     float core = exp(-u * u * 40.0);
     float halo = exp(-u * u * 4.0);
-    vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + v_t * 1.5 - t * 0.1));
+    vec3 film = filmHue(v_t * 1.5 - t * 0.1);
     vec3 warm = mix(srgb2lin(vec3(1.0, 0.82, 0.55)), film, 0.25);
     float run = pow(0.5 + 0.5 * sin(t * 2.4 - v_t * 18.0), 6.0);
     float lit = min(v_glow, 1.0);
@@ -145,11 +145,7 @@ void main() {
     // read as directional fibres rather than flat facets
     float tl = length(tgrad);
     if (part == 0 && tl > 0.0) {
-      vec3 T = tgrad / tl;
-      T = normalize(T - n * dot(T, n) + 1e-6);
-      vec3 H = normalize(SUN + V);
-      float th = dot(T, H);
-      float sheen = pow(sqrt(max(1.0 - th * th, 0.0)), 40.0);
+      float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
       float lit = smoothstep(0.0, 0.3, dot(n, SUN));
       vec3 light = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.95, 0.85), pc.sun.w);
       c += mix(albedo, light, 0.5) * sheen * lit * 0.28 * smoothstep(0.3, 1.5, tl);

@@ -11,7 +11,6 @@ const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const Mesh = @import("../vertex.zig").Mesh;
 const kit = @import("wolf_kit.zig");
-const noise = @import("../../core/noise.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -65,7 +64,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   // the core, and the vines woven over it: each a grown vine tapering to a
   // point at both ends, its tips tucking into the core rather than cut off
   var r:[N]f32 = undefined;
-  for (0..N) |i| r[i] = radii[i] * 0.72;
+  for (0..N) |i| r[i] = radii[i] * mg.BRAID_CORE;
   try b.tubeR(&spine, &ts, &r, core, .stem, 8);
   var fn_:[N]V3 = undefined;
   var fb:[N]V3 = undefined;
@@ -73,18 +72,18 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   var paths:[STRANDS][N]V3 = undefined;
   for (0..STRANDS) |si| {
     const a0 = m.ratio(si, STRANDS) * m.tau;
-    const sd:u64 = 0x7055 +% si * 7919;
+    const sd:u64 = 0x7055 +% si * mg.STRAND_SALT;
     // strands start and end at different heights, so their tips are staggered
     const lo = 0.02 + 0.06 * m.f(si % 3) / 2;
     const hi = 0.98 - 0.06 * m.f((si + 1) % 3) / 2;
     for (0..N) |i| {
       const u = m.ratio(i, N - 1);
       const e = m.smooth(m.clamp01((u - lo) / 0.12)) * m.smooth(m.clamp01((hi - u) / 0.12));
-      const ang = a0 + turn[i] + pal.STRAND_WOBBLE * 4 * noise.grad(sd, u * 3, 0.5);
+      const ang = a0 + turn[i] + mg.strandTurn(sd, u, pal.STRAND_WOBBLE);
       // toward their tips the strands sink into the core
-      const off = radii[i] * m.lerp(0.55, 0.8, e) * (1 + pal.STRAND_WOBBLE * 3 * noise.grad(sd, u * 3, 7.5));
+      const off = radii[i] * m.lerp(0.55, mg.BRAID_OFF, e) * mg.strandSwell(sd, u, pal.STRAND_WOBBLE);
       paths[si][i] = spine[i] + (fn_[i] * m.splat3(@cos(ang)) + fb[i] * m.splat3(@sin(ang))) * m.splat3(off);
-      r[i] = @max(radii[i] * 0.26 * e, 0.0008);
+      r[i] = @max(radii[i] * mg.BRAID_STRAND * e, 0.0008);
     }
     try b.tubeR(&paths[si], &ts, &r, vine, .stem, 5);
   }

@@ -30,6 +30,27 @@ pub const RATE:f32 = 4;
 pub const BUFFER = 8;
 /// roots radiating from the knot (see `emit`)
 const ROOTS = 6;
+/// idle roots breathe this deep at this tempo; roots facing the node
+/// (within 60 degrees) stretch by `STRETCH` with each item drawn
+const BREATH:f32 = 0.02;
+const BREATH_RATE:f32 = 1.3;
+const FACING:f32 = 0.5;
+const STRETCH:f32 = 0.15;
+/// each root's size varies by `SIZE_SPREAD` about `SIZE_MIN`, and a sprout
+/// starts at `SPROUT` of it
+const SIZE_MIN:f32 = 0.9;
+const SIZE_SPREAD:f32 = 0.2;
+const SPROUT:f32 = 0.15;
+const GLOW:f32 = 0.2;
+const GLOW_ACTIVE:f32 = 0.6;
+/// the item drawn in arcs from `ARC_BASE` up by `ARC`, carried at this size
+const ARC_BASE:f32 = 0.12;
+const ARC:f32 = 0.15;
+const MOTE_SIZE:f32 = 0.5;
+const MOTE_GLOW:f32 = 0.9;
+/// its describe bar sits further right (a longer line) and is shorter
+const BAR_X:f32 = 300;
+const BAR_W:f32 = 60;
 
 /// the node being worked: which side it lies on, what it yields, and how far
 /// along the current item is.
@@ -122,39 +143,42 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   const node_yaw = if (dg) |d| m.dirYaw(d.dir) else 0;
   for (0..ROOTS) |r| {
     const yaw = m.ratio(r, ROOTS) * m.tau + s.seed * 2;
-    const breathe = 1 + 0.02 * @sin(tf * 1.3 + m.f(r) * 1.7);
-    const facing = working and @cos(m.angleDiff(yaw, node_yaw)) > 0.5;
-    const reach = if (facing) 1 + 0.15 * (0.5 - 0.5 * @cos(k * m.tau)) else breathe;
-    const size = (0.9 + 0.2 * @abs(@sin(s.seed * 13 + m.f(r) * 2.3))) * m.lerp(0.15, 1, m.smooth(s.grown));
+    const breathe = 1 + BREATH * @sin(tf * BREATH_RATE + m.f(r) * 1.7);
+    const facing = working and @cos(m.angleDiff(yaw, node_yaw)) > FACING;
+    const reach = if (facing) 1 + STRETCH * (0.5 - 0.5 * @cos(k * m.tau)) else breathe;
+    const size = (SIZE_MIN + SIZE_SPREAD * @abs(@sin(s.seed * 13 + m.f(r) * 2.3))) * m.lerp(SPROUT, 1, m.smooth(s.grown));
     try out.emit(.digger_root, m.chain(&.{
       m.translate(ctr),
       m.rotY(yaw),
       m.scale3(m.v3(reach * size, size, size)),
-    }), .{ .glow = 0.2 + 0.6 * s.activity, .phase = s.seed });
+    }), .{ .glow = GLOW + GLOW_ACTIVE * s.activity, .phase = s.seed });
   }
   if (!working) return;
   const d = dg.?;
   const v = m.dirVec(d.dir);
   const from = ctr + m.v3(m.f(v.x), 0, m.f(v.z));
-  const p = m.lerpV(from, ctr, k) + m.v3(0, 0.12 + 0.15 * @sin(k * m.pi), 0);
+  const p = m.lerpV(from, ctr, k) + m.v3(0, ARC_BASE + ARC * @sin(k * m.pi), 0);
   try out.emit(.item_pod, m.chain(&.{
     m.translate(p),
-    m.scale3(m.splat3(0.5)),
-  }), .{ .glow = 0.9, .tint = color.Rgba8.of(d.item.info().col).toF4() });
+    m.scale3(m.splat3(MOTE_SIZE)),
+  }), .{ .glow = MOTE_GLOW, .tint = color.Rgba8.of(d.item.info().col).toF4() });
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const n = s.inv.total();
   const dg = s.state.root_digger.dig orelse {
-    _ = try d.print(x, y, 1.4, style.dim, "NO NODE BESIDE IT  HOLDS {d}/{d}", .{ n, BUFFER });
+    _ = try d.print(x, y, style.text_body, style.dim, "NO NODE BESIDE IT  HOLDS {d}/{d}", .{ n, BUFFER });
     return;
   };
   const what = if (n >= BUFFER) "FULL: LEAD A CONDUIT AWAY" else dg.item.info().name;
-  _ = try d.print(x, y, 1.4, style.white, "DIGS {s}  HOLDS {d}/{d}", .{ what, n, BUFFER });
-  try d.tendril(x + 300, y + 2, 60, 12, style.digger, dg.t / RATE, 0.4);
+  _ = try d.print(x, y, style.text_body, style.white, "DIGS {s}  HOLDS {d}/{d}", .{ what, n, BUFFER });
+  try d.tendril(x + BAR_X, y + 2, BAR_W, style.bar_h, style.digger, dg.t / RATE, 0.4);
 }
 
 // ---- tests ----
+
+/// tests tick structures at 20 Hz
+const TEST_DT:f32 = 0.05;
 
 /// a strip of soil at y = 0 (x = 0..5) with a moss node of `res` fibre at
 /// (2, 0); the digger goes at (1, 0).
@@ -175,7 +199,7 @@ fn fixture(w:*World, res:u8) !void {
 
 fn run(ss:*st.Structures, w:*World, plants:*Plants, g:*prog.Progression, seconds:f32) void {
   var t:f32 = 0;
-  while (t < seconds) : (t += 0.05) ss.tick(w, plants, g, 0.05);
+  while (t < seconds) : (t += TEST_DT) ss.tick(w, plants, g, TEST_DT);
 }
 
 test "a digger beside a node draws one item every 4 seconds" {
@@ -263,7 +287,7 @@ test "a conduit behind the digger carries its items away" {
 
 test "uprooting a digger returns its bulb and what it holds" {
   const gpa = testing.allocator;
-  var g = try play.Game.init(gpa, 0x5EED_0F_11FE);
+  var g = try play.Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
   const at = m.tileAt(g.player.pos);
   const c = g.world.chunkOfTile(at[0], at[1]).?;

@@ -11,6 +11,21 @@ layout(push_constant) uniform Push {
 
 #define SUN pc.sun.xyz
 
+const float TAU = 6.2831853;
+// how tight the sheen along fibres is (anisotropic highlight exponent)
+const float SHEEN_POWER = 40.0;
+
+// a thin film's hue: one turn of the rainbow per unit of `x`.
+vec3 filmHue(float x) { return 0.5 + 0.5 * cos(TAU * (vec3(0.0, 0.33, 0.67) + x)); }
+
+// the highlight of light (half vector `H`) along fibres running `tgrad`
+// (unnormalised, its length `tl` > 0) over a surface with normal `n`.
+float fibreSheen(vec3 tgrad, float tl, vec3 n, vec3 H) {
+  vec3 T = normalize(tgrad / tl - n * dot(tgrad / tl, n) + 1e-6);
+  float th = dot(T, H);
+  return pow(sqrt(max(1.0 - th * th, 0.0)), SHEEN_POWER);
+}
+
 // the one wind over the whole garden at a point (x,z): its heading (xy,
 // unit) drifts slowly, and broad gusts (z, 0..1, mostly calm) roll across
 // it as a wave, so neighbours lean together; w is the point's distance
@@ -52,7 +67,7 @@ float sapBubbles(vec3 obj, vec3 view, float t) {
     vec3 h = hash33(id + fl * 19.0);
     if (h.x > 0.3) continue;
     vec3 c = id + 0.3 + 0.4 * h.yzx;
-    c.x += 0.1 * sin(t * 0.8 + h.z * 6.28);
+    c.x += 0.1 * sin(t * 0.8 + h.z * TAU);
     float r = 0.08 + 0.14 * h.y;
     float d = length(q - c);
     // a thin bright skin, a clear middle

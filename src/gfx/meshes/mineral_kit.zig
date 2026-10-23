@@ -15,7 +15,7 @@ const v3 = m.v3;
 /// one flat-shaded triangle, facing away from `inside`
 pub fn facet(b:*mg.Builder, p:[3]V3, inside:V3, col:[3]color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
   var n = m.norm(m.cross(p[1] - p[0], p[2] - p[0]));
-  const flip = m.dot(n, (p[0] + p[1] + p[2]) * m.splat3(1.0 / 3.0) - inside) < 0;
+  const flip = m.dot(n, m.centroid(p[0], p[1], p[2]) - inside) < 0;
   if (flip) n = -n;
   const order = if (flip) [3]usize{0, 2, 1} else [3]usize{0, 1, 2};
   for (order) |i| try b.put(p[i], n, col[i], t, 0, part);

@@ -60,8 +60,8 @@ pub fn configure(s:*st.Structure, g:*prog.Progression) void {
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const gs = &s.state.germinator;
-  _ = try d.print(x, y, 1.4, style.white, "WEAVES {s} (C)", .{craft.hand[gs.recipe].out.info().name});
-  try d.tendril(x + 250, y + 2, 110, 12, style.gold, gs.weave.progress(), 0.3);
+  _ = try d.print(x, y, style.text_body, style.white, "WEAVES {s} (C)", .{craft.hand[gs.recipe].out.info().name});
+  try d.tendril(x + style.desc_bar_x, y + 2, style.desc_bar_w, style.bar_h, style.gold, gs.weave.progress(), 0.3);
 }
 
 // a fresh germinator starts on recipe 0, which must be a seed weave

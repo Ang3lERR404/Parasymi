@@ -16,6 +16,20 @@ const play = @import("play.zig");
 const Game = play.Game;
 
 pub const GATHER_TIME:f32 = 0.45;
+/// how long a one-off gesture keeps the hands busy (s): putting something
+/// down or uprooting it, feeding or emptying a structure, harvesting
+pub const LINGER_PUT:f32 = 0.35;
+const LINGER_TRADE:f32 = 0.4;
+const LINGER_HARVEST:f32 = 0.5;
+/// wait before the next put (s): after one, and after warning of none left
+const PUT_COOLDOWN:f32 = 0.25;
+const WARN_COOLDOWN:f32 = 1.5;
+/// starlight within `ATTRACT` drifts to the chest, faster the closer
+/// (`PULL` less `PULL_FALLOFF` per unit away), and is absorbed within `ABSORB`
+const ATTRACT:f32 = 2.4;
+const PULL:f32 = 5;
+const PULL_FALLOFF:f32 = 1.5;
+const ABSORB:f32 = 0.45;
 
 /// returns whether the wolf keeps working this tile.
 pub fn gather(g:*Game, c:*ck.Chunk, t:usize, dt:f32) bool {
@@ -38,7 +52,7 @@ pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
   if (!play.known(g, item)) return;
   if (g.player.inv.count(item) == 0) {
     g.prog.say("NO {s}. WEAVE ONE IN YOUR BELLY (TAB)", .{item.info().name});
-    g.plant_cd = 1.5;
+    g.plant_cd = WARN_COOLDOWN;
     return;
   }
   const ok = if (item.plants()) |sp|
@@ -49,8 +63,8 @@ pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
   if (ok) {
     if (st.kindOf(item) != null) g.structs.sprout(g.structs.at(&g.world, h[0], h[1]).?);
     _ = g.player.inv.take(item, 1);
-    g.plant_cd = 0.25;
-    g.linger = 0.35;
+    g.plant_cd = PUT_COOLDOWN;
+    g.linger = LINGER_PUT;
   }
 }
 
@@ -78,7 +92,7 @@ pub fn feed(g:*Game, j:st.Id) void {
     s.n -= n;
     if (s.n == 0) slot.* = null;
   };
-  g.linger = 0.4;
+  g.linger = LINGER_TRADE;
   if (moved == 0) g.prog.say("IT WANTS NOTHING YOU CARRY", .{});
 }
 
@@ -91,7 +105,7 @@ pub fn takeFrom(g:*Game, j:st.Id) void {
     if (it.n == 0) slot.* = null;
   };
   if (st.release(s)) |h| if (g.player.inv.add(h, 1) == 0) g.prog.say("YOUR BELLY CAN HOLD NO MORE", .{});
-  g.linger = 0.4;
+  g.linger = LINGER_TRADE;
 }
 
 /// uproot a structure: its bulb and contents come back (what fits).
@@ -142,7 +156,7 @@ pub fn harvest(g:*Game, h:[2]i32) void {
     if (g.player.inv.add(species.ripeSeed(sp, m.floorTo(u32, s.items(.seeds)[i])), 1) == 0) break;
     s.items(.seeds)[i] -= 1;
   }
-  g.linger = 0.5;
+  g.linger = LINGER_HARVEST;
   if (got_es + got_sd < es + seeds) g.prog.say("YOUR BELLY CAN HOLD NO MORE", .{});
 }
 
@@ -164,8 +178,8 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
     const mo = &g.stars.motes.items[i];
     const d = chest - mo.pos;
     const dist = m.len(d);
-    if (dist < 2.4) mo.pos += d * m.splat3(@min(1, dt * (5 - dist * 1.5)));
-    if (dist < 0.45 and g.player.inv.add(.starlight, 1) == 1) {
+    if (dist < ATTRACT) mo.pos += d * m.splat3(@min(1, dt * (PULL - dist * PULL_FALLOFF)));
+    if (dist < ABSORB and g.player.inv.add(.starlight, 1) == 1) {
       _ = g.stars.motes.swapRemove(i);
       continue;
     }
@@ -175,7 +189,7 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
 
 test "a confluence gives convergence essence and its parents' seeds" {
   const gpa = std.testing.allocator;
-  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
   const x, const z = m.tileAt(g.player.pos);
   for (0..2) |dy| for (0..2) |dx| {

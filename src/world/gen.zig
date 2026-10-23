@@ -9,6 +9,37 @@ const rng = @import("../core/rng.zig");
 
 pub const TERRACE = 0.35;
 pub const WATER_H = 0.0;
+/// terrace levels per unit of elevation noise; below `SEA` is water
+const LEVELS:f32 = 7;
+const SEA:f32 = -0.28;
+/// elevation above which the ground is bare stone
+const STONE:f32 = 0.62;
+/// ridged vein noise above this is a ley line; ley lines carry 4x the ley
+const VEIN:f32 = 0.955;
+const LEY_BASE:f32 = 0.2;
+const LEY_LINE:f32 = 4;
+/// wetness above which the ground is moss, not soil
+const WET:f32 = 0.05;
+/// noise wavelengths (tiles): domain warp (and how far it pushes),
+/// continents, hills (and their share), wetness, veins, resource patches
+const WARP_L:f32 = 90;
+const WARP:f32 = 14;
+const CONTINENT_L:f32 = 70;
+const HILL_L:f32 = 14;
+const HILLS:f32 = 0.25;
+const WET_L:f32 = 55;
+const VEIN_L:f32 = 45;
+const PATCH_L:f32 = 16;
+/// resource nodes: in patches denser than `PATCH`, on `NODE_CHANCE` of their
+/// tiles, holding `RES_MIN` plus up to `RES_SPREAD` scaled by the tile hash
+const PATCH:f32 = 0.42;
+const NODE_CHANCE:f32 = 0.6;
+const RES_MIN:f32 = 6;
+const RES_SPREAD:f32 = 20;
+/// the yardstick for how full a node looks (drawn at full size)
+pub const RES_FULL:f32 = RES_MIN + RES_SPREAD;
+/// the most ley a tile holds (a ley line at full vein strength)
+pub const LEY_MAX:f32 = LEY_BASE + LEY_LINE;
 
 pub const Sample = struct { height:f32, kind:ck.Kind, ley:f32, res:u8 = 0 };
 
@@ -16,25 +47,25 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
   const x = m.f(wx);
   const y = m.f(wy);
   // domain warp keeps coastlines and ridges organic instead of blobby.
-  const wx2 = x + 14 * noise.fbm(seed +% 11, x / 90, y / 90, 3);
-  const wy2 = y + 14 * noise.fbm(seed +% 12, x / 90, y / 90, 3);
-  const e = noise.fbm(seed, wx2 / 70, wy2 / 70, 5) + 0.25 * noise.fbm(seed +% 1, x / 14, y / 14, 2);
-  const wet = noise.fbm(seed +% 2, x / 55, y / 55, 3);
-  const vein = noise.ridged(seed +% 3, wx2 / 45, wy2 / 45, 3);
+  const wx2 = x + WARP * noise.fbm(seed +% 11, x / WARP_L, y / WARP_L, 3);
+  const wy2 = y + WARP * noise.fbm(seed +% 12, x / WARP_L, y / WARP_L, 3);
+  const e = noise.fbm(seed, wx2 / CONTINENT_L, wy2 / CONTINENT_L, 5) + HILLS * noise.fbm(seed +% 1, x / HILL_L, y / HILL_L, 2);
+  const wet = noise.fbm(seed +% 2, x / WET_L, y / WET_L, 3);
+  const vein = noise.ridged(seed +% 3, wx2 / VEIN_L, wy2 / VEIN_L, 3);
 
-  if (e < -0.28) return .{.height = WATER_H, .kind = .water, .ley = 0};
-  const level:f32 = @floor((e + 0.28) * 7) + 1;
+  if (e < SEA) return .{.height = WATER_H, .kind = .water, .ley = 0};
+  const level:f32 = @floor((e - SEA) * LEVELS) + 1;
   const height = level * TERRACE;
-  const kind:ck.Kind = if (e > 0.62) .stone
-    else if (vein > 0.955) .ley
-    else if (wet > 0.05) .moss
+  const kind:ck.Kind = if (e > STONE) .stone
+    else if (vein > VEIN) .ley
+    else if (wet > WET) .moss
     else .soil;
-  const ley = 0.2 + vein * vein * vein * (if (kind == .ley) @as(f32, 4) else 1);
+  const ley = LEY_BASE + vein * vein * vein * (if (kind == .ley) LEY_LINE else 1);
 
   // resource nodes cluster in noisy patches. No flora: every plant is seeded.
   const h = rng.unit(rng.hash2(seed +% 7, wx, wy));
-  const patch = noise.fbm(seed +% 5, x / 16, y / 16, 2);
-  const res:u8 = if (patch > 0.42 and h < 0.6) @intFromFloat(6 + h * 20) else 0;
+  const patch = noise.fbm(seed +% 5, x / PATCH_L, y / PATCH_L, 2);
+  const res:u8 = if (patch > PATCH and h < NODE_CHANCE) @intFromFloat(RES_MIN + h * RES_SPREAD) else 0;
   return .{.height = height, .kind = kind, .ley = ley, .res = res};
 }
 

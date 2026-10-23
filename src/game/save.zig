@@ -232,7 +232,7 @@ pub fn load(gpa:Allocator, io:Io) Error!Game {
 
 test "a garden survives a save round trip" {
   const gpa = testing.allocator;
-  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
   try @import("setups.zig").demo(&g, 3);
   // gather from some node so a depleted chunk is stored too

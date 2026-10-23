@@ -17,7 +17,7 @@ pub fn draw(g:*play.Game, d:*Draw, _:f32, H:f32) Allocator.Error!void {
   for (g.prog.log, 0..) |msg, i| {
     if (msg.len == 0 or msg.age > max_age) continue;
     const a:u8 = @intFromFloat(255 * m.clamp01(1.5 - msg.age / fade_dur));
-    _ = try d.text(24, H - start_y - m.f(i) * line_h, 1.75, .{220, 210, 255, a}, msg.buf[0..msg.len]);
+    _ = try d.text(24, H - start_y - m.f(i) * line_h, s.text_label, .{220, 210, 255, a}, msg.buf[0..msg.len]);
   }
-  _ = try d.text(24, H - 22, 1.2, s.dim, controls);
+  _ = try d.text(24, H - 22, s.text_small, s.dim, controls);
 }

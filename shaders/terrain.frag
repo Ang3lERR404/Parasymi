@@ -29,7 +29,7 @@ float plexus(vec2 wp, float t) {
   for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
     vec2 c = id + vec2(i, j);
     float r1 = hash12(c), r2 = hash12(c + 17.1), r3 = hash12(c + 41.7);
-    vec2 drift = vec2(sin(t * (0.15 + 0.2 * r1) + r2 * 6.28), cos(t * (0.13 + 0.2 * r3) + r1 * 6.28));
+    vec2 drift = vec2(sin(t * (0.15 + 0.2 * r1) + r2 * TAU), cos(t * (0.13 + 0.2 * r3) + r1 * TAU));
     pts[(j + 1) * 3 + (i + 1)] = c + 0.5 + 0.36 * drift;
   }
   float v = 0.0;

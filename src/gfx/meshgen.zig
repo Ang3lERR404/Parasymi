@@ -28,6 +28,23 @@ pub const LODS = 3;
 /// eye distance at which each level after the first takes over
 pub const LOD_AT = [LODS - 1]f32{36, 70};
 
+/// braids: the core's and each strand's share of the radius, how far out
+/// the strands run (share of the radius), and the seed step between strands
+pub const BRAID_CORE:f32 = 0.72;
+pub const BRAID_STRAND:f32 = 0.26;
+pub const BRAID_OFF:f32 = 0.8;
+pub const STRAND_SALT = 7919;
+/// a strand's wander: noise frequency along it, and how far its turn and
+/// its distance out stray (per unit of wobble)
+const STRAND_FREQ:f32 = 3;
+const STRAND_TURN:f32 = 4;
+const STRAND_SWELL:f32 = 3;
+
+/// how far a braid strand (seeded `sd`) strays round the core at `u` along it.
+pub fn strandTurn(sd:u64, u:f32, wobble:f32) f32 { return wobble * STRAND_TURN * noise.grad(sd, u * STRAND_FREQ, 0.5); }
+/// how far out a braid strand runs at `u` along it, as a factor of its rest.
+pub fn strandSwell(sd:u64, u:f32, wobble:f32) f32 { return 1 + wobble * STRAND_SWELL * noise.grad(sd, u * STRAND_FREQ, 7.5); }
+
 /// the level of detail for something `dist` from the eye.
 pub fn lodAt(dist:f32) u32 {
   var l:u32 = 0;
@@ -329,18 +346,18 @@ pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f
   var fb:[MAX_SPINE]V3 = undefined;
   transport(spine, fn_[0..n], fb[0..n]);
   var r:[MAX_SPINE]f32 = undefined;
-  for (0..n) |i| r[i] = radii[i] * 0.72;
+  for (0..n) |i| r[i] = radii[i] * BRAID_CORE;
   try b.tubeR(spine, ts, r[0..n], core, .stem, 8);
-  for (0..n) |i| r[i] = radii[i] * 0.26;
+  for (0..n) |i| r[i] = radii[i] * BRAID_STRAND;
   for (0..strands) |si| {
     const a0 = m.ratio(si, strands) * m.tau;
-    const sd = seed +% si * 7919;
+    const sd = seed +% si * STRAND_SALT;
     var path:[MAX_SPINE]V3 = undefined;
     for (0..n) |i| {
       const u = m.ratio(i, n - 1);
       // strands stay embedded in the core: the offset never leaves 0.8 +- 10%
-      const a = a0 + turn[i] + wobble * 4 * noise.grad(sd, u * 3, 0.5);
-      const off = radii[i] * 0.8 * (1 + wobble * 3 * noise.grad(sd, u * 3, 7.5));
+      const a = a0 + turn[i] + strandTurn(sd, u, wobble);
+      const off = radii[i] * BRAID_OFF * strandSwell(sd, u, wobble);
       path[i] = spine[i] + (fn_[i] * m.splat3(@cos(a)) + fb[i] * m.splat3(@sin(a))) * m.splat3(off);
     }
     try b.tubeR(path[0..n], ts, r[0..n], strand, .stem, 5);
@@ -956,7 +973,7 @@ fn shard(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:color.Rgba8, tip:color
     const p1 = ring[(i + 1) % S];
     for ([_][3]V3{.{p0, p1, end}, .{p1, p0, base}}, 0..) |tri, k| {
       var n = m.norm(m.cross(tri[1] - tri[0], tri[2] - tri[0]));
-      if (m.dot(n, (tri[0] + tri[1] + tri[2]) * m.splat3(1.0 / 3.0) - mid) < 0) n = -n;
+      if (m.dot(n, m.centroid(tri[0], tri[1], tri[2]) - mid) < 0) n = -n;
       const c = if (k == 0) tip else col;
       for (tri) |p| try b.put(p, n, c, 0, 0, .bloom);
     }
@@ -1026,7 +1043,7 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
     const crown = m.smooth(m.clamp01((k - 0.8) / 0.2));
     r.* = g.stem_r * (0.7 + 0.3 * gr.rise) * m.lerp(1, 0.75, k) * (1 + 0.6 * flare * flare * flare * flare) * m.lerp(1, 0.55, crown);
     // the core closes over at the crown instead of ending in a flat cut
-    cr.* = r.* * 0.72 * (1 - 0.85 * m.smooth(m.clamp01((k - 0.85) / 0.15)));
+    cr.* = r.* * BRAID_CORE * (1 - 0.85 * m.smooth(m.clamp01((k - 0.85) / 0.15)));
   }
   try b.tubeR(&spine, &ts, &core_r, core, .stem, 8);
 
@@ -1067,15 +1084,15 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
     var pr:[N]f32 = undefined;
     var cols:[N]color.Rgba8 = undefined;
     const a0 = m.ratio(si, STRANDS) * m.tau;
-    const sd = seed +% si * 7919;
+    const sd = seed +% si * STRAND_SALT;
     for (0..RES) |i| {
       const u = m.ratio(i, RES - 1);
-      const a = a0 + u * TWIST + WOBBLE * 4 * noise.grad(sd, u * 3, 0.5);
-      const off = radii[i] * 0.8 * (1 + WOBBLE * 3 * noise.grad(sd, u * 3, 7.5));
+      const a = a0 + u * TWIST + strandTurn(sd, u, WOBBLE);
+      const off = radii[i] * BRAID_OFF * strandSwell(sd, u, WOBBLE);
       path[i] = spine[i] + (fn_[i] * m.splat3(@cos(a)) + fb[i] * m.splat3(@sin(a))) * m.splat3(off);
       pt[i] = ts[i];
       pu[i] = 0;
-      pr[i] = radii[i] * 0.26;
+      pr[i] = radii[i] * BRAID_STRAND;
       cols[i] = strand;
     }
     const root = path[RES - 1];

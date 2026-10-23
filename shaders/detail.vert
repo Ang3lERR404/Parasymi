@@ -75,7 +75,7 @@ void main() {
     float fx = mix(0.06, 0.94, hash13(k + 0.1));
     float fz = mix(0.06, 0.94, hash13(k + 1.7));
     float len = mix(0.09, 0.23, hash13(k + 3.3));
-    float ang = 6.2832 * hash13(k + 5.9);
+    float ang = TAU * hash13(k + 5.9);
     float lean = 0.25 * hash13(k + 7.1);
     vec3 base = vec3(cell.x + fx, groundAt(fx, fz) - 0.01, cell.y + fz);
     vec3 side = vec3(cos(ang), 0.0, sin(ang)) * 0.014;
@@ -116,7 +116,7 @@ void main() {
   float r = stone ? mix(0.025, 0.055, hash13(k + 4.4)) : mix(0.05, 0.1, hash13(k + 4.4));
   float flat_ = stone ? 0.7 : 0.35;
   vec3 c = vec3(cell.x + fx, groundAt(fx, fz), cell.y + fz);
-  float turn = 6.2832 * hash13(k + 6.6);
+  float turn = TAU * hash13(k + 6.6);
   // the triangle's three points: ring i, ring i+1 and the crown (top) or
   // the buried bottom
   int i = tri - (tri >= 5 ? 5 : 0);
@@ -124,7 +124,7 @@ void main() {
   vec3 q[3];
   for (int n = 0; n < 2; n++) {
     int ri = (i + n) - ((i + n) >= 5 ? 5 : 0);
-    float a = turn + 6.2832 * float(ri) / 5.0;
+    float a = turn + TAU * float(ri) / 5.0;
     vec3 kr = k + float(ri) * 13.1;
     float d = r * mix(0.75, 1.25, hash13(kr + 0.7));
     q[n] = c + vec3(cos(a) * d, r * flat_ * 0.25 * hash13(kr + 1.9), sin(a) * d);

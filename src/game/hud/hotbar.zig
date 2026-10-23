@@ -32,8 +32,8 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const cnt = g.player.inv.count(item);
     var buf:[8]u8 = undefined;
     const label = bufPrint(&buf, "{d}", .{cnt}) catch "0";
-    _ = try d.text(x - Draw.width(label, 1.75) / 2, hy - 7, 1.75, if (cnt > 0) s.white else s.dim, label);
-    _ = try d.text(x - 4, hy + 28, 1.2, s.dim, play.hotbar_keys[i]);
+    _ = try d.text(x - Draw.width(label, s.text_label) / 2, hy - 7, s.text_label, if (cnt > 0) s.white else s.dim, label);
+    _ = try d.text(x - 4, hy + 28, s.text_small, s.dim, play.hotbar_keys[i]);
   }
 
   const item = play.hotbar[g.hot];
@@ -41,5 +41,5 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const label = if (!play.known(g, item)) "NOT YET UNDERSTOOD"
     else if (item == .conduit) bufPrint(&buf, "{s} FACING {s}", .{item.info().name, facing[g.place_dir]}) catch item.info().name
     else item.info().name;
-  _ = try d.text(W / 2 - Draw.width(label, 1.5) / 2, hy - 50, 1.5, s.gold, label);
+  _ = try d.text(W / 2 - Draw.width(label, s.text_sub) / 2, hy - 50, s.text_sub, s.gold, label);
 }   

@@ -16,10 +16,59 @@ const hud = @import("hud.zig");
 const play = @import("play.zig");
 
 const Game = play.Game;
+const gen = @import("../world/gen.zig");
+
+/// shader time wraps this often (s) so f32 keeps its precision
+const TIME_WRAP:f64 = 3600;
+/// no hovered tile: a position far off any tile
+const NO_HOVER:f32 = 1e9;
+/// fog thickens over this many chunks' eighths past the camera distance
+const FOG_REACH:f32 = 32 * ck.SIZE / 8;
+/// fog starts to close in at this share of the drawn reach
+const FOG_NEAR:f32 = 0.7;
+/// a plant's bounding sphere: this much plus its footprint, centred this
+/// share of the way up
+const PLANT_BOUND:f32 = 1.2;
+const PLANT_BOUND_UP:f32 = 0.6;
+/// floaters: bob amplitudes and rates, drift about the tile, and a shadow
+/// that shrinks as they rise
+const BOB = [2]f32{ 0.07, 0.025 };
+const BOB_RATE = [2]f32{ 0.5, 1.13 };
+const DRIFT:f32 = 0.05;
+const DRIFT_RATE = [2]f32{ 0.31, 0.27 };
+const SHADOW_R:f32 = 0.42;
+const SHADOW_SHRINK:f32 = 0.6;
+const SHADOW_LIFT:f32 = 0.03;
+const SHADOW_FADE:f32 = 0.6;
+/// beams: how far they bow, and the last share of growth they reach out over
+const BEAM_SAG:f32 = 0.03;
+const BEAM_SAG_RATE:f32 = 0.4;
+const BEAM_FROM:f32 = 0.85;
+const BEAM_DIM:f32 = 0.1;
+/// structures breathe at one tempo, deeper with activity, and glow with it
+const BREATH_RATE:f32 = 1.6;
+const BREATH:f32 = 0.02;
+const BREATH_ACTIVE:f32 = 0.04;
+const GLOW:f32 = 0.25;
+const GLOW_ACTIVE:f32 = 1.1;
+/// placement preview: fixed plant seed, structure lift and shrink, tints,
+/// pulse
+const GHOST_SEED:f32 = 0.37;
+const GHOST_LIFT:f32 = 0.02;
+const GHOST_SCALE:f32 = 0.96;
+const GHOST_FITS = [4]f32{ 0.6, 1.4, 0.8, 0.7 };
+const GHOST_BLOCKED = [4]f32{ 1.6, 0.4, 0.4, 0.8 };
+const GHOST_PULSE_RATE:f32 = 5;
+/// resource nodes shrink to `NODE_MIN` of full size as they empty
+const NODE_MIN:f32 = 0.55;
+/// star motes: size, and echoes trailing a falling one
+const MOTE_SIZE:f32 = 1.8;
+const ECHOES = 3;
+const ECHO_SIZE:f32 = 1.2;
 
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
-  const tf:f32 = @floatCast(@mod(g.time, 3600));
+  const tf:f32 = @floatCast(@mod(g.time, TIME_WRAP));
 
   // parts first: plants add parts of their own (shadows under floaters).
   // Everything is culled to what the camera sees and drawn at the level of
@@ -38,16 +87,16 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const veil = g.prog.veil;
   const sky = g.sky.color(veil);
   const eye = g.cam.viewEye();
-  const hv:[2]f32 = if (g.hover) |h| .{m.f(h[0]), m.f(h[1])} else .{1e9, 1e9};
+  const hv:[2]f32 = if (g.hover) |h| .{m.f(h[0]), m.f(h[1])} else .{NO_HOVER, NO_HOVER};
   const ld = g.sky.lightDir();
   var out:renderer.Scene = .{
     .push = .{
       .vp = g.cam.viewProj(),
       .eye_time = .{eye[0], eye[1], eye[2], tf},
-      .fog = .{sky[0], sky[1], sky[2], 1.0 / (32 * ck.SIZE / 8 + g.cam.dist)},
+      .fog = .{sky[0], sky[1], sky[2], 1.0 / (FOG_REACH + g.cam.dist)},
       .misc = .{veil, if (g.prog.done.contains(.ley_sight)) 1 else 0, hv[0], hv[1]},
       .sun = .{ld[0], ld[1], ld[2], g.sky.daylight()},
-      .view = .{g.cam.target[0], g.cam.target[2], reach * 0.7, reach},
+      .view = .{g.cam.target[0], g.cam.target[2], reach * FOG_NEAR, reach},
       .feet = .{
         .{feet[0][0], feet[0][1], feet[0][2], g.player.facing},
         .{feet[1][0], feet[1][1], feet[1][2], g.player.facing},
@@ -57,7 +106,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
     .instances = undefined,
     .parts = g.parts.slices(),
     .ui = g.ui.v.items,
-    .ui_time = @floatCast(@mod(g.ui_time, 3600)),
+    .ui_time = @floatCast(@mod(g.ui_time, TIME_WRAP)),
   };
   for (&out.instances, g.inst) |*o, l| o.* = l.items;
   return out;
@@ -83,8 +132,8 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
 /// fall, and a lazy drift about its tile.
 fn floatAt(def:*const species.Species, x:i32, y:i32, ground:f32, seed:f32, tf:f32) m.V3 {
   const c = m.footprintCentre(x, y, def.size, 0);
-  const lift = 0.07 * @sin(tf * 0.5 + seed * 10) + 0.025 * @sin(tf * 1.13 + seed * 4);
-  return m.v3(c[0] + 0.05 * @sin(tf * 0.31 + seed * 7), @max(ground, 0) + def.hover + lift, c[2] + 0.05 * @cos(tf * 0.27 + seed * 5));
+  const lift = BOB[0] * @sin(tf * BOB_RATE[0] + seed * 10) + BOB[1] * @sin(tf * BOB_RATE[1] + seed * 4);
+  return m.v3(c[0] + DRIFT * @sin(tf * DRIFT_RATE[0] + seed * 7), @max(ground, 0) + def.hover + lift, c[2] + DRIFT * @cos(tf * DRIFT_RATE[1] + seed * 5));
 }
 
 /// the threads of light between linked blooms (see ecology `Radiance`):
@@ -103,12 +152,12 @@ fn threads(g:*Game, tf:f32) Allocator.Error!void {
     const pos = [2]m.V3{ end(g, ia, tf), end(g, ib, tf) };
     const span = pos[1] - pos[0];
     // a beam runs true, bowing only a breath as the blooms drift
-    const sag = m.v3(0, 0.03 * @sin(tf * 0.4 + m.f(ia)), 0);
+    const sag = m.v3(0, BEAM_SAG * @sin(tf * BEAM_SAG_RATE + m.f(ia)), 0);
     const ctrl = [4]m.V3{ pos[0], pos[0] + span * m.splat3(1.0 / 3.0) + sag, pos[0] + span * m.splat3(2.0 / 3.0) + sag, pos[1] };
     const side = m.norm(m.cross(span, m.v3(0, 1, 0)));
-    const reach = m.smooth(m.clamp01((s.items(.growth)[ia] - 0.85) / 0.15));
+    const reach = m.smooth(m.clamp01((s.items(.growth)[ia] - BEAM_FROM) / (1 - BEAM_FROM)));
     if (reach <= 0) continue;
-    try g.parts.emitCurve(.bloom_thread, ctrl, side, 1, reach, .{.glow = if (l.live) 1 else 0.1, .phase = s.items(.seed)[ia]});
+    try g.parts.emitCurve(.bloom_thread, ctrl, side, 1, reach, .{.glow = if (l.live) 1 else BEAM_DIM, .phase = s.items(.seed)[ia]});
   }
 }
 
@@ -130,8 +179,8 @@ const Drawn = struct {
 fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   const def = species.get(d.sp);
   const foot = m.footprintCentre(d.x, d.y, def.size, d.ground);
-  const reach = 1.2 + m.f(def.size);
-  if (g.parts.view) |v| if (!v.sphere(foot + m.v3(0, reach * 0.6, 0), reach)) return;
+  const reach = PLANT_BOUND + m.f(def.size);
+  if (g.parts.view) |v| if (!v.sphere(foot + m.v3(0, reach * PLANT_BOUND_UP, 0), reach)) return;
   const lod = meshgen.lodAt(m.len(foot - g.parts.eye));
   var at = m.footprintCentre(d.x, d.y, def.size, 0);
   var y = d.ground;
@@ -142,8 +191,8 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
     const f = floatAt(def, d.x, d.y, d.ground, d.seed, tf);
     at = f;
     y = f[1];
-    const r = 0.42 - 0.6 * (f[1] - ground - def.hover);
-    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + 0.03, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = 0.6});
+    const r = SHADOW_R - SHADOW_SHRINK * (f[1] - ground - def.hover);
+    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + SHADOW_LIFT, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = SHADOW_FADE});
   }
   // a confluence grows through its keys, blending from one to the next;
   // other plants pick a shape by tile
@@ -172,10 +221,10 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     const yaw = m.dirYaw(s.dir);
     // a fixed tempo: activity deepens the breath but never retimes it (a
     // tempo that followed activity jumped phase every time it changed)
-    const breathe = 1 + (0.02 + 0.04 * a) * @sin(tf * 1.6 + s.seed * 9);
+    const breathe = 1 + (BREATH + BREATH_ACTIVE * a) * @sin(tf * BREATH_RATE + s.seed * 9);
     const size = s.grownScale() * m.v3(breathe, 2 - breathe, breathe);
     try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(size)}), .{
-      .glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap,
+      .glow = GLOW + GLOW_ACTIVE * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap,
       .sway = s.def().sway, .tall = s.def().tall, .grown = s.grown,
     });
     try st.emit(s, &g.parts, ctr, tf);
@@ -193,13 +242,13 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(item) > 0;
   if (item.plants()) |sp| {
     // a fixed seed so the preview does not spin about as the cursor moves
-    return plant(g, .{.sp = sp, .x = h[0], .y = h[1], .ground = g.heightAt(h[0], h[1]), .growth = 1, .seed = 0.37, .ghost = true, .fits = ok}, tf);
+    return plant(g, .{.sp = sp, .x = h[0], .y = h[1], .ground = g.heightAt(h[0], h[1]), .growth = 1, .seed = GHOST_SEED, .ghost = true, .fits = ok}, tf);
   }
   const k = st.kindOf(item) orelse return;
   const def = st.defs.get(k);
-  const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + 0.02);
-  const tint:[4]f32 = if (ok) .{0.6, 1.4, 0.8, 0.7} else .{1.6, 0.4, 0.4, 0.8};
-  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(0.96))}), .{.glow = 0.6 + 0.4 * @sin(tf * 5), .tint = tint});
+  const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + GHOST_LIFT);
+  const tint = if (ok) GHOST_FITS else GHOST_BLOCKED;
+  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = 0.6 + 0.4 * @sin(tf * GHOST_PULSE_RATE), .tint = tint});
 }
 
 /// resource nodes within `nr` tiles of the camera focus.
@@ -218,7 +267,7 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
         const wx = c.originX() + @as(i32, @intCast(t % ck.SIZE));
         const wz = c.originY() + @as(i32, @intCast(t / ck.SIZE));
         const hsh = rng.unit(rng.hash2(0xD0D, wx, wz));
-        const sc = 0.55 + 0.45 * m.f(c.res[t]) / 26;
+        const sc = NODE_MIN + (1 - NODE_MIN) * m.f(c.res[t]) / gen.RES_FULL;
         try g.parts.emit(node.mesh, m.chain(&.{
           m.translate(m.tileCentre(wx, wz, c.height[t])),
           m.rotY(hsh * m.tau), m.scale3(m.splat3(sc)),
@@ -234,8 +283,8 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
 fn motes(g:*Game) Allocator.Error!void {
   for (g.stars.motes.items) |mo| {
     const fade = m.clamp01(mo.life);
-    try g.parts.emitMote(mo.pos, mo.phase, fade, if (mo.falling) 0 else -1, 1.8 * fade);
+    try g.parts.emitMote(mo.pos, mo.phase, fade, if (mo.falling) 0 else -1, MOTE_SIZE * fade);
     if (!mo.falling) continue;
-    for (1..4) |k| try g.parts.emitMote(mo.pos, mo.phase, fade, m.f(k), 1.2 * fade / (1 + m.f(k)));
+    for (1..ECHOES + 1) |k| try g.parts.emitMote(mo.pos, mo.phase, fade, m.f(k), ECHO_SIZE * fade / (1 + m.f(k)));
   }
 }

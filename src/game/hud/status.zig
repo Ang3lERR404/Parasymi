@@ -5,7 +5,7 @@ const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
 
-const panel_x:f32 = 16;
+const panel_x = s.edge;
 const panel_y:f32 = 14;
 const panel_w:f32 = 300;
 const panel_h:f32 = 74;
@@ -22,7 +22,7 @@ pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
   const glow = [4]u8{ orb[0], orb[1], orb[2], glow_alpha };
   try d.glow(orb_x, orb_y, glow_r, glow);
   try d.pod(orb_x, orb_y, orb_r, orb, 0.4 + 0.6 * (if (day > 0.5) day else 1 - day), 0.3);
-  _ = try d.text(orb_x + 32, 30, 2, s.white, g.sky.name());
-  _ = try d.text(orb_x + 32, 56, 1.5, s.dim, "SAP");
-  try d.tendril(118, 52, 180, 14, s.sap, g.player.inv.fill(), 0.2);
+  _ = try d.text(orb_x + 32, 30, s.text_heading, s.white, g.sky.name());
+  _ = try d.text(orb_x + 32, 56, s.text_sub, s.dim, "SAP");
+  try d.tendril(118, 52, 180, s.bar_h_bold, s.sap, g.player.inv.fill(), 0.2);
 }   

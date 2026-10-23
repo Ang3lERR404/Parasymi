@@ -7,9 +7,9 @@ const m = @import("../core/math.zig");
 
 /// pitch limits and resting angle, radians above the horizon: never fully
 /// level, never straight down.
-pub const MIN_PITCH:f32 = 30.0 * m.pi / 180.0;
-pub const MAX_PITCH:f32 = 85.0 * m.pi / 180.0;
-pub const REST_PITCH:f32 = 55.0 * m.pi / 180.0;
+pub const MIN_PITCH:f32 = m.rad(30.0);
+pub const MAX_PITCH:f32 = m.rad(85.0);
+pub const REST_PITCH:f32 = m.rad(55.0);
 /// field of view at the lowest pitch (radians, vertical)
 const WIDE_FOVY:f32 = 1.0;
 /// the free camera: its field of view, how long it takes to ease back to
@@ -19,6 +19,26 @@ const RETURN_TIME:f32 = 0.3;
 pub const FLY:f32 = 3;
 pub const LOOK:f32 = 0.0025;
 pub const ROLL:f32 = 1.2;
+/// the resting view: distance, vertical field of view, aspect
+const REST_DIST:f32 = 32;
+const REST_FOVY:f32 = 0.6;
+const REST_ASPECT:f32 = 16.0 / 9.0;
+/// clip planes: near for following and free flight; far grows with distance
+const NEAR:f32 = 0.1;
+const FREE_NEAR:f32 = 0.05;
+const FAR_PER_DIST:f32 = 6;
+const FAR_MIN:f32 = 120;
+/// below rest the gaze lifts by this share of half the field of view
+const LIFT:f32 = 0.45;
+/// draw reach: distance times this (plus more as the camera lowers), plus a margin
+const REACH_HIGH:f32 = 2.2;
+const REACH_LOW:f32 = 3.5;
+const REACH_MARGIN:f32 = 12;
+/// each wheel notch scales the distance by this, within these bounds
+const ZOOM_STEP:f32 = 0.88;
+const MIN_DIST:f32 = 4;
+const MAX_DIST:f32 = 120;
+const UP = m.v3(0, 1, 0);
 
 /// a free-flying view: anywhere, any orientation (no limits on pitch or yaw)
 pub const Free = struct {
@@ -51,11 +71,11 @@ pub const View = union(enum) {
 
 pub const Camera = struct {
   target:m.V3 = m.v3(0, 1, 0),
-  dist:f32 = 32,
+  dist:f32 = REST_DIST,
   yaw:f32 = 0,
   pitch:f32 = REST_PITCH,
-  fovy:f32 = 0.6,
-  aspect:f32 = 16.0 / 9.0,
+  fovy:f32 = REST_FOVY,
+  aspect:f32 = REST_ASPECT,
   view:View = .follow,
 
   pub fn eye(c:*const Camera) m.V3 {
@@ -64,17 +84,17 @@ pub const Camera = struct {
   }
 
   pub fn viewProj(c:*const Camera) m.M4 {
-    const far = c.dist * 6 + 120;
+    const far = c.dist * FAR_PER_DIST + FAR_MIN;
     const follow_dir = m.norm(c.aim() - c.eye());
     return switch (c.view) {
-      .follow => m.mul(m.perspective(c.fov(), c.aspect, 0.1, far), m.lookAt(c.eye(), c.aim(), m.v3(0, 1, 0))),
-      .free => |f| m.mul(m.perspective(FREE_FOVY, c.aspect, 0.05, far), m.lookAt(f.pos, f.pos + f.forward(), f.up())),
+      .follow => m.mul(m.perspective(c.fov(), c.aspect, NEAR, far), m.lookAt(c.eye(), c.aim(), UP)),
+      .free => |f| m.mul(m.perspective(FREE_FOVY, c.aspect, FREE_NEAR, far), m.lookAt(f.pos, f.pos + f.forward(), f.up())),
       .returning => |r| blk: {
         const w = 1 - m.smooth(m.clamp01(r.t / RETURN_TIME));
         const e = c.viewEye();
         const dir = m.norm(m.lerpV(follow_dir, r.from.forward(), w));
-        const up = m.norm(m.lerpV(m.v3(0, 1, 0), r.from.up(), w));
-        break :blk m.mul(m.perspective(m.lerp(c.fov(), FREE_FOVY, w), c.aspect, 0.05, far), m.lookAt(e, e + dir, up));
+        const up = m.norm(m.lerpV(UP, r.from.up(), w));
+        break :blk m.mul(m.perspective(m.lerp(c.fov(), FREE_FOVY, w), c.aspect, FREE_NEAR, far), m.lookAt(e, e + dir, up));
       },
     };
   }
@@ -138,7 +158,7 @@ pub const Camera = struct {
   /// gaze lifts toward the horizon, keeping the target in the lower frame,
   /// so the sky opens up as it drops (about a third of the view at 30).
   fn aim(c:*const Camera) m.V3 {
-    const down = c.pitch - 0.45 * (c.fov() / 2) * @sqrt(c.lowness());
+    const down = c.pitch - LIFT * (c.fov() / 2) * @sqrt(c.lowness());
     const fwd = m.v3(-@sin(c.yaw), 0, -@cos(c.yaw));
     return c.eye() + fwd * m.splat3(@cos(down)) - m.v3(0, @sin(down), 0);
   }
@@ -155,11 +175,11 @@ pub const Camera = struct {
   /// how far around the target the world is worth drawing: further the
   /// lower the camera looks, never beyond what is streamed in.
   pub fn reach(c:*const Camera, limit:f32) f32 {
-    return @min(c.dist * (2.2 + 3.5 * (1 - @sin(c.pitch))) + 12, limit);
+    return @min(c.dist * (REACH_HIGH + REACH_LOW * (1 - @sin(c.pitch))) + REACH_MARGIN, limit);
   }
 
   pub fn zoom(c:*Camera, steps:f32) void {
-    c.dist = m.clamp(c.dist * m.pow(f32, 0.88, steps), 4, 120);
+    c.dist = m.clamp(c.dist * m.pow(f32, ZOOM_STEP, steps), MIN_DIST, MAX_DIST);
   }
 
   /// world-space ray through a pixel.

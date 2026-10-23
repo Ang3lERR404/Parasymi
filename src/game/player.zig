@@ -37,6 +37,25 @@ const GAIT_FREQ:f32 = 2.6; // phase advance per unit of speed
 const STRIDE_RESPONSE:f32 = 8; // how quickly stride eases in/out
 const TURN_RESPONSE:f32 = 10; // how quickly facing matches the target
 const GROUND_FREQ:f32 = 18; // spring frequency for following terrain height
+const WORK_DRAG:f32 = 0.85; // velocity kept each frame while the hands work
+const FACE_MIN_SPEED:f32 = 0.3; // slower than this, the wolf keeps its facing
+const MIN_DT:f32 = 1e-4; // guards rates divided by the frame time
+const FULLNESS_RESPONSE:f32 = 2; // how quickly the belly's look follows its fill
+const REACH_FREQ:f32 = 10; // spring frequency into and out of the work gesture
+/// a foot's pad presses flat (spring frequency) once lifted less than 1/6
+const PAD_FREQ:f32 = 14;
+const PAD_LIFT_GAIN:f32 = 6;
+/// breathing: one tempo, the torso swells 2%, the limbs 1% a beat later
+const BREATH_RATE:f32 = 1.7;
+const BREATH_TORSO:f32 = 0.02;
+const BREATH_LIMB:f32 = 0.01;
+const BREATH_LAG:f32 = 0.5;
+/// the ears lean forward and out by this much
+const EAR_TILT:f32 = m.rad(12);
+/// a planted foot's central pad flattens by this fraction
+const PAD_FLATTEN:f32 = 0.1;
+/// what the wolf works on or carries sits this high above its feet
+const CHEST_HEIGHT:f32 = 1.0;
 
 /// leg segments, anthro digitigrade: a near-vertical thigh, a long calf
 /// angled back to a high hock, a shorter metatarsal angled forward, and a
@@ -111,6 +130,19 @@ comptime {
 const TAIL_ROOT_TILT:f32 = -(m.pi / 2.0 - m.pi / 6.0);
 /// the tailbone's sap node is mostly see-through
 const TAILBONE_SAP_OPACITY:f32 = 0.3;
+/// the tail's steering: turning swings it out (capped), an idle sway at rest
+/// gives way to the gait's swing in stride; each joint's spring is softer
+/// than the one before
+const TAIL_TURN:f32 = 0.12;
+const TAIL_TURN_MAX:f32 = 0.8;
+const TAIL_IDLE_RATE:f32 = 2.3;
+const TAIL_IDLE:f32 = 0.25;
+const TAIL_GAIT:f32 = 0.15;
+const TAIL_FREQ:f32 = 7;
+const TAIL_FREQ_STEP:f32 = 1.5;
+/// a lump keeps within this share of the sac, and at least this much room
+const BELLY_ROOM:f32 = 0.8;
+const BELLY_ROOM_MIN:f32 = 0.01;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -145,8 +177,8 @@ pub const Player = struct {
   /// the central pad flattens with it
   pad:[2]f32 = @splat(1),
   pad_v:[2]f32 = @splat(0),
-  tail:[3]f32 = @splat(0),
-  tail_v:[3]f32 = @splat(0),
+  tail:[TAIL_JOINTS]f32 = @splat(0),
+  tail_v:[TAIL_JOINTS]f32 = @splat(0),
   /// 0..1 blend toward the work gesture (gathering, planting, harvesting)
   reach:f32 = 0,
   reach_v:f32 = 0,
@@ -159,7 +191,7 @@ pub const Player = struct {
     const target = v3(wish[0] * speed, 0, wish[1] * speed);
     const k = @min(1, dt * ACCEL_RESPONSE);
     p.vel += (target - p.vel) * m.splat3(k);
-    if (p.work != null) p.vel *= m.splat3(0.85);
+    if (p.work != null) p.vel *= m.splat3(WORK_DRAG);
 
     const here = ground.walkable(m.tileOf(p.pos[0]), m.tileOf(p.pos[2])) orelse p.pos[1];
     // resolve each axis separately so the wolf slides along cliffs and shores
@@ -179,13 +211,13 @@ pub const Player = struct {
     var want = p.facing;
     if (p.work) |w| {
       want = m.atan2(w[0] - p.pos[0], w[2] - p.pos[2]);
-    } else if (@abs(p.vel[0]) + @abs(p.vel[2]) > 0.3) {
+    } else if (@abs(p.vel[0]) + @abs(p.vel[2]) > FACE_MIN_SPEED) {
       want = m.atan2(p.vel[0], p.vel[2]);
     }
     const diff = m.angleDiff(p.facing, want);
     const turn = diff * @min(1, dt * TURN_RESPONSE);
     p.facing += turn;
-    p.turn = turn / @max(dt, 1e-4);
+    p.turn = turn / @max(dt, MIN_DT);
   }
 
   pub fn animate(p:*Player, dt:f32) void {
@@ -197,21 +229,21 @@ pub const Player = struct {
     // a footfall every half cycle drops what the belly carries
     const step = @floor(prev / m.pi) != @floor(p.phase / m.pi);
 
-    p.fullness += (p.inv.fill() - p.fullness) * @min(1, dt * 2);
-    m.spring(&p.reach, &p.reach_v, if (p.work != null) 1 else 0, 10, dt);
+    p.fullness += (p.inv.fill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
+    m.spring(&p.reach, &p.reach_v, if (p.work != null) 1 else 0, REACH_FREQ, dt);
 
     // what the body feels: its acceleration, turned into its own frame
-    const a = (p.vel - p.last_vel) / m.splat3(@max(dt, 1e-4));
+    const a = (p.vel - p.last_vel) / m.splat3(@max(dt, MIN_DT));
     p.last_vel = p.vel;
     const al = m.mulV(m.rotY(-p.facing), .{ a[0], a[1], a[2], 0 });
     p.accel = v3(al[0], al[1], al[2]);
     p.slosh(step, dt);
-    for (&p.pad, &p.pad_v, [_]f32{ -1, 1 }) |*c, *v, side| m.spring(c, v, 1 - m.clamp01(p.legLift(side) * 6), 14, dt);
+    for (&p.pad, &p.pad_v, [_]f32{ -1, 1 }) |*c, *v, side| m.spring(c, v, 1 - m.clamp01(p.legLift(side) * PAD_LIFT_GAIN), PAD_FREQ, dt);
 
     // tail: each segment chases the one before it, steered by turning and gait
-    var target = m.clamp(-p.turn * 0.12, -0.8, 0.8) + @sin(p.t * 2.3) * 0.25 * (1 - p.stride) + @sin(p.phase) * 0.15 * p.stride;
-    for (0..3) |i| {
-      m.spring(&p.tail[i], &p.tail_v[i], target, 7 - m.f(i) * 1.5, dt);
+    var target = m.clamp(-p.turn * TAIL_TURN, -TAIL_TURN_MAX, TAIL_TURN_MAX) + @sin(p.t * TAIL_IDLE_RATE) * TAIL_IDLE * (1 - p.stride) + @sin(p.phase) * TAIL_GAIT * p.stride;
+    for (0..TAIL_JOINTS) |i| {
+      m.spring(&p.tail[i], &p.tail_v[i], target, TAIL_FREQ - m.f(i) * TAIL_FREQ_STEP, dt);
       target = p.tail[i];
     }
   }
@@ -250,10 +282,10 @@ pub const Player = struct {
 
   fn bellyScale(p:*const Player) f32 { return 1 + p.fullness * BELLY_GROW; }
   fn lumpRadius(p:*const Player) f32 { return LUMP_R * p.bellyScale() / (1 + BELLY_GROW); }
-  /// how far a lump's centre may stray from the belly's centre: within 80%
+  /// how far a lump's centre may stray from the belly's centre: within `BELLY_ROOM`
   /// of the sac, and never poking through it
   fn bellyRoom(p:*const Player) f32 {
-    return @max(@reduce(.Min, BELLY_R) * p.bellyScale() * 0.8 - p.lumpRadius(), 0.01);
+    return @max(@reduce(.Min, BELLY_R) * p.bellyScale() * BELLY_ROOM - p.lumpRadius(), BELLY_ROOM_MIN);
   }
 
   /// emit every part; returns where each paw (left, right) touches down.
@@ -266,9 +298,9 @@ pub const Player = struct {
     const root = m.chain(&.{ T(p.pos), m.rotY(p.facing) });
     const hips = m.chain(&.{ root, T(v3(0, hip_y, 0)) });
     const torso = m.chain(&.{ hips, m.rotY(@sin(p.phase) * 0.08 * st), m.rotX(lean) });
-    // the surface breathes: the torso swells 2%, the limbs 1% a beat later
-    const breath = 1 + 0.02 * @sin(t * 1.7);
-    const lb = 1 + 0.01 * @sin(t * 1.7 + 0.5);
+    // the surface breathes (see `BREATH_RATE`)
+    const breath = 1 + BREATH_TORSO * @sin(t * BREATH_RATE);
+    const lb = 1 + BREATH_LIMB * @sin(t * BREATH_RATE + BREATH_LAG);
     const vine_look:parts.Look = .{ .glow = 0.25, .phase = 0.1 };
 
     try out.emit(.wolf_torso, m.chain(&.{ torso, S(v3(breath, 1, breath)) }), vine_look);
@@ -304,7 +336,7 @@ pub const Player = struct {
     }
 
     // head looks down into the work, nods with breath
-    const nod = @sin(t * 1.7) * 0.03 + p.reach * 0.35 - lean * 0.8;
+    const nod = @sin(t * BREATH_RATE) * 0.03 + p.reach * 0.35 - lean * 0.8;
     const neck = m.chain(&.{ torso, T(v3(0, 0.5, 0.05)), m.rotX(nod) });
     try joint(out, neck, 0.075);
     const head = m.chain(&.{ neck, T(v3(0, 0.0, 0.02)) });
@@ -314,7 +346,7 @@ pub const Player = struct {
     // ears: rooted in the skull, leaning a little forward and out; heavy,
     // so they do not flutter
     for ([_]f32{ -1, 1 }) |side| {
-      const ear = m.chain(&.{ head, T(head_mesh.ear_root * v3(side, 1, 1)), m.rotZ(-side * 12 * m.pi / 180.0), m.rotX(12 * m.pi / 180.0) });
+      const ear = m.chain(&.{ head, T(head_mesh.ear_root * v3(side, 1, 1)), m.rotZ(-side * EAR_TILT), m.rotX(EAR_TILT) });
       try out.emit(.wolf_ear, ear, .{ .glow = 0.3, .phase = 0.5 + side * 0.1, .fade = EAR_OPACITY });
     }
 
@@ -364,10 +396,10 @@ pub const Player = struct {
       try joint(out, heel, 0.038);
       const foot = m.chain(&.{ heel, m.rotX(-(th + kn + mt)) });
       try out.emit(.wolf_foot, foot, vine_look);
-      // the beans: one central pad that flattens 10% while planted, four toe pads
+      // the beans: one central pad that flattens while planted, four toe pads
       const fi:usize = if (side > 0) 1 else 0;
       const bean:parts.Look = .{ .glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
-      try out.emit(.paw_pad, m.chain(&.{ foot, T(foot_mesh.pad_at), S(v3(0.021, 0.006 * (1 - 0.1 * p.pad[fi]), 0.02)) }), bean);
+      try out.emit(.paw_pad, m.chain(&.{ foot, T(foot_mesh.pad_at), S(v3(0.021, 0.006 * (1 - PAD_FLATTEN * p.pad[fi]), 0.02)) }), bean);
       for (foot_mesh.toes) |tp| {
         try out.emit(.paw_bean, m.chain(&.{ foot, T(v3(tp[0], foot_mesh.SOLE_Y + 0.002, tp[1])), S(v3(0.0065, 0.004, 0.008)) }), bean);
       }
@@ -399,7 +431,7 @@ pub const Player = struct {
     return feet;
   }
 
-  pub fn chest(p:*const Player) V3 { return p.pos + v3(0, 1.0, 0); }
+  pub fn chest(p:*const Player) V3 { return p.pos + v3(0, CHEST_HEIGHT, 0); }
 
   pub fn inReach(p:*const Player, wx:i32, wz:i32) bool {
     const c = m.tileCentre(wx, wz, 0);
@@ -414,10 +446,14 @@ fn joint(out:*Parts, at:m.M4, r:f32) Allocator.Error!void {
   try out.emit(.wolf_joint, m.chain(&.{ at, S(m.splat3(r)) }), .{ .glow = 0.25, .phase = 0.1 });
 }
 
+/// tests step at the 60 Hz tick and allow this much float slack
+const TEST_DT:f32 = 1.0 / 60.0;
+const TEST_EPS:f32 = 1e-4;
+
 test "belly contents lag a sprint, overshoot a stop, then settle" {
   var p:Player = .{ .pos = v3(0, 0, 0) };
   _ = p.inv.add(.grit, 50);
-  const dt:f32 = 1.0 / 60.0;
+  const dt:f32 = TEST_DT;
   for (0..120) |_| p.animate(dt);
   const rest = p.lump[0].pos;
   // a burst of speed forward (+z): the lump swings back
@@ -431,9 +467,9 @@ test "belly contents lag a sprint, overshoot a stop, then settle" {
   for (0..4) |_| p.animate(dt);
   try testing.expect(p.lump[0].pos[2] > rest[2] + 0.005);
   // and it never leaves the sac
-  for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + 1e-4);
-  for (p.pec) |q| try testing.expect(m.len(q.pos) <= PEC_MAX + 1e-5);
-  for (p.rump) |q| try testing.expect(m.len(q.pos) <= RUMP_MAX + 1e-5);
+  for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + TEST_EPS);
+  for (p.pec) |q| try testing.expect(m.len(q.pos) <= PEC_MAX + TEST_EPS);
+  for (p.rump) |q| try testing.expect(m.len(q.pos) <= RUMP_MAX + TEST_EPS);
 }
 
 test "the tail's root clears the rear lobes" {

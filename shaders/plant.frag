@@ -39,7 +39,7 @@ vec3 surfaceTangent() {
 // pale sap with a thin-film sheen whose hue turns with the view angle.
 vec3 sapOf(float aff, float ndv, float seed) {
   if (aff > 0.5) return vec3(0.25, 0.95, 0.8);
-  if (aff < -0.5) return mix(vec3(0.75, 0.8, 0.95), 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + ndv * 1.3 + seed)), 0.55);
+  if (aff < -0.5) return mix(vec3(0.75, 0.8, 0.95), filmHue(ndv * 1.3 + seed), 0.55);
   return vec3(0.75, 0.55, 1.0);
 }
 
@@ -97,11 +97,7 @@ void main() {
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
   if (tl > 0.0 && part != 1 && part != 2) {
-    vec3 T = tgrad / tl;
-    T = normalize(T - n * dot(T, n) + 1e-6);
-    vec3 H = normalize(SUN + V);
-    float th = dot(T, H);
-    float sheen = pow(sqrt(max(1.0 - th * th, 0.0)), 40.0);
+    float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
     c += mix(body, lit, 0.5) * sheen * smoothstep(0.0, 0.3, dot(n, SUN)) * 0.22 * smoothstep(0.3, 1.5, tl);
   }
 

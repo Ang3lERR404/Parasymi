@@ -26,6 +26,14 @@ const SPEED:f32 = 2.5;
 /// and withers back when the plant is gone
 const ROOT_GROW:f32 = 0.6;
 const ROOT_WITHER:f32 = 1.5;
+/// a side root grows long first, then thickens from `TAP_GIRTH` of its girth
+const TAP_GIRTH:f32 = 0.35;
+const TAP_FLUTTER:f32 = 0.3;
+/// the carried item rides this high over the root, bobbing a little
+const RIDE:f32 = 0.1;
+const RIDE_BOB:f32 = 0.01;
+const RIDE_BOB_RATE:f32 = 2.2;
+const RIDE_GLOW:f32 = 0.8;
 
 pub const State = struct {
   /// the item in transit and how far along it is (0..1)
@@ -130,21 +138,21 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     if (r <= 0) continue;
     // a root grows out from the conduit: longer first, then thicker
     const len = m.smooth(r) * m.smooth(s.grown);
-    const girth = 0.35 + 0.65 * m.smooth(m.clamp01(r * 1.5 - 0.5));
-    try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(@intCast(d))), m.scale3(m.v3(len, girth, girth))}), .{.flutter = 0.3, .phase = s.seed, .fade = 0.78});
+    const girth = TAP_GIRTH + (1 - TAP_GIRTH) * m.smooth(m.clamp01(r * 1.5 - 0.5));
+    try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(@intCast(d))), m.scale3(m.v3(len, girth, girth))}), .{.flutter = TAP_FLUTTER, .phase = s.seed, .fade = st.SAP});
   }
   const item = s.state.conduit.held orelse return;
   const v = m.dirVec(s.dir);
   const k = s.state.conduit.move_t - 0.5;
   // it rides along the root, over its hump and down through its dip
-  const p = ctr + m.v3(m.f(v.x) * k, root.rise(k + 0.5) + 0.1 + 0.01 * @sin(tf * 2.2 + s.seed * 6), m.f(v.z) * k);
+  const p = ctr + m.v3(m.f(v.x) * k, root.rise(k + 0.5) + RIDE + RIDE_BOB * @sin(tf * RIDE_BOB_RATE + s.seed * 6), m.f(v.z) * k);
   const col = item.info().col;
   try out.emit(.item_pod, m.translate(p), .{
-    .glow = 0.8,
+    .glow = RIDE_GLOW,
     .tint = color.Rgba8.of(col).toF4(),
   });
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
-  _ = try d.print(x, y, 1.4, style.white, "CARRIES {s}", .{if (s.state.conduit.held) |it| it.info().name else "NOTHING"});
+  _ = try d.print(x, y, style.text_body, style.white, "CARRIES {s}", .{if (s.state.conduit.held) |it| it.info().name else "NOTHING"});
 }

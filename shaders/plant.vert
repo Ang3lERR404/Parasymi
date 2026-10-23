@@ -56,16 +56,16 @@ void main() {
     // and locks into place as growth passes it; each ring (tu.y) orbits at
     // its own pace; the whole breathes slowly. It never bends from a root:
     // the view bobs and drifts it.
-    float order = tu.x, ring = tu.y, bearing = col.a * 6.2832;
+    float order = tu.x, ring = tu.y, bearing = col.a * TAU;
     float settle = smoothstep(order * 0.7, order * 0.7 + 0.3, growth);
     float spin = ring < 0.5 ? 0.06 : (ring < 1.5 ? 0.22 : (ring < 2.5 ? -0.13 : 0.04));
-    mat2 turn = rot(t * spin + seed * 6.2832);
+    mat2 turn = rot(t * spin + seed * TAU);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
     float away = 1.0 - settle;
     p.xz += (turn * vec2(cos(bearing), sin(bearing))) * away * 1.6;
     p.y += away * (0.5 + 0.6 * sin(bearing * 3.0 + seed * 9.0));
-    p *= 1.0 + 0.025 * sin(t * 0.9 + seed * 6.28);
+    p *= 1.0 + 0.025 * sin(t * 0.9 + seed * TAU);
     vec3 wp = ipos + p;
     v_pos = wp;
     v_nrm = n;
@@ -110,7 +110,7 @@ void main() {
   float gust = wind.z, along = wind.w;
 
   // symbiotic breathing: slow, the leaf tips moving
-  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * 6.28);
+  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * TAU);
   // leaves and petals lift a touch in the gusts, tips most (bases stay)
   if (part == 1u || part == 2u) p.y += 0.012 * tu.y * tu.y * gust * sin(t * 1.7 + seed * 11.0 + h * 3.0);
   // parasites: fronds curl and uncurl slowly while feeding, alien but
@@ -121,13 +121,13 @@ void main() {
     if (part == 3u) p.y += 0.006 * hunger * tu.y * sin(t * 4.0 + seed * 40.0 + tu.x * 7.0);
   }
   // convergent: blooms turn, very slowly (a confluence's canopy stays on its leader)
-  if (abs(aff) < 0.5 && part == 2u && !confluence) p.xz = rot(t * 0.12 + seed * 6.28) * p.xz;
+  if (abs(aff) < 0.5 && part == 2u && !confluence) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
 
   // wilt when unhealthy
   p.y *= mix(0.55, 1.0, health);
 
   // per-instance variation
-  float yaw = seed * 6.2831;
+  float yaw = seed * TAU;
   p.xz = rot(yaw) * p.xz;
   n.xz = rot(yaw) * n.xz;
 
@@ -135,7 +135,7 @@ void main() {
   // toward the tip, so a plant curves instead of shearing. Its own lean is
   // slow and reaches the tip after the base. What hangs below the root (a
   // floater's filaments) swings the other way, so it trails downwind.
-  float own = sin(t * 0.85 - along * 0.3 + seed * 6.28 - h * 0.9);
+  float own = sin(t * 0.85 - along * 0.3 + seed * TAU - h * 0.9);
   float lean = sway * (0.05 * gust + 0.025 * (0.4 + gust) * own);
   float ang = lean * h * h;
   ang *= smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
@@ -151,7 +151,7 @@ void main() {
   // the transition zone of a confluence's vines shimmers: its hue drifts +-10 degrees
   if (confluence && part == 4u) {
     float zone = smoothstep(0.08, 0.3, tu.y) * (1.0 - smoothstep(0.55, 0.8, tu.y));
-    v_col = max(hueShift(v_col, radians(10.0) * zone * sin(t * 0.5 + seed * 6.28 + tu.y * 3.0)), 0.0);
+    v_col = max(hueShift(v_col, radians(10.0) * zone * sin(t * 0.5 + seed * TAU + tu.y * 3.0)), 0.0);
   }
   v_form = ib.w;
   v_ghost = ic.yz;
