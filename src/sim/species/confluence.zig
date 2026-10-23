@@ -4,6 +4,7 @@
 //! contains the parasites around it rather than killing them. Condenses
 //! convergence essence and ripens its parents' seeds.
 const species = @import("../species.zig");
+const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
   .name = "CONFLUENCE", .lineage = .convergent, .seed = null, .size = 2, .yields = .convergence_essence,
@@ -20,7 +21,7 @@ pub const def:species.Species = .{
     .tendril_curl = 0.15, .tendril_wobble = 0.2,
     // stem: the symbiotic weave; leaf: where it frays into the parasitic
     // reach; bloom: violet sap at the heart of a petal, amber at its rim
-    .stem_col = .{0.2, 0.48, 0.38}, .leaf_col = .{0.52, 0.2, 0.18}, .bloom_col = .{0.55, 0.3, 0.95},
+    .stem_col = color.rgb(0.2, 0.48, 0.38), .leaf_col = color.rgb(0.52, 0.2, 0.18), .bloom_col = color.rgb(0.55, 0.3, 0.95),
   },
   .parents = .{.lumenroot, .thornleech},
 };

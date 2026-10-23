@@ -4,7 +4,15 @@ const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
-const s = @import("style.zig");
+const s = @import("../style.zig");
+
+const pw:f32 = 480;
+const header_h:f32 = 100;
+const option_h:f32 = 44;
+const pad_bottom:f32 = 30;
+const pod_x:f32 = 90;
+const key_x:f32 = 112;
+const label_x:f32 = 190;
 
 const options = [_][2][]const u8{
   .{"ESC", "RESUME"},
@@ -17,18 +25,16 @@ const options = [_][2][]const u8{
 pub fn visible(g:*const play.Game) bool { return g.mode == .paused; }
 
 pub fn draw(_:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
-  // a radial veil dims the world without drawing any edge
-  try d.glow(W / 2, H / 2, @max(W, H) * 0.75, .{4, 6, 10, 200});
-  const pw:f32 = 480;
-  const ph:f32 = 130 + 44 * m.f(options.len);
+  try d.glow(W / 2, H / 2, @max(W, H) * 0.75, s.veil);
+  const ph = header_h + option_h * m.f(options.len) + pad_bottom;
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
-  try d.membrane(px, py, pw, ph, .{24, 30, 40, 235}, 0.55);
+  try d.membrane(px, py, pw, ph, s.pause_panel, 0.55);
   _ = try d.text(W / 2 - Draw.width("PAUSED", 3.5) / 2, py + 30, 3.5, s.gold, "PAUSED");
   for (options, 0..) |o, i| {
-    const y = py + 100 + 44 * m.f(i);
-    try d.pod(px + 90, y + 8, 9, s.gold, 0.5, m.f(i) * 0.4);
-    _ = try d.text(px + 112, y, 1.75, s.dim, o[0]);
-    _ = try d.text(px + 190, y, 1.75, s.white, o[1]);
+    const y = py + header_h + option_h * m.f(i);
+    try d.pod(px + pod_x, y + 8, 9, s.gold, 0.5, m.f(i) * 0.4);
+    _ = try d.text(px + key_x, y, 1.75, s.dim, o[0]);
+    _ = try d.text(px + label_x, y, 1.75, s.white, o[1]);
   }
 }

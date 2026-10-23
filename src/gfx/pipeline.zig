@@ -5,6 +5,7 @@ const std = @import("std");
 const zeroes = std.mem.zeroes;
 const vk = @import("vulkan");
 const ctx = @import("ctx.zig");
+const color = @import("../core/color.zig");
 const Ctx = ctx.Ctx;
 const swapchain = @import("swapchain.zig");
 
@@ -16,7 +17,7 @@ fn formatOf(comptime T:type) vk.Format {
     [4]f32 => .r32g32b32a32_sfloat,
     u32 => .r32_uint,
     [2]u32 => .r32g32_uint,
-    [4]u8 => .r8g8b8a8_unorm,
+    [4]u8, color.Rgba8 => .r8g8b8a8_unorm,
     else => @compileError("no vertex format for " ++ @typeName(T)),
   };
 }

@@ -75,14 +75,26 @@ pub const Lab = struct {
   speed:f32 = 1,
 };
 
-pub const Message = struct { buf:[96]u8 = undefined, len:usize = 0, age:f32 = 0 };
+const LOG_LEN = 6;
+const MSG_BUF:usize = 96;
+
+pub const Message = struct {
+  buf:[MSG_BUF]u8 = undefined,
+  len:usize = 0,
+  age:f32 = 0,
+};
+
+/// seconds before a batch of withered plants is reported (avoids log spam)
+const WITHER_BATCH:f32 = 2;
+/// how quickly the veil eases toward its target (per second)
+const VEIL_EASE:f32 = 0.3;
 
 pub const Progression = struct {
   done:std.EnumSet(Id) = .initEmpty(),
   found:std.EnumSet(Discovery) = .initEmpty(),
   /// world event blend 0..1 (sky/glow shift after the veil thins).
   veil:f32 = 0,
-  log:[6]Message = @splat(.{}),
+  log:[LOG_LEN]Message = @splat(.{}),
   /// the technology every lab works on, and units finished per technology.
   current:?Id = null,
   progress:std.EnumArray(Id, u32) = .initFill(0),
@@ -94,6 +106,7 @@ pub const Progression = struct {
     copyBackwards(Message, g.log[1..], g.log[0 .. g.log.len - 1]);
     const m = &g.log[0];
     m.* = .{};
+    // if the message is too long it silently truncates to the buffer size
     m.len = if (bufPrint(&m.buf, fmt, args)) |s| s.len else |_| m.buf.len;
   }
 
@@ -187,12 +200,12 @@ pub const Progression = struct {
   pub fn absorb(g:*Progression, ev:ecology.Events, dt:f32) void {
     g.died += ev.died;
     g.died_t += dt;
-    if (g.died_t > 2) {
+    if (g.died_t > WITHER_BATCH) {
       if (g.died > 0) g.say("{d} PLANT(S) WITHERED", .{g.died});
       g.died = 0;
       g.died_t = 0;
     }
-    g.veil += (g.veilTarget() - g.veil) * @min(1, dt * 0.3);
+    g.veil += (g.veilTarget() - g.veil) * @min(1, dt * VEIL_EASE);
     for (&g.log) |*m| m.age += dt;
   }
 };

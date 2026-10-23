@@ -16,12 +16,13 @@ const Plants = @import("../../sim/plants.zig").Plants;
 const st = @import("../structures.zig");
 const prog = @import("../progression.zig");
 const resources = @import("../resources.zig");
+const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
 
-pub const def:st.Def = .{.name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger};
+pub const def:st.Def = .{ .name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger };
 
 /// seconds per item drawn from the node
 pub const RATE:f32 = 4;
@@ -32,7 +33,11 @@ const ROOTS = 6;
 
 /// the node being worked: which side it lies on, what it yields, and how far
 /// along the current item is.
-pub const Dig = struct { dir:m.Dir, item:items.Item, t:f32 = 0 };
+pub const Dig = struct {
+  dir:m.Dir,
+  item:items.Item,
+  t:f32 = 0,
+};
 
 pub const State = struct {
   /// null while there is no node beside it
@@ -43,42 +48,46 @@ pub const State = struct {
 pub fn ground(k:ck.Kind) bool { return k == .soil or k == .moss; }
 
 pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
-  const s = ctx.ss.get(i);
+  const self = ctx.ss.get(i);
   handOff(ctx, i);
-  const d = &s.state.root_digger;
-  const found = findNode(ctx.w, s.x, s.y, if (d.dig) |dg| dg.dir else 0) orelse {
+  const d = &self.state.root_digger;
+  const found = findNode(ctx.w, self.x, self.y, if (d.dig) |dg| dg.dir else 0) orelse {
     d.dig = null;
     return false;
   };
-  // keep the progress while it stays on the same node
-  if (d.dig == null or d.dig.?.dir != found.dir) d.dig = .{.dir = found.dir, .item = found.item};
+  if (d.dig == null or d.dig.?.dir != found.dir) d.dig = .{ .dir = found.dir, .item = found.item };
   const dg = &d.dig.?;
-  if (s.inv.total() >= BUFFER) return false;
+  if (self.inv.total() >= BUFFER) return false;
   dg.t += dt;
   if (dg.t < RATE) return true;
   dg.t -= RATE;
   found.chunk.res[found.tile] -= 1;
-  _ = s.inv.add(dg.item, 1);
+  _ = self.inv.add(dg.item, 1);
   return true;
 }
 
 /// feed the next buffered item to a neighbour that wants it. Conduits are
 /// left alone: one behind the digger pulls through `output` itself.
 fn handOff(ctx:st.Ctx, i:st.Id) void {
-  const s = ctx.ss.get(i);
-  const item = output(s) orelse return;
+  const self = ctx.ss.get(i);
+  const item = output(self) orelse return;
   for (0..4) |k| {
     const v = m.dirVec(@intCast(k));
-    const j = ctx.ss.at(ctx.w, s.x + v[0], s.y + v[1]) orelse continue;
+    const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
     if (ctx.ss.get(j).kind() == .conduit) continue;
     if (ctx.ss.insert(ctx.g, j, item, 1) == 1) {
-      _ = s.inv.take(item, 1);
+      _ = self.inv.take(item, 1);
       return;
     }
   }
 }
 
-const Found = struct { dir:m.Dir, item:items.Item, chunk:*ck.Chunk, tile:usize };
+const Found = struct {
+  dir:m.Dir,
+  item:items.Item,
+  chunk:*ck.Chunk,
+  tile:usize,
+};
 
 /// an unoccupied resource node beside (x, y), trying `prefer` first so a
 /// digger stays on the node it is working.
@@ -86,11 +95,11 @@ fn findNode(w:*const World, x:i32, y:i32, prefer:m.Dir) ?Found {
   for (0..4) |k| {
     const dir:m.Dir = prefer +% @as(m.Dir, @intCast(k));
     const v = m.dirVec(dir);
-    const c = w.chunkOfTile(x + v[0], y + v[1]) orelse continue;
-    const t = ck.localIndex(x + v[0], y + v[1]);
+    const c = w.chunkOfTile(x + v.x, y + v.z) orelse continue;
+    const t = ck.localIndex(x + v.x, y + v.z);
     if (c.res[t] == 0 or c.occ[t] != .none) continue;
     const node = resources.of(c.kind[t]) orelse continue;
-    return .{.dir = dir, .item = node.item, .chunk = c, .tile = t};
+    return .{ .dir = dir, .item = node.item, .chunk = c, .tile = t };
   }
   return null;
 }
@@ -117,25 +126,32 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const facing = working and @cos(m.angleDiff(yaw, node_yaw)) > 0.5;
     const reach = if (facing) 1 + 0.15 * (0.5 - 0.5 * @cos(k * m.tau)) else breathe;
     const size = 0.9 + 0.2 * @abs(@sin(s.seed * 13 + m.f(r) * 2.3));
-    try out.emit(.digger_root, m.chain(.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(reach * size, size, size))}), .{.glow = 0.2 + 0.6 * s.activity, .phase = s.seed});
+    try out.emit(.digger_root, m.chain(&.{
+      m.translate(ctr),
+      m.rotY(yaw),
+      m.scale3(m.v3(reach * size, size, size)),
+    }), .{ .glow = 0.2 + 0.6 * s.activity, .phase = s.seed });
   }
   if (!working) return;
   const d = dg.?;
   const v = m.dirVec(d.dir);
-  const from = ctr + m.v3(m.f(v[0]), 0, m.f(v[1]));
+  const from = ctr + m.v3(m.f(v.x), 0, m.f(v.z));
   const p = m.lerpV(from, ctr, k) + m.v3(0, 0.12 + 0.15 * @sin(k * m.pi), 0);
-  try out.emit(.item_pod, m.chain(.{m.translate(p), m.scale3(m.splat(0.5))}), .{.glow = 0.9, .tint = color.toF(d.item.info().col, 1)});
+  try out.emit(.item_pod, m.chain(&.{
+    m.translate(p),
+    m.scale3(m.splat3(0.5)),
+  }), .{ .glow = 0.9, .tint = color.Rgba8.of(d.item.info().col).toF4() });
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const n = s.inv.total();
   const dg = s.state.root_digger.dig orelse {
-    _ = try d.print(x, y, 1.4, .{150, 170, 150, 255}, "NO NODE BESIDE IT  HOLDS {d}/{d}", .{n, BUFFER});
+    _ = try d.print(x, y, 1.4, style.dim, "NO NODE BESIDE IT  HOLDS {d}/{d}", .{ n, BUFFER });
     return;
   };
   const what = if (n >= BUFFER) "FULL: LEAD A CONDUIT AWAY" else dg.item.info().name;
-  _ = try d.print(x, y, 1.4, .{235, 240, 225, 255}, "DIGS {s}  HOLDS {d}/{d}", .{what, n, BUFFER});
-  try d.tendril(x + 300, y + 2, 60, 12, .{200, 170, 110, 255}, dg.t / RATE, 0.4);
+  _ = try d.print(x, y, 1.4, style.white, "DIGS {s}  HOLDS {d}/{d}", .{ what, n, BUFFER });
+  try d.tendril(x + 300, y + 2, 60, 12, style.digger, dg.t / RATE, 0.4);
 }
 
 // ---- tests ----
@@ -143,8 +159,7 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
 /// a strip of soil at y = 0 (x = 0..5) with a moss node of `res` fibre at
 /// (2, 0); the digger goes at (1, 0).
 fn fixture(w:*World, res:u8) !void {
-  try w.stream(.{.x = 0, .y = 0}, 1, 100);
-  // no generated nodes anywhere nearby, so only the fixture's count
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
   var it = w.map.valueIterator();
   while (it.next()) |cp| @memset(&cp.*.res, 0);
   const c = w.chunkOfTile(0, 0).?;
@@ -197,7 +212,6 @@ test "a digger with no node beside it idles" {
   const s = ss.get(ss.at(&w, 4, 1).?);
   try testing.expectEqual(@as(u32, 0), s.inv.total());
   try testing.expect(s.state.root_digger.dig == null);
-  // only living ground takes it
   w.chunkOfTile(0, 0).?.kind[ck.SIZE + 3] = .stone;
   try testing.expect(!ss.canPlace(&w, 3, 1, .root_digger));
 }
@@ -223,7 +237,6 @@ test "a conduit behind the digger carries its items away" {
   var w = World.init(gpa, 5);
   defer w.deinit();
   try fixture(&w, 6);
-  // the node moves to (1, 1) so the conduit can sit east of the digger
   const c = w.chunkOfTile(0, 0).?;
   c.kind[2] = .soil;
   c.res[2] = 0;
@@ -234,7 +247,6 @@ test "a conduit behind the digger carries its items away" {
   var ss:st.Structures = .{};
   defer ss.deinit(gpa);
   var g:prog.Progression = .{};
-  // digger -> conduit (facing east) -> cache
   try testing.expect(try ss.place(gpa, &w, 1, 0, .root_digger, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 2, 0, .conduit, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 3, 0, .sap_cache, 0, 0));

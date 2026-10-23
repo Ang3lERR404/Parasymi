@@ -26,5 +26,5 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     }, 4, 8, 0.04, pal.wolf_core, .stem, 6, 0.3, 0.6);
   }
   // the connection point: translucent through the instance's fade
-  try mg.ellipsoid(b, .{.center = v3(0, 0.012, 0), .radii = m.splat(0.03), .col = pal.sap, .part = .bloom, .rings = 6, .segs = 9, .t = 0.3});
+  try mg.ellipsoid(b, .{.center = v3(0, 0.012, 0), .radii = m.splat3(0.03), .col = pal.sap, .part = .bloom, .rings = 6, .segs = 9, .t = 0.3});
 }

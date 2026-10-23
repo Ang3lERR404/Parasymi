@@ -37,7 +37,7 @@ pub const Free = struct {
   pub fn right(f:*const Free) m.V3 { return m.v3(@cos(f.yaw), 0, -@sin(f.yaw)); }
   pub fn up(f:*const Free) m.V3 {
     const u = m.cross(f.right(), f.forward());
-    return u * m.splat(@cos(f.roll)) + f.right() * m.splat(@sin(f.roll));
+    return u * m.splat3(@cos(f.roll)) + f.right() * m.splat3(@sin(f.roll));
   }
 };
 
@@ -60,7 +60,7 @@ pub const Camera = struct {
 
   pub fn eye(c:*const Camera) m.V3 {
     const cp = @cos(c.pitch);
-    return c.target + m.v3(@sin(c.yaw) * cp, @sin(c.pitch), @cos(c.yaw) * cp) * m.splat(c.dist);
+    return c.target + m.v3(@sin(c.yaw) * cp, @sin(c.pitch), @cos(c.yaw) * cp) * m.splat3(c.dist);
   }
 
   pub fn viewProj(c:*const Camera) m.M4 {
@@ -121,7 +121,7 @@ pub const Camera = struct {
         f.yaw += look[0];
         f.pitch += look[1];
         f.roll += roll;
-        f.pos += f.right() * m.splat(move[0]) + f.up() * m.splat(move[1]) + f.forward() * m.splat(move[2] + dolly);
+        f.pos += f.right() * m.splat3(move[0]) + f.up() * m.splat3(move[1]) + f.forward() * m.splat3(move[2] + dolly);
       },
       .follow, .returning => {},
     }
@@ -140,14 +140,14 @@ pub const Camera = struct {
   fn aim(c:*const Camera) m.V3 {
     const down = c.pitch - 0.45 * (c.fov() / 2) * @sqrt(c.lowness());
     const fwd = m.v3(-@sin(c.yaw), 0, -@cos(c.yaw));
-    return c.eye() + fwd * m.splat(@cos(down)) - m.v3(0, @sin(down), 0);
+    return c.eye() + fwd * m.splat3(@cos(down)) - m.v3(0, @sin(down), 0);
   }
 
   /// screen-space pan direction mapped onto the ground plane.
   pub fn pan(c:*Camera, right:f32, fwd:f32) void {
     const r = m.v3(@cos(c.yaw), 0, -@sin(c.yaw));
     const f = m.v3(-@sin(c.yaw), 0, -@cos(c.yaw));
-    c.target += r * m.splat(right) + f * m.splat(fwd);
+    c.target += r * m.splat3(right) + f * m.splat3(fwd);
   }
 
   pub fn tilt(c:*Camera, by:f32) void { c.pitch = m.clamp(c.pitch + by, MIN_PITCH, MAX_PITCH); }

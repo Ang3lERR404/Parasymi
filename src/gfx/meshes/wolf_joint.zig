@@ -18,7 +18,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     var ts:[13]f32 = undefined;
     for (0..13) |j| {
       const a = m.f(j) / 12 * m.tau;
-      const p = v3(@cos(a), 0, @sin(a)) * m.splat(1.02);
+      const p = v3(@cos(a), 0, @sin(a)) * m.splat3(1.02);
       loop[j] = v3(p[0], p[1] * @cos(tilt) - p[2] * @sin(tilt), p[1] * @sin(tilt) + p[2] * @cos(tilt));
       ts[j] = 0.5;
     }

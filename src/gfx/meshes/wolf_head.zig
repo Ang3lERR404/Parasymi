@@ -70,7 +70,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     jspine[i] = v3(0, above - jhs[i] - gap, z);
     jts[i] = 0.45;
   }
-  try mg.loft(b, &jspine, &jts, &jws, &jhs, v3(0, 1, 0), jawShape, color.shade(.{0.2, 0.18, 0.12}, 1), .stem, 12);
+  try mg.loft(b, &jspine, &jts, &jws, &jhs, v3(0, 1, 0), jawShape, color.shade(color.rgb(0.2, 0.18, 0.12), 1), .stem, 12);
 
   // eyes on the sides of the muzzle's base, looking forward and out
   for ([_]f32{-1, 1}) |side| {

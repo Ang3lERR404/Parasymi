@@ -24,7 +24,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
       path[j] = v3(@cos(a + k * 0.6) * r, @sin(k * m.pi) * h - 0.02, @sin(a + k * 0.6) * r);
       ts[j] = k;
     }
-    try b.tube(&path, &ts, 0.022, 0.012, color.rgb(.{0.55, 0.45, 0.28}, 255), .tendril, 4);
+    try b.tube(&path, &ts, 0.022, 0.012, color.rgb(0.55, 0.45, 0.28).toRgba8(255), .tendril, 4);
   }
-  try mg.ellipsoid(b, .{.center = v3(0, 0.02, 0), .radii = v3(0.09, 0.05, 0.09), .col = color.rgb(.{0.3, 0.5, 0.22}, 255), .rings = 4, .segs = 7});
+  try mg.ellipsoid(b, .{.center = v3(0, 0.02, 0), .radii = v3(0.09, 0.05, 0.09), .col = color.rgb(0.3, 0.5, 0.22).toRgba8(255), .rings = 4, .segs = 7});
 }

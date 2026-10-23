@@ -5,6 +5,7 @@
 //!
 //! A new species is one new file plus one line in `parts`.
 const items = @import("items.zig");
+const color = @import("../core/color.zig");
 const registry = @import("../core/registry.zig");
 
 const parts = struct {
@@ -52,7 +53,7 @@ pub const Genome = struct {
   thorns:u8, tendrils:u8,
   /// tendrils are grown vines too: they coil as they reach for the ground
   tendril_curl:f32 = 0.4, tendril_wobble:f32 = 0.2,
-  stem_col:[3]f32, leaf_col:[3]f32, bloom_col:[3]f32,
+  stem_col:color.Rgb, leaf_col:color.Rgb, bloom_col:color.Rgb,
 };
 
 pub const Species = struct {

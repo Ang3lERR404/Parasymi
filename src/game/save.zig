@@ -29,6 +29,9 @@ const Belly = @FieldType(player_mod.Player, "inv");
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
 const VERSION:u32 = 3;
+/// max save file size (64 MB): a garden with millions of plants will never
+/// approach this; anything larger is almost certainly a corrupt or malicious file.
+const MAX_SAVE:usize = 64 << 20;
 
 /// everything saving and loading can fail with; file-system errors are
 /// folded into these at the boundary.
@@ -45,13 +48,24 @@ pub const Error = error{
 
 /// one plant, without its runtime links (rebuilt on load).
 const PlantRec = extern struct {
-  x:i32, y:i32,
+  x:i32,
+  y:i32,
   sp:u32,
-  growth:f32, span:f32, mana:f32, health:f32, seed:f32, flow:f32, essence:f32, seeds:f32,
+  growth:f32,
+  span:f32,
+  mana:f32,
+  health:f32,
+  seed:f32,
+  flow:f32,
+  essence:f32,
+  seeds:f32,
 };
 
 /// one chunk whose resource nodes differ from what the generator made.
-const NodesRec = struct { at:ck.Coord, res:[ck.N]u8 };
+const NodesRec = struct {
+  at:ck.Coord,
+  res:[ck.N]u8,
+};
 
 const Header = extern struct {
   magic:[4]u8,
@@ -74,7 +88,9 @@ const layout_fingerprint = blk: {
 const Writer = struct {
   gpa:Allocator,
   buf:std.ArrayList(u8) = .empty,
-  fn put(w:*Writer, comptime T:type, v:T) Allocator.Error!void { try w.buf.appendSlice(w.gpa, asBytes(&v)); }
+  fn put(w:*Writer, comptime T:type, v:T) Allocator.Error!void {
+    try w.buf.appendSlice(w.gpa, asBytes(&v));
+  }
 };
 
 const Reader = struct {
@@ -90,9 +106,9 @@ const Reader = struct {
 };
 
 pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
-  var w:Writer = .{.gpa = gpa};
+  var w:Writer = .{ .gpa = gpa };
   errdefer w.buf.deinit(gpa);
-  try w.put(Header, .{.magic = MAGIC, .version = VERSION, .layout = layout_fingerprint, .seed = g.world.seed});
+  try w.put(Header, .{ .magic = MAGIC, .version = VERSION, .layout = layout_fingerprint, .seed = g.world.seed });
 
   // the gardener and what it knows
   try w.put(Rng, g.rng);
@@ -123,7 +139,7 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
   var it = g.world.map.valueIterator();
   while (it.next()) |c| if (gathered(g.world.seed, c.*)) try touched.append(gpa, c.*);
   try w.put(u32, @intCast(touched.items.len));
-  for (touched.items) |c| try w.put(NodesRec, .{.at = c.at, .res = c.res});
+  for (touched.items) |c| try w.put(NodesRec, .{ .at = c.at, .res = c.res });
 
   return w.buf.toOwnedSlice(gpa);
 }
@@ -138,7 +154,7 @@ fn gathered(seed:u64, c:*const ck.Chunk) bool {
 
 /// rebuild a game from bytes produced by `encode`.
 pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
-  var r:Reader = .{.data = data};
+  var r:Reader = .{ .data = data };
   const h = try r.get(Header);
   if (!eql(u8, &h.magic, &MAGIC)) return error.NotASave;
   if (h.version != VERSION or h.layout != layout_fingerprint) return error.IncompatibleSave;
@@ -174,9 +190,12 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
   for (0..structs) |_| {
     const s = try r.get(st.Structure);
     try ensureFootprint(&g, s.x, s.y, s.def().size);
-    if (try g.structs.place(gpa, &g.world, s.x, s.y, s.kind(), s.dir, s.seed)) {
-      g.structs.list.items[g.structs.list.items.len - 1] = s;
-    }
+    // place allocates and initialises a fresh structure; we then overwrite it
+    // with the saved one so its runtime state (inventory, per-kind data) is
+    // restored exactly. If place fails the save is corrupt (the world is
+    // regenerated from the same seed, so the tile was valid when saved).
+    if (!try g.structs.place(gpa, &g.world, s.x, s.y, s.kind(), s.dir, s.seed)) return error.CorruptSave;
+    g.structs.list.items[g.structs.list.items.len - 1] = s;
   }
   const nodes = try r.get(u32);
   for (0..nodes) |_| {
@@ -190,7 +209,7 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
 
 fn ensureFootprint(g:*Game, x:i32, y:i32, size:u8) Allocator.Error!void {
   const far = @as(i32, size) - 1;
-  for ([_][2]i32{.{x, y}, .{x + far, y}, .{x, y + far}, .{x + far, y + far}}) |t| {
+  for ([_][2]i32{ .{ x, y }, .{ x + far, y }, .{ x, y + far }, .{ x + far, y + far } }) |t| {
     _ = try g.world.ensure(ck.Coord.ofTile(t[0], t[1]));
   }
 }
@@ -198,11 +217,11 @@ fn ensureFootprint(g:*Game, x:i32, y:i32, size:u8) Allocator.Error!void {
 pub fn save(g:*Game, gpa:Allocator, io:Io) Error!void {
   const bytes = try encode(gpa, g);
   defer gpa.free(bytes);
-  Io.Dir.cwd().writeFile(io, .{.sub_path = PATH, .data = bytes}) catch return error.SaveUnwritable;
+  Io.Dir.cwd().writeFile(io, .{ .sub_path = PATH, .data = bytes }) catch return error.SaveUnwritable;
 }
 
 pub fn load(gpa:Allocator, io:Io) Error!Game {
-  const bytes = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(64 << 20)) catch |e| return switch (e) {
+  const bytes = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(MAX_SAVE)) catch |e| return switch (e) {
     error.FileNotFound => error.NoSave,
     error.OutOfMemory => error.OutOfMemory,
     else => error.SaveUnreadable,

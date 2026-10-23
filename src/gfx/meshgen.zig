@@ -25,7 +25,7 @@ pub const Builder = struct {
 
   pub fn deinit(b:*Builder) void { b.v.deinit(b.gpa); }
 
-  fn put(b:*Builder, p:V3, n:V3, col:[4]u8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
+  fn put(b:*Builder, p:V3, n:V3, col:color.Rgba8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
     try b.v.append(b.gpa, .{.pos = p, .nrm = m.norm(n), .col = col, .tu = .{t, u}, .part = @intFromEnum(part)});
   }
 
@@ -48,7 +48,7 @@ pub const Builder = struct {
   pub fn mark(b:*const Builder) usize { return b.v.items.len; }
 
   /// tube along a spine, `sides` facets, radius tapering from r0 to r1.
-  pub fn tube(b:*Builder, spine:[]const V3, ts:[]const f32, r0:f32, r1:f32, col:[4]u8, part:vertex.Part, sides:u32) Allocator.Error!void {
+  pub fn tube(b:*Builder, spine:[]const V3, ts:[]const f32, r0:f32, r1:f32, col:color.Rgba8, part:vertex.Part, sides:u32) Allocator.Error!void {
     var radii:[MAX_SPINE]f32 = undefined;
     const last = m.f(spine.len - 1);
     for (0..spine.len) |i| radii[i] = m.lerp(r0, r1, m.f(i) / last);
@@ -58,15 +58,15 @@ pub const Builder = struct {
   /// watertight tube: one ring per spine point, oriented by a frame carried
   /// smoothly along the curve (parallel transport) so consecutive segments
   /// share their rings exactly, with both ends capped.
-  pub fn tubeR(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, col:[4]u8, part:vertex.Part, sides:u32) Allocator.Error!void {
-    var cols:[MAX_SPINE][4]u8 = undefined;
+  pub fn tubeR(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, col:color.Rgba8, part:vertex.Part, sides:u32) Allocator.Error!void {
+    var cols:[MAX_SPINE]color.Rgba8 = undefined;
     @memset(cols[0..spine.len], col);
     try b.tubeC(spine, ts, radii, cols[0..spine.len], null, part, sides);
   }
 
   /// `tubeR` with a colour per ring (a gradient along the tube, shared rings
   /// so it never steps), and optionally `us[i]` written to tu.y.
-  pub fn tubeC(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, cols:[]const [4]u8, us:?[]const f32, part:vertex.Part, sides:u32) Allocator.Error!void {
+  pub fn tubeC(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, cols:[]const color.Rgba8, us:?[]const f32, part:vertex.Part, sides:u32) Allocator.Error!void {
     assert(spine.len >= 2 and spine.len <= MAX_SPINE and sides <= MAX_SIDES and cols.len == spine.len);
     var rings:[MAX_SPINE][MAX_SIDES]V3 = undefined;
     var norms:[MAX_SPINE][MAX_SIDES]V3 = undefined;
@@ -77,9 +77,9 @@ pub const Builder = struct {
     for (0..n) |i| {
       for (0..sides) |k| {
         const a = m.ratio(k, sides) * m.tau;
-        const dir = fn_[i] * m.splat(@cos(a)) + fb[i] * m.splat(@sin(a));
+        const dir = fn_[i] * m.splat3(@cos(a)) + fb[i] * m.splat3(@sin(a));
         norms[i][k] = dir;
-        rings[i][k] = spine[i] + dir * m.splat(radii[i]);
+        rings[i][k] = spine[i] + dir * m.splat3(radii[i]);
       }
     }
     for (0..n - 1) |i| for (0..sides) |k| {
@@ -104,7 +104,7 @@ pub const Builder = struct {
   fn uOf(us:?[]const f32, i:usize) f32 { return if (us) |s| s[i] else 0; }
 
   /// curved blade (leaf/petal). `dir` horizontal outward, droops along its length.
-  pub fn blade(b:*Builder, base:V3, dir:V3, len:f32, width:f32, droop:f32, col:[4]u8, tip:[4]u8, t:f32, part:vertex.Part) Allocator.Error!void {
+  pub fn blade(b:*Builder, base:V3, dir:V3, len:f32, width:f32, droop:f32, col:color.Rgba8, tip:color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
     var cs:[BLADE_SEGS + 1]V3 = undefined;
     bladeSpine(&cs, base, dir, len, droop);
     try b.sheet(&cs, m.norm(m.cross(dir, m.v3(0, 1, 0))), width, col, tip, t, part);
@@ -112,7 +112,7 @@ pub const Builder = struct {
 
   /// a blade whose midrib follows the smooth spline through `path`, its
   /// width lying along `side`.
-  pub fn bladeAlong(b:*Builder, path:[]const V3, side:V3, width:f32, col:[4]u8, tip:[4]u8, t:f32, part:vertex.Part) Allocator.Error!void {
+  pub fn bladeAlong(b:*Builder, path:[]const V3, side:V3, width:f32, col:color.Rgba8, tip:color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
     var cs:[BLADE_SEGS + 1]V3 = undefined;
     m.splineResample(path, &cs);
     try b.sheet(&cs, side, width, col, tip, t, part);
@@ -121,7 +121,7 @@ pub const Builder = struct {
   /// the leaf surface along a midrib: rows of (left, centre, right) shared
   /// between neighbouring quads, with one smooth normal per row so the leaf
   /// bends without seams or light breaks.
-  fn sheet(b:*Builder, cs:*const [BLADE_SEGS + 1]V3, side:V3, width:f32, col:[4]u8, tip:[4]u8, t:f32, part:vertex.Part) Allocator.Error!void {
+  fn sheet(b:*Builder, cs:*const [BLADE_SEGS + 1]V3, side:V3, width:f32, col:color.Rgba8, tip:color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
     const segs = BLADE_SEGS;
     var ws:[segs + 1]f32 = undefined;
     for (0..segs + 1) |i| {
@@ -137,16 +137,16 @@ pub const Builder = struct {
       const k0 = m.f(i) / segs;
       const k1 = m.f(i + 1) / segs;
       // a slight raised midrib keeps the blade from reading as a flat card
-      const rib0 = cs[i] + ns[i] * m.splat(ws[i] * 0.25);
-      const rib1 = cs[i + 1] + ns[i + 1] * m.splat(ws[i + 1] * 0.25);
+      const rib0 = cs[i] + ns[i] * m.splat3(ws[i] * 0.25);
+      const rib1 = cs[i + 1] + ns[i + 1] * m.splat3(ws[i + 1] * 0.25);
       const quads = [2][4]V3{
-        .{cs[i] + side * m.splat(ws[i]), rib0, rib1, cs[i + 1] + side * m.splat(ws[i + 1])},
-        .{rib0, cs[i] - side * m.splat(ws[i]), cs[i + 1] - side * m.splat(ws[i + 1]), rib1},
+        .{cs[i] + side * m.splat3(ws[i]), rib0, rib1, cs[i + 1] + side * m.splat3(ws[i + 1])},
+        .{rib0, cs[i] - side * m.splat3(ws[i]), cs[i + 1] - side * m.splat3(ws[i + 1]), rib1},
       };
       const c0 = color.mix(col, tip, k0);
       const c1 = color.mix(col, tip, k1);
       for (quads) |q| {
-        const cols = [4][4]u8{c0, c0, c1, c1};
+        const cols = [4]color.Rgba8{c0, c0, c1, c1};
         const kk = [4]f32{k0, k0, k1, k1};
         const nn = [4]V3{ns[i], ns[i], ns[i + 1], ns[i + 1]};
         for ([_]usize{0, 1, 2, 0, 2, 3}) |v| try b.put(q[v], nn[v], cols[v], t, kk[v], part);
@@ -154,23 +154,23 @@ pub const Builder = struct {
     }
   }
 
-  pub fn cone(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:[4]u8, t:f32, part:vertex.Part) Allocator.Error!void {
+  pub fn cone(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
     const side = m.norm(m.cross(dir, if (@abs(dir[1]) > 0.9) m.v3(1, 0, 0) else m.v3(0, 1, 0)));
     const up = m.cross(side, dir);
-    const tip = base + dir * m.splat(len);
+    const tip = base + dir * m.splat3(len);
     const sides = 4;
     for (0..sides) |i| {
       const a0 = m.f(i) / sides * m.tau;
       const a1 = m.f(i + 1) / sides * m.tau;
-      const n0 = side * m.splat(@cos(a0)) + up * m.splat(@sin(a0));
-      const n1 = side * m.splat(@cos(a1)) + up * m.splat(@sin(a1));
-      try b.put(base + n0 * m.splat(r), n0, col, t, 0, part);
-      try b.put(base + n1 * m.splat(r), n1, col, t, 0, part);
+      const n0 = side * m.splat3(@cos(a0)) + up * m.splat3(@sin(a0));
+      const n1 = side * m.splat3(@cos(a1)) + up * m.splat3(@sin(a1));
+      try b.put(base + n0 * m.splat3(r), n0, col, t, 0, part);
+      try b.put(base + n1 * m.splat3(r), n1, col, t, 0, part);
       try b.put(tip, dir, col, t, 1, part);
       // base cap so a cone never shows a hole when seen from below
       try b.put(base, -dir, col, t, 0, part);
-      try b.put(base + n1 * m.splat(r), -dir, col, t, 0, part);
-      try b.put(base + n0 * m.splat(r), -dir, col, t, 0, part);
+      try b.put(base + n1 * m.splat3(r), -dir, col, t, 0, part);
+      try b.put(base + n0 * m.splat3(r), -dir, col, t, 0, part);
     }
   }
 };
@@ -179,7 +179,7 @@ pub const Builder = struct {
 pub fn bladeSpine(cs:*[BLADE_SEGS + 1]V3, base:V3, dir:V3, len:f32, droop:f32) void {
   for (cs, 0..) |*c, i| {
     const k = m.ratio(i, BLADE_SEGS);
-    c.* = base + dir * m.splat(len * k) + m.v3(0, len * (0.35 * k - droop * k * k), 0);
+    c.* = base + dir * m.splat3(len * k) + m.v3(0, len * (0.35 * k - droop * k * k), 0);
   }
 }
 
@@ -194,7 +194,7 @@ pub fn transport(spine:[]const V3, nrms:[]V3, bis:[]V3) void {
     // tangent: average of the neighbouring segments, so joints bisect the bend
     const tan = m.norm(spine[@min(i + 1, n - 1)] - spine[if (i == 0) 0 else i - 1]);
     // carry the normal along: remove its component along the new tangent
-    nrm = m.norm(nrm - tan * m.splat(m.dot(nrm, tan)));
+    nrm = m.norm(nrm - tan * m.splat3(m.dot(nrm, tan)));
     nrms[i] = nrm;
     bis[i] = m.cross(tan, nrm);
   }
@@ -228,19 +228,19 @@ pub fn grow(pts:[]V3, g:Growth) void {
   for (pts[1..], 1..) |*p, i| {
     const t = m.ratio(i, n - 1);
     const w = g.wobble * step * (1 - 0.5 * t);
-    p.* += side * m.splat((rng.float() - 0.5) * w) + up * m.splat((rng.float() - 0.5) * w);
+    p.* += side * m.splat3((rng.float() - 0.5) * w) + up * m.splat3((rng.float() - 0.5) * w);
     if (g.curl > 0) {
       const a = t * g.curl * 4 * m.tau;
       // the spiral widens out of the root and closes toward the tip
       const r = g.curl * 0.25 * g.length * m.smooth(@min(1, t * 4)) * (1 - t);
-      p.* += side * m.splat(@cos(a) * r) + up * m.splat(@sin(a) * r);
+      p.* += side * m.splat3(@cos(a) * r) + up * m.splat3(@sin(a) * r);
     }
   }
 }
 
 /// control points for a grown vine, one per element of `out`.
 pub fn growthPath(g:Growth, out:[]V3) void {
-  for (out, 0..) |*p, i| p.* = g.start + g.direction * m.splat(g.length * m.ratio(i, out.len - 1));
+  for (out, 0..) |*p, i| p.* = g.start + g.direction * m.splat3(g.length * m.ratio(i, out.len - 1));
   grow(out, g);
 }
 
@@ -251,7 +251,7 @@ pub fn taperRadii(r0:f32, tip:f32, out:[]f32) void {
 
 /// a grown vine: `ctrl_n` control points from `g`, smoothed by Catmull-Rom
 /// into `res` evenly spaced rings, tapering by `g.taper`, `t` from t0 to t1.
-pub fn vine(b:*Builder, g:Growth, ctrl_n:usize, res:usize, r0:f32, col:[4]u8, part:vertex.Part, sides:u32, t0:f32, t1:f32) Allocator.Error!void {
+pub fn vine(b:*Builder, g:Growth, ctrl_n:usize, res:usize, r0:f32, col:color.Rgba8, part:vertex.Part, sides:u32, t0:f32, t1:f32) Allocator.Error!void {
   var ctrl:[MAX_SPINE]V3 = undefined;
   growthPath(g, ctrl[0..ctrl_n]);
   var path:[MAX_SPINE]V3 = undefined;
@@ -266,7 +266,7 @@ pub fn vine(b:*Builder, g:Growth, ctrl_n:usize, res:usize, r0:f32, col:[4]u8, pa
 /// a woven vine: a darker core along `spine` wrapped by `strands` helical
 /// vines, `radii[i]` the bundle's radius at each point. `wobble` roughs the
 /// strands' winding with smooth noise (0 = a perfect lathe-like helix).
-pub fn braid(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, strands:u32, twist:f32, wobble:f32, seed:u64, core:[4]u8, strand:[4]u8) Allocator.Error!void {
+pub fn braid(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, strands:u32, twist:f32, wobble:f32, seed:u64, core:color.Rgba8, strand:color.Rgba8) Allocator.Error!void {
   var turn:[MAX_SPINE]f32 = undefined;
   for (turn[0..spine.len], 0..) |*a, i| a.* = m.ratio(i, spine.len - 1) * twist;
   try braidTurned(b, spine, ts, radii, turn[0..spine.len], strands, wobble, seed, core, strand);
@@ -275,7 +275,7 @@ pub fn braid(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, st
 /// a braid whose strands have wound `turn[i]` radians around the core by
 /// point i: winding fast spreads them into a loose diagonal weave, winding
 /// slowly gathers them tight and nearly vertical.
-pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, turn:[]const f32, strands:u32, wobble:f32, seed:u64, core:[4]u8, strand:[4]u8) Allocator.Error!void {
+pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, turn:[]const f32, strands:u32, wobble:f32, seed:u64, core:color.Rgba8, strand:color.Rgba8) Allocator.Error!void {
   const n = spine.len;
   var fn_:[MAX_SPINE]V3 = undefined;
   var fb:[MAX_SPINE]V3 = undefined;
@@ -293,7 +293,7 @@ pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f
       // strands stay embedded in the core: the offset never leaves 0.8 +- 10%
       const a = a0 + turn[i] + wobble * 4 * noise.grad(sd, u * 3, 0.5);
       const off = radii[i] * 0.8 * (1 + wobble * 3 * noise.grad(sd, u * 3, 7.5));
-      path[i] = spine[i] + (fn_[i] * m.splat(@cos(a)) + fb[i] * m.splat(@sin(a))) * m.splat(off);
+      path[i] = spine[i] + (fn_[i] * m.splat3(@cos(a)) + fb[i] * m.splat3(@sin(a))) * m.splat3(off);
     }
     try b.tubeR(path[0..n], ts, r[0..n], strand, .stem, 5);
   }
@@ -303,7 +303,7 @@ pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f
 /// 0..tau, roughly unit size, counter-clockwise when seen from the spine's
 /// start) scaled by `widths`/`heights`, upright toward `up`. Rings are
 /// shared and both ends capped, so it is watertight like `tubeR`.
-pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, heights:[]const f32, up:V3, comptime shape:fn (f32) [2]f32, col:[4]u8, part:vertex.Part, sides:u32) Allocator.Error!void {
+pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, heights:[]const f32, up:V3, comptime shape:fn (f32) [2]f32, col:color.Rgba8, part:vertex.Part, sides:u32) Allocator.Error!void {
   assert(spine.len >= 2 and spine.len <= MAX_SPINE and sides <= MAX_LOFT);
   const n = spine.len;
   var rings:[MAX_SPINE][MAX_LOFT]V3 = undefined;
@@ -321,8 +321,8 @@ pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, he
       const p1 = shape(a + e);
       const dx = (p1[0] - p0[0]) * widths[i];
       const dy = (p1[1] - p0[1]) * heights[i];
-      norms[i][k] = m.norm(side * m.splat(dy) - u * m.splat(dx));
-      rings[i][k] = spine[i] + side * m.splat(p[0] * widths[i]) + u * m.splat(p[1] * heights[i]);
+      norms[i][k] = m.norm(side * m.splat3(dy) - u * m.splat3(dx));
+      rings[i][k] = spine[i] + side * m.splat3(p[0] * widths[i]) + u * m.splat3(p[1] * heights[i]);
     }
   }
   for (0..n - 1) |i| for (0..sides) |k| {
@@ -344,7 +344,7 @@ pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, he
 
 /// a surface from a grid of `rows` x `cols` points (row-major), quads shared
 /// between neighbours. Normals, colours and `us` (written to tu.y) are per point.
-pub fn patch(b:*Builder, rows:usize, cols:usize, pts:[]const V3, nrms:[]const V3, cols_rgba:[]const [4]u8, us:[]const f32, t:f32, part:vertex.Part) Allocator.Error!void {
+pub fn patch(b:*Builder, rows:usize, cols:usize, pts:[]const V3, nrms:[]const V3, cols_rgba:[]const color.Rgba8, us:[]const f32, t:f32, part:vertex.Part) Allocator.Error!void {
   assert(pts.len == rows * cols and nrms.len == pts.len and cols_rgba.len == pts.len and us.len == pts.len);
   for (0..rows - 1) |r| for (0..cols - 1) |c| {
     const q = [4]usize{r * cols + c, r * cols + c + 1, (r + 1) * cols + c + 1, (r + 1) * cols + c};
@@ -355,14 +355,14 @@ pub fn patch(b:*Builder, rows:usize, cols:usize, pts:[]const V3, nrms:[]const V3
 /// grown vine bands wrapping over an ellipsoid (centre `at`, `radii`) along
 /// its curvature: each band runs from (polar th0, azimuth ph0) to (th1, ph1).
 /// `side` mirrors it in x, so left and right forms are built, not mirrored.
-pub fn bands(b:*Builder, at:V3, radii:V3, arcs:[]const [4]f32, side:f32, r:f32, wobble:f32, seed:u64, col:[4]u8) Allocator.Error!void {
+pub fn bands(b:*Builder, at:V3, radii:V3, arcs:[]const [4]f32, side:f32, r:f32, wobble:f32, seed:u64, col:color.Rgba8) Allocator.Error!void {
   for (arcs, 0..) |arc, i| {
     var ctrl:[6]V3 = undefined;
     for (&ctrl, 0..) |*c, j| {
       const k = m.ratio(j, ctrl.len - 1);
       const th = m.lerp(arc[0], arc[2], k);
       const ph = m.lerp(arc[1], arc[3], k);
-      c.* = at + m.v3(@sin(th) * @cos(ph) * side, @cos(th), @sin(th) * @sin(ph)) * radii * m.splat(1.03);
+      c.* = at + m.v3(@sin(th) * @cos(ph) * side, @cos(th), @sin(th) * @sin(ph)) * radii * m.splat3(1.03);
     }
     grow(&ctrl, .{
       .start = ctrl[0], .direction = m.norm(ctrl[ctrl.len - 1] - ctrl[0]), .length = m.len(ctrl[ctrl.len - 1] - ctrl[0]),
@@ -383,7 +383,7 @@ pub fn bands(b:*Builder, at:V3, radii:V3, arcs:[]const [4]f32, side:f32, r:f32, 
 pub const Ellipsoid = struct {
   center:V3,
   radii:V3,
-  col:[4]u8,
+  col:color.Rgba8,
   part:vertex.Part = .stem,
   rings:u32 = 8,
   segs:u32 = 10,
@@ -411,7 +411,7 @@ pub fn ellipsoid(b:*Builder, e:Ellipsoid) Allocator.Error!void {
 
 /// a woven bundle of vines along +Y from 0 to 1 (see `braid`).
 /// `profile(k)` gives the bundle radius at height k.
-pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32, wobble:f32, seed:u64, core:[4]u8, strand:[4]u8) Allocator.Error!void {
+pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32, wobble:f32, seed:u64, core:color.Rgba8, strand:color.Rgba8) Allocator.Error!void {
   const N = 18;
   var spine:[N + 1]V3 = undefined;
   var ts:[N + 1]f32 = undefined;
@@ -458,7 +458,7 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!voi
   var radii:[RES]f32 = undefined;
   for (&ts, 0..) |*t, i| t.* = m.ratio(i, RES - 1);
   taperRadii(g.stem_r, stem.taper, &radii);
-  try b.tubeR(&spine, &ts, &radii, color.rgb(g.stem_col, 255), .stem, 6);
+  try b.tubeR(&spine, &ts, &radii, g.stem_col.toRgba8(255), .stem, 6);
 
   // leaves in a phyllotactic spiral up the stem.
   for (0..g.leaves) |i| {
@@ -467,7 +467,7 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!voi
     const ang = m.f(i) * golden + m.f(variant);
     const dir = m.v3(@cos(ang), 0, @sin(ang));
     const len = g.leaf_len * (1.1 - 0.5 * k) * rng.range(0.85, 1.15);
-    try b.blade(at, dir, len, g.leaf_w, g.leaf_droop, color.shade(g.leaf_col, 0.6), color.rgb(g.leaf_col, 255), k, .leaf);
+    try b.blade(at, dir, len, g.leaf_w, g.leaf_droop, color.shade(g.leaf_col, 0.6), g.leaf_col.toRgba8(255), k, .leaf);
   }
 
   // thorns: short cones pointing outward and slightly down.
@@ -487,7 +487,7 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!voi
     try vine(b, .{
       .start = start, .direction = m.norm(reach), .length = m.len(reach),
       .wobble = g.tendril_wobble, .curl = g.tendril_curl, .taper = 0.3, .seed = seed +% i * 31,
-    }, 7, 24, 0.014, color.rgb(g.stem_col, 255), .tendril, 4, 0.35, 1);
+    }, 7, 24, 0.014, g.stem_col.toRgba8(255), .tendril, 4, 0.35, 1);
   }
 
   // bloom: a fan of petals around the tip.
@@ -495,7 +495,7 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!voi
   for (0..g.petals) |i| {
     const ang = m.ratio(i, g.petals) * m.tau;
     const dir = m.v3(@cos(ang), 0, @sin(ang));
-    try b.blade(top, dir, g.bloom_r, g.bloom_r * 0.45, -0.6, color.shade(g.bloom_col, 0.8), color.rgb(g.bloom_col, 255), 1, .bloom);
+    try b.blade(top, dir, g.bloom_r, g.bloom_r * 0.45, -0.6, color.shade(g.bloom_col, 0.8), g.bloom_col.toRgba8(255), 1, .bloom);
   }
 }
 
@@ -515,8 +515,8 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, stage:u32) Allocator.Error
   var rng = Rng.init(seed);
   const core = color.shade(g.stem_col, 0.55);
   const strand = color.shade(g.stem_col, 1.3);
-  const orange = color.rgb(.{g.leaf_col[0] * 1.2, g.leaf_col[1] * 1.9, g.leaf_col[2] * 1.1}, 255);
-  const red = color.rgb(g.leaf_col, 255);
+  const orange = color.rgb(g.leaf_col.r * 1.2, g.leaf_col.g * 1.9, g.leaf_col.b * 1.1).toRgba8(255);
+  const red = g.leaf_col.toRgba8(255);
 
   // the braid: dense symbiotic weave, flaring into the ground
   const RES = 24;
@@ -581,7 +581,7 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, stage:u32) Allocator.Error
       const out = m.norm(m.v3(root[0] - top[0], 0, root[2] - top[2]));
       const e = rng.range(0.5, 1.0);
       const len = (g.stem_h - trunk_h) * rng.range(0.8, 1.05) * reach;
-      break :blk root + (out * m.splat(@cos(e)) + m.v3(0, @sin(e), 0)) * m.splat(len);
+      break :blk root + (out * m.splat3(@cos(e)) + m.v3(0, @sin(e), 0)) * m.splat3(len);
     };
     var free:[VC - PEEL + 1]V3 = undefined;
     growthPath(.{
@@ -592,15 +592,15 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, stage:u32) Allocator.Error
     // for its own path
     for (free[1..], PEEL..) |p, j| {
       const w = m.smooth(@min(1, m.ratio(j - PEEL + 1, PEEL)));
-      const hug = root + up * m.splat(m.len(p - root));
-      vc[j] = hug + (p - hug) * m.splat(w);
+      const hug = root + up * m.splat3(m.len(p - root));
+      vc[j] = hug + (p - hug) * m.splat3(w);
     }
     var path:[VR]V3 = undefined;
     m.splineResample(&vc, &path);
     var vt:[VR]f32 = undefined;
     var vu:[VR]f32 = undefined;
     var vr:[VR]f32 = undefined;
-    var cols:[VR][4]u8 = undefined;
+    var cols:[VR]color.Rgba8 = undefined;
     const r0 = g.stem_r * (if (leader) @as(f32, 0.36) else 0.28);
     for (0..VR) |i| {
       const k = m.ratio(i, VR - 1);
@@ -619,7 +619,7 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, stage:u32) Allocator.Error
 
   // the canopy: translucent sap petals, violet at the heart, amber at the rim
   const heart = color.shade(g.bloom_col, 0.8);
-  const rim = color.rgb(.{0.82, 0.6, 1.0}, 255);
+  const rim = color.rgb(0.82, 0.6, 1.0).toRgba8(255);
   for (0..g.petals) |i| {
     const a = m.ratio(i, g.petals) * m.tau;
     try b.blade(leader_tip, m.v3(@cos(a), 0, @sin(a)), g.bloom_r, g.bloom_r * 0.42, -0.35, heart, rim, 1, .bloom);
@@ -638,11 +638,11 @@ fn strandAt(spine:[]const V3, fn_:[]const V3, fb:[]const V3, radii:[]const f32, 
   const lo:usize = @min(n - 2, @as(usize, @intFromFloat(fi)));
   const t = fi - m.f(lo);
   const at = struct {
-    fn v(xs:[]const V3, i:usize, w:f32) V3 { return xs[i] + (xs[i + 1] - xs[i]) * m.splat(w); }
+    fn v(xs:[]const V3, i:usize, w:f32) V3 { return xs[i] + (xs[i + 1] - xs[i]) * m.splat3(w); }
   };
   const a = a0 + k * twist;
   const off = m.lerp(radii[lo], radii[lo + 1], t) * 0.8;
-  return at.v(spine, lo, t) + (at.v(fn_, lo, t) * m.splat(@cos(a)) + at.v(fb, lo, t) * m.splat(@sin(a))) * m.splat(off);
+  return at.v(spine, lo, t) + (at.v(fn_, lo, t) * m.splat3(@cos(a)) + at.v(fb, lo, t) * m.splat3(@sin(a))) * m.splat3(off);
 }
 
 /// where a (species, variant) mesh sits in per-variant tables.

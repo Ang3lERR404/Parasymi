@@ -7,10 +7,12 @@ const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
 const prog = @import("../progression.zig");
 const craft = @import("../craft.zig");
+const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 
-pub const def:st.Def = .{.name = "GERMINATOR", .item = .germinator, .size = 2, .mesh = .germinator};
+pub const def:st.Def = .{ .name = "GERMINATOR", .item = .germinator, .size = 2, .mesh = .germinator };
 
+/// weave speed multiplier relative to hand-weaving
 const SPEED:f32 = 0.6;
 /// most of one ingredient it will hold
 const STOCK = 20;
@@ -22,11 +24,11 @@ pub const State = struct {
 };
 
 pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
-  const s = ctx.ss.get(i);
-  const g = &s.state.germinator;
+  const self = ctx.ss.get(i);
+  const g = &self.state.germinator;
   const r = craft.hand[g.recipe];
-  if (!g.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(s.inv.bag(), r)) _ = g.weave.push(s.inv.bag(), g.recipe);
-  _ = g.weave.tick(s.inv.bag(), dt * SPEED);
+  if (!g.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(self.inv.bag(), r)) _ = g.weave.push(self.inv.bag(), g.recipe);
+  _ = g.weave.tick(self.inv.bag(), dt * SPEED);
   return g.weave.busy();
 }
 
@@ -58,8 +60,8 @@ pub fn configure(s:*st.Structure, g:*prog.Progression) void {
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const gs = &s.state.germinator;
-  _ = try d.print(x, y, 1.4, .{235, 240, 225, 255}, "WEAVES {s} (C)", .{craft.hand[gs.recipe].out.info().name});
-  try d.tendril(x + 250, y + 2, 110, 12, .{255, 215, 130, 255}, gs.weave.progress(), 0.3);
+  _ = try d.print(x, y, 1.4, style.white, "WEAVES {s} (C)", .{craft.hand[gs.recipe].out.info().name});
+  try d.tendril(x + 250, y + 2, 110, 12, style.gold, gs.weave.progress(), 0.3);
 }
 
 // a fresh germinator starts on recipe 0, which must be a seed weave

@@ -117,11 +117,11 @@ fn spot(w:*const World, p:*const Plants, a:Rect, b:Rect) ?[2]i32 {
   while (y < a.y + a.size + r) : (y += 1) {
     var x = a.x - r - size + 1;
     while (x < a.x + a.size + r) : (x += 1) {
-      const e:Rect = .{.x = x, .y = y, .size = size};
+      const e:Rect = .{ .x = x, .y = y, .size = size };
       if (e.gap(a) > r) continue;
       const sc = e.gap(a) + e.gap(b);
       if (sc >= score or !p.canPlace(w, x, y, HYBRID)) continue;
-      best = .{x, y};
+      best = .{ x, y };
       score = sc;
     }
   }
@@ -133,25 +133,25 @@ fn spot(w:*const World, p:*const Plants, a:Rect, b:Rect) ?[2]i32 {
 /// symbiote and a mature parasite (returned in that order).
 fn chain(w:*const World, p:*const Plants, ss:*st.Structures, s:*const st.Structure) ?[2]usize {
   const v = m.dirVec(s.dir);
-  const from = p.at(w, s.x - v[0], s.y - v[1]) orelse return null;
+  const from = p.at(w, s.x - v.x, s.y - v.z) orelse return null;
   var cur = s;
   for (0..MAX_CHAIN) |_| {
     const cv = m.dirVec(cur.dir);
-    const fx = cur.x + cv[0];
-    const fy = cur.y + cv[1];
-    if (ss.at(w, fx, fy)) |j| {
+    const fx = cur.x + cv.x;
+    const fz = cur.y + cv.z;
+    if (ss.at(w, fx, fz)) |j| {
       const next = ss.get(j);
       if (next.kind() != .conduit) return null;
       const nv = m.dirVec(next.dir);
-      if (nv[0] == -cv[0] and nv[1] == -cv[1]) return null;
+      if (nv.x == -cv.x and nv.z == -cv.z) return null;
       cur = next;
       continue;
     }
-    const to = p.at(w, fx, fy) orelse return null;
+    const to = p.at(w, fx, fz) orelse return null;
     const a = from.idx();
     const b = to.idx();
-    if (ripe(p, a, .symbiotic) and ripe(p, b, .parasitic)) return .{a, b};
-    if (ripe(p, b, .symbiotic) and ripe(p, a, .parasitic)) return .{b, a};
+    if (ripe(p, a, .symbiotic) and ripe(p, b, .parasitic)) return .{ a, b };
+    if (ripe(p, b, .symbiotic) and ripe(p, a, .parasitic)) return .{ b, a };
     return null;
   }
   return null;
@@ -167,8 +167,8 @@ const Garden = struct {
   sk:Seeker = .{},
 
   fn init(gpa:Allocator, side:usize) Allocator.Error!Garden {
-    var gd:Garden = .{.w = World.init(gpa, 5)};
-    try gd.w.stream(.{.x = 0, .y = 0}, 1, 100);
+    var gd:Garden = .{ .w = World.init(gpa, 5) };
+    try gd.w.stream(.{ .x = 0, .y = 0 }, 1, 100);
     const c = gd.w.chunkOfTile(0, 0).?;
     for (0..side) |y| for (0..side) |x| {
       c.kind[y * ck.SIZE + x] = .soil;
@@ -183,7 +183,7 @@ const Garden = struct {
     gd.w.deinit();
   }
   fn mature(gd:*Garden, gpa:Allocator, x:i32, y:i32, sp:species.Id) !void {
-    try testing.expect(try gd.p.placeEx(gpa, &gd.w, x, y, .{.x = x, .y = y, .chunk = undefined, .tile = undefined, .sp = sp, .seed = 0.5, .growth = 1, .mana = 5}));
+    try testing.expect(try gd.p.placeEx(gpa, &gd.w, x, y, .{ .x = x, .y = y, .chunk = undefined, .tile = undefined, .sp = sp, .seed = 0.5, .growth = 1, .mana = 5 }));
   }
   fn sweep(gd:*Garden, gpa:Allocator) Allocator.Error!void {
     for (0..4) |_| try gd.sk.tick(gpa, &gd.w, &gd.p, &gd.ss, &gd.g);
@@ -251,7 +251,7 @@ test "lineages too far apart meet only through a conduit chain" {
   // lumenroot -> 7 conduits (facing +x) -> thornleech
   var x:i32 = 2;
   while (x < 9) : (x += 1) try testing.expect(try gd.ss.place(gpa, &gd.w, x, 1, .conduit, 0, 0));
-  try testing.expectEqual(@as(i32, 1), m.dirVec(0)[0]);
+  try testing.expectEqual(@as(i32, 1), m.dirVec(0).x);
   try gd.sweep(gpa);
   try testing.expectEqual(@as(usize, 1), gd.hybrids());
 }

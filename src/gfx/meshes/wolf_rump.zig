@@ -32,6 +32,6 @@ pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
   };
   for (nodes, 0..) |n, i| {
     const r:f32 = if (i == 0) 0.024 else 0.016;
-    try mg.ellipsoid(b, .{.center = n * radii * v3(side, 1, 1), .radii = m.splat(r), .col = pal.sap, .part = .bloom, .rings = 5, .segs = 7, .t = 0.3});
+    try mg.ellipsoid(b, .{.center = n * radii * v3(side, 1, 1), .radii = m.splat3(r), .col = pal.sap, .part = .bloom, .rings = 5, .segs = 7, .t = 0.3});
   }
 }

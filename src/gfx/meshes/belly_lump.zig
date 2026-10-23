@@ -8,5 +8,5 @@ const mg = @import("../meshgen.zig");
 const color = @import("../../core/color.zig");
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  try mg.ellipsoid(b, .{.center = m.v3(0, 0, 0), .radii = m.v3(1, 1, 1), .col = color.rgb(.{0.2, 0.09, 0.03}, 255), .part = .bloom, .rings = 6, .segs = 9, .t = 0.4});
+  try mg.ellipsoid(b, .{.center = m.v3(0, 0, 0), .radii = m.v3(1, 1, 1), .col = color.rgb(0.2, 0.09, 0.03).toRgba8(255), .part = .bloom, .rings = 6, .segs = 9, .t = 0.4});
 }

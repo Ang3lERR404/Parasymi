@@ -23,6 +23,6 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     const splay = m.norm(v3(t[0] * 2.5, 0, 1));
     const c = v3(t[0], 0.008, t[1]);
     try mg.ellipsoid(b, .{.center = c, .radii = v3(0.011, 0.0105, 0.018), .col = pal.wolf_core, .rings = 5, .segs = 8});
-    try b.cone(c + splay * m.splat(0.015) + v3(0, 0.002, 0), m.norm(splay + v3(0, -0.5, 0)), 0.012, 0.004, pal.wolf_claw, 0, .thorn);
+    try b.cone(c + splay * m.splat3(0.015) + v3(0, 0.002, 0), m.norm(splay + v3(0, -0.5, 0)), 0.012, 0.004, pal.wolf_claw, 0, .thorn);
   }
 }

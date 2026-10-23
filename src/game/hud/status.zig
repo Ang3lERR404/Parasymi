@@ -3,15 +3,26 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
-const s = @import("style.zig");
+const s = @import("../style.zig");
+
+const panel_x:f32 = 16;
+const panel_y:f32 = 14;
+const panel_w:f32 = 300;
+const panel_h:f32 = 74;
+const orb_x:f32 = 52;
+const orb_y:f32 = 50;
+const orb_r:f32 = 17;
+const glow_r:f32 = 30;
+const glow_alpha:u8 = 90;
 
 pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
-  try d.membrane(16, 14, 300, 74, s.skin, 0.1);
+  try d.membrane(panel_x, panel_y, panel_w, panel_h, s.skin, 0.1);
   const day = g.sky.daylight();
-  const orb = if (day > 0.5) [4]u8{255, 210, 120, 255} else [4]u8{170, 190, 255, 255};
-  try d.glow(52, 50, 30, .{orb[0], orb[1], orb[2], 90});
-  try d.pod(52, 50, 17, orb, 0.4 + 0.6 * (if (day > 0.5) day else 1 - day), 0.3);
-  _ = try d.text(84, 30, 2, s.white, g.sky.name());
-  _ = try d.text(84, 56, 1.5, s.dim, "SAP");
-  try d.tendril(118, 52, 180, 14, .{255, 190, 90, 255}, g.player.inv.fill(), 0.2);
-}
+  const orb = if (day > 0.5) s.sun else s.moon;
+  const glow = [4]u8{ orb[0], orb[1], orb[2], glow_alpha };
+  try d.glow(orb_x, orb_y, glow_r, glow);
+  try d.pod(orb_x, orb_y, orb_r, orb, 0.4 + 0.6 * (if (day > 0.5) day else 1 - day), 0.3);
+  _ = try d.text(orb_x + 32, 30, 2, s.white, g.sky.name());
+  _ = try d.text(orb_x + 32, 56, 1.5, s.dim, "SAP");
+  try d.tendril(118, 52, 180, 14, s.sap, g.player.inv.fill(), 0.2);
+}   

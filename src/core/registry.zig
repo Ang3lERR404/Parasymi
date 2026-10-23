@@ -14,6 +14,10 @@
 //! dispatched with a comptime switch:
 //!
 //!   switch (id) { inline else => |k| reg.module(k).tick(...) }
+//!
+//! NOTE: every `pub const` in the namespace is treated as a module.
+//! Don't put helper constants or types in the namespace; put them in
+//! the modules themselves.
 const std = @import("std");
 const EnumArray = std.enums.EnumArray;
 const values = std.enums.values;
@@ -85,4 +89,7 @@ test "registry derives enum, tables and unions" {
   const u:U = .{.alpha = .{.n = 3}};
   try testing.expectEqual(R.Id.alpha, activeTag(u));
   try testing.expect(R.has(.alpha, "State") and !R.has(.beta, "State"));
+  const S = R.Struct("State");
+  const s:S = .{ .alpha = .{ .n = 5 }, .beta = {} };
+  try testing.expectEqual(@as(u8, 5), s.alpha.n);
 }

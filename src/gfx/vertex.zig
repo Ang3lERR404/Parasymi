@@ -1,11 +1,12 @@
 //! GPU vertex/instance layouts. Pipelines derive their attribute descriptions
 //! from these (gfx/pipeline.zig), and the GLSL `layout(location=..)` must match
 //! field order.
+const color = @import("../core/color.zig");
 
 pub const Terrain = extern struct {
   pos:[3]f32,
   nrm:[3]f32,
-  col:[4]u8,
+  col:color.Rgba8,
   /// x: tile kind, y: ley intensity, z: is-top-face, w: unused
   info:[4]u8,
 };
@@ -17,7 +18,7 @@ pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear };
 pub const Mesh = extern struct {
   pos:[3]f32,
   nrm:[3]f32,
-  col:[4]u8,
+  col:color.Rgba8,
   /// x: height along the plant 0..1 (growth/sway), y: position along a leaf/petal 0..1
   tu:[2]f32,
   part:u32,

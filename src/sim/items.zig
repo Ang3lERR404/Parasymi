@@ -105,6 +105,13 @@ pub fn Inventory(comptime slots:usize) type {
     pub fn take(inv:*Self, item:Item, n:u32) bool { return inv.bag().take(item, n); }
     pub fn count(inv:*const Self, item:Item) u32 { return countIn(&inv.slot, item); }
 
+    /// slots holding anything.
+    pub fn used(inv:*const Self) usize {
+      var c:usize = 0;
+      for (inv.slot) |s| if (s != null) { c += 1; };
+      return c;
+    }
+
     /// every item held, whatever it is.
     pub fn total(inv:*const Self) u32 {
       var c:u32 = 0;

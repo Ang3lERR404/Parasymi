@@ -61,9 +61,12 @@ pub fn kindOf(item:items.Item) ?Kind {
 }
 
 pub const SLOTS = 16;
+/// how quickly a structure's activity glow eases toward its target
+const ACTIVITY_EASE:f32 = 3;
 
 pub const Structure = struct {
-  x:i32, y:i32,
+  x:i32,
+  y:i32,
   dir:m.Dir = 0,
   seed:f32,
   inv:items.Inventory(SLOTS) = .{},
@@ -110,7 +113,7 @@ pub const Structures = struct {
   pub fn place(ss:*Structures, gpa:Allocator, w:*World, wx:i32, wy:i32, k:Kind, dir:m.Dir, seed:f32) Allocator.Error!bool {
     if (!ss.canPlace(w, wx, wy, k)) return false;
     const idx = Id.of(ss.list.items.len);
-    try ss.list.append(gpa, .{.x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k)});
+    try ss.list.append(gpa, .{ .x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k) });
     w.setFootprint(wx, wy, defs.get(k).size, Occ.structure(idx));
     return true;
   }
@@ -148,6 +151,8 @@ pub const Structures = struct {
     };
   }
 
+  /// insert up to `n` of `item` (capped by what the structure still wants).
+  /// Returns how many were actually inserted.
   pub fn insert(ss:*Structures, g:*const prog.Progression, id:Id, item:items.Item, n:u16) u16 {
     const k:u16 = @intCast(@min(n, ss.wants(g, id, item)));
     if (k == 0) return 0;
@@ -155,14 +160,14 @@ pub const Structures = struct {
   }
 
   pub fn tick(ss:*Structures, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) void {
-    const ctx:Ctx = .{.w = w, .plants = plants, .g = g, .ss = ss};
+    const ctx:Ctx = .{ .w = w, .plants = plants, .g = g, .ss = ss };
     for (0..ss.list.items.len) |idx| {
       const id = Id.of(idx);
       const active = switch (ss.get(id).kind()) {
         inline else => |k| if (comptime reg.has(k, "tick")) reg.module(k).tick(ctx, id, dt) else false,
       };
       const s = ss.get(id);
-      s.activity += ((if (active) @as(f32, 1) else 0) - s.activity) * @min(1, dt * 3);
+      s.activity += ((if (active) @as(f32, 1) else 0) - s.activity) * @min(1, dt * ACTIVITY_EASE);
     }
   }
 };
@@ -212,7 +217,7 @@ test "conduits harvest plants into a cache" {
   const gpa = testing.allocator;
   var w = World.init(gpa, 5);
   defer w.deinit();
-  try w.stream(.{.x = 0, .y = 0}, 1, 100);
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
   const c = w.chunkOfTile(0, 0).?;
   for (0..4) |x| { c.kind[x] = .soil; c.height[x] = 1; c.res[x] = 0; }
   var plants:Plants = .{};
@@ -221,7 +226,7 @@ test "conduits harvest plants into a cache" {
   defer ss.deinit(gpa);
   var g:prog.Progression = .{};
   // plant -> conduit -> conduit -> cache, left to right
-  try testing.expect(try plants.placeEx(gpa, &w, 0, 0, .{.x = 0, .y = 0, .chunk = undefined, .tile = undefined, .sp = .lumenroot, .seed = 0, .growth = 1, .essence = 3}));
+  try testing.expect(try plants.placeEx(gpa, &w, 0, 0, .{ .x = 0, .y = 0, .chunk = undefined, .tile = undefined, .sp = .lumenroot, .seed = 0, .growth = 1, .essence = 3 }));
   try testing.expect(try ss.place(gpa, &w, 1, 0, .conduit, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 2, 0, .conduit, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 3, 0, .sap_cache, 0, 0));

@@ -14,10 +14,12 @@ const v3 = m.v3;
 
 pub const LEN:f32 = 0.24;
 const SWELL_AT:f32 = 0.4;
+/// overall forearm scale relative to the upper arm (thinner)
+const FOREARM_SCALE:f32 = 0.8;
 
 fn radius(k:f32) f32 {
   const bump = @exp(-((k - SWELL_AT) * (k - SWELL_AT)) / 0.03);
-  return upper.ARM_R * 0.8 * m.lerp(1.1, 0.7, k) * (1 + 0.12 * bump);
+  return upper.ARM_R * FOREARM_SCALE * m.lerp(1.1, 0.7, k) * (1 + 0.12 * bump);
 }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {

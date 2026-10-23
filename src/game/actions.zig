@@ -94,11 +94,15 @@ pub fn takeFrom(g:*Game, j:st.Id) void {
 }
 
 /// uproot a structure: its bulb and contents come back (what fits).
+/// anything that doesn't fit is lost.
 pub fn unbuild(g:*Game, j:st.Id) void {
   var s = g.structs.remove(&g.world, j);
   var lost:u32 = 0;
+  // add returns how many fit; 1 - that = how many were lost
   lost += 1 - g.player.inv.add(s.def().item, 1);
-  for (s.inv.slot) |slot| if (slot) |it| { lost += it.n - g.player.inv.add(it.item, it.n); };
+  for (s.inv.slot) |slot| if (slot) |it| {
+    lost += it.n - g.player.inv.add(it.item, it.n);
+  };
   if (st.release(&s)) |h| lost += 1 - g.player.inv.add(h, 1);
   if (lost > 0) g.prog.say("{d} THINGS SPILLED AND WITHERED", .{lost});
 }
@@ -159,7 +163,7 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
     const mo = &g.stars.motes.items[i];
     const d = chest - mo.pos;
     const dist = m.len(d);
-    if (dist < 2.4) mo.pos += d * m.splat(@min(1, dt * (5 - dist * 1.5)));
+    if (dist < 2.4) mo.pos += d * m.splat3(@min(1, dt * (5 - dist * 1.5)));
     if (dist < 0.45 and g.player.inv.add(.starlight, 1) == 1) {
       _ = g.stars.motes.swapRemove(i);
       continue;

@@ -35,6 +35,21 @@ const STREAM_RADIUS = 4;
 /// streamed radius, so a low camera never runs off the generated world)
 pub const DRAW_LIMIT:f32 = (STREAM_RADIUS - 0.5) * ck.SIZE;
 
+/// max chunks to stream in a single call (initial load is generous,
+/// per-frame is tight to avoid hitches)
+const STREAM_INIT = 1 << 10;
+const STREAM_FRAME = 4;
+
+/// camera feel parameters (tune here, not scattered through update)
+const YAW_SPEED:f32 = 1.5;
+const TILT_SPEED:f32 = 1.2;
+const FOLLOW_LERP:f32 = 6;
+const FPS_LERP:f32 = 0.05;
+
+/// ray-march parameters for ground picking
+const PICK_STEP:f32 = 0.1;
+const PICK_RANGE_MULT:f32 = 4;
+
 /// everything the wolf can put into the world, in hotbar key order 1..9, 0.
 pub const hotbar = [_]items.Item{
   .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
@@ -115,10 +130,10 @@ pub const Game = struct {
       .gpa = gpa,
       .world = World.init(gpa, seed),
       .rng = Rng.init(seed ^ 0xA11CE),
-      .stars = .{.rng = Rng.init(seed ^ 0x57A2)},
-      .player = .{.pos = m.v3(0.5, 0, 0.5)},
+      .stars = .{ .rng = Rng.init(seed ^ 0x57A2) },
+      .player = .{ .pos = m.v3(0.5, 0, 0.5) },
       .parts = Parts.init(gpa),
-      .ui = .{.gpa = gpa},
+      .ui = .{ .gpa = gpa },
     };
     // start on dry land: spiral out from the origin until a fertile tile shows up.
     var r:i32 = 0;
@@ -134,7 +149,7 @@ pub const Game = struct {
       }
     }
     g.cam.target = g.player.pos;
-    try g.world.stream(g.focus(), STREAM_RADIUS, 1 << 10);
+    try g.world.stream(g.focus(), STREAM_RADIUS, STREAM_INIT);
     g.prog.say("YOU WAKE AMONG BARE ROOTS. GATHER WHAT THE GROUND OFFERS", .{});
     g.prog.say("AT NIGHT, CATCH STARLIGHT. WEAVE SEEDS IN YOUR BELLY (TAB)", .{});
     return g;
@@ -166,8 +181,9 @@ pub const Game = struct {
   fn pick(g:*const Game, in:*const Input, screen:[2]f32) ?[2]i32 {
     const ray = g.cam.ray(in.mouse[0], in.mouse[1], screen[0], screen[1]);
     var t:f32 = 0;
-    while (t < g.cam.dist * 4) : (t += 0.1) {
-      const p = ray.o + ray.d * m.splat(t);
+    const max_t = g.cam.dist * PICK_RANGE_MULT;
+    while (t < max_t) : (t += PICK_STEP) {
+      const p = ray.o + ray.d * m.splat3(t);
       const tile = m.tileAt(p);
       if (p[1] <= g.heightAt(tile[0], tile[1])) return tile;
     }
@@ -176,7 +192,7 @@ pub const Game = struct {
 
   pub fn update(g:*Game, in:*const Input, dt:f32, screen:[2]f32) Error!void {
     g.ui_time += dt;
-    g.frame_ms += (dt * 1000 - g.frame_ms) * 0.05;
+    g.frame_ms += (dt * 1000 - g.frame_ms) * FPS_LERP;
     g.cam.aspect = screen[0] / @max(screen[1], 1);
 
     // system keys work everywhere; Esc closes a panel first, then pauses
@@ -236,8 +252,8 @@ pub const Game = struct {
       if (in.down(.d) or in.down(.right)) mx += 1;
     }
     if (inspecting) {} else if (ctrl) {
-      if (in.down(.w) or in.down(.up)) g.cam.tilt(dt * 1.2);
-      if (in.down(.s) or in.down(.down)) g.cam.tilt(-dt * 1.2);
+      if (in.down(.w) or in.down(.up)) g.cam.tilt(dt * TILT_SPEED);
+      if (in.down(.s) or in.down(.down)) g.cam.tilt(-dt * TILT_SPEED);
     } else {
       if (in.down(.w) or in.down(.up)) mz += 1;
       if (in.down(.s) or in.down(.down)) mz -= 1;
@@ -245,11 +261,11 @@ pub const Game = struct {
     const yaw = g.cam.yaw;
     var wish = [2]f32{@cos(yaw) * mx - @sin(yaw) * mz, -@sin(yaw) * mx - @cos(yaw) * mz};
     const wl = @sqrt(wish[0] * wish[0] + wish[1] * wish[1]);
-    if (wl > 1) wish = .{wish[0] / wl, wish[1] / wl};
+    if (wl > 1) wish = .{ wish[0] / wl, wish[1] / wl };
 
     if (!inspecting) {
-      if (in.down(.q)) g.cam.yaw -= dt * 1.5;
-      if (in.down(.e)) g.cam.yaw += dt * 1.5;
+      if (in.down(.q)) g.cam.yaw -= dt * YAW_SPEED;
+      if (in.down(.e)) g.cam.yaw += dt * YAW_SPEED;
       if (in.scroll != 0) g.cam.zoom(in.scroll);
     }
 
@@ -293,13 +309,13 @@ pub const Game = struct {
     g.player.move(wish, in.down(.left_shift), &g.world, dt);
     g.player.animate(dt);
     const follow = g.player.pos + m.v3(0, 0.6, 0);
-    g.cam.target += (follow - g.cam.target) * m.splat(@min(1, dt * 6));
+    g.cam.target += (follow - g.cam.target) * m.splat3(@min(1, dt * FOLLOW_LERP));
 
     try g.stars.update(g.gpa, &g.sky, g.player.pos, &g.world, dt);
     actions.catchStarlight(g, dt);
 
     // stream the world around the player; chunks holding what we grew stay
-    try g.world.stream(g.focus(), STREAM_RADIUS, 4);
+    try g.world.stream(g.focus(), STREAM_RADIUS, STREAM_FRAME);
     try g.world.far(g.focus(), STREAM_RADIUS, &g.far);
     for (g.far.items) |c| try g.world.unload(c);
   }
@@ -326,12 +342,12 @@ pub const Game = struct {
       .follow, .returning => return,
     };
     // the frame the cursor is taken its jump is not a look
-    var look:[2]f32 = .{0, 0};
+    var look:[2]f32 = .{ 0, 0 };
     if (in.clicked(.left) and !f.captured) {
       in.capture(true);
       f.captured = true;
     } else if (f.captured or in.held(.left)) {
-      look = .{-in.mouse_delta[0] * camera.LOOK, -in.mouse_delta[1] * camera.LOOK};
+      look = .{ -in.mouse_delta[0] * camera.LOOK, -in.mouse_delta[1] * camera.LOOK };
     }
     const speed = camera.FLY * dt * @as(f32, if (in.down(.left_shift)) 3 else 1);
     var move = m.v3(0, 0, 0);
@@ -372,11 +388,11 @@ test "the wolf stays put without input" {
   var g = try Game.init(gpa, 0x5EED_0F_11FE);
   defer g.deinit();
   try @import("setups.zig").demo(&g, 5);
-  var in:Input = .{.win = undefined};
-  in.mouse = .{-1e4, -1e4};
+  var in:Input = .{ .win = undefined };
+  in.mouse = .{ -1e4, -1e4 };
   const start = g.player.pos;
   for (0..300) |_| {
-    try g.update(&in, 1.0 / 60.0, .{1600, 900});
+    try g.update(&in, 1.0 / 60.0, .{ 1600, 900 });
     try g.simulate(1.0 / 60.0);
   }
   try testing.expectApproxEqAbs(start[0], g.player.pos[0], 0.05);

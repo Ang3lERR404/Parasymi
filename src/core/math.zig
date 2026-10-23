@@ -6,11 +6,28 @@ const std = @import("std");
 const math = std.math;
 const testing = std.testing;
 const assert = std.debug.assert;
+const Allocator = std.mem.Allocator;
+const runtime_safety = std.debug.runtime_safety;
 
-pub const V2 = @Vector(2, f32);
 pub const V3 = @Vector(3, f32);
 pub const V4 = @Vector(4, f32);
 pub const M4 = [4]V4;
+
+// ---- constants ----
+
+/// below this, a vector is treated as zero (for normalisation).
+pub const EPS:f32 = 1e-8;
+
+/// substep rate for springDamper: 4 substeps per 60 Hz tick.
+/// Stiffer than this and stiff springs (k=80+) overshoot on long frames.
+const SPRING_SUBSTEP_HZ:f32 = 240;
+
+/// Catmull-Rom samples per segment for arc-length resampling.
+/// 8 is the sweet spot: 4 is visibly uneven on tight curves, 16 is wasted.
+const SPLINE_DENSE:usize = 8;
+
+/// max control points per spline path (vine, tail, etc).
+pub const MAX_SPLINE:usize = 64;
 
 // ---- scalars ----
 
@@ -20,7 +37,8 @@ pub const clamp = math.clamp;
 pub const pow = math.pow;
 pub const maxInt = math.maxInt;
 
-/// integer (or comptime number) to f32: the cast written everywhere else.
+/// int→f32. Takes anytype on purpose: callers pass i32, u8, u16, u32, usize.
+/// This is the one sanctioned anytype in the file.
 pub inline fn f(x:anytype) f32 { return @floatFromInt(x); }
 pub inline fn lerp(a:f32, b:f32, t:f32) f32 { return a + (b - a) * t; }
 pub inline fn clamp01(x:f32) f32 { return math.clamp(x, 0, 1); }
@@ -54,8 +72,14 @@ pub inline fn tileCentre(x:i32, z:i32, y:f32) V3 { return footprintCentre(x, z, 
 
 /// one of four facings: +x (east), +z (south), -x (west), -z (north).
 pub const Dir = u2;
-pub fn dirVec(d:Dir) [2]i32 {
-  return switch (d) { 0 => .{1, 0}, 1 => .{0, 1}, 2 => .{-1, 0}, 3 => .{0, -1} };
+pub const DirVec = struct { x:i32, z:i32 };
+pub fn dirVec(d:Dir) DirVec {
+  return switch (d) {
+    0 => .{ .x = 1, .z = 0 },
+    1 => .{ .x = 0, .z = 1 },
+    2 => .{ .x = -1, .z = 0 },
+    3 => .{ .x = 0, .z = -1 },
+  };
 }
 /// yaw that turns a +x-facing model to face `d`.
 pub inline fn dirYaw(d:Dir) f32 { return -f(d) * pi / 2.0; }
@@ -63,18 +87,20 @@ pub inline fn dirYaw(d:Dir) f32 { return -f(d) * pi / 2.0; }
 // ---- vectors ----
 
 pub inline fn v3(x:f32, y:f32, z:f32) V3 { return .{x, y, z}; }
-pub inline fn splat(s:f32) V3 { return @splat(s); }
+pub inline fn splat3(s:f32) V3 { return @splat(s); }
+pub inline fn splat4(s:f32) V4 { return @splat(s); }
 pub inline fn dot(a:V3, b:V3) f32 { return @reduce(.Add, a * b); }
 pub inline fn len(a:V3) f32 { return @sqrt(dot(a, a)); }
 pub inline fn norm(a:V3) V3 {
   const l = len(a);
-  return if (l > 1e-8) a / splat(l) else a;
+  return if (l > EPS) a / splat3(l) else a;
 }
 pub inline fn cross(a:V3, b:V3) V3 {
   return .{a[1]*b[2] - a[2]*b[1], a[2]*b[0] - a[0]*b[2], a[0]*b[1] - a[1]*b[0]};
 }
-pub inline fn lerpV(a:V3, b:V3, t:f32) V3 { return a + (b - a) * splat(t); }
-/// a point at fraction `k` (0..1) along a polyline.
+pub inline fn lerpV(a:V3, b:V3, t:f32) V3 { return a + (b - a) * splat3(t); }
+/// a point at fraction `k` (0..1) along a polyline, by point index (for
+/// evenly resampled paths; see `Path` for arc length on uneven ones).
 pub fn alongPath(path:[]const V3, k:f32) V3 {
   const pos = k * f(path.len - 1);
   const i:usize = @min(@as(usize, @intFromFloat(pos)), path.len - 2);
@@ -88,13 +114,10 @@ pub fn alongPath(path:[]const V3, k:f32) V3 {
 pub fn catmullRom(p0:V3, p1:V3, p2:V3, p3:V3, t:f32) V3 {
   const t2 = t * t;
   const t3 = t2 * t;
-  return (p1 * splat(2) + (p2 - p0) * splat(t) +
-    (p0 * splat(2) - p1 * splat(5) + p2 * splat(4) - p3) * splat(t2) +
-    (p1 * splat(3) - p0 - p2 * splat(3) + p3) * splat(t3)) * splat(0.5);
+  return (p1 * splat3(2) + (p2 - p0) * splat3(t) +
+    (p0 * splat3(2) - p1 * splat3(5) + p2 * splat3(4) - p3) * splat3(t2) +
+    (p1 * splat3(3) - p0 - p2 * splat3(3) + p3) * splat3(t3)) * splat3(0.5);
 }
-
-pub const MAX_SPLINE = 64;
-const DENSE = 8;
 
 /// resample the Catmull-Rom spline through every point of `pts` into `out`,
 /// evenly spaced by arc length. The end points repeat as their own outer
@@ -102,15 +125,14 @@ const DENSE = 8;
 pub fn splineResample(pts:[]const V3, out:[]V3) void {
   assert(pts.len >= 2 and pts.len <= MAX_SPLINE and out.len >= 2);
   const n = pts.len;
-  // dense samples along the curve, with cumulative length
-  var dense:[(MAX_SPLINE - 1) * DENSE + 1]V3 = undefined;
-  var at:[(MAX_SPLINE - 1) * DENSE + 1]f32 = undefined;
+  var dense:[(MAX_SPLINE - 1) * SPLINE_DENSE + 1]V3 = undefined;
+  var at:[(MAX_SPLINE - 1) * SPLINE_DENSE + 1]f32 = undefined;
   var k:usize = 0;
   for (0..n - 1) |seg| {
     const p0 = pts[if (seg == 0) 0 else seg - 1];
     const p3 = pts[@min(seg + 2, n - 1)];
-    for (0..DENSE) |j| {
-      dense[k] = catmullRom(p0, pts[seg], pts[seg + 1], p3, ratio(j, DENSE));
+    for (0..SPLINE_DENSE) |j| {
+      dense[k] = catmullRom(p0, pts[seg], pts[seg + 1], p3, ratio(j, SPLINE_DENSE));
       k += 1;
     }
   }
@@ -118,15 +140,51 @@ pub fn splineResample(pts:[]const V3, out:[]V3) void {
   at[0] = 0;
   for (1..k + 1) |i| at[i] = at[i - 1] + len(dense[i] - dense[i - 1]);
   const total = at[k];
-  // walk the dense polyline, emitting a point every total/(out.len-1)
   var i:usize = 0;
   for (out, 0..) |*o, j| {
     const want = total * ratio(j, out.len - 1);
     while (i + 1 < k and at[i + 1] < want) i += 1;
     const span = at[i + 1] - at[i];
-    o.* = lerpV(dense[i], dense[i + 1], if (span > 1e-8) clamp01((want - at[i]) / span) else 0);
+    o.* = lerpV(dense[i], dense[i + 1], if (span > EPS) clamp01((want - at[i]) / span) else 0);
   }
 }
+
+// ---- paths (precomputed arc-length polylines) ----
+
+/// A polyline with precomputed cumulative arc lengths for O(log n) lookup.
+/// Build once when the path is set; call `.at(k)` every frame.
+pub const Path = struct {
+  pts:[]const V3,
+  cum:[]const f32,
+  total:f32,
+
+  /// build a Path from a slice of points. Allocates `cum` via `alloc`.
+  pub fn build(pts:[]const V3, alloc:Allocator) Allocator.Error!Path {
+    assert(pts.len >= 2);
+    const cum = try alloc.alloc(f32, pts.len);
+    cum[0] = 0;
+    for (1..pts.len) |i| cum[i] = cum[i - 1] + len(pts[i] - pts[i - 1]);
+    return .{ .pts = pts, .cum = cum, .total = cum[pts.len - 1] };
+  }
+
+  pub fn deinit(self:Path, alloc:Allocator) void { alloc.free(self.cum); }
+
+  /// point at fraction k (0..1) along the path, evenly spaced by arc length.
+  pub fn at(self:Path, k:f32) V3 {
+    const want = clamp01(k) * self.total;
+    var lo:usize = 0;
+    var hi:usize = self.pts.len - 1;
+    while (lo + 1 < hi) {
+      const mid = (lo + hi) / 2;
+      if (self.cum[mid] <= want) lo = mid else hi = mid;
+    }
+    const span = self.cum[hi] - self.cum[lo];
+    const t = if (span > EPS) (want - self.cum[lo]) / span else 0;
+    return lerpV(self.pts[lo], self.pts[hi], t);
+  }
+};
+
+// ---- matrices ----
 
 pub const identity:M4 = .{
   .{1, 0, 0, 0}, .{0, 1, 0, 0}, .{0, 0, 1, 0}, .{0, 0, 0, 1},
@@ -135,15 +193,15 @@ pub const identity:M4 = .{
 pub fn mul(a:M4, b:M4) M4 {
   var r:M4 = undefined;
   inline for (0..4) |c| {
-    r[c] = a[0] * @as(V4, @splat(b[c][0])) + a[1] * @as(V4, @splat(b[c][1])) +
-      a[2] * @as(V4, @splat(b[c][2])) + a[3] * @as(V4, @splat(b[c][3]));
+    r[c] = a[0] * splat4(b[c][0]) + a[1] * splat4(b[c][1]) +
+      a[2] * splat4(b[c][2]) + a[3] * splat4(b[c][3]);
   }
   return r;
 }
 
 pub fn mulV(m:M4, v:V4) V4 {
-  return m[0] * @as(V4, @splat(v[0])) + m[1] * @as(V4, @splat(v[1])) +
-    m[2] * @as(V4, @splat(v[2])) + m[3] * @as(V4, @splat(v[3]));
+  return m[0] * splat4(v[0]) + m[1] * splat4(v[1]) +
+    m[2] * splat4(v[2]) + m[3] * splat4(v[3]);
 }
 
 /// right-handed perspective for Vulkan (y flipped, depth 0..1).
@@ -187,10 +245,10 @@ pub fn rotZ(a:f32) M4 {
   const c = @cos(a); const s = @sin(a);
   return .{.{c, s, 0, 0}, .{-s, c, 0, 0}, .{0, 0, 1, 0}, .{0, 0, 0, 1}};
 }
-/// chain transforms parent-first: chain(.{a, b, c}) == a * b * c.
-pub fn chain(ms:anytype) M4 {
+/// chain transforms parent-first: chain(&.{a, b, c}) == a * b * c.
+pub fn chain(ms:[]const M4) M4 {
   var r:M4 = identity;
-  inline for (ms) |x| r = mul(r, x);
+  for (ms) |x| r = mul(r, x);
   return r;
 }
 pub fn origin(a:M4) V3 { return .{a[3][0], a[3][1], a[3][2]}; }
@@ -203,9 +261,10 @@ pub fn alignY(dir:V3) M4 {
   return .{.{x[0], x[1], x[2], 0}, .{dir[0], dir[1], dir[2], 0}, .{z[0], z[1], z[2], 0}, .{0, 0, 0, 1}};
 }
 
+// ---- springs ----
+
 /// critically damped spring step (for procedural secondary motion).
-/// Uses the exact closed-form solution, so it is stable for any `dt`: a long
-/// frame can never make it overshoot or blow up.
+/// Uses the exact closed-form solution, so it is stable for any `dt`.
 pub fn spring(pos:*f32, vel:*f32, target:f32, freq:f32, dt:f32) void {
   const x = pos.* - target;
   const j = vel.* + freq * x;
@@ -218,33 +277,57 @@ pub fn spring(pos:*f32, vel:*f32, target:f32, freq:f32, dt:f32) void {
 /// `m a = -k (pos - rest) - c v + force`. Substepped so stiff springs stay
 /// stable over long frames.
 pub fn springDamper(pos:*V3, vel:*V3, rest:V3, k:f32, c:f32, mass:f32, force:V3, dt:f32) void {
-  const n = @max(@as(u32, @intFromFloat(@ceil(dt * 240))), 1);
+  const n = @max(@as(u32, @intFromFloat(@ceil(dt * SPRING_SUBSTEP_HZ))), 1);
   const h = dt / f(n);
   for (0..n) |_| {
-    const acc = (force - (pos.* - rest) * splat(k) - vel.* * splat(c)) / splat(mass);
-    vel.* += acc * splat(h);
-    pos.* += vel.* * splat(h);
+    const acc = (force - (pos.* - rest) * splat3(k) - vel.* * splat3(c)) / splat3(mass);
+    vel.* += acc * splat3(h);
+    pos.* += vel.* * splat3(h);
   }
 }
 
-test "spring-damper settles where its force balances" {
-  var p = v3(0, 0, 0);
-  var v = v3(1, 0, 0);
-  for (0..120) |_| springDamper(&p, &v, v3(0, 1, 0), 60, 6, 0.8, v3(0, 0, 3), 1.0 / 30.0);
-  try testing.expect(len(p - v3(0, 1, 0.05)) < 1e-3);
-  try testing.expect(len(v) < 1e-3);
+// ---- inverses ----
+
+fn column(m:M4, c:usize) V3 { return .{m[c][0], m[c][1], m[c][2]}; }
+
+/// a matrix whose upper 3x3 has rows `r0..r2` and translation `-R * t`.
+fn fromRows(r0:V3, r1:V3, r2:V3, t:V3) M4 {
+  return .{
+    .{r0[0], r1[0], r2[0], 0},
+    .{r0[1], r1[1], r2[1], 0},
+    .{r0[2], r1[2], r2[2], 0},
+    .{-dot(r0, t), -dot(r1, t), -dot(r2, t), 1},
+  };
 }
 
-test "spring is stable for huge steps" {
-  var p:f32 = 0;
-  var v:f32 = 50;
-  for (0..20) |_| spring(&p, &v, 1, 7, 0.75);
-  try testing.expectApproxEqAbs(@as(f32, 1), p, 1e-3);
-  try testing.expect(@abs(v) < 1e-2);
+/// inverse of a rigid transform (rotation + translation only): transpose the 3x3.
+pub fn inverseRigid(m:M4) M4 {
+  return fromRows(column(m, 0), column(m, 1), column(m, 2), column(m, 3));
 }
 
-/// general 4x4 inverse (cofactor expansion), used for mouse picking.
+/// inverse of an affine transform (rotation/scale/shear + translation;
+/// bottom row 0 0 0 1). The 3x3 inverts by cofactors.
+pub fn inverseAffine(m:M4) M4 {
+  const c0 = column(m, 0);
+  const c1 = column(m, 1);
+  const c2 = column(m, 2);
+  const x12 = cross(c1, c2);
+  const det = dot(c0, x12);
+  if (runtime_safety and det == 0) @panic("singular matrix in m.inverseAffine");
+  const id = splat3(1 / det);
+  return fromRows(x12 * id, cross(c2, c0) * id, cross(c0, c1) * id, column(m, 3));
+}
+
+/// general 4x4 inverse (full cofactor expansion).
+/// Only needed for view-projection (mouse picking), which is non-affine.
+/// All other inverses in the game use inverseAffine or inverseRigid.
+/// The [16]f32 layout is the standard formulation; it doesn't decompose
+/// cleanly into 3D cross products the way the 3x3 case does.
 pub fn inverse(m:M4) M4 {
+  // Fast path: if affine, delegate to the simpler/faster version.
+  if (m[0][3] == 0 and m[1][3] == 0 and m[2][3] == 0 and m[3][3] == 1)
+    return inverseAffine(m);
+
   var a:[16]f32 = undefined;
   inline for (0..4) |c| inline for (0..4) |r| { a[c*4 + r] = m[c][r]; };
   var inv:[16]f32 = undefined;
@@ -265,42 +348,32 @@ pub fn inverse(m:M4) M4 {
   inv[11] = -a[0]*a[5]*a[11] + a[0]*a[7]*a[9] + a[4]*a[1]*a[11] - a[4]*a[3]*a[9] - a[8]*a[1]*a[7] + a[8]*a[3]*a[5];
   inv[15] = a[0]*a[5]*a[10] - a[0]*a[6]*a[9] - a[4]*a[1]*a[10] + a[4]*a[2]*a[9] + a[8]*a[1]*a[6] - a[8]*a[2]*a[5];
   const det = a[0]*inv[0] + a[1]*inv[4] + a[2]*inv[8] + a[3]*inv[12];
-  const id = if (det != 0) 1 / det else 0;
+  if (runtime_safety and det == 0) @panic("singular matrix in m.inverse");
+  const id = 1 / det;
   var r:M4 = undefined;
   inline for (0..4) |c| inline for (0..4) |rr| { r[c][rr] = inv[c*4 + rr] * id; };
   return r;
 }
 
-/// a matrix whose upper 3x3 has rows `r0..r2` (inverse of the linear part)
-/// and translation `-R * t`, undoing a translation `t`.
-fn fromRows(r0:V3, r1:V3, r2:V3, t:V3) M4 {
-  return .{
-    .{r0[0], r1[0], r2[0], 0},
-    .{r0[1], r1[1], r2[1], 0},
-    .{r0[2], r1[2], r2[2], 0},
-    .{-dot(r0, t), -dot(r1, t), -dot(r2, t), 1},
-  };
+// ---- tests ----
+
+test "spring-damper settles where its force balances" {
+  var p = v3(0, 0, 0);
+  var v = v3(1, 0, 0);
+  const k = 60.0;
+  const force_z = 3.0;
+  for (0..120) |_| springDamper(&p, &v, v3(0, 1, 0), k, 6, 0.8, v3(0, 0, force_z), 1.0 / 30.0);
+  // equilibrium: displacement = force / k = 3/60 = 0.05
+  try testing.expect(len(p - v3(0, 1, force_z / k)) < 1e-3);
+  try testing.expect(len(v) < 1e-3);
 }
 
-fn column(m:M4, c:usize) V3 { return .{m[c][0], m[c][1], m[c][2]}; }
-
-/// inverse of an affine transform (any rotation/scale/shear + translation;
-/// bottom row 0 0 0 1). The 3x3 inverts by cofactors: its rows are the
-/// cross products of the columns over the determinant.
-pub fn inverseAffine(m:M4) M4 {
-  const c0 = column(m, 0);
-  const c1 = column(m, 1);
-  const c2 = column(m, 2);
-  const x12 = cross(c1, c2);
-  const det = dot(c0, x12);
-  const id = splat(if (det != 0) 1 / det else 0);
-  return fromRows(x12 * id, cross(c2, c0) * id, cross(c0, c1) * id, column(m, 3));
-}
-
-/// inverse of a rigid transform (rotation + translation only): the rotation
-/// transposes.
-pub fn inverseRigid(m:M4) M4 {
-  return fromRows(column(m, 0), column(m, 1), column(m, 2), column(m, 3));
+test "spring is stable for huge steps" {
+  var p:f32 = 0;
+  var v:f32 = 50;
+  for (0..20) |_| spring(&p, &v, 1, 7, 0.75);
+  try testing.expectApproxEqAbs(@as(f32, 1), p, 1e-3);
+  try testing.expect(@abs(v) < 1e-2);
 }
 
 test "inverse roundtrip" {
@@ -312,8 +385,8 @@ test "inverse roundtrip" {
 }
 
 test "affine and rigid inverses" {
-  const aff = chain(.{translate(v3(3, -2, 5)), rotY(0.7), rotX(-0.4), scale3(v3(2, 0.5, 1.5))});
-  const rig = chain(.{translate(v3(-1, 4, 2)), rotY(1.9), rotZ(0.3)});
+  const aff = chain(&.{translate(v3(3, -2, 5)), rotY(0.7), rotX(-0.4), scale3(v3(2, 0.5, 1.5))});
+  const rig = chain(&.{translate(v3(-1, 4, 2)), rotY(1.9), rotZ(0.3)});
   for ([_]M4{mul(inverseAffine(aff), aff), mul(aff, inverseAffine(aff)), mul(inverseRigid(rig), rig)}) |i| {
     inline for (0..4) |c| inline for (0..4) |r| {
       try testing.expectApproxEqAbs(identity[c][r], i[c][r], 1e-4);
@@ -334,7 +407,6 @@ test "catmull-rom passes through its inner points" {
   try testing.expectEqual(b, catmullRom(a, b, c, d, 0));
   const e = catmullRom(a, b, c, d, 1);
   try testing.expect(len(e - c) < 1e-5);
-  // evenly spaced collinear points give a straight, uniformly paced line
   const mid = catmullRom(v3(0, 0, 0), v3(1, 0, 0), v3(2, 0, 0), v3(3, 0, 0), 0.5);
   try testing.expect(len(mid - v3(1.5, 0, 0)) < 1e-5);
 }
@@ -359,3 +431,12 @@ test "alignY maps +Y onto the direction, orthonormally" {
     try testing.expectApproxEqAbs(@as(f32, 1), dot(cross(x, d), z), 1e-5);
   }
 }
+
+test "Path.at gives evenly spaced points" {
+  const pts = [_]V3{v3(0, 0, 0), v3(1, 0, 0), v3(2, 0, 0), v3(3, 0, 0)};
+  const p = try Path.build(&pts, testing.allocator);
+  defer p.deinit(testing.allocator);
+  try testing.expectApproxEqAbs(@as(f32, 0.0), p.at(0.0)[0], 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 1.5), p.at(0.5)[0], 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 3.0), p.at(1.0)[0], 1e-5);
+}   

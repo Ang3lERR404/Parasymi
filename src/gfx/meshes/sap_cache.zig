@@ -19,7 +19,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void { try gourd(b, 1); }
 /// `scale` times its full size, standing on the origin.
 pub fn gourd(b:*mg.Builder, scale:f32) Allocator.Error!void {
   const s = b.mark();
-  try mg.ellipsoid(b, .{.center = v3(0, 0.3, 0), .radii = v3(0.33, 0.32, 0.33), .col = color.rgb(.{0.55, 0.38, 0.18}, 255), .rings = 9, .segs = 12, .t = 0.4});
+  try mg.ellipsoid(b, .{.center = v3(0, 0.3, 0), .radii = v3(0.33, 0.32, 0.33), .col = color.rgb(0.55, 0.38, 0.18).toRgba8(255), .rings = 9, .segs = 12, .t = 0.4});
   try mg.ellipsoid(b, .{.center = v3(0, 0.3, 0.27), .radii = v3(0.13, 0.15, 0.08), .col = sap, .part = .bloom, .t = 0.4});
   for (0..5) |i| {
     const a = m.f(i) / 5 * m.tau;
@@ -36,5 +36,5 @@ pub fn gourd(b:*mg.Builder, scale:f32) Allocator.Error!void {
     const a = m.f(i) / 5 * m.tau;
     try b.blade(v3(0, 0.6, 0), v3(@cos(a), 0, @sin(a)), 0.22, 0.08, -0.5, leaf_dark, leaf_lite, 1, .leaf);
   }
-  if (scale != 1) b.xform(s, m.scale3(m.splat(scale)));
+  if (scale != 1) b.xform(s, m.scale3(m.splat3(scale)));
 }

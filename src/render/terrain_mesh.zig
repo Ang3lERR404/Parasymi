@@ -10,17 +10,17 @@ const rng = @import("../core/rng.zig");
 const color = @import("../core/color.zig");
 const TV = @import("../gfx/vertex.zig").Terrain;
 
-fn baseColor(k:ck.Kind) [3]f32 {
+fn baseColor(k:ck.Kind) color.Rgb {
   return switch (k) {
-    .water => .{0.10, 0.22, 0.35},
-    .soil => .{0.36, 0.27, 0.19},
-    .moss => .{0.20, 0.36, 0.20},
-    .stone => .{0.42, 0.42, 0.46},
-    .ley => .{0.30, 0.24, 0.45},
+    .water => color.rgb(0.10, 0.22, 0.35),
+    .soil => color.rgb(0.36, 0.27, 0.19),
+    .moss => color.rgb(0.20, 0.36, 0.20),
+    .stone => color.rgb(0.42, 0.42, 0.46),
+    .ley => color.rgb(0.30, 0.24, 0.45),
   };
 }
 
-fn quad(out:*std.ArrayList(TV), gpa:Allocator, p:[4][3]f32, n:[3]f32, c:[4]u8, info:[4]u8) Allocator.Error!void {
+fn quad(out:*std.ArrayList(TV), gpa:Allocator, p:[4][3]f32, n:[3]f32, c:color.Rgba8, info:[4]u8) Allocator.Error!void {
   const idx = [_]usize{0, 1, 2, 0, 2, 3};
   for (idx) |i| try out.append(gpa, .{.pos = p[i], .nrm = n, .col = c, .info = info});
 }

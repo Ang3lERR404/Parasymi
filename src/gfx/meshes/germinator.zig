@@ -19,7 +19,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     const a = m.f(i) / 9 * m.tau;
     try b.blade(v3(@cos(a) * 0.2, 0.12, @sin(a) * 0.2), v3(@cos(a), 0, @sin(a)), 0.8, 0.3, -0.9, leaf_dark, leaf_lite, 0.6, .leaf);
   }
-  try mg.ellipsoid(b, .{.center = v3(0, 0.55, 0), .radii = v3(0.38, 0.45, 0.38), .col = color.rgb(.{0.75, 0.95, 0.5}, 255), .part = .bloom, .rings = 10, .segs = 14, .t = 0.8});
+  try mg.ellipsoid(b, .{.center = v3(0, 0.55, 0), .radii = v3(0.38, 0.45, 0.38), .col = color.rgb(0.75, 0.95, 0.5).toRgba8(255), .part = .bloom, .rings = 10, .segs = 14, .t = 0.8});
   for (0..4) |i| {
     const a = m.f(i) / 4 * m.tau + 0.4;
     var path:[8]V3 = undefined;

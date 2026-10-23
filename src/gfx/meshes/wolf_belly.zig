@@ -19,7 +19,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     for (0..9) |j| {
       const th = m.f(j) / 8 * m.pi;
       const tw = a + th * 0.5;
-      path[j] = v3(@sin(th) * @cos(tw), @cos(th), @sin(th) * @sin(tw)) * m.splat(1.05);
+      path[j] = v3(@sin(th) * @cos(tw), @cos(th), @sin(th) * @sin(tw)) * m.splat3(1.05);
       ts[j] = 0.4;
     }
     try b.tube(&path, &ts, 0.07, 0.07, vine, .stem, 4);

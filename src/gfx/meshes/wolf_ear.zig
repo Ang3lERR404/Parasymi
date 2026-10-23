@@ -30,7 +30,7 @@ fn at(k:f32, u:f32) V3 {
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   var pts:[ROWS * COLS]V3 = undefined;
   var nrms:[ROWS * COLS]V3 = undefined;
-  var cols:[ROWS * COLS][4]u8 = undefined;
+  var cols:[ROWS * COLS]color.Rgba8 = undefined;
   var us:[ROWS * COLS]f32 = undefined;
   for (0..ROWS) |r| for (0..COLS) |c| {
     const k = m.ratio(r, ROWS - 1) * 0.985;

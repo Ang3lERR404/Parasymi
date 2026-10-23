@@ -11,6 +11,7 @@ pub const Look = struct {
   flutter:f32 = 0,
   phase:f32 = 0,
   fade:f32 = 1,
+  /// rgb tint + weight (weight 0 = no tint, 1 = full tint)
   tint:[4]f32 = .{1, 1, 1, 0},
   /// how far a sac sags outward under its own weight (unit-radius units)
   sag:f32 = 0,
@@ -54,6 +55,7 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
     .p = .{look.glow, look.flutter, look.phase, look.fade},
     .tint = look.tint,
+    // q.x = sag; q.y/z/w reserved (GPU alignment)
     .q = .{look.sag, 0, 0, 0},
   };
 }

@@ -98,7 +98,7 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     const a = s.activity;
     const yaw = m.dirYaw(s.dir);
     const breathe = 1 + (0.02 + 0.05 * a) * @sin(tf * (1.5 + 2 * a) + s.seed * 9);
-    try g.parts.emit(s.def().mesh, m.chain(.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed});
+    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed});
     try st.emit(s, &g.parts, ctr, tf);
   }
 }
@@ -112,7 +112,7 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(def.item) > 0;
   const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + 0.02);
   const tint:[4]f32 = if (ok) .{0.6, 1.4, 0.8, 0.7} else .{1.6, 0.4, 0.4, 0.8};
-  try g.parts.emit(def.mesh, m.chain(.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat(0.96))}), .{.glow = 0.6 + 0.4 * @sin(tf * 5), .tint = tint});
+  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(0.96))}), .{.glow = 0.6 + 0.4 * @sin(tf * 5), .tint = tint});
 }
 
 /// resource nodes within `nr` tiles of the camera focus.
@@ -132,9 +132,9 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
         const wz = c.originY() + @as(i32, @intCast(t / ck.SIZE));
         const hsh = rng.unit(rng.hash2(0xD0D, wx, wz));
         const sc = 0.55 + 0.45 * m.f(c.res[t]) / 26;
-        try g.parts.emit(node.mesh, m.chain(.{
+        try g.parts.emit(node.mesh, m.chain(&.{
           m.translate(m.tileCentre(wx, wz, c.height[t])),
-          m.rotY(hsh * m.tau), m.scale3(m.splat(sc)),
+          m.rotY(hsh * m.tau), m.scale3(m.splat3(sc)),
         }), .{.glow = node.glow, .phase = hsh});
       }
     }
@@ -145,6 +145,6 @@ fn motes(g:*Game) Allocator.Error!void {
   for (g.stars.motes.items) |mo| {
     const spin = @as(f32, @floatCast(g.time)) * 1.5 + mo.phase * 10;
     const fade = m.clamp01(mo.life);
-    try g.parts.emit(.mote, m.chain(.{m.translate(mo.pos), m.rotY(spin), m.rotX(spin * 0.7), m.scale3(m.splat(0.6 + 0.6 * fade))}), .{.glow = 1.6 * fade, .phase = mo.phase});
+    try g.parts.emit(.mote, m.chain(&.{m.translate(mo.pos), m.rotY(spin), m.rotX(spin * 0.7), m.scale3(m.splat3(0.6 + 0.6 * fade))}), .{.glow = 1.6 * fade, .phase = mo.phase});
   }
 }
