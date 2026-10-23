@@ -151,6 +151,12 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   `v_young` (newest growth and tips thinner, more translucent). Petals see-
   through face-on. Parasitic: alien, not hostile: pale pearl/lilac with a
   thin-film iridescent sap. Symbiotic: greens/teals.
+- Plant silhouettes: symbiotes (`herb`) flare into short roots, carry their
+  leaves on one vase envelope (`leaf_from` lifts it into a crown for trees),
+  and bloom from a calyx with sepals: two cupped whorls of real petals
+  (`meshgen.petal`: narrow claw, broad, rounded tip). Parasites (`coil`):
+  twisted 3-strand stalk on a bulbous foot, small bladders up it, a crown
+  of fronds curling into spirals around a bulb; no leaves or spikes.
 - Confluence: 8 growth keys with one vertex layout, blended per vertex in
   plant.vert (binding 2 reads the next key), so it grows without stepping;
   each braid strand gathers at the crown and runs on as its red vine in one

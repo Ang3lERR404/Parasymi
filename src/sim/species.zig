@@ -37,6 +37,10 @@ pub const Lineage = enum(u8) {
 pub const Form = enum(u8) {
   /// a stem with leaves, thorns, tendrils and a bloom
   herb,
+  /// the parasites' alien body: a twisted stalk on a bulbous foot with
+  /// bladders (`thorns`) up it and a crown of curling fronds (`tendrils`)
+  /// around a bulb (`bloom_r`); no leaves or petals
+  coil,
   /// a symbiotic braid below that frays into parasitic vines above, crowned
   /// by translucent sap petals: both lineages in one body
   confluence,
@@ -49,6 +53,9 @@ pub const Genome = struct {
   /// control points, `curl` spiral (0 none .. 0.5 tight), `wobble` noise.
   stem_h:f32, stem_r:f32, segments:u8, curl:f32, wobble:f32 = 0.1,
   leaves:u8, leaf_len:f32, leaf_w:f32, leaf_droop:f32,
+  /// how far up the stem (0..1) the leaves begin: low for a leafy herb,
+  /// high for a tree that carries its leaves as a crown
+  leaf_from:f32 = 0.2,
   petals:u8, bloom_r:f32,
   thorns:u8, tendrils:u8,
   /// tendrils are grown vines too: they coil as they reach for the ground
