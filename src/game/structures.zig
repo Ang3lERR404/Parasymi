@@ -59,6 +59,9 @@ pub const Def = struct {
   /// seconds it takes to grow from a sprout once the gardener puts it down
   /// (0: there at once); it does no work until grown
   grow:f32 = 0,
+  /// carries items tile to tile the way it faces (R turns it): carriers
+  /// chain into one line, and producers leave them to pull through `output`
+  carrier:bool = false,
 };
 
 pub const defs = reg.table(Def, "def");

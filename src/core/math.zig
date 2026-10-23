@@ -57,6 +57,8 @@ pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
 pub inline fn asin(x:f32) f32 { return math.asin(clamp(x, -1, 1)); }
 pub inline fn sign(x:f32) f32 { return math.sign(x); }
 /// degrees to radians.
+/// a 0..1 value quantised to a byte (clamped; truncates like the GPU's unorm).
+pub inline fn unorm8(x:f32) u8 { return @intFromFloat(clamp01(x) * 255); }
 pub inline fn rad(deg:f32) f32 { return deg * (pi / 180.0); }
 /// shortest signed difference `to - from`, wrapped into -pi..pi.
 pub inline fn angleDiff(from:f32, to:f32) f32 { return atan2(@sin(to - from), @cos(to - from)); }
@@ -74,6 +76,40 @@ pub inline fn footprintCentre(x:i32, z:i32, size:u8, y:f32) V3 {
 }
 /// world-space centre of tile (x, z) at height y.
 pub inline fn tileCentre(x:i32, z:i32, y:f32) V3 { return footprintCentre(x, z, 1, y); }
+
+/// the tiles of a size x size footprint anchored at (x, z), row by row:
+/// `var it = m.footprint(x, z, 2); while (it.next()) |t| ...` (t = .{x, z}).
+pub const Footprint = struct {
+  x:i32, z:i32, size:u8, k:u16 = 0,
+  pub fn next(fp:*Footprint) ?[2]i32 {
+    const n = @as(u16, fp.size) * fp.size;
+    if (fp.k >= n) return null;
+    defer fp.k += 1;
+    return .{fp.x + @as(i32, fp.k % fp.size), fp.z + @as(i32, fp.k / fp.size)};
+  }
+};
+pub inline fn footprint(x:i32, z:i32, size:u8) Footprint { return .{.x = x, .z = z, .size = size}; }
+
+/// offsets on the square ring at Chebyshev distance `r` (r = 0 is the centre
+/// alone), row by row; walking r = 0, 1, 2… visits tiles nearest-first.
+pub const Ring = struct {
+  r:i32, dx:i32, dz:i32,
+  pub fn next(it:*Ring) ?[2]i32 {
+    while (it.dz <= it.r) {
+      const o:[2]i32 = .{it.dx, it.dz};
+      // inner rows touch the ring only at their ends
+      const edge = @abs(it.dz) == it.r;
+      it.dx = if (it.dx >= it.r) -it.r else if (edge) it.dx + 1 else it.r;
+      if (it.dx == -it.r) it.dz += 1;
+      return o;
+    }
+    return null;
+  }
+};
+pub inline fn ring(r:i32) Ring { return .{.r = r, .dx = -r, .dz = -r}; }
+
+/// the four facings in order, for `for (m.dirs) |d|`.
+pub const dirs = [4]Dir{0, 1, 2, 3};
 
 /// one of four facings: +x (east), +z (south), -x (west), -z (north).
 pub const Dir = u2;
@@ -490,4 +526,19 @@ test "degrees to radians, and a triangle's centroid" {
   try testing.expectApproxEqAbs(@as(f32, 1), c[0], 1e-6);
   try testing.expectApproxEqAbs(@as(f32, 1), c[1], 1e-6);
   try testing.expectApproxEqAbs(@as(f32, 2), c[2], 1e-6);
+}
+test "footprints and rings visit each tile once" {
+  var fp = footprint(-1, 4, 2);
+  const want = [_][2]i32{.{-1, 4}, .{0, 4}, .{-1, 5}, .{0, 5}};
+  for (want) |w| try testing.expectEqual(w, fp.next().?);
+  try testing.expect(fp.next() == null);
+  for (0..5) |ri| {
+    const r:i32 = @intCast(ri);
+    var it = ring(r);
+    var n:i32 = 0;
+    while (it.next()) |o| : (n += 1) try testing.expectEqual(@abs(r), @max(@abs(o[0]), @abs(o[1])));
+    try testing.expectEqual(if (r == 0) 1 else 8 * r, n);
+  }
+  try testing.expectEqual(@as(u8, 255), unorm8(2));
+  try testing.expectEqual(@as(u8, 0), unorm8(-1));
 }

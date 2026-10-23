@@ -18,7 +18,7 @@ const root = @import("../../gfx/meshes/conduit.zig");
 /// decision: a conduit grows (out from its middle to its edges) but does
 /// not sway: its root hugs the ground and joins the next conduit's, and a
 /// bend per conduit would split the joins along a chain
-pub const def:st.Def = .{ .name = "ROOT CONDUIT", .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5 };
+pub const def:st.Def = .{ .name = "ROOT CONDUIT", .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true };
 
 /// tiles per second an item travels along conduits
 const SPEED:f32 = 2.5;

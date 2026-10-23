@@ -3,6 +3,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
+const m = @import("../core/math.zig");
 const ck = @import("chunk.zig");
 const gen = @import("gen.zig");
 
@@ -43,24 +44,22 @@ pub const World = struct {
   /// claim (or release, with .none) a size x size footprint anchored at
   /// (wx, wy), pinning/unpinning each chunk once per tile.
   pub fn setFootprint(w:*World, wx:i32, wy:i32, size:u8, o:Occ) void {
-    for (0..size) |dy| for (0..size) |dx| {
-      const x = wx + @as(i32, @intCast(dx));
-      const y = wy + @as(i32, @intCast(dy));
-      const c = w.chunkOfTile(x, y) orelse continue;
-      const t = ck.localIndex(x, y);
+    var it = m.footprint(wx, wy, size);
+    while (it.next()) |p| {
+      const c = w.chunkOfTile(p[0], p[1]) orelse continue;
+      const t = ck.localIndex(p[0], p[1]);
       if (c.occ[t] == .none and o != .none) c.pins += 1;
       if (c.occ[t] != .none and o == .none) c.pins -= 1;
       c.occ[t] = o;
-    };
+    }
   }
 
   /// re-point an existing footprint at a new occupant id (after a swap-remove).
   pub fn moveFootprint(w:*World, wx:i32, wy:i32, size:u8, o:Occ) void {
-    for (0..size) |dy| for (0..size) |dx| {
-      const x = wx + @as(i32, @intCast(dx));
-      const y = wy + @as(i32, @intCast(dy));
-      if (w.chunkOfTile(x, y)) |c| c.occ[ck.localIndex(x, y)] = o;
-    };
+    var it = m.footprint(wx, wy, size);
+    while (it.next()) |p| {
+      if (w.chunkOfTile(p[0], p[1])) |c| c.occ[ck.localIndex(p[0], p[1])] = o;
+    }
   }
 
   /// height of a loaded tile something can stand on (null over water or void).
@@ -75,13 +74,12 @@ pub const World = struct {
   pub fn footprintFree(w:*const World, wx:i32, wy:i32, size:u8, comptime ok:fn (ck.Kind) bool) bool {
     const c0 = w.chunkOfTile(wx, wy) orelse return false;
     const h0 = c0.height[ck.localIndex(wx, wy)];
-    for (0..size) |dy| for (0..size) |dx| {
-      const x = wx + @as(i32, @intCast(dx));
-      const y = wy + @as(i32, @intCast(dy));
-      const c = w.chunkOfTile(x, y) orelse return false;
-      const t = ck.localIndex(x, y);
+    var it = m.footprint(wx, wy, size);
+    while (it.next()) |p| {
+      const c = w.chunkOfTile(p[0], p[1]) orelse return false;
+      const t = ck.localIndex(p[0], p[1]);
       if (c.occ[t] != .none or !ok(c.kind[t]) or c.height[t] != h0) return false;
-    };
+    }
     return true;
   }
 
@@ -103,16 +101,12 @@ pub const World = struct {
     w.fresh.clearRetainingCapacity();
     var r:i32 = 0;
     while (r <= radius) : (r += 1) {
-      var dy:i32 = -r;
-      while (dy <= r) : (dy += 1) {
-        var dx:i32 = -r;
-        while (dx <= r) : (dx += 1) {
-          if (@max(@abs(dx), @abs(dy)) != r) continue;
-          const at:Coord = .{.x = focus.x + dx, .y = focus.y + dy};
-          if (w.map.contains(at)) continue;
-          if (w.fresh.items.len >= budget) return;
-          _ = try w.load(at);
-        }
+      var it = m.ring(r);
+      while (it.next()) |o| {
+        const at:Coord = .{.x = focus.x + o[0], .y = focus.y + o[1]};
+        if (w.map.contains(at)) continue;
+        if (w.fresh.items.len >= budget) return;
+        _ = try w.load(at);
       }
     }
   }

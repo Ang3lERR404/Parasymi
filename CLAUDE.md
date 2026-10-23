@@ -84,7 +84,8 @@ recipes (`game/craft.zig`) are plain data tables.
 
 ## Conventions
 - 2-space indent, `name:Type`, terse `//!`/`///` docs, LF.
-- All math via `core/math.zig` (`m`): scalars, tiles, `dirVec`/`dirYaw`,
+- All math via `core/math.zig` (`m`): scalars, `unorm8`, tiles (`footprint`
+  and `ring` iterators, `Chunk.tileOf` back from a local index), `dirs`/`dirVec`/`dirYaw`,
   vectors/matrices, `spring`, `springDamper`, `catmullRom`/`splineResample`,
   `alignY`, `Frustum`. Colours via `core/color.zig`. Never reach into
   `std.math` or hand-roll casts. No inline `std.ns.Name`: alias at file top.
@@ -136,7 +137,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   adjacent node 1 item/4 s into an 8-item buffer, feeds neighbours, idles
   with no node; 3 fibre + 2 grit + 1 ley shard; "Deep Rooting"). Put down,
   they grow (`Def.grow`: germinator 6 s, research bloom 8, sap cache and
-  digger 4, conduit 1.5) and do no work until grown.
+  digger 4, conduit 1.5) and do no work until grown. `Def.carrier` marks
+  item carriers (conduit): they face a way, chain, and are pulled through.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
   unless one already holds them. Never sown; grows 1.5× the slower parent

@@ -72,11 +72,9 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
 pub fn heightAt(seed:u64, wx:i32, wy:i32) f32 { return sample(seed, wx, wy).height; }
 
 pub fn generate(seed:u64, c:*ck.Chunk) void {
-  const ox = c.originX();
-  const oy = c.originY();
-  for (0..ck.SIZE) |ly| for (0..ck.SIZE) |lx| {
-    const i = ly * ck.SIZE + lx;
-    const s = sample(seed, ox + @as(i32, @intCast(lx)), oy + @as(i32, @intCast(ly)));
+  for (0..ck.N) |i| {
+    const wx, const wy = c.tileOf(i);
+    const s = sample(seed, wx, wy);
     c.height[i] = s.height;
     c.kind[i] = s.kind;
     c.ley[i] = s.ley;
@@ -84,7 +82,7 @@ pub fn generate(seed:u64, c:*ck.Chunk) void {
     c.res[i] = s.res;
 
     c.occ[i] = .none;
-  };
+  }
 }
 
 test "generation is deterministic" {

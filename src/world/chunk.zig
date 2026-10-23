@@ -94,4 +94,8 @@ pub const Chunk = struct {
 
   pub fn originX(c:*const Chunk) i32 { return c.at.x * SIZE; }
   pub fn originY(c:*const Chunk) i32 { return c.at.y * SIZE; }
+  /// world tile (x, y) of local tile index `t` (inverse of `localIndex`).
+  pub fn tileOf(c:*const Chunk, t:usize) [2]i32 {
+    return .{c.originX() + @as(i32, @intCast(t % SIZE)), c.originY() + @as(i32, @intCast(t / SIZE))};
+  }
 };

@@ -44,7 +44,7 @@ pub const Seeker = struct {
     if (sk.cursor >= n) sk.cursor = 0;
     // conduit chains are few: follow them all once per sweep
     if (sk.cursor == 0) for (ss.list.items) |*s| {
-      if (s.kind() != .conduit) continue;
+      if (!s.def().carrier) continue;
       const pair = chain(w, p, ss, s) orelse continue;
       if (try sk.meet(gpa, w, p, g, pair[0], pair[1])) return;
     };
@@ -141,7 +141,7 @@ fn chain(w:*const World, p:*const Plants, ss:*st.Structures, s:*const st.Structu
     const fz = cur.y + cv.z;
     if (ss.at(w, fx, fz)) |j| {
       const next = ss.get(j);
-      if (next.kind() != .conduit) return null;
+      if (!next.def().carrier) return null;
       const nv = m.dirVec(next.dir);
       if (nv.x == -cv.x and nv.z == -cv.z) return null;
       cur = next;
@@ -216,10 +216,8 @@ test "mature lineages within two tiles grow one confluence" {
   const h = gd.p.len() - 1;
   const e = gd.p.extent(h);
   try testing.expectEqual(@as(u8, 2), e.size);
-  for (0..2) |dy| for (0..2) |dx| {
-    const at = gd.p.at(&gd.w, e.x + @as(i32, @intCast(dx)), e.y + @as(i32, @intCast(dy))).?;
-    try testing.expectEqual(h, at.idx());
-  };
+  var fp = m.footprint(e.x, e.y, e.size);
+  while (fp.next()) |p| try testing.expectEqual(h, gd.p.at(&gd.w, p[0], p[1]).?.idx());
   try testing.expect(!gd.p.canPlace(&gd.w, e.x + 1, e.y + 1, .lumenroot));
   try testing.expect(e.gap(gd.p.extent(0)) <= species.get(HYBRID).contain);
 

@@ -21,7 +21,7 @@ pub const Rgb = extern struct {
 
   /// 0..1 rgb -> 8-bit RGBA with the given alpha byte.
   pub fn toRgba8(self:Rgb, a:u8) Rgba8 {
-    return .{ .r = byte(self.r), .g = byte(self.g), .b = byte(self.b), .a = a };
+    return .{ .r = m.unorm8(self.r), .g = m.unorm8(self.g), .b = m.unorm8(self.b), .a = a };
   }
 };
 
@@ -44,8 +44,6 @@ pub const Rgba8 = extern struct {
 };
 
 const INV255:f32 = 1.0 / 255.0;
-
-inline fn byte(x:f32) u8 { return @intFromFloat(m.clamp01(x) * 255); }
 
 pub fn rgb(r:f32, g:f32, b:f32) Rgb { return .{ .r = r, .g = g, .b = b }; }
 

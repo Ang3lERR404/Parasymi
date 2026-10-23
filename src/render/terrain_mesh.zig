@@ -181,7 +181,7 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
     const k = r.kind[i];
     const wx = ox + lx;
     const wy = oy + ly;
-    const ley:u8 = @intFromFloat(m.clamp01(c.ley_cap[t] / gen.LEY_MAX) * 255);
+    const ley = m.unorm8(c.ley_cap[t] / gen.LEY_MAX);
     // info.z: 255 marks the ground's top surface (read back as 1.0)
     const info:[4]u8 = .{@intFromEnum(k), ley, 255, 0};
 

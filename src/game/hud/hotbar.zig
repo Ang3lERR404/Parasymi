@@ -6,6 +6,8 @@ const bufPrint = std.fmt.bufPrint;
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
+const st = @import("../structures.zig");
+const items = @import("../../sim/items.zig");
 
 const gap:f32 = 64;
 const pod_r:f32 = 20;
@@ -14,6 +16,12 @@ const glow_alpha:u8 = 110;
 
 /// display names for each Direction value, in enum order.
 const facing = [_][]const u8{"EAST", "SOUTH", "WEST", "NORTH"};
+
+/// whether placing `item` puts down a structure that faces a way (R turns it).
+fn turns(item:items.Item) bool {
+  const k = st.kindOf(item) orelse return false;
+  return st.defs.get(k).carrier;
+}
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const n = play.hotbar.len;
@@ -39,7 +47,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const item = play.hotbar[g.hot];
   var buf:[64]u8 = undefined;
   const label = if (!play.known(g, item)) "NOT YET UNDERSTOOD"
-    else if (item == .conduit) bufPrint(&buf, "{s} FACING {s}", .{item.info().name, facing[g.place_dir]}) catch item.info().name
+    else if (turns(item)) bufPrint(&buf, "{s} FACING {s}", .{item.info().name, facing[g.place_dir]}) catch item.info().name
     else item.info().name;
   _ = try d.text(W / 2 - Draw.width(label, s.text_sub) / 2, hy - 50, s.text_sub, s.gold, label);
 }   

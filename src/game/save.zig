@@ -146,7 +146,8 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
 
 fn gathered(seed:u64, c:*const ck.Chunk) bool {
   for (0..ck.N) |t| {
-    const s = gen.sample(seed, c.originX() + @as(i32, @intCast(t % ck.SIZE)), c.originY() + @as(i32, @intCast(t / ck.SIZE)));
+    const wx, const wy = c.tileOf(t);
+    const s = gen.sample(seed, wx, wy);
     if (s.res != c.res[t]) return true;
   }
   return false;

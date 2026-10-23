@@ -264,8 +264,7 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
       for (0..ck.N) |t| {
         if (c.res[t] == 0) continue;
         const node = resources.of(c.kind[t]) orelse continue;
-        const wx = c.originX() + @as(i32, @intCast(t % ck.SIZE));
-        const wz = c.originY() + @as(i32, @intCast(t / ck.SIZE));
+        const wx, const wz = c.tileOf(t);
         const hsh = rng.unit(rng.hash2(0xD0D, wx, wz));
         const sc = NODE_MIN + (1 - NODE_MIN) * m.f(c.res[t]) / gen.RES_FULL;
         try g.parts.emit(node.mesh, m.chain(&.{

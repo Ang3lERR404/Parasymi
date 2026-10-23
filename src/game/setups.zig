@@ -76,28 +76,24 @@ fn digger(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   g.prog.done.insert(.deep_rooting);
   var r:i32 = 2;
   while (r < 12) : (r += 1) {
-    var dz:i32 = -r;
-    while (dz <= r) : (dz += 1) {
-      var dx:i32 = -r;
-      while (dx <= r) : (dx += 1) {
-        if (@max(@abs(dx), @abs(dz)) != r) continue;
-        const x = cx + dx;
-        const z = cz + dz;
-        if (!nodeBeside(g, x, z) or !g.structs.canPlace(&g.world, x, z, .root_digger)) continue;
-        _ = try g.structs.place(g.gpa, &g.world, x, z, .root_digger, 0, 0.6);
-        for (0..4) |k| {
-          const v = m.dirVec(@intCast(k));
-          if (try g.structs.place(g.gpa, &g.world, x + v.x, z + v.z, .sap_cache, 0, 0.7)) return;
-        }
-        return;
+    var it = m.ring(r);
+    while (it.next()) |o| {
+      const x = cx + o[0];
+      const z = cz + o[1];
+      if (!nodeBeside(g, x, z) or !g.structs.canPlace(&g.world, x, z, .root_digger)) continue;
+      _ = try g.structs.place(g.gpa, &g.world, x, z, .root_digger, 0, 0.6);
+      for (m.dirs) |d| {
+        const v = m.dirVec(d);
+        if (try g.structs.place(g.gpa, &g.world, x + v.x, z + v.z, .sap_cache, 0, 0.7)) return;
       }
+      return;
     }
   }
 }
 
 fn nodeBeside(g:*const Game, x:i32, z:i32) bool {
-  for (0..4) |k| {
-    const v = m.dirVec(@intCast(k));
+  for (m.dirs) |d| {
+    const v = m.dirVec(d);
     const c = g.world.chunkOfTile(x + v.x, z + v.z) orelse continue;
     const t = ck.localIndex(x + v.x, z + v.z);
     if (c.res[t] > 0 and c.occ[t] == .none and c.kind[t] != .water) return true;

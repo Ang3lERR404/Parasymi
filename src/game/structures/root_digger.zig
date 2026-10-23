@@ -87,15 +87,15 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   return true;
 }
 
-/// feed the next buffered item to a neighbour that wants it. Conduits are
+/// feed the next buffered item to a neighbour that wants it. Carriers are
 /// left alone: one behind the digger pulls through `output` itself.
 fn handOff(ctx:st.Ctx, i:st.Id) void {
   const self = ctx.ss.get(i);
   const item = output(self) orelse return;
-  for (0..4) |k| {
-    const v = m.dirVec(@intCast(k));
+  for (m.dirs) |d| {
+    const v = m.dirVec(d);
     const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
-    if (ctx.ss.get(j).kind() == .conduit) continue;
+    if (ctx.ss.get(j).def().carrier) continue;
     if (ctx.ss.insert(ctx.g, j, item, 1) == 1) {
       _ = self.inv.take(item, 1);
       return;
@@ -113,8 +113,8 @@ const Found = struct {
 /// an unoccupied resource node beside (x, y), trying `prefer` first so a
 /// digger stays on the node it is working.
 fn findNode(w:*const World, x:i32, y:i32, prefer:m.Dir) ?Found {
-  for (0..4) |k| {
-    const dir:m.Dir = prefer +% @as(m.Dir, @intCast(k));
+  for (m.dirs) |k| {
+    const dir = prefer +% k;
     const v = m.dirVec(dir);
     const c = w.chunkOfTile(x + v.x, y + v.z) orelse continue;
     const t = ck.localIndex(x + v.x, y + v.z);

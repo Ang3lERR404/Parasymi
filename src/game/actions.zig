@@ -192,14 +192,13 @@ test "a confluence gives convergence essence and its parents' seeds" {
   var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
   const x, const z = m.tileAt(g.player.pos);
-  for (0..2) |dy| for (0..2) |dx| {
-    const wx = x + 2 + @as(i32, @intCast(dx));
-    const wz = z + @as(i32, @intCast(dy));
-    const cc = g.world.chunkOfTile(wx, wz).?;
-    const t = ck.localIndex(wx, wz);
+  var fp = m.footprint(x + 2, z, 2);
+  while (fp.next()) |p| {
+    const cc = g.world.chunkOfTile(p[0], p[1]).?;
+    const t = ck.localIndex(p[0], p[1]);
     cc.kind[t] = .soil;
     cc.res[t] = 0;
-  };
+  }
   try std.testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
     .x = x + 2, .y = z, .chunk = undefined, .tile = undefined, .sp = .confluence,
     .seed = 0.5, .growth = 1, .essence = 3.5, .seeds = 2.2,
