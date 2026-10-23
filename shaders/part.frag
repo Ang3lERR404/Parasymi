@@ -55,6 +55,20 @@ void main() {
   // instance tint (paw beans, nose) can make it denser and browner
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
   bool inner_ear = part == 5 && dot(raw, V) < 0.0;
+  if (part == 8) {
+    // a thread of light between blooms: thin, semi-solid, a warm
+    // iridescent film whose hue turns with the view and along its length,
+    // with light running along it from bloom to bloom (glow: its network
+    // radiates, or it is a faint dark thread)
+    float t = pc.eye_time.w;
+    float fres = pow(1.0 - abs(dot(raw, V)), 2.0);
+    vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + fres * 1.2 + v_t * 2.0 - t * 0.15));
+    vec3 warm = mix(srgb2lin(vec3(1.0, 0.86, 0.62)), film, 0.4);
+    float run = 0.55 + 0.45 * pow(0.5 + 0.5 * sin(t * 2.2 - v_t * 16.0), 3.0);
+    c = warm * (0.25 + v_glow * 1.2 * run) + warm * fres * 0.3;
+    o = vec4(applyFog(c, v_pos), mix(0.45, 0.85, fres) * (0.5 + 0.5 * min(v_glow, 1.0)));
+    return;
+  }
   if (part == 7) {
     // a soft shadow on the ground: darkest at its centre, gone at its rim
     float r = clamp(v_t, 0.0, 1.0);

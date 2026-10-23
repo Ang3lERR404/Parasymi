@@ -41,13 +41,47 @@ void main() {
   float t = pc.eye_time.w;
   float growth = ia.x, fill = ia.y, seed = ia.z, aff = ia.w;
   float flow = ib.x, health = ib.y, sway = ib.z;
-  // species.Form: 0 herb, 1 coil, 2 confluence, 3 drift
-  bool confluence = abs(ib.w - 2.0) < 0.5;
+  // species.Form: 0 herb, 1 coil, 2 drift, 3 confluence, 4 radiant
+  bool confluence = abs(ib.w - 3.0) < 0.5;
   bool coil = abs(ib.w - 1.0) < 0.5;
+  bool radiant = abs(ib.w - 4.0) < 0.5;
   // a confluence blends between the growth keys around its growth, so it
   // grows smoothly instead of stepping from one shape to the next
   vec3 p = mix(pos, pos_next, ic.x);
   vec3 n = normalize(mix(nrm, nrm_next, ic.x));
+
+  if (radiant) {
+    // a structure of light assembles rather than grows: each fragment
+    // (tu.x its order, colour alpha its bearing) drifts in from its bearing
+    // and locks into place as growth passes it; each ring (tu.y) orbits at
+    // its own pace; the whole breathes slowly. It never bends from a root:
+    // the view bobs and drifts it.
+    float order = tu.x, ring = tu.y, bearing = col.a * 6.2832;
+    float settle = smoothstep(order * 0.7, order * 0.7 + 0.3, growth);
+    float spin = ring < 0.5 ? 0.06 : (ring < 1.5 ? 0.22 : (ring < 2.5 ? -0.13 : 0.04));
+    mat2 turn = rot(t * spin + seed * 6.2832);
+    p.xz = turn * p.xz;
+    n.xz = turn * n.xz;
+    float away = 1.0 - settle;
+    p.xz += (turn * vec2(cos(bearing), sin(bearing))) * away * 1.6;
+    p.y += away * (0.5 + 0.6 * sin(bearing * 3.0 + seed * 9.0));
+    p *= 1.0 + 0.025 * sin(t * 0.9 + seed * 6.28);
+    vec3 wp = ipos + p;
+    v_pos = wp;
+    v_nrm = n;
+    v_col = srgb2lin(col.rgb);
+    v_form = ib.w;
+    v_ghost = ic.yz;
+    v_obj = p;
+    // light moving through it, a slow pulse out from the core
+    v_sap = vec2(fill, 0.5 + 0.5 * sin(t * 1.3 - order * 6.0 + seed * 6.0));
+    v_t = order;
+    // how far each fragment has settled (it fades in as it locks)
+    v_young = settle;
+    v_inst = vec4(aff, seed, health, float(part));
+    gl_Position = pc.vp * vec4(wp, 1.0);
+    return;
+  }
 
   // growth: whole-plant scale, then leaves/petals unfurl as it matures
   float g = smoothstep(0.0, 1.0, growth);

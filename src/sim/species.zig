@@ -49,6 +49,10 @@ pub const Form = enum(u8) {
   /// a symbiotic braid below that frays into parasitic vines above, crowned
   /// by translucent sap petals: both lineages in one body
   confluence,
+  /// a structure of light: a luminous core with fragments orbiting it
+  /// (`petals` lens plates, `bloom_r` its size); it assembles rather than
+  /// grows, and drifts rather than bends
+  radiant,
 };
 
 /// procedural mesh parameters (see gfx/meshgen.zig).

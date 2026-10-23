@@ -56,7 +56,23 @@ void main() {
   vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
   float fill = v_sap.x, moving = v_sap.y;
 
-  if (abs(v_form - 2.0) < 0.5 && part == 2) {
+  if (abs(v_form - 4.0) < 0.5) {
+    // a celestial bloom: the only thing in the garden that truly glows, and
+    // the glow is light carried inside thin living tissue, not a flat
+    // emission: brightest where the tissue is thinnest (its edges, at
+    // grazing angles) and in its core, pulsing out from the heart, with sap
+    // bubbles rising through it. Fragments fade in as they lock into place.
+    float core = part == 2 ? 1.0 : 0.65;
+    vec3 c = shade(v_col * 0.2, n, v_pos);
+    c += v_col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
+    c += v_col * max(dot(-n, SUN), 0.0) * 0.4;
+    c += mix(v_col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5;
+    float a = mix(0.5, 0.95, fres) * v_young;
+    if (v_ghost.x > 0.5) a *= 0.5;
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+  if (abs(v_form - 3.0) < 0.5 && part == 2) {
     // a confluence's sap petal: see-through violet face-on, amber at grazing
     // angles. Hue follows the vertex colour.
     vec3 deep = v_col * 0.18 * health;

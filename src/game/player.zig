@@ -391,7 +391,7 @@ pub const Player = struct {
       .wobble = 0.06, .curl = 0.15, .taper = 0.2, .seed = 0x7A11,
     });
     const side = m.mulV(hips, .{ 1, 0, 0, 0 });
-    try out.emitCurve(.wolf_tail, ctrl, v3(side[0], side[1], side[2]), tail_mesh.LEN, vine_look);
+    try out.emitCurve(.wolf_tail, ctrl, v3(side[0], side[1], side[2]), tail_mesh.LEN, 1, vine_look);
     // the tuft keeps the last joint's frame (smooth, no roll flips), moved
     // onto the vine's actual tip, which growth shifted slightly off the joint
     const tip = m.chain(&.{ T(ctrl[TAIL_JOINTS] - m.origin(seg)), seg });

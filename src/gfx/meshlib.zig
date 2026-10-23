@@ -54,6 +54,8 @@ const parts = struct {
   pub const item_pod = @import("meshes/item_pod.zig");
   pub const root_digger = @import("meshes/root_digger.zig");
   pub const digger_root = @import("meshes/digger_root.zig");
+  // translucent, over everything
+  pub const bloom_thread = @import("meshes/bloom_thread.zig");
 };
 const reg = registry.Registry(parts);
 

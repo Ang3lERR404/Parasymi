@@ -18,10 +18,9 @@ pub const def:species.Species = .{
   .hover = 3.2,
   // it drifts and bobs; it does not bend from a root
   .sway = 0.6,
-  // decision: until its own visual lands it grows as a floater, brighter
-  // and more saturated than the ground plants (it belongs to the sky)
+  // brighter and more saturated than the ground plants: it belongs to the sky
   .genome = .{
-    .form = .drift,
+    .form = .radiant,
     .stem_h = 0.12, .stem_r = 0.03, .segments = 4, .curl = 0.05, .wobble = 0.1,
     .leaves = 0, .leaf_len = 0.1, .leaf_w = 0.05, .leaf_droop = 0,
     .petals = 12, .bloom_r = 0.3, .thorns = 0, .tendrils = 5, .tendril_curl = 0.2, .tendril_wobble = 0.2,

@@ -163,9 +163,22 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   outside every field. Worked out each tick from the blooms only (pairwise
   links, then each radiating bloom's tiles), like containment. The hover
   panel shows RADIATING/DARK and links, DRAWING RADIANCE/WITHERING. Seed:
-  3 starlight + 1 ley shard + 2 essence (hotbar `-`). Its own visual (a
-  structure of light, threads between blooms) is next; it grows as a
-  brighter floater meanwhile.
+  3 starlight + 1 ley shard + 2 essence (hotbar `-`).
+  Visual (form `.radiant`, `meshgen.radiant`): a structure of light, not a
+  flower: a faceted luminous core with a brighter nucleus, spires above
+  and below, a ring of lens plates and a looser ring of crystal shards
+  orbiting at their own paces (counter to each other), a tilted halo.
+  Each fragment carries its assembly order (tu.x), ring (tu.y) and bearing
+  (colour alpha): plant.vert drifts it in from its bearing and locks it in
+  as growth passes its order (it assembles, never scales up), and the
+  bloom drifts and bobs instead of bending. plant.frag: the only true
+  glow, light carried in thin tissue (fresnel, core, pulse, bubbles),
+  translucent, fragments fading in as they lock. Threads (meshlib
+  `bloom_thread`, part `.thread`): bent on the GPU through the parts pass
+  (curve mode, `e.y` how far it reaches) from bloom core to core with a
+  slight sag; a warm iridescent film with light running along it, bright
+  when its network radiates; it reaches out from the more grown bloom as
+  that bloom finishes assembling.
 - Item ids are stored by value: new items go at the end of `items.Item`.
 - Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the seed;
   only the gardener's changes are stored. Bump `VERSION` when a stored layout

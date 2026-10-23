@@ -27,6 +27,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   g.parts.clear();
   g.parts.look(g.cam.viewEye(), m.Frustum.of(g.cam.viewProj()));
   try plants(g, reach, tf);
+  try threads(g, tf);
   const feet = try g.player.rig(&g.parts);
   try nodes(g, @intFromFloat(reach));
   try structures(g, reach, tf);
@@ -78,6 +79,45 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   }
 }
 
+/// where a floater hangs this frame: its hover height with a slow rise and
+/// fall, and a lazy drift about its tile.
+fn floatAt(def:*const species.Species, x:i32, y:i32, ground:f32, seed:f32, tf:f32) m.V3 {
+  const c = m.footprintCentre(x, y, def.size, 0);
+  const lift = 0.07 * @sin(tf * 0.5 + seed * 10) + 0.025 * @sin(tf * 1.13 + seed * 4);
+  return m.v3(c[0] + 0.05 * @sin(tf * 0.31 + seed * 7), @max(ground, 0) + def.hover + lift, c[2] + 0.05 * @cos(tf * 0.27 + seed * 5));
+}
+
+/// the threads of light between linked blooms (see ecology `Radiance`):
+/// bent on the GPU from one bloom's core to the other's with a slight sag,
+/// bright where their network radiates, faint where it is dark. A thread
+/// reaches out from the more grown bloom as that bloom finishes assembling.
+fn threads(g:*Game, tf:f32) Allocator.Error!void {
+  const s = g.plants.list.slice();
+  for (g.eco.radiance.links.items) |l| {
+    var ia = l.a.idx();
+    var ib = l.b.idx();
+    // links are worked out each tick; an uproot since then leaves a stale one
+    if (ia >= g.plants.len() or ib >= g.plants.len()) continue;
+    if (species.get(s.items(.sp)[ia]).radiance <= 0 or species.get(s.items(.sp)[ib]).radiance <= 0) continue;
+    if (s.items(.growth)[ib] > s.items(.growth)[ia]) std.mem.swap(usize, &ia, &ib);
+    const pos = [2]m.V3{ end(g, ia, tf), end(g, ib, tf) };
+    const span = pos[1] - pos[0];
+    const sag = m.v3(0, -0.12 * @sqrt(m.len(span)) * (1 + 0.15 * @sin(tf * 0.4 + m.f(ia))), 0);
+    const ctrl = [4]m.V3{ pos[0], pos[0] + span * m.splat3(1.0 / 3.0) + sag, pos[0] + span * m.splat3(2.0 / 3.0) + sag, pos[1] };
+    const side = m.norm(m.cross(span, m.v3(0, 1, 0)));
+    const reach = m.smooth(m.clamp01((s.items(.growth)[ia] - 0.85) / 0.15));
+    if (reach <= 0) continue;
+    try g.parts.emitCurve(.bloom_thread, ctrl, side, 1, reach, .{.glow = if (l.live) 1 else 0.1, .phase = s.items(.seed)[ia]});
+  }
+}
+
+/// a bloom's core this frame
+fn end(g:*Game, i:usize, tf:f32) m.V3 {
+  const s = g.plants.list.slice();
+  const def = species.get(s.items(.sp)[i]);
+  return floatAt(def, s.items(.x)[i], s.items(.y)[i], s.items(.chunk)[i].height[s.items(.tile)[i]], s.items(.seed)[i], tf);
+}
+
 /// what drawing one plant needs to know about it.
 const Drawn = struct {
   sp:species.Id, x:i32, y:i32, ground:f32,
@@ -98,10 +138,10 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
     // floaters hang in the air: a slow rise and fall and a lazy drift,
     // never a bounce, over a soft shadow that shrinks as they rise
     const ground = @max(y, 0);
-    const lift = 0.07 * @sin(tf * 0.5 + d.seed * 10) + 0.025 * @sin(tf * 1.13 + d.seed * 4);
-    y = ground + def.hover + lift;
-    at = m.v3(at[0] + 0.05 * @sin(tf * 0.31 + d.seed * 7), 0, at[2] + 0.05 * @cos(tf * 0.27 + d.seed * 5));
-    const r = 0.42 - 0.6 * lift;
+    const f = floatAt(def, d.x, d.y, d.ground, d.seed, tf);
+    at = f;
+    y = f[1];
+    const r = 0.42 - 0.6 * (f[1] - ground - def.hover);
     if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + 0.03, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = 0.6});
   }
   // a confluence grows through its keys, blending from one to the next;

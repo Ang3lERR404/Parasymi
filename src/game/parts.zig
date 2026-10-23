@@ -66,15 +66,16 @@ pub const Parts = struct {
 
   /// a mesh built straight up +Y over 0..1, bent on the GPU along the
   /// Catmull-Rom curve through `ctrl`, its x laid toward `side`; `len` is
-  /// the length the mesh was built at.
-  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl:[4]m.V3, side:m.V3, len:f32, look_:Look) Allocator.Error!void {
+  /// the length the mesh was built at, `reach` how far along it is drawn
+  /// (0..1; what lies beyond gathers at its end).
+  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl:[4]m.V3, side:m.V3, len:f32, reach:f32, look_:Look) Allocator.Error!void {
     var inst = instance(m.identity, look_);
     inst.c0 = .{ctrl[0][0], ctrl[0][1], ctrl[0][2], 1};
     inst.c1 = .{ctrl[1][0], ctrl[1][1], ctrl[1][2], 1};
     inst.c2 = .{ctrl[2][0], ctrl[2][1], ctrl[2][2], 1};
     inst.c3 = .{ctrl[3][0], ctrl[3][1], ctrl[3][2], 1};
     inst.tint = .{side[0], side[1], side[2], 0};
-    inst.e = .{1, 0, 0, len};
+    inst.e = .{1, @max(reach, 1e-3), 0, len};
     try p.add(id, ctrl[0], inst);
   }
 

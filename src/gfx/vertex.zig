@@ -18,7 +18,7 @@ pub const Terrain = extern struct {
 /// while the base holds.
 /// `shadow`: a soft dark patch on the ground under something floating
 /// (tu.x its radial fraction; instance fade its darkness).
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow };
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread };
 
 pub const Mesh = extern struct {
   pos:[3]f32,
@@ -84,9 +84,10 @@ pub const PartInstance = extern struct {
   /// growing structure has come along (1 grown)
   w:[4]f32,
   /// x how part.vert places it: 0 by the matrix; 1 along a curve (the
-  /// tail: c0..c3 xyz its control points, tint.xyz the side its x lies
-  /// toward, w its rest length); 2 a star mote (c3 its centre; y phase,
-  /// z life, w its trail echo, -1 when resting)
+  /// tail, a bloom thread: c0..c3 xyz its control points, tint.xyz the side
+  /// its x lies toward, y how far along it reaches (0: all of it), w its
+  /// rest length); 2 a star mote (c3 its centre; y phase, z life, w its
+  /// trail echo, -1 when resting)
   e:[4]f32 = .{0, 0, 0, 0},
 };
 

@@ -84,7 +84,8 @@ void main() {
     // ends extended in line), its x laid toward the side (tint.xyz) and its
     // z across, so the vine bends here instead of being rebuilt each frame
     vec3 P[4] = vec3[4](c0.xyz, c1.xyz, c2.xyz, c3.xyz);
-    float u = clamp(p.y, 0.0, 1.0) * 3.0;
+    // how far along it reaches (a bloom thread extends as its bloom finishes)
+    float u = clamp(p.y, 0.0, ie.y) * 3.0;
     int i = min(int(u), 2);
     float f = u - float(i);
     vec3 b = P[i], c = P[i + 1];
@@ -133,7 +134,7 @@ void main() {
   v_col = mode == 1 ? c : mix(c, c * tint.rgb, tint.w);
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * 6.28);
-  v_glow = ip.x * (part == 2u ? 1.0 : 0.06) * pulse * twinkle;
+  v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
   v_part = float(part);
   v_t = tu.x;
   v_fade = ip.w;

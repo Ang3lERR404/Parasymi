@@ -564,6 +564,7 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
     .herb => try herb(b, g, seed + @as(u64, variant) * 131, variant, !def.floating),
     .coil => try coil(b, g, seed + @as(u64, variant) * 131, variant),
     .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
+    .radiant => try radiant(b, g, seed + @as(u64, variant) * 131, variant),
     // a confluence's variants are its growth keys, all grown from one seed
     .confluence => try confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
   }
@@ -859,6 +860,109 @@ fn drift(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!vo
   }
 }
 
+/// a celestial bloom: not a flower but a structure of light that happens
+/// to be alive. A faceted core of luminous sap with a brighter nucleus, two
+/// slender spires of light above and below it, a ring of broad lens plates
+/// orbiting close, a looser ring of crystal shards orbiting the other way,
+/// and a thin halo. Each fragment is rigid and carries, for plant.vert:
+/// tu.x its assembly order (0 the core .. 1 the last to lock in), tu.y its
+/// ring (0 still, 1 the plates, 2 the shards, 3 the halo; each orbits at its
+/// own pace) and colour alpha its bearing around the core (where it drifts
+/// in from while the bloom assembles). The origin is the core.
+fn radiant(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!void {
+  var rng = Rng.init(seed);
+  const body = g.stem_col.toRgba8(255);
+  const lite = g.bloom_col.toRgba8(255);
+  const leaf = g.leaf_col.toRgba8(255);
+  const R = g.bloom_r;
+
+  // the core and its nucleus
+  var s = b.mark();
+  try ellipsoid(b, .{.center = m.v3(0, 0, 0), .radii = m.splat3(R * 0.55), .col = body, .part = .bloom, .rings = 5, .segs = 7, .t = 0.5});
+  try ellipsoid(b, .{.center = m.v3(0, 0, 0), .radii = m.splat3(R * 0.28), .col = lite, .part = .bloom, .rings = 4, .segs = 6, .t = 0.5});
+  fragment(b, s, 0, 0, 0);
+
+  // spires of light above and below
+  for ([_]f32{1, -1}, 0..) |dir, i| {
+    s = b.mark();
+    try shard(b, m.v3(0, dir * R * 0.4, 0), m.v3(0, dir, 0), R * (if (dir > 0) @as(f32, 2.4) else 1.6), R * 0.12, leaf, lite);
+    fragment(b, s, 0.15 + 0.05 * m.f(i), 0, 0);
+  }
+
+  // the inner ring: broad lens plates, tilted, close about the core
+  const plates = 5 + variant % 2;
+  for (0..plates) |i| {
+    const a = m.ratio(i, plates) * m.tau + rng.range(-0.15, 0.15);
+    const out = m.v3(@cos(a), 0, @sin(a));
+    s = b.mark();
+    try petal(b, .{
+      .base = out * m.splat3(R * 0.7) + m.v3(0, rng.range(-0.05, 0.05), 0), .out = out,
+      .len = R * rng.range(1.0, 1.25), .width = R * 0.5,
+      .rise = rng.range(-0.25, 0.35), .flare = 0.2, .cup = 0.35,
+      .col = body, .tip = lite, .part = .leaf,
+    });
+    fragment(b, s, 0.3 + 0.3 * m.ratio(i, plates), 1, a);
+  }
+
+  // the outer ring: crystal shards, looser, pointing along their orbit
+  const shards = 7;
+  for (0..shards) |i| {
+    const a = m.ratio(i, shards) * m.tau + 0.4 + rng.range(-0.2, 0.2);
+    const out = m.v3(@cos(a), 0, @sin(a));
+    const along = m.v3(-@sin(a), rng.range(-0.4, 0.4), @cos(a));
+    s = b.mark();
+    try shard(b, out * m.splat3(R * rng.range(1.9, 2.3)) + m.v3(0, rng.range(-0.25, 0.25) * R, 0), m.norm(along), R * rng.range(0.5, 0.8), R * 0.1, leaf, lite);
+    fragment(b, s, 0.55 + 0.35 * m.ratio(i, shards), 2, a);
+  }
+
+  // the halo: a thin ring of light at a tilt, the last to close
+  s = b.mark();
+  var ring:[25]V3 = undefined;
+  var ts:[25]f32 = undefined;
+  const tilt:f32 = 0.35;
+  for (&ring, &ts, 0..) |*p, *t, j| {
+    const a = m.ratio(j, 24) * m.tau;
+    const q = m.v3(@cos(a) * R * 1.55, 0, @sin(a) * R * 1.55);
+    p.* = m.v3(q[0], q[1] * @cos(tilt) - q[2] * @sin(tilt), q[1] * @sin(tilt) + q[2] * @cos(tilt));
+    t.* = 1;
+  }
+  try b.tube(&ring, &ts, R * 0.025, R * 0.025, lite, .bloom, 4);
+  fragment(b, s, 0.95, 3, 0);
+}
+
+/// mark every vertex since `start` as one fragment of a radiant bloom
+fn fragment(b:*Builder, start:usize, order:f32, ring:f32, bearing:f32) void {
+  const a:u8 = @intFromFloat(@mod(bearing, m.tau) / m.tau * 255);
+  for (b.v.items[start..]) |*v| {
+    v.tu = .{order, ring};
+    v.col.a = a;
+  }
+}
+
+/// a slender crystal of light: a faceted bipyramid from `base` along `dir`
+fn shard(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:color.Rgba8, tip:color.Rgba8) Allocator.Error!void {
+  const side = m.norm(m.cross(dir, if (@abs(dir[1]) > 0.9) m.v3(1, 0, 0) else m.v3(0, 1, 0)));
+  const up = m.cross(side, dir);
+  const mid = base + dir * m.splat3(len * 0.3);
+  const end = base + dir * m.splat3(len);
+  const S = 5;
+  var ring:[S]V3 = undefined;
+  for (&ring, 0..) |*p, i| {
+    const a = m.ratio(i, S) * m.tau;
+    p.* = mid + (side * m.splat3(@cos(a)) + up * m.splat3(@sin(a))) * m.splat3(r);
+  }
+  for (0..S) |i| {
+    const p0 = ring[i];
+    const p1 = ring[(i + 1) % S];
+    for ([_][3]V3{.{p0, p1, end}, .{p1, p0, base}}, 0..) |tri, k| {
+      var n = m.norm(m.cross(tri[1] - tri[0], tri[2] - tri[0]));
+      if (m.dot(n, (tri[0] + tri[1] + tri[2]) * m.splat3(1.0 / 3.0) - mid) < 0) n = -n;
+      const c = if (k == 0) tip else col;
+      for (tri) |p| try b.put(p, n, c, 0, 0, .bloom);
+    }
+  }
+}
+
 /// tu.x where the confluence's braid gives way to its vines.
 const FRAY = 0.55;
 /// control points over which a vine peels off the line of its strand.
@@ -1052,7 +1156,7 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
 /// confluence its growth keys.
 pub fn variants(id:species.Id) u32 {
   return switch (species.get(id).genome.form) {
-    .herb, .coil, .drift => VARIANTS,
+    .herb, .coil, .drift, .radiant => VARIANTS,
     .confluence => KEYS,
   };
 }
@@ -1062,7 +1166,7 @@ pub fn variants(id:species.Id) u32 {
 pub const Key = struct { v:u32, f:f32 };
 pub fn growthKey(id:species.Id, growth:f32) ?Key {
   switch (species.get(id).genome.form) {
-    .herb, .coil, .drift => return null,
+    .herb, .coil, .drift, .radiant => return null,
     .confluence => {
       const x = m.clamp01(growth) * (KEYS - 1);
       const v = @min(m.floorTo(u32, x), KEYS - 2);
