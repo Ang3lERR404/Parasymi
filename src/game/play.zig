@@ -27,6 +27,7 @@ const Parts = @import("parts.zig").Parts;
 const craft = @import("craft.zig");
 const st = @import("structures.zig");
 const actions = @import("actions.zig");
+const convergence = @import("convergence.zig");
 
 pub const TICK = 1.0 / 60.0;
 const STREAM_RADIUS = 4;
@@ -72,6 +73,7 @@ pub const Game = struct {
   plants:Plants = .{},
   structs:st.Structures = .{},
   eco:Ecology = .{},
+  converge:convergence.Seeker = .{},
   prog:prog.Progression = .{},
   cam:Camera = .{},
   sky:sky_mod.Sky = .{},
@@ -351,12 +353,14 @@ pub const Game = struct {
     while (g.acc >= TICK) : (g.acc -= TICK) try g.step();
   }
 
-  /// one fixed tick of everything that lives: ecology, progression, structures.
+  /// one fixed tick of everything that lives: ecology, convergence,
+  /// progression, structures.
   /// (see the test below for the headless harness)
   pub fn step(g:*Game) Error!void {
     var mods = g.prog.mods();
     mods.night = 1 - g.sky.daylight();
     const ev = try g.eco.tick(g.gpa, &g.plants, &g.world, mods, TICK);
+    try g.converge.tick(g.gpa, &g.world, &g.plants, &g.structs, &g.prog);
     g.prog.absorb(ev, TICK);
     g.structs.tick(&g.world, &g.plants, &g.prog, TICK);
     g.ticks += 1;

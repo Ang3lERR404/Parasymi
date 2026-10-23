@@ -128,6 +128,13 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Root-digger: 1×1 on soil/moss, digs an adjacent node 1 item/4s into an
   8-item buffer, feeds adjacent structures (conduits pull from it), idles when
   no node. Recipe: 3 fibre + 2 grit + 1 ley shard. Gated by "Deep Rooting".
+- Confluence (convergence hybrid, `game/convergence.zig`): a mature symbiote
+  and mature parasite within 2 tiles (or joined by a conduit chain) root a
+  2×2 confluence beside them unless one already holds them. Never sown
+  (`seed = null`); grows 1.5× the slower parent (per-plant `span`) in 4
+  stages; yields convergence essence + its parents' seeds; mature, it halves
+  parasite drain within 3 tiles. Discovery-gated; "Convergence Theory" only
+  reveals its yield in the HUD.
 - Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the seed;
   only the gardener's changes are stored. Bump `VERSION` when a stored layout
   changes (the fingerprint checks sizes only).
@@ -138,6 +145,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
   tile), vertex-shader sway. Parasitic: desaturated reds/oranges. Symbiotic:
   greens/teals.
+- Confluence: stage meshes (variants = growth stages); teal braid peeling
+  over 4 control points into red vines (vertex-colour gradient, ±10° hue
+  drift in the zone); leader crowned by translucent violet petals with amber
+  fresnel (plants pass blends; only these petals have alpha < 1). Sway ×1.5.
 - Sky: gradient dome pass (fog colour at the horizon), sun/moon, stars,
   starlight motes. Low pitch widens the view and lifts it toward the horizon.
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow. 150 ms anim.
@@ -168,12 +179,12 @@ Changes a layer boundary or build/run interface → stop and ask.
 Otherwise decide and note with `// decision:` comment.
 
 ## Current state
-Done: engine, terrain, streaming, plants + 5 species, ecology, structures,
-footprints/floaters, research (8 nodes), hand weaving, save/load, pause,
+Done: engine, terrain, streaming, plants + 6 species, ecology, structures,
+footprints/floaters, research (9 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, spline vines, adjustable/free camera, sky dome, wolf
-anatomy + "alive" passes.
+anatomy + "alive" passes, convergence hybrid (confluence).
 **Next (post-prototype / vertical slice):**
-1. 2–3 more species per lineage + convergence hybrid
+1. 2–3 more species per lineage
 2. Research tree to ~12 nodes
 3. First world event (something that *happens*, not just a research unlock)
 4. Bloom + one "wow" visual moment (sky shift at convergence)

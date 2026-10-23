@@ -16,6 +16,10 @@ pub const desc:pass.Desc = .{
   .vert = "plant.vert", .frag = "plant.frag",
   .bindings = &.{pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PlantInstance, 1, .instance)},
   .attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5)),
+  // decision: blending on for the confluence's translucent petals; every
+  // other plant fragment is opaque (alpha 1), so they are unchanged. The
+  // confluence is the last species, so its petals blend over every plant.
+  .blend = true,
 };
 
 pub const Frame = struct { inst:Buffer = .{} };

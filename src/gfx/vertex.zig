@@ -27,7 +27,7 @@ pub const PlantInstance = extern struct {
   pos:[3]f32,
   /// growth 0..1, mana fill 0..1, seed 0..1, lineage affinity -1..1
   a:[4]f32,
-  /// flow, health, 0, 0
+  /// flow, health, sway amplitude, genome form (species.Form)
   b:[4]f32,
 };
 

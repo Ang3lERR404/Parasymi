@@ -18,6 +18,19 @@ const Error = Allocator.Error;
 pub const R1 = 12;
 pub const R2 = 20;
 
+/// a square of tiles: a footprint.
+pub const Rect = struct {
+  x:i32, y:i32, size:u8,
+
+  /// Chebyshev tile distance between two squares: 0 when they overlap, 1
+  /// when they touch, 2 with one tile between them.
+  pub fn gap(a:Rect, b:Rect) i32 {
+    const dx = @max(0, @max(b.x - (a.x + a.size - 1), a.x - (b.x + b.size - 1)));
+    const dy = @max(0, @max(b.y - (a.y + a.size - 1), a.y - (b.y + b.size - 1)));
+    return @max(dx, dy);
+  }
+};
+
 pub const Plant = struct {
   /// anchor tile (top-left of the footprint, or the tile hovered over)
   x:i32, y:i32,
@@ -25,6 +38,8 @@ pub const Plant = struct {
   tile:u16,
   sp:species.Id,
   growth:f32 = 0,
+  /// seconds to maturity at full mana, when not the species' own (0).
+  span:f32 = 0,
   mana:f32 = 1,
   health:f32 = 1,
   /// 0..1 random, drives animation phase and mesh variation.
@@ -110,6 +125,13 @@ pub const Plants = struct {
     }
     p.list.swapRemove(i);
     p.topology_dirty = true;
+  }
+
+  /// the tiles a plant covers: its footprint, or the one tile it hovers over.
+  pub fn extent(p:*const Plants, i:usize) Rect {
+    const s = p.list.slice();
+    const def = species.get(s.items(.sp)[i]);
+    return .{.x = s.items(.x)[i], .y = s.items(.y)[i], .size = if (def.floating) 1 else def.size};
   }
 
   /// world-space centre of a plant's footprint (x, z).

@@ -13,6 +13,7 @@ const parts = struct {
   pub const vesper = @import("species/vesper.zig");
   pub const driftwisp = @import("species/driftwisp.zig");
   pub const hollowheart = @import("species/hollowheart.zig");
+  pub const confluence = @import("species/confluence.zig");
 };
 const reg = registry.Registry(parts);
 
@@ -31,8 +32,18 @@ pub const Lineage = enum(u8) {
   }
 };
 
+/// how a genome is grown into a mesh (see gfx/meshgen.zig).
+pub const Form = enum(u8) {
+  /// a stem with leaves, thorns, tendrils and a bloom
+  herb,
+  /// a symbiotic braid below that frays into parasitic vines above, crowned
+  /// by translucent sap petals: both lineages in one body
+  confluence,
+};
+
 /// procedural mesh parameters (see gfx/meshgen.zig).
 pub const Genome = struct {
+  form:Form = .herb,
   /// the stem grows as a vine (gfx/meshgen.zig `Growth`): `segments`+1
   /// control points, `curl` spiral (0 none .. 0.5 tight), `wobble` noise.
   stem_h:f32, stem_r:f32, segments:u8, curl:f32, wobble:f32 = 0.1,
@@ -47,8 +58,9 @@ pub const Genome = struct {
 pub const Species = struct {
   name:[]const u8,
   lineage:Lineage,
-  /// the item that plants this species
-  seed:items.Item,
+  /// the item that plants this species; null when it cannot be sown and only
+  /// grows where its parents meet (it then ripens its parents' seeds).
+  seed:?items.Item,
   /// footprint: a size x size square of tiles, or none at all when floating
   /// (a floater hovers over any tile, even water or another plant).
   size:u8 = 1,
@@ -69,7 +81,24 @@ pub const Species = struct {
   seed_time:f32,
   genome:Genome,
   parents:?[2]Id = null,
+  /// parasites within this many tiles of the mature plant drain at
+  /// `CONTAINED` of their rate (0: none).
+  contain:u8 = 0,
+  /// wind sway amplitude relative to other plants.
+  sway:f32 = 1,
+  /// growth stages, when its mesh variants are these stages in order instead
+  /// of shapes picked by tile.
+  stages:?[4][]const u8 = null,
+
+  /// which stage a plant at `growth` shows (0 when unstaged).
+  pub fn stage(s:*const Species, growth:f32) u32 {
+    const st = s.stages orelse return 0;
+    return @min(st.len - 1, @as(u32, @intFromFloat(@max(growth, 0) * st.len)));
+  }
 };
+
+/// drain rate of a parasite near a mature containing plant.
+pub const CONTAINED:f32 = 0.5;
 
 pub const table = reg.table(Species, "def");
 
@@ -77,6 +106,15 @@ pub inline fn get(id:Id) *const Species { return table.getPtrConst(id); }
 
 /// which species an item plants, if any.
 pub fn fromSeed(item:items.Item) ?Id {
-  inline for (ids) |id| if (table.get(id).seed == item) return id;
+  inline for (ids) |id| if (table.get(id).seed) |s| if (s == item) return id;
   return null;
+}
+
+/// the `k`th seed a plant of this species ripens: its own, or for one that
+/// cannot be sown, its parents' in turn.
+pub fn ripeSeed(id:Id, k:u32) items.Item {
+  const d = get(id);
+  if (d.seed) |s| return s;
+  const ps = d.parents.?;
+  return get(ps[k % 2]).seed.?;
 }

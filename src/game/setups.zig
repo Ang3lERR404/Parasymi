@@ -43,6 +43,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = try g.plants.place(g.gpa, &g.world, cx - 5, cz - 1, .driftwisp, 0.8);
   _ = try g.plants.place(g.gpa, &g.world, cx - 4, cz + 2, .driftwisp, 0.9);
   try digger(g, cx, cz);
+  try confluences(g, cx, cz);
 
   var t:f32 = 0;
   while (t < seconds) : (t += play.TICK) try g.step();
@@ -52,6 +53,21 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = g.player.inv.add(.seed_lumenroot, 5);
   _ = g.player.inv.add(.conduit, 6);
   _ = g.player.inv.add(.root_digger, 2);
+}
+
+/// a symbiote and a parasite two tiles apart, left to converge, and a row of
+/// confluences held at each growth stage.
+fn confluences(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  _ = try g.plants.place(g.gpa, &g.world, cx + 4, cz - 7, .lumenroot, 0.3);
+  _ = try g.plants.place(g.gpa, &g.world, cx + 6, cz - 7, .thornleech, 0.6);
+  for ([_]f32{0.1, 0.35, 0.6, 0.95}, 0..) |growth, i| {
+    const x = cx - 6 + 3 * @as(i32, @intCast(i));
+    // a span this long holds the stage for viewing
+    _ = try g.plants.placeEx(g.gpa, &g.world, x, cz + 9, .{
+      .x = x, .y = cz + 9, .chunk = undefined, .tile = undefined, .sp = .confluence,
+      .seed = 0.2 * m.f(i), .growth = growth, .span = 1e9, .mana = 20,
+    });
+  }
 }
 
 /// the nearest free spot beside a resource node gets a root-digger, with a

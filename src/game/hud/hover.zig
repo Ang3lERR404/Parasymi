@@ -58,7 +58,12 @@ fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Alloca
   _ = try d.text(x, y, 1.75, s.white, def.name);
   y += 24;
   try d.tendril(x, y, 150, 12, .{120, 230, 150, 255}, p.growth, 0.5);
-  _ = try d.print(x + 164, y - 4, 1.25, s.dim, "GROWTH {d:.0}%", .{p.growth * 100});
+  if (def.stages) |names| {
+    const k = def.stage(p.growth);
+    _ = try d.print(x + 164, y - 4, 1.25, s.dim, "{s} {d}/{d}  {d:.0}%", .{names[k], k + 1, names.len, p.growth * 100});
+  } else _ = try d.print(x + 164, y - 4, 1.25, s.dim, "GROWTH {d:.0}%", .{p.growth * 100});
   y += 22;
-  _ = try d.print(x, y, 1.4, s.gold, "{s} {d:.1}  SEEDS {d}  HP {d:.0}%", .{def.yields.info().short, p.essence, m.floorTo(u32, p.seeds), p.health * 100});
+  // an unstudied yield shows only as a mystery
+  const yields = if (g.prog.yieldKnown(p.sp)) def.yields.info().short else "??";
+  _ = try d.print(x, y, 1.4, s.gold, "{s} {d:.1}  SEEDS {d}  HP {d:.0}%", .{yields, p.essence, m.floorTo(u32, p.seeds), p.health * 100});
 }

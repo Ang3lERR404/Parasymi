@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const species = @import("species.zig");
 const plants_mod = @import("plants.zig");
+const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 
 const Plants = plants_mod.Plants;
@@ -24,8 +25,6 @@ pub const Mods = struct {
 
 pub const Events = struct {
   died:u32 = 0,
-  /// a mature symbiote touched a mature parasite this tick.
-  convergence:bool = false,
 };
 
 pub const MAX_SEEDS = 3;
@@ -34,10 +33,33 @@ pub const Ecology = struct {
   dm:std.ArrayList(f32) = .empty,
   dh:std.ArrayList(f32) = .empty,
   df:std.ArrayList(f32) = .empty,
+  /// per plant: its drain rate after containment (1, or `species.CONTAINED`).
+  calm:std.ArrayList(f32) = .empty,
   dead:std.ArrayList(Id) = .empty,
 
   pub fn deinit(e:*Ecology, gpa:Allocator) void {
-    e.dm.deinit(gpa); e.dh.deinit(gpa); e.df.deinit(gpa); e.dead.deinit(gpa);
+    e.dm.deinit(gpa); e.dh.deinit(gpa); e.df.deinit(gpa); e.calm.deinit(gpa); e.dead.deinit(gpa);
+  }
+
+  /// mature containing plants (the confluence) calm every parasite within
+  /// their reach: they keep draining, at a fraction of the rate.
+  fn contain(e:*Ecology, gpa:Allocator, p:*const Plants, w:*const World) Allocator.Error!void {
+    try e.calm.resize(gpa, p.len());
+    @memset(e.calm.items, 1);
+    const s = p.list.slice();
+    for (s.items(.sp), s.items(.growth), 0..) |sp, growth, i| {
+      const r:i32 = species.get(sp).contain;
+      if (r == 0 or growth < 1) continue;
+      const f = p.extent(i);
+      var y = f.y - r;
+      while (y < f.y + f.size + r) : (y += 1) {
+        var x = f.x - r;
+        while (x < f.x + f.size + r) : (x += 1) {
+          const j = p.at(w, x, y) orelse continue;
+          if (species.get(s.items(.sp)[j.idx()]).lineage == .parasitic) e.calm.items[j.idx()] = species.CONTAINED;
+        }
+      }
+    }
   }
 
   pub fn tick(e:*Ecology, gpa:Allocator, p:*Plants, w:*World, mods:Mods, dt:f32) Allocator.Error!Events {
@@ -48,6 +70,8 @@ pub const Ecology = struct {
     try e.dm.resize(gpa, n); @memset(e.dm.items, 0);
     try e.dh.resize(gpa, n); @memset(e.dh.items, 0);
     try e.df.resize(gpa, n); @memset(e.df.items, 0);
+    try e.contain(gpa, p, w);
+    const calm = e.calm.items;
     const dm = e.dm.items;
     const dh = e.dh.items;
     const df = e.df.items;
@@ -56,6 +80,7 @@ pub const Ecology = struct {
     const sps = s.items(.sp);
     const mana = s.items(.mana);
     const growth = s.items(.growth);
+    const span = s.items(.span);
     const health = s.items(.health);
     const chunks = s.items(.chunk);
     const tiles = s.items(.tile);
@@ -113,7 +138,7 @@ pub const Ecology = struct {
             .symbiotic => false,
           };
           if (!prey) continue;
-          const take = @min(mana[j], sp.drain * mods.drain_mult * dt);
+          const take = @min(mana[j], sp.drain * mods.drain_mult * calm[i] * dt);
           dm[j] -= take; dm[i] += take * 0.85;
           df[i] += take; df[j] += take;
           if (mana[j] < 0.1 * species.get(sps[j]).mana_cap) dh[j] -= 0.08 * dt;
@@ -121,7 +146,8 @@ pub const Ecology = struct {
       }
 
       if (growth[i] < 1) {
-        growth[i] = @min(1, growth[i] + dt / sp.mature_time * (0.3 + 0.7 * fill) * health[i] * (1 + 0.15 * kin));
+        const mature = if (span[i] > 0) span[i] else sp.mature_time;
+        growth[i] = @min(1, growth[i] + dt / mature * (0.3 + 0.7 * fill) * health[i] * (1 + 0.15 * kin));
       } else {
         // mana condenses into essence held by the plant until harvested.
         const room = cap - essence[i];
@@ -129,11 +155,6 @@ pub const Ecology = struct {
         dm[i] -= conv;
         essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + 0.1 * kin));
         if (health[i] > 0.5) seeds[i] = @min(MAX_SEEDS, seeds[i] + dt / sp.seed_time);
-        if (lin == .symbiotic) for (n1[i]) |id| {
-          if (id == .none) break;
-          const j = id.idx();
-          if (species.get(sps[j]).lineage == .parasitic and growth[j] >= 1) ev.convergence = true;
-        };
       }
       dh[i] += if (fill < 0.05 and growth[i] >= 1) -0.05 * dt else 0.02 * dt;
     }
@@ -172,4 +193,30 @@ test "symbiotes share, parasites drain" {
   const es = p.list.items(.essence);
   try testing.expect(p.len() < 2 or es[0] + es[1] > 0);
   try testing.expect(p.list.items(.flow)[0] > 0 or p.len() < 2);
+}
+
+test "a mature confluence halves parasite drain within 3 tiles" {
+  const gpa = testing.allocator;
+  var loss:[3]f32 = undefined;
+  // no confluence; a mature one 2 tiles from the leech; one 4 tiles away
+  for ([_]?i32{null, 3, 5}, 0..) |at, k| {
+    var w = World.init(gpa, 5);
+    defer w.deinit();
+    try w.stream(.{.x = 0, .y = 0}, 1, 100);
+    const c = w.chunkOfTile(0, 0).?;
+    for (0..2) |y| for (0..8) |x| { c.kind[y * ck.SIZE + x] = .soil; c.height[y * ck.SIZE + x] = 1; };
+    var p:Plants = .{};
+    defer p.deinit(gpa);
+    var eco:Ecology = .{};
+    defer eco.deinit(gpa);
+    try testing.expect(try p.placeEx(gpa, &w, 0, 0, .{.x = 0, .y = 0, .chunk = undefined, .tile = undefined, .sp = .lumenroot, .seed = 0, .mana = 5}));
+    try testing.expect(try p.place(gpa, &w, 1, 0, .thornleech, 0));
+    if (at) |x| try testing.expect(try p.placeEx(gpa, &w, x, 0, .{.x = x, .y = 0, .chunk = undefined, .tile = undefined, .sp = .confluence, .seed = 0, .growth = 1}));
+    // the leech's 2-tile neighbourhood keeps the root's ley draw identical in every case
+    _ = try eco.tick(gpa, &p, &w, .{}, 0.1);
+    loss[k] = 5 - p.list.items(.mana)[0];
+  }
+  const full = species.get(.thornleech).drain * 0.1;
+  try testing.expectApproxEqAbs(full * (1 - species.CONTAINED), loss[0] - loss[1], 1e-4);
+  try testing.expectApproxEqAbs(loss[0], loss[2], 1e-4);
 }

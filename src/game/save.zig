@@ -28,7 +28,7 @@ const Belly = @FieldType(player_mod.Player, "inv");
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 2;
+const VERSION:u32 = 3;
 
 /// everything saving and loading can fail with; file-system errors are
 /// folded into these at the boundary.
@@ -47,7 +47,7 @@ pub const Error = error{
 const PlantRec = extern struct {
   x:i32, y:i32,
   sp:u32,
-  growth:f32, mana:f32, health:f32, seed:f32, flow:f32, essence:f32, seeds:f32,
+  growth:f32, span:f32, mana:f32, health:f32, seed:f32, flow:f32, essence:f32, seeds:f32,
 };
 
 /// one chunk whose resource nodes differ from what the generator made.
@@ -111,7 +111,7 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
   try w.put(u32, @intCast(g.plants.len()));
   for (0..g.plants.len()) |i| try w.put(PlantRec, .{
     .x = s.items(.x)[i], .y = s.items(.y)[i], .sp = @intFromEnum(s.items(.sp)[i]),
-    .growth = s.items(.growth)[i], .mana = s.items(.mana)[i], .health = s.items(.health)[i],
+    .growth = s.items(.growth)[i], .span = s.items(.span)[i], .mana = s.items(.mana)[i], .health = s.items(.health)[i],
     .seed = s.items(.seed)[i], .flow = s.items(.flow)[i], .essence = s.items(.essence)[i], .seeds = s.items(.seeds)[i],
   });
   try w.put(u32, @intCast(g.structs.list.items.len));
@@ -166,7 +166,7 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
     try ensureFootprint(&g, p.x, p.y, species.get(sp).size);
     _ = try g.plants.placeEx(gpa, &g.world, p.x, p.y, .{
       .x = p.x, .y = p.y, .chunk = undefined, .tile = undefined, .sp = sp,
-      .growth = p.growth, .mana = p.mana, .health = p.health, .seed = p.seed,
+      .growth = p.growth, .span = p.span, .mana = p.mana, .health = p.health, .seed = p.seed,
       .flow = p.flow, .essence = p.essence, .seeds = p.seeds,
     });
   }

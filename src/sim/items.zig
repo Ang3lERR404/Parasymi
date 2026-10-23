@@ -8,14 +8,14 @@ const species = @import("species.zig");
 
 pub const Item = enum(u8) {
   grit, fibre, ley_shard, starlight, essence,
+  /// condensed only where the lineages have merged: the next tier's study.
+  convergence_essence,
   seed_lumenroot, seed_thornleech, seed_vesper, seed_driftwisp, seed_hollowheart,
   // structure bulbs: woven, then planted to grow a structure
   conduit, sap_cache, germinator, research_bloom, root_digger,
 
   pub fn info(i:Item) Info { return infos.get(i); }
 
-  /// the mapping lives with each species (its `def.seed`).
-  pub fn seedOf(sp:species.Id) Item { return species.get(sp).seed; }
   pub fn plants(i:Item) ?species.Id { return species.fromSeed(i); }
 };
 
@@ -27,6 +27,7 @@ const infos = EnumArray(Item, Info).init(.{
   .ley_shard = .{.name = "LEY SHARD", .short = "LY", .col = .{170, 120, 255, 255}, .stack = 20},
   .starlight = .{.name = "STARLIGHT", .short = "ST", .col = .{255, 245, 190, 255}, .stack = 20},
   .essence = .{.name = "ESSENCE", .short = "ES", .col = .{255, 215, 120, 255}},
+  .convergence_essence = .{.name = "CONVERGENCE ESSENCE", .short = "CE", .col = .{220, 150, 255, 255}, .stack = 20},
   .seed_lumenroot = .{.name = "LUMENROOT SEED", .short = "LS", .col = .{120, 240, 220, 255}, .stack = 20},
   .seed_thornleech = .{.name = "THORNLEECH SEED", .short = "TS", .col = .{240, 90, 120, 255}, .stack = 20},
   .seed_vesper = .{.name = "VESPER SEED", .short = "VS", .col = .{200, 170, 255, 255}, .stack = 10},

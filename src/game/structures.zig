@@ -203,7 +203,7 @@ pub fn harvestOne(plants:*Plants, id:PlantId) ?items.Item {
   }
   if (s.items(.seeds)[p] >= 1) {
     s.items(.seeds)[p] -= 1;
-    return items.Item.seedOf(sp);
+    return species.ripeSeed(sp, m.floorTo(u32, s.items(.seeds)[p]));
   }
   return null;
 }

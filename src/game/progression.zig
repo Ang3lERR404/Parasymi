@@ -11,6 +11,7 @@
 //!   unlocks:[_]species.Id         species it lets the gardener plant
 //!   completed(*Progression)       anything said or done when it is learned
 //!   veil:f32                      how far it pulls the world-event veil
+//!   reveals:[_]species.Id         species whose yield it makes visible
 //! A new technology is one new file plus one line in `techs`.
 const std = @import("std");
 const EnumArray = std.enums.EnumArray;
@@ -31,6 +32,7 @@ const techs = struct {
   pub const hungering_tendrils = @import("research/hungering_tendrils.zig");
   pub const seed_splicing = @import("research/seed_splicing.zig");
   pub const thinning_veil = @import("research/thinning_veil.zig");
+  pub const convergence_theory = @import("research/convergence_theory.zig");
 };
 const reg = registry.Registry(techs);
 
@@ -55,6 +57,13 @@ pub const tree = reg.table(Research, "def");
 const plant_gate = blk: {
   var gate = EnumArray(species.Id, ?Id).initFill(null);
   for (reg.ids) |id| if (reg.has(id, "unlocks")) for (reg.module(id).unlocks) |sp| gate.set(sp, id);
+  break :blk gate;
+};
+
+/// for each species, the technology that must be known to see its yield (null: always).
+const yield_gate = blk: {
+  var gate = EnumArray(species.Id, ?Id).initFill(null);
+  for (reg.ids) |id| if (reg.has(id, "reveals")) for (reg.module(id).reveals) |sp| gate.set(sp, id);
   break :blk gate;
 };
 
@@ -139,6 +148,24 @@ pub const Progression = struct {
     return g.done.contains(gate);
   }
 
+  /// does the gardener know what this species condenses?
+  pub fn yieldKnown(g:*const Progression, sp:species.Id) bool {
+    const gate = yield_gate.get(sp) orelse return true;
+    return g.done.contains(gate);
+  }
+
+  /// something witnessed in the garden, said once.
+  pub fn discover(g:*Progression, d:Discovery) void {
+    if (g.found.contains(d)) return;
+    g.found.insert(d);
+    switch (d) {
+      .convergence => {
+        g.say("DISCOVERY: SYMBIOTE AND PARASITE ENTWINE", .{});
+        g.say("A HYBRID SEED STIRS. RESEARCH SEED SPLICING", .{});
+      },
+    }
+  }
+
   /// the living world as shaped by everything learned so far.
   pub fn mods(g:*const Progression) ecology.Mods {
     var m:ecology.Mods = .{};
@@ -164,11 +191,6 @@ pub const Progression = struct {
       if (g.died > 0) g.say("{d} PLANT(S) WITHERED", .{g.died});
       g.died = 0;
       g.died_t = 0;
-    }
-    if (ev.convergence and !g.found.contains(.convergence)) {
-      g.found.insert(.convergence);
-      g.say("DISCOVERY: SYMBIOTE AND PARASITE ENTWINE", .{});
-      g.say("A HYBRID SEED STIRS. RESEARCH SEED SPLICING", .{});
     }
     g.veil += (g.veilTarget() - g.veil) * @min(1, dt * 0.3);
     for (&g.log) |*m| m.age += dt;
@@ -196,6 +218,11 @@ test "labs consume ingredients unit by unit" {
   g.done.insert(.root_communion);
   g.done.insert(.hungering_tendrils);
   try testing.expect(g.status(.seed_splicing) == .locked);
-  g.absorb(.{.convergence = true}, 0.016);
+  try testing.expect(g.status(.convergence_theory) == .locked);
+  try testing.expect(!g.yieldKnown(.confluence) and g.yieldKnown(.lumenroot));
+  g.discover(.convergence);
   try testing.expect(g.status(.seed_splicing) == .open);
+  try testing.expect(g.status(.convergence_theory) == .open);
+  g.done.insert(.convergence_theory);
+  try testing.expect(g.yieldKnown(.confluence));
 }

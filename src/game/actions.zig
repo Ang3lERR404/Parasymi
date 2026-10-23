@@ -120,16 +120,23 @@ pub fn harvest(g:*Game, h:[2]i32) void {
     g.prog.say("NOTHING IS RIPE YET", .{});
     return;
   }
-  const got_es = g.player.inv.add(species.get(sp).yields, es);
+  const yields = species.get(sp).yields;
+  const got_es = g.player.inv.add(yields, es);
   s.items(.essence)[i] -= m.f(got_es);
+  // what an unstudied plant gives is learned only by taking it
+  if (got_es > 0 and !g.prog.yieldKnown(sp)) g.prog.say("IT GIVES UP {d} {s}", .{got_es, yields.info().name});
   if (seeds > 0 and g.prog.done.contains(.seed_splicing) and touchesOtherLineage(s, i)) {
     if (g.player.inv.add(.seed_vesper, 1) == 1) {
       seeds -= 1;
       s.items(.seeds)[i] -= 1;
     }
   }
-  const got_sd = g.player.inv.add(items.Item.seedOf(sp), seeds);
-  s.items(.seeds)[i] -= m.f(got_sd);
+  // one at a time: a plant that cannot be sown ripens its parents' seeds in turn
+  var got_sd:u16 = 0;
+  while (got_sd < seeds) : (got_sd += 1) {
+    if (g.player.inv.add(species.ripeSeed(sp, m.floorTo(u32, s.items(.seeds)[i])), 1) == 0) break;
+    s.items(.seeds)[i] -= 1;
+  }
   g.linger = 0.5;
   if (got_es + got_sd < es + seeds) g.prog.say("YOUR BELLY CAN HOLD NO MORE", .{});
 }
@@ -159,4 +166,29 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
     }
     i += 1;
   }
+}
+
+test "a confluence gives convergence essence and its parents' seeds" {
+  const gpa = std.testing.allocator;
+  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  defer g.deinit();
+  const x, const z = m.tileAt(g.player.pos);
+  for (0..2) |dy| for (0..2) |dx| {
+    const wx = x + 2 + @as(i32, @intCast(dx));
+    const wz = z + @as(i32, @intCast(dy));
+    const cc = g.world.chunkOfTile(wx, wz).?;
+    const t = ck.localIndex(wx, wz);
+    cc.kind[t] = .soil;
+    cc.res[t] = 0;
+  };
+  try std.testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
+    .x = x + 2, .y = z, .chunk = undefined, .tile = undefined, .sp = .confluence,
+    .seed = 0.5, .growth = 1, .essence = 3.5, .seeds = 2.2,
+  }));
+  harvest(&g, .{x + 3, z + 1});
+  try std.testing.expectEqual(@as(u32, 3), g.player.inv.count(.convergence_essence));
+  // one seed of each parent lineage
+  try std.testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_lumenroot));
+  try std.testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_thornleech));
+  try std.testing.expect(species.fromSeed(.convergence_essence) == null);
 }
