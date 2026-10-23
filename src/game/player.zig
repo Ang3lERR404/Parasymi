@@ -301,10 +301,11 @@ pub const Player = struct {
     const head = m.chain(&.{ neck, T(v3(0, 0.0, 0.02)) });
     try out.emit(.wolf_head, head, .{ .glow = 0.9, .flutter = 1, .phase = 0.5 });
     try out.emit(.paw_bean, m.chain(&.{ head, T(head_mesh.nose), S(v3(0.021, 0.014, 0.013)) }), .{ .glow = 0.1, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
-    // ears: tall, leaning 15 degrees forward and 10 out
+    // ears: rooted in the skull, leaning a little forward and out; heavy,
+    // so they do not flutter
     for ([_]f32{ -1, 1 }) |side| {
-      const ear = m.chain(&.{ head, T(v3(side * 0.058, 0.15, -0.005)), m.rotZ(-side * 10 * m.pi / 180.0), m.rotX(15 * m.pi / 180.0) });
-      try out.emit(.wolf_ear, ear, .{ .glow = 0.3, .flutter = 0.6, .phase = 0.5 + side * 0.1, .fade = EAR_OPACITY });
+      const ear = m.chain(&.{ head, T(head_mesh.ear_root * v3(side, 1, 1)), m.rotZ(-side * 12 * m.pi / 180.0), m.rotX(12 * m.pi / 180.0) });
+      try out.emit(.wolf_ear, ear, .{ .glow = 0.3, .phase = 0.5 + side * 0.1, .fade = EAR_OPACITY });
     }
 
     for ([_]f32{ -1, 1 }) |side| {

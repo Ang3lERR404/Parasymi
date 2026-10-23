@@ -25,7 +25,7 @@ pub const Builder = struct {
 
   pub fn deinit(b:*Builder) void { b.v.deinit(b.gpa); }
 
-  fn put(b:*Builder, p:V3, n:V3, col:color.Rgba8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
+  pub fn put(b:*Builder, p:V3, n:V3, col:color.Rgba8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
     try b.v.append(b.gpa, .{.pos = p, .nrm = m.norm(n), .col = col, .tu = .{t, u}, .part = @intFromEnum(part)});
   }
 

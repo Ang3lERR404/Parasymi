@@ -200,8 +200,14 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow. 150 ms anim.
 - Wolf (rigid joint skeleton, organic surface; `game/player.zig` rig):
   - Muted greens/browns; amber only on belly, eyes, inner ears (and beans).
-  - Head: flat-bridged lofted muzzle, jaw seam, nose bean, side-set eyes,
-    tall ears (sap inner face 50%, antihelix ridge), grown-tendril mane.
+  - Head: one closed surface of planes (`wolf_head.point`): broad cranium
+    with sloping temples, brow ridges hooding the eyes, a stop down to a
+    long wedge muzzle (narrow flat bridge, sides falling away) tapering to
+    the nose bean, cheekbones flaring below the eyes, jaw line chamfered
+    back from the chin over a separate lower jaw. Ears: thick (sap inner
+    face 50% over a vine back shell, joined by a rolled rim), cupped with an
+    inner fold, base flaring wide and sunk into the skull (`ear_root`),
+    leaning 12 degrees forward and out, no flutter. Grown-tendril mane.
   - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
     hips); pectorals are broad dishes of resin sap (wider top edge, areola +
     nipple below the crown), base held on the chest, surface sprung; chest
