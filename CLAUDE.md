@@ -36,6 +36,13 @@ rise/sink, Q/E roll, wheel dolly, unclamped; eases back in 0.3 s.
 - 30 Hz fixed sim tick, decoupled from render (currently 60 Hz, `play.TICK`).
 - Chunk: 64×64 tiles, < 2 ms gen+upload, queue-based (currently 32×32).
 - < 200 draw calls at stress. Instancing expected.
+- **Computation-heavy work goes on the GPU.** Dense or per-element visual
+  work (grass, scatter, particles, procedural detail, deformation,
+  animation fields) is generated or evaluated in shaders (instancing,
+  vertex/fragment fields, compute), not built on the CPU per frame or per
+  chunk. The CPU keeps game state and sim logic. Existing CPU-side heavy
+  paths (baked chunk grass/stones, mote particles, the per-frame tail)
+  move to the GPU when next touched.
 
 ## Layers (import only downward)
 
