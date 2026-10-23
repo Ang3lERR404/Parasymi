@@ -177,13 +177,14 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   far edge into the next (`conduit.rise`), rootlets forking into the soil,
   side roots (`conduit_tap`) creeping out to plants. Structures breathe at a
   fixed tempo (activity deepens it, never retimes it).
-  Standing structures (germinator, research bloom, sap cache; `Def.sway`)
+  Standing structures (germinator, research bloom, sap cache, root-digger;
+  `Def.sway`; conduits hug the ground and do not sway, so chains stay joined)
   move like plants in part.vert: they bend from the root in the same
   garden wind (`gardenWind`/`bendIn` in common.glsl), leaves and petals
   breathe and lift; what hangs on them (orb, stored items) sways with them
   (`Look.drop`).
   Put down by the gardener they grow (`Def.grow` s; germinator 6, research
-  bloom 8, sap cache and digger 4) and do no work until grown: they shoot
+  bloom 8, sap cache and digger 4, conduit 1.5) and do no work until grown: they shoot
   up first and fill out after (`Structure.grownScale`), leaves and petals
   unfold bottom-up (part.vert), the research orb forms last.
 - Floaters (`drift`): a translucent sap float, a wide catcher dish above,
@@ -241,6 +242,12 @@ Target: a stranger plays 2 hours and says "I want to see what happens next."
 Work until the current phase's acceptance criteria are met. Don't end with
 "next I would…" — take the next step. Stop only for a blocking decision or
 phase completion.
+
+## Plant rule
+Everything grown (plants, grown structures, anything plant-like) must have a
+proper growing animation, be moved by the garden's sway, and match the
+current quality of the rest of the plants in game, unless the user specifies
+otherwise. A new or changed grown thing is not done without all three.
 
 ## Visual authority
 The user is the artist. On all visual/aesthetic decisions (proportions,

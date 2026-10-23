@@ -22,7 +22,7 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
 
-pub const def:st.Def = .{ .name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger, .grow = 4 };
+pub const def:st.Def = .{ .name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger, .grow = 4, .sway = 0.5, .tall = 0.6 };
 
 /// seconds per item drawn from the node
 pub const RATE:f32 = 4;

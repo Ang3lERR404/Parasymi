@@ -15,7 +15,10 @@ const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 const root = @import("../../gfx/meshes/conduit.zig");
 
-pub const def:st.Def = .{ .name = "ROOT CONDUIT", .item = .conduit, .size = 1, .mesh = .conduit };
+/// decision: a conduit grows (out from its middle to its edges) but does
+/// not sway: its root hugs the ground and joins the next conduit's, and a
+/// bend per conduit would split the joins along a chain
+pub const def:st.Def = .{ .name = "ROOT CONDUIT", .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5 };
 
 /// tiles per second an item travels along conduits
 const SPEED:f32 = 2.5;
@@ -126,7 +129,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   for (s.state.conduit.reach, 0..) |r, d| {
     if (r <= 0) continue;
     // a root grows out from the conduit: longer first, then thicker
-    const len = m.smooth(r);
+    const len = m.smooth(r) * m.smooth(s.grown);
     const girth = 0.35 + 0.65 * m.smooth(m.clamp01(r * 1.5 - 0.5));
     try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(@intCast(d))), m.scale3(m.v3(len, girth, girth))}), .{.flutter = 0.3, .phase = s.seed, .fade = 0.78});
   }
