@@ -130,3 +130,58 @@ test "a fur leaf's base stays on the surface it grows from" {
   try leaf(&b, .{.base = v3(0, 1, 0), .along = v3(0, 0, -1), .out = v3(0, 1, 0), .len = 0.1, .width = 0.02, .col = .{.r = 0, .g = 0, .b = 0, .a = 255}, .tip = .{.r = 0, .g = 0, .b = 0, .a = 255}});
   for (b.v.items) |vx| if (vx.tu[1] == 0) try std.testing.expectApproxEqAbs(@as(f32, 1), vx.pos[1], 1e-5);
 }
+
+/// a claw: a curved, tapering hook from `base` along `dir`, bending toward
+/// `down` as it goes, closed to a point.
+pub fn claw(b:*mg.Builder, base:V3, dir:V3, down:V3, len:f32, r:f32, col:color.Rgba8) Allocator.Error!void {
+  const N = 7;
+  var path:[N]V3 = undefined;
+  var ts:[N]f32 = undefined;
+  var rs:[N]f32 = undefined;
+  path[0] = base;
+  for (0..N) |i| {
+    const k = m.ratio(i, N - 1);
+    const d = m.norm(dir * m.splat3(@cos(k * 1.1)) + down * m.splat3(@sin(k * 1.1)));
+    if (i > 0) path[i] = path[i - 1] + d * m.splat3(len / (N - 1));
+    ts[i] = 0;
+    rs[i] = r * (1 - k) + 0.0006;
+  }
+  try b.tubeR(&path, &ts, &rs, col, .thorn, 5);
+}
+
+/// a digit: a knuckle, a finger or toe arching from `base` along `dir` and
+/// down to the ground (`down`), and its claw. Segments are forms of planes.
+pub const Digit = struct {
+  base:V3,
+  dir:V3,
+  down:V3 = v3(0, -1, 0),
+  len:f32,
+  r:f32,
+  col:color.Rgba8,
+  claw:color.Rgba8,
+};
+
+pub fn digit(b:*mg.Builder, d:Digit) Allocator.Error!void {
+  const side = m.norm(m.cross(d.down, d.dir));
+  // knuckle, then two segments, each a little lower and narrower
+  const segs = [_]struct { at:f32, drop:f32, w:f32, l:f32 }{
+    .{.at = 0.0, .drop = 0.0, .w = 1.15, .l = 0.42},
+    .{.at = 0.42, .drop = 0.25, .w = 0.95, .l = 0.36},
+    .{.at = 0.75, .drop = 0.55, .w = 0.8, .l = 0.3},
+  };
+  for (segs) |sg| {
+    const c = d.base + d.dir * m.splat3(d.len * sg.at) + d.down * m.splat3(d.r * sg.drop);
+    const s = b.mark();
+    try form(b, .{.center = v3(0, 0, 0), .radii = v3(d.r * sg.w, d.r * sg.w * 0.85, d.len * sg.l * 0.62), .ns = 0.75, .ew = 0.65, .col = d.col, .rings = 7, .segs = 9});
+    // align the segment: its length along dir, its top away from down
+    const up = -m.norm(m.cross(d.dir, side));
+    b.xform(s, .{
+      .{side[0], side[1], side[2], 0},
+      .{up[0], up[1], up[2], 0},
+      .{d.dir[0], d.dir[1], d.dir[2], 0},
+      .{c[0], c[1], c[2], 1},
+    });
+  }
+  const tip = d.base + d.dir * m.splat3(d.len * 0.98) + d.down * m.splat3(d.r * 0.55);
+  try claw(b, tip, d.dir, d.down, d.r * 1.6, d.r * 0.42, d.claw);
+}

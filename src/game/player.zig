@@ -19,6 +19,7 @@ const head_mesh = @import("../gfx/meshes/wolf_head.zig");
 const upper_arm = @import("../gfx/meshes/wolf_upper_arm.zig");
 const forearm = @import("../gfx/meshes/wolf_forearm.zig");
 const foot_mesh = @import("../gfx/meshes/wolf_foot.zig");
+const paw_mesh = @import("../gfx/meshes/wolf_paw.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
@@ -325,7 +326,14 @@ pub const Player = struct {
       try out.emit(.wolf_forearm, m.chain(&.{ elbow, m.rotX(m.pi), S(v3(lb, 1, lb)) }), vine_look);
       const wrist = m.chain(&.{ elbow, T(v3(0, -forearm.LEN, 0)) });
       try joint(out, wrist, 0.042);
-      try out.emit(.wolf_paw, m.chain(&.{ wrist, m.rotX(1.2) }), vine_look);
+      const hand = m.chain(&.{ wrist, m.rotX(1.2) });
+      try out.emit(.wolf_paw, hand, vine_look);
+      // the hand's beans: a palm pad and four finger pads
+      const hand_bean:parts.Look = .{ .glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
+      try out.emit(.paw_pad, m.chain(&.{ hand, T(paw_mesh.palm_at), S(v3(0.019, 0.005, 0.017)) }), hand_bean);
+      for (paw_mesh.fingers) |fp| {
+        try out.emit(.paw_bean, m.chain(&.{ hand, T(v3(fp[0] * 1.05, paw_mesh.PALM_Y - 0.002, fp[1])), S(v3(0.0058, 0.0035, 0.007)) }), hand_bean);
+      }
 
       // digitigrade legs, anthro proportions: near-vertical thigh, knee
       // bending forward, the calf angled back to a high hock, the metatarsal

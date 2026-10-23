@@ -216,6 +216,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
     knuckles with a condyle at each end of the hinge and tendon straps over
     front and back; the deltoid is a squared cap with front and rear heads
     draping into a tendon down the upper arm.
+  - Hands and feet (`wolf_kit.digit`/`claw`): a squared back of the hand /
+    long squared foot with a raised arch, vine tendons over the top to four
+    knuckled digits arching down to curved claws (a dewclaw high on each
+    hand); sap beans under both (palm/central pad and four digit pads).
   - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
     hips); pectorals are broad dishes of resin sap (wider top edge, areola +
     nipple below the crown), base held on the chest, surface sprung; chest
@@ -226,7 +230,7 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   - Rear: two plump vine lobes nearly touching, sap nodes (40%), firm springs;
     tailbone knot above them; tail is a braided spline rebuilt each frame.
   - Legs: anthro digitigrade (vertical thigh, calf back to a high hock with a
-    +25% swell, forward metatarsal), long flat feet, sap beans (80%, browner),
+    +25% swell, forward metatarsal), long feet, sap beans (80%, browner),
     central pad flattens 10% when planted.
   - Breathing 2% torso / 1% limbs (CPU instance scale); body strands wobble
     0.03; anisotropic sheen along vine tangents.
@@ -262,6 +266,15 @@ Everything grown (plants, grown structures, anything plant-like) must have a
 proper growing animation, be moved by the garden's sway, and match the
 current quality of the rest of the plants in game, unless the user specifies
 otherwise. A new or changed grown thing is not done without all three.
+
+## Cohesion rule
+Every major visual overhaul sets the bar for everything of its kind: the
+rest of the wolf's body is brought up to match each upgrade (forms of planes,
+fur leaves, sap material), and the plants and grown structures stay
+consistent with each other. New plants (and anything new that is grown)
+follow the current look, motion and growth by default, built from the shared
+kits (`meshgen` plant forms, `structure_kit`, `wolf_kit`), never from older,
+cruder primitives.
 
 ## Visual authority
 The user is the artist. On all visual/aesthetic decisions (proportions,
