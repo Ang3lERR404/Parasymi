@@ -4,7 +4,8 @@
 Player-centric Factorio-like automation game: magically infused plants
 (parasitic + symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig
 (Vulkan 1.3), Windows, no asset files (every mesh, the font and all UI shapes
-are procedural) except `parasymi.cfg`, the player-facing strings. 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
+are procedural) except `parasymi.cfg`, the player-facing strings, and
+`controls.cfg`, the key/button bindings. 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
 free rotation in play; free inspection camera on Ctrl+F.
 
 ## Build
@@ -23,7 +24,7 @@ zglfw `f04fdbf` (upstream heads need 0.17). A stray `CPATH` breaks GLFW's C
 build. New shaders go in `build.zig`'s list.
 
 ## Controls
-WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
+Defaults in `controls.cfg` (rebindable there): WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
 RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate. 1–9/0/- pick
 hotbar slots only; research nodes and weave recipes are clicked in their
 panels. Tab belly (weave), T research, F3 debug, Esc closes a panel else
@@ -115,6 +116,16 @@ recipes (`game/craft.zig`) are plain data tables.
   `Progression.say` / `Draw.print`; lists are `a | b` (`txt.nth`). The test
   build embeds the cfg and fails on a missing or unknown key. Not text:
   file paths/magic, shader names, CLI flags, log/panic messages, reflection.
+- **Never hard-code inputs**: no key or mouse button is named in code. Every
+  binding lives in `controls.cfg` (`[bind] action = name | name`, GLFW key
+  names, `mouse_left`…), read once at startup by `game/controls.zig`
+  (`controls.load` in main). Game code asks about an `ctl.Action`
+  (`ctl.down`/`ctl.pressed(in, .harvest)`), never `glfw.Key`/`Button`;
+  `platform/input.zig` only polls and answers for a `Bind`. New input = an
+  `Action` tag + a cfg line (the test fails on an unbound action); modifiers
+  are actions too (`alt`, `take`, `run`). Headless tests `ctl.fill` the
+  embedded cfg and `ctl.hold` actions. The mouse wheel/cursor are axes, not
+  bindings.
 - Edits: write to files, pass files to scripts; no inline heredocs.
 
 ## Zig 0.16 notes

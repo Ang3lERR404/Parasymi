@@ -90,6 +90,7 @@ pub fn build(b:*Build) !void {
   });
   // the tests check the strings file is complete; the game reads it at startup
   tests.root_module.addAnonymousImport("parasymi.cfg", .{.root_source_file = b.path("parasymi.cfg")});
+  tests.root_module.addAnonymousImport("controls.cfg", .{.root_source_file = b.path("controls.cfg")});
   const test_step = b.step("test", "run unit tests.");
   test_step.dependOn(&b.addRunArtifact(tests).step);
 }

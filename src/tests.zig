@@ -4,6 +4,8 @@ test {
   _ = @import("core/registry.zig");
   _ = @import("core/text.zig");
   _ = @import("game/text.zig");
+  _ = @import("game/controls.zig");
+  _ = @import("platform/input.zig");
   _ = @import("core/rng.zig");
   _ = @import("core/noise.zig");
   _ = @import("world/gen.zig");

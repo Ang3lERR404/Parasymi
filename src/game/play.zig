@@ -18,6 +18,7 @@ const items = @import("../sim/items.zig");
 const prog = @import("progression.zig");
 const txt = @import("text.zig");
 const Input = @import("../platform/input.zig").Input;
+const ctl = @import("controls.zig");
 const camera = @import("../render/camera.zig");
 const Camera = camera.Camera;
 const renderer = @import("../render/renderer.zig");
@@ -69,12 +70,13 @@ const SPAWN_STEP = 3;
 const PICK_STEP:f32 = 0.1;
 const PICK_RANGE_MULT:f32 = 4;
 
-/// everything the wolf can put into the world, in hotbar key order 1..9, 0, -.
+/// everything the wolf can put into the world, in hotbar slot order
+/// (`ctl.slots`).
 pub const hotbar = [_]items.Item{
   .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
   .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom,
 };
-/// the key that picks each hotbar slot, as the hotbar labels it
+comptime { std.debug.assert(hotbar.len == ctl.slots.len); }
 
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
 pub fn known(g:*const Game, item:items.Item) bool {
@@ -218,49 +220,45 @@ pub const Game = struct {
     g.cam.aspect = screen[0] / @max(screen[1], 1);
 
     // system keys work everywhere; Esc closes a panel first, then pauses
-    if (in.pressed(.F5)) g.request = .save;
-    if (in.pressed(.F9)) g.request = .load;
-    if (in.pressed(.F11)) g.request = .fullscreen;
-    if (in.pressed(.escape)) switch (g.mode) {
+    if (ctl.pressed(in, .save)) g.request = .save;
+    if (ctl.pressed(in, .load)) g.request = .load;
+    if (ctl.pressed(in, .fullscreen)) g.request = .fullscreen;
+    if (ctl.pressed(in, .back)) switch (g.mode) {
       .roam => g.mode = .paused,
       .belly, .research, .paused => g.mode = .roam,
       .inspect => g.inspect(in, false),
     };
     if (!g.mode.live()) {
-      if (in.pressed(.q)) g.request = .quit;
+      if (ctl.pressed(in, .quit)) g.request = .quit;
       return;
     }
 
     g.time += dt;
     g.sky.update(dt);
 
-    // decision: Ctrl+F toggles the free inspection camera (F alone harvests)
-    const ctrl = in.down(.left_control);
-    if (ctrl and in.pressed(.f)) g.inspect(in, g.mode != .inspect);
+    // decision: alt + free_cam (Ctrl+F) toggles the free inspection camera
+    // (harvest alone, F, harvests)
+    const alt = ctl.down(in, .alt);
+    if (alt and ctl.pressed(in, .free_cam)) g.inspect(in, g.mode != .inspect);
     const inspecting = g.mode == .inspect;
     g.cam.tick(dt);
 
     // panels and selection
     if (!inspecting) {
-      if (in.pressed(.tab)) g.mode = if (g.mode == .belly) .roam else .belly;
-      if (in.pressed(.t)) g.mode = if (g.mode == .research) .roam else .research;
+      if (ctl.pressed(in, .belly)) g.mode = if (g.mode == .belly) .roam else .belly;
+      if (ctl.pressed(in, .research)) g.mode = if (g.mode == .research) .roam else .research;
     }
-    if (in.pressed(.F3)) g.debug = !g.debug;
-    if (in.pressed(.r)) g.place_dir +%= 1;
-    const nums = [_]bool{
-      in.pressed(.one), in.pressed(.two), in.pressed(.three), in.pressed(.four), in.pressed(.five),
-      in.pressed(.six), in.pressed(.seven), in.pressed(.eight), in.pressed(.nine), in.pressed(.zero),
-      in.pressed(.minus),
-    };
-    // number keys pick the hotbar slot, whichever panel is open
-    if (!inspecting) for (nums, 0..) |p, i| {
-      if (p and i < hotbar.len) g.hot = i;
+    if (ctl.pressed(in, .debug)) g.debug = !g.debug;
+    if (ctl.pressed(in, .rotate)) g.place_dir +%= 1;
+    // slot keys pick the hotbar slot, whichever panel is open
+    if (!inspecting) for (ctl.slots, 0..) |a, i| {
+      if (ctl.pressed(in, a)) g.hot = i;
     };
 
     // a click lands on the HUD panel under the mouse before the world: rows
     // choose research or weave a recipe; a panel's backdrop just absorbs it
     const ui_hit = if (inspecting) null else g.rows.at(in.mouse);
-    if (in.clicked(.left)) if (ui_hit) |hit| switch (hit) {
+    if (ctl.pressed(in, .use)) if (ui_hit) |hit| switch (hit) {
       .panel => {},
       .research => |id| g.prog.select(id),
       .weave => |i| actions.weaveByHand(g, i),
@@ -274,15 +272,15 @@ pub const Game = struct {
     if (inspecting) {
       g.fly(in, dt);
     } else {
-      if (in.down(.a) or in.down(.left)) mx -= 1;
-      if (in.down(.d) or in.down(.right)) mx += 1;
+      if (ctl.down(in, .move_left)) mx -= 1;
+      if (ctl.down(in, .move_right)) mx += 1;
     }
-    if (inspecting) {} else if (ctrl) {
-      if (in.down(.w) or in.down(.up)) g.cam.tilt(dt * TILT_SPEED);
-      if (in.down(.s) or in.down(.down)) g.cam.tilt(-dt * TILT_SPEED);
+    if (inspecting) {} else if (alt) {
+      if (ctl.down(in, .move_forward)) g.cam.tilt(dt * TILT_SPEED);
+      if (ctl.down(in, .move_back)) g.cam.tilt(-dt * TILT_SPEED);
     } else {
-      if (in.down(.w) or in.down(.up)) mz += 1;
-      if (in.down(.s) or in.down(.down)) mz -= 1;
+      if (ctl.down(in, .move_forward)) mz += 1;
+      if (ctl.down(in, .move_back)) mz -= 1;
     }
     const yaw = g.cam.yaw;
     var wish = [2]f32{@cos(yaw) * mx - @sin(yaw) * mz, -@sin(yaw) * mx - @cos(yaw) * mz};
@@ -290,8 +288,8 @@ pub const Game = struct {
     if (wl > 1) wish = .{ wish[0] / wl, wish[1] / wl };
 
     if (!inspecting) {
-      if (in.down(.q)) g.cam.yaw -= dt * YAW_SPEED;
-      if (in.down(.e)) g.cam.yaw += dt * YAW_SPEED;
+      if (ctl.down(in, .yaw_left)) g.cam.yaw -= dt * YAW_SPEED;
+      if (ctl.down(in, .yaw_right)) g.cam.yaw += dt * YAW_SPEED;
       if (in.scroll != 0) g.cam.zoom(in.scroll);
     }
 
@@ -301,24 +299,24 @@ pub const Game = struct {
     var work:?m.V3 = null;
     g.plant_cd -= dt;
     g.linger -= dt;
-    if (!in.held(.left)) {
+    if (!ctl.down(in, .use)) {
       g.gather_t = 0;
       g.full_warned = false;
     }
     if (g.hover) |h| if (g.player.inReach(h[0], h[1])) if (g.world.chunkOfTile(h[0], h[1])) |c| {
       const t = ck.localIndex(h[0], h[1]);
       const on_struct = g.structs.at(&g.world, h[0], h[1]);
-      if (in.held(.left) and on_struct == null and ui_hit == null) {
+      if (ctl.down(in, .use) and on_struct == null and ui_hit == null) {
         if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
       }
-      if (in.pressed(.f) and !ctrl) {
+      if (ctl.pressed(in, .harvest) and !alt) {
         if (on_struct) |j| {
-          if (in.down(.left_shift)) actions.takeFrom(g, j) else actions.feed(g, j);
+          if (ctl.down(in, .take)) actions.takeFrom(g, j) else actions.feed(g, j);
         } else actions.harvest(g, h);
       }
-      if (in.pressed(.c)) if (on_struct) |j| st.configure(g.structs.get(j), &g.prog);
-      if (in.clicked(.right)) {
+      if (ctl.pressed(in, .configure)) if (on_struct) |j| st.configure(g.structs.get(j), &g.prog);
+      if (ctl.pressed(in, .uproot)) {
         if (on_struct) |j| actions.unbuild(g, j)
         else if (g.plants.removeAt(&g.world, h[0], h[1])) _ = g.player.inv.add(.fibre, 1);
         g.linger = actions.LINGER_PUT;
@@ -332,7 +330,7 @@ pub const Game = struct {
     if (work == null and g.linger > 0) work = g.player.work;
     g.player.work = work;
 
-    g.player.move(wish, in.down(.left_shift), &g.world, dt);
+    g.player.move(wish, ctl.down(in, .run), &g.world, dt);
     g.player.animate(dt);
     const follow = g.player.pos + m.v3(0, FOLLOW_HEIGHT, 0);
     g.cam.target += (follow - g.cam.target) * m.splat3(@min(1, dt * FOLLOW_LERP));
@@ -369,22 +367,22 @@ pub const Game = struct {
     };
     // the frame the cursor is taken its jump is not a look
     var look:[2]f32 = .{ 0, 0 };
-    if (in.clicked(.left) and !f.captured) {
+    if (ctl.pressed(in, .use) and !f.captured) {
       in.capture(true);
       f.captured = true;
-    } else if (f.captured or in.held(.left)) {
+    } else if (f.captured or ctl.down(in, .use)) {
       look = .{ -in.mouse_delta[0] * camera.LOOK, -in.mouse_delta[1] * camera.LOOK };
     }
-    const speed = camera.FLY * dt * @as(f32, if (in.down(.left_shift)) FLY_FAST else 1);
+    const speed = camera.FLY * dt * @as(f32, if (ctl.down(in, .fly_fast)) FLY_FAST else 1);
     var move = m.v3(0, 0, 0);
-    if (in.down(.w) or in.down(.up)) move[2] += speed;
-    if (in.down(.s) or in.down(.down)) move[2] -= speed;
-    if (in.down(.d) or in.down(.right)) move[0] += speed;
-    if (in.down(.a) or in.down(.left)) move[0] -= speed;
-    if (in.down(.space)) move[1] += if (in.down(.left_control)) -speed else speed;
+    if (ctl.down(in, .move_forward)) move[2] += speed;
+    if (ctl.down(in, .move_back)) move[2] -= speed;
+    if (ctl.down(in, .move_right)) move[0] += speed;
+    if (ctl.down(in, .move_left)) move[0] -= speed;
+    if (ctl.down(in, .rise)) move[1] += if (ctl.down(in, .alt)) -speed else speed;
     var roll:f32 = 0;
-    if (in.down(.q)) roll -= camera.ROLL * dt;
-    if (in.down(.e)) roll += camera.ROLL * dt;
+    if (ctl.down(in, .roll_left)) roll -= camera.ROLL * dt;
+    if (ctl.down(in, .roll_right)) roll += camera.ROLL * dt;
     g.cam.fly(look, move, roll, in.scroll * DOLLY_PER_NOTCH);
   }
 
@@ -432,6 +430,8 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   const screen = TEST_SCREEN;
+  try ctl.fill(@embedFile("controls.cfg"));
+  defer ctl.unload();
   var in:Input = .{.win = undefined};
   const click = struct {
     /// press the left button over the middle of the first row picking `want`
@@ -440,11 +440,11 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
       for (gg.rows.rect[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
         if (!eqlDeep(p, want)) continue;
         i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
-        i.bprev[0] = false;
-        i.bcur[0] = true;
+        i.advance();
+        ctl.hold(i, .use, true);
         try gg.update(i, TICK, sc);
-        i.bcur[0] = false;
-        i.bprev[0] = true;
+        i.advance();
+        ctl.hold(i, .use, false);
         return;
       }
       return error.TestUnexpectedResult;
@@ -462,11 +462,10 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   try click.on(&g, &in, .{.weave = 0}, screen);
   try testing.expect(g.weave.busy());
 
-  // with the belly open, a number key picks the hotbar slot, not a recipe
+  // with the belly open, a slot key picks the hotbar slot, not a recipe
   in.mouse = .{-1e4, -1e4};
-  in.prev = @splat(false);
-  in.cur = @splat(false);
-  in.cur[Input.idx(.three)] = true;
+  in.advance();
+  ctl.hold(&in, .slot_3, true);
   try g.update(&in, TICK, screen);
   try testing.expectEqual(@as(usize, 2), g.hot);
   try testing.expectEqual(@as(usize, 1), g.weave.len);

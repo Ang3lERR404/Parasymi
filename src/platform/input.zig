@@ -1,24 +1,44 @@
-//! per-frame input snapshot with edge detection, fed by GLFW.
+//! per-frame input snapshot with edge detection, fed by GLFW. Keys and
+//! buttons are asked about as a `Bind`; what each one does is the game's
+//! business (`game/controls.zig`, read from `controls.cfg`).
 const std = @import("std");
 const log = std.log;
+const EnumSet = std.enums.EnumSet;
+const values = std.enums.values;
+const eql = std.mem.eql;
+const startsWith = std.mem.startsWith;
+const stringToEnum = std.meta.stringToEnum;
 const glfw = @import("zglfw");
 
 pub const Key = glfw.Key;
 pub const Button = glfw.MouseButton;
 
-const tracked = [_]Key{
-  .w, .a, .s, .d, .q, .e, .r, .f, .t, .c, .up, .down, .left, .right,
-  .one, .two, .three, .four, .five, .six, .seven, .eight, .nine, .zero, .minus,
-  .tab, .escape, .F3, .F5, .F9, .F11, .left_shift, .left_control, .space,
+/// a mouse button's name in a binding is this prefix and the button's
+/// (`mouse_left`); a key's is its GLFW name (`w`, `left_shift`, `F5`, `one`).
+pub const MOUSE = "mouse_";
+
+/// one physical key or mouse button.
+pub const Bind = union(enum) {
+  key:Key,
+  button:Button,
+
+  /// the bind named `name`, or null for no such key or button.
+  pub fn parse(name:[]const u8) ?Bind {
+    if (startsWith(u8, name, MOUSE)) if (stringToEnum(Button, name[MOUSE.len..])) |b| return .{ .button = b };
+    if (eql(u8, name, @tagName(Key.unknown))) return null;
+    return if (stringToEnum(Key, name)) |k| .{ .key = k } else null;
+  }
 };
-const buttons = [_]Button{.left, .right, .middle};
+
+const Keys = EnumSet(Key);
+const Buttons = EnumSet(Button);
 
 pub const Input = struct {
   win:*glfw.Window,
-  cur:[tracked.len]bool = @splat(false),
-  prev:[tracked.len]bool = @splat(false),
-  bcur:[buttons.len]bool = @splat(false),
-  bprev:[buttons.len]bool = @splat(false),
+  cur:Keys = .initEmpty(),
+  prev:Keys = .initEmpty(),
+  bcur:Buttons = .initEmpty(),
+  bprev:Buttons = .initEmpty(),
   mouse:[2]f32 = .{0, 0},
   mouse_delta:[2]f32 = .{0, 0},
   scroll:f32 = 0,
@@ -35,8 +55,9 @@ pub const Input = struct {
   pub fn update(in:*Input) void {
     in.prev = in.cur;
     in.bprev = in.bcur;
-    inline for (tracked, 0..) |k, i| in.cur[i] = in.win.getKey(k) == .press;
-    inline for (buttons, 0..) |b, i| in.bcur[i] = in.win.getMouseButton(b) == .press;
+    // decision: poll every key, so any key can be bound without a list here
+    for (comptime values(Key)) |k| if (k != .unknown) in.cur.setPresent(k, in.win.getKey(k) == .press);
+    for (comptime values(Button)) |b| in.bcur.setPresent(b, in.win.getMouseButton(b) == .press);
     const mp = in.win.getCursorPos();
     const m:[2]f32 = .{@floatCast(mp[0]), @floatCast(mp[1])};
     in.mouse_delta = .{m[0] - in.mouse[0], m[1] - in.mouse[1]};
@@ -45,25 +66,38 @@ pub const Input = struct {
     in.scroll_acc = 0;
   }
 
-  pub fn idx(comptime k:Key) usize {
-    inline for (tracked, 0..) |t, i| if (t == k) return i;
-    @compileError("key not tracked: " ++ @tagName(k));
+  /// is `b` held this frame?
+  pub fn down(in:*const Input, b:Bind) bool {
+    return switch (b) {
+      .key => |k| in.cur.contains(k),
+      .button => |k| in.bcur.contains(k),
+    };
   }
-  fn bidx(comptime b:Button) usize {
-    inline for (buttons, 0..) |t, i| if (t == b) return i;
-    @compileError("button not tracked");
+  /// did `b` go down this frame?
+  pub fn pressed(in:*const Input, b:Bind) bool {
+    return switch (b) {
+      .key => |k| in.cur.contains(k) and !in.prev.contains(k),
+      .button => |k| in.bcur.contains(k) and !in.bprev.contains(k),
+    };
+  }
+  /// headless tests: hold `b` down (or let it go) as of this frame.
+  pub fn hold(in:*Input, b:Bind, on:bool) void {
+    switch (b) {
+      .key => |k| in.cur.setPresent(k, on),
+      .button => |k| in.bcur.setPresent(k, on),
+    }
+  }
+  /// headless tests: start the next frame from this one, as `update` does.
+  pub fn advance(in:*Input) void {
+    in.prev = in.cur;
+    in.bprev = in.bcur;
   }
 
-  pub fn down(in:*const Input, comptime k:Key) bool { return in.cur[idx(k)]; }
-  pub fn pressed(in:*const Input, comptime k:Key) bool { const i = idx(k); return in.cur[i] and !in.prev[i]; }
   /// hide and hold the cursor for mouse look, or give it back.
   pub fn capture(in:*const Input, on:bool) void {
     // without capture the cursor stays visible; look still works while dragging
     in.win.setInputMode(.cursor, if (on) .disabled else .normal) catch |e| log.warn("cursor capture: {t}", .{e});
   }
-
-  pub fn held(in:*const Input, comptime b:Button) bool { return in.bcur[bidx(b)]; }
-  pub fn clicked(in:*const Input, comptime b:Button) bool { const i = bidx(b); return in.bcur[i] and !in.bprev[i]; }
 };
 
 fn onScroll(w:*glfw.Window, _:f64, y:f64) callconv(.c) void {
@@ -71,4 +105,12 @@ fn onScroll(w:*glfw.Window, _:f64, y:f64) callconv(.c) void {
 }
 fn onResize(w:*glfw.Window, _:c_int, _:c_int) callconv(.c) void {
   if (w.getUserPointer(Input)) |in| in.resized = true;
+}
+
+test "binds parse by key and mouse button name" {
+  try std.testing.expectEqual(Bind{ .key = .left_shift }, Bind.parse("left_shift").?);
+  try std.testing.expectEqual(Bind{ .key = .F5 }, Bind.parse("F5").?);
+  try std.testing.expectEqual(Bind{ .button = .right }, Bind.parse("mouse_right").?);
+  try std.testing.expectEqual(null, Bind.parse("unknown"));
+  try std.testing.expectEqual(null, Bind.parse("mouse_nose"));
 }

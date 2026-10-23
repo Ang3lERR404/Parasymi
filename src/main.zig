@@ -22,6 +22,7 @@ const view = @import("game/view.zig");
 const setups = @import("game/setups.zig");
 const save = @import("game/save.zig");
 const txt = @import("game/text.zig");
+const controls = @import("game/controls.zig");
 const m = @import("core/math.zig");
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
@@ -55,6 +56,9 @@ pub fn main(init:Init) !void {
   // the only read of the strings file: everything shown comes from it
   try txt.load(gpa, io);
   defer txt.unload(gpa);
+  // the only read of the controls file: no key or button is named in code
+  try controls.load(gpa, io);
+  defer controls.unload();
 
   try glfw.init();
   defer glfw.terminate();
