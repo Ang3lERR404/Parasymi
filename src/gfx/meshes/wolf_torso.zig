@@ -3,7 +3,7 @@
 //! to mid-chest, a loose diagonal weave), a short narrow waist (vines
 //! gathered tight and nearly vertical, like a corset) and the hips flaring
 //! back out toward the rear. The sap pectorals are their own instances
-//! (`wolf_pec`, sprung by the player rig); the chest vines tuck in behind.
+//! (`wolf_pec_l`/`_r`, sprung by the player rig); the chest vines tuck in behind.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -16,10 +16,10 @@ const v3 = m.v3;
 const core = pal.wolf_core;
 const vine = pal.wolf_vine;
 
-/// each pectoral lobe's centre (x for the right side; mirrored) and radii,
-/// in torso space. The two lobes overlap at the sternum.
-pub const pec_centre = v3(0.066, 0.355, 0.10);
-pub const pec_radii = v3(0.07, 0.056, 0.05);
+/// each pectoral's centre on the chest (x for the right side; mirrored), in
+/// torso space; the lobes themselves are built around it (wolf_pec.zig) and
+/// meet at the sternum.
+pub const pec_centre = v3(0.072, 0.36, 0.098);
 
 /// the three sections along the height (0 hips .. 1 neck): radius and how
 /// fast the vines wind (radians per unit height) at each key
@@ -71,7 +71,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
 /// position: every copy of a shared vertex moves alike, so the braid stays
 /// watertight.
 fn tuck(vs:[]Mesh) void {
-  const reach = v3(0.1, 0.08, 0.09);
+  const reach = v3(0.13, 0.1, 0.09);
   for (vs) |*v| {
     const p = v3(v.pos[0], v.pos[1], v.pos[2]);
     var w:f32 = 0;

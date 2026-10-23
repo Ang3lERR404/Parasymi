@@ -280,12 +280,13 @@ pub const Player = struct {
       .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .sag = BELLY_SAG * b,
     });
 
-    // pectorals: plump lobes of solidified sap, giving like dense gel and
-    // never quite still
-    for ([_]f32{ -1, 1 }, 0..) |side, i| {
+    // pectorals: broad dishes of solidified sap. Their bases sit on the
+    // chest; the spring (and a slow idle) moves their surface like dense gel
+    for ([_]meshlib.Id{ .wolf_pec_l, .wolf_pec_r }, [_]f32{ -1, 1 }, 0..) |id, side, i| {
       const idle = v3(0, 0.003 * @sin(t * m.tau / 3 + side * 1.3), 0);
-      const at = torso_mesh.pec_centre * v3(side * breath, 1, breath) + p.pec[i].pos + idle;
-      try out.emit(.wolf_pec, m.chain(&.{ torso, T(at), S(torso_mesh.pec_radii) }), .{ .glow = 0.3, .phase = 0.6, .fade = PEC_OPACITY });
+      const at = torso_mesh.pec_centre * v3(side * breath, 1, breath);
+      const give = p.pec[i].pos + idle;
+      try out.emit(id, m.chain(&.{ torso, T(at) }), .{ .phase = 0.6, .fade = PEC_OPACITY, .give = .{ give[0], give[1], give[2] } });
     }
     // the rear: two knotted lobes of dense vine behind the hips
     for ([_]meshlib.Id{ .wolf_rump_l, .wolf_rump_r }, [_]f32{ -1, 1 }, 0..) |id, side, i| {

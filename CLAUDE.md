@@ -157,7 +157,9 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   - Head: flat-bridged lofted muzzle, jaw seam, nose bean, side-set eyes,
     tall ears (sap inner face 50%, antihelix ridge), grown-tendril mane.
   - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
-    hips); sap pectorals (80%) on springs, chest vines tucked behind.
+    hips); pectorals are broad dishes of resin sap (wider top edge, areola +
+    nipple below the crown), base held on the chest, surface sprung; chest
+    vines tucked behind.
   - Belly: translucent sap (72%), inflates +35% and drops/sags with fill;
     up to 5 dark lumps inside on spring-dampers driven by acceleration.
   - Arms: deltoid caps, bicep/tricep, forearm tapering 1.1→0.7.

@@ -13,7 +13,10 @@ pub const Terrain = extern struct {
 
 /// shading role of a vertex; shaders key secondary motion and glow off it.
 /// `ear`: a leaf whose inner face (opposite its normal) is lined with sap.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear };
+/// `resin`: solidified sap, thick and dense at its base (tu.y 0) thinning
+/// toward its surface (tu.y 1); the instance's `give` moves the surface
+/// while the base holds.
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin };
 
 pub const Mesh = extern struct {
   pos:[3]f32,
@@ -43,7 +46,8 @@ pub const PartInstance = extern struct {
   p:[4]f32,
   /// rgb colour multiply, w blend amount
   tint:[4]f32,
-  /// x sag: outward bulge of a sac, heavier at its bottom and front (0 = none)
+  /// x sag: outward bulge of a sac, heavier at its bottom and front (0 = none);
+  /// yzw give: how far a resin part's surface is pushed (mesh space), its base held
   q:[4]f32,
 };
 

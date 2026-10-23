@@ -7,7 +7,7 @@ layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 nrm;
 layout(location = 2) in vec4 col;
 layout(location = 3) in vec2 tu;
-layout(location = 4) in uint part;  // 0 vine 1 leaf 2 sap/glow 3 claw/thorn 4 root 5 sap-lined leaf (ear)
+layout(location = 4) in uint part;  // 0 vine 1 leaf 2 sap/glow 3 claw/thorn 4 root 5 sap-lined leaf (ear) 6 resin
 // per-instance
 layout(location = 5) in vec4 c0;
 layout(location = 6) in vec4 c1;
@@ -15,7 +15,7 @@ layout(location = 7) in vec4 c2;
 layout(location = 8) in vec4 c3;
 layout(location = 9) in vec4 ip;    // glow, flutter, phase, fade
 layout(location = 10) in vec4 tint; // rgb multiply, w amount
-layout(location = 11) in vec4 iq;   // sag
+layout(location = 11) in vec4 iq;   // sag, give (resin surface push)
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -24,6 +24,7 @@ layout(location = 3) out float v_glow;
 layout(location = 4) flat out float v_part;
 layout(location = 5) out float v_t;         // position along the part (tube tangent source)
 layout(location = 6) flat out float v_fade; // opacity of translucent sap at its centre
+layout(location = 7) out float v_u;         // across a leaf; through a resin part (0 base .. 1 surface)
 
 void main() {
   float t = pc.eye_time.w;
@@ -40,6 +41,9 @@ void main() {
   // fixed axis scaled by position along the leaf: tips move, bases stay put.
   if (part == 1u || part == 5u) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
   if (part == 4u) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
+  // resin gives like dense gel: its surface follows the spring, its base on
+  // the body holds (a smooth field of height, so shared vertices move alike)
+  if (part == 6u) p += iq.yzw * smoothstep(0.0, 1.0, tu.y);
 
   vec4 w = M * vec4(p, 1.0);
   v_pos = w.xyz;
@@ -52,5 +56,6 @@ void main() {
   v_part = float(part);
   v_t = tu.x;
   v_fade = ip.w;
+  v_u = tu.y;
   gl_Position = pc.vp * w;
 }

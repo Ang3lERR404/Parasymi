@@ -16,7 +16,8 @@ const parts = struct {
   // drawn before the belly so the translucent sac blends over them
   pub const belly_lump = @import("meshes/belly_lump.zig");
   pub const wolf_belly = @import("meshes/wolf_belly.zig");
-  pub const wolf_pec = @import("meshes/wolf_pec.zig");
+  pub const wolf_pec_l = @import("meshes/wolf_pec_l.zig");
+  pub const wolf_pec_r = @import("meshes/wolf_pec_r.zig");
   pub const wolf_head = @import("meshes/wolf_head.zig");
   pub const wolf_ear = @import("meshes/wolf_ear.zig");
   pub const wolf_limb = @import("meshes/wolf_limb.zig");

@@ -9,6 +9,7 @@ layout(location = 3) in float v_glow;
 layout(location = 4) flat in float v_part;
 layout(location = 5) in float v_t;
 layout(location = 6) flat in float v_fade;
+layout(location = 7) in float v_u;
 layout(location = 0) out vec4 o;
 
 const vec3 SAP = vec3(1.0, 0.43, 0.08);       // linear amber, the only accent
@@ -40,6 +41,34 @@ void main() {
   // instance tint (paw beans, nose) can make it denser and browner
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
   bool inner_ear = part == 5 && dot(raw, V) < 0.0;
+  if (part == 6) {
+    // solidified sap, thick as resin: dense and dark where it meets the body
+    // (v_u 0), thinning toward its surface (v_u 1). No light of its own:
+    // what glows is light passing through it, so it dims with the day.
+    if (dot(raw, V) < 0.0) discard;
+    float h = clamp(v_u, 0.0, 1.0);
+    float ndv = clamp(dot(raw, V), 0.0, 1.0);
+    float fres = pow(1.0 - ndv, 2.0);
+    float day = pc.sun.w;
+    vec3 sap = SAP * hue;
+    vec3 deep = SAP_DEEP * hue * mix(0.55, 1.6, h);
+    // light carried through the mass: wrapped, so the shadow side still
+    // shows a warm core, thicker resin swallowing more of it
+    float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0);
+    float through = max(dot(-raw, SUN), 0.0);
+    vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
+    c = shade(deep, raw, v_pos);
+    c += sap * lit * wrap * mix(0.06, 0.32, h);
+    c += sap * lit * through * 0.25 * h;
+    // the polished face: amber at grazing angles and a tight highlight
+    c += mix(deep, sap * 1.4, fres) * 0.3 * lit;
+    vec3 H = normalize(SUN + V);
+    c += lit * pow(max(dot(raw, H), 0.0), 90.0) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN));
+    // denser at the base: nearly opaque there, see-through only toward the face
+    alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
+    o = vec4(applyFog(c, v_pos), alpha);
+    return;
+  }
   if (part == 2 && v_fade < 0.999) {
     // translucent sap sac: dark and see-through at the centre, amber at
     // grazing angles. Only the near side is drawn (it is a closed sac).

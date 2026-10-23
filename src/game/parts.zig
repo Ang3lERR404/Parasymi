@@ -15,6 +15,9 @@ pub const Look = struct {
   tint:[4]f32 = .{1, 1, 1, 0},
   /// how far a sac sags outward under its own weight (unit-radius units)
   sag:f32 = 0,
+  /// how far a resin part's surface is pushed off its rest (mesh space);
+  /// its base on the body stays put (see vertex.Part.resin)
+  give:[3]f32 = .{0, 0, 0},
 };
 
 pub const Parts = struct {
@@ -55,7 +58,7 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
     .p = .{look.glow, look.flutter, look.phase, look.fade},
     .tint = look.tint,
-    // q.x = sag; q.y/z/w reserved (GPU alignment)
-    .q = .{look.sag, 0, 0, 0},
+    // q.x = sag; q.yzw = give
+    .q = .{look.sag, look.give[0], look.give[1], look.give[2]},
   };
 }
