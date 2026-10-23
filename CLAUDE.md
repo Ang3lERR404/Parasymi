@@ -76,7 +76,7 @@ registry kinds outside the registry file; add a hook.
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground` |
-| research | `game/progression.zig` | `def`, `apply`, `unlocks`, `completed`, `veil` |
+| research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
 | render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, ui) |
 
@@ -243,7 +243,33 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   threshold and anti-firefly weighting, tent filter back up); composite
   adds the glow (0.7), rolls highlights off above 0.8 and a faint vignette;
   `Desc.screen` passes (UI) draw on top. ~0.1 ms.
-- UI: wobbling membranes, seed-pod slots, tendril bars, soft glow; 150 ms anim.
+- UI: wobbling membranes, seed-pod slots, tendril bars, soft glow, stems
+  (`Draw.limb`) and leaves/buds (`Draw.leaf`); 150 ms anim.
+- Research panel (T, `hud/research.zig`) is a sapling in soil, laid out
+  from the prerequisites alone, so it never needs placing or adjusting:
+  - Adding research: one file in `research/` + one line in `techs`. Set
+    `.branch = true` on a big step (new structures, species, an event);
+    anything else is a leaf. Nothing else to do: no coordinates, no sizes.
+  - Host: a node grows on the nearest branch up its *first* prerequisite
+    chain, else on the trunk (so list the prerequisite it belongs to first).
+  - Along a host, children sit one slot apart by depth (longest prereq
+    chain; a `needs` discovery counts 1), then declaration order; leaves and
+    branches each alternate sides. Stems are one slot longer than their
+    children (branches ≥ `BRANCH_MIN`) and bend toward the light.
+  - The fully grown, still tree is fitted to the panel (`fit`, slot ≤
+    `max_slot` px), so nothing moves: the sapling starts small at the soil
+    and fills the panel as research is done.
+  - Known: grown leaf / branch with a violet bloom at its tip. Open: gold
+    bud (glows; while studied a leaf unfurls and a branch shoot extends with
+    progress). Locked: dim dormant bud where its host has grown, else
+    hidden. The trunk reaches `TRUNK_LEAD` past its highest open/known
+    node (eased, `play.Game.sapling`) and thickens with √(known).
+  - Wind sways stems from the base (children follow), leaves flutter.
+    Hovering a node (`Game.pointed`) shows its card (cost, progress, or
+    what it is DORMANT on); else the studied one. Click selects.
+  - The test asserts hosts come before what grows on them and no two nodes
+    crowd (> 0.5 slot); if it fails after adding research, fix the layout
+    rules there, never hand-place a node.
 - Wolf (`game/player.zig` rig; muted greens/browns, amber only on belly,
   eyes, inner ears, beans):
   - Built of planes (`wolf_kit`): head one closed surface (`wolf_head.point`:
@@ -298,7 +324,7 @@ Done: engine, terrain, streaming, plants + 7 species, ecology, structures,
 footprints/floaters, research (9 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
 planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
-LOD + culling, bloom post-processing.
+LOD + culling, bloom post-processing, research sapling panel.
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes

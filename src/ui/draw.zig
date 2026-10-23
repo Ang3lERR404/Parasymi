@@ -22,6 +22,12 @@ pub const Shape = enum(u32) {
   tendril,
   /// soft radial halo
   glow,
+  /// tapered stem segment (bark, sap rising); param.x = end/start radius,
+  /// param.y = arc length at its start, so texture runs on across segments
+  limb,
+  /// leaf blade from its base along the quad; param.x = how open (0 is a
+  /// closed bud), param.y = seed
+  leaf,
 };
 
 const shape_mark:u32 = 0xffff_ffff;
@@ -49,6 +55,24 @@ pub const Draw = struct {
     }
   }
 
+  /// a quad laid along unit direction `u` from `a`: local x runs along it
+  /// (len), y across (thick), both padded like `shape`.
+  fn along(d:*Draw, kind:Shape, a:[2]f32, u:[2]f32, len:f32, thick:f32, col:Color, param:[2]f32) Allocator.Error!void {
+    const pad:f32 = 28;
+    const w = len + 2 * pad;
+    const h = thick + 2 * pad;
+    const uv = [4][2]f32{.{0, 0}, .{w, 0}, .{w, h}, .{0, h}};
+    var p:[4][2]f32 = undefined;
+    for (uv, &p) |q, *o| {
+      const x = q[0] - pad;
+      const y = q[1] - h / 2;
+      o.* = .{a[0] + u[0] * x - u[1] * y, a[1] + u[1] * x + u[0] * y};
+    }
+    for ([_]usize{0, 1, 2, 0, 2, 3}) |i| {
+      try d.v.append(d.gpa, .{.pos = p[i], .uv = uv[i], .size = .{w, h}, .col = col, .bits = .{shape_mark, @intFromEnum(kind)}, .param = param});
+    }
+  }
+
   /// shapes get a margin so wobble/glow can spill past the nominal bounds.
   fn shape(d:*Draw, kind:Shape, x:f32, y:f32, w:f32, h:f32, col:Color, param:[2]f32) Allocator.Error!void {
     const pad:f32 = 28;
@@ -66,6 +90,20 @@ pub const Draw = struct {
   }
   pub fn glow(d:*Draw, cx:f32, cy:f32, r:f32, col:Color) Allocator.Error!void {
     try d.shape(.glow, cx - r, cy - r, 2 * r, 2 * r, col, .{0, 0});
+  }
+
+  /// a stem from `a` (radius r0) to `b` (radius r1 <= r0), round at both
+  /// ends so consecutive segments join; `s0` is the arc length at `a`.
+  pub fn limb(d:*Draw, a:[2]f32, b:[2]f32, r0:f32, r1:f32, col:Color, s0:f32) Allocator.Error!void {
+    const dx = b[0] - a[0];
+    const dy = b[1] - a[1];
+    const l = @sqrt(dx * dx + dy * dy);
+    const u:[2]f32 = if (l > m.EPS) .{dx / l, dy / l} else .{1, 0};
+    try d.along(.limb, a, u, l, 2 * r0, col, .{if (r0 > m.EPS) r1 / r0 else 1, s0});
+  }
+  /// a leaf (or, closed, a bud) growing from `base` at screen angle `ang`.
+  pub fn leaf(d:*Draw, base:[2]f32, ang:f32, len:f32, wid:f32, col:Color, open:f32, seed:f32) Allocator.Error!void {
+    try d.along(.leaf, base, .{@cos(ang), @sin(ang)}, len, wid, col, .{m.clamp01(open), seed});
   }
 
   /// returns the x after the last glyph.

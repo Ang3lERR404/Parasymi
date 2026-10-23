@@ -53,6 +53,7 @@ pub const Strings = struct {
     belly_title:S = "", belly_fill:S = "", weave:S = "", weave_hint:S = "", queued:S = "",
     recipe:S = "", recipe_many:S = "", recipe_needs:S = "",
     research_title:S = "", research_hint:S = "", research_cost:S = "",
+    research_dormant:S = "", research_unwitnessed:S = "",
     hotbar_keys:S = "", facing:S = "", facing_label:S = "", not_understood:S = "",
     too_far:S = "", empty:S = "", node:S = "", tile:S = "", stage:S = "", growth:S = "",
     bloom:S = "", radiating:S = "", dark:S = "", no_mature:S = "",

@@ -121,6 +121,9 @@ pub const Game = struct {
   ui:Draw,
   /// what a click on the HUD would land on, as drawn last frame
   rows:hud.Rows = .{},
+  /// the HUD area under the mouse this frame (panels show what it points at)
+  pointed:?hud.Pick = null,
+  sapling:hud.Sapling = .{},
   weave:craft.Crafter = .{},
 
   mode:Mode = .roam,
@@ -258,6 +261,7 @@ pub const Game = struct {
     // a click lands on the HUD panel under the mouse before the world: rows
     // choose research or weave a recipe; a panel's backdrop just absorbs it
     const ui_hit = if (inspecting) null else g.rows.at(in.mouse);
+    g.pointed = ui_hit;
     if (ctl.pressed(in, .use)) if (ui_hit) |hit| switch (hit) {
       .panel => {},
       .research => |id| g.prog.select(id),

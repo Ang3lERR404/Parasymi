@@ -16,6 +16,9 @@ const prog = @import("progression.zig");
 /// just a panel (which keeps the click out of the world beneath it).
 pub const Pick = union(enum) { panel, research:prog.Id, weave:usize };
 
+/// the research sapling's growth, kept between frames.
+pub const Sapling = panels.research.Sapling;
+
 /// the clickable areas the panels drew last frame. Panels add them as they
 /// draw (backdrop first, rows on top); `build` clears them; play.update
 /// hit-tests the mouse against them, one frame behind the draw.

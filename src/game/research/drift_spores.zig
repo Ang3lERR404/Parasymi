@@ -10,6 +10,7 @@ pub const def:prog.Research = .{
   .units = 15,
   .unit_time = 4,
   .prereq = &.{ .ley_sight },
+  .branch = true,
 };
 
 pub const unlocks = [_]species.Id{ .driftwisp };

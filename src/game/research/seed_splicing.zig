@@ -15,6 +15,7 @@ pub const def:prog.Research = .{
     .hungering_tendrils
   },
   .needs = .convergence,
+  .branch = true,
 };
 
 pub const unlocks = [_]species.Id{.vesper};

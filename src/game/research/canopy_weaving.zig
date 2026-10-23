@@ -11,6 +11,7 @@ pub const def:prog.Research = .{
   .units = 25,
   .unit_time = 6,
   .prereq = &.{ .root_communion },
+  .branch = true,
 };
 
 pub const unlocks = [_]species.Id{ .hollowheart };

@@ -54,6 +54,19 @@ pub const research_done:C = .{140, 230, 170, 255};
 pub const research_locked:C = .{105, 105, 120, 255};
 /// research row: currently selected glow
 pub const research_active:C = .{255, 210, 130, 120};
+/// research node under the mouse
+pub const research_hover:C = .{220, 235, 210, 90};
+/// research bud that can be chosen: a faint gold call
+pub const research_invite:C = .{255, 215, 130, 45};
+/// research sapling bark: young green twig, old brown wood
+pub const bark_young:C = .{100, 140, 80, 255};
+pub const bark_old:C = .{105, 80, 58, 255};
+/// research sapling: a known leaf, a bud that can be chosen, a dormant bud
+pub const leaf:C = .{105, 185, 105, 235};
+pub const bud:C = .{235, 195, 115, 245};
+pub const bud_dormant:C = .{95, 95, 105, 200};
+/// the soil the sapling stands in
+pub const soil:C = .{70, 48, 32, 150};
 /// sun orb (warm amber)
 pub const sun:C = .{255, 210, 120, 255};
 /// moon orb (cool blue)

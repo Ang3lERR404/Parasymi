@@ -115,6 +115,53 @@ vec4 glow(vec2 px) {
   return vec4(v_col.rgb, a * v_col.a);
 }
 
+// a tapered stem segment along local x: round bark lit from one side, fibre
+// grooves running along it and sap pulses rising toward the tip. `s0` is the
+// arc length at its start, so consecutive segments read as one stem.
+vec4 limb(vec2 px, float taper, float s0) {
+  float t = pc.time;
+  float L = v_size.x - 2.0 * PAD;
+  float r0 = (v_size.y - 2.0 * PAD) * 0.5;
+  vec2 p = px - vec2(PAD, v_size.y * 0.5);
+  float k = clamp(p.x / max(L, 1e-3), 0.0, 1.0);
+  float r = r0 * mix(1.0, taper, k);
+  float d = length(vec2(p.x - k * L, p.y)) - r;
+  float cover = smoothstep(0.8, -0.8, d);
+  float across = clamp(p.y / max(r, 0.5), -1.0, 1.0);
+  float s = s0 + p.x;
+  float shade = 0.6 + 0.4 * sqrt(max(0.0, 1.0 - across * across)) - 0.1 * across;
+  float groove = vnoise(vec2(s * 0.07, across * 2.5 + 3.0));
+  vec3 col = v_col.rgb * shade * (0.8 + 0.35 * groove);
+  float pulse = pow(0.5 + 0.5 * sin(s * 0.05 - t * 2.4), 6.0) * (1.0 - abs(across));
+  col = sapColor(col, pulse * 0.35);
+  col *= mix(1.0, 0.55, smoothstep(0.7, 1.0, abs(across)));
+  return vec4(col, cover * v_col.a);
+}
+
+// a leaf blade from its base (x = 0) to its tip (x = L), or closed (open 0)
+// a fat teardrop bud: lit and shaded halves about the midrib, veins, sap
+// showing through the thin margin.
+vec4 leaf(vec2 px, float open, float seed) {
+  float L = v_size.x - 2.0 * PAD;
+  float W = (v_size.y - 2.0 * PAD) * 0.5;
+  vec2 p = px - vec2(PAD, v_size.y * 0.5);
+  float kc = clamp(p.x / max(L, 1e-3), 0.0, 1.0);
+  float prof = pow(sin(3.14159 * pow(kc, mix(0.8, 0.62, open))), mix(1.1, 0.8, open));
+  float w = W * prof;
+  float y = p.y - W * 0.3 * kc * kc * sin(seed * 6.0) * open;
+  float d = max(abs(y) - w, max(-p.x, p.x - L));
+  float cover = smoothstep(0.8, -0.8, d);
+  float across = clamp(y / max(w, 0.5), -1.0, 1.0);
+  float lit = across > 0.0 ? 1.0 : mix(0.7, 0.86, open);
+  float midrib = smoothstep(1.2, 0.0, abs(y)) * open;
+  float veins = smoothstep(0.8, 1.0, sin((kc * 6.0 - abs(across) * 1.4) * 6.2832)) * open * (1.0 - abs(across));
+  float margin = smoothstep(0.55, 1.0, abs(across));
+  vec3 col = v_col.rgb * lit * (0.85 + 0.15 * vnoise(p * 0.15 + seed * 9.0));
+  col = mix(col, col * 1.3 + vec3(0.04, 0.06, 0.02), veins * 0.5 + midrib * 0.6);
+  col = sapColor(col, margin * 0.25);
+  return vec4(col, cover * v_col.a * mix(0.96, 0.85, margin));
+}
+
 // is glyph cell q set? (5x7 bitmap, row-major, bit 0 top-left)
 bool lit(ivec2 q) {
   if (q.x < 0 || q.y < 0 || q.x >= 5 || q.y >= 7) return false;
@@ -130,7 +177,9 @@ void main() {
       case 0u: c = membrane(v_uv, v_param.y); break;
       case 1u: c = pod(v_uv, v_param.x, v_param.y); break;
       case 2u: c = tendril(v_uv, v_param.x, v_param.y); break;
-      default: c = glow(v_uv); break;
+      case 3u: c = glow(v_uv); break;
+      case 4u: c = limb(v_uv, v_param.x, v_param.y); break;
+      default: c = leaf(v_uv, v_param.x, v_param.y); break;
     }
     if (c.a < 0.003) discard;
     o = c;

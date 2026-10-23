@@ -14,6 +14,7 @@ pub const def:prog.Research = .{
   .units = 50,
   .unit_time = 12,
   .prereq = &.{.seed_splicing},
+  .branch = true,
 };
 
 /// how far this knowledge pulls the veil (world event blend target).

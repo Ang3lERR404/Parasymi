@@ -10,4 +10,5 @@ pub const def:prog.Research = .{
   .units = 10,
   .unit_time = 5,
   .prereq = &.{ .ley_sight },
+  .branch = true,
 };

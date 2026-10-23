@@ -6,7 +6,7 @@
 //! paid from a pool.
 //!
 //! Each technology is its own module under `research/` declaring:
-//!   def:Research                  name, cost, prerequisites    (required)
+//!   def:Research                  cost, prerequisites, branch  (required)
 //!   apply(*ecology.Mods)          what it changes in the living world
 //!   unlocks:[_]species.Id         species it lets the gardener plant
 //!   completed(*Progression)       anything said or done when it is learned
@@ -48,9 +48,14 @@ pub const Research = struct {
   unit_time:f32,
   prereq:[]const Id = &.{},
   needs:?Discovery = null,
+  /// a big step (new structures, species, a world event): grows as a branch
+  /// of the research sapling; anything else is a leaf (hud/research.zig).
+  branch:bool = false,
 };
 
 pub const tree = reg.table(Research, "def");
+
+pub const Status = enum { done, open, locked };
 
 /// for each species, the technology that must be known to plant it (null: always).
 const plant_gate = blk: {
@@ -110,7 +115,7 @@ pub const Progression = struct {
     m.len = ctext.bufRender(&m.buf, tpl, args).len;
   }
 
-  pub fn status(g:*const Progression, id:Id) enum { done, open, locked } {
+  pub fn status(g:*const Progression, id:Id) Status {
     if (g.done.contains(id)) return .done;
     const r = tree.get(id);
     for (r.prereq) |p| if (!g.done.contains(p)) return .locked;
