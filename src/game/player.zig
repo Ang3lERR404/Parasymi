@@ -15,6 +15,10 @@ const rump_mesh = @import("../gfx/meshes/wolf_rump.zig");
 const thigh_mesh = @import("../gfx/meshes/wolf_thigh.zig");
 const calf_mesh = @import("../gfx/meshes/wolf_calf.zig");
 const tailbone = @import("../gfx/meshes/wolf_tailbone.zig");
+const head_mesh = @import("../gfx/meshes/wolf_head.zig");
+const upper_arm = @import("../gfx/meshes/wolf_upper_arm.zig");
+const forearm = @import("../gfx/meshes/wolf_forearm.zig");
+const foot_mesh = @import("../gfx/meshes/wolf_foot.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
@@ -22,11 +26,18 @@ const Parts = parts.Parts;
 pub const SLOTS = 24;
 pub const REACH:f32 = 2.4;
 const STEP_UP:f32 = 0.45;
-/// leg segment lengths: upper leg (thigh + shin, hip to hock) 0.32, lower
-/// leg (metatarsal + paw, hock to toe) ~0.66, about twice as long.
+/// leg segments, anthro digitigrade: a near-vertical thigh, a long calf
+/// angled back to a high hock, a shorter metatarsal angled forward, and a
+/// long flat foot on the ground (side view: a clear Z)
 const THIGH = thigh_mesh.LEN;
 const SHIN = calf_mesh.LEN;
-const META:f32 = 0.56;
+const META:f32 = 0.335;
+/// paw beans and the nose: sap made denser (80%) and browner than the belly
+const BEAN_OPACITY:f32 = 0.8;
+const BEAN_TINT = [4]f32{0.72, 0.5, 0.38, 1};
+const NOSE_TINT = [4]f32{0.3, 0.22, 0.2, 1};
+/// the inner ears' sap
+const EAR_OPACITY:f32 = 0.5;
 /// the belly's sap at its centre lets the body behind show through faintly;
 /// the pectorals are solidified sap, 30% less see-through.
 const SAP_OPACITY:f32 = 0.72;
@@ -110,6 +121,10 @@ pub const Player = struct {
   lump:[lumps.len]Spring3 = @splat(.{}),
   pec:[2]Spring3 = @splat(.{}),
   rump:[2]Spring3 = @splat(.{}),
+  /// each foot's contact with the ground (1 planted .. 0 lifted), eased;
+  /// the central pad flattens with it
+  pad:[2]f32 = @splat(1),
+  pad_v:[2]f32 = @splat(0),
   tail:[3]f32 = @splat(0),
   tail_v:[3]f32 = @splat(0),
   /// 0..1 blend toward the work gesture (gathering, planting, harvesting)
@@ -171,6 +186,7 @@ pub const Player = struct {
     const al = m.mulV(m.rotY(-p.facing), .{a[0], a[1], a[2], 0});
     p.accel = v3(al[0], al[1], al[2]);
     p.slosh(step, dt);
+    for (&p.pad, &p.pad_v, [_]f32{-1, 1}) |*c, *v, side| m.spring(c, v, 1 - m.clamp01(p.legLift(side) * 6), 14, dt);
 
     // tail: each segment chases the one before it, steered by turning and gait
     var target = m.clamp(-p.turn * 0.12, -0.8, 0.8) + @sin(p.t * 2.3) * 0.25 * (1 - p.stride) + @sin(p.phase) * 0.15 * p.stride;
@@ -207,6 +223,10 @@ pub const Player = struct {
       if (d > RUMP_MAX) s.pos *= m.splat(RUMP_MAX / d);
     }
   }
+
+  /// a leg's place in the gait cycle, and how far it is lifted (0 planted)
+  fn legPhase(p:*const Player, side:f32) f32 { return p.phase + (if (side > 0) m.pi else @as(f32, 0)); }
+  fn legLift(p:*const Player, side:f32) f32 { return @max(0, @cos(p.legPhase(side))) * p.stride; }
 
   fn bellyScale(p:*const Player) f32 { return 1 + p.fullness * BELLY_GROW; }
   fn lumpRadius(p:*const Player) f32 { return LUMP_R * p.bellyScale() / (1 + BELLY_GROW); }
@@ -263,7 +283,14 @@ pub const Player = struct {
     const nod = @sin(t * 1.7) * 0.03 + p.reach * 0.35 - lean * 0.8;
     const neck = m.chain(.{torso, T(v3(0, 0.5, 0.05)), m.rotX(nod)});
     try joint(out, neck, 0.075);
-    try out.emit(.wolf_head, m.chain(.{neck, T(v3(0, 0.0, 0.02))}), .{.glow = 0.9, .flutter = 1, .phase = 0.5});
+    const head = m.chain(.{neck, T(v3(0, 0.0, 0.02))});
+    try out.emit(.wolf_head, head, .{.glow = 0.9, .flutter = 1, .phase = 0.5});
+    try out.emit(.paw_bean, m.chain(.{head, T(head_mesh.nose), S(v3(0.021, 0.014, 0.013))}), .{.glow = 0.1, .fade = BEAN_OPACITY, .tint = NOSE_TINT});
+    // ears: tall, leaning 15 degrees forward and 10 out
+    for ([_]f32{-1, 1}) |side| {
+      const ear = m.chain(.{head, T(v3(side * 0.058, 0.15, -0.005)), m.rotZ(-side * 10 * m.pi / 180.0), m.rotX(15 * m.pi / 180.0)});
+      try out.emit(.wolf_ear, ear, .{.glow = 0.3, .flutter = 0.6, .phase = 0.5 + side * 0.1, .fade = EAR_OPACITY});
+    }
 
     for ([_]f32{-1, 1}) |side| {
       try out.emit(.leaf_tuft, m.chain(.{torso, T(v3(side * 0.17, 0.47, -0.01)), m.rotZ(-side * 0.5)}), .{.flutter = 1, .phase = 0.2 + side * 0.1});
@@ -273,23 +300,24 @@ pub const Player = struct {
       const dig = -1.15 + @sin(t * 9 + side) * 0.25;
       const a = m.lerp(swing, dig, p.reach);
       const shoulder = m.chain(.{torso, T(v3(side * 0.19, 0.43, 0)), m.rotZ(side * 0.15), m.rotX(a)});
-      try joint(out, shoulder, 0.075);
-      try out.emit(.wolf_limb, m.chain(.{shoulder, m.rotX(m.pi), S(v3(0.13 * lb, 0.25, 0.13 * lb))}), vine_look);
-      const elbow = m.chain(.{shoulder, T(v3(0, -0.25, 0)), m.rotX(-(0.3 + 0.35 * st * @max(0, -swing)) - p.reach * 0.7)});
+      // a deltoid caps the joint; bicep and tricep above a tapering forearm
+      try out.emit(.wolf_deltoid, m.chain(.{shoulder, S(m.splat(lb))}), vine_look);
+      try out.emit(.wolf_upper_arm, m.chain(.{shoulder, m.rotX(m.pi), S(v3(lb, 1, lb))}), vine_look);
+      const elbow = m.chain(.{shoulder, T(v3(0, -upper_arm.LEN, 0)), m.rotX(-(0.3 + 0.35 * st * @max(0, -swing)) - p.reach * 0.7)});
       try joint(out, elbow, 0.058);
-      try out.emit(.wolf_limb, m.chain(.{elbow, m.rotX(m.pi), S(v3(0.1 * lb, 0.23, 0.1 * lb))}), vine_look);
-      const wrist = m.chain(.{elbow, T(v3(0, -0.24, 0))});
+      try out.emit(.wolf_forearm, m.chain(.{elbow, m.rotX(m.pi), S(v3(lb, 1, lb))}), vine_look);
+      const wrist = m.chain(.{elbow, T(v3(0, -forearm.LEN, 0))});
       try joint(out, wrist, 0.042);
       try out.emit(.wolf_paw, m.chain(.{wrist, m.rotX(1.2)}), vine_look);
 
-      // digitigrade legs: a short upper leg (thigh forward, shin back to the
-      // hock, which bends backward) over a lower leg (long metatarsal + paw)
-      // about twice its length. At rest the paw lands under the hip.
-      const lp = p.phase + (if (side > 0) m.pi else @as(f32, 0));
-      const lift = @max(0, @cos(lp)) * st;
-      const th = -0.65 - @sin(lp) * 0.45 * st + 0.25 * p.reach;
-      const kn = 1.85 + 0.55 * lift + 0.3 * p.reach;
-      const mt = -1.6 - 0.4 * lift - 0.25 * p.reach;
+      // digitigrade legs, anthro proportions: near-vertical thigh, knee
+      // bending forward, the calf angled back to a high hock, the metatarsal
+      // angled forward to a long flat foot. At rest the ball lands under the hip.
+      const lp = p.legPhase(side);
+      const lift = p.legLift(side);
+      const th = -0.25 - @sin(lp) * 0.45 * st + 0.25 * p.reach;
+      const kn = 0.87 + 0.55 * lift + 0.3 * p.reach;
+      const mt = -1.23 - 0.4 * lift - 0.25 * p.reach;
       const thigh = m.chain(.{hips, T(v3(side * 0.1, 0, 0)), m.rotX(th)});
       try joint(out, thigh, 0.095);
       try out.emit(.wolf_thigh, m.chain(.{thigh, m.rotX(m.pi), S(v3(lb, 1, lb))}), vine_look);
@@ -301,10 +329,17 @@ pub const Player = struct {
       try out.emit(.wolf_limb, m.chain(.{hock, m.rotX(m.pi), S(v3(0.095 * lb, META, 0.095 * lb))}), vine_look);
       const heel = m.chain(.{hock, T(v3(0, -META, 0))});
       try joint(out, heel, 0.038);
-      const paw = m.chain(.{heel, m.rotX(-(th + kn + mt))});
-      try out.emit(.wolf_paw, paw, vine_look);
-      const c = m.mulV(paw, .{0, 0, 0.03, 1});
-      feet[if (side > 0) 1 else 0] = v3(c[0], c[1], c[2]);
+      const foot = m.chain(.{heel, m.rotX(-(th + kn + mt))});
+      try out.emit(.wolf_foot, foot, vine_look);
+      // the beans: one central pad that flattens 10% while planted, four toe pads
+      const fi:usize = if (side > 0) 1 else 0;
+      const bean:parts.Look = .{.glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT};
+      try out.emit(.paw_pad, m.chain(.{foot, T(foot_mesh.pad_at), S(v3(0.021, 0.006 * (1 - 0.1 * p.pad[fi]), 0.02))}), bean);
+      for (foot_mesh.toes) |tp| {
+        try out.emit(.paw_bean, m.chain(.{foot, T(v3(tp[0], foot_mesh.SOLE_Y + 0.002, tp[1])), S(v3(0.0065, 0.004, 0.008))}), bean);
+      }
+      const c = m.mulV(foot, .{0, 0, 0.04, 1});
+      feet[fi] = v3(c[0], c[1], c[2]);
     }
 
     // tail: the spring-steered joint chain gives the control points, and a

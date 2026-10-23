@@ -6,7 +6,7 @@ const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("style.zig");
 
-const controls = "WASD MOVE  SHIFT RUN  Q/E TURN  CTRL+W/S TILT  LMB GATHER/PLACE  R ROTATE  F HARVEST/FEED  SHIFT+F TAKE  C RECIPE  RMB UPROOT  1-9 HOTBAR  TAB BELLY  T RESEARCH";
+const controls = "WASD MOVE  SHIFT RUN  Q/E TURN  CTRL+W/S TILT  CTRL+F FREE CAM  LMB GATHER/PLACE  R ROTATE  F HARVEST/FEED  SHIFT+F TAKE  C RECIPE  RMB UPROOT  1-9 HOTBAR  TAB BELLY  T RESEARCH";
 
 pub fn draw(g:*play.Game, d:*Draw, _:f32, H:f32) Allocator.Error!void {
   for (g.prog.log, 0..) |msg, i| {

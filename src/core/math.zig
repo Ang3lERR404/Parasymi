@@ -33,6 +33,8 @@ pub inline fn ratio(a:anytype, b:anytype) f32 { return f(a) / f(b); }
 // ---- angles ----
 
 pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
+pub inline fn asin(x:f32) f32 { return math.asin(clamp(x, -1, 1)); }
+pub inline fn sign(x:f32) f32 { return math.sign(x); }
 /// shortest signed difference `to - from`, wrapped into -pi..pi.
 pub inline fn angleDiff(from:f32, to:f32) f32 { return atan2(@sin(to - from), @cos(to - from)); }
 

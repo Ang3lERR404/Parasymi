@@ -20,6 +20,7 @@ const panels = struct {
   pub const research = @import("hud/research.zig");
   pub const log = @import("hud/log.zig");
   pub const debug = @import("hud/debug.zig");
+  pub const inspect = @import("hud/inspect.zig");
   pub const pause = @import("hud/pause.zig");
 };
 const reg = registry.Registry(panels);

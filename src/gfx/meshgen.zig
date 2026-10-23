@@ -17,6 +17,7 @@ pub const BLADE_SEGS = 8;
 /// mesh variants grown per species, so neighbouring plants differ in shape.
 pub const VARIANTS = 4;
 const MAX_SIDES = 16;
+const MAX_LOFT = 24;
 
 pub const Builder = struct {
   gpa:Allocator,
@@ -256,6 +257,15 @@ pub fn vine(b:*Builder, g:Growth, ctrl_n:usize, res:usize, r0:f32, col:[4]u8, pa
 /// vines, `radii[i]` the bundle's radius at each point. `wobble` roughs the
 /// strands' winding with smooth noise (0 = a perfect lathe-like helix).
 pub fn braid(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, strands:u32, twist:f32, wobble:f32, seed:u64, core:[4]u8, strand:[4]u8) Allocator.Error!void {
+  var turn:[MAX_SPINE]f32 = undefined;
+  for (turn[0..spine.len], 0..) |*a, i| a.* = m.ratio(i, spine.len - 1) * twist;
+  try braidTurned(b, spine, ts, radii, turn[0..spine.len], strands, wobble, seed, core, strand);
+}
+
+/// a braid whose strands have wound `turn[i]` radians around the core by
+/// point i: winding fast spreads them into a loose diagonal weave, winding
+/// slowly gathers them tight and nearly vertical.
+pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, turn:[]const f32, strands:u32, wobble:f32, seed:u64, core:[4]u8, strand:[4]u8) Allocator.Error!void {
   const n = spine.len;
   var fn_:[MAX_SPINE]V3 = undefined;
   var fb:[MAX_SPINE]V3 = undefined;
@@ -271,11 +281,92 @@ pub fn braid(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, st
     for (0..n) |i| {
       const u = m.ratio(i, n - 1);
       // strands stay embedded in the core: the offset never leaves 0.8 +- 10%
-      const a = a0 + u * twist + wobble * 4 * noise.grad(sd, u * 3, 0.5);
+      const a = a0 + turn[i] + wobble * 4 * noise.grad(sd, u * 3, 0.5);
       const off = radii[i] * 0.8 * (1 + wobble * 3 * noise.grad(sd, u * 3, 7.5));
       path[i] = spine[i] + (fn_[i] * m.splat(@cos(a)) + fb[i] * m.splat(@sin(a))) * m.splat(off);
     }
     try b.tubeR(path[0..n], ts, r[0..n], strand, .stem, 5);
+  }
+}
+
+/// a tube along `spine` whose cross-section is `shape` (a closed curve over
+/// 0..tau, roughly unit size, counter-clockwise when seen from the spine's
+/// start) scaled by `widths`/`heights`, upright toward `up`. Rings are
+/// shared and both ends capped, so it is watertight like `tubeR`.
+pub fn loft(b:*Builder, spine:[]const V3, ts:[]const f32, widths:[]const f32, heights:[]const f32, up:V3, comptime shape:fn (f32) [2]f32, col:[4]u8, part:vertex.Part, sides:u32) Allocator.Error!void {
+  assert(spine.len >= 2 and spine.len <= MAX_SPINE and sides <= MAX_LOFT);
+  const n = spine.len;
+  var rings:[MAX_SPINE][MAX_LOFT]V3 = undefined;
+  var norms:[MAX_SPINE][MAX_LOFT]V3 = undefined;
+  for (0..n) |i| {
+    const tan = m.norm(spine[@min(i + 1, n - 1)] - spine[if (i == 0) 0 else i - 1]);
+    const side = m.norm(m.cross(up, tan));
+    const u = m.cross(tan, side);
+    for (0..sides) |k| {
+      const a = m.ratio(k, sides) * m.tau;
+      const p = shape(a);
+      // outward normal of the (scaled) section curve
+      const e:f32 = 0.01;
+      const p0 = shape(a - e);
+      const p1 = shape(a + e);
+      const dx = (p1[0] - p0[0]) * widths[i];
+      const dy = (p1[1] - p0[1]) * heights[i];
+      norms[i][k] = m.norm(side * m.splat(dy) - u * m.splat(dx));
+      rings[i][k] = spine[i] + side * m.splat(p[0] * widths[i]) + u * m.splat(p[1] * heights[i]);
+    }
+  }
+  for (0..n - 1) |i| for (0..sides) |k| {
+    const k1 = (k + 1) % sides;
+    const q = [4]usize{k, k1, k1, k};
+    const r = [4]usize{i, i, i + 1, i + 1};
+    for ([_]usize{0, 1, 2, 0, 2, 3}) |c| try b.put(rings[r[c]][q[c]], norms[r[c]][q[c]], col, ts[r[c]], 0, part);
+  };
+  for ([_]usize{0, n - 1}) |i| {
+    const out = if (i == 0) m.norm(spine[0] - spine[1]) else m.norm(spine[n - 1] - spine[n - 2]);
+    for (0..sides) |k| {
+      const k1 = (k + 1) % sides;
+      try b.put(spine[i], out, col, ts[i], 0, part);
+      try b.put(rings[i][k], out, col, ts[i], 0, part);
+      try b.put(rings[i][k1], out, col, ts[i], 0, part);
+    }
+  }
+}
+
+/// a surface from a grid of `rows` x `cols` points (row-major), quads shared
+/// between neighbours. Normals, colours and `us` (written to tu.y) are per point.
+pub fn patch(b:*Builder, rows:usize, cols:usize, pts:[]const V3, nrms:[]const V3, cols_rgba:[]const [4]u8, us:[]const f32, t:f32, part:vertex.Part) Allocator.Error!void {
+  assert(pts.len == rows * cols and nrms.len == pts.len and cols_rgba.len == pts.len and us.len == pts.len);
+  for (0..rows - 1) |r| for (0..cols - 1) |c| {
+    const q = [4]usize{r * cols + c, r * cols + c + 1, (r + 1) * cols + c + 1, (r + 1) * cols + c};
+    for ([_]usize{0, 1, 2, 0, 2, 3}) |v| try b.put(pts[q[v]], nrms[q[v]], cols_rgba[q[v]], t, us[q[v]], part);
+  };
+}
+
+/// grown vine bands wrapping over an ellipsoid (centre `at`, `radii`) along
+/// its curvature: each band runs from (polar th0, azimuth ph0) to (th1, ph1).
+/// `side` mirrors it in x, so left and right forms are built, not mirrored.
+pub fn bands(b:*Builder, at:V3, radii:V3, arcs:[]const [4]f32, side:f32, r:f32, wobble:f32, seed:u64, col:[4]u8) Allocator.Error!void {
+  for (arcs, 0..) |arc, i| {
+    var ctrl:[6]V3 = undefined;
+    for (&ctrl, 0..) |*c, j| {
+      const k = m.ratio(j, ctrl.len - 1);
+      const th = m.lerp(arc[0], arc[2], k);
+      const ph = m.lerp(arc[1], arc[3], k);
+      c.* = at + m.v3(@sin(th) * @cos(ph) * side, @cos(th), @sin(th) * @sin(ph)) * radii * m.splat(1.03);
+    }
+    grow(&ctrl, .{
+      .start = ctrl[0], .direction = m.norm(ctrl[ctrl.len - 1] - ctrl[0]), .length = m.len(ctrl[ctrl.len - 1] - ctrl[0]),
+      .wobble = wobble, .curl = 0, .seed = seed +% i * 17,
+    });
+    var path:[16]V3 = undefined;
+    m.splineResample(&ctrl, &path);
+    var ts:[16]f32 = undefined;
+    var rs:[16]f32 = undefined;
+    for (&ts, &rs, 0..) |*t, *rr, j| {
+      t.* = m.ratio(j, 15);
+      rr.* = r;
+    }
+    try b.tubeR(&path, &ts, &rs, col, .stem, 5);
   }
 }
 

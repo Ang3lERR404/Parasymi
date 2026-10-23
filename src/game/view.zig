@@ -32,7 +32,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
 
   const veil = g.prog.veil;
   const sky = g.sky.color(veil);
-  const eye = g.cam.eye();
+  const eye = g.cam.viewEye();
   const hv:[2]f32 = if (g.hover) |h| .{m.f(h[0]), m.f(h[1])} else .{1e9, 1e9};
   const ld = g.sky.lightDir();
   var out:renderer.Scene = .{

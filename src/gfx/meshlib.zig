@@ -18,7 +18,11 @@ const parts = struct {
   pub const wolf_belly = @import("meshes/wolf_belly.zig");
   pub const wolf_pec = @import("meshes/wolf_pec.zig");
   pub const wolf_head = @import("meshes/wolf_head.zig");
+  pub const wolf_ear = @import("meshes/wolf_ear.zig");
   pub const wolf_limb = @import("meshes/wolf_limb.zig");
+  pub const wolf_upper_arm = @import("meshes/wolf_upper_arm.zig");
+  pub const wolf_forearm = @import("meshes/wolf_forearm.zig");
+  pub const wolf_deltoid = @import("meshes/wolf_deltoid.zig");
   pub const wolf_thigh = @import("meshes/wolf_thigh.zig");
   pub const wolf_calf = @import("meshes/wolf_calf.zig");
   pub const wolf_rump_l = @import("meshes/wolf_rump_l.zig");
@@ -26,6 +30,10 @@ const parts = struct {
   pub const wolf_tailbone = @import("meshes/wolf_tailbone.zig");
   pub const wolf_joint = @import("meshes/wolf_joint.zig");
   pub const wolf_paw = @import("meshes/wolf_paw.zig");
+  pub const wolf_foot = @import("meshes/wolf_foot.zig");
+  // after the foot, so the translucent pads blend over its sole
+  pub const paw_pad = @import("meshes/paw_pad.zig");
+  pub const paw_bean = @import("meshes/paw_bean.zig");
   pub const leaf_tuft = @import("meshes/leaf_tuft.zig");
   // the world
   pub const node_grit = @import("meshes/node_grit.zig");

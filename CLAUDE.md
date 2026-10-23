@@ -5,7 +5,8 @@
 Player-centric Factorio-like automation game. Magically infused plants (parasitic +
 symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig, Windows, no asset
 files (everything procedural). 2.5D top-down 3D. Adjustable pitch (30°–85°,
-default 55°, Ctrl+W/S), yaw via Q/E. No free rotation.
+default 55°, Ctrl+W/S), yaw via Q/E. No free rotation in play; Ctrl+F
+opens a free inspection camera (always available, eases back on exit).
 
 ## Build
 
@@ -126,7 +127,11 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow. 150 ms anim.
 - Wolf: translucent fresnel belly (amber) that inflates (+35%), drops and sags
   with fill, heavy contents jostling inside on springs; sap pectorals (denser
-  sap, sprung gel) with chest vines tucked behind; contact shadows under feet,
+  sap, sprung gel) with chest vines tucked behind; three-section torso (broad
+  chest, vine-corset waist, hips); deltoids, bicep/tricep, tapered forearms;
+  plump vine rump; anthro digitigrade legs (Z silhouette, calf swell) on long
+  flat feet with sap beans; flat-bridged muzzle with jaw seam and nose bean;
+  tall wolf ears with sap inner faces; contact shadows under feet,
   accent discipline (amber only on belly/eyes/inner ear, rest muted),
   anisotropic vine highlight along tube tangent.
 - "Celestial / beyond comprehension" is the next phase target.

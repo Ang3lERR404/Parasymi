@@ -10,7 +10,7 @@ const pal = @import("palette.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub const LEN:f32 = 0.18;
+pub const LEN:f32 = 0.22;
 /// the leg's reference radius (the knee); thigh 1.3x..1x, calf 1x..0.7x
 pub const LEG_R:f32 = 0.07;
 

@@ -1,7 +1,8 @@
 //! mesh: WOLF CALF. knee at origin, hock (the backward-bending joint) at +Y
 //! LEN: tendon and sinew. One smooth vine tapering from 1x the leg radius
-//! to 0.7x, with a gastrocnemius swell on its back (+Z here, which faces
-//! backward once the rig turns the segment downward) and a single wrap.
+//! to 0.7x, with a prominent gastrocnemius swell (+25% at 30%) on its back
+//! (+Z here, which faces backward once the rig turns the segment downward)
+//! and a single wrap.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -12,10 +13,10 @@ const thigh = @import("wolf_thigh.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub const LEN:f32 = 0.14;
+pub const LEN:f32 = 0.26;
 /// where the calf swells, and by how much
-const BULGE_AT:f32 = 0.4;
-const BULGE:f32 = 0.15;
+const BULGE_AT:f32 = 0.3;
+const BULGE:f32 = 0.25;
 
 const N = 16;
 

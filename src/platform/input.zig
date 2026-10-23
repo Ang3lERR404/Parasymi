@@ -1,4 +1,6 @@
 //! per-frame input snapshot with edge detection, fed by GLFW.
+const std = @import("std");
+const log = std.log;
 const glfw = @import("zglfw");
 
 pub const Key = glfw.Key;
@@ -54,6 +56,12 @@ pub const Input = struct {
 
   pub fn down(in:*const Input, comptime k:Key) bool { return in.cur[idx(k)]; }
   pub fn pressed(in:*const Input, comptime k:Key) bool { const i = idx(k); return in.cur[i] and !in.prev[i]; }
+  /// hide and hold the cursor for mouse look, or give it back.
+  pub fn capture(in:*const Input, on:bool) void {
+    // without capture the cursor stays visible; look still works while dragging
+    in.win.setInputMode(.cursor, if (on) .disabled else .normal) catch |e| log.warn("cursor capture: {t}", .{e});
+  }
+
   pub fn held(in:*const Input, comptime b:Button) bool { return in.bcur[bidx(b)]; }
   pub fn clicked(in:*const Input, comptime b:Button) bool { const i = bidx(b); return in.bcur[i] and !in.bprev[i]; }
 };

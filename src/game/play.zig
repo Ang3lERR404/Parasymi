@@ -16,7 +16,8 @@ const Ecology = @import("../sim/ecology.zig").Ecology;
 const items = @import("../sim/items.zig");
 const prog = @import("progression.zig");
 const Input = @import("../platform/input.zig").Input;
-const Camera = @import("../render/camera.zig").Camera;
+const camera = @import("../render/camera.zig");
+const Camera = camera.Camera;
 const renderer = @import("../render/renderer.zig");
 const vertex = @import("../gfx/vertex.zig");
 const Draw = @import("../ui/draw.zig").Draw;
@@ -56,6 +57,8 @@ pub const Mode = enum {
   research,
   /// the world is frozen and the pause menu is open (Esc)
   paused,
+  /// the free camera is flying for inspection (Ctrl+F); the wolf stands idle
+  inspect,
 
   /// the world keeps moving underneath (everything but the pause menu)
   pub fn live(md:Mode) bool { return md != .paused; }
@@ -178,9 +181,10 @@ pub const Game = struct {
     if (in.pressed(.F5)) g.request = .save;
     if (in.pressed(.F9)) g.request = .load;
     if (in.pressed(.F11)) g.request = .fullscreen;
-    if (in.pressed(.escape)) g.mode = switch (g.mode) {
-      .roam => .paused,
-      .belly, .research, .paused => .roam,
+    if (in.pressed(.escape)) switch (g.mode) {
+      .roam => g.mode = .paused,
+      .belly, .research, .paused => g.mode = .roam,
+      .inspect => g.inspect(in, false),
     };
     if (!g.mode.live()) {
       if (in.pressed(.q)) g.request = .quit;
@@ -190,9 +194,17 @@ pub const Game = struct {
     g.time += dt;
     g.sky.update(dt);
 
+    // decision: Ctrl+F toggles the free inspection camera (F alone harvests)
+    const ctrl = in.down(.left_control);
+    if (ctrl and in.pressed(.f)) g.inspect(in, g.mode != .inspect);
+    const inspecting = g.mode == .inspect;
+    g.cam.tick(dt);
+
     // panels and selection
-    if (in.pressed(.tab)) g.mode = if (g.mode == .belly) .roam else .belly;
-    if (in.pressed(.t)) g.mode = if (g.mode == .research) .roam else .research;
+    if (!inspecting) {
+      if (in.pressed(.tab)) g.mode = if (g.mode == .belly) .roam else .belly;
+      if (in.pressed(.t)) g.mode = if (g.mode == .research) .roam else .research;
+    }
     if (in.pressed(.F3)) g.debug = !g.debug;
     if (in.pressed(.r)) g.place_dir +%= 1;
     const nums = [_]bool{
@@ -205,6 +217,7 @@ pub const Game = struct {
         .research => if (i < prog.tree.values.len) g.prog.select(@enumFromInt(i)),
         .belly => if (i < craft.hand.len) actions.weaveByHand(g, i),
         .roam => if (i < hotbar.len) { g.hot = i; },
+        .inspect => {},
         .paused => unreachable,
       }
     }
@@ -214,10 +227,13 @@ pub const Game = struct {
     var mz:f32 = 0;
     // decision: Ctrl+W/S tilts the camera (Shift is already sprint); W/S do
     // not move the wolf while Ctrl is held.
-    const tilting = in.down(.left_control);
-    if (in.down(.a) or in.down(.left)) mx -= 1;
-    if (in.down(.d) or in.down(.right)) mx += 1;
-    if (tilting) {
+    if (inspecting) {
+      g.fly(in, dt);
+    } else {
+      if (in.down(.a) or in.down(.left)) mx -= 1;
+      if (in.down(.d) or in.down(.right)) mx += 1;
+    }
+    if (inspecting) {} else if (ctrl) {
       if (in.down(.w) or in.down(.up)) g.cam.tilt(dt * 1.2);
       if (in.down(.s) or in.down(.down)) g.cam.tilt(-dt * 1.2);
     } else {
@@ -229,12 +245,14 @@ pub const Game = struct {
     const wl = @sqrt(wish[0] * wish[0] + wish[1] * wish[1]);
     if (wl > 1) wish = .{wish[0] / wl, wish[1] / wl};
 
-    if (in.down(.q)) g.cam.yaw -= dt * 1.5;
-    if (in.down(.e)) g.cam.yaw += dt * 1.5;
-    if (in.scroll != 0) g.cam.zoom(in.scroll);
+    if (!inspecting) {
+      if (in.down(.q)) g.cam.yaw -= dt * 1.5;
+      if (in.down(.e)) g.cam.yaw += dt * 1.5;
+      if (in.scroll != 0) g.cam.zoom(in.scroll);
+    }
 
-    // interaction with the hovered tile
-    g.hover = g.pick(in, screen);
+    // interaction with the hovered tile (none while inspecting)
+    g.hover = if (inspecting) null else g.pick(in, screen);
     var working = false;
     var work:?m.V3 = null;
     g.plant_cd -= dt;
@@ -250,7 +268,7 @@ pub const Game = struct {
         if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
       }
-      if (in.pressed(.f)) {
+      if (in.pressed(.f) and !ctrl) {
         if (on_struct) |j| {
           if (in.down(.left_shift)) actions.takeFrom(g, j) else actions.feed(g, j);
         } else actions.harvest(g, h);
@@ -282,6 +300,48 @@ pub const Game = struct {
     try g.world.stream(g.focus(), STREAM_RADIUS, 4);
     try g.world.far(g.focus(), STREAM_RADIUS, &g.far);
     for (g.far.items) |c| try g.world.unload(c);
+  }
+
+  /// enter or leave the free camera. Leaving gives the cursor back and eases
+  /// the view home.
+  fn inspect(g:*Game, in:*const Input, on:bool) void {
+    if (on) {
+      g.mode = .inspect;
+      g.cam.startFree();
+      return;
+    }
+    g.mode = .roam;
+    if (g.cam.view == .free and g.cam.view.free.captured) in.capture(false);
+    g.cam.endFree();
+  }
+
+  /// the free camera: click to hold the cursor and look around, WASD to fly
+  /// (Shift faster), Q/E to roll, the wheel to dolly. Space and Ctrl+Space
+  /// rise and sink.
+  fn fly(g:*Game, in:*const Input, dt:f32) void {
+    const f = switch (g.cam.view) {
+      .free => |*f| f,
+      .follow, .returning => return,
+    };
+    // the frame the cursor is taken its jump is not a look
+    var look:[2]f32 = .{0, 0};
+    if (in.clicked(.left) and !f.captured) {
+      in.capture(true);
+      f.captured = true;
+    } else if (f.captured or in.held(.left)) {
+      look = .{-in.mouse_delta[0] * camera.LOOK, -in.mouse_delta[1] * camera.LOOK};
+    }
+    const speed = camera.FLY * dt * @as(f32, if (in.down(.left_shift)) 3 else 1);
+    var move = m.v3(0, 0, 0);
+    if (in.down(.w) or in.down(.up)) move[2] += speed;
+    if (in.down(.s) or in.down(.down)) move[2] -= speed;
+    if (in.down(.d) or in.down(.right)) move[0] += speed;
+    if (in.down(.a) or in.down(.left)) move[0] -= speed;
+    if (in.down(.space)) move[1] += if (in.down(.left_control)) -speed else speed;
+    var roll:f32 = 0;
+    if (in.down(.q)) roll -= camera.ROLL * dt;
+    if (in.down(.e)) roll += camera.ROLL * dt;
+    g.cam.fly(look, move, roll, in.scroll * 0.4);
   }
 
   /// fixed-step simulation; never more than 8 catch-up ticks per frame.
