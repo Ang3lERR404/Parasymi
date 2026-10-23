@@ -102,7 +102,8 @@ fn threads(g:*Game, tf:f32) Allocator.Error!void {
     if (s.items(.growth)[ib] > s.items(.growth)[ia]) std.mem.swap(usize, &ia, &ib);
     const pos = [2]m.V3{ end(g, ia, tf), end(g, ib, tf) };
     const span = pos[1] - pos[0];
-    const sag = m.v3(0, -0.12 * @sqrt(m.len(span)) * (1 + 0.15 * @sin(tf * 0.4 + m.f(ia))), 0);
+    // a beam runs true, bowing only a breath as the blooms drift
+    const sag = m.v3(0, 0.03 * @sin(tf * 0.4 + m.f(ia)), 0);
     const ctrl = [4]m.V3{ pos[0], pos[0] + span * m.splat3(1.0 / 3.0) + sag, pos[0] + span * m.splat3(2.0 / 3.0) + sag, pos[1] };
     const side = m.norm(m.cross(span, m.v3(0, 1, 0)));
     const reach = m.smooth(m.clamp01((s.items(.growth)[ia] - 0.85) / 0.15));

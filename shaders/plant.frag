@@ -62,7 +62,7 @@ void main() {
     // emission: brightest where the tissue is thinnest (its edges, at
     // grazing angles) and in its core, pulsing out from the heart, with sap
     // bubbles rising through it. Fragments fade in as they lock into place.
-    float core = part == 2 ? 1.0 : 0.65;
+    float core = part == 2 ? 2.4 : 0.65;
     vec3 c = shade(v_col * 0.2, n, v_pos);
     c += v_col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
     c += v_col * max(dot(-n, SUN), 0.0) * 0.4;

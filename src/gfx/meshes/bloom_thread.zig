@@ -1,36 +1,26 @@
-//! mesh: BLOOM THREAD. a thread of light between two celestial blooms:
-//! a thin tube built straight up +Y over 0..1 (x and z in metres), bent on
-//! the GPU along the curve from one bloom's core to the other's (part.vert
-//! curve mode), with small beads of light strung along it. Part `.thread`:
-//! part.frag gives it a warm iridescent film with light running along it.
-//! Listed last: it is translucent and blends over everything.
+//! mesh: BLOOM THREAD. a beam of light between two celestial blooms: a flat
+//! ribbon, its length running up +Y over 0..1 (tu.x), its width across x
+//! from -1 to 1 (tu.y). part.vert (curve mode) carries it from one bloom's
+//! core to the other's and turns its width to face the eye, so it is a
+//! beam from every side, never a wire; part.frag gives it a bright core
+//! falling off to a soft halo across its width, with light running along
+//! it. Part `.thread`. Listed last: it blends over everything.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const color = @import("../../core/color.zig");
 
-const V3 = m.V3;
 const v3 = m.v3;
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  const warm = color.rgb(1.0, 0.86, 0.62).toRgba8(255);
-  const N = 32;
-  var spine:[N]V3 = undefined;
-  var ts:[N]f32 = undefined;
-  var rs:[N]f32 = undefined;
-  for (&spine, &ts, &rs, 0..) |*p, *t, *r, i| {
-    t.* = m.ratio(i, N - 1);
-    p.* = v3(0, t.*, 0);
-    // a little fuller in the middle, fine where it meets each bloom
-    r.* = 0.007 + 0.006 * @sin(m.pi * t.*);
-  }
-  try b.tubeR(&spine, &ts, &rs, warm, .thread, 5);
-  for ([_]f32{0.25, 0.5, 0.75}) |k| {
-    const s = b.mark();
-    try mg.ellipsoid(b, .{.center = v3(0, k, 0), .radii = v3(0.018, 0.018, 0.018), .col = warm, .part = .thread, .rings = 4, .segs = 6, .t = k});
-    // beads keep the length fraction of where they sit (curve mode reads y
-    // as a fraction of a thread some 8 m long)
-    for (b.v.items[s..]) |*vx| vx.pos[1] = k + (vx.pos[1] - k) / 8;
-  }
+  const warm = color.rgb(1.0, 0.9, 0.7).toRgba8(255);
+  const N = 48;
+  const across = [_]f32{-1, 0, 1};
+  for (0..N - 1) |i| for (0..across.len - 1) |j| {
+    const k0 = m.ratio(i, N - 1);
+    const k1 = m.ratio(i + 1, N - 1);
+    const q = [4][2]f32{.{k0, across[j]}, .{k0, across[j + 1]}, .{k1, across[j + 1]}, .{k1, across[j]}};
+    for ([_]usize{0, 1, 2, 0, 2, 3}) |c| try b.put(v3(q[c][1], q[c][0], 0), v3(0, 0, 1), warm, q[c][0], q[c][1], .thread);
+  };
 }

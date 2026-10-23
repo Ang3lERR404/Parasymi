@@ -10,6 +10,7 @@ const shaders = [_][]const u8{
   "part.vert", "part.frag",
   "ui.vert", "ui.frag",
   "sky.vert", "sky.frag",
+  "post.vert", "bloom_down.frag", "bloom_up.frag", "composite.frag",
 };
 
 pub fn build(b:*Build) !void {

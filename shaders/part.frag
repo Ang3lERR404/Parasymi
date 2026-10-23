@@ -56,17 +56,23 @@ void main() {
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
   bool inner_ear = part == 5 && dot(raw, V) < 0.0;
   if (part == 8) {
-    // a thread of light between blooms: thin, semi-solid, a warm
-    // iridescent film whose hue turns with the view and along its length,
-    // with light running along it from bloom to bloom (glow: its network
-    // radiates, or it is a faint dark thread)
+    // a beam of light between blooms: a bright, nearly white core across
+    // its width (v_u -1..1) falling off to a warm halo, its hue drifting
+    // faintly iridescent along it, with pulses of light running from bloom
+    // to bloom. It carries light of its own (bloom catches it); a dark
+    // network's beam is a faint trace.
     float t = pc.eye_time.w;
-    float fres = pow(1.0 - abs(dot(raw, V)), 2.0);
-    vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + fres * 1.2 + v_t * 2.0 - t * 0.15));
-    vec3 warm = mix(srgb2lin(vec3(1.0, 0.86, 0.62)), film, 0.4);
-    float run = 0.55 + 0.45 * pow(0.5 + 0.5 * sin(t * 2.2 - v_t * 16.0), 3.0);
-    c = warm * (0.25 + v_glow * 1.2 * run) + warm * fres * 0.3;
-    o = vec4(applyFog(c, v_pos), mix(0.45, 0.85, fres) * (0.5 + 0.5 * min(v_glow, 1.0)));
+    float u = v_u;
+    float core = exp(-u * u * 40.0);
+    float halo = exp(-u * u * 4.0);
+    vec3 film = 0.5 + 0.5 * cos(6.2832 * (vec3(0.0, 0.33, 0.67) + v_t * 1.5 - t * 0.1));
+    vec3 warm = mix(srgb2lin(vec3(1.0, 0.82, 0.55)), film, 0.25);
+    float run = pow(0.5 + 0.5 * sin(t * 2.4 - v_t * 18.0), 6.0);
+    float lit = min(v_glow, 1.0);
+    // fade into each bloom's core at the ends
+    float ends = smoothstep(0.0, 0.06, v_t) * smoothstep(1.0, 0.94, v_t);
+    c = (mix(warm, vec3(1.0, 0.97, 0.9), core) * (core * 3.0 + halo * 0.6) * (0.8 + 1.4 * run)) * (0.15 + 0.85 * lit);
+    o = vec4(applyFog(c, v_pos), clamp(core + halo * 0.55, 0.0, 1.0) * ends * (0.35 + 0.65 * lit));
     return;
   }
   if (part == 7) {

@@ -23,6 +23,7 @@ const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
 const terrain_mesh = @import("terrain_mesh.zig");
 const pass = @import("pass.zig");
+const Post = @import("post.zig").Post;
 
 const passes = struct {
   pub const sky = @import("passes/sky.zig");
@@ -106,6 +107,8 @@ pub const Renderer = struct {
   window:*glfw.Window,
   ctx:Ctx,
   sc:sw.Swapchain,
+  /// the HDR image the world is drawn into, and the glow taken from it
+  post:Post = .{},
   vsync:bool,
   frames:[FRAMES]Frame = @splat(.{}),
   fi:usize = 0,
@@ -149,6 +152,7 @@ pub const Renderer = struct {
     const c = &r.ctx;
     const fb = r.window.getFramebufferSize();
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, .null_handle);
+    r.post = try Post.init(c, r.sc.format.format, r.sc.extent.width, r.sc.extent.height);
 
     for (&r.frames) |*f| {
       f.pool = try c.device.createCommandPool(&.{.flags = .{.reset_command_buffer = true}, .queue_family_index = c.family}, null);
@@ -239,6 +243,7 @@ pub const Renderer = struct {
     r.meshes.deinit(c);
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
+    r.post.deinit(c);
     r.sc.deinit(c, r.gpa, false);
   }
 
@@ -318,6 +323,7 @@ pub const Renderer = struct {
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, old.handle);
     var o = old;
     o.deinit(c, r.gpa, false);
+    r.post.resize(c, r.sc.extent.width, r.sc.extent.height) catch |e| return ctx.fold(e);
   }
 
   pub fn extent(r:*const Renderer) [2]f32 {
@@ -348,11 +354,20 @@ pub const Renderer = struct {
     const cmd = vk.CommandBufferProxy.init(f.cmd, c.vkd);
     try cmd.resetCommandBuffer(.{});
     try cmd.beginCommandBuffer(&.{.flags = .{.one_time_submit = true}});
-    r.begin(cmd, img, scene.clear);
-
+    // the world into the HDR image, then its glow, then the screen: the
+    // world and its glow composed, the UI over it
     var stats:Stats = .{.meshed = r.stats.meshed};
-    inline for (reg.ids) |id| reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
-
+    r.beginWorld(cmd, scene.clear);
+    inline for (reg.ids) |id| {
+      if (comptime !reg.module(id).desc.screen) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
+    }
+    cmd.endRendering();
+    r.post.glow(cmd);
+    r.beginScreen(cmd, img);
+    r.post.compose(cmd, r.sc.extent);
+    inline for (reg.ids) |id| {
+      if (comptime reg.module(id).desc.screen) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
+    }
     r.end(cmd, img);
     try cmd.endCommandBuffer();
     try r.submit(f, img);
@@ -371,38 +386,24 @@ pub const Renderer = struct {
     if (pres != .success or acq.result == .suboptimal_khr) try r.recreate();
   }
 
-  /// transition the targets and open the dynamic-rendering scope.
-  fn begin(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32, clear:[3]f32) void {
-    const pre = [_]vk.ImageMemoryBarrier2{
-      .{
-        .src_stage_mask = .{.color_attachment_output = true},
-        .src_access_mask = .{},
-        .dst_stage_mask = .{.color_attachment_output = true},
-        .dst_access_mask = .{.color_attachment_write = true},
-        .old_layout = .undefined,
-        .new_layout = .color_attachment_optimal,
-        .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-        .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-        .image = r.sc.images[img],
-        .subresource_range = sw.colorRange(),
-      },
-      .{
-        .src_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
-        .src_access_mask = .{.depth_stencil_attachment_write = true},
-        .dst_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
-        .dst_access_mask = .{.depth_stencil_attachment_write = true, .depth_stencil_attachment_read = true},
-        .old_layout = .undefined,
-        .new_layout = .depth_attachment_optimal,
-        .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-        .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-        .image = r.sc.depth,
-        .subresource_range = sw.depthRange(),
-      },
-    };
+  /// open the world's rendering scope: the HDR image and the depth buffer.
+  fn beginWorld(r:*Renderer, cmd:vk.CommandBufferProxy, clear:[3]f32) void {
+    r.post.beginWorld(cmd);
+    const pre = [_]vk.ImageMemoryBarrier2{.{
+      .src_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
+      .src_access_mask = .{.depth_stencil_attachment_write = true},
+      .dst_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
+      .dst_access_mask = .{.depth_stencil_attachment_write = true, .depth_stencil_attachment_read = true},
+      .old_layout = .undefined,
+      .new_layout = .depth_attachment_optimal,
+      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+      .image = r.sc.depth,
+      .subresource_range = sw.depthRange(),
+    }};
     cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
-
     const color = [_]vk.RenderingAttachmentInfo{.{
-      .image_view = r.sc.views[img],
+      .image_view = r.post.hdr.views[0],
       .image_layout = .color_attachment_optimal,
       .resolve_mode = .{},
       .resolve_image_layout = .undefined,
@@ -419,14 +420,45 @@ pub const Renderer = struct {
       .store_op = .dont_care,
       .clear_value = .{.depth_stencil = .{.depth = 1, .stencil = 0}},
     };
+    r.scope(cmd, &color, &depth);
+  }
+
+  /// open the screen's rendering scope: the swapchain image, no depth.
+  fn beginScreen(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32) void {
+    const pre = [_]vk.ImageMemoryBarrier2{.{
+      .src_stage_mask = .{.color_attachment_output = true},
+      .src_access_mask = .{},
+      .dst_stage_mask = .{.color_attachment_output = true},
+      .dst_access_mask = .{.color_attachment_write = true},
+      .old_layout = .undefined,
+      .new_layout = .color_attachment_optimal,
+      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+      .image = r.sc.images[img],
+      .subresource_range = sw.colorRange(),
+    }};
+    cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
+    const color = [_]vk.RenderingAttachmentInfo{.{
+      .image_view = r.sc.views[img],
+      .image_layout = .color_attachment_optimal,
+      .resolve_mode = .{},
+      .resolve_image_layout = .undefined,
+      .load_op = .dont_care,
+      .store_op = .store,
+      .clear_value = .{.color = .{.float_32 = .{0, 0, 0, 1}}},
+    }};
+    r.scope(cmd, &color, null);
+  }
+
+  fn scope(r:*Renderer, cmd:vk.CommandBufferProxy, color:[]const vk.RenderingAttachmentInfo, depth:?*const vk.RenderingAttachmentInfo) void {
     const area:vk.Rect2D = .{.offset = .{.x = 0, .y = 0}, .extent = r.sc.extent};
     cmd.beginRendering(&.{
       .render_area = area,
       .layer_count = 1,
       .view_mask = 0,
-      .color_attachment_count = color.len,
-      .p_color_attachments = &color,
-      .p_depth_attachment = &depth,
+      .color_attachment_count = @intCast(color.len),
+      .p_color_attachments = color.ptr,
+      .p_depth_attachment = depth,
     });
     cmd.setViewport(0, &.{.{
       .x = 0, .y = 0,

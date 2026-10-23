@@ -47,7 +47,11 @@ pub const Desc = struct {
   layout:vk.PipelineLayout,
   color_format:vk.Format,
   depth:bool = true,
+  /// whether the rendering scope it draws in has a depth attachment
+  depth_attachment:bool = true,
   blend:bool = false,
+  /// with `blend`: add onto what is there instead of blending over it
+  additive:bool = false,
   cull:bool = true,
 };
 
@@ -69,9 +73,9 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
   };
   const vin:vk.PipelineVertexInputStateCreateInfo = .{
     .vertex_binding_description_count = @intCast(d.bindings.len),
-    .p_vertex_binding_descriptions = d.bindings.ptr,
+    .p_vertex_binding_descriptions = if (d.bindings.len > 0) d.bindings.ptr else null,
     .vertex_attribute_description_count = @intCast(d.attrs.len),
-    .p_vertex_attribute_descriptions = d.attrs.ptr,
+    .p_vertex_attribute_descriptions = if (d.attrs.len > 0) d.attrs.ptr else null,
   };
   const ia:vk.PipelineInputAssemblyStateCreateInfo = .{.topology = .triangle_list, .primitive_restart_enable = .false};
   const vp:vk.PipelineViewportStateCreateInfo = .{.viewport_count = 1, .scissor_count = 1};
@@ -107,8 +111,8 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
   };
   const att = [_]vk.PipelineColorBlendAttachmentState{.{
     .blend_enable = if (d.blend) .true else .false,
-    .src_color_blend_factor = .src_alpha,
-    .dst_color_blend_factor = .one_minus_src_alpha,
+    .src_color_blend_factor = if (d.additive) .one else .src_alpha,
+    .dst_color_blend_factor = if (d.additive) .one else .one_minus_src_alpha,
     .color_blend_op = .add,
     .src_alpha_blend_factor = .one,
     .dst_alpha_blend_factor = .one_minus_src_alpha,
@@ -129,7 +133,7 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
     .view_mask = 0,
     .color_attachment_count = 1,
     .p_color_attachment_formats = &fmts,
-    .depth_attachment_format = swapchain.depth_format,
+    .depth_attachment_format = if (d.depth_attachment) swapchain.depth_format else .undefined,
     .stencil_attachment_format = .undefined,
   };
   var p:vk.Pipeline = undefined;

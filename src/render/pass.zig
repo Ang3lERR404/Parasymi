@@ -9,6 +9,7 @@ const vk = @import("vulkan");
 const ctx = @import("../gfx/ctx.zig");
 const Ctx = ctx.Ctx;
 const pipeline = @import("../gfx/pipeline.zig");
+const post = @import("post.zig");
 
 /// which push-constant block the pass uses.
 pub const Layout = enum { world, ui };
@@ -21,11 +22,14 @@ pub const Desc = struct {
   layout:Layout = .world,
   depth:bool = true,
   blend:bool = false,
+  /// drawn onto the screen after the world (and its glow): the UI. World
+  /// passes draw into the HDR image the glow is taken from.
+  screen:bool = false,
 };
 
 pub const stages:vk.ShaderStageFlags = .{.vertex = true, .fragment = true};
 
-pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, fmt:vk.Format) ctx.Error!vk.Pipeline {
+pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, screen:vk.Format) ctx.Error!vk.Pipeline {
   const vs = try c.shader(d.vert);
   defer c.device.destroyShaderModule(vs, null);
   const fs = try c.shader(d.frag);
@@ -33,7 +37,7 @@ pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, fmt:vk.Fo
   return pipeline.create(c, .{
     .vert = vs, .frag = fs,
     .bindings = d.bindings, .attrs = d.attrs,
-    .layout = layout, .color_format = fmt,
-    .depth = d.depth, .blend = d.blend, .cull = false,
+    .layout = layout, .color_format = if (d.screen) screen else post.HDR_FORMAT,
+    .depth = d.depth, .depth_attachment = !d.screen, .blend = d.blend, .cull = false,
   });
 }

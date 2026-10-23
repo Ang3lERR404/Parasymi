@@ -92,11 +92,20 @@ void main() {
     vec3 a = i == 0 ? 2.0 * b - c : P[i - 1];
     vec3 d = i == 2 ? 2.0 * c - b : P[i + 2];
     vec3 T = normalize(catmullTan(a, b, c, d, f));
-    vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
-    vec3 N = cross(B, T);
-    w = vec4(catmull(a, b, c, d, f) + B * p.x + N * p.z, 1.0);
-    // the mesh was squeezed to 0..1 along its length: undo that on its normals
-    wn = B * nrm.x + T * (nrm.y / ie.w) + N * nrm.z;
+    vec3 C = catmull(a, b, c, d, f);
+    if (part == 8u) {
+      // a beam: its width (x, -1..1) turned to face the eye from every side
+      vec3 toEye = normalize(pc.eye_time.xyz - C);
+      vec3 right = normalize(cross(T, toEye) + vec3(1e-5, 0.0, 0.0));
+      w = vec4(C + right * p.x * 0.12, 1.0);
+      wn = toEye;
+    } else {
+      vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
+      vec3 N = cross(B, T);
+      w = vec4(C + B * p.x + N * p.z, 1.0);
+      // the mesh was squeezed to 0..1 along its length: undo that on its normals
+      wn = B * nrm.x + T * (nrm.y / ie.w) + N * nrm.z;
+    }
   } else if (mode == 2) {
     // a star mote: it turns slowly, tilts, twinkles and, resting, hovers
     // with a slow breath; falling, its echoes (ie.w 1..3) trail above it,

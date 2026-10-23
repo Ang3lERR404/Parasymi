@@ -16,7 +16,7 @@ pub const desc:pass.Desc = .{
   .vert = "ui.vert", .frag = "ui.frag",
   .bindings = &.{pipeline.binding(vertex.Ui, 0, .vertex)},
   .attrs = &pipeline.attrs(vertex.Ui, 0, 0),
-  .layout = .ui, .depth = false, .blend = true,
+  .layout = .ui, .depth = false, .blend = true, .screen = true,
 };
 
 /// screen size and time for the animated shapes
