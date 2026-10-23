@@ -46,7 +46,8 @@ pub const PlantInstance = extern struct {
   a:[4]f32,
   /// flow, health, sway amplitude, genome form (species.Form)
   b:[4]f32,
-  /// x: blend toward the next growth key (0..1); y, z, w unused
+  /// x: blend toward the next growth key (0..1); y: 1 for a placement
+  /// preview (ghost); z: 1 when that preview fits; w unused
   c:[4]f32 = .{0, 0, 0, 0},
 };
 

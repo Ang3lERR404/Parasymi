@@ -49,6 +49,9 @@ pub const Def = struct {
   item:items.Item,
   size:u8,
   mesh:meshlib.Id,
+  /// how see-through its sap (resin pods, sap beads) is at its thinnest;
+  /// like the wolf's, it has no light of its own
+  sap:f32 = 0.78,
 };
 
 pub const defs = reg.table(Def, "def");
@@ -236,4 +239,26 @@ test "conduits harvest plants into a cache" {
   // removing the middle conduit keeps the others addressable
   _ = ss.remove(&w, ss.at(&w, 1, 0).?);
   try testing.expect(ss.get(ss.at(&w, 3, 0).?).kind() == .sap_cache);
+}
+test "a conduit's side root reaches a plant beside it and harvests it" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..3) |x| for (0..2) |y| { const t = y * ck.SIZE + x; c.kind[t] = .soil; c.height[t] = 1; c.res[t] = 0; };
+  var plants:Plants = .{};
+  defer plants.deinit(gpa);
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression = .{};
+  // conduit -> cache along +x, a mature plant beside the conduit (+y)
+  try testing.expect(try plants.placeEx(gpa, &w, 1, 1, .{ .x = 1, .y = 1, .chunk = undefined, .tile = undefined, .sp = .lumenroot, .seed = 0, .growth = 1, .essence = 2 }));
+  try testing.expect(try ss.place(gpa, &w, 1, 0, .conduit, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 2, 0, .sap_cache, 0, 0));
+  // nothing moves until the root has grown out to it
+  ss.tick(&w, &plants, &g, 0.05);
+  try testing.expect(ss.get(ss.at(&w, 1, 0).?).state.conduit.held == null);
+  for (0..200) |_| ss.tick(&w, &plants, &g, 0.05);
+  try testing.expectEqual(@as(u32, 2), ss.get(ss.at(&w, 2, 0).?).inv.count(.essence));
 }

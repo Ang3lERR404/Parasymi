@@ -10,6 +10,9 @@ pub const vine = color.rgb(0.36, 0.58, 0.24).toRgba8(255);
 pub const leaf_dark = color.rgb(0.16, 0.42, 0.20).toRgba8(255);
 pub const leaf_lite = color.rgb(0.40, 0.80, 0.38).toRgba8(255);
 pub const sap = color.rgb(1.0, 0.68, 0.22).toRgba8(255);
+/// living roots: the wolf's root brown, paler where the bark is young
+pub const root_bark = color.rgb(0.19, 0.15, 0.09).toRgba8(255);
+pub const root_lite = color.rgb(0.31, 0.26, 0.16).toRgba8(255);
 
 /// the vine-wolf keeps to muted, low-saturation greens and browns so its only
 /// accents are amber sap: the belly, the eyes and the inner ears.

@@ -17,6 +17,7 @@ layout(location = 4) flat in vec4 v_inst;
 layout(location = 5) flat in float v_form;
 layout(location = 6) in float v_t;
 layout(location = 7) in float v_young;
+layout(location = 8) flat in vec2 v_ghost; // a placement preview, and whether it fits
 layout(location = 0) out vec4 o;
 
 const vec3 AMBER = vec3(1.0, 0.43, 0.08);
@@ -54,7 +55,7 @@ void main() {
   vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
   float fill = v_sap.x, moving = v_sap.y;
 
-  if (v_form > 0.5 && part == 2) {
+  if (abs(v_form - 2.0) < 0.5 && part == 2) {
     // a confluence's sap petal: see-through violet face-on, amber at grazing
     // angles. Hue follows the vertex colour.
     vec3 deep = v_col * 0.18 * health;
@@ -109,5 +110,13 @@ void main() {
 
   // petals are thin enough to see through face-on
   float alpha = part == 2 ? mix(0.72, 1.0, fres) : 1.0;
+  // a placement preview: the grown plant as a pale, breathing outline,
+  // green where it fits, red where it cannot be sown
+  if (v_ghost.x > 0.5) {
+    vec3 tint = v_ghost.y > 0.5 ? vec3(0.55, 1.0, 0.7) : vec3(1.0, 0.35, 0.3);
+    float pulse = 0.5 + 0.5 * sin(pc.eye_time.w * 4.0);
+    c = mix(c, tint * (0.5 + 0.4 * day), 0.6) + tint * fres * 0.5;
+    alpha = mix(0.3, 0.6, fres) * (0.8 + 0.2 * pulse);
+  }
   o = vec4(applyFog(c, v_pos), alpha);
 }

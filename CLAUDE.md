@@ -124,8 +124,9 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Hand-weaving is the bootstrap (wolf weaves seeds from gathered matter + starlight).
 - Plants and structures share occupancy. Footprints: 1×1, 2×2, or floating.
 - Player-centric, builds toward full automation.
-- Structures: conduit (pulls from behind, pushes forward), sap cache,
-  germinator, research bloom, root-digger.
+- Structures: conduit (pulls from behind, pushes forward; grows a side root
+  to any plant beside or behind it and harvests it once the root arrives),
+  sap cache, germinator, research bloom, root-digger.
 - Root-digger: 1×1 on soil/moss, digs an adjacent node 1 item/4s into an
   8-item buffer, feeds adjacent structures (conduits pull from it), idles when
   no node. Recipe: 3 fibre + 2 grit + 1 ley shard. Gated by "Deep Rooting".
@@ -152,8 +153,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   muted skin with a fibre sheen, old growth near the ground densifying to
   root brown, colour carried by sap seen through thin/young tissue (back
   light, grazing angles), no self-glow (rim only at night). Growth read:
-  `v_young` (newest growth and tips thinner, more translucent). Petals see-
-  through face-on. Parasitic: alien, not hostile: pale pearl/lilac with a
+  plants scale up as they grow; parasites come up with their fronds closed
+  and open as they mature. `v_young` (newest growth and tips thinner, more translucent). Petals see-
+  through face-on. Holding a seed shows its grown plant as a ghost on the
+  hovered tile (green fits, red not). Parasitic: alien, not hostile: pale pearl/lilac with a
   thin-film iridescent sap. Symbiotic: greens/teals.
 - Plant silhouettes: symbiotes (`herb`) flare into short roots, carry their
   leaves on one vase envelope (`leaf_from` lifts it into a crown for trees),
@@ -166,9 +169,14 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   (breathing/unfurling weighted by tu.y), and only parasites writhe.
 - Grown structures speak the plants' language (`meshes/structure_kit.zig`):
   woven root mats, grown vines with leaves along them, real petals, and
-  pods of the wolf's resin sap (part `.resin`, instance fade `STRUCT_SAP`;
+  pods of the wolf's resin sap (part `.resin`, instance fade `Def.sap`;
   no light of their own). Germinator: resin pod with a seed inside, cradled
   by vines. Research bloom: woven stalk, broad violet flower, banded resin orb.
+  Sap cache: clear resin pod in a woven vine basket, what it holds hanging
+  inside. Conduit: a gnarled root surfacing over its tile and sinking at its
+  far edge into the next (`conduit.rise`), rootlets forking into the soil,
+  side roots (`conduit_tap`) creeping out to plants. Structures breathe at a
+  fixed tempo (activity deepens it, never retimes it).
 - Floaters (`drift`): a translucent sap float, a wide catcher dish above,
   filaments trailing beneath (tips sway most); they rise and fall slowly
   and drift over a soft ground shadow (part `.shadow`, meshlib `shadow`).

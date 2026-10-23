@@ -11,8 +11,8 @@ layout(location = 4) in uint part;  // 0 stem 1 leaf 2 bloom 3 thorn 4 tendril
 // per-instance
 layout(location = 5) in vec3 ipos;
 layout(location = 6) in vec4 ia;    // growth, mana fill, seed, affinity
-layout(location = 7) in vec4 ib;    // flow, health, sway amplitude, form (0 herb, 1 confluence)
-layout(location = 8) in vec4 ic;    // blend toward the next growth key
+layout(location = 7) in vec4 ib;    // flow, health, sway amplitude, form (species.Form)
+layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (0/1), ghost fits (0/1)
 // the same vertex in the next growth key (equals pos/nrm for keyless plants)
 layout(location = 9) in vec3 pos_next;
 layout(location = 10) in vec3 nrm_next;
@@ -25,6 +25,7 @@ layout(location = 6) out float v_t;           // height along the plant (fibre d
 layout(location = 7) out float v_young;       // 0 old, dense growth .. 1 newest, thinnest
 layout(location = 4) flat out vec4 v_inst; // affinity, seed, health, part
 layout(location = 5) flat out float v_form;
+layout(location = 8) flat out vec2 v_ghost; // a placement preview, and whether it fits
 
 mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 
@@ -39,7 +40,9 @@ void main() {
   float t = pc.eye_time.w;
   float growth = ia.x, fill = ia.y, seed = ia.z, aff = ia.w;
   float flow = ib.x, health = ib.y, sway = ib.z;
-  bool confluence = ib.w > 0.5;
+  // species.Form: 0 herb, 1 coil, 2 confluence, 3 drift
+  bool confluence = abs(ib.w - 2.0) < 0.5;
+  bool coil = abs(ib.w - 1.0) < 0.5;
   // a confluence blends between the growth keys around its growth, so it
   // grows smoothly instead of stepping from one shape to the next
   vec3 p = mix(pos, pos_next, ic.x);
@@ -51,7 +54,14 @@ void main() {
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
   // where it grows from, on the stem or along a vine.
-  if ((part == 1u || part == 2u) && !confluence) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
+  if ((part == 1u || part == 2u) && !confluence && !coil) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
+  // a parasite's crown comes up closed, its fronds a tight upright bundle,
+  // and opens out as it matures; its bladders swell in as the stalk passes them
+  if (coil) {
+    float unfurl = smoothstep(0.3, 1.0, growth);
+    if (part == 4u) p.xz *= mix(0.3, 1.0, unfurl);
+    if (part == 2u && tu.x < 0.9) p.xz *= mix(0.55, 1.0, smoothstep(tu.x * 0.7, tu.x * 0.7 + 0.35, growth));
+  }
 
   // ---- motion: rooted and heavy. Nothing jitters: plants bend from the
   // root and answer the wind late, tips last; leaves only lift a little.
@@ -118,6 +128,7 @@ void main() {
     v_col = max(hueShift(v_col, radians(10.0) * zone * sin(t * 0.5 + seed * 6.28 + tu.y * 3.0)), 0.0);
   }
   v_form = ib.w;
+  v_ghost = ic.yz;
   // sap moving through the plant travels up it as a slow pulse
   v_sap = vec2(fill, clamp(flow, 0.0, 1.0) * (0.5 + 0.5 * sin(t * 2.0 - h * 6.0 + seed * 12.0)));
   v_t = h;

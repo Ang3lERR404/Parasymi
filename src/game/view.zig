@@ -17,10 +17,6 @@ const play = @import("play.zig");
 
 const Game = play.Game;
 
-/// how see-through grown structures' sap is at its thinnest (resin pods,
-/// sap beads); like the wolf's, it has no light of its own.
-const STRUCT_SAP:f32 = 0.78;
-
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
   const tf:f32 = @floatCast(@mod(g.time, 3600));
@@ -73,34 +69,47 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   for (0..g.plants.len()) |i| {
     const ctr = g.plants.centre(i);
     if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[1] - g.cam.target[2]) > reach) continue;
-    const sp = s.items(.sp)[i];
-    const def = species.get(sp);
-    var y = s.items(.chunk)[i].height[s.items(.tile)[i]];
-    var at = ctr;
-    if (def.floating) {
-      // floaters hang in the air: a slow rise and fall and a lazy drift,
-      // never a bounce, over a soft shadow that shrinks as they rise
-      const sd = s.items(.seed)[i];
-      const ground = @max(y, 0);
-      const lift = 0.07 * @sin(tf * 0.5 + sd * 10) + 0.025 * @sin(tf * 1.13 + sd * 4);
-      y = ground + 1.15 + lift;
-      at = .{ctr[0] + 0.05 * @sin(tf * 0.31 + sd * 7), ctr[1] + 0.05 * @cos(tf * 0.27 + sd * 5)};
-      const r = 0.42 - 0.6 * lift;
-      try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + 0.03, at[1])), m.scale3(m.v3(r, 1, r))}), .{.fade = 0.6});
-    }
-    // a confluence grows through its keys, blending from one to the next;
-    // other plants pick a shape by tile
-    const growth = s.items(.growth)[i];
-    const key = meshgen.growthKey(sp, growth) orelse meshgen.Key{
-      .v = @intCast(rng.hash2(0x7A11, s.items(.x)[i], s.items(.y)[i]) % meshgen.VARIANTS), .f = 0,
-    };
-    try g.inst[meshgen.plantSlot(sp, key.v)].append(g.gpa, .{
-      .pos = .{at[0], y, at[1]},
-      .a = .{growth, s.items(.mana)[i] / def.mana_cap, s.items(.seed)[i], def.lineage.affinity()},
-      .b = .{s.items(.flow)[i], s.items(.health)[i], def.sway, m.f(@intFromEnum(def.genome.form))},
-      .c = .{key.f, 0, 0, 0},
-    });
+    try plant(g, .{
+      .sp = s.items(.sp)[i], .x = s.items(.x)[i], .y = s.items(.y)[i], .ground = s.items(.chunk)[i].height[s.items(.tile)[i]],
+      .growth = s.items(.growth)[i], .mana = s.items(.mana)[i], .seed = s.items(.seed)[i],
+      .flow = s.items(.flow)[i], .health = s.items(.health)[i],
+    }, tf);
   }
+}
+
+/// what drawing one plant needs to know about it.
+const Drawn = struct {
+  sp:species.Id, x:i32, y:i32, ground:f32,
+  growth:f32, mana:f32 = 0, seed:f32, flow:f32 = 0, health:f32 = 1,
+  /// a placement preview, and whether it fits
+  ghost:bool = false, fits:bool = true,
+};
+
+fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
+  const def = species.get(d.sp);
+  var at = m.footprintCentre(d.x, d.y, def.size, 0);
+  var y = d.ground;
+  if (def.floating) {
+    // floaters hang in the air: a slow rise and fall and a lazy drift,
+    // never a bounce, over a soft shadow that shrinks as they rise
+    const ground = @max(y, 0);
+    const lift = 0.07 * @sin(tf * 0.5 + d.seed * 10) + 0.025 * @sin(tf * 1.13 + d.seed * 4);
+    y = ground + 1.15 + lift;
+    at = m.v3(at[0] + 0.05 * @sin(tf * 0.31 + d.seed * 7), 0, at[2] + 0.05 * @cos(tf * 0.27 + d.seed * 5));
+    const r = 0.42 - 0.6 * lift;
+    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + 0.03, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = 0.6});
+  }
+  // a confluence grows through its keys, blending from one to the next;
+  // other plants pick a shape by tile
+  const key = meshgen.growthKey(d.sp, d.growth) orelse meshgen.Key{
+    .v = @intCast(rng.hash2(0x7A11, d.x, d.y) % meshgen.VARIANTS), .f = 0,
+  };
+  try g.inst[meshgen.plantSlot(d.sp, key.v)].append(g.gpa, .{
+    .pos = .{at[0], y, at[2]},
+    .a = .{d.growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
+    .b = .{d.flow, d.health, def.sway, m.f(@intFromEnum(def.genome.form))},
+    .c = .{key.f, if (d.ghost) 1 else 0, if (d.fits) 1 else 0, 0},
+  });
 }
 
 fn structCentre(g:*const Game, s:*const st.Structure) m.V3 {
@@ -115,19 +124,29 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[2] - g.cam.target[2]) > reach) continue;
     const a = s.activity;
     const yaw = m.dirYaw(s.dir);
-    const breathe = 1 + (0.02 + 0.05 * a) * @sin(tf * (1.5 + 2 * a) + s.seed * 9);
-    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed, .fade = STRUCT_SAP});
+    // a fixed tempo: activity deepens the breath but never retimes it (a
+    // tempo that followed activity jumped phase every time it changed)
+    const breathe = 1 + (0.02 + 0.04 * a) * @sin(tf * 1.6 + s.seed * 9);
+    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap});
     try st.emit(s, &g.parts, ctr, tf);
   }
 }
 
-/// a tinted, pulsing preview of the structure about to be grown.
+/// a tinted, pulsing preview of what is about to be sown or grown: the
+/// plant as it will look grown (the same shape its tile will give it), or
+/// the structure.
 fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   const h = g.hover orelse return;
-  const k = st.kindOf(play.hotbar[g.hot]) orelse return;
   if (g.mode != .roam) return;
+  const item = play.hotbar[g.hot];
+  if (!play.known(g, item)) return;
+  const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(item) > 0;
+  if (item.plants()) |sp| {
+    // a fixed seed so the preview does not spin about as the cursor moves
+    return plant(g, .{.sp = sp, .x = h[0], .y = h[1], .ground = g.heightAt(h[0], h[1]), .growth = 1, .seed = 0.37, .ghost = true, .fits = ok}, tf);
+  }
+  const k = st.kindOf(item) orelse return;
   const def = st.defs.get(k);
-  const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(def.item) > 0;
   const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + 0.02);
   const tint:[4]f32 = if (ok) .{0.6, 1.4, 0.8, 0.7} else .{1.6, 0.4, 0.4, 0.8};
   try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(0.96))}), .{.glow = 0.6 + 0.4 * @sin(tf * 5), .tint = tint});

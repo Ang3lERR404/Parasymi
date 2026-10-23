@@ -69,3 +69,33 @@ pub fn footLeaves(b:*mg.Builder, n:u32, r:f32, len:f32, width:f32, seed:u64) All
   }
 }
 
+
+/// a root grown from `from` along `dir` (heading down into the soil),
+/// tapering to a hair, with two forks splitting off its far half.
+pub fn rootlet(b:*mg.Builder, from:V3, dir:V3, len:f32, r0:f32, seed:u64) Allocator.Error!void {
+  var rng = Rng.init(seed);
+  var c:[6]V3 = undefined;
+  mg.growthPath(.{.start = from, .direction = dir, .length = len, .wobble = 0.35, .seed = seed}, &c);
+  var p:[12]V3 = undefined;
+  m.splineResample(&c, &p);
+  var ts:[12]f32 = undefined;
+  var rs:[12]f32 = undefined;
+  mg.taperRadii(r0, 0.12, &rs);
+  for (&ts, 0..) |*t, j| t.* = m.ratio(j, 11) * 0.3;
+  try b.tubeR(&p, &ts, &rs, pal.root_bark, .stem, 5);
+  for (0..2) |f| {
+    const k:usize = 4 + f * 3;
+    const side = m.norm(m.cross(dir, v3(0, 1, 0)));
+    const sgn:f32 = if (f == 0) 1 else -1;
+    const fd = m.norm(dir + side * m.splat3(sgn * rng.range(0.5, 0.9)) + v3(0, -0.2, 0));
+    var fc:[4]V3 = undefined;
+    mg.growthPath(.{.start = p[k], .direction = fd, .length = len * rng.range(0.35, 0.5), .wobble = 0.4, .seed = seed +% f * 13}, &fc);
+    var fp:[8]V3 = undefined;
+    m.splineResample(&fc, &fp);
+    var ft:[8]f32 = undefined;
+    var fr:[8]f32 = undefined;
+    mg.taperRadii(rs[k] * 0.75, 0.15, &fr);
+    for (&ft) |*t| t.* = ts[k];
+    try b.tubeR(&fp, &ft, &fr, pal.root_bark, .stem, 4);
+  }
+}
