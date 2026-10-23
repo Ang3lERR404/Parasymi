@@ -50,7 +50,8 @@ pub fn wraps(b:*mg.Builder, radii:[]const f32, len:f32, n:u32, turn:f32, seed:u6
     var rs:[16]f32 = undefined;
     for (&ts, &rs, 0..) |*t, *rr, i| {
       t.* = m.ratio(i, 15);
-      rr.* = 0.011;
+      // tapering to a point at both ends
+      rr.* = @max(0.011 * @sqrt(@sin(m.pi * t.*)), 0.0006);
     }
     try b.tubeR(&path, &ts, &rs, pal.wolf_vine, .stem, 5);
   }

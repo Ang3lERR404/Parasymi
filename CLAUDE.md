@@ -226,6 +226,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
     (Achilles, down the forearm and metatarsal); thighs and calves keep
     grown vine wraps. Torso weave over trapezius and lat forms; rump lobes
     are squared forms; fur leaves ring the tail, lying back toward its tip.
+    Every vine on the body is a grown vine: it tapers to a point at both
+    ends (torso weave strands staggered and tucking into the core, belly
+    net, collarbone, leg wraps, `mg.bands`), never a hard cut, and the
+    torso weave and belly net carry small fur leaves along their length.
   - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
     hips); pectorals are broad dishes of resin sap (wider top edge, areola +
     nipple below the crown), base held on the chest, surface sprung; chest
@@ -233,7 +237,7 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   - Belly: translucent sap (72%), inflates +35% and drops/sags with fill;
     up to 5 dark lumps inside on spring-dampers driven by acceleration.
   - Arms: deltoid caps, bicep/tricep forms, forearm tapering 1.1→0.7.
-  - Rear: two plump vine lobes nearly touching, sap nodes (40%), firm springs;
+  - Rear: two squared vine lobes pressed together at the cleft, sap nodes (40%), firm springs;
     tailbone knot above them; tail is a braided spline rebuilt each frame.
   - Legs: anthro digitigrade (vertical thigh, calf back to a high hock with a
     +25% swell, forward metatarsal), long feet, sap beans (80%, browner),

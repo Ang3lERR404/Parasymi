@@ -11,6 +11,7 @@ const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const Mesh = @import("../vertex.zig").Mesh;
 const kit = @import("wolf_kit.zig");
+const noise = @import("../../core/noise.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -60,9 +61,36 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     turn[i] = a;
   }
   const s = b.mark();
-  try mg.braidTurned(b, &spine, &ts, &radii, &turn, 7, pal.STRAND_WOBBLE, 0x7055, core, vine);
-  b.xform(s, m.scale3(v3(1.25, 0.5, 0.95)));
+  const shape = m.scale3(SHAPE);
+  // the core, and the vines woven over it: each a grown vine tapering to a
+  // point at both ends, its tips tucking into the core rather than cut off
+  var r:[N]f32 = undefined;
+  for (0..N) |i| r[i] = radii[i] * 0.72;
+  try b.tubeR(&spine, &ts, &r, core, .stem, 8);
+  var fn_:[N]V3 = undefined;
+  var fb:[N]V3 = undefined;
+  mg.transport(&spine, &fn_, &fb);
+  var paths:[STRANDS][N]V3 = undefined;
+  for (0..STRANDS) |si| {
+    const a0 = m.ratio(si, STRANDS) * m.tau;
+    const sd:u64 = 0x7055 +% si * 7919;
+    // strands start and end at different heights, so their tips are staggered
+    const lo = 0.02 + 0.06 * m.f(si % 3) / 2;
+    const hi = 0.98 - 0.06 * m.f((si + 1) % 3) / 2;
+    for (0..N) |i| {
+      const u = m.ratio(i, N - 1);
+      const e = m.smooth(m.clamp01((u - lo) / 0.12)) * m.smooth(m.clamp01((hi - u) / 0.12));
+      const ang = a0 + turn[i] + pal.STRAND_WOBBLE * 4 * noise.grad(sd, u * 3, 0.5);
+      // toward their tips the strands sink into the core
+      const off = radii[i] * m.lerp(0.55, 0.8, e) * (1 + pal.STRAND_WOBBLE * 3 * noise.grad(sd, u * 3, 7.5));
+      paths[si][i] = spine[i] + (fn_[i] * m.splat3(@cos(ang)) + fb[i] * m.splat3(@sin(ang))) * m.splat3(off);
+      r[i] = @max(radii[i] * 0.26 * e, 0.0008);
+    }
+    try b.tubeR(&paths[si], &ts, &r, vine, .stem, 5);
+  }
+  b.xform(s, shape);
   tuck(b.v.items[s..]);
+  try strandLeaves(b, &paths);
   // forms of planes under the weave, as on the limbs: trapezius sloping
   // from the neck to each shoulder, and the lats fanning down the back
   // into the waist
@@ -72,8 +100,46 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     try kit.form(b, .{.center = v3(0, 0, 0), .radii = v3(0.05, 0.11, 0.04), .ns = 0.72, .ew = 0.6, .col = core});
     b.xform(lat, m.chain(&.{m.translate(v3(side * 0.09, 0.34, -0.095)), m.rotZ(side * 0.35), m.rotX(-0.15)}));
   }
-  // collarbone vine across the shoulders, passing just behind the lobes
-  try b.tube(&.{v3(-0.16, 0.43, -0.005), v3(0, 0.41, 0.035), v3(0.16, 0.43, -0.005)}, &.{0.9, 0.9, 0.9}, 0.022, 0.022, vine, .stem, 5);
+  // collarbone vine across the shoulders, passing just behind the lobes,
+  // tapering to a point at each end
+  const ctrl = [_]V3{v3(-0.17, 0.435, -0.02), v3(-0.08, 0.42, 0.025), v3(0, 0.41, 0.035), v3(0.08, 0.42, 0.025), v3(0.17, 0.435, -0.02)};
+  var cp:[16]V3 = undefined;
+  m.splineResample(&ctrl, &cp);
+  var ct:[16]f32 = undefined;
+  var cr:[16]f32 = undefined;
+  for (&ct, &cr, 0..) |*t, *q, i| {
+    const k = m.ratio(i, 15);
+    t.* = 0.9;
+    q.* = @max(0.022 * @sqrt(@sin(m.pi * k)), 0.0008);
+  }
+  try b.tubeR(&cp, &ct, &cr, vine, .stem, 5);
+}
+
+/// the torso's shape: the weave is built in a unit column, then shaped
+const SHAPE = v3(1.25, 0.5, 0.95);
+const STRANDS = 7;
+
+/// small leaves along the woven vines, lying down them like fur. None on the
+/// chest under the pectorals or over the belly, where the sap shows through.
+fn strandLeaves(b:*mg.Builder, paths:*const [STRANDS][30]V3) Allocator.Error!void {
+  for (paths, 0..) |path, si| {
+    for ([_]f32{0.22, 0.5, 0.78}, 0..) |k0, j| {
+      const k = k0 + 0.07 * m.f((si + j) % 3) - 0.07;
+      const i = m.floorTo(usize, k * 29);
+      const p = path[i] * SHAPE;
+      const tan = m.norm((path[i + 1] - path[i - 1]) * SHAPE);
+      const out = m.norm(v3(p[0], 0, p[2]));
+      // the front, from the belly up through the pectorals, stays bare
+      if (out[2] > 0.25 and p[1] < 0.43) continue;
+      // lying down the vine (toward the hips), off the surface
+      const along = if (tan[1] > 0) -tan else tan;
+      try kit.leaf(b, .{
+        .base = p + out * m.splat3(0.004), .along = along, .out = out,
+        .len = 0.05, .width = 0.016, .lift = 0.35, .curl = 0.4, .cup = 0.3,
+        .col = pal.wolf_leaf_dark, .tip = pal.wolf_leaf_lite, .t = k,
+      });
+    }
+  }
 }
 
 /// pull the chest vines in and down where the pectorals sit, so the lobes

@@ -1,6 +1,6 @@
 //! the wolf's rear: one lobe per side, a plump knotted ball of dense vine
 //! with small sap nodes at the hip joint and along its lower edge. The two
-//! nearly meet at the centre line, reading as one form split down the
+//! press together at the centre line, reading as one form split down the
 //! middle, and hang below the hip joints. Built per side (`wolf_rump_l`,
 //! `wolf_rump_r`) rather than mirrored, so winding and lighting stay correct.
 //! Origin at the lobe's centre; +X outward for the right lobe, +Z forward.
@@ -15,9 +15,9 @@ const V3 = m.V3;
 const v3 = m.v3;
 
 /// each lobe's radii and centre (right side; mirrored) in the hips' frame:
-/// nearly round, inner edges 0.004 apart, bottoms below the hip joints (y 0)
+/// squared lobes pressed together, overlapping a little at the cleft, bottoms below the hip joints (y 0)
 pub const radii = v3(0.09, 0.095, 0.09);
-pub const centre = v3(radii[0] + 0.002, 0.03, -0.07);
+pub const centre = v3(radii[0] * 0.8, 0.03, -0.07);
 
 pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
   // a squared lobe: flat faces with rounded edges, like the rest of the body

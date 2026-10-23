@@ -440,7 +440,8 @@ pub fn bands(b:*Builder, at:V3, radii:V3, arcs:[]const [4]f32, side:f32, r:f32, 
     var rs:[16]f32 = undefined;
     for (&ts, &rs, 0..) |*t, *rr, j| {
       t.* = m.ratio(j, 15);
-      rr.* = r;
+      // a grown vine: it tapers to a point at both ends, never cut off
+      rr.* = @max(r * @sqrt(@sin(m.pi * t.*)), r * 0.05);
     }
     try b.tubeR(&path, &ts, &rs, col, .stem, 5);
   }
