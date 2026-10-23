@@ -32,27 +32,39 @@ pub const Look = struct {
 pub const Parts = struct {
   gpa:Allocator,
   lists:[meshlib.count]std.ArrayList(PartInstance) = @splat(.empty),
-  /// geometry grown afresh every frame, already in world space (the wolf's
-  /// tail follows its joints as one smooth vine), drawn with `live_look`.
-  live:Builder,
-  live_look:Look = .{},
-
-  pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa, .live = .{.gpa = gpa}}; }
+  pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa}; }
   pub fn deinit(p:*Parts) void {
     for (&p.lists) |*l| l.deinit(p.gpa);
-    p.live.deinit();
   }
   pub fn clear(p:*Parts) void {
     for (&p.lists) |*l| l.clearRetainingCapacity();
-    p.live.v.clearRetainingCapacity();
   }
 
   pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look:Look) Allocator.Error!void {
     try p.lists[@intFromEnum(id)].append(p.gpa, instance(mat, look));
   }
 
-  /// the single instance the live geometry is drawn with.
-  pub fn liveInstance(p:*const Parts) PartInstance { return instance(m.identity, p.live_look); }
+  /// a mesh built straight up +Y over 0..1, bent on the GPU along the
+  /// Catmull-Rom curve through `ctrl`, its x laid toward `side`; `len` is
+  /// the length the mesh was built at.
+  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl:[4]m.V3, side:m.V3, len:f32, look:Look) Allocator.Error!void {
+    var inst = instance(m.identity, look);
+    inst.c0 = .{ctrl[0][0], ctrl[0][1], ctrl[0][2], 1};
+    inst.c1 = .{ctrl[1][0], ctrl[1][1], ctrl[1][2], 1};
+    inst.c2 = .{ctrl[2][0], ctrl[2][1], ctrl[2][2], 1};
+    inst.c3 = .{ctrl[3][0], ctrl[3][1], ctrl[3][2], 1};
+    inst.tint = .{side[0], side[1], side[2], 0};
+    inst.e = .{1, 0, 0, len};
+    try p.lists[@intFromEnum(id)].append(p.gpa, inst);
+  }
+
+  /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
+  /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
+  pub fn emitMote(p:*Parts, at:m.V3, phase:f32, life:f32, echo:f32, glow:f32) Allocator.Error!void {
+    var inst = instance(m.translate(at), .{.glow = glow, .phase = phase});
+    inst.e = .{2, phase, life, echo};
+    try p.lists[@intFromEnum(meshlib.Id.mote)].append(p.gpa, inst);
+  }
 
 
   pub fn slices(p:*const Parts) [meshlib.count][]const PartInstance {

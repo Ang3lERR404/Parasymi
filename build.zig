@@ -5,7 +5,7 @@ const Build = std.Build;
 /// every shader in `shaders/` is compiled to SPIR-V at build time and exposed
 /// as an anonymous import named after its file (`@embedFile("terrain.vert")`).
 const shaders = [_][]const u8{
-  "terrain.vert", "terrain.frag",
+  "terrain.vert", "terrain.frag", "detail.vert",
   "plant.vert", "plant.frag",
   "part.vert", "part.frag",
   "ui.vert", "ui.frag",

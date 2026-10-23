@@ -1,12 +1,13 @@
-//! chunk -> smooth ground mesh. Each tile is a 3x3 grid of points: its
+//! chunk -> smooth ground mesh. Each tile is a fan of four triangles: its
 //! centre at the tile's own height (where everything on it stands), its
-//! edges and corners shared with its neighbours (the average of the tiles
-//! that meet there), so the ground rolls from one terrace to the next with
-//! no walls or hard ramps, and its colour blends across tile borders. Land
-//! dips under the water at the shore. On top: thin grass blades on every
-//! tile but water and soil (coloured by the tile, swayed by the shader), and
-//! clods and small stones on soil. Border neighbours come from the generator
-//! directly, so a chunk can be meshed without its neighbours being loaded.
+//! corners shared with its neighbours (the average of the tiles that meet
+//! there), so the ground rolls from one terrace to the next with no walls
+//! or hard ramps, and its colour blends across tile borders. Land dips
+//! under the water at the shore. The detail on top (grass on every tile but
+//! water and soil, clods and stones on soil) is not meshed here: each such
+//! tile gets one `DetailTile` record and the GPU grows the detail from it.
+//! Border neighbours come from the generator directly, so a chunk can be
+//! meshed without its neighbours being loaded.
 const std = @import("std");
 const m = @import("../core/math.zig");
 const Allocator = std.mem.Allocator;
@@ -14,7 +15,9 @@ const ck = @import("../world/chunk.zig");
 const gen = @import("../world/gen.zig");
 const rng = @import("../core/rng.zig");
 const color = @import("../core/color.zig");
-const TV = @import("../gfx/vertex.zig").Terrain;
+const vertex = @import("../gfx/vertex.zig");
+const TV = vertex.Terrain;
+const DetailTile = vertex.DetailTile;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -29,7 +32,7 @@ fn baseColor(k:ck.Kind) color.Rgb {
   };
 }
 
-/// how many grass blades grow on a tile of each kind
+/// how many grass blades grow on a tile of each kind (detail.vert grows them)
 fn blades(k:ck.Kind) u32 {
   return switch (k) {
     .water, .soil => 0,
@@ -41,9 +44,6 @@ fn blades(k:ck.Kind) u32 {
 
 /// where the land meets the water it dips just under the surface
 const SHORE = gen.WATER_H - 0.14;
-/// info.w on grass blades: 1 at the base .. 255 at the tip (0: not grass)
-const GRASS_BASE:u8 = 1;
-const GRASS_TIP:u8 = 255;
 
 /// the tiles around a chunk, one ring beyond it, read once
 const Ring = struct {
@@ -137,11 +137,6 @@ fn put(out:*std.ArrayList(TV), gpa:Allocator, p:V3, n:V3, c:color.Rgba8, info:[4
   try out.append(gpa, .{.pos = .{p[0], p[1], p[2]}, .nrm = .{n[0], n[1], n[2]}, .col = c, .info = info});
 }
 
-fn tri(out:*std.ArrayList(TV), gpa:Allocator, p:[3]V3, c:[3]color.Rgba8, info:[4]u8) Allocator.Error!void {
-  var n = m.norm(m.cross(p[2] - p[0], p[1] - p[0]));
-  if (n[1] < 0) n = -n;
-  for (0..3) |i| try put(out, gpa, p[i], n, c[i], info);
-}
 
 /// every shared point of a chunk's half-tile grid (one point beyond it on
 /// each side, for slopes at its border), worked out once
@@ -158,16 +153,14 @@ const Grid = struct {
   fn at(g:*const Grid, px:i32, py:i32) Shared { return g.p[@intCast((py + 2) * W + (px + 2))]; }
 };
 
-/// mesh a chunk into `out`: the ground first, then the detail on it (grass,
-/// clods, stones). Returns how many vertices are ground: the renderer draws
-/// the detail only on chunks near the camera.
-pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV)) Allocator.Error!u32 {
+/// mesh a chunk's ground into `out`, and into `detail` one record per tile
+/// that carries grass, clods or stones (the GPU grows those from it).
+pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV), detail:*std.ArrayList(DetailTile)) Allocator.Error!void {
   out.clearRetainingCapacity();
+  detail.clearRetainingCapacity();
   // room for the whole chunk up front: no regrowing mid-build
-  try out.ensureTotalCapacity(gpa, ck.N * 12 + ck.N * 30);
-  var detail:std.ArrayList(TV) = .empty;
-  defer detail.deinit(gpa);
-  try detail.ensureTotalCapacity(gpa, ck.N * 30);
+  try out.ensureTotalCapacity(gpa, ck.N * 12);
+  try detail.ensureTotalCapacity(gpa, ck.N);
   var r:Ring = .{};
   fill(&r, seed, c);
   const grid = try gpa.create(Grid);
@@ -216,11 +209,6 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV))
       const dz = grid.at(px, py + 1).h - grid.at(px, py - 1).h;
       gn[gy][gx] = m.norm(v3(-dx, 1, -dz));
     }
-    // edge midpoints (used to place grass and stones) lie between corners
-    for ([_][2]usize{.{1, 0}, .{0, 1}, .{2, 1}, .{1, 2}}) |g| {
-      const a = if (g[0] == 1) [2][2]usize{.{0, g[1]}, .{2, g[1]}} else [2][2]usize{.{g[0], 0}, .{g[0], 2}};
-      gh[g[1]][g[0]] = 0.5 * (gh[a[0][1]][a[0][0]] + gh[a[1][1]][a[1][0]]);
-    }
     const x0 = m.f(wx);
     const z0 = m.f(wy);
     const corners = [_][2]usize{.{0, 0}, .{0, 2}, .{2, 2}, .{2, 0}};
@@ -232,80 +220,15 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV))
     }
     if (k == .water) continue;
 
-    const height = struct {
-      /// the ground's height at (fx, fz) within the tile (0..1 each)
-      fn at(g:*const [3][3]f32, fx:f32, fz:f32) f32 {
-        const gx = @min(fx * 2, 1.999);
-        const gz = @min(fz * 2, 1.999);
-        const ix = m.floorTo(usize, gx);
-        const iz = m.floorTo(usize, gz);
-        const u = gx - m.f(ix);
-        const w = gz - m.f(iz);
-        return m.lerp(m.lerp(g[iz][ix], g[iz][ix + 1], u), m.lerp(g[iz + 1][ix], g[iz + 1][ix + 1], u), w);
-      }
-    };
-    var rr = rng.Rng.init(rng.hash2(seed ^ 0x6A55, wx, wy));
-    const tile = r.col[i];
-
-    // grass: thin blades, darker at the root, the tile's own colour lighter
-    // at the tip; the shader sways them by height (info.w)
-    for (0..blades(k)) |_| {
-      const fx = rr.range(0.06, 0.94);
-      const fz = rr.range(0.06, 0.94);
-      const len = rr.range(0.09, 0.23);
-      const ang = rr.range(0, m.tau);
-      const lean = rr.range(0, 0.25);
-      const base = v3(x0 + fx, height.at(&gh, fx, fz) - 0.01, z0 + fz);
-      const side = v3(@cos(ang), 0, @sin(ang)) * m.splat3(0.014);
-      const tip = base + v3(-@sin(ang) * lean * len, len, @cos(ang) * lean * len);
-      const root = color.rgb(tile.r * 0.7, tile.g * 0.75, tile.b * 0.7).toRgba8(255);
-      const top = color.rgb(@min(tile.r * 1.35, 1), @min(tile.g * 1.45, 1), @min(tile.b * 1.3, 1)).toRgba8(255);
-      const n = v3(0, 1, 0);
-      try put(&detail, gpa, base - side, n, root, .{info[0], info[1], 0, GRASS_BASE});
-      try put(&detail, gpa, base + side, n, root, .{info[0], info[1], 0, GRASS_BASE});
-      try put(&detail, gpa, tip, n, top, .{info[0], info[1], 0, GRASS_TIP});
-    }
-
-    // rich soil: clods heaped up out of it and small stones half sunk in it
-    if (k == .soil) {
-      // most soil tiles carry a clod or two and a stone
-      const n:u32 = if (rr.float() < 0.35) 0 else 2;
-      for (0..n) |j| {
-        const fx = rr.range(0.12, 0.88);
-        const fz = rr.range(0.12, 0.88);
-        const stone = j == 1;
-        const rad = if (stone) rr.range(0.025, 0.055) else rr.range(0.05, 0.1);
-        const col = if (stone)
-          color.shade(color.rgb(0.42, 0.4, 0.38), rr.range(0.75, 1.15))
-        else
-          color.rgb(tile.r * 0.78, tile.g * 0.72, tile.b * 0.68).toRgba8(255);
-        const at = v3(x0 + fx, height.at(&gh, fx, fz), z0 + fz);
-        try lump(&detail, gpa, at, rad, if (stone) 0.7 else 0.35, &rr, col, .{info[0], info[1], 0, 0});
-      }
-    }
+    // the detail on it (grass, or clods and stones on soil) is grown on the
+    // GPU from this one record (shaders/detail.vert)
+    const n = blades(k);
+    if (n == 0 and k != .soil) continue;
+    try detail.append(gpa, .{
+      .at = .{x0, gh[1][1], z0},
+      .corners = .{gh[0][0], gh[2][0], gh[2][2], gh[0][2]},
+      .col = r.col[i].toRgba8(255),
+      .info = .{@intFromEnum(k), ley, @intCast(n), 0},
+    });
   };
-  const ground:u32 = @intCast(out.items.len);
-  try out.appendSlice(gpa, detail.items);
-  return ground;
-}
-
-/// a small faceted lump sitting in the ground: an irregular octahedron-ish
-/// stone, `flat` its height relative to its width, the lower half sunk.
-fn lump(out:*std.ArrayList(TV), gpa:Allocator, at:V3, r:f32, flat:f32, rr:*rng.Rng, col:color.Rgba8, info:[4]u8) Allocator.Error!void {
-  const S = 5;
-  var ring:[S]V3 = undefined;
-  const turn = rr.range(0, m.tau);
-  for (&ring, 0..) |*p, j| {
-    const a = turn + m.tau * m.ratio(j, S);
-    const d = r * rr.range(0.75, 1.25);
-    p.* = at + v3(@cos(a) * d, r * flat * rr.range(0, 0.25), @sin(a) * d);
-  }
-  const top = at + v3(r * rr.range(-0.08, 0.08), r * flat, r * rr.range(-0.08, 0.08));
-  const below = at - v3(0, r * flat * 0.6, 0);
-  for (0..S) |j| {
-    const a = ring[j];
-    const b = ring[(j + 1) % S];
-    try tri(out, gpa, .{top, b, a}, .{col, col, col}, info);
-    try tri(out, gpa, .{below, a, b}, .{col, col, col}, info);
-  }
 }

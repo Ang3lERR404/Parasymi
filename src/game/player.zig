@@ -20,6 +20,7 @@ const head_mesh = @import("../gfx/meshes/wolf_head.zig");
 const upper_arm = @import("../gfx/meshes/wolf_upper_arm.zig");
 const forearm = @import("../gfx/meshes/wolf_forearm.zig");
 const foot_mesh = @import("../gfx/meshes/wolf_foot.zig");
+const tail_mesh = @import("../gfx/meshes/wolf_tail.zig");
 const paw_mesh = @import("../gfx/meshes/wolf_paw.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const parts = @import("parts.zig");
@@ -102,7 +103,9 @@ const Spring3 = struct {
 /// woven through them is sampled.
 const TAIL_JOINTS = 3;
 const TAIL_SEG:f32 = 0.16;
-const TAIL_RES = 20;
+comptime {
+  if (TAIL_SEG * TAIL_JOINTS != tail_mesh.LEN) @compileError("the tail mesh is built at the joints' length");
+}
 /// the tail leaves the tailbone up and back, 30 degrees above horizontal
 /// (the angle that turns +Y onto that direction), lifting a little with stride
 const TAIL_ROOT_TILT:f32 = -(m.pi / 2.0 - m.pi / 6.0);
@@ -372,9 +375,9 @@ pub const Player = struct {
       feet[fi] = v3(c[0], c[1], c[2]);
     }
 
-    // tail: the spring-steered joint chain gives the control points, and a
-    // grown vine is woven through them afresh every frame, so it lags and
-    // curves like a living thing instead of a row of rigid rods.
+    // tail: the spring-steered joint chain gives the control points, and the
+    // GPU bends the tail's braided vine through them (part.vert), so it lags
+    // and curves like a living thing instead of a row of rigid rods.
     try out.emit(.wolf_tailbone, m.chain(&.{ hips, T(tailbone.at) }), .{ .glow = 0.25, .phase = 0.15, .fade = TAILBONE_SAP_OPACITY });
     var seg = m.chain(&.{ hips, T(tailbone.at), m.rotX(TAIL_ROOT_TILT + 0.15 * st) });
     var ctrl:[TAIL_JOINTS + 1]V3 = undefined;
@@ -387,18 +390,11 @@ pub const Player = struct {
       .start = ctrl[0], .direction = m.norm(ctrl[TAIL_JOINTS] - ctrl[0]), .length = TAIL_SEG * TAIL_JOINTS,
       .wobble = 0.06, .curl = 0.15, .taper = 0.2, .seed = 0x7A11,
     });
-    var path:[TAIL_RES]V3 = undefined;
-    m.splineResample(&ctrl, &path);
-    var ts:[TAIL_RES]f32 = undefined;
-    for (&ts, 0..) |*k, i| k.* = m.ratio(i, TAIL_RES - 1);
-    var radii:[TAIL_RES]f32 = undefined;
-    mg.taperRadii(0.06, 0.2, &radii);
-    try mg.braid(&out.live, &path, &ts, &radii, 3, 4.0, pal.STRAND_WOBBLE, 0x7A11, pal.wolf_core, pal.wolf_vine);
-    out.live_look = vine_look;
-    try tailFur(&out.live, &path, &radii);
+    const side = m.mulV(hips, .{ 1, 0, 0, 0 });
+    try out.emitCurve(.wolf_tail, ctrl, v3(side[0], side[1], side[2]), tail_mesh.LEN, vine_look);
     // the tuft keeps the last joint's frame (smooth, no roll flips), moved
     // onto the vine's actual tip, which growth shifted slightly off the joint
-    const tip = m.chain(&.{ T(path[TAIL_RES - 1] - m.origin(seg)), seg });
+    const tip = m.chain(&.{ T(ctrl[TAIL_JOINTS] - m.origin(seg)), seg });
     try out.emit(.leaf_tuft, m.chain(&.{ tip, m.rotX(-0.6), S(v3(1.3, 1.3, 1.3)) }), .{ .flutter = 1.5, .phase = 0.7 });
     return feet;
   }
@@ -412,27 +408,6 @@ pub const Player = struct {
     return dx * dx + dz * dz <= REACH * REACH;
   }
 };
-
-/// fur along the tail: rings of leaves lying back along it toward the tip,
-/// all the way around, longer toward the tip, each ring turned from the last.
-fn tailFur(b:*mg.Builder, path:[]const V3, radii:[]const f32) Allocator.Error!void {
-  const n = path.len;
-  for (0..6) |ring| {
-    const k = 0.3 + 0.1 * m.f(ring);
-    const i = m.floorTo(usize, k * m.f(n - 1));
-    const tan = m.norm(path[@min(i + 1, n - 1)] - path[i - 1]);
-    const up0 = m.norm(v3(0, 1, 0) - tan * m.splat3(tan[1]));
-    for (0..3) |j| {
-      const a = m.f(j) / 3 * m.tau + m.f(ring) * 1.05;
-      const radial = up0 * m.splat3(@cos(a)) + m.cross(tan, up0) * m.splat3(@sin(a));
-      try wolf_kit.leaf(b, .{
-        .base = path[i] + radial * m.splat3(radii[i] * 0.85), .along = tan, .out = radial,
-        .len = 0.055 + 0.03 * k, .width = 0.02, .lift = 0.45, .curl = 0.4, .cup = 0.3,
-        .col = pal.wolf_leaf_dark, .tip = pal.wolf_leaf_lite,
-      });
-    }
-  }
-}
 
 /// a woven knot where two parts meet, so bent joints never show a seam.
 fn joint(out:*Parts, at:m.M4, r:f32) Allocator.Error!void {

@@ -51,6 +51,19 @@ pub const PlantInstance = extern struct {
   c:[4]f32 = .{0, 0, 0, 0},
 };
 
+/// one tile's worth of ground detail, read per instance by detail.vert,
+/// which grows the tile's grass blades (or its clods and stones on soil)
+/// from it: the ground itself stays one baked mesh, the detail is the GPU's.
+pub const DetailTile = extern struct {
+  /// the tile's corner x, its centre height, its corner z
+  at:[3]f32,
+  /// the heights of its corners: (x0,z0), (x0,z1), (x1,z1), (x1,z0)
+  corners:[4]f32,
+  col:color.Rgba8,
+  /// tile kind, ley 0..255, grass blades, unused
+  info:[4]u8,
+};
+
 /// a rigid procedural part (creature limb, resource node, mote, structure piece).
 pub const PartInstance = extern struct {
   /// model matrix columns
@@ -70,6 +83,11 @@ pub const PartInstance = extern struct {
   /// rooted (a part hovering above its stalk bends with it); w how far a
   /// growing structure has come along (1 grown)
   w:[4]f32,
+  /// x how part.vert places it: 0 by the matrix; 1 along a curve (the
+  /// tail: c0..c3 xyz its control points, tint.xyz the side its x lies
+  /// toward, w its rest length); 2 a star mote (c3 its centre; y phase,
+  /// z life, w its trail echo, -1 when resting)
+  e:[4]f32 = .{0, 0, 0, 0},
 };
 
 pub const Ui = extern struct {

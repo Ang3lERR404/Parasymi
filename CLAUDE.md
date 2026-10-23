@@ -40,9 +40,8 @@ rise/sink, Q/E roll, wheel dolly, unclamped; eases back in 0.3 s.
   work (grass, scatter, particles, procedural detail, deformation,
   animation fields) is generated or evaluated in shaders (instancing,
   vertex/fragment fields, compute), not built on the CPU per frame or per
-  chunk. The CPU keeps game state and sim logic. Existing CPU-side heavy
-  paths (baked chunk grass/stones, mote particles, the per-frame tail)
-  move to the GPU when next touched.
+  chunk. The CPU keeps game state and sim logic (it sends small records:
+  a tile's corners, a mote's state, the tail's four control points).
 
 ## Layers (import only downward)
 
@@ -154,14 +153,15 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   (everything on it stands there), corners shared with its neighbours
   (average height, colour and ley, from a per-chunk grid worked out once),
   smooth normals; land dips under the water at the
-  shore. Thin grass blades on every tile but water and soil (tile-coloured,
-  swayed by the garden wind in terrain.vert, info.w = height up the blade);
-  clods and small stones on soil. Ley lines carry a faint plexus of drifting
+  shore. Detail is grown on the GPU (detail pass, `shaders/detail.vert`):
+  each tile with any gets one `DetailTile` record (corner heights, colour,
+  kind, blade count) and runs 60 vertices: thin grass blades on every tile
+  but water and soil (tile-coloured, swayed by the garden wind), or a clod
+  and a stone (faceted lumps) on soil, all hashed from the tile; drawn on
+  chunks within `DETAIL_R` (28 tiles) of the view's focus. Ley lines carry a faint plexus of drifting
   points joined by threads (terrain.frag); ley sight glows smoothly across
-  tile borders. info.z = 255 marks the ground's top surface. A chunk's
-  mesh is ground first, then detail (grass, clods, stones): the terrain
-  pass draws the detail only on chunks within `DETAIL_R` (22 tiles) of the
-  view's focus. Streaming meshes at most `MESH_MS` (3 ms) of chunks a frame. Fog closes in
+  tile borders. info.z = 255 marks the ground's top surface. Streaming
+  meshes at most `MESH_MS` (3 ms) of chunks a frame. Fog closes in
   before the drawn edge; contact shadows under the wolf's feet.
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
   tile). Motion (plant.vert) is rooted and heavy: points bend about the root
@@ -217,7 +217,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Sky: gradient dome pass (fog colour at the horizon), sun/moon, stars,
   starlight motes (a faceted bipyramid of light, a tilted ring and four
   needle rays; they turn slowly, twinkle, hover breathing, and trail fading
-  echoes while falling).
+  echoes while falling, all in part.vert's mote mode: the CPU sends each
+  mote's centre, phase, life and echo).
+- part.vert places an instance by `PartInstance.e.x`: 0 its matrix, 1 a
+  curve (the tail), 2 a star mote.
 - Resource nodes (`meshes/mineral_kit.zig`: flat-faceted crystals and
   stones): ley shards a violet crystal cluster on a dark stone root; grit
   faceted stones half sunk with quartz chips; fibre a clump of arching
@@ -272,7 +275,9 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
     spring-dampers driven by acceleration.
   - Arms: deltoid caps, bicep/tricep forms, forearm tapering 1.1→0.7.
   - Rear: two squared vine lobes pressed together at the cleft, sap nodes (40%), firm springs;
-    tailbone knot above them; tail is a braided spline rebuilt each frame.
+    tailbone knot above them; tail (`wolf_tail`, braid + fur leaves, built
+    once straight over 0..1) is bent on the GPU along the Catmull-Rom curve
+    through the rig's spring-steered joints (part.vert curve mode).
   - Legs: anthro digitigrade (vertical thigh, calf back to a high hock with a
     +25% swell, forward metatarsal), long feet, sap beans (80%, browner),
     central pad flattens 10% when planted.

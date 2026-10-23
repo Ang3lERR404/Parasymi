@@ -27,6 +27,7 @@ const pass = @import("pass.zig");
 const passes = struct {
   pub const sky = @import("passes/sky.zig");
   pub const terrain = @import("passes/terrain.zig");
+  pub const detail = @import("passes/detail.zig");
   pub const plants = @import("passes/plants.zig");
   pub const parts = @import("passes/parts.zig");
   pub const ui = @import("passes/ui.zig");
@@ -61,9 +62,6 @@ pub const Scene = struct {
   instances:[PLANT_MESHES][]const vertex.PlantInstance,
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
   parts:[meshlib.count][]const vertex.PartInstance,
-  /// world-space part geometry rebuilt this frame, and the instance it draws with
-  live:[]const vertex.Mesh,
-  live_inst:vertex.PartInstance,
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)
   ui_time:f32,
@@ -87,11 +85,13 @@ const Frame = struct {
 const MESH_MS:f64 = 3;
 
 pub const Slot = struct {
+  /// the chunk's ground mesh
   buf:Buffer = .{},
   count:u32 = 0,
-  /// vertices of ground (drawn always); the rest is detail (grass, stones)
-  /// drawn only near the camera
-  ground:u32 = 0,
+  /// its detail records (one per tile with grass, clods or stones), which
+  /// the detail pass grows on the GPU near the camera
+  detail:Buffer = .{},
+  tiles:u32 = 0,
   /// the chunk's centre (x, z)
   centre:[2]f32 = .{0, 0},
   live:bool = false,
@@ -119,6 +119,7 @@ pub const Renderer = struct {
   plant_morph:[PLANT_MESHES]u64 = @splat(0),
   part_ranges:[meshlib.count][2]u32 = undefined,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
+  detail_scratch:std.ArrayList(vertex.DetailTile) = .empty,
   /// buffers retired since the last frame began; any frame still in flight
   /// may use them, so they join the next frame's garbage (freed only once
   /// that frame, and every frame before it, has finished on the GPU).
@@ -220,10 +221,14 @@ pub const Renderer = struct {
       c.device.destroyFence(f.fence, null);
       c.device.destroyCommandPool(f.pool, null);
     }
-    for (r.slots.items) |*s| s.buf.deinit(c);
+    for (r.slots.items) |*s| {
+      s.buf.deinit(c);
+      s.detail.deinit(c);
+    }
     r.slots.deinit(r.gpa);
     r.free_slots.deinit(r.gpa);
     r.scratch.deinit(r.gpa);
+    r.detail_scratch.deinit(r.gpa);
     r.meshes.deinit(c);
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
@@ -247,6 +252,7 @@ pub const Renderer = struct {
     for (w.evicted.items) |si| {
       const i = @intFromEnum(si);
       try r.retire(r.slots.items[i].buf);
+      try r.retire(r.slots.items[i].detail);
       r.slots.items[i] = .{};
       try r.free_slots.append(r.gpa, si);
     }
@@ -262,21 +268,29 @@ pub const Renderer = struct {
       // is spent (at least one, so streaming always moves on)
       if (r.stats.meshed >= budget) break;
       if (r.stats.meshed > 0 and (glfw.getTime() - start) * 1000 > MESH_MS) break;
-      const ground = try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch);
+      try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch, &r.detail_scratch);
       const bytes = sliceAsBytes(r.scratch.items);
       var buf = try Buffer.init(&r.ctx, @max(bytes.len, 64), .{.vertex_buffer = true});
-      buf.write(0, bytes);
       errdefer buf.deinit(&r.ctx);
+      buf.write(0, bytes);
+      const dbytes = sliceAsBytes(r.detail_scratch.items);
+      var detail = try Buffer.init(&r.ctx, @max(dbytes.len, 64), .{.vertex_buffer = true});
+      errdefer detail.deinit(&r.ctx);
+      detail.write(0, dbytes);
       const slot = if (c.gpu_slot) |s| s else r.free_slots.pop() orelse blk: {
         try r.slots.append(r.gpa, .{});
         break :blk @as(ck.MeshSlot, @enumFromInt(r.slots.items.len - 1));
       };
       const at = @intFromEnum(slot);
-      if (c.gpu_slot != null) try r.retire(r.slots.items[at].buf);
+      if (c.gpu_slot != null) {
+        try r.retire(r.slots.items[at].buf);
+        try r.retire(r.slots.items[at].detail);
+      }
       c.gpu_slot = slot;
       const half = m.f(ck.SIZE) / 2;
       r.slots.items[at] = .{
-        .buf = buf, .count = @intCast(r.scratch.items.len), .ground = ground, .live = true,
+        .buf = buf, .count = @intCast(r.scratch.items.len), .live = true,
+        .detail = detail, .tiles = @intCast(r.detail_scratch.items.len),
         .centre = .{m.f(c.originX()) + half, m.f(c.originY()) + half},
       };
       c.dirty = false;

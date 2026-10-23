@@ -52,8 +52,6 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
     .clear = sky,
     .instances = undefined,
     .parts = g.parts.slices(),
-    .live = g.parts.live.v.items,
-    .live_inst = g.parts.liveInstance(),
     .ui = g.ui.v.items,
     .ui_time = @floatCast(@mod(g.ui_time, 3600)),
   };
@@ -186,19 +184,10 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
 /// slow breath over the ground; while it falls, fading echoes of it trail
 /// above, a streak of light.
 fn motes(g:*Game) Allocator.Error!void {
-  const t:f32 = @floatCast(@mod(g.time, 3600));
   for (g.stars.motes.items) |mo| {
     const fade = m.clamp01(mo.life);
-    const twinkle = 0.75 + 0.25 * @sin(t * 3.1 + mo.phase * 40) * @sin(t * 1.7 + mo.phase * 13);
-    const turn = t * 0.35 + mo.phase * m.tau;
-    const hover = if (mo.falling) 0 else 0.05 * @sin(t * 1.1 + mo.phase * 30);
-    const at = mo.pos + m.v3(0, hover, 0);
-    const size = (0.55 + 0.55 * fade) * (0.9 + 0.1 * twinkle);
-    try g.parts.emit(.mote, m.chain(&.{m.translate(at), m.rotY(turn), m.rotZ(0.25 * @sin(t * 0.5 + mo.phase * 9)), m.scale3(m.splat3(size))}), .{.glow = 1.8 * fade * twinkle, .phase = mo.phase});
+    try g.parts.emitMote(mo.pos, mo.phase, fade, if (mo.falling) 0 else -1, 1.8 * fade);
     if (!mo.falling) continue;
-    for (1..4) |k| {
-      const e = m.f(k);
-      try g.parts.emit(.mote, m.chain(&.{m.translate(at + m.v3(0, 0.16 * e, 0)), m.rotY(turn - 0.3 * e), m.scale3(m.splat3(size * (1 - 0.22 * e)))}), .{.glow = 1.2 * fade / (1 + e), .phase = mo.phase});
-    }
+    for (1..4) |k| try g.parts.emitMote(mo.pos, mo.phase, fade, m.f(k), 1.2 * fade / (1 + m.f(k)));
   }
 }
