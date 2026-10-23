@@ -5,12 +5,13 @@ const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const craft = @import("../craft.zig");
 const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 
-pub const def:st.Def = .{ .name = "GERMINATOR", .item = .germinator, .size = 2, .mesh = .germinator, .sway = 0.9, .tall = 1.05, .grow = 6 };
+pub const def:st.Def = .{ .item = .germinator, .size = 2, .mesh = .germinator, .sway = 0.9, .tall = 1.05, .grow = 6 };
 
 /// weave speed multiplier relative to hand-weaving
 const SPEED:f32 = 0.6;
@@ -55,12 +56,12 @@ pub fn configure(s:*st.Structure, g:*prog.Progression) void {
     if (craft.isSeedRecipe(r) and craft.hand[r].unlocked(g)) break;
   }
   gs.recipe = r;
-  g.say("GERMINATOR NOW WEAVES {s}", .{craft.hand[r].out.info().name});
+  g.say(txt.s.msg.germinator_weaves, .{txt.item(craft.hand[r].out).name});
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const gs = &s.state.germinator;
-  _ = try d.print(x, y, style.text_body, style.white, "WEAVES {s} (C)", .{craft.hand[gs.recipe].out.info().name});
+  _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.weaves, .{txt.item(craft.hand[gs.recipe].out).name});
   try d.tendril(x + style.desc_bar_x, y + 2, style.desc_bar_w, style.bar_h, style.gold, gs.weave.progress(), 0.3);
 }
 

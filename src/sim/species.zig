@@ -6,6 +6,7 @@
 //! A new species is one new file plus one line in `parts`.
 const items = @import("items.zig");
 const color = @import("../core/color.zig");
+const m = @import("../core/math.zig");
 const registry = @import("../core/registry.zig");
 
 const parts = struct {
@@ -73,7 +74,6 @@ pub const Genome = struct {
 };
 
 pub const Species = struct {
-  name:[]const u8,
   lineage:Lineage,
   /// the item that plants this species; null when it cannot be sown and only
   /// grows where its parents meet (it then ripens its parents' seeds).
@@ -112,14 +112,14 @@ pub const Species = struct {
   link:f32 = 0,
   /// it needs celestial energy: outside every field it halts and withers
   needs_radiance:bool = false,
-  /// names of its growth stages, shown on hover (the mesh itself grows
-  /// continuously; see meshgen `KEYS`).
-  stages:?[4][]const u8 = null,
+  /// growth stages named on hover (0: unstaged; names in `game/text.zig`,
+  /// the mesh itself grows continuously; see meshgen `KEYS`).
+  stages:u8 = 0,
 
   /// which stage a plant at `growth` shows (0 when unstaged).
   pub fn stage(s:*const Species, growth:f32) u32 {
-    const st = s.stages orelse return 0;
-    return @min(st.len - 1, @as(u32, @intFromFloat(@max(growth, 0) * st.len)));
+    if (s.stages == 0) return 0;
+    return @min(s.stages - 1, @as(u32, @intFromFloat(@max(growth, 0) * m.f(s.stages))));
   }
 };
 

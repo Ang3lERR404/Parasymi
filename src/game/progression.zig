@@ -15,13 +15,14 @@
 //! A new technology is one new file plus one line in `techs`.
 const std = @import("std");
 const EnumArray = std.enums.EnumArray;
-const bufPrint = std.fmt.bufPrint;
 const copyBackwards = std.mem.copyBackwards;
 const testing = std.testing;
 const registry = @import("../core/registry.zig");
 const species = @import("../sim/species.zig");
 const ecology = @import("../sim/ecology.zig");
 const items = @import("../sim/items.zig");
+const txt = @import("text.zig");
+const ctext = @import("../core/text.zig");
 
 const techs = struct {
   pub const ley_sight = @import("research/ley_sight.zig");
@@ -41,8 +42,6 @@ pub const Discovery = enum { convergence };
 pub const Id = reg.Id;
 
 pub const Research = struct {
-  name:[]const u8,
-  desc:[]const u8,
   /// ingredients consumed per unit, units needed, seconds per unit.
   per_unit:[]const items.Ingredient,
   units:u32,
@@ -102,12 +101,13 @@ pub const Progression = struct {
   died:u32 = 0,
   died_t:f32 = 0,
 
-  pub fn say(g:*Progression, comptime fmt:[]const u8, args:anytype) void {
+  /// `tpl` is a runtime template (`core/text.zig`), usually `txt.s.msg.*`.
+  pub fn say(g:*Progression, tpl:[]const u8, args:anytype) void {
     copyBackwards(Message, g.log[1..], g.log[0 .. g.log.len - 1]);
     const m = &g.log[0];
     m.* = .{};
     // if the message is too long it silently truncates to the buffer size
-    m.len = if (bufPrint(&m.buf, fmt, args)) |s| s.len else |_| m.buf.len;
+    m.len = ctext.bufRender(&m.buf, tpl, args).len;
   }
 
   pub fn status(g:*const Progression, id:Id) enum { done, open, locked } {
@@ -119,11 +119,11 @@ pub const Progression = struct {
   }
 
   pub fn select(g:*Progression, id:Id) void {
-    const r = tree.get(id);
+    const name = txt.research(id).name;
     switch (g.status(id)) {
-      .open => { g.current = id; g.say("RESEARCHING {s}", .{r.name}); },
-      .done => g.say("{s} IS ALREADY KNOWN", .{r.name}),
-      .locked => g.say("{s} IS LOCKED", .{r.name}),
+      .open => { g.current = id; g.say(txt.s.msg.researching, .{name}); },
+      .done => g.say(txt.s.msg.already_known, .{name}),
+      .locked => g.say(txt.s.msg.locked, .{name}),
     }
   }
 
@@ -150,7 +150,7 @@ pub const Progression = struct {
   fn complete(g:*Progression, id:Id) void {
     g.done.insert(id);
     if (g.current == id) g.current = null;
-    g.say("RESEARCHED {s}", .{tree.get(id).name});
+    g.say(txt.s.msg.researched, .{txt.research(id).name});
     switch (id) {
       inline else => |k| if (comptime reg.has(k, "completed")) reg.module(k).completed(g),
     }
@@ -173,8 +173,8 @@ pub const Progression = struct {
     g.found.insert(d);
     switch (d) {
       .convergence => {
-        g.say("DISCOVERY: SYMBIOTE AND PARASITE ENTWINE", .{});
-        g.say("A HYBRID SEED STIRS. RESEARCH SEED SPLICING", .{});
+        g.say(txt.s.msg.entwine, .{});
+        g.say(txt.s.msg.hybrid_stirs, .{});
       },
     }
   }
@@ -201,7 +201,7 @@ pub const Progression = struct {
     g.died += ev.died;
     g.died_t += dt;
     if (g.died_t > WITHER_BATCH) {
-      if (g.died > 0) g.say("{d} PLANT(S) WITHERED", .{g.died});
+      if (g.died > 0) g.say(txt.s.msg.withered, .{g.died});
       g.died = 0;
       g.died_t = 0;
     }

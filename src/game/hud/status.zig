@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
+const txt = @import("../text.zig");
 
 const panel_x = s.edge;
 const panel_y:f32 = 14;
@@ -23,6 +24,6 @@ pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
   try d.glow(orb_x, orb_y, glow_r, glow);
   try d.pod(orb_x, orb_y, orb_r, orb, 0.4 + 0.6 * (if (day > 0.5) day else 1 - day), 0.3);
   _ = try d.text(orb_x + 32, 30, s.text_heading, s.white, g.sky.name());
-  _ = try d.text(orb_x + 32, 56, s.text_sub, s.dim, "SAP");
+  _ = try d.text(orb_x + 32, 56, s.text_sub, s.dim, txt.s.hud.sap);
   try d.tendril(118, 52, 180, s.bar_h_bold, s.sap, g.player.inv.fill(), 0.2);
 }   

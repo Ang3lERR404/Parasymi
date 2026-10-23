@@ -3,8 +3,6 @@ const prog = @import("../progression.zig");
 const species = @import("../../sim/species.zig");
 
 pub const def:prog.Research = .{
-  .name = "DRIFT SPORES",
-  .desc = "WEAVE DRIFTWISPS: FLOATERS THAT CONDENSE STARLIGHT",
   .per_unit = &.{
     .{ .item = .starlight, .n = 2 },
     .{ .item = .essence, .n = 1 },

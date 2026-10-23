@@ -45,7 +45,6 @@ pub const Kind = reg.Id;
 pub const Id = ck.StructId;
 
 pub const Def = struct {
-  name:[]const u8,
   item:items.Item,
   size:u8,
   mesh:meshlib.Id,

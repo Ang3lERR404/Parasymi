@@ -21,6 +21,7 @@ const Game = play.Game;
 const view = @import("game/view.zig");
 const setups = @import("game/setups.zig");
 const save = @import("game/save.zig");
+const txt = @import("game/text.zig");
 const m = @import("core/math.zig");
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
@@ -51,11 +52,15 @@ pub fn main(init:Init) !void {
     if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a["--seed=".len..], 0);
   }
 
+  // the only read of the strings file: everything shown comes from it
+  try txt.load(gpa, io);
+  defer txt.unload(gpa);
+
   try glfw.init();
   defer glfw.terminate();
   if (!glfw.isVulkanSupported()) return error.VulkanUnsupported;
   glfw.windowHint(.client_api, .no_api);
-  const window = try glfw.createWindow(play.WINDOW[0], play.WINDOW[1], "Parasymi", null, null);
+  const window = try glfw.createWindow(play.WINDOW[0], play.WINDOW[1], try init.arena.allocator().dupeZ(u8, txt.s.window.title), null, null);
   defer window.destroy();
 
   var input:Input = .{.win = window};
@@ -87,9 +92,9 @@ pub fn main(init:Init) !void {
     if (game.request) |rq| {
       game.request = null;
       switch (rq) {
-        .save => if (save.save(&game, gpa, io)) game.prog.say("THE GARDEN IS SAVED", .{}) else |e| game.prog.say("SAVE FAILED: {t}", .{e}),
+        .save => if (save.save(&game, gpa, io)) game.prog.say(txt.s.msg.saved, .{}) else |e| game.prog.say(txt.s.msg.save_failed, .{e}),
         .load => try restore(gpa, io, &game, r),
-        .fullscreen => display.toggle() catch |e| game.prog.say("NO FULLSCREEN: {t}", .{e}),
+        .fullscreen => display.toggle() catch |e| game.prog.say(txt.s.msg.no_fullscreen, .{e}),
         .quit => {
           save.save(&game, gpa, io) catch |e| log.err("save failed: {t}", .{e});
           window.setShouldClose(true);
@@ -112,7 +117,7 @@ pub fn main(init:Init) !void {
 /// replace the running game with the saved one (keeping it on failure).
 fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer) !void {
   var loaded = save.load(gpa, io) catch |e| {
-    game.prog.say("NO GARDEN TO RETURN TO: {t}", .{e});
+    game.prog.say(txt.s.msg.no_save, .{e});
     return;
   };
   // the old world's meshes belong to chunks that are about to disappear

@@ -3,8 +3,6 @@
 const prog = @import("../progression.zig");
 
 pub const def:prog.Research = .{
-  .name = "DEEP ROOTING",
-  .desc = "WEAVE ROOT-DIGGERS: THEY GATHER FROM A NODE BESIDE THEM",
   .per_unit = &.{
     .{ .item = .essence, .n = 5 },
     .{ .item = .ley_shard, .n = 3 },

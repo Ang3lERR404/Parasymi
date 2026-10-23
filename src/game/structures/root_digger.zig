@@ -14,6 +14,7 @@ const World = @import("../../world/world.zig").World;
 const items = @import("../../sim/items.zig");
 const Plants = @import("../../sim/plants.zig").Plants;
 const st = @import("../structures.zig");
+const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const resources = @import("../resources.zig");
 const style = @import("../style.zig");
@@ -22,7 +23,7 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
 
-pub const def:st.Def = .{ .name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger, .grow = 4, .sway = 0.5, .tall = 0.6 };
+pub const def:st.Def = .{ .item = .root_digger, .size = 1, .mesh = .root_digger, .grow = 4, .sway = 0.5, .tall = 0.6 };
 
 /// seconds per item drawn from the node
 pub const RATE:f32 = 4;
@@ -167,11 +168,11 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const n = s.inv.total();
   const dg = s.state.root_digger.dig orelse {
-    _ = try d.print(x, y, style.text_body, style.dim, "NO NODE BESIDE IT  HOLDS {d}/{d}", .{ n, BUFFER });
+    _ = try d.print(x, y, style.text_body, style.dim, txt.s.describe.no_node, .{ n, BUFFER });
     return;
   };
-  const what = if (n >= BUFFER) "FULL: LEAD A CONDUIT AWAY" else dg.item.info().name;
-  _ = try d.print(x, y, style.text_body, style.white, "DIGS {s}  HOLDS {d}/{d}", .{ what, n, BUFFER });
+  const what = if (n >= BUFFER) txt.s.describe.digger_full else txt.item(dg.item).name;
+  _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.digs, .{ what, n, BUFFER });
   try d.tendril(x + BAR_X, y + 2, BAR_W, style.bar_h, style.digger, dg.t / RATE, 0.4);
 }
 

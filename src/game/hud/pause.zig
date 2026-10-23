@@ -5,6 +5,7 @@ const m = @import("../../core/math.zig");
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
+const txt = @import("../text.zig");
 
 const pw:f32 = 480;
 const header_h:f32 = 100;
@@ -14,27 +15,23 @@ const pod_x:f32 = 90;
 const key_x:f32 = 112;
 const label_x:f32 = 190;
 
-const options = [_][2][]const u8{
-  .{"ESC", "RESUME"},
-  .{"F5", "SAVE THE GARDEN"},
-  .{"F9", "RETURN TO THE LAST SAVE"},
-  .{"F11", "FULLSCREEN"},
-  .{"Q", "SAVE AND LEAVE"},
-};
-
 pub fn visible(g:*const play.Game) bool { return g.mode == .paused; }
 
 pub fn draw(_:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   try d.glow(W / 2, H / 2, @max(W, H) * 0.75, s.veil);
-  const ph = header_h + option_h * m.f(options.len) + pad_bottom;
+  const keys = txt.s.hud.pause_keys;
+  const labels = txt.s.hud.pause_labels;
+  const n = txt.count(labels);
+  const ph = header_h + option_h * m.f(n) + pad_bottom;
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
   try d.membrane(px, py, pw, ph, s.pause_panel, 0.55);
-  _ = try d.text(W / 2 - Draw.width("PAUSED", s.text_banner) / 2, py + 30, s.text_banner, s.gold, "PAUSED");
-  for (options, 0..) |o, i| {
+  const title = txt.s.hud.paused;
+  _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + 30, s.text_banner, s.gold, title);
+  for (0..n) |i| {
     const y = py + header_h + option_h * m.f(i);
     try d.pod(px + pod_x, y + 8, 9, s.gold, 0.5, m.f(i) * 0.4);
-    _ = try d.text(px + key_x, y, s.text_label, s.dim, o[0]);
-    _ = try d.text(px + label_x, y, s.text_label, s.white, o[1]);
+    _ = try d.text(px + key_x, y, s.text_label, s.dim, txt.nth(keys, i));
+    _ = try d.text(px + label_x, y, s.text_label, s.white, txt.nth(labels, i));
   }
 }

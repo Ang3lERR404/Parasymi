@@ -3,8 +3,6 @@ const prog = @import("../progression.zig");
 const ecology = @import("../../sim/ecology.zig");
 
 pub const def:prog.Research = .{
-  .name = "ROOT COMMUNION",
-  .desc = "SYMBIOTIC LINKS REACH 2 TILES",
   .per_unit = &.{
     .{.item = .essence, .n = 2},
     .{.item = .fibre, .n = 1}

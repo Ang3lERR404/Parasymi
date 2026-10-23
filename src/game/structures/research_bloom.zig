@@ -6,12 +6,13 @@ const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 
-pub const def:st.Def = .{ .name = "RESEARCH BLOOM", .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0, .grow = 8 };
+pub const def:st.Def = .{ .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0, .grow = 8 };
 
 /// most of one ingredient it will hold
 const STOCK = 20;
@@ -66,10 +67,10 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 
 pub fn describe(_:*const st.Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const id = g.current orelse {
-    _ = try d.text(x, y, style.text_body, style.dim, "CHOOSE WHAT TO STUDY (T)");
+    _ = try d.text(x, y, style.text_body, style.dim, txt.s.describe.choose_study);
     return;
   };
   const r = prog.tree.get(id);
-  _ = try d.print(x, y, style.text_body, style.white, "STUDIES {s}", .{r.name});
+  _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.studies, .{txt.research(id).name});
   try d.tendril(x + style.desc_bar_x, y + 2, style.desc_bar_w, style.bar_h, style.research_tendril, m.ratio(g.progress.get(id), r.units), 0.3);
 }

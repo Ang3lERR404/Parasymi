@@ -7,12 +7,12 @@ const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
-  .name = "CONFLUENCE", .lineage = .convergent, .seed = null, .size = 2, .yields = .convergence_essence,
+  .lineage = .convergent, .seed = null, .size = 2, .yields = .convergence_essence,
   // decision: mature_time is the fallback for a confluence without parents
   // (1.5x the slower first pair); a spawned one carries its own span.
   .mature_time = 18, .mana_cap = 40, .ley_draw = 1.6, .share = 0.5, .drain = 0, .yield = 0.12, .seed_time = 50,
   .contain = 3, .sway = 1.5,
-  .stages = .{"ROOTING", "ENTWINING", "REACHING", "BLOOMING"},
+  .stages = 4,
   .genome = .{
     .form = .confluence,
     .stem_h = 2.8, .stem_r = 0.34, .segments = 10, .curl = 0.04, .wobble = 0.08,

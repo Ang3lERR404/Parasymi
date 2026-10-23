@@ -88,6 +88,8 @@ pub fn build(b:*Build) !void {
   const tests = b.addTest(.{
     .root_module = Mods.make(b, "src/tests.zig", t, o, vulkan, glfw_mod, zglfw.artifact("glfw"), &spvs),
   });
+  // the tests check the strings file is complete; the game reads it at startup
+  tests.root_module.addAnonymousImport("parasymi.cfg", .{.root_source_file = b.path("parasymi.cfg")});
   const test_step = b.step("test", "run unit tests.");
   test_step.dependOn(&b.addRunArtifact(tests).step);
 }

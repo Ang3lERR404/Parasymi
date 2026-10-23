@@ -12,6 +12,7 @@ const craft = @import("craft.zig");
 const st = @import("structures.zig");
 const resources = @import("resources.zig");
 const play = @import("play.zig");
+const txt = @import("text.zig");
 
 const Game = play.Game;
 
@@ -38,7 +39,7 @@ pub fn gather(g:*Game, c:*ck.Chunk, t:usize, dt:f32) bool {
   if (g.gather_t < GATHER_TIME) return true;
   g.gather_t = 0;
   if (g.player.inv.add(node.item, 1) == 0) {
-    if (!g.full_warned) g.prog.say("YOUR BELLY CAN HOLD NO MORE", .{});
+    if (!g.full_warned) g.prog.say(txt.s.msg.belly_full, .{});
     g.full_warned = true;
     return false;
   }
@@ -51,7 +52,7 @@ pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
   const item = play.hotbar[g.hot];
   if (!play.known(g, item)) return;
   if (g.player.inv.count(item) == 0) {
-    g.prog.say("NO {s}. WEAVE ONE IN YOUR BELLY (TAB)", .{item.info().name});
+    g.prog.say(txt.s.msg.no_item, .{txt.item(item).name});
     g.plant_cd = WARN_COOLDOWN;
     return;
   }
@@ -77,8 +78,8 @@ pub fn canPut(g:*const Game, h:[2]i32) bool {
 
 pub fn weaveByHand(g:*Game, i:usize) void {
   const r = craft.hand[i];
-  if (!r.unlocked(&g.prog)) return g.prog.say("{s} IS NOT YET UNDERSTOOD", .{r.out.info().name});
-  if (!g.weave.push(g.player.inv.bag(), i)) g.prog.say("NOT ENOUGH TO WEAVE {s}", .{r.out.info().name});
+  if (!r.unlocked(&g.prog)) return g.prog.say(txt.s.msg.not_understood, .{txt.item(r.out).name});
+  if (!g.weave.push(g.player.inv.bag(), i)) g.prog.say(txt.s.msg.cannot_weave, .{txt.item(r.out).name});
 }
 
 /// give a structure everything from the belly it will take.
@@ -93,7 +94,7 @@ pub fn feed(g:*Game, j:st.Id) void {
     if (s.n == 0) slot.* = null;
   };
   g.linger = LINGER_TRADE;
-  if (moved == 0) g.prog.say("IT WANTS NOTHING YOU CARRY", .{});
+  if (moved == 0) g.prog.say(txt.s.msg.wants_nothing, .{});
 }
 
 /// empty a structure into the belly (what fits).
@@ -104,7 +105,7 @@ pub fn takeFrom(g:*Game, j:st.Id) void {
     it.n -= n;
     if (it.n == 0) slot.* = null;
   };
-  if (st.release(s)) |h| if (g.player.inv.add(h, 1) == 0) g.prog.say("YOUR BELLY CAN HOLD NO MORE", .{});
+  if (st.release(s)) |h| if (g.player.inv.add(h, 1) == 0) g.prog.say(txt.s.msg.belly_full, .{});
   g.linger = LINGER_TRADE;
 }
 
@@ -119,7 +120,7 @@ pub fn unbuild(g:*Game, j:st.Id) void {
     lost += it.n - g.player.inv.add(it.item, it.n);
   };
   if (st.release(&s)) |h| lost += 1 - g.player.inv.add(h, 1);
-  if (lost > 0) g.prog.say("{d} THINGS SPILLED AND WITHERED", .{lost});
+  if (lost > 0) g.prog.say(txt.s.msg.spilled, .{lost});
 }
 
 /// take a mature plant's yield and ripe seeds. Where lineages touch and
@@ -130,20 +131,20 @@ pub fn harvest(g:*Game, h:[2]i32) void {
   const s = g.plants.list.slice();
   const sp = s.items(.sp)[i];
   if (s.items(.growth)[i] < 1) {
-    g.prog.say("{s} IS STILL GROWING ({d:.0}%)", .{species.get(sp).name, s.items(.growth)[i] * 100});
+    g.prog.say(txt.s.msg.still_growing, .{txt.plant(sp).name, s.items(.growth)[i] * 100});
     return;
   }
   const es = m.floorTo(u16, s.items(.essence)[i]);
   var seeds = m.floorTo(u16, s.items(.seeds)[i]);
   if (es == 0 and seeds == 0) {
-    g.prog.say("NOTHING IS RIPE YET", .{});
+    g.prog.say(txt.s.msg.not_ripe, .{});
     return;
   }
   const yields = species.get(sp).yields;
   const got_es = g.player.inv.add(yields, es);
   s.items(.essence)[i] -= m.f(got_es);
   // what an unstudied plant gives is learned only by taking it
-  if (got_es > 0 and !g.prog.yieldKnown(sp)) g.prog.say("IT GIVES UP {d} {s}", .{got_es, yields.info().name});
+  if (got_es > 0 and !g.prog.yieldKnown(sp)) g.prog.say(txt.s.msg.gives_up, .{got_es, txt.item(yields).name});
   if (seeds > 0 and g.prog.done.contains(.seed_splicing) and touchesOtherLineage(s, i)) {
     if (g.player.inv.add(.seed_vesper, 1) == 1) {
       seeds -= 1;
@@ -157,7 +158,7 @@ pub fn harvest(g:*Game, h:[2]i32) void {
     s.items(.seeds)[i] -= 1;
   }
   g.linger = LINGER_HARVEST;
-  if (got_es + got_sd < es + seeds) g.prog.say("YOUR BELLY CAN HOLD NO MORE", .{});
+  if (got_es + got_sd < es + seeds) g.prog.say(txt.s.msg.belly_full, .{});
 }
 
 fn touchesOtherLineage(s:std.MultiArrayList(plants_mod.Plant).Slice, i:usize) bool {

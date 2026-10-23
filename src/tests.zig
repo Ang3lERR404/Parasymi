@@ -2,6 +2,8 @@
 test {
   _ = @import("core/math.zig");
   _ = @import("core/registry.zig");
+  _ = @import("core/text.zig");
+  _ = @import("game/text.zig");
   _ = @import("core/rng.zig");
   _ = @import("core/noise.zig");
   _ = @import("world/gen.zig");

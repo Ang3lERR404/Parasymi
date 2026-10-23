@@ -16,6 +16,7 @@ const Plants = @import("../sim/plants.zig").Plants;
 const Ecology = @import("../sim/ecology.zig").Ecology;
 const items = @import("../sim/items.zig");
 const prog = @import("progression.zig");
+const txt = @import("text.zig");
 const Input = @import("../platform/input.zig").Input;
 const camera = @import("../render/camera.zig");
 const Camera = camera.Camera;
@@ -74,7 +75,6 @@ pub const hotbar = [_]items.Item{
   .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom,
 };
 /// the key that picks each hotbar slot, as the hotbar labels it
-pub const hotbar_keys = [_][]const u8{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"};
 
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
 pub fn known(g:*const Game, item:items.Item) bool {
@@ -172,8 +172,8 @@ pub const Game = struct {
     }
     g.cam.target = g.player.pos;
     try g.world.stream(g.focus(), STREAM_RADIUS, STREAM_INIT);
-    g.prog.say("YOU WAKE AMONG BARE ROOTS. GATHER WHAT THE GROUND OFFERS", .{});
-    g.prog.say("AT NIGHT, CATCH STARLIGHT. WEAVE SEEDS IN YOUR BELLY (TAB)", .{});
+    g.prog.say(txt.s.msg.wake, .{});
+    g.prog.say(txt.s.msg.night_hint, .{});
     return g;
   }
 
@@ -326,7 +326,7 @@ pub const Game = struct {
       if (working or g.linger > 0) work = m.tileCentre(h[0], h[1], c.height[t]);
     };
     // weaving: hands work at the chest while the queue runs
-    if (g.weave.tick(g.player.inv.bag(), dt)) |made| g.prog.say("WOVE A {s}", .{made.info().name});
+    if (g.weave.tick(g.player.inv.bag(), dt)) |made| g.prog.say(txt.s.msg.wove, .{txt.item(made).name});
     if (g.weave.busy() and !working) work = g.player.pos + m.v3(@sin(g.player.facing), 0, @cos(g.player.facing));
     // a one-off gesture keeps facing where it happened
     if (work == null and g.linger > 0) work = g.player.work;

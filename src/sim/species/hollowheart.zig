@@ -4,7 +4,7 @@ const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
-  .name = "HOLLOWHEART", .lineage = .symbiotic, .seed = .seed_hollowheart, .size = 2,
+  .lineage = .symbiotic, .seed = .seed_hollowheart, .size = 2,
   .mature_time = 45, .mana_cap = 60, .ley_draw = 2.4, .share = 0.9, .drain = 0, .yield = 0.5, .seed_time = 60,
   // a heavy tree: it leans, it does not wave
   .sway = 0.6,

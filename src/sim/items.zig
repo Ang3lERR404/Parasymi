@@ -21,26 +21,27 @@ pub const Item = enum(u8) {
   pub fn plants(i:Item) ?species.Id { return species.fromSeed(i); }
 };
 
-pub const Info = struct { name:[]const u8, short:[]const u8, col:[4]u8, stack:u16 = 50 };
+/// names are player-facing text (`game/text.zig`).
+pub const Info = struct { col:[4]u8, stack:u16 = 50 };
 
 const infos = EnumArray(Item, Info).init(.{
-  .grit = .{.name = "MINERAL GRIT", .short = "GR", .col = .{150, 140, 130, 255}},
-  .fibre = .{.name = "ROOT FIBRE", .short = "FB", .col = .{120, 170, 90, 255}},
-  .ley_shard = .{.name = "LEY SHARD", .short = "LY", .col = .{170, 120, 255, 255}, .stack = 20},
-  .starlight = .{.name = "STARLIGHT", .short = "ST", .col = .{255, 245, 190, 255}, .stack = 20},
-  .essence = .{.name = "ESSENCE", .short = "ES", .col = .{255, 215, 120, 255}},
-  .convergence_essence = .{.name = "CONVERGENCE ESSENCE", .short = "CE", .col = .{220, 150, 255, 255}, .stack = 20},
-  .seed_lumenroot = .{.name = "LUMENROOT SEED", .short = "LS", .col = .{120, 240, 220, 255}, .stack = 20},
-  .seed_thornleech = .{.name = "THORNLEECH SEED", .short = "TS", .col = .{240, 90, 120, 255}, .stack = 20},
-  .seed_vesper = .{.name = "VESPER SEED", .short = "VS", .col = .{200, 170, 255, 255}, .stack = 10},
-  .seed_driftwisp = .{.name = "DRIFTWISP SPORE", .short = "DW", .col = .{190, 210, 255, 255}, .stack = 10},
-  .seed_hollowheart = .{.name = "HOLLOWHEART SEED", .short = "HH", .col = .{230, 170, 100, 255}, .stack = 5},
-  .conduit = .{.name = "ROOT CONDUIT", .short = "RC", .col = .{150, 120, 80, 255}},
-  .sap_cache = .{.name = "SAP CACHE", .short = "SC", .col = .{210, 160, 70, 255}, .stack = 10},
-  .germinator = .{.name = "GERMINATOR", .short = "GM", .col = .{140, 220, 140, 255}, .stack = 5},
-  .research_bloom = .{.name = "RESEARCH BLOOM", .short = "RB", .col = .{200, 150, 255, 255}, .stack = 5},
-  .root_digger = .{.name = "ROOT-DIGGER", .short = "RD", .col = .{190, 140, 90, 255}, .stack = 10},
-  .seed_bloom = .{.name = "BLOOM SEED", .short = "BL", .col = .{140, 255, 215, 255}, .stack = 5},
+  .grit = .{.col = .{150, 140, 130, 255}},
+  .fibre = .{.col = .{120, 170, 90, 255}},
+  .ley_shard = .{.col = .{170, 120, 255, 255}, .stack = 20},
+  .starlight = .{.col = .{255, 245, 190, 255}, .stack = 20},
+  .essence = .{.col = .{255, 215, 120, 255}},
+  .convergence_essence = .{.col = .{220, 150, 255, 255}, .stack = 20},
+  .seed_lumenroot = .{.col = .{120, 240, 220, 255}, .stack = 20},
+  .seed_thornleech = .{.col = .{240, 90, 120, 255}, .stack = 20},
+  .seed_vesper = .{.col = .{200, 170, 255, 255}, .stack = 10},
+  .seed_driftwisp = .{.col = .{190, 210, 255, 255}, .stack = 10},
+  .seed_hollowheart = .{.col = .{230, 170, 100, 255}, .stack = 5},
+  .conduit = .{.col = .{150, 120, 80, 255}},
+  .sap_cache = .{.col = .{210, 160, 70, 255}, .stack = 10},
+  .germinator = .{.col = .{140, 220, 140, 255}, .stack = 5},
+  .research_bloom = .{.col = .{200, 150, 255, 255}, .stack = 5},
+  .root_digger = .{.col = .{190, 140, 90, 255}, .stack = 10},
+  .seed_bloom = .{.col = .{140, 255, 215, 255}, .stack = 5},
 });
 
 pub const Stack = struct { item:Item, n:u16 };

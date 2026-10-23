@@ -1,11 +1,10 @@
 //! CONVERGENCE THEORY: study of what grows where the lineages meet. The
 //! confluence needs no research to take root; this only teaches what it gives.
 const prog = @import("../progression.zig");
+const txt = @import("../text.zig");
 const species = @import("../../sim/species.zig");
 
 pub const def:prog.Research = .{
-  .name = "CONVERGENCE THEORY",
-  .desc = "LEARN WHAT THE CONFLUENCE CONDENSES",
   .per_unit = &.{
     .{ .item = .essence, .n = 2 },
     .{ .item = .starlight, .n = 1 },
@@ -19,5 +18,5 @@ pub const def:prog.Research = .{
 pub const reveals = [_]species.Id{ .confluence };
 
 pub fn completed(g:*prog.Progression) void {
-  g.say("WHERE THE LINEAGES MEET, ESSENCE CONVERGES", .{});
+  g.say(txt.s.msg.essence_converges, .{});
 }

@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
 const World = @import("../world/world.zig").World;
+const txt = @import("text.zig");
 
 /// seconds per full day/night cycle
 pub const DAY_LEN:f32 = 300;
@@ -57,8 +58,8 @@ pub const Sky = struct {
 
   pub fn name(s:*const Sky) []const u8 {
     const e = s.elevation();
-    if (@abs(e) < TWILIGHT_BAND) return if (s.tod < 0.5) "DAWN" else "DUSK";
-    return if (e > 0) "DAY" else "NIGHT";
+    if (@abs(e) < TWILIGHT_BAND) return if (s.tod < 0.5) txt.s.sky.dawn else txt.s.sky.dusk;
+    return if (e > 0) txt.s.sky.day else txt.s.sky.night;
   }
 };
 

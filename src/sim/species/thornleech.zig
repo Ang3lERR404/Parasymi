@@ -5,7 +5,7 @@ const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
-  .name = "THORNLEECH", .lineage = .parasitic, .seed = .seed_thornleech,
+  .lineage = .parasitic, .seed = .seed_thornleech,
   .mature_time = 8, .mana_cap = 14, .ley_draw = 1.0, .share = 0, .drain = 1.2, .yield = 0.22, .seed_time = 20,
   .genome = .{
     .form = .coil,

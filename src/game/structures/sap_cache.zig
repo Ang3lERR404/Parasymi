@@ -3,6 +3,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
@@ -11,7 +12,7 @@ const color = @import("../../core/color.zig");
 const Parts = @import("../parts.zig").Parts;
 const pod = @import("../../gfx/meshes/sap_cache.zig");
 
-pub const def:st.Def = .{ .name = "SAP CACHE", .item = .sap_cache, .size = 1, .mesh = .sap_cache, .sap = 0.3, .sway = 0.5, .tall = 0.9, .grow = 4 };
+pub const def:st.Def = .{ .item = .sap_cache, .size = 1, .mesh = .sap_cache, .sap = 0.3, .sway = 0.5, .tall = 0.9, .grow = 4 };
 
 /// effectively unlimited: conduits and diggers will always hand off to a cache
 const WANTS_MAX:u32 = 1 << 16;
@@ -64,5 +65,5 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 }
 
 pub fn describe(_:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
-  _ = try d.text(x, y, style.text_body, style.dim, "HOLDS ANYTHING. FEED (F), TAKE (SHIFT+F)");
+  _ = try d.text(x, y, style.text_body, style.dim, txt.s.describe.cache);
 }

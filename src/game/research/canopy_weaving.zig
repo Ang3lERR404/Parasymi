@@ -3,8 +3,6 @@ const prog = @import("../progression.zig");
 const species = @import("../../sim/species.zig");
 
 pub const def:prog.Research = .{
-  .name = "CANOPY WEAVING",
-  .desc = "WEAVE HOLLOWHEARTS: 2X2 MANA RESERVOIR TREES",
   .per_unit = &.{
     .{ .item = .essence, .n = 3 },
     .{ .item = .fibre, .n = 2 },

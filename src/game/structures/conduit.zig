@@ -8,6 +8,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const color = @import("../../core/color.zig");
 const style = @import("../style.zig");
@@ -18,7 +19,7 @@ const root = @import("../../gfx/meshes/conduit.zig");
 /// decision: a conduit grows (out from its middle to its edges) but does
 /// not sway: its root hugs the ground and joins the next conduit's, and a
 /// bend per conduit would split the joins along a chain
-pub const def:st.Def = .{ .name = "ROOT CONDUIT", .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true };
+pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true };
 
 /// tiles per second an item travels along conduits
 const SPEED:f32 = 2.5;
@@ -154,5 +155,5 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
-  _ = try d.print(x, y, style.text_body, style.white, "CARRIES {s}", .{if (s.state.conduit.held) |it| it.info().name else "NOTHING"});
+  _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.carries, .{if (s.state.conduit.held) |it| txt.item(it).name else txt.s.describe.nothing});
 }

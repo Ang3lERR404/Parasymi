@@ -7,6 +7,7 @@ const m = @import("../core/math.zig");
 const bufPrint = std.fmt.bufPrint;
 const Allocator = std.mem.Allocator;
 const font = @import("font.zig");
+const ctext = @import("../core/text.zig");
 const UV = @import("../gfx/vertex.zig").Ui;
 
 pub const Color = [4]u8;
@@ -79,9 +80,15 @@ pub const Draw = struct {
 
   pub fn width(str:[]const u8, s:f32) f32 { return m.f(str.len) * cell_w * s; }
 
-  pub fn print(d:*Draw, x:f32, y:f32, s:f32, col:Color, comptime fmt:[]const u8, args:anytype) Allocator.Error!f32 {
+  /// `tpl` is a runtime template (`core/text.zig`), truncated to 256 bytes.
+  pub fn print(d:*Draw, x:f32, y:f32, s:f32, col:Color, tpl:[]const u8, args:anytype) Allocator.Error!f32 {
     var buf:[256]u8 = undefined;
-    const str:[]const u8 = bufPrint(&buf, fmt, args) catch &buf;
-    return d.text(x, y, s, col, str);
+    return d.text(x, y, s, col, ctext.bufRender(&buf, tpl, args));
+  }
+
+  /// a bare count.
+  pub fn number(d:*Draw, x:f32, y:f32, s:f32, col:Color, n:anytype) Allocator.Error!f32 {
+    var buf:[24]u8 = undefined;
+    return d.text(x, y, s, col, bufPrint(&buf, "{d}", .{n}) catch &buf);
   }
 };

@@ -4,7 +4,7 @@ const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
-  .name = "LUMENROOT", .lineage = .symbiotic, .seed = .seed_lumenroot,
+  .lineage = .symbiotic, .seed = .seed_lumenroot,
   .mature_time = 12, .mana_cap = 10, .ley_draw = 0.6, .share = 0.8, .drain = 0, .yield = 0.12, .seed_time = 25,
   .genome = .{
     .stem_h = 0.75, .stem_r = 0.035, .segments = 7, .curl = 0, .wobble = 0.1,

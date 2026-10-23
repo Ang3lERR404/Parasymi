@@ -4,7 +4,6 @@ const prog = @import("../progression.zig");
 const species = @import("../../sim/species.zig");
 
 pub const def:prog.Research = .{
-  .name = "SEED SPLICING", .desc = "HARVEST VESPER SEEDS WHERE LINEAGES TOUCH",
   .per_unit = &.{
     .{.item = .essence, .n = 3},
     .{.item = .starlight, .n = 1},

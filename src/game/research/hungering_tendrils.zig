@@ -3,8 +3,6 @@ const prog = @import("../progression.zig");
 const ecology = @import("../../sim/ecology.zig");
 
 pub const def:prog.Research = .{
-  .name = "HUNGERING TENDRILS",
-  .desc = "PARASITES DRAIN X2",
   .per_unit = &.{
     .{ .item = .essence, .n = 2 },
     .{ .item = .grit, .n = 1 },

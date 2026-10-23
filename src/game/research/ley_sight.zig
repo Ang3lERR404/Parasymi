@@ -2,8 +2,6 @@
 const prog = @import("../progression.zig");
 
 pub const def:prog.Research = .{
-  .name = "LEY SIGHT",
-  .desc = "SEE THE LEY CURRENTS",
   .per_unit = &.{
     .{.item = .starlight, .n = 1}
   },

@@ -22,6 +22,7 @@ const craft = @import("craft.zig");
 const st = @import("structures.zig");
 const player_mod = @import("player.zig");
 const play = @import("play.zig");
+const txt = @import("text.zig");
 
 const Game = play.Game;
 const Belly = @FieldType(player_mod.Player, "inv");
@@ -204,7 +205,7 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
     const c = try g.world.ensure(n.at);
     c.res = n.res;
   }
-  g.prog.say("THE GARDEN REMEMBERS", .{});
+  g.prog.say(txt.s.msg.remembers, .{});
   return g;
 }
 

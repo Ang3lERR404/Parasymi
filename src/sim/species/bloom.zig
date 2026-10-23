@@ -9,7 +9,7 @@ const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
-  .name = "CELESTIAL BLOOM", .lineage = .symbiotic, .seed = .seed_bloom, .floating = true,
+  .lineage = .symbiotic, .seed = .seed_bloom, .floating = true,
   // no item, no output: it radiates instead (the sky feeds it, as it does
   // every floater; it never condenses essence or ripens seeds)
   .mature_time = 30, .mana_cap = 10, .ley_draw = 0.5, .share = 0, .drain = 0, .yield = 0, .seed_time = 1e9,

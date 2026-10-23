@@ -15,6 +15,7 @@ const species = @import("../sim/species.zig");
 const plants_mod = @import("../sim/plants.zig");
 const st = @import("structures.zig");
 const prog = @import("progression.zig");
+const txt = @import("text.zig");
 
 const Plants = plants_mod.Plants;
 const PlantId = plants_mod.Id;
@@ -69,7 +70,7 @@ pub const Seeker = struct {
     g.discover(.convergence);
     if (contained(p, a, b)) return false;
     const at = spot(w, p, p.extent(a), p.extent(b)) orelse {
-      if (!sk.cramped) g.say("THE LINEAGES STRAIN TOWARD EACH OTHER. CLEAR 2X2 GROUND BESIDE THEM", .{});
+      if (!sk.cramped) g.say(txt.s.msg.lineages_strain, .{});
       sk.cramped = true;
       return false;
     };
@@ -78,7 +79,7 @@ pub const Seeker = struct {
       .x = at[0], .y = at[1], .chunk = undefined, .tile = undefined, .sp = HYBRID,
       .seed = rng.unit(rng.hash2(0xC0F1, at[0], at[1])), .span = span,
     });
-    g.say("A CONFLUENCE TAKES ROOT WHERE THE LINEAGES MEET", .{});
+    g.say(txt.s.msg.confluence_roots, .{});
     return true;
   }
 };

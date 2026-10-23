@@ -6,7 +6,7 @@ const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
-  .name = "VESPER BLOOM", .lineage = .convergent, .seed = .seed_vesper,
+  .lineage = .convergent, .seed = .seed_vesper,
   .mature_time = 16, .mana_cap = 24, .ley_draw = 0.8, .share = 0.6, .drain = 0.8, .yield = 0.4, .seed_time = 45,
   // decision: the first plant that needs radiance (the brief names none)
   .needs_radiance = true,

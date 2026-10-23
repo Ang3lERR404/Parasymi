@@ -4,7 +4,7 @@
 Player-centric Factorio-like automation game: magically infused plants
 (parasitic + symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig
 (Vulkan 1.3), Windows, no asset files (every mesh, the font and all UI shapes
-are procedural). 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
+are procedural) except `parasymi.cfg`, the player-facing strings. 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
 free rotation in play; free inspection camera on Ctrl+F.
 
 ## Build
@@ -106,6 +106,15 @@ recipes (`game/craft.zig`) are plain data tables.
   vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
 - `WorldPush` is 176 bytes (limit checked at pipeline creation).
 - UI: organic, animated, no boxes; SDFs in `shaders/ui.frag`.
+- **Never hard-code strings**: every player-facing string (messages, HUD
+  labels, names/descriptions of items, plants, research, structures, tiles,
+  the window title) lives in `parasymi.cfg`, read once at startup by
+  `game/text.zig` (`txt.load` in main) and never again. Add a field to
+  `txt.Strings` and a line to the cfg; show it via `txt.s.*`/`txt.item(i)`.
+  Templates are runtime: `{0}`, `{1:.1}` (`core/text.zig`), passed to
+  `Progression.say` / `Draw.print`; lists are `a | b` (`txt.nth`). The test
+  build embeds the cfg and fails on a missing or unknown key. Not text:
+  file paths/magic, shader names, CLI flags, log/panic messages, reflection.
 - Edits: write to files, pass files to scripts; no inline heredocs.
 
 ## Zig 0.16 notes
