@@ -7,7 +7,7 @@ const pipeline = @import("../../gfx/pipeline.zig");
 const ctx = @import("../../gfx/ctx.zig");
 const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
-const pass = @import("../pass.zig");
+const pass = R.pass;
 const R = @import("../renderer.zig");
 
 pub const MAX = 1 << 17;

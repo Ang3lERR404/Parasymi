@@ -1,6 +1,6 @@
 //! frame orchestration: acquire, record every pass inside one dynamic
 //! rendering scope, submit, present. What gets drawn lives in the pass
-//! modules under `passes/` (see render/pass.zig); they record in the order
+//! modules under `passes/` (shape in `pass` below); they record in the order
 //! listed in `passes`. A new pass is one new file plus one line.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -22,8 +22,48 @@ const species = @import("../sim/species.zig");
 const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
 const terrain_mesh = @import("terrain_mesh.zig");
-const pass = @import("pass.zig");
 const Post = @import("post.zig").Post;
+const HDR_FORMAT = @import("post.zig").HDR_FORMAT;
+
+/// the shape of a render pass module (see passes/). Each pass declares
+///   desc:Desc                          its shaders, vertex layout and state
+///   Frame                              per-frame resources (optional)
+///   initFrame(c) Error!Frame / deinitFrame(*Frame, c)
+///                                      (Frame fields default to empty)
+///   record(r, *Frame, cmd, scene, stats) upload this frame's data, draw it
+/// Passes record in declaration order inside one dynamic-rendering scope.
+pub const pass = struct {
+  /// which push-constant block the pass uses.
+  pub const Layout = enum { world, ui };
+
+  pub const Desc = struct {
+    vert:[]const u8,
+    frag:[]const u8,
+    bindings:[]const vk.VertexInputBindingDescription,
+    attrs:[]const vk.VertexInputAttributeDescription,
+    layout:Layout = .world,
+    depth:bool = true,
+    blend:bool = false,
+    /// drawn onto the screen after the world (and its glow): the UI. World
+    /// passes draw into the HDR image the glow is taken from.
+    screen:bool = false,
+  };
+
+  pub const stages:vk.ShaderStageFlags = .{.vertex = true, .fragment = true};
+
+  pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, screen:vk.Format) ctx.Error!vk.Pipeline {
+    const vs = try c.shader(d.vert);
+    defer c.device.destroyShaderModule(vs, null);
+    const fs = try c.shader(d.frag);
+    defer c.device.destroyShaderModule(fs, null);
+    return pipeline.create(c, .{
+      .vert = vs, .frag = fs,
+      .bindings = d.bindings, .attrs = d.attrs,
+      .layout = layout, .color_format = if (d.screen) screen else HDR_FORMAT,
+      .depth = d.depth, .depth_attachment = !d.screen, .blend = d.blend, .cull = false,
+    });
+  }
+};
 
 const passes = struct {
   pub const sky = @import("passes/sky.zig");

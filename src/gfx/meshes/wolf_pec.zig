@@ -9,7 +9,7 @@
 //! Every vertex is part `.resin` with tu.y its height through the lobe (0 at
 //! the base on the chest, 1 at the crown): the shader thins the resin toward
 //! the surface and the rig's spring moves the crown while the base holds.
-//! Built once per side (`wolf_pec_l` / `wolf_pec_r`), mirrored, not flipped
+//! Built once per side (`left` / `right`), mirrored, not flipped
 //! by an instance, so normals and facing stay true.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -129,3 +129,7 @@ pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
     m.rotY(YAW_OUT), m.rotX(TILT_DOWN), m.rotZ(ROLL),
   }));
 }
+
+/// the two lobes, one library mesh each
+pub const left = struct { pub fn build(b:*mg.Builder) Allocator.Error!void { try lobe(b, -1); } };
+pub const right = struct { pub fn build(b:*mg.Builder) Allocator.Error!void { try lobe(b, 1); } };

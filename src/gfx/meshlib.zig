@@ -1,10 +1,11 @@
-//! catalogue of rigid procedural part meshes, one module each under
+//! catalogue of rigid procedural part meshes, one module (or a companion
+//! struct inside its owner's module) each under
 //! `meshes/` exposing `build(b)`. Each is built once at startup in its own
 //! local space; anything "made of parts" (the player, resource nodes, motes,
 //! structures) draws instances of these with a per-instance transform, so
 //! procedural animation is just transform math.
 //!
-//! A new mesh is one new file plus one line in `parts`.
+//! A new mesh is one new file (or struct) plus one line in `parts`.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const mg = @import("meshgen.zig");
@@ -18,8 +19,8 @@ const parts = struct {
   // drawn before the belly so the translucent sac blends over them
   pub const belly_lump = @import("meshes/belly_lump.zig");
   pub const wolf_belly = @import("meshes/wolf_belly.zig");
-  pub const wolf_pec_l = @import("meshes/wolf_pec_l.zig");
-  pub const wolf_pec_r = @import("meshes/wolf_pec_r.zig");
+  pub const wolf_pec_l = @import("meshes/wolf_pec.zig").left;
+  pub const wolf_pec_r = @import("meshes/wolf_pec.zig").right;
   pub const wolf_head = @import("meshes/wolf_head.zig");
   pub const wolf_ear = @import("meshes/wolf_ear.zig");
   pub const wolf_limb = @import("meshes/wolf_limb.zig");
@@ -28,8 +29,8 @@ const parts = struct {
   pub const wolf_deltoid = @import("meshes/wolf_deltoid.zig");
   pub const wolf_thigh = @import("meshes/wolf_thigh.zig");
   pub const wolf_calf = @import("meshes/wolf_calf.zig");
-  pub const wolf_rump_l = @import("meshes/wolf_rump_l.zig");
-  pub const wolf_rump_r = @import("meshes/wolf_rump_r.zig");
+  pub const wolf_rump_l = @import("meshes/wolf_rump.zig").left;
+  pub const wolf_rump_r = @import("meshes/wolf_rump.zig").right;
   pub const wolf_tailbone = @import("meshes/wolf_tailbone.zig");
   pub const wolf_tail = @import("meshes/wolf_tail.zig");
   pub const wolf_joint = @import("meshes/wolf_joint.zig");
@@ -37,7 +38,7 @@ const parts = struct {
   pub const wolf_foot = @import("meshes/wolf_foot.zig");
   // after the foot, so the translucent pads blend over its sole
   pub const paw_pad = @import("meshes/paw_pad.zig");
-  pub const paw_bean = @import("meshes/paw_bean.zig");
+  pub const paw_bean = @import("meshes/paw_pad.zig").bean;
   pub const leaf_tuft = @import("meshes/leaf_tuft.zig");
   // the world
   pub const node_grit = @import("meshes/node_grit.zig");
@@ -46,14 +47,14 @@ const parts = struct {
   pub const mote = @import("meshes/mote.zig");
   // structures
   pub const conduit = @import("meshes/conduit.zig");
-  pub const conduit_tap = @import("meshes/conduit_tap.zig");
+  pub const conduit_tap = @import("meshes/conduit.zig").tap;
   pub const sap_cache = @import("meshes/sap_cache.zig");
   pub const germinator = @import("meshes/germinator.zig");
   pub const research_bloom = @import("meshes/research_bloom.zig");
-  pub const research_orb = @import("meshes/research_orb.zig");
+  pub const research_orb = @import("meshes/research_bloom.zig").orb;
   pub const item_pod = @import("meshes/item_pod.zig");
   pub const root_digger = @import("meshes/root_digger.zig");
-  pub const digger_root = @import("meshes/digger_root.zig");
+  pub const digger_root = @import("meshes/root_digger.zig").root;
   // translucent, over everything
   pub const bloom_thread = @import("meshes/bloom_thread.zig");
 };

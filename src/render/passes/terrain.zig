@@ -2,7 +2,7 @@
 const vk = @import("vulkan");
 const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
-const pass = @import("../pass.zig");
+const pass = R.pass;
 const R = @import("../renderer.zig");
 const m = @import("../../core/math.zig");
 

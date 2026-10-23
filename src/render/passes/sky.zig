@@ -1,7 +1,7 @@
 //! sky: the dome behind everything, drawn first as one full-screen triangle
 //! without depth (the world draws over it). No vertex data.
 const vk = @import("vulkan");
-const pass = @import("../pass.zig");
+const pass = R.pass;
 const R = @import("../renderer.zig");
 
 pub const desc:pass.Desc = .{

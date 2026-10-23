@@ -1,8 +1,8 @@
 //! the wolf's rear: one lobe per side, a plump knotted ball of dense vine
 //! with small sap nodes at the hip joint and along its lower edge. The two
 //! press together at the centre line, reading as one form split down the
-//! middle, and hang below the hip joints. Built per side (`wolf_rump_l`,
-//! `wolf_rump_r`) rather than mirrored, so winding and lighting stay correct.
+//! middle, and hang below the hip joints. Built per side (`left`,
+//! `right`) rather than mirrored, so winding and lighting stay correct.
 //! Origin at the lobe's centre; +X outward for the right lobe, +Z forward.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -36,3 +36,7 @@ pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
     try mg.ellipsoid(b, .{.center = n * radii * v3(side, 1, 1), .radii = m.splat3(r), .col = pal.sap, .part = .bloom, .rings = 5, .segs = 7, .t = 0.3});
   }
 }
+
+/// the two lobes, one library mesh each
+pub const left = struct { pub fn build(b:*mg.Builder) Allocator.Error!void { try lobe(b, -1); } };
+pub const right = struct { pub fn build(b:*mg.Builder) Allocator.Error!void { try lobe(b, 1); } };
