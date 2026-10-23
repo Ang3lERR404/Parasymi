@@ -36,7 +36,7 @@ pub const Pass = reg.Id;
 
 pub const FRAMES = 2;
 /// every grown plant mesh: each species in each of its variants.
-pub const PLANT_MESHES = species.count * meshgen.VARIANTS;
+pub const PLANT_MESHES = species.count * meshgen.MAX_VARIANTS;
 
 /// the renderer fails the way the graphics layer does.
 pub const Error = ctx.Error;
@@ -100,7 +100,11 @@ pub const Renderer = struct {
   free_slots:std.ArrayList(ck.MeshSlot) = .empty,
   /// every built-once mesh (plant species + part library) in one buffer.
   meshes:Buffer = .{},
-  plant_ranges:[PLANT_MESHES][2]u32 = undefined,
+  /// (first vertex, count) per plant slot; slots a species does not use are empty
+  plant_ranges:[PLANT_MESHES][2]u32 = @splat(.{0, 0}),
+  /// per plant slot, the byte offset from its mesh to the next growth key's
+  /// (the plant shader blends toward it); 0 where a species has no keys
+  plant_morph:[PLANT_MESHES]u64 = @splat(0),
   part_ranges:[meshlib.count][2]u32 = undefined,
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   /// buffers retired since the last frame began; any frame still in flight
@@ -157,11 +161,22 @@ pub const Renderer = struct {
     var arena = ArenaAllocator.init(r.gpa);
     defer arena.deinit();
     var b:meshgen.Builder = .{.gpa = arena.allocator()};
-    for (species.ids) |id| for (0..meshgen.VARIANTS) |v| {
-      const first:u32 = @intCast(b.v.items.len);
-      try meshgen.plant(&b, id, @intCast(v));
-      r.plant_ranges[meshgen.plantSlot(id, @intCast(v))] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
-    };
+    for (species.ids) |id| {
+      const n = meshgen.variants(id);
+      for (0..n) |v| {
+        const first:u32 = @intCast(b.v.items.len);
+        try meshgen.plant(&b, id, @intCast(v));
+        r.plant_ranges[meshgen.plantSlot(id, @intCast(v))] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
+      }
+      // growth keys blend vertex for vertex into the next key
+      if (meshgen.growthKey(id, 0) == null) continue;
+      for (0..n - 1) |v| {
+        const a = r.plant_ranges[meshgen.plantSlot(id, @intCast(v))];
+        const z = r.plant_ranges[meshgen.plantSlot(id, @intCast(v + 1))];
+        if (a[1] != z[1]) @panic("growth keys differ in vertex count");
+        r.plant_morph[meshgen.plantSlot(id, @intCast(v))] = @as(u64, z[0] - a[0]) * @sizeOf(vertex.Mesh);
+      }
+    }
     try meshlib.build(&b, &r.part_ranges);
     const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});

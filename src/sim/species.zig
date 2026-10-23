@@ -87,8 +87,8 @@ pub const Species = struct {
   contain:u8 = 0,
   /// wind sway amplitude relative to other plants.
   sway:f32 = 1,
-  /// growth stages, when its mesh variants are these stages in order instead
-  /// of shapes picked by tile.
+  /// names of its growth stages, shown on hover (the mesh itself grows
+  /// continuously; see meshgen `KEYS`).
   stages:?[4][]const u8 = null,
 
   /// which stage a plant at `growth` shows (0 when unstaged).

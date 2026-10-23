@@ -12,6 +12,10 @@ layout(location = 4) in uint part;  // 0 stem 1 leaf 2 bloom 3 thorn 4 tendril
 layout(location = 5) in vec3 ipos;
 layout(location = 6) in vec4 ia;    // growth, mana fill, seed, affinity
 layout(location = 7) in vec4 ib;    // flow, health, sway amplitude, form (0 herb, 1 confluence)
+layout(location = 8) in vec4 ic;    // blend toward the next growth key
+// the same vertex in the next growth key (equals pos/nrm for keyless plants)
+layout(location = 9) in vec3 pos_next;
+layout(location = 10) in vec3 nrm_next;
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -34,13 +38,16 @@ void main() {
   float growth = ia.x, fill = ia.y, seed = ia.z, aff = ia.w;
   float flow = ib.x, health = ib.y, sway = ib.z;
   bool confluence = ib.w > 0.5;
-  vec3 p = pos;
-  vec3 n = nrm;
+  // a confluence blends between the growth keys around its growth, so it
+  // grows smoothly instead of stepping from one shape to the next
+  vec3 p = mix(pos, pos_next, ic.x);
+  vec3 n = normalize(mix(nrm, nrm_next, ic.x));
 
   // growth: whole-plant scale, then leaves/petals unfurl as it matures
   float g = smoothstep(0.0, 1.0, growth);
   float open = part == 2u ? smoothstep(0.75, 1.0, growth) : smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth);
-  if (part == 1u || part == 2u) p.xz *= mix(0.25, 1.0, open);
+  // (a confluence's canopy opens in its growth keys instead, on its leader)
+  if ((part == 1u || part == 2u) && !confluence) p.xz *= mix(0.25, 1.0, open);
 
   // symbiotic breathing: slow, shared rhythm
   if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.07 * aff * sin(t * 1.6 + seed * 6.28);
@@ -69,8 +76,8 @@ void main() {
   float yaw = seed * 6.2831;
   p.xz = rot(yaw) * p.xz;
   n.xz = rot(yaw) * n.xz;
-  // a confluence's stage meshes already carry its size
-  float s = mix(confluence ? 0.6 : 0.12, 1.0, g) * (0.85 + 0.3 * fract(seed * 7.13));
+  // a confluence's growth keys already carry its size
+  float s = (confluence ? 1.0 : mix(0.12, 1.0, g)) * (0.85 + 0.3 * fract(seed * 7.13));
   vec3 wp = ipos + p * s;
 
   v_pos = wp;

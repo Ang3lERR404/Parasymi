@@ -427,14 +427,15 @@ pub fn bundle(b:*Builder, comptime profile:fn (f32) f32, strands:u32, twist:f32,
 
 /// grow one of a species' mesh variants from its genome. Deterministic per
 /// (species, variant): the stem and tendrils are grown vines, so every
-/// variant leans, wobbles and curls a little differently.
+/// variant leans, wobbles and curls a little differently. A confluence's
+/// variants are instead its growth keys (see `KEYS`).
 pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
   const g = species.get(id).genome;
   const seed = @as(u64, @intFromEnum(id)) * 977 + 77;
   switch (g.form) {
     .herb => try herb(b, g, seed + @as(u64, variant) * 131, variant),
-    // a confluence's variants are its growth stages, all grown from one seed
-    .confluence => try confluence(b, g, seed, variant),
+    // a confluence's variants are its growth keys, all grown from one seed
+    .confluence => try confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
   }
 }
 
@@ -501,48 +502,77 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!voi
 
 /// tu.x where the confluence's braid gives way to its vines.
 const FRAY = 0.55;
-/// control points over which a vine peels off its braid strand.
+/// control points over which a vine peels off the line of its strand.
 const PEEL = 4;
+/// growth keys a confluence is built at, evenly from sprout (0) to bloom (1).
+/// Every key has the same vertices in the same order, so the plant shader
+/// blends between the two around a plant's growth: it grows, never jumps.
+pub const KEYS = 8;
 
-/// the confluence at growth `stage` (0..3): a symbiotic braid below whose
-/// strands peel away, over `PEEL` control points, into parasitic vines that
-/// reach up and out, green blending to red along them. The leader returns to
-/// the axis and, at the last stage, opens into a canopy of sap petals.
-fn confluence(b:*Builder, g:species.Genome, seed:u64, stage:u32) Allocator.Error!void {
-  comptime assert(VARIANTS == 4);
-  const rise = ([4]f32{0.4, 0.7, 1, 1})[stage];
-  const reach = ([4]f32{0, 0.45, 1, 1})[stage];
+/// how each part of a confluence has come along at `growth` (0..1)
+const Grown = struct {
+  /// the braid's height and girth
+  rise:f32,
+  /// the vines' length
+  reach:f32,
+  /// the canopy's petals
+  bloom:f32,
+
+  fn at(growth:f32) Grown {
+    return .{
+      .rise = m.lerp(0.3, 1, m.smooth(m.clamp01(growth / 0.5))),
+      .reach = m.smooth(m.clamp01((growth - 0.15) / 0.6)),
+      .bloom = m.smooth(m.clamp01((growth - 0.72) / 0.28)),
+    };
+  }
+};
+
+/// the confluence at `growth` (0..1): a symbiotic braid below whose strands
+/// gather at its crown and carry on, each as one unbroken tube, into a
+/// parasitic vine reaching up and out, green blending to red along it. The
+/// leader returns to the axis and opens into a canopy of sap petals.
+/// Nothing appears or vanishes with growth (a part not yet grown is folded
+/// to nothing), so every growth gives the same vertex layout.
+fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Error!void {
+  const gr = Grown.at(growth);
   var rng = Rng.init(seed);
   const core = color.shade(g.stem_col, 0.55);
   const strand = color.shade(g.stem_col, 1.3);
   const orange = color.rgb(g.leaf_col.r * 1.2, g.leaf_col.g * 1.9, g.leaf_col.b * 1.1).toRgba8(255);
   const red = g.leaf_col.toRgba8(255);
 
-  // the braid: dense symbiotic weave, flaring into the ground
+  // the braid: dense symbiotic weave, flaring into the ground and gathering
+  // at its crown, where the strands leave it
   const RES = 24;
   const STRANDS = 7;
   const TWIST:f32 = 3;
+  const WOBBLE:f32 = 0.04;
   const trunk_h = g.stem_h * FRAY;
   const lean = m.norm(m.v3(rng.range(-0.05, 0.05), 1, rng.range(-0.05, 0.05)));
   var ctrl:[8]V3 = undefined;
-  growthPath(.{.start = m.v3(0, 0, 0), .direction = lean, .length = trunk_h * rise, .wobble = g.wobble, .curl = g.curl, .seed = seed ^ 0x57E4}, &ctrl);
+  growthPath(.{.start = m.v3(0, 0, 0), .direction = lean, .length = trunk_h * gr.rise, .wobble = g.wobble, .curl = g.curl, .seed = seed ^ 0x57E4}, &ctrl);
   var spine:[RES]V3 = undefined;
   m.splineResample(&ctrl, &spine);
   var ts:[RES]f32 = undefined;
   var radii:[RES]f32 = undefined;
-  for (&ts, &radii, 0..) |*t, *r, i| {
+  var core_r:[RES]f32 = undefined;
+  for (&ts, &radii, &core_r, 0..) |*t, *r, *cr, i| {
     const k = m.ratio(i, RES - 1);
-    t.* = k * FRAY * rise;
+    t.* = k * FRAY * gr.rise;
     const flare = 1 - k;
-    r.* = g.stem_r * (0.7 + 0.3 * rise) * m.lerp(1, 0.75, k) * (1 + 0.6 * flare * flare * flare * flare);
+    const crown = m.smooth(m.clamp01((k - 0.8) / 0.2));
+    r.* = g.stem_r * (0.7 + 0.3 * gr.rise) * m.lerp(1, 0.75, k) * (1 + 0.6 * flare * flare * flare * flare) * m.lerp(1, 0.55, crown);
+    // the core closes over at the crown instead of ending in a flat cut
+    cr.* = r.* * 0.72 * (1 - 0.85 * m.smooth(m.clamp01((k - 0.85) / 0.15)));
   }
-  try braid(b, &spine, &ts, &radii, STRANDS, TWIST, 0.04, seed, core, strand);
+  try b.tubeR(&spine, &ts, &core_r, core, .stem, 8);
 
   // buttress roots splay toward the corners of the footprint
   for (0..4) |i| {
     const a = (m.f(i) + 0.5) / 4 * m.tau + rng.range(-0.2, 0.2);
-    const from = m.v3(0, trunk_h * rise * 0.18, 0);
-    const to = m.v3(@cos(a) * 0.75 * (0.6 + 0.4 * rise), -0.02, @sin(a) * 0.75 * (0.6 + 0.4 * rise));
+    const from = m.v3(0, trunk_h * gr.rise * 0.18, 0);
+    const spread = 0.75 * (0.6 + 0.4 * gr.rise);
+    const to = m.v3(@cos(a) * spread, -0.02, @sin(a) * spread);
     var rc:[6]V3 = undefined;
     growthPath(.{.start = from, .direction = m.norm(to - from), .length = m.len(to - from), .wobble = 0.15, .seed = seed +% i * 53}, &rc);
     var rs:[12]V3 = undefined;
@@ -557,96 +587,127 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, stage:u32) Allocator.Error
     try braid(b, &rs, &rt, &rr, 3, 2, 0.05, seed +% i * 7, core, strand);
   }
 
-  if (stage == 0) return;
-
-  // vines: each strand's path along the top of the braid, then free
+  // each strand: wound around the core up the braid (as `braidTurned` winds
+  // them), then on past the crown as its vine, one tube from root to tip
   var fn_:[RES]V3 = undefined;
   var fb:[RES]V3 = undefined;
   transport(&spine, &fn_, &fb);
   const top = spine[RES - 1];
-  const up = m.norm(spine[RES - 1] - spine[RES - 2]);
-  const VC = 12;
+  const VC = 10;
   const VR = 28;
+  const N = RES + VR - 1;
   var leader_tip = top;
   for (0..STRANDS) |si| {
+    var path:[N]V3 = undefined;
+    var pt:[N]f32 = undefined;
+    var pu:[N]f32 = undefined;
+    var pr:[N]f32 = undefined;
+    var cols:[N]color.Rgba8 = undefined;
     const a0 = m.ratio(si, STRANDS) * m.tau;
-    var vc:[VC]V3 = undefined;
-    for (vc[0..PEEL], 0..) |*p, j| p.* = strandAt(&spine, &fn_, &fb, &radii, a0, TWIST, m.lerp(0.5, 1, m.ratio(j, PEEL - 1)));
-    const root = vc[PEEL - 1];
+    const sd = seed +% si * 7919;
+    for (0..RES) |i| {
+      const u = m.ratio(i, RES - 1);
+      const a = a0 + u * TWIST + WOBBLE * 4 * noise.grad(sd, u * 3, 0.5);
+      const off = radii[i] * 0.8 * (1 + WOBBLE * 3 * noise.grad(sd, u * 3, 7.5));
+      path[i] = spine[i] + (fn_[i] * m.splat3(@cos(a)) + fb[i] * m.splat3(@sin(a))) * m.splat3(off);
+      pt[i] = ts[i];
+      pu[i] = 0;
+      pr[i] = radii[i] * 0.26;
+      cols[i] = strand;
+    }
+    const root = path[RES - 1];
+    const along = m.norm(root - path[RES - 2]);
     // the leader climbs back over the axis; the rest reach up and out
     const leader = si == 0;
+    const e = rng.range(0.5, 1.0);
+    const span = (g.stem_h - trunk_h) * rng.range(0.8, 1.05);
     const target = if (leader)
-      top + m.v3(0, (g.stem_h - trunk_h) * reach, 0)
+      top + m.v3(0, (g.stem_h - trunk_h) * gr.reach, 0)
     else blk: {
       const out = m.norm(m.v3(root[0] - top[0], 0, root[2] - top[2]));
-      const e = rng.range(0.5, 1.0);
-      const len = (g.stem_h - trunk_h) * rng.range(0.8, 1.05) * reach;
-      break :blk root + (out * m.splat3(@cos(e)) + m.v3(0, @sin(e), 0)) * m.splat3(len);
+      break :blk root + (out * m.splat3(@cos(e)) + m.v3(0, @sin(e), 0)) * m.splat3(span * gr.reach);
     };
-    var free:[VC - PEEL + 1]V3 = undefined;
+    // a vine not yet grown is a bud at the strand's end, never nothing
+    const to = target - root;
+    const len = @max(m.len(to), 0.004);
+    const dir = if (m.len(to) > 1e-4) m.norm(to) else along;
+    var vc:[VC]V3 = undefined;
     growthPath(.{
-      .start = root, .direction = m.norm(target - root), .length = m.len(target - root),
+      .start = root, .direction = dir, .length = len,
       .wobble = g.tendril_wobble, .curl = g.tendril_curl, .seed = seed +% si * 31,
-    }, &free);
-    // over the next PEEL control points the vine leaves the braid's axis
-    // for its own path
-    for (free[1..], PEEL..) |p, j| {
-      const w = m.smooth(@min(1, m.ratio(j - PEEL + 1, PEEL)));
-      const hug = root + up * m.splat3(m.len(p - root));
-      vc[j] = hug + (p - hug) * m.splat3(w);
+    }, &vc);
+    // over the first PEEL control points the vine leaves the line the
+    // strand was on for its own path
+    for (vc[1..], 1..) |*p, j| {
+      const w = m.smooth(@min(1, m.ratio(j, PEEL)));
+      const hug = root + along * m.splat3(m.len(p.* - root));
+      p.* = hug + (p.* - hug) * m.splat3(w);
     }
-    var path:[VR]V3 = undefined;
-    m.splineResample(&vc, &path);
-    var vt:[VR]f32 = undefined;
-    var vu:[VR]f32 = undefined;
-    var vr:[VR]f32 = undefined;
-    var cols:[VR]color.Rgba8 = undefined;
-    const r0 = g.stem_r * (if (leader) @as(f32, 0.36) else 0.28);
-    for (0..VR) |i| {
-      const k = m.ratio(i, VR - 1);
-      vt[i] = m.lerp(FRAY * rise * 0.9, if (leader) 1 else 0.92, k);
-      vu[i] = k;
-      vr[i] = r0 * m.lerp(1, 0.25, k);
+    var vp:[VR]V3 = undefined;
+    m.splineResample(&vc, &vp);
+    const body = g.stem_r * (if (leader) @as(f32, 0.36) else 0.28) * m.lerp(0.3, 1, gr.reach);
+    const t0 = ts[RES - 1];
+    const t1 = m.lerp(t0, if (leader) @as(f32, 1) else 0.92, gr.reach);
+    // vp[0] is the strand's last point: the vine starts one ring on
+    for (1..VR) |j| {
+      const k = m.ratio(j, VR - 1);
+      const at = RES - 1 + j;
+      path[at] = vp[j];
+      pt[at] = m.lerp(t0, t1, k);
+      pu[at] = k;
+      // the strand swells into the vine, then tapers to its tip
+      pr[at] = @max(m.lerp(pr[RES - 1], body, m.smooth(@min(1, k / 0.15))) * m.lerp(1, 0.25, k), 1e-3);
       // the transition zone: a gradient, never a line
       const warm = color.mix(strand, orange, m.smooth(m.clamp01((k - 0.12) / 0.4)));
-      cols[i] = color.mix(warm, red, m.smooth(m.clamp01((k - 0.45) / 0.45)));
+      cols[at] = color.mix(warm, red, m.smooth(m.clamp01((k - 0.45) / 0.45)));
     }
-    try b.tubeC(&path, &vt, &vr, &cols, &vu, .tendril, 6);
-    if (leader) leader_tip = path[VR - 1];
+    try b.tubeC(&path, &pt, &pr, &cols, &pu, .tendril, 6);
+    if (leader) leader_tip = path[N - 1];
   }
 
-  if (stage < 3) return;
-
-  // the canopy: translucent sap petals, violet at the heart, amber at the rim
+  // the canopy: translucent sap petals, violet at the heart, amber at the
+  // rim, folded small inside the leader's tip until it blooms
+  const open = @max(gr.bloom, 0.02);
   const heart = color.shade(g.bloom_col, 0.8);
   const rim = color.rgb(0.82, 0.6, 1.0).toRgba8(255);
   for (0..g.petals) |i| {
     const a = m.ratio(i, g.petals) * m.tau;
-    try b.blade(leader_tip, m.v3(@cos(a), 0, @sin(a)), g.bloom_r, g.bloom_r * 0.42, -0.35, heart, rim, 1, .bloom);
+    try b.blade(leader_tip, m.v3(@cos(a), 0, @sin(a)), g.bloom_r * open, g.bloom_r * 0.42 * open, -0.35, heart, rim, 1, .bloom);
   }
   for (0..6) |i| {
     const a = (m.f(i) + 0.5) / 6 * m.tau;
-    try b.blade(leader_tip, m.norm(m.v3(@cos(a), 0.9, @sin(a))), g.bloom_r * 0.6, g.bloom_r * 0.3, -0.2, heart, rim, 1, .bloom);
+    try b.blade(leader_tip, m.norm(m.v3(@cos(a), 0.9, @sin(a))), g.bloom_r * 0.6 * open, g.bloom_r * 0.3 * open, -0.2, heart, rim, 1, .bloom);
   }
 }
 
-/// where braid strand `a0` (see `braidTurned`, ignoring its noise) lies at
-/// fraction `k` up `spine`.
-fn strandAt(spine:[]const V3, fn_:[]const V3, fb:[]const V3, radii:[]const f32, a0:f32, twist:f32, k:f32) V3 {
-  const n = spine.len;
-  const fi = k * m.f(n - 1);
-  const lo:usize = @min(n - 2, @as(usize, @intFromFloat(fi)));
-  const t = fi - m.f(lo);
-  const at = struct {
-    fn v(xs:[]const V3, i:usize, w:f32) V3 { return xs[i] + (xs[i + 1] - xs[i]) * m.splat3(w); }
+/// how many meshes a species is built as: shapes picked by tile, or for a
+/// confluence its growth keys.
+pub fn variants(id:species.Id) u32 {
+  return switch (species.get(id).genome.form) {
+    .herb => VARIANTS,
+    .confluence => KEYS,
   };
-  const a = a0 + k * twist;
-  const off = m.lerp(radii[lo], radii[lo + 1], t) * 0.8;
-  return at.v(spine, lo, t) + (at.v(fn_, lo, t) * m.splat3(@cos(a)) + at.v(fb, lo, t) * m.splat3(@sin(a))) * m.splat3(off);
 }
 
+/// for a species grown through keys, the key below `growth` and how far
+/// toward the next one it is; null for a species of fixed shapes.
+pub const Key = struct { v:u32, f:f32 };
+pub fn growthKey(id:species.Id, growth:f32) ?Key {
+  switch (species.get(id).genome.form) {
+    .herb => return null,
+    .confluence => {
+      const x = m.clamp01(growth) * (KEYS - 1);
+      const v = @min(m.floorTo(u32, x), KEYS - 2);
+      return .{.v = v, .f = x - m.f(v)};
+    },
+  }
+}
+
+/// slots per species in per-variant tables (the most any species uses).
+pub const MAX_VARIANTS = @max(VARIANTS, KEYS);
+
 /// where a (species, variant) mesh sits in per-variant tables.
-pub fn plantSlot(id:species.Id, variant:u32) usize { return @as(usize, @intFromEnum(id)) * VARIANTS + variant; }
+pub fn plantSlot(id:species.Id, variant:u32) usize { return @as(usize, @intFromEnum(id)) * MAX_VARIANTS + variant; }
 
 test "grown vines keep their root and regrow identically" {
   const g:Growth = .{.start = m.v3(1, 0, 2), .direction = m.v3(0, 1, 0), .length = 1, .wobble = 0.2, .curl = 0.4, .seed = 9};
@@ -658,4 +719,26 @@ test "grown vines keep their root and regrow identically" {
   for (a, b) |x, y| try std.testing.expectEqual(x, y);
   // it still grows along its direction, roughly its length
   try std.testing.expect(@abs(a[7][1] - 1) < 0.1);
+}
+
+test "a confluence's growth keys share one vertex layout and grow taller" {
+  var b:Builder = .{.gpa = std.testing.allocator};
+  defer b.deinit();
+  var counts:[KEYS]usize = undefined;
+  var tops:[KEYS]f32 = undefined;
+  for (0..KEYS) |v| {
+    b.v.clearRetainingCapacity();
+    try plant(&b, .confluence, @intCast(v));
+    counts[v] = b.v.items.len;
+    var hi:f32 = 0;
+    for (b.v.items) |x| hi = @max(hi, x.pos[1]);
+    tops[v] = hi;
+  }
+  for (counts[1..]) |c| try std.testing.expectEqual(counts[0], c);
+  for (tops[1..], tops[0 .. KEYS - 1]) |t, prev| try std.testing.expect(t >= prev);
+  // keys cover growth end to end; between keys the blend is the fraction
+  try std.testing.expectEqual(Key{.v = 0, .f = 0}, growthKey(.confluence, 0).?);
+  const end = growthKey(.confluence, 1).?;
+  try std.testing.expect(end.v == KEYS - 2 and end.f == 1);
+  try std.testing.expect(growthKey(.lumenroot, 0.5) == null);
 }

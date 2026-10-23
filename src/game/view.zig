@@ -73,14 +73,17 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     var y = s.items(.chunk)[i].height[s.items(.tile)[i]];
     // floaters drift above whatever is beneath them
     if (def.floating) y = @max(y, 0) + 1.15 + 0.12 * @sin(tf * 1.3 + s.items(.seed)[i] * 10);
-    // a staged species grows through its variants; others pick one by tile
+    // a confluence grows through its keys, blending from one to the next;
+    // other plants pick a shape by tile
     const growth = s.items(.growth)[i];
-    const variant:u32 = if (def.stages != null) def.stage(growth)
-      else @intCast(rng.hash2(0x7A11, s.items(.x)[i], s.items(.y)[i]) % meshgen.VARIANTS);
-    try g.inst[meshgen.plantSlot(sp, variant)].append(g.gpa, .{
+    const key = meshgen.growthKey(sp, growth) orelse meshgen.Key{
+      .v = @intCast(rng.hash2(0x7A11, s.items(.x)[i], s.items(.y)[i]) % meshgen.VARIANTS), .f = 0,
+    };
+    try g.inst[meshgen.plantSlot(sp, key.v)].append(g.gpa, .{
       .pos = .{ctr[0], y, ctr[1]},
       .a = .{growth, s.items(.mana)[i] / def.mana_cap, s.items(.seed)[i], def.lineage.affinity()},
       .b = .{s.items(.flow)[i], s.items(.health)[i], def.sway, m.f(@intFromEnum(def.genome.form))},
+      .c = .{key.f, 0, 0, 0},
     });
   }
 }

@@ -145,9 +145,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
   tile), vertex-shader sway. Parasitic: desaturated reds/oranges. Symbiotic:
   greens/teals.
-- Confluence: stage meshes (variants = growth stages); teal braid peeling
-  over 4 control points into red vines (vertex-colour gradient, ±10° hue
-  drift in the zone); leader crowned by translucent violet petals with amber
+- Confluence: 8 growth keys with one vertex layout, blended per vertex in
+  plant.vert (binding 2 reads the next key), so it grows without stepping;
+  each braid strand gathers at the crown and runs on as its red vine in one
+  tube (vertex-colour gradient, ±10° hue drift in the zone); leader crowned by translucent violet petals with amber
   fresnel (plants pass blends; only these petals have alpha < 1). Sway ×1.5.
 - Sky: gradient dome pass (fog colour at the horizon), sun/moon, stars,
   starlight motes. Low pitch widens the view and lifts it toward the horizon.

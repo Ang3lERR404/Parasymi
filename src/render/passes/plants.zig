@@ -14,8 +14,10 @@ pub const MAX = 1 << 16;
 
 pub const desc:pass.Desc = .{
   .vert = "plant.vert", .frag = "plant.frag",
-  .bindings = &.{pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PlantInstance, 1, .instance)},
-  .attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5)),
+  // binding 2: the same mesh buffer, offset to the next growth key, so a
+  // confluence blends toward it (see Renderer.plant_morph)
+  .bindings = &.{pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PlantInstance, 1, .instance), pipeline.binding(vertex.Mesh, 2, .vertex)},
+  .attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5) ++ pipeline.attrs(vertex.MeshPose, 2, 9)),
   // decision: blending on for the confluence's translucent petals; every
   // other plant fragment is opaque (alpha 1), so they are unchanged. The
   // confluence is the last species, so its petals blend over every plant.
@@ -46,6 +48,7 @@ pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R
   cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf}, &.{0, 0});
   for (0..R.PLANT_MESHES) |i| {
     if (counts[i] == 0) continue;
+    cmd.bindVertexBuffers(2, &.{r.meshes.buf}, &.{r.plant_morph[i]});
     cmd.draw(r.plant_ranges[i][1], counts[i], r.plant_ranges[i][0], first[i]);
     stats.draws += 1;
   }

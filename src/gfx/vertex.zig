@@ -27,12 +27,25 @@ pub const Mesh = extern struct {
   part:u32,
 };
 
+/// the leading fields of `Mesh`, read from a second growth key of the same
+/// mesh buffer (same stride) so a plant can blend between keys.
+pub const MeshPose = extern struct {
+  pos:[3]f32,
+  nrm:[3]f32,
+};
+comptime {
+  if (@offsetOf(MeshPose, "pos") != @offsetOf(Mesh, "pos") or @offsetOf(MeshPose, "nrm") != @offsetOf(Mesh, "nrm"))
+    @compileError("MeshPose must mirror the start of Mesh");
+}
+
 pub const PlantInstance = extern struct {
   pos:[3]f32,
   /// growth 0..1, mana fill 0..1, seed 0..1, lineage affinity -1..1
   a:[4]f32,
   /// flow, health, sway amplitude, genome form (species.Form)
   b:[4]f32,
+  /// x: blend toward the next growth key (0..1); y, z, w unused
+  c:[4]f32 = .{0, 0, 0, 0},
 };
 
 /// a rigid procedural part (creature limb, resource node, mote, structure piece).
