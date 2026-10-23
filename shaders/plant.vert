@@ -20,7 +20,9 @@ layout(location = 10) in vec3 nrm_next;
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
 layout(location = 2) out vec3 v_col;
-layout(location = 3) out float v_glow;
+layout(location = 3) out vec2 v_sap;          // mana fill 0..1, sap moving through (pulse) 0..1
+layout(location = 6) out float v_t;           // height along the plant (fibre direction)
+layout(location = 7) out float v_young;       // 0 old, dense growth .. 1 newest, thinnest
 layout(location = 4) flat out vec4 v_inst; // affinity, seed, health, part
 layout(location = 5) flat out float v_form;
 
@@ -89,8 +91,13 @@ void main() {
     v_col = max(hueShift(v_col, radians(10.0) * zone * sin(t * 0.5 + seed * 6.28 + tu.y * 3.0)), 0.0);
   }
   v_form = ib.w;
-  float bloomy = part == 2u ? 1.0 : (part == 1u ? 0.25 : 0.1);
-  v_glow = (fill * bloomy + flow * 0.4) * (0.6 + 0.4 * sin(t * 3.0 + seed * 12.0 + h * 4.0)) * mix(0.3, 1.0, g);
+  // sap moving through the plant travels up it as a slow pulse
+  v_sap = vec2(fill, clamp(flow, 0.0, 1.0) * (0.5 + 0.5 * sin(t * 2.0 - h * 6.0 + seed * 12.0)));
+  v_t = h;
+  // growth read: what grew last (near the growing front, and toward the
+  // tips once grown) is thinner and more translucent than the old base
+  v_young = clamp((h - growth + 0.55) / 0.55, 0.0, 1.0);
+  if (part == 1u || part == 2u) v_young = max(v_young, 0.5);
   v_inst = vec4(aff, seed, health, float(part));
   gl_Position = pc.vp * vec4(wp, 1.0);
 }

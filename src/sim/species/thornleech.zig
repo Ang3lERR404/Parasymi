@@ -10,6 +10,6 @@ pub const def:species.Species = .{
     .stem_h = 0.55, .stem_r = 0.05, .segments = 6, .curl = 0.2, .wobble = 0.15,
     .leaves = 3, .leaf_len = 0.22, .leaf_w = 0.06, .leaf_droop = 0.8,
     .petals = 4, .bloom_r = 0.09, .thorns = 10, .tendrils = 4, .tendril_curl = 0.4, .tendril_wobble = 0.2,
-    .stem_col = color.rgb(0.35, 0.12, 0.22), .leaf_col = color.rgb(0.55, 0.15, 0.35), .bloom_col = color.rgb(1.0, 0.25, 0.45),
+    .stem_col = color.rgb(0.56, 0.54, 0.62), .leaf_col = color.rgb(0.70, 0.70, 0.80), .bloom_col = color.rgb(0.62, 0.84, 0.92),
   },
 };

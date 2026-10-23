@@ -144,8 +144,13 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Terrain: flat, biome-tinted tiles, one directional + ambient, flat shading.
   Fog closes in before the drawn edge; contact shadows under the wolf's feet.
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
-  tile), vertex-shader sway. Parasitic: desaturated reds/oranges. Symbiotic:
-  greens/teals.
+  tile), vertex-shader sway. Material (plant.frag) is the wolf's vocabulary:
+  muted skin with a fibre sheen, old growth near the ground densifying to
+  root brown, colour carried by sap seen through thin/young tissue (back
+  light, grazing angles), no self-glow (rim only at night). Growth read:
+  `v_young` (newest growth and tips thinner, more translucent). Petals see-
+  through face-on. Parasitic: alien, not hostile: pale pearl/lilac with a
+  thin-film iridescent sap. Symbiotic: greens/teals.
 - Confluence: 8 growth keys with one vertex layout, blended per vertex in
   plant.vert (binding 2 reads the next key), so it grows without stepping;
   each braid strand gathers at the crown and runs on as its red vine in one
