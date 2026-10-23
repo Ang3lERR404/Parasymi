@@ -10,6 +10,7 @@ const items = @import("../sim/items.zig");
 const World = @import("../world/world.zig").World;
 const mg = @import("../gfx/meshgen.zig");
 const pal = @import("../gfx/meshes/palette.zig");
+const wolf_kit = @import("../gfx/meshes/wolf_kit.zig");
 const torso_mesh = @import("../gfx/meshes/wolf_torso.zig");
 const rump_mesh = @import("../gfx/meshes/wolf_rump.zig");
 const thigh_mesh = @import("../gfx/meshes/wolf_thigh.zig");
@@ -390,6 +391,7 @@ pub const Player = struct {
     mg.taperRadii(0.06, 0.2, &radii);
     try mg.braid(&out.live, &path, &ts, &radii, 3, 4.0, pal.STRAND_WOBBLE, 0x7A11, pal.wolf_core, pal.wolf_vine);
     out.live_look = vine_look;
+    try tailFur(&out.live, &path, &radii);
     // the tuft keeps the last joint's frame (smooth, no roll flips), moved
     // onto the vine's actual tip, which growth shifted slightly off the joint
     const tip = m.chain(&.{ T(path[TAIL_RES - 1] - m.origin(seg)), seg });
@@ -406,6 +408,27 @@ pub const Player = struct {
     return dx * dx + dz * dz <= REACH * REACH;
   }
 };
+
+/// fur along the tail: rings of leaves lying back along it toward the tip,
+/// all the way around, longer toward the tip, each ring turned from the last.
+fn tailFur(b:*mg.Builder, path:[]const V3, radii:[]const f32) Allocator.Error!void {
+  const n = path.len;
+  for (0..6) |ring| {
+    const k = 0.3 + 0.1 * m.f(ring);
+    const i = m.floorTo(usize, k * m.f(n - 1));
+    const tan = m.norm(path[@min(i + 1, n - 1)] - path[i - 1]);
+    const up0 = m.norm(v3(0, 1, 0) - tan * m.splat3(tan[1]));
+    for (0..3) |j| {
+      const a = m.f(j) / 3 * m.tau + m.f(ring) * 1.05;
+      const radial = up0 * m.splat3(@cos(a)) + m.cross(tan, up0) * m.splat3(@sin(a));
+      try wolf_kit.leaf(b, .{
+        .base = path[i] + radial * m.splat3(radii[i] * 0.85), .along = tan, .out = radial,
+        .len = 0.055 + 0.03 * k, .width = 0.02, .lift = 0.45, .curl = 0.4, .cup = 0.3,
+        .col = pal.wolf_leaf_dark, .tip = pal.wolf_leaf_lite,
+      });
+    }
+  }
+}
 
 /// a woven knot where two parts meet, so bent joints never show a seam.
 fn joint(out:*Parts, at:m.M4, r:f32) Allocator.Error!void {

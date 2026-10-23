@@ -9,6 +9,7 @@ const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
+const kit = @import("wolf_kit.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -19,8 +20,8 @@ pub const radii = v3(0.09, 0.095, 0.09);
 pub const centre = v3(radii[0] + 0.002, 0.03, -0.07);
 
 pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
-  // a slightly faceted ball: fewer rings than the soft sap reads as knotted
-  try mg.ellipsoid(b, .{.center = v3(0, 0, 0), .radii = radii, .col = pal.wolf_core, .rings = 7, .segs = 10, .t = 0.3});
+  // a squared lobe: flat faces with rounded edges, like the rest of the body
+  try kit.form(b, .{.center = v3(0, 0, 0), .radii = radii, .ns = 0.8, .ew = 0.75, .col = pal.wolf_core, .t = 0.3, .rings = 10, .segs = 14});
   // grown vine bands wrapping around it along its curvature
   try mg.bands(b, v3(0, 0, 0), radii, &.{
     .{0.3, 0.2, 2.7, 0.9}, .{0.3, 1.3, 2.7, 2.0}, .{0.3, 2.5, 2.7, 3.3}, .{0.4, -0.9, 2.6, -0.2},

@@ -1,43 +1,28 @@
 //! mesh: WOLF CALF. knee at origin, hock (the backward-bending joint) at +Y
-//! LEN: tendon and sinew. One smooth vine tapering from 1x the leg radius
-//! to 0.7x, with a prominent gastrocnemius swell (+25% at 30%) on its back
-//! (+Z here, which faces backward once the rig turns the segment downward)
-//! and a single wrap.
+//! LEN: tendon and sinew. A squared core tapering from 1x the leg radius to
+//! 0.7x, the gastrocnemius a form of its own swelling on its back (+Z here,
+//! which faces backward once the rig turns the segment downward) at 30%,
+//! running into an Achilles tendon of vine down to the hock, and one wrap.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
+const kit = @import("wolf_kit.zig");
 const thigh = @import("wolf_thigh.zig");
 
-const V3 = m.V3;
 const v3 = m.v3;
 
 pub const LEN:f32 = 0.26;
-/// where the calf swells, and by how much
-const BULGE_AT:f32 = 0.3;
-const BULGE:f32 = 0.25;
-
 const N = 16;
 
-fn radius(k:f32) f32 {
-  const bump = @exp(-((k - BULGE_AT) * (k - BULGE_AT)) / 0.03);
-  return thigh.LEG_R * m.lerp(1, 0.7, k) * (1 + BULGE * bump);
-}
+fn radius(k:f32) f32 { return thigh.LEG_R * m.lerp(0.9, 0.62, k); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  // the swell is one control point pushed back; the spline smooths it in
-  const ks = [_]f32{0, 0.2, BULGE_AT, 0.7, 1};
-  var ctrl:[ks.len]V3 = undefined;
-  for (&ctrl, ks) |*c, k| c.* = v3(0, k * LEN, if (k == BULGE_AT) BULGE * radius(k) else 0);
-  var spine:[N]V3 = undefined;
-  m.splineResample(&ctrl, &spine);
-  var ts:[N]f32 = undefined;
+  try kit.limbCore(b, LEN, radius, pal.wolf_vine);
+  try kit.muscle(b, v3(0, 0.3 * LEN, 0.03), v3(0.055, 0.085, 0.045), 0.1, pal.wolf_vine);
+  try kit.tendon(b, v3(0, 0.5 * LEN, radius(0.5) * 0.95), v3(0, LEN, radius(1) * 0.95), v3(0, 0, 0.006), 0.008, pal.wolf_core);
   var radii:[N]f32 = undefined;
-  for (&ts, &radii, 0..) |*t, *r, i| {
-    t.* = m.ratio(i, N - 1);
-    r.* = radius(t.*);
-  }
-  try b.tubeR(&spine, &ts, &radii, pal.wolf_vine, .stem, 8);
+  for (&radii, 0..) |*r, i| r.* = radius(m.ratio(i, N - 1)) * 1.05;
   try thigh.wraps(b, &radii, LEN, 1, 1.2, 0xCA1F);
 }

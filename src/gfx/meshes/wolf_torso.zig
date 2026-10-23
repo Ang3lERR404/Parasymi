@@ -10,6 +10,7 @@ const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const Mesh = @import("../vertex.zig").Mesh;
+const kit = @import("wolf_kit.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -62,6 +63,15 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.braidTurned(b, &spine, &ts, &radii, &turn, 7, pal.STRAND_WOBBLE, 0x7055, core, vine);
   b.xform(s, m.scale3(v3(1.25, 0.5, 0.95)));
   tuck(b.v.items[s..]);
+  // forms of planes under the weave, as on the limbs: trapezius sloping
+  // from the neck to each shoulder, and the lats fanning down the back
+  // into the waist
+  for ([_]f32{-1, 1}) |side| {
+    try kit.muscle(b, v3(side * 0.09, 0.45, -0.035), v3(0.085, 0.035, 0.06), 0, core);
+    const lat = b.mark();
+    try kit.form(b, .{.center = v3(0, 0, 0), .radii = v3(0.05, 0.11, 0.04), .ns = 0.72, .ew = 0.6, .col = core});
+    b.xform(lat, m.chain(&.{m.translate(v3(side * 0.09, 0.34, -0.095)), m.rotZ(side * 0.35), m.rotX(-0.15)}));
+  }
   // collarbone vine across the shoulders, passing just behind the lobes
   try b.tube(&.{v3(-0.16, 0.43, -0.005), v3(0, 0.41, 0.035), v3(0.16, 0.43, -0.005)}, &.{0.9, 0.9, 0.9}, 0.022, 0.022, vine, .stem, 5);
 }

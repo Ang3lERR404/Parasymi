@@ -1,11 +1,13 @@
-//! mesh: WOLF THIGH. hip at origin, knee at +Y LEN: the leg's power. A dense
-//! braid tapering from 1.3x the leg radius at the hip to 1x at the knee,
-//! with a few grown vines wrapped across it like muscle bands.
+//! mesh: WOLF THIGH. hip at origin, knee at +Y LEN (mesh -Z faces front):
+//! the leg's power. A squared core tapering from 1.3x the leg radius at the
+//! hip to 1x at the knee, a quadriceps form on the front and a hamstring on
+//! the back, and grown vines wrapped across it like muscle bands.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
+const kit = @import("wolf_kit.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -13,21 +15,17 @@ const v3 = m.v3;
 pub const LEN:f32 = 0.22;
 /// the leg's reference radius (the knee); thigh 1.3x..1x, calf 1x..0.7x
 pub const LEG_R:f32 = 0.07;
-
 const N = 14;
 
+fn radius(k:f32) f32 { return LEG_R * m.lerp(1.2, 0.92, k); }
+
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  var spine:[N]V3 = undefined;
-  var ts:[N]f32 = undefined;
+  try kit.limbCore(b, LEN, radius, pal.wolf_core);
+  try kit.muscle(b, v3(0, 0.55 * LEN, -0.03), v3(0.062, 0.1, 0.05), -0.06, pal.wolf_core);
+  try kit.muscle(b, v3(0, 0.45 * LEN, 0.03), v3(0.058, 0.095, 0.048), 0.06, pal.wolf_core);
   var radii:[N]f32 = undefined;
-  for (0..N) |i| {
-    const k = m.ratio(i, N - 1);
-    spine[i] = v3(0, k * LEN, 0);
-    ts[i] = k;
-    radii[i] = LEG_R * m.lerp(1.3, 1, k);
-  }
-  try mg.braid(b, &spine, &ts, &radii, 5, 2.2, pal.STRAND_WOBBLE, 0x7A16, pal.wolf_core, pal.wolf_vine);
-  try wraps(b, &radii, LEN, 3, 1.6, 0x7A17);
+  for (&radii, 0..) |*r, i| r.* = radius(m.ratio(i, N - 1)) * 1.12;
+  try wraps(b, &radii, LEN, 2, 1.6, 0x7A17);
 }
 
 /// `n` grown vines winding diagonally over a segment `len` long whose radius
@@ -52,7 +50,7 @@ pub fn wraps(b:*mg.Builder, radii:[]const f32, len:f32, n:u32, turn:f32, seed:u6
     var rs:[16]f32 = undefined;
     for (&ts, &rs, 0..) |*t, *rr, i| {
       t.* = m.ratio(i, 15);
-      rr.* = 0.013;
+      rr.* = 0.011;
     }
     try b.tubeR(&path, &ts, &rs, pal.wolf_vine, .stem, 5);
   }

@@ -220,13 +220,19 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
     long squared foot with a raised arch, vine tendons over the top to four
     knuckled digits arching down to curved claws (a dewclaw high on each
     hand); sap beans under both (palm/central pad and four digit pads).
+  - Limbs (`wolf_kit.limbCore`/`muscle`/`tendon`): squared cores (lofted
+    rounded-square sections) with distinct muscle forms (bicep/tricep,
+    brachioradialis, quadriceps/hamstring, gastrocnemius) and vine tendons
+    (Achilles, down the forearm and metatarsal); thighs and calves keep
+    grown vine wraps. Torso weave over trapezius and lat forms; rump lobes
+    are squared forms; fur leaves ring the tail, lying back toward its tip.
   - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
     hips); pectorals are broad dishes of resin sap (wider top edge, areola +
     nipple below the crown), base held on the chest, surface sprung; chest
     vines tucked behind.
   - Belly: translucent sap (72%), inflates +35% and drops/sags with fill;
     up to 5 dark lumps inside on spring-dampers driven by acceleration.
-  - Arms: deltoid caps, bicep/tricep, forearm tapering 1.1→0.7.
+  - Arms: deltoid caps, bicep/tricep forms, forearm tapering 1.1→0.7.
   - Rear: two plump vine lobes nearly touching, sap nodes (40%), firm springs;
     tailbone knot above them; tail is a braided spline rebuilt each frame.
   - Legs: anthro digitigrade (vertical thigh, calf back to a high hock with a
