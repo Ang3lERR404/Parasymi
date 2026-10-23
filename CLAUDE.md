@@ -144,7 +144,11 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Terrain: flat, biome-tinted tiles, one directional + ambient, flat shading.
   Fog closes in before the drawn edge; contact shadows under the wolf's feet.
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
-  tile), vertex-shader sway. Material (plant.frag) is the wolf's vocabulary:
+  tile). Motion (plant.vert) is rooted and heavy: points bend about the root
+  in the wind's plane (h², tips lagging), one garden-wide wind with slow
+  gusts rolling across as a wave, per-species `sway` (heavy trees 0.6,
+  floaters 1.8); leaves lift a little; parasite fronds curl slowly; hanging
+  filaments trail downwind. Material (plant.frag) is the wolf's vocabulary:
   muted skin with a fibre sheen, old growth near the ground densifying to
   root brown, colour carried by sap seen through thin/young tissue (back
   light, grazing angles), no self-glow (rim only at night). Growth read:

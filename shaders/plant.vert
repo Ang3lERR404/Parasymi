@@ -53,32 +53,58 @@ void main() {
   // where it grows from, on the stem or along a vine.
   if ((part == 1u || part == 2u) && !confluence) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
 
-  // symbiotic breathing: slow, shared rhythm, the leaf tips moving
-  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.07 * aff * tu.y * sin(t * 1.6 + seed * 6.28);
-  // parasitic hunger: a parasite's fronds writhe and thorns twitch harder
-  // while feeding (other lineages' vines carry leaves and stay put)
+  // ---- motion: rooted and heavy. Nothing jitters: plants bend from the
+  // root and answer the wind late, tips last; leaves only lift a little.
+  // Every offset is a smooth field of position and tu, so shared vertices
+  // move alike and the meshes stay watertight. ----
+  float h = tu.x;
+  // one wind over the whole garden: its heading drifts slowly, and broad
+  // gusts roll across it as a wave, so neighbours lean together
+  float head = 0.6 + 0.35 * sin(t * 0.031);
+  vec2 wdir = vec2(cos(head), sin(head));
+  float along = dot(ipos.xz, wdir);
+  float gust = 0.5 + 0.5 * sin(t * 0.32 - along * 0.16);
+  gust *= gust; // mostly calm, now and then a push
+
+  // symbiotic breathing: slow, the leaf tips moving
+  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * 6.28);
+  // leaves and petals lift a touch in the gusts, tips most (bases stay)
+  if (part == 1u || part == 2u) p.y += 0.012 * tu.y * tu.y * gust * sin(t * 1.7 + seed * 11.0 + h * 3.0);
+  // parasites: fronds curl and uncurl slowly while feeding, alien but
+  // unhurried; thorns barely stir
   if (aff < -0.5) {
     float hunger = -aff * (0.3 + flow);
-    if (part == 4u) p.xz = rot(sin(t * 3.0 + tu.x * 7.0 + seed * 9.0) * 0.35 * hunger) * p.xz;
-    // thorns quiver at the tip only (tu.y = 0 at the base), along a shared axis
-    if (part == 3u) p.y += 0.02 * hunger * tu.y * sin(t * 23.0 + seed * 40.0 + tu.x * 7.0);
+    if (part == 4u) p.xz = rot(sin(t * 0.6 + tu.x * 3.0 + seed * 9.0) * 0.12 * hunger) * p.xz;
+    if (part == 3u) p.y += 0.006 * hunger * tu.y * sin(t * 4.0 + seed * 40.0 + tu.x * 7.0);
   }
-  // convergent: blooms slowly orbit (a confluence's canopy stays on its leader)
-  if (abs(aff) < 0.5 && part == 2u && !confluence) p.xz = rot(t * 0.4 + seed * 6.28) * p.xz;
+  // convergent: blooms turn, very slowly (a confluence's canopy stays on its leader)
+  if (abs(aff) < 0.5 && part == 2u && !confluence) p.xz = rot(t * 0.12 + seed * 6.28) * p.xz;
 
   // wilt when unhealthy
   p.y *= mix(0.55, 1.0, health);
-
-  // wind sway, stronger toward the tip
-  float h = tu.x;
-  float wind = sin(t * 1.3 + ipos.x * 0.35 + ipos.z * 0.25 + seed * 6.28) + 0.4 * sin(t * 2.7 + seed * 20.0);
-  p.x += wind * 0.05 * sway * h * h;
-  p.z += cos(t * 1.1 + ipos.z * 0.3 + seed * 3.0) * 0.03 * sway * h * h;
 
   // per-instance variation
   float yaw = seed * 6.2831;
   p.xz = rot(yaw) * p.xz;
   n.xz = rot(yaw) * n.xz;
+
+  // the bend: each point turns about the root in the wind's plane, more
+  // toward the tip, so a plant curves instead of shearing. Its own lean is
+  // slow and reaches the tip after the base. What hangs below the root (a
+  // floater's filaments) swings the other way, so it trails downwind.
+  float own = sin(t * 0.85 - along * 0.3 + seed * 6.28 - h * 0.9);
+  float lean = sway * (0.05 * gust + 0.025 * (0.4 + gust) * own);
+  float ang = lean * h * h;
+  float ca = cos(ang);
+  float sa = sin(ang) * (smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0);
+  float a0 = dot(p.xz, wdir);
+  float a1 = a0 * ca + p.y * sa;
+  p.y = p.y * ca - a0 * sa;
+  p.xz += wdir * (a1 - a0);
+  float na0 = dot(n.xz, wdir);
+  float na1 = na0 * ca + n.y * sa;
+  n.y = n.y * ca - na0 * sa;
+  n.xz += wdir * (na1 - na0);
   // a confluence's growth keys already carry its size
   float s = (confluence ? 1.0 : mix(0.12, 1.0, g)) * (0.85 + 0.3 * fract(seed * 7.13));
   vec3 wp = ipos + p * s;

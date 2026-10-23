@@ -6,6 +6,8 @@ const color = @import("../../core/color.zig");
 pub const def:species.Species = .{
   .name = "HOLLOWHEART", .lineage = .symbiotic, .seed = .seed_hollowheart, .size = 2,
   .mature_time = 45, .mana_cap = 60, .ley_draw = 2.4, .share = 0.9, .drain = 0, .yield = 0.5, .seed_time = 60,
+  // a heavy tree: it leans, it does not wave
+  .sway = 0.6,
   .genome = .{
     .stem_h = 2.1, .stem_r = 0.16, .segments = 12, .curl = 0.06, .wobble = 0.08,
     .leaves = 20, .leaf_len = 0.75, .leaf_w = 0.24, .leaf_droop = 0.45, .leaf_from = 0.55,

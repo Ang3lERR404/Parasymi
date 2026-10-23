@@ -7,6 +7,8 @@ const color = @import("../../core/color.zig");
 pub const def:species.Species = .{
   .name = "DRIFTWISP", .lineage = .symbiotic, .seed = .seed_driftwisp, .floating = true, .yields = .starlight,
   .mature_time = 20, .mana_cap = 8, .ley_draw = 0.5, .share = 0.4, .drain = 0, .yield = 0.06, .seed_time = 40,
+  // light and hanging in the air: the wind carries it furthest
+  .sway = 1.8,
   .genome = .{
     .form = .drift,
     .stem_h = 0.1, .stem_r = 0.028, .segments = 4, .curl = 0.05, .wobble = 0.1,
