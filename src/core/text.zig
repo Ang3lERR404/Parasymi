@@ -1,7 +1,9 @@
 //! runtime text: templates (`{0}`, `{1:.2}`) filled at runtime, and the
 //! `key = value` cfg format they are loaded from (see `game/text.zig`).
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const Writer = std.Io.Writer;
+const indexOf = std.mem.indexOf;
 const EnumArray = std.enums.EnumArray;
 const trim = std.mem.trim;
 const eql = std.mem.eql;
@@ -152,6 +154,72 @@ fn missing(comptime T:type, p:*const T, path:*Writer) bool {
     if (missing(f.type, &@field(p, f.name), path)) return true;
   }
   return false;
+}
+
+/// opens a load-time token (`{@name}`): replaced once, by `expand`, before
+/// anything is rendered.
+pub const TOKEN = "{@";
+/// writes what token `name` stands for; false for no such name.
+pub const Lookup = *const fn (w:*Writer, name:[]const u8) Writer.Error!bool;
+pub const ExpandError = error{ UnknownToken, BadLine } || Allocator.Error;
+
+/// replaces every `{@name}` in the string leaves of `p` with what `lookup`
+/// writes for `name`; changed strings are allocated from `gpa` (an arena:
+/// nothing is freed here). On an unknown name it is written to `bad`.
+pub fn expand(comptime T:type, p:*T, gpa:Allocator, lookup:Lookup, bad:*Writer) ExpandError!void {
+  if (T == ?[]const u8) {
+    if (p.*) |*v| try expand([]const u8, v, gpa, lookup, bad);
+    return;
+  }
+  if (T == []const u8) {
+    if (indexOf(u8, p.*, TOKEN) == null) return;
+    var out:Writer.Allocating = .init(gpa);
+    const w = &out.writer;
+    var rest = p.*;
+    while (indexOf(u8, rest, TOKEN)) |at| {
+      const end = indexOfScalarPos(u8, rest, at, '}') orelse return failExpand(bad, rest[at..], error.BadLine);
+      const name = rest[at + TOKEN.len .. end];
+      w.writeAll(rest[0..at]) catch return error.OutOfMemory;
+      if (!(lookup(w, name) catch return error.OutOfMemory)) return failExpand(bad, name, error.UnknownToken);
+      rest = rest[end + 1 ..];
+    }
+    w.writeAll(rest) catch return error.OutOfMemory;
+    p.* = try out.toOwnedSlice();
+    return;
+  }
+  if (comptime isEnumArray(T)) {
+    inline for (0..T.len) |i| try expand(T.Value, p.getPtr(T.Indexer.keyForIndex(i)), gpa, lookup, bad);
+    return;
+  }
+  inline for (@typeInfo(T).@"struct".fields) |f| try expand(f.type, &@field(p, f.name), gpa, lookup, bad);
+}
+
+fn failExpand(bad:*Writer, what:[]const u8, e:ExpandError) ExpandError {
+  bad.writeAll(what) catch {};
+  return e;
+}
+
+test "expand replaces load-time tokens" {
+  const T = struct { a:[]const u8 = "", b:?[]const u8 = null, c:[]const u8 = "" };
+  var arena:std.heap.ArenaAllocator = .init(testing.allocator);
+  defer arena.deinit();
+  const look = struct {
+    fn f(w:*Writer, name:[]const u8) Writer.Error!bool {
+      if (!eql(u8, name, "k")) return false;
+      try w.writeAll("KEY");
+      return true;
+    }
+  }.f;
+  var bad_buf:[MAX_KEY]u8 = undefined;
+  var bad:Writer = .fixed(&bad_buf);
+  var t:T = .{ .a = "PRESS {@k} OR {@k} {0}", .b = "{@k}", .c = "PLAIN" };
+  try expand(T, &t, arena.allocator(), look, &bad);
+  try testing.expectEqualStrings("PRESS KEY OR KEY {0}", t.a);
+  try testing.expectEqualStrings("KEY", t.b.?);
+  try testing.expectEqualStrings("PLAIN", t.c);
+  var u:T = .{ .a = "{@nope}" };
+  try testing.expectError(error.UnknownToken, expand(T, &u, arena.allocator(), look, &bad));
+  try testing.expectEqualStrings("nope", bad.buffered());
 }
 
 test "render fills positional templates" {

@@ -125,7 +125,10 @@ recipes (`game/craft.zig`) are plain data tables.
   `Action` tag + a cfg line (the test fails on an unbound action); modifiers
   are actions too (`alt`, `take`, `run`). Headless tests `ctl.fill` the
   embedded cfg and `ctl.hold` actions. The mouse wheel/cursor are axes, not
-  bindings.
+  bindings. Text never names a key either: write `{@action}` in
+  `parasymi.cfg` (`FEED ({@harvest})`); `txt.load` (after `controls.load`)
+  replaces it once with the bound key's `[key]`/`[mouse]` name (else its
+  binding name in capitals), so labels follow rebinding.
 - Edits: write to files, pass files to scripts; no inline heredocs.
 
 ## Zig 0.16 notes

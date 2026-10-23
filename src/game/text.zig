@@ -6,6 +6,11 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const EnumArray = std.enums.EnumArray;
 const log = std.log;
+const ArenaAllocator = std.heap.ArenaAllocator;
+const stringToEnum = std.meta.stringToEnum;
+const toUpper = std.ascii.toUpper;
+const input = @import("../platform/input.zig");
+const ctl = @import("controls.zig");
 const ctext = @import("../core/text.zig");
 const ck = @import("../world/chunk.zig");
 const items = @import("../sim/items.zig");
@@ -67,6 +72,9 @@ pub const Strings = struct {
   plant:EnumArray(species.Id, PlantText) = .initFill(.{}),
   research:EnumArray(prog.Id, ResearchText) = .initFill(.{}),
   structure:EnumArray(st.Kind, Named) = .initFill(.{}),
+  /// shown names of keys and mouse buttons (for `{@action}`); optional
+  key:EnumArray(input.Key, ?S) = .initFill(null),
+  mouse:EnumArray(input.Button, ?S) = .initFill(null),
 };
 
 /// the loaded strings; empty until `load` (headless tests run without them).
@@ -74,6 +82,8 @@ pub const Strings = struct {
 // after, instead of threading a pointer through every HUD and message site.
 pub var s:Strings = .{};
 var src:[]u8 = &.{};
+/// holds the strings `{@action}` tokens were written into
+var arena:?ArenaAllocator = null;
 
 pub const Error = error{ NoStrings, BadStrings } || Allocator.Error;
 
@@ -85,23 +95,54 @@ pub fn load(gpa:Allocator, io:Io) Error!void {
     else => { log.err("{s}: {t}", .{PATH, e}); return error.NoStrings; },
   };
   errdefer unload(gpa);
-  try fill(src);
+  try fill(gpa, src);
 }
 
-/// parses cfg source `text` (which must outlive the strings) into `s`.
-pub fn fill(text:[]const u8) Error!void {
+/// parses cfg source `text` (which must outlive the strings) into `s`, then
+/// writes each `{@action}` as the key or button bound to it, so what is
+/// shown follows `controls.cfg` (loaded first).
+pub fn fill(gpa:Allocator, text:[]const u8) Error!void {
   var bad_buf:[256]u8 = undefined;
   var bad:Io.Writer = .fixed(&bad_buf);
   ctext.parse(Strings, &s, text, &bad) catch |e| {
     log.err("{s}: {t}: {s}", .{PATH, e, bad.buffered()});
     return error.BadStrings;
   };
+  std.debug.assert(arena == null);
+  arena = .init(gpa);
+  ctext.expand(Strings, &s, arena.?.allocator(), action, &bad) catch |e| return switch (e) {
+    error.OutOfMemory => error.OutOfMemory,
+    else => { log.err("{s}: {t}: {s}", .{PATH, e, bad.buffered()}); return error.BadStrings; },
+  };
 }
 
 pub fn unload(gpa:Allocator) void {
   gpa.free(src);
   src = &.{};
+  if (arena) |*a| a.deinit();
+  arena = null;
   s = .{};
+}
+
+/// `{@name}`: the first key or button bound to action `name`.
+fn action(w:*Io.Writer, name:[]const u8) Io.Writer.Error!bool {
+  const a = stringToEnum(ctl.Action, name) orelse return false;
+  const binds = ctl.map.getPtrConst(a).items();
+  if (binds.len > 0) try bindName(w, binds[0]);
+  return true;
+}
+
+/// how a key or button is shown: its `[key]`/`[mouse]` name in the cfg,
+/// else its binding name in capitals.
+// decision: only keys whose binding name reads badly (left_shift, one,
+// mouse_left) get a cfg name; F5, TAB, W show as they are bound.
+pub fn bindName(w:*Io.Writer, b:input.Bind) Io.Writer.Error!void {
+  const named, const tag = switch (b) {
+    .key => |k| .{ s.key.get(k), @tagName(k) },
+    .button => |k| .{ s.mouse.get(k), @tagName(k) },
+  };
+  if (named) |n| return w.writeAll(n);
+  for (tag) |c| try w.writeByte(toUpper(c));
 }
 
 pub fn item(i:items.Item) ItemText { return s.item.get(i); }
@@ -110,9 +151,18 @@ pub fn research(id:prog.Id) ResearchText { return s.research.get(id); }
 pub fn structure(k:st.Kind) []const u8 { return s.structure.get(k).name; }
 pub fn tile(k:ck.Kind) []const u8 { return s.tile.get(k).name; }
 
-test "the strings file fills every key" {
-  defer s = .{};
-  try fill(@embedFile("parasymi.cfg"));
+test "the strings file fills every key, shown with the bound keys" {
+  const gpa = std.testing.allocator;
+  try ctl.fill(@embedFile("controls.cfg"));
+  defer ctl.unload();
+  defer unload(gpa);
+  try fill(gpa, @embedFile("parasymi.cfg"));
+  try std.testing.expect(std.mem.indexOf(u8, s.hud.controls, ctext.TOKEN) == null);
+  // rebinding changes what is shown
+  unload(gpa);
+  try ctl.fill(@embedFile("controls.cfg") ++ "\n[bind]\nbelly = mouse_middle | b\n");
+  try fill(gpa, @embedFile("parasymi.cfg"));
+  try std.testing.expect(std.mem.indexOf(u8, s.msg.night_hint, s.mouse.get(.middle).?) != null);
   try std.testing.expectEqual(count(s.hud.pause_keys), count(s.hud.pause_labels));
   try std.testing.expectEqual(4, count(s.hud.facing));
 }

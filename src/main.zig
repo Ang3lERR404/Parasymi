@@ -53,12 +53,13 @@ pub fn main(init:Init) !void {
     if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a["--seed=".len..], 0);
   }
 
+  // the only read of the controls file: no key or button is named in code.
+  // First, so the strings can show what each action is bound to.
+  try controls.load(gpa, io);
+  defer controls.unload();
   // the only read of the strings file: everything shown comes from it
   try txt.load(gpa, io);
   defer txt.unload(gpa);
-  // the only read of the controls file: no key or button is named in code
-  try controls.load(gpa, io);
-  defer controls.unload();
 
   try glfw.init();
   defer glfw.terminate();
