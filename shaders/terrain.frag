@@ -61,7 +61,9 @@ void main() {
     vec3 leyc = mix(vec3(0.45, 0.3, 1.0), vec3(1.0, 0.7, 1.0), pc.misc.x);
     c += leyc * pc.misc.y * ley * ley * 0.45 * pulse;
     // a faint plexus drifting over the ley lines themselves
-    if (ground) c += mix(leyc, vec3(0.9, 0.85, 1.0), 0.4) * plexus(v_pos.xz, t) * smoothstep(0.5, 0.85, ley) * mix(0.32, 0.16, pc.sun.w);
+    // (only evaluated where it shows: it is the costliest thing on the ground)
+    float on = smoothstep(0.5, 0.85, ley);
+    if (ground && on > 0.0) c += mix(leyc, vec3(0.9, 0.85, 1.0), 0.4) * plexus(v_pos.xz, t) * on * mix(0.32, 0.16, pc.sun.w);
   }
   // hovered tile
   if (ground && all(equal(floor(v_pos.xz), pc.misc.zw))) c += vec3(0.25, 0.25, 0.2) * (0.7 + 0.3 * sin(t * 6.0));
