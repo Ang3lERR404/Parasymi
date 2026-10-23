@@ -83,7 +83,19 @@ const Frame = struct {
   garbage:std.ArrayList(Buffer) = .empty,
 };
 
-pub const Slot = struct { buf:Buffer = .{}, count:u32 = 0, live:bool = false };
+/// milliseconds a frame may spend meshing streamed chunks
+const MESH_MS:f64 = 3;
+
+pub const Slot = struct {
+  buf:Buffer = .{},
+  count:u32 = 0,
+  /// vertices of ground (drawn always); the rest is detail (grass, stones)
+  /// drawn only near the camera
+  ground:u32 = 0,
+  /// the chunk's centre (x, z)
+  centre:[2]f32 = .{0, 0},
+  live:bool = false,
+};
 
 pub const Renderer = struct {
   gpa:Allocator,
@@ -241,12 +253,16 @@ pub const Renderer = struct {
     w.evicted.clearRetainingCapacity();
 
     r.stats.meshed = 0;
+    const start = glfw.getTime();
     var it = w.map.valueIterator();
     while (it.next()) |cp| {
       const c = cp.*;
       if (!c.dirty) continue;
+      // at most `budget` chunks, and no more once a frame's share of time
+      // is spent (at least one, so streaming always moves on)
       if (r.stats.meshed >= budget) break;
-      try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch);
+      if (r.stats.meshed > 0 and (glfw.getTime() - start) * 1000 > MESH_MS) break;
+      const ground = try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch);
       const bytes = sliceAsBytes(r.scratch.items);
       var buf = try Buffer.init(&r.ctx, @max(bytes.len, 64), .{.vertex_buffer = true});
       buf.write(0, bytes);
@@ -258,7 +274,11 @@ pub const Renderer = struct {
       const at = @intFromEnum(slot);
       if (c.gpu_slot != null) try r.retire(r.slots.items[at].buf);
       c.gpu_slot = slot;
-      r.slots.items[at] = .{.buf = buf, .count = @intCast(r.scratch.items.len), .live = true};
+      const half = m.f(ck.SIZE) / 2;
+      r.slots.items[at] = .{
+        .buf = buf, .count = @intCast(r.scratch.items.len), .ground = ground, .live = true,
+        .centre = .{m.f(c.originX()) + half, m.f(c.originY()) + half},
+      };
       c.dirty = false;
       r.stats.meshed += 1;
     }

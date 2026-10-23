@@ -143,14 +143,18 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 
 ## Visual (current)
 - Terrain (`render/terrain_mesh.zig`): smooth ground, no walls or ramps.
-  Each tile is a 3x3 grid: its centre at the tile's height (everything on
-  it stands there), edges and corners shared with its neighbours (average
-  height, colour and ley), smooth normals; land dips under the water at the
+  Each tile is a fan of four triangles: its centre at the tile's height
+  (everything on it stands there), corners shared with its neighbours
+  (average height, colour and ley, from a per-chunk grid worked out once),
+  smooth normals; land dips under the water at the
   shore. Thin grass blades on every tile but water and soil (tile-coloured,
   swayed by the garden wind in terrain.vert, info.w = height up the blade);
   clods and small stones on soil. Ley lines carry a faint plexus of drifting
   points joined by threads (terrain.frag); ley sight glows smoothly across
-  tile borders. info.z = 255 marks the ground's top surface. Fog closes in
+  tile borders. info.z = 255 marks the ground's top surface. A chunk's
+  mesh is ground first, then detail (grass, clods, stones): the terrain
+  pass draws the detail only on chunks within `DETAIL_R` (22 tiles) of the
+  view's focus. Streaming meshes at most `MESH_MS` (3 ms) of chunks a frame. Fog closes in
   before the drawn edge; contact shadows under the wolf's feet.
 - Plants: grown spline stems/tendrils, 4 mesh variants per species (picked by
   tile). Motion (plant.vert) is rooted and heavy: points bend about the root
