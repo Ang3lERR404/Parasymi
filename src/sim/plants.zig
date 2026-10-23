@@ -7,6 +7,7 @@ const std = @import("std");
 const m = @import("../core/math.zig");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
+const indexOfScalar = std.mem.indexOfScalar;
 const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("species.zig");
@@ -124,7 +125,27 @@ pub const Plants = struct {
       else w.moveFootprint(lx, ly, ld.size, Occ.plant(id));
     }
     p.list.swapRemove(i);
+    // links stay valid without waiting for a rebuild: the removed plant
+    // drops out of every ring, and the plant that moved into its slot is
+    // found there (readers outside the tick, e.g. harvesting, rely on this)
+    const moved = Id.of(last);
+    const s2 = p.list.slice();
+    for (s2.items(.n1)) |*ring| relink(ring, id, moved);
+    for (s2.items(.n2)) |*ring| relink(ring, id, moved);
     p.topology_dirty = true;
+  }
+
+  /// drop `gone` from a ring and re-point `from` at `gone`'s slot, keeping
+  /// the ring packed (readers stop at the first `.none`).
+  fn relink(ring:[]Id, gone:Id, from:Id) void {
+    var k:usize = 0;
+    for (ring) |e| {
+      if (e == .none) break;
+      if (e == gone) continue;
+      ring[k] = if (e == from) gone else e;
+      k += 1;
+    }
+    while (k < ring.len and ring[k] != .none) : (k += 1) ring[k] = .none;
   }
 
   /// the tiles a plant covers: its footprint, or the one tile it hovers over.
@@ -220,4 +241,43 @@ test "footprints, floaters and links" {
   p.remove(&w, .of(0));
   try testing.expectEqual(@as(u32, 2), c.pins);
   try testing.expect(p.at(&w, 3, 1) != null and p.at(&w, 2, 2) != null);
+}
+
+test "links stay valid right after a remove, matching a rebuild" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{.x = 0, .y = 0}, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..6) |y| for (0..6) |x| { c.kind[y * ck.SIZE + x] = .soil; c.height[y * ck.SIZE + x] = 1; };
+  var p:Plants = .{};
+  defer p.deinit(gpa);
+  // a 2x2 and a ring of 1x1s around it, plus a floater, all linked
+  try testing.expect(try p.place(gpa, &w, 2, 2, .hollowheart, 0.5));
+  for ([_][2]i32{.{1, 1}, .{4, 2}, .{2, 4}, .{1, 3}, .{4, 4}, .{0, 2}}) |t| try testing.expect(try p.place(gpa, &w, t[0], t[1], .lumenroot, 0.5));
+  try testing.expect(try p.place(gpa, &w, 3, 3, .driftwisp, 0.5));
+  // remove from the middle, from the front and the last slot, checking each time
+  for ([_]usize{3, 0, 4}) |victim| {
+    p.rebuildLinks(&w);
+    p.remove(&w, .of(@min(victim, p.len() - 1)));
+    const n = p.len();
+    var got:[16][R1 + R2]Id = undefined;
+    for (0..n) |i| {
+      const s = p.list.slice();
+      for (s.items(.n1)[i], 0..) |e, k| { if (e != .none) try testing.expect(e.idx() < n); got[i][k] = e; }
+      for (s.items(.n2)[i], 0..) |e, k| { if (e != .none) try testing.expect(e.idx() < n); got[i][R1 + k] = e; }
+    }
+    // the patched links say exactly what a full rebuild says (as sets per ring)
+    p.rebuildLinks(&w);
+    const s = p.list.slice();
+    for (0..n) |i| {
+      for ([2][]const Id{got[i][0..R1], got[i][R1..]}, [2][]const Id{&s.items(.n1)[i], &s.items(.n2)[i]}) |a, b| {
+        var ca:usize = 0;
+        var cb:usize = 0;
+        for (a) |e| if (e != .none) { ca += 1; try testing.expect(indexOfScalar(Id, b, e) != null); };
+        for (b) |e| if (e != .none) { cb += 1; };
+        try testing.expectEqual(cb, ca);
+      }
+    }
+  }
 }

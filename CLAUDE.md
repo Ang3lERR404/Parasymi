@@ -24,7 +24,8 @@ zglfw `f04fdbf`. Upstream heads need 0.17. A stray `CPATH` breaks GLFW's C build
 
 ## Controls
 WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
-RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate, 1–9/0 hotbar,
+RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate, 1–9/0 hotbar
+(only), click a research node or weave recipe in its panel,
 Tab belly (weave), T research, F3 debug. Esc closes a panel, else pauses (Q in
 pause = save and quit). F5 save, F9 load, F11 fullscreen.
 Free cam (Ctrl+F): click to look, WASD fly (Shift fast), Space/Ctrl+Space

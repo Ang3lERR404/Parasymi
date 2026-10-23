@@ -5,6 +5,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
+const eqlDeep = std.meta.eql;
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
 const ck = @import("../world/chunk.zig");
@@ -28,6 +29,7 @@ const craft = @import("craft.zig");
 const st = @import("structures.zig");
 const actions = @import("actions.zig");
 const convergence = @import("convergence.zig");
+const hud = @import("hud.zig");
 
 pub const TICK = 1.0 / 60.0;
 const STREAM_RADIUS = 4;
@@ -97,6 +99,8 @@ pub const Game = struct {
   rng:Rng,
   parts:Parts,
   ui:Draw,
+  /// what a click on the HUD would land on, as drawn last frame
+  rows:hud.Rows = .{},
   weave:craft.Crafter = .{},
 
   mode:Mode = .roam,
@@ -229,16 +233,19 @@ pub const Game = struct {
       in.pressed(.one), in.pressed(.two), in.pressed(.three), in.pressed(.four), in.pressed(.five),
       in.pressed(.six), in.pressed(.seven), in.pressed(.eight), in.pressed(.nine), in.pressed(.zero),
     };
-    for (nums, 0..) |p, i| {
-      if (!p) continue;
-      switch (g.mode) {
-        .research => if (i < prog.tree.values.len) g.prog.select(@enumFromInt(i)),
-        .belly => if (i < craft.hand.len) actions.weaveByHand(g, i),
-        .roam => if (i < hotbar.len) { g.hot = i; },
-        .inspect => {},
-        .paused => unreachable,
-      }
-    }
+    // number keys pick the hotbar slot, whichever panel is open
+    if (!inspecting) for (nums, 0..) |p, i| {
+      if (p and i < hotbar.len) g.hot = i;
+    };
+
+    // a click lands on the HUD panel under the mouse before the world: rows
+    // choose research or weave a recipe; a panel's backdrop just absorbs it
+    const ui_hit = if (inspecting) null else g.rows.at(in.mouse);
+    if (in.clicked(.left)) if (ui_hit) |hit| switch (hit) {
+      .panel => {},
+      .research => |id| g.prog.select(id),
+      .weave => |i| actions.weaveByHand(g, i),
+    };
 
     // movement relative to the camera
     var mx:f32 = 0;
@@ -282,7 +289,7 @@ pub const Game = struct {
     if (g.hover) |h| if (g.player.inReach(h[0], h[1])) if (g.world.chunkOfTile(h[0], h[1])) |c| {
       const t = ck.localIndex(h[0], h[1]);
       const on_struct = g.structs.at(&g.world, h[0], h[1]);
-      if (in.held(.left) and on_struct == null) {
+      if (in.held(.left) and on_struct == null and ui_hit == null) {
         if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
       }
@@ -397,4 +404,48 @@ test "the wolf stays put without input" {
   }
   try testing.expectApproxEqAbs(start[0], g.player.pos[0], 0.05);
   try testing.expectApproxEqAbs(start[2], g.player.pos[2], 0.05);
+}
+test "clicking a research node or weave recipe picks it; number keys only pick the hotbar" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, 0x5EED_0F_11FE);
+  defer g.deinit();
+  const screen = [2]f32{1600, 900};
+  var in:Input = .{.win = undefined};
+  const click = struct {
+    /// press the left button over the middle of the first row picking `want`
+    fn on(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32) !void {
+      try hud.build(gg, sc);
+      for (gg.rows.rect[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
+        if (!eqlDeep(p, want)) continue;
+        i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
+        i.bprev[0] = false;
+        i.bcur[0] = true;
+        try gg.update(i, 1.0 / 60.0, sc);
+        i.bcur[0] = false;
+        i.bprev[0] = true;
+        return;
+      }
+      return error.TestUnexpectedResult;
+    }
+  };
+
+  g.mode = .research;
+  try click.on(&g, &in, .{.research = .ley_sight}, screen);
+  try testing.expect(g.prog.current == .ley_sight);
+
+  g.mode = .belly;
+  _ = g.player.inv.add(.fibre, 2);
+  _ = g.player.inv.add(.starlight, 1);
+  try testing.expect(craft.hand[0].out == .seed_lumenroot);
+  try click.on(&g, &in, .{.weave = 0}, screen);
+  try testing.expect(g.weave.busy());
+
+  // with the belly open, a number key picks the hotbar slot, not a recipe
+  in.mouse = .{-1e4, -1e4};
+  in.prev = @splat(false);
+  in.cur = @splat(false);
+  in.cur[Input.idx(.three)] = true;
+  try g.update(&in, 1.0 / 60.0, screen);
+  try testing.expectEqual(@as(usize, 2), g.hot);
+  try testing.expectEqual(@as(usize, 1), g.weave.len);
 }

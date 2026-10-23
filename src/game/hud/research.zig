@@ -1,5 +1,6 @@
 //! the research tree (T): every technology with its per-unit ingredients,
-//! units, status and a tendril of progress; 1-n chooses what blooms study.
+//! units, status and a tendril of progress; clicking a node chooses what
+//! blooms study.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
@@ -26,13 +27,15 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = W - pw - margin;
   const py = @max(10, (H - ph) / 2 - panel_lift);
   try d.membrane(px, py, pw, ph, s.research_panel, 0.77);
+  g.rows.add(px, py, pw, ph, .panel);
   _ = try d.text(px + 72, py + 30, 2.5, s.gold, "RESEARCH");
-  _ = try d.text(px + 72, py + 58, 1.2, s.dim, "RESEARCH BLOOMS STUDY WHAT IS CHOSEN, EATING WHAT THEY ARE FED. NUMBER KEYS CHOOSE");
+  _ = try d.text(px + 72, py + 58, 1.2, s.dim, "RESEARCH BLOOMS STUDY WHAT IS CHOSEN, EATING WHAT THEY ARE FED. CLICK TO CHOOSE");
 
   for (prog.tree.values, 0..) |r, i| {
     const id:prog.Id = @enumFromInt(i);
     const status = g.prog.status(id);
     const y = py + header_h + row_h * m.f(i);
+    g.rows.add(px + 20, y - 12, pw - 40, row_h, .{.research = id});
     const cur = g.prog.current == id;
     const col = switch (status) {
       .done => s.research_done,
@@ -40,7 +43,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
       .locked => s.research_locked,
     };
     if (cur) try d.glow(px + 40, y + 8, 22, s.research_active);
-    _ = try d.print(px + 46, y, 1.6, if (cur) s.gold else col, "{d} {s}", .{i + 1, r.name});
+    _ = try d.text(px + 46, y, 1.6, if (cur) s.gold else col, r.name);
     _ = try d.text(px + 70, y + 20, 1.15, s.dim, r.desc);
 
     var x = px + 70;

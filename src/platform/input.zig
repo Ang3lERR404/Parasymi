@@ -45,7 +45,7 @@ pub const Input = struct {
     in.scroll_acc = 0;
   }
 
-  fn idx(comptime k:Key) usize {
+  pub fn idx(comptime k:Key) usize {
     inline for (tracked, 0..) |t, i| if (t == k) return i;
     @compileError("key not tracked: " ++ @tagName(k));
   }
