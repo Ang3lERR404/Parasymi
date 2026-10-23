@@ -173,12 +173,14 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   as growth passes its order (it assembles, never scales up), and the
   bloom drifts and bobs instead of bending. plant.frag: the only true
   glow, light carried in thin tissue (fresnel, core, pulse, bubbles),
-  translucent, fragments fading in as they lock. Threads (meshlib
-  `bloom_thread`, part `.thread`): bent on the GPU through the parts pass
-  (curve mode, `e.y` how far it reaches) from bloom core to core with a
-  slight sag; a warm iridescent film with light running along it, bright
-  when its network radiates; it reaches out from the more grown bloom as
-  that bloom finishes assembling.
+  translucent, fragments fading in as they lock. Beams (meshlib
+  `bloom_thread`, part `.thread`): a flat ribbon carried on the GPU through
+  the parts pass (curve mode, `e.y` how far it reaches) from bloom core to
+  core, running true, its width turned to face the eye; a bright near-white
+  core falling off to a warm faintly iridescent halo, pulses of light
+  running along it, fading into each core; bright (it blooms) when its
+  network radiates, a faint trace when dark; it reaches out from the more
+  grown bloom as that bloom finishes assembling.
 - Item ids are stored by value: new items go at the end of `items.Item`.
 - Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the seed;
   only the gardener's changes are stored. Bump `VERSION` when a stored layout
@@ -251,6 +253,16 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   each braid strand gathers at the crown and runs on as its red vine in one
   tube (vertex-colour gradient, ±10° hue drift in the zone); leader crowned by translucent violet petals with amber
   fresnel (plants pass blends; only these petals have alpha < 1). Sway ×1.5.
+- Post-processing (`render/post.zig`, the one post effect so far): world
+  passes draw into an HDR image (`post.HDR_FORMAT`); what is brighter than
+  white blooms: a 13-tap filtered chain of 5 half-size levels down (the
+  first with a soft-knee threshold and a brightness-weighted average
+  against fireflies) and a tent filter additively back up; the composite
+  lays the glow over the scene (intensity 0.7), rolls highlights off above
+  0.8 (below it the look is untouched) and adds a faint vignette, onto the
+  swapchain; passes with `Desc.screen` (the UI) draw on top. ~0.1 ms.
+  What glows is what is drawn brighter than 1: celestial blooms and their
+  beams, motes, sap glow, ley crystals, highlights.
 - Sky: gradient dome pass (fog colour at the horizon), sun/moon, stars,
   starlight motes (a faceted bipyramid of light, a tilted ring and four
   needle rays; they turn slowly, twinkle, hover breathing, and trail fading
@@ -323,8 +335,8 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - "Celestial / beyond comprehension" is the next phase target.
 
 ## Scope guard
-Do NOT build without explicit direction: audio, multiplayer, PBR/IBL/post-processing,
-Linux/macOS. Flag and stop if a task drifts toward these.
+Do NOT build without explicit direction: audio, multiplayer, PBR/IBL, further
+post-processing (bloom was asked for), Linux/macOS. Flag and stop if a task drifts toward these.
 
 ## Decision authority
 Changes a layer boundary or build/run interface → stop and ask.
