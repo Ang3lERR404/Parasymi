@@ -299,7 +299,8 @@ pub const Player = struct {
     const neck = m.chain(&.{ torso, T(v3(0, 0.5, 0.05)), m.rotX(nod) });
     try joint(out, neck, 0.075);
     const head = m.chain(&.{ neck, T(v3(0, 0.0, 0.02)) });
-    try out.emit(.wolf_head, head, .{ .glow = 0.9, .flutter = 1, .phase = 0.5 });
+    // its fur and cheek leaves barely stir: they lie on the head, not wave
+    try out.emit(.wolf_head, head, .{ .glow = 0.9, .flutter = 0.15, .phase = 0.5 });
     try out.emit(.paw_bean, m.chain(&.{ head, T(head_mesh.nose), S(v3(0.021, 0.014, 0.013)) }), .{ .glow = 0.1, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
     // ears: rooted in the skull, leaning a little forward and out; heavy,
     // so they do not flutter

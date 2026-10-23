@@ -207,7 +207,15 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
     back from the chin over a separate lower jaw. Ears: thick (sap inner
     face 50% over a vine back shell, joined by a rolled rim), cupped with an
     inner fold, base flaring wide and sunk into the skull (`ear_root`),
-    leaning 12 degrees forward and out, no flutter. Grown-tendril mane.
+    leaning 12 degrees forward and out, no flutter. Fur: leaves lie back
+    over the skull behind the ears in staggered rows, lengthening into a
+    ruff over the nape (`wolf_kit.leaf`: base flush, lifting off, tip
+    curling back); small leaves emerge along each cheekbone. Leaf tufts
+    (shoulders, tail tip) are whorls of the same fur leaves.
+  - Forms of planes (`wolf_kit.form`, superellipsoids): joints are squared
+    knuckles with a condyle at each end of the hinge and tendon straps over
+    front and back; the deltoid is a squared cap with front and rear heads
+    draping into a tendon down the upper arm.
   - Torso: three sections (broad loose-woven chest, tight vine-corset waist,
     hips); pectorals are broad dishes of resin sap (wider top edge, areola +
     nipple below the crown), base held on the chest, surface sprung; chest

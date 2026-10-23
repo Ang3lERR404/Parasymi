@@ -6,17 +6,19 @@
 //! running back from the chin to the cheek. A separate lower jaw sits under
 //! the muzzle (the seam opens a little at the back). The ears and the nose
 //! pad are their own instances (`wolf_ear`, `paw_bean`), placed by the rig.
+//! Leaves lie back over the skull behind the ears like fur, wrapping the
+//! nape in a ruff, and small leaves emerge along each cheekbone.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("../../core/color.zig");
+const kit = @import("wolf_kit.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
 const core = pal.wolf_core;
-const leaf_dark = pal.wolf_leaf_dark;
 const sap = pal.sap;
 
 /// the head runs from the back of the skull to the end of the muzzle
@@ -111,7 +113,6 @@ fn normal(z:f32, a:f32) V3 {
 fn zAt(i:usize) f32 { return m.lerp(BACK, FRONT, m.ratio(i, STATIONS - 1)); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  var rng = pal.rngFor("wolf_head");
   // the head: one closed surface. Darker toward the back, the hide's
   // vine tone on the muzzle.
   const hide = color.mix(core, pal.wolf_vine, 0.35);
@@ -166,13 +167,60 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     const at = point(0.058, a) - normal(0.058, a) * m.splat3(0.006);
     try mg.ellipsoid(b, .{.center = at, .radii = v3(0.012, 0.012, 0.017), .col = sap, .part = .bloom, .rings = 5, .segs = 7, .t = 1});
   }
-  // mane: living tendrils sweeping back off the skull
-  for (0..6) |i| {
-    const a = (m.f(i) - 2.5) * 0.35;
-    try mg.vine(b, .{
-      .start = v3(0, 0.15, -0.05), .direction = m.norm(v3(@sin(a) * 0.6, 0.3, -1)), .length = 0.14 * rng.range(0.8, 1.2),
-      .curl = 0.3, .wobble = 0.1, .taper = 0.1, .seed = 0x3A9E +% i,
-    }, 5, 12, 0.014, leaf_dark, .tendril, 4, 0.8, 1);
+  try fur(b);
+  try cheekLeaves(b);
+}
+
+/// the surface's direction toward the back of the head at (z, a), along it
+fn backward(z:f32, a:f32) V3 {
+  const d = point(z - 0.004, a) - point(z + 0.004, a);
+  const n = normal(z, a);
+  return m.norm(d - n * m.splat3(m.dot(d, n)));
+}
+
+/// leaves lying back over the skull behind the ears like fur, in staggered
+/// rows that lengthen toward the nape and wrap around it into a ruff over
+/// the neck, each overlapping the row behind
+fn fur(b:*mg.Builder) Allocator.Error!void {
+  var rng = pal.rngFor("wolf_fur");
+  const rows = [_]struct { z:f32, a0:f32, a1:f32, n:u32, len:f32 }{
+    .{.z = -0.028, .a0 = 1.05, .a1 = 2.09, .n = 3, .len = 0.05},
+    .{.z = -0.048, .a0 = 0.55, .a1 = 2.59, .n = 6, .len = 0.058},
+    .{.z = -0.066, .a0 = 0.05, .a1 = 3.09, .n = 8, .len = 0.066},
+    .{.z = -0.082, .a0 = -0.5, .a1 = 3.64, .n = 10, .len = 0.074},
+  };
+  for (rows, 0..) |row, ri| {
+    for (0..row.n) |i| {
+      const stagger = if (ri % 2 == 0) @as(f32, 0.5) else 0.25;
+      const a = m.lerp(row.a0, row.a1, (m.f(i) + stagger) / m.f(row.n)) + rng.range(-0.05, 0.05);
+      const n = normal(row.z, a);
+      // they lie back and settle down over the curve of the skull
+      const along = m.norm(backward(row.z, a) + v3(0, -0.25, 0));
+      try kit.leaf(b, .{
+        .base = point(row.z, a) - n * m.splat3(0.002), .along = along, .out = n,
+        .len = row.len * rng.range(0.85, 1.1), .width = 0.017 * rng.range(0.9, 1.1),
+        .lift = 0.4, .curl = 0.5, .cup = 0.3,
+        .col = pal.wolf_leaf_dark, .tip = pal.wolf_leaf_lite, .t = 0.9,
+      });
+    }
+  }
+}
+
+/// small leaves emerging along each cheekbone, flush at the base, angling
+/// out, back and a little up
+fn cheekLeaves(b:*mg.Builder) Allocator.Error!void {
+  for ([_]f32{-1, 1}) |side| {
+    for ([_]f32{0.002, 0.024, 0.046}, 0..) |z, i| {
+      const a:f32 = if (side > 0) -0.12 else m.pi + 0.12;
+      const n = normal(z, a);
+      const along = m.norm(backward(z, a) + v3(0, 0.35, 0));
+      try kit.leaf(b, .{
+        .base = point(z, a) - n * m.splat3(0.0015), .along = along, .out = n,
+        .len = 0.03 + 0.007 * m.f(2 - i), .width = 0.012,
+        .lift = 0.7, .curl = 0.25, .cup = 0.3,
+        .col = pal.wolf_leaf_dark, .tip = pal.wolf_leaf_lite, .t = 0.9,
+      });
+    }
   }
 }
 
