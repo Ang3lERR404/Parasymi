@@ -1,7 +1,6 @@
 # CLAUDE.md
 
 ## What this is
-
 Player-centric Factorio-like automation game. Magically infused plants (parasitic +
 symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3),
 Windows, no asset files (every mesh, the font and all UI shapes are procedural).
@@ -9,7 +8,6 @@ Windows, no asset files (every mesh, the font and all UI shapes are procedural).
 rotation in play; a free inspection camera is always available (Ctrl+F).
 
 ## Build
-
 ```
 zig build run                     # debug (validation on)
 zig build run -Drelease=true      # ReleaseFast (-Doptimize is not accepted)
@@ -25,7 +23,6 @@ Needs `VULKAN_SDK` (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`,
 zglfw `f04fdbf`. Upstream heads need 0.17. A stray `CPATH` breaks GLFW's C build.
 
 ## Controls
-
 WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
 RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate, 1–9/0 hotbar,
 Tab belly (weave), T research, F3 debug. Esc closes a panel, else pauses (Q in
@@ -34,7 +31,6 @@ Free cam (Ctrl+F): click to look, WASD fly (Shift fast), Space/Ctrl+Space
 rise/sink, Q/E roll, wheel dolly, unclamped; eases back in 0.3 s.
 
 ## Performance targets
-
 - 8 ms frame (120 FPS), RTX 3060-class, validation ON.
 - 30 Hz fixed sim tick, decoupled from render (currently 60 Hz, `play.TICK`).
 - Chunk: 64×64 tiles, < 2 ms gen+upload, queue-based (currently 32×32).
@@ -55,7 +51,6 @@ main      wiring, frame loop, save/load/fullscreen requests
 ```
 
 ## Registries
-
 One module per thing. Enum via `std.meta.DeclEnum`, dispatch via
 `switch (id) { inline else => |k| reg.module(k).hook(...) }`; hooks optional
 (`reg.has`). Adding a thing = one file + one line in the namespace. Never add a
@@ -73,7 +68,6 @@ One module per thing. Enum via `std.meta.DeclEnum`, dispatch via
 Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tables.
 
 ## Conventions
-
 - 2-space indent, `name:Type` (no space after colon), terse `//!`/`///` docs, LF.
 - All math via `core/math.zig` (alias `m`): scalars, tiles, `m.dirVec`/`dirYaw`,
   vectors/matrices, `m.spring` (exact critically damped), `m.springDamper`
@@ -101,7 +95,6 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
 - Edits: write to files, pass files to scripts. No inline heredocs.
 
 ## Zig 0.16 API notes
-
 - `std.Io` replaces all old I/O. Pass an `Io` instance like an allocator.
 - "Juicy Main": `main` accepts injected params. No global env/args.
 - `@Type` removed. Use `@Pointer`, `@ErrorUnion`, explicit `error{...}` sets.
@@ -197,3 +190,12 @@ silhouette, material feel, "does this read as X"), their word is final.
 If they say something looks "off," "weak," "generic," or "too X," that
 is the acceptance criterion — implement the fix they describe, don't
 propose alternatives or ask for justification.
+
+## Working rules
+- Commit and push `devel` after every verified change (builds, tests pass),
+  without asking. Never commit `parasymi.sav`. Broken work is reported, not
+  committed.
+- Reports: no commentary. End a task with a short list of changes only;
+  a real deviation or blocker is one bullet.
+- Verify visual work in the running game (a scratch copy may move the camera);
+  say what was not checked.
