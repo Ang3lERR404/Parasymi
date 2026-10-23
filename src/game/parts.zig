@@ -18,6 +18,11 @@ pub const Look = struct {
   /// how far a resin part's surface is pushed off its rest (mesh space);
   /// its base on the body stays put (see vertex.Part.resin)
   give:[3]f32 = .{0, 0, 0},
+  /// how far it bends in the garden's wind, as the plants do (0 rigid),
+  /// over what height, rooted how far below its origin
+  sway:f32 = 0,
+  tall:f32 = 1,
+  drop:f32 = 0,
 };
 
 pub const Parts = struct {
@@ -60,5 +65,6 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .tint = look.tint,
     // q.x = sag; q.yzw = give
     .q = .{look.sag, look.give[0], look.give[1], look.give[2]},
+    .w = .{look.sway, look.tall, look.drop, 0},
   };
 }

@@ -10,7 +10,7 @@ const craft = @import("../craft.zig");
 const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 
-pub const def:st.Def = .{ .name = "GERMINATOR", .item = .germinator, .size = 2, .mesh = .germinator };
+pub const def:st.Def = .{ .name = "GERMINATOR", .item = .germinator, .size = 2, .mesh = .germinator, .sway = 0.9, .tall = 1.05 };
 
 /// weave speed multiplier relative to hand-weaving
 const SPEED:f32 = 0.6;

@@ -11,7 +11,7 @@ const color = @import("../../core/color.zig");
 const Parts = @import("../parts.zig").Parts;
 const pod = @import("../../gfx/meshes/sap_cache.zig");
 
-pub const def:st.Def = .{ .name = "SAP CACHE", .item = .sap_cache, .size = 1, .mesh = .sap_cache, .sap = 0.3 };
+pub const def:st.Def = .{ .name = "SAP CACHE", .item = .sap_cache, .size = 1, .mesh = .sap_cache, .sap = 0.3, .sway = 0.5, .tall = 0.9 };
 
 /// effectively unlimited: conduits and diggers will always hand off to a cache
 const WANTS_MAX:u32 = 1 << 16;
@@ -42,6 +42,8 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const r = 0.06 + 0.04 * m.clamp01(m.f(it.n) / 20);
     try out.emit(.belly_lump, m.chain(&.{m.translate(ctr + m.v3(@cos(a) * ring, y, @sin(a) * ring)), m.scale3(m.splat3(r))}), .{
       .glow = 0.2, .phase = s.seed, .tint = color.Rgba8.of(it.item.info().col).toF4(),
+      // it sways with the pod it hangs in
+      .sway = def.sway, .tall = def.tall, .drop = y,
     });
     k += 1;
   }

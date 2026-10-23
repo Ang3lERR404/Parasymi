@@ -70,11 +70,9 @@ void main() {
   float h = tu.x;
   // one wind over the whole garden: its heading drifts slowly, and broad
   // gusts roll across it as a wave, so neighbours lean together
-  float head = 0.6 + 0.35 * sin(t * 0.031);
-  vec2 wdir = vec2(cos(head), sin(head));
-  float along = dot(ipos.xz, wdir);
-  float gust = 0.5 + 0.5 * sin(t * 0.32 - along * 0.16);
-  gust *= gust; // mostly calm, now and then a push
+  vec4 wind = gardenWind(t, ipos.xz);
+  vec2 wdir = wind.xy;
+  float gust = wind.z, along = wind.w;
 
   // symbiotic breathing: slow, the leaf tips moving
   if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * 6.28);
@@ -105,16 +103,9 @@ void main() {
   float own = sin(t * 0.85 - along * 0.3 + seed * 6.28 - h * 0.9);
   float lean = sway * (0.05 * gust + 0.025 * (0.4 + gust) * own);
   float ang = lean * h * h;
-  float ca = cos(ang);
-  float sa = sin(ang) * (smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0);
-  float a0 = dot(p.xz, wdir);
-  float a1 = a0 * ca + p.y * sa;
-  p.y = p.y * ca - a0 * sa;
-  p.xz += wdir * (a1 - a0);
-  float na0 = dot(n.xz, wdir);
-  float na1 = na0 * ca + n.y * sa;
-  n.y = n.y * ca - na0 * sa;
-  n.xz += wdir * (na1 - na0);
+  ang *= smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
+  p = bendIn(p, wdir, ang);
+  n = bendIn(n, wdir, ang);
   // a confluence's growth keys already carry its size
   float s = (confluence ? 1.0 : mix(0.12, 1.0, g)) * (0.85 + 0.3 * fract(seed * 7.13));
   vec3 wp = ipos + p * s;

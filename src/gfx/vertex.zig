@@ -65,6 +65,10 @@ pub const PartInstance = extern struct {
   /// x sag: outward bulge of a sac, heavier at its bottom and front (0 = none);
   /// yzw give: how far a resin part's surface is pushed (mesh space), its base held
   q:[4]f32,
+  /// x sway: how far it bends from its root in the garden's wind (0 rigid);
+  /// y the height over which it bends; z how far below the origin it is
+  /// rooted (a part hovering above its stalk bends with it); w unused
+  w:[4]f32,
 };
 
 pub const Ui = extern struct {

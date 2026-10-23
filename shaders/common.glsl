@@ -11,6 +11,29 @@ layout(push_constant) uniform Push {
 
 #define SUN pc.sun.xyz
 
+// the one wind over the whole garden at a point (x,z): its heading (xy,
+// unit) drifts slowly, and broad gusts (z, 0..1, mostly calm) roll across
+// it as a wave, so neighbours lean together; w is the point's distance
+// along the wind, which later motion is phased by.
+vec4 gardenWind(float t, vec2 at) {
+  float head = 0.6 + 0.35 * sin(t * 0.031);
+  vec2 wdir = vec2(cos(head), sin(head));
+  float along = dot(at, wdir);
+  float gust = 0.5 + 0.5 * sin(t * 0.32 - along * 0.16);
+  return vec4(wdir, gust * gust, along);
+}
+
+// turn `v` about the origin by `ang` in the vertical plane holding `wdir`
+// (positive: its top toward the wind's heading).
+vec3 bendIn(vec3 v, vec2 wdir, float ang) {
+  float ca = cos(ang), sa = sin(ang);
+  float a0 = dot(v.xz, wdir);
+  float a1 = a0 * ca + v.y * sa;
+  v.y = v.y * ca - a0 * sa;
+  v.xz += wdir * (a1 - a0);
+  return v;
+}
+
 vec3 srgb2lin(vec3 c) { return pow(c, vec3(2.2)); }
 
 vec3 shade(vec3 albedo, vec3 n, vec3 wpos) {

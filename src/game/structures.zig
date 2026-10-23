@@ -52,6 +52,10 @@ pub const Def = struct {
   /// how see-through its sap (resin pods, sap beads) is at its thinnest;
   /// like the wolf's, it has no light of its own
   sap:f32 = 0.78,
+  /// grown structures that stand up move like plants: how far they bend in
+  /// the wind (0 rigid) and over what height
+  sway:f32 = 0,
+  tall:f32 = 1,
 };
 
 pub const defs = reg.table(Def, "def");

@@ -177,6 +177,11 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   far edge into the next (`conduit.rise`), rootlets forking into the soil,
   side roots (`conduit_tap`) creeping out to plants. Structures breathe at a
   fixed tempo (activity deepens it, never retimes it).
+  Standing structures (germinator, research bloom, sap cache; `Def.sway`)
+  move like plants in part.vert: they bend from the root in the same
+  garden wind (`gardenWind`/`bendIn` in common.glsl), leaves and petals
+  breathe and lift; what hangs on them (orb, stored items) sways with them
+  (`Look.drop`).
 - Floaters (`drift`): a translucent sap float, a wide catcher dish above,
   filaments trailing beneath (tips sway most); they rise and fall slowly
   and drift over a soft ground shadow (part `.shadow`, meshlib `shadow`).

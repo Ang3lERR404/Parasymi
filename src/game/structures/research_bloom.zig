@@ -11,7 +11,7 @@ const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 
-pub const def:st.Def = .{ .name = "RESEARCH BLOOM", .item = .research_bloom, .size = 2, .mesh = .research_bloom };
+pub const def:st.Def = .{ .name = "RESEARCH BLOOM", .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0 };
 
 /// most of one ingredient it will hold
 const STOCK = 20;
@@ -34,15 +34,18 @@ pub fn wants(s:*const st.Structure, g:*const prog.Progression, item:items.Item) 
   return 0;
 }
 
-/// the orb hovering over the bloom: bobs, and spins with the work.
+/// the orb hovering over the bloom: bobs, turns, and sways with the
+/// flower under it. It turns at a fixed tempo (one that followed the work
+/// jumped every time the work changed); the work makes it rock harder.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   const a = s.activity;
   const bob = 0.12 * @sin(tf * 1.4 + s.seed * 5);
+  const lift = 2.05 + bob;
   try out.emit(.research_orb, m.chain(&.{
-    m.translate(ctr + m.v3(0, 2.05 + bob, 0)),
-    m.rotY(tf * (0.4 + 2.5 * a)),
-    m.rotX(0.3 * @sin(tf)),
-  }), .{ .glow = 0.7 + 1.5 * a, .phase = s.seed, .fade = 0.7 });
+    m.translate(ctr + m.v3(0, lift, 0)),
+    m.rotY(tf * 0.5 + s.seed * m.tau),
+    m.rotX((0.15 + 0.25 * a) * @sin(tf)),
+  }), .{ .glow = 0.7 + 1.5 * a, .phase = s.seed, .fade = 0.7, .sway = def.sway, .tall = def.tall, .drop = lift });
 }
 
 pub fn describe(_:*const st.Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {

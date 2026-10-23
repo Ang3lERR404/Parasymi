@@ -16,6 +16,7 @@ layout(location = 8) in vec4 c3;
 layout(location = 9) in vec4 ip;    // glow, flutter, phase, fade
 layout(location = 10) in vec4 tint; // rgb multiply, w amount
 layout(location = 11) in vec4 iq;   // sag, give (resin surface push)
+layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -39,15 +40,33 @@ void main() {
   // secondary motion. Offsets must be identical for every copy of a shared
   // vertex (faceted parts carry different normals per face), so they use a
   // fixed axis scaled by position along the leaf: tips move, bases stay put.
-  if (part == 1u || part == 5u) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
+  float sway = iw.x;
+  vec4 wind = gardenWind(t, c3.xz);
+  // grown structures move as the plants do: leaves and petals breathe
+  // slowly and lift a little in the gusts, tips most, bases held
+  if (sway > 0.0 && (part == 1u || part == 5u)) {
+    p.y += tu.y * tu.y * (0.012 * wind.z * sin(t * 1.7 + ip.z * 11.0 + tu.x * 3.0) + 0.01 * sin(t * 0.9 + ip.z * 6.28));
+  } else if (part == 1u || part == 5u) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
   if (part == 4u) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
   // resin gives like dense gel: its surface follows the spring, its base on
   // the body holds (a smooth field of height, so shared vertices move alike)
   if (part == 6u) p += iq.yzw * smoothstep(0.0, 1.0, tu.y);
 
   vec4 w = M * vec4(p, 1.0);
+  vec3 wn = mat3(M) * nrm;
+  // ... and bend from their root in the garden's wind, as the plants do:
+  // more toward the top, the lean slow and late at the tip (a smooth field
+  // of world height, so shared vertices move alike)
+  if (sway > 0.0) {
+    vec3 root = c3.xyz - vec3(0.0, iw.z, 0.0);
+    float h = clamp((w.y - root.y) / iw.y, 0.0, 1.5);
+    float own = sin(t * 0.85 - wind.w * 0.3 + ip.z * 6.28 - h * 0.9);
+    float ang = sway * (0.05 * wind.z + 0.025 * (0.4 + wind.z) * own) * h * h;
+    w.xyz = root + bendIn(w.xyz - root, wind.xy, ang);
+    wn = bendIn(wn, wind.xy, ang);
+  }
   v_pos = w.xyz;
-  v_nrm = normalize(mat3(M) * nrm);
+  v_nrm = normalize(wn);
   vec3 c = srgb2lin(col.rgb);
   v_col = mix(c, c * tint.rgb, tint.w);
   // sap pulses travel along the part
