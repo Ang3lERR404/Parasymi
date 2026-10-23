@@ -15,6 +15,7 @@ const parts = struct {
   pub const driftwisp = @import("species/driftwisp.zig");
   pub const hollowheart = @import("species/hollowheart.zig");
   pub const confluence = @import("species/confluence.zig");
+  pub const bloom = @import("species/bloom.zig");
 };
 const reg = registry.Registry(parts);
 
@@ -98,6 +99,15 @@ pub const Species = struct {
   contain:u8 = 0,
   /// wind sway amplitude relative to other plants.
   sway:f32 = 1,
+  /// a floater's height above the ground
+  hover:f32 = 1.15,
+  /// celestial energy: the radius (tiles) of the field this plant holds
+  /// once it radiates (0: none), and how far (tiles) it links with others
+  /// of its kind into one network (see ecology `Radiance`)
+  radiance:f32 = 0,
+  link:f32 = 0,
+  /// it needs celestial energy: outside every field it halts and withers
+  needs_radiance:bool = false,
   /// names of its growth stages, shown on hover (the mesh itself grows
   /// continuously; see meshgen `KEYS`).
   stages:?[4][]const u8 = null,

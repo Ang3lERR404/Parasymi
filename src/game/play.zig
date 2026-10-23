@@ -52,11 +52,13 @@ const FPS_LERP:f32 = 0.05;
 const PICK_STEP:f32 = 0.1;
 const PICK_RANGE_MULT:f32 = 4;
 
-/// everything the wolf can put into the world, in hotbar key order 1..9, 0.
+/// everything the wolf can put into the world, in hotbar key order 1..9, 0, -.
 pub const hotbar = [_]items.Item{
   .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
-  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger,
+  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom,
 };
+/// the key that picks each hotbar slot, as the hotbar labels it
+pub const hotbar_keys = [_][]const u8{"1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-"};
 
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
 pub fn known(g:*const Game, item:items.Item) bool {
@@ -232,6 +234,7 @@ pub const Game = struct {
     const nums = [_]bool{
       in.pressed(.one), in.pressed(.two), in.pressed(.three), in.pressed(.four), in.pressed(.five),
       in.pressed(.six), in.pressed(.seven), in.pressed(.eight), in.pressed(.nine), in.pressed(.zero),
+      in.pressed(.minus),
     };
     // number keys pick the hotbar slot, whichever panel is open
     if (!inspecting) for (nums, 0..) |p, i| {

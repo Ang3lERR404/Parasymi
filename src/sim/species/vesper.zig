@@ -1,11 +1,15 @@
 //! VESPER BLOOM: the first convergent hybrid, spliced where symbiote and
-//! parasite touch. Shares with symbiotes and drains parasites.
+//! parasite touch. Shares with symbiotes and drains parasites. The evening
+//! star's flower: it needs celestial energy, and withers outside a bloom's
+//! field.
 const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
   .name = "VESPER BLOOM", .lineage = .convergent, .seed = .seed_vesper,
   .mature_time = 16, .mana_cap = 24, .ley_draw = 0.8, .share = 0.6, .drain = 0.8, .yield = 0.4, .seed_time = 45,
+  // decision: the first plant that needs radiance (the brief names none)
+  .needs_radiance = true,
   .genome = .{
     .stem_h = 0.95, .stem_r = 0.04, .segments = 9, .curl = 0.12, .wobble = 0.12,
     .leaves = 9, .leaf_len = 0.30, .leaf_w = 0.09, .leaf_droop = 0.55,

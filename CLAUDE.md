@@ -24,7 +24,7 @@ zglfw `f04fdbf`. Upstream heads need 0.17. A stray `CPATH` breaks GLFW's C build
 
 ## Controls
 WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
-RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate, 1–9/0 hotbar
+RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate, 1–9/0/- hotbar
 (only), click a research node or weave recipe in its panel,
 Tab belly (weave), T research, F3 debug. Esc closes a panel, else pauses (Q in
 pause = save and quit). F5 save, F9 load, F11 fullscreen.
@@ -153,6 +153,20 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   stages; yields convergence essence + its parents' seeds; mature, it halves
   parasite drain within 3 tiles. Discovery-gated; "Convergence Theory" only
   reveals its yield in the HUD.
+- Celestial bloom (`species/bloom.zig`, `ecology.Radiance`): a sown,
+  floating symbiote (hover 3.2, above the motes) that yields nothing and
+  radiates a field of celestial energy (3.5 tiles). Blooms within 10 tiles
+  link into networks; a network radiates when it holds a mature bloom, and
+  then all its blooms (growing ones too) hold their fields, so uprooting a
+  linking bloom cuts off the blooms beyond it. Plants with
+  `needs_radiance` (the vesper bloom, for now) halt and wither (0.06 HP/s)
+  outside every field. Worked out each tick from the blooms only (pairwise
+  links, then each radiating bloom's tiles), like containment. The hover
+  panel shows RADIATING/DARK and links, DRAWING RADIANCE/WITHERING. Seed:
+  3 starlight + 1 ley shard + 2 essence (hotbar `-`). Its own visual (a
+  structure of light, threads between blooms) is next; it grows as a
+  brighter floater meanwhile.
+- Item ids are stored by value: new items go at the end of `items.Item`.
 - Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the seed;
   only the gardener's changes are stored. Bump `VERSION` when a stored layout
   changes (the fingerprint checks sizes only).
@@ -304,7 +318,7 @@ Changes a layer boundary or build/run interface → stop and ask.
 Otherwise decide and note with `// decision:` comment.
 
 ## Current state
-Done: engine, terrain, streaming, plants + 6 species, ecology, structures,
+Done: engine, terrain, streaming, plants + 7 species, ecology, structures,
 footprints/floaters, research (9 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, spline vines, adjustable/free camera, sky dome, wolf
 anatomy + "alive" passes, convergence hybrid (confluence).

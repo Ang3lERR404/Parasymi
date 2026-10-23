@@ -26,6 +26,8 @@ pub const hand = [_]Recipe{
   .{ .out = .seed_lumenroot, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
   .{ .out = .seed_thornleech, .in = &.{ .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
   .{ .out = .seed_driftwisp, .in = &.{ .{ .item = .starlight, .n = 1 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .fibre, .n = 1 } }, .time = 2, .needs = .drift_spores },
+  // decision: ungated, from starlight, ley and essence (the brief sets no cost)
+  .{ .out = .seed_bloom, .in = &.{ .{ .item = .starlight, .n = 3 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .essence, .n = 2 } }, .time = 3 },
   .{ .out = .seed_hollowheart, .in = &.{ .{ .item = .essence, .n = 4 }, .{ .item = .fibre, .n = 3 }, .{ .item = .grit, .n = 2 } }, .time = 3, .needs = .canopy_weaving },
   .{ .out = .conduit, .n = 2, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .grit, .n = 1 } }, .time = 1 },
   .{ .out = .sap_cache, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .grit, .n = 4 } }, .time = 2 },

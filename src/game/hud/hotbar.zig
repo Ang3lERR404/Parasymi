@@ -33,7 +33,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     var buf:[8]u8 = undefined;
     const label = bufPrint(&buf, "{d}", .{cnt}) catch "0";
     _ = try d.text(x - Draw.width(label, 1.75) / 2, hy - 7, 1.75, if (cnt > 0) s.white else s.dim, label);
-    _ = try d.print(x - 4, hy + 28, 1.2, s.dim, "{d}", .{(i + 1) % 10});
+    _ = try d.text(x - 4, hy + 28, 1.2, s.dim, play.hotbar_keys[i]);
   }
 
   const item = play.hotbar[g.hot];

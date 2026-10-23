@@ -99,7 +99,7 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
     // never a bounce, over a soft shadow that shrinks as they rise
     const ground = @max(y, 0);
     const lift = 0.07 * @sin(tf * 0.5 + d.seed * 10) + 0.025 * @sin(tf * 1.13 + d.seed * 4);
-    y = ground + 1.15 + lift;
+    y = ground + def.hover + lift;
     at = m.v3(at[0] + 0.05 * @sin(tf * 0.31 + d.seed * 7), 0, at[2] + 0.05 * @cos(tf * 0.27 + d.seed * 5));
     const r = 0.42 - 0.6 * lift;
     if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + 0.03, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = 0.6});

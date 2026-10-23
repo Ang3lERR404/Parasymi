@@ -50,7 +50,7 @@ fn structure(g:*play.Game, d:*Draw, sp:*const st.Structure, near:bool) Allocator
 
 fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Allocator.Error!void {
   const pi = g.plants.at(&g.world, h[0], h[1]);
-  const ph:f32 = if (pi != null) 112 else 60;
+  const ph:f32 = if (pi != null) 134 else 60;
   try d.membrane(panel_x, panel_y, 360, ph, s.skin, 0.6);
   if (c.res[t] > 0 and c.occ[t] == .none) {
     const item = resources.of(c.kind[t]).?.item;
@@ -73,6 +73,24 @@ fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Alloca
     _ = try d.print(text_x + 164, y - 4, 1.25, s.dim, "GROWTH {d:.0}%", .{p.growth * 100});
   }
   y += 22;
+  y += 22;
+  const rad = &g.eco.radiance;
+  const known = i.idx() < rad.powered.items.len;
+  if (def.radiance > 0) {
+    // a bloom: it yields nothing; it radiates, or waits on its network
+    var links:u32 = 0;
+    for (rad.links.items) |l| {
+      if (l.a == i or l.b == i) links += 1;
+    }
+    const lit = known and rad.radiating.items[i.idx()];
+    _ = try d.print(text_x, y - 22, 1.4, if (lit) s.gold else s.dim, "{s}  LINKED TO {d}  HP {d:.0}%", .{if (lit) "RADIATING" else "DARK", links, p.health * 100});
+    if (!lit) _ = try d.text(text_x, y, 1.25, s.dim, "NO MATURE BLOOM IN ITS NETWORK");
+    return;
+  }
   const yields = if (g.prog.yieldKnown(p.sp)) def.yields.info().short else "??";
-  _ = try d.print(text_x, y, 1.4, s.gold, "{s} {d:.1}  SEEDS {d}  HP {d:.0}%", .{yields, p.essence, m.floorTo(u32, p.seeds), p.health * 100});
+  _ = try d.print(text_x, y - 22, 1.4, s.gold, "{s} {d:.1}  SEEDS {d}  HP {d:.0}%", .{yields, p.essence, m.floorTo(u32, p.seeds), p.health * 100});
+  if (def.needs_radiance) {
+    const lit = known and rad.powered.items[i.idx()];
+    _ = try d.text(text_x, y, 1.25, if (lit) s.gold else s.dim, if (lit) "DRAWING RADIANCE" else "NO RADIANCE: WITHERING");
+  }
 }
