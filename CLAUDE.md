@@ -160,6 +160,11 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   Symbiote vines (tendrils, the confluence's green vine length) grow small
   leaves along them (`leavesAlong`); plant.vert holds every leaf's base
   (breathing/unfurling weighted by tu.y), and only parasites writhe.
+- Grown structures speak the plants' language (`meshes/structure_kit.zig`):
+  woven root mats, grown vines with leaves along them, real petals, and
+  pods of the wolf's resin sap (part `.resin`, instance fade `STRUCT_SAP`;
+  no light of their own). Germinator: resin pod with a seed inside, cradled
+  by vines. Research bloom: woven stalk, broad violet flower, banded resin orb.
 - Floaters (`drift`): a translucent sap float, a wide catcher dish above,
   filaments trailing beneath (tips sway most); they rise and fall slowly
   and drift over a soft ground shadow (part `.shadow`, meshlib `shadow`).

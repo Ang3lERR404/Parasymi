@@ -1,16 +1,18 @@
-//! mesh: RESEARCH ORB. hovers above the research bloom; spun and bobbed per instance
+//! mesh: RESEARCH ORB. a sphere of resin sap held in two grown vine bands,
+//! hovering above the research bloom; spun and bobbed per instance.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
-const color = @import("../../core/color.zig");
+const pal = @import("palette.zig");
+const kit = @import("structure_kit.zig");
 
 const v3 = m.v3;
+const R:f32 = 0.22;
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  try mg.ellipsoid(b, .{.center = v3(0, 0, 0), .radii = v3(0.22, 0.22, 0.22), .col = color.rgb(0.85, 0.7, 1.0).toRgba8(255), .part = .bloom, .rings = 10, .segs = 14, .t = 1});
-  for (0..8) |i| {
-    const a = m.f(i) / 8 * m.tau;
-    try b.cone(v3(@cos(a) * 0.32, 0, @sin(a) * 0.32), v3(-@sin(a), 0.2, @cos(a)), 0.14, 0.025, color.rgb(1, 0.85, 0.6).toRgba8(255), 1, .bloom);
-  }
+  try kit.resinPod(b, v3(0, 0, 0), v3(R, R, R), 10, 14);
+  // two bands wrapping it, pole to pole, crossing
+  const arcs = [_][4]f32{ .{0.15, 0.3, 2.99, 2.4}, .{0.2, 3.5, 2.9, 5.6} };
+  try mg.bands(b, v3(0, 0, 0), v3(R, R, R), &arcs, 1, 0.018, 0.12, 0x0B5, pal.vine);
 }

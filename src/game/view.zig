@@ -17,6 +17,10 @@ const play = @import("play.zig");
 
 const Game = play.Game;
 
+/// how see-through grown structures' sap is at its thinnest (resin pods,
+/// sap beads); like the wolf's, it has no light of its own.
+const STRUCT_SAP:f32 = 0.78;
+
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
   const tf:f32 = @floatCast(@mod(g.time, 3600));
@@ -112,7 +116,7 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     const a = s.activity;
     const yaw = m.dirYaw(s.dir);
     const breathe = 1 + (0.02 + 0.05 * a) * @sin(tf * (1.5 + 2 * a) + s.seed * 9);
-    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed});
+    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed, .fade = STRUCT_SAP});
     try st.emit(s, &g.parts, ctr, tf);
   }
 }

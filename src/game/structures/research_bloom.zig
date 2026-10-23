@@ -42,7 +42,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     m.translate(ctr + m.v3(0, 2.05 + bob, 0)),
     m.rotY(tf * (0.4 + 2.5 * a)),
     m.rotX(0.3 * @sin(tf)),
-  }), .{ .glow = 0.7 + 1.5 * a, .phase = s.seed });
+  }), .{ .glow = 0.7 + 1.5 * a, .phase = s.seed, .fade = 0.7 });
 }
 
 pub fn describe(_:*const st.Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {

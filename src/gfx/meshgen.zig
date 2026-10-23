@@ -633,7 +633,7 @@ fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32, rooted:bool) Alloca
 /// `n` small leaves grown along a vine between fractions `k0`..`k1` of
 /// `path`: turning around it leaf by leaf, lifting toward the light, smaller
 /// toward the tip. `t0`..`t1` is the vine's tu.x over its length.
-fn leavesAlong(b:*Builder, path:[]const V3, n:u32, len:f32, width:f32, k0:f32, k1:f32, t0:f32, t1:f32, col:color.Rgba8, tip:color.Rgba8, seed:u64) Allocator.Error!void {
+pub fn leavesAlong(b:*Builder, path:[]const V3, n:u32, len:f32, width:f32, k0:f32, k1:f32, t0:f32, t1:f32, col:color.Rgba8, tip:color.Rgba8, seed:u64) Allocator.Error!void {
   var rng = Rng.init(seed);
   for (0..n) |i| {
     const k = m.lerp(k0, k1, (m.f(i) + 0.5) / m.f(n));
