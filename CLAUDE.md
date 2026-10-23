@@ -182,6 +182,10 @@ Items (`sim/items.zig`) and weave recipes (`game/craft.zig`) are plain data tabl
   garden wind (`gardenWind`/`bendIn` in common.glsl), leaves and petals
   breathe and lift; what hangs on them (orb, stored items) sways with them
   (`Look.drop`).
+  Put down by the gardener they grow (`Def.grow` s; germinator 6, research
+  bloom 8, sap cache and digger 4) and do no work until grown: they shoot
+  up first and fill out after (`Structure.grownScale`), leaves and petals
+  unfold bottom-up (part.vert), the research orb forms last.
 - Floaters (`drift`): a translucent sap float, a wide catcher dish above,
   filaments trailing beneath (tips sway most); they rise and fall slowly
   and drift over a soft ground shadow (part `.shadow`, meshlib `shadow`).

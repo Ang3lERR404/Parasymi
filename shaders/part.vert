@@ -16,7 +16,7 @@ layout(location = 8) in vec4 c3;
 layout(location = 9) in vec4 ip;    // glow, flutter, phase, fade
 layout(location = 10) in vec4 tint; // rgb multiply, w amount
 layout(location = 11) in vec4 iq;   // sag, give (resin surface push)
-layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted
+layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted, grown
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -41,6 +41,12 @@ void main() {
   // vertex (faceted parts carry different normals per face), so they use a
   // fixed axis scaled by position along the leaf: tips move, bases stay put.
   float sway = iw.x;
+  // a growing structure's leaves and petals come up folded and open from
+  // the bottom up, tips last (weighted along the leaf so its base holds)
+  if (iw.w < 1.0 && (part == 1u || part == 5u)) {
+    float open = smoothstep(pos.y / iw.y * 0.7, pos.y / iw.y * 0.7 + 0.35, iw.w);
+    p.xz *= mix(1.0, mix(0.2, 1.0, open), tu.y);
+  }
   vec4 wind = gardenWind(t, c3.xz);
   // grown structures move as the plants do: leaves and petals breathe
   // slowly and lift a little in the gusts, tips most, bases held

@@ -22,7 +22,7 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
 
-pub const def:st.Def = .{ .name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger };
+pub const def:st.Def = .{ .name = "ROOT-DIGGER", .item = .root_digger, .size = 1, .mesh = .root_digger, .grow = 4 };
 
 /// seconds per item drawn from the node
 pub const RATE:f32 = 4;
@@ -125,7 +125,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const breathe = 1 + 0.02 * @sin(tf * 1.3 + m.f(r) * 1.7);
     const facing = working and @cos(m.angleDiff(yaw, node_yaw)) > 0.5;
     const reach = if (facing) 1 + 0.15 * (0.5 - 0.5 * @cos(k * m.tau)) else breathe;
-    const size = 0.9 + 0.2 * @abs(@sin(s.seed * 13 + m.f(r) * 2.3));
+    const size = (0.9 + 0.2 * @abs(@sin(s.seed * 13 + m.f(r) * 2.3))) * m.lerp(0.15, 1, m.smooth(s.grown));
     try out.emit(.digger_root, m.chain(&.{
       m.translate(ctr),
       m.rotY(yaw),

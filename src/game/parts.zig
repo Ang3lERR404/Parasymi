@@ -23,6 +23,9 @@ pub const Look = struct {
   sway:f32 = 0,
   tall:f32 = 1,
   drop:f32 = 0,
+  /// how far a grown structure has come along (0 sprout .. 1 grown): its
+  /// leaves and petals unfold from the bottom up
+  grown:f32 = 1,
 };
 
 pub const Parts = struct {
@@ -65,6 +68,6 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .tint = look.tint,
     // q.x = sag; q.yzw = give
     .q = .{look.sag, look.give[0], look.give[1], look.give[2]},
-    .w = .{look.sway, look.tall, look.drop, 0},
+    .w = .{look.sway, look.tall, look.drop, look.grown},
   };
 }

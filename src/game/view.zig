@@ -127,7 +127,11 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     // a fixed tempo: activity deepens the breath but never retimes it (a
     // tempo that followed activity jumped phase every time it changed)
     const breathe = 1 + (0.02 + 0.04 * a) * @sin(tf * 1.6 + s.seed * 9);
-    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(m.v3(breathe, 2 - breathe, breathe))}), .{.glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap, .sway = s.def().sway, .tall = s.def().tall});
+    const size = s.grownScale() * m.v3(breathe, 2 - breathe, breathe);
+    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(size)}), .{
+      .glow = 0.25 + 1.1 * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap,
+      .sway = s.def().sway, .tall = s.def().tall, .grown = s.grown,
+    });
     try st.emit(s, &g.parts, ctr, tf);
   }
 }

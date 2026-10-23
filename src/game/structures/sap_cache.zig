@@ -11,7 +11,7 @@ const color = @import("../../core/color.zig");
 const Parts = @import("../parts.zig").Parts;
 const pod = @import("../../gfx/meshes/sap_cache.zig");
 
-pub const def:st.Def = .{ .name = "SAP CACHE", .item = .sap_cache, .size = 1, .mesh = .sap_cache, .sap = 0.3, .sway = 0.5, .tall = 0.9 };
+pub const def:st.Def = .{ .name = "SAP CACHE", .item = .sap_cache, .size = 1, .mesh = .sap_cache, .sap = 0.3, .sway = 0.5, .tall = 0.9, .grow = 4 };
 
 /// effectively unlimited: conduits and diggers will always hand off to a cache
 const WANTS_MAX:u32 = 1 << 16;
@@ -40,10 +40,11 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const ring = if (n == 1) 0 else pod.POD_R[0] * 0.45;
     const y = pod.POD_AT[1] + 0.02 + 0.1 * m.ratio(k, @max(n, 2) - 1) + 0.015 * @sin(tf * 0.7 + m.f(k) * 2);
     const r = 0.06 + 0.04 * m.clamp01(m.f(it.n) / 20);
-    try out.emit(.belly_lump, m.chain(&.{m.translate(ctr + m.v3(@cos(a) * ring, y, @sin(a) * ring)), m.scale3(m.splat3(r))}), .{
+    const at = m.v3(@cos(a) * ring, y, @sin(a) * ring) * s.grownScale();
+    try out.emit(.belly_lump, m.chain(&.{m.translate(ctr + at), m.scale3(m.splat3(r * s.grown))}), .{
       .glow = 0.2, .phase = s.seed, .tint = color.Rgba8.of(it.item.info().col).toF4(),
       // it sways with the pod it hangs in
-      .sway = def.sway, .tall = def.tall, .drop = y,
+      .sway = def.sway, .tall = def.tall, .drop = at[1],
     });
     k += 1;
   }

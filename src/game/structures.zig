@@ -56,6 +56,9 @@ pub const Def = struct {
   /// the wind (0 rigid) and over what height
   sway:f32 = 0,
   tall:f32 = 1,
+  /// seconds it takes to grow from a sprout once the gardener puts it down
+  /// (0: there at once); it does no work until grown
+  grow:f32 = 0,
 };
 
 pub const defs = reg.table(Def, "def");
@@ -80,8 +83,17 @@ pub const Structure = struct {
   state:State,
   /// smoothed 0..1, drives glow and motion
   activity:f32 = 0,
+  /// 0 a sprout .. 1 grown (see `Def.grow`)
+  grown:f32 = 1,
 
   pub fn kind(s:*const Structure) Kind { return activeTag(s.state); }
+  /// how big a growing structure is drawn: it shoots up from the ground
+  /// first and fills out after, as the plants do
+  pub fn grownScale(s:*const Structure) m.V3 {
+    const up = m.smooth(m.clamp01(s.grown * 1.4));
+    const out = m.smooth(s.grown);
+    return m.v3(m.lerp(0.2, 1, out), m.lerp(0.1, 1, up), m.lerp(0.2, 1, out));
+  }
   pub fn def(s:*const Structure) Def { return defs.get(s.kind()); }
 };
 
@@ -123,6 +135,12 @@ pub const Structures = struct {
     try ss.list.append(gpa, .{ .x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k) });
     w.setFootprint(wx, wy, defs.get(k).size, Occ.structure(idx));
     return true;
+  }
+
+  /// a structure the gardener has just put down starts as a sprout.
+  pub fn sprout(ss:*Structures, id:Id) void {
+    const s = ss.get(id);
+    if (s.def().grow > 0) s.grown = 0;
   }
 
   pub fn at(_:*const Structures, w:*const World, wx:i32, wy:i32) ?Id {
@@ -170,7 +188,11 @@ pub const Structures = struct {
     const ctx:Ctx = .{ .w = w, .plants = plants, .g = g, .ss = ss };
     for (0..ss.list.items.len) |idx| {
       const id = Id.of(idx);
-      const active = switch (ss.get(id).kind()) {
+      const g0 = ss.get(id);
+      const active = if (g0.grown < 1) blk: {
+        g0.grown = @min(1, g0.grown + dt / g0.def().grow);
+        break :blk false;
+      } else switch (g0.kind()) {
         inline else => |k| if (comptime reg.has(k, "tick")) reg.module(k).tick(ctx, id, dt) else false,
       };
       const s = ss.get(id);
@@ -265,4 +287,29 @@ test "a conduit's side root reaches a plant beside it and harvests it" {
   try testing.expect(ss.get(ss.at(&w, 1, 0).?).state.conduit.held == null);
   for (0..200) |_| ss.tick(&w, &plants, &g, 0.05);
   try testing.expectEqual(@as(u32, 2), ss.get(ss.at(&w, 2, 0).?).inv.count(.essence));
+}
+
+test "a structure put down grows before it works" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..2) |x| for (0..2) |y| { const t = y * ck.SIZE + x; c.kind[t] = .soil; c.height[t] = 1; c.res[t] = 0; };
+  var plants:Plants = .{};
+  defer plants.deinit(gpa);
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression = .{};
+  try testing.expect(try ss.place(gpa, &w, 0, 0, .germinator, 0, 0));
+  const id = ss.at(&w, 0, 0).?;
+  ss.sprout(id);
+  try testing.expectEqual(@as(f32, 0), ss.get(id).grown);
+  const secs = defs.get(.germinator).grow;
+  var t:f32 = 0;
+  while (t < secs * 0.5) : (t += 0.05) ss.tick(&w, &plants, &g, 0.05);
+  try testing.expect(ss.get(id).grown > 0.4 and ss.get(id).grown < 0.6);
+  try testing.expect(ss.get(id).activity < 0.01);
+  while (t < secs + 0.1) : (t += 0.05) ss.tick(&w, &plants, &g, 0.05);
+  try testing.expectEqual(@as(f32, 1), ss.get(id).grown);
 }

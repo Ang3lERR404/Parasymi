@@ -11,7 +11,7 @@ const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 
-pub const def:st.Def = .{ .name = "RESEARCH BLOOM", .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0 };
+pub const def:st.Def = .{ .name = "RESEARCH BLOOM", .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0, .grow = 8 };
 
 /// most of one ingredient it will hold
 const STOCK = 20;
@@ -40,9 +40,13 @@ pub fn wants(s:*const st.Structure, g:*const prog.Progression, item:items.Item) 
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   const a = s.activity;
   const bob = 0.12 * @sin(tf * 1.4 + s.seed * 5);
-  const lift = 2.05 + bob;
+  // the orb forms last, once the flower has opened
+  const form = m.smooth(m.clamp01((s.grown - 0.75) / 0.25));
+  if (form <= 0) return;
+  const lift = (2.05 + bob) * s.grownScale()[1];
   try out.emit(.research_orb, m.chain(&.{
     m.translate(ctr + m.v3(0, lift, 0)),
+    m.scale3(m.splat3(form)),
     m.rotY(tf * 0.5 + s.seed * m.tau),
     m.rotX((0.15 + 0.25 * a) * @sin(tf)),
   }), .{ .glow = 0.7 + 1.5 * a, .phase = s.seed, .fade = 0.7, .sway = def.sway, .tall = def.tall, .drop = lift });

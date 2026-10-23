@@ -47,6 +47,7 @@ pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
     try g.structs.place(g.gpa, &g.world, h[0], h[1], k, g.place_dir, g.rng.float())
   else false;
   if (ok) {
+    if (st.kindOf(item) != null) g.structs.sprout(g.structs.at(&g.world, h[0], h[1]).?);
     _ = g.player.inv.take(item, 1);
     g.plant_cd = 0.25;
     g.linger = 0.35;

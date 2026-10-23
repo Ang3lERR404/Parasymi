@@ -67,7 +67,8 @@ pub const PartInstance = extern struct {
   q:[4]f32,
   /// x sway: how far it bends from its root in the garden's wind (0 rigid);
   /// y the height over which it bends; z how far below the origin it is
-  /// rooted (a part hovering above its stalk bends with it); w unused
+  /// rooted (a part hovering above its stalk bends with it); w how far a
+  /// growing structure has come along (1 grown)
   w:[4]f32,
 };
 
