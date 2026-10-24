@@ -24,7 +24,7 @@ fn pointed(g:*const play.Game) ?items.Item {
     .store => |i| if (g.holds(.{.store = i})) null else if (g.storeSlot(i)) |it| it.item else null,
     // what a recipe weaves, once it is understood
     .recipe => |r| if (craft.hand[r].unlocked(&g.prog)) craft.hand[r].out else null,
-    .panel, .research, .weave, .pause, .option, .back => null,
+    .panel, .research, .weave, .pause, .option, .back, .garden, .garden_act, .scroll => null,
   };
 }
 

@@ -21,6 +21,7 @@ test {
   _ = @import("game/player.zig");
   _ = @import("game/save.zig");
   _ = @import("game/options.zig");
+  _ = @import("game/home.zig");
   _ = @import("gfx/meshgen.zig");
   _ = @import("gfx/meshes/wolf_skeleton.zig");
   _ = @import("gfx/meshes/wolf_belly.zig");

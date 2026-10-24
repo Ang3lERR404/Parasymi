@@ -25,6 +25,8 @@ const save = @import("game/save.zig");
 const txt = @import("game/text.zig");
 const controls = @import("game/controls.zig");
 const options = @import("game/options.zig");
+const home = @import("game/home.zig");
+const sep_str = std.fs.path.sep_str;
 const Options = options.Options;
 const m = @import("core/math.zig");
 
@@ -41,6 +43,13 @@ pub fn main(init:Init) !void {
   const gpa = init.gpa;
   const io = init.io;
   const args = try init.minimal.args.toSlice(init.arena.allocator());
+  // every file of the gardener's lives in their folder, made on first start
+  // (with the settings, strings and controls in it); files kept beside the
+  // game before move in once
+  try home.open(io, init.environ_map);
+  defer home.close(io);
+  home.adopt(io, options.PATH, options.PATH);
+  home.adopt(io, save.LEGACY, home.SAVES ++ sep_str ++ save.LEGACY);
   // the gardener's settings; `--novsync` overrides theirs for this run
   var opts = try options.load(gpa, io);
   var demo = false;
@@ -88,7 +97,10 @@ pub fn main(init:Init) !void {
   // is applied on the first frame
   var applied = opts;
   applied.fullscreen = false;
-  if (load) try restore(gpa, io, &game, r);
+  if (load) {
+    relist(gpa, io, &game);
+    if (game.gardens.items.len > 0) try restore(gpa, io, &game, r, game.gardens.items[0].name);
+  }
   if (demo) try setups.demo(&game, DEMO_FORWARD);
   if (stress) try setups.stress(&game, STRESS_SIDE);
   if (tod) |t| game.sky.tod = t;
@@ -108,10 +120,25 @@ pub fn main(init:Init) !void {
     if (game.request) |rq| {
       game.request = null;
       switch (rq) {
-        .save => if (save.save(&game, gpa, io)) game.prog.say(txt.s.msg.saved, .{}) else |e| game.prog.say(txt.s.msg.save_failed, .{e}),
-        .load => try restore(gpa, io, &game, r),
+        .save => keep(gpa, io, &game, game.slot),
+        .save_as => |n| keep(gpa, io, &game, n),
+        .autosave => keep(gpa, io, &game, save.Name.of(save.AUTO).?),
+        .load => {
+          // the garden being played as last saved, else the newest
+          const n = game.slot orelse newest: {
+            relist(gpa, io, &game);
+            if (game.gardens.items.len == 0) {
+              game.prog.say(txt.s.msg.no_save, .{error.NoSave});
+              break :newest null;
+            }
+            break :newest game.gardens.items[0].name;
+          };
+          if (n) |nn| try restore(gpa, io, &game, r, nn);
+        },
+        .load_from => |n| try restore(gpa, io, &game, r, n),
+        .list => relist(gpa, io, &game),
         .quit => {
-          save.save(&game, gpa, io) catch |e| log.err("save failed: {t}", .{e});
+          keep(gpa, io, &game, game.slot);
           window.setShouldClose(true);
         },
       }
@@ -146,12 +173,40 @@ fn apply(io:Io, game:*Game, r:*Renderer, display:*Display, applied:*Options) !vo
   applied.* = o.*;
 }
 
-/// replace the running game with the saved one (keeping it on failure).
-fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer) !void {
-  var loaded = save.load(gpa, io) catch |e| {
+/// save the garden as `want` (a fresh name if null); saved by hand (not
+/// the autosave) it becomes the garden being played. A failure is said.
+fn keep(gpa:Allocator, io:Io, game:*Game, want:?save.Name) void {
+  game.since_save = 0;
+  const name = want orelse fresh: {
+    relist(gpa, io, game);
+    break :fresh save.fresh(game.gardens.items);
+  };
+  save.save(game, gpa, io, name) catch |e| return game.prog.say(txt.s.msg.save_failed, .{e});
+  if (name.is(save.AUTO)) {
+    game.prog.say(txt.s.msg.autosaved, .{});
+  } else {
+    game.slot = name;
+    game.prog.say(txt.s.msg.saved, .{name.slice()});
+  }
+  if (game.mode == .gardens) relist(gpa, io, game);
+}
+
+/// the saved gardens menu's list, made afresh
+fn relist(gpa:Allocator, io:Io, game:*Game) void {
+  save.list(gpa, io, &game.gardens) catch |e| game.prog.say(txt.s.msg.no_gardens, .{e});
+  game.listed();
+}
+
+/// replace the running game with the saved garden `name` (keeping it on
+/// failure).
+fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer, name:save.Name) !void {
+  var loaded = save.load(gpa, io, name) catch |e| {
     game.prog.say(txt.s.msg.no_save, .{e});
     return;
   };
+  // played on as itself, unless it is the autosave (saved by hand, it
+  // becomes a garden of its own)
+  loaded.slot = if (name.is(save.AUTO)) null else name;
   // the old world's meshes belong to chunks that are about to disappear
   try r.dropWorld();
   // the settings belong to the gardener, not the garden

@@ -15,12 +15,15 @@ const opt = @import("options.zig");
 
 /// what a click on the HUD lands on: a research node, a weave recipe, a
 /// belly slot, a hotbar slot, a slot of the open structure, a recipe it may
-/// be set to weave, a pause menu row, an option, the options panel's way
-/// back, or just a panel (which keeps the click out of the world beneath it).
+/// be set to weave, a pause menu row, an option, the way back to the pause
+/// menu, a saved garden (0: a fresh one), a button under them, their
+/// scroll groove, or just a panel (which keeps the click out of the world
+/// beneath it).
 pub const Pick = union(enum) {
   panel, research:prog.Id, weave:usize, slot:usize, bar:usize,
   store:usize, recipe:u8,
   pause:play.PauseRow, option:opt.Setting, back,
+  garden:usize, garden_act:play.GardenAct, scroll,
 };
 
 /// the research sapling's growth, kept between frames.
@@ -52,6 +55,16 @@ pub const Rows = struct {
     }
     return null;
   }
+
+  /// the area last added for `p`, if any.
+  pub fn find(r:*const Rows, p:Pick) ?[4]f32 {
+    var i = r.len;
+    while (i > 0) {
+      i -= 1;
+      if (std.meta.eql(r.pick[i], p)) return r.rect[i];
+    }
+    return null;
+  }
 };
 
 const panels = struct {
@@ -69,6 +82,7 @@ const panels = struct {
   pub const carry = @import("hud/carry.zig");
   pub const pause = @import("hud/pause.zig");
   pub const options = @import("hud/options.zig");
+  pub const gardens = @import("hud/gardens.zig");
 };
 const reg = registry.Registry(panels);
 

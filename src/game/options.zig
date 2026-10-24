@@ -1,17 +1,20 @@
 //! the gardener's settings (pause menu, OPTIONS): how the garden is drawn
-//! and shown. Kept in `PATH` beside the save: read once at startup, written
-//! whenever one changes. A missing or unreadable file means the defaults.
+//! and shown, and how often it saves itself. Kept in `PATH` in `home`: read
+//! once at startup (written with the defaults when missing), written
+//! whenever one changes. An unreadable file means the defaults.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const Writer = Io.Writer;
 const eql = std.mem.eql;
 const stringToEnum = std.meta.stringToEnum;
+const parseInt = std.fmt.parseInt;
 const log = std.log;
 const testing = std.testing;
 const ctext = @import("../core/text.zig");
 const txt = @import("text.zig");
 const Antialias = @import("../render/renderer.zig").Antialias;
+const home = @import("home.zig");
 
 // decision: a file of its own (not the save): settings belong to the
 // player, not to one garden, and loading a save keeps them.
@@ -22,10 +25,21 @@ pub const Options = struct {
   aa:Antialias = .msaa4,
   vsync:bool = true,
   fullscreen:bool = false,
+  /// minutes between autosaves (one of `AUTOSAVE`; 0: never)
+  autosave:u8 = 5,
 };
 
+/// the autosave intervals offered, in minutes (in `txt.s.hud.autosave` order)
+pub const AUTOSAVE = [_]u8{ 0, 1, 2, 5, 10, 15, 30, 60 };
+
 /// the options panel's rows, in `txt.s.hud.option_labels` order
-pub const Setting = enum { antialias, vsync, fullscreen };
+pub const Setting = enum { antialias, vsync, fullscreen, autosave };
+
+/// where `minutes` is in `AUTOSAVE` (else the next longer one there)
+fn autosaveIndex(minutes:u8) usize {
+  for (AUTOSAVE, 0..) |a, i| if (a >= minutes) return i;
+  return AUTOSAVE.len - 1;
+}
 
 /// turn `set` one way (`dir` +1) or back (-1), wrapping round; anti-aliasing
 /// skips MSAA with more than `most` samples (what the GPU can take)
@@ -42,6 +56,10 @@ pub fn step(o:*Options, set:Setting, dir:i32, most:u32) void {
     },
     .vsync => o.vsync = !o.vsync,
     .fullscreen => o.fullscreen = !o.fullscreen,
+    .autosave => {
+      const n:i32 = AUTOSAVE.len;
+      o.autosave = AUTOSAVE[@intCast(@mod(@as(i32, @intCast(autosaveIndex(o.autosave))) + dir, n))];
+    },
   }
 }
 
@@ -51,12 +69,16 @@ pub fn shown(o:*const Options, set:Setting) []const u8 {
     .antialias => txt.nth(txt.s.hud.antialias, @intFromEnum(o.aa)),
     .vsync => txt.nth(txt.s.hud.toggle, @intFromBool(o.vsync)),
     .fullscreen => txt.nth(txt.s.hud.toggle, @intFromBool(o.fullscreen)),
+    .autosave => txt.nth(txt.s.hud.autosave, autosaveIndex(o.autosave)),
   };
 }
 
 /// the file as written: each setting by name (any may be missing)
 const Source = struct {
-  options:struct { antialias:?[]const u8 = null, vsync:?[]const u8 = null, fullscreen:?[]const u8 = null } = .{},
+  options:struct {
+    antialias:?[]const u8 = null, vsync:?[]const u8 = null, fullscreen:?[]const u8 = null,
+    autosave:?[]const u8 = null,
+  } = .{},
 };
 
 const ON = "on";
@@ -76,21 +98,30 @@ pub fn parse(text:[]const u8) Options {
   if (f.antialias) |v| o.aa = stringToEnum(Antialias, v) orelse o.aa;
   if (f.vsync) |v| o.vsync = !eql(u8, v, OFF);
   if (f.fullscreen) |v| o.fullscreen = eql(u8, v, ON);
+  if (f.autosave) |v| if (parseInt(u8, v, 10)) |n| { o.autosave = AUTOSAVE[autosaveIndex(n)]; } else |_| {};
   return o;
 }
 
 /// writes `o` as cfg source.
 pub fn format(o:*const Options, w:*Writer) Writer.Error!void {
-  try w.print("# Parasymi options: written by the game (pause menu, OPTIONS)\n[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\n", .{
-    o.aa, if (o.vsync) ON else OFF, if (o.fullscreen) ON else OFF,
+  try w.print("# Parasymi options: written by the game (pause menu, OPTIONS)\n" ++
+    "# autosave: minutes between autosaves (0: never)\n" ++
+    "[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\nautosave = {d}\n", .{
+    o.aa, if (o.vsync) ON else OFF, if (o.fullscreen) ON else OFF, o.autosave,
   });
 }
 
-/// reads `PATH`; the defaults if there is none or it cannot be read.
+/// reads `PATH`; the defaults if it cannot be read, written out if there
+/// is none.
 pub fn load(gpa:Allocator, io:Io) Allocator.Error!Options {
-  const text = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(MAX_FILE)) catch |e| return switch (e) {
-    error.OutOfMemory => error.OutOfMemory,
-    else => .{},
+  const text = home.dir().readFileAlloc(io, PATH, gpa, .limited(MAX_FILE)) catch |e| switch (e) {
+    error.OutOfMemory => return error.OutOfMemory,
+    error.FileNotFound => {
+      const o:Options = .{};
+      save(&o, io) catch |se| log.warn("{s}: {t}", .{PATH, se});
+      return o;
+    },
+    else => return .{},
   };
   defer gpa.free(text);
   return parse(text);
@@ -102,17 +133,19 @@ pub fn save(o:*const Options, io:Io) Error!void {
   var buf:[256]u8 = undefined;
   var w:Writer = .fixed(&buf);
   format(o, &w) catch return error.OptionsUnwritable;
-  Io.Dir.cwd().writeFile(io, .{ .sub_path = PATH, .data = w.buffered() }) catch return error.OptionsUnwritable;
+  home.dir().writeFile(io, .{ .sub_path = PATH, .data = w.buffered() }) catch return error.OptionsUnwritable;
 }
 
 test "options round-trip through their file; unknown values keep the defaults" {
-  const o:Options = .{.aa = .fxaa, .vsync = false, .fullscreen = true};
+  const o:Options = .{.aa = .fxaa, .vsync = false, .fullscreen = true, .autosave = 15};
   var buf:[256]u8 = undefined;
   var w:Writer = .fixed(&buf);
   try format(&o, &w);
   try testing.expectEqual(o, parse(w.buffered()));
   try testing.expectEqual(Options{}, parse("[options]\nantialias = sparkle\n"));
   try testing.expectEqual(Options{}, parse(""));
+  // an interval not offered snaps to the next longer one
+  try testing.expectEqual(@as(u8, 10), parse("[options]\nautosave = 7\n").autosave);
 }
 
 test "anti-aliasing turns both ways and skips what the GPU cannot take" {
@@ -127,4 +160,11 @@ test "anti-aliasing turns both ways and skips what the GPU cannot take" {
   try testing.expectEqual(Antialias.off, o.aa);
   step(&o, .vsync, 1, 4);
   try testing.expect(!o.vsync);
+  // autosave: 5 minutes by default, wrapping round to never
+  try testing.expectEqual(@as(u8, 5), o.autosave);
+  step(&o, .autosave, -1, 4);
+  try testing.expectEqual(@as(u8, 2), o.autosave);
+  o.autosave = 60;
+  step(&o, .autosave, 1, 4);
+  try testing.expectEqual(@as(u8, 0), o.autosave);
 }

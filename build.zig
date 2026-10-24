@@ -79,6 +79,9 @@ pub fn build(b:*Build) !void {
       });
       md.linkLibrary(glfw);
       for (names, sp) |s, spv| md.addAnonymousImport(s, .{.root_source_file = spv});
+      // the game ships its strings and controls, writing them out where the
+      // gardener can edit them; the tests check the strings file is complete
+      for ([_][]const u8{"parasymi.cfg", "controls.cfg"}) |c| md.addAnonymousImport(c, .{.root_source_file = bb.path(c)});
       return md;
     }
   };
@@ -103,9 +106,6 @@ pub fn build(b:*Build) !void {
   const tests = b.addTest(.{
     .root_module = Mods.make(b, "src/tests.zig", t, o, vulkan, glfw_mod, zglfw.artifact("glfw"), &spvs),
   });
-  // the tests check the strings file is complete; the game reads it at startup
-  tests.root_module.addAnonymousImport("parasymi.cfg", .{.root_source_file = b.path("parasymi.cfg")});
-  tests.root_module.addAnonymousImport("controls.cfg", .{.root_source_file = b.path("controls.cfg")});
   const test_step = b.step("test", "run unit tests.");
   test_step.dependOn(&b.addRunArtifact(tests).step);
 }

@@ -17,8 +17,11 @@ const items = @import("../sim/items.zig");
 const species = @import("../sim/species.zig");
 const prog = @import("progression.zig");
 const st = @import("structures.zig");
+const home = @import("home.zig");
 
 pub const PATH = "parasymi.cfg";
+/// the strings as built: what an edited file leaves out falls back to these
+const DEFAULT = @embedFile("parasymi.cfg");
 /// the cfg is a few kilobytes; anything near this is not one.
 const MAX_CFG:usize = 1 << 20;
 
@@ -46,7 +49,8 @@ pub const Strings = struct {
     entwine:S = "", hybrid_stirs:S = "", withered:S = "",
     essence_converges:S = "", veil_thins:S = "",
     germinator_weaves:S = "", halo_forms:S = "", diamond_forms:S = "", lattice_stirs:S = "",
-    saved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_fullscreen:S = "", options_unsaved:S = "",
+    saved:S = "", autosaved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_gardens:S = "",
+    no_fullscreen:S = "", options_unsaved:S = "",
   } = .{},
   hud:struct {
     controls:S = "", ingredient:S = "", unknown:S = "", stock:S = "",
@@ -60,7 +64,9 @@ pub const Strings = struct {
     plant:S = "", unknown_yield:S = "", drawing_radiance:S = "", withering:S = "",
     sap:S = "", paused:S = "", pause_keys:S = "", pause_labels:S = "",
     options_title:S = "", options_hint:S = "", option_labels:S = "",
-    antialias:S = "", toggle:S = "", options_back:S = "",
+    antialias:S = "", toggle:S = "", autosave:S = "", options_back:S = "",
+    gardens_title:S = "", gardens_fresh:S = "", gardens_auto:S = "", gardens_playing:S = "", gardens_age:S = "",
+    gardens_save:S = "", gardens_overwrite:S = "", gardens_load:S = "", gardens_hint:S = "",
     free_cam:S = "", free_cam_hint:S = "",
     fps:S = "", sim:S = "", counts:S = "", draws:S = "", pos:S = "", motes:S = "",
   } = .{},
@@ -91,24 +97,32 @@ var arena:?ArenaAllocator = null;
 
 pub const Error = error{ NoStrings, BadStrings } || Allocator.Error;
 
-/// reads and parses `PATH`. Called once, at startup, before anything is shown.
+/// reads and parses `PATH` (in `home`, made from the game's own when
+/// missing) over the game's own strings. Called once, at startup, before
+/// anything is shown.
 pub fn load(gpa:Allocator, io:Io) Error!void {
   std.debug.assert(src.len == 0);
-  src = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(MAX_CFG)) catch |e| return switch (e) {
-    error.OutOfMemory => error.OutOfMemory,
-    else => { log.err("{s}: {t}", .{PATH, e}); return error.NoStrings; },
-  };
+  src = try home.stock(gpa, io, PATH, DEFAULT);
   errdefer unload(gpa);
-  try fill(gpa, src);
+  fill(gpa, &.{DEFAULT, src}) catch |e| switch (e) {
+    error.OutOfMemory => return error.OutOfMemory,
+    else => {
+      // the gardener's file is broken: the game's own still read
+      log.warn("{s}: ignoring the edited strings", .{PATH});
+      unload(gpa);
+      try fill(gpa, &.{DEFAULT});
+    },
+  };
 }
 
-/// parses cfg source `text` (which must outlive the strings) into `s`, then
-/// writes each `{@action}` as the key or button bound to it, so what is
-/// shown follows `controls.cfg` (loaded first).
-pub fn fill(gpa:Allocator, text:[]const u8) Error!void {
+/// parses each cfg source of `texts` (which must outlive the strings) into
+/// `s` in turn, later ones over earlier; then writes each `{@action}` as
+/// the key or button bound to it, so what is shown follows `controls.cfg`
+/// (loaded first).
+pub fn fill(gpa:Allocator, texts:[]const []const u8) Error!void {
   var bad_buf:[256]u8 = undefined;
   var bad:Io.Writer = .fixed(&bad_buf);
-  ctext.parse(Strings, &s, text, &bad) catch |e| {
+  for (texts) |text| ctext.parse(Strings, &s, text, &bad) catch |e| {
     log.err("{s}: {t}: {s}", .{PATH, e, bad.buffered()});
     return error.BadStrings;
   };
@@ -121,7 +135,7 @@ pub fn fill(gpa:Allocator, text:[]const u8) Error!void {
 }
 
 pub fn unload(gpa:Allocator) void {
-  gpa.free(src);
+  if (src.len > 0) gpa.free(src);
   src = &.{};
   if (arena) |*a| a.deinit();
   arena = null;
@@ -157,15 +171,15 @@ pub fn tile(k:ck.Kind) []const u8 { return s.tile.get(k).name; }
 
 test "the strings file fills every key, shown with the bound keys" {
   const gpa = std.testing.allocator;
-  try ctl.fill(@embedFile("controls.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   defer unload(gpa);
-  try fill(gpa, @embedFile("parasymi.cfg"));
+  try fill(gpa, &.{DEFAULT});
   try std.testing.expect(std.mem.indexOf(u8, s.hud.controls, ctext.TOKEN) == null);
   // rebinding changes what is shown
   unload(gpa);
-  try ctl.fill(@embedFile("controls.cfg") ++ "\n[bind]\nbelly = mouse_middle | b\n");
-  try fill(gpa, @embedFile("parasymi.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg") ++ "\n[bind]\nbelly = mouse_middle | b\n"});
+  try fill(gpa, &.{DEFAULT});
   try std.testing.expect(std.mem.indexOf(u8, s.msg.night_hint, s.mouse.get(.middle).?) != null);
   try std.testing.expectEqual(count(s.hud.pause_keys), count(s.hud.pause_labels));
   try std.testing.expectEqual(std.meta.fields(@import("play.zig").PauseRow).len, count(s.hud.pause_labels));
@@ -173,5 +187,7 @@ test "the strings file fills every key, shown with the bound keys" {
   try std.testing.expectEqual(std.meta.fields(opt.Setting).len, count(s.hud.option_labels));
   try std.testing.expectEqual(std.meta.fields(@FieldType(opt.Options, "aa")).len, count(s.hud.antialias));
   try std.testing.expectEqual(2, count(s.hud.toggle));
+  try std.testing.expectEqual(opt.AUTOSAVE.len, count(s.hud.autosave));
+  try std.testing.expectEqual(4, count(s.hud.gardens_age));
   try std.testing.expectEqual(4, count(s.hud.facing));
 }

@@ -5,7 +5,8 @@ Player-centric Factorio-like automation game: magically infused plants
 (parasitic + symbiotic lineages that converge). Zig 0.16, zglfw + vulkan-zig
 (Vulkan 1.3), Windows, no asset files (every mesh, the font and all UI shapes
 are procedural) except `parasymi.cfg`, the player-facing strings, and
-`controls.cfg`, the key/button bindings. 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
+`controls.cfg`, the key/button bindings (both built into the game and written
+out to the gardener's folder, below). 2.5D top-down 3D: pitch 30°–85° (default 55°), yaw Q/E, no
 free rotation in play; free inspection camera on Ctrl+F.
 
 ## Build
@@ -16,7 +17,7 @@ zig build run -- --demo           # test garden + structures, fast-forwarded
 zig build run -- --stress         # 120×120 plant field
 zig build run -- --tod=0.9        # time of day (0=midnight, 0.5=noon)
 zig build run -- --novsync --seed=0x1234
-zig build run -- --load           # load save
+zig build run -- --load           # load the newest saved garden
 zig build test                    # headless logic tests (no window/GPU)
 ```
 Needs `VULKAN_SDK` (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`,
@@ -40,9 +41,13 @@ the belly's, lifted/put down between them the same way (into it only what
 it `wants`), Shift+LMB moves a stack across; a germinator's panel also
 picks its seed (`recipes`/`chosen`/`choose` hooks). Closes out of reach.
 Tab belly (weave), T research, F3 debug, Esc closes a panel else
-pauses (pause rows are clicked or keyed: Q = save and quit, O = options),
-F5 save, F9 load, F11 fullscreen. Options panel: LMB turns a setting, RMB
-turns it back, Esc/BACK returns to the pause menu.
+pauses (pause rows are clicked or keyed: Q = save and quit, O = options,
+G = saved gardens), F5 save (the garden being played), F9 load (its last
+save), F11 fullscreen. Options panel: LMB turns a setting, RMB turns it
+back, Esc/BACK returns to the pause menu. Saved gardens panel (pause menu
+only, `hud/gardens.zig`, `Mode.gardens`): A FRESH GARDEN then every save,
+newest first; wheel or drag its stem to scroll (`GARDENS_SHOWN` rows), LMB
+chooses, SAVE (twice to save over one), LOAD, BACK/Esc.
 Free cam: click to look, WASD fly (Shift fast), Space/Ctrl+Space rise/sink,
 Q/E roll, wheel dolly; eases back in 0.3 s.
 
@@ -227,8 +232,21 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   any dry tile (they gather as they grow, then flash). The diamond is the
   world event's future launch point. Demo: west of the garden, the fourth
   bloom finishes ~20 s in.
-- Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the
-  seed; only the gardener's changes are stored. Bump `VERSION` when a stored
+- The gardener's folder (`game/home.zig`): `%LOCALAPPDATA%\Parasymi`
+  holds `parasymi.cfg`, `controls.cfg`, `options.cfg` and `saves/`, all
+  made on startup when missing (`home.open` first in main; `home.dir()`
+  for every file). The two cfgs are embedded (`@embedFile`) and written
+  with a `# stock <hash>` first line: an untouched copy is replaced when
+  the repo's changes, an edited one is kept and read over the built-in
+  (what it lacks falls back). So repo cfg edits reach the game unless the
+  AppData copy was hand-edited. Old `options.cfg`/`parasymi.sav` beside
+  the game are copied in once.
+- Save (`game/save.zig`, `saves/<name>.sav`): the world regenerates from the
+  seed; only the gardener's changes are stored. Written to a `.tmp` then
+  renamed over. `Game.slot` is the garden being played (F5/quit save into
+  it, a fresh `garden N` if none); `Request` carries saves/loads/listing to
+  main. Autosave (`autosave.sav`) every `Options.autosave` minutes of play
+  (default 5, options panel: never..60). Bump `VERSION` when a stored
   layout changes (the fingerprint checks sizes only).
 
 ## Visual (current)
@@ -312,7 +330,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   `Renderer.antialias`/`setVsync` switch at runtime (remake pipelines /
   swapchain). Release: off 4.1, fxaa 3.9, msaa4 4.35, msaa8 4.9 ms (demo).
 - Options (`game/options.zig`, `hud/options.zig`): AA, vsync, fullscreen,
-  stored in `options.cfg` (gitignored, written by the game when one
+  autosave, stored in `options.cfg` (in the gardener's folder, written when one
   changes, kept across save loads); main applies `Game.opts` when it
   differs from what is in effect.
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow, stems
@@ -421,7 +439,8 @@ fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
 planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
 LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation,
 anti-aliasing (MSAA/FXAA) + options panel, the wolf as one sculpted skinned
-mesh with procedural locomotion (planted feet, leg IK, springs).
+mesh with procedural locomotion (planted feet, leg IK, springs), saved gardens
+menu + autosave, files in `%LOCALAPPDATA%\Parasymi`.
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes

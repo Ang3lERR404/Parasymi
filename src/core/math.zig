@@ -31,6 +31,8 @@ pub const MAX_SPLINE:usize = 64;
 
 /// milliseconds per second (frame timings are shown and budgeted in ms).
 pub const MS_PER_S = 1000;
+/// seconds per minute (autosave intervals are set in minutes).
+pub const S_PER_MIN = 60;
 
 // ---- scalars ----
 

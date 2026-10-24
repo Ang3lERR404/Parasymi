@@ -35,6 +35,7 @@ const actions = @import("actions.zig");
 const convergence = @import("convergence.zig");
 const hud = @import("hud.zig");
 const options = @import("options.zig");
+const save = @import("save.zig");
 
 pub const TICK = 1.0 / 60.0;
 /// the world every new game grows from, unless `--seed=` says otherwise
@@ -92,10 +93,33 @@ pub fn known(g:*const Game, item:items.Item) bool {
   return if (item.plants()) |sp| g.prog.canPlant(sp) else true;
 }
 
-pub const Request = enum { save, load, quit };
+/// what only main can do (it owns the window and the file system)
+pub const Request = union(enum) {
+  /// into the garden being played (under a fresh name if it has none yet)
+  save,
+  /// back to the garden being played as last saved (else the newest)
+  load,
+  /// the autosave timer ran out: into `save.AUTO`
+  autosave,
+  /// the saved gardens menu wants its list (`Game.gardens`)
+  list,
+  /// the saved gardens menu: save as the chosen garden (null: a fresh one)
+  save_as:?save.Name,
+  /// the saved gardens menu: replace the running game with the chosen one
+  load_from:save.Name,
+  /// save and leave
+  quit,
+};
 
 /// the pause menu's rows, in `txt.s.hud.pause_labels` order
-pub const PauseRow = enum { @"resume", options, save, load, fullscreen, quit };
+pub const PauseRow = enum { @"resume", options, gardens, fullscreen, quit };
+/// the saved gardens menu's buttons under its list
+pub const GardenAct = enum { save, load };
+/// saved gardens menu: rows in view at once (it scrolls past them), rows a
+/// wheel notch scrolls, and how fast the list follows (1/s)
+pub const GARDENS_SHOWN = 7;
+const GARDEN_NOTCH:f32 = 1;
+const GARDEN_EASE:f32 = 14;
 
 /// what has the wolf's attention; only one at a time.
 pub const Mode = enum {
@@ -112,12 +136,15 @@ pub const Mode = enum {
   paused,
   /// the world is frozen and the options panel is open (from the pause menu)
   options,
+  /// the world is frozen and the saved gardens are listed (from the pause
+  /// menu): save as one, load one
+  gardens,
   /// the free camera is flying for inspection (Ctrl+F); the wolf stands idle
   inspect,
 
   /// the world keeps moving underneath (everything but the pause menu and
-  /// the options panel)
-  pub fn live(md:Mode) bool { return md != .paused and md != .options; }
+  /// the panels opened from it)
+  pub fn live(md:Mode) bool { return md != .paused and md != .options and md != .gardens; }
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode) bool { return md == .belly or md == .structure; }
 };
@@ -155,6 +182,22 @@ pub const Game = struct {
   opts:options.Options = .{},
   /// the most MSAA samples the GPU takes (main sets it from the renderer)
   most_samples:u32 = 8,
+  /// the garden being played, as saved (null until it is saved or loaded)
+  slot:?save.Name = null,
+  /// seconds played since the garden was last saved (autosave counts these)
+  since_save:f64 = 0,
+  /// the saved gardens menu: its list (main fills it on `.list`, at
+  /// `listed_at` in UI time), the chosen row (0: a fresh garden, else
+  /// `gardens[i - 1]`), whether saving over it was asked once already, and
+  /// the first row in view (wanted, and eased toward)
+  gardens:std.ArrayList(save.Entry) = .empty,
+  listed_at:f64 = 0,
+  garden:usize = 0,
+  overwrite:bool = false,
+  garden_top:f32 = 0,
+  garden_at:f32 = 0,
+  /// the list's scroll groove is held (dragged)
+  scrolling:bool = false,
   /// keeps running while paused, so the UI still breathes.
   ui_time:f64 = 0,
 
@@ -220,6 +263,7 @@ pub const Game = struct {
   }
 
   pub fn deinit(g:*Game) void {
+    g.gardens.deinit(g.gpa);
     for (&g.inst) |*l| l.deinit(g.gpa);
     g.far.deinit(g.gpa);
     g.parts.deinit();
@@ -267,12 +311,18 @@ pub const Game = struct {
     if (ctl.pressed(in, .back)) switch (g.mode) {
       .roam => g.mode = .paused,
       .belly, .structure, .research, .paused => g.mode = .roam,
-      .options => g.mode = .paused,
+      .options, .gardens => g.mode = .paused,
       .inspect => g.inspect(in, false),
-    } else if (!g.mode.live()) g.menu(in);
+    } else if (!g.mode.live()) g.menu(in, dt);
     if (!g.mode.live()) return;
 
     g.time += dt;
+    // the garden saves itself every so often (only time played counts)
+    g.since_save += dt;
+    if (g.opts.autosave > 0 and g.since_save >= m.f(g.opts.autosave) * m.S_PER_MIN and g.request == null) {
+      g.request = .autosave;
+      g.since_save = 0;
+    }
     g.sky.update(dt);
 
     // decision: alt + free_cam (Ctrl+F) toggles the free inspection camera
@@ -323,7 +373,7 @@ pub const Game = struct {
         .store => |i| if (across) g.moveAcross(.{.store = i}) else g.clickStore(i),
         .bar => |i| if (g.mode.sorting()) g.clickBar(i) else { g.hot = i; },
         // drawn only while the world is frozen (see `menu`)
-        .pause, .option, .back => {},
+        .pause, .option, .back, .garden, .garden_act, .scroll => {},
       } else if (g.held != null) {
         g.drop();
         g.use_spent = true;
@@ -580,23 +630,32 @@ pub const Game = struct {
     return false;
   }
 
-  /// the pause menu and options panel, while the world is frozen: a click
-  /// on a pause row does what it says; on an option it turns it (the other
-  /// button turns it back). Keys still work for the pause rows.
-  fn menu(g:*Game, in:*const Input) void {
+  /// the pause menu and the panels opened from it, while the world is
+  /// frozen: a click on a pause row does what it says; on an option it
+  /// turns it (the other button turns it back); in the saved gardens it
+  /// chooses a garden, or saves or loads it. Keys still work for the pause
+  /// rows.
+  fn menu(g:*Game, in:*const Input, dt:f32) void {
     g.mouse = in.mouse;
     const hit = g.rows.at(in.mouse);
     g.pointed = hit;
     if (g.mode == .paused) {
       if (ctl.pressed(in, .quit)) g.request = .quit;
       if (ctl.pressed(in, .options)) g.mode = .options;
+      if (ctl.pressed(in, .gardens)) g.openGardens();
     }
+    if (g.mode == .gardens) g.scroll(in, hit, dt);
     const dir:i32 = if (ctl.pressed(in, .use)) 1 else if (ctl.pressed(in, .uproot)) -1 else 0;
     if (dir == 0) return;
     switch (hit orelse return) {
       .pause => |row| if (dir > 0) g.choose(row),
       .option => |set| options.step(&g.opts, set, dir, g.most_samples),
       .back => if (dir > 0) { g.mode = .paused; },
+      .garden => |i| if (dir > 0 and i != g.garden) {
+        g.garden = i;
+        g.overwrite = false;
+      },
+      .garden_act => |a| if (dir > 0) g.gardenAct(a),
       else => {},
     }
   }
@@ -605,10 +664,63 @@ pub const Game = struct {
     switch (row) {
       .@"resume" => g.mode = .roam,
       .options => g.mode = .options,
-      .save => g.request = .save,
-      .load => g.request = .load,
+      .gardens => g.openGardens(),
       .fullscreen => g.opts.fullscreen = !g.opts.fullscreen,
       .quit => g.request = .quit,
+    }
+  }
+
+  /// the saved gardens menu opens on a fresh list, the played garden chosen
+  fn openGardens(g:*Game) void {
+    g.mode = .gardens;
+    g.request = .list;
+    g.garden = 0;
+    g.overwrite = false;
+    g.garden_top = 0;
+    g.garden_at = 0;
+  }
+
+  /// main has just listed the gardens (`gardens`): the played one is
+  /// chosen (else the choice is kept in range) and scrolled into view.
+  pub fn listed(g:*Game) void {
+    g.listed_at = g.ui_time;
+    g.overwrite = false;
+    if (g.slot) |n| for (g.gardens.items, 1..) |e, i| if (e.name.is(n.slice())) { g.garden = i; };
+    g.garden = @min(g.garden, g.gardens.items.len);
+    const first = @max(m.f(g.garden) - m.f(GARDENS_SHOWN - 1), 0);
+    g.garden_top = @min(m.clamp(g.garden_top, first, m.f(g.garden)), g.gardenScroll());
+  }
+
+  /// how far the gardens list scrolls (rows above the first in view)
+  fn gardenScroll(g:*const Game) f32 {
+    return m.f((g.gardens.items.len + 1) -| GARDENS_SHOWN);
+  }
+
+  /// the wheel scrolls the gardens list; its groove, held, drags it
+  fn scroll(g:*Game, in:*const Input, hit:?hud.Pick, dt:f32) void {
+    const most = g.gardenScroll();
+    g.garden_top -= in.scroll * GARDEN_NOTCH;
+    if (!ctl.down(in, .use)) g.scrolling = false;
+    if (ctl.pressed(in, .use)) if (hit) |h| if (h == .scroll) { g.scrolling = true; };
+    if (g.scrolling) if (g.rows.find(.scroll)) |r| {
+      g.garden_top = m.clamp((in.mouse[1] - r[1]) / r[3], 0, 1) * most;
+    };
+    g.garden_top = m.clamp(g.garden_top, 0, most);
+    g.garden_at += (g.garden_top - g.garden_at) * @min(1, dt * GARDEN_EASE);
+  }
+
+  /// SAVE: as a fresh garden at once; over a saved one only when asked
+  /// twice. LOAD: the chosen saved garden.
+  fn gardenAct(g:*Game, a:GardenAct) void {
+    const chosen:?save.Name = if (g.garden == 0) null else g.gardens.items[g.garden - 1].name;
+    switch (a) {
+      .save => if (chosen == null or g.overwrite) {
+        g.request = .{.save_as = chosen};
+        g.overwrite = false;
+      } else {
+        g.overwrite = true;
+      },
+      .load => if (chosen) |n| { g.request = .{.load_from = n}; },
     }
   }
 
@@ -722,7 +834,7 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   const screen = TEST_SCREEN;
-  try ctl.fill(@embedFile("controls.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   var in:Input = .{.win = undefined};
 
@@ -751,7 +863,7 @@ test "the pause menu opens the options; clicks turn them and lead back" {
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   const screen = TEST_SCREEN;
-  try ctl.fill(@embedFile("controls.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   var in:Input = .{.win = undefined};
   g.opts = .{.aa = .off};
@@ -771,12 +883,87 @@ test "the pause menu opens the options; clicks turn them and lead back" {
   try testing.expectEqual(@as(u64, 0), g.ticks);
 }
 
+test "the saved gardens scroll, save over one only when asked twice, and load" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  const screen = TEST_SCREEN;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+
+  g.mode = .paused;
+  try click.on(&g, &in, .{.pause = .gardens}, screen);
+  try testing.expectEqual(Mode.gardens, g.mode);
+  try testing.expect(g.request.? == .list);
+  g.request = null;
+  // main lists them: more than fit, so the list scrolls
+  for (0..GARDENS_SHOWN + 3) |i| {
+    var buf:[16]u8 = undefined;
+    try g.gardens.append(gpa, .{.name = save.Name.of(std.fmt.bufPrint(&buf, "garden {d}", .{i}) catch unreachable).?, .age = @intCast(i * 90)});
+  }
+  g.listed();
+  in.mouse = .{-1e4, -1e4};
+  in.advance();
+  in.scroll = -2;
+  try g.update(&in, TICK, screen);
+  in.scroll = 0;
+  try testing.expectEqual(@as(f32, 2), g.garden_top);
+  in.scroll = -100;
+  try g.update(&in, TICK, screen);
+  in.scroll = 0;
+  try testing.expectEqual(m.f(4), g.garden_top);
+  // the list follows, bringing the last rows into view
+  for (0..60) |_| try g.update(&in, TICK, screen);
+  try testing.expectApproxEqAbs(m.f(4), g.garden_at, 0.01);
+
+  // a fresh garden saves at once
+  try click.on(&g, &in, .{.garden_act = .save}, screen);
+  try testing.expect(g.request.?.save_as == null);
+  g.request = null;
+  // a saved one only on the second click
+  try click.on(&g, &in, .{.garden = 9}, screen);
+  try testing.expectEqual(@as(usize, 9), g.garden);
+  try click.on(&g, &in, .{.garden_act = .save}, screen);
+  try testing.expect(g.request == null and g.overwrite);
+  try click.on(&g, &in, .{.garden_act = .save}, screen);
+  try testing.expectEqualStrings("garden 8", g.request.?.save_as.?.slice());
+  g.request = null;
+  try click.on(&g, &in, .{.garden_act = .load}, screen);
+  try testing.expectEqualStrings("garden 8", g.request.?.load_from.slice());
+  g.request = null;
+  try click.on(&g, &in, .back, screen);
+  try testing.expectEqual(Mode.paused, g.mode);
+  try testing.expectEqual(@as(u64, 0), g.ticks);
+}
+
+test "the garden saves itself once the autosave interval is played" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  in.mouse = .{-1e4, -1e4};
+  g.opts.autosave = 1;
+  const step_s:f32 = 0.5;
+  var frames:usize = 0;
+  while (g.request == null) : (frames += 1) try g.update(&in, step_s, TEST_SCREEN);
+  try testing.expect(g.request.? == .autosave);
+  try testing.expectEqual(@as(usize, m.S_PER_MIN / step_s), frames);
+  // never, when turned off
+  g.request = null;
+  g.opts.autosave = 0;
+  for (0..1000) |_| try g.update(&in, step_s, TEST_SCREEN);
+  try testing.expect(g.request == null);
+}
+
 test "a germinator's panel: choose its seed, put in only what it weaves from, move stacks across" {
   const gpa = testing.allocator;
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   const screen = TEST_SCREEN;
-  try ctl.fill(@embedFile("controls.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   var in:Input = .{.win = undefined};
   const x, const z = m.tileAt(g.player.pos);
@@ -843,7 +1030,7 @@ test "a click lifts a stack, the next puts it down; dropped on the hotbar it ass
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   const screen = TEST_SCREEN;
-  try ctl.fill(@embedFile("controls.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   var in:Input = .{.win = undefined};
   for (g.bar) |b| try testing.expect(b == null);
@@ -895,7 +1082,7 @@ test "discard throws away a belly stack, hovered or carried, never a structure's
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
   const screen = TEST_SCREEN;
-  try ctl.fill(@embedFile("controls.cfg"));
+  try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   var in:Input = .{.win = undefined};
   g.mode = .belly;

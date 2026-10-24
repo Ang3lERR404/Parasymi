@@ -12,8 +12,11 @@ const ctext = @import("../core/text.zig");
 const input = @import("../platform/input.zig");
 const Input = input.Input;
 const Bind = input.Bind;
+const home = @import("home.zig");
 
 pub const PATH = "controls.cfg";
+/// the bindings as built: what an edited file leaves out falls back to these
+const DEFAULT = @embedFile("controls.cfg");
 /// the cfg is a few kilobytes; anything near this is not one.
 const MAX_CFG:usize = 1 << 16;
 /// most alternatives one action can be bound to.
@@ -46,7 +49,7 @@ pub const Action = enum {
   /// close a panel, else pause
   back,
   /// while paused
-  quit, options,
+  quit, options, gardens,
   save, load, fullscreen, debug,
 };
 
@@ -69,22 +72,28 @@ pub var map:EnumArray(Action, Binds) = .initFill(.{});
 
 pub const Error = error{ NoControls, BadControls } || Allocator.Error;
 
-/// reads and parses `PATH`. Called once, at startup, before the first frame.
+/// reads and parses `PATH` (in `home`, made from the game's own when
+/// missing) over the game's own bindings. Called once, at startup, before
+/// the first frame.
 pub fn load(gpa:Allocator, io:Io) Error!void {
-  const src = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(MAX_CFG)) catch |e| return switch (e) {
-    error.OutOfMemory => error.OutOfMemory,
-    else => { log.err("{s}: {t}", .{PATH, e}); return error.NoControls; },
-  };
+  const src = try home.stock(gpa, io, PATH, DEFAULT);
   defer gpa.free(src);
-  try fill(src);
+  fill(&.{DEFAULT, src}) catch |e| switch (e) {
+    error.OutOfMemory => return error.OutOfMemory,
+    else => {
+      log.warn("{s}: ignoring the edited bindings", .{PATH});
+      try fill(&.{DEFAULT});
+    },
+  };
 }
 
-/// parses cfg source `text` into `map` (nothing of `text` is kept).
-pub fn fill(text:[]const u8) Error!void {
+/// parses each cfg source of `texts` into `map` in turn, an action bound
+/// in a later one replacing an earlier's (nothing of `texts` is kept).
+pub fn fill(texts:[]const []const u8) Error!void {
   var bad_buf:[256]u8 = undefined;
   var bad:Io.Writer = .fixed(&bad_buf);
   var src:Source = .{};
-  ctext.parse(Source, &src, text, &bad) catch |e| {
+  for (texts) |text| ctext.parse(Source, &src, text, &bad) catch |e| {
     log.err("{s}: {t}: {s}", .{PATH, e, bad.buffered()});
     return error.BadControls;
   };
@@ -129,7 +138,7 @@ pub fn hold(in:*Input, a:Action, on:bool) void {
 
 test "the controls file binds every action" {
   defer unload();
-  try fill(@embedFile("controls.cfg"));
+  try fill(&.{@embedFile("controls.cfg")});
   for (std.enums.values(Action)) |a| try std.testing.expect(map.get(a).len > 0);
   try std.testing.expectEqual(Bind{ .button = .left }, map.get(.use).list[0]);
 }

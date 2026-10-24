@@ -3,6 +3,9 @@
 //! the wolf and its belly, research, the weave queue, every plant and
 //! structure, and resource nodes that were gathered.
 //!
+//! Each garden is a file of its own in `home.SAVES` (`<name>.sav`), chosen
+//! in the saved gardens menu; the timer saves into `AUTO`.
+//!
 //! Format: a small header (magic, version, layout fingerprint) followed by
 //! plain-old-data records. The fingerprint changes whenever a stored type's
 //! size changes, so an incompatible save is refused instead of misread.
@@ -11,7 +14,13 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const asBytes = std.mem.asBytes;
 const eql = std.mem.eql;
+const startsWith = std.mem.startsWith;
+const endsWith = std.mem.endsWith;
+const parseInt = std.fmt.parseInt;
+const sep_str = std.fs.path.sep_str;
+const ns_per_s = std.time.ns_per_s;
 const testing = std.testing;
+const home = @import("home.zig");
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
 const ck = @import("../world/chunk.zig");
@@ -32,7 +41,18 @@ const NO_ITEM:u8 = 0xff;
 const item_count = std.meta.fields(items.Item).len;
 comptime { std.debug.assert(item_count < NO_ITEM); }
 
-pub const PATH = "parasymi.sav";
+/// where saves were kept before they moved into `home.SAVES`
+pub const LEGACY = "parasymi.sav";
+/// a saved garden's file extension, and its scratch copy's while written
+pub const EXT = ".sav";
+const TMP = ".tmp";
+/// the garden the timer saves into
+pub const AUTO = "autosave";
+/// gardens saved fresh are named this and a number
+// decision: file names, not text; the saves menu shows them as they are
+pub const FRESH = "garden ";
+pub const MAX_NAME = 48;
+const MAX_PATH = home.SAVES.len + 1 + MAX_NAME + EXT.len + TMP.len;
 const MAGIC = "PRSY".*;
 const VERSION:u32 = 11;
 /// max save file size (64 MB): a garden with millions of plants will never
@@ -226,20 +246,90 @@ fn ensureFootprint(g:*Game, x:i32, y:i32, size:u8) Allocator.Error!void {
   }
 }
 
-pub fn save(g:*Game, gpa:Allocator, io:Io) Error!void {
-  const bytes = try encode(gpa, g);
-  defer gpa.free(bytes);
-  Io.Dir.cwd().writeFile(io, .{ .sub_path = PATH, .data = bytes }) catch return error.SaveUnwritable;
+/// a saved garden's file name, without its folder or `EXT`.
+pub const Name = struct {
+  buf:[MAX_NAME]u8 = undefined,
+  len:u8 = 0,
+
+  pub fn of(s:[]const u8) ?Name {
+    if (s.len == 0 or s.len > MAX_NAME) return null;
+    var n:Name = .{ .len = @intCast(s.len) };
+    @memcpy(n.buf[0..s.len], s);
+    return n;
+  }
+  pub fn slice(n:*const Name) []const u8 { return n.buf[0..n.len]; }
+  pub fn is(n:*const Name, s:[]const u8) bool { return eql(u8, n.slice(), s); }
+};
+
+/// a garden in `home.SAVES`, as listed: its name and how long ago (s) it
+/// was saved, when the list was made.
+pub const Entry = struct { name:Name, age:i64 };
+
+/// lists the saved gardens into `out`, the most recent first.
+pub fn list(gpa:Allocator, io:Io, out:*std.ArrayList(Entry)) Error!void {
+  out.clearRetainingCapacity();
+  var d = home.dir().openDir(io, home.SAVES, .{ .iterate = true }) catch return error.SaveUnreadable;
+  defer d.close(io);
+  const now = Io.Clock.real.now(io).nanoseconds;
+  var it = d.iterate();
+  while (it.next(io) catch return error.SaveUnreadable) |e| {
+    if (e.kind != .file or !endsWith(u8, e.name, EXT)) continue;
+    const name = Name.of(e.name[0 .. e.name.len - EXT.len]) orelse continue;
+    const st_ = d.statFile(io, e.name, .{}) catch continue;
+    const age:i64 = @intCast(@divFloor(now - st_.mtime.nanoseconds, ns_per_s));
+    try out.append(gpa, .{ .name = name, .age = @max(age, 0) });
+  }
+  std.mem.sort(Entry, out.items, {}, struct {
+    fn newer(_:void, a:Entry, b:Entry) bool { return a.age < b.age; }
+  }.newer);
 }
 
-pub fn load(gpa:Allocator, io:Io) Error!Game {
-  const bytes = Io.Dir.cwd().readFileAlloc(io, PATH, gpa, .limited(MAX_SAVE)) catch |e| return switch (e) {
+/// a name no garden in `have` uses: `FRESH` and the next number up.
+pub fn fresh(have:[]const Entry) Name {
+  var top:u32 = 0;
+  for (have) |e| if (startsWith(u8, e.name.slice(), FRESH)) {
+    top = @max(top, parseInt(u32, e.name.slice()[FRESH.len..], 10) catch continue);
+  };
+  var buf:[MAX_NAME]u8 = undefined;
+  return Name.of(std.fmt.bufPrint(&buf, FRESH ++ "{d}", .{top + 1}) catch unreachable).?;
+}
+
+/// `home.SAVES`/`name``EXT`, plus `extra`
+fn pathOf(buf:*[MAX_PATH]u8, name:Name, extra:[]const u8) []const u8 {
+  return std.fmt.bufPrint(buf, "{s}{s}{s}{s}{s}", .{home.SAVES, sep_str, name.slice(), EXT, extra}) catch unreachable;
+}
+
+/// writes the garden as `name` (whole or not at all: into a scratch file
+/// first, then over the old one).
+pub fn save(g:*Game, gpa:Allocator, io:Io, name:Name) Error!void {
+  const bytes = try encode(gpa, g);
+  defer gpa.free(bytes);
+  var tmp_buf:[MAX_PATH]u8 = undefined;
+  var to_buf:[MAX_PATH]u8 = undefined;
+  const tmp = pathOf(&tmp_buf, name, TMP);
+  home.dir().writeFile(io, .{ .sub_path = tmp, .data = bytes }) catch return error.SaveUnwritable;
+  Io.Dir.rename(home.dir(), tmp, home.dir(), pathOf(&to_buf, name, ""), io) catch return error.SaveUnwritable;
+}
+
+pub fn load(gpa:Allocator, io:Io, name:Name) Error!Game {
+  var buf:[MAX_PATH]u8 = undefined;
+  const bytes = home.dir().readFileAlloc(io, pathOf(&buf, name, ""), gpa, .limited(MAX_SAVE)) catch |e| return switch (e) {
     error.FileNotFound => error.NoSave,
     error.OutOfMemory => error.OutOfMemory,
     else => error.SaveUnreadable,
   };
   defer gpa.free(bytes);
   return decode(gpa, bytes);
+}
+
+test "a fresh garden's name follows the highest numbered one" {
+  var have = [_]Entry{
+    .{ .name = Name.of(FRESH ++ "2").?, .age = 0 },
+    .{ .name = Name.of(AUTO).?, .age = 0 },
+    .{ .name = Name.of(FRESH ++ "x").?, .age = 0 },
+  };
+  try testing.expectEqualStrings(FRESH ++ "3", fresh(&have).slice());
+  try testing.expectEqualStrings(FRESH ++ "1", fresh(have[1..]).slice());
 }
 
 test "a garden survives a save round trip" {
