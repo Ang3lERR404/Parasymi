@@ -7,6 +7,7 @@ const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const eqlDeep = std.meta.eql;
 const swap = std.mem.swap;
+const bufPrint = std.fmt.bufPrint;
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
 const ck = @import("../world/chunk.zig");
@@ -242,6 +243,7 @@ pub const Game = struct {
       .parts = Parts.init(gpa),
       .ui = .{ .gpa = gpa },
     };
+    errdefer g.deinit();
     // start on dry land: spiral out from the origin until a fertile tile shows up.
     var r:i32 = 0;
     find: while (r < SPAWN_SEARCH) : (r += SPAWN_STEP) {
@@ -381,7 +383,7 @@ pub const Game = struct {
     }
     if (ctl.pressed(in, .uproot)) if (ui_hit) |hit| switch (hit) {
       .bar => |i| g.bar[i] = null,
-      else => {},
+      .panel, .research, .weave, .slot, .store, .recipe, .pause, .option, .back, .garden, .garden_act, .scroll => {},
     };
     if (ctl.pressed(in, .discard) and g.mode.sorting()) g.discard(ui_hit);
 
@@ -582,7 +584,7 @@ pub const Game = struct {
       .bar, .store => return,
     } else if (hit) |p| switch (p) {
       .slot => |j| j,
-      else => return,
+      .panel, .research, .weave, .bar, .store, .recipe, .pause, .option, .back, .garden, .garden_act, .scroll => return,
     } else return;
     const s = g.player.inv.slot[i] orelse return;
     g.player.inv.slot[i] = null;
@@ -656,7 +658,8 @@ pub const Game = struct {
         g.overwrite = false;
       },
       .garden_act => |a| if (dir > 0) g.gardenAct(a),
-      else => {},
+      // the world's own rows, not the menus'
+      .panel, .research, .weave, .slot, .bar, .store, .recipe, .scroll => {},
     }
   }
 
@@ -900,7 +903,7 @@ test "the saved gardens scroll, save over one only when asked twice, and load" {
   // main lists them: more than fit, so the list scrolls
   for (0..GARDENS_SHOWN + 3) |i| {
     var buf:[16]u8 = undefined;
-    try g.gardens.append(gpa, .{.name = save.Name.of(std.fmt.bufPrint(&buf, "garden {d}", .{i}) catch unreachable).?, .age = @intCast(i * 90)});
+    try g.gardens.append(gpa, .{.name = save.Name.of(bufPrint(&buf, "garden {d}", .{i}) catch unreachable).?, .age = @intCast(i * 90)});
   }
   g.listed();
   in.mouse = .{-1e4, -1e4};

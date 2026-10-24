@@ -4,6 +4,7 @@
 //! to the pause menu.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const fields = std.meta.fields;
 const m = @import("../../core/math.zig");
 const play = @import("../play.zig");
 const opt = @import("../options.zig");
@@ -23,7 +24,7 @@ const value_x:f32 = 150;
 const leaf_off:f32 = 84;
 const leaf_len:f32 = 20;
 const leaf_w:f32 = 12;
-const settings = std.meta.fields(opt.Setting).len;
+const settings = fields(opt.Setting).len;
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .options; }
 

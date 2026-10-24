@@ -16,6 +16,7 @@
 //! shader raises it from inside the sap to the surface, and on out.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
@@ -232,9 +233,9 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
 test "the belly is full below and narrows toward the ribs" {
   const mid = surface(m.half_pi, 0, 1)[0] - CENTRE[0];
   const high = surface(m.pi * 0.85, 0, 1)[0] - CENTRE[0];
-  try std.testing.expect(mid > 0.1);
-  try std.testing.expect(high < mid * 0.6);
-  try std.testing.expect(gut(m.pi * 0.25) > 0.95 and gut(m.pi * 0.95) < 0.05);
+  try testing.expect(mid > 0.1);
+  try testing.expect(high < mid * 0.6);
+  try testing.expect(gut(m.pi * 0.25) > 0.95 and gut(m.pi * 0.95) < 0.05);
 }
 
 test "the gut's shares change up the sac as their slopes say" {
@@ -243,9 +244,9 @@ test "the gut's shares change up the sac as their slopes say" {
   while (k < 200) : (k += 1) {
     const yr = m.lerp(-DOWN, UP, m.ratio(k, 200));
     const fd = (share(yr + e)[0] - share(yr - e)[0]) / (2 * e);
-    try std.testing.expectApproxEqAbs(fd, share(yr)[1], 0.05 + 0.02 * @abs(fd));
+    try testing.expectApproxEqAbs(fd, share(yr)[1], 0.05 + 0.02 * @abs(fd));
     const fl = (lower(yr + e)[0] - lower(yr - e)[0]) / (2 * e);
-    try std.testing.expectApproxEqAbs(fl, lower(yr)[1], 0.05 + 0.02 * @abs(fl));
+    try testing.expectApproxEqAbs(fl, lower(yr)[1], 0.05 + 0.02 * @abs(fl));
   }
 }
 
@@ -259,10 +260,10 @@ test "the swelling sac never folds over itself, however full" {
       const lo = lower(yr)[0];
       const r = reach(yr);
       const h = yr + fill * g * (lo * r[0] + (1 - lo) * r[1]);
-      try std.testing.expect(h > last);
+      try testing.expect(h > last);
       last = h;
     }
     // and its top stays where it hangs from the ribs
-    try std.testing.expectApproxEqAbs(UP, last, 1e-4);
+    try testing.expectApproxEqAbs(UP, last, 1e-4);
   }
 }

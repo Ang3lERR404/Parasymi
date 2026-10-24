@@ -18,6 +18,9 @@ const eql = std.mem.eql;
 const parseInt = std.fmt.parseInt;
 const log = std.log;
 const testing = std.testing;
+const indexOfScalar = std.mem.indexOfScalar;
+const trim = std.mem.trim;
+const bufPrint = std.fmt.bufPrint;
 
 // decision: a file path, not player-facing text, so not in the strings
 // (which live inside this folder and are read after it is found).
@@ -100,8 +103,8 @@ pub fn stock(gpa:Allocator, io:Io, path:[]const u8, default:[]const u8) Allocato
 /// the contents after the stamp, if `text` is still exactly as stamped.
 fn untouched(text:[]const u8) ?[]const u8 {
   if (!startsWith(u8, text, STAMP)) return null;
-  const nl = std.mem.indexOfScalar(u8, text, '\n') orelse return null;
-  const hash = parseInt(u64, std.mem.trim(u8, text[STAMP.len..nl], " \r"), 16) catch return null;
+  const nl = indexOfScalar(u8, text, '\n') orelse return null;
+  const hash = parseInt(u64, trim(u8, text[STAMP.len..nl], " \r"), 16) catch return null;
   const body = text[nl + 1 ..];
   return if (Wyhash.hash(0, body) == hash) body else null;
 }
@@ -114,7 +117,7 @@ fn write(io:Io, path:[]const u8, body:[]const u8) void {
   };
   defer f.close(io);
   var buf:[STAMP.len + 18]u8 = undefined;
-  const head = std.fmt.bufPrint(&buf, STAMP ++ "{x:0>16}\n", .{Wyhash.hash(0, body)}) catch unreachable;
+  const head = bufPrint(&buf, STAMP ++ "{x:0>16}\n", .{Wyhash.hash(0, body)}) catch unreachable;
   f.writePositionalAll(io, head, 0) catch |e| return log.warn("{s}: {t}", .{path, e});
   f.writePositionalAll(io, body, head.len) catch |e| return log.warn("{s}: {t}", .{path, e});
 }
@@ -132,7 +135,7 @@ pub fn adopt(io:Io, path:[]const u8, to:[]const u8) void {
 test "a stock file is refreshed only while untouched" {
   var buf:[64]u8 = undefined;
   const body = "a = 1\n";
-  const stamped = try std.fmt.bufPrint(&buf, STAMP ++ "{x:0>16}\n" ++ body, .{Wyhash.hash(0, body)});
+  const stamped = try bufPrint(&buf, STAMP ++ "{x:0>16}\n" ++ body, .{Wyhash.hash(0, body)});
   try testing.expectEqualStrings(body, untouched(stamped).?);
   // edited after stamping: kept as the gardener left it
   stamped[stamped.len - 2] = '2';

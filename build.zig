@@ -1,6 +1,7 @@
 const std = @import("std");
 const zon = @import("build.zig.zon");
 const Build = std.Build;
+const OptimizeMode = std.builtin.OptimizeMode;
 
 /// every shader in `shaders/` is compiled to SPIR-V at build time and exposed
 /// as an anonymous import named after its file (`@embedFile("terrain.vert")`).
@@ -72,7 +73,7 @@ pub fn build(b:*Build) !void {
   }
 
   const Mods = struct {
-    fn make(bb:*Build, root:[]const u8, tt:Build.ResolvedTarget, oo:std.builtin.OptimizeMode, vk:*Build.Module, gm:*Build.Module, glfw:*Build.Step.Compile, sp:[]const Build.LazyPath) *Build.Module {
+    fn make(bb:*Build, root:[]const u8, tt:Build.ResolvedTarget, oo:OptimizeMode, vk:*Build.Module, gm:*Build.Module, glfw:*Build.Step.Compile, sp:[]const Build.LazyPath) *Build.Module {
       const md = bb.createModule(.{
         .optimize = oo,
         .target = tt,

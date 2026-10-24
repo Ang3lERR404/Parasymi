@@ -57,10 +57,10 @@ void surface() {
   vec3 V = normalize(pc.eye_time.xyz - v_pos);
   float aff = v_inst.x, seed = v_inst.y, health = v_inst.z;
   int part = int(v_inst.w + 0.5);
-  float day = pc.sun.w;
+  float day = DAYLIGHT;
   float ndv = clamp(dot(n, V), 0.0, 1.0);
   float fres = pow(1.0 - ndv, FRESNEL_POW);
-  vec3 lit = mix(NIGHT_LIT, vec3(1.0), day);
+  vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
   float fill = v_sap.x, moving = v_sap.y;
   // how much of the key light reaches here (what stands between it and the
   // sun or moon shades it), and that light: what it carries through thin
@@ -101,7 +101,7 @@ void surface() {
     return;
   }
 
-  if (isForm(v_form, FORM_DRIFT) && part == PART_BLOOM && v_t < 0.75) {
+  if (isLantern(v_form, part, v_t)) {
     // a floater's lantern (meshgen `lantern`, tu.x 0.5): clear sap, the
     // spore inside showing through face-on and its rim bright; its comb
     // rows carry light split into colours (their vertex colour), the hue
@@ -134,12 +134,12 @@ void surface() {
 
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
-  if (tl > 0.0 && part != PART_LEAF && part != PART_BLOOM) c += fibreLight(body, lit, tgrad, tl, n, V, 0.22, sh);
+  if (tl > 0.0 && !PART_IN(SHEETS, part)) c += fibreLight(body, lit, tgrad, tl, n, V, 0.22, sh);
 
   // sap, seen through the skin: light from behind and at grazing angles,
   // more where the growth is thin and the plant is full
   vec3 sap = mix(sapOf(aff, ndv, seed), v_col, 0.25);
-  sap = mix(sap, vec3(1.0, 0.85, 1.0), pc.misc.x * 0.5);
+  sap = mix(sap, vec3(1.0, 0.85, 1.0), VEIL * 0.5);
   float through = max(dot(-n, SUN), 0.0) * sh;
   float wrap = clamp(dot(n, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
   float show = mix(0.1, 1.0, thin) * (0.35 + 0.65 * fill);

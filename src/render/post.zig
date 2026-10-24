@@ -192,7 +192,7 @@ pub const Post = struct {
     p.pipe_up = try p.pipe(c, "bloom_up.frag", HDR_FORMAT, true);
     p.pipe_composite = try p.pipe(c, "composite.frag", p.screen, false);
     p.pipe_fxaa = try p.pipe(c, "fxaa.frag", p.screen, false);
-    try p.resize(c, w, h);
+    try p.images(c, w, h);
   }
 
   fn pipe(p:*const Post, c:*const Ctx, comptime frag:[]const u8, fmt:vk.Format, additive:bool) !vk.Pipeline {
@@ -209,7 +209,11 @@ pub const Post = struct {
 
   /// (re)make the images for a screen `w` x `h` and point the sets at them.
   /// The device must be idle.
-  pub fn resize(p:*Post, c:*const Ctx, w:u32, h:u32) !void {
+  pub fn resize(p:*Post, c:*const Ctx, w:u32, h:u32) ctx.Error!void {
+    p.images(c, w, h) catch |e| return ctx.fold(e);
+  }
+
+  fn images(p:*Post, c:*const Ctx, w:u32, h:u32) !void {
     p.hdr.deinit(c);
     p.ms.deinit(c);
     p.ms_depth.deinit(c);
@@ -234,7 +238,7 @@ pub const Post = struct {
 
   /// smooth edges another way: remakes the images (the device must be idle;
   /// pipelines drawing into the world must be remade for its sample count)
-  pub fn antialias(p:*Post, c:*const Ctx, aa:Antialias) !void {
+  pub fn antialias(p:*Post, c:*const Ctx, aa:Antialias) ctx.Error!void {
     p.aa = aa;
     try p.resize(c, p.hdr.extent.width, p.hdr.extent.height);
   }

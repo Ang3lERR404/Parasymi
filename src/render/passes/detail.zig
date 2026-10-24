@@ -24,7 +24,7 @@ pub const VERTS_PER_TILE = 60;
 /// how far from the view's focus (tiles, to a chunk's nearest edge) the
 /// detail is drawn
 const DETAIL_R:f32 = 28;
-const HALF:f32 = @as(f32, @floatFromInt(ck.SIZE)) / 2;
+const HALF:f32 = m.f(ck.SIZE) / 2;
 
 pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   cmd.bindPipeline(.graphics, r.pipe(.detail));

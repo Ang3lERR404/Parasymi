@@ -8,6 +8,7 @@
 //! one new file plus one line in `panels`.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const eqlDeep = std.meta.eql;
 const registry = @import("../core/registry.zig");
 const play = @import("play.zig");
 const prog = @import("progression.zig");
@@ -61,7 +62,7 @@ pub const Rows = struct {
     var i = r.len;
     while (i > 0) {
       i -= 1;
-      if (std.meta.eql(r.pick[i], p)) return r.rect[i];
+      if (eqlDeep(r.pick[i], p)) return r.rect[i];
     }
     return null;
   }

@@ -77,12 +77,12 @@ void main() {
     // fading smoothly across tile borders (ley is shared at tile edges)
     float ley = v_info.y;
     float pulse = 0.5 + 0.5 * sin(t * 2.0 + v_pos.x * 0.45 + v_pos.z * 0.3);
-    vec3 leyc = mix(LEY, LEY_VEILED, pc.misc.x);
+    vec3 leyc = mix(LEY, LEY_VEILED, VEIL);
     c += leyc * pc.misc.y * ley * ley * 0.45 * pulse;
     // a faint plexus drifting over the ley lines themselves
     // (only evaluated where it shows: it is the costliest thing on the ground)
     float on = smoothstep(0.5, 0.85, ley);
-    if (ground && on > 0.0) c += mix(leyc, PLEXUS_PALE, 0.4) * plexus(v_pos.xz, t) * on * mix(0.32, 0.16, pc.sun.w);
+    if (ground && on > 0.0) c += mix(leyc, PLEXUS_PALE, 0.4) * plexus(v_pos.xz, t) * on * mix(0.32, 0.16, DAYLIGHT);
   }
   // hovered tile
   if (ground && all(equal(floor(v_pos.xz), pc.misc.zw))) c += HOVER * (0.7 + 0.3 * sin(t * HOVER_PULSE));

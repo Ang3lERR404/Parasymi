@@ -9,6 +9,9 @@ const Compress = flate.Compress;
 const Crc32 = std.hash.Crc32;
 const writeInt = std.mem.writeInt;
 const testing = std.testing;
+const assert = std.debug.assert;
+const readInt = std.mem.readInt;
+const Reader = std.Io.Reader;
 
 const SIGNATURE = "\x89PNG\r\n\x1a\n";
 /// IHDR: 8 bits a channel, colour type 2 (RGB), no interlace
@@ -25,7 +28,7 @@ pub const Error = Allocator.Error || Writer.Error;
 /// `px`: `w`×`h` pixels of 4 bytes, row by row from the top. The caller
 /// frees the result.
 pub fn encode(gpa:Allocator, w:u32, h:u32, px:[]const u8, layout:Layout) Error![]u8 {
-  std.debug.assert(px.len == @as(usize, w) * h * 4);
+  assert(px.len == @as(usize, w) * h * 4);
   // filtered rows: a filter byte, then RGB
   const row = @as(usize, w) * 3 + 1;
   const raw = try gpa.alloc(u8, row * h);
@@ -85,12 +88,12 @@ test "a PNG holds its pixels: header, then rows that decompress back" {
   defer gpa.free(png);
   try testing.expectEqualStrings(SIGNATURE, png[0..8]);
   try testing.expectEqualStrings("IHDR", png[12..16]);
-  try testing.expectEqual(@as(u32, 2), std.mem.readInt(u32, png[16..20], .big));
+  try testing.expectEqual(@as(u32, 2), readInt(u32, png[16..20], .big));
   // IDAT follows IHDR (8 + 13 + 4 bytes on)
   const at = 8 + 25;
-  const n = std.mem.readInt(u32, png[at..][0..4], .big);
+  const n = readInt(u32, png[at..][0..4], .big);
   try testing.expectEqualStrings("IDAT", png[at + 4 ..][0..4]);
-  var in:std.Io.Reader = .fixed(png[at + 8 ..][0..n]);
+  var in:Reader = .fixed(png[at + 8 ..][0..n]);
   var buf:[flate.max_window_len]u8 = undefined;
   var d:flate.Decompress = .init(&in, .zlib, &buf);
   var rows:[14]u8 = undefined;

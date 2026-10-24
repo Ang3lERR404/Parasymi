@@ -3,6 +3,7 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
 const vertex = @import("vertex.zig");
@@ -104,20 +105,15 @@ pub const Builder = struct {
     const nm = m.inverse(mat); // normals use the inverse-transpose
     for (b.v.items[start..]) |*v| {
       v.pos = m.mulPoint(mat, v.pos);
-      const n:m.V3 = .{
-        nm[0][0] * v.nrm[0] + nm[0][1] * v.nrm[1] + nm[0][2] * v.nrm[2],
-        nm[1][0] * v.nrm[0] + nm[1][1] * v.nrm[1] + nm[1][2] * v.nrm[2],
-        nm[2][0] * v.nrm[0] + nm[2][1] * v.nrm[1] + nm[2][2] * v.nrm[2],
-      };
-      v.nrm = m.norm(n);
+      v.nrm = m.norm(m.mulCovector(nm, v.nrm));
     }
     // a weight's gradient is a covector too: it goes as the normals do
     if (start >= b.skin.items.len) return;
     for (b.skin.items[start..]) |*k| for (0..4) |i| {
-      const g = [3]f32{k.gx[i], k.gy[i], k.gz[i]};
-      k.gx[i] = nm[0][0] * g[0] + nm[0][1] * g[1] + nm[0][2] * g[2];
-      k.gy[i] = nm[1][0] * g[0] + nm[1][1] * g[1] + nm[1][2] * g[2];
-      k.gz[i] = nm[2][0] * g[0] + nm[2][1] * g[1] + nm[2][2] * g[2];
+      const g = m.mulCovector(nm, .{k.gx[i], k.gy[i], k.gz[i]});
+      k.gx[i] = g[0];
+      k.gy[i] = g[1];
+      k.gz[i] = g[2];
     };
   }
 
@@ -1765,14 +1761,14 @@ test "grown vines keep their root and regrow identically" {
   var b:[8]V3 = undefined;
   growthPath(g, &a);
   growthPath(g, &b);
-  try std.testing.expectEqual(g.start, a[0]);
-  for (a, b) |x, y| try std.testing.expectEqual(x, y);
+  try testing.expectEqual(g.start, a[0]);
+  for (a, b) |x, y| try testing.expectEqual(x, y);
   // it still grows along its direction, roughly its length
-  try std.testing.expect(@abs(a[7][1] - 1) < 0.1);
+  try testing.expect(@abs(a[7][1] - 1) < 0.1);
 }
 
 test "a blade has a body: both faces, wound outward, its vein on the cupped face" {
-  var b:Builder = .{.gpa = std.testing.allocator};
+  var b:Builder = .{.gpa = testing.allocator};
   defer b.deinit();
   const c = color.rgb(0.3, 0.6, 0.2).toRgba8(255);
   try b.blade(m.v3(0, 0, 0), m.v3(1, 0, 0), 1, 0.2, 0.3, c, c, 1, .leaf);
@@ -1785,22 +1781,22 @@ test "a blade has a body: both faces, wound outward, its vein on the cupped face
     const n:V3 = @as(V3, v[0].nrm) + @as(V3, v[1].nrm) + @as(V3, v[2].nrm);
     const g = m.cross(p[1] - p[0], p[2] - p[0]);
     if (m.len(g) < 1e-9) continue;
-    try std.testing.expect(m.dot(g, n) > 0);
+    try testing.expect(m.dot(g, n) > 0);
     if (m.norm(g)[1] > 0.5) up += 1;
     if (m.norm(g)[1] < -0.5) down += 1;
   }
-  try std.testing.expect(up > 0 and down > 0);
+  try testing.expect(up > 0 and down > 0);
   // the vein's crest is paler than the blade, and stands on the face looking up
   var pale = false;
   for (b.v.items) |vx| if (vx.col.r > c.r + 10) {
     pale = true;
-    try std.testing.expect(vx.nrm[1] > 0);
+    try testing.expect(vx.nrm[1] > 0);
   };
-  try std.testing.expect(pale);
+  try testing.expect(pale);
 }
 
 test "a confluence's growth keys share one vertex layout and grow taller" {
-  var b:Builder = .{.gpa = std.testing.allocator};
+  var b:Builder = .{.gpa = testing.allocator};
   defer b.deinit();
   var counts:[KEYS]usize = undefined;
   var tops:[KEYS]f32 = undefined;
@@ -1812,11 +1808,11 @@ test "a confluence's growth keys share one vertex layout and grow taller" {
     for (b.v.items) |x| hi = @max(hi, x.pos[1]);
     tops[v] = hi;
   }
-  for (counts[1..]) |c| try std.testing.expectEqual(counts[0], c);
-  for (tops[1..], tops[0 .. KEYS - 1]) |t, prev| try std.testing.expect(t >= prev);
+  for (counts[1..]) |c| try testing.expectEqual(counts[0], c);
+  for (tops[1..], tops[0 .. KEYS - 1]) |t, prev| try testing.expect(t >= prev);
   // keys cover growth end to end; between keys the blend is the fraction
-  try std.testing.expectEqual(Key{.v = 0, .f = 0}, growthKey(.confluence, 0).?);
+  try testing.expectEqual(Key{.v = 0, .f = 0}, growthKey(.confluence, 0).?);
   const end = growthKey(.confluence, 1).?;
-  try std.testing.expect(end.v == KEYS - 2 and end.f == 1);
-  try std.testing.expect(growthKey(.lumenroot, 0.5) == null);
+  try testing.expect(end.v == KEYS - 2 and end.f == 1);
+  try testing.expect(growthKey(.lumenroot, 0.5) == null);
 }

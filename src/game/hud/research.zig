@@ -17,6 +17,8 @@
 //! that is known. Hover a node for its card below; click it to study it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const indexOfScalar = std.mem.indexOfScalar;
+const testing = std.testing;
 const play = @import("../play.zig");
 const prog = @import("../progression.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
@@ -417,7 +419,7 @@ fn node(d:*Draw, f:Fit, l:*const Layout, g:*const play.Game, id:Id, gl:f32, trun
 }
 
 fn budColor(st:prog.Status) Color {
-  return switch (st) { .locked => s.bud_dormant, else => s.bud };
+  return switch (st) { .locked => s.bud_dormant, .open, .done => s.bud };
 }
 
 /// what the hovered (or studied) node is: name, description, what each unit
@@ -454,13 +456,13 @@ fn card(g:*const play.Game, d:*Draw, px:f32, y:f32, focus:?Id) Allocator.Error!v
 test "the sapling lays itself out: hosts grow first, nodes keep apart" {
   // every branch's host is the trunk or a branch earlier in the order
   for (plan.order[0..plan.branches], 0..) |b, n| if (plan.host[@intFromEnum(b)]) |h| {
-    const before = std.mem.indexOfScalar(Id, plan.order[0..n], h);
-    try std.testing.expect(before != null);
+    const before = indexOfScalar(Id, plan.order[0..n], h);
+    try testing.expect(before != null);
   };
   // no two nodes (leaf middles, branch tips) crowd each other
   const l = layout(0, 0);
   var at:[N]V3 = undefined;
   for (0..N) |i| at[i] = if (isBranch(i)) l.stems[1 + i].point(l.stems[1 + i].len)
     else l.base[i] + heading(l.ang[i]) * m.splat3(PETIOLE + LEAF_LEN / 2);
-  for (0..N) |i| for (i + 1..N) |j| try std.testing.expect(m.len(at[i] - at[j]) > 0.5);
+  for (0..N) |i| for (i + 1..N) |j| try testing.expect(m.len(at[i] - at[j]) > 0.5);
 }

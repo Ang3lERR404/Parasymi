@@ -1,6 +1,7 @@
 //! the sap belly (Tab): the wolf's inventory, and the weave list below it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const assert = std.debug.assert;
 const play = @import("../play.zig");
 const player_mod = @import("../player.zig");
 const prog = @import("../progression.zig");
@@ -15,7 +16,7 @@ const hud = @import("../hud.zig");
 
 pub const cols = 6;
 const rows = player_mod.SLOTS / cols;
-comptime { std.debug.assert(player_mod.SLOTS % cols == 0); }
+comptime { assert(player_mod.SLOTS % cols == 0); }
 
 const gap = s.slot_gap;
 const pw:f32 = 780;

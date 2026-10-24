@@ -714,8 +714,8 @@ pub fn solveLeg(d:V3, fold:f32, pelvis_pitch:f32, hang:f32) skel.Limb {
   const dist = m.clamp(reach, @abs(lv - l2) + 1e-3, lv + l2 - 1e-3);
   // the direction toward the ball, as a limb's turn about X
   const beta = m.atan2(-dz, -dy);
-  const g1 = std.math.acos(m.clamp((lv * lv + dist * dist - l2 * l2) / (2 * lv * dist), -1, 1));
-  const g2 = std.math.acos(m.clamp((l2 * l2 + dist * dist - lv * lv) / (2 * l2 * dist), -1, 1));
+  const g1 = m.acos((lv * lv + dist * dist - l2 * l2) / (2 * lv * dist));
+  const g2 = m.acos((l2 * l2 + dist * dist - lv * lv) / (2 * l2 * dist));
   const th = beta - g1 - phi;
   const shin = beta + g2;
   const meta = th + delta;

@@ -13,6 +13,9 @@ const indexOfScalarPos = std.mem.indexOfScalarPos;
 const parseUnsigned = std.fmt.parseUnsigned;
 const stringToEnum = std.meta.stringToEnum;
 const testing = std.testing;
+const countOf = std.mem.count;
+const bufPrint = std.fmt.bufPrint;
+const ArenaAllocator = std.heap.ArenaAllocator;
 
 /// separates the entries of a list value (`a | b | c`).
 pub const LIST_SEP = '|';
@@ -72,7 +75,7 @@ pub fn nth(list:[]const u8, i:usize) []const u8 {
 /// number of entries in a list value.
 pub fn count(list:[]const u8) usize {
   if (list.len == 0) return 0;
-  return std.mem.count(u8, list, &.{LIST_SEP}) + 1;
+  return countOf(u8, list, &.{LIST_SEP}) + 1;
 }
 
 pub const ParseError = error{ BadLine, UnknownKey, MissingKey };
@@ -100,7 +103,7 @@ pub fn parse(comptime T:type, out:*T, src:[]const u8, bad:*Writer) ParseError!vo
     }
     const eq = indexOfScalar(u8, line, '=') orelse return fail(bad, line, error.BadLine);
     const name = trim(u8, line[0..eq], " \t");
-    const key = if (prefix.len == 0) name else std.fmt.bufPrint(&key_buf, "{s}.{s}", .{prefix, name}) catch return fail(bad, line, error.BadLine);
+    const key = if (prefix.len == 0) name else bufPrint(&key_buf, "{s}.{s}", .{prefix, name}) catch return fail(bad, line, error.BadLine);
     if (!set(T, out, key, trim(u8, line[eq + 1 ..], " \t"))) return fail(bad, key, error.UnknownKey);
   }
   var path_buf:[MAX_KEY]u8 = undefined;
@@ -201,7 +204,7 @@ fn failExpand(bad:*Writer, what:[]const u8, e:ExpandError) ExpandError {
 
 test "expand replaces load-time tokens" {
   const T = struct { a:[]const u8 = "", b:?[]const u8 = null, c:[]const u8 = "" };
-  var arena:std.heap.ArenaAllocator = .init(testing.allocator);
+  var arena:ArenaAllocator = .init(testing.allocator);
   defer arena.deinit();
   const look = struct {
     fn f(w:*Writer, name:[]const u8) Writer.Error!bool {

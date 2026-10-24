@@ -24,6 +24,17 @@ const float GLYPH_ROUND = 0.3;
 // coverage below which a fragment is dropped: shapes, glyphs
 const float SHAPE_CLEAR = 0.003;
 const float GLYPH_CLEAR = 0.01;
+// a quad is a shape when its bits' x is SHAPE_MARK (else a glyph's bitmap),
+// its bits' y which (ui/draw.zig `Shape`, its u32 value; must match)
+const uint SHAPE_MARK = 0xffffffffu;
+const uint SHAPE_MEMBRANE = 0u;
+const uint SHAPE_POD = 1u;
+const uint SHAPE_TENDRIL = 2u;
+const uint SHAPE_GLOW = 3u;
+const uint SHAPE_LIMB = 4u;
+const uint SHAPE_LEAF = 5u;
+const uint SHAPE_GRAIN = 6u;
+const uint SHAPE_GEM = 7u;
 
 // integer hash of a lattice point: exact at any magnitude (a sin()-based hash
 // loses precision as time grows and shows up as crawling speckle)
@@ -253,17 +264,17 @@ bool lit(ivec2 q) {
 }
 
 void main() {
-  if (v_bits.x == 0xffffffffu) {
+  if (v_bits.x == SHAPE_MARK) {
     vec4 c;
     switch (v_bits.y) {
-      case 0u: c = membrane(v_uv, v_param.y); break;
-      case 1u: c = pod(v_uv, v_param.x, v_param.y); break;
-      case 2u: c = tendril(v_uv, v_param.x, v_param.y); break;
-      case 3u: c = glow(v_uv); break;
-      case 4u: c = limb(v_uv, v_param.x, v_param.y); break;
-      case 5u: c = leaf(v_uv, v_param.x, v_param.y); break;
-      case 6u: c = seedCoat(v_uv, v_param.x, v_param.y); break;
-      default: c = gem(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_MEMBRANE: c = membrane(v_uv, v_param.y); break;
+      case SHAPE_POD: c = pod(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_TENDRIL: c = tendril(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_GLOW: c = glow(v_uv); break;
+      case SHAPE_LIMB: c = limb(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_LEAF: c = leaf(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_GRAIN: c = seedCoat(v_uv, v_param.x, v_param.y); break;
+      default: c = gem(v_uv, v_param.x, v_param.y); break; // SHAPE_GEM
     }
     if (c.a < SHAPE_CLEAR) discard;
     o = c;

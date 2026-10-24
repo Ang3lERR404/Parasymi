@@ -64,6 +64,9 @@ const float PULSE_RATE = 3.0;
 const float DIM_GLOW = 0.06;
 // a conduit's amber pulses: how fast they run (rad/s)
 const float CORE_RUN_RATE = 2.6;
+// the roles that are a structure's foliage (leaves, an ear): they unfold as
+// it grows and breathe and lift in the wind
+const uint FOLIAGE = PART_BIT(PART_LEAF) | PART_BIT(PART_EAR);
 
 // Catmull-Rom through b..c (a, d the neighbours) at f, and its tangent
 vec3 catmull(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
@@ -135,15 +138,16 @@ void main() {
   float sway = iw.x;
   // a growing structure's leaves and petals come up folded and open from
   // the bottom up, tips last (weighted along the leaf so its base holds)
-  if (iw.w < 1.0 && (part == PART_LEAF || part == PART_EAR)) {
+  if (iw.w < 1.0 && PART_IN(FOLIAGE, part)) {
     p.xz *= unfold(0.2, grownPast(pos.y / iw.y, 0.7, 0.35, iw.w), tu.y);
   }
   vec4 wind = gardenWind(t, c3.xz);
   // grown structures move as the plants do: leaves and petals breathe
   // slowly and lift a little in the gusts, tips most, bases held
-  if (sway > 0.0 && (part == PART_LEAF || part == PART_EAR)) {
+  bool foliage = PART_IN(FOLIAGE, part);
+  if (sway > 0.0 && foliage) {
     p.y += tu.y * tu.y * (LEAF_LIFT * wind.z * sin(t * LEAF_LIFT_RATE + ip.z * 11.0 + tu.x * 3.0) + 0.01 * sin(t * 0.9 + ip.z * TAU));
-  } else if (part == PART_LEAF || part == PART_EAR) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
+  } else if (foliage) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
   if (part == PART_TENDRIL) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
   // resin gives like dense gel: its surface follows the spring, its base on
   // the body holds (a smooth field of height, so shared vertices move alike)
@@ -310,9 +314,9 @@ void main() {
   if (part == PART_HALO || part == PART_PROJECTION) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
   gl_Position = project(w.xyz);
 #ifdef SHADOW
-  // what is light itself casts no shadow (a star mote, a beam, a halo's
-  // flash, ring and rays), nor does the soft shadow under a floater
-  if (mode == PLACE_MOTE || part == PART_SHADOW || part == PART_THREAD || part == PART_FLASH || part == PART_HALO || part == PART_PROJECTION) gl_Position = UNSEEN;
+  // what is light itself casts no shadow (a star mote, PARTS_LIGHT: a beam,
+  // a halo's flash, ring and rays), nor does the soft shadow under a floater
+  if (mode == PLACE_MOTE || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part)) gl_Position = UNSEEN;
 #endif
 }
 

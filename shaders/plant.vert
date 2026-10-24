@@ -31,14 +31,10 @@ layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubb
 
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
-// a celestial bloom's turning: each ring's pace (rad/s, alternating ways):
-// core, inner, middle, outer whorl, motes, threads
-const float SPIN_CORE = 0.03;
-const float SPIN_INNER = 0.05;
-const float SPIN_MIDDLE = -0.035;
-const float SPIN_OUTER = 0.025;
-const float SPIN_MOTES = 0.1;
-const float SPIN_THREADS = 0.04;
+// a celestial bloom's turning: each ring's pace (rad/s, alternating ways),
+// by its meshgen.Ring: core, inner, middle, outer whorl, motes, threads
+// (a ring past the table turns as the last)
+const float SPIN[6] = float[6](0.03, 0.05, -0.035, 0.025, 0.1, 0.04);
 const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
 // how far a fragment comes in from (horizontally) as it settles
 const float ARRIVE_REACH = 1.4;
@@ -53,6 +49,23 @@ const float SIZE_SPREAD = 0.3;
 // how far behind the growing front growth still reads as new (v_young)
 const float YOUNG_SPAN = 0.55;
 
+// what each form does its own way (sets of FORM_ bits, common.glsl): a new
+// form, or a new species of one, takes up a behaviour by joining its set.
+// Petals float free of a core, gathered and turned by it, never bending
+// from a root (the celestial bloom)
+const uint FORMS_FREE = FORM_BIT(FORM_RADIANT);
+// its growth keys carry its size, its canopy and its offshoots (blended
+// between keys; nothing scaled or unfolded here)
+const uint FORMS_KEYED = FORM_BIT(FORM_CONFLUENCE);
+// a crown that comes up closed, its fronds a tight bundle, opening out as
+// it matures (its leaves and petals not unfolding on their own)
+const uint FORMS_CROWNED = FORM_BIT(FORM_COIL);
+// filaments hanging from a float, rippling like a jelly's
+const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
+// vines whose hue shimmers where they turn from one lineage's into the
+// other's (a confluence's braid running on into red vines)
+const uint FORMS_SHIMMER = FORM_BIT(FORM_CONFLUENCE);
+
 // rotate a colour's hue by `a` radians about the grey axis
 vec3 hueShift(vec3 c, float a) { return turnAbout(c, vec3(0.57735), a); }
 
@@ -65,17 +78,16 @@ void main() {
   vec3 base = drawn ? haloSpiral(ipos, ih.xyz, ih.w) : ipos;
   if (drawn) growth = mix(growth, HALO_BUD, haloFold(ih.w));
   float flow = ib.x, health = ib.y, sway = ib.z;
-  // species.Form: 0 herb, 1 coil, 2 drift, 3 confluence, 4 radiant
-  bool confluence = isForm(ib.w, FORM_CONFLUENCE);
-  bool coil = isForm(ib.w, FORM_COIL);
-  bool radiant = isForm(ib.w, FORM_RADIANT);
-  bool drift = isForm(ib.w, FORM_DRIFT);
+  // species.Form (ib.w): what it does its own way (the FORMS_ sets above)
+  bool keyed = formIn(FORMS_KEYED, ib.w);
+  bool crowned = formIn(FORMS_CROWNED, ib.w);
+  bool sheet = PART_IN(SHEETS, part);
   // a confluence blends between the growth keys around its growth, so it
   // grows smoothly instead of stepping from one shape to the next
   vec3 p = mix(pos, pos_next, ic.x);
   vec3 n = normalize(mix(nrm, nrm_next, ic.x));
 
-  if (radiant) {
+  if (formIn(FORMS_FREE, ib.w)) {
     // a flower whose petals float free of it, gathered by its core: each
     // fragment (tu.x its order, colour alpha its bearing, tu.y its ring,
     // meshgen.Ring) drifts in from its bearing, spiralling, folded up like
@@ -115,7 +127,7 @@ void main() {
       p.xz = rot(c * 2.2) * p.xz;
     }
     // each ring turns at its own slow pace, alternating ways
-    float spin = ring < 0.5 ? SPIN_CORE : (ring < 1.5 ? SPIN_INNER : (ring < 2.5 ? SPIN_MIDDLE : (ring < 3.5 ? SPIN_OUTER : (ring < 4.5 ? SPIN_MOTES : SPIN_THREADS))));
+    float spin = SPIN[clamp(int(ring), 0, 5)];
     mat2 turn = rot(t * spin + seed * TAU + away * 1.4);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
@@ -159,16 +171,16 @@ void main() {
   // the main plant, meshgen `shootFold`): an offshoot comes up pressed to
   // its stem, its bud or bloom a narrow closed one, and leans out and opens
   // as growth passes where it leaves (a confluence grows them in its keys)
-  float shoot = confluence ? 0.0 : 1.0 - col.a;
+  float shoot = keyed ? 0.0 : 1.0 - col.a;
   bool trunk = shoot < 0.002;
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
   // where it grows from, on the stem or along a vine.
-  if ((part == PART_LEAF || part == PART_BLOOM) && !confluence && !coil && trunk) p.xz *= unfold(0.25, open, tu.y);
+  if (sheet && !keyed && !crowned && trunk) p.xz *= unfold(0.25, open, tu.y);
   if (!trunk) p.xz *= unfold(0.2, passed, shoot);
   // a parasite's crown comes up closed, its fronds a tight upright bundle,
   // and opens out as it matures; its bladders swell in as the stalk passes them
-  if (coil && trunk) {
+  if (crowned && trunk) {
     float unfurl = smoothstep(0.3, 1.0, growth);
     if (part == PART_TENDRIL) p.xz *= mix(0.3, 1.0, unfurl);
     if (part == PART_BLOOM && tu.x < 0.9) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
@@ -188,7 +200,7 @@ void main() {
   // symbiotic breathing: slow, the leaf tips moving
   if (aff > 0.0 && part == PART_LEAF) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * TAU);
   // leaves and petals lift a touch in the gusts, tips most (bases stay)
-  if (part == PART_LEAF || part == PART_BLOOM) p.y += LEAF_LIFT * tu.y * tu.y * gust * sin(t * LEAF_LIFT_RATE + seed * 11.0 + h * 3.0);
+  if (sheet) p.y += LEAF_LIFT * tu.y * tu.y * gust * sin(t * LEAF_LIFT_RATE + seed * 11.0 + h * 3.0);
   // parasites: fronds curl and uncurl slowly while feeding, alien but
   // unhurried; thorns barely stir
   if (aff < -0.5) {
@@ -199,13 +211,13 @@ void main() {
   // a floater's filaments ripple like a jelly's: slow waves run down them
   // from the float, swinging wider toward the free tips (the bend below
   // still trails them downwind)
-  if (drift && part == PART_TENDRIL) {
+  if (part == PART_TENDRIL && formIn(FORMS_FILAMENTS, ib.w)) {
     float down = max(-p.y, 0.0);
     float ph = t * 1.4 - down * 8.0 + seed * TAU;
     p.xz += vec2(sin(ph + p.x * 9.0), cos(ph * 0.83 + p.z * 9.0)) * 0.03 * down;
   }
   // convergent: blooms turn, very slowly (a confluence's canopy stays on its leader)
-  if (abs(aff) < 0.5 && part == PART_BLOOM && !confluence && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
+  if (abs(aff) < 0.5 && part == PART_BLOOM && !keyed && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
 
   // wilt when unhealthy
   p.y *= mix(WILT, 1.0, health);
@@ -224,14 +236,14 @@ void main() {
   p = bendIn(p, wdir, ang);
   n = bendIn(n, wdir, ang);
   // a confluence's growth keys already carry its size
-  float s = (confluence ? 1.0 : mix(SEEDLING, 1.0, g)) * (SIZE_MIN + SIZE_SPREAD * fract(seed * 7.13));
+  float s = (keyed ? 1.0 : mix(SEEDLING, 1.0, g)) * (SIZE_MIN + SIZE_SPREAD * fract(seed * 7.13));
   vec3 wp = base + p * s;
 
   v_pos = wp;
   v_nrm = n;
   v_col = srgb2lin(col.rgb);
   // the transition zone of a confluence's vines shimmers: its hue drifts +-10 degrees
-  if (confluence && part == PART_TENDRIL) {
+  if (part == PART_TENDRIL && formIn(FORMS_SHIMMER, ib.w)) {
     float zone = smoothstep(0.08, 0.3, tu.y) * (1.0 - smoothstep(0.55, 0.8, tu.y));
     v_col = max(hueShift(v_col, radians(SHIMMER_DEG) * zone * sin(t * 0.5 + seed * TAU + tu.y * 3.0)), 0.0);
   }
@@ -244,12 +256,12 @@ void main() {
   // growth read: what grew last (near the growing front, and toward the
   // tips once grown) is thinner and more translucent than the old base
   v_young = clamp((h - growth + YOUNG_SPAN) / YOUNG_SPAN, 0.0, 1.0);
-  if (part == PART_LEAF || part == PART_BLOOM) v_young = max(v_young, 0.5);
+  if (sheet) v_young = max(v_young, 0.5);
   v_inst = vec4(aff, seed, health, float(part));
   gl_Position = project(wp);
 #ifdef SHADOW
   // a placement preview casts no shadow, nor does a floater's clear lantern
-  if (ic.y > 0.5 || (drift && part == PART_BLOOM && h < 0.75)) gl_Position = UNSEEN;
+  if (ic.y > 0.5 || isLantern(ib.w, int(part), h)) gl_Position = UNSEEN;
 #endif
 }
 

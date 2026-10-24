@@ -3,6 +3,8 @@
 //! respect to the simulation.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const pdq = std.sort.pdq;
+const swap = std.mem.swap;
 const m = @import("../core/math.zig");
 const rng = @import("../core/rng.zig");
 const ck = @import("../world/chunk.zig");
@@ -191,7 +193,7 @@ fn rankLights(g:*Game) void {
     }
     fn before(ctx:@This(), a:vertex.Light, b:vertex.Light) bool { return score(ctx, a) > score(ctx, b); }
   };
-  std.sort.pdq(vertex.Light, ls, Rank{ .focus = g.cam.target }, Rank.before);
+  pdq(vertex.Light, ls, Rank{ .focus = g.cam.target }, Rank.before);
   g.parts.lights.shrinkRetainingCapacity(renderer.MAX_LIGHTS);
 }
 
@@ -226,7 +228,7 @@ fn threads(g:*Game, tf:f32) Allocator.Error!void {
     // links are worked out each tick; an uproot since then leaves a stale one
     if (ia >= g.plants.len() or ib >= g.plants.len()) continue;
     if (species.get(s.items(.sp)[ia]).radiance <= 0 or species.get(s.items(.sp)[ib]).radiance <= 0) continue;
-    if (s.items(.growth)[ib] > s.items(.growth)[ia]) std.mem.swap(usize, &ia, &ib);
+    if (s.items(.growth)[ib] > s.items(.growth)[ia]) swap(usize, &ia, &ib);
     const pos = [2]m.V3{ end(g, ia, tf), end(g, ib, tf) };
     const span = pos[1] - pos[0];
     // a beam runs true, bowing only a breath as the blooms drift

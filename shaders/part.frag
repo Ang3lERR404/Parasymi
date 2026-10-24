@@ -37,13 +37,17 @@ const float GROUND_SHADOW_FALLOFF = 1.6;
 const vec3 FLASH_WHITE = vec3(1.0, 0.97, 0.9);
 // the halo's projection: how many rays it has round it
 const float RAYS = 40.0;
+// the roles thin enough for light from behind to shine through (leaves,
+// sap, an ear), and the woven ones with a sheen along their fibres
+const uint THIN = PART_BIT(PART_LEAF) | PART_BIT(PART_BLOOM) | PART_BIT(PART_EAR);
+const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE);
 
 // sap is alive: bubbles drifting up inside it, beads sliding down its
 // surface. Added to every sap material. `sh`: how much of the key light
 // reaches it (its glints fall in shadow with it)
 vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout float alpha) {
   float t = pc.eye_time.w;
-  vec3 lit = mix(NIGHT_LIT, vec3(1.0), pc.sun.w);
+  vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
   float bub = sapBubbles(v_obj, V, t) * inside;
   c += mix(sapc, vec3(1.0, 0.95, 0.85), 0.35) * bub * 0.45 * lit;
   vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
@@ -65,6 +69,8 @@ void surface() {
   // instance tint (paw beans, nose) can make it denser and browner
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
   bool inner_ear = part == PART_EAR && dot(raw, V) < 0.0;
+  // what is light itself (PARTS_LIGHT: beams, a halo's flash, ring and
+  // rays) shines on its own, the key light left out: each its own material
   if (part == PART_THREAD) {
     // soft rays sent from one bloom to the other: no core, a faint haze
     // across the width (v_u -1..1) with a few soft streaks in it, each
@@ -214,8 +220,8 @@ void surface() {
     float fres = pow(1.0 - ndv, PRISM_FRESNEL_POW);
     vec3 facet = hash33(floor(n * 7.0) + 3.0);
     vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), PRISM_FILM, 0.35);
-    float day = pc.sun.w;
-    vec3 lit = mix(NIGHT_LIT, PRISM_DAY, day);
+    float day = DAYLIGHT;
+    vec3 lit = byDay(NIGHT_LIT, PRISM_DAY);
     c = shadeLit(v_col * 0.55, n, v_pos, sh);
     c += film * lit * (0.18 + 0.55 * fres + 0.25 * facet.y * max(dot(n, SUN), 0.0) * sh);
     c += film * pointLight(v_pos, n, 0.0) * 0.5;
@@ -240,14 +246,14 @@ void surface() {
     float h = clamp(v_u, 0.0, 1.0);
     float ndv = clamp(dot(raw, V), 0.0, 1.0);
     float fres = pow(1.0 - ndv, FRESNEL_POW);
-    float day = pc.sun.w;
+    float day = DAYLIGHT;
     vec3 sap = SAP * hue;
     vec3 deep = SAP_DEEP * hue * mix(0.55, 1.6, h);
     // light carried through the mass: wrapped, so the shadow side still
     // shows a warm core, thicker resin swallowing more of it
     float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
     float through = max(dot(-raw, SUN), 0.0) * sh;
-    vec3 lit = mix(RESIN_NIGHT, vec3(1.0), day);
+    vec3 lit = byDay(RESIN_NIGHT, vec3(1.0));
     c = shadeLit(deep, raw, v_pos, sh);
     c += sap * lit * wrap * mix(0.06, 0.32, h);
     c += sap * lit * through * 0.25 * h;
@@ -294,17 +300,17 @@ void surface() {
     c = shadeLit(albedo, n, v_pos, sh);
     // leaves and sap are thin/translucent: back light shines through (a
     // bloom's or a mote's too)
-    if (part == PART_LEAF || part == PART_BLOOM || part == PART_EAR) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pointLight(v_pos, -n, 0.0) * 0.3);
+    if (PART_IN(THIN, part)) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pointLight(v_pos, -n, 0.0) * 0.3);
     c += SAP * inner * 0.25;
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets
     float tl = length(tgrad);
-    if ((part == PART_STEM || part == PART_CORE) && tl > 0.0) c += fibreLight(albedo, mix(NIGHT_LIT, SUNLIGHT, pc.sun.w), tgrad, tl, n, V, 0.28, sh);
+    if (PART_IN(FIBRES, part) && tl > 0.0) c += fibreLight(albedo, byDay(NIGHT_LIT, SUNLIGHT), tgrad, tl, n, V, 0.28, sh);
     c += v_col * v_glow * 2.2;
   }
   // rim light keeps the silhouette readable at night
   float rim = pow(1.0 - max(dot(n, V), 0.0), RIM_POW);
-  c += v_col * rim * mix(0.35, 0.12, pc.sun.w);
+  c += v_col * rim * mix(0.35, 0.12, DAYLIGHT);
   o = vec4(applyFog(c, v_pos), alpha);
 }
 

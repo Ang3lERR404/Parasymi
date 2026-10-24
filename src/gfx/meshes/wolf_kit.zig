@@ -4,6 +4,7 @@
 //! wolf's meshes use it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const color = @import("../../core/color.zig");
@@ -124,10 +125,10 @@ pub fn leaf(b:*mg.Builder, l:Leaf) Allocator.Error!void {
 }
 
 test "a fur leaf's base stays on the surface it grows from" {
-  var b:mg.Builder = .{.gpa = std.testing.allocator};
+  var b:mg.Builder = .{.gpa = testing.allocator};
   defer b.deinit();
   try leaf(&b, .{.base = v3(0, 1, 0), .along = v3(0, 0, -1), .out = v3(0, 1, 0), .len = 0.1, .width = 0.02, .col = .{.r = 0, .g = 0, .b = 0, .a = 255}, .tip = .{.r = 0, .g = 0, .b = 0, .a = 255}});
-  for (b.v.items) |vx| if (vx.tu[1] == 0) try std.testing.expectApproxEqAbs(@as(f32, 1), vx.pos[1], 1e-5);
+  for (b.v.items) |vx| if (vx.tu[1] == 0) try testing.expectApproxEqAbs(@as(f32, 1), vx.pos[1], 1e-5);
 }
 
 /// a lobe of resin grown over the hide (the pectorals, the rear): an

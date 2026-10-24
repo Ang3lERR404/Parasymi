@@ -18,6 +18,13 @@ layout(push_constant) uniform Push {
 } pc;
 
 #define SUN pc.sun.xyz
+// what drives the garden's light, by name (a sky shift or other world event
+// is these moving): how much of the day it is (0 night .. 1 noon), and how
+// far the veil has drawn over it (0 none .. 1 full)
+#define DAYLIGHT pc.sun.w
+#define VEIL pc.misc.x
+// a light or a colour that turns with the day: `night` by night, `day` at noon
+vec3 byDay(vec3 night, vec3 day) { return mix(night, day, DAYLIGHT); }
 
 // this frame's light (render/light.zig `Lighting`): the key light's shadow
 // cascades and the points of light the garden makes
@@ -69,6 +76,17 @@ const float SHEEN_POWER = 40.0;
 #define PART_HALO 11      // the ring of split light
 #define PART_PROJECTION 12 // the rays that make the ring
 #define PART_CORE 13      // a conduit's core
+// sets of roles, one bit each: a shader keys what roles do alike off a set
+// (PART_IN), so a new role joins a behaviour by joining its set
+#define PART_BIT(p) (1u << uint(p))
+#define PART_IN(set, p) ((((set) >> uint(p)) & 1u) != 0u)
+// the roles that are light itself: they cast no shadow (part.vert SHADOW)
+// and are not lit by the key light (part.frag)
+const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION);
+// the roles that are a plant's leaves and petals (plant.vert, plant.frag):
+// they unfurl as it grows, lift in the gusts, always read as thin and show
+// no fibres
+const uint SHEETS = PART_BIT(PART_LEAF) | PART_BIT(PART_BLOOM);
 
 // a plant's form (sim/species.zig `Form`, instance ib.w; must match)
 const float FORM_HERB = 0.0;
@@ -77,6 +95,16 @@ const float FORM_DRIFT = 2.0;
 const float FORM_CONFLUENCE = 3.0;
 const float FORM_RADIANT = 4.0;
 bool isForm(float f, float form) { return abs(f - form) < 0.5; }
+// sets of forms, one bit each (as the roles' sets): what forms do alike is
+// keyed off a set (formIn), so a new form joins a behaviour by joining it
+#define FORM_BIT(f) (1u << uint(f))
+bool formIn(uint set, float f) { return ((set >> uint(f + 0.5)) & 1u) != 0u; }
+// the forms whose petals are a lantern of clear sap (meshgen `lantern`,
+// below LANTERN_TOP along the plant): it is drawn see-through and, being
+// clear, casts no shadow (plant.vert SHADOW and plant.frag agree on it)
+const uint FORMS_LANTERN = FORM_BIT(FORM_DRIFT);
+const float LANTERN_TOP = 0.75;
+bool isLantern(float form, int part, float h) { return part == PART_BLOOM && h < LANTERN_TOP && formIn(FORMS_LANTERN, form); }
 
 // tile kinds (world tile `Kind`, info.x * 255; must match)
 const int TILE_WATER = 0;
@@ -154,20 +182,33 @@ vec4 gardenWind(float t, vec2 at) {
   return vec4(wdir, gust * gust, along);
 }
 
+// how a kind of growth answers the garden's wind (windPush): its own sway's
+// rate (rad/s) and phase per unit along the wind, its push per unit of gust,
+// and its own sway's reach, keeping `calm` of that reach in a calm (more in
+// gusts). Everything grown that bends in the wind is one of these.
+struct WindResponse { float rate; float wave; float gust; float own; float calm; };
+// how far a thing answering `r` is pushed by the wind (`wind`, gardenWind)
+// at its own `phase`: the gust's push plus a sway of its own, phased by
+// where it stands along the wind
+float windPush(float t, vec4 wind, float phase, WindResponse r) {
+  float own = sin(t * r.rate - wind.w * r.wave + phase);
+  return r.gust * wind.z + r.own * (r.calm + wind.z) * own;
+}
+
 // how far something grown leans in the wind (radians at its tip, before the
-// h^2 of its height): the gust's push plus a slow sway of its own, phased by
-// where it stands along the wind (`wind`, gardenWind) and its own `phase`,
-// reaching a point at height `h` (0 root .. 1 tip) late. Plants and
-// standing structures share it.
-const float LEAN_RATE = 0.85;   // its own sway (rad/s)
-const float LEAN_WAVE = 0.3;    // phase per unit along the wind
+// h^2 of its height): the push (as LEAN), at its own `phase`, reaching a
+// point at height `h` (0 root .. 1 tip) late. Plants and standing
+// structures share it.
+const WindResponse LEAN = WindResponse(
+  0.85,  // its own sway (rad/s)
+  0.3,   // phase per unit along the wind
+  0.05,  // lean per unit of gust
+  0.025, // its own sway's reach ...
+  0.4    // ... (this much even in a calm, more in gusts)
+);
 const float LEAN_LAG = 0.9;     // phase the tip lags the base by
-const float LEAN_GUST = 0.05;   // lean per unit of gust
-const float LEAN_OWN = 0.025;   // its own sway's reach ...
-const float LEAN_CALM = 0.4;    // ... (this much even in a calm, more in gusts)
 float windLean(float t, vec4 wind, float phase, float h, float sway) {
-  float own = sin(t * LEAN_RATE - wind.w * LEAN_WAVE + phase - h * LEAN_LAG);
-  return sway * (LEAN_GUST * wind.z + LEAN_OWN * (LEAN_CALM + wind.z) * own);
+  return sway * windPush(t, wind, phase - h * LEAN_LAG, LEAN);
 }
 
 // leaves and petals lift a touch in the gusts and breathe, tips most
@@ -331,9 +372,7 @@ vec3 pointLight(vec3 wpos, vec3 n, float wrap) {
 const float MOON_STRENGTH = 0.35;
 const float SUN_STRENGTH = 1.1;
 // the key light's colour and strength (the sun by day, the moon by night)
-vec3 keyLight() {
-  return mix(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH, pc.sun.w);
-}
+vec3 keyLight() { return byDay(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH); }
 
 // the ambient light: the sky's by day (veiled, toward violet), by night, the
 // ground's bounce (dimmed to this share by night), and how strong it all is
@@ -347,9 +386,9 @@ const float AMBIENT = 0.55;
 // keyShadow) and the points of light
 vec3 shadeLit(vec3 albedo, vec3 n, vec3 wpos, float sh) {
   float ndl = max(dot(n, SUN), 0.0);
-  float day = pc.sun.w;
-  vec3 sky = mix(SKY_DAY, SKY_VEILED, pc.misc.x);
-  sky = mix(SKY_NIGHT, sky, day);
+  float day = DAYLIGHT;
+  vec3 sky = mix(SKY_DAY, SKY_VEILED, VEIL);
+  sky = byDay(SKY_NIGHT, sky);
   vec3 ground = GROUND_BOUNCE * mix(GROUND_NIGHT, 1.0, day);
   vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * AMBIENT;
   vec3 sun = keyLight() * ndl * sh;

@@ -20,6 +20,10 @@ const parseInt = std.fmt.parseInt;
 const sep_str = std.fs.path.sep_str;
 const ns_per_s = std.time.ns_per_s;
 const testing = std.testing;
+const fields = std.meta.fields;
+const assert = std.debug.assert;
+const sort = std.mem.sort;
+const bufPrint = std.fmt.bufPrint;
 const home = @import("home.zig");
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
@@ -38,8 +42,8 @@ const Game = play.Game;
 const Belly = @FieldType(player_mod.Player, "inv");
 /// a hotbar slot is stored as its item's id, or this when empty
 const NO_ITEM:u8 = 0xff;
-const item_count = std.meta.fields(items.Item).len;
-comptime { std.debug.assert(item_count < NO_ITEM); }
+const item_count = fields(items.Item).len;
+comptime { assert(item_count < NO_ITEM); }
 
 /// where saves were kept before they moved into `home.SAVES`
 pub const LEGACY = "parasymi.sav";
@@ -279,7 +283,7 @@ pub fn list(gpa:Allocator, io:Io, out:*std.ArrayList(Entry)) Error!void {
     const age:i64 = @intCast(@divFloor(now - st_.mtime.nanoseconds, ns_per_s));
     try out.append(gpa, .{ .name = name, .age = @max(age, 0) });
   }
-  std.mem.sort(Entry, out.items, {}, struct {
+  sort(Entry, out.items, {}, struct {
     fn newer(_:void, a:Entry, b:Entry) bool { return a.age < b.age; }
   }.newer);
 }
@@ -291,12 +295,12 @@ pub fn fresh(have:[]const Entry) Name {
     top = @max(top, parseInt(u32, e.name.slice()[FRESH.len..], 10) catch continue);
   };
   var buf:[MAX_NAME]u8 = undefined;
-  return Name.of(std.fmt.bufPrint(&buf, FRESH ++ "{d}", .{top + 1}) catch unreachable).?;
+  return Name.of(bufPrint(&buf, FRESH ++ "{d}", .{top + 1}) catch unreachable).?;
 }
 
 /// `home.SAVES`/`name``EXT`, plus `extra`
 fn pathOf(buf:*[MAX_PATH]u8, name:Name, extra:[]const u8) []const u8 {
-  return std.fmt.bufPrint(buf, "{s}{s}{s}{s}{s}", .{home.SAVES, sep_str, name.slice(), EXT, extra}) catch unreachable;
+  return bufPrint(buf, "{s}{s}{s}{s}{s}", .{home.SAVES, sep_str, name.slice(), EXT, extra}) catch unreachable;
 }
 
 /// writes the garden as `name` (whole or not at all: into a scratch file

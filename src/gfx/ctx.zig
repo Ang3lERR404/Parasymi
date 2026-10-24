@@ -19,13 +19,15 @@ extern fn glfwGetInstanceProcAddress(instance:?vk.Instance, name:[*:0]const u8) 
 pub const Error = error{OutOfMemory, DeviceLost, SurfaceLost, NoVulkan, NoSuitableGpu, NoMemoryType, GpuFailure};
 
 /// translate a Vulkan/GLFW error into `Error`, logging any detail it loses.
-pub fn fold(e:anytype) Error {
+/// Folding an `Error` again keeps it as it is.
+pub fn fold(e:anyerror) Error {
   const name = @errorName(e);
   const known = .{
     .{"OutOfMemory", error.OutOfMemory}, .{"OutOfHostMemory", error.OutOfMemory}, .{"OutOfDeviceMemory", error.OutOfMemory},
-    .{"DeviceLost", error.DeviceLost}, .{"SurfaceLostKHR", error.SurfaceLost},
+    .{"DeviceLost", error.DeviceLost}, .{"SurfaceLostKHR", error.SurfaceLost}, .{"SurfaceLost", error.SurfaceLost},
     .{"IncompatibleDriver", error.NoVulkan}, .{"InitializationFailed", error.NoVulkan}, .{"APIUnavailable", error.NoVulkan},
-    .{"NoSuitableGpu", error.NoSuitableGpu}, .{"NoMemoryType", error.NoMemoryType},
+    .{"NoVulkan", error.NoVulkan}, .{"NoSuitableGpu", error.NoSuitableGpu}, .{"NoMemoryType", error.NoMemoryType},
+    .{"GpuFailure", error.GpuFailure},
   };
   inline for (known) |k| if (eql(u8, name, k[0])) return k[1];
   log.err("gpu: {s}", .{name});
@@ -81,6 +83,10 @@ pub const Ctx = struct {
       .engine_version = 0,
       .api_version = @bitCast(vk.API_VERSION_1_3),
     };
+    // the wrappers are allocated before what they wrap, so a failed
+    // allocation never strands a live instance or device
+    c.vki = try gpa.create(vk.InstanceWrapper);
+    errdefer gpa.destroy(c.vki);
     const inst = try c.vkb.createInstance(&.{
       .p_application_info = &app,
       .enabled_extension_count = @intCast(exts.items.len),
@@ -88,8 +94,6 @@ pub const Ctx = struct {
       .enabled_layer_count = @intCast(layers.items.len),
       .pp_enabled_layer_names = layers.items.ptr,
     }, null);
-    c.vki = try gpa.create(vk.InstanceWrapper);
-    errdefer gpa.destroy(c.vki);
     c.vki.* = vk.InstanceWrapper.load(inst, c.vkb.dispatch.vkGetInstanceProcAddr.?);
     c.instance = vk.InstanceProxy.init(inst, c.vki);
     errdefer c.instance.destroyInstance(null);
@@ -117,6 +121,8 @@ pub const Ctx = struct {
     const dev_exts = [_][*:0]const u8{vk.extensions.khr_swapchain.name};
     c.sample_shading = c.instance.getPhysicalDeviceFeatures(c.pdev).sample_rate_shading == .true;
     const f10:vk.PhysicalDeviceFeatures = .{.sample_rate_shading = if (c.sample_shading) .true else .false};
+    c.vkd = try gpa.create(vk.DeviceWrapper);
+    errdefer gpa.destroy(c.vkd);
     const dev = try c.instance.createDevice(c.pdev, &.{
       .p_next = &f11,
       .p_enabled_features = &f10,
@@ -125,7 +131,6 @@ pub const Ctx = struct {
       .enabled_extension_count = dev_exts.len,
       .pp_enabled_extension_names = &dev_exts,
     }, null);
-    c.vkd = try gpa.create(vk.DeviceWrapper);
     c.vkd.* = vk.DeviceWrapper.load(dev, c.vki.dispatch.vkGetDeviceProcAddr.?);
     c.device = vk.DeviceProxy.init(dev, c.vkd);
     c.queue = c.device.getDeviceQueue(c.family, 0);

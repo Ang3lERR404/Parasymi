@@ -8,6 +8,7 @@ const values = std.enums.values;
 const eql = std.mem.eql;
 const startsWith = std.mem.startsWith;
 const stringToEnum = std.meta.stringToEnum;
+const testing = std.testing;
 const glfw = @import("zglfw");
 
 pub const Key = glfw.Key;
@@ -108,9 +109,9 @@ fn onResize(w:*glfw.Window, _:c_int, _:c_int) callconv(.c) void {
 }
 
 test "binds parse by key and mouse button name" {
-  try std.testing.expectEqual(Bind{ .key = .left_shift }, Bind.parse("left_shift").?);
-  try std.testing.expectEqual(Bind{ .key = .F5 }, Bind.parse("F5").?);
-  try std.testing.expectEqual(Bind{ .button = .right }, Bind.parse("mouse_right").?);
-  try std.testing.expectEqual(null, Bind.parse("unknown"));
-  try std.testing.expectEqual(null, Bind.parse("mouse_nose"));
+  try testing.expectEqual(Bind{ .key = .left_shift }, Bind.parse("left_shift").?);
+  try testing.expectEqual(Bind{ .key = .F5 }, Bind.parse("F5").?);
+  try testing.expectEqual(Bind{ .button = .right }, Bind.parse("mouse_right").?);
+  try testing.expectEqual(null, Bind.parse("unknown"));
+  try testing.expectEqual(null, Bind.parse("mouse_nose"));
 }

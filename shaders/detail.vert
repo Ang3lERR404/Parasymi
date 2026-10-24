@@ -27,11 +27,7 @@ const float BLADE_HALF_WIDTH = 0.014;
 const float BLADE_LEAN = 0.25;
 // grass in the wind: its own sway (rad/s, phase per unit along the wind),
 // the gust's push and its own sway's reach (this much even in a calm)
-const float GRASS_SWAY_RATE = 1.4;
-const float GRASS_SWAY_WAVE = 0.4;
-const float GRASS_GUST = 0.09;
-const float GRASS_OWN = 0.035;
-const float GRASS_CALM = 0.4;
+const WindResponse GRASS = WindResponse(1.4, 0.4, 0.09, 0.035, 0.4);
 // how far a bent blade sinks (per bend squared)
 const float GRASS_DROOP = 0.3;
 // the share of soil tiles bare of clods and stones
@@ -108,8 +104,7 @@ void main() {
     }
     // it bends in the garden's wind, the tip most, with a sway of its own
     vec4 wind = gardenWind(t, p.xz);
-    float own = sin(t * GRASS_SWAY_RATE - wind.w * GRASS_SWAY_WAVE + dot(floor(base.xz * 8.0), vec2(1.7, 2.3)));
-    float bend = (GRASS_GUST * wind.z + GRASS_OWN * (GRASS_CALM + wind.z) * own) * hf * hf;
+    float bend = windPush(t, wind, dot(floor(base.xz * 8.0), vec2(1.7, 2.3)), GRASS) * hf * hf;
     p.xz += wind.xy * bend;
     p.y -= GRASS_DROOP * bend * bend;
     v_pos = p;

@@ -278,7 +278,7 @@ pub const Sculpt = struct {
     var left:i32 = 255;
     for (0..4) |k| {
       const q:i32 = if (k == 3) left else @intFromFloat(@round(wt[k] / sum * 255));
-      const c = std.math.clamp(@min(q, left), 0, 255);
+      const c = m.clamp(@min(q, left), 0, 255);
       out.weights[k] = @intCast(c);
       left -= c;
       out.bones |= @as(u32, idx[k]) << @intCast(8 * k);
@@ -338,7 +338,7 @@ pub const Sculpt = struct {
     const S = B + 1;
     var nb:[3]usize = undefined;
     inline for (0..3) |c| nb[c] = @as(usize, @intFromFloat(@ceil((hi[c] - lo[c]) / (h * B)))) + 1;
-    const NONE = std.math.maxInt(u32);
+    const NONE = m.maxInt(u32);
     const map = try gpa.alloc(u32, nb[0] * nb[1] * nb[2]);
     defer gpa.free(map);
     @memset(map, NONE);

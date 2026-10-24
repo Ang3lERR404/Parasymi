@@ -206,7 +206,7 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
       }
       const s = grid.at(px, py);
       // ley fades across tile borders like the colour does
-      gl[gy][gx] = @intFromFloat(s.ley * 255);
+      gl[gy][gx] = m.unorm8(s.ley);
       gh[gy][gx] = s.h;
       gc[gy][gx] = s.col.toRgba8(255);
       // central differences over half-tile steps

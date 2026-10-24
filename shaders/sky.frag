@@ -30,7 +30,7 @@ float hash(vec3 p) {
 // and stars once it is dark.
 void main() {
   vec3 d = normalize(v_dir);
-  float day = pc.sun.w;
+  float day = DAYLIGHT;
   float up = clamp(d.y, 0.0, 1.0);
   vec3 horizon = pc.fog.rgb;
   vec3 zenith = mix(horizon * ZENITH_NIGHT, horizon * ZENITH_DAY, day);

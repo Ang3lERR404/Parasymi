@@ -137,7 +137,7 @@ pub const Draw = struct {
   }
 
   /// a bare count.
-  pub fn number(d:*Draw, x:f32, y:f32, s:f32, col:Color, n:anytype) Allocator.Error!f32 {
+  pub fn number(d:*Draw, x:f32, y:f32, s:f32, col:Color, n:u32) Allocator.Error!f32 {
     var buf:[24]u8 = undefined;
     return d.text(x, y, s, col, bufPrint(&buf, "{d}", .{n}) catch &buf);
   }

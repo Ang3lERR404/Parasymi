@@ -9,6 +9,10 @@ const log = std.log;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const stringToEnum = std.meta.stringToEnum;
 const toUpper = std.ascii.toUpper;
+const assert = std.debug.assert;
+const testing = std.testing;
+const indexOf = std.mem.indexOf;
+const fields = std.meta.fields;
 const input = @import("../platform/input.zig");
 const ctl = @import("controls.zig");
 const ctext = @import("../core/text.zig");
@@ -101,7 +105,7 @@ pub const Error = error{ NoStrings, BadStrings } || Allocator.Error;
 /// missing) over the game's own strings. Called once, at startup, before
 /// anything is shown.
 pub fn load(gpa:Allocator, io:Io) Error!void {
-  std.debug.assert(src.len == 0);
+  assert(src.len == 0);
   src = try home.stock(gpa, io, PATH, DEFAULT);
   errdefer unload(gpa);
   fill(gpa, &.{DEFAULT, src}) catch |e| switch (e) {
@@ -126,7 +130,7 @@ pub fn fill(gpa:Allocator, texts:[]const []const u8) Error!void {
     log.err("{s}: {t}: {s}", .{PATH, e, bad.buffered()});
     return error.BadStrings;
   };
-  std.debug.assert(arena == null);
+  assert(arena == null);
   arena = .init(gpa);
   ctext.expand(Strings, &s, arena.?.allocator(), action, &bad) catch |e| return switch (e) {
     error.OutOfMemory => error.OutOfMemory,
@@ -170,24 +174,24 @@ pub fn structure(k:st.Kind) []const u8 { return s.structure.get(k).name; }
 pub fn tile(k:ck.Kind) []const u8 { return s.tile.get(k).name; }
 
 test "the strings file fills every key, shown with the bound keys" {
-  const gpa = std.testing.allocator;
+  const gpa = testing.allocator;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
   defer unload(gpa);
   try fill(gpa, &.{DEFAULT});
-  try std.testing.expect(std.mem.indexOf(u8, s.hud.controls, ctext.TOKEN) == null);
+  try testing.expect(indexOf(u8, s.hud.controls, ctext.TOKEN) == null);
   // rebinding changes what is shown
   unload(gpa);
   try ctl.fill(&.{@embedFile("controls.cfg") ++ "\n[bind]\nbelly = mouse_middle | b\n"});
   try fill(gpa, &.{DEFAULT});
-  try std.testing.expect(std.mem.indexOf(u8, s.msg.night_hint, s.mouse.get(.middle).?) != null);
-  try std.testing.expectEqual(count(s.hud.pause_keys), count(s.hud.pause_labels));
-  try std.testing.expectEqual(std.meta.fields(@import("play.zig").PauseRow).len, count(s.hud.pause_labels));
+  try testing.expect(indexOf(u8, s.msg.night_hint, s.mouse.get(.middle).?) != null);
+  try testing.expectEqual(count(s.hud.pause_keys), count(s.hud.pause_labels));
+  try testing.expectEqual(fields(@import("play.zig").PauseRow).len, count(s.hud.pause_labels));
   const opt = @import("options.zig");
-  try std.testing.expectEqual(std.meta.fields(opt.Setting).len, count(s.hud.option_labels));
-  try std.testing.expectEqual(std.meta.fields(@FieldType(opt.Options, "aa")).len, count(s.hud.antialias));
-  try std.testing.expectEqual(2, count(s.hud.toggle));
-  try std.testing.expectEqual(opt.AUTOSAVE.len, count(s.hud.autosave));
-  try std.testing.expectEqual(4, count(s.hud.gardens_age));
-  try std.testing.expectEqual(4, count(s.hud.facing));
+  try testing.expectEqual(fields(opt.Setting).len, count(s.hud.option_labels));
+  try testing.expectEqual(fields(@FieldType(opt.Options, "aa")).len, count(s.hud.antialias));
+  try testing.expectEqual(2, count(s.hud.toggle));
+  try testing.expectEqual(opt.AUTOSAVE.len, count(s.hud.autosave));
+  try testing.expectEqual(4, count(s.hud.gardens_age));
+  try testing.expectEqual(4, count(s.hud.facing));
 }

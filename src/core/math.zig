@@ -64,6 +64,7 @@ pub inline fn ratio(a:anytype, b:anytype) f32 { return f(a) / f(b); }
 
 pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
 pub inline fn asin(x:f32) f32 { return math.asin(clamp(x, -1, 1)); }
+pub inline fn acos(x:f32) f32 { return math.acos(clamp(x, -1, 1)); }
 pub inline fn sign(x:f32) f32 { return math.sign(x); }
 /// |x|^p carrying x's sign (superellipse outlines).
 pub fn signedPow(x:f32, p:f32) f32 {
@@ -269,6 +270,17 @@ pub fn mulPoint(m:M4, p:V3) V3 {
 pub fn mulDir(m:M4, d:V3) V3 {
   const r = mulV(m, .{d[0], d[1], d[2], 0});
   return .{r[0], r[1], r[2]};
+}
+
+/// a covector (a normal, a gradient) through the transform whose inverse is
+/// `inv`: by the inverse-transpose, so it stays perpendicular to what the
+/// transform carries (not renormalised).
+pub fn mulCovector(inv:M4, d:V3) V3 {
+  return .{
+    dot(.{inv[0][0], inv[0][1], inv[0][2]}, d),
+    dot(.{inv[1][0], inv[1][1], inv[1][2]}, d),
+    dot(.{inv[2][0], inv[2][1], inv[2][2]}, d),
+  };
 }
 
 /// right-handed perspective for Vulkan (y flipped, depth 0..1).
@@ -509,6 +521,16 @@ test "points move with a transform, directions only turn" {
   try testing.expectEqual(@as(f32, 4), signedPow(2, 2));
 }
 
+test "covectors stay perpendicular through a sheared, unevenly scaled transform" {
+  const t = chain(&.{translate(v3(1, 2, 3)), rotY(0.7), scale3(v3(3, 0.5, 1)), rotZ(0.4)});
+  const along = v3(1, 1, 0);
+  const n = v3(1, -1, 0);
+  const moved = mulDir(t, along);
+  const turned = mulCovector(inverseAffine(t), n);
+  try testing.expectApproxEqAbs(@as(f32, 0), dot(moved, turned), 1e-5);
+  try testing.expect(len(turned) > 0.1);
+}
+
 test "inverse roundtrip" {
   const p = mul(perspective(0.8, 1.5, 0.1, 100), lookAt(v3(3, 10, 8), v3(0, 0, 0), v3(0, 1, 0)));
   const i = mul(inverse(p), p);
@@ -575,13 +597,13 @@ test "Path.at gives evenly spaced points" {
 }   
 test "a frustum keeps what is inside it and culls what is not" {
   const fr = Frustum.of(identity);
-  try std.testing.expect(fr.sphere(v3(0, 0, 0.5), 0.1));
-  try std.testing.expect(!fr.sphere(v3(3, 0, 0.5), 0.5));
-  try std.testing.expect(fr.sphere(v3(1.3, 0, 0.5), 0.5));
-  try std.testing.expect(!fr.sphere(v3(0, 0, -1), 0.5));
+  try testing.expect(fr.sphere(v3(0, 0, 0.5), 0.1));
+  try testing.expect(!fr.sphere(v3(3, 0, 0.5), 0.5));
+  try testing.expect(fr.sphere(v3(1.3, 0, 0.5), 0.5));
+  try testing.expect(!fr.sphere(v3(0, 0, -1), 0.5));
   // a capsule reaching in from outside is kept, one wholly outside is not
-  try std.testing.expect(fr.capsule(v3(3, 0, 0.5), v3(0, 0, 0.5), 0.1));
-  try std.testing.expect(!fr.capsule(v3(3, 0, 0.5), v3(2, 0, 0.5), 0.5));
+  try testing.expect(fr.capsule(v3(3, 0, 0.5), v3(0, 0, 0.5), 0.1));
+  try testing.expect(!fr.capsule(v3(3, 0, 0.5), v3(2, 0, 0.5), 0.5));
 }
 test "ortho maps its box onto clip space, near to depth 0, far to 1" {
   const o = ortho(-2, 6, -1, 3, 1, 11);

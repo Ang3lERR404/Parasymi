@@ -7,6 +7,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const sliceAsBytes = std.mem.sliceAsBytes;
 const ArenaAllocator = std.heap.ArenaAllocator;
+const asBytes = std.mem.asBytes;
 const vk = @import("vulkan");
 const glfw = @import("zglfw");
 const m = @import("../core/math.zig");
@@ -329,7 +330,7 @@ pub const Renderer = struct {
     const c = &r.ctx;
     c.device.deviceWaitIdle() catch |e| return ctx.fold(e);
     const remake = a.samples() != r.post.aa.samples();
-    r.post.antialias(c, a) catch |e| return ctx.fold(e);
+    try r.post.antialias(c, a);
     if (!remake) return;
     inline for (reg.ids) |id| {
       if (comptime reg.module(id).desc.target == .world) {
@@ -514,7 +515,7 @@ pub const Renderer = struct {
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, old.handle);
     var o = old;
     o.deinit(c, r.gpa, false);
-    r.post.resize(c, r.sc.extent.width, r.sc.extent.height) catch |e| return ctx.fold(e);
+    try r.post.resize(c, r.sc.extent.width, r.sc.extent.height);
   }
 
   pub fn extent(r:*const Renderer) [2]f32 {
@@ -637,7 +638,7 @@ pub const Renderer = struct {
     };
     @memcpy(l.texel[0..light.CASCADES], &cas.texel);
     @memcpy(l.lights[0..n], scene.lights[0..n]);
-    f.lighting.write(0, std.mem.asBytes(&l));
+    f.lighting.write(0, asBytes(&l));
     const at = f.lighting.address(&r.ctx);
     p.light = .{@truncate(at), @truncate(at >> 32)};
     return n;

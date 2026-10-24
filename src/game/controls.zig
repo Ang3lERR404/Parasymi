@@ -8,6 +8,8 @@ const EnumArray = std.enums.EnumArray;
 const log = std.log;
 const trim = std.mem.trim;
 const splitScalar = std.mem.splitScalar;
+const values = std.enums.values;
+const testing = std.testing;
 const ctext = @import("../core/text.zig");
 const input = @import("../platform/input.zig");
 const Input = input.Input;
@@ -139,6 +141,6 @@ pub fn hold(in:*Input, a:Action, on:bool) void {
 test "the controls file binds every action" {
   defer unload();
   try fill(&.{@embedFile("controls.cfg")});
-  for (std.enums.values(Action)) |a| try std.testing.expect(map.get(a).len > 0);
-  try std.testing.expectEqual(Bind{ .button = .left }, map.get(.use).list[0]);
+  for (values(Action)) |a| try testing.expect(map.get(a).len > 0);
+  try testing.expectEqual(Bind{ .button = .left }, map.get(.use).list[0]);
 }

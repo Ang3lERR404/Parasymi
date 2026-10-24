@@ -3,6 +3,7 @@
 //! on the Game and reports through the progression log.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const m = @import("../core/math.zig");
 const ck = @import("../world/chunk.zig");
 const species = @import("../sim/species.zig");
@@ -179,7 +180,7 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
 }
 
 test "plants never set seed; an uprooted plant comes back as its seed" {
-  const gpa = std.testing.allocator;
+  const gpa = testing.allocator;
   var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
   const x, const z = m.tileAt(g.player.pos);
@@ -187,27 +188,27 @@ test "plants never set seed; an uprooted plant comes back as its seed" {
   const t = ck.localIndex(x + 2, z);
   cc.kind[t] = .soil;
   cc.res[t] = 0;
-  try std.testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
+  try testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
     .x = x + 2, .y = z, .chunk = undefined, .tile = undefined, .sp = .lumenroot,
     .seed = 0.5, .growth = 1, .essence = 2.5,
   }));
   harvest(&g, .{x + 2, z});
-  try std.testing.expectEqual(@as(u32, 2), g.player.inv.count(.essence));
-  try std.testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_lumenroot));
+  try testing.expectEqual(@as(u32, 2), g.player.inv.count(.essence));
+  try testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_lumenroot));
   uproot(&g, .{x + 2, z});
-  try std.testing.expect(g.plants.at(&g.world, x + 2, z) == null);
-  try std.testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_lumenroot));
+  try testing.expect(g.plants.at(&g.world, x + 2, z) == null);
+  try testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_lumenroot));
 }
 
 test "seeds are woven only by a germinator, which is woven from gathered matter" {
-  for (craft.by_hand) |i| try std.testing.expect(!craft.isSeedRecipe(i));
+  for (craft.by_hand) |i| try testing.expect(!craft.isSeedRecipe(i));
   for (craft.hand) |r| if (r.out == .germinator) for (r.in) |ing| {
-    try std.testing.expect(ing.item == .fibre or ing.item == .grit or ing.item == .starlight);
+    try testing.expect(ing.item == .fibre or ing.item == .grit or ing.item == .starlight);
   };
 }
 
 test "a confluence gives only convergence essence" {
-  const gpa = std.testing.allocator;
+  const gpa = testing.allocator;
   var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
   const x, const z = m.tileAt(g.player.pos);
@@ -218,17 +219,17 @@ test "a confluence gives only convergence essence" {
     cc.kind[t] = .soil;
     cc.res[t] = 0;
   }
-  try std.testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
+  try testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
     .x = x + 2, .y = z, .chunk = undefined, .tile = undefined, .sp = .confluence,
     .seed = 0.5, .growth = 1, .essence = 3.5,
   }));
   harvest(&g, .{x + 3, z + 1});
-  try std.testing.expectEqual(@as(u32, 3), g.player.inv.count(.convergence_essence));
-  try std.testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_lumenroot));
-  try std.testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_thornleech));
-  try std.testing.expect(species.fromSeed(.convergence_essence) == null);
+  try testing.expectEqual(@as(u32, 3), g.player.inv.count(.convergence_essence));
+  try testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_lumenroot));
+  try testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_thornleech));
+  try testing.expect(species.fromSeed(.convergence_essence) == null);
   // never sown, so uprooting it gives nothing back
   uproot(&g, .{x + 3, z + 1});
-  try std.testing.expect(g.plants.at(&g.world, x + 3, z + 1) == null);
-  try std.testing.expectEqual(@as(u32, 3), g.player.inv.total());
+  try testing.expect(g.plants.at(&g.world, x + 3, z + 1) == null);
+  try testing.expectEqual(@as(u32, 3), g.player.inv.total());
 }

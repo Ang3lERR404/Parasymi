@@ -11,6 +11,7 @@ const stringToEnum = std.meta.stringToEnum;
 const parseInt = std.fmt.parseInt;
 const log = std.log;
 const testing = std.testing;
+const fields = std.meta.fields;
 const ctext = @import("../core/text.zig");
 const txt = @import("text.zig");
 const Antialias = @import("../render/renderer.zig").Antialias;
@@ -46,7 +47,7 @@ fn autosaveIndex(minutes:u8) usize {
 pub fn step(o:*Options, set:Setting, dir:i32, most:u32) void {
   switch (set) {
     .antialias => {
-      const n:i32 = @intCast(std.meta.fields(Antialias).len);
+      const n:i32 = @intCast(fields(Antialias).len);
       var i:i32 = @intFromEnum(o.aa);
       while (true) {
         i = @mod(i + dir, n);

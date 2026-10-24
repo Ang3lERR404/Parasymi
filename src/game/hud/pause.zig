@@ -2,6 +2,7 @@
 //! Each row is clicked (or its key pressed) to do what it says.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const fields = std.meta.fields;
 const m = @import("../../core/math.zig");
 const play = @import("../play.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
@@ -17,7 +18,7 @@ const key_x:f32 = 112;
 const label_x:f32 = 190;
 /// a row's clickable band, from this far left of its pod
 const row_inset:f32 = 50;
-const rows = std.meta.fields(play.PauseRow).len;
+const rows = fields(play.PauseRow).len;
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .paused; }
 
