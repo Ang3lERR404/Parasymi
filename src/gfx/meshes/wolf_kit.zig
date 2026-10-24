@@ -87,12 +87,11 @@ pub const Leaf = struct {
 };
 
 /// a leaf lying over the body like fur: its base flush with the surface it
-/// emerges from, lifting off it and curling back toward it at the tip. One
-/// shared-vertex sheet, tu.y running base to tip (the part shader moves the
-/// tips, never the base).
+/// emerges from, lifting off it and curling back toward it at the tip. A
+/// `lamina` (thin, bevelled, veined), tu.y running base to tip (the part
+/// shader moves the tips, never the base).
 pub fn leaf(b:*mg.Builder, l:Leaf) Allocator.Error!void {
   const R = 8;
-  const C = 5;
   const side = m.norm(m.cross(l.out, l.along));
   var spine:[R]V3 = undefined;
   var face:[R]V3 = undefined;
@@ -104,30 +103,24 @@ pub fn leaf(b:*mg.Builder, l:Leaf) Allocator.Error!void {
     if (i > 0) spine[i] = spine[i - 1] + dir * m.splat3(l.len / (R - 1));
     face[i] = m.norm(m.cross(dir, side));
   }
-  var pts:[R * C]V3 = undefined;
-  var ns:[R * C]V3 = undefined;
-  var cs:[R * C]color.Rgba8 = undefined;
-  var us:[R * C]f32 = undefined;
+  var sides:[R]V3 = undefined;
+  var under:[R]V3 = undefined;
+  var ws:[R]f32 = undefined;
+  var dish:[R]f32 = undefined;
+  var vein:[R]f32 = undefined;
+  var cs:[R]color.Rgba8 = undefined;
   for (0..R) |i| {
     const k = m.ratio(i, R - 1);
     // lanceolate: a narrow claw, broadest a third along, a long point
-    const w = l.width * @sqrt(@max(@sin(m.pi * m.pow(f32, k, 0.75)), 0)) * (1 - 0.35 * k);
-    for (0..C) |j| {
-      const u = m.ratio(j, C - 1) * 2 - 1;
-      pts[i * C + j] = spine[i] + side * m.splat3(w * u) - face[i] * m.splat3(l.cup * w * u * u);
-      cs[i * C + j] = color.mix(l.col, l.tip, k);
-      us[i * C + j] = k;
-    }
+    ws[i] = l.width * @sqrt(@max(@sin(m.pi * m.pow(f32, k, 0.75)), 0)) * (1 - 0.35 * k);
+    sides[i] = side;
+    // it cups toward the body, and its vein runs in the cup
+    under[i] = -face[i];
+    dish[i] = l.cup * ws[i];
+    vein[i] = mg.LAMINA_THICK * l.width * 0.8 * (1 - 0.7 * k);
+    cs[i] = color.mix(l.col, l.tip, k);
   }
-  for (0..R) |i| for (0..C) |j| {
-    const dk = pts[@as(usize, @min(i + 1, R - 1)) * C + j] - pts[(if (i == 0) 0 else i - 1) * C + j];
-    const du = pts[i * C + @min(j + 1, C - 1)] - pts[i * C + (if (j == 0) 0 else j - 1)];
-    var n = m.cross(dk, du);
-    if (m.len(n) < 1e-9) n = face[i];
-    if (m.dot(n, face[i]) < 0) n = -n;
-    ns[i * C + j] = m.norm(n);
-  };
-  try mg.patch(b, R, C, &pts, &ns, &cs, &us, l.t, .leaf);
+  try mg.lamina(b, .{.spine = &spine, .side = &sides, .face = &under, .width = &ws, .dish = &dish, .broad = l.width, .vein = &vein, .col = &cs, .t = l.t, .part = .leaf});
 }
 
 test "a fur leaf's base stays on the surface it grows from" {

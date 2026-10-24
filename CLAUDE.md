@@ -126,9 +126,13 @@ recipes (`game/craft.zig`) are plain data tables.
   root never moves), never a straight line or simple arc, and taper to a
   point at both ends (no hard cuts).
 - meshgen primitives: `tubeR`/`tubeC`, `vine`, `braid`/`braidTurned`, `bundle`,
-  `loft`, `patch`, `blade`/`bladeAlong`, `petal`, `stamens`, `leavesAlong`, `bands`,
+  `loft`, `patch`, `lamina`, `blade`/`bladeAlong`, `petal`, `stamens`, `leavesAlong`, `bands`,
   `ellipsoid`, `cone`. Shared kits: `structure_kit`, `wolf_kit` (`leaf`,
   `digit`, `claw`), `sculpt_kit` (SDF forms meshed and skinned), `mineral_kit`.
+- **Leaves and petals have a body** (`meshgen.lamina`): a thin closed shell
+  (`LAMINA_THICK` of the broadest half-width) rounded over at the edges, a
+  small bevel; leaves (blades, fur leaves) fold toward a pale midrib vein
+  raised in the fold, fading to the tip. Petals have no vein.
 - Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from
   vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
 - See-through is two passes: `plants`/`parts` keep only fragments with

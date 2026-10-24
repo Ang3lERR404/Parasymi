@@ -199,9 +199,8 @@ pub const Builder = struct {
     try b.sheet(&cs, side, width, col, tip, t, part);
   }
 
-  /// the leaf surface along a midrib: rows of (left, centre, right) shared
-  /// between neighbouring quads, with one smooth normal per row so the leaf
-  /// bends without seams or light breaks.
+  /// the leaf along a midrib: a `lamina` (thin, bevelled at its edges,
+  /// a vein along its middle) with one row per point of `cs`.
   fn sheet(b:*Builder, cs:*const [BLADE_SEGS + 1]V3, side:V3, width:f32, col:color.Rgba8, tip:color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
     const segs = BLADE_SEGS;
     var ws:[segs + 1]f32 = undefined;
@@ -214,29 +213,24 @@ pub const Builder = struct {
       const tan = cs[@min(i + 1, segs)] - cs[if (i == 0) 0 else i - 1];
       ns[i] = m.norm(m.cross(tan, side));
     }
-    var keep:[segs + 1]usize = undefined;
-    const kn = stride(segs + 1, b.step(), &keep);
-    for (0..kn - 1) |j| {
-      const i = keep[j];
-      const ia = keep[j + 1];
-      const k0 = m.f(i) / segs;
-      const k1 = m.f(ia) / segs;
-      // a slight raised midrib keeps the blade from reading as a flat card
-      const rib0 = cs[i] + ns[i] * m.splat3(ws[i] * 0.25);
-      const rib1 = cs[ia] + ns[ia] * m.splat3(ws[ia] * 0.25);
-      const quads = [2][4]V3{
-        .{cs[i] + side * m.splat3(ws[i]), rib0, rib1, cs[ia] + side * m.splat3(ws[ia])},
-        .{rib0, cs[i] - side * m.splat3(ws[i]), cs[ia] - side * m.splat3(ws[ia]), rib1},
-      };
-      const c0 = color.mix(col, tip, k0);
-      const c1 = color.mix(col, tip, k1);
-      for (quads) |q| {
-        const cols = [4]color.Rgba8{c0, c0, c1, c1};
-        const kk = [4]f32{k0, k0, k1, k1};
-        const nn = [4]V3{ns[i], ns[i], ns[ia], ns[ia]};
-        for ([_]usize{0, 1, 2, 0, 2, 3}) |v| try b.put(q[v], nn[v], cols[v], t, kk[v], part);
-      }
+    // folded along its midrib (its halves dipping to it, so it never reads
+    // as a flat card), the vein running in the fold and fading to the tip
+    var spine:[segs + 1]V3 = undefined;
+    var sides:[segs + 1]V3 = undefined;
+    var face:[segs + 1]V3 = undefined;
+    var dish:[segs + 1]f32 = undefined;
+    var vein:[segs + 1]f32 = undefined;
+    var cols:[segs + 1]color.Rgba8 = undefined;
+    for (0..segs + 1) |i| {
+      const k = m.f(i) / segs;
+      spine[i] = cs[i] + ns[i] * m.splat3(ws[i] * 0.25);
+      sides[i] = side;
+      face[i] = -ns[i];
+      dish[i] = ws[i] * 0.25;
+      vein[i] = LAMINA_THICK * width * 0.8 * (1 - 0.7 * k);
+      cols[i] = color.mix(col, tip, k);
     }
+    try lamina(b, .{.spine = &spine, .side = &sides, .face = &face, .width = &ws, .dish = &dish, .bow = 1, .broad = width, .vein = &vein, .col = &cols, .t = t, .part = part});
   }
 
   pub fn cone(b:*Builder, base:V3, dir:V3, len:f32, r:f32, col:color.Rgba8, t:f32, part:vertex.Part) Allocator.Error!void {
@@ -449,6 +443,129 @@ pub fn patch(b:*Builder, rows:usize, cols:usize, pts:[]const V3, nrms:[]const V3
   };
 }
 
+/// half a leaf's or petal's thickness, as a share of its broadest half-width
+pub const LAMINA_THICK:f32 = 0.055;
+/// most rows a lamina may have
+const MAX_LAMINA = 12;
+/// a lamina's cross-section, once round: the face (its cupped side) edge to
+/// edge with the vein's crest at its middle, round the right edge, the
+/// back, round the left edge
+const FACE_U = [_]f32{-1, -0.5, -0.07, 0, 0.07, 0.5, 1};
+const BACK_U = [_]f32{1, 0.5, 0, -0.5, -1};
+/// the edge's bevel: the angles (off the midplane) it is rounded over at
+const BEVEL = [_]f32{0.9, -0.9};
+const LAMINA_RING = FACE_U.len + BACK_U.len + 2 * BEVEL.len;
+/// how much thinner a lamina is at its edge than along its midrib
+const EDGE_THIN:f32 = 0.35;
+/// the vein's colour: paler than the blade it runs through
+const VEIN_PALE = color.rgb(0.9, 0.92, 0.72);
+
+/// a leaf or petal with a body to it: its mid-surface (row i at `spine[i]`,
+/// `width[i]` out each way along `side[i]`, its edges rising `dish[i]`
+/// toward `face[i]`, the side it cups to; `bow` 1 folds it along the
+/// midrib, 2 cups it smoothly) given a thin thickness that rounds over at
+/// the edges, a small bevel catching the light. `vein` raises a midrib along
+/// the face, in the fold. Rows run base to tip (tu.y); where a row closes to
+/// a point the shell closes with it, so it is watertight.
+pub const Lamina = struct {
+  spine:[]const V3,
+  side:[]const V3,
+  face:[]const V3,
+  width:[]const f32,
+  dish:[]const f32,
+  bow:f32 = 2,
+  /// its broadest half-width (the thickness follows it)
+  broad:f32,
+  /// how far the vein rises off the face, per row
+  vein:?[]const f32 = null,
+  col:[]const color.Rgba8,
+  t:f32,
+  part:vertex.Part,
+};
+
+pub fn lamina(b:*Builder, l:Lamina) Allocator.Error!void {
+  const R = l.spine.len;
+  const C = LAMINA_RING;
+  assert(R >= 2 and R <= MAX_LAMINA);
+  var pts:[MAX_LAMINA][C]V3 = undefined;
+  // each point's normal as the cross-section alone would have it: it orients
+  // the sheet's own, and stands in where a row closes to a point
+  var tpl:[MAX_LAMINA][C]V3 = undefined;
+  var cs:[MAX_LAMINA][C]color.Rgba8 = undefined;
+  const pale = VEIN_PALE.toRgba8(255);
+  for (0..R) |i| {
+    const w = l.width[i];
+    const fc = l.face[i];
+    const sd = l.side[i];
+    // thin everywhere, closing to nothing where the row narrows to a point
+    const half = @min(LAMINA_THICK * l.broad, 0.4 * w);
+    const mid = struct {
+      fn at(lm:Lamina, i_:usize, u:f32) V3 {
+        return lm.spine[i_] + lm.side[i_] * m.splat3(lm.width[i_] * u) + lm.face[i_] * m.splat3(lm.dish[i_] * m.pow(f32, @abs(u), lm.bow));
+      }
+    }.at;
+    var j:usize = 0;
+    for (FACE_U) |u| {
+      const rise:f32 = if (u != 0) 0 else if (l.vein) |v| @min(v[i], 0.3 * w) else 0;
+      pts[i][j] = mid(l, i, u) + fc * m.splat3(half * (1 - EDGE_THIN * u * u) + rise);
+      tpl[i][j] = fc;
+      cs[i][j] = if (rise > 0) color.mix(l.col[i], pale, 0.35) else l.col[i];
+      j += 1;
+    }
+    const rim = half * (1 - EDGE_THIN);
+    for ([_]f32{1, -1}, 0..) |e, ei| {
+      // round the right edge face to back, then the left edge back to face
+      for (0..BEVEL.len) |q| {
+        const a = if (ei == 0) BEVEL[q] else BEVEL[BEVEL.len - 1 - q];
+        const out = sd * m.splat3(e * @cos(a)) + fc * m.splat3(@sin(a));
+        pts[i][j] = mid(l, i, e) + out * m.splat3(rim);
+        tpl[i][j] = out;
+        cs[i][j] = l.col[i];
+        j += 1;
+      }
+      if (ei == 1) break;
+      for (BACK_U) |u| {
+        pts[i][j] = mid(l, i, u) - fc * m.splat3(half * (1 - EDGE_THIN * u * u));
+        tpl[i][j] = -fc;
+        cs[i][j] = l.col[i];
+        j += 1;
+      }
+    }
+    assert(j == C);
+  }
+  // normals from the shell itself, across its rows and round its section
+  var ns:[MAX_LAMINA][C]V3 = undefined;
+  for (0..R) |i| for (0..C) |j| {
+    const dk = pts[@min(i + 1, R - 1)][j] - pts[if (i == 0) 0 else i - 1][j];
+    const du = pts[i][(j + 1) % C] - pts[i][(j + C - 1) % C];
+    var n = m.cross(du, dk);
+    if (m.len(n) < 1e-12) n = tpl[i][j];
+    if (m.dot(n, tpl[i][j]) < 0) n = -n;
+    ns[i][j] = m.norm(n);
+  };
+  // rows and points round the section kept at this level of detail (the
+  // section closes on itself: its last kept point joins back to the first)
+  var kr:[MAX_LAMINA]usize = undefined;
+  var kc:[C + 1]usize = undefined;
+  const nr = stride(R, b.step(), &kr);
+  const nc = stride(C + 1, b.step(), &kc);
+  for (0..nr - 1) |ri| for (0..nc - 1) |ci| {
+    const r = [4]usize{kr[ri], kr[ri], kr[ri + 1], kr[ri + 1]};
+    const c = [4]usize{kc[ci] % C, kc[ci + 1] % C, kc[ci + 1] % C, kc[ci] % C};
+    for ([2][3]usize{.{0, 1, 2}, .{0, 2, 3}}) |tri| {
+      var p:[3]V3 = undefined;
+      var n = m.v3(0, 0, 0);
+      for (tri, 0..) |v, q| {
+        p[q] = pts[r[v]][c[v]];
+        n += ns[r[v]][c[v]];
+      }
+      // front faces wind counter-clockwise seen from outside
+      const order = if (m.dot(m.cross(p[1] - p[0], p[2] - p[0]), n) < 0) [3]usize{tri[0], tri[2], tri[1]} else tri;
+      for (order) |v| try b.put(pts[r[v]][c[v]], ns[r[v]][c[v]], cs[r[v]][c[v]], l.t, m.ratio(r[v], R - 1), l.part);
+    }
+  };
+}
+
 pub const Petal = struct {
   base:V3,
   /// horizontal direction the petal faces out along (unit)
@@ -470,10 +587,10 @@ pub const Petal = struct {
 
 /// a flower petal: narrow at its claw, broadest past the middle and closing
 /// in a rounded tip, cupped across its width, curving from upright at the
-/// base to open at the tip. One shared-vertex sheet; tu.y runs base to tip.
+/// base to open at the tip. A `lamina` (thin, bevelled at its edges); tu.y
+/// runs base to tip.
 pub fn petal(b:*Builder, p:Petal) Allocator.Error!void {
   const R = 7;
-  const C = 5;
   const up = m.v3(0, 1, 0);
   const side = m.norm(m.cross(up, p.out));
   var spine:[R]V3 = undefined;
@@ -487,32 +604,19 @@ pub fn petal(b:*Builder, p:Petal) Allocator.Error!void {
     // the face toward the bloom's heart and the sky
     nrm[i] = m.norm(m.cross(side, dir));
   }
-  var pts:[R * C]V3 = undefined;
-  var ns:[R * C]V3 = undefined;
-  var cs:[R * C]color.Rgba8 = undefined;
-  var us:[R * C]f32 = undefined;
+  var sides:[R]V3 = undefined;
+  var ws:[R]f32 = undefined;
+  var dish:[R]f32 = undefined;
+  var cs:[R]color.Rgba8 = undefined;
   for (0..R) |i| {
     const k = m.ratio(i, R - 1);
     // obovate: zero at the claw, widest near two thirds, a rounded tip
-    const w = p.width * @sqrt(@max(@sin(m.pi * m.pow(f32, k, 1.6)), 0));
-    for (0..C) |j| {
-      const u = m.ratio(j, C - 1) * 2 - 1;
-      pts[i * C + j] = spine[i] + side * m.splat3(w * u) + nrm[i] * m.splat3(p.cup * w * u * u);
-      cs[i * C + j] = color.mix(p.col, p.tip, k);
-      us[i * C + j] = k;
-    }
+    ws[i] = p.width * @sqrt(@max(@sin(m.pi * m.pow(f32, k, 1.6)), 0));
+    sides[i] = side;
+    dish[i] = p.cup * ws[i];
+    cs[i] = color.mix(p.col, p.tip, k);
   }
-  // normals from the sheet itself; where a row closes to a point (claw,
-  // tip) the spine's face stands in
-  for (0..R) |i| for (0..C) |j| {
-    const dk = pts[@as(usize, @min(i + 1, R - 1)) * C + j] - pts[(if (i == 0) 0 else i - 1) * C + j];
-    const du = pts[i * C + @min(j + 1, C - 1)] - pts[i * C + (if (j == 0) 0 else j - 1)];
-    var n = m.cross(du, dk);
-    if (m.len(n) < 1e-7) n = nrm[i];
-    if (m.dot(n, nrm[i]) < 0) n = -n;
-    ns[i * C + j] = m.norm(n);
-  };
-  try patch(b, R, C, &pts, &ns, &cs, &us, p.t, p.part);
+  try lamina(b, .{.spine = &spine, .side = &sides, .face = &nrm, .width = &ws, .dish = &dish, .broad = p.width, .col = &cs, .t = p.t, .part = p.part});
 }
 
 /// pollen: the warm gold of an anther
@@ -1666,6 +1770,34 @@ test "grown vines keep their root and regrow identically" {
   for (a, b) |x, y| try std.testing.expectEqual(x, y);
   // it still grows along its direction, roughly its length
   try std.testing.expect(@abs(a[7][1] - 1) < 0.1);
+}
+
+test "a blade has a body: both faces, wound outward, its vein on the cupped face" {
+  var b:Builder = .{.gpa = std.testing.allocator};
+  defer b.deinit();
+  const c = color.rgb(0.3, 0.6, 0.2).toRgba8(255);
+  try b.blade(m.v3(0, 0, 0), m.v3(1, 0, 0), 1, 0.2, 0.3, c, c, 1, .leaf);
+  var up:usize = 0;
+  var down:usize = 0;
+  var tri:usize = 0;
+  while (tri < b.v.items.len) : (tri += 3) {
+    const v = b.v.items[tri .. tri + 3];
+    const p:[3]V3 = .{v[0].pos, v[1].pos, v[2].pos};
+    const n:V3 = @as(V3, v[0].nrm) + @as(V3, v[1].nrm) + @as(V3, v[2].nrm);
+    const g = m.cross(p[1] - p[0], p[2] - p[0]);
+    if (m.len(g) < 1e-9) continue;
+    try std.testing.expect(m.dot(g, n) > 0);
+    if (m.norm(g)[1] > 0.5) up += 1;
+    if (m.norm(g)[1] < -0.5) down += 1;
+  }
+  try std.testing.expect(up > 0 and down > 0);
+  // the vein's crest is paler than the blade, and stands on the face looking up
+  var pale = false;
+  for (b.v.items) |vx| if (vx.col.r > c.r + 10) {
+    pale = true;
+    try std.testing.expect(vx.nrm[1] > 0);
+  };
+  try std.testing.expect(pale);
 }
 
 test "a confluence's growth keys share one vertex layout and grow taller" {
