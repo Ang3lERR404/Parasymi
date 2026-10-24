@@ -19,6 +19,9 @@ pub const Swapchain = struct {
   depth:vk.Image = .null_handle,
   depth_mem:vk.DeviceMemory = .null_handle,
   depth_view:vk.ImageView = .null_handle,
+  /// its images can be copied out (screenshots): 8-bit RGBA or BGRA, and
+  /// the surface lets them be a transfer's source
+  readable:bool = false,
 
   pub fn init(c:*const Ctx, gpa:Allocator, w:u32, h:u32, vsync:bool, old:vk.SwapchainKHR) ctx.Error!Swapchain {
     var s:Swapchain = .{};
@@ -49,6 +52,10 @@ pub const Swapchain = struct {
       for (modes) |md| if (md == .mailbox_khr or (md == .immediate_khr and mode != .mailbox_khr)) { mode = md; };
     }
 
+    s.readable = caps.supported_usage_flags.transfer_src and switch (s.format.format) {
+      .b8g8r8a8_srgb, .b8g8r8a8_unorm, .r8g8b8a8_srgb, .r8g8b8a8_unorm => true,
+      else => false,
+    };
     var count = caps.min_image_count + 1;
     if (caps.max_image_count > 0) count = @min(count, caps.max_image_count);
     s.handle = try c.device.createSwapchainKHR(&.{
@@ -58,7 +65,7 @@ pub const Swapchain = struct {
       .image_color_space = s.format.color_space,
       .image_extent = s.extent,
       .image_array_layers = 1,
-      .image_usage = .{.color_attachment = true},
+      .image_usage = .{.color_attachment = true, .transfer_src = s.readable},
       .image_sharing_mode = .exclusive,
       .pre_transform = caps.current_transform,
       .composite_alpha = .{.opaque_khr = true},

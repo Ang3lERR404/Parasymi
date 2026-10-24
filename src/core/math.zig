@@ -41,6 +41,7 @@ pub const tau = math.tau;
 pub const clamp = math.clamp;
 pub const pow = math.pow;
 pub const maxInt = math.maxInt;
+pub const inf = math.inf;
 
 /// int→f32. Takes anytype on purpose: callers pass i32, u8, u16, u32, usize.
 /// This is the one sanctioned anytype in the file.

@@ -8,6 +8,7 @@ test {
   _ = @import("platform/input.zig");
   _ = @import("core/rng.zig");
   _ = @import("core/noise.zig");
+  _ = @import("core/png.zig");
   _ = @import("world/gen.zig");
   _ = @import("world/world.zig");
   _ = @import("sim/ecology.zig");
@@ -18,6 +19,7 @@ test {
   _ = @import("game/structures.zig");
   _ = @import("game/seeds.zig");
   _ = @import("game/play.zig");
+  _ = @import("game/orbit.zig");
   _ = @import("game/player.zig");
   _ = @import("game/save.zig");
   _ = @import("game/options.zig");

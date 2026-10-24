@@ -128,6 +128,9 @@ pub const Scene = struct {
   ui_time:f32,
 };
 
+/// a captured frame: 4 bytes a pixel, row by row from the top
+pub const Shot = struct { w:u32, h:u32, px:[]const u8, bgra:bool };
+
 pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0 };
 
 const Frame = struct {
@@ -201,6 +204,11 @@ pub const Renderer = struct {
   /// that frame, and every frame before it, has finished on the GPU).
   pending:std.ArrayList(Buffer) = .empty,
   stats:Stats = .{},
+  /// set before `draw`: copy that frame (UI and all) out for `shot`
+  capture:bool = false,
+  /// where a captured frame lands, and whether it holds one
+  shot_buf:Buffer = .{},
+  shot_ready:bool = false,
 
   /// `aa` falls back to the most samples the GPU offers (see `antialias`)
   pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool, aa:Antialias) Error!*Renderer {
@@ -378,6 +386,7 @@ pub const Renderer = struct {
     r.detail_scratch.deinit(r.gpa);
     r.meshes.deinit(c);
     r.skins.deinit(c);
+    r.shot_buf.deinit(c);
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
     r.post.deinit(c);
@@ -471,7 +480,22 @@ pub const Renderer = struct {
   }
 
   pub fn draw(r:*Renderer, scene:*const Scene, resized:bool) Error!void {
+    defer r.capture = false;
     r.frame(scene, resized) catch |e| return ctx.fold(e);
+  }
+
+  /// the frame last drawn with `capture` set (once; null if none was, or
+  /// the swapchain cannot be read). Valid until the next `draw`.
+  pub fn shot(r:*Renderer) ?Shot {
+    if (!r.shot_ready) return null;
+    r.shot_ready = false;
+    const w = r.sc.extent.width;
+    const h = r.sc.extent.height;
+    const bgra = switch (r.sc.format.format) {
+      .b8g8r8a8_srgb, .b8g8r8a8_unorm => true,
+      else => false,
+    };
+    return .{.w = w, .h = h, .px = r.shot_buf.map[0 .. @as(usize, w) * h * 4], .bgra = bgra};
   }
 
   fn frame(r:*Renderer, scene:*const Scene, resized:bool) !void {
@@ -490,6 +514,15 @@ pub const Renderer = struct {
     };
     const img = acq.image_index;
     try c.device.resetFences(&.{f.fence});
+    // a capture copies the finished screen into a buffer the CPU reads
+    const cap = r.capture and r.sc.readable;
+    if (cap) {
+      const size = @as(u64, r.sc.extent.width) * r.sc.extent.height * 4;
+      if (r.shot_buf.size < size) {
+        try r.retire(r.shot_buf);
+        r.shot_buf = try Buffer.init(c, size, .{.transfer_dst = true});
+      }
+    }
 
     const cmd = vk.CommandBufferProxy.init(f.cmd, c.vkd);
     try cmd.resetCommandBuffer(.{});
@@ -508,7 +541,7 @@ pub const Renderer = struct {
     inline for (reg.ids) |id| {
       if (comptime reg.module(id).desc.screen) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
     }
-    r.end(cmd, img);
+    r.end(cmd, img, cap);
     try cmd.endCommandBuffer();
     try r.submit(f, img);
     const pres = c.device.queuePresentKHR(c.queue, &.{
@@ -521,6 +554,11 @@ pub const Renderer = struct {
       error.OutOfDateKHR => vk.Result.error_out_of_date_khr,
       else => return e,
     };
+    // decision: a capture waits for its frame (screenshots only)
+    if (cap) {
+      _ = try c.device.waitForFences(&.{f.fence}, .true, m.maxInt(u64));
+      r.shot_ready = true;
+    }
     r.fi = (r.fi + 1) % FRAMES;
     r.stats = stats;
     if (pres != .success or acq.result == .suboptimal_khr) try r.recreate();
@@ -603,15 +641,17 @@ pub const Renderer = struct {
     cmd.setScissor(0, &.{area});
   }
 
-  /// close the rendering scope and hand the image to presentation.
-  fn end(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32) void {
+  /// close the rendering scope and hand the image to presentation (with
+  /// `cap`, copied into `shot_buf` on the way).
+  fn end(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32, cap:bool) void {
     cmd.endRendering();
+    if (cap) r.copyOut(cmd, img);
     const post = [_]vk.ImageMemoryBarrier2{.{
-      .src_stage_mask = .{.color_attachment_output = true},
-      .src_access_mask = .{.color_attachment_write = true},
+      .src_stage_mask = if (cap) .{.copy = true} else .{.color_attachment_output = true},
+      .src_access_mask = if (cap) .{} else .{.color_attachment_write = true},
       .dst_stage_mask = .{},
       .dst_access_mask = .{},
-      .old_layout = .color_attachment_optimal,
+      .old_layout = if (cap) .transfer_src_optimal else .color_attachment_optimal,
       .new_layout = .present_src_khr,
       .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
       .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
@@ -619,6 +659,39 @@ pub const Renderer = struct {
       .subresource_range = sw.colorRange(),
     }};
     cmd.pipelineBarrier2(&.{.image_memory_barrier_count = post.len, .p_image_memory_barriers = &post});
+  }
+
+  /// the screen image into `shot_buf`, left as a transfer's source
+  fn copyOut(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32) void {
+    const pre = [_]vk.ImageMemoryBarrier2{.{
+      .src_stage_mask = .{.color_attachment_output = true},
+      .src_access_mask = .{.color_attachment_write = true},
+      .dst_stage_mask = .{.copy = true},
+      .dst_access_mask = .{.transfer_read = true},
+      .old_layout = .color_attachment_optimal,
+      .new_layout = .transfer_src_optimal,
+      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+      .image = r.sc.images[img],
+      .subresource_range = sw.colorRange(),
+    }};
+    cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
+    cmd.copyImageToBuffer(r.sc.images[img], .transfer_src_optimal, r.shot_buf.buf, &.{.{
+      .buffer_offset = 0,
+      .buffer_row_length = 0,
+      .buffer_image_height = 0,
+      .image_subresource = .{.aspect_mask = .{.color = true}, .mip_level = 0, .base_array_layer = 0, .layer_count = 1},
+      .image_offset = .{.x = 0, .y = 0, .z = 0},
+      .image_extent = .{.width = r.sc.extent.width, .height = r.sc.extent.height, .depth = 1},
+    }});
+    // the host reads it once the frame's fence is signalled
+    const done = [_]vk.MemoryBarrier2{.{
+      .src_stage_mask = .{.copy = true},
+      .src_access_mask = .{.transfer_write = true},
+      .dst_stage_mask = .{.host = true},
+      .dst_access_mask = .{.host_read = true},
+    }};
+    cmd.pipelineBarrier2(&.{.memory_barrier_count = done.len, .p_memory_barriers = &done});
   }
 
   fn submit(r:*Renderer, f:*Frame, img:u32) !void {

@@ -16,7 +16,8 @@ const log = std.log;
 const glfw = @import("zglfw");
 const Input = @import("platform/input.zig").Input;
 const Display = @import("platform/display.zig").Display;
-const Renderer = @import("render/renderer.zig").Renderer;
+const renderer = @import("render/renderer.zig");
+const Renderer = renderer.Renderer;
 const play = @import("game/play.zig");
 const Game = play.Game;
 const view = @import("game/view.zig");
@@ -26,6 +27,10 @@ const txt = @import("game/text.zig");
 const controls = @import("game/controls.zig");
 const options = @import("game/options.zig");
 const home = @import("game/home.zig");
+const orbit = @import("game/orbit.zig");
+const png = @import("core/png.zig");
+const bufPrint = std.fmt.bufPrint;
+const Dir = Io.Dir;
 const sep_str = std.fs.path.sep_str;
 const Options = options.Options;
 const m = @import("core/math.zig");
@@ -38,6 +43,9 @@ const DEMO_FORWARD = 25;
 const STRESS_SIDE = 120;
 /// most streamed chunks meshed in one frame (`MESH_MS` also caps it)
 const MESH_BUDGET = 6;
+/// `--inspect` writes its screenshots here, under the working directory
+/// (kept out of git)
+const SHOTS = "shots";
 
 pub fn main(init:Init) !void {
   const gpa = init.gpa;
@@ -57,7 +65,18 @@ pub fn main(init:Init) !void {
   var load = false;
   var tod:?f32 = null;
   var seed:u64 = play.DEFAULT_SEED;
+  // `--inspect[=player|<species>|<structure>|x,z]` turns the camera round
+  // it, saving screenshots, then closes; `--shots=`, `--orbit=` (seconds a
+  // turn), `--dist=`, `--pitch=` (degrees) shape it
+  var inspect:?orbit.Focus = null;
+  var turn:orbit.Orbit = .{};
   for (args[1..]) |a| {
+    if (eql(u8, a, "--inspect")) inspect = .player;
+    if (startsWith(u8, a, "--inspect=")) inspect = try orbit.Focus.parse(a["--inspect=".len..]);
+    if (startsWith(u8, a, "--shots=")) turn.shots = try parseInt(u32, a["--shots=".len..], 0);
+    if (startsWith(u8, a, "--orbit=")) turn.period = try parseFloat(f32, a["--orbit=".len..]);
+    if (startsWith(u8, a, "--dist=")) turn.dist = try parseFloat(f32, a["--dist=".len..]);
+    if (startsWith(u8, a, "--pitch=")) turn.pitch = m.rad(try parseFloat(f32, a["--pitch=".len..]));
     if (eql(u8, a, "--novsync")) opts.vsync = false;
     if (eql(u8, a, "--demo")) demo = true;
     if (eql(u8, a, "--stress")) stress = true;
@@ -104,6 +123,10 @@ pub fn main(init:Init) !void {
   if (demo) try setups.demo(&game, DEMO_FORWARD);
   if (stress) try setups.stress(&game, STRESS_SIDE);
   if (tod) |t| game.sky.tod = t;
+  if (inspect) |f| {
+    turn.focus = f;
+    Dir.cwd().createDirPath(io, SHOTS) catch |e| log.err("{s}: {t}", .{SHOTS, e});
+  }
 
   var last = glfw.getTime();
   while (!window.shouldClose()) {
@@ -144,17 +167,37 @@ pub fn main(init:Init) !void {
       }
     }
     if (!eqlDeep(game.opts, applied)) try apply(io, &game, r, &display, &applied);
+    // inspecting, the camera turns round the focus and the HUD is hidden
+    const shoot = if (inspect != null) turn.step(&game, @floatCast(dt)) else false;
     const t0 = glfw.getTime();
     try game.simulate(dt);
     game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * m.MS_PER_S)) - game.sim_ms) * play.TIMING_EASE;
     try r.syncWorld(&game.world, MESH_BUDGET);
     game.render_stats = r.stats;
 
-    const scene = try view.scene(&game, screen);
+    var scene = try view.scene(&game, screen);
+    if (inspect != null) scene.ui = &.{};
     const resized = input.resized;
     input.resized = false;
+    r.capture = shoot;
     try r.draw(&scene, resized);
+    if (r.shot()) |sh| {
+      snap(gpa, io, sh, &turn);
+      if (turn.done()) window.setShouldClose(true);
+    }
   }
+}
+
+/// write a captured frame as `shots/<focus>_<n>.png` (failures are logged)
+fn snap(gpa:Allocator, io:Io, sh:renderer.Shot, turn:*orbit.Orbit) void {
+  defer turn.took();
+  var nb:[32]u8 = undefined;
+  var pb:[96]u8 = undefined;
+  const path = bufPrint(&pb, SHOTS ++ sep_str ++ "{s}_{d}.png", .{turn.focus.name(&nb), turn.taken}) catch unreachable;
+  const bytes = png.encode(gpa, sh.w, sh.h, sh.px, if (sh.bgra) .bgra else .rgba) catch |e| return log.err("{s}: {t}", .{path, e});
+  defer gpa.free(bytes);
+  Dir.cwd().writeFile(io, .{.sub_path = path, .data = bytes}) catch |e| return log.err("{s}: {t}", .{path, e});
+  log.info("shot {s}", .{path});
 }
 
 /// put the gardener's changed settings into effect (as far as the GPU and

@@ -18,6 +18,9 @@ zig build run -- --stress         # 120×120 plant field
 zig build run -- --tod=0.9        # time of day (0=midnight, 0.5=noon)
 zig build run -- --novsync --seed=0x1234
 zig build run -- --load           # load the newest saved garden
+zig build run -- --demo --inspect # orbit the wolf, screenshots to shots/, then quit
+zig build run -- --inspect=bloom --shots=12 --orbit=30 --dist=6 --pitch=25
+                                  # focus: player | <species> | <structure> | x,z
 zig build test                    # headless logic tests (no window/GPU)
 ```
 Needs `VULKAN_SDK` (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`,
