@@ -47,6 +47,13 @@ pub const Mesh = extern struct {
 pub const Skin = extern struct {
   bones:u32 = 0,
   weights:[4]u8 = .{0, 0, 0, 0},
+  /// how each of the four weights changes across the mesh (per unit of
+  /// mesh space, its x, y and z): a skin swelling under a scaled bone
+  /// (the belly) bends its normals by them, not by the blended bones alone
+  /// (part.vert). Zero where the weights hold still or are not known.
+  gx:[4]f32 = @splat(0),
+  gy:[4]f32 = @splat(0),
+  gz:[4]f32 = @splat(0),
 };
 
 /// the leading fields of `Mesh`, read from a second growth key of the same

@@ -35,7 +35,7 @@ pub const RX:f32 = skel.GUT_R[0];
 pub const DOWN:f32 = skel.GUT_R[1];
 /// (it reaches up under the pectorals, so the two meet with no bare hide
 /// between them)
-pub const UP:f32 = 0.21;
+pub const UP:f32 = skel.GUT_UP;
 pub const RZ:f32 = skel.GUT_R[2];
 /// how far the sac narrows toward its top (share of its width)
 const TAPER:f32 = 0.12;
@@ -78,10 +78,45 @@ fn normal(th:f32, ph:f32) V3 {
   return if (m.dot(n, out) < 0) -n else n;
 }
 
-/// how much of the gut a point at `th` is: all of it up past the middle
-/// (so the whole sac swells round, up toward the ribs as well), easing to
-/// none at its top where it hangs from them
-fn gut(th:f32) f32 { return 1 - m.smooth(m.clamp01((-@cos(th) - 0.35) / 0.62)); }
+/// how much of the gut a point at `th` is (`share`)
+fn gut(th:f32) f32 { return share(-@cos(th) * (if (@cos(th) < 0) UP else DOWN))[0]; }
+
+/// `scale` times a smooth step of x over `from`..`from + span`, and its
+/// slope in x
+fn ramp(x:f32, from:f32, span:f32, scale:f32) [2]f32 {
+  const u = (x - from) / span;
+  if (u <= 0 or u >= 1) return .{scale * m.smooth(m.clamp01(u)), 0};
+  return .{scale * m.smooth(u), scale * 6 * u * (1 - u) / span};
+}
+
+/// how far up the sac (share of `UP`) it starts being held to the body
+const PIN:f32 = 0.55;
+/// how much of the gut a point `yr` above the gut's centre is, and how fast
+/// that changes going up: all of it up past the middle (so the whole sac
+/// swells round, up toward the ribs as well), easing to none at its top
+/// where it hangs from them. Above the middle the gut is its upper bone,
+/// which lifts nothing past where the waist holds it, so this easing never
+/// folds the swollen sac over itself.
+fn share(yr:f32) [2]f32 {
+  const r = ramp(yr / UP, PIN, 1 - PIN, 1);
+  return .{1 - r[0], -r[1] / UP};
+}
+
+/// the gut's two bones part across its middle, where both take a point
+/// alike: below, `gut` (the sac drops and rounds out full), above,
+/// `gut_top` (the sac rounds out as wide but keeps its top). How much of
+/// the gut a point `yr` above its centre is of the lower, and its slope.
+const PART:f32 = 0.04;
+fn lower(yr:f32) [2]f32 {
+  const r = ramp(yr, -PART, 2 * PART, 1);
+  return .{1 - r[0], -r[1]};
+}
+
+/// how far the full gut bones lift a point `yr` above the gut's centre
+/// (negative: drop it), the lower and the upper
+fn reach(yr:f32) [2]f32 {
+  return .{skel.GUT_GROW[1] * yr + skel.GUT_SHIFT[1], skel.GUT_GROW_TOP[1] * yr + skel.GUT_SHIFT[1]};
+}
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   const start = b.mark();
@@ -104,9 +139,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.patch(b, R, C, &pts, &nrm, &cols, &us, 0, .bloom);
   // tu.x: how much of the gut each vertex is
   for (b.v.items[start..]) |*vx| {
-    const y = (vx.pos[1] - CENTRE[1]);
-    const th = m.pi / 2.0 + m.asin(m.clamp(y / (if (y > 0) UP else DOWN), -1, 1));
-    vx.tu[0] = gut(th);
+    vx.tu[0] = share(vx.pos[1] - CENTRE[1])[0];
   }
 
   // the net: grown vines from under the gut up over it, twisting, the
@@ -162,19 +195,36 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   try b.tube(&ring, &rts, 0.003, 0.003, knot, .bloom, 8);
   for (b.v.items[navel..]) |*vx| vx.tu[1] = NAVEL;
 
-  // into the waist's place in the bind pose: the gut with the gut bone,
-  // the rest with the spine, the hips below it and the ribs above
+  // into the waist's place in the bind pose: the gut with the gut bones,
+  // the rest with the spine, the hips below it and the ribs above. The
+  // weights change with height alone, and the gut swells the sac to three
+  // times its size, so its normals turn by how fast the weights change up
+  // it too (each weight's slope, carried in the skin), not by the blended
+  // bones alone
   for (b.v.items[start..], try b.skinOf(start)) |vx, *k| {
     const y = vx.pos[1];
     const g = vx.tu[0];
+    const dg = if (vx.tu[1] == NAVEL) 0 else share(y - CENTRE[1])[1];
+    const lo = lower(y - CENTRE[1]);
     var w:[skel.COUNT]f32 = @splat(0);
-    const low = 0.5 * m.smooth(m.clamp01(-y / 0.09));
-    const high = 0.6 * m.smooth(m.clamp01((y - 0.06) / 0.1));
-    w[@intFromEnum(skel.Bone.gut)] = g;
-    w[@intFromEnum(skel.Bone.pelvis)] = (1 - g) * low;
-    w[@intFromEnum(skel.Bone.chest)] = (1 - g) * high;
-    w[@intFromEnum(skel.Bone.waist)] = (1 - g) * (1 - low - high);
-    k.* = Sculpt.pack(&w);
+    var dw:[skel.COUNT]f32 = @splat(0);
+    const low = ramp(-y, 0, 0.09, 0.5);
+    const high = ramp(y, 0.06, 0.1, 0.6);
+    const dlow = -low[1];
+    const dhigh = high[1];
+    w[@intFromEnum(skel.Bone.gut)] = g * lo[0];
+    dw[@intFromEnum(skel.Bone.gut)] = dg * lo[0] + g * lo[1];
+    w[@intFromEnum(skel.Bone.gut_top)] = g * (1 - lo[0]);
+    dw[@intFromEnum(skel.Bone.gut_top)] = dg * (1 - lo[0]) - g * lo[1];
+    w[@intFromEnum(skel.Bone.pelvis)] = (1 - g) * low[0];
+    dw[@intFromEnum(skel.Bone.pelvis)] = -dg * low[0] + (1 - g) * dlow;
+    w[@intFromEnum(skel.Bone.chest)] = (1 - g) * high[0];
+    dw[@intFromEnum(skel.Bone.chest)] = -dg * high[0] + (1 - g) * dhigh;
+    w[@intFromEnum(skel.Bone.waist)] = (1 - g) * (1 - low[0] - high[0]);
+    dw[@intFromEnum(skel.Bone.waist)] = -dg * (1 - low[0] - high[0]) - (1 - g) * (dlow + dhigh);
+    var grad:[skel.COUNT]V3 = undefined;
+    for (&grad, dw) |*q, d| q.* = v3(0, d, 0);
+    k.* = Sculpt.packWith(&w, &grad);
   }
   b.xform(start, skel.bind()[@intFromEnum(skel.Bone.waist)]);
 }
@@ -185,4 +235,34 @@ test "the belly is full below and narrows toward the ribs" {
   try std.testing.expect(mid > 0.1);
   try std.testing.expect(high < mid * 0.6);
   try std.testing.expect(gut(m.pi * 0.25) > 0.95 and gut(m.pi * 0.95) < 0.05);
+}
+
+test "the gut's shares change up the sac as their slopes say" {
+  const e:f32 = 1e-4;
+  var k:usize = 1;
+  while (k < 200) : (k += 1) {
+    const yr = m.lerp(-DOWN, UP, m.ratio(k, 200));
+    const fd = (share(yr + e)[0] - share(yr - e)[0]) / (2 * e);
+    try std.testing.expectApproxEqAbs(fd, share(yr)[1], 0.05 + 0.02 * @abs(fd));
+    const fl = (lower(yr + e)[0] - lower(yr - e)[0]) / (2 * e);
+    try std.testing.expectApproxEqAbs(fl, lower(yr)[1], 0.05 + 0.02 * @abs(fl));
+  }
+}
+
+test "the swelling sac never folds over itself, however full" {
+  for ([_]f32{ 0.25, 0.5, 1 }) |fill| {
+    var last:f32 = -1e9;
+    var k:usize = 0;
+    while (k <= 400) : (k += 1) {
+      const yr = m.lerp(-DOWN, UP, m.ratio(k, 400));
+      const g = share(yr)[0];
+      const lo = lower(yr)[0];
+      const r = reach(yr);
+      const h = yr + fill * g * (lo * r[0] + (1 - lo) * r[1]);
+      try std.testing.expect(h > last);
+      last = h;
+    }
+    // and its top stays where it hangs from the ribs
+    try std.testing.expectApproxEqAbs(UP, last, 1e-4);
+  }
 }

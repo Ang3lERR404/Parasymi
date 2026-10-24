@@ -393,8 +393,12 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
     chest, the rear (`wolf_rump`) on the pelvis, its lower edge partly
     following the thighs.
   - Belly (`wolf_belly`): convex egg sac on the gut; filling scales and
-    drops the `gut` bone (tu.x = gut share of each vertex); the belly button
-    pops out; up to 5 lumps inside (in the gut bone's frame).
+    drops the `gut` bone (lower half) and `gut_top` (upper half: as wide,
+    its top kept where it hangs), so the swollen sac never folds (tested);
+    tu.x = gut share of each vertex; the belly button pops out; up to 5
+    lumps inside (in the gut bone's frame). `vertex.Skin` carries each
+    weight's slope (`gx/gy/gz`): part.vert bends skinned normals by the
+    true Jacobian, not the blended bones alone.
   - Motion: feet planted in the world, swung on arcs when the gait's phase
     (or, standing, a foot left behind) says; digitigrade leg IK
     (`solveLeg`: thigh+metatarsal as one link); pelvis bobs at footfalls,

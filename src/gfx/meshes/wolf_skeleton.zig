@@ -23,6 +23,8 @@ pub const Bone = enum(u8) {
   // each hand's four fingers: the knuckle's segment, then the tip's
   finger0_l, finger1_l, finger2_l, finger3_l, tip0_l, tip1_l, tip2_l, tip3_l,
   finger0_r, finger1_r, finger2_r, finger3_r, tip0_r, tip1_r, tip2_r, tip3_r,
+  // the gut's upper half (see `GUT_GROW_TOP`)
+  gut_top,
 };
 pub const COUNT = @typeInfo(Bone).@"enum".fields.len;
 pub const TAIL = 4;
@@ -43,7 +45,7 @@ pub fn parent(b:Bone) ?Bone {
   return switch (b) {
     .pelvis => null,
     .waist, .tail0, .thigh_l, .thigh_r => .pelvis,
-    .chest, .gut => .waist,
+    .chest, .gut, .gut_top => .waist,
     .neck, .arm_l, .arm_r => .chest,
     .head => .neck,
     .jaw, .ear_l, .ear_r => .head,
@@ -90,6 +92,14 @@ pub const GUT_FULL:f32 = 0.3;
 pub const GUT_DROP:f32 = 0.11;
 pub const GUT_GROW = m.splat3(GUT_FULL) / GUT_R - m.splat3(1);
 pub const GUT_SHIFT = v3(0, -GUT_DROP, GUT_FULL - GUT_R[2]);
+/// how far the sac reaches up from the gut's centre toward the ribs
+pub const GUT_UP:f32 = 0.21;
+/// the sac's upper half swells on its own bone (`gut_top`): as wide as the
+/// gut, but its height grows only by the drop, so its top stays where it
+/// hangs from the ribs while the half below rounds out, and nothing above
+/// is lifted past where the waist holds it (so blending the two never
+/// folds the sac over)
+pub const GUT_GROW_TOP = v3(GUT_GROW[0], GUT_DROP / GUT_UP, GUT_GROW[2]);
 pub const SHOULDER = v3(0.185, 0.17, -0.01);
 pub const UPPER_ARM:f32 = 0.25;
 pub const FOREARM:f32 = 0.24;
@@ -192,6 +202,7 @@ pub fn fk(p:Pose) [COUNT]M4 {
   set(&w, .head, m.chain(&.{ at(&w, .neck), T(HEAD_AT), p.head.m4() }));
   set(&w, .jaw, m.chain(&.{ at(&w, .head), T(JAW_AT), m.rotX(p.jaw) }));
   set(&w, .gut, m.chain(&.{ at(&w, .waist), T(GUT_AT + GUT_SHIFT * m.splat3(p.gut)), m.scale3(m.splat3(1) + GUT_GROW * m.splat3(p.gut)) }));
+  set(&w, .gut_top, m.chain(&.{ at(&w, .waist), T(GUT_AT + GUT_SHIFT * m.splat3(p.gut)), m.scale3(m.splat3(1) + GUT_GROW_TOP * m.splat3(p.gut)) }));
   var tail = m.chain(&.{ at(&w, .pelvis), T(TAIL_AT), m.rotX(TAIL_TILT) });
   inline for (.{ Bone.tail0, Bone.tail1, Bone.tail2, Bone.tail3 }, 0..) |b, i| {
     if (i > 0) tail = m.chain(&.{ tail, T(v3(0, TAIL_SEG, 0)) });

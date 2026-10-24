@@ -112,6 +112,14 @@ pub const Builder = struct {
       };
       v.nrm = m.norm(n);
     }
+    // a weight's gradient is a covector too: it goes as the normals do
+    if (start >= b.skin.items.len) return;
+    for (b.skin.items[start..]) |*k| for (0..4) |i| {
+      const g = [3]f32{k.gx[i], k.gy[i], k.gz[i]};
+      k.gx[i] = nm[0][0] * g[0] + nm[0][1] * g[1] + nm[0][2] * g[2];
+      k.gy[i] = nm[1][0] * g[0] + nm[1][1] * g[1] + nm[1][2] * g[2];
+      k.gz[i] = nm[2][0] * g[0] + nm[2][1] * g[1] + nm[2][2] * g[2];
+    };
   }
 
   pub fn mark(b:*const Builder) usize { return b.v.items.len; }

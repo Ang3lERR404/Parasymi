@@ -290,6 +290,20 @@ pub const Sculpt = struct {
     return out;
   }
 
+  /// `pack`, with how each bone's weight changes across the mesh (`slope`,
+  /// per bone like `w`), so the skin's normals bend as it truly does
+  pub fn packWith(w:[]const f32, slope:[]const V3) vertex.Skin {
+    var out = pack(w);
+    for (0..4) |k| {
+      if (out.weights[k] == 0) continue;
+      const g = slope[(out.bones >> @intCast(8 * k)) & 255];
+      out.gx[k] = g[0];
+      out.gy[k] = g[1];
+      out.gz[k] = g[2];
+    }
+    return out;
+  }
+
   /// the field's colour at `p`: the forms' colours meeting softly where
   /// they meet
   fn colourFrom(s:*const Sculpt, p:V3, list:[]const u32) V3 {

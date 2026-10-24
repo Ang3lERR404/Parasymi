@@ -24,6 +24,10 @@ layout(location = 14) in vec4 ih;   // a forming halo it belongs to: its centre,
 // per-vertex skin (skinned meshes only): four bone indices, one per byte, and their weights
 layout(location = 15) in uint sbones;
 layout(location = 16) in vec4 sweights;
+// how each of those weights changes across the mesh: its x, y and z
+layout(location = 17) in vec4 sgx;
+layout(location = 18) in vec4 sgy;
+layout(location = 19) in vec4 sgz;
 
 // this frame's bones (renderer Scene.bones): each carries a vertex from
 // where it was built to where it is now
@@ -187,9 +191,26 @@ void main() {
     if (echo > 0.5) twinkle = 1.0;
   } else {
     w = M * vec4(p, 1.0);
-    // a skinned mesh's bones may swell it unevenly (the belly): its
-    // normals take the inverse-transpose
-    wn = mode == 3 ? transpose(inverse(mat3(M))) * nm : mat3(M) * nm;
+    if (mode == 3) {
+      // a skinned mesh's bones may swell it unevenly (the belly): its
+      // normals take the inverse-transpose of how the skin truly moves
+      // there, the blended bones plus where each bone would take this
+      // point times how fast its weight changes across the skin (without
+      // that, where a swollen sac hangs from the body the normals turn
+      // away from a surface still facing the eye)
+      Bones B = Bones(pc.bones);
+      int base = int(ie.y + 0.5);
+      mat3 J = mat3(M);
+      // (where each bone would take it, from where the blend does: the
+      // slopes need not sum to nothing once the slightest bones are
+      // dropped, and the wolf's place in the world must not leak in)
+      vec4 hp = vec4(p, 1.0);
+      for (int k = 0; k < 4; k++) {
+        vec3 at = (B.m[base + int((sbones >> (8u * uint(k))) & 255u)] * hp).xyz - w.xyz;
+        J += mat3(at * sgx[k], at * sgy[k], at * sgz[k]);
+      }
+      wn = transpose(inverse(J)) * nm;
+    } else wn = mat3(M) * nm;
     // a shadow under a bloom a forming halo draws in follows it over the
     // ground (fading as the bloom folds, below)
     if (drawn && part == 7u) w.xz += haloSpiral(c3.xyz, ih.xyz, ih.w).xz - c3.xz;
