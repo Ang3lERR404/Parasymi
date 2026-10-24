@@ -34,6 +34,7 @@ const st = @import("structures.zig");
 const actions = @import("actions.zig");
 const convergence = @import("convergence.zig");
 const hud = @import("hud.zig");
+const options = @import("options.zig");
 
 pub const TICK = 1.0 / 60.0;
 /// the world every new game grows from, unless `--seed=` says otherwise
@@ -88,7 +89,10 @@ pub fn known(g:*const Game, item:items.Item) bool {
   return if (item.plants()) |sp| g.prog.canPlant(sp) else true;
 }
 
-pub const Request = enum { save, load, fullscreen, quit };
+pub const Request = enum { save, load, quit };
+
+/// the pause menu's rows, in `txt.s.hud.pause_labels` order
+pub const PauseRow = enum { @"resume", options, save, load, fullscreen, quit };
 
 /// what has the wolf's attention; only one at a time.
 pub const Mode = enum {
@@ -100,11 +104,14 @@ pub const Mode = enum {
   research,
   /// the world is frozen and the pause menu is open (Esc)
   paused,
+  /// the world is frozen and the options panel is open (from the pause menu)
+  options,
   /// the free camera is flying for inspection (Ctrl+F); the wolf stands idle
   inspect,
 
-  /// the world keeps moving underneath (everything but the pause menu)
-  pub fn live(md:Mode) bool { return md != .paused; }
+  /// the world keeps moving underneath (everything but the pause menu and
+  /// the options panel)
+  pub fn live(md:Mode) bool { return md != .paused and md != .options; }
 };
 
 const Error = Allocator.Error;
@@ -136,6 +143,10 @@ pub const Game = struct {
   mode:Mode = .roam,
   /// something only main can do (it owns the window and the file system).
   request:?Request = null,
+  /// the gardener's settings; main applies them when they change
+  opts:options.Options = .{},
+  /// the most MSAA samples the GPU takes (main sets it from the renderer)
+  most_samples:u32 = 8,
   /// keeps running while paused, so the UI still breathes.
   ui_time:f64 = 0,
 
@@ -241,16 +252,14 @@ pub const Game = struct {
     // system keys work everywhere; Esc closes a panel first, then pauses
     if (ctl.pressed(in, .save)) g.request = .save;
     if (ctl.pressed(in, .load)) g.request = .load;
-    if (ctl.pressed(in, .fullscreen)) g.request = .fullscreen;
+    if (ctl.pressed(in, .fullscreen)) g.opts.fullscreen = !g.opts.fullscreen;
     if (ctl.pressed(in, .back)) switch (g.mode) {
       .roam => g.mode = .paused,
       .belly, .research, .paused => g.mode = .roam,
+      .options => g.mode = .paused,
       .inspect => g.inspect(in, false),
-    };
-    if (!g.mode.live()) {
-      if (ctl.pressed(in, .quit)) g.request = .quit;
-      return;
-    }
+    } else if (!g.mode.live()) g.menu(in);
+    if (!g.mode.live()) return;
 
     g.time += dt;
     g.sky.update(dt);
@@ -295,6 +304,8 @@ pub const Game = struct {
         },
         .slot => |i| g.clickSlot(i),
         .bar => |i| if (g.mode == .belly) g.clickBar(i) else { g.hot = i; },
+        // drawn only while the world is frozen (see `menu`)
+        .pause, .option, .back => {},
       } else if (g.held != null) {
         g.drop();
         g.use_spent = true;
@@ -457,6 +468,38 @@ pub const Game = struct {
     }
   }
 
+  /// the pause menu and options panel, while the world is frozen: a click
+  /// on a pause row does what it says; on an option it turns it (the other
+  /// button turns it back). Keys still work for the pause rows.
+  fn menu(g:*Game, in:*const Input) void {
+    g.mouse = in.mouse;
+    const hit = g.rows.at(in.mouse);
+    g.pointed = hit;
+    if (g.mode == .paused) {
+      if (ctl.pressed(in, .quit)) g.request = .quit;
+      if (ctl.pressed(in, .options)) g.mode = .options;
+    }
+    const dir:i32 = if (ctl.pressed(in, .use)) 1 else if (ctl.pressed(in, .uproot)) -1 else 0;
+    if (dir == 0) return;
+    switch (hit orelse return) {
+      .pause => |row| if (dir > 0) g.choose(row),
+      .option => |set| options.step(&g.opts, set, dir, g.most_samples),
+      .back => if (dir > 0) { g.mode = .paused; },
+      else => {},
+    }
+  }
+
+  fn choose(g:*Game, row:PauseRow) void {
+    switch (row) {
+      .@"resume" => g.mode = .roam,
+      .options => g.mode = .options,
+      .save => g.request = .save,
+      .load => g.request = .load,
+      .fullscreen => g.opts.fullscreen = !g.opts.fullscreen,
+      .quit => g.request = .quit,
+    }
+  }
+
   /// enter or leave the free camera. Leaving gives the cursor back and eases
   /// the view home.
   fn inspect(g:*Game, in:*const Input, on:bool) void {
@@ -586,6 +629,31 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   try g.update(&in, TICK, screen);
   try testing.expectEqual(@as(usize, 2), g.hot);
   try testing.expectEqual(@as(usize, 1), g.weave.len);
+}
+
+test "the pause menu opens the options; clicks turn them and lead back" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  const screen = TEST_SCREEN;
+  try ctl.fill(@embedFile("controls.cfg"));
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  g.opts = .{.aa = .off};
+
+  g.mode = .paused;
+  try click.on(&g, &in, .{.pause = .options}, screen);
+  try testing.expectEqual(Mode.options, g.mode);
+  try click.on(&g, &in, .{.option = .antialias}, screen);
+  try testing.expectEqual(renderer.Antialias.fxaa, g.opts.aa);
+  try click.on(&g, &in, .{.option = .vsync}, screen);
+  try testing.expect(!g.opts.vsync);
+  try click.on(&g, &in, .back, screen);
+  try testing.expectEqual(Mode.paused, g.mode);
+  try click.on(&g, &in, .{.pause = .@"resume"}, screen);
+  try testing.expectEqual(Mode.roam, g.mode);
+  // nothing moved while frozen
+  try testing.expectEqual(@as(u64, 0), g.ticks);
 }
 
 test "a click lifts a stack, the next puts it down; dropped on the hotbar it assigns" {

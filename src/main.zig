@@ -9,6 +9,7 @@ const Io = std.Io;
 const parseFloat = std.fmt.parseFloat;
 const parseInt = std.fmt.parseInt;
 const eql = std.mem.eql;
+const eqlDeep = std.meta.eql;
 const startsWith = std.mem.startsWith;
 const Init = std.process.Init;
 const log = std.log;
@@ -23,6 +24,8 @@ const setups = @import("game/setups.zig");
 const save = @import("game/save.zig");
 const txt = @import("game/text.zig");
 const controls = @import("game/controls.zig");
+const options = @import("game/options.zig");
+const Options = options.Options;
 const m = @import("core/math.zig");
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
@@ -38,14 +41,15 @@ pub fn main(init:Init) !void {
   const gpa = init.gpa;
   const io = init.io;
   const args = try init.minimal.args.toSlice(init.arena.allocator());
-  var vsync = true;
+  // the gardener's settings; `--novsync` overrides theirs for this run
+  var opts = try options.load(gpa, io);
   var demo = false;
   var stress = false;
   var load = false;
   var tod:?f32 = null;
   var seed:u64 = play.DEFAULT_SEED;
   for (args[1..]) |a| {
-    if (eql(u8, a, "--novsync")) vsync = false;
+    if (eql(u8, a, "--novsync")) opts.vsync = false;
     if (eql(u8, a, "--demo")) demo = true;
     if (eql(u8, a, "--stress")) stress = true;
     if (eql(u8, a, "--load")) load = true;
@@ -72,11 +76,18 @@ pub fn main(init:Init) !void {
   input.attach();
   var display:Display = .{.win = window};
 
-  const r = try Renderer.init(gpa, window, vsync);
+  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa);
   defer r.deinit();
+  opts.aa = r.antialiasing();
 
   var game = try Game.init(gpa, seed);
   defer game.deinit();
+  game.opts = opts;
+  game.most_samples = r.maxSamples();
+  // what is in effect; the window opens windowed, so a fullscreen setting
+  // is applied on the first frame
+  var applied = opts;
+  applied.fullscreen = false;
   if (load) try restore(gpa, io, &game, r);
   if (demo) try setups.demo(&game, DEMO_FORWARD);
   if (stress) try setups.stress(&game, STRESS_SIDE);
@@ -99,13 +110,13 @@ pub fn main(init:Init) !void {
       switch (rq) {
         .save => if (save.save(&game, gpa, io)) game.prog.say(txt.s.msg.saved, .{}) else |e| game.prog.say(txt.s.msg.save_failed, .{e}),
         .load => try restore(gpa, io, &game, r),
-        .fullscreen => display.toggle() catch |e| game.prog.say(txt.s.msg.no_fullscreen, .{e}),
         .quit => {
           save.save(&game, gpa, io) catch |e| log.err("save failed: {t}", .{e});
           window.setShouldClose(true);
         },
       }
     }
+    if (!eqlDeep(game.opts, applied)) try apply(io, &game, r, &display, &applied);
     const t0 = glfw.getTime();
     try game.simulate(dt);
     game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * m.MS_PER_S)) - game.sim_ms) * play.TIMING_EASE;
@@ -119,6 +130,22 @@ pub fn main(init:Init) !void {
   }
 }
 
+/// put the gardener's changed settings into effect (as far as the GPU and
+/// monitor allow, which the settings then show) and keep them.
+fn apply(io:Io, game:*Game, r:*Renderer, display:*Display, applied:*Options) !void {
+  const o = &game.opts;
+  try r.antialias(o.aa);
+  o.aa = r.antialiasing();
+  try r.setVsync(o.vsync);
+  const full = display.mode == .fullscreen;
+  if (o.fullscreen != full) display.toggle() catch |e| {
+    game.prog.say(txt.s.msg.no_fullscreen, .{e});
+    o.fullscreen = full;
+  };
+  options.save(o, io) catch |e| game.prog.say(txt.s.msg.options_unsaved, .{e});
+  applied.* = o.*;
+}
+
 /// replace the running game with the saved one (keeping it on failure).
 fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer) !void {
   var loaded = save.load(gpa, io) catch |e| {
@@ -127,6 +154,9 @@ fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer) !void {
   };
   // the old world's meshes belong to chunks that are about to disappear
   try r.dropWorld();
+  // the settings belong to the gardener, not the garden
+  loaded.opts = game.opts;
+  loaded.most_samples = game.most_samples;
   game.deinit();
   game.* = loaded;
   loaded = undefined;

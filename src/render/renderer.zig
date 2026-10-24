@@ -22,8 +22,10 @@ const species = @import("../sim/species.zig");
 const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
 const terrain_mesh = @import("terrain_mesh.zig");
-const Post = @import("post.zig").Post;
-const HDR_FORMAT = @import("post.zig").HDR_FORMAT;
+const post_mod = @import("post.zig");
+const Post = post_mod.Post;
+const HDR_FORMAT = post_mod.HDR_FORMAT;
+pub const Antialias = post_mod.Antialias;
 
 /// the shape of a render pass module (see passes/). Each pass declares
 ///   desc:Desc                          its shaders, vertex layout and state
@@ -49,11 +51,16 @@ pub const pass = struct {
     /// drawn onto the screen after the world (and its glow): the UI. World
     /// passes draw into the HDR image the glow is taken from.
     screen:bool = false,
+    /// with MSAA, shade every sample: its fragments choose for themselves
+    /// whether they are solid or see-through, so the edge between the two
+    /// (and the silhouette it makes) lies inside the pixel, not on geometry
+    per_sample:bool = false,
   };
 
   pub const stages:vk.ShaderStageFlags = .{.vertex = true, .fragment = true};
 
-  pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, screen:vk.Format) ctx.Error!vk.Pipeline {
+  /// `samples`: per pixel of the world's attachments (the screen has one)
+  pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, screen:vk.Format, samples:u32) ctx.Error!vk.Pipeline {
     const vs = try c.shader(d.vert);
     defer c.device.destroyShaderModule(vs, null);
     const fs = try c.shader(d.frag);
@@ -63,6 +70,7 @@ pub const pass = struct {
       .bindings = d.bindings, .attrs = d.attrs,
       .layout = layout, .color_format = if (d.screen) screen else HDR_FORMAT,
       .depth = d.depth, .depth_write = d.depth_write, .depth_attachment = !d.screen, .blend = d.blend, .cull = false,
+      .samples = post_mod.sampleFlags(if (d.screen) 1 else samples), .per_sample = d.per_sample,
     });
   }
 };
@@ -185,10 +193,12 @@ pub const Renderer = struct {
   pending:std.ArrayList(Buffer) = .empty,
   stats:Stats = .{},
 
-  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool) Error!*Renderer {
+  /// `aa` falls back to the most samples the GPU offers (see `antialias`)
+  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool, aa:Antialias) Error!*Renderer {
     const r = try gpa.create(Renderer);
     errdefer gpa.destroy(r);
     r.* = .{.gpa = gpa, .window = window, .vsync = vsync, .ctx = undefined, .sc = .{}};
+    r.post.aa = aa;
     for (&r.frames) |*f| inline for (reg.ids) |id| {
       if (comptime reg.has(id, "Frame")) @field(f.pass, @tagName(id)) = .{};
     };
@@ -204,7 +214,7 @@ pub const Renderer = struct {
     const c = &r.ctx;
     const fb = r.window.getFramebufferSize();
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, .null_handle);
-    r.post = try Post.init(c, r.sc.format.format, r.sc.extent.width, r.sc.extent.height);
+    r.post = try Post.init(c, r.sc.format.format, r.sc.extent.width, r.sc.extent.height, r.fit(r.post.aa));
 
     for (&r.frames) |*f| {
       f.pool = try c.device.createCommandPool(&.{.flags = .{.reset_command_buffer = true}, .queue_family_index = c.family}, null);
@@ -218,11 +228,66 @@ pub const Renderer = struct {
 
     r.layouts[@intFromEnum(pass.Layout.world)] = try pipeline.layout(c, @sizeOf(WorldPush));
     r.layouts[@intFromEnum(pass.Layout.ui)] = try pipeline.layout(c, @sizeOf(passes.ui.Push));
+    try r.makePipes(false);
+    try r.buildMeshes();
+  }
+
+  /// every pass's pipeline (or with `world_only`, those drawing into the
+  /// world, after its sample count changed: the old ones must be destroyed)
+  fn makePipes(r:*Renderer, world_only:bool) Error!void {
+    const n = r.post.aa.samples();
     inline for (reg.ids) |id| {
       const d = reg.module(id).desc;
-      r.pipes[@intFromEnum(id)] = try pass.create(c, d, r.layout(d.layout), r.sc.format.format);
+      if (!(world_only and d.screen)) {
+        r.pipes[@intFromEnum(id)] = try pass.create(&r.ctx, d, r.layout(d.layout), r.sc.format.format, n);
+      }
     }
-    try r.buildMeshes();
+  }
+
+  /// the most samples per pixel both the world's colour and depth can take
+  pub fn maxSamples(r:*const Renderer) u32 {
+    const l = r.ctx.props.limits;
+    const both:u32 = @as(u32, @bitCast(l.framebuffer_color_sample_counts)) & @as(u32, @bitCast(l.framebuffer_depth_sample_counts));
+    var n:u32 = 8;
+    while (n > 1 and both & n == 0) n /= 2;
+    return n;
+  }
+
+  /// `aa`, or MSAA with as many samples as the GPU can take
+  fn fit(r:*const Renderer, aa:Antialias) Antialias {
+    const most = r.maxSamples();
+    var a = aa;
+    while (a.samples() > most) a = @enumFromInt(@intFromEnum(a) - 1);
+    return a;
+  }
+
+  /// what the world is smoothed with now
+  pub fn antialiasing(r:*const Renderer) Antialias { return r.post.aa; }
+
+  /// smooth edges another way (what the GPU can take of `aa`); waits for
+  /// the GPU and remakes the world's images and pipelines
+  pub fn antialias(r:*Renderer, aa:Antialias) Error!void {
+    const a = r.fit(aa);
+    if (a == r.post.aa) return;
+    const c = &r.ctx;
+    c.device.deviceWaitIdle() catch |e| return ctx.fold(e);
+    const remake = a.samples() != r.post.aa.samples();
+    r.post.antialias(c, a) catch |e| return ctx.fold(e);
+    if (!remake) return;
+    inline for (reg.ids) |id| {
+      if (comptime !reg.module(id).desc.screen) {
+        c.device.destroyPipeline(r.pipes[@intFromEnum(id)], null);
+        r.pipes[@intFromEnum(id)] = .null_handle;
+      }
+    }
+    try r.makePipes(true);
+  }
+
+  /// wait for the display's refresh or not; remakes the swapchain
+  pub fn setVsync(r:*Renderer, on:bool) Error!void {
+    if (on == r.vsync) return;
+    r.vsync = on;
+    try r.recreate();
   }
 
   pub fn pipe(r:*const Renderer, p:Pass) vk.Pipeline { return r.pipes[@intFromEnum(p)]; }
@@ -416,7 +481,7 @@ pub const Renderer = struct {
     try cmd.resetCommandBuffer(.{});
     try cmd.beginCommandBuffer(&.{.flags = .{.one_time_submit = true}});
     // the world into the HDR image, then its glow, then the screen: the
-    // world and its glow composed, the UI over it
+    // world and its glow composed (and with FXAA filtered), the UI over it
     var stats:Stats = .{.meshed = r.stats.meshed};
     r.beginWorld(cmd, scene.clear);
     inline for (reg.ids) |id| {
@@ -447,9 +512,11 @@ pub const Renderer = struct {
     if (pres != .success or acq.result == .suboptimal_khr) try r.recreate();
   }
 
-  /// open the world's rendering scope: the HDR image and the depth buffer.
+  /// open the world's rendering scope: the HDR image and the depth buffer
+  /// (with MSAA, multisampled ones resolved into the HDR image).
   fn beginWorld(r:*Renderer, cmd:vk.CommandBufferProxy, clear:[3]f32) void {
     r.post.beginWorld(cmd);
+    const ms = r.post.multisampled();
     const pre = [_]vk.ImageMemoryBarrier2{.{
       .src_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
       .src_access_mask = .{.depth_stencil_attachment_write = true},
@@ -459,21 +526,13 @@ pub const Renderer = struct {
       .new_layout = .depth_attachment_optimal,
       .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
       .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .image = r.sc.depth,
+      .image = if (ms) r.post.ms_depth.image else r.sc.depth,
       .subresource_range = sw.depthRange(),
     }};
     cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
-    const color = [_]vk.RenderingAttachmentInfo{.{
-      .image_view = r.post.hdr.views[0],
-      .image_layout = .color_attachment_optimal,
-      .resolve_mode = .{},
-      .resolve_image_layout = .undefined,
-      .load_op = .clear,
-      .store_op = .store,
-      .clear_value = .{.color = .{.float_32 = .{clear[0], clear[1], clear[2], 1}}},
-    }};
+    const color = [_]vk.RenderingAttachmentInfo{r.post.worldColor(clear)};
     const depth:vk.RenderingAttachmentInfo = .{
-      .image_view = r.sc.depth_view,
+      .image_view = if (ms) r.post.ms_depth.views[0] else r.sc.depth_view,
       .image_layout = .depth_attachment_optimal,
       .resolve_mode = .{},
       .resolve_image_layout = .undefined,

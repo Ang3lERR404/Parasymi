@@ -55,6 +55,11 @@ pub const Desc = struct {
   /// with `blend`: add onto what is there instead of blending over it
   additive:bool = false,
   cull:bool = true,
+  /// samples per pixel of the attachments it draws into (MSAA)
+  samples:vk.SampleCountFlags = .{.@"1" = true},
+  /// with several samples: run the fragment shader for each one (where a
+  /// shader, not the geometry, decides what a fragment draws), if the GPU can
+  per_sample:bool = false,
 };
 
 pub fn layout(c:*const Ctx, push_size:u32) ctx.Error!vk.PipelineLayout {
@@ -94,8 +99,8 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
     .line_width = 1,
   };
   const ms:vk.PipelineMultisampleStateCreateInfo = .{
-    .rasterization_samples = .{.@"1" = true},
-    .sample_shading_enable = .false,
+    .rasterization_samples = d.samples,
+    .sample_shading_enable = if (d.per_sample and c.sample_shading and !d.samples.@"1") .true else .false,
     .min_sample_shading = 1,
     .alpha_to_coverage_enable = .false,
     .alpha_to_one_enable = .false,

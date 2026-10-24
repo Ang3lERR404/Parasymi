@@ -11,11 +11,16 @@ const Allocator = std.mem.Allocator;
 const registry = @import("../core/registry.zig");
 const play = @import("play.zig");
 const prog = @import("progression.zig");
+const opt = @import("options.zig");
 
 /// what a click on the HUD lands on: a research node, a weave recipe, a
-/// belly slot, a hotbar slot, or just a panel (which keeps the click out of
-/// the world beneath it).
-pub const Pick = union(enum) { panel, research:prog.Id, weave:usize, slot:usize, bar:usize };
+/// belly slot, a hotbar slot, a pause menu row, an option, the options
+/// panel's way back, or just a panel (which keeps the click out of the
+/// world beneath it).
+pub const Pick = union(enum) {
+  panel, research:prog.Id, weave:usize, slot:usize, bar:usize,
+  pause:play.PauseRow, option:opt.Setting, back,
+};
 
 /// the research sapling's growth, kept between frames.
 pub const Sapling = panels.research.Sapling;
@@ -61,6 +66,7 @@ const panels = struct {
   pub const tooltip = @import("hud/tooltip.zig");
   pub const carry = @import("hud/carry.zig");
   pub const pause = @import("hud/pause.zig");
+  pub const options = @import("hud/options.zig");
 };
 const reg = registry.Registry(panels);
 

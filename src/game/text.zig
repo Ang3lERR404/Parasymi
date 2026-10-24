@@ -46,7 +46,7 @@ pub const Strings = struct {
     entwine:S = "", hybrid_stirs:S = "", withered:S = "",
     essence_converges:S = "", veil_thins:S = "",
     germinator_weaves:S = "", halo_forms:S = "", diamond_forms:S = "", lattice_stirs:S = "",
-    saved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_fullscreen:S = "",
+    saved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_fullscreen:S = "", options_unsaved:S = "",
   } = .{},
   hud:struct {
     controls:S = "", ingredient:S = "", unknown:S = "",
@@ -59,6 +59,8 @@ pub const Strings = struct {
     bloom:S = "", radiating:S = "", dark:S = "", no_mature:S = "",
     plant:S = "", unknown_yield:S = "", drawing_radiance:S = "", withering:S = "",
     sap:S = "", paused:S = "", pause_keys:S = "", pause_labels:S = "",
+    options_title:S = "", options_hint:S = "", option_labels:S = "",
+    antialias:S = "", toggle:S = "", options_back:S = "",
     free_cam:S = "", free_cam_hint:S = "",
     fps:S = "", sim:S = "", counts:S = "", draws:S = "", pos:S = "", motes:S = "",
   } = .{},
@@ -166,5 +168,10 @@ test "the strings file fills every key, shown with the bound keys" {
   try fill(gpa, @embedFile("parasymi.cfg"));
   try std.testing.expect(std.mem.indexOf(u8, s.msg.night_hint, s.mouse.get(.middle).?) != null);
   try std.testing.expectEqual(count(s.hud.pause_keys), count(s.hud.pause_labels));
+  try std.testing.expectEqual(std.meta.fields(@import("play.zig").PauseRow).len, count(s.hud.pause_labels));
+  const opt = @import("options.zig");
+  try std.testing.expectEqual(std.meta.fields(opt.Setting).len, count(s.hud.option_labels));
+  try std.testing.expectEqual(std.meta.fields(@FieldType(opt.Options, "aa")).len, count(s.hud.antialias));
+  try std.testing.expectEqual(2, count(s.hud.toggle));
   try std.testing.expectEqual(4, count(s.hud.facing));
 }

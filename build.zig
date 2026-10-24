@@ -10,7 +10,7 @@ const shaders = [_][]const u8{
   "part.vert", "part.frag",
   "ui.vert", "ui.frag",
   "sky.vert", "sky.frag",
-  "post.vert", "bloom_down.frag", "bloom_up.frag", "composite.frag",
+  "post.vert", "bloom_down.frag", "bloom_up.frag", "composite.frag", "fxaa.frag",
 };
 /// shaders compiled a second time from the same source with a define,
 /// imported under their own name: (name, source, define). The glass

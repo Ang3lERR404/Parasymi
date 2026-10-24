@@ -46,6 +46,8 @@ pub const Ctx = struct {
   mem_props:vk.PhysicalDeviceMemoryProperties,
   family:u32,
   queue:vk.Queue,
+  /// whether pipelines may shade every sample (MSAA edges a shader decides)
+  sample_shading:bool,
 
   pub fn init(gpa:Allocator, window:*glfw.Window) Error!Ctx {
     var c:Ctx = undefined;
@@ -107,8 +109,11 @@ pub const Ctx = struct {
     const qci = [_]vk.DeviceQueueCreateInfo{.{.queue_family_index = c.family, .queue_count = 1, .p_queue_priorities = &prio}};
     var f13:vk.PhysicalDeviceVulkan13Features = .{.dynamic_rendering = .true, .synchronization_2 = .true, .shader_demote_to_helper_invocation = .true};
     const dev_exts = [_][*:0]const u8{vk.extensions.khr_swapchain.name};
+    c.sample_shading = c.instance.getPhysicalDeviceFeatures(c.pdev).sample_rate_shading == .true;
+    const f10:vk.PhysicalDeviceFeatures = .{.sample_rate_shading = if (c.sample_shading) .true else .false};
     const dev = try c.instance.createDevice(c.pdev, &.{
       .p_next = &f13,
+      .p_enabled_features = &f10,
       .queue_create_info_count = qci.len,
       .p_queue_create_infos = &qci,
       .enabled_extension_count = dev_exts.len,

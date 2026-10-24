@@ -20,7 +20,7 @@ fn pointed(g:*const play.Game) ?items.Item {
   return switch (p) {
     .slot => |i| if (g.holds(.{.slot = i})) null else if (g.player.inv.slot[i]) |it| it.item else null,
     .bar => |i| if (g.holds(.{.bar = i})) null else g.bar[i],
-    .panel, .research, .weave => null,
+    .panel, .research, .weave, .pause, .option, .back => null,
   };
 }
 

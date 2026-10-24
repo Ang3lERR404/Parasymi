@@ -4,7 +4,8 @@
 // then a gentle tone curve: below 0.8 the scene passes untouched (the
 // garden keeps its look), above it highlights roll off softly toward white
 // instead of clipping, so bright light reads as light. A faint vignette
-// draws the eye in. Output is linear (the swapchain encodes sRGB).
+// draws the eye in. Output is linear (the swapchain, or the image FXAA
+// reads, encodes sRGB).
 layout(location = 0) in vec2 v_uv;
 layout(location = 0) out vec4 o;
 layout(set = 0, binding = 0) uniform sampler2D scene;
@@ -28,5 +29,7 @@ void main() {
   c = shoulder(c);
   vec2 d = v_uv - 0.5;
   c *= 1.0 - 0.18 * smoothstep(0.35, 0.85, length(d * vec2(1.2, 1.0)));
-  o = vec4(c, 1.0);
+  // alpha: perceptual luma, for FXAA when it runs after this (the
+  // swapchain is opaque, so it is ignored otherwise)
+  o = vec4(c, sqrt(clamp(dot(c, vec3(0.299, 0.587, 0.114)), 0.0, 1.0)));
 }

@@ -19,6 +19,7 @@ test {
   _ = @import("game/play.zig");
   _ = @import("game/player.zig");
   _ = @import("game/save.zig");
+  _ = @import("game/options.zig");
   _ = @import("gfx/meshgen.zig");
   _ = @import("render/camera.zig");
 }

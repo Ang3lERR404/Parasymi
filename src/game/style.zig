@@ -51,6 +51,8 @@ pub const freecam_glow:C = .{150, 230, 190, 90};
 pub const veil:C = .{4, 6, 10, 200};
 /// pause menu panel membrane
 pub const pause_panel:C = .{24, 30, 40, 235};
+/// a pause menu row or option under the mouse
+pub const menu_hover:C = .{255, 215, 130, 40};
 /// research panel membrane (dark purple)
 pub const research_panel:C = .{26, 18, 44, 225};
 /// research row: completed

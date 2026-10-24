@@ -44,7 +44,7 @@ pub const Action = enum {
   /// close a panel, else pause
   back,
   /// while paused
-  quit,
+  quit, options,
   save, load, fullscreen, debug,
 };
 

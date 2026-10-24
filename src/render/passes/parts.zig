@@ -20,7 +20,7 @@ const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartI
 
 pub const desc:pass.Desc = .{
   .vert = "part.vert", .frag = "part.frag",
-  .bindings = bindings, .attrs = attrs,
+  .bindings = bindings, .attrs = attrs, .per_sample = true,
 };
 
 /// this frame's instances, and where each mesh's run of them starts and how
@@ -69,7 +69,7 @@ pub const glass = struct {
   pub const desc:pass.Desc = .{
     .vert = "part.vert", .frag = "part_glass.frag",
     .bindings = bindings, .attrs = attrs,
-    .blend = true, .depth_write = false,
+    .blend = true, .depth_write = false, .per_sample = true,
   };
   pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
     draw(r, &r.frames[r.fi].pass.parts, cmd, scene, stats, .parts_glass);

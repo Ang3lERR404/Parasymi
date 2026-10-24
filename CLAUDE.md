@@ -32,7 +32,9 @@ the cursor, the next puts it down (empty slot, merge, or swap: sorting by
 hand); dropped on a hotbar slot it assigns that item (any item); a lifted
 hotbar item swaps or, dropped elsewhere, comes off; RMB clears a hotbar
 slot. Hovering a slot shows the item's full name. Tab belly (weave), T research, F3 debug, Esc closes a panel else
-pauses (Q in pause = save and quit), F5 save, F9 load, F11 fullscreen.
+pauses (pause rows are clicked or keyed: Q = save and quit, O = options),
+F5 save, F9 load, F11 fullscreen. Options panel: LMB turns a setting, RMB
+turns it back, Esc/BACK returns to the pause menu.
 Free cam: click to look, WASD fly (Shift fast), Space/Ctrl+Space rise/sink,
 Q/E roll, wheel dolly; eases back in 0.3 s.
 
@@ -280,6 +282,17 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   threshold and anti-firefly weighting, tent filter back up); composite
   adds the glow (0.7), rolls highlights off above 0.8 and a faint vignette;
   `Desc.screen` passes (UI) draw on top. ~0.1 ms.
+- Anti-aliasing (`post.Antialias`: off, fxaa, msaa2/4/8; default msaa4):
+  MSAA draws the world into multisampled colour + depth resolved (average)
+  into the HDR image; plant/part passes (`Desc.per_sample`) shade per
+  sample, since their solid/glass split is per fragment. FXAA (`fxaa.frag`,
+  FXAA 3.11 quality) filters the composite (luma in alpha) before the UI.
+  `Renderer.antialias`/`setVsync` switch at runtime (remake pipelines /
+  swapchain). Release: off 4.1, fxaa 3.9, msaa4 4.35, msaa8 4.9 ms (demo).
+- Options (`game/options.zig`, `hud/options.zig`): AA, vsync, fullscreen,
+  stored in `options.cfg` (gitignored, written by the game when one
+  changes, kept across save loads); main applies `Game.opts` when it
+  differs from what is in effect.
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow, stems
   (`Draw.limb`) and leaves/buds (`Draw.leaf`), seeds (`Draw.grain`) and
   gems (`Draw.gem`); 150 ms anim.
@@ -374,7 +387,8 @@ Done: engine, terrain, streaming, plants + 7 species, ecology, structures,
 footprints/floaters, research (10 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
 planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
-LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation.
+LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation,
+anti-aliasing (MSAA/FXAA) + options panel.
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes
