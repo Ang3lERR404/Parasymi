@@ -247,7 +247,11 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   the grown plant (green fits, red not). Forms (`species.Form`: herb 0,
   coil 1, drift 2, confluence 3, radiant 4): symbiotes (`herb`) flare into
   roots, one vase leaf envelope (`leaf_from` for tree crowns), calyx and two
-  whorls of real petals; vines grow leaves along them. Parasites (`coil`):
+  whorls of real petals; vines grow leaves along them. Offshoots
+  (`meshgen.offshoot`, genome `shoots` = per-variant count range): side
+  stems off the main stem ending in a closed bud or a small bloom (looks
+  only); colour alpha = 1 - how far out along one, and plant.vert folds
+  them in against the stem until growth passes them. Parasites (`coil`):
   alien not hostile, pale pearl/lilac with thin-film sap: twisted 3-strand
   stalk on a bulbous foot, bladders, fronds curling around a bulb.
   Floaters (`drift`): sap float, catcher dish, trailing filaments, slow bob
