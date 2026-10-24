@@ -12,11 +12,13 @@
 //!   completed(*Progression)       anything said or done when it is learned
 //!   veil:f32                      how far it pulls the world-event veil
 //!   reveals:[_]species.Id         species whose yield it makes visible
+//!   study(*Study)                 what it teaches the labs (arsthraxias)
 //! A new technology is one new file plus one line in `techs`.
 const std = @import("std");
 const EnumArray = std.enums.EnumArray;
 const copyBackwards = std.mem.copyBackwards;
 const testing = std.testing;
+const m = @import("../core/math.zig");
 const registry = @import("../core/registry.zig");
 const species = @import("../sim/species.zig");
 const ecology = @import("../sim/ecology.zig");
@@ -35,6 +37,10 @@ const techs = struct {
   pub const thinning_veil = @import("research/thinning_veil.zig");
   pub const convergence_theory = @import("research/convergence_theory.zig");
   pub const celestial_defragmentation = @import("research/celestial_defragmentation.zig");
+  pub const arsthraxia = @import("research/arsthraxia.zig");
+  pub const sap_satellites = @import("research/sap_satellites.zig");
+  pub const condensing_whorl = @import("research/condensing_whorl.zig");
+  pub const lattice_of_thought = @import("research/lattice_of_thought.zig");
 };
 const reg = registry.Registry(techs);
 
@@ -72,12 +78,41 @@ const yield_gate = blk: {
   break :blk gate;
 };
 
-/// working state of one research structure.
-pub const Lab = struct {
-  /// a unit's ingredients have been consumed and are being worked.
-  busy:bool = false,
-  t:f32 = 0,
+/// what research has taught the labs, summed over what is known (`study`
+/// hooks).
+pub const Study = struct {
+  /// how fast a lab condenses a unit by itself, unfed, as a share of the
+  /// pace it works one it has eaten the ingredients of
+  unfed:f32 = UNFED,
+  /// how fast it works, fed or not
   speed:f32 = 1,
+  /// how many times the labs have grown (each an offshoot, a satellite)
+  growth:u32 = 0,
+};
+/// a lab condenses this share of its fed pace unfed, knowing nothing yet
+const UNFED:f32 = 0.2;
+/// one growth of the labs (a minor study along Arsthraxia)
+const FLOURISH_UNFED:f32 = 0.1;
+pub fn flourish(s:*Study) void {
+  s.growth += 1;
+  s.unfed += FLOURISH_UNFED;
+}
+
+/// working state of one research structure: the unit it condenses.
+pub const Lab = struct {
+  /// how far along the unit is (0..1)
+  t:f32 = 0,
+  /// its ingredients have been eaten: it goes at the full pace
+  fed:bool = false,
+  /// it is condensing (a study is chosen)
+  active:bool = false,
+
+  /// share of the current study it adds a second (0..1)
+  pub fn pace(lab:*const Lab, g:*const Progression, s:Study) f32 {
+    const id = g.current orelse return 0;
+    const r = tree.get(id);
+    return (if (lab.fed) @as(f32, 1) else s.unfed) * s.speed / (r.unit_time * m.f(r.units));
+  }
 };
 
 const LOG_LEN = 6;
@@ -110,10 +145,10 @@ pub const Progression = struct {
   /// `tpl` is a runtime template (`core/text.zig`), usually `txt.s.msg.*`.
   pub fn say(g:*Progression, tpl:[]const u8, args:anytype) void {
     copyBackwards(Message, g.log[1..], g.log[0 .. g.log.len - 1]);
-    const m = &g.log[0];
-    m.* = .{};
+    const msg = &g.log[0];
+    msg.* = .{};
     // if the message is too long it silently truncates to the buffer size
-    m.len = ctext.bufRender(&m.buf, tpl, args).len;
+    msg.len = ctext.bufRender(&msg.buf, tpl, args).len;
   }
 
   pub fn status(g:*const Progression, id:Id) Status {
@@ -133,24 +168,42 @@ pub const Progression = struct {
     }
   }
 
-  /// advance one research structure. `inv` is the structure's own inventory.
-  pub fn labTick(g:*Progression, lab:*Lab, inv:items.Bag, dt:f32) void {
-    const id = g.current orelse return;
-    const r = tree.get(id);
-    if (!lab.busy) {
-      for (r.per_unit) |ing| if (inv.count(ing.item) < ing.n) return;
-      for (r.per_unit) |ing| _ = inv.take(ing.item, ing.n);
-      lab.busy = true;
-      lab.t = 0;
+  /// what the labs have been taught, from everything known.
+  pub fn study(g:*const Progression) Study {
+    var s:Study = .{};
+    inline for (reg.ids) |id| {
+      if (comptime reg.has(id, "study")) if (g.done.contains(id)) reg.module(id).study(&s);
     }
-    lab.t += dt * lab.speed;
-    if (lab.t < r.unit_time) return;
-    lab.busy = false;
+    return s;
+  }
+
+  /// advance one research structure. `inv` is the structure's own
+  /// inventory: it eats a unit's ingredients from it when it has them and
+  /// works the unit at full pace, else condenses it by itself at
+  /// `Study.unfed` of that. Returns whether it finished a unit.
+  pub fn labTick(g:*Progression, lab:*Lab, inv:items.Bag, s:Study, dt:f32) bool {
+    const id = g.current orelse {
+      lab.active = false;
+      return false;
+    };
+    const r = tree.get(id);
+    if (!lab.fed) feed: {
+      for (r.per_unit) |ing| if (inv.count(ing.item) < ing.n) break :feed;
+      for (r.per_unit) |ing| _ = inv.take(ing.item, ing.n);
+      lab.fed = true;
+    }
+    const rate = (if (lab.fed) @as(f32, 1) else s.unfed) * s.speed;
+    lab.active = rate > 0;
+    lab.t += dt * rate / r.unit_time;
+    if (lab.t < 1) return false;
+    lab.t = 0;
+    lab.fed = false;
     // another lab may have finished it while this unit was in progress
-    if (g.done.contains(id)) return;
+    if (g.done.contains(id)) return false;
     const p = g.progress.getPtr(id);
     p.* += 1;
     if (p.* >= r.units) g.complete(id);
+    return true;
   }
 
   fn complete(g:*Progression, id:Id) void {
@@ -190,11 +243,11 @@ pub const Progression = struct {
 
   /// the living world as shaped by everything learned so far.
   pub fn mods(g:*const Progression) ecology.Mods {
-    var m:ecology.Mods = .{};
+    var md:ecology.Mods = .{};
     inline for (reg.ids) |id| {
-      if (comptime reg.has(id, "apply")) if (g.done.contains(id)) reg.module(id).apply(&m);
+      if (comptime reg.has(id, "apply")) if (g.done.contains(id)) reg.module(id).apply(&md);
     }
-    return m;
+    return md;
   }
 
   /// where the world-event veil is heading, from what has been learned.
@@ -215,7 +268,7 @@ pub const Progression = struct {
       g.died_t = 0;
     }
     g.veil += (g.veilTarget() - g.veil) * @min(1, dt * VEIL_EASE);
-    for (&g.log) |*m| m.age += dt;
+    for (&g.log) |*msg| msg.age += dt;
   }
 };
 
@@ -223,16 +276,18 @@ test "labs consume ingredients unit by unit" {
   var g:Progression = .{};
   var lab:Lab = .{};
   var inv:items.Inventory(8) = .{};
+  // labs that condense nothing unfed only work what they are fed
+  const fed_only:Study = .{ .unfed = 0 };
   g.select(.seed_splicing);
   try testing.expect(g.current == null); // locked
   g.select(.ley_sight);
   try testing.expect(g.current == .ley_sight);
   // no ingredients: nothing happens
-  g.labTick(&lab, inv.bag(), 10);
-  try testing.expect(!lab.busy);
+  _ = g.labTick(&lab, inv.bag(), fed_only, 10);
+  try testing.expect(!lab.fed and lab.t == 0);
   _ = inv.add(.starlight, 20);
   var t:f32 = 0;
-  while (t < 60) : (t += 0.1) g.labTick(&lab, inv.bag(), 0.1);
+  while (t < 60) : (t += 0.1) _ = g.labTick(&lab, inv.bag(), fed_only, 0.1);
   try testing.expect(g.done.contains(.ley_sight));
   try testing.expectEqual(@as(u32, 10), inv.count(.starlight));
   try testing.expect(g.current == null);
@@ -247,4 +302,25 @@ test "labs consume ingredients unit by unit" {
   try testing.expect(g.status(.convergence_theory) == .open);
   g.done.insert(.convergence_theory);
   try testing.expect(g.yieldKnown(.confluence));
+}
+
+test "an unfed lab condenses research by itself, faster along Arsthraxia" {
+  var g:Progression = .{};
+  var lab:Lab = .{};
+  var inv:items.Inventory(8) = .{};
+  g.select(.ley_sight);
+  const r = tree.get(.ley_sight);
+  // a fifth of the fed pace: one unit takes five unit times
+  var s = g.study();
+  try testing.expectApproxEqAbs(UNFED, s.unfed, 1e-6);
+  var t:f32 = 0;
+  while (t < r.unit_time * 5 + 0.05) : (t += 0.1) _ = g.labTick(&lab, inv.bag(), s, 0.1);
+  try testing.expectEqual(@as(u32, 1), g.progress.get(.ley_sight));
+  try testing.expect(lab.active and !lab.fed);
+  // the line quickens it and grows the labs once per minor study
+  for ([_]Id{ .arsthraxia, .sap_satellites, .condensing_whorl }) |id| g.done.insert(id);
+  s = g.study();
+  try testing.expectEqual(@as(u32, 2), s.growth);
+  try testing.expect(s.unfed > UNFED + 0.35 and s.speed > 1);
+  try testing.expect(lab.pace(&g, s) > lab.pace(&g, .{}));
 }

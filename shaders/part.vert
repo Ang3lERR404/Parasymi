@@ -71,6 +71,9 @@ const float CORE_RUN_RATE = 2.6;
 // a stream of essence poured into a germinator's core: how far it ripples
 // off its fall at the bottom
 const float POUR_RIPPLE = 0.012;
+// research energy's core quivers by this share of its size, more as it flares
+const float ENERGY_QUIVER = 0.04;
+const float ENERGY_QUIVER_FLARE = 0.12;
 // the roles that are a structure's foliage (leaves, an ear): they unfold as
 // it grows and breathe and lift in the wind
 const uint FOLIAGE = PART_BIT(PART_LEAF) | PART_BIT(PART_EAR);
@@ -183,6 +186,13 @@ void main() {
     p.z += POUR_RIPPLE * 0.7 * k * sin(k * 10.0 - t * 7.0 + ip.z * 17.0);
   }
 
+  // research energy condensing in an arsthraxia's core (matrix-placed;
+  // its wisps are curves): it quivers, a smooth field of its rest position
+  // so shared vertices move alike, harder as it flares (flutter)
+  if (part == PART_ENERGY && mode == PLACE_MATRIX) {
+    float q = sin(t * 6.3 + dot(pos, vec3(5.0, 7.0, 3.0)) + ip.z * TAU) * sin(t * 4.1 - dot(pos, vec3(3.0, -4.0, 6.0)));
+    p *= 1.0 + (ENERGY_QUIVER + ENERGY_QUIVER_FLARE * ip.y) * q;
+  }
   vec4 w;
   vec3 wn;
   float twinkle = 1.0;
@@ -296,9 +306,9 @@ void main() {
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * PULSE_RATE - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == PART_BLOOM || part == PART_THREAD) ? 1.0 : DIM_GLOW) * pulse * twinkle;
-  // a flash and a halo's projection shine as bright as their glow, never
-  // pulsing; a prism has no light of its own
-  if (part == PART_FLASH || part == PART_PROJECTION) v_glow = ip.x;
+  // a flash, a halo's projection and research energy shine as bright as
+  // their glow, never pulsing; a prism has no light of its own
+  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY) v_glow = ip.x;
   // the ring: an arc is as bright as the points at its ends (tint holds
   // the four points' light, east, south, west, north; tu.x its angle)
   if (part == PART_HALO) {

@@ -12,7 +12,7 @@ pub const Item = enum(u8) {
   convergence_essence,
   seed_lumenroot, seed_thornleech, seed_vesper, seed_driftwisp, seed_hollowheart,
   // structure bulbs: woven, then planted to grow a structure
-  conduit, sap_cache, germinator, research_bloom, root_digger,
+  conduit, sap_cache, germinator, arsthraxia, root_digger,
   // later additions go last, so stored item ids never shift
   seed_bloom, polyp, diamond,
 
@@ -42,7 +42,7 @@ const infos = EnumArray(Item, Info).init(.{
   .conduit = .{.col = .{150, 120, 80, 255}},
   .sap_cache = .{.col = .{210, 160, 70, 255}},
   .germinator = .{.col = .{140, 220, 140, 255}},
-  .research_bloom = .{.col = .{200, 150, 255, 255}},
+  .arsthraxia = .{.col = .{200, 150, 255, 255}},
   .root_digger = .{.col = .{190, 140, 90, 255}},
   .seed_bloom = .{.col = .{140, 255, 215, 255}},
   .polyp = .{.col = .{235, 205, 230, 255}},

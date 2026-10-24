@@ -77,13 +77,14 @@ const float SHEEN_POWER = 40.0;
 #define PART_PROJECTION 12 // the rays that make the ring
 #define PART_CORE 13      // a conduit's core
 #define PART_ESSENCE 14   // liquid essence a germinator pours, spins and winds
+#define PART_ENERGY 15    // research energy an arsthraxia condenses
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))
 #define PART_IN(set, p) ((((set) >> uint(p)) & 1u) != 0u)
 // the roles that are light itself: they cast no shadow (part.vert SHADOW)
 // and are not lit by the key light (part.frag)
-const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION);
+const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY);
 // the roles that are a plant's leaves and petals (plant.vert, plant.frag):
 // they unfurl as it grows, lift in the gusts, always read as thin and show
 // no fibres

@@ -25,12 +25,12 @@ pub const Terrain = extern struct {
 /// conduit's living core. `essence`: liquid essence a germinator pours,
 /// spins and winds into a seed (its colour the instance's, tu.x the way it
 /// flows, < 0 still).
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection, core, essence };
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection, core, essence, energy };
 
 /// roles a library part may draw see-through (part.frag)
 pub fn seeThrough(p:Part) bool {
   return switch (p) {
-    .bloom, .ear, .resin, .shadow, .thread, .flash, .halo, .projection => true,
+    .bloom, .ear, .resin, .shadow, .thread, .flash, .halo, .projection, .energy => true,
     .stem, .leaf, .thorn, .tendril, .prism, .core, .essence => false,
   };
 }

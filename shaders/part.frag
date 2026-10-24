@@ -40,6 +40,19 @@ const vec3 GROUND_SHADOW = vec3(0.015, 0.015, 0.025);
 const float GROUND_SHADOW_FALLOFF = 1.6;
 // a flash's burst: a warm white
 const vec3 FLASH_WHITE = vec3(1.0, 0.97, 0.9);
+// research energy: deep violet, white-gold at its heart; its core's
+// filaments (how many arms, how far they wind in from the rim, how fast),
+// its rings closing in (how many, how fast), a wisp's pulses (how many
+// along it, how fast they run into the core)
+const vec3 ENERGY_DEEP = vec3(0.32, 0.14, 0.95);
+const vec3 ENERGY_HEART = vec3(1.0, 0.86, 0.62);
+const float ENERGY_ARMS = 3.0;
+const float ENERGY_WIND = 7.0;
+const float ENERGY_SPIN = 2.6;
+const float ENERGY_RINGS = 14.0;
+const float ENERGY_CLOSE = 5.0;
+const float ENERGY_PULSES = 3.0;
+const float ENERGY_RUN = 8.0;
 // the halo's projection: how many rays it has round it
 const float RAYS = 40.0;
 // the roles thin enough for light from behind to shine through (leaves,
@@ -130,6 +143,41 @@ void surface() {
     c = (film * haze * 0.25 + rays * 0.9 + mix(mc, vec3(m), 0.35) * 2.5) * (0.12 + 0.88 * lit);
     float a = clamp(haze * 0.18 + ray_a * 0.45 + m, 0.0, 1.0);
     o = vec4(applyFog(c, v_pos), a * ends * (0.3 + 0.7 * lit));
+    return;
+  }
+  if (part == PART_ENERGY) {
+    // research energy an arsthraxia condenses: light itself, deep violet
+    // going white-gold at its heart (v_glow how bright; v_fade how far
+    // the unit has condensed 0..1; v_aux a flare as it is done, fading).
+    // Its core (v_t < 0): a dense heart face-on, filaments of light
+    // winding in from the rim toward it and rings of it closing in on it.
+    // A wisp (v_t 0 at the satellite .. 1 at the core): a soft thread
+    // whose pulses run into the core, brightening as they near it.
+    if (dot(raw, V) < 0.0) discard;
+    float t = pc.eye_time.w;
+    float ndv = clamp(dot(raw, V), 0.0, 1.0);
+    float rim = 1.0 - ndv;
+    float a;
+    if (v_t < 0.0) {
+      float dense = clamp(v_fade, 0.0, 1.0);
+      vec3 d = normalize(v_obj);
+      float around = atan(d.z, d.x);
+      float wind = around * ENERGY_ARMS + rim * ENERGY_WIND + t * ENERGY_SPIN + v_phase * TAU + 1.5 * sin(d.y * 4.0 + t * 0.7);
+      float fil = pow(0.5 + 0.5 * sin(wind), 8.0) * rim;
+      float rings = pow(0.5 + 0.5 * sin(rim * ENERGY_RINGS + t * ENERGY_CLOSE), 6.0) * rim;
+      float heart = pow(ndv, 3.0);
+      vec3 col = mix(ENERGY_DEEP, ENERGY_HEART, heart * (0.35 + 0.65 * dense) + v_aux * 0.5);
+      c = col * (heart * (0.6 + 1.4 * dense) + fil * 0.9 + rings * 0.55 + v_aux * 1.6) * v_glow;
+      a = clamp(heart * (0.3 + 0.65 * dense) + fil * 0.55 + rings * 0.35 + v_aux * 0.5, 0.0, 1.0);
+    } else {
+      float run = pow(0.5 + 0.5 * sin(v_t * TAU * ENERGY_PULSES - t * ENERGY_RUN + v_phase * TAU), 4.0);
+      float body = pow(ndv, 1.5);
+      float ends = smoothstep(0.0, 0.15, v_t) * smoothstep(1.0, 0.8, v_t);
+      vec3 col = mix(ENERGY_DEEP, ENERGY_HEART, 0.2 + 0.5 * v_t * run);
+      c = col * body * (0.25 + 1.3 * run) * (0.5 + 0.5 * v_t) * v_glow;
+      a = clamp(body * (0.15 + 0.75 * run), 0.0, 1.0) * ends * clamp(v_fade, 0.0, 1.0);
+    }
+    o = vec4(applyFog(c, v_pos), a);
     return;
   }
   if (part == PART_FLASH) {

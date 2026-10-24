@@ -51,7 +51,7 @@ pub const Strings = struct {
     lineages_strain:S = "", confluence_roots:S = "",
     researching:S = "", already_known:S = "", locked:S = "", researched:S = "",
     entwine:S = "", hybrid_stirs:S = "", withered:S = "",
-    essence_converges:S = "", veil_thins:S = "",
+    essence_converges:S = "", veil_thins:S = "", arsthraxia_grows:S = "",
     germinator_weaves:S = "", halo_forms:S = "", diamond_forms:S = "", lattice_stirs:S = "",
     saved:S = "", autosaved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_gardens:S = "",
     no_fullscreen:S = "", options_unsaved:S = "",

@@ -18,6 +18,8 @@
 //!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
 //!   field(s) ?Field             a field of celestial energy it holds
 //!   hold(s, x, y) ?Hold         how it draws the floater at a tile toward itself
+//!   size(s) f32                 how much larger than its mesh it has grown
+//!                               (by research), its growing in aside
 //!   icon(ic, col)               its bulb in the HUD: the seed (`ic.coat`) and a
 //!                               sprout or two showing what it does (`icon.zig`)
 //! Missing hooks fall back to doing nothing. A new structure is one new file
@@ -45,7 +47,7 @@ const kinds = struct {
   pub const conduit = @import("structures/conduit.zig");
   pub const sap_cache = @import("structures/sap_cache.zig");
   pub const germinator = @import("structures/germinator.zig");
-  pub const research_bloom = @import("structures/research_bloom.zig");
+  pub const arsthraxia = @import("structures/arsthraxia.zig");
   pub const root_digger = @import("structures/root_digger.zig");
   pub const polyp = @import("structures/polyp.zig");
   pub const diamond = @import("structures/diamond.zig");
@@ -129,10 +131,16 @@ pub const Structure = struct {
   pub fn kind(s:*const Structure) Kind { return activeTag(s.state); }
   /// how big a growing structure is drawn: it shoots up from the ground
   /// first and fills out after, as the plants do
+  /// (and at the size research has grown it to, `size`)
   pub fn grownScale(s:*const Structure) m.V3 {
     const up = m.smooth(m.clamp01(s.grown * SHOOT));
     const out = m.smooth(s.grown);
-    return m.v3(m.lerp(SPROUT_W, 1, out), m.lerp(SPROUT_H, 1, up), m.lerp(SPROUT_W, 1, out));
+    return m.v3(m.lerp(SPROUT_W, 1, out), m.lerp(SPROUT_H, 1, up), m.lerp(SPROUT_W, 1, out)) * m.splat3(s.size());
+  }
+  pub fn size(s:*const Structure) f32 {
+    return switch (s.kind()) {
+      inline else => |k| if (comptime reg.has(k, "size")) reg.module(k).size(s) else 1,
+    };
   }
   pub fn def(s:*const Structure) Def { return defs.get(s.kind()); }
   /// where its mesh is drawn from, at its centre `ctr`: turned its way,

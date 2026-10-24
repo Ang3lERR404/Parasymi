@@ -48,8 +48,12 @@ const parts = struct {
   pub const germinator_winding = @import("meshes/germinator.zig").winding;
   // (see-through: blends over what spins inside it)
   pub const germinator_core = @import("meshes/germinator.zig").core;
-  pub const research_bloom = @import("meshes/research_bloom.zig");
-  pub const research_orb = @import("meshes/research_bloom.zig").orb;
+  pub const arsthraxia = @import("meshes/arsthraxia.zig");
+  pub const arsthraxia_shoot = @import("meshes/arsthraxia.zig").shoot;
+  pub const arsthraxia_satellite = @import("meshes/arsthraxia.zig").satellite;
+  // (light: blends over the satellites spinning round it)
+  pub const arsthraxia_core = @import("meshes/arsthraxia.zig").core;
+  pub const arsthraxia_wisp = @import("meshes/arsthraxia.zig").wisp;
   pub const item_pod = @import("meshes/item_pod.zig");
   pub const root_digger = @import("meshes/root_digger.zig");
   pub const digger_root = @import("meshes/root_digger.zig").root;

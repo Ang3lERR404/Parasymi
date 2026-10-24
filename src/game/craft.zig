@@ -39,7 +39,7 @@ pub const hand = [_]Recipe{
   .{ .out = .sap_cache, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .grit, .n = 4 } }, .time = 2 },
   // no essence: nothing yields it until the germinator has woven a seed
   .{ .out = .germinator, .in = &.{ .{ .item = .fibre, .n = 6 }, .{ .item = .grit, .n = 4 }, .{ .item = .starlight, .n = 2 } }, .time = 3 },
-  .{ .out = .research_bloom, .in = &.{ .{ .item = .fibre, .n = 8 }, .{ .item = .grit, .n = 6 }, .{ .item = .essence, .n = 4 }, .{ .item = .starlight, .n = 4 }, .{ .item = .ley_shard, .n = 2 } }, .time = 4 },
+  .{ .out = .arsthraxia, .in = &.{ .{ .item = .fibre, .n = 8 }, .{ .item = .grit, .n = 6 }, .{ .item = .essence, .n = 4 }, .{ .item = .starlight, .n = 4 }, .{ .item = .ley_shard, .n = 2 } }, .time = 4 },
   .{ .out = .root_digger, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2, .needs = .deep_rooting },
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
   .{ .out = .polyp, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 2 } }, .time = 3 },

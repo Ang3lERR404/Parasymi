@@ -28,7 +28,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   }
   // a lumenroot harvested by conduits into a cache, a germinator and research
   // bloom already fed, the new plant forms around
-  for ([_]prog.Id{ .ley_sight, .drift_spores, .root_communion, .canopy_weaving }) |id| g.prog.done.insert(id);
+  for ([_]prog.Id{ .ley_sight, .drift_spores, .root_communion, .canopy_weaving, .arsthraxia, .sap_satellites, .condensing_whorl }) |id| g.prog.done.insert(id);
   _ = try g.structs.place(g.gpa, &g.world, cx - 2, cz - 3, .conduit, 0, 0.1);
   _ = try g.structs.place(g.gpa, &g.world, cx - 1, cz - 3, .conduit, 0, 0.2);
   _ = try g.structs.place(g.gpa, &g.world, cx, cz - 3, .sap_cache, 0, 0.3);
@@ -37,7 +37,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
     _ = g.structs.insert(&g.prog, j, .fibre, 20);
     _ = g.structs.insert(&g.prog, j, .starlight, 20);
   }
-  if (try g.structs.place(g.gpa, &g.world, cx + 1, cz + 5, .research_bloom, 0, 0.5)) {
+  if (try g.structs.place(g.gpa, &g.world, cx + 1, cz + 5, .arsthraxia, 0, 0.5)) {
     g.prog.select(.hungering_tendrils);
     const j = g.structs.at(&g.world, cx + 1, cz + 5).?;
     _ = g.structs.insert(&g.prog, j, .essence, 20);
@@ -57,7 +57,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   // fed for a while: all its cups pour
   if (g.structs.at(&g.world, cx - 2, cz + 5)) |j| {
     const r = for (craft.all) |r| {
-      if (craft.hand[r].out == .research_bloom) break r;
+      if (craft.hand[r].out == .arsthraxia) break r;
     } else unreachable;
     st.choose(g.structs.get(j), &g.prog, r);
     for (craft.hand[r].in) |ing| _ = g.structs.insert(&g.prog, j, ing.item, items.STACK);
