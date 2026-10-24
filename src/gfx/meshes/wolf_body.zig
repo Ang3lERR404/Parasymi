@@ -337,28 +337,37 @@ fn furLeaf(b:*mg.Builder, s:*const sculpt.Sculpt, guess:V3, along:V3, len:f32, w
 fn fur(b:*mg.Builder, s:*const sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
   var rng = pal.rngFor("wolf_fur");
   const head = w[bi(.head)];
-  const back = dir(head, v3(0, -0.25, -1));
-  // hair: staggered rows of leaves from just behind the brow back over
-  // the crown (narrow between the ears, widening behind them), lying back
-  // and lengthening toward the nape, wrapping it in a ruff over the neck
-  const rows = [_]struct { z:f32, a0:f32, a1:f32, n:u32, len:f32 }{
-    .{ .z = 0.04, .a0 = 1.25, .a1 = 1.89, .n = 3, .len = 0.042 },
-    .{ .z = 0.022, .a0 = 1.15, .a1 = 1.99, .n = 4, .len = 0.046 },
-    .{ .z = 0.004, .a0 = 1.1, .a1 = 2.04, .n = 5, .len = 0.05 },
-    .{ .z = -0.014, .a0 = 0.95, .a1 = 2.19, .n = 6, .len = 0.054 },
-    .{ .z = -0.032, .a0 = 0.7, .a1 = 2.44, .n = 7, .len = 0.058 },
-    .{ .z = -0.05, .a0 = 0.4, .a1 = 2.74, .n = 8, .len = 0.064 },
-    .{ .z = -0.068, .a0 = 0.1, .a1 = 3.04, .n = 10, .len = 0.07 },
-    .{ .z = -0.086, .a0 = -0.3, .a1 = 3.44, .n = 11, .len = 0.076 },
-    .{ .z = -0.1, .a0 = -0.7, .a1 = 3.84, .n = 12, .len = 0.082 },
-    .{.z = 0.8,.a0 = 1.1,.a1 = 3.94,.n = 13,.len = 0.12}
+  // hair: staggered rows of leaves over the head. Each row: how far along
+  // the head it roots (`z`, metres in the head's frame: + toward the nose,
+  // the brow is at 0.058, the back of the skull at -0.1), the arc of it
+  // round the skull (`a0`..`a1`, radians: pi/2 the crown, 0 and pi the
+  // sides), how many leaves, how long, and the way they lie (`lie`, in the
+  // head's frame: +z forward, -z back, -y down). Rows behind the brow lie
+  // back and lengthen toward the nape into a ruff; the fringe at the front
+  // falls forward over the brow, and side locks forward past the temples.
+  const back_lie = v3(0, -0.45, -1);
+  const rows = [_]struct { z:f32, a0:f32, a1:f32, n:u32, len:f32, lie:V3, lift:f32 = 0.4 }{
+    // the fringe, falling forward and down over the brow
+    .{ .z = 0.05, .a0 = 1.2, .a1 = 1.94, .n = 4, .len = 0.07, .lie = v3(0, -0.4, 1), .lift = 0.8 },
+    .{ .z = 0.03, .a0 = 1.05, .a1 = 2.09, .n = 5, .len = 0.08, .lie = v3(0, -0.3, 1), .lift = 0.85 },
+    // side locks, falling forward past the temples in front of the ears
+    .{ .z = 0.02, .a0 = 0.55, .a1 = 0.85, .n = 2, .len = 0.065, .lie = v3(0.25, -0.8, 0.8), .lift = 0.45 },
+    .{ .z = 0.02, .a0 = 2.29, .a1 = 2.59, .n = 2, .len = 0.065, .lie = v3(-0.25, -0.8, 0.8), .lift = 0.45 },
+    // the crown, lying back toward the nape
+    .{ .z = 0.004, .a0 = 1.1, .a1 = 2.04, .n = 5, .len = 0.05, .lie = back_lie },
+    .{ .z = -0.014, .a0 = 0.95, .a1 = 2.19, .n = 6, .len = 0.054, .lie = back_lie },
+    .{ .z = -0.032, .a0 = 0.7, .a1 = 2.44, .n = 7, .len = 0.058, .lie = back_lie },
+    .{ .z = -0.05, .a0 = 0.4, .a1 = 2.74, .n = 8, .len = 0.064, .lie = back_lie },
+    .{ .z = -0.068, .a0 = 0.1, .a1 = 3.04, .n = 10, .len = 0.07, .lie = back_lie },
+    .{ .z = -0.086, .a0 = -0.3, .a1 = 3.44, .n = 11, .len = 0.076, .lie = back_lie },
+    .{ .z = -0.1, .a0 = -0.7, .a1 = 3.84, .n = 12, .len = 0.082, .lie = back_lie },
   };
   for (rows, 0..) |row, ri| {
     for (0..row.n) |i| {
       const stagger:f32 = if (ri % 2 == 0) 0.5 else 0.25;
       const a = m.lerp(row.a0, row.a1, (m.f(i) + stagger) / m.f(row.n)) + rng.range(-0.05, 0.05);
       const guess = xf(head, v3(@cos(a) * 0.1, 0.04 + @sin(a) * 0.1, row.z));
-      try furLeaf(b, s, guess, back + v3(0, -0.2, 0), row.len * rng.range(0.85, 1.1), 0.017 * rng.range(0.9, 1.1), 0.4, 0.5);
+      try furLeaf(b, s, guess, dir(head, row.lie), row.len * rng.range(0.85, 1.1), 0.017 * rng.range(0.9, 1.1), row.lift, 0.5);
     }
   }
   // a forelock between the ears: a few longer leaves rising off the brow
