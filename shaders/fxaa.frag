@@ -1,4 +1,6 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "post.glsl"
 
 // FXAA (the quality path of Lottes' FXAA 3.11), on the tone-mapped scene
 // before the UI goes over it. The composite left each pixel's perceptual
@@ -7,14 +9,7 @@
 // sample across it by how near the pixel is to the closer end, so stair
 // steps blend into a line; a sub-pixel term softens what falls between
 // pixels (thin stalks, grass tips, motes) so it no longer crawls.
-layout(location = 0) in vec2 v_uv;
-layout(location = 0) out vec4 o;
 layout(set = 0, binding = 0) uniform sampler2D scene;
-layout(push_constant) uniform Push {
-  vec2 texel;
-  float threshold;
-  float intensity;
-} pc;
 
 // darkest contrast worth smoothing, and contrast needed relative to the
 // brightest neighbour

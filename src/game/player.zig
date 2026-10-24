@@ -663,8 +663,7 @@ pub const Player = struct {
       for (body_mesh.TOES) |tp| {
         try out.emit(.paw_bean, m.chain(&.{ foot, T(v3(tp[0], body_mesh.SOLE_Y + 0.002, tp[1])), S(v3(0.0065, 0.004, 0.008)) }), bean);
       }
-      const c = m.mulV(foot, .{ 0, 0, 0.04, 1 });
-      feet[s] = v3(c[0], c[1], c[2]);
+      feet[s] = m.mulPoint(foot, v3(0, 0, 0.04));
     }
     return feet;
   }

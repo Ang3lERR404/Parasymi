@@ -102,12 +102,7 @@ pub const Swapchain = struct {
       .sharing_mode = .exclusive,
       .initial_layout = .undefined,
     }, null);
-    const req = c.device.getImageMemoryRequirements(s.depth);
-    s.depth_mem = try c.device.allocateMemory(&.{
-      .allocation_size = req.size,
-      .memory_type_index = try c.memType(req.memory_type_bits, .{.device_local = true}),
-    }, null);
-    try c.device.bindImageMemory(s.depth, s.depth_mem, 0);
+    s.depth_mem = try c.imageMemory(s.depth);
     s.depth_view = try c.device.createImageView(&.{
       .image = s.depth,
       .view_type = .@"2d",
@@ -136,4 +131,22 @@ pub fn colorRange() vk.ImageSubresourceRange {
 }
 pub fn depthRange() vk.ImageSubresourceRange {
   return .{.aspect_mask = .{.depth = true}, .base_mip_level = 0, .level_count = 1, .base_array_layer = 0, .layer_count = 1};
+}
+
+/// move `range` of `image` from layout `old` to `new`, once what `src_*`
+/// names is done and before what `dst_*` names begins.
+pub fn barrier(cmd:vk.CommandBufferProxy, image:vk.Image, range:vk.ImageSubresourceRange, old:vk.ImageLayout, new:vk.ImageLayout, src_stage:vk.PipelineStageFlags2, src_access:vk.AccessFlags2, dst_stage:vk.PipelineStageFlags2, dst_access:vk.AccessFlags2) void {
+  const b = [_]vk.ImageMemoryBarrier2{.{
+    .src_stage_mask = src_stage,
+    .src_access_mask = src_access,
+    .dst_stage_mask = dst_stage,
+    .dst_access_mask = dst_access,
+    .old_layout = old,
+    .new_layout = new,
+    .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+    .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
+    .image = image,
+    .subresource_range = range,
+  }};
+  cmd.pipelineBarrier2(&.{.image_memory_barrier_count = b.len, .p_image_memory_barriers = &b});
 }

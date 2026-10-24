@@ -177,6 +177,18 @@ pub const Ctx = struct {
     return error.NoMemoryType;
   }
 
+  /// device-local memory allocated for `image` and bound to it.
+  pub fn imageMemory(c:*const Ctx, image:vk.Image) Error!vk.DeviceMemory {
+    const req = c.device.getImageMemoryRequirements(image);
+    const mem = c.device.allocateMemory(&.{
+      .allocation_size = req.size,
+      .memory_type_index = try c.memType(req.memory_type_bits, .{.device_local = true}),
+    }, null) catch |e| return fold(e);
+    errdefer c.device.freeMemory(mem, null);
+    c.device.bindImageMemory(image, mem, 0) catch |e| return fold(e);
+    return mem;
+  }
+
   /// `name` is a build-time compiled shader (see build.zig `shaders`).
   pub fn shader(c:*const Ctx, comptime name:[]const u8) Error!vk.ShaderModule {
     const words = comptime blk: {

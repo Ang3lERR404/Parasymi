@@ -103,8 +103,7 @@ pub const Builder = struct {
   pub fn xform(b:*Builder, start:usize, mat:m.M4) void {
     const nm = m.inverse(mat); // normals use the inverse-transpose
     for (b.v.items[start..]) |*v| {
-      const p = m.mulV(mat, .{v.pos[0], v.pos[1], v.pos[2], 1});
-      v.pos = .{p[0], p[1], p[2]};
+      v.pos = m.mulPoint(mat, v.pos);
       const n:m.V3 = .{
         nm[0][0] * v.nrm[0] + nm[0][1] * v.nrm[1] + nm[0][2] * v.nrm[2],
         nm[1][0] * v.nrm[0] + nm[1][1] * v.nrm[1] + nm[1][2] * v.nrm[2],

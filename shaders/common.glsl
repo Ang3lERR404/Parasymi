@@ -114,6 +114,28 @@ float fibreSheen(vec3 tgrad, float tl, vec3 n, vec3 H) {
   float th = dot(T, H);
   return pow(sqrt(max(1.0 - th * th, 0.0)), SHEEN_POWER);
 }
+// that sheen as light on a woven body (`base`, its sheen tinted toward
+// `light`), `k` of it, on faces toward the key light (`sh` of it reaching
+// them), fading where the fibres are too fine to see (tl small)
+vec3 fibreLight(vec3 base, vec3 light, vec3 tgrad, float tl, vec3 n, vec3 V, float k, float sh) {
+  float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
+  return mix(base, light, 0.5) * sheen * smoothstep(0.0, 0.3, dot(n, SUN)) * k * smoothstep(0.3, 1.5, tl) * sh;
+}
+
+// a turn by `a` radians in a plane (x,y) or (x,z)
+mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
+// `v` turned by `a` radians about the unit `axis` (Rodrigues)
+vec3 turnAbout(vec3 v, vec3 axis, float a) {
+  float ca = cos(a);
+  return v * ca + cross(axis, v) * sin(a) + axis * dot(axis, v) * (1.0 - ca);
+}
+
+// how far growth `g` has passed a point `at` along what grows (0..1): it
+// arrives there at `at * pace`, and is wholly past `span` later
+float grownPast(float at, float pace, float span, float g) { return smoothstep(at * pace, at * pace + span, g); }
+// the scale across a leaf or petal growing in, `along` it (0 its base,
+// which holds, .. 1 its tip): `closed` while folded, 1 once `open`
+float unfold(float closed, float open, float along) { return mix(1.0, mix(closed, 1.0, open), along); }
 
 // the one wind over the whole garden at a point (x,z): its heading (xy,
 // unit) drifts slowly, and broad gusts (z, 0..1, mostly calm) roll across

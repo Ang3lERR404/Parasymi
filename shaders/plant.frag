@@ -1,6 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
+#include "surface.glsl"
 
 // Plants share the wolf's material vocabulary (part.frag): a woven body with
 // a sheen along its fibres, and sap inside it that is dense and dark where
@@ -41,18 +42,6 @@ const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
 const vec3 GHOST_BLOCKED = vec3(1.0, 0.35, 0.3);
 const float GHOST_PULSE = 4.0;
 
-// direction of increasing `v_t` across the surface: up the stem, along a
-// tendril. Zero where `v_t` is constant (a petal fan).
-vec3 surfaceTangent() {
-  vec3 dpx = dFdx(v_pos);
-  vec3 dpy = dFdy(v_pos);
-  vec3 sn = cross(dpx, dpy);
-  vec3 r1 = cross(dpy, sn);
-  vec3 r2 = cross(sn, dpx);
-  float det = dot(dpx, r1);
-  return abs(det) < 1e-12 ? vec3(0.0) : (r1 * dFdx(v_t) + r2 * dFdy(v_t)) / det;
-}
-
 // the sap each lineage carries. Parasites are alien rather than hostile: a
 // pale sap with a thin-film sheen whose hue turns with the view angle.
 vec3 sapOf(float aff, float ndv, float seed) {
@@ -62,7 +51,7 @@ vec3 sapOf(float aff, float ndv, float seed) {
 }
 
 void surface() {
-  vec3 tgrad = surfaceTangent(); // derivatives first, in uniform control flow
+  vec3 tgrad = surfaceTangent(v_pos, v_t); // up the stem, along a tendril; derivatives first, in uniform control flow
   vec3 n = normalize(v_nrm);
   if (!gl_FrontFacing) n = -n;
   vec3 V = normalize(pc.eye_time.xyz - v_pos);
@@ -145,10 +134,7 @@ void surface() {
 
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
-  if (tl > 0.0 && part != PART_LEAF && part != PART_BLOOM) {
-    float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
-    c += mix(body, lit, 0.5) * sheen * smoothstep(0.0, 0.3, dot(n, SUN)) * 0.22 * smoothstep(0.3, 1.5, tl) * sh;
-  }
+  if (tl > 0.0 && part != PART_LEAF && part != PART_BLOOM) c += fibreLight(body, lit, tgrad, tl, n, V, 0.22, sh);
 
   // sap, seen through the skin: light from behind and at grazing angles,
   // more where the growth is thin and the plant is full
@@ -191,13 +177,7 @@ void surface() {
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
-// two passes draw every surface (SOLID, common.glsl), so nothing
-// see-through hides what lies behind it
 void main() {
   surface();
-#ifdef GLASS
-  if (o.a >= SOLID || o.a < CLEAR) discard;
-#else
-  if (o.a < SOLID) discard;
-#endif
+  keepPass(o.a);
 }

@@ -118,10 +118,6 @@ fn shapeBound(s:Shape) struct { c:V3, r:f32 } {
   };
 }
 
-fn xf(mat:M4, p:V3) V3 {
-  const r = m.mulV(mat, .{ p[0], p[1], p[2], 1 });
-  return v3(r[0], r[1], r[2]);
-}
 
 fn colV(c:color.Rgba8) V3 { return v3(m.f(c.r), m.f(c.g), m.f(c.b)); }
 
@@ -159,14 +155,14 @@ pub const Sculpt = struct {
     try s.forms.append(s.gpa, .{
       .f = f,
       .inv = m.inverseAffine(f.at),
-      .centre = xf(f.at, bound.c * f.stretch),
+      .centre = m.mulPoint(f.at, bound.c * f.stretch),
       .reach = bound.r * grow * scale + f.k + f.ink * 4,
       .shrink = @reduce(.Min, f.stretch),
     });
   }
 
   fn formDist(pf:*const Placed, p:V3) f32 {
-    const q = xf(pf.inv, p) / pf.f.stretch;
+    const q = m.mulPoint(pf.inv, p) / pf.f.stretch;
     return shapeDist(pf.f.shape, q) * pf.shrink;
   }
 

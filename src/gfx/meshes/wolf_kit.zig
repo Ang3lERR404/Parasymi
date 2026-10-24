@@ -170,11 +170,11 @@ pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, com
     const x = o[0] * k;
     const y = o[1] * k;
     const q = i * C + j;
-    if (try s.cast(xf(at, v3(x, y, -REACH)), into, 2 * REACH)) |h| {
+    if (try s.cast(m.mulPoint(at, v3(x, y, -REACH)), into, 2 * REACH)) |h| {
       hide[q] = h.p;
       up[q] = h.n;
     } else {
-      const pr = try s.project(xf(at, v3(x, y, 0)));
+      const pr = try s.project(m.mulPoint(at, v3(x, y, 0)));
       hide[q] = pr.p;
       up[q] = pr.n;
     }
@@ -283,10 +283,6 @@ pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, com
   }
 }
 
-fn xf(mat:M4, p:V3) V3 {
-  const r = m.mulV(mat, .{ p[0], p[1], p[2], 1 });
-  return v3(r[0], r[1], r[2]);
-}
 
 /// a claw: a curved, tapering hook from `base` along `dir`, bending toward
 /// `down` as it goes, closed to a point.

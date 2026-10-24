@@ -182,12 +182,7 @@ pub const Shadow = struct {
       .sharing_mode = .exclusive,
       .initial_layout = .undefined,
     }, null);
-    const req = c.device.getImageMemoryRequirements(s.image);
-    s.mem = try c.device.allocateMemory(&.{
-      .allocation_size = req.size,
-      .memory_type_index = try c.memType(req.memory_type_bits, .{.device_local = true}),
-    }, null);
-    try c.device.bindImageMemory(s.image, s.mem, 0);
+    s.mem = try c.imageMemory(s.image);
     s.view = try c.device.createImageView(&.{
       .image = s.image,
       .view_type = .@"2d_array",
@@ -232,7 +227,7 @@ pub const Shadow = struct {
   /// (What earlier frames read of it is done first: a barrier waits on
   /// every command before it in the queue.)
   pub fn begin(s:*const Shadow, cmd:vk.CommandBufferProxy) void {
-    barrier(cmd, s.image, .undefined, .depth_attachment_optimal,
+    sw.barrier(cmd, s.image, layers(), .undefined, .depth_attachment_optimal,
       .{.fragment_shader = true}, .{},
       .{.early_fragment_tests = true, .late_fragment_tests = true}, .{.depth_stencil_attachment_write = true, .depth_stencil_attachment_read = true});
     const depth:vk.RenderingAttachmentInfo = .{
@@ -260,7 +255,7 @@ pub const Shadow = struct {
   /// close it and hand the map to the world's fragment shaders
   pub fn end(s:*const Shadow, cmd:vk.CommandBufferProxy) void {
     cmd.endRendering();
-    barrier(cmd, s.image, .depth_attachment_optimal, .shader_read_only_optimal,
+    sw.barrier(cmd, s.image, layers(), .depth_attachment_optimal, .shader_read_only_optimal,
       .{.late_fragment_tests = true}, .{.depth_stencil_attachment_write = true},
       .{.fragment_shader = true}, .{.shader_sampled_read = true});
   }
@@ -268,22 +263,6 @@ pub const Shadow = struct {
 
 fn layers() vk.ImageSubresourceRange {
   return .{.aspect_mask = .{.depth = true}, .base_mip_level = 0, .level_count = 1, .base_array_layer = 0, .layer_count = CASCADES};
-}
-
-fn barrier(cmd:vk.CommandBufferProxy, image:vk.Image, old:vk.ImageLayout, new:vk.ImageLayout, src_stage:vk.PipelineStageFlags2, src_access:vk.AccessFlags2, dst_stage:vk.PipelineStageFlags2, dst_access:vk.AccessFlags2) void {
-  const b = [_]vk.ImageMemoryBarrier2{.{
-    .src_stage_mask = src_stage,
-    .src_access_mask = src_access,
-    .dst_stage_mask = dst_stage,
-    .dst_access_mask = dst_access,
-    .old_layout = old,
-    .new_layout = new,
-    .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-    .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-    .image = image,
-    .subresource_range = layers(),
-  }};
-  cmd.pipelineBarrier2(&.{.image_memory_barrier_count = b.len, .p_image_memory_barriers = &b});
 }
 
 const testing = std.testing;

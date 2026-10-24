@@ -43,32 +43,29 @@ pub fn Registry(comptime ns:type) type {
       };
     }
 
+    /// each module's name and its `decl` type (void when it declares none).
+    fn fields(comptime decl:[]const u8) struct { names:[count][]const u8, types:[count]type } {
+      var names:[count][]const u8 = undefined;
+      var types:[count]type = undefined;
+      for (ids, 0..) |id, i| {
+        names[i] = @tagName(id);
+        types[i] = if (@hasDecl(module(id), decl)) @field(module(id), decl) else void;
+      }
+      return .{.names = names, .types = types};
+    }
+
     /// a tagged union over Id whose payloads are each module's `decl` type
     /// (void when a module does not declare one).
     pub fn Union(comptime decl:[]const u8) type {
-      return comptime blk: {
-        var names:[count][]const u8 = undefined;
-        var types:[count]type = undefined;
-        for (ids, 0..) |id, i| {
-          names[i] = @tagName(id);
-          types[i] = if (@hasDecl(module(id), decl)) @field(module(id), decl) else void;
-        }
-        break :blk @Union(.auto, Id, &names, &types, &@splat(.{}));
-      };
+      const f = comptime fields(decl);
+      return @Union(.auto, Id, &f.names, &f.types, &@splat(.{}));
     }
 
     /// a struct with one field per module, typed by that module's `decl`
     /// (void when absent): e.g. per-pass resources living side by side.
     pub fn Struct(comptime decl:[]const u8) type {
-      return comptime blk: {
-        var names:[count][]const u8 = undefined;
-        var types:[count]type = undefined;
-        for (ids, 0..) |id, i| {
-          names[i] = @tagName(id);
-          types[i] = if (@hasDecl(module(id), decl)) @field(module(id), decl) else void;
-        }
-        break :blk @Struct(.auto, null, &names, &types, &@splat(.{}));
-      };
+      const f = comptime fields(decl);
+      return @Struct(.auto, null, &f.names, &f.types, &@splat(.{}));
     }
 
     /// does a module implement an optional hook?

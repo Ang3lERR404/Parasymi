@@ -41,10 +41,6 @@ const FOOT:f32 = 0.3;
 const RINGS = 36;
 const STEPS = 72;
 
-fn signedPow(x:f32, p:f32) f32 {
-  const y = m.pow(f32, @abs(x), p);
-  return if (x < 0) -y else y;
-}
 
 /// outline at angle `a` (x outward, y up), unit radius
 fn outline(a:f32) [2]f32 {
@@ -55,7 +51,7 @@ fn outline(a:f32) [2]f32 {
   // toward the cleft)
   const w = if (c < 0) W_OUT else W_IN;
   const e:f32 = if (c < 0) 1 else 0.8;
-  return .{ signedPow(c, e) * w, s * (if (s > 0) H_TOP else H_BOT) };
+  return .{ m.signedPow(c, e) * w, s * (if (s > 0) H_TOP else H_BOT) };
 }
 
 /// the lobe's shape for the kit (wolf_kit.resinLobe): a full dome, heavier

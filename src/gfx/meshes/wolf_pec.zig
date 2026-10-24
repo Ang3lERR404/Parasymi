@@ -70,13 +70,9 @@ fn outline(a:f32) [2]f32 {
   const w = m.lerp(W_BOT, W_TOP, up);
   const h = if (s > 0) H_TOP else H_BOT;
   // a superellipse, squarer than an ellipse, so the top edge reads broad
-  return .{ signedPow(c, 0.8) * w - SWEEP * @max(-s, 0), signedPow(s, 0.85) * h };
+  return .{ m.signedPow(c, 0.8) * w - SWEEP * @max(-s, 0), m.signedPow(s, 0.85) * h };
 }
 
-fn signedPow(x:f32, p:f32) f32 {
-  const y = m.pow(f32, @abs(x), p);
-  return if (x < 0) -y else y;
-}
 
 /// the bump of a raised disc (smooth shoulder) of radius `r` at distance `d`
 fn disc(d:f32, r:f32) f32 { return 1 - m.smooth(m.clamp01((d - r * 0.7) / (r * 0.3))); }

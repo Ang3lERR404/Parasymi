@@ -119,14 +119,11 @@ pub const Radiance = struct {
     // small, so their tiles are walked as a bloom's are
     for (fields) |fl| {
       const reach = fl.reach();
-      var dy:i32 = -reach;
-      while (dy <= reach) : (dy += 1) {
-        var dx:i32 = -reach;
-        while (dx <= reach) : (dx += 1) {
-          if (!fl.holds(fl.x + dx, fl.y + dy)) continue;
-          const j = p.at(w, fl.x + dx, fl.y + dy) orelse continue;
-          r.powered.items[j.idx()] = true;
-        }
+      var it = m.footprint(fl.x - reach, fl.y - reach, @intCast(2 * reach + 1));
+      while (it.next()) |t| {
+        if (!fl.holds(t[0], t[1])) continue;
+        const j = p.at(w, t[0], t[1]) orelse continue;
+        r.powered.items[j.idx()] = true;
       }
     }
     for (s.items(.sp), 0..) |sp, i| {
@@ -166,14 +163,11 @@ pub const Radiance = struct {
       if (!r.radiating.items[i]) continue;
       const rad = species.get(s.items(.sp)[i]).radiance;
       const reach:i32 = @intFromFloat(@ceil(rad));
-      var dy:i32 = -reach;
-      while (dy <= reach) : (dy += 1) {
-        var dx:i32 = -reach;
-        while (dx <= reach) : (dx += 1) {
-          if (m.f(dx * dx + dy * dy) > rad * rad) continue;
-          const j = p.at(w, xs[i] + dx, ys[i] + dy) orelse continue;
-          r.powered.items[j.idx()] = true;
-        }
+      var it = m.footprint(-reach, -reach, @intCast(2 * reach + 1));
+      while (it.next()) |d| {
+        if (m.f(d[0] * d[0] + d[1] * d[1]) > rad * rad) continue;
+        const j = p.at(w, xs[i] + d[0], ys[i] + d[1]) orelse continue;
+        r.powered.items[j.idx()] = true;
       }
     }
   }

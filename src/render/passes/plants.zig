@@ -1,6 +1,4 @@
 //! plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
-const std = @import("std");
-const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
 const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
@@ -39,15 +37,7 @@ pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
 /// upload every instance (before any pass draws them).
 pub fn prepare(r:*R.Renderer, f:*Frame, scene:*const R.Scene, stats:*R.Stats) void {
   _ = r;
-  var n:u32 = 0;
-  for (scene.instances, 0..) |list, i| {
-    const k:u32 = @intCast(@min(list.len, MAX - n));
-    f.first[i] = n;
-    f.counts[i] = k;
-    f.inst.write(n * @sizeOf(vertex.PlantInstance), sliceAsBytes(list[0..k]));
-    n += k;
-  }
-  stats.instances = n;
+  stats.instances = pass.upload(vertex.PlantInstance, &f.inst, &scene.instances, &f.first, &f.counts, MAX);
 }
 
 /// their solid fragments.

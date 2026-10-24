@@ -92,12 +92,7 @@ const Image = struct {
       .sharing_mode = .exclusive,
       .initial_layout = .undefined,
     }, null);
-    const req = c.device.getImageMemoryRequirements(im.image);
-    im.mem = try c.device.allocateMemory(&.{
-      .allocation_size = req.size,
-      .memory_type_index = try c.memType(req.memory_type_bits, .{.device_local = true}),
-    }, null);
-    try c.device.bindImageMemory(im.image, im.mem, 0);
+    im.mem = try c.imageMemory(im.image);
     for (0..sp.levels) |l| {
       im.views[l] = try c.device.createImageView(&.{
         .image = im.image,
@@ -278,9 +273,9 @@ pub const Post = struct {
 
   /// the world's images, ready to be drawn into (their old contents dropped)
   pub fn beginWorld(p:*const Post, cmd:vk.CommandBufferProxy) void {
-    barrier(cmd, p.hdr.image, 0, .undefined, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true});
+    sw.barrier(cmd, p.hdr.image, range(0), .undefined, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true});
     if (!p.multisampled()) return;
-    barrier(cmd, p.ms.image, 0, .undefined, .color_attachment_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true, .color_attachment_read = true});
+    sw.barrier(cmd, p.ms.image, range(0), .undefined, .color_attachment_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true, .color_attachment_read = true});
   }
 
   /// the world scope's colour attachment: the HDR image, or with MSAA the
@@ -311,30 +306,30 @@ pub const Post = struct {
   /// after the world is drawn: pull the glow out of it and blur it down the
   /// chain and back up again.
   pub fn glow(p:*const Post, cmd:vk.CommandBufferProxy) void {
-    barrier(cmd, p.hdr.image, 0, .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
+    sw.barrier(cmd, p.hdr.image, range(0), .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
     // down: each level filters the one above it (the first also keeps only
     // what is brighter than the threshold)
     for (0..LEVELS) |l| {
       const lv:u32 = @intCast(l);
-      barrier(cmd, p.bloom.image, lv, .undefined, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true});
+      sw.barrier(cmd, p.bloom.image, range(lv), .undefined, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true});
       const src = if (l == 0) p.hdr.extent else p.bloom.size(lv - 1);
       p.pass(cmd, p.pipe_down, p.down[l], p.bloom.views[l], p.bloom.size(lv), src, .dont_care, if (l == 0) 1 else 0);
-      barrier(cmd, p.bloom.image, lv, .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
+      sw.barrier(cmd, p.bloom.image, range(lv), .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
     }
     // up: each level adds the blurred level below it onto itself
     var l:usize = LEVELS - 1;
     while (l > 0) {
       l -= 1;
       const lv:u32 = @intCast(l);
-      barrier(cmd, p.bloom.image, lv, .shader_read_only_optimal, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true, .color_attachment_read = true});
+      sw.barrier(cmd, p.bloom.image, range(lv), .shader_read_only_optimal, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true, .color_attachment_read = true});
       p.pass(cmd, p.pipe_up, p.up[l], p.bloom.views[l], p.bloom.size(lv), p.bloom.size(lv + 1), .load, 0);
-      barrier(cmd, p.bloom.image, lv, .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
+      sw.barrier(cmd, p.bloom.image, range(lv), .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
     }
     // FXAA: the composite goes into its own image first, for FXAA to read
     if (p.aa.filtered()) {
-      barrier(cmd, p.ldr.image, 0, .undefined, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true});
+      sw.barrier(cmd, p.ldr.image, range(0), .undefined, .color_attachment_optimal, .{.fragment_shader = true}, .{.shader_sampled_read = true}, .{.color_attachment_output = true}, .{.color_attachment_write = true});
       p.pass(cmd, p.pipe_composite, p.composite, p.ldr.views[0], p.ldr.extent, p.hdr.extent, .dont_care, 0);
-      barrier(cmd, p.ldr.image, 0, .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
+      sw.barrier(cmd, p.ldr.image, range(0), .color_attachment_optimal, .shader_read_only_optimal, .{.color_attachment_output = true}, .{.color_attachment_write = true}, .{.fragment_shader = true}, .{.shader_sampled_read = true});
     }
   }
 
@@ -373,19 +368,3 @@ pub const Post = struct {
     cmd.endRendering();
   }
 };
-
-fn barrier(cmd:vk.CommandBufferProxy, image:vk.Image, level:u32, old:vk.ImageLayout, new:vk.ImageLayout, src_stage:vk.PipelineStageFlags2, src_access:vk.AccessFlags2, dst_stage:vk.PipelineStageFlags2, dst_access:vk.AccessFlags2) void {
-  const b = [_]vk.ImageMemoryBarrier2{.{
-    .src_stage_mask = src_stage,
-    .src_access_mask = src_access,
-    .dst_stage_mask = dst_stage,
-    .dst_access_mask = dst_access,
-    .old_layout = old,
-    .new_layout = new,
-    .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-    .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-    .image = image,
-    .subresource_range = range(level),
-  }};
-  cmd.pipelineBarrier2(&.{.image_memory_barrier_count = b.len, .p_image_memory_barriers = &b});
-}

@@ -63,7 +63,7 @@ pub fn build(b:*Build) !void {
     const v:?[3][]const u8 = if (i < shaders.len) null else variants[i - shaders.len];
     const cmd = b.addSystemCommand(&.{glslc, "--target-env=vulkan1.3", "-O"});
     cmd.addPrefixedDirectoryArg("-I", b.path("shaders"));
-    cmd.addFileInput(b.path("shaders/common.glsl"));
+    for ([_][]const u8{"common.glsl", "surface.glsl", "post.glsl"}) |inc| cmd.addFileInput(b.path(b.fmt("shaders/{s}", .{inc})));
     if (v) |vv| cmd.addArg(b.fmt("-D{s}", .{vv[2]}));
     // glslc reads the stage from the source's extension
     cmd.addFileArg(b.path(b.fmt("shaders/{s}", .{if (v) |vv| vv[1] else s})));

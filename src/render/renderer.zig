@@ -65,6 +65,21 @@ pub const pass = struct {
 
   pub const stages:vk.ShaderStageFlags = .{.vertex = true, .fragment = true};
 
+  /// write each mesh's run of instances into `buf` back to back (at most
+  /// `max` in all), noting where each run starts and how long it is;
+  /// returns how many were written.
+  pub fn upload(comptime I:type, buf:*Buffer, lists:[]const []const I, first:[]u32, counts:[]u32, max:u32) u32 {
+    var n:u32 = 0;
+    for (lists, 0..) |list, i| {
+      const k:u32 = @intCast(@min(list.len, max - n));
+      first[i] = n;
+      counts[i] = k;
+      buf.write(n * @sizeOf(I), sliceAsBytes(list[0..k]));
+      n += k;
+    }
+    return n;
+  }
+
   /// `samples`: per pixel of the world's attachments (the screen has one)
   pub fn create(c:*const Ctx, comptime d:Desc, layout:vk.PipelineLayout, screen:vk.Format, samples:u32) ctx.Error!vk.Pipeline {
     const vs = try c.shader(d.vert);
@@ -634,19 +649,9 @@ pub const Renderer = struct {
   fn beginWorld(r:*Renderer, cmd:vk.CommandBufferProxy, clear:[3]f32) void {
     r.post.beginWorld(cmd);
     const ms = r.post.multisampled();
-    const pre = [_]vk.ImageMemoryBarrier2{.{
-      .src_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
-      .src_access_mask = .{.depth_stencil_attachment_write = true},
-      .dst_stage_mask = .{.early_fragment_tests = true, .late_fragment_tests = true},
-      .dst_access_mask = .{.depth_stencil_attachment_write = true, .depth_stencil_attachment_read = true},
-      .old_layout = .undefined,
-      .new_layout = .depth_attachment_optimal,
-      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .image = if (ms) r.post.ms_depth.image else r.sc.depth,
-      .subresource_range = sw.depthRange(),
-    }};
-    cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
+    sw.barrier(cmd, if (ms) r.post.ms_depth.image else r.sc.depth, sw.depthRange(), .undefined, .depth_attachment_optimal,
+      .{.early_fragment_tests = true, .late_fragment_tests = true}, .{.depth_stencil_attachment_write = true},
+      .{.early_fragment_tests = true, .late_fragment_tests = true}, .{.depth_stencil_attachment_write = true, .depth_stencil_attachment_read = true});
     const color = [_]vk.RenderingAttachmentInfo{r.post.worldColor(clear)};
     const depth:vk.RenderingAttachmentInfo = .{
       .image_view = if (ms) r.post.ms_depth.views[0] else r.sc.depth_view,
@@ -662,19 +667,9 @@ pub const Renderer = struct {
 
   /// open the screen's rendering scope: the swapchain image, no depth.
   fn beginScreen(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32) void {
-    const pre = [_]vk.ImageMemoryBarrier2{.{
-      .src_stage_mask = .{.color_attachment_output = true},
-      .src_access_mask = .{},
-      .dst_stage_mask = .{.color_attachment_output = true},
-      .dst_access_mask = .{.color_attachment_write = true},
-      .old_layout = .undefined,
-      .new_layout = .color_attachment_optimal,
-      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .image = r.sc.images[img],
-      .subresource_range = sw.colorRange(),
-    }};
-    cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
+    sw.barrier(cmd, r.sc.images[img], sw.colorRange(), .undefined, .color_attachment_optimal,
+      .{.color_attachment_output = true}, .{},
+      .{.color_attachment_output = true}, .{.color_attachment_write = true});
     const color = [_]vk.RenderingAttachmentInfo{.{
       .image_view = r.sc.views[img],
       .image_layout = .color_attachment_optimal,
@@ -711,36 +706,16 @@ pub const Renderer = struct {
   fn end(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32, cap:bool) void {
     cmd.endRendering();
     if (cap) r.copyOut(cmd, img);
-    const post = [_]vk.ImageMemoryBarrier2{.{
-      .src_stage_mask = if (cap) .{.copy = true} else .{.color_attachment_output = true},
-      .src_access_mask = if (cap) .{} else .{.color_attachment_write = true},
-      .dst_stage_mask = .{},
-      .dst_access_mask = .{},
-      .old_layout = if (cap) .transfer_src_optimal else .color_attachment_optimal,
-      .new_layout = .present_src_khr,
-      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .image = r.sc.images[img],
-      .subresource_range = sw.colorRange(),
-    }};
-    cmd.pipelineBarrier2(&.{.image_memory_barrier_count = post.len, .p_image_memory_barriers = &post});
+    sw.barrier(cmd, r.sc.images[img], sw.colorRange(), if (cap) .transfer_src_optimal else .color_attachment_optimal, .present_src_khr,
+      if (cap) .{.copy = true} else .{.color_attachment_output = true}, if (cap) .{} else .{.color_attachment_write = true},
+      .{}, .{});
   }
 
   /// the screen image into `shot_buf`, left as a transfer's source
   fn copyOut(r:*Renderer, cmd:vk.CommandBufferProxy, img:u32) void {
-    const pre = [_]vk.ImageMemoryBarrier2{.{
-      .src_stage_mask = .{.color_attachment_output = true},
-      .src_access_mask = .{.color_attachment_write = true},
-      .dst_stage_mask = .{.copy = true},
-      .dst_access_mask = .{.transfer_read = true},
-      .old_layout = .color_attachment_optimal,
-      .new_layout = .transfer_src_optimal,
-      .src_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .dst_queue_family_index = vk.QUEUE_FAMILY_IGNORED,
-      .image = r.sc.images[img],
-      .subresource_range = sw.colorRange(),
-    }};
-    cmd.pipelineBarrier2(&.{.image_memory_barrier_count = pre.len, .p_image_memory_barriers = &pre});
+    sw.barrier(cmd, r.sc.images[img], sw.colorRange(), .color_attachment_optimal, .transfer_src_optimal,
+      .{.color_attachment_output = true}, .{.color_attachment_write = true},
+      .{.copy = true}, .{.transfer_read = true});
     cmd.copyImageToBuffer(r.sc.images[img], .transfer_src_optimal, r.shot_buf.buf, &.{.{
       .buffer_offset = 0,
       .buffer_row_length = 0,

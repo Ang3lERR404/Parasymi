@@ -1,17 +1,12 @@
 #version 450
+#extension GL_GOOGLE_include_directive : require
+#include "post.glsl"
 
 // one step down the glow's blur chain: a 13-tap filter of the image above,
 // at half its size. The first step (threshold > 0) also keeps only what is
 // brighter than white (with a soft knee below it) and weighs each group of
 // taps by its brightness, so a single blazing pixel cannot flicker.
-layout(location = 0) in vec2 v_uv;
-layout(location = 0) out vec4 o;
 layout(set = 0, binding = 0) uniform sampler2D src;
-layout(push_constant) uniform Push {
-  vec2 texel;
-  float threshold;
-  float intensity;
-} pc;
 
 vec3 bright(vec3 c) {
   if (pc.threshold <= 0.0) return c;

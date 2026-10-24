@@ -219,14 +219,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   try digits(b, &w);
 }
 
-fn xf(mat:M4, p:V3) V3 {
-  const r = m.mulV(mat, .{ p[0], p[1], p[2], 1 });
-  return v3(r[0], r[1], r[2]);
-}
-fn dir(mat:M4, d:V3) V3 {
-  const r = m.mulV(mat, .{ d[0], d[1], d[2], 0 });
-  return m.norm(v3(r[0], r[1], r[2]));
-}
+fn dir(mat:M4, d:V3) V3 { return m.norm(m.mulDir(mat, d)); }
 
 /// every vertex since `start` moves with `bone` alone
 fn rigid(b:*mg.Builder, start:usize, bone:Bone) Allocator.Error!void {
@@ -298,7 +291,7 @@ fn wind(w:*const [skel.COUNT]M4, segs:[]const Seg, a0:f32, turn:f32) Lay {
     }
     const mat = w[bi(at.bone)];
     const a = a0 + k * turn;
-    lay.axis[i] = xf(mat, v3(0, m.lerp(at.y0, at.y1, f), 0));
+    lay.axis[i] = m.mulPoint(mat, v3(0, m.lerp(at.y0, at.y1, f), 0));
     lay.out[i] = dir(mat, v3(@sin(a), 0, @cos(a)));
   }
   return lay;
@@ -311,7 +304,7 @@ fn line(w:*const [skel.COUNT]M4, bone:Bone, from:V3, to:V3, out:V3) Lay {
   const mat = w[bi(bone)];
   for (0..VINE) |i| {
     const k = m.ratio(i, VINE - 1);
-    lay.axis[i] = xf(mat, m.lerpV(from, to, k));
+    lay.axis[i] = m.mulPoint(mat, m.lerpV(from, to, k));
     lay.out[i] = dir(mat, out);
   }
   return lay;
@@ -399,14 +392,14 @@ fn fur(b:*mg.Builder, s:*const sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator
     for (0..row.n) |i| {
       const stagger:f32 = if (ri % 2 == 0) 0.5 else 0.25;
       const a = m.lerp(row.a0, row.a1, (m.f(i) + stagger) / m.f(row.n)) + rng.range(-0.05, 0.05);
-      const guess = xf(head, v3(@cos(a) * 0.1, 0.04 + @sin(a) * 0.1, row.z));
+      const guess = m.mulPoint(head, v3(@cos(a) * 0.1, 0.04 + @sin(a) * 0.1, row.z));
       try furLeaf(b, s, guess, dir(head, row.lie), row.len * rng.range(0.85, 1.1), 0.017 * rng.range(0.9, 1.1), row.lift, 0.5);
     }
   }
   // a forelock between the ears: a few longer leaves rising off the brow
   // and arching back over the crown
   for ([_]f32{ -0.012, 0.0, 0.012 }, 0..) |x, i| {
-    try furLeaf(b, s, xf(head, v3(x, 0.12, 0.03 - 0.008 * m.f(i % 2))), dir(head, v3(x * 4, 0.6, -1)), 0.07 * rng.range(0.9, 1.1), 0.02, 0.75, 0.6);
+    try furLeaf(b, s, m.mulPoint(head, v3(x, 0.12, 0.03 - 0.008 * m.f(i % 2))), dir(head, v3(x * 4, 0.6, -1)), 0.07 * rng.range(0.9, 1.1), 0.02, 0.75, 0.6);
   }
   // the mane running on down the back of the neck, longest at its root
   const neck = w[bi(.neck)];
@@ -414,13 +407,13 @@ fn fur(b:*mg.Builder, s:*const sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator
     const n:u32 = 5 + @as(u32, @intCast(ri));
     for (0..n) |i| {
       const a = m.lerp(m.pi * 0.62, m.pi * 1.38, (m.f(i) + 0.5) / m.f(n)) + rng.range(-0.06, 0.06);
-      try furLeaf(b, s, xf(neck, v3(@sin(a) * 0.1, y, @cos(a) * 0.1)), dir(neck, v3(@sin(a) * 0.3, -1, -0.5)), (0.075 + 0.006 * m.f(ri)) * rng.range(0.85, 1.1), 0.019, 0.38, 0.5);
+      try furLeaf(b, s, m.mulPoint(neck, v3(@sin(a) * 0.1, y, @cos(a) * 0.1)), dir(neck, v3(@sin(a) * 0.3, -1, -0.5)), (0.075 + 0.006 * m.f(ri)) * rng.range(0.85, 1.1), 0.019, 0.38, 0.5);
     }
   }
   // along each cheekbone, angling back and up
   for ([_]f32{ -1, 1 }) |x| {
     for ([_]f32{ 0.0, 0.022, 0.044 }, 0..) |z, i| {
-      try furLeaf(b, s, xf(head, v3(x * 0.09, 0.0, z)), dir(head, v3(0, 0.35, -1)), 0.03 + 0.007 * m.f(2 - i), 0.012, 0.7, 0.25);
+      try furLeaf(b, s, m.mulPoint(head, v3(x * 0.09, 0.0, z)), dir(head, v3(0, 0.35, -1)), 0.03 + 0.007 * m.f(2 - i), 0.012, 0.7, 0.25);
     }
   }
   // a tuft over each shoulder
@@ -428,7 +421,7 @@ fn fur(b:*mg.Builder, s:*const sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator
     const arm = w[bi(sd.arm)];
     for (0..6) |i| {
       const a = m.ratio(i, 6) * m.tau;
-      try furLeaf(b, s, xf(arm, v3(@sin(a) * 0.05, 0.06, @cos(a) * 0.05)), dir(arm, v3(@sin(a), -0.6, @cos(a))), 0.085 * rng.range(0.85, 1.1), 0.026, 0.45, 0.45);
+      try furLeaf(b, s, m.mulPoint(arm, v3(@sin(a) * 0.05, 0.06, @cos(a) * 0.05)), dir(arm, v3(@sin(a), -0.6, @cos(a))), 0.085 * rng.range(0.85, 1.1), 0.026, 0.45, 0.45);
     }
   }
   // rings of fur down the tail, longer toward the tip, and the tuft there
@@ -438,7 +431,7 @@ fn fur(b:*mg.Builder, s:*const sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator
     const tb = w[bi(.tail0) + seg];
     for (0..3) |j| {
       const a = m.f(j) / 3 * m.tau + m.f(ring) * 1.05;
-      try furLeaf(b, s, xf(tb, v3(@sin(a) * 0.08, (along - m.f(seg)) * skel.TAIL_SEG, @cos(a) * 0.08)), dir(tb, v3(0, 1, 0)), 0.06 + 0.012 * m.f(ring), 0.02, 0.45, 0.4);
+      try furLeaf(b, s, m.mulPoint(tb, v3(@sin(a) * 0.08, (along - m.f(seg)) * skel.TAIL_SEG, @cos(a) * 0.08)), dir(tb, v3(0, 1, 0)), 0.06 + 0.012 * m.f(ring), 0.02, 0.45, 0.4);
     }
   }
   const tip = m.chain(&.{ w[bi(.tail3)], m.translate(v3(0, skel.TAIL_SEG * 0.85, 0)) });

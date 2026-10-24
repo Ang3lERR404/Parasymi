@@ -53,15 +53,7 @@ pub fn deinitFrame(f:*Frame, c:*const Ctx) void {
 
 /// upload every instance and bone (before any pass draws them).
 pub fn prepare(r:*R.Renderer, f:*Frame, scene:*const R.Scene, stats:*R.Stats) void {
-  var n:u32 = 0;
-  for (scene.parts, 0..) |list, i| {
-    const k:u32 = @intCast(@min(list.len, MAX - n));
-    f.first[i] = n;
-    f.counts[i] = k;
-    f.inst.write(n * @sizeOf(vertex.PartInstance), sliceAsBytes(list[0..k]));
-    n += k;
-  }
-  stats.parts = n;
+  stats.parts = pass.upload(vertex.PartInstance, &f.inst, &scene.parts, &f.first, &f.counts, MAX);
   f.bones.write(0, sliceAsBytes(scene.bones[0..@min(scene.bones.len, MAX_BONES)]));
   const at = f.bones.address(&r.ctx);
   f.push = scene.push;

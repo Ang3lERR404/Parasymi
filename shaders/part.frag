@@ -1,6 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
+#include "surface.glsl"
 
 layout(location = 0) in vec3 v_pos;
 layout(location = 1) in vec3 v_nrm;
@@ -37,18 +38,6 @@ const vec3 FLASH_WHITE = vec3(1.0, 0.97, 0.9);
 // the halo's projection: how many rays it has round it
 const float RAYS = 40.0;
 
-// direction of increasing `v_t` across the surface: along a tube that is its
-// spine. Zero where `v_t` is constant (knots, spheres).
-vec3 surfaceTangent() {
-  vec3 dpx = dFdx(v_pos);
-  vec3 dpy = dFdy(v_pos);
-  vec3 sn = cross(dpx, dpy);
-  vec3 r1 = cross(dpy, sn);
-  vec3 r2 = cross(sn, dpx);
-  float det = dot(dpx, r1);
-  return abs(det) < 1e-12 ? vec3(0.0) : (r1 * dFdx(v_t) + r2 * dFdy(v_t)) / det;
-}
-
 // sap is alive: bubbles drifting up inside it, beads sliding down its
 // surface. Added to every sap material. `sh`: how much of the key light
 // reaches it (its glints fall in shadow with it)
@@ -64,7 +53,7 @@ vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout fl
 }
 
 void surface() {
-  vec3 tgrad = surfaceTangent(); // derivatives first, in uniform control flow
+  vec3 tgrad = surfaceTangent(v_pos, v_t); // along a tube; derivatives first, in uniform control flow
   vec3 raw = normalize(v_nrm);
   vec3 n = gl_FrontFacing ? raw : -raw;
   vec3 V = normalize(pc.eye_time.xyz - v_pos);
@@ -310,12 +299,7 @@ void surface() {
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets
     float tl = length(tgrad);
-    if ((part == PART_STEM || part == PART_CORE) && tl > 0.0) {
-      float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
-      float lit = smoothstep(0.0, 0.3, dot(n, SUN));
-      vec3 light = mix(NIGHT_LIT, SUNLIGHT, pc.sun.w);
-      c += mix(albedo, light, 0.5) * sheen * lit * 0.28 * smoothstep(0.3, 1.5, tl) * sh;
-    }
+    if ((part == PART_STEM || part == PART_CORE) && tl > 0.0) c += fibreLight(albedo, mix(NIGHT_LIT, SUNLIGHT, pc.sun.w), tgrad, tl, n, V, 0.28, sh);
     c += v_col * v_glow * 2.2;
   }
   // rim light keeps the silhouette readable at night
@@ -324,13 +308,7 @@ void surface() {
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
-// two passes draw every surface (SOLID, common.glsl), so nothing
-// see-through hides what lies behind it
 void main() {
   surface();
-#ifdef GLASS
-  if (o.a >= SOLID || o.a < CLEAR) discard;
-#else
-  if (o.a < SOLID) discard;
-#endif
+  keepPass(o.a);
 }

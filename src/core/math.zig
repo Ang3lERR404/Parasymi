@@ -65,6 +65,11 @@ pub inline fn ratio(a:anytype, b:anytype) f32 { return f(a) / f(b); }
 pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
 pub inline fn asin(x:f32) f32 { return math.asin(clamp(x, -1, 1)); }
 pub inline fn sign(x:f32) f32 { return math.sign(x); }
+/// |x|^p carrying x's sign (superellipse outlines).
+pub fn signedPow(x:f32, p:f32) f32 {
+  const y = pow(f32, @abs(x), p);
+  return if (x < 0) -y else y;
+}
 /// a 0..1 value quantised to a byte (clamped; truncates like the GPU's unorm).
 pub inline fn unorm8(x:f32) u8 { return @intFromFloat(clamp01(x) * 255); }
 /// degrees to radians.
@@ -254,6 +259,16 @@ pub fn mul(a:M4, b:M4) M4 {
 pub fn mulV(m:M4, v:V4) V4 {
   return m[0] * splat4(v[0]) + m[1] * splat4(v[1]) +
     m[2] * splat4(v[2]) + m[3] * splat4(v[3]);
+}
+/// a point through `m` (w = 1).
+pub fn mulPoint(m:M4, p:V3) V3 {
+  const r = mulV(m, .{p[0], p[1], p[2], 1});
+  return .{r[0], r[1], r[2]};
+}
+/// a direction through `m` (w = 0: no translation; not renormalised).
+pub fn mulDir(m:M4, d:V3) V3 {
+  const r = mulV(m, .{d[0], d[1], d[2], 0});
+  return .{r[0], r[1], r[2]};
 }
 
 /// right-handed perspective for Vulkan (y flipped, depth 0..1).
@@ -479,6 +494,19 @@ test "spring is stable for huge steps" {
   for (0..20) |_| spring(&p, &v, 1, 7, 0.75);
   try testing.expectApproxEqAbs(@as(f32, 1), p, 1e-3);
   try testing.expect(@abs(v) < 1e-2);
+}
+
+test "points move with a transform, directions only turn" {
+  const t = chain(&.{translate(v3(1, 2, 3)), rotY(pi / 2.0)});
+  const p = mulPoint(t, v3(1, 0, 0));
+  const d = mulDir(t, v3(1, 0, 0));
+  try testing.expectApproxEqAbs(@as(f32, 1), p[0], 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 1), @abs(p[2] - 3), 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 2), p[1], 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 0), d[0], 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 1), @abs(d[2]), 1e-5);
+  try testing.expectEqual(@as(f32, -8), signedPow(-2, 3));
+  try testing.expectEqual(@as(f32, 4), signedPow(2, 2));
 }
 
 test "inverse roundtrip" {

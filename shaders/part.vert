@@ -1,7 +1,5 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
-#extension GL_EXT_buffer_reference : require
-#extension GL_EXT_buffer_reference_uvec2 : require
 #include "common.glsl"
 
 // per-vertex (mesh library)
@@ -32,6 +30,9 @@ layout(location = 19) in vec4 sgz;
 // this frame's bones (renderer Scene.bones): each carries a vertex from
 // where it was built to where it is now
 layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer Bones { mat4 m[]; };
+// this vertex's `k`th bone (of four, one index per byte of sbones), its
+// mesh's bones starting at `base`
+mat4 bone(Bones B, int base, int k) { return B.m[base + int((sbones >> (8u * uint(k))) & 255u)]; }
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -81,7 +82,7 @@ void main() {
     Bones B = Bones(pc.bones);
     int base = int(ie.y + 0.5);
     M = mat4(0.0);
-    for (int k = 0; k < 4; k++) M += sweights[k] * B.m[base + int((sbones >> (8u * uint(k))) & 255u)];
+    for (int k = 0; k < 4; k++) M += sweights[k] * bone(B, base, k);
   }
   vec3 p = pos;
   vec3 nm = nrm;
@@ -135,8 +136,7 @@ void main() {
   // a growing structure's leaves and petals come up folded and open from
   // the bottom up, tips last (weighted along the leaf so its base holds)
   if (iw.w < 1.0 && (part == PART_LEAF || part == PART_EAR)) {
-    float open = smoothstep(pos.y / iw.y * 0.7, pos.y / iw.y * 0.7 + 0.35, iw.w);
-    p.xz *= mix(1.0, mix(0.2, 1.0, open), tu.y);
+    p.xz *= unfold(0.2, grownPast(pos.y / iw.y, 0.7, 0.35, iw.w), tu.y);
   }
   vec4 wind = gardenWind(t, c3.xz);
   // grown structures move as the plants do: leaves and petals breathe
@@ -157,7 +157,7 @@ void main() {
     float form = sqrt(haloPull(ih.w));
     float a = (1.0 - form) * 3.0;
     p = p * form + nrm * (1.0 - form) * 0.45;
-    p.xz = mat2(cos(a), -sin(a), sin(a), cos(a)) * p.xz;
+    p.xz = rot(a) * p.xz;
   }
   // the flash where the blooms met: a disc of light (tu.x its radius
   // 0..1) thrown outward from the diamond, fast then slowing (age 0..1)
@@ -247,7 +247,7 @@ void main() {
       // dropped, and the wolf's place in the world must not leak in)
       vec4 hp = vec4(p, 1.0);
       for (int k = 0; k < 4; k++) {
-        vec3 at = (B.m[base + int((sbones >> (8u * uint(k))) & 255u)] * hp).xyz - w.xyz;
+        vec3 at = (bone(B, base, k) * hp).xyz - w.xyz;
         J += mat3(at * sgx[k], at * sgy[k], at * sgz[k]);
       }
       wn = transpose(inverse(J)) * nm;

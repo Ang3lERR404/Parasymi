@@ -53,14 +53,8 @@ const float SIZE_SPREAD = 0.3;
 // how far behind the growing front growth still reads as new (v_young)
 const float YOUNG_SPAN = 0.55;
 
-mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
-
 // rotate a colour's hue by `a` radians about the grey axis
-vec3 hueShift(vec3 c, float a) {
-  const vec3 k = vec3(0.57735);
-  float ca = cos(a);
-  return c * ca + cross(k, c) * sin(a) + k * dot(k, c) * (1.0 - ca);
-}
+vec3 hueShift(vec3 c, float a) { return turnAbout(c, vec3(0.57735), a); }
 
 void main() {
   float t = pc.eye_time.w;
@@ -94,7 +88,7 @@ void main() {
     float held = 1.0 - fract(tu.y + 0.01) / 0.9;
     bool petals = ring > 0.5 && ring < 3.5;
     bool motes = abs(ring - 4.0) < 0.5;
-    float settle = smoothstep(order * 0.7, order * 0.7 + 0.3, growth);
+    float settle = grownPast(order, 0.7, 0.3, growth);
     float away = 1.0 - settle;
     vec2 dir = vec2(cos(bearing), sin(bearing));
     float ph = bearing * 3.0 + ring * 1.7 + seed * 9.0;
@@ -104,17 +98,17 @@ void main() {
       float fold = away * 0.9 + 0.07 * (ring / 3.0) * sin(t * 0.35 + ph);
       vec3 ax = vec3(-dir.y, 0.0, dir.x);
       float ang = fold * held;
-      p = p * cos(ang) + cross(ax, p) * sin(ang) + ax * dot(ax, p) * (1.0 - cos(ang));
-      n = n * cos(ang) + cross(ax, n) * sin(ang) + ax * dot(ax, n) * (1.0 - cos(ang));
+      p = turnAbout(p, ax, ang);
+      n = turnAbout(n, ax, ang);
       // drifting apart and together, and bobbing out of step
       float drift = 0.035 * ring * (0.5 + 0.5 * sin(t * 0.3 + ph));
       p.xz += dir * drift * held;
       p.y += 0.025 * sin(t * 0.55 + ph * 1.3) * held;
     }
+    // each mote spirals in from beyond the outer whorl to the core and
+    // fades as it is taken up, then begins again (c 0..1 of the way)
+    float c = fract(t * MOTE_RATE + order + seed);
     if (motes) {
-      // each mote spirals in from beyond the outer whorl to the core and
-      // fades as it is taken up, then begins again
-      float c = fract(t * MOTE_RATE + order + seed);
       float r = mix(0.75, -0.12, c);
       p.xz += dir * r;
       p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
@@ -147,7 +141,7 @@ void main() {
     v_sap = vec2(fill, 0.5 + 0.5 * sin(t * 1.1 - order * 5.0 + seed * 6.0));
     v_t = order;
     // how far each fragment has settled (it fades in as it arrives)
-    v_young = motes ? settle * smoothstep(0.0, 0.15, fract(t * MOTE_RATE + order + seed)) * (1.0 - smoothstep(0.75, 1.0, fract(t * MOTE_RATE + order + seed))) : settle;
+    v_young = motes ? settle * smoothstep(0.0, 0.15, c) * (1.0 - smoothstep(0.75, 1.0, c)) : settle;
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = project(wp);
 #ifdef SHADOW
@@ -159,7 +153,8 @@ void main() {
 
   // growth: whole-plant scale, then leaves/petals unfurl as it matures
   float g = smoothstep(0.0, 1.0, growth);
-  float open = part == PART_BLOOM ? smoothstep(0.75, 1.0, growth) : smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth);
+  float passed = grownPast(tu.x, 0.8, 0.3, growth);
+  float open = part == PART_BLOOM ? smoothstep(0.75, 1.0, growth) : passed;
   // how far out along an offshoot a vertex is (colour alpha 1 - it; 0 on
   // the main plant, meshgen `shootFold`): an offshoot comes up pressed to
   // its stem, its bud or bloom a narrow closed one, and leans out and opens
@@ -169,14 +164,14 @@ void main() {
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
   // where it grows from, on the stem or along a vine.
-  if ((part == PART_LEAF || part == PART_BLOOM) && !confluence && !coil && trunk) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
-  if (!trunk) p.xz *= mix(1.0, mix(0.2, 1.0, smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth)), shoot);
+  if ((part == PART_LEAF || part == PART_BLOOM) && !confluence && !coil && trunk) p.xz *= unfold(0.25, open, tu.y);
+  if (!trunk) p.xz *= unfold(0.2, passed, shoot);
   // a parasite's crown comes up closed, its fronds a tight upright bundle,
   // and opens out as it matures; its bladders swell in as the stalk passes them
   if (coil && trunk) {
     float unfurl = smoothstep(0.3, 1.0, growth);
     if (part == PART_TENDRIL) p.xz *= mix(0.3, 1.0, unfurl);
-    if (part == PART_BLOOM && tu.x < 0.9) p.xz *= mix(0.55, 1.0, smoothstep(tu.x * 0.7, tu.x * 0.7 + 0.35, growth));
+    if (part == PART_BLOOM && tu.x < 0.9) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
   }
 
   // ---- motion: rooted and heavy. Nothing jitters: plants bend from the
