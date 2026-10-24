@@ -336,9 +336,14 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   kind; the whole wolf and all plants/structures are kept up with it; new
   grown things follow the current look, motion and growth via the shared
   kits, never older primitives.
-- **Visual authority**: the user is the artist; their word on proportions,
-  silhouette, material and "does this read as X" is final. "Off", "weak",
-  "generic", "too X" is the acceptance criterion: implement their fix.
+- **Visual authority**: the user calls the shots on art direction, with NO
+  compromises, period. Their word on look, motion, proportions,
+  silhouette, material, technique (e.g. "on the GPU") and "does this read
+  as X" is final. Build exactly what they describe: never substitute a
+  cheaper, simpler or "equivalent" approach, never water it down, never
+  ship a stand-in and call it done. If it can't be done as described, stop
+  and say so; if it's ambiguous, ask. "Off", "weak", "generic", "too X" is
+  the acceptance criterion: implement their fix.
 - **Finish line**: work until the phase's criteria are met; take the next
   step instead of "next I would…"; stop only for a blocking decision or
   phase completion.
