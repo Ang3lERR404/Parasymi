@@ -1114,16 +1114,17 @@ fn drift(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!vo
   var rng = Rng.init(seed);
   const float_r = g.bloom_r * 0.62;
 
-  // the float
+  // the float: a comb-jelly lantern, a spore held inside it
+  try lantern(b, g, float_r, seed);
   try ellipsoid(b, .{
-    .center = m.v3(0, 0, 0), .radii = m.v3(float_r, float_r * 0.8, float_r),
-    .col = color.shade(g.bloom_col, 0.85), .part = .bloom, .rings = 7, .segs = 10, .t = 0.5,
+    .center = m.v3(0, -float_r * 0.05, 0), .radii = m.v3(float_r * 0.26, float_r * 0.36, float_r * 0.26),
+    .col = color.rgb(1.0, 0.92, 0.62).toRgba8(255), .part = .stem, .rings = 6, .segs = 8, .t = 0.95,
   });
 
   // the neck and the catcher dish: two whorls opening wide and shallow
-  const neck = m.v3(rng.range(-0.02, 0.02), float_r * 0.7 + g.stem_h, rng.range(-0.02, 0.02));
+  const neck = m.v3(rng.range(-0.02, 0.02), float_r * 0.95 + g.stem_h, rng.range(-0.02, 0.02));
   var nc:[4]V3 = undefined;
-  growthPath(.{.start = m.v3(0, float_r * 0.5, 0), .direction = m.norm(neck - m.v3(0, float_r * 0.5, 0)), .length = m.len(neck - m.v3(0, float_r * 0.5, 0)), .wobble = g.wobble, .seed = seed ^ 0x57E4}, &nc);
+  growthPath(.{.start = m.v3(0, float_r * 0.75, 0), .direction = m.norm(neck - m.v3(0, float_r * 0.75, 0)), .length = m.len(neck - m.v3(0, float_r * 0.75, 0)), .wobble = g.wobble, .seed = seed ^ 0x57E4}, &nc);
   var np:[8]V3 = undefined;
   m.splineResample(&nc, &np);
   var nt:[8]f32 = undefined;
@@ -1170,26 +1171,101 @@ fn drift(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!vo
     shootFold(b, s, 1);
   }
 
-  // trailing filaments from the underside of the float
+  // trailing filaments out of the lantern's mouth: hair-thin threads, each
+  // waving in its own plane (and a little across it), the waves widening
+  // toward the free tip, which tapers to nothing. plant.vert runs a slow
+  // wave down them as well, so they ripple like a jelly's.
   for (0..g.tendrils) |i| {
     const a = m.ratio(i, g.tendrils) * m.tau + rng.range(-0.25, 0.25);
-    const from = m.v3(@cos(a) * float_r * 0.55, -float_r * 0.5, @sin(a) * float_r * 0.55);
-    const len = rng.range(0.55, 0.9);
-    const to = from + m.v3(@cos(a) * 0.12, -len, @sin(a) * 0.12);
-    var fc:[6]V3 = undefined;
-    growthPath(.{.start = from, .direction = m.norm(to - from), .length = m.len(to - from), .wobble = g.tendril_wobble, .curl = g.tendril_curl, .seed = seed +% i * 31}, &fc);
-    var fp:[16]V3 = undefined;
+    const out = m.v3(@cos(a), 0, @sin(a));
+    const from = out * m.splat3(float_r * 0.22) + m.v3(0, -float_r * 0.55, 0);
+    // every other one shorter, so they hang in two lengths
+    const len = if (i % 2 == 0) rng.range(0.75, 1.05) else rng.range(0.45, 0.7);
+    const to = from + out * m.splat3(rng.range(0.06, 0.14)) + m.v3(0, -len, 0);
+    const dir = m.norm(to - from);
+    const across = m.norm(m.cross(dir, out));
+    const waves = rng.range(2.2, 3.4);
+    const ph = rng.range(0, m.tau);
+    var fc:[14]V3 = undefined;
+    for (&fc, 0..) |*c, j| {
+      const k = m.ratio(j, fc.len - 1);
+      const amp = TENDRIL_WAVE * m.smooth(@min(1, k * 3)) * (0.5 + 0.5 * k);
+      const w = k * waves * m.tau + ph;
+      c.* = from + (to - from) * m.splat3(k) + out * m.splat3(@sin(w) * amp) + across * m.splat3(@sin(w * 0.5 + 1.3) * amp * 0.45);
+    }
+    grow(&fc, .{.start = from, .direction = dir, .length = m.len(to - from), .wobble = g.tendril_wobble, .seed = seed +% i * 31});
+    var fp:[40]V3 = undefined;
     m.splineResample(&fc, &fp);
-    var ft:[16]f32 = undefined;
-    var fr:[16]f32 = undefined;
+    var ft:[40]f32 = undefined;
+    var fr:[40]f32 = undefined;
     for (&ft, &fr, 0..) |*t, *r, j| {
-      const k = m.ratio(j, 15);
+      const k = m.ratio(j, fp.len - 1);
       // tu.x rises toward the tips so they sway most, like a pendulum
       t.* = m.lerp(0.3, 1, k);
-      r.* = g.stem_r * m.lerp(0.55, 0.12, k);
+      r.* = TENDRIL_R * (1 - k) * (0.4 + 0.6 * (1 - k));
     }
     try b.tubeR(&fp, &ft, &fr, g.leaf_col.toRgba8(255), .tendril, 4);
   }
+}
+
+/// a driftwisp filament's thickness at the mouth, and how far its waves swing
+const TENDRIL_R:f32 = 0.0075;
+const TENDRIL_WAVE:f32 = 0.045;
+/// the lantern: comb rows standing out of it, how sharp their crests, and
+/// how far they turn round it from mouth to top
+const LANTERN_ROWS = 8;
+const LANTERN_RIB:f32 = 0.11;
+const LANTERN_CREST:f32 = 4;
+const LANTERN_TWIST:f32 = 0.7;
+
+/// a driftwisp's float: a comb-jelly lantern of sap, an egg a little taller
+/// than wide, broadest below its middle, with eight comb rows standing out
+/// of it from its mouth to its top, turning a little as they go. The rows
+/// carry the light split into colours (pale rainbow along each one); the
+/// skin between them is clear sap. One shared-vertex sheet closed at both
+/// poles, so it is watertight.
+fn lantern(b:*Builder, g:species.Genome, R:f32, seed:u64) Allocator.Error!void {
+  const ROWS = 17;
+  const COLS = 49;
+  var pts:[ROWS * COLS]V3 = undefined;
+  var nrms:[ROWS * COLS]V3 = undefined;
+  var cols:[ROWS * COLS]color.Rgba8 = undefined;
+  var us:[ROWS * COLS]f32 = undefined;
+  const skin = color.shade(g.bloom_col, 0.8);
+  const hue0 = m.f(seed % 97) / 97;
+  for (0..ROWS) |i| for (0..COLS) |j| {
+    const s = m.ratio(i, ROWS - 1);
+    const ph = m.ratio(j, COLS - 1) * m.tau;
+    const at = i * COLS + j;
+    pts[at] = lanternAt(R, s, ph);
+    // the poles' normals point straight out of them; elsewhere, across the
+    // sheet's two directions
+    nrms[at] = if (i == 0) m.v3(0, -1, 0) else if (i == ROWS - 1) m.v3(0, 1, 0) else n: {
+      const e:f32 = 0.002;
+      const ds = lanternAt(R, s + e, ph) - lanternAt(R, s - e, ph);
+      const dp = lanternAt(R, s, ph + e) - lanternAt(R, s, ph - e);
+      break :n m.norm(m.cross(ds, dp));
+    };
+    const crest = lanternCrest(s, ph);
+    const x = hue0 + s * 1.3 + m.f(j) / COLS * 0.5;
+    const film = color.rgb(0.5 + 0.5 * @cos(m.tau * x), 0.5 + 0.5 * @cos(m.tau * (x + 0.33)), 0.5 + 0.5 * @cos(m.tau * (x + 0.67))).toRgba8(255);
+    cols[at] = color.mix(skin, color.mix(film, color.rgb(1, 1, 1).toRgba8(255), 0.35), crest * 0.8);
+    us[at] = 0;
+  };
+  try patch(b, ROWS, COLS, &pts, &nrms, &cols, &us, 0.5, .bloom);
+}
+
+/// how much of a comb row's crest lies at height `s` (0 mouth .. 1 top) and
+/// bearing `ph`
+fn lanternCrest(s:f32, ph:f32) f32 {
+  return m.pow(f32, 0.5 + 0.5 * @cos(LANTERN_ROWS * ph + LANTERN_TWIST * s * m.tau), LANTERN_CREST);
+}
+
+/// a point on the lantern at height `s` (0 its mouth .. 1 its top) and bearing `ph`
+fn lanternAt(R:f32, s:f32, ph:f32) V3 {
+  const k = m.clamp01(s);
+  const r = R * m.pow(f32, @sin(k * m.pi), 0.7) * (1.08 - 0.22 * k) * (1 + LANTERN_RIB * lanternCrest(k, ph));
+  return m.v3(@cos(ph) * r, R * m.lerp(-0.85, 1.0, k), @sin(ph) * r);
 }
 
 /// a celestial bloom: a flower whose petals are not joined to it. A small

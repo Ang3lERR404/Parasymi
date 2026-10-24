@@ -13,7 +13,7 @@ pub const def:species.Species = .{
     .form = .drift,
     .stem_h = 0.1, .stem_r = 0.028, .segments = 4, .curl = 0.05, .wobble = 0.1,
     .leaves = 0, .leaf_len = 0.1, .leaf_w = 0.05, .leaf_droop = 0,
-    .petals = 10, .bloom_r = 0.26, .thorns = 0, .tendrils = 7, .tendril_curl = 0.15, .tendril_wobble = 0.25,
+    .petals = 10, .bloom_r = 0.26, .thorns = 0, .tendrils = 11, .tendril_curl = 0.15, .tendril_wobble = 0.12,
     .stem_col = color.rgb(0.5, 0.6, 0.8), .leaf_col = color.rgb(0.6, 0.7, 1.0), .bloom_col = color.rgb(0.85, 0.9, 1.0),
   },
 };

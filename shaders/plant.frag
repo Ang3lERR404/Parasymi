@@ -88,6 +88,24 @@ void surface() {
     return;
   }
 
+  if (abs(v_form - 2.0) < 0.5 && part == 2 && v_t < 0.75) {
+    // a floater's lantern (meshgen `lantern`, tu.x 0.5): clear sap, the
+    // spore inside showing through face-on and its rim bright; its comb
+    // rows carry light split into colours (their vertex colour), the hue
+    // turning with the view angle, and bubbles rise inside it
+    vec3 film = filmHue(ndv * 1.3 + seed * 3.0 + pc.eye_time.w * 0.05);
+    vec3 col = mix(v_col, v_col * film * 1.8, 0.3 + 0.4 * fres);
+    vec3 c = shade(col * 0.25, n, v_pos) * health;
+    c += col * (0.2 + 0.85 * fres) * lit;
+    c += col * max(dot(-n, SUN), 0.0) * 0.3 * lit;
+    c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * lit * 0.5;
+    c += lit * pow(max(dot(n, normalize(SUN + V)), 0.0), 80.0) * 0.5 * smoothstep(0.0, 0.2, dot(n, SUN));
+    float a = mix(0.18, 0.85, fres);
+    if (v_ghost.x > 0.5) a *= 0.5;
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+
   // thickness: old growth is dense, new growth thin; leaves and petals are
   // always thin. A wilting plant's skin dulls toward dead brown.
   float thin = clamp(v_young, 0.0, 1.0);

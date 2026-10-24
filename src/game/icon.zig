@@ -127,6 +127,24 @@ pub const Icon = struct {
     }
   }
 
+  /// a hair-thin thread hanging from `from` straight down `len`, waving
+  /// `waves` times across its length, the swing `amp` widening toward its
+  /// free tip and a wave running down it; it tapers from `w` to nothing.
+  pub fn thread(ic:Icon, from:P, len:f32, waves:f32, amp:f32, w:f32, ph:f32, c:Color) Allocator.Error!void {
+    const N = 14;
+    var prev = ic.px(from);
+    var arc:f32 = 0;
+    for (1..N + 1) |i| {
+      const k0 = m.ratio(i - 1, N);
+      const k = m.ratio(i, N);
+      const swing = amp * k * @sin(k * waves * m.tau - ic.t * 2.2 + ph);
+      const next = ic.px(.{from[0] + swing, from[1] - len * k});
+      try ic.d.limb(prev, next, w * ic.r * 0.5 * (1 - k0) + 0.3, w * ic.r * 0.5 * (1 - k) + 0.3, ic.col(c), arc);
+      arc += @sqrt((next[0] - prev[0]) * (next[0] - prev[0]) + (next[1] - prev[1]) * (next[1] - prev[1]));
+      prev = next;
+    }
+  }
+
   /// a small seed of its own (what a germinator makes).
   pub fn kernel(ic:Icon, at:P, h:f32, c:Color) Allocator.Error!void {
     const q = ic.px(at);

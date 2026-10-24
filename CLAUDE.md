@@ -280,8 +280,11 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   them in against the stem until growth passes them. Parasites (`coil`):
   alien not hostile, pale pearl/lilac with thin-film sap: twisted 3-strand
   stalk on a bulbous foot, bladders, fronds curling around a bulb.
-  Floaters (`drift`): sap float, catcher dish, trailing filaments, slow bob
-  over a ground shadow. Confluence: 8 growth keys of one vertex layout
+  Floaters (`drift`): a comb-jelly lantern (`meshgen.lantern`: clear sap,
+  8 twisting comb rows in split-light colours, a golden spore inside;
+  plant.frag shades it apart by tu.x 0.5, bright iridescent film, approved
+  as is), catcher dish, hair-thin filaments waving in two lengths (a wave
+  runs down them in plant.vert), slow bob over a ground shadow. Confluence: 8 growth keys of one vertex layout
   blended in plant.vert (binding 2), braid strands running on into red
   vines, translucent violet petals, sway ×1.5.
 - Celestial bloom (`radiant`): a flower whose petals float free, gathered

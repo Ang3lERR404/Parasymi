@@ -51,6 +51,7 @@ void main() {
   bool confluence = abs(ib.w - 3.0) < 0.5;
   bool coil = abs(ib.w - 1.0) < 0.5;
   bool radiant = abs(ib.w - 4.0) < 0.5;
+  bool drift = abs(ib.w - 2.0) < 0.5;
   // a confluence blends between the growth keys around its growth, so it
   // grows smoothly instead of stepping from one shape to the next
   vec3 p = mix(pos, pos_next, ic.x);
@@ -171,6 +172,14 @@ void main() {
     float hunger = -aff * (0.3 + flow);
     if (part == 4u && trunk) p.xz = rot(sin(t * 0.6 + tu.x * 3.0 + seed * 9.0) * 0.12 * hunger) * p.xz;
     if (part == 3u) p.y += 0.006 * hunger * tu.y * sin(t * 4.0 + seed * 40.0 + tu.x * 7.0);
+  }
+  // a floater's filaments ripple like a jelly's: slow waves run down them
+  // from the float, swinging wider toward the free tips (the bend below
+  // still trails them downwind)
+  if (drift && part == 4u) {
+    float down = max(-p.y, 0.0);
+    float ph = t * 1.4 - down * 8.0 + seed * TAU;
+    p.xz += vec2(sin(ph + p.x * 9.0), cos(ph * 0.83 + p.z * 9.0)) * 0.03 * down;
   }
   // convergent: blooms turn, very slowly (a confluence's canopy stays on its leader)
   if (abs(aff) < 0.5 && part == 2u && !confluence && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
