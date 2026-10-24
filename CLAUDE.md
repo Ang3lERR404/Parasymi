@@ -341,8 +341,10 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   silhouette, material, technique (e.g. "on the GPU") and "does this read
   as X" is final. Build exactly what they describe: never substitute a
   cheaper, simpler or "equivalent" approach, never water it down, never
-  ship a stand-in and call it done. If it can't be done as described, stop
-  and say so; if it's ambiguous, ask. "Off", "weak", "generic", "too X" is
+  ship a stand-in and call it done. If it can't be done as described,
+  research another way (techniques, papers, docs, prior art) that delivers
+  exactly what they described, and build that; never give up on it or
+  fall back to less. If it's ambiguous, ask. "Off", "weak", "generic", "too X" is
   the acceptance criterion: implement their fix.
 - **Finish line**: work until the phase's criteria are met; take the next
   step instead of "next I would…"; stop only for a blocking decision or
