@@ -4,6 +4,7 @@
 //!   def:Def                     name, bulb item, footprint, mesh   (required)
 //!   State                       per-kind data (optional, see `State` union)
 //!   tick(ctx, id, dt) [!]bool   advance; returns whether it is active
+//!   link(ctx, id)               notice its neighbours, every tick, grown or not
 //!   wants(s, g, item) u32       how many of `item` it will still take in
 //!   output(s) ?Item             what may leave it (pulled by conduits)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
@@ -243,6 +244,9 @@ pub const Structures = struct {
     const ctx:Ctx = .{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss };
     for (0..ss.list.items.len) |idx| {
       const id = Id.of(idx);
+      switch (ss.get(id).kind()) {
+        inline else => |k| if (comptime reg.has(k, "link")) reg.module(k).link(ctx, id),
+      }
       const g0 = ss.get(id);
       const active = if (g0.grown < 1) blk: {
         g0.grown = @min(1, g0.grown + dt / g0.def().grow);

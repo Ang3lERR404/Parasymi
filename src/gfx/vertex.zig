@@ -22,13 +22,13 @@ pub const Terrain = extern struct {
 /// a halo's blooms met (tu.x its radius). `prism`: a cut iridescent crystal
 /// that only catches light. `halo`: the ring of split light a diamond
 /// projects; `projection`: the rays it throws to make it.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection };
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection, core };
 
 /// roles a library part may draw see-through (part.frag)
 pub fn seeThrough(p:Part) bool {
   return switch (p) {
     .bloom, .ear, .resin, .shadow, .thread, .flash, .halo, .projection => true,
-    .stem, .leaf, .thorn, .tendril, .prism => false,
+    .stem, .leaf, .thorn, .tendril, .prism, .core => false,
   };
 }
 
@@ -104,7 +104,8 @@ pub const PartInstance = extern struct {
   p:[4]f32,
   /// rgb colour multiply, w blend amount
   tint:[4]f32,
-  /// x unused;
+  /// x how far along a conduit's core the essence it carries has come
+  /// (0..1, < 0 none; its colour in `e.yzw` when placed by the matrix);
   /// yzw give: how far a resin part's surface is pushed (mesh space), its base held
   q:[4]f32,
   /// x sway: how far it bends from its root in the garden's wind (0 rigid);
@@ -116,7 +117,8 @@ pub const PartInstance = extern struct {
   /// thread: c0..c3 xyz its control points, tint.xyz the side its x lies
   /// toward, y how far along it reaches (0: all of it), w its rest length;
   /// z which of its ends a forming halo draws in: 1 its first, 2 its last,
-  /// 3 both); 2 a star mote (c3 its centre; y phase, z life, w its trail
+  /// 3 both); placed by the matrix, yzw the colour of the essence a
+  /// conduit's core carries (`q.x`); 2 a star mote (c3 its centre; y phase, z life, w its trail
   /// echo, -1 when resting); 3 skinned (y the first of its bones in the
   /// frame's bone buffer; each vertex by its `Skin`)
   e:[4]f32 = .{0, 0, 0, 0},

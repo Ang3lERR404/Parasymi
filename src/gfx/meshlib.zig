@@ -33,6 +33,8 @@ const parts = struct {
   pub const mote = @import("meshes/mote.zig");
   // structures
   pub const conduit = @import("meshes/conduit.zig");
+  pub const conduit_left = @import("meshes/conduit.zig").left;
+  pub const conduit_right = @import("meshes/conduit.zig").right;
   pub const conduit_tap = @import("meshes/conduit.zig").tap;
   pub const sap_cache = @import("meshes/sap_cache.zig");
   pub const germinator = @import("meshes/germinator.zig");

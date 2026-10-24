@@ -97,7 +97,7 @@ registry kinds outside the registry file; add a hook.
 |---|---|---|
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
-| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
+| structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
@@ -308,9 +308,16 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   leafy vines, real petals, pods of resin sap (`Def.sap`, no own light).
   Germinator: resin pod with a seed, cradled by vines. Research bloom: woven
   stalk, violet flower, banded resin orb (forms last). Sap cache: clear pod
-  in a vine basket, contents hanging inside. Conduit: a gnarled root
-  surfacing and sinking (`conduit.rise`), rootlets, side roots
-  (`conduit_tap`). Standing structures sway (`Def.sway`; conduits don't, so
+  in a vine basket, contents hanging inside. Conduit (`Def.bare`, its own
+  `emit`): per tile a root digs up out of the soil at each edge it is fed
+  from (`link` hook: `feeds`; `conduit`/`conduit_left`/`conduit_right`),
+  arches (rising long, diving short) and digs back in at its front, so
+  chains join underground in any turn; a sapwood core (part `.core`) in an
+  over-under weave of strands, branchlets, leaves in twos/threes swept
+  forward, soil heaped (a ridge pushed ahead where it dives) with rootlets.
+  Carried essence swells and tints the core as it passes (part.vert,
+  `Look.carry`/`carry_col`), amber pulses run the way it carries; side
+  roots (`conduit_tap`) are smaller woven arches. Standing structures sway (`Def.sway`; conduits don't, so
   chains stay joined; hung parts follow via `Look.drop`), breathe at a fixed
   tempo, and grow in (shoot up, fill out, leaves unfold).
 - Resource nodes (`mineral_kit`, flat facets): ley shards a violet crystal

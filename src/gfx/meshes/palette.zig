@@ -13,6 +13,12 @@ pub const sap = color.rgb(1.0, 0.68, 0.22).toRgba8(255);
 /// living roots: the wolf's root brown, paler where the bark is young
 pub const root_bark = color.rgb(0.19, 0.15, 0.09).toRgba8(255);
 pub const root_lite = color.rgb(0.31, 0.26, 0.16).toRgba8(255);
+/// a conduit's living core showing through its weave: paler, warmer wood
+pub const sapwood = color.rgb(0.52, 0.38, 0.21).toRgba8(255);
+pub const sapwood_dark = color.rgb(0.36, 0.25, 0.13).toRgba8(255);
+/// soil a root has heaped breaking the ground, and its clods
+pub const soil = color.rgb(0.40, 0.29, 0.18).toRgba8(255);
+pub const soil_dark = color.rgb(0.31, 0.22, 0.14).toRgba8(255);
 
 /// the vine-wolf keeps to muted, low-saturation greens and browns so its only
 /// accents are amber sap: the belly, the eyes and the inner ears.
@@ -27,4 +33,4 @@ pub const wolf_claw = color.rgb(0.58, 0.54, 0.44).toRgba8(255);
 /// the same mesh always grows the same way.
 pub fn rngFor(comptime name:[]const u8) Rng {
   return Rng.init(comptime Wyhash.hash(0x9A27, name));
-}
+}

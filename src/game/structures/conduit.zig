@@ -3,6 +3,9 @@
 //! harvests it) and passes it forward to the next conduit or structure.
 //! It also sends a root out to any plant beside it (left, right or behind)
 //! and, once that root has reached it, harvests that plant too.
+//! Its root digs up out of the soil at the edge it is fed from, arches
+//! over its tile and digs back in at its front, so chains join under the
+//! ground however they turn; what it carries runs through its core.
 const m = @import("../../core/math.zig");
 const std = @import("std");
 const Allocator = std.mem.Allocator;
@@ -16,12 +19,25 @@ const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
-const root = @import("../../gfx/meshes/conduit.zig");
+const meshlib = @import("../../gfx/meshlib.zig");
 
-/// decision: a conduit grows (out from its middle to its edges) but does
-/// not sway: its root hugs the ground and joins the next conduit's, and a
-/// bend per conduit would split the joins along a chain
-pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true };
+/// decision: a conduit grows (pushing up out of the soil) but does not
+/// sway: its arches join the next conduit's under the ground, and a bend
+/// per conduit would pull them apart. It draws its own arches (`emit`),
+/// one per edge it is fed from; `mesh` (the straight one) is its preview.
+pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true, .bare = true };
+
+/// its arch by the edge it comes in at, counted from the way it faces
+/// (1 the side +Z of it in its own frame, 2 behind, 3 the other side)
+const ARCH = [4]?meshlib.Id{null, .conduit_left, .conduit, .conduit_right};
+const BEHIND:m.Dir = 2;
+/// how deep a sprouting root lies before it has pushed up out of the soil,
+/// and a side root before it has reached its plant
+const SINK:f32 = 0.35;
+const TAP_SINK:f32 = 0.15;
+/// essence waiting for room ahead shows here, where the root goes down
+const WAIT_AT:f32 = 0.86;
+const FLUTTER:f32 = 0.5;
 
 /// tiles per second an item travels along conduits
 const SPEED:f32 = 2.5;
@@ -32,11 +48,6 @@ const ROOT_WITHER:f32 = 1.5;
 /// a side root grows long first, then thickens from `TAP_GIRTH` of its girth
 const TAP_GIRTH:f32 = 0.35;
 const TAP_FLUTTER:f32 = 0.3;
-/// the carried item rides this high over the root, bobbing a little
-const RIDE:f32 = 0.1;
-const RIDE_BOB:f32 = 0.01;
-const RIDE_BOB_RATE:f32 = 2.2;
-const RIDE_GLOW:f32 = 0.8;
 
 pub const State = struct {
   /// the item in transit and how far along it is (0..1)
@@ -47,7 +58,31 @@ pub const State = struct {
   reach:[4]f32 = .{0, 0, 0, 0},
   /// which side root harvests next, so neighbours take turns
   turn:u8 = 0,
+  /// the edges roots come in at (bit per edge counted from the way it
+  /// faces, see `ARCH`), and the one the item in transit came in by
+  feeds:u8 = 1 << BEHIND,
+  came:m.Dir = BEHIND,
 };
+
+fn bit(r:m.Dir) u8 { return @as(u8, 1) << r; }
+
+/// which edges its root comes in at: from each conduit facing into it, and
+/// from behind when anything else stands there (it pulls from it) or
+/// nothing feeds it at all.
+pub fn link(ctx:st.Ctx, i:st.Id) void {
+  const self = ctx.ss.get(i);
+  var feeds:u8 = 0;
+  for ([_]m.Dir{1, 2, 3}) |r| {
+    const d = self.dir +% r;
+    const v = m.dirVec(d);
+    const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
+    const t = ctx.ss.get(j);
+    if (t.kind() == .conduit) {
+      if (t.dir == d +% 2) feeds |= bit(r);
+    } else if (r == BEHIND) feeds |= bit(r);
+  }
+  self.state.conduit.feeds = if (feeds == 0) bit(BEHIND) else feeds;
+}
 
 /// the directions a conduit sends roots: behind, then its two sides.
 fn tapDirs(d:m.Dir) [3]m.Dir { return .{d +% 2, d +% 1, d +% 3}; }
@@ -75,6 +110,7 @@ fn pull(ctx:st.Ctx, self:*st.Structure) ?items.Item {
     if (ss.get(j).kind() == .conduit) return null; // conduits push, they never pull
     const item = ss.output(j) orelse return null;
     _ = ss.get(j).inv.take(item, 1);
+    c.came = BEHIND;
     return item;
   }
   for (0..taps.len) |k| {
@@ -84,6 +120,7 @@ fn pull(ctx:st.Ctx, self:*st.Structure) ?items.Item {
     const p = ctx.plants.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
     if (st.harvestOne(ctx.plants, p)) |item| {
       c.turn = @intCast((c.turn + k + 1) % taps.len);
+      c.came = d -% self.dir;
       return item;
     }
   }
@@ -120,6 +157,8 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
     if (t.state.conduit.held != null or (back.x == -v.x and back.z == -v.z)) return false;
     t.state.conduit.held = item;
     t.state.conduit.move_t = 0;
+    // (it comes in at the edge facing this one)
+    t.state.conduit.came = (self.dir +% 2) -% t.dir;
     self.state.conduit.held = null;
     return true;
   }
@@ -134,26 +173,31 @@ pub fn release(s:*st.Structure) ?items.Item {
   return h;
 }
 
-/// the roots it has sent out to plants beside it, and the item in transit,
-/// gliding along it.
-pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
-  for (s.state.conduit.reach, 0..) |r, d| {
+/// its arches, one up out of the soil from each edge it is fed at, the
+/// item in transit running through the core of the one it came in by; and
+/// the roots it has sent out to plants beside it. Sprouting, all of it
+/// pushes up out of the soil.
+pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, _:f32) Allocator.Error!void {
+  const c = &s.state.conduit;
+  const place = m.chain(&.{m.translate(ctr - m.v3(0, SINK * (1 - m.smooth(s.grown)), 0)), m.rotY(m.dirYaw(s.dir))});
+  // (essence pulled from a plant beside it, with no arch there, runs
+  // through the first)
+  const by = if (c.feeds & bit(c.came) != 0) c.came else @as(m.Dir, @intCast(@ctz(c.feeds)));
+  const along = if (c.move_t >= 1) WAIT_AT else c.move_t;
+  const col = if (c.held) |it| color.Rgba8.of(it.info().col).toF4() else [4]f32{0, 0, 0, 0};
+  for (ARCH, 0..) |id, r| {
+    if (c.feeds & bit(@intCast(r)) == 0) continue;
+    const carry = if (c.held != null and r == by) along else -1;
+    try out.emit(id.?, place, .{.glow = s.activity, .flutter = FLUTTER, .phase = s.seed, .grown = s.grown, .carry = carry, .carry_col = .{col[0], col[1], col[2]}});
+  }
+  for (c.reach, 0..) |r, d| {
     if (r <= 0) continue;
-    // a root grows out from the conduit: longer first, then thicker
+    // a root grows out from the conduit: longer first, then thicker,
+    // coming up out of the soil as it goes
     const len = m.smooth(r) * m.smooth(s.grown);
     const girth = TAP_GIRTH + (1 - TAP_GIRTH) * m.smooth(m.clamp01(r * 1.5 - 0.5));
-    try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(@intCast(d))), m.scale3(m.v3(len, girth, girth))}), .{.flutter = TAP_FLUTTER, .phase = s.seed, .fade = st.SAP});
+    try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr - m.v3(0, TAP_SINK * (1 - len), 0)), m.rotY(m.dirYaw(@intCast(d))), m.scale3(m.v3(len, girth, girth))}), .{.flutter = TAP_FLUTTER, .phase = s.seed, .grown = len});
   }
-  const item = s.state.conduit.held orelse return;
-  const v = m.dirVec(s.dir);
-  const k = s.state.conduit.move_t - 0.5;
-  // it rides along the root, over its hump and down through its dip
-  const p = ctr + m.v3(m.f(v.x) * k, root.rise(k + 0.5) + RIDE + RIDE_BOB * @sin(tf * RIDE_BOB_RATE + s.seed * 6), m.f(v.z) * k);
-  const col = item.info().col;
-  try out.emit(.item_pod, m.translate(p), .{
-    .glow = RIDE_GLOW,
-    .tint = color.Rgba8.of(col).toF4(),
-  });
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {

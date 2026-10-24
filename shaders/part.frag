@@ -282,7 +282,7 @@ void surface() {
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets
     float tl = length(tgrad);
-    if (part == 0 && tl > 0.0) {
+    if ((part == 0 || part == 13) && tl > 0.0) {
       float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
       float lit = smoothstep(0.0, 0.3, dot(n, SUN));
       vec3 light = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.95, 0.85), pc.sun.w);

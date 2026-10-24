@@ -42,6 +42,10 @@ pub const Look = struct {
   /// which of its ends that halo draws in (1 first, 2 last, 3 both)
   halo:[4]f32 = vertex.NO_HALO,
   ends:f32 = 0,
+  /// essence carried through a conduit's core: how far along it (0..1,
+  /// < 0 none) and its colour (sRGB 0..1)
+  carry:f32 = -1,
+  carry_col:[3]f32 = .{0, 0, 0},
 };
 
 pub const Parts = struct {
@@ -137,9 +141,11 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
     .p = .{look.glow, look.flutter, look.phase, look.fade},
     .tint = look.tint,
-    // q.yzw = give
-    .q = .{0, look.give[0], look.give[1], look.give[2]},
+    // q.x = carry, q.yzw = give
+    .q = .{look.carry, look.give[0], look.give[1], look.give[2]},
     .w = .{look.sway, look.tall, look.drop, look.grown},
+    // placed by the matrix: e.yzw the carried essence's colour
+    .e = .{0, look.carry_col[0], look.carry_col[1], look.carry_col[2]},
     .h = look.halo,
   };
 }

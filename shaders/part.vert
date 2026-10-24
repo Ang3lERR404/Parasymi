@@ -9,7 +9,7 @@ layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 nrm;
 layout(location = 2) in vec4 col;
 layout(location = 3) in vec2 tu;
-layout(location = 4) in uint part;  // 0 vine 1 leaf 2 sap/glow 3 claw/thorn 4 root 5 sap-lined leaf (ear) 6 resin
+layout(location = 4) in uint part;  // 0 vine 1 leaf 2 sap/glow 3 claw/thorn 4 root 5 sap-lined leaf (ear) 6 resin ... 13 a conduit's core
 // per-instance
 layout(location = 5) in vec4 c0;
 layout(location = 6) in vec4 c1;
@@ -17,7 +17,7 @@ layout(location = 7) in vec4 c2;
 layout(location = 8) in vec4 c3;
 layout(location = 9) in vec4 ip;    // glow, flutter, phase, fade
 layout(location = 10) in vec4 tint; // rgb multiply, w amount
-layout(location = 11) in vec4 iq;   // sag, give (resin surface push)
+layout(location = 11) in vec4 iq;   // essence carried along a conduit's core (< 0 none), give (resin surface push)
 layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted, grown
 layout(location = 13) in vec4 ie;   // placement: 0 matrix, 1 curve (tail), 2 star mote; then its parameters
 layout(location = 14) in vec4 ih;   // a forming halo it belongs to: its centre, how far along (< 0 none)
@@ -92,6 +92,22 @@ void main() {
       p -= nrm * depth * g;
       nm = normalize(nrm + depth * (slope - nrm * dot(slope, nrm)));
     }
+  }
+  // a conduit's living core (part 13, tu.x 0 where it comes up out of the
+  // soil .. 1 where it goes back down): essence carried through it (iq.x
+  // how far along, < 0 none; ie.yzw its colour) swells it as it passes,
+  // pushing out between the strands woven round it, and leaves a fading
+  // wake behind. A smooth field along it, so shared vertices move alike.
+  float carried = 0.0;
+  float wake = 0.0;
+  if (part == 13u && mode == 0 && iq.x >= 0.0) {
+    const float CARRY_W = 0.075; // how long a stretch the essence fills
+    const float SWELL = 0.022;
+    const float WAKE = 0.2;
+    float d = tu.x - iq.x;
+    carried = exp(-d * d / (CARRY_W * CARRY_W));
+    wake = d < 0.0 ? exp(d / WAKE) * (1.0 - carried) : 0.0;
+    p += nrm * SWELL * carried;
   }
   // secondary motion. Offsets must be identical for every copy of a shared
   // vertex (faceted parts carry different normals per face), so they use a
@@ -245,6 +261,15 @@ void main() {
     v_glow = mix(tint[i], tint[(i + 1) % 4], fract(a));
   }
   if (part == 10u) v_glow = 0.0;
+  // a conduit's core: its sap forever runs the way it carries, in faint
+  // amber pulses (brighter while it is busy, ip.x); essence carried
+  // through it takes it over in its own colour, its wake fading behind
+  if (part == 13u) {
+    float run = pow(0.5 + 0.5 * sin(tu.x * TAU * 2.0 - t * 2.6 + ip.z * TAU), 6.0);
+    v_col = mix(v_col, vec3(1.0, 0.43, 0.08) * 0.8, run * 0.6);
+    v_col = mix(v_col, srgb2lin(clamp(ie.yzw, 0.0, 1.0)), max(carried, wake * 0.6));
+    v_glow = run * (0.1 + 0.2 * ip.x) + carried * 0.55 + wake * 0.2;
+  }
   v_part = float(part);
   v_t = tu.x;
   // a beam carries its length instead, so its rays and motes keep their size
