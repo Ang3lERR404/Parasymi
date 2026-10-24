@@ -27,7 +27,11 @@ build. New shaders go in `build.zig`'s list.
 Defaults in `controls.cfg` (rebindable there): WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
 RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate. 1–9/0/-/=/Backspace pick
 hotbar slots only; research nodes and weave recipes are clicked in their
-panels. Tab belly (weave), T research, F3 debug, Esc closes a panel else
+panels. Hotbar slots start empty: in the belly a click lifts a stack onto
+the cursor, the next puts it down (empty slot, merge, or swap: sorting by
+hand); dropped on a hotbar slot it assigns that item (any item); a lifted
+hotbar item swaps or, dropped elsewhere, comes off; RMB clears a hotbar
+slot. Hovering a slot shows the item's full name. Tab belly (weave), T research, F3 debug, Esc closes a panel else
 pauses (Q in pause = save and quit), F5 save, F9 load, F11 fullscreen.
 Free cam: click to look, WASD fly (Shift fast), Space/Ctrl+Space rise/sink,
 Q/E roll, wheel dolly; eases back in 0.3 s.
@@ -75,7 +79,7 @@ registry kinds outside the registry file; add a hook.
 |---|---|---|
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
-| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground`, `field`, `hold` |
+| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
 | render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |
@@ -181,10 +185,10 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   wither (0.06 HP/s) outside every field. Worked out per tick from blooms
   only (pairwise links, then each radiating bloom's tiles). Hover panel
   shows RADIATING/DARK + links, DRAWING RADIANCE/WITHERING. Seed: 3
-  starlight + 1 ley shard + 2 essence (hotbar `-`).
+  starlight + 1 ley shard + 2 essence.
 - Halo (`structures/polyp.zig`, `halo.zig` shared, `diamond.zig`): a
-  polyp (1×1, grows 6 s; 4 fibre + 3 essence + 2 starlight + 2 ley shard,
-  hotbar `=`) checks each tick for grown blooms (HP > 0.5) on the four
+  polyp (1×1, grows 6 s; 4 fibre + 3 essence + 2 starlight + 2 ley shard)
+  checks each tick for grown blooms (HP > 0.5) on the four
   points 5 tiles out E/S/W/N. Then, once ever, over 5 s: the blooms spiral
   in to where their cross of beams meets, the ring's heart at bloom hover
   (share ∝ e^(4k), 1.25 turns) and fold to buds, all on the GPU
@@ -199,7 +203,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   `Def.floating`/`hover`/`bare`) is put down; the polyp stays as it is. Ring field: radius 5 while
   forming; diamond field: radius 7. Points without a grown bloom dim their
   arcs to 0.3. A diamond discovers `.diamond`, opening CELESTIAL
-  DEFRAGMENTATION, which lets diamonds be woven (hotbar BKSP) and put over
+  DEFRAGMENTATION, which lets diamonds be woven and put over
   any dry tile (they gather as they grow, then flash). The diamond is the
   world event's future launch point. Demo: west of the garden, the fourth
   bloom finishes ~20 s in.
@@ -277,7 +281,13 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   adds the glow (0.7), rolls highlights off above 0.8 and a faint vignette;
   `Desc.screen` passes (UI) draw on top. ~0.1 ms.
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow, stems
-  (`Draw.limb`) and leaves/buds (`Draw.leaf`); 150 ms anim.
+  (`Draw.limb`) and leaves/buds (`Draw.leaf`), seeds (`Draw.grain`) and
+  gems (`Draw.gem`); 150 ms anim.
+- Item icons (`game/icon.zig`): a structure's bulb is a split seed with a
+  sprout or two showing what it does (its `icon` hook, drawn with the
+  `Icon` kit: `coat`, `stem` along a Bézier, `leaf`, `bud`, `glow`, `gem`,
+  `kernel`; sprouts sway); any other item is its colour fill with its
+  short name, for now.
 - Research panel (T, `hud/research.zig`) is a sapling in soil, laid out
   from the prerequisites alone, so it never needs placing or adjusting:
   - Adding research: one file in `research/` + one line in `techs`. Set

@@ -8,12 +8,14 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const color = @import("../../core/color.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 const root = @import("../../gfx/meshes/conduit.zig");
 
 /// decision: a conduit grows (out from its middle to its edges) but does
@@ -157,3 +159,18 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.carries, .{if (s.state.conduit.held) |it| txt.item(it).name else txt.s.describe.nothing});
 }
+
+/// its bulb: a root arching out of the seed and diving back in beside it,
+/// a bead of essence running along it (it carries things one way).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  const arch = [4]icon_kit.P{.{0, icon_kit.TOP}, .{-0.15, 0.62}, .{0.78, 0.9}, .{0.7, 0.02}};
+  try ic.stem(arch, 0.13, icon_root);
+  try ic.leaf(.{-0.04, 0.32}, 2.5, 0.32, 0.18, icon_kit.sprout, 0.9);
+  const k = @mod(ic.t * ICON_RUN + ic.phase, 1);
+  try ic.bud(icon_kit.curve(arch, k), 0.09, icon_bead, @sin(k * m.pi));
+  try ic.coat(col);
+}
+const icon_root:Color = .{150, 112, 72, 255};
+const icon_bead:Color = .{255, 215, 120, 255};
+/// beads along the arch a second
+const ICON_RUN:f32 = 0.45;

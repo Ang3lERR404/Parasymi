@@ -1,15 +1,18 @@
 //! GERMINATOR: weaves seeds by itself from what it is fed, running the same
 //! recipes the wolf weaves by hand (only the seed ones), at its own pace.
 const std = @import("std");
+const m = @import("../../core/math.zig");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const craft = @import("../craft.zig");
 const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 
 pub const def:st.Def = .{ .item = .germinator, .size = 2, .mesh = .germinator, .sway = 0.9, .tall = 1.05, .grow = 6 };
 
@@ -67,3 +70,15 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
 
 // a fresh germinator starts on recipe 0, which must be a seed weave
 comptime { assert(craft.isSeedRecipe(0)); }
+
+/// its bulb: a sprout whose two cupped leaves cradle a new seed (it weaves seeds).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  try ic.stem(.{.{0, icon_kit.TOP}, .{0, 0.3}, .{0.06, 0.4}, .{0, 0.5}}, 0.11, icon_kit.stem_col);
+  try ic.glow(.{0, 0.72}, 0.28, icon_glow);
+  try ic.kernel(.{0, 0.74}, 0.42, icon_seed);
+  try ic.leaf(.{0, 0.48}, 0.4, 0.46, 0.3, icon_kit.sprout, 0.55);
+  try ic.leaf(.{0, 0.48}, m.pi - 0.4, 0.46, 0.3, icon_kit.sprout, 0.55);
+  try ic.coat(col);
+}
+const icon_seed:Color = .{120, 240, 220, 255};
+const icon_glow:Color = .{150, 255, 200, 70};

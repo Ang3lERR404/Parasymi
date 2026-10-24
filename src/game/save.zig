@@ -17,6 +17,7 @@ const Rng = @import("../core/rng.zig").Rng;
 const ck = @import("../world/chunk.zig");
 const gen = @import("../world/gen.zig");
 const species = @import("../sim/species.zig");
+const items = @import("../sim/items.zig");
 const prog = @import("progression.zig");
 const craft = @import("craft.zig");
 const st = @import("structures.zig");
@@ -26,10 +27,14 @@ const txt = @import("text.zig");
 
 const Game = play.Game;
 const Belly = @FieldType(player_mod.Player, "inv");
+/// a hotbar slot is stored as its item's id, or this when empty
+const NO_ITEM:u8 = 0xff;
+const item_count = std.meta.fields(items.Item).len;
+comptime { std.debug.assert(item_count < NO_ITEM); }
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 8;
+const VERSION:u32 = 9;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;
@@ -116,6 +121,9 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
   try w.put(f32, g.sky.tod);
   try w.put(f64, g.time);
   try w.put(u32, @intCast(g.hot));
+  var bar:[play.BAR]u8 = undefined;
+  for (g.bar, &bar) |b, *o| o.* = if (b) |it| @intFromEnum(it) else NO_ITEM;
+  try w.put([play.BAR]u8, bar);
   try w.put(m.Dir, g.place_dir);
   try w.put(m.V3, g.player.pos);
   try w.put(f32, g.player.facing);
@@ -167,7 +175,10 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
   g.sky.tod = try r.get(f32);
   g.time = try r.get(f64);
   g.hot = try r.get(u32);
-  if (g.hot >= play.hotbar.len) return error.CorruptSave;
+  if (g.hot >= play.BAR) return error.CorruptSave;
+  for (try r.get([play.BAR]u8), &g.bar) |b, *o| o.* = if (b == NO_ITEM) null
+    else if (b < item_count) @enumFromInt(b)
+    else return error.CorruptSave;
   g.place_dir = try r.get(m.Dir);
   g.player.pos = try r.get(m.V3);
   g.player.facing = try r.get(f32);

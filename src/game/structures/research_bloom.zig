@@ -6,11 +6,13 @@ const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 
 pub const def:st.Def = .{ .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0, .grow = 8 };
 
@@ -74,3 +76,20 @@ pub fn describe(_:*const st.Structure, d:*Draw, g:*const prog.Progression, x:f32
   _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.studies, .{txt.research(id).name});
   try d.tendril(x + style.desc_bar_x, y + 2, style.desc_bar_w, style.bar_h, style.research_tendril, m.ratio(g.progress.get(id), r.units), 0.3);
 }
+
+/// its bulb: a sprout opening into a violet flower (it studies).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  const top:icon_kit.P = .{0, 0.68};
+  try ic.stem(.{.{0, icon_kit.TOP}, .{0.12, 0.35}, .{-0.12, 0.55}, top}, 0.11, icon_kit.stem_col);
+  try ic.leaf(.{0.04, 0.32}, 0.25, 0.3, 0.17, icon_kit.sprout, 0.9);
+  try ic.glow(top, 0.32, icon_glow);
+  for (0..ICON_PETALS) |i| {
+    try ic.leaf(top, m.pi / 2.0 + m.tau * m.ratio(i, ICON_PETALS), 0.3, 0.2, icon_petal, 1);
+  }
+  try ic.bud(top, 0.08, icon_core, 1);
+  try ic.coat(col);
+}
+const ICON_PETALS = 5;
+const icon_petal:Color = .{200, 150, 255, 255};
+const icon_core:Color = .{255, 215, 130, 255};
+const icon_glow:Color = .{200, 160, 255, 80};

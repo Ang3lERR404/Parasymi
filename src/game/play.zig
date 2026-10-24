@@ -6,6 +6,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const eqlDeep = std.meta.eql;
+const swap = std.mem.swap;
 const m = @import("../core/math.zig");
 const Rng = @import("../core/rng.zig").Rng;
 const ck = @import("../world/chunk.zig");
@@ -71,13 +72,16 @@ const SPAWN_STEP = 3;
 const PICK_STEP:f32 = 0.1;
 const PICK_RANGE_MULT:f32 = 4;
 
-/// everything the wolf can put into the world, in hotbar slot order
-/// (`ctl.slots`).
-pub const hotbar = [_]items.Item{
-  .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
-  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom, .polyp, .diamond,
-};
-comptime { std.debug.assert(hotbar.len == ctl.slots.len); }
+/// hotbar slots, in `ctl.slots` order. Each is empty or holds an item the
+/// gardener dropped on it from the belly; it shows how many the belly holds.
+pub const BAR = ctl.slots.len;
+/// UI time handed to HUD motion wraps after this many seconds
+const UI_WRAP:f64 = 1000;
+
+/// what the cursor carries (one click lifts, the next puts down): a belly
+/// slot's stack, or a hotbar slot's item. It stays where it was until put
+/// down, so closing the belly or saving loses nothing.
+pub const Held = union(enum) { slot:usize, bar:usize };
 
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
 pub fn known(g:*const Game, item:items.Item) bool {
@@ -135,7 +139,15 @@ pub const Game = struct {
   /// keeps running while paused, so the UI still breathes.
   ui_time:f64 = 0,
 
+  /// the hotbar's items and the selected slot
+  bar:[BAR]?items.Item = @splat(null),
   hot:usize = 0,
+  held:?Held = null,
+  /// the cursor, in screen pixels (tooltips and what is carried follow it)
+  mouse:[2]f32 = .{0, 0},
+  /// a click spent putting down or dropping what was carried does nothing
+  /// in the garden until the button is let go
+  use_spent:bool = false,
   /// facing for the next structure placed (R rotates)
   place_dir:m.Dir = 0,
   debug:bool = false,
@@ -263,13 +275,34 @@ pub const Game = struct {
     };
 
     // a click lands on the HUD panel under the mouse before the world: rows
-    // choose research or weave a recipe; a panel's backdrop just absorbs it
+    // choose research, weave a recipe, lift or put down an item; a panel's
+    // backdrop just absorbs it
+    g.mouse = in.mouse;
+    if (g.mode != .belly) g.held = null;
+    if (g.held) |h| switch (h) {
+      .slot => |i| if (g.player.inv.slot[i] == null) { g.held = null; },
+      .bar => |i| if (g.bar[i] == null) { g.held = null; },
+    };
     const ui_hit = if (inspecting) null else g.rows.at(in.mouse);
     g.pointed = ui_hit;
-    if (ctl.pressed(in, .use)) if (ui_hit) |hit| switch (hit) {
-      .panel => {},
-      .research => |id| g.prog.select(id),
-      .weave => |i| actions.weaveByHand(g, i),
+    if (!ctl.down(in, .use)) g.use_spent = false;
+    if (ctl.pressed(in, .use)) {
+      if (ui_hit) |hit| switch (hit) {
+        .panel, .research, .weave => if (g.held != null) g.drop() else switch (hit) {
+          .research => |id| g.prog.select(id),
+          .weave => |i| actions.weaveByHand(g, i),
+          else => {},
+        },
+        .slot => |i| g.clickSlot(i),
+        .bar => |i| if (g.mode == .belly) g.clickBar(i) else { g.hot = i; },
+      } else if (g.held != null) {
+        g.drop();
+        g.use_spent = true;
+      }
+    }
+    if (ctl.pressed(in, .uproot)) if (ui_hit) |hit| switch (hit) {
+      .bar => |i| g.bar[i] = null,
+      else => {},
     };
 
     // movement relative to the camera
@@ -314,7 +347,7 @@ pub const Game = struct {
     if (g.hover) |h| if (g.player.inReach(h[0], h[1])) if (g.world.chunkOfTile(h[0], h[1])) |c| {
       const t = ck.localIndex(h[0], h[1]);
       const on_struct = g.structs.at(&g.world, h[0], h[1]);
-      if (ctl.down(in, .use) and on_struct == null and ui_hit == null) {
+      if (ctl.down(in, .use) and on_struct == null and ui_hit == null and !g.use_spent) {
         if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
       }
@@ -324,7 +357,7 @@ pub const Game = struct {
         } else actions.harvest(g, h);
       }
       if (ctl.pressed(in, .configure)) if (on_struct) |j| st.configure(g.structs.get(j), &g.prog);
-      if (ctl.pressed(in, .uproot)) {
+      if (ctl.pressed(in, .uproot) and ui_hit == null) {
         if (on_struct) |j| actions.unbuild(g, j)
         else if (g.plants.removeAt(&g.world, h[0], h[1])) _ = g.player.inv.add(.fibre, 1);
         g.linger = actions.LINGER_PUT;
@@ -350,6 +383,78 @@ pub const Game = struct {
     try g.world.stream(g.focus(), STREAM_RADIUS, STREAM_FRAME);
     try g.world.far(g.focus(), STREAM_RADIUS, &g.far);
     for (g.far.items) |c| try g.world.unload(c);
+  }
+
+  /// is the cursor carrying `h`?
+  pub fn holds(g:*const Game, h:Held) bool { return if (g.held) |x| eqlDeep(x, h) else false; }
+  /// is the mouse over `p`?
+  pub fn points(g:*const Game, p:hud.Pick) bool { return if (g.pointed) |x| eqlDeep(x, p) else false; }
+  /// UI seconds, kept small enough for f32 sway and pulses.
+  pub fn uiT(g:*const Game) f32 { return @floatCast(@mod(g.ui_time, UI_WRAP)); }
+
+  /// the selected hotbar slot's item, if it holds one.
+  pub fn selected(g:*const Game) ?items.Item { return g.bar[g.hot]; }
+
+  /// what the cursor carries, if anything.
+  pub fn carried(g:*const Game) ?items.Item {
+    const h = g.held orelse return null;
+    return switch (h) {
+      .slot => |i| if (g.player.inv.slot[i]) |s| s.item else null,
+      .bar => |i| g.bar[i],
+    };
+  }
+
+  /// a click on belly slot `i`: lift its stack, or put down what is carried
+  /// there (into an empty slot, onto a stack of the same item as far as it
+  /// fits, else trading places with what is there). A hotbar item carried
+  /// off its slot is taken off the hotbar.
+  fn clickSlot(g:*Game, i:usize) void {
+    const slot = &g.player.inv.slot;
+    const h = g.held orelse {
+      if (slot[i] != null) g.held = .{.slot = i};
+      return;
+    };
+    g.held = null;
+    switch (h) {
+      .bar => |j| g.bar[j] = null,
+      .slot => |j| {
+        if (j == i) return;
+        if (slot[j]) |*from| if (slot[i]) |*to| if (to.item == from.item) {
+          const k = @min(from.n, to.item.info().stack -| to.n);
+          to.n += k;
+          from.n -= k;
+          // what did not fit stays in hand
+          if (from.n == 0) slot[j] = null else g.held = .{.slot = j};
+          return;
+        };
+        swap(?items.Stack, &slot[i], &slot[j]);
+      },
+    }
+  }
+
+  /// a click on hotbar slot `i`: put what is carried there (a belly stack
+  /// assigns its item, a hotbar item trades places), or lift its item.
+  fn clickBar(g:*Game, i:usize) void {
+    const h = g.held orelse {
+      if (g.bar[i] != null) g.held = .{.bar = i};
+      return;
+    };
+    g.held = null;
+    switch (h) {
+      .slot => |j| g.bar[i] = if (g.player.inv.slot[j]) |s| s.item else g.bar[i],
+      .bar => |j| swap(?items.Item, &g.bar[i], &g.bar[j]),
+    }
+  }
+
+  /// put down what is carried anywhere but a slot: a belly stack goes back
+  /// where it was, a hotbar item comes off the hotbar.
+  fn drop(g:*Game) void {
+    const h = g.held orelse return;
+    g.held = null;
+    switch (h) {
+      .slot => {},
+      .bar => |i| g.bar[i] = null,
+    }
   }
 
   /// enter or leave the free camera. Leaving gives the cursor back and eases
@@ -435,6 +540,25 @@ test "the wolf stays put without input" {
   try testing.expectApproxEqAbs(start[0], g.player.pos[0], 0.05);
   try testing.expectApproxEqAbs(start[2], g.player.pos[2], 0.05);
 }
+/// headless clicks on the HUD
+const click = struct {
+  /// press the left button over the middle of the first row picking `want`
+  fn on(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32) !void {
+    try hud.build(gg, sc);
+    for (gg.rows.rect[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
+      if (!eqlDeep(p, want)) continue;
+      i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
+      i.advance();
+      ctl.hold(i, .use, true);
+      try gg.update(i, TICK, sc);
+      i.advance();
+      ctl.hold(i, .use, false);
+      return;
+    }
+    return error.TestUnexpectedResult;
+  }
+};
+
 test "clicking a research node or weave recipe picks it; number keys only pick the hotbar" {
   const gpa = testing.allocator;
   var g = try Game.init(gpa, DEFAULT_SEED);
@@ -443,23 +567,6 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   try ctl.fill(@embedFile("controls.cfg"));
   defer ctl.unload();
   var in:Input = .{.win = undefined};
-  const click = struct {
-    /// press the left button over the middle of the first row picking `want`
-    fn on(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32) !void {
-      try hud.build(gg, sc);
-      for (gg.rows.rect[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
-        if (!eqlDeep(p, want)) continue;
-        i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
-        i.advance();
-        ctl.hold(i, .use, true);
-        try gg.update(i, TICK, sc);
-        i.advance();
-        ctl.hold(i, .use, false);
-        return;
-      }
-      return error.TestUnexpectedResult;
-    }
-  };
 
   g.mode = .research;
   try click.on(&g, &in, .{.research = .ley_sight}, screen);
@@ -479,4 +586,56 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   try g.update(&in, TICK, screen);
   try testing.expectEqual(@as(usize, 2), g.hot);
   try testing.expectEqual(@as(usize, 1), g.weave.len);
+}
+
+test "a click lifts a stack, the next puts it down; dropped on the hotbar it assigns" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  const screen = TEST_SCREEN;
+  try ctl.fill(@embedFile("controls.cfg"));
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  for (g.bar) |b| try testing.expect(b == null);
+  g.mode = .belly;
+  g.player.inv = .{};
+  g.player.inv.slot[0] = .{.item = .fibre, .n = 30};
+  g.player.inv.slot[1] = .{.item = .conduit, .n = 3};
+  g.player.inv.slot[2] = .{.item = .fibre, .n = 40};
+
+  // sort by hand: into an empty slot, then trade places
+  try click.on(&g, &in, .{.slot = 0}, screen);
+  try testing.expectEqual(@as(?items.Item, .fibre), g.carried());
+  try click.on(&g, &in, .{.slot = 5}, screen);
+  try testing.expect(g.held == null and g.player.inv.slot[0] == null);
+  try testing.expectEqual(@as(u16, 30), g.player.inv.slot[5].?.n);
+  try click.on(&g, &in, .{.slot = 5}, screen);
+  try click.on(&g, &in, .{.slot = 1}, screen);
+  try testing.expectEqual(items.Item.fibre, g.player.inv.slot[1].?.item);
+  try testing.expectEqual(items.Item.conduit, g.player.inv.slot[5].?.item);
+  // onto a stack of the same: as much as fits, the rest stays in hand
+  try click.on(&g, &in, .{.slot = 1}, screen);
+  try click.on(&g, &in, .{.slot = 2}, screen);
+  try testing.expectEqual(@as(u16, 50), g.player.inv.slot[2].?.n);
+  try testing.expectEqual(@as(u16, 20), g.player.inv.slot[1].?.n);
+  try testing.expect(g.holds(.{.slot = 1}));
+  try click.on(&g, &in, .{.slot = 1}, screen);
+  try testing.expect(g.held == null);
+
+  // onto the hotbar: the slot takes the item, the stack stays in the belly
+  try click.on(&g, &in, .{.slot = 5}, screen);
+  try click.on(&g, &in, .{.bar = 3}, screen);
+  try testing.expectEqual(@as(?items.Item, .conduit), g.bar[3]);
+  try testing.expectEqual(@as(u32, 3), g.player.inv.count(.conduit));
+  // hotbar items trade places, and come off when dropped elsewhere
+  try click.on(&g, &in, .{.bar = 3}, screen);
+  try click.on(&g, &in, .{.bar = 0}, screen);
+  try testing.expect(g.bar[3] == null and g.bar[0] == .conduit);
+  g.mode = .roam;
+  try click.on(&g, &in, .{.bar = 0}, screen);
+  try testing.expectEqual(@as(?items.Item, .conduit), g.selected());
+  g.mode = .belly;
+  try click.on(&g, &in, .{.bar = 0}, screen);
+  try click.on(&g, &in, .panel, screen);
+  try testing.expect(g.bar[0] == null and g.selected() == null);
 }

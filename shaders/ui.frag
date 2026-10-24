@@ -162,6 +162,73 @@ vec4 leaf(vec2 px, float open, float seed) {
   return vec4(col, cover * v_col.a * mix(0.96, 0.85, margin));
 }
 
+// a seed standing on its round end, its pointed top (where it breaks open)
+// up: a lit, ridged coat with a darker seam down from the tip that splits
+// open by `crack` to show green inside, and a pale hilum scar at its foot.
+vec4 seedCoat(vec2 px, float crack, float seed) {
+  float t = pc.time;
+  vec2 inner = v_size - 2.0 * PAD;
+  vec2 c = px - v_size * 0.5;
+  vec2 h = inner * 0.5;
+  vec2 q = c / h;                            // -1..1, y down
+  float breathe = 1.0 + 0.02 * sin(t * 1.6 + seed * 6.0);
+  // narrower toward the top: an egg drawn to a soft point
+  float w = mix(0.55, 1.0, smoothstep(-1.0, 0.4, q.y));
+  vec2 e = vec2(q.x / w, q.y) / breathe;
+  float l = length(e);
+  float d = (l - 1.0) * min(h.x * w, h.y);
+  float cover = smoothstep(0.8, -0.8, d);
+  vec3 n = normalize(vec3(e.x, e.y, sqrt(max(0.0, 1.0 - min(l * l, 1.0)))));
+  float shade = 0.45 + 0.55 * max(dot(n, normalize(vec3(-0.55, -0.6, 0.6))), 0.0);
+  float ridge = 0.9 + 0.1 * sin(atan(e.x, 1.0 - e.y) * 9.0 + seed * 5.0);
+  float speck = vnoise(c * 0.4 + seed * 13.0);
+  vec3 col = v_col.rgb * shade * ridge * (0.88 + 0.2 * speck);
+  // the seam, splitting from the tip
+  float reach = mix(0.15, 0.85, crack);
+  float along = smoothstep(-1.0 + reach, -1.0, q.y);
+  float gap = (0.02 + 0.16 * crack * along) * h.x;
+  float seam = smoothstep(gap + 1.0, gap, abs(c.x + sin(q.y * 4.0 + seed) * 0.6)) * step(q.y, -1.0 + reach + 0.1);
+  vec3 inside = mix(vec3(0.15, 0.3, 0.12), vec3(0.45, 0.85, 0.35), along);
+  col = mix(col, crack > 0.01 ? inside : col * 0.5, seam * along);
+  // the hilum and a thin darker rim
+  float hilum = smoothstep(0.22, 0.12, length((q - vec2(0.0, 0.82)) * vec2(1.0, 2.2)));
+  col = mix(col, v_col.rgb * 1.25 + 0.1, hilum * 0.6);
+  col *= mix(1.0, 0.55, smoothstep(-2.0, 0.0, d));
+  float glint = smoothstep(0.3, 0.0, length(q - vec2(-0.35, -0.2))) * 0.35;
+  return vec4(col + glint, cover * v_col.a);
+}
+
+// a cut gem: a flat table, a crown of facets over the girdle, a pavilion
+// drawn to a point. Each facet catches light in turn (spectral fire), the
+// edges are bright lines.
+vec4 gem(vec2 px, float lit, float seed) {
+  float t = pc.time;
+  vec2 c = px - v_size * 0.5;
+  float R = (v_size.x - 2.0 * PAD) * 0.5;
+  vec2 q = c / R;
+  vec2 a = vec2(abs(q.x), q.y);
+  vec2 n1 = normalize(vec2(0.5, -0.55));
+  vec2 n2 = normalize(vec2(1.2, 1.0));
+  float dTop = -q.y - 0.62;
+  float dCrown = dot(a - vec2(1.0, -0.15), n1);
+  float dPav = dot(a - vec2(1.0, -0.15), n2);
+  float d = max(max(dTop, dCrown), dPav) * R;
+  float cover = smoothstep(0.8, -0.8, d);
+  bool crown = q.y < -0.15;
+  // facets: sectors about the culet below the girdle, table and bevels above
+  float sector = crown ? floor((q.x + 1.0) * 2.5) : floor(atan(q.x, 1.0 - q.y) * 5.0 + 5.0);
+  float f = hash(vec2(sector, crown ? 7.0 : 3.0) + seed * 17.0);
+  float fire = pow(0.5 + 0.5 * sin(t * 1.7 + f * 6.2832), 4.0);
+  vec3 spec = 0.6 + 0.4 * cos(6.2832 * (f + t * 0.05 + vec3(0.0, 0.33, 0.67)));
+  float shade = crown ? 0.85 + 0.15 * f : 0.55 + 0.35 * f;
+  vec3 col = v_col.rgb * shade + spec * fire * 0.45 * (0.5 + lit);
+  // edges: girdle, table and facet seams
+  float edge = smoothstep(1.4, 0.0, abs(q.y + 0.15) * R) + smoothstep(1.2, 0.0, abs(dTop) * R) + smoothstep(1.0, 0.0, -d);
+  col += vec3(1.0, 0.97, 0.9) * min(edge, 1.0) * 0.4;
+  float star = smoothstep(0.25, 0.0, length(q - vec2(-0.3, -0.35))) * (0.5 + 0.5 * sin(t * 2.3 + seed * 4.0));
+  return vec4(col + star * 0.6, cover * v_col.a);
+}
+
 // is glyph cell q set? (5x7 bitmap, row-major, bit 0 top-left)
 bool lit(ivec2 q) {
   if (q.x < 0 || q.y < 0 || q.x >= 5 || q.y >= 7) return false;
@@ -179,7 +246,9 @@ void main() {
       case 2u: c = tendril(v_uv, v_param.x, v_param.y); break;
       case 3u: c = glow(v_uv); break;
       case 4u: c = limb(v_uv, v_param.x, v_param.y); break;
-      default: c = leaf(v_uv, v_param.x, v_param.y); break;
+      case 5u: c = leaf(v_uv, v_param.x, v_param.y); break;
+      case 6u: c = seedCoat(v_uv, v_param.x, v_param.y); break;
+      default: c = gem(v_uv, v_param.x, v_param.y); break;
     }
     if (c.a < 0.003) discard;
     o = c;

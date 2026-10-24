@@ -9,6 +9,7 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
 const m = @import("../../core/math.zig");
+const icon = @import("../icon.zig");
 
 const cols = 6;
 const rows = player_mod.SLOTS / cols;
@@ -19,6 +20,11 @@ const pw:f32 = 780;
 const header_h:f32 = 72;
 const weave_row_h:f32 = 52;
 const panel_lift:f32 = 30; // shift up to clear the hotbar
+const slot_r:f32 = 24;
+const lifted_alpha:u8 = 50;
+/// a recipe's output, and how faded while it cannot be woven yet
+const recipe_r:f32 = 15;
+const unready_alpha:u8 = 150;
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .belly; }
 
@@ -34,6 +40,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   g.rows.add(px, py, pw, ph, .panel);
   _ = try d.text(px + 72, py + 30, s.text_title, s.gold, txt.s.hud.belly_title);
   _ = try d.print(px + pw - 200, py + 38, s.text_sub, s.dim, txt.s.hud.belly_fill, .{g.player.inv.fill() * 100});
+  _ = try d.text(px + 72, py + 58, s.text_fine, s.dim, txt.s.hud.belly_hint);
 
   var y = py + header_h;
   try slots(g, d, px, y);
@@ -41,20 +48,25 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   try weaves(g, d, px, y);
 }
 
+/// the slots, in the order the gardener keeps them: a click lifts a stack
+/// onto the cursor, the next puts it down (play.Game.clickSlot).
 fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) Allocator.Error!void {
   const gx = px + (pw - gap * cols) / 2;
+  const t = g.uiT();
+  const carrying = g.held != null;
   for (g.player.inv.slot, 0..) |slot, i| {
     const cx = gx + gap * (m.f(i % cols) + 0.5);
     const cy = py + gap * (m.f(i / cols) + 0.5);
-    if (slot) |st| {
-      const info = st.item.info();
-      const full = m.ratio(st.n, info.stack);
-      try d.pod(cx, cy, 24, info.col, 0.3 + 0.7 * full, m.f(i) * 0.13);
-      _ = try d.text(cx - 12, cy - 12, s.text_heading, s.dark, txt.item(st.item).short);
-      _ = try d.number(cx - 10, cy + 8, s.text_note, s.white, st.n);
-    } else {
-      try d.pod(cx, cy, 19, s.pod_empty, 0, m.f(i) * 0.13);
-    }
+    const phase = m.f(i) * 0.13;
+    g.rows.add(cx - gap / 2, cy - gap / 2, gap, gap, .{.slot = i});
+    if (g.points(.{.slot = i})) try d.glow(cx, cy, 36, if (carrying) s.drop_target else s.slot_hover);
+    try d.pod(cx, cy, 21, s.pod_empty, 0, phase);
+    const it = slot orelse continue;
+    // lifted onto the cursor: only a faint trace stays behind
+    const lifted = g.holds(.{.slot = i});
+    const full = m.ratio(it.n, it.item.info().stack);
+    try icon.draw(d, it.item, .{cx, cy}, slot_r, t, phase, 0.3 + 0.7 * full, if (lifted) lifted_alpha else 255);
+    if (!lifted) try icon.count(d, .{cx, cy}, slot_r, it.n);
   }
 }
 
@@ -73,8 +85,8 @@ fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
     g.rows.add(colx - 10, y - 24, col_w - 20, weave_row_h, .{.weave = i});
     const open = r.unlocked(&g.prog);
     const ok = open and craft.Crafter.can(g.player.inv.bag(), r);
-    const info = r.out.info();
-    try d.pod(colx + 16, y, 15, if (open) info.col else s.unknown, if (ok) 0.9 else 0.1, m.f(i) * 0.5);
+    if (open) try icon.draw(d, r.out, .{colx + 16, y}, recipe_r, g.uiT(), m.f(i) * 0.5, if (ok) 0.9 else 0.1, if (ok) 255 else unready_alpha)
+    else try d.pod(colx + 16, y, recipe_r, s.unknown, 0.1, m.f(i) * 0.5);
     if (!open) {
       const need_name = if (r.needs) |n| txt.research(n).name else txt.s.hud.unknown;
       _ = try d.print(colx + 40, y - 14, s.text_body, s.unknown, txt.s.hud.recipe_needs, .{need_name});

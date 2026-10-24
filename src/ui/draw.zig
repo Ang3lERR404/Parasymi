@@ -28,6 +28,11 @@ pub const Shape = enum(u32) {
   /// leaf blade from its base along the quad; param.x = how open (0 is a
   /// closed bud), param.y = seed
   leaf,
+  /// a seed on its round end, pointed top up; param.x = how far its seam
+  /// has split open, param.y = seed
+  grain,
+  /// a cut gem, table up; param.x = how much fire, param.y = seed
+  gem,
 };
 
 const shape_mark:u32 = 0xffff_ffff;
@@ -104,6 +109,13 @@ pub const Draw = struct {
   /// a leaf (or, closed, a bud) growing from `base` at screen angle `ang`.
   pub fn leaf(d:*Draw, base:[2]f32, ang:f32, len:f32, wid:f32, col:Color, open:f32, seed:f32) Allocator.Error!void {
     try d.along(.leaf, base, .{@cos(ang), @sin(ang)}, len, wid, col, .{m.clamp01(open), seed});
+  }
+  /// a seed `w` x `h` centred on (cx, cy), split open by `crack`.
+  pub fn grain(d:*Draw, cx:f32, cy:f32, w:f32, h:f32, col:Color, crack:f32, phase:f32) Allocator.Error!void {
+    try d.shape(.grain, cx - w / 2, cy - h / 2, w, h, col, .{m.clamp01(crack), phase});
+  }
+  pub fn gem(d:*Draw, cx:f32, cy:f32, r:f32, col:Color, fire:f32, phase:f32) Allocator.Error!void {
+    try d.shape(.gem, cx - r, cy - r, 2 * r, 2 * r, col, .{fire, phase});
   }
 
   /// returns the x after the last glyph.

@@ -49,7 +49,9 @@ pub fn gather(g:*Game, c:*ck.Chunk, t:usize, dt:f32) bool {
 
 /// put the selected hotbar item into the world: sow a seed or grow a bulb.
 pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
-  const item = play.hotbar[g.hot];
+  const item = g.selected() orelse return;
+  // anything but a seed or a bulb stays in the belly
+  if (item.plants() == null and st.kindOf(item) == null) return;
   if (!play.known(g, item)) return;
   if (g.player.inv.count(item) == 0) {
     g.prog.say(txt.s.msg.no_item, .{txt.item(item).name});
@@ -70,7 +72,7 @@ pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
 }
 
 pub fn canPut(g:*const Game, h:[2]i32) bool {
-  const item = play.hotbar[g.hot];
+  const item = g.selected() orelse return false;
   if (item.plants()) |sp| return g.plants.canPlace(&g.world, h[0], h[1], sp);
   if (st.kindOf(item)) |k| return g.structs.canPlace(&g.world, h[0], h[1], k);
   return false;

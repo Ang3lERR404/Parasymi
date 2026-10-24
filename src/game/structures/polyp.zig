@@ -15,11 +15,13 @@ const m = @import("../../core/math.zig");
 const species = @import("../../sim/species.zig");
 const Field = @import("../../sim/ecology.zig").Field;
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 const halo = @import("halo.zig");
 
 pub const def:st.Def = .{ .item = .polyp, .size = 1, .mesh = .polyp, .sway = 0.4, .tall = 0.9, .grow = 6, .sap = 0.6 };
@@ -188,3 +190,23 @@ test "four grown blooms on a polyp's points form a halo; the diamond it leaves p
   _ = ss.remove(&w, dia);
   try testing.expectEqual(st.Kind.polyp, ss.get(ss.at(&w, px, py).?).kind());
 }
+
+/// its bulb: a pearl bud on a sprout, threads of light running out to four
+/// blooms on a ring round it (it calls the halo).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  const heart:icon_kit.P = .{0, 0.6};
+  const points = [_]icon_kit.P{.{-0.5, 0.6}, .{0, 0.86}, .{0.5, 0.6}, .{0, 0.38}};
+  for (points) |q| try ic.stem(.{heart, heart, q, q}, 0.06, icon_thread);
+  try ic.stem(.{.{0, icon_kit.TOP}, .{0.08, 0.3}, .{-0.06, 0.45}, heart}, 0.1, icon_kit.stem_col);
+  try ic.glow(heart, 0.25, icon_glow);
+  try ic.bud(heart, 0.12, icon_pearl, 0.6);
+  for (points, 0..) |q, i| {
+    const lit = 0.5 + 0.5 * @sin(ic.t * 2 + m.f(i) * 1.6);
+    try ic.bud(q, 0.11, icon_bloom, lit);
+  }
+  try ic.coat(col);
+}
+const icon_thread:Color = .{255, 236, 180, 200};
+const icon_pearl:Color = .{235, 205, 230, 255};
+const icon_bloom:Color = .{140, 255, 215, 255};
+const icon_glow:Color = .{255, 236, 200, 80};

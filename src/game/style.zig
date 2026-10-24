@@ -34,6 +34,11 @@ pub const membrane:C = .{30, 22, 40, 225};
 pub const skin:C = .{24, 40, 30, 215};
 /// empty inventory slot
 pub const pod_empty:C = .{40, 55, 45, 160};
+/// a slot under the mouse; one that will take what the cursor carries
+pub const slot_hover:C = .{220, 235, 210, 70};
+pub const drop_target:C = .{255, 215, 130, 120};
+/// a slot's count drawn over its icon, and the shadow under it
+pub const count_shadow:C = .{10, 12, 10, 220};
 /// something not yet understood / locked
 pub const unknown:C = .{70, 70, 80, 255};
 /// growth tendril fill (symbiotic green)

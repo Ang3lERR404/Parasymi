@@ -12,9 +12,10 @@ const registry = @import("../core/registry.zig");
 const play = @import("play.zig");
 const prog = @import("progression.zig");
 
-/// what a click on the HUD lands on: a research node, a weave recipe, or
-/// just a panel (which keeps the click out of the world beneath it).
-pub const Pick = union(enum) { panel, research:prog.Id, weave:usize };
+/// what a click on the HUD lands on: a research node, a weave recipe, a
+/// belly slot, a hotbar slot, or just a panel (which keeps the click out of
+/// the world beneath it).
+pub const Pick = union(enum) { panel, research:prog.Id, weave:usize, slot:usize, bar:usize };
 
 /// the research sapling's growth, kept between frames.
 pub const Sapling = panels.research.Sapling;
@@ -23,7 +24,7 @@ pub const Sapling = panels.research.Sapling;
 /// draw (backdrop first, rows on top); `build` clears them; play.update
 /// hit-tests the mouse against them, one frame behind the draw.
 pub const Rows = struct {
-  const MAX = 48;
+  const MAX = 96;
   rect:[MAX][4]f32 = undefined,
   pick:[MAX]Pick = undefined,
   len:usize = 0,
@@ -57,6 +58,8 @@ const panels = struct {
   pub const log = @import("hud/log.zig");
   pub const debug = @import("hud/debug.zig");
   pub const inspect = @import("hud/inspect.zig");
+  pub const tooltip = @import("hud/tooltip.zig");
+  pub const carry = @import("hud/carry.zig");
   pub const pause = @import("hud/pause.zig");
 };
 const reg = registry.Registry(panels);

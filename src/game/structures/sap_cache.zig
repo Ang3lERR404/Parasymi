@@ -3,10 +3,12 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 const m = @import("../../core/math.zig");
 const color = @import("../../core/color.zig");
 const Parts = @import("../parts.zig").Parts;
@@ -67,3 +69,17 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 pub fn describe(_:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   _ = try d.text(x, y, style.text_body, style.dim, txt.s.describe.cache);
 }
+
+/// its bulb: two sprouts curling into a basket round a bead of amber sap
+/// (it holds things).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  try ic.glow(.{0, 0.55}, 0.4, icon_glow);
+  try ic.bud(.{0, 0.55}, 0.22, icon_sap, 0.8);
+  for ([_]f32{-1, 1}) |sx| {
+    try ic.stem(.{.{0, icon_kit.TOP}, .{0.55 * sx, 0.22}, .{0.6 * sx, 0.75}, .{0.3 * sx, 0.9}}, 0.1, icon_kit.stem_col);
+    try ic.leaf(.{0.3 * sx, 0.9}, if (sx < 0) 2.7 else 0.45, 0.26, 0.16, icon_kit.sprout, 0.9);
+  }
+  try ic.coat(col);
+}
+const icon_sap:Color = .{255, 190, 90, 255};
+const icon_glow:Color = .{255, 190, 90, 90};

@@ -259,7 +259,7 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
 fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   const h = g.hover orelse return;
   if (g.mode != .roam) return;
-  const item = play.hotbar[g.hot];
+  const item = g.selected() orelse return;
   if (!play.known(g, item)) return;
   const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(item) > 0;
   if (item.plants()) |sp| {

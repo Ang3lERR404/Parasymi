@@ -13,6 +13,8 @@
 //!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
 //!   field(s) ?Field             a field of celestial energy it holds
 //!   hold(s, x, y) ?Hold         how it draws the floater at a tile toward itself
+//!   icon(ic, col)               its bulb in the HUD: the seed (`ic.coat`) and a
+//!                               sprout or two showing what it does (`icon.zig`)
 //! Missing hooks fall back to doing nothing. A new structure is one new file
 //! plus one line in `kinds`.
 const std = @import("std");
@@ -31,6 +33,8 @@ const meshlib = @import("../gfx/meshlib.zig");
 const prog = @import("progression.zig");
 const Parts = @import("parts.zig").Parts;
 const Draw = @import("../ui/draw.zig").Draw;
+const Color = @import("../ui/draw.zig").Color;
+const icon_kit = @import("icon.zig");
 
 const kinds = struct {
   pub const conduit = @import("structures/conduit.zig");
@@ -285,6 +289,13 @@ pub fn emit(s:*const Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!vo
 pub fn describe(s:*const Structure, d:*Draw, g:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   switch (s.kind()) {
     inline else => |k| if (comptime reg.has(k, "describe")) try reg.module(k).describe(s, d, g, x, y),
+  }
+}
+
+/// draws kind `k`'s bulb in the HUD, its seed tinted `col`.
+pub fn icon(k:Kind, ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  switch (k) {
+    inline else => |t| if (comptime reg.has(t, "icon")) try reg.module(t).icon(ic, col) else try icon_kit.plain(ic, col),
   }
 }
 

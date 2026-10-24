@@ -14,12 +14,14 @@ const World = @import("../../world/world.zig").World;
 const items = @import("../../sim/items.zig");
 const Plants = @import("../../sim/plants.zig").Plants;
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const resources = @import("../resources.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
 
@@ -302,3 +304,19 @@ test "uprooting a digger returns its bulb and what it holds" {
   try testing.expectEqual(grit + 3, g.player.inv.count(.grit));
   try testing.expect(g.structs.at(&g.world, at[0], at[1]) == null);
 }
+
+/// its bulb: a small sprout above, roots reaching down from the seed to a
+/// stone and a ley shard (it digs nodes).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  try ic.stem(.{.{-0.12, -0.62}, .{-0.25, -0.62}, .{-0.4, -0.55}, .{-0.5, -0.66}}, 0.11, icon_root);
+  try ic.stem(.{.{0.12, -0.62}, .{0.25, -0.66}, .{0.38, -0.55}, .{0.5, -0.62}}, 0.11, icon_root);
+  try ic.bud(.{-0.58, -0.7}, 0.19, icon_stone, 0.2);
+  try ic.gem(.{0.6, -0.66}, 0.21, icon_ley);
+  try ic.stem(.{.{0, icon_kit.TOP}, .{0, 0.25}, .{0.06, 0.35}, .{0.02, 0.45}}, 0.09, icon_kit.stem_col);
+  try ic.leaf(.{0.02, 0.42}, 0.6, 0.3, 0.18, icon_kit.sprout, 0.9);
+  try ic.leaf(.{0.02, 0.4}, m.pi - 0.6, 0.28, 0.17, icon_kit.sprout, 0.9);
+  try ic.coat(col);
+}
+const icon_root:Color = .{150, 112, 72, 255};
+const icon_stone:Color = .{150, 140, 130, 255};
+const icon_ley:Color = .{170, 120, 255, 255};

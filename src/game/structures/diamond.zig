@@ -12,11 +12,13 @@ const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const Field = @import("../../sim/ecology.zig").Field;
 const st = @import("../structures.zig");
+const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
+const Color = @import("../../ui/draw.zig").Color;
 const halo = @import("halo.zig");
 
 // it floats as high as the blooms hang, at the heart of its ring, over
@@ -56,3 +58,17 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, _:f32) Allocator.Error!
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   _ = try d.print(x, y, style.text_body, style.gold, txt.s.describe.diamond, .{halo.lit(s.state.diamond.light)});
 }
+
+/// its bulb: a sprout holding up a cut diamond in its own light (the halo's
+/// heart, to be woven).
+pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
+  const top:icon_kit.P = .{0, 0.68};
+  try ic.stem(.{.{0, icon_kit.TOP}, .{-0.06, 0.3}, .{0.06, 0.42}, .{0, 0.5}}, 0.09, icon_kit.stem_col);
+  try ic.leaf(.{0.02, 0.22}, 0.4, 0.28, 0.17, icon_kit.sprout, 0.9);
+  try ic.leaf(.{0.02, 0.2}, m.pi - 0.4, 0.26, 0.16, icon_kit.sprout, 0.9);
+  try ic.glow(top, 0.5, icon_glow);
+  try ic.gem(top, 0.26, icon_gem);
+  try ic.coat(col);
+}
+const icon_gem:Color = .{255, 236, 215, 255};
+const icon_glow:Color = .{255, 240, 220, 90};

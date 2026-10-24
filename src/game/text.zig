@@ -50,7 +50,7 @@ pub const Strings = struct {
   } = .{},
   hud:struct {
     controls:S = "", ingredient:S = "", unknown:S = "",
-    belly_title:S = "", belly_fill:S = "", weave:S = "", weave_hint:S = "", queued:S = "",
+    belly_title:S = "", belly_fill:S = "", belly_hint:S = "", weave:S = "", weave_hint:S = "", queued:S = "",
     recipe:S = "", recipe_many:S = "", recipe_needs:S = "",
     research_title:S = "", research_hint:S = "", research_cost:S = "",
     research_dormant:S = "", research_unwitnessed:S = "",
