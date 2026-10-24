@@ -37,6 +37,11 @@ pub const FORM:f32 = 5;
 pub const FLASH:f32 = 1.4;
 /// a formed diamond's field reaches this far (the ring's, `R`)
 pub const DIAMOND_R:f32 = 7;
+/// the diamond floats at the centre of the ring, where the blooms' cross
+/// of beams meets: as high as they hang, the ring with it
+pub const HOVER:f32 = species.get(.bloom).hover;
+/// the projection's least rise (level, its cone would be flat)
+const LEVEL:f32 = 0.02;
 /// how bright a point's arcs are without a bloom (1 with one), and how
 /// quickly they follow
 pub const DIM:f32 = 0.3;
@@ -75,10 +80,11 @@ pub fn lit(light:[4]f32) u32 {
 pub fn draw(out:*Parts, seed:f32, at:m.V3, ground:m.V3, k:f32, light:[4]f32) Allocator.Error!void {
   const halo = [4]f32{ at[0], at[1], at[2], k };
   try out.emit(.halo_diamond, m.chain(&.{ m.translate(at), m.rotY(seed * m.tau) }), .{ .phase = seed, .halo = halo });
-  // the ring floats at a bloom's hover over the ground at the centre
-  const ring = ground + m.v3(0, species.get(.bloom).hover, 0);
+  // the ring floats at a bloom's hover over the ground at the centre, the
+  // diamond at its heart, so its rays run level out to it
+  const ring = ground + m.v3(0, HOVER, 0);
   const r = m.f(R);
-  try out.emit(.halo_projection, m.chain(&.{ m.translate(at), m.scale3(m.v3(r, ring[1] - at[1], r)) }), .{ .glow = 1, .phase = seed, .halo = halo });
+  try out.emit(.halo_projection, m.chain(&.{ m.translate(at), m.scale3(m.v3(r, @max(ring[1] - at[1], LEVEL), r)) }), .{ .glow = 1, .phase = seed, .halo = halo });
   try out.emit(.halo_ring, m.chain(&.{ m.translate(ring), m.scale3(m.v3(r, 1, r)) }), .{ .glow = 1, .phase = seed, .tint = light, .halo = halo });
   const age = (k - 1) * FORM / FLASH;
   if (age >= 0 and age < 1) try out.emit(.halo_flash, m.translate(at), .{ .glow = 1, .flutter = age });

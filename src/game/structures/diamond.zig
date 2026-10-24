@@ -1,8 +1,8 @@
-//! DIAMOND: where a halo's four blooms became one, floating over the
-//! polyp's cup; or, once Celestial Defragmentation is known, woven and put
-//! down over any dry tile. Small and still, a cut crystal that only catches
-//! light. It fragments that light into the halo's ring around it (see
-//! `halo.zig`), and holds a field of celestial energy wider than the ring.
+//! DIAMOND: where a halo's four blooms became one, floating high over the
+//! polyp at its ring's heart; or, once Celestial Defragmentation is known,
+//! woven and put down over any dry tile. Small and still, a cut crystal that
+//! only catches light. It fragments that light into the halo's ring around
+//! it (see `halo.zig`), and holds a field of celestial energy wider than it.
 //! Put down by hand, it gathers from its shards as it grows in; grown, or
 //! born of a halo, it forms with a flash of light. Blooms sown on the
 //! ring's four points brighten the arcs beside them. (The world event will
@@ -17,11 +17,11 @@ const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
-const mesh = @import("../../gfx/meshes/polyp.zig");
 const halo = @import("halo.zig");
 
-// it floats where a polyp's cup holds it, over whatever is under it
-pub const def:st.Def = .{ .item = .diamond, .size = 1, .mesh = .halo_diamond, .floating = true, .hover = mesh.SEAT, .bare = true, .grow = 8 };
+// it floats as high as the blooms hang, at the heart of its ring, over
+// whatever is under it
+pub const def:st.Def = .{ .item = .diamond, .size = 1, .mesh = .halo_diamond, .floating = true, .hover = halo.HOVER, .bare = true, .grow = 8 };
 
 pub const State = struct {
   /// seconds since it formed (grown)

@@ -1,13 +1,14 @@
 //! POLYP: where a halo forms. When four grown celestial blooms stand on the
 //! four points `halo.R` tiles out east, south, west and north of it, the
 //! halo forms (checked each tick until it does, then never again): the
-//! blooms spiral in toward its cup, slowly and then exponentially faster,
-//! while a diamond gathers there from shards of light and projects the
-//! halo's ring through the points they left. Where they meet they become
-//! one: the diamond, a structure of its own (`diamond.zig`), is put down
-//! floating over the cup, with a flash of light. The polyp itself is left
-//! as it was. While the halo forms, its ring is already a field of
-//! celestial energy (see `halo.zig`).
+//! blooms spiral in to the heart of the ring, where their cross of beams
+//! meets, slowly and then exponentially faster, while a diamond gathers
+//! there from shards of light and projects the halo's ring through the
+//! points they left. Where they meet they become one: the diamond, a
+//! structure of its own (`diamond.zig`), is put down floating high over
+//! the polyp, with a flash of light. The polyp is left as it was. While the
+//! halo forms, its ring is already a field of celestial energy (see
+//! `halo.zig`).
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -19,7 +20,6 @@ const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
-const mesh = @import("../../gfx/meshes/polyp.zig");
 const halo = @import("halo.zig");
 
 pub const def:st.Def = .{ .item = .polyp, .size = 1, .mesh = .polyp, .sway = 0.4, .tall = 0.9, .grow = 6, .sap = 0.6 };
@@ -56,7 +56,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) Allocator.Error!bool {
         const id = ctx.plants.at(ctx.w, at[0], at[1]) orelse continue;
         if (species.get(ctx.plants.list.items(.sp)[id.idx()]).radiance > 0) ctx.plants.remove(ctx.w, id);
       }
-      // decision: a diamond already floating over the cup (put there by
+      // decision: a diamond already floating over the polyp (put there by
       // hand) takes the halo's place; no second one is formed
       if (try ctx.ss.place(ctx.gpa, ctx.w, x, y, .diamond, 0, seed)) {
         // it is born whole (no growing in), its light still the blooms'
@@ -76,24 +76,24 @@ pub fn field(s:*const st.Structure) ?Field {
   return .{ .x = s.x, .y = s.y, .radius = m.f(halo.R) };
 }
 
-/// a bloom on one of a forming halo's points is drawn in to the cup (the
-/// GPU spirals it there).
+/// a bloom on one of a forming halo's points is drawn in to the ring's heart,
+/// where the blooms' cross of beams meets (the GPU spirals it there).
 pub fn hold(s:*const st.Structure, wx:i32, wy:i32) ?st.Hold {
   const h = &s.state.polyp;
   if (h.phase != .forming) return null;
   for (0..4) |k| {
     const at = halo.pointAt(s.x, s.y, k);
-    if (at[0] == wx and at[1] == wy) return .{ .k = h.t / halo.FORM, .seat = mesh.SEAT * s.grownScale()[1] };
+    if (at[0] == wx and at[1] == wy) return .{ .k = h.t / halo.FORM, .seat = halo.HOVER };
   }
   return null;
 }
 
-/// while the halo forms: the diamond gathering in the cup, its projection
-/// and ring.
+/// while the halo forms: the diamond gathering at the ring's heart, its
+/// projection and ring.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, _:f32) Allocator.Error!void {
   const h = &s.state.polyp;
   if (h.phase != .forming) return;
-  try halo.draw(out, s.seed, ctr + m.v3(0, mesh.SEAT * s.grownScale()[1], 0), ctr, h.t / halo.FORM, @splat(1));
+  try halo.draw(out, s.seed, ctr + m.v3(0, halo.HOVER, 0), ctr, h.t / halo.FORM, @splat(1));
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {

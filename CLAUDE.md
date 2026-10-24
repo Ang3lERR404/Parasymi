@@ -186,16 +186,17 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   polyp (1×1, grows 6 s; 4 fibre + 3 essence + 2 starlight + 2 ley shard,
   hotbar `=`) checks each tick for grown blooms (HP > 0.5) on the four
   points 5 tiles out E/S/W/N. Then, once ever, over 5 s: the blooms spiral
-  in (share ∝ e^(4k), 1.25 turns) and fold to buds, all on the GPU
+  in to where their cross of beams meets, the ring's heart at bloom hover
+  (share ∝ e^(4k), 1.25 turns) and fold to buds, all on the GPU
   (common.glsl `haloSpiral`; the CPU sends only `[centre, k]`, instance `h`
   / `vertex.NO_HALO`, beams their held ends in `e.z`), while the diamond
-  gathers from its shards and projects the halo: needle rays of split
-  light (`halo_projection`, part 12) up to a ring at bloom hover through
-  the points (`halo_ring`, part 11: spectrum across its width, red inner
-  edge as an ice halo, beam-like swells and motes running round). As they
-  meet they are consumed, a flash spreads (`halo_flash`, part 9) and a
-  DIAMOND structure (floating over the cup, `Def.floating`/`hover`/`bare`)
-  is put down; the polyp stays as it is. Ring field: radius 5 while
+  (1.6× its mesh) gathers there from its shards and projects the halo:
+  needle rays of split light (`halo_projection`, part 12) running level
+  out to a ring through the points (`halo_ring`, part 11: spectrum across
+  its width, red inner edge as an ice halo, beam-like swells and motes
+  running round). As they meet they are consumed, a flash spreads
+  (`halo_flash`, part 9) and a DIAMOND structure (floating there,
+  `Def.floating`/`hover`/`bare`) is put down; the polyp stays as it is. Ring field: radius 5 while
   forming; diamond field: radius 7. Points without a grown bloom dim their
   arcs to 0.3. A diamond discovers `.diamond`, opening CELESTIAL
   DEFRAGMENTATION, which lets diamonds be woven (hotbar BKSP) and put over

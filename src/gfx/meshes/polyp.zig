@@ -1,8 +1,8 @@
 //! mesh: POLYP. the heart of a halo: a short woven stalk on a root mat,
 //! opening into a small cup of petals that holds a bead of resin, with a
 //! ring of pale tentacles curling up around it. The diamond (`diamond`)
-//! forms in the cup as the halo completes, with a flash of light (`flash`)
-//! as it does; the halo's ring is beams of light (`bloom_thread`).
+//! forms high over it as the halo completes, with a flash of light
+//! (`flash`), and projects the halo's ring (`ring`, `projection`).
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -15,8 +15,6 @@ const mineral = @import("mineral_kit.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 const HEIGHT:f32 = 0.55;
-/// where the diamond sits in the cup (its centre, mesh space)
-pub const SEAT:f32 = 0.86;
 const pearl = color.rgb(0.78, 0.74, 0.84);
 const lilac = color.rgb(0.62, 0.52, 0.78);
 const heart = color.rgb(0.34, 0.28, 0.44);
@@ -40,7 +38,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
       .col = heart.toRgba8(255), .tip = pearl.toRgba8(255), .part = .leaf,
     });
   }
-  // a bead of resin in the cup: the diamond's bed
+  // a bead of resin in the cup
   try kit.resinPod(b, v3(0, HEIGHT + 0.04, 0), v3(0.1, 0.05, 0.1), 6, 10);
   // tentacles: grown from the crown, reaching up and out, curling in at the
   // tips, tapering to a point
@@ -94,6 +92,8 @@ pub const flash = struct {
 /// the halo forms (they are separate faces, so each comes in on its own).
 pub const diamond = struct {
   const S = 8;
+  /// how much larger it is built than the rings below give it
+  const SIZE:f32 = 1.6;
   /// rings from the bottom point to the top one: height, radius, twist
   /// (in half steps), each staggered from the next
   const rings = [_][3]f32{
@@ -106,6 +106,7 @@ pub const diamond = struct {
   };
 
   pub fn build(b:*mg.Builder) Allocator.Error!void {
+    const start = b.mark();
     var rng = pal.rngFor("halo_diamond");
     const deep = color.rgb(0.95, 0.84, 0.76).toRgba8(255);
     const lite = color.rgb(1.0, 0.97, 0.92).toRgba8(255);
@@ -146,6 +147,7 @@ pub const diamond = struct {
         .len = rng.range(0.12, 0.17), .r = rng.range(0.022, 0.03), .col = deep, .tip = lite, .part = .prism,
       }, &rng);
     }
+    b.xform(start, m.scale3(m.splat3(SIZE)));
   }
 };
 
