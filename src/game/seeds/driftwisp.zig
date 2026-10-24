@@ -25,6 +25,7 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
     const a = m.pi / 2.0 + (m.ratio(i, PETALS - 1) - 0.5) * 2.2;
     try ic.leaf(dish, a, 0.3, 0.12, petal, 0.8);
   }
+  try ic.stamens(dish, m.pi / 2.0, 0.6, 4, 0.2, filament_lite);
   try ic.glow(float, 0.24, float_glow);
   try ic.bud(float, 0.12, sap, 0.8);
   // starlight falling into the dish
@@ -42,6 +43,7 @@ const BOB_RATE:f32 = 1.6;
 const FALL:f32 = 0.5;
 const filament:Color = .{150, 170, 220, 200};
 const petal:Color = .{200, 215, 255, 230};
+const filament_lite:Color = .{230, 238, 255, 240};
 const sap:Color = .{215, 230, 255, 200};
 const float_glow:Color = .{190, 210, 255, 70};
 const star:Color = .{255, 245, 190, 255};

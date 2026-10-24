@@ -25,6 +25,8 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
     try ic.stem(.{from, from, at, at}, 0.025, thread);
     try ic.leaf(at, a, 0.18, 0.1, petal, 0.8);
   }
+  // its crown of stamens
+  try ic.stamens(core, m.pi / 2.0, 0.7, 5, 0.15, thread);
   try ic.bud(core, 0.09, core_col, 1);
   try ic.coat(col);
 }

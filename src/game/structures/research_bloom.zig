@@ -86,10 +86,12 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   for (0..ICON_PETALS) |i| {
     try ic.leaf(top, m.pi / 2.0 + m.tau * m.ratio(i, ICON_PETALS), 0.3, 0.2, icon_petal, 1);
   }
+  try ic.stamens(top, m.pi / 2.0, 0.8, 5, 0.22, icon_filament);
   try ic.bud(top, 0.08, icon_core, 1);
   try ic.coat(col);
 }
 const ICON_PETALS = 5;
 const icon_petal:Color = .{200, 150, 255, 255};
 const icon_core:Color = .{255, 215, 130, 255};
+const icon_filament:Color = .{230, 215, 250, 255};
 const icon_glow:Color = .{200, 160, 255, 80};

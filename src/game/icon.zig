@@ -35,6 +35,8 @@ const FILL_R:f32 = 0.95;
 
 pub const sprout:Color = .{110, 190, 95, 255};
 pub const stem_col:Color = s.bark_young;
+/// an anther's pollen (meshgen `POLLEN`)
+pub const pollen:Color = .{235, 185, 80, 255};
 
 pub const Icon = struct {
   d:*Draw,
@@ -107,6 +109,22 @@ pub const Icon = struct {
   pub fn gem(ic:Icon, at:P, r:f32, c:Color) Allocator.Error!void {
     const q = ic.px(at);
     try ic.d.gem(q[0], q[1], r * ic.r, ic.col(c), 1, ic.phase);
+  }
+
+  /// a flower's stamens: `n` thin filaments fanning `spread` radians either
+  /// side of `ang` from its heart `at`, `len` long, each tipped with a
+  /// grain of pollen; they sway with the flower.
+  pub fn stamens(ic:Icon, at:P, ang:f32, spread:f32, n:u32, len:f32, c:Color) Allocator.Error!void {
+    for (0..n) |i| {
+      const k = if (n > 1) m.ratio(i, n - 1) * 2 - 1 else 0;
+      const a = ang + k * spread + 0.05 * @sin(ic.t * 1.9 + ic.phase * 5 + m.f(i));
+      // the outer ones shorter, as they lean away
+      const l = len * (1 - 0.25 * k * k);
+      const tip:P = .{at[0] + @cos(a) * l, at[1] + @sin(a) * l};
+      const mid:P = .{at[0] + @cos(ang + k * spread * 0.6) * l * 0.5, at[1] + @sin(ang + k * spread * 0.6) * l * 0.5};
+      try ic.stem(.{at, mid, mid, tip}, 0.025, c);
+      try ic.bud(tip, 0.028, pollen, 1);
+    }
   }
 
   /// a small seed of its own (what a germinator makes).

@@ -507,6 +507,89 @@ pub fn petal(b:*Builder, p:Petal) Allocator.Error!void {
   try patch(b, R, C, &pts, &ns, &cs, &us, p.t, p.part);
 }
 
+/// pollen: the warm gold of an anther
+pub const POLLEN = color.rgb(0.92, 0.72, 0.3);
+
+pub const Stamens = struct {
+  /// the bloom's heart and the way it faces (unit)
+  heart:V3,
+  axis:V3,
+  n:u32,
+  /// filament length and its thickest radius
+  len:f32,
+  r:f32,
+  /// angle the filaments leave the axis at, and how much further out they
+  /// arch by the tip
+  lean:f32 = 0.35,
+  arch:f32 = 0.55,
+  /// each anther's length
+  anther:f32,
+  col:color.Rgba8,
+  tip:color.Rgba8 = POLLEN.toRgba8(255),
+  /// turns the ring of them about the axis
+  spin:f32 = 0,
+  t:f32 = 1,
+  part:vertex.Part = .leaf,
+  seed:u64 = 0,
+};
+
+/// the stamens at a flower's heart: a ring of slender filaments grown out
+/// of it (Catmull-Rom, tapering to a point at both ends), leaving the
+/// bloom's axis at `lean` and arching further out toward the tip, each
+/// carrying a plump two-lobed anther heading on along it. tu.y runs from 0
+/// at the heart to 1 at the anther, so they fold into the bud with the
+/// petals and open with them. The vertex layout never depends on the sizes
+/// (a confluence's growth keys pass smaller ones).
+pub fn stamens(b:*Builder, s:Stamens) Allocator.Error!void {
+  const N = 6;
+  const RES = 10;
+  const ref = if (@abs(s.axis[1]) < 0.9) m.v3(0, 1, 0) else m.v3(1, 0, 0);
+  const e1 = m.norm(m.cross(s.axis, ref));
+  const e2 = m.cross(s.axis, e1);
+  var rng = Rng.init(s.seed ^ 0x57A3);
+  for (0..s.n) |i| {
+    const a = m.ratio(i, s.n) * m.tau + s.spin + rng.range(-0.15, 0.15);
+    const out = e1 * m.splat3(@cos(a)) + e2 * m.splat3(@sin(a));
+    const len = s.len * rng.range(0.85, 1.1);
+    const lean = s.lean + rng.range(-0.08, 0.08);
+    var ctrl:[N]V3 = undefined;
+    ctrl[0] = s.heart + out * m.splat3(s.r);
+    for (1..N) |j| {
+      const k = m.ratio(j, N - 1);
+      const h = lean + s.arch * k * k;
+      ctrl[j] = ctrl[j - 1] + (s.axis * m.splat3(@cos(h)) + out * m.splat3(@sin(h))) * m.splat3(len / (N - 1));
+    }
+    grow(&ctrl, .{.start = ctrl[0], .direction = m.norm(ctrl[N - 1] - ctrl[0]), .length = len, .wobble = 0.1, .seed = s.seed +% i * 29});
+    var path:[RES]V3 = undefined;
+    m.splineResample(&ctrl, &path);
+    var ts:[RES]f32 = undefined;
+    var rs:[RES]f32 = undefined;
+    var us:[RES]f32 = undefined;
+    var cs:[RES]color.Rgba8 = undefined;
+    for (&ts, &rs, &us, &cs, 0..) |*t, *r, *u, *c, j| {
+      const k = m.ratio(j, RES - 1);
+      t.* = s.t;
+      u.* = k;
+      // (never below the cap threshold, so every size keeps one layout)
+      r.* = @max(s.r * @sqrt(@sin(m.pi * k)), 2e-4);
+      c.* = color.mix(s.col, s.tip, k * k * 0.35);
+    }
+    try b.tubeC(&path, &ts, &rs, &cs, &us, s.part, 4);
+    // the anther: two lobes side by side, sitting on the tip and heading on
+    const dir = m.norm(path[RES - 1] - path[RES - 3]);
+    const lobe = s.anther * 0.2;
+    const st = b.mark();
+    for ([_]f32{-1, 1}) |side| {
+      try ellipsoid(b, .{
+        .center = m.v3(side * lobe * 0.8, s.anther * 0.25, 0), .radii = m.v3(lobe, s.anther * 0.5, lobe * 0.9),
+        .col = s.tip, .part = s.part, .rings = 5, .segs = 6, .t = s.t,
+      });
+    }
+    b.xform(st, m.chain(&.{m.translate(path[RES - 1]), m.alignY(dir), m.rotY(a)}));
+    for (b.v.items[st..]) |*v| v.tu[1] = 1;
+  }
+}
+
 /// grown vine bands wrapping over an ellipsoid (centre `at`, `radii`) along
 /// its curvature: each band runs from (polar th0, azimuth ph0) to (th1, ph1).
 /// `side` mirrors it in x, so left and right forms are built, not mirrored.
@@ -829,6 +912,17 @@ fn flower(b:*Builder, g:species.Genome, top:V3, axis:V3, sc:f32, spin:f32, t:f32
       .col = color.shade(g.bloom_col, 0.8), .tip = g.bloom_col.toRgba8(255), .t = t,
     });
   }
+  // stamens standing up out of the cup
+  try stamens(b, .{
+    .heart = heart, .axis = axis, .n = @max(g.petals, 5),
+    .len = g.bloom_r * sc * 0.55, .r = g.bloom_r * sc * 0.035, .anther = g.bloom_r * sc * 0.2,
+    .lean = 0.3, .arch = 0.6, .col = filament(g), .spin = spin, .t = t, .seed = @as(u32, @bitCast(spin)),
+  });
+}
+
+/// a flower's filaments: its bloom's colour paled almost to white
+fn filament(g:species.Genome) color.Rgba8 {
+  return color.mix(g.bloom_col.toRgba8(255), color.rgb(1, 0.97, 0.9).toRgba8(255), 0.6);
 }
 
 /// a closed bud at `top`: a calyx, sepals clasping up around it, and the
@@ -1044,6 +1138,12 @@ fn drift(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!vo
       .col = color.shade(g.bloom_col, 0.8), .tip = g.bloom_col.toRgba8(255),
     });
   }
+  // stamens fanning out over the dish
+  try stamens(b, .{
+    .heart = np[7], .axis = m.norm(np[7] - np[5]), .n = @max(g.petals / 2 + 2, 5),
+    .len = g.bloom_r * 0.45, .r = g.bloom_r * 0.022, .anther = g.bloom_r * 0.11,
+    .lean = 0.45, .arch = 0.5, .col = filament(g), .t = 0.9, .spin = m.f(variant), .seed = seed,
+  });
 
   // offshoots: slender stalks leaning out of the neck beneath the dish,
   // each lifting a bud or a small bloom of its own to the sky
@@ -1108,9 +1208,9 @@ fn radiant(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!
   try ellipsoid(b, .{.center = m.v3(0, R * 0.04, 0), .radii = m.splat3(R * 0.22), .col = lite, .part = .bloom, .rings = 4, .segs = 6});
   // a crown of stamens rising out of its top and arching out, each tipped
   // with a bead of light (their roots sunk in the core)
-  const stamens = 7;
-  for (0..stamens) |i| {
-    const a = m.ratio(i, stamens) * m.tau + rng.range(-0.2, 0.2);
+  const crown = 7;
+  for (0..crown) |i| {
+    const a = m.ratio(i, crown) * m.tau + rng.range(-0.2, 0.2);
     const out = m.v3(@cos(a), 0, @sin(a));
     const from = out * m.splat3(R * 0.12) + m.v3(0, R * 0.3, 0);
     const len = R * rng.range(0.55, 0.8);
@@ -1382,6 +1482,9 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
 
   const heart = color.shade(g.bloom_col, 0.8);
   const rim = color.rgb(0.82, 0.6, 1.0).toRgba8(255);
+  // its stamens: pale violet filaments, anthers of amber pollen
+  const stamen_col = color.rgb(0.86, 0.78, 0.96).toRgba8(255);
+  const pollen = color.rgb(0.95, 0.66, 0.26).toRgba8(255);
 
   // offshoots: woven side stems reaching out of the braid as it rises, each
   // ending in a sap bud, some of which open into small canopies with the
@@ -1408,6 +1511,11 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
         .cup = m.lerp(0.7, 0.4, op), .col = heart, .tip = rim, .t = tip.t1,
       });
     }
+    try stamens(b, .{
+      .heart = tip.at, .axis = tip.axis, .n = 5,
+      .len = g.bloom_r * sc * m.lerp(0.2, 0.55, op), .r = g.bloom_r * sc * 0.03, .anther = g.bloom_r * sc * m.lerp(0.08, 0.16, op),
+      .lean = m.lerp(0.05, 0.35, op), .arch = m.lerp(0.1, 0.6, op), .col = stamen_col, .tip = pollen, .t = tip.t1, .spin = m.f(i), .seed = seed +% i * 41,
+    });
   }
 
   // the canopy: translucent sap petals, violet at the heart, amber at the
@@ -1427,6 +1535,12 @@ fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Erro
       .cup = 0.4, .col = heart, .tip = rim,
     });
   }
+  // stamens: a tight sheaf inside the bud, spreading as it opens
+  try stamens(b, .{
+    .heart = leader_tip, .axis = m.v3(0, 1, 0), .n = 9,
+    .len = g.bloom_r * m.lerp(0.18, 0.5, op), .r = g.bloom_r * m.lerp(0.012, 0.022, op), .anther = g.bloom_r * m.lerp(0.05, 0.1, op),
+    .lean = m.lerp(0.05, 0.4, op), .arch = m.lerp(0.1, 0.6, op), .col = stamen_col, .tip = pollen, .seed = seed ^ 0x5A3E,
+  });
 }
 
 /// how many meshes a species is built as: shapes picked by tile, or for a

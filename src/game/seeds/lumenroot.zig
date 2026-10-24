@@ -27,6 +27,7 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   for (0..PETALS) |i| {
     try ic.leaf(top, m.pi / 2.0 + m.tau * m.ratio(i, PETALS), 0.2, 0.13, petal, 1);
   }
+  try ic.stamens(top, m.pi / 2.0, 0.75, 5, 0.17, filament);
   try ic.bud(top, 0.06, core, 1);
   try ic.coat(col);
 }
@@ -37,5 +38,6 @@ const RUN:f32 = 0.4;
 const stem:Color = .{70, 140, 95, 255};
 const petal:Color = .{140, 240, 255, 255};
 const core:Color = .{230, 255, 250, 255};
+const filament:Color = .{220, 250, 245, 255};
 const mote:Color = .{160, 250, 240, 255};
 const glow:Color = .{140, 240, 255, 80};

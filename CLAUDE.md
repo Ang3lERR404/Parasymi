@@ -106,6 +106,9 @@ recipes (`game/craft.zig`) are plain data tables.
 - **Never hand-roll linear algebra**: `m.inverseRigid`, `m.inverseAffine`,
   `m.inverse` only as fallback; add missing methods with a test. A singular
   matrix is a bug (`@panic` in debug).
+- **Every flower has stamens** (`meshgen.stamens`: grown filaments, two-lobed
+  pollen anthers, `.leaf` so they fold and open with the petals; icons
+  `Icon.stamens`). Closed buds hide theirs.
 - **Geometry watertight and seamless**: shared rings (parallel transport),
   capped cones/lofts, shared-vertex sheets; deform only with smooth position
   fields so shared vertices move alike.
@@ -113,7 +116,7 @@ recipes (`game/craft.zig`) are plain data tables.
   root never moves), never a straight line or simple arc, and taper to a
   point at both ends (no hard cuts).
 - meshgen primitives: `tubeR`/`tubeC`, `vine`, `braid`/`braidTurned`, `bundle`,
-  `loft`, `patch`, `blade`/`bladeAlong`, `petal`, `leavesAlong`, `bands`,
+  `loft`, `patch`, `blade`/`bladeAlong`, `petal`, `stamens`, `leavesAlong`, `bands`,
   `ellipsoid`, `cone`. Shared kits: `structure_kit`, `wolf_kit` (`leaf`,
   `digit`, `claw`), `sculpt_kit` (SDF forms meshed and skinned), `mineral_kit`.
 - Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from

@@ -41,7 +41,13 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
       .col = petal_heart.toRgba8(255), .tip = petal_rim.toRgba8(255), .part = .leaf,
     });
   }
+  // stamens arching out of its heart beneath the orb
+  try mg.stamens(b, .{
+    .heart = heart, .axis = v3(0, 1, 0), .n = 9, .len = 0.32, .r = 0.009, .anther = 0.055,
+    .lean = 0.4, .arch = 0.6, .col = stamen.toRgba8(255), .seed = 0x7B05,
+  });
 }
+const stamen = color.rgb(0.8, 0.74, 0.9);
 
 /// mesh: RESEARCH ORB. a sphere of resin sap held in two grown vine bands,
 /// hovering above the bloom; spun and bobbed per instance.

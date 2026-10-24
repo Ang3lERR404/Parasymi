@@ -38,8 +38,12 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
       .col = heart.toRgba8(255), .tip = pearl.toRgba8(255), .part = .leaf,
     });
   }
-  // a bead of resin in the cup
+  // a bead of resin in the cup, stamens standing round it
   try kit.resinPod(b, v3(0, HEIGHT + 0.04, 0), v3(0.1, 0.05, 0.1), 6, 10);
+  try mg.stamens(b, .{
+    .heart = crown, .axis = v3(0, 1, 0), .n = 7, .len = 0.17, .r = 0.006, .anther = 0.032,
+    .lean = 0.5, .arch = 0.45, .col = pearl.toRgba8(255), .spin = 0.45, .seed = 0x9074,
+  });
   // tentacles: grown from the crown, reaching up and out, curling in at the
   // tips, tapering to a point
   for (0..6) |i| {

@@ -24,6 +24,7 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   for (0..PETALS) |i| {
     try ic.leaf(top, m.pi / 2.0 + m.tau * m.ratio(i, PETALS), 0.2, 0.1, petal, 1);
   }
+  try ic.stamens(top, m.pi / 2.0, 0.75, 5, 0.16, filament);
   try ic.bud(top, 0.05, core, 1);
   const twinkle = 0.75 + 0.25 * @sin(ic.t * 3 + ic.phase * 4);
   try ic.glow(star, 0.22 * twinkle, star_glow);
@@ -39,6 +40,7 @@ const leaf:Color = .{115, 105, 220, 255};
 const thorn:Color = .{150, 140, 175, 255};
 const petal:Color = .{240, 195, 255, 255};
 const core:Color = .{255, 240, 255, 255};
+const filament:Color = .{250, 230, 255, 255};
 const bloom_glow:Color = .{230, 190, 255, 80};
 const ray:Color = .{255, 245, 200, 255};
 const star_col:Color = .{255, 245, 210, 255};
