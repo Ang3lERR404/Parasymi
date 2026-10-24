@@ -37,7 +37,7 @@ pub const Action = enum {
   belly,
   research,
   /// hotbar slots in order (see `slots`)
-  slot_1, slot_2, slot_3, slot_4, slot_5, slot_6, slot_7, slot_8, slot_9, slot_10, slot_11,
+  slot_1, slot_2, slot_3, slot_4, slot_5, slot_6, slot_7, slot_8, slot_9, slot_10, slot_11, slot_12,
   /// with alt
   free_cam,
   fly_fast, rise, roll_left, roll_right,
@@ -49,7 +49,7 @@ pub const Action = enum {
 };
 
 /// the actions that pick hotbar slots, slot 0 first.
-pub const slots = [_]Action{ .slot_1, .slot_2, .slot_3, .slot_4, .slot_5, .slot_6, .slot_7, .slot_8, .slot_9, .slot_10, .slot_11 };
+pub const slots = [_]Action{ .slot_1, .slot_2, .slot_3, .slot_4, .slot_5, .slot_6, .slot_7, .slot_8, .slot_9, .slot_10, .slot_11, .slot_12 };
 
 pub const Binds = struct {
   list:[MAX_BINDS]Bind = undefined,

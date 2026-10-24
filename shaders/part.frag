@@ -111,6 +111,49 @@ void main() {
     o = vec4(applyFog(c, v_pos), a * ends * (0.3 + 0.7 * lit));
     return;
   }
+  if (part == 9) {
+    // a halo band: still light lying on the ground along an edge of the
+    // halo's square, from a corner (v_t 0) to the edge's middle. A soft
+    // haze across its width (v_u -1..1) around a fine core, a little
+    // brighter at the corner; its hue a film that turns with the angle it
+    // is seen from and runs along it. Nothing in it moves with time; its
+    // brightness (v_glow) dims where a corner has lost its bloom.
+    float reach = max(v_fade, 1e-3);
+    float u = v_u;
+    float along = v_t * reach; // share of the half edge from its corner
+    float ndv = abs(dot(raw, V));
+    float haze = exp(-u * u * 2.5) * (1.0 - u * u);
+    float core = exp(-u * u * 18.0);
+    float corner = 1.0 + 0.35 * exp(-along * 18.0);
+    vec3 film = mix(filmHue(0.55 + 0.6 * (1.0 - ndv) + along * 0.4 + u * 0.06), vec3(1.0), 0.35);
+    float b = v_glow;
+    c = film * (haze * 0.45 + core * 0.75) * b * corner;
+    float a = clamp(haze * 0.45 + core * 0.5, 0.0, 1.0) * mix(0.5, 1.0, b);
+    // its growing end softens; grown, it meets its neighbour at the middle
+    a *= mix(1.0, smoothstep(1.0, 0.75, v_t), clamp((1.0 - reach) * 8.0, 0.0, 1.0));
+    // it starts just behind its corner, fading into the band crossing it
+    a *= smoothstep(0.0, 0.03, along);
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+  if (part == 10) {
+    // a cut crystal with no light of its own: each flat facet shades as
+    // stone does and reflects a warm iridescent film that shifts with the
+    // angle it is seen at and from facet to facet; the sun glints off it
+    float ndv = clamp(dot(n, V), 0.0, 1.0);
+    float fres = pow(1.0 - ndv, 3.0);
+    vec3 facet = hash33(floor(n * 7.0) + 3.0);
+    vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), vec3(1.0, 0.82, 0.6), 0.35);
+    float day = pc.sun.w;
+    vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.96, 0.9), day);
+    c = shade(v_col * 0.55, n, v_pos);
+    c += film * lit * (0.18 + 0.55 * fres + 0.25 * facet.y * max(dot(n, SUN), 0.0));
+    vec3 H = normalize(SUN + V);
+    c += lit * pow(max(dot(n, H), 0.0), 120.0) * 1.6 * step(0.0, dot(n, SUN));
+    c += film * fres * mix(0.25, 0.08, day);
+    o = vec4(applyFog(c, v_pos), 1.0);
+    return;
+  }
   if (part == 7) {
     // a soft shadow on the ground: darkest at its centre, gone at its rim
     float r = clamp(v_t, 0.0, 1.0);

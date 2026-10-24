@@ -14,7 +14,7 @@ pub const Item = enum(u8) {
   // structure bulbs: woven, then planted to grow a structure
   conduit, sap_cache, germinator, research_bloom, root_digger,
   // later additions go last, so stored item ids never shift
-  seed_bloom,
+  seed_bloom, polyp,
 
   pub fn info(i:Item) Info { return infos.get(i); }
 
@@ -42,6 +42,7 @@ const infos = EnumArray(Item, Info).init(.{
   .research_bloom = .{.col = .{200, 150, 255, 255}, .stack = 5},
   .root_digger = .{.col = .{190, 140, 90, 255}, .stack = 10},
   .seed_bloom = .{.col = .{140, 255, 215, 255}, .stack = 5},
+  .polyp = .{.col = .{235, 205, 230, 255}, .stack = 5},
 });
 
 pub const Stack = struct { item:Item, n:u16 };

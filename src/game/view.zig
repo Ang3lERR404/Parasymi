@@ -45,6 +45,8 @@ const BEAM_SAG:f32 = 0.03;
 const BEAM_SAG_RATE:f32 = 0.4;
 const BEAM_FROM:f32 = 0.85;
 const BEAM_DIM:f32 = 0.1;
+/// a bloom drawn into a halo folds back to this much of its growth
+const FOLDED:f32 = 0.12;
 /// structures breathe at one tempo, deeper with activity, and glow with it
 const BREATH_RATE:f32 = 1.6;
 const BREATH:f32 = 0.02;
@@ -136,6 +138,23 @@ fn floatAt(def:*const species.Species, x:i32, y:i32, ground:f32, seed:f32, tf:f3
   return m.v3(c[0] + DRIFT * @sin(tf * DRIFT_RATE[0] + seed * 7), @max(ground, 0) + def.hover + lift, c[2] + DRIFT * @cos(tf * DRIFT_RATE[1] + seed * 5));
 }
 
+/// where a floater is drawn this frame, and how far its petals have folded
+/// back in: over its tile, or on its way to a structure drawing it in (a
+/// forming halo's polyp).
+const Held = struct { at:m.V3, fold:f32 };
+fn floaterAt(g:*const Game, def:*const species.Species, x:i32, y:i32, ground:f32, seed:f32, tf:f32) Held {
+  const f = floatAt(def, x, y, ground, seed, tf);
+  if (def.radiance <= 0) return .{.at = f, .fold = 0};
+  const hd = st.hold(&g.structs, x, y) orelse return .{.at = f, .fold = 0};
+  const to = structCentre(g, hd.s) + m.v3(0, hd.h.seat, 0);
+  // a spiral: the way out from the centre turned, and shortened
+  const out = f - to;
+  const c = @cos(hd.h.turn);
+  const sn = @sin(hd.h.turn);
+  const k = 1 - hd.h.pull;
+  return .{.at = to + m.v3((out[0] * c - out[2] * sn) * k, out[1] * k, (out[0] * sn + out[2] * c) * k), .fold = hd.h.fold};
+}
+
 /// the threads of light between linked blooms (see ecology `Radiance`):
 /// bent on the GPU from one bloom's core to the other's with a slight sag,
 /// bright where their network radiates, faint where it is dark. A thread
@@ -165,7 +184,7 @@ fn threads(g:*Game, tf:f32) Allocator.Error!void {
 fn end(g:*Game, i:usize, tf:f32) m.V3 {
   const s = g.plants.list.slice();
   const def = species.get(s.items(.sp)[i]);
-  return floatAt(def, s.items(.x)[i], s.items(.y)[i], s.items(.chunk)[i].height[s.items(.tile)[i]], s.items(.seed)[i], tf);
+  return floaterAt(g, def, s.items(.x)[i], s.items(.y)[i], s.items(.chunk)[i].height[s.items(.tile)[i]], s.items(.seed)[i], tf).at;
 }
 
 /// what drawing one plant needs to know about it.
@@ -184,24 +203,28 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   const lod = meshgen.lodAt(m.len(foot - g.parts.eye));
   var at = m.footprintCentre(d.x, d.y, def.size, 0);
   var y = d.ground;
+  var growth = d.growth;
   if (def.floating) {
     // floaters hang in the air: a slow rise and fall and a lazy drift,
     // never a bounce, over a soft shadow that shrinks as they rise
     const ground = @max(y, 0);
     const f = floatAt(def, d.x, d.y, d.ground, d.seed, tf);
-    at = f;
-    y = f[1];
+    const held:Held = if (d.ghost) .{.at = f, .fold = 0} else floaterAt(g, def, d.x, d.y, d.ground, d.seed, tf);
+    at = held.at;
+    y = at[1];
+    // drawn in, it folds back toward a bud and its shadow fades
+    growth = m.lerp(d.growth, FOLDED, held.fold);
     const r = SHADOW_R - SHADOW_SHRINK * (f[1] - ground - def.hover);
-    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + SHADOW_LIFT, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = SHADOW_FADE});
+    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + SHADOW_LIFT, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = SHADOW_FADE * (1 - held.fold)});
   }
   // a confluence grows through its keys, blending from one to the next;
   // other plants pick a shape by tile
-  const key = meshgen.growthKey(d.sp, d.growth) orelse meshgen.Key{
+  const key = meshgen.growthKey(d.sp, growth) orelse meshgen.Key{
     .v = @intCast(rng.hash2(0x7A11, d.x, d.y) % meshgen.VARIANTS), .f = 0,
   };
   try g.inst[meshgen.plantSlot(d.sp, key.v, lod)].append(g.gpa, .{
     .pos = .{at[0], y, at[2]},
-    .a = .{d.growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
+    .a = .{growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
     .b = .{d.flow, d.health, def.sway, m.f(@intFromEnum(def.genome.form))},
     .c = .{key.f, if (d.ghost) 1 else 0, if (d.fits) 1 else 0, 0},
   });

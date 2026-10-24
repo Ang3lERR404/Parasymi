@@ -85,8 +85,9 @@ void main() {
     // ends extended in line), its x laid toward the side (tint.xyz) and its
     // z across, so the vine bends here instead of being rebuilt each frame
     vec3 P[4] = vec3[4](c0.xyz, c1.xyz, c2.xyz, c3.xyz);
-    // how far along it reaches (a bloom thread extends as its bloom finishes)
-    float u = clamp(p.y, 0.0, ie.y) * 3.0;
+    // how far along it reaches (a bloom thread extends as its bloom
+    // finishes); a halo band grows whole along it, its end leading
+    float u = (part == 9u ? p.y * ie.y : clamp(p.y, 0.0, ie.y)) * 3.0;
     int i = min(int(u), 2);
     float f = u - float(i);
     vec3 b = P[i], c = P[i + 1];
@@ -148,10 +149,15 @@ void main() {
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
+  // a halo band is still: its brightness runs from its corner's (glow) to
+  // its middle's (flutter), never pulsing; a prism has no light of its own
+  if (part == 9u) v_glow = mix(ip.x, ip.y, tu.x);
+  if (part == 10u) v_glow = 0.0;
   v_part = float(part);
   v_t = tu.x;
-  // a beam carries its length instead, so its rays and motes keep their size
-  v_fade = part == 8u ? length(c3.xyz - c0.xyz) : ip.w;
+  // a beam carries its length instead, so its rays and motes keep their
+  // size; a halo band how far it has grown
+  v_fade = part == 8u ? length(c3.xyz - c0.xyz) : part == 9u ? ie.y : ip.w;
   v_u = tu.y;
   v_obj = p;
   v_phase = ip.z;

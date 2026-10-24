@@ -55,7 +55,11 @@ const parts = struct {
   pub const item_pod = @import("meshes/item_pod.zig");
   pub const root_digger = @import("meshes/root_digger.zig");
   pub const digger_root = @import("meshes/root_digger.zig").root;
+  // drawn before the halo's ring, which lies over the ground under it
+  pub const polyp = @import("meshes/polyp.zig");
+  pub const halo_diamond = @import("meshes/polyp.zig").diamond;
   // translucent, over everything
+  pub const halo_ring = @import("meshes/polyp.zig").ring;
   pub const bloom_thread = @import("meshes/bloom_thread.zig");
 };
 const reg = registry.Registry(parts);

@@ -13,7 +13,8 @@ const gen = @import("../world/gen.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("../sim/species.zig");
 const Plants = @import("../sim/plants.zig").Plants;
-const Ecology = @import("../sim/ecology.zig").Ecology;
+const ecology = @import("../sim/ecology.zig");
+const Ecology = ecology.Ecology;
 const items = @import("../sim/items.zig");
 const prog = @import("progression.zig");
 const txt = @import("text.zig");
@@ -74,7 +75,7 @@ const PICK_RANGE_MULT:f32 = 4;
 /// (`ctl.slots`).
 pub const hotbar = [_]items.Item{
   .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
-  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom,
+  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom, .polyp,
 };
 comptime { std.debug.assert(hotbar.len == ctl.slots.len); }
 
@@ -110,6 +111,8 @@ pub const Game = struct {
   plants:Plants = .{},
   structs:st.Structures = .{},
   eco:Ecology = .{},
+  /// the standing fields of celestial energy (halos), gathered each tick
+  fields:std.ArrayList(ecology.Field) = .empty,
   converge:convergence.Seeker = .{},
   prog:prog.Progression = .{},
   cam:Camera = .{},
@@ -189,6 +192,7 @@ pub const Game = struct {
     g.ui.deinit();
     g.stars.deinit(g.gpa);
     g.eco.deinit(g.gpa);
+    g.fields.deinit(g.gpa);
     g.plants.deinit(g.gpa);
     g.structs.deinit(g.gpa);
     g.world.deinit();
@@ -403,6 +407,8 @@ pub const Game = struct {
   pub fn step(g:*Game) Error!void {
     var mods = g.prog.mods();
     mods.night = 1 - g.sky.daylight();
+    try st.fields(&g.structs, g.gpa, &g.fields);
+    mods.fields = g.fields.items;
     const ev = try g.eco.tick(g.gpa, &g.plants, &g.world, mods, TICK);
     try g.converge.tick(g.gpa, &g.world, &g.plants, &g.structs, &g.prog);
     g.prog.absorb(ev, TICK);

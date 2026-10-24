@@ -21,6 +21,28 @@ pub const Mods = struct {
   yield_mult:[species.count]f32 = @splat(1),
   /// how dark it is (0 day .. 1 night); floating plants drink starlight.
   night:f32 = 0,
+  /// fields of celestial energy held by something other than a bloom (a
+  /// completed halo); they power plants as a bloom's field does
+  fields:[]const Field = &.{},
+};
+
+/// an area of celestial energy around a tile: the square turned 45° on the
+/// grid with its corners `turned` tiles out along the axes, and every tile
+/// within `radius` of it (either 0 for none).
+pub const Field = struct {
+  x:i32,
+  y:i32,
+  turned:i32 = 0,
+  radius:f32 = 0,
+
+  pub fn holds(fl:Field, wx:i32, wy:i32) bool {
+    const dx = wx - fl.x;
+    const dy = wy - fl.y;
+    if (@abs(dx) + @abs(dy) <= fl.turned) return true;
+    return m.f(dx * dx + dy * dy) <= fl.radius * fl.radius;
+  }
+  /// how far out it reaches on either axis
+  pub fn reach(fl:Field) i32 { return @max(fl.turned, m.floorTo(i32, fl.radius)); }
 };
 
 pub const Events = struct {
@@ -91,7 +113,7 @@ pub const Radiance = struct {
     return k;
   }
 
-  pub fn update(r:*Radiance, gpa:Allocator, p:*const Plants, w:*const World) Allocator.Error!void {
+  pub fn update(r:*Radiance, gpa:Allocator, p:*const Plants, w:*const World, fields:[]const Field) Allocator.Error!void {
     const n = p.len();
     try r.powered.resize(gpa, n);
     @memset(r.powered.items, false);
@@ -100,6 +122,20 @@ pub const Radiance = struct {
     r.links.clearRetainingCapacity();
     r.blooms.clearRetainingCapacity();
     const s = p.list.slice();
+    // standing fields (halos) power what lies inside them; they are few and
+    // small, so their tiles are walked as a bloom's are
+    for (fields) |fl| {
+      const reach = fl.reach();
+      var dy:i32 = -reach;
+      while (dy <= reach) : (dy += 1) {
+        var dx:i32 = -reach;
+        while (dx <= reach) : (dx += 1) {
+          if (!fl.holds(fl.x + dx, fl.y + dy)) continue;
+          const j = p.at(w, fl.x + dx, fl.y + dy) orelse continue;
+          r.powered.items[j.idx()] = true;
+        }
+      }
+    }
     for (s.items(.sp), 0..) |sp, i| {
       if (species.get(sp).radiance > 0) try r.blooms.append(gpa, @intCast(i));
     }
@@ -194,7 +230,7 @@ pub const Ecology = struct {
     try e.dh.resize(gpa, n); @memset(e.dh.items, 0);
     try e.df.resize(gpa, n); @memset(e.df.items, 0);
     try e.contain(gpa, p, w);
-    try e.radiance.update(gpa, p, w);
+    try e.radiance.update(gpa, p, w, mods.fields);
     const calm = e.calm.items;
     const powered = e.radiance.powered.items;
     const dm = e.dm.items;

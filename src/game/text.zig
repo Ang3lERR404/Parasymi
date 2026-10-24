@@ -45,7 +45,7 @@ pub const Strings = struct {
     researching:S = "", already_known:S = "", locked:S = "", researched:S = "",
     entwine:S = "", hybrid_stirs:S = "", withered:S = "",
     essence_converges:S = "", veil_thins:S = "",
-    germinator_weaves:S = "",
+    germinator_weaves:S = "", halo_forms:S = "", diamond_forms:S = "",
     saved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_fullscreen:S = "",
   } = .{},
   hud:struct {
@@ -66,6 +66,7 @@ pub const Strings = struct {
   describe:struct {
     carries:S = "", nothing:S = "", weaves:S = "", choose_study:S = "", studies:S = "",
     no_node:S = "", digger_full:S = "", digs:S = "", cache:S = "",
+    halo_open:S = "", halo_forming:S = "", halo_complete:S = "",
   } = .{},
   sky:struct { dawn:S = "", dusk:S = "", day:S = "", night:S = "" } = .{},
   tile:EnumArray(ck.Kind, Named) = .initFill(.{}),

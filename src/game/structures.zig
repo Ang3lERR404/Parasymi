@@ -11,6 +11,8 @@
 //!   emit(s, out, ctr, tf)       extra visuals beyond its mesh
 //!   describe(s, d, g, x, y)     one line of hover text
 //!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
+//!   field(s) ?Field             a field of celestial energy it holds
+//!   hold(s, x, y) ?Hold         how it draws the floater at a tile toward itself
 //! Missing hooks fall back to doing nothing. A new structure is one new file
 //! plus one line in `kinds`.
 const std = @import("std");
@@ -24,6 +26,7 @@ const World = @import("../world/world.zig").World;
 const items = @import("../sim/items.zig");
 const species = @import("../sim/species.zig");
 const Plants = @import("../sim/plants.zig").Plants;
+const Field = @import("../sim/ecology.zig").Field;
 const meshlib = @import("../gfx/meshlib.zig");
 const prog = @import("progression.zig");
 const Parts = @import("parts.zig").Parts;
@@ -35,6 +38,7 @@ const kinds = struct {
   pub const germinator = @import("structures/germinator.zig");
   pub const research_bloom = @import("structures/research_bloom.zig");
   pub const root_digger = @import("structures/root_digger.zig");
+  pub const polyp = @import("structures/polyp.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -209,6 +213,28 @@ pub const Structures = struct {
     }
   }
 };
+
+/// a floating plant drawn in toward a structure: how far along the way
+/// (0 at its tile .. 1 there), how far it has turned around it on the way
+/// (radians), how far its petals have folded back in, and
+/// how high over the structure's ground it is drawn to.
+pub const Hold = struct { pull:f32, turn:f32 = 0, fold:f32, seat:f32 };
+
+/// every field of celestial energy a structure holds, into `out`.
+pub fn fields(ss:*const Structures, gpa:Allocator, out:*std.ArrayList(Field)) Allocator.Error!void {
+  out.clearRetainingCapacity();
+  for (ss.list.items) |*s| switch (s.kind()) {
+    inline else => |k| if (comptime reg.has(k, "field")) if (reg.module(k).field(s)) |f| try out.append(gpa, f),
+  };
+}
+
+/// the structure drawing the floater at a tile toward itself, if any.
+pub fn hold(ss:*const Structures, wx:i32, wy:i32) ?struct { s:*const Structure, h:Hold } {
+  for (ss.list.items) |*s| switch (s.kind()) {
+    inline else => |k| if (comptime reg.has(k, "hold")) if (reg.module(k).hold(s, wx, wy)) |h| return .{ .s = s, .h = h },
+  };
+  return null;
+}
 
 pub fn release(s:*Structure) ?items.Item {
   return switch (s.kind()) {

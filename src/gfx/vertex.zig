@@ -18,7 +18,10 @@ pub const Terrain = extern struct {
 /// while the base holds.
 /// `shadow`: a soft dark patch on the ground under something floating
 /// (tu.x its radial fraction; instance fade its darkness).
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread };
+/// `thread`: a beam between blooms. `halo`: a band of still light lying on
+/// the ground (tu.x along it from a corner, tu.y across -1..1). `prism`: a
+/// cut iridescent crystal that only catches light.
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, halo, prism };
 
 pub const Mesh = extern struct {
   pos:[3]f32,
