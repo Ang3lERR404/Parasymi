@@ -33,9 +33,11 @@ const vec3 LUMA = vec3(0.3, 0.59, 0.11);
 // old growth densifies toward the wolf's root brown; wilting toward dead brown
 const vec3 ROOT_BROWN = vec3(0.06, 0.055, 0.035);
 const vec3 DEAD_BROWN = vec3(0.18, 0.12, 0.06);
-// highlight exponents: a floater's lantern, polished thin growth
-const float LANTERN_SPEC_POW = 80.0;
-const float POLISH_SPEC_POW = 60.0;
+// how tightly sap's colour gathers to its edge (1 - n.v)^this (part.frag
+// alike): a narrow band; its light is the glisten's (sapGlisten)
+const float SAP_EDGE_POW = 5.0;
+// how much thin sap-filled growth glistens (under its skin, less than bare sap)
+const float SKIN_GLISTEN = 0.6;
 // a placement preview: green where it fits, red where it cannot be sown,
 // breathing at this rate (rad/s)
 const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
@@ -94,10 +96,12 @@ void surface() {
     // a confluence's sap petal: see-through violet face-on, amber at grazing
     // angles. Hue follows the vertex colour.
     vec3 deep = v_col * 0.18 * health;
-    vec3 c = shadeLit(deep, n, v_pos, sh) + mix(v_col * 0.8, mix(v_col, AMBER, 0.45) * 2.0, fres) * (0.3 + fill * 0.3) * lit;
+    vec3 c = shadeLit(deep, n, v_pos, sh) + mix(v_col * 0.8, mix(v_col, AMBER, 0.45) * 2.0, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.3 + fill * 0.3) * lit;
     c += mix(v_col, AMBER, 0.3) * max(dot(-n, SUN), 0.0) * 0.25 * klit;
     c += mix(v_col, AMBER, 0.3) * pointLight(v_pos, n, 1.0) * 0.5;
-    o = vec4(applyFog(c, v_pos), mix(0.5, 1.0, fres));
+    vec3 g = sapGlisten(n, V, v_pos, v_obj, mix(v_col, AMBER, 0.3), 1.0 - fres, sh) * health;
+    float a = max(mix(0.5, 1.0, fres), clamp(dot(g, vec3(0.33)), 0.0, 1.0));
+    o = vec4(applyFog(c + g, v_pos), a);
     return;
   }
 
@@ -113,8 +117,9 @@ void surface() {
     c += col * max(dot(-n, SUN), 0.0) * 0.3 * klit;
     c += col * pointLight(v_pos, n, 1.0) * 0.6;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * lit * 0.5;
-    c += klit * pow(max(dot(n, normalize(SUN + V)), 0.0), LANTERN_SPEC_POW) * 0.5 * smoothstep(0.0, 0.2, dot(n, SUN));
-    float a = mix(0.18, 0.85, fres);
+    vec3 g = sapGlisten(n, V, v_pos, v_obj, col, 1.0 - fres, sh) * health;
+    c += g;
+    float a = max(mix(0.18, 0.85, fres), clamp(dot(g, vec3(0.33)), 0.0, 1.0));
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
     return;
@@ -154,10 +159,10 @@ void surface() {
   // sliding down the skin of a full plant
   c += mix(sap, vec3(1.0), 0.3) * sapBubbles(v_obj, V, pc.eye_time.w) * show * lit * 0.4;
   vec2 drop = sapDroplets(v_obj * 0.8, n, SUN, V, pc.eye_time.w) * (0.25 + 0.75 * fill) * health;
-  c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + klit * drop.y * 0.7;
-  // thin sap-filled growth has a polished face
-  vec3 Hs = normalize(SUN + V);
-  c += klit * pow(max(dot(n, Hs), 0.0), POLISH_SPEC_POW) * 0.25 * thin * smoothstep(0.0, 0.2, dot(n, SUN));
+  c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + keyLight() * drop.y * sh * 0.8;
+  // thin sap-filled growth is wet: it glistens, as bare sap does, a little
+  // less under its skin
+  c += sapGlisten(n, V, v_pos, v_obj, sap, thin * show, sh) * thin * (0.35 + 0.65 * fill) * health * SKIN_GLISTEN;
 
 
   // rim light keeps the silhouette readable at night (as on the wolf)

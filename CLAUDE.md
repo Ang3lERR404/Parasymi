@@ -343,7 +343,12 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   cluster; grit faceted stones with quartz chips; fibre a swaying clump of
   arching stalks.
 - Sap everywhere is alive: bubbles rise inside, beads slide down its surface
-  (`sapBubbles`/`sapDroplets`, mesh space).
+  (`sapBubbles`/`sapDroplets`, mesh space). Sap glistens, never glows
+  softly (`sapGlisten`, common.glsl, on every sap material): hard-edged
+  mirrored lights (`hardSpot`: key light with a white-hot core, points of
+  light, a sky window), winking skin facets, a sharp caustic through clear
+  sap, a thin hard edge line; its colour gathers to a narrow edge band
+  (`SAP_EDGE_POW`). The bloom post makes the glow round the glints.
 - Sky: gradient dome, sun/moon, stars; star motes (faceted core, ring,
   needle rays) turn, twinkle, hover and trail echoes while falling. Low
   pitch widens the view toward the horizon.

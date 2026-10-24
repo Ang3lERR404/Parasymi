@@ -234,13 +234,24 @@ vec3 hash33(vec3 p) {
   return fract((p.xxy + p.yxx) * p.zyx);
 }
 
-// bubbles floating up through sap: a rim-lit ring mask, sampled at two
-// depths behind the surface along the view so they hang inside it. `obj`
-// is the mesh-space point (they ride with the body), `view` toward the eye.
+// a hard-edged highlight: 1 where the direction `r` falls within a disc of
+// radius `size` (1 - cos of it) about the light's direction `l`, its edge a
+// sharp step (SPOT_EDGE of the radius), never a soft falloff
+const float SPOT_EDGE = 0.3;
+float hardSpot(vec3 r, vec3 l, float size) {
+  return 1.0 - smoothstep(size * (1.0 - SPOT_EDGE), size, 1.0 - dot(r, l));
+}
+
+// bubbles floating up through sap: a crisp ring mask with a pinpoint where
+// the light from above catches each, sampled at two depths behind the
+// surface along the view so they hang inside it. `obj` is the mesh-space
+// point (they ride with the body), `view` toward the eye.
 const float BUBBLE_DEPTH = 0.012;  // how far behind the surface the near layer hangs
 const float BUBBLE_CELLS = 36.0;   // bubble cells per unit (near layer)
 const float BUBBLE_RISE = 0.3;     // how fast they rise (cells/s, near layer)
 const float BUBBLE_SHARE = 0.3;    // the share of cells holding one
+const vec3 BUBBLE_CATCH = vec3(-0.3, 0.5, 0.0); // where on a bubble its pinpoint sits (of its radius)
+const float BUBBLE_CATCH_GAIN = 2.5;
 float sapBubbles(vec3 obj, vec3 view, float t) {
   float b = 0.0;
   for (int l = 0; l < 2; l++) {
@@ -253,18 +264,21 @@ float sapBubbles(vec3 obj, vec3 view, float t) {
     c.x += 0.1 * sin(t * 0.8 + h.z * TAU);
     float r = 0.08 + 0.14 * h.y;
     float d = length(q - c);
-    // a thin bright skin, a clear middle
-    b += (smoothstep(r, r * 0.78, d) - 0.7 * smoothstep(r * 0.72, r * 0.35, d)) * (1.0 - 0.45 * fl);
+    // a thin sharp skin, a clear middle, a hard pinpoint of light
+    float skin = smoothstep(r, r * 0.9, d) - 0.85 * smoothstep(r * 0.86, r * 0.66, d);
+    float pin = 1.0 - smoothstep(r * 0.12, r * 0.17, length(q - c - BUBBLE_CATCH * r));
+    b += (skin + pin * BUBBLE_CATCH_GAIN) * (1.0 - 0.45 * fl);
   }
   return b;
 }
 
 // beads of sap clinging to a surface, sliding slowly down it: x the bead,
-// y its glint (a dome lit off-centre by `light`)
+// y its glint (a dome mirroring `light` in a hard spot)
 const float DROP_CELLS = 52.0;    // bead cells per unit
 const float DROP_SLIDE = 0.1;     // how fast they slide down (cells/s)
 const float DROP_SHARE = 0.4;     // the share of cells holding one
-const float DROP_GLINT_POW = 48.0; // how tight a bead's glint is
+const float DROP_SPOT = 0.03;     // how big a bead's glint is (1 - cos)
+const float DROP_GLINT_GAIN = 3.0;
 vec2 sapDroplets(vec3 obj, vec3 n, vec3 light, vec3 view, float t) {
   vec3 q = obj * DROP_CELLS + vec3(0.0, t * DROP_SLIDE, 0.0);
   vec3 id = floor(q);
@@ -278,7 +292,7 @@ vec2 sapDroplets(vec3 obj, vec3 n, vec3 light, vec3 view, float t) {
   float l = length(d);
   float bead = smoothstep(r, r * 0.7, l);
   vec3 bn = normalize(n + (d / r) * 0.9);
-  float glint = pow(max(dot(reflect(-light, bn), view), 0.0), DROP_GLINT_POW);
+  float glint = hardSpot(reflect(-light, bn), view, DROP_SPOT) * DROP_GLINT_GAIN;
   return vec2(bead, bead * glint);
 }
 
@@ -398,6 +412,78 @@ vec3 shadeLit(vec3 albedo, vec3 n, vec3 wpos, float sh) {
 }
 
 vec3 shade(vec3 albedo, vec3 n, vec3 wpos) { return shadeLit(albedo, n, wpos, keyShadow(wpos, n)); }
+
+// sap glistens: it is wet, and light on a wet surface is hard. Each light is
+// mirrored in it as a crisp disc with a white-hot core, brighter than white
+// so the bloom gathers the glow round it (the sap itself never glows softly);
+// its skin ripples in tiny facets that catch the light one by one and wink
+// out; light falling through a clear body is focused into a sharp caustic on
+// its far wall; and its edge holds a thin hard line of reflected sky.
+const float SUN_SPOT = 0.0035;      // the key light's image (1 - cos of its radius)
+const float SUN_CORE = 0.0008;      // its white-hot core
+const float SUN_SPOT_GAIN = 2.2;
+const float SUN_CORE_GAIN = 6.0;
+const float POINT_SPOT = 0.012;     // a point of light's image
+const float POINT_SPOT_GAIN = 3.5;
+const float GLINT_CELLS = 26.0;     // glinting facets per unit of skin
+const float GLINT_SHARE = 0.45;     // the share of cells holding one
+const float GLINT_SIZE = 0.32;      // a facet's radius (of its cell)
+const float GLINT_TILT = 0.5;       // how far a facet leans off the skin
+const float GLINT_RATE = 0.8;       // how fast facets turn (rad/s)
+const float GLINT_SPOT = 0.02;      // how near the light's mirror a facet catches
+const float GLINT_GAIN = 5.0;
+const float SAP_IOR = 1.45;         // sap bends light as water does, a little more
+const float CAUSTIC_SPOT = 0.05;    // the focused light's spot on the far wall
+const float CAUSTIC_GAIN = 2.4;
+const float EDGE_LINE = 0.14;       // n.v below which the edge line shows
+const float EDGE_GAIN = 0.6;
+const float SKY_SPOT = 0.05;        // the bright sky overhead mirrored: a hard window
+const float SKY_SPOT_GAIN = 0.45;
+// the hard light on sap at `wpos` (mesh-space `obj`, its glints ride with
+// it) facing `n`, seen from `V`: `sapc` its colour, `clear` how see-through
+// (0 opaque: no caustic), `sh` the key light reaching it (keyShadow)
+vec3 sapGlisten(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, float sh) {
+  vec3 R = reflect(-V, n);
+  vec3 key = keyLight();
+  vec3 c = key * (hardSpot(R, SUN, SUN_SPOT) * SUN_SPOT_GAIN + hardSpot(R, SUN, SUN_CORE) * SUN_CORE_GAIN) * sh;
+  // the sky overhead, mirrored as a hard-edged window of light
+  vec3 sky = byDay(MOONLIGHT * 0.25, mix(SKY_DAY, SKY_VEILED, VEIL) + 0.5);
+  c += sky * hardSpot(R, vec3(0.0, 1.0, 0.0), SKY_SPOT) * SKY_SPOT_GAIN;
+  // every point of light nearby (blooms, motes) is mirrored too
+  Lighting L = Lighting(pc.light);
+  int count = int(L.info.x + 0.5);
+  for (int i = 0; i < count; i++) {
+    vec4 lp = L.lights[i].pos;
+    vec3 d = lp.xyz - wpos;
+    float k = dot(d, d) / (lp.w * lp.w);
+    if (k >= 1.0) continue;
+    c += L.lights[i].col.rgb * hardSpot(R, normalize(d), POINT_SPOT) * POINT_SPOT_GAIN * (1.0 - k) * (1.0 - k);
+  }
+  // facets of the rippling skin, each leaning its own way and turning
+  // slowly, flashing as one swings through the light's mirror
+  float t = pc.eye_time.w;
+  vec3 q = obj * GLINT_CELLS;
+  vec3 id = floor(q);
+  vec3 h = hash33(id + 31.0);
+  if (h.x < GLINT_SHARE) {
+    float facet = 1.0 - smoothstep(GLINT_SIZE * 0.8, GLINT_SIZE, length(q - id - 0.5 - (h.yzx - 0.5) * 0.3));
+    float a = t * GLINT_RATE * (0.5 + h.z) + h.y * TAU;
+    vec3 lean = (hash33(id + 57.0) - 0.5) * 2.0 + vec3(cos(a), sin(a * 0.7), sin(a)) * 0.6;
+    vec3 fn = normalize(n + lean * GLINT_TILT);
+    c += key * hardSpot(reflect(-V, fn), SUN, GLINT_SPOT) * facet * GLINT_GAIN * sh;
+  }
+  // the light focused through a clear body: seen through it on the far
+  // wall (a sphere's chord from where the view enters, bent), where that
+  // wall faces away from the light
+  vec3 r = refract(-V, n, 1.0 / SAP_IOR);
+  vec3 far = n - 2.0 * dot(n, r) * r;
+  c += sapc * key * hardSpot(far, -SUN, CAUSTIC_SPOT) * CAUSTIC_GAIN * clear * mix(0.4, 1.0, sh);
+  // the edge: a thin hard line of sky
+  float ndv = dot(n, V);
+  float edge = (1.0 - smoothstep(EDGE_LINE * 0.75, EDGE_LINE, ndv)) * step(0.0, ndv);
+  c += mix(sapc, vec3(1.0), 0.6) * byDay(MOONLIGHT * 0.3, vec3(1.0)) * edge * EDGE_GAIN;
+  return c;
+}
 
 
 vec3 applyFog(vec3 c, vec3 wpos) {

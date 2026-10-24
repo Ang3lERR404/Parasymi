@@ -28,11 +28,11 @@ const vec3 PRISM_DAY = vec3(1.0, 0.96, 0.9);
 const vec3 PRISM_FILM = vec3(1.0, 0.82, 0.6);
 const float PRISM_SPEC_POW = 120.0;
 const float PRISM_FRESNEL_POW = 3.0;
-// resin's tight highlight
-const float RESIN_SPEC_POW = 90.0;
-// liquid essence: its highlight, and the streaks running along it (how
-// many over its length, how fast)
-const float ESSENCE_SPEC_POW = 60.0;
+// how tightly sap's colour gathers to its edge (1 - n.v)^this: a narrow
+// band, so face-on it reads deep and clear and its light is the glisten's
+const float SAP_EDGE_POW = 5.0;
+// liquid essence: the streaks running along it (how many over its length,
+// how fast)
 const float ESSENCE_STREAKS = 3.0;
 const float ESSENCE_RUN = 5.0;
 // the soft shadow under a floater: its colour, and how it falls off to its rim
@@ -60,18 +60,22 @@ const float RAYS = 40.0;
 const uint THIN = PART_BIT(PART_LEAF) | PART_BIT(PART_BLOOM) | PART_BIT(PART_EAR);
 const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE);
 
-// sap is alive: bubbles drifting up inside it, beads sliding down its
-// surface. Added to every sap material. `sh`: how much of the key light
-// reaches it (its glints fall in shadow with it)
+// sap is alive and wet: bubbles drifting up inside it, beads sliding down
+// its surface, and hard light glistening on it (sapGlisten). Added to every
+// sap material. `inside` how see-through it is there; `sh`: how much of the
+// key light reaches it (its glints fall in shadow with it)
 vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout float alpha) {
   float t = pc.eye_time.w;
   vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
   float bub = sapBubbles(v_obj, V, t) * inside;
   c += mix(sapc, vec3(1.0, 0.95, 0.85), 0.35) * bub * 0.45 * lit;
   vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
-  c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + lit * drop.y * 0.9 * sh;
+  c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + keyLight() * drop.y * sh;
   alpha = max(alpha, drop.x * 0.85);
-  return c;
+  vec3 g = sapGlisten(n, V, v_pos, v_obj, sapc, inside, sh);
+  // a glint is opaque light: it shows whole even on clear sap
+  alpha = max(alpha, clamp(dot(g, vec3(0.33)), 0.0, 1.0));
+  return c + g;
 }
 
 void surface() {
@@ -278,8 +282,7 @@ void surface() {
     c += v_col * v_glow * (0.7 + 1.1 * flow);
     c += mix(v_col, vec3(1.0), 0.5) * fres * 0.5 * lit;
     c += v_col * pointLight(v_pos, n, 0.0) * 0.3;
-    vec3 H = normalize(SUN + V);
-    c += lit * pow(max(dot(n, H), 0.0), ESSENCE_SPEC_POW) * 0.6 * step(0.0, dot(n, SUN)) * sh;
+    c += sapGlisten(n, V, v_pos, v_obj, v_col, 0.0, sh);
     o = vec4(applyFog(c, v_pos), 1.0);
     return;
   }
@@ -326,14 +329,13 @@ void surface() {
     float through = max(dot(-raw, SUN), 0.0) * sh;
     vec3 lit = byDay(RESIN_NIGHT, vec3(1.0));
     c = shadeLit(deep, raw, v_pos, sh);
-    c += sap * lit * wrap * mix(0.06, 0.32, h);
+    c += sap * lit * wrap * mix(0.05, 0.22, h);
     c += sap * lit * through * 0.25 * h;
     // light from a bloom or a mote nearby carried through the mass too
     c += sap * pointLight(v_pos, raw, 1.0) * mix(0.1, 0.4, h);
-    // the polished face: amber at grazing angles and a tight highlight
-    c += mix(deep, sap * 1.4, fres) * 0.3 * lit;
-    vec3 H = normalize(SUN + V);
-    c += lit * pow(max(dot(raw, H), 0.0), RESIN_SPEC_POW) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN)) * sh;
+    // the polished face: amber gathered to a narrow band at its edge (its
+    // highlights are the glisten's, in sapLife)
+    c += mix(deep, sap * 1.4, pow(1.0 - ndv, SAP_EDGE_POW)) * 0.3 * lit;
     // denser at the base: nearly opaque there, see-through only toward the face
     alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
     c = sapLife(c, sap, raw, V, h * (1.0 - fres), sh, alpha);
@@ -344,18 +346,20 @@ void surface() {
     // translucent sap sac: dark and see-through at the centre, amber at
     // grazing angles. Only the near side is drawn (it is a closed sac).
     if (dot(raw, V) < 0.0) discard;
-    float fres = pow(1.0 - clamp(dot(raw, V), 0.0, 1.0), FRESNEL_POW);
+    float ndv = clamp(dot(raw, V), 0.0, 1.0);
+    float fres = pow(1.0 - ndv, FRESNEL_POW);
     vec3 deep = SAP_DEEP * hue * (0.6 + 0.8 * v_glow);
-    c = shadeLit(deep, raw, v_pos, sh) + mix(deep, SAP * hue * 2.2, fres) * (0.35 + v_glow);
+    c = shadeLit(deep, raw, v_pos, sh) + mix(deep, SAP * hue * 2.2, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.35 + v_glow);
     c += SAP * hue * pointLight(v_pos, raw, 1.0) * 0.3;
     alpha = mix(v_fade, 1.0, fres);
     c = sapLife(c, SAP * hue, raw, V, 1.0 - fres, sh, alpha);
   } else if (inner_ear && v_fade < 0.999) {
     // the inner ear is a sheet of sap: glowing at grazing angles, faintly
     // see-through face-on (the outer face stays solid vine)
-    float fres = pow(1.0 - clamp(-dot(raw, V), 0.0, 1.0), FRESNEL_POW);
+    float ndv = clamp(-dot(raw, V), 0.0, 1.0);
+    float fres = pow(1.0 - ndv, FRESNEL_POW);
     vec3 deep = SAP_DEEP * 1.6;
-    c = shadeLit(deep, -raw, v_pos, sh) + mix(deep, SAP * 1.8, fres) * 0.5;
+    c = shadeLit(deep, -raw, v_pos, sh) + mix(deep, SAP * 1.8, pow(1.0 - ndv, SAP_EDGE_POW)) * 0.5;
     c += SAP * max(dot(raw, SUN), 0.0) * 0.25 * sh; // light through the ear
     c += SAP * pointLight(v_pos, raw, 0.0) * 0.25;
     alpha = mix(v_fade, 1.0, fres);
