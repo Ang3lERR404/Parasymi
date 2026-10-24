@@ -219,10 +219,13 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   each in folded as a bud and opens it as growth passes it; grown, whorls
   turn slowly, alternating, and drift apart and back; it bobs and never
   bends. The garden's only true glow. Beams
-  between linked blooms (`bloom_thread`, part `.thread`): a camera-facing
-  ribbon bent in part.vert curve mode, bright near-white core, warm halo,
-  pulses running along; dim when the network is dark; extends from the more
-  grown bloom as it finishes.
+  between linked blooms (`bloom_thread`, part `.thread`): soft rays, a
+  camera-facing spindle bent in part.vert curve mode; no core, a faint haze
+  with five soft streaks swelling from sender to receiver, iridescent
+  (rainbow end to end, rolling along), tiny motes drifting inside shifting
+  hue (seeded by the instance phase); dim when the network is dark; sent
+  from the more grown bloom as it finishes. Demo: a chain of five blooms
+  arced around the garden, clear of parasites (they drain floaters).
 - Structures (`structure_kit`) speak the plants' language: woven root mats,
   leafy vines, real petals, pods of resin sap (`Def.sap`, no own light).
   Germinator: resin pod with a seed, cradled by vines. Research bloom: woven

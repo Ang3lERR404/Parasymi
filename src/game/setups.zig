@@ -71,14 +71,21 @@ fn confluences(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   }
 }
 
-/// a row of celestial blooms held at each growth stage, the last all but
-/// mature (a mature bloom off the ley would fade).
+/// an arc of celestial blooms around the garden, each ~5 tiles from the next
+/// and > 10 (their link reach) from the one after, so they link in a chain
+/// whose beams never overlap. Mature ones keep the network radiating; the
+/// others are held mid-assembly and as a beam still reaching out (> 0.85).
+/// None sits beside a parasite (the thornleech bed, the converging pair): it
+/// would be drained and wither.
 fn blooms(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
-  for ([_]f32{ 0.5, 0.999, 0.25, 0.75 }, 0..) |growth, i| {
-    const x = cx - 3 + 2 * @as(i32, @intCast(i));
-    _ = try g.plants.placeEx(g.gpa, &g.world, x, cz + 1, .{
-      .x = x, .y = cz + 1, .chunk = undefined, .tile = undefined, .sp = .bloom,
-      .seed = 0.13 + 0.21 * m.f(i), .growth = growth, .span = 1e9, .mana = 10,
+  const at = [_][2]i32{ .{ -8, -3 }, .{ -4, -7 }, .{ 1, -8 }, .{ 8, -6 }, .{ 10, -2 } };
+  const growth = [_]f32{ 1, 0.3, 1, 0.6, 0.95 };
+  for (at, growth, 0..) |o, gr, i| {
+    const x = cx + o[0];
+    const z = cz + o[1];
+    _ = try g.plants.placeEx(g.gpa, &g.world, x, z, .{
+      .x = x, .y = z, .chunk = undefined, .tile = undefined, .sp = .bloom,
+      .seed = 0.13 + 0.21 * m.f(i), .growth = gr, .span = 1e9, .mana = 10,
     });
   }
 }

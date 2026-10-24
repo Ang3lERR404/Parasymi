@@ -1,10 +1,11 @@
-//! mesh: BLOOM THREAD. a beam of light between two celestial blooms: a flat
+//! mesh: BLOOM THREAD. soft rays sent between two celestial blooms: a flat
 //! ribbon, its length running up +Y over 0..1 (tu.x), its width across x
 //! from -1 to 1 (tu.y). part.vert (curve mode) carries it from one bloom's
-//! core to the other's and turns its width to face the eye, so it is a
-//! beam from every side, never a wire; part.frag gives it a bright core
-//! falling off to a soft halo across its width, with light running along
-//! it. Part `.thread`. Listed last: it blends over everything.
+//! core to the other's as a spindle and turns its width to face the eye,
+//! so it reads from every side, never a wire; part.frag fills it with a
+//! faint haze, soft streaks swelling from sender to receiver and tiny
+//! drifting motes, the rainbow running from one end to the other. Part
+//! `.thread`. Listed last: it blends over everything.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");

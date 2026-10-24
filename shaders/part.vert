@@ -28,6 +28,7 @@ layout(location = 5) out float v_t;         // position along the part (tube tan
 layout(location = 6) flat out float v_fade; // opacity of translucent sap at its centre
 layout(location = 7) out float v_u;
 layout(location = 8) out vec3 v_obj;       // mesh-space point (sap bubbles ride with the body)
+layout(location = 9) flat out float v_phase; // per-instance phase (seeds a beam's motes)
 
 // Catmull-Rom through b..c (a, d the neighbours) at f, and its tangent
 vec3 catmull(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
@@ -94,10 +95,13 @@ void main() {
     vec3 T = normalize(catmullTan(a, b, c, d, f));
     vec3 C = catmull(a, b, c, d, f);
     if (part == 8u) {
-      // a beam: its width (x, -1..1) turned to face the eye from every side
+      // soft rays: a spindle of light, narrow where it leaves one bloom and
+      // reaches the other, widest between, its width (x, -1..1) turned to
+      // face the eye from every side
       vec3 toEye = normalize(pc.eye_time.xyz - C);
       vec3 right = normalize(cross(T, toEye) + vec3(1e-5, 0.0, 0.0));
-      w = vec4(C + right * p.x * 0.12, 1.0);
+      float spindle = mix(0.3, 1.0, pow(sin(0.5 * TAU * clamp(tu.x, 0.0, 1.0)), 0.6));
+      w = vec4(C + right * p.x * 0.42 * spindle, 1.0);
       wn = toEye;
     } else {
       vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
@@ -146,8 +150,10 @@ void main() {
   v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
   v_part = float(part);
   v_t = tu.x;
-  v_fade = ip.w;
+  // a beam carries its length instead, so its rays and motes keep their size
+  v_fade = part == 8u ? length(c3.xyz - c0.xyz) : ip.w;
   v_u = tu.y;
   v_obj = p;
+  v_phase = ip.z;
   gl_Position = pc.vp * w;
 }

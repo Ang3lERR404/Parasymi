@@ -11,6 +11,7 @@ layout(location = 5) in float v_t;
 layout(location = 6) flat in float v_fade;
 layout(location = 7) in float v_u;
 layout(location = 8) in vec3 v_obj;
+layout(location = 9) flat in float v_phase; // per-instance phase (seeds a beam's motes)
 layout(location = 0) out vec4 o;
 
 const vec3 SAP = vec3(1.0, 0.43, 0.08);       // linear amber, the only accent
@@ -56,23 +57,58 @@ void main() {
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
   bool inner_ear = part == 5 && dot(raw, V) < 0.0;
   if (part == 8) {
-    // a beam of light between blooms: a bright, nearly white core across
-    // its width (v_u -1..1) falling off to a warm halo, its hue drifting
-    // faintly iridescent along it, with pulses of light running from bloom
-    // to bloom. It carries light of its own (bloom catches it); a dark
-    // network's beam is a faint trace.
+    // soft rays sent from one bloom to the other: no core, a faint haze
+    // across the width (v_u -1..1) with a few soft streaks in it, each
+    // broken into long swells of light travelling from the sender (v_t 0)
+    // to the receiver. The hue runs the rainbow from one end to the other,
+    // rolling along with them; tiny motes of light drift along inside,
+    // shifting hue as they go. It carries light of its own (bloom catches
+    // the swells and motes); a dark network's beam is a faint trace.
     float t = pc.eye_time.w;
     float u = v_u;
-    float core = exp(-u * u * 40.0);
-    float halo = exp(-u * u * 4.0);
-    vec3 film = filmHue(v_t * 1.5 - t * 0.1);
-    vec3 warm = mix(srgb2lin(vec3(1.0, 0.82, 0.55)), film, 0.25);
-    float run = pow(0.5 + 0.5 * sin(t * 2.4 - v_t * 18.0), 6.0);
+    float len = max(v_fade, 0.1);
+    float x = v_t * len; // world distance from the sender
     float lit = min(v_glow, 1.0);
+    float roll = v_t - t * 0.12;
+    float haze = exp(-u * u * 3.0);
+    vec3 rays = vec3(0.0);
+    float ray_a = 0.0;
+    for (int k = 0; k < 5; k++) {
+      float fk = float(k);
+      float lane = (fk - 2.0) * 0.32 + 0.1 * sin(t * 0.6 + fk * 2.1 + x * 0.7);
+      float across = exp(-(u - lane) * (u - lane) * 38.0);
+      float swell = 0.5 + 0.5 * sin(x * (1.1 + 0.23 * fk) - t * (1.6 + 0.3 * fk) + fk * 1.7);
+      float a = across * swell * swell * (1.0 - 0.15 * abs(fk - 2.0));
+      rays += filmHue(roll + fk * 0.04) * a;
+      ray_a += a;
+    }
+    // motes: one per cell along the beam, drifting toward the receiver,
+    // each at its own place across (seeded by the instance's phase, which
+    // holds still, unlike its length) and twinkling; neighbouring cells
+    // too, so none is cut at a cell's edge
+    const float CELL = 0.3;
+    const float DRIFT = 0.55;
+    const float WIDTH = 0.42; // part.vert's half width at the middle
+    float m = 0.0;
+    vec3 mc = vec3(0.0);
+    float drift = (x - t * DRIFT) / CELL;
+    for (int k = -1; k <= 1; k++) {
+      float id = floor(drift) + float(k);
+      vec3 h = hash33(vec3(id, v_phase * 7.31, 7.0));
+      float dx = (drift - id - h.x) * CELL;
+      float du = (u - (h.y * 1.5 - 0.75) - 0.08 * sin(t * 1.3 + h.z * TAU)) * WIDTH;
+      float tw = 0.55 + 0.45 * sin(t * (3.0 + 3.0 * h.z) + h.x * TAU);
+      float d2 = dx * dx + du * du;
+      float g = (exp(-d2 / 0.0006) + 0.35 * exp(-d2 / 0.006)) * tw;
+      m += g;
+      mc += filmHue(roll + h.z * 0.3 + t * 0.05) * g;
+    }
     // fade into each bloom's core at the ends
-    float ends = smoothstep(0.0, 0.06, v_t) * smoothstep(1.0, 0.94, v_t);
-    c = (mix(warm, vec3(1.0, 0.97, 0.9), core) * (core * 3.0 + halo * 0.6) * (0.8 + 1.4 * run)) * (0.15 + 0.85 * lit);
-    o = vec4(applyFog(c, v_pos), clamp(core + halo * 0.55, 0.0, 1.0) * ends * (0.35 + 0.65 * lit));
+    float ends = smoothstep(0.0, 0.08, v_t) * smoothstep(1.0, 0.92, v_t);
+    vec3 film = filmHue(roll);
+    c = (film * haze * 0.25 + rays * 0.9 + mix(mc, vec3(m), 0.35) * 2.5) * (0.12 + 0.88 * lit);
+    float a = clamp(haze * 0.18 + ray_a * 0.45 + m, 0.0, 1.0);
+    o = vec4(applyFog(c, v_pos), a * ends * (0.3 + 0.7 * lit));
     return;
   }
   if (part == 7) {
