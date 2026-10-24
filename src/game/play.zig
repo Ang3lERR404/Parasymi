@@ -80,9 +80,12 @@ pub const BAR = ctl.slots.len;
 const UI_WRAP:f64 = 1000;
 
 /// what the cursor carries (one click lifts, the next puts down): a belly
-/// slot's stack, or a hotbar slot's item. It stays where it was until put
-/// down, so closing the belly or saving loses nothing.
-pub const Held = union(enum) { slot:usize, bar:usize };
+/// slot's stack, a hotbar slot's item, or a stack from a slot of the
+/// structure whose panel is open. It stays where it was until put down, so
+/// closing the panel or saving loses nothing.
+pub const Held = union(enum) { slot:usize, bar:usize, store:usize };
+/// a stack put down within one inventory goes as far as it fits
+const STACK_ANY:u32 = 1 << 16;
 
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
 pub fn known(g:*const Game, item:items.Item) bool {
@@ -100,6 +103,9 @@ pub const Mode = enum {
   roam,
   /// the belly is open (Tab): weaving by hand
   belly,
+  /// a structure's panel is open (clicked in the garden, `Game.open`): its
+  /// slots beside the belly's, and what it may be set to weave
+  structure,
   /// the research list is open (T)
   research,
   /// the world is frozen and the pause menu is open (Esc)
@@ -112,6 +118,8 @@ pub const Mode = enum {
   /// the world keeps moving underneath (everything but the pause menu and
   /// the options panel)
   pub fn live(md:Mode) bool { return md != .paused and md != .options; }
+  /// the belly's slots are open: stacks are lifted and put down
+  pub fn sorting(md:Mode) bool { return md == .belly or md == .structure; }
 };
 
 const Error = Allocator.Error;
@@ -154,6 +162,9 @@ pub const Game = struct {
   bar:[BAR]?items.Item = @splat(null),
   hot:usize = 0,
   held:?Held = null,
+  /// the tile of the structure whose panel is open (mode `.structure`); a
+  /// tile, not an id, since ids move when a structure is removed
+  open:[2]i32 = .{0, 0},
   /// the cursor, in screen pixels (tooltips and what is carried follow it)
   mouse:[2]f32 = .{0, 0},
   /// a click spent putting down or dropping what was carried does nothing
@@ -255,7 +266,7 @@ pub const Game = struct {
     if (ctl.pressed(in, .fullscreen)) g.opts.fullscreen = !g.opts.fullscreen;
     if (ctl.pressed(in, .back)) switch (g.mode) {
       .roam => g.mode = .paused,
-      .belly, .research, .paused => g.mode = .roam,
+      .belly, .structure, .research, .paused => g.mode = .roam,
       .options => g.mode = .paused,
       .inspect => g.inspect(in, false),
     } else if (!g.mode.live()) g.menu(in);
@@ -287,23 +298,30 @@ pub const Game = struct {
     // choose research, weave a recipe, lift or put down an item; a panel's
     // backdrop just absorbs it
     g.mouse = in.mouse;
-    if (g.mode != .belly) g.held = null;
+    // a structure's panel closes once it is gone or out of reach
+    if (g.mode == .structure and g.opened() == null) g.mode = .roam;
+    if (!g.mode.sorting()) g.held = null;
     if (g.held) |h| switch (h) {
       .slot => |i| if (g.player.inv.slot[i] == null) { g.held = null; },
       .bar => |i| if (g.bar[i] == null) { g.held = null; },
+      .store => |i| if (g.storeSlot(i) == null) { g.held = null; },
     };
     const ui_hit = if (inspecting) null else g.rows.at(in.mouse);
     g.pointed = ui_hit;
     if (!ctl.down(in, .use)) g.use_spent = false;
     if (ctl.pressed(in, .use)) {
+      // held with use: a stack moves straight across to the other side
+      const across = ctl.down(in, .take) and g.held == null and g.mode == .structure;
       if (ui_hit) |hit| switch (hit) {
-        .panel, .research, .weave => if (g.held != null) g.drop() else switch (hit) {
+        .panel, .research, .weave, .recipe => if (g.held != null) g.drop() else switch (hit) {
           .research => |id| g.prog.select(id),
           .weave => |i| actions.weaveByHand(g, i),
+          .recipe => |r| if (g.opened()) |j| st.choose(g.structs.get(j), &g.prog, r),
           else => {},
         },
-        .slot => |i| g.clickSlot(i),
-        .bar => |i| if (g.mode == .belly) g.clickBar(i) else { g.hot = i; },
+        .slot => |i| if (across) g.moveAcross(.{.slot = i}) else g.clickSlot(i),
+        .store => |i| if (across) g.moveAcross(.{.store = i}) else g.clickStore(i),
+        .bar => |i| if (g.mode.sorting()) g.clickBar(i) else { g.hot = i; },
         // drawn only while the world is frozen (see `menu`)
         .pause, .option, .back => {},
       } else if (g.held != null) {
@@ -362,6 +380,12 @@ pub const Game = struct {
         if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
       }
+      // a click on a structure that keeps items opens its panel
+      if (ctl.pressed(in, .use) and ui_hit == null and !g.use_spent) if (on_struct) |j| if (g.structs.get(j).def().store) {
+        g.open = h;
+        g.mode = .structure;
+        g.use_spent = true;
+      };
       if (ctl.pressed(in, .harvest) and !alt) {
         if (on_struct) |j| {
           if (ctl.down(in, .take)) actions.takeFrom(g, j) else actions.feed(g, j);
@@ -407,18 +431,32 @@ pub const Game = struct {
   pub fn selected(g:*const Game) ?items.Item { return g.bar[g.hot]; }
 
   /// what the cursor carries, if anything.
-  pub fn carried(g:*const Game) ?items.Item {
-    const h = g.held orelse return null;
+  pub fn carried(g:*const Game) ?items.Item { return if (g.held) |h| g.itemOf(h) else null; }
+
+  /// the item a slot holds.
+  fn itemOf(g:*const Game, h:Held) ?items.Item {
     return switch (h) {
       .slot => |i| if (g.player.inv.slot[i]) |s| s.item else null,
       .bar => |i| g.bar[i],
+      .store => |i| if (g.storeSlot(i)) |s| s.item else null,
     };
   }
 
+  /// the structure whose panel is open, while it stands within reach.
+  pub fn opened(g:*const Game) ?st.Id {
+    if (g.mode != .structure or !g.player.inReach(g.open[0], g.open[1])) return null;
+    return g.structs.at(&g.world, g.open[0], g.open[1]);
+  }
+
+  /// slot `i` of the open structure, if it holds a stack.
+  pub fn storeSlot(g:*const Game, i:usize) ?items.Stack {
+    const j = g.opened() orelse return null;
+    return g.structs.list.items[j.idx()].inv.slot[i];
+  }
+
   /// a click on belly slot `i`: lift its stack, or put down what is carried
-  /// there (into an empty slot, onto a stack of the same item as far as it
-  /// fits, else trading places with what is there). A hotbar item carried
-  /// off its slot is taken off the hotbar.
+  /// there (`putDown`). A hotbar item carried off its slot is taken off the
+  /// hotbar. A structure's stack trades places only with one it would take.
   fn clickSlot(g:*Game, i:usize) void {
     const slot = &g.player.inv.slot;
     const h = g.held orelse {
@@ -428,22 +466,39 @@ pub const Game = struct {
     g.held = null;
     switch (h) {
       .bar => |j| g.bar[j] = null,
-      .slot => |j| {
-        if (j == i) return;
-        if (slot[j]) |*from| if (slot[i]) |*to| if (to.item == from.item) {
-          const k = @min(from.n, to.item.info().stack -| to.n);
-          to.n += k;
-          from.n -= k;
-          // what did not fit stays in hand
-          if (from.n == 0) slot[j] = null else g.held = .{.slot = j};
-          return;
-        };
-        swap(?items.Stack, &slot[i], &slot[j]);
+      .slot => |j| if (j != i and putDown(&slot[j], &slot[i], STACK_ANY, true)) { g.held = h; },
+      .store => |j| {
+        const id = g.opened() orelse return;
+        const there = if (slot[i]) |s| g.structs.wants(&g.prog, id, s.item) >= s.n else true;
+        if (putDown(&g.structs.get(id).inv.slot[j], &slot[i], STACK_ANY, there)) g.held = h;
       },
     }
   }
 
-  /// a click on hotbar slot `i`: put what is carried there (a belly stack
+  /// a click on slot `i` of the open structure: lift its stack, or put down
+  /// what is carried there, as much of it as the structure will take (it
+  /// trades places only when it takes the whole stack). A hotbar item is
+  /// just put down.
+  fn clickStore(g:*Game, i:usize) void {
+    const id = g.opened() orelse return;
+    const slot = &g.structs.get(id).inv.slot;
+    const h = g.held orelse {
+      if (slot[i] != null) g.held = .{.store = i};
+      return;
+    };
+    g.held = null;
+    switch (h) {
+      .bar => |j| g.bar[j] = null,
+      .store => |j| if (j != i and putDown(&slot[j], &slot[i], STACK_ANY, true)) { g.held = h; },
+      .slot => |j| {
+        const from = &g.player.inv.slot[j];
+        const room = if (from.*) |s| g.structs.wants(&g.prog, id, s.item) else 0;
+        if (putDown(from, &slot[i], room, room >= from.*.?.n)) g.held = h;
+      },
+    }
+  }
+
+  /// a click on hotbar slot `i`: put what is carried there (a stack
   /// assigns its item, a hotbar item trades places), or lift its item.
   fn clickBar(g:*Game, i:usize) void {
     const h = g.held orelse {
@@ -452,20 +507,60 @@ pub const Game = struct {
     };
     g.held = null;
     switch (h) {
-      .slot => |j| g.bar[i] = if (g.player.inv.slot[j]) |s| s.item else g.bar[i],
+      .slot, .store => g.bar[i] = g.itemOf(h) orelse g.bar[i],
       .bar => |j| swap(?items.Item, &g.bar[i], &g.bar[j]),
     }
   }
 
-  /// put down what is carried anywhere but a slot: a belly stack goes back
-  /// where it was, a hotbar item comes off the hotbar.
+  /// put down what is carried anywhere but a slot: a stack goes back where
+  /// it was, a hotbar item comes off the hotbar.
   fn drop(g:*Game) void {
     const h = g.held orelse return;
     g.held = null;
     switch (h) {
-      .slot => {},
+      .slot, .store => {},
       .bar => |i| g.bar[i] = null,
     }
+  }
+
+  /// move a whole stack straight across, belly to the open structure (as
+  /// much as it will take) or back (as much as fits).
+  fn moveAcross(g:*Game, from:Held) void {
+    const id = g.opened() orelse return;
+    switch (from) {
+      .slot => |i| if (g.player.inv.slot[i]) |*s| {
+        s.n -= g.structs.insert(&g.prog, id, s.item, s.n);
+        if (s.n == 0) g.player.inv.slot[i] = null;
+      },
+      .store => |i| if (g.structs.get(id).inv.slot[i]) |*s| {
+        s.n -= g.player.inv.add(s.item, s.n);
+        if (s.n == 0) g.structs.get(id).inv.slot[i] = null
+        else g.prog.say(txt.s.msg.belly_full, .{});
+      },
+      .bar => {},
+    }
+  }
+
+  /// put the carried stack `from` down on `to`: into an empty slot or onto
+  /// the same item, as much as fits and `cap` allows; else the two trade
+  /// places if `trade`. Returns whether some of it is still in hand.
+  fn putDown(from:*?items.Stack, to:*?items.Stack, cap:u32, trade:bool) bool {
+    const f = if (from.*) |*p| p else return false;
+    var room:u32 = f.item.info().stack;
+    if (to.*) |t| {
+      if (t.item != f.item) {
+        if (trade) swap(?items.Stack, from, to);
+        return !trade;
+      }
+      room -|= t.n;
+    }
+    const k:u16 = @intCast(@min(f.n, room, cap));
+    if (k == 0) return true;
+    if (to.*) |*t| t.n += k else to.* = .{.item = f.item, .n = k};
+    f.n -= k;
+    if (f.n > 0) return true;
+    from.* = null;
+    return false;
   }
 
   /// the pause menu and options panel, while the world is frozen: a click
@@ -654,6 +749,73 @@ test "the pause menu opens the options; clicks turn them and lead back" {
   try testing.expectEqual(Mode.roam, g.mode);
   // nothing moved while frozen
   try testing.expectEqual(@as(u64, 0), g.ticks);
+}
+
+test "a germinator's panel: choose its seed, put in only what it weaves from, move stacks across" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  const screen = TEST_SCREEN;
+  try ctl.fill(@embedFile("controls.cfg"));
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  const x, const z = m.tileAt(g.player.pos);
+  var fp = m.footprint(x + 1, z, 2);
+  while (fp.next()) |p| {
+    const c = g.world.chunkOfTile(p[0], p[1]).?;
+    const t = ck.localIndex(p[0], p[1]);
+    c.kind[t] = .soil;
+    c.res[t] = 0;
+    c.occ[t] = .none;
+  }
+  try testing.expect(try g.structs.place(gpa, &g.world, x + 1, z, .germinator, 0, 0));
+  const id = g.structs.at(&g.world, x + 1, z).?;
+  g.player.inv = .{};
+  g.player.inv.slot[0] = .{.item = .fibre, .n = 30};
+  g.player.inv.slot[1] = .{.item = .grit, .n = 5};
+  g.mode = .structure;
+  g.open = .{x + 1, z};
+  try testing.expect(g.opened() != null);
+
+  // set to thornleech, it takes no fibre: the stack stays in hand
+  const thorn = for (craft.seeds) |r| {
+    if (craft.hand[r].out == .seed_thornleech) break r;
+  } else unreachable;
+  try click.on(&g, &in, .{.recipe = thorn}, screen);
+  try testing.expectEqual(@as(?u8, thorn), st.chosen(g.structs.get(id)));
+  try click.on(&g, &in, .{.slot = 0}, screen);
+  try click.on(&g, &in, .{.store = 0}, screen);
+  try testing.expect(g.holds(.{.slot = 0}));
+  try testing.expect(g.structs.get(id).inv.slot[0] == null);
+  try click.on(&g, &in, .panel, screen);
+  // grit it takes, the whole stack
+  try click.on(&g, &in, .{.slot = 1}, screen);
+  try click.on(&g, &in, .{.store = 2}, screen);
+  try testing.expectEqual(@as(u32, 5), g.structs.get(id).inv.count(.grit));
+  try testing.expect(g.held == null and g.player.inv.slot[1] == null);
+  // a locked seed is not chosen
+  const vesper = for (craft.seeds) |r| {
+    if (craft.hand[r].out == .seed_vesper) break r;
+  } else unreachable;
+  try click.on(&g, &in, .{.recipe = vesper}, screen);
+  try testing.expectEqual(@as(?u8, thorn), st.chosen(g.structs.get(id)));
+  // back to lumenroot: fibre goes in up to what it stocks, the rest in hand
+  try click.on(&g, &in, .{.recipe = craft.seeds[0]}, screen);
+  try click.on(&g, &in, .{.slot = 0}, screen);
+  try click.on(&g, &in, .{.store = 0}, screen);
+  try testing.expectEqual(@as(u32, 20), g.structs.get(id).inv.count(.fibre));
+  try testing.expectEqual(@as(u32, 10), g.player.inv.count(.fibre));
+  try click.on(&g, &in, .panel, screen);
+  // with take held, a click moves a stack straight back
+  ctl.hold(&in, .take, true);
+  try click.on(&g, &in, .{.store = 2}, screen);
+  ctl.hold(&in, .take, false);
+  try testing.expectEqual(@as(u32, 5), g.player.inv.count(.grit));
+  try testing.expectEqual(@as(u32, 0), g.structs.get(id).inv.count(.grit));
+  // out of reach, the panel closes
+  g.player.pos += m.v3(40, 0, 0);
+  try g.update(&in, TICK, screen);
+  try testing.expectEqual(Mode.roam, g.mode);
 }
 
 test "a click lifts a stack, the next puts it down; dropped on the hotbar it assigns" {

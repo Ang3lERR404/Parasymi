@@ -31,7 +31,13 @@ panels. Hotbar slots start empty: in the belly a click lifts a stack onto
 the cursor, the next puts it down (empty slot, merge, or swap: sorting by
 hand); dropped on a hotbar slot it assigns that item (any item); a lifted
 hotbar item swaps or, dropped elsewhere, comes off; RMB clears a hotbar
-slot. Hovering a slot shows the item's full name. Tab belly (weave), T research, F3 debug, Esc closes a panel else
+slot. Hovering a slot shows the item's full name. LMB on a structure that
+keeps items (`Def.store`: sap cache, germinator, research bloom, digger)
+opens its panel (`Mode.structure`, `hud/structure.zig`): its slots beside
+the belly's, lifted/put down between them the same way (into it only what
+it `wants`), Shift+LMB moves a stack across; a germinator's panel also
+picks its seed (`recipes`/`chosen`/`choose` hooks). Closes out of reach.
+Tab belly (weave), T research, F3 debug, Esc closes a panel else
 pauses (pause rows are clicked or keyed: Q = save and quit, O = options),
 F5 save, F9 load, F11 fullscreen. Options panel: LMB turns a setting, RMB
 turns it back, Esc/BACK returns to the pause menu.
@@ -81,7 +87,7 @@ registry kinds outside the registry file; add a hook.
 |---|---|---|
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
-| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
+| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
 | render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |

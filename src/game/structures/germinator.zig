@@ -3,6 +3,7 @@
 const std = @import("std");
 const m = @import("../../core/math.zig");
 const assert = std.debug.assert;
+const indexOfScalar = std.mem.indexOfScalar;
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
@@ -14,7 +15,7 @@ const style = @import("../style.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 
-pub const def:st.Def = .{ .item = .germinator, .size = 2, .mesh = .germinator, .sway = 0.9, .tall = 1.05, .grow = 6 };
+pub const def:st.Def = .{ .item = .germinator, .size = 2, .mesh = .germinator, .store = true, .sway = 0.9, .tall = 1.05, .grow = 6 };
 
 /// weave speed multiplier relative to hand-weaving
 const SPEED:f32 = 0.6;
@@ -43,23 +44,35 @@ pub fn wants(s:*const st.Structure, _:*const prog.Progression, item:items.Item) 
   return 0;
 }
 
-/// only finished weaves leave.
+/// only finished weaves leave: any seed, so one woven before the recipe
+/// was changed still goes.
 pub fn output(s:*const st.Structure) ?items.Item {
-  const out = craft.hand[s.state.germinator.recipe].out;
-  return if (s.inv.count(out) > 0) out else null;
+  for (s.inv.slot) |slot| if (slot) |it| if (it.item.plants() != null) return it.item;
+  return null;
+}
+
+/// its panel offers every seed weave.
+pub fn recipes() []const u8 { return &craft.seeds; }
+pub fn chosen(s:*const st.Structure) ?u8 { return s.state.germinator.recipe; }
+
+/// set the seed it weaves, if the gardener understands it. A weave under
+/// way finishes first (its ingredients are already in it).
+pub fn choose(s:*st.Structure, g:*prog.Progression, r:u8) void {
+  assert(craft.isSeedRecipe(r));
+  const out = txt.item(craft.hand[r].out).name;
+  if (!craft.hand[r].unlocked(g)) return g.say(txt.s.msg.not_understood, .{out});
+  if (s.state.germinator.recipe == r) return;
+  s.state.germinator.recipe = r;
+  g.say(txt.s.msg.germinator_weaves, .{out});
 }
 
 /// cycle through the seed recipes the gardener understands.
 pub fn configure(s:*st.Structure, g:*prog.Progression) void {
-  const gs = &s.state.germinator;
-  if (gs.weave.busy()) return;
-  var r = gs.recipe;
-  for (0..craft.hand.len) |_| {
-    r = @intCast((r + 1) % craft.hand.len);
-    if (craft.isSeedRecipe(r) and craft.hand[r].unlocked(g)) break;
+  const at = indexOfScalar(u8, &craft.seeds, s.state.germinator.recipe) orelse 0;
+  for (1..craft.seeds.len + 1) |k| {
+    const r = craft.seeds[(at + k) % craft.seeds.len];
+    if (craft.hand[r].unlocked(g)) return choose(s, g, r);
   }
-  gs.recipe = r;
-  g.say(txt.s.msg.germinator_weaves, .{txt.item(craft.hand[r].out).name});
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {

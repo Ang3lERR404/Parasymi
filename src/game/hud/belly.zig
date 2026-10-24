@@ -10,8 +10,10 @@ const s = @import("../style.zig");
 const txt = @import("../text.zig");
 const m = @import("../../core/math.zig");
 const icon = @import("../icon.zig");
+const items = @import("../../sim/items.zig");
+const hud = @import("../hud.zig");
 
-const cols = 6;
+pub const cols = 6;
 const rows = player_mod.SLOTS / cols;
 comptime { std.debug.assert(player_mod.SLOTS % cols == 0); }
 
@@ -43,27 +45,34 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   _ = try d.text(px + 72, py + 58, s.text_fine, s.dim, txt.s.hud.belly_hint);
 
   var y = py + header_h;
-  try slots(g, d, px, y);
+  try grid(g, d, .slot, &g.player.inv.slot, cols, px + (pw - gap * cols) / 2, y);
   y += slots_h + 6;
   try weaves(g, d, px, y);
 }
 
-/// the slots, in the order the gardener keeps them: a click lifts a stack
-/// onto the cursor, the next puts it down (play.Game.clickSlot).
-fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) Allocator.Error!void {
-  const gx = px + (pw - gap * cols) / 2;
+/// the side of a slot grid: the belly's, or the open structure's
+pub const Side = enum { slot, store };
+/// the belly's slot grid is this wide
+pub const width = gap * cols;
+pub const height = gap * m.f(rows);
+
+/// the slots of one side, `columns` across from `gx`, in the order the
+/// gardener keeps them: a click lifts a stack onto the cursor, the next
+/// puts it down (play.Game.clickSlot / clickStore).
+pub fn grid(g:*play.Game, d:*Draw, comptime side:Side, stacks:[]const ?items.Stack, columns:usize, gx:f32, py:f32) Allocator.Error!void {
   const t = g.uiT();
   const carrying = g.held != null;
-  for (g.player.inv.slot, 0..) |slot, i| {
-    const cx = gx + gap * (m.f(i % cols) + 0.5);
-    const cy = py + gap * (m.f(i / cols) + 0.5);
+  for (stacks, 0..) |slot, i| {
+    const cx = gx + gap * (m.f(i % columns) + 0.5);
+    const cy = py + gap * (m.f(i / columns) + 0.5);
     const phase = m.f(i) * 0.13;
-    g.rows.add(cx - gap / 2, cy - gap / 2, gap, gap, .{.slot = i});
-    if (g.points(.{.slot = i})) try d.glow(cx, cy, 36, if (carrying) s.drop_target else s.slot_hover);
+    const pick = @unionInit(hud.Pick, @tagName(side), i);
+    g.rows.add(cx - gap / 2, cy - gap / 2, gap, gap, pick);
+    if (g.points(pick)) try d.glow(cx, cy, 36, if (carrying) s.drop_target else s.slot_hover);
     try d.pod(cx, cy, 21, s.pod_empty, 0, phase);
     const it = slot orelse continue;
     // lifted onto the cursor: only a faint trace stays behind
-    const lifted = g.holds(.{.slot = i});
+    const lifted = g.holds(@unionInit(play.Held, @tagName(side), i));
     const full = m.ratio(it.n, it.item.info().stack);
     try icon.draw(d, it.item, .{cx, cy}, slot_r, t, phase, 0.3 + 0.7 * full, if (lifted) lifted_alpha else 255);
     if (!lifted) try icon.count(d, .{cx, cy}, slot_r, it.n);

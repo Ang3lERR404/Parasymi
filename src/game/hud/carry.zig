@@ -24,6 +24,7 @@ pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
   try icon.draw(d, item, c, r, g.uiT(), phase, 1, 255);
   switch (g.held.?) {
     .slot => |i| try icon.count(d, c, r, g.player.inv.slot[i].?.n),
+    .store => |i| try icon.count(d, c, r, g.storeSlot(i).?.n),
     .bar => {},
   }
 }

@@ -48,14 +48,22 @@ pub const hand = [_]Recipe{
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
 
 /// the recipes the wolf weaves by hand (indices into `hand`): all but seeds.
-pub const by_hand = blk: {
+pub const by_hand = recipesWhere(false);
+/// the recipes a germinator may be set to weave: the seeds.
+pub const seeds = recipesWhere(true);
+
+fn countWhere(comptime seed:bool) usize {
   var n:usize = 0;
-  for (0..hand.len) |i| if (!isSeedRecipe(i)) { n += 1; };
-  var out:[n]u8 = undefined;
+  for (0..hand.len) |i| if (isSeedRecipe(i) == seed) { n += 1; };
+  return n;
+}
+
+fn recipesWhere(comptime seed:bool) [countWhere(seed)]u8 {
+  var out:[countWhere(seed)]u8 = undefined;
   var k:usize = 0;
-  for (0..hand.len) |i| if (!isSeedRecipe(i)) { out[k] = i; k += 1; };
-  break :blk out;
-};
+  for (0..hand.len) |i| if (isSeedRecipe(i) == seed) { out[k] = i; k += 1; };
+  return out;
+}
 
 /// max weaves queued at once (the wolf's hands can only do so much)
 const QUEUE_MAX = 8;

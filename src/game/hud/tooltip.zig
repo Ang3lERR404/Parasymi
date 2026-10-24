@@ -7,6 +7,7 @@ const items = @import("../../sim/items.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
+const craft = @import("../craft.zig");
 
 /// from the cursor to the card, the card's margin and line height
 const offset = [2]f32{20, 10};
@@ -20,6 +21,9 @@ fn pointed(g:*const play.Game) ?items.Item {
   return switch (p) {
     .slot => |i| if (g.holds(.{.slot = i})) null else if (g.player.inv.slot[i]) |it| it.item else null,
     .bar => |i| if (g.holds(.{.bar = i})) null else g.bar[i],
+    .store => |i| if (g.holds(.{.store = i})) null else if (g.storeSlot(i)) |it| it.item else null,
+    // what a recipe weaves, once it is understood
+    .recipe => |r| if (craft.hand[r].unlocked(&g.prog)) craft.hand[r].out else null,
     .panel, .research, .weave, .pause, .option, .back => null,
   };
 }

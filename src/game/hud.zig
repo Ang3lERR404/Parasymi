@@ -14,11 +14,12 @@ const prog = @import("progression.zig");
 const opt = @import("options.zig");
 
 /// what a click on the HUD lands on: a research node, a weave recipe, a
-/// belly slot, a hotbar slot, a pause menu row, an option, the options
-/// panel's way back, or just a panel (which keeps the click out of the
-/// world beneath it).
+/// belly slot, a hotbar slot, a slot of the open structure, a recipe it may
+/// be set to weave, a pause menu row, an option, the options panel's way
+/// back, or just a panel (which keeps the click out of the world beneath it).
 pub const Pick = union(enum) {
   panel, research:prog.Id, weave:usize, slot:usize, bar:usize,
+  store:usize, recipe:u8,
   pause:play.PauseRow, option:opt.Setting, back,
 };
 
@@ -59,6 +60,7 @@ const panels = struct {
   pub const hover = @import("hud/hover.zig");
   pub const gather = @import("hud/gather.zig");
   pub const belly = @import("hud/belly.zig");
+  pub const structure = @import("hud/structure.zig");
   pub const research = @import("hud/research.zig");
   pub const log = @import("hud/log.zig");
   pub const debug = @import("hud/debug.zig");

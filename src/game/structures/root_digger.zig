@@ -25,7 +25,7 @@ const Color = @import("../../ui/draw.zig").Color;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
 
-pub const def:st.Def = .{ .item = .root_digger, .size = 1, .mesh = .root_digger, .grow = 4, .sway = 0.5, .tall = 0.6 };
+pub const def:st.Def = .{ .item = .root_digger, .size = 1, .mesh = .root_digger, .store = true, .grow = 4, .sway = 0.5, .tall = 0.6 };
 
 /// seconds per item drawn from the node
 pub const RATE:f32 = 4;

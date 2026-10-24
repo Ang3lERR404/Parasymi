@@ -8,6 +8,9 @@
 //!   output(s) ?Item             what may leave it (pulled by conduits)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
 //!   configure(s, g)             the player's "C" interaction
+//!   recipes() []const u8        what its panel offers to weave (indices into
+//!                               `craft.hand`); `chosen(s)` is the one it
+//!                               weaves, `choose(s, g, r)` sets it
 //!   emit(s, out, ctr, tf)       extra visuals beyond its mesh
 //!   describe(s, d, g, x, y)     one line of hover text
 //!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
@@ -70,6 +73,9 @@ pub const Def = struct {
   /// carries items tile to tile the way it faces (R turns it): carriers
   /// chain into one line, and producers leave them to pull through `output`
   carrier:bool = false,
+  /// keeps items in its slots: a click on it opens its panel, where they
+  /// are lifted and put down as in the belly (hud/structure.zig)
+  store:bool = false,
   /// floats over its tile, `hover` over the ground, instead of standing on
   /// it: it takes no room there, so it may float over a structure or a
   /// plant (never over water or another floating one)
@@ -282,6 +288,24 @@ pub fn release(s:*Structure) ?items.Item {
 pub fn configure(s:*Structure, g:*prog.Progression) void {
   switch (s.kind()) {
     inline else => |k| if (comptime reg.has(k, "configure")) reg.module(k).configure(s, g),
+  }
+}
+
+pub fn recipes(k:Kind) []const u8 {
+  return switch (k) {
+    inline else => |t| if (comptime reg.has(t, "recipes")) reg.module(t).recipes() else &.{},
+  };
+}
+
+pub fn chosen(s:*const Structure) ?u8 {
+  return switch (s.kind()) {
+    inline else => |k| if (comptime reg.has(k, "chosen")) reg.module(k).chosen(s) else null,
+  };
+}
+
+pub fn choose(s:*Structure, g:*prog.Progression, r:u8) void {
+  switch (s.kind()) {
+    inline else => |k| if (comptime reg.has(k, "choose")) reg.module(k).choose(s, g, r),
   }
 }
 

@@ -19,8 +19,11 @@ const text_top:f32 = 116;
 const line_h:f32 = 24;
 const inv_cols:usize = 8;
 const inv_gap:f32 = 44;
+/// the line saying a click opens a structure's panel
+const hint_h:f32 = 22;
 
-pub fn visible(g:*const play.Game) bool { return g.hover != null; }
+/// (a structure's open panel shows all of this itself)
+pub fn visible(g:*const play.Game) bool { return g.hover != null and g.mode != .structure; }
 
 pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
   const h = g.hover.?;
@@ -32,8 +35,10 @@ pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
 
 fn structure(g:*play.Game, d:*Draw, sp:*const st.Structure, near:bool) Allocator.Error!void {
   const inv_rows = @max((sp.inv.used() + inv_cols - 1) / inv_cols, 1);
-  const ph = 60 + 14 + inv_gap * m.f(inv_rows) + 16;
+  const opens = sp.def().store;
+  const ph = 60 + 14 + inv_gap * m.f(inv_rows) + 16 + @as(f32, if (opens) hint_h else 0);
   try d.membrane(panel_x, panel_y, 400, ph, s.skin, 0.6);
+  if (opens) _ = try d.text(text_x, panel_y + ph - hint_h - 4, s.text_note, if (near) s.gold else s.dim, txt.s.hud.open_hint);
   _ = try d.text(text_x, text_top, s.text_label, s.gold, txt.structure(sp.kind()));
   if (!near) _ = try d.text(text_x + 290, text_top, s.text_note, s.dim, txt.s.hud.too_far);
   try st.describe(sp, d, &g.prog, text_x, text_top + 26);

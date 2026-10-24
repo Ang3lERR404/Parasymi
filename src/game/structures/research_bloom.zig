@@ -14,7 +14,7 @@ const Parts = @import("../parts.zig").Parts;
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 
-pub const def:st.Def = .{ .item = .research_bloom, .size = 2, .mesh = .research_bloom, .sway = 0.8, .tall = 2.0, .grow = 8 };
+pub const def:st.Def = .{ .item = .research_bloom, .size = 2, .mesh = .research_bloom, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8 };
 
 /// most of one ingredient it will hold
 const STOCK = 20;
