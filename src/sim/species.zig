@@ -68,6 +68,9 @@ pub const Genome = struct {
   leaf_from:f32 = 0.2,
   petals:u8, bloom_r:f32,
   thorns:u8, tendrils:u8,
+  /// offshoots: side stems off the main stem, each ending in a bud or a
+  /// small bloom (looks only); each variant grows between the two
+  shoots:[2]u8 = .{1, 3},
   /// tendrils are grown vines too: they coil as they reach for the ground
   tendril_curl:f32 = 0.4, tendril_wobble:f32 = 0.2,
   stem_col:color.Rgb, leaf_col:color.Rgb, bloom_col:color.Rgb,

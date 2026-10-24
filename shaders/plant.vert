@@ -131,13 +131,20 @@ void main() {
   // growth: whole-plant scale, then leaves/petals unfurl as it matures
   float g = smoothstep(0.0, 1.0, growth);
   float open = part == 2u ? smoothstep(0.75, 1.0, growth) : smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth);
+  // how far out along an offshoot a vertex is (colour alpha 1 - it; 0 on
+  // the main plant, meshgen `shootFold`): an offshoot comes up pressed to
+  // its stem, its bud or bloom a narrow closed one, and leans out and opens
+  // as growth passes where it leaves (a confluence grows them in its keys)
+  float shoot = confluence ? 0.0 : 1.0 - col.a;
+  bool trunk = shoot < 0.002;
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
   // where it grows from, on the stem or along a vine.
-  if ((part == 1u || part == 2u) && !confluence && !coil) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
+  if ((part == 1u || part == 2u) && !confluence && !coil && trunk) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
+  if (!trunk) p.xz *= mix(1.0, mix(0.2, 1.0, smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth)), shoot);
   // a parasite's crown comes up closed, its fronds a tight upright bundle,
   // and opens out as it matures; its bladders swell in as the stalk passes them
-  if (coil) {
+  if (coil && trunk) {
     float unfurl = smoothstep(0.3, 1.0, growth);
     if (part == 4u) p.xz *= mix(0.3, 1.0, unfurl);
     if (part == 2u && tu.x < 0.9) p.xz *= mix(0.55, 1.0, smoothstep(tu.x * 0.7, tu.x * 0.7 + 0.35, growth));
@@ -162,11 +169,11 @@ void main() {
   // unhurried; thorns barely stir
   if (aff < -0.5) {
     float hunger = -aff * (0.3 + flow);
-    if (part == 4u) p.xz = rot(sin(t * 0.6 + tu.x * 3.0 + seed * 9.0) * 0.12 * hunger) * p.xz;
+    if (part == 4u && trunk) p.xz = rot(sin(t * 0.6 + tu.x * 3.0 + seed * 9.0) * 0.12 * hunger) * p.xz;
     if (part == 3u) p.y += 0.006 * hunger * tu.y * sin(t * 4.0 + seed * 40.0 + tu.x * 7.0);
   }
   // convergent: blooms turn, very slowly (a confluence's canopy stays on its leader)
-  if (abs(aff) < 0.5 && part == 2u && !confluence) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
+  if (abs(aff) < 0.5 && part == 2u && !confluence && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
 
   // wilt when unhealthy
   p.y *= mix(0.55, 1.0, health);

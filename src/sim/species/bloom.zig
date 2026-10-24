@@ -24,6 +24,8 @@ pub const def:species.Species = .{
     .stem_h = 0.12, .stem_r = 0.03, .segments = 4, .curl = 0.05, .wobble = 0.1,
     .leaves = 0, .leaf_len = 0.1, .leaf_w = 0.05, .leaf_droop = 0,
     .petals = 12, .bloom_r = 0.3, .thorns = 0, .tendrils = 5, .tendril_curl = 0.2, .tendril_wobble = 0.2,
+    // no stem to branch from: its petals float free of the core
+    .shoots = .{0, 0},
     .stem_col = color.rgb(0.72, 0.76, 0.86), .leaf_col = color.rgb(0.85, 0.88, 0.95), .bloom_col = color.rgb(0.95, 0.95, 1.0),
   },
 };

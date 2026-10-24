@@ -13,7 +13,7 @@ pub const def:species.Species = .{
   .genome = .{
     .stem_h = 0.95, .stem_r = 0.04, .segments = 9, .curl = 0.12, .wobble = 0.12,
     .leaves = 9, .leaf_len = 0.30, .leaf_w = 0.09, .leaf_droop = 0.55,
-    .petals = 9, .bloom_r = 0.2, .thorns = 4, .tendrils = 2,
+    .petals = 9, .bloom_r = 0.2, .thorns = 4, .tendrils = 2, .shoots = .{2, 4},
     .stem_col = color.rgb(0.25, 0.2, 0.45), .leaf_col = color.rgb(0.45, 0.4, 0.95), .bloom_col = color.rgb(0.95, 0.75, 1.0),
   },
   .parents = .{.lumenroot, .thornleech},

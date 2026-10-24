@@ -19,6 +19,8 @@ pub const def:species.Species = .{
     .leaves = 0, .leaf_len = 0, .leaf_w = 0, .leaf_droop = 0,
     .petals = 11, .bloom_r = 0.55, .thorns = 0, .tendrils = 7,
     .tendril_curl = 0.15, .tendril_wobble = 0.2,
+    // one shape grown through keys: the count is drawn once, from the seed
+    .shoots = .{3, 5},
     // stem: the symbiotic weave; leaf: where it frays into the parasitic
     // reach; bloom: violet sap at the heart of a petal, amber at its rim
     .stem_col = color.rgb(0.2, 0.48, 0.38), .leaf_col = color.rgb(0.52, 0.2, 0.18), .bloom_col = color.rgb(0.55, 0.3, 0.95),
