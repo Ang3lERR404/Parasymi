@@ -209,12 +209,16 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   over a ground shadow. Confluence: 8 growth keys of one vertex layout
   blended in plant.vert (binding 2), braid strands running on into red
   vines, translucent violet petals, sway ×1.5.
-- Celestial bloom (`radiant`): a structure of light: faceted luminous core,
-  spires, a ring of lens plates and a counter-orbiting ring of crystal
-  shards, tilted halo. Fragments carry assembly order (tu.x), ring (tu.y)
-  and bearing (colour alpha): plant.vert drifts each in and locks it as
-  growth passes it (it assembles, never scales), rings orbit, it bobs and
-  never bends. The garden's only true glow (light in thin tissue). Beams
+- Celestial bloom (`radiant`): a flower whose petals float free, gathered
+  by its core: a luminous core with a crown of stamens, three whorls of
+  narrow cupped petals (inner upright .. outer open) floating apart from it,
+  each held by a thread of light, motes spiralling in, tilted halo. Pearl
+  with an iridescent film (plant.frag `filmHue` by view angle). Fragments
+  carry assembly order (tu.x), `meshgen.Ring` (tu.y; a thread adds its
+  distance from its petal) and bearing (colour alpha): plant.vert spirals
+  each in folded as a bud and opens it as growth passes it; grown, whorls
+  turn slowly, alternating, and drift apart and back; it bobs and never
+  bends. The garden's only true glow. Beams
   between linked blooms (`bloom_thread`, part `.thread`): a camera-facing
   ribbon bent in part.vert curve mode, bright near-white core, warm halo,
   pulses running along; dim when the network is dark; extends from the more

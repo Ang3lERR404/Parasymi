@@ -51,21 +51,54 @@ void main() {
   vec3 n = normalize(mix(nrm, nrm_next, ic.x));
 
   if (radiant) {
-    // a structure of light assembles rather than grows: each fragment
-    // (tu.x its order, colour alpha its bearing) drifts in from its bearing
-    // and locks into place as growth passes it; each ring (tu.y) orbits at
-    // its own pace; the whole breathes slowly. It never bends from a root:
-    // the view bobs and drifts it.
-    float order = tu.x, ring = tu.y, bearing = col.a * TAU;
+    // a flower whose petals float free of it, gathered by its core: each
+    // fragment (tu.x its order, colour alpha its bearing, tu.y its ring,
+    // meshgen.Ring) drifts in from its bearing, spiralling, folded up like
+    // a bud, and opens as it settles. Grown, the whorls never quite close:
+    // each petal drifts a little away and back, slowly, held by its thread
+    // (a thread's core end, fract(tu.y) high, stays with the core). Motes
+    // of light spiral in and are taken up. It never bends from a root.
+    float order = tu.x, bearing = col.a * TAU;
+    float ring = floor(tu.y + 0.01);
+    float held = 1.0 - fract(tu.y + 0.01) / 0.9;
+    bool petals = ring > 0.5 && ring < 3.5;
+    bool motes = abs(ring - 4.0) < 0.5;
     float settle = smoothstep(order * 0.7, order * 0.7 + 0.3, growth);
-    float spin = ring < 0.5 ? 0.06 : (ring < 1.5 ? 0.22 : (ring < 2.5 ? -0.13 : 0.04));
-    mat2 turn = rot(t * spin + seed * TAU);
+    float away = 1.0 - settle;
+    vec2 dir = vec2(cos(bearing), sin(bearing));
+    float ph = bearing * 3.0 + ring * 1.7 + seed * 9.0;
+    if (petals) {
+      // fold up toward a bud while it comes in, then open; breathing
+      // slowly once it has settled, the outer whorls most
+      float fold = away * 0.9 + 0.07 * (ring / 3.0) * sin(t * 0.35 + ph);
+      vec3 ax = vec3(-dir.y, 0.0, dir.x);
+      float ang = fold * held;
+      p = p * cos(ang) + cross(ax, p) * sin(ang) + ax * dot(ax, p) * (1.0 - cos(ang));
+      n = n * cos(ang) + cross(ax, n) * sin(ang) + ax * dot(ax, n) * (1.0 - cos(ang));
+      // drifting apart and together, and bobbing out of step
+      float drift = 0.035 * ring * (0.5 + 0.5 * sin(t * 0.3 + ph));
+      p.xz += dir * drift * held;
+      p.y += 0.025 * sin(t * 0.55 + ph * 1.3) * held;
+    }
+    if (motes) {
+      // each mote spirals in from beyond the outer whorl to the core and
+      // fades as it is taken up, then begins again
+      float c = fract(t * 0.07 + order + seed);
+      float r = mix(0.75, -0.12, c);
+      p.xz += dir * r;
+      p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
+      p.xz = rot(c * 2.2) * p.xz;
+    }
+    // each ring turns at its own slow pace, alternating ways
+    float spin = ring < 0.5 ? 0.03 : (ring < 1.5 ? 0.05 : (ring < 2.5 ? -0.035 : (ring < 3.5 ? 0.025 : (ring < 4.5 ? 0.1 : 0.04))));
+    mat2 turn = rot(t * spin + seed * TAU + away * 1.4);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
-    float away = 1.0 - settle;
-    p.xz += (turn * vec2(cos(bearing), sin(bearing))) * away * 1.6;
-    p.y += away * (0.5 + 0.6 * sin(bearing * 3.0 + seed * 9.0));
-    p *= 1.0 + 0.025 * sin(t * 0.9 + seed * TAU);
+    // arriving from afar along its bearing, rising in from below
+    float far = away * held;
+    p.xz += (turn * dir) * far * 1.4;
+    p.y += far * (-0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0));
+    p *= 1.0 + 0.02 * sin(t * 0.6 + seed * TAU);
     vec3 wp = ipos + p;
     v_pos = wp;
     v_nrm = n;
@@ -74,10 +107,10 @@ void main() {
     v_ghost = ic.yz;
     v_obj = p;
     // light moving through it, a slow pulse out from the core
-    v_sap = vec2(fill, 0.5 + 0.5 * sin(t * 1.3 - order * 6.0 + seed * 6.0));
+    v_sap = vec2(fill, 0.5 + 0.5 * sin(t * 1.1 - order * 5.0 + seed * 6.0));
     v_t = order;
-    // how far each fragment has settled (it fades in as it locks)
-    v_young = settle;
+    // how far each fragment has settled (it fades in as it arrives)
+    v_young = motes ? settle * smoothstep(0.0, 0.15, fract(t * 0.07 + order + seed)) * (1.0 - smoothstep(0.75, 1.0, fract(t * 0.07 + order + seed))) : settle;
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = pc.vp * vec4(wp, 1.0);
     return;

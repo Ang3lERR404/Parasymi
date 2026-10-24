@@ -62,12 +62,18 @@ void main() {
     // emission: brightest where the tissue is thinnest (its edges, at
     // grazing angles) and in its core, pulsing out from the heart, with sap
     // bubbles rising through it. Fragments fade in as they lock into place.
-    float core = part == 2 ? 2.4 : 0.65;
-    vec3 c = shade(v_col * 0.2, n, v_pos);
-    c += v_col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
-    c += v_col * max(dot(-n, SUN), 0.0) * 0.4;
-    c += mix(v_col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5;
-    float a = mix(0.5, 0.95, fres) * v_young;
+    // Its tissue is iridescent: a pearl whose thin film turns its hue with
+    // the view angle, drifting slowly along each petal; the core and its
+    // threads stay near white, with only a breath of the film.
+    float core = part == 2 ? 1.3 : 1.1;
+    vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + seed * 3.0 + pc.eye_time.w * 0.03);
+    vec3 col = mix(v_col, film, part == 2 ? 0.25 : 0.4 + 0.35 * fres);
+    vec3 c = shade(col * 0.2, n, v_pos);
+    c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
+    c += col * max(dot(-n, SUN), 0.0) * 0.4;
+    c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5;
+    // petals are thin: see-through face-on, their edges bright
+    float a = (part == 1 ? mix(0.3, 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
     return;

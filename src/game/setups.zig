@@ -44,6 +44,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = try g.plants.place(g.gpa, &g.world, cx - 4, cz + 2, .driftwisp, 0.9);
   try digger(g, cx, cz);
   try confluences(g, cx, cz);
+  try blooms(g, cx, cz);
 
   var t:f32 = 0;
   while (t < seconds) : (t += play.TICK) try g.step();
@@ -66,6 +67,18 @@ fn confluences(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
     _ = try g.plants.placeEx(g.gpa, &g.world, x, cz + 9, .{
       .x = x, .y = cz + 9, .chunk = undefined, .tile = undefined, .sp = .confluence,
       .seed = 0.2 * m.f(i), .growth = growth, .span = 1e9, .mana = 20,
+    });
+  }
+}
+
+/// a row of celestial blooms held at each growth stage, the last all but
+/// mature (a mature bloom off the ley would fade).
+fn blooms(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  for ([_]f32{ 0.5, 0.999, 0.25, 0.75 }, 0..) |growth, i| {
+    const x = cx - 3 + 2 * @as(i32, @intCast(i));
+    _ = try g.plants.placeEx(g.gpa, &g.world, x, cz + 1, .{
+      .x = x, .y = cz + 1, .chunk = undefined, .tile = undefined, .sp = .bloom,
+      .seed = 0.13 + 0.21 * m.f(i), .growth = growth, .span = 1e9, .mana = 10,
     });
   }
 }
