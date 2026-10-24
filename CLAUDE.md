@@ -42,7 +42,7 @@ keeps items (`Def.store`: sap cache, germinator, research bloom, digger)
 opens its panel (`Mode.structure`, `hud/structure.zig`): its slots beside
 the belly's, lifted/put down between them the same way (into it only what
 it `wants`), Shift+LMB moves a stack across; a germinator's panel also
-picks its seed (`recipes`/`chosen`/`choose` hooks). Closes out of reach.
+picks what it weaves, any weave (`recipes`/`chosen`/`choose` hooks). Closes out of reach.
 Tab belly (weave), T research, F3 debug, Esc closes a panel else
 pauses (pause rows are clicked or keyed: Q = save and quit, O = options,
 G = saved gardens), F5 save (the garden being played), F9 load (its last
@@ -133,6 +133,8 @@ recipes (`game/craft.zig`) are plain data tables.
   (`LAMINA_THICK` of the broadest half-width) rounded over at the edges, a
   small bevel; leaves (blades, fur leaves) fold toward a pale midrib vein
   raised in the fold, fading to the tip. Petals have no vein.
+- Liquid essence (part `.essence`, a germinator's): solid, its colour the
+  instance tint (sRGB), tu.x the way it flows (streaks), < 0 still.
 - Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from
   vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
 - See-through is two passes: `plants`/`parts` keep only fragments with
@@ -189,7 +191,9 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   Factorio-lab model (structures consume ingredients unit by unit).
   Plants never set seed: only a germinator weaves seeds (hand-weaving
   makes bulbs only, `craft.by_hand`). The germinator is the bootstrap,
-  woven from fibre, grit and starlight; always open: lumenroot/thornleech
+  woven from fibre, grit and starlight, and the hub of automation: it
+  weaves every recipe, seeds and bulbs (`craft.all`), and lets only what
+  it wove go (`craft.woven`); always open: lumenroot/thornleech
   seeds, conduits, sap caches, germinator; other species research-gated
   (vesper by Seed Splicing: essence + convergence essence + fibre).
   Uprooting a sown plant always gives its seed back (it stays put while
@@ -310,7 +314,17 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   arced around the garden, clear of parasites (they drain floaters).
 - Structures (`structure_kit`) speak the plants' language: woven root mats,
   leafy vines, real petals, pods of resin sap (`Def.sap`, no own light).
-  Germinator: resin pod with a seed, cradled by vines. Research bloom: woven
+  Germinator (`Def.still`: no breath, so its emitted pieces stay on it;
+  `Def.preview` whole): a small tree, woven trunk on a root mat, five
+  braided boughs rising round a core of thin resin sap held in a calyx and
+  arching over it to hold flower cups (stamens) above it; a sapwood
+  spindle runs up through the core. A weave is seen through by its
+  progress alone: the cups hold what it stocks (pools of `.essence`, kept
+  level), tip and pour it (curve-placed streams, colour in `q.yzw`); the
+  core spins it into a whirl round the spindle (one arm per essence,
+  turned by the area under the spin stage, whole turns per weave) and
+  threads wind a seed of them on the spindle (kernel in the output's
+  colour, a winding per essence). Research bloom: woven
   stalk, violet flower, banded resin orb (forms last). Sap cache: clear pod
   in a vine basket, contents hanging inside. Conduit (`Def.bare`, its own
   `emit`): per tile a root digs up out of the soil at each edge it is fed

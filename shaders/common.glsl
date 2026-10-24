@@ -76,6 +76,7 @@ const float SHEEN_POWER = 40.0;
 #define PART_HALO 11      // the ring of split light
 #define PART_PROJECTION 12 // the rays that make the ring
 #define PART_CORE 13      // a conduit's core
+#define PART_ESSENCE 14   // liquid essence a germinator pours, spins and winds
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))

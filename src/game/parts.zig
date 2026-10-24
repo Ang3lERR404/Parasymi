@@ -131,6 +131,8 @@ pub const Parts = struct {
     inst.c3 = .{ctrl[3][0], ctrl[3][1], ctrl[3][2], 1};
     inst.tint = .{side[0], side[1], side[2], 0};
     inst.e = .{PLACE_CURVE, @max(reach, MIN_REACH), look_.ends, len};
+    // a curve has no resin to give: q.yzw carries its essence's colour
+    inst.q = .{look_.carry, look_.carry_col[0], look_.carry_col[1], look_.carry_col[2]};
     try p.add(id, ctrl[0], inst);
   }
 

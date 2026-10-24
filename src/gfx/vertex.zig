@@ -21,14 +21,17 @@ pub const Terrain = extern struct {
 /// `thread`: a beam between blooms. `flash`: a disc of light thrown out where
 /// a halo's blooms met (tu.x its radius). `prism`: a cut iridescent crystal
 /// that only catches light. `halo`: the ring of split light a diamond
-/// projects; `projection`: the rays it throws to make it.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection, core };
+/// projects; `projection`: the rays it throws to make it. `core`: a
+/// conduit's living core. `essence`: liquid essence a germinator pours,
+/// spins and winds into a seed (its colour the instance's, tu.x the way it
+/// flows, < 0 still).
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection, core, essence };
 
 /// roles a library part may draw see-through (part.frag)
 pub fn seeThrough(p:Part) bool {
   return switch (p) {
     .bloom, .ear, .resin, .shadow, .thread, .flash, .halo, .projection => true,
-    .stem, .leaf, .thorn, .tendril, .prism, .core => false,
+    .stem, .leaf, .thorn, .tendril, .prism, .core, .essence => false,
   };
 }
 
@@ -119,7 +122,8 @@ pub const PartInstance = extern struct {
   /// z which of its ends a forming halo draws in: 1 its first, 2 its last,
   /// 3 both); placed by the matrix, yzw the colour of the essence a
   /// conduit's core carries (`q.x`); 2 a star mote (c3 its centre; y phase, z life, w its trail
-  /// echo, -1 when resting); 3 skinned (y the first of its bones in the
+  /// echo, -1 when resting); along a curve, q.yzw its essence's colour
+  /// (sRGB 0..1); 3 skinned (y the first of its bones in the
   /// frame's bone buffer; each vertex by its `Skin`)
   e:[4]f32 = .{0, 0, 0, 0},
   /// a forming halo it belongs to (see `NO_HALO`)

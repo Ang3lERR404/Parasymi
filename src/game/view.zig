@@ -324,12 +324,10 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     const ctr = structCentre(g, s);
     if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[2] - g.cam.target[2]) > reach) continue;
     const a = s.activity;
-    const yaw = m.dirYaw(s.dir);
     // a fixed tempo: activity deepens the breath but never retimes it (a
     // tempo that followed activity jumped phase every time it changed)
-    const breathe = 1 + (BREATH + BREATH_ACTIVE * a) * @sin(tf * BREATH_RATE + s.seed * 9);
-    const size = s.grownScale() * m.v3(breathe, 2 - breathe, breathe);
-    if (!s.def().bare) try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(size)}), .{
+    const breathe = if (s.def().still) 1 else 1 + (BREATH + BREATH_ACTIVE * a) * @sin(tf * BREATH_RATE + s.seed * 9);
+    if (!s.def().bare) try g.parts.emit(s.def().mesh, m.mul(s.place(ctr), m.scale3(m.v3(breathe, 2 - breathe, breathe))), .{
       .glow = GLOW + GLOW_ACTIVE * a, .flutter = FLUTTER, .phase = s.seed, .fade = s.def().sap,
       .sway = s.def().sway, .tall = s.def().tall, .grown = s.grown,
     });
@@ -355,7 +353,7 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   // (a floating one where it will hang)
   const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + GHOST_LIFT + def.hover);
   const tint = if (ok) GHOST_FITS else GHOST_BLOCKED;
-  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = GHOST_GLOW + GHOST_PULSE * @sin(tf * GHOST_PULSE_RATE), .tint = tint, .ghost = true});
+  try g.parts.emit(def.preview orelse def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = GHOST_GLOW + GHOST_PULSE * @sin(tf * GHOST_PULSE_RATE), .tint = tint, .ghost = true});
 }
 
 /// resource nodes within `nr` tiles of the camera focus.

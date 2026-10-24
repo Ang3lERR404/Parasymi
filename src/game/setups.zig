@@ -8,6 +8,9 @@ const prog = @import("progression.zig");
 const play = @import("play.zig");
 const m = @import("../core/math.zig");
 const halo = @import("structures/halo.zig");
+const craft = @import("craft.zig");
+const st = @import("structures.zig");
+const items = @import("../sim/items.zig");
 
 const Game = play.Game;
 
@@ -50,6 +53,15 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   var t:f32 = 0;
   while (t < seconds) : (t += play.TICK) try g.step();
   try haloGarden(g, cx, cz);
+  // the germinator, its seeds woven, set to a bulb woven from five things,
+  // fed for a while: all its cups pour
+  if (g.structs.at(&g.world, cx - 2, cz + 5)) |j| {
+    const r = for (craft.all) |r| {
+      if (craft.hand[r].out == .research_bloom) break r;
+    } else unreachable;
+    st.choose(g.structs.get(j), &g.prog, r);
+    for (craft.hand[r].in) |ing| _ = g.structs.insert(&g.prog, j, ing.item, items.STACK);
+  }
   _ = g.player.inv.add(.grit, 34);
   _ = g.player.inv.add(.fibre, 21);
   _ = g.player.inv.add(.starlight, 7);

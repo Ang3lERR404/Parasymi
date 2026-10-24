@@ -38,6 +38,16 @@ const parts = struct {
   pub const conduit_tap = @import("meshes/conduit.zig").tap;
   pub const sap_cache = @import("meshes/sap_cache.zig");
   pub const germinator = @import("meshes/germinator.zig");
+  pub const germinator_whole = @import("meshes/germinator.zig").whole;
+  pub const germinator_cup = @import("meshes/germinator.zig").cup;
+  pub const germinator_pool = @import("meshes/germinator.zig").pool;
+  pub const germinator_pour = @import("meshes/germinator.zig").pour;
+  pub const germinator_vortex = @import("meshes/germinator.zig").vortex;
+  pub const germinator_thread = @import("meshes/germinator.zig").thread;
+  pub const germinator_seed = @import("meshes/germinator.zig").seed;
+  pub const germinator_winding = @import("meshes/germinator.zig").winding;
+  // (see-through: blends over what spins inside it)
+  pub const germinator_core = @import("meshes/germinator.zig").core;
   pub const research_bloom = @import("meshes/research_bloom.zig");
   pub const research_orb = @import("meshes/research_bloom.zig").orb;
   pub const item_pod = @import("meshes/item_pod.zig");

@@ -1,7 +1,8 @@
 //! weaving: turning gathered matter into seeds and structure bulbs. The wolf
-//! weaves bulbs by hand; seeds only a germinator weaves (plants never set
-//! seed), so the germinator is the bootstrap: it is woven from gathered
-//! matter alone, and weaves the first essence flowers. Ingredients
+//! weaves bulbs by hand; a germinator weaves everything, seeds and bulbs,
+//! and only it weaves seeds (plants never set seed), so it is the
+//! bootstrap: woven from gathered matter alone, it weaves the first
+//! essence flowers, and fed by conduits it is what automates the garden. Ingredients
 //! leave the inventory when a weave is queued (like Factorio hand crafting)
 //! and the result appears when it finishes.
 const std = @import("std");
@@ -23,7 +24,8 @@ pub const Recipe = struct {
   }
 };
 
-/// everything that can be woven. Seeds first (only a germinator weaves those).
+/// everything that can be woven. Seeds first (only a germinator weaves those;
+/// it weaves the rest too).
 pub const hand = [_]Recipe{
   .{ .out = .seed_lumenroot, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
   .{ .out = .seed_thornleech, .in = &.{ .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
@@ -49,8 +51,20 @@ pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
 
 /// the recipes the wolf weaves by hand (indices into `hand`): all but seeds.
 pub const by_hand = recipesWhere(false);
-/// the recipes a germinator may be set to weave: the seeds.
+/// the seed weaves (indices into `hand`).
 pub const seeds = recipesWhere(true);
+/// every weave: what a germinator may be set to (indices into `hand`).
+pub const all = blk: {
+  var out:[hand.len]u8 = undefined;
+  for (&out, 0..) |*o, i| o.* = i;
+  break :blk out;
+};
+
+/// whether some weave makes `item` (what a germinator lets go of).
+pub fn woven(item:items.Item) bool {
+  for (hand) |r| if (r.out == item) return true;
+  return false;
+}
 
 fn countWhere(comptime seed:bool) usize {
   var n:usize = 0;

@@ -12,7 +12,8 @@
 //!   recipes() []const u8        what its panel offers to weave (indices into
 //!                               `craft.hand`); `chosen(s)` is the one it
 //!                               weaves, `choose(s, g, r)` sets it
-//!   emit(s, out, ctr, tf)       extra visuals beyond its mesh
+//!   emit(s, out, ctr, tf)       extra visuals beyond its mesh (placed as it is:
+//!                               `place(s, ctr)`)
 //!   describe(s, d, g, x, y)     one line of hover text
 //!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
 //!   field(s) ?Field             a field of celestial energy it holds
@@ -85,6 +86,12 @@ pub const Def = struct {
   /// its mesh is drawn by its own `emit` (a diamond: it forms on the GPU),
   /// not breathing and growing in as the others do; `mesh` is its preview
   bare:bool = false,
+  /// does not breathe: what it emits hangs on its mesh and must stay put
+  /// on it (a germinator's cups and core)
+  still:bool = false,
+  /// what the gardener sees before putting it down, if not `mesh` (a
+  /// germinator's emitted pieces at rest with it)
+  preview:?meshlib.Id = null,
 };
 
 pub const defs = reg.table(Def, "def");
@@ -128,6 +135,11 @@ pub const Structure = struct {
     return m.v3(m.lerp(SPROUT_W, 1, out), m.lerp(SPROUT_H, 1, up), m.lerp(SPROUT_W, 1, out));
   }
   pub fn def(s:*const Structure) Def { return defs.get(s.kind()); }
+  /// where its mesh is drawn from, at its centre `ctr`: turned its way,
+  /// at the size it has grown to (breathing aside)
+  pub fn place(s:*const Structure, ctr:m.V3) m.M4 {
+    return m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(s.dir)), m.scale3(s.grownScale())});
+  }
 };
 
 /// everything a structure's behaviour may touch.
@@ -411,4 +423,35 @@ test "a structure put down grows before it works" {
   try testing.expect(ss.get(id).activity < 0.01);
   while (t < secs + 0.1) : (t += 0.05) try ss.tick(gpa, &w, &plants, &g, 0.05);
   try testing.expectEqual(@as(f32, 1), ss.get(id).grown);
+}
+
+test "a germinator weaves structure bulbs as well as seeds, and lets go only what it wove" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..2) |x| for (0..2) |y| { const t = y * ck.SIZE + x; c.kind[t] = .soil; c.height[t] = 1; c.res[t] = 0; };
+  var plants:Plants = .{};
+  defer plants.deinit(gpa);
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression = .{};
+  try testing.expect(try ss.place(gpa, &w, 0, 0, .germinator, 0, 0));
+  const id = ss.at(&w, 0, 0).?;
+  const craft = @import("craft.zig");
+  // every weave is on offer, the bulbs too
+  try testing.expectEqual(craft.hand.len, recipes(.germinator).len);
+  const conduit = for (recipes(.germinator)) |r| {
+    if (craft.hand[r].out == .conduit) break r;
+  } else unreachable;
+  choose(ss.get(id), &g, conduit);
+  try testing.expectEqual(@as(u16, 5), ss.insert(&g, id, .fibre, 5));
+  try testing.expectEqual(@as(u16, 2), ss.insert(&g, id, .grit, 2));
+  // what it weaves from never leaves it
+  try testing.expect(ss.output(id) == null);
+  for (0..400) |_| try ss.tick(gpa, &w, &plants, &g, 0.05);
+  try testing.expectEqual(@as(u32, 4), ss.get(id).inv.count(.conduit));
+  try testing.expectEqual(@as(u32, 1), ss.get(id).inv.count(.fibre));
+  try testing.expect(ss.output(id) == .conduit);
 }

@@ -30,6 +30,11 @@ const float PRISM_SPEC_POW = 120.0;
 const float PRISM_FRESNEL_POW = 3.0;
 // resin's tight highlight
 const float RESIN_SPEC_POW = 90.0;
+// liquid essence: its highlight, and the streaks running along it (how
+// many over its length, how fast)
+const float ESSENCE_SPEC_POW = 60.0;
+const float ESSENCE_STREAKS = 3.0;
+const float ESSENCE_RUN = 5.0;
 // the soft shadow under a floater: its colour, and how it falls off to its rim
 const vec3 GROUND_SHADOW = vec3(0.015, 0.015, 0.025);
 const float GROUND_SHADOW_FALLOFF = 1.6;
@@ -212,6 +217,24 @@ void surface() {
   // and the sun or moon shades it): it shades the light's glints, the
   // light carried through sap and leaves and the fibres' sheen with it
   float sh = part == PART_SHADOW ? 1.0 : keyShadow(v_pos, n);
+  if (part == PART_ESSENCE) {
+    // liquid essence, thick and glossy, in its own colour: lit as anything
+    // is, but carrying a light of its own (what the plants condensed);
+    // where it flows (v_t 0..1 the way it runs, < 0 still) brighter streaks
+    // run along it, and a pale film shines at grazing angles
+    float t = pc.eye_time.w;
+    float flow = v_t < 0.0 ? 0.0 : pow(0.5 + 0.5 * sin(v_t * TAU * ESSENCE_STREAKS - t * ESSENCE_RUN + v_phase * TAU), 3.0);
+    float fres = pow(1.0 - clamp(dot(n, V), 0.0, 1.0), FRESNEL_POW);
+    vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
+    c = shadeLit(v_col * 0.5, n, v_pos, sh);
+    c += v_col * v_glow * (0.7 + 1.1 * flow);
+    c += mix(v_col, vec3(1.0), 0.5) * fres * 0.5 * lit;
+    c += v_col * pointLight(v_pos, n, 0.0) * 0.3;
+    vec3 H = normalize(SUN + V);
+    c += lit * pow(max(dot(n, H), 0.0), ESSENCE_SPEC_POW) * 0.6 * step(0.0, dot(n, SUN)) * sh;
+    o = vec4(applyFog(c, v_pos), 1.0);
+    return;
+  }
   if (part == PART_PRISM) {
     // a cut crystal with no light of its own: each flat facet shades as
     // stone does and reflects a warm iridescent film that shifts with the

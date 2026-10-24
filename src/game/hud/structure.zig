@@ -1,6 +1,6 @@
 //! a structure's panel (a click on one that keeps items): its slots beside
 //! the belly's, lifted and put down between them as in the belly, and the
-//! seeds it may be set to weave (a germinator's `recipes`).
+//! weaves it may be set to (a germinator's `recipes`).
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
@@ -27,9 +27,12 @@ const pw = margin + store_w + between + belly.width + margin;
 const header_h:f32 = 116;
 const label_h:f32 = 34;
 const hint_h:f32 = 76;
-/// the weave choices: a row of seed pods, the shown one's ingredients beside
-const recipes_h:f32 = 104;
+/// the weave choices: rows of seed pods, the shown one's ingredients beside
+/// them, one to a line
+const recipe_cols = 7;
 const recipe_gap:f32 = 58;
+const recipe_line:f32 = 18;
+fn recipesH(n:usize) f32 { return 104 + recipe_gap * m.f((n + recipe_cols - 1) / recipe_cols - 1); }
 const recipe_r:f32 = 19;
 const unready_alpha:u8 = 120;
 
@@ -38,7 +41,7 @@ pub fn visible(g:*const play.Game) bool { return g.opened() != null; }
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const sp = g.structs.get(g.opened().?);
   const choices = st.recipes(sp.kind());
-  const ph = header_h + (if (choices.len > 0) recipes_h else 0) + label_h + belly.height + hint_h;
+  const ph = header_h + (if (choices.len > 0) recipesH(choices.len) else 0) + label_h + belly.height + hint_h;
   const px = (W - pw) / 2;
   const py = (H - ph) / 2 - s.panel_lift;
 
@@ -50,7 +53,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   var y = py + header_h;
   if (choices.len > 0) {
     try recipes(g, d, sp, choices, px + margin, y);
-    y += recipes_h;
+    y += recipesH(choices.len);
   }
   const bx = px + margin + store_w + between;
   _ = try d.text(px + margin, y, s.text_heading, s.gold, txt.s.hud.holds);
@@ -70,9 +73,10 @@ fn recipes(g:*play.Game, d:*Draw, sp:*const st.Structure, choices:[]const u8, x:
   const t = g.uiT();
   const chosen = st.chosen(sp);
   var shown = chosen;
-  const cy = y + 58;
+  const row0 = y + 58;
   for (choices, 0..) |r, k| {
-    const cx = x + recipe_gap * (m.f(k) + 0.5);
+    const cx = x + recipe_gap * (m.f(k % recipe_cols) + 0.5);
+    const cy = row0 + recipe_gap * m.f(k / recipe_cols);
     const phase = m.f(k) * 0.29;
     const on = chosen == r;
     g.rows.add(cx - recipe_gap / 2, cy - recipe_gap / 2, recipe_gap, recipe_gap, .{.recipe = r});
@@ -88,18 +92,19 @@ fn recipes(g:*play.Game, d:*Draw, sp:*const st.Structure, choices:[]const u8, x:
   }
 
   const r = craft.hand[shown orelse return];
-  const ix = x + recipe_gap * m.f(choices.len) + 24;
+  const ix = x + recipe_gap * m.f(@min(choices.len, recipe_cols)) + 24;
+  const cy = row0;
   if (!r.unlocked(&g.prog)) {
     const need = if (r.needs) |n| txt.research(n).name else txt.s.hud.unknown;
     _ = try d.print(ix, cy - 10, s.text_body, s.unknown, txt.s.hud.recipe_needs, .{need});
     return;
   }
   _ = try d.print(ix, cy - 24, s.text_body, if (shown == chosen) s.gold else s.white, if (r.n > 1) txt.s.hud.recipe_many else txt.s.hud.recipe, .{txt.item(r.out).name, r.n});
-  var ex = ix + 4;
   for (r.in, 0..) |ing, j| {
     const have = sp.inv.count(ing.item);
     const enough = have >= ing.n;
-    try d.pod(ex + 6, cy + 14, 6, ing.item.info().col, if (enough) 0.7 else 0.05, m.f(j) * 0.3);
-    ex = try d.print(ex + 14, cy + 9, s.text_fine, if (enough) s.white else s.dim, txt.s.hud.stock, .{have, ing.n, txt.item(ing.item).short}) + 12;
+    const ly = cy + 4 + recipe_line * m.f(j);
+    try d.pod(ix + 10, ly + 5, 6, ing.item.info().col, if (enough) 0.7 else 0.05, m.f(j) * 0.3);
+    _ = try d.print(ix + 22, ly, s.text_fine, if (enough) s.white else s.dim, txt.s.hud.stock, .{have, ing.n, txt.item(ing.item).short});
   }
 }

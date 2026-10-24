@@ -68,6 +68,9 @@ const float PULSE_RATE = 3.0;
 const float DIM_GLOW = 0.06;
 // a conduit's amber pulses: how fast they run (rad/s)
 const float CORE_RUN_RATE = 2.6;
+// a stream of essence poured into a germinator's core: how far it ripples
+// off its fall at the bottom
+const float POUR_RIPPLE = 0.012;
 // the roles that are a structure's foliage (leaves, an ear): they unfold as
 // it grows and breathe and lift in the wind
 const uint FOLIAGE = PART_BIT(PART_LEAF) | PART_BIT(PART_EAR);
@@ -170,6 +173,15 @@ void main() {
   // the flash where the blooms met: a disc of light (tu.x its radius
   // 0..1) thrown outward from the diamond, fast then slowing (age 0..1)
   if (part == PART_FLASH) p.xz *= mix(FLASH_FROM, FLASH_TO, 1.0 - pow(1.0 - clamp(ip.y, 0.0, 1.0), 3.0));
+  // a stream of essence poured along a curve (a germinator's): its fade is
+  // how full it runs, and it ripples as it falls, more the further from
+  // the lip (a smooth field along it, so shared vertices move alike)
+  if (part == PART_ESSENCE && mode == PLACE_CURVE) {
+    float k = clamp(p.y, 0.0, 1.0);
+    p.xz *= ip.w;
+    p.x += POUR_RIPPLE * k * sin(k * 13.0 - t * 9.0 + ip.z * TAU);
+    p.z += POUR_RIPPLE * 0.7 * k * sin(k * 10.0 - t * 7.0 + ip.z * 17.0);
+  }
 
   vec4 w;
   vec3 wn;
@@ -279,6 +291,8 @@ void main() {
   vec3 c = srgb2lin(col.rgb);
   // (the ring's tint is its points' light, not a colour)
   v_col = (mode == PLACE_CURVE || part == PART_HALO) ? c : mix(c, c * tint.rgb, tint.w);
+  // essence is the colour of what it is (sRGB; along a curve in iq.yzw)
+  if (part == PART_ESSENCE) v_col = c * srgb2lin(clamp(mode == PLACE_CURVE ? iq.yzw : tint.rgb, 0.0, 1.0));
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * PULSE_RATE - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == PART_BLOOM || part == PART_THREAD) ? 1.0 : DIM_GLOW) * pulse * twinkle;
@@ -293,6 +307,8 @@ void main() {
     v_glow = mix(tint[i], tint[(i + 1) % 4], fract(a));
   }
   if (part == PART_PRISM) v_glow = 0.0;
+  // essence carries as much light of its own as its glow, never pulsing
+  if (part == PART_ESSENCE) v_glow = ip.x;
   // a conduit's core: its sap forever runs the way it carries, in faint
   // amber pulses (brighter while it is busy, ip.x); essence carried
   // through it takes it over in its own colour, its wake fading behind
