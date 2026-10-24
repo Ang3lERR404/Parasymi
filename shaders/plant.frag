@@ -21,7 +21,25 @@ layout(location = 8) flat in vec2 v_ghost; // a placement preview, and whether i
 layout(location = 9) in vec3 v_obj;
 layout(location = 0) out vec4 o;
 
-const vec3 AMBER = vec3(1.0, 0.43, 0.08);
+// what the sap carries at night (moonlight; by day plain white)
+const vec3 NIGHT_LIT = MOONLIGHT * 0.25;
+// each lineage's sap: symbiote, parasite (pale, under its film), convergent
+const vec3 SAP_SYMBIOTE = vec3(0.25, 0.95, 0.8);
+const vec3 SAP_PARASITE = vec3(0.75, 0.8, 0.95);
+const vec3 SAP_CONVERGENT = vec3(0.75, 0.55, 1.0);
+// perceived brightness weights (the body's grey)
+const vec3 LUMA = vec3(0.3, 0.59, 0.11);
+// old growth densifies toward the wolf's root brown; wilting toward dead brown
+const vec3 ROOT_BROWN = vec3(0.06, 0.055, 0.035);
+const vec3 DEAD_BROWN = vec3(0.18, 0.12, 0.06);
+// highlight exponents: a floater's lantern, polished thin growth
+const float LANTERN_SPEC_POW = 80.0;
+const float POLISH_SPEC_POW = 60.0;
+// a placement preview: green where it fits, red where it cannot be sown,
+// breathing at this rate (rad/s)
+const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
+const vec3 GHOST_BLOCKED = vec3(1.0, 0.35, 0.3);
+const float GHOST_PULSE = 4.0;
 
 // direction of increasing `v_t` across the surface: up the stem, along a
 // tendril. Zero where `v_t` is constant (a petal fan).
@@ -38,9 +56,9 @@ vec3 surfaceTangent() {
 // the sap each lineage carries. Parasites are alien rather than hostile: a
 // pale sap with a thin-film sheen whose hue turns with the view angle.
 vec3 sapOf(float aff, float ndv, float seed) {
-  if (aff > 0.5) return vec3(0.25, 0.95, 0.8);
-  if (aff < -0.5) return mix(vec3(0.75, 0.8, 0.95), filmHue(ndv * 1.3 + seed), 0.55);
-  return vec3(0.75, 0.55, 1.0);
+  if (aff > 0.5) return SAP_SYMBIOTE;
+  if (aff < -0.5) return mix(SAP_PARASITE, filmHue(ndv * 1.3 + seed), 0.55);
+  return SAP_CONVERGENT;
 }
 
 void surface() {
@@ -52,8 +70,8 @@ void surface() {
   int part = int(v_inst.w + 0.5);
   float day = pc.sun.w;
   float ndv = clamp(dot(n, V), 0.0, 1.0);
-  float fres = pow(1.0 - ndv, 2.0);
-  vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
+  float fres = pow(1.0 - ndv, FRESNEL_POW);
+  vec3 lit = mix(NIGHT_LIT, vec3(1.0), day);
   float fill = v_sap.x, moving = v_sap.y;
   // how much of the key light reaches here (what stands between it and the
   // sun or moon shades it), and that light: what it carries through thin
@@ -61,7 +79,7 @@ void surface() {
   float sh = keyShadow(v_pos, n);
   vec3 klit = lit * sh;
 
-  if (abs(v_form - 4.0) < 0.5) {
+  if (isForm(v_form, FORM_RADIANT)) {
     // a celestial bloom: the only thing in the garden that truly glows, and
     // the glow is light carried inside thin living tissue, not a flat
     // emission: brightest where the tissue is thinnest (its edges, at
@@ -70,20 +88,20 @@ void surface() {
     // Its tissue is iridescent: a pearl whose thin film turns its hue with
     // the view angle, drifting slowly along each petal; the core and its
     // threads stay near white, with only a breath of the film.
-    float core = part == 2 ? 1.3 : 1.1;
+    float core = part == PART_BLOOM ? 1.3 : 1.1;
     vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + seed * 3.0 + pc.eye_time.w * 0.03);
-    vec3 col = mix(v_col, film, part == 2 ? 0.25 : 0.4 + 0.35 * fres);
+    vec3 col = mix(v_col, film, part == PART_BLOOM ? 0.25 : 0.4 + 0.35 * fres);
     vec3 c = shadeLit(col * 0.2, n, v_pos, sh);
     c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
     c += col * max(dot(-n, SUN), 0.0) * 0.4;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5;
     // petals are thin: see-through face-on, their edges bright
-    float a = (part == 1 ? mix(0.3, 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
+    float a = (part == PART_LEAF ? mix(0.3, 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
     return;
   }
-  if (abs(v_form - 3.0) < 0.5 && part == 2) {
+  if (isForm(v_form, FORM_CONFLUENCE) && part == PART_BLOOM) {
     // a confluence's sap petal: see-through violet face-on, amber at grazing
     // angles. Hue follows the vertex colour.
     vec3 deep = v_col * 0.18 * health;
@@ -94,7 +112,7 @@ void surface() {
     return;
   }
 
-  if (abs(v_form - 2.0) < 0.5 && part == 2 && v_t < 0.75) {
+  if (isForm(v_form, FORM_DRIFT) && part == PART_BLOOM && v_t < 0.75) {
     // a floater's lantern (meshgen `lantern`, tu.x 0.5): clear sap, the
     // spore inside showing through face-on and its rim bright; its comb
     // rows carry light split into colours (their vertex colour), the hue
@@ -106,7 +124,7 @@ void surface() {
     c += col * max(dot(-n, SUN), 0.0) * 0.3 * klit;
     c += col * pointLight(v_pos, n, 1.0) * 0.6;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * lit * 0.5;
-    c += klit * pow(max(dot(n, normalize(SUN + V)), 0.0), 80.0) * 0.5 * smoothstep(0.0, 0.2, dot(n, SUN));
+    c += klit * pow(max(dot(n, normalize(SUN + V)), 0.0), LANTERN_SPEC_POW) * 0.5 * smoothstep(0.0, 0.2, dot(n, SUN));
     float a = mix(0.18, 0.85, fres);
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
@@ -119,15 +137,15 @@ void surface() {
   // the body is the wolf's family: a muted skin, its colour carried mostly
   // by the sap showing through; old growth near the ground densifies
   // toward the wolf's root brown
-  float lum = dot(v_col, vec3(0.3, 0.59, 0.11));
+  float lum = dot(v_col, LUMA);
   vec3 body = mix(vec3(lum), v_col, 0.5) * 0.78;
-  body = mix(body, vec3(0.06, 0.055, 0.035), (1.0 - thin) * (1.0 - smoothstep(0.0, 0.55, v_t)) * 0.75);
-  body = mix(vec3(0.18, 0.12, 0.06), body, health);
+  body = mix(body, ROOT_BROWN, (1.0 - thin) * (1.0 - smoothstep(0.0, 0.55, v_t)) * 0.75);
+  body = mix(DEAD_BROWN, body, health);
   vec3 c = shadeLit(body, n, v_pos, sh);
 
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
-  if (tl > 0.0 && part != 1 && part != 2) {
+  if (tl > 0.0 && part != PART_LEAF && part != PART_BLOOM) {
     float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
     c += mix(body, lit, 0.5) * sheen * smoothstep(0.0, 0.3, dot(n, SUN)) * 0.22 * smoothstep(0.3, 1.5, tl) * sh;
   }
@@ -153,35 +171,32 @@ void surface() {
   c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + klit * drop.y * 0.7;
   // thin sap-filled growth has a polished face
   vec3 Hs = normalize(SUN + V);
-  c += klit * pow(max(dot(n, Hs), 0.0), 60.0) * 0.25 * thin * smoothstep(0.0, 0.2, dot(n, SUN));
+  c += klit * pow(max(dot(n, Hs), 0.0), POLISH_SPEC_POW) * 0.25 * thin * smoothstep(0.0, 0.2, dot(n, SUN));
 
 
   // rim light keeps the silhouette readable at night (as on the wolf)
-  float rim = pow(1.0 - ndv, 3.0);
+  float rim = pow(1.0 - ndv, RIM_POW);
   c += v_col * rim * mix(0.3, 0.1, day);
 
   // petals are thin enough to see through face-on
-  float alpha = part == 2 ? mix(0.72, 1.0, fres) : 1.0;
+  float alpha = part == PART_BLOOM ? mix(0.72, 1.0, fres) : 1.0;
   // a placement preview: the grown plant as a pale, breathing outline,
   // green where it fits, red where it cannot be sown
   if (v_ghost.x > 0.5) {
-    vec3 tint = v_ghost.y > 0.5 ? vec3(0.55, 1.0, 0.7) : vec3(1.0, 0.35, 0.3);
-    float pulse = 0.5 + 0.5 * sin(pc.eye_time.w * 4.0);
+    vec3 tint = v_ghost.y > 0.5 ? GHOST_FITS : GHOST_BLOCKED;
+    float pulse = 0.5 + 0.5 * sin(pc.eye_time.w * GHOST_PULSE);
     c = mix(c, tint * (0.5 + 0.4 * day), 0.6) + tint * fres * 0.5;
     alpha = mix(0.3, 0.6, fres) * (0.8 + 0.2 * pulse);
   }
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
-// two passes draw every surface: the solid one keeps the fragments that are
-// opaque and writes depth; the glass one (built with GLASS, after every
-// solid pass) blends the see-through ones over it, testing depth but writing
-// none, so nothing see-through hides what lies behind it
-const float SOLID = 0.996;
+// two passes draw every surface (SOLID, common.glsl), so nothing
+// see-through hides what lies behind it
 void main() {
   surface();
 #ifdef GLASS
-  if (o.a >= SOLID || o.a < 0.002) discard;
+  if (o.a >= SOLID || o.a < CLEAR) discard;
 #else
   if (o.a < SOLID) discard;
 #endif

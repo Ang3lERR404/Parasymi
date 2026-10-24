@@ -29,6 +29,30 @@ layout(location = 5) flat out float v_form;
 layout(location = 8) flat out vec2 v_ghost; // a placement preview, and whether it fits
 layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubbles ride with it)
 
+// how far a bloom a forming halo draws in has folded back toward a bud
+const float HALO_BUD = 0.12;
+// a celestial bloom's turning: each ring's pace (rad/s, alternating ways):
+// core, inner, middle, outer whorl, motes, threads
+const float SPIN_CORE = 0.03;
+const float SPIN_INNER = 0.05;
+const float SPIN_MIDDLE = -0.035;
+const float SPIN_OUTER = 0.025;
+const float SPIN_MOTES = 0.1;
+const float SPIN_THREADS = 0.04;
+const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
+// how far a fragment comes in from (horizontally) as it settles
+const float ARRIVE_REACH = 1.4;
+// a confluence's vines: how far their hue drifts in the transition zone
+const float SHIMMER_DEG = 10.0;
+// a wilting plant sinks to this share of its height
+const float WILT = 0.55;
+// a sown plant's size: seedling share, and the spread between instances
+const float SEEDLING = 0.12;
+const float SIZE_MIN = 0.85;
+const float SIZE_SPREAD = 0.3;
+// how far behind the growing front growth still reads as new (v_young)
+const float YOUNG_SPAN = 0.55;
+
 mat2 rot(float a) { float c = cos(a), s = sin(a); return mat2(c, -s, s, c); }
 
 // rotate a colour's hue by `a` radians about the grey axis
@@ -45,13 +69,13 @@ void main() {
   // folding back toward a bud as it arrives
   bool drawn = ih.w >= 0.0;
   vec3 base = drawn ? haloSpiral(ipos, ih.xyz, ih.w) : ipos;
-  if (drawn) growth = mix(growth, 0.12, haloFold(ih.w));
+  if (drawn) growth = mix(growth, HALO_BUD, haloFold(ih.w));
   float flow = ib.x, health = ib.y, sway = ib.z;
   // species.Form: 0 herb, 1 coil, 2 drift, 3 confluence, 4 radiant
-  bool confluence = abs(ib.w - 3.0) < 0.5;
-  bool coil = abs(ib.w - 1.0) < 0.5;
-  bool radiant = abs(ib.w - 4.0) < 0.5;
-  bool drift = abs(ib.w - 2.0) < 0.5;
+  bool confluence = isForm(ib.w, FORM_CONFLUENCE);
+  bool coil = isForm(ib.w, FORM_COIL);
+  bool radiant = isForm(ib.w, FORM_RADIANT);
+  bool drift = isForm(ib.w, FORM_DRIFT);
   // a confluence blends between the growth keys around its growth, so it
   // grows smoothly instead of stepping from one shape to the next
   vec3 p = mix(pos, pos_next, ic.x);
@@ -90,20 +114,20 @@ void main() {
     if (motes) {
       // each mote spirals in from beyond the outer whorl to the core and
       // fades as it is taken up, then begins again
-      float c = fract(t * 0.07 + order + seed);
+      float c = fract(t * MOTE_RATE + order + seed);
       float r = mix(0.75, -0.12, c);
       p.xz += dir * r;
       p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
       p.xz = rot(c * 2.2) * p.xz;
     }
     // each ring turns at its own slow pace, alternating ways
-    float spin = ring < 0.5 ? 0.03 : (ring < 1.5 ? 0.05 : (ring < 2.5 ? -0.035 : (ring < 3.5 ? 0.025 : (ring < 4.5 ? 0.1 : 0.04))));
+    float spin = ring < 0.5 ? SPIN_CORE : (ring < 1.5 ? SPIN_INNER : (ring < 2.5 ? SPIN_MIDDLE : (ring < 3.5 ? SPIN_OUTER : (ring < 4.5 ? SPIN_MOTES : SPIN_THREADS))));
     mat2 turn = rot(t * spin + seed * TAU + away * 1.4);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
     // arriving from afar along its bearing, rising in from below
     float far = away * held;
-    p.xz += (turn * dir) * far * 1.4;
+    p.xz += (turn * dir) * far * ARRIVE_REACH;
     p.y += far * (-0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0));
     p *= 1.0 + 0.02 * sin(t * 0.6 + seed * TAU);
     // drawn into a forming halo, it turns with its orbit
@@ -123,7 +147,7 @@ void main() {
     v_sap = vec2(fill, 0.5 + 0.5 * sin(t * 1.1 - order * 5.0 + seed * 6.0));
     v_t = order;
     // how far each fragment has settled (it fades in as it arrives)
-    v_young = motes ? settle * smoothstep(0.0, 0.15, fract(t * 0.07 + order + seed)) * (1.0 - smoothstep(0.75, 1.0, fract(t * 0.07 + order + seed))) : settle;
+    v_young = motes ? settle * smoothstep(0.0, 0.15, fract(t * MOTE_RATE + order + seed)) * (1.0 - smoothstep(0.75, 1.0, fract(t * MOTE_RATE + order + seed))) : settle;
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = project(wp);
 #ifdef SHADOW
@@ -135,7 +159,7 @@ void main() {
 
   // growth: whole-plant scale, then leaves/petals unfurl as it matures
   float g = smoothstep(0.0, 1.0, growth);
-  float open = part == 2u ? smoothstep(0.75, 1.0, growth) : smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth);
+  float open = part == PART_BLOOM ? smoothstep(0.75, 1.0, growth) : smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth);
   // how far out along an offshoot a vertex is (colour alpha 1 - it; 0 on
   // the main plant, meshgen `shootFold`): an offshoot comes up pressed to
   // its stem, its bud or bloom a narrow closed one, and leans out and opens
@@ -145,14 +169,14 @@ void main() {
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
   // where it grows from, on the stem or along a vine.
-  if ((part == 1u || part == 2u) && !confluence && !coil && trunk) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
+  if ((part == PART_LEAF || part == PART_BLOOM) && !confluence && !coil && trunk) p.xz *= mix(1.0, mix(0.25, 1.0, open), tu.y);
   if (!trunk) p.xz *= mix(1.0, mix(0.2, 1.0, smoothstep(tu.x * 0.8, tu.x * 0.8 + 0.3, growth)), shoot);
   // a parasite's crown comes up closed, its fronds a tight upright bundle,
   // and opens out as it matures; its bladders swell in as the stalk passes them
   if (coil && trunk) {
     float unfurl = smoothstep(0.3, 1.0, growth);
-    if (part == 4u) p.xz *= mix(0.3, 1.0, unfurl);
-    if (part == 2u && tu.x < 0.9) p.xz *= mix(0.55, 1.0, smoothstep(tu.x * 0.7, tu.x * 0.7 + 0.35, growth));
+    if (part == PART_TENDRIL) p.xz *= mix(0.3, 1.0, unfurl);
+    if (part == PART_BLOOM && tu.x < 0.9) p.xz *= mix(0.55, 1.0, smoothstep(tu.x * 0.7, tu.x * 0.7 + 0.35, growth));
   }
 
   // ---- motion: rooted and heavy. Nothing jitters: plants bend from the
@@ -164,32 +188,32 @@ void main() {
   // gusts roll across it as a wave, so neighbours lean together
   vec4 wind = gardenWind(t, ipos.xz);
   vec2 wdir = wind.xy;
-  float gust = wind.z, along = wind.w;
+  float gust = wind.z;
 
   // symbiotic breathing: slow, the leaf tips moving
-  if (aff > 0.0 && part == 1u) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * TAU);
+  if (aff > 0.0 && part == PART_LEAF) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * TAU);
   // leaves and petals lift a touch in the gusts, tips most (bases stay)
-  if (part == 1u || part == 2u) p.y += 0.012 * tu.y * tu.y * gust * sin(t * 1.7 + seed * 11.0 + h * 3.0);
+  if (part == PART_LEAF || part == PART_BLOOM) p.y += LEAF_LIFT * tu.y * tu.y * gust * sin(t * LEAF_LIFT_RATE + seed * 11.0 + h * 3.0);
   // parasites: fronds curl and uncurl slowly while feeding, alien but
   // unhurried; thorns barely stir
   if (aff < -0.5) {
     float hunger = -aff * (0.3 + flow);
-    if (part == 4u && trunk) p.xz = rot(sin(t * 0.6 + tu.x * 3.0 + seed * 9.0) * 0.12 * hunger) * p.xz;
-    if (part == 3u) p.y += 0.006 * hunger * tu.y * sin(t * 4.0 + seed * 40.0 + tu.x * 7.0);
+    if (part == PART_TENDRIL && trunk) p.xz = rot(sin(t * 0.6 + tu.x * 3.0 + seed * 9.0) * 0.12 * hunger) * p.xz;
+    if (part == PART_THORN) p.y += 0.006 * hunger * tu.y * sin(t * 4.0 + seed * 40.0 + tu.x * 7.0);
   }
   // a floater's filaments ripple like a jelly's: slow waves run down them
   // from the float, swinging wider toward the free tips (the bend below
   // still trails them downwind)
-  if (drift && part == 4u) {
+  if (drift && part == PART_TENDRIL) {
     float down = max(-p.y, 0.0);
     float ph = t * 1.4 - down * 8.0 + seed * TAU;
     p.xz += vec2(sin(ph + p.x * 9.0), cos(ph * 0.83 + p.z * 9.0)) * 0.03 * down;
   }
   // convergent: blooms turn, very slowly (a confluence's canopy stays on its leader)
-  if (abs(aff) < 0.5 && part == 2u && !confluence && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
+  if (abs(aff) < 0.5 && part == PART_BLOOM && !confluence && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
 
   // wilt when unhealthy
-  p.y *= mix(0.55, 1.0, health);
+  p.y *= mix(WILT, 1.0, health);
 
   // per-instance variation
   float yaw = seed * TAU;
@@ -200,23 +224,21 @@ void main() {
   // toward the tip, so a plant curves instead of shearing. Its own lean is
   // slow and reaches the tip after the base. What hangs below the root (a
   // floater's filaments) swings the other way, so it trails downwind.
-  float own = sin(t * 0.85 - along * 0.3 + seed * TAU - h * 0.9);
-  float lean = sway * (0.05 * gust + 0.025 * (0.4 + gust) * own);
-  float ang = lean * h * h;
+  float ang = windLean(t, wind, seed * TAU, h, sway) * h * h;
   ang *= smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
   p = bendIn(p, wdir, ang);
   n = bendIn(n, wdir, ang);
   // a confluence's growth keys already carry its size
-  float s = (confluence ? 1.0 : mix(0.12, 1.0, g)) * (0.85 + 0.3 * fract(seed * 7.13));
+  float s = (confluence ? 1.0 : mix(SEEDLING, 1.0, g)) * (SIZE_MIN + SIZE_SPREAD * fract(seed * 7.13));
   vec3 wp = base + p * s;
 
   v_pos = wp;
   v_nrm = n;
   v_col = srgb2lin(col.rgb);
   // the transition zone of a confluence's vines shimmers: its hue drifts +-10 degrees
-  if (confluence && part == 4u) {
+  if (confluence && part == PART_TENDRIL) {
     float zone = smoothstep(0.08, 0.3, tu.y) * (1.0 - smoothstep(0.55, 0.8, tu.y));
-    v_col = max(hueShift(v_col, radians(10.0) * zone * sin(t * 0.5 + seed * TAU + tu.y * 3.0)), 0.0);
+    v_col = max(hueShift(v_col, radians(SHIMMER_DEG) * zone * sin(t * 0.5 + seed * TAU + tu.y * 3.0)), 0.0);
   }
   v_form = ib.w;
   v_ghost = ic.yz;
@@ -226,13 +248,13 @@ void main() {
   v_t = h;
   // growth read: what grew last (near the growing front, and toward the
   // tips once grown) is thinner and more translucent than the old base
-  v_young = clamp((h - growth + 0.55) / 0.55, 0.0, 1.0);
-  if (part == 1u || part == 2u) v_young = max(v_young, 0.5);
+  v_young = clamp((h - growth + YOUNG_SPAN) / YOUNG_SPAN, 0.0, 1.0);
+  if (part == PART_LEAF || part == PART_BLOOM) v_young = max(v_young, 0.5);
   v_inst = vec4(aff, seed, health, float(part));
   gl_Position = project(wp);
 #ifdef SHADOW
   // a placement preview casts no shadow, nor does a floater's clear lantern
-  if (ic.y > 0.5 || (drift && part == 2u && h < 0.75)) gl_Position = UNSEEN;
+  if (ic.y > 0.5 || (drift && part == PART_BLOOM && h < 0.75)) gl_Position = UNSEEN;
 #endif
 }
 

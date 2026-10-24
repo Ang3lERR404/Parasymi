@@ -35,6 +35,8 @@ const FILL_R:f32 = 0.95;
 
 pub const sprout:Color = .{110, 190, 95, 255};
 pub const stem_col:Color = s.bark_young;
+/// a woven root (conduit arches, a digger's roots)
+pub const root_col:Color = .{150, 112, 72, 255};
 /// an anther's pollen (meshgen `POLLEN`)
 pub const pollen:Color = .{235, 185, 80, 255};
 

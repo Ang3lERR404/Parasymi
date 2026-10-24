@@ -28,7 +28,7 @@ const settings = std.meta.fields(opt.Setting).len;
 pub fn visible(g:*const play.Game) bool { return g.mode == .options; }
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
-  try d.glow(W / 2, H / 2, @max(W, H) * 0.75, s.veil);
+  try d.glow(W / 2, H / 2, @max(W, H) * s.veil_reach, s.veil);
   const labels = txt.s.hud.option_labels;
   const ph = header_h + row_h * m.f(settings) + back_h + hint_h;
   const px = (W - pw) / 2;
@@ -37,7 +37,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   try d.membrane(px, py, pw, ph, s.pause_panel, 0.71);
   g.rows.add(px, py, pw, ph, .panel);
   const title = txt.s.hud.options_title;
-  _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + 30, s.text_banner, s.gold, title);
+  _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
 
   for (0..settings) |i| {
     const set:opt.Setting = @enumFromInt(i);

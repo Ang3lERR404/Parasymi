@@ -65,6 +65,11 @@ const STANDING:f32 = 0.15;
 /// a standing foot further than this from where it rests steps back under
 const SETTLE:f32 = 0.06;
 const SETTLE_TIME:f32 = 0.26;
+/// a striding foot's swing lasts its share of the cycle, as if walking at
+/// least `SWING_SPEED_MIN`, held within these seconds
+const SWING_SPEED_MIN:f32 = 0.5;
+const SWING_MIN:f32 = 0.12;
+const SWING_MAX:f32 = 0.4;
 /// a planted foot never trails the hip by more than this before it lifts
 const TRAIL_MAX:f32 = 0.5;
 /// a foot this far from the body (a load, a teleport) is put straight back
@@ -74,6 +79,8 @@ const LOST:f32 = 1.2;
 const LIFT:f32 = 0.05;
 const LIFT_STRIDE:f32 = 0.08;
 const TOE_HANG:f32 = 0.55;
+/// the lift's arc over the swing (sin^this: under 1 rises fast, hangs high)
+const LIFT_ARC:f32 = 0.8;
 /// the metatarsal folds this much more under the leg mid-swing
 const SWING_FOLD:f32 = 0.45;
 /// the pelvis: how far it sinks with stride and bobs at each footfall,
@@ -94,6 +101,8 @@ const BANK:f32 = 0.05;
 const BANK_MAX:f32 = 0.2;
 const LEAN_WORK:f32 = 0.38;
 const LEAN_FREQ:f32 = 5;
+const LEAN_DAMP:f32 = 0.7;
+const BANK_DAMP:f32 = 0.8;
 /// arms: swing against the legs, hang out a little, bend at the elbow
 /// (more as they come forward); their springs make them lag and carry
 const ARM_SWING:f32 = 0.62;
@@ -147,9 +156,19 @@ const SPREAD_OPEN:f32 = 0.6;
 const SPREAD_SHUT:f32 = -0.35;
 const FINGER_FREQ:f32 = 10;
 const FINGER_DAMP:f32 = 0.5;
+/// the fingers' spread springs this damped
+const SPREAD_DAMP:f32 = 0.7;
 
 /// paw beans and the nose: sap made denser (80%) and browner than the belly
 const BEAN_OPACITY:f32 = 0.8;
+/// how much the beans, nose, inner ears and belly lumps glow; the belly's
+/// sap glows from `BELLY_GLOW` up by `BELLY_GLOW_FULL` as it fills
+const BEAN_GLOW:f32 = 0.15;
+const NOSE_GLOW:f32 = 0.1;
+const EAR_GLOW:f32 = 0.3;
+const LUMP_GLOW:f32 = 0.25;
+const BELLY_GLOW:f32 = 0.35;
+const BELLY_GLOW_FULL:f32 = 0.65;
 const BEAN_TINT = [4]f32{ 0.72, 0.5, 0.38, 1 };
 const NOSE_TINT = [4]f32{ 0.3, 0.22, 0.2, 1 };
 /// a planted foot's central pad flattens by this fraction
@@ -217,6 +236,7 @@ const TAIL_LIFT:f32 = 0.25;
 const TAIL_DROOP:f32 = 0.16;
 const TAIL_FREQ:f32 = 7;
 const TAIL_FREQ_STEP:f32 = 1.2;
+const TAIL_DAMP:f32 = 0.45;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -418,7 +438,7 @@ pub const Player = struct {
         if (lift) {
           f.from = f.at;
           f.t = 0;
-          f.dur = if (moving) m.clamp((1 - p.duty) * p.cycle / @max(spd, 0.5), 0.12, 0.4) else SETTLE_TIME;
+          f.dur = if (moving) m.clamp((1 - p.duty) * p.cycle / @max(spd, SWING_SPEED_MIN), SWING_MIN, SWING_MAX) else SETTLE_TIME;
           f.lift = LIFT + LIFT_STRIDE * p.stride;
         }
       }
@@ -429,7 +449,7 @@ pub const Player = struct {
         const to = p.onGround(ground, p.rest(ground, s) + p.vel * m.splat3(left) + ahead);
         const k = m.smooth(f.t);
         f.at = m.lerpV(f.from, to, k);
-        f.at[1] = m.lerp(f.from[1], to[1], k) + f.lift * m.pow(f32, @sin(f.t * m.pi), 0.8);
+        f.at[1] = m.lerp(f.from[1], to[1], k) + f.lift * m.pow(f32, @sin(f.t * m.pi), LIFT_ARC);
         if (f.planted()) {
           f.at[1] = to[1];
           fell = true;
@@ -444,12 +464,12 @@ pub const Player = struct {
   fn springs(p:*Player, dt:f32) void {
     const st = p.stride;
     const work = p.reach.x;
-    p.lean.to(m.clamp(LEAN_STRIDE * st + p.accel[2] * LEAN_ACCEL, -LEAN_MAX, LEAN_MAX) + LEAN_WORK * work, LEAN_FREQ, 0.7, dt);
-    p.bank.to(m.clamp(-p.turn * BANK * st, -BANK_MAX, BANK_MAX), LEAN_FREQ, 0.8, dt);
+    p.lean.to(m.clamp(LEAN_STRIDE * st + p.accel[2] * LEAN_ACCEL, -LEAN_MAX, LEAN_MAX) + LEAN_WORK * work, LEAN_FREQ, LEAN_DAMP, dt);
+    p.bank.to(m.clamp(-p.turn * BANK * st, -BANK_MAX, BANK_MAX), LEAN_FREQ, BANK_DAMP, dt);
     for (0..2) |s| {
       // each arm swings with the opposite leg: back as its own leg comes forward
       const ph = @mod(p.phase + 0.5 * m.f(s), 1);
-      const swing = @sin(ph * m.tau + m.pi * 0.5) * ARM_SWING * st;
+      const swing = @sin(ph * m.tau + m.half_pi) * ARM_SWING * st;
       const dig = DIG + @sin(p.t * DIG_RATE + m.f(s) * 1.7) * DIG_DEPTH;
       p.arm[s].to(m.lerp(swing, dig, work), ARM_FREQ, ARM_DAMP, dt);
       p.elbow[s].to(ELBOW_REST + ELBOW_SWING * st * m.clamp01(-p.arm[s].x * 2) + 0.7 * work, ARM_FREQ, ARM_DAMP, dt);
@@ -473,7 +493,7 @@ pub const Player = struct {
         sum += c.x;
       }
       const shut = m.clamp01(sum / (skel.FINGERS * GRIP_CLOSE));
-      spread.to(m.lerp(SPREAD_OPEN, SPREAD_SHUT, shut), FINGER_FREQ, 0.7, dt);
+      spread.to(m.lerp(SPREAD_OPEN, SPREAD_SHUT, shut), FINGER_FREQ, SPREAD_DAMP, dt);
     }
     const look = m.clamp(p.turn * LOOK_TURN, -LOOK_MAX, LOOK_MAX) + LOOK_IDLE * idle * noise.grad(0x100C, p.t * LOOK_IDLE_RATE, 0.5);
     p.look.to(look, HEAD_FREQ, HEAD_DAMP, dt);
@@ -481,7 +501,7 @@ pub const Player = struct {
     // tail: each joint chases the one before it, steered by turning and gait
     var target = m.clamp(-p.turn * TAIL_TURN, -TAIL_TURN_MAX, TAIL_TURN_MAX) + @sin(p.t * TAIL_IDLE_RATE) * TAIL_IDLE * (1 - st) + @sin(p.phase * m.tau) * TAIL_GAIT * st;
     for (&p.tail, 0..) |*j, i| {
-      j.to(target, TAIL_FREQ - m.f(i) * TAIL_FREQ_STEP, 0.45, dt);
+      j.to(target, TAIL_FREQ - m.f(i) * TAIL_FREQ_STEP, TAIL_DAMP, dt);
       target = j.x;
     }
   }
@@ -596,8 +616,8 @@ pub const Player = struct {
     }.f;
 
     try out.emitSkinned(.wolf_body, base, mid, .{ .glow = BODY_GLOW, .flutter = BODY_FLUTTER, .phase = 0.1 });
-    try out.emitSkinned(.wolf_ears, base, mid, .{ .glow = 0.3, .phase = 0.5, .fade = EAR_OPACITY });
-    try out.emit(.paw_bean, m.chain(&.{ at(&w, .head), T(body_mesh.NOSE), m.rotX(-body_mesh.NOSE_TILT), S(v3(0.015, 0.0105, 0.011)) }), .{ .glow = 0.1, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
+    try out.emitSkinned(.wolf_ears, base, mid, .{ .glow = EAR_GLOW, .phase = 0.5, .fade = EAR_OPACITY });
+    try out.emit(.paw_bean, m.chain(&.{ at(&w, .head), T(body_mesh.NOSE), m.rotX(-body_mesh.NOSE_TILT), S(v3(0.015, 0.0105, 0.011)) }), .{ .glow = NOSE_GLOW, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
 
     // the belly: a sap sac that inflates with the inventory, drops and sags
     // as it fills, with the heavier things inside showing through as shadows
@@ -608,12 +628,12 @@ pub const Player = struct {
       held += 1;
     };
     for (p.lump[0..@min(held, lumps.len)]) |l| {
-      try out.emit(.belly_lump, m.chain(&.{ gut, T(l.pos), S(m.splat3(LUMP_R)) }), .{ .glow = 0.25, .phase = 0.3 });
+      try out.emit(.belly_lump, m.chain(&.{ gut, T(l.pos), S(m.splat3(LUMP_R)) }), .{ .glow = LUMP_GLOW, .phase = 0.3 });
     }
     // (the shader creases it as it fills, the folds crossing at its button)
     const cross = belly_mesh.crossing();
     try out.emitSkinned(.wolf_belly, base, mid, .{
-      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY - SAP_STRETCH * b, .give = .{ b, cross[1], cross[2] },
+      .glow = BELLY_GLOW + BELLY_GLOW_FULL * b, .phase = 0.3, .fade = SAP_OPACITY - SAP_STRETCH * b, .give = .{ b, cross[1], cross[2] },
     });
 
     // the pectorals and the rear: resin, its surface given by its spring
@@ -632,7 +652,7 @@ pub const Player = struct {
       const x = skel.sign(s);
       // the beans: a palm pad and one under each fingertip; one
       // central pad on each foot that flattens while planted, four toe pads
-      const bean:parts.Look = .{ .glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
+      const bean:parts.Look = .{ .glow = BEAN_GLOW, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
       const hand = at(&w, sd.hand);
       try out.emit(.paw_pad, m.chain(&.{ hand, T(body_mesh.PALM * v3(x, 1, 1)), m.rotZ(x * m.pi / 2.0), S(v3(0.018, 0.005, 0.016)) }), bean);
       for (sd.tips) |tb| {

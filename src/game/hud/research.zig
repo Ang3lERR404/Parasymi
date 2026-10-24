@@ -46,7 +46,7 @@ const min_hit:f32 = 26;
 // ---- the shape, in slots (one slot = the spacing between nodes on a stem) ----
 
 const SEG = 10;
-const UP:f32 = m.pi / 2.0;
+const UP:f32 = m.half_pi;
 /// angles off the host's heading
 const BRANCH_ANGLE = m.rad(60);
 const TWIG_ANGLE = m.rad(40);
@@ -77,8 +77,17 @@ const TAPER:f32 = 0.85;
 const OLD_R:f32 = 0.13;
 const ROOT_LEN:f32 = 0.45;
 const ROOT_SPREAD:f32 = 0.7;
+/// wind: stems sway (the trunk by `TRUNK_SWAY` of it), leaves flutter, each
+/// at its own rate
 const SWAY:f32 = 0.05;
+const SWAY_RATE:f32 = 0.8;
+const TRUNK_SWAY:f32 = 0.4;
 const FLUTTER:f32 = 0.08;
+const FLUTTER_RATE:f32 = 1.3;
+/// the sapling's clock wraps after this many seconds (keeps f32 precise)
+const TIME_WRAP:f64 = 1000;
+/// a frame's trunk easing steps at most this many seconds
+const EASE_DT_MAX:f64 = 0.1;
 
 fn isBranch(i:usize) bool { return prog.tree.values[i].branch; }
 /// stem index of a host: 0 the trunk, 1 + id a branch.
@@ -192,7 +201,7 @@ const Layout = struct {
 /// the whole tree at time `t`; `amp` scales the wind (0: still).
 fn layout(t:f32, amp:f32) Layout {
   var l:Layout = undefined;
-  l.stems[0] = .build(m.splat3(0), UP, stemLen(0), BEND, amp * sway(0, t) * 0.4);
+  l.stems[0] = .build(m.splat3(0), UP, stemLen(0), BEND, amp * sway(0, t) * TRUNK_SWAY);
   place(&l, null, t, amp);
   for (plan.order[0..plan.branches]) |b| {
     const i = @intFromEnum(b);
@@ -206,13 +215,13 @@ fn place(l:*Layout, h:?Id, t:f32, amp:f32) void {
   const st = &l.stems[stemOf(h)];
   for (0..N) |i| if (stemOf(plan.host[i]) == stemOf(h)) {
     const off = if (!isBranch(i)) LEAF_ANGLE else if (h == null) BRANCH_ANGLE else TWIG_ANGLE;
-    const flutter = if (isBranch(i)) 0 else FLUTTER * @sin(t * 1.3 + m.f(i) * 2.3);
+    const flutter = if (isBranch(i)) 0 else FLUTTER * @sin(t * FLUTTER_RATE + m.f(i) * 2.3);
     l.base[i] = st.point(plan.at[i]);
     l.ang[i] = st.angle(plan.at[i]) + plan.side[i] * off + amp * flutter;
   };
 }
 
-fn sway(k:usize, t:f32) f32 { return SWAY * @sin(t * 0.8 + m.f(k) * 1.9); }
+fn sway(k:usize, t:f32) f32 { return SWAY * @sin(t * SWAY_RATE + m.f(k) * 1.9); }
 
 /// a leaf's tip, fully open.
 fn leafTip(l:*const Layout, i:usize) V3 { return l.base[i] + heading(l.ang[i]) * m.splat3(PETIOLE + LEAF_LEN); }
@@ -272,20 +281,20 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const py = (H - ph) / 2;
   try d.membrane(px, py, pw, ph, s.research_panel, 0.77);
   g.rows.add(px, py, pw, ph, .panel);
-  _ = try d.text(px + 56, py + 30, s.text_title, s.gold, txt.s.hud.research_title);
+  _ = try d.text(px + 56, py + s.title_y, s.text_title, s.gold, txt.s.hud.research_title);
   _ = try d.text(px + 56, py + 58, s.text_small, s.dim, txt.s.hud.research_hint);
 
   const sp = &g.sapling;
   const target = trunkTarget(g);
   if (sp.t < 0) sp.trunk = target else {
-    const dt:f32 = @floatCast(m.clamp(g.ui_time - sp.t, 0, 0.1));
+    const dt:f32 = @floatCast(m.clamp(g.ui_time - sp.t, 0, EASE_DT_MAX));
     sp.trunk += (target - sp.trunk) * @min(1, dt * TRUNK_EASE);
   }
   sp.t = g.ui_time;
 
   const area_y = py + header_h;
   const f = fit(px + tree_pad, area_y, pw - 2 * tree_pad, ph - header_h - card_h);
-  const t:f32 = @floatCast(@mod(g.ui_time, 1000));
+  const t:f32 = @floatCast(@mod(g.ui_time, TIME_WRAP));
   const l = layout(t, 1);
 
   // how far each stem has grown, and how thick it is at its base

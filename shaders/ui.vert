@@ -11,9 +11,11 @@ layout(location = 1) out vec4 v_col;
 layout(location = 2) flat out uvec2 v_bits;
 layout(location = 3) flat out vec2 v_size;
 layout(location = 4) flat out vec2 v_param;
+// the palette's sRGB colours to linear (as common.glsl srgb2lin)
+const float GAMMA = 2.2;
 void main() {
   v_uv = uv;
-  v_col = vec4(pow(col.rgb, vec3(2.2)), col.a);
+  v_col = vec4(pow(col.rgb, vec3(GAMMA)), col.a);
   v_bits = bits;
   v_size = size;
   v_param = param;

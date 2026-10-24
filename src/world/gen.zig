@@ -32,6 +32,13 @@ const HILLS:f32 = 0.25;
 const WET_L:f32 = 55;
 const VEIN_L:f32 = 45;
 const PATCH_L:f32 = 16;
+/// octaves of each: warp, continents, hills, wetness, veins, patches
+const WARP_OCT = 3;
+const CONTINENT_OCT = 5;
+const HILL_OCT = 2;
+const WET_OCT = 3;
+const VEIN_OCT = 3;
+const PATCH_OCT = 2;
 /// resource nodes: in patches denser than `PATCH`, on `NODE_CHANCE` of their
 /// tiles, holding `RES_MIN` plus up to `RES_SPREAD` scaled by the tile hash
 const PATCH:f32 = 0.42;
@@ -49,11 +56,11 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
   const x = m.f(wx);
   const y = m.f(wy);
   // domain warp keeps coastlines and ridges organic instead of blobby.
-  const wx2 = x + WARP * noise.fbm(seed +% 11, x / WARP_L, y / WARP_L, 3);
-  const wy2 = y + WARP * noise.fbm(seed +% 12, x / WARP_L, y / WARP_L, 3);
-  const e = noise.fbm(seed, wx2 / CONTINENT_L, wy2 / CONTINENT_L, 5) + HILLS * noise.fbm(seed +% 1, x / HILL_L, y / HILL_L, 2);
-  const wet = noise.fbm(seed +% 2, x / WET_L, y / WET_L, 3);
-  const vein = noise.ridged(seed +% 3, wx2 / VEIN_L, wy2 / VEIN_L, 3);
+  const wx2 = x + WARP * noise.fbm(seed +% 11, x / WARP_L, y / WARP_L, WARP_OCT);
+  const wy2 = y + WARP * noise.fbm(seed +% 12, x / WARP_L, y / WARP_L, WARP_OCT);
+  const e = noise.fbm(seed, wx2 / CONTINENT_L, wy2 / CONTINENT_L, CONTINENT_OCT) + HILLS * noise.fbm(seed +% 1, x / HILL_L, y / HILL_L, HILL_OCT);
+  const wet = noise.fbm(seed +% 2, x / WET_L, y / WET_L, WET_OCT);
+  const vein = noise.ridged(seed +% 3, wx2 / VEIN_L, wy2 / VEIN_L, VEIN_OCT);
 
   if (e < SEA) return .{.height = WATER_H, .kind = .water, .ley = 0};
   const level:f32 = @floor((e - SEA) * LEVELS) + 1;
@@ -66,7 +73,7 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
 
   // resource nodes cluster in noisy patches. No flora: every plant is seeded.
   const h = rng.unit(rng.hash2(seed +% 7, wx, wy));
-  const patch = noise.fbm(seed +% 5, x / PATCH_L, y / PATCH_L, 2);
+  const patch = noise.fbm(seed +% 5, x / PATCH_L, y / PATCH_L, PATCH_OCT);
   const res:ck.Res = if (patch > PATCH and h < NODE_CHANCE) @intFromFloat(RES_MIN + h * RES_SPREAD) else 0;
   return .{.height = height, .kind = kind, .ley = ley, .res = res};
 }

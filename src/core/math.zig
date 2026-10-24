@@ -34,10 +34,16 @@ pub const MS_PER_S = 1000;
 /// seconds per minute (autosave intervals are set in minutes).
 pub const S_PER_MIN = 60;
 
+/// |cos| of the angle between unit vectors above which they count as near
+/// parallel: pick a different reference axis before crossing them.
+pub const NEAR_PARALLEL:f32 = 0.9;
+
 // ---- scalars ----
 
 pub const pi = math.pi;
 pub const tau = math.tau;
+/// a quarter turn (pi / 2).
+pub const half_pi = pi / 2.0;
 pub const clamp = math.clamp;
 pub const pow = math.pow;
 pub const maxInt = math.maxInt;
@@ -59,9 +65,9 @@ pub inline fn ratio(a:anytype, b:anytype) f32 { return f(a) / f(b); }
 pub inline fn atan2(y:f32, x:f32) f32 { return math.atan2(y, x); }
 pub inline fn asin(x:f32) f32 { return math.asin(clamp(x, -1, 1)); }
 pub inline fn sign(x:f32) f32 { return math.sign(x); }
-/// degrees to radians.
 /// a 0..1 value quantised to a byte (clamped; truncates like the GPU's unorm).
 pub inline fn unorm8(x:f32) u8 { return @intFromFloat(clamp01(x) * 255); }
+/// degrees to radians.
 pub inline fn rad(deg:f32) f32 { return deg * (pi / 180.0); }
 /// shortest signed difference `to - from`, wrapped into -pi..pi.
 pub inline fn angleDiff(from:f32, to:f32) f32 { return atan2(@sin(to - from), @cos(to - from)); }
@@ -313,7 +319,7 @@ pub fn origin(a:M4) V3 { return .{a[3][0], a[3][1], a[3][2]}; }
 
 /// a rotation taking +Y onto `dir` (a unit vector); the roll around it is arbitrary.
 pub fn alignY(dir:V3) M4 {
-  const ref = if (@abs(dir[2]) < 0.9) v3(0, 0, 1) else v3(1, 0, 0);
+  const ref = if (@abs(dir[2]) < NEAR_PARALLEL) v3(0, 0, 1) else v3(1, 0, 0);
   const x = norm(cross(dir, ref));
   const z = cross(x, dir);
   return .{.{x[0], x[1], x[2], 0}, .{dir[0], dir[1], dir[2], 0}, .{z[0], z[1], z[2], 0}, .{0, 0, 0, 1}};
@@ -557,7 +563,7 @@ test "ortho maps its box onto clip space, near to depth 0, far to 1" {
   inline for (0..3) |i| try testing.expectApproxEqAbs(@as(f32, 1), hi[i], 1e-6);
 }
 test "degrees to radians, and a triangle's centroid" {
-  try testing.expectApproxEqAbs(pi / 2.0, rad(90), 1e-6);
+  try testing.expectApproxEqAbs(half_pi, rad(90), 1e-6);
   const c = centroid(v3(0, 0, 0), v3(3, 0, 0), v3(0, 3, 6));
   try testing.expectApproxEqAbs(@as(f32, 1), c[0], 1e-6);
   try testing.expectApproxEqAbs(@as(f32, 1), c[1], 1e-6);

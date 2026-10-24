@@ -46,8 +46,8 @@ pub fn form(b:*mg.Builder, f0:Form) Allocator.Error!void {
   f.rings = b.around(f0.rings, 4);
   f.segs = b.around(f0.segs, 6);
   for (0..f.rings) |i| for (0..f.segs) |j| {
-    const th0 = -m.pi / 2.0 + m.pi * m.ratio(i, f.rings);
-    const th1 = -m.pi / 2.0 + m.pi * m.ratio(i + 1, f.rings);
+    const th0 = -m.half_pi + m.pi * m.ratio(i, f.rings);
+    const th1 = -m.half_pi + m.pi * m.ratio(i + 1, f.rings);
     const ph0 = m.tau * m.ratio(j, f.segs);
     const ph1 = m.tau * m.ratio(j + 1, f.segs);
     const q = [4][2]f32{.{th0, ph0}, .{th0, ph1}, .{th1, ph1}, .{th1, ph0}};

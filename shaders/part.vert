@@ -45,6 +45,25 @@ layout(location = 8) out vec3 v_obj;       // mesh-space point (sap bubbles ride
 layout(location = 9) flat out float v_phase; // per-instance phase (seeds a beam's motes)
 layout(location = 10) flat out float v_aux;  // a beam: 1 for a halo's edge; a flash: its age 0..1
 
+// how an instance is placed (vertex.zig `PartInstance.e.x`; must match)
+const int PLACE_MATRIX = 0;
+const int PLACE_CURVE = 1;   // along a Catmull-Rom curve (the tail, beams)
+const int PLACE_MOTE = 2;    // a star mote
+const int PLACE_SKINNED = 3; // by its bones
+
+// a flash spreads out from this share of its size to this many times it
+const float FLASH_FROM = 0.1;
+const float FLASH_TO = 3.2;
+// a star mote: how fast it turns (rad/s), how far its echoes trail above it
+const float MOTE_TURN = 0.35;
+const float ECHO_RISE = 0.16;
+// sap pulses running along a part (rad/s), and a part's own glow beside a
+// glowing sap part's
+const float PULSE_RATE = 3.0;
+const float DIM_GLOW = 0.06;
+// a conduit's amber pulses: how fast they run (rad/s)
+const float CORE_RUN_RATE = 2.6;
+
 // Catmull-Rom through b..c (a, d the neighbours) at f, and its tangent
 vec3 catmull(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
   return 0.5 * (2.0 * b + (c - a) * f + (2.0 * a - 5.0 * b + 4.0 * c - d) * f * f + (3.0 * b - a - 3.0 * c + d) * f * f * f);
@@ -58,7 +77,7 @@ void main() {
   int mode = int(ie.x + 0.5);
   mat4 M = mat4(c0, c1, c2, c3);
   // a skinned mesh: its vertex goes where its bones, blended by weight, take it
-  if (mode == 3) {
+  if (mode == PLACE_SKINNED) {
     Bones B = Bones(pc.bones);
     int base = int(ie.y + 0.5);
     M = mat4(0.0);
@@ -100,7 +119,7 @@ void main() {
   // wake behind. A smooth field along it, so shared vertices move alike.
   float carried = 0.0;
   float wake = 0.0;
-  if (part == 13u && mode == 0 && iq.x >= 0.0) {
+  if (part == PART_CORE && mode == PLACE_MATRIX && iq.x >= 0.0) {
     const float CARRY_W = 0.075; // how long a stretch the essence fills
     const float SWELL = 0.022;
     const float WAKE = 0.2;
@@ -115,26 +134,26 @@ void main() {
   float sway = iw.x;
   // a growing structure's leaves and petals come up folded and open from
   // the bottom up, tips last (weighted along the leaf so its base holds)
-  if (iw.w < 1.0 && (part == 1u || part == 5u)) {
+  if (iw.w < 1.0 && (part == PART_LEAF || part == PART_EAR)) {
     float open = smoothstep(pos.y / iw.y * 0.7, pos.y / iw.y * 0.7 + 0.35, iw.w);
     p.xz *= mix(1.0, mix(0.2, 1.0, open), tu.y);
   }
   vec4 wind = gardenWind(t, c3.xz);
   // grown structures move as the plants do: leaves and petals breathe
   // slowly and lift a little in the gusts, tips most, bases held
-  if (sway > 0.0 && (part == 1u || part == 5u)) {
-    p.y += tu.y * tu.y * (0.012 * wind.z * sin(t * 1.7 + ip.z * 11.0 + tu.x * 3.0) + 0.01 * sin(t * 0.9 + ip.z * TAU));
-  } else if (part == 1u || part == 5u) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
-  if (part == 4u) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
+  if (sway > 0.0 && (part == PART_LEAF || part == PART_EAR)) {
+    p.y += tu.y * tu.y * (LEAF_LIFT * wind.z * sin(t * LEAF_LIFT_RATE + ip.z * 11.0 + tu.x * 3.0) + 0.01 * sin(t * 0.9 + ip.z * TAU));
+  } else if (part == PART_LEAF || part == PART_EAR) p.y += 0.03 * ip.y * tu.y * tu.y * sin(t * 7.0 + ip.z * 40.0 + tu.y * 2.0);
+  if (part == PART_TENDRIL) p.y += 0.006 * sin(t * 2.0 + ip.z * 20.0 + tu.x * 9.0);
   // resin gives like dense gel: its surface follows the spring, its base on
   // the body holds (a smooth field of height, so shared vertices move alike)
-  if (part == 6u) p += iq.yzw * smoothstep(0.0, 1.0, tu.y);
+  if (part == PART_RESIN) p += iq.yzw * smoothstep(0.0, 1.0, tu.y);
   bool drawn = ih.w >= 0.0;
   // the halo's diamond forms as its blooms close in (how far they have come,
   // haloPull): its facets gather from shards turning in around it, each
   // drawn in along its face and growing as it comes, fitting together as
   // the blooms meet; then it is still
-  if (part == 10u && drawn) {
+  if (part == PART_PRISM && drawn) {
     float form = sqrt(haloPull(ih.w));
     float a = (1.0 - form) * 3.0;
     p = p * form + nrm * (1.0 - form) * 0.45;
@@ -142,12 +161,12 @@ void main() {
   }
   // the flash where the blooms met: a disc of light (tu.x its radius
   // 0..1) thrown outward from the diamond, fast then slowing (age 0..1)
-  if (part == 9u) p.xz *= mix(0.1, 3.2, 1.0 - pow(1.0 - clamp(ip.y, 0.0, 1.0), 3.0));
+  if (part == PART_FLASH) p.xz *= mix(FLASH_FROM, FLASH_TO, 1.0 - pow(1.0 - clamp(ip.y, 0.0, 1.0), 3.0));
 
   vec4 w;
   vec3 wn;
   float twinkle = 1.0;
-  if (mode == 1) {
+  if (mode == PLACE_CURVE) {
     // a curve (the tail): the mesh runs straight up +Y over 0..1; each point
     // goes to that fraction along the Catmull-Rom curve through c0..c3 (the
     // ends extended in line), its x laid toward the side (tint.xyz) and its
@@ -171,7 +190,7 @@ void main() {
     vec3 d = i == 2 ? 2.0 * c - b : P[i + 2];
     vec3 T = normalize(catmullTan(a, b, c, d, f));
     vec3 C = catmull(a, b, c, d, f);
-    if (part == 8u) {
+    if (part == PART_THREAD) {
       // soft rays: a spindle of light, narrow where it leaves one bloom and
       // reaches the other, widest between, its width (x, -1..1) turned to
       // face the eye from every side
@@ -180,7 +199,7 @@ void main() {
       // a halo's edge (flutter 1) runs even from corner to corner, so the
       // edges join into one ring
       float spindle = ip.y > 0.5 ? 0.7 : mix(0.3, 1.0, pow(sin(0.5 * TAU * clamp(tu.x, 0.0, 1.0)), 0.6));
-      w = vec4(C + right * p.x * 0.42 * spindle, 1.0);
+      w = vec4(C + right * p.x * BEAM_HALF_WIDTH * spindle, 1.0);
       wn = toEye;
     } else {
       vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
@@ -189,20 +208,20 @@ void main() {
       // the mesh was squeezed to 0..1 along its length: undo that on its normals
       wn = B * nrm.x + T * (nrm.y / ie.w) + N * nrm.z;
     }
-  } else if (mode == 2) {
+  } else if (mode == PLACE_MOTE) {
     // a star mote: it turns slowly, tilts, twinkles and, resting, hovers
     // with a slow breath; falling, its echoes (ie.w 1..3) trail above it,
     // fading and shrinking
     float ph = ie.y;
     float echo = ie.w;
     twinkle = 0.75 + 0.25 * sin(t * 3.1 + ph * 40.0) * sin(t * 1.7 + ph * 13.0);
-    float turn = t * 0.35 + ph * TAU - max(echo, 0.0) * 0.3;
+    float turn = t * MOTE_TURN + ph * TAU - max(echo, 0.0) * 0.3;
     float tilt = echo > 0.5 ? 0.0 : 0.25 * sin(t * 0.5 + ph * 9.0);
     float size = (0.55 + 0.55 * ie.z) * (0.9 + 0.1 * twinkle) * (1.0 - 0.22 * max(echo, 0.0));
     float hover = echo < 0.0 ? 0.05 * sin(t * 1.1 + ph * 30.0) : 0.0;
     mat3 R = mat3(cos(turn), 0.0, -sin(turn), 0.0, 1.0, 0.0, sin(turn), 0.0, cos(turn))
            * mat3(cos(tilt), sin(tilt), 0.0, -sin(tilt), cos(tilt), 0.0, 0.0, 0.0, 1.0);
-    w = vec4(c3.xyz + vec3(0.0, hover + 0.16 * max(echo, 0.0), 0.0) + R * p * size, 1.0);
+    w = vec4(c3.xyz + vec3(0.0, hover + ECHO_RISE * max(echo, 0.0), 0.0) + R * p * size, 1.0);
     wn = R * nrm;
     if (echo > 0.5) twinkle = 1.0;
   } else {
@@ -212,7 +231,7 @@ void main() {
     wn = nm;
     if (false) {
 #else
-    if (mode == 3) {
+    if (mode == PLACE_SKINNED) {
 #endif
       // a skinned mesh's bones may swell it unevenly (the belly): its
       // normals take the inverse-transpose of how the skin truly moves
@@ -235,7 +254,7 @@ void main() {
     } else wn = mat3(M) * nm;
     // a shadow under a bloom a forming halo draws in follows it over the
     // ground (fading as the bloom folds, below)
-    if (drawn && part == 7u) w.xz += haloSpiral(c3.xyz, ih.xyz, ih.w).xz - c3.xz;
+    if (drawn && part == PART_SHADOW) w.xz += haloSpiral(c3.xyz, ih.xyz, ih.w).xz - c3.xz;
   }
   // ... and bend from their root in the garden's wind, as the plants do:
   // more toward the top, the lean slow and late at the tip (a smooth field
@@ -243,8 +262,7 @@ void main() {
   if (sway > 0.0) {
     vec3 root = c3.xyz - vec3(0.0, iw.z, 0.0);
     float h = clamp((w.y - root.y) / iw.y, 0.0, 1.5);
-    float own = sin(t * 0.85 - wind.w * 0.3 + ip.z * TAU - h * 0.9);
-    float ang = sway * (0.05 * wind.z + 0.025 * (0.4 + wind.z) * own) * h * h;
+    float ang = windLean(t, wind, ip.z * TAU, h, sway) * h * h;
     w.xyz = root + bendIn(w.xyz - root, wind.xy, ang);
     wn = bendIn(wn, wind.xy, ang);
   }
@@ -252,49 +270,49 @@ void main() {
   v_nrm = normalize(wn);
   vec3 c = srgb2lin(col.rgb);
   // (the ring's tint is its points' light, not a colour)
-  v_col = (mode == 1 || part == 11u) ? c : mix(c, c * tint.rgb, tint.w);
+  v_col = (mode == PLACE_CURVE || part == PART_HALO) ? c : mix(c, c * tint.rgb, tint.w);
   // sap pulses travel along the part
-  float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * TAU);
-  v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
+  float pulse = 0.65 + 0.35 * sin(t * PULSE_RATE - tu.x * 8.0 + ip.z * TAU);
+  v_glow = ip.x * ((part == PART_BLOOM || part == PART_THREAD) ? 1.0 : DIM_GLOW) * pulse * twinkle;
   // a flash and a halo's projection shine as bright as their glow, never
   // pulsing; a prism has no light of its own
-  if (part == 9u || part == 12u) v_glow = ip.x;
+  if (part == PART_FLASH || part == PART_PROJECTION) v_glow = ip.x;
   // the ring: an arc is as bright as the points at its ends (tint holds
   // the four points' light, east, south, west, north; tu.x its angle)
-  if (part == 11u) {
+  if (part == PART_HALO) {
     float a = fract(tu.x) * 4.0;
     int i = int(a) % 4;
     v_glow = mix(tint[i], tint[(i + 1) % 4], fract(a));
   }
-  if (part == 10u) v_glow = 0.0;
+  if (part == PART_PRISM) v_glow = 0.0;
   // a conduit's core: its sap forever runs the way it carries, in faint
   // amber pulses (brighter while it is busy, ip.x); essence carried
   // through it takes it over in its own colour, its wake fading behind
-  if (part == 13u) {
-    float run = pow(0.5 + 0.5 * sin(tu.x * TAU * 2.0 - t * 2.6 + ip.z * TAU), 6.0);
-    v_col = mix(v_col, vec3(1.0, 0.43, 0.08) * 0.8, run * 0.6);
+  if (part == PART_CORE) {
+    float run = pow(0.5 + 0.5 * sin(tu.x * TAU * 2.0 - t * CORE_RUN_RATE + ip.z * TAU), 6.0);
+    v_col = mix(v_col, AMBER * 0.8, run * 0.6);
     v_col = mix(v_col, srgb2lin(clamp(ie.yzw, 0.0, 1.0)), max(carried, wake * 0.6));
     v_glow = run * (0.1 + 0.2 * ip.x) + carried * 0.55 + wake * 0.2;
   }
   v_part = float(part);
   v_t = tu.x;
   // a beam carries its length instead, so its rays and motes keep their size
-  v_fade = part == 8u ? length(c3.xyz - c0.xyz) : ip.w;
+  v_fade = part == PART_THREAD ? length(c3.xyz - c0.xyz) : ip.w;
   // the halo's ring and its projection carry their radius (their scale)
-  if (part == 11u || part == 12u) v_fade = length(c0.xyz);
-  if (drawn && part == 7u) v_fade *= 1.0 - haloFold(ih.w);
+  if (part == PART_HALO || part == PART_PROJECTION) v_fade = length(c0.xyz);
+  if (drawn && part == PART_SHADOW) v_fade *= 1.0 - haloFold(ih.w);
   v_u = tu.y;
   v_obj = p;
   v_phase = ip.z;
   v_aux = ip.y;
   // the halo's ring and the rays making it appear as its diamond forms
   // (from its shards, as its blooms close in)
-  if (part == 11u || part == 12u) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
+  if (part == PART_HALO || part == PART_PROJECTION) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
   gl_Position = project(w.xyz);
 #ifdef SHADOW
   // what is light itself casts no shadow (a star mote, a beam, a halo's
   // flash, ring and rays), nor does the soft shadow under a floater
-  if (mode == 2 || part == 7u || part == 8u || part == 9u || part == 11u || part == 12u) gl_Position = UNSEEN;
+  if (mode == PLACE_MOTE || part == PART_SHADOW || part == PART_THREAD || part == PART_FLASH || part == PART_HALO || part == PART_PROJECTION) gl_Position = UNSEEN;
 #endif
 }
 

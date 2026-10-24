@@ -54,6 +54,8 @@ const BREATH:f32 = 0.02;
 const BREATH_ACTIVE:f32 = 0.04;
 const GLOW:f32 = 0.25;
 const GLOW_ACTIVE:f32 = 1.1;
+/// how much a standing structure's leaves flutter
+const FLUTTER:f32 = 0.6;
 /// placement preview: fixed plant seed, structure lift and shrink, tints,
 /// pulse
 const GHOST_SEED:f32 = 0.37;
@@ -62,6 +64,9 @@ const GHOST_SCALE:f32 = 0.96;
 const GHOST_FITS = [4]f32{ 0.6, 1.4, 0.8, 0.7 };
 const GHOST_BLOCKED = [4]f32{ 1.6, 0.4, 0.4, 0.8 };
 const GHOST_PULSE_RATE:f32 = 5;
+/// a structure ghost's glow pulses about `GHOST_GLOW`, by `GHOST_PULSE`
+const GHOST_GLOW:f32 = 0.6;
+const GHOST_PULSE:f32 = 0.4;
 /// resource nodes shrink to `NODE_MIN` of full size as they empty
 const NODE_MIN:f32 = 0.55;
 /// star motes: size, and echoes trailing a falling one
@@ -88,6 +93,8 @@ const MOTE_COL = m.V3{ 1.0, 0.86, 0.62 };
 const NODE_REACH:f32 = 2.6;
 const NODE_LIGHT:f32 = 0.45;
 const NODE_COL = m.V3{ 0.5, 0.3, 1.0 };
+/// and how high over its tile the light sits
+const NODE_LIFT:f32 = 0.3;
 
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
@@ -321,7 +328,7 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     const breathe = 1 + (BREATH + BREATH_ACTIVE * a) * @sin(tf * BREATH_RATE + s.seed * 9);
     const size = s.grownScale() * m.v3(breathe, 2 - breathe, breathe);
     if (!s.def().bare) try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(size)}), .{
-      .glow = GLOW + GLOW_ACTIVE * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap,
+      .glow = GLOW + GLOW_ACTIVE * a, .flutter = FLUTTER, .phase = s.seed, .fade = s.def().sap,
       .sway = s.def().sway, .tall = s.def().tall, .grown = s.grown,
     });
     try st.emit(s, &g.parts, ctr, tf);
@@ -346,7 +353,7 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   // (a floating one where it will hang)
   const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + GHOST_LIFT + def.hover);
   const tint = if (ok) GHOST_FITS else GHOST_BLOCKED;
-  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = 0.6 + 0.4 * @sin(tf * GHOST_PULSE_RATE), .tint = tint});
+  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = GHOST_GLOW + GHOST_PULSE * @sin(tf * GHOST_PULSE_RATE), .tint = tint});
 }
 
 /// resource nodes within `nr` tiles of the camera focus.
@@ -370,7 +377,7 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
           m.rotY(hsh * m.tau), m.scale3(m.splat3(sc)),
         }), .{.glow = node.glow, .phase = hsh, .sway = node.sway, .tall = node.tall * sc});
         // a glowing node (ley shards) lights the ground round it
-        if (node.glow > 0) try g.parts.light(m.tileCentre(wx, wz, c.height[t] + 0.3), NODE_COL * m.splat3(NODE_LIGHT * node.glow * sc), NODE_REACH);
+        if (node.glow > 0) try g.parts.light(m.tileCentre(wx, wz, c.height[t] + NODE_LIFT), NODE_COL * m.splat3(NODE_LIGHT * node.glow * sc), NODE_REACH);
       }
     }
   }

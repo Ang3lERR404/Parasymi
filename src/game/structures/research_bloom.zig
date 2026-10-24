@@ -84,9 +84,9 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   try ic.leaf(.{0.04, 0.32}, 0.25, 0.3, 0.17, icon_kit.sprout, 0.9);
   try ic.glow(top, 0.32, icon_glow);
   for (0..ICON_PETALS) |i| {
-    try ic.leaf(top, m.pi / 2.0 + m.tau * m.ratio(i, ICON_PETALS), 0.3, 0.2, icon_petal, 1);
+    try ic.leaf(top, m.half_pi + m.tau * m.ratio(i, ICON_PETALS), 0.3, 0.2, icon_petal, 1);
   }
-  try ic.stamens(top, m.pi / 2.0, 0.8, 5, 0.22, icon_filament);
+  try ic.stamens(top, m.half_pi, 0.8, 5, 0.22, icon_filament);
   try ic.bud(top, 0.08, icon_core, 1);
   try ic.coat(col);
 }

@@ -118,7 +118,7 @@ pub const META:f32 = 0.335;
 pub const TAIL_AT = v3(0, 0.12, -0.13);
 pub const TAIL_SEG:f32 = 0.12;
 /// the tail leaves the rear up and back, this far (radians) from straight up
-pub const TAIL_TILT:f32 = -(m.pi / 2.0 - m.pi / 6.0);
+pub const TAIL_TILT:f32 = -(m.half_pi - m.pi / 6.0);
 /// where an ear roots on the skull (x for the right one)
 pub const EAR_AT = v3(0.05, 0.092, -0.012);
 /// ears lean forward and out by this much at rest

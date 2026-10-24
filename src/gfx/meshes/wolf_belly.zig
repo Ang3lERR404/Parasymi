@@ -50,7 +50,7 @@ const NAVEL_LIFT:f32 = 0.86;
 /// where the creases cross (the belly button, on the sac's surface), in
 /// the bind pose (wolf space)
 pub fn crossing() V3 {
-  return v3(0, skel.HIP_Y + skel.WAIST_AT[1], skel.WAIST_AT[2]) + surface(NAVEL_TH, m.pi / 2.0, 1);
+  return v3(0, skel.HIP_Y + skel.WAIST_AT[1], skel.WAIST_AT[2]) + surface(NAVEL_TH, m.half_pi, 1);
 }
 
 const RINGS = 30;
@@ -178,8 +178,8 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   // the belly button: a small knot of sap sunk in the sac at the front of
   // the gut, a puckered ring of sap around it, all one with the sac
   const nth = NAVEL_TH;
-  const at = surface(nth, m.pi / 2.0, NAVEL_LIFT);
-  const out = normal(nth, m.pi / 2.0);
+  const at = surface(nth, m.half_pi, NAVEL_LIFT);
+  const out = normal(nth, m.half_pi);
   const navel = b.mark();
   const knot = pal.sap;
   try mg.ellipsoid(b, .{ .center = at, .radii = v3(0.0068, 0.008, 0.0056), .col = knot, .part = .bloom, .rings = 8, .segs = 12, .t = 1 });
@@ -230,7 +230,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
 }
 
 test "the belly is full below and narrows toward the ribs" {
-  const mid = surface(m.pi / 2.0, 0, 1)[0] - CENTRE[0];
+  const mid = surface(m.half_pi, 0, 1)[0] - CENTRE[0];
   const high = surface(m.pi * 0.85, 0, 1)[0] - CENTRE[0];
   try std.testing.expect(mid > 0.1);
   try std.testing.expect(high < mid * 0.6);

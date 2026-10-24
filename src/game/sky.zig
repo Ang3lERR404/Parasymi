@@ -21,6 +21,15 @@ const DUSK_BAND:f32 = 0.25;
 const DUSK_GLOW:f32 = 0.8 * 0.6;
 /// dawn and dusk are named within this elevation of the horizon
 const TWILIGHT_BAND:f32 = 0.15;
+/// the key light's direction: the sun swings this far east-west, rises at
+/// least `SUN_LOW` plus `SUN_LIFT` and leans this far south; the moon likewise
+const SUN_SWING:f32 = 0.7;
+const SUN_LOW:f32 = 0.1;
+const SUN_LIFT:f32 = 0.2;
+const SUN_LEAN:f32 = 0.35;
+const MOON_SWING:f32 = 0.5;
+const MOON_LIFT:f32 = 0.3;
+const MOON_LEAN:f32 = -0.3;
 /// sky colours (linear): night, day plain and veiled, dusk glow
 const NIGHT_SKY = [3]f32{ 0.008, 0.01, 0.028 };
 const DAY_SKY = [3]f32{ 0.16, 0.22, 0.32 };
@@ -41,8 +50,8 @@ pub const Sky = struct {
   pub fn lightDir(s:*const Sky) m.V3 {
     const az = s.tod * m.tau;
     const e = s.elevation();
-    if (e > SUN_ABOVE) return m.norm(m.v3(@cos(az) * 0.7, @max(e, 0.1) + 0.2, 0.35));
-    return m.norm(m.v3(-@cos(az) * 0.5, -e + 0.3, -0.3));
+    if (e > SUN_ABOVE) return m.norm(m.v3(@cos(az) * SUN_SWING, @max(e, SUN_LOW) + SUN_LIFT, SUN_LEAN));
+    return m.norm(m.v3(-@cos(az) * MOON_SWING, -e + MOON_LIFT, MOON_LEAN));
   }
 
   /// linear sky/fog colour, with dusk glow near the horizon.

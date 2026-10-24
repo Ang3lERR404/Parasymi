@@ -13,7 +13,7 @@ const st = @import("../structures.zig");
 const items = @import("../../sim/items.zig");
 const icon = @import("../icon.zig");
 
-const gap:f32 = 64;
+const gap = s.slot_gap;
 const pod_r:f32 = 20;
 const pod_r_sel:f32 = 24;
 const glow_alpha:u8 = 110;

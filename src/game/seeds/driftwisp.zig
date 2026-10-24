@@ -26,10 +26,10 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   }
   // the catcher dish: a cup of petals opening upward
   for (0..PETALS) |i| {
-    const a = m.pi / 2.0 + (m.ratio(i, PETALS - 1) - 0.5) * 2.2;
+    const a = m.half_pi + (m.ratio(i, PETALS - 1) - 0.5) * 2.2;
     try ic.leaf(dish, a, 0.3, 0.12, petal, 0.8);
   }
-  try ic.stamens(dish, m.pi / 2.0, 0.6, 4, 0.2, filament_lite);
+  try ic.stamens(dish, m.half_pi, 0.6, 4, 0.2, filament_lite);
   // the lantern: clear sap, the spore inside, comb rows over it in colours
   try ic.glow(float, 0.26, float_glow);
   try ic.bud(float, LANTERN_W, sap, 0.6);

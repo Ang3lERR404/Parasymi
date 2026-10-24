@@ -23,6 +23,14 @@ pub const edge:f32 = 16;
 /// a structure's description bar: offset from the text and width
 pub const desc_bar_x:f32 = 250;
 pub const desc_bar_w:f32 = 110;
+/// spacing of item slots (belly, hotbar, a structure's store)
+pub const slot_gap:f32 = 64;
+/// a centred panel's title sits this far below its top
+pub const title_y:f32 = 30;
+/// centred panels shift up by this to clear the hotbar
+pub const panel_lift:f32 = 30;
+/// a menu's backdrop veil reaches this share of the screen's longer side
+pub const veil_reach:f32 = 0.75;
 
 pub const white:C = .{235, 240, 225, 255};
 pub const dim:C = .{150, 170, 150, 255};

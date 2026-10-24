@@ -16,7 +16,7 @@ const belly = @import("belly.zig");
 
 /// its slots, this many across (the belly's grid sits to their right)
 const cols = 4;
-const gap:f32 = 64;
+const gap = s.slot_gap;
 const store_w = gap * cols;
 const store_h = gap * m.f((st.SLOTS + cols - 1) / cols);
 comptime { assert(store_h <= belly.height); }
@@ -27,7 +27,6 @@ const pw = margin + store_w + between + belly.width + margin;
 const header_h:f32 = 116;
 const label_h:f32 = 34;
 const hint_h:f32 = 76;
-const panel_lift:f32 = 30; // shift up to clear the hotbar
 /// the weave choices: a row of seed pods, the shown one's ingredients beside
 const recipes_h:f32 = 104;
 const recipe_gap:f32 = 58;
@@ -41,7 +40,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const choices = st.recipes(sp.kind());
   const ph = header_h + (if (choices.len > 0) recipes_h else 0) + label_h + belly.height + hint_h;
   const px = (W - pw) / 2;
-  const py = (H - ph) / 2 - panel_lift;
+  const py = (H - ph) / 2 - s.panel_lift;
 
   try d.membrane(px, py, pw, ph, s.membrane, 0.41);
   g.rows.add(px, py, pw, ph, .panel);

@@ -15,9 +15,27 @@ layout(location = 9) flat in float v_phase; // per-instance phase (seeds a beam'
 layout(location = 10) flat in float v_aux;  // a beam: 1 for a halo's edge; a flash: its age 0..1
 layout(location = 0) out vec4 o;
 
-const vec3 SAP = vec3(1.0, 0.43, 0.08);       // linear amber, the only accent
+const vec3 SAP = AMBER;                        // linear amber, the only accent
 const vec3 SAP_DEEP = vec3(0.12, 0.035, 0.004); // the sac's dark heart
 const vec3 SAP_SRGB_LIN = vec3(1.0, 0.428, 0.036); // palette sap (1, .68, .22), linearised
+// what light reaches sap and fibres at night (moonlight; by day near white)
+const vec3 NIGHT_LIT = MOONLIGHT * 0.3;
+// resin's light at night (it is denser)
+const vec3 RESIN_NIGHT = MOONLIGHT * 0.25;
+// the diamond's crystal: its daylight, the warm film it reflects, its glint
+const vec3 PRISM_DAY = vec3(1.0, 0.96, 0.9);
+const vec3 PRISM_FILM = vec3(1.0, 0.82, 0.6);
+const float PRISM_SPEC_POW = 120.0;
+const float PRISM_FRESNEL_POW = 3.0;
+// resin's tight highlight
+const float RESIN_SPEC_POW = 90.0;
+// the soft shadow under a floater: its colour, and how it falls off to its rim
+const vec3 GROUND_SHADOW = vec3(0.015, 0.015, 0.025);
+const float GROUND_SHADOW_FALLOFF = 1.6;
+// a flash's burst: a warm white
+const vec3 FLASH_WHITE = vec3(1.0, 0.97, 0.9);
+// the halo's projection: how many rays it has round it
+const float RAYS = 40.0;
 
 // direction of increasing `v_t` across the surface: along a tube that is its
 // spine. Zero where `v_t` is constant (knots, spheres).
@@ -36,7 +54,7 @@ vec3 surfaceTangent() {
 // reaches it (its glints fall in shadow with it)
 vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout float alpha) {
   float t = pc.eye_time.w;
-  vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0), pc.sun.w);
+  vec3 lit = mix(NIGHT_LIT, vec3(1.0), pc.sun.w);
   float bub = sapBubbles(v_obj, V, t) * inside;
   c += mix(sapc, vec3(1.0, 0.95, 0.85), 0.35) * bub * 0.45 * lit;
   vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
@@ -57,8 +75,8 @@ void surface() {
   // sap's hue follows its vertex colour relative to plain sap, so an
   // instance tint (paw beans, nose) can make it denser and browner
   vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5);
-  bool inner_ear = part == 5 && dot(raw, V) < 0.0;
-  if (part == 8) {
+  bool inner_ear = part == PART_EAR && dot(raw, V) < 0.0;
+  if (part == PART_THREAD) {
     // soft rays sent from one bloom to the other: no core, a faint haze
     // across the width (v_u -1..1) with a few soft streaks in it, each
     // broken into long swells of light travelling from the sender (v_t 0)
@@ -90,7 +108,7 @@ void surface() {
     // too, so none is cut at a cell's edge
     const float CELL = 0.3;
     const float DRIFT = 0.55;
-    const float WIDTH = 0.42; // part.vert's half width at the middle
+    const float WIDTH = BEAM_HALF_WIDTH;
     float m = 0.0;
     vec3 mc = vec3(0.0);
     float drift = (x - t * DRIFT) / CELL;
@@ -114,7 +132,7 @@ void surface() {
     o = vec4(applyFog(c, v_pos), a * ends * (0.3 + 0.7 * lit));
     return;
   }
-  if (part == 9) {
+  if (part == PART_FLASH) {
     // the flash where the blooms became one: a disc of light thrown out
     // from the diamond (v_t its radius 0..1), its rim a bright ring that
     // runs the film's colours around, its inside a burst that is gone
@@ -126,11 +144,11 @@ void surface() {
     float burst = (1.0 - r * r) * pow(1.0 - age, 6.0);
     float fade = pow(1.0 - age, 2.0);
     vec3 film = mix(filmHue(atan(v_obj.z, v_obj.x) / TAU + age * 0.3), vec3(1.0), 0.45);
-    c = (film * rim * 3.0 + vec3(1.0, 0.97, 0.9) * burst * 2.5) * fade * v_glow;
+    c = (film * rim * 3.0 + FLASH_WHITE * burst * 2.5) * fade * v_glow;
     o = vec4(applyFog(c, v_pos), clamp((rim * 0.9 + burst * 0.6) * fade, 0.0, 1.0));
     return;
   }
-  if (part == 11) {
+  if (part == PART_HALO) {
     // the halo: light the diamond has split and thrown into a ring. Across
     // its width (v_u, inner edge -1 .. outer 1) the spectrum fans out as in
     // an ice halo: a sharp red inner edge, then orange, gold, green, blue,
@@ -173,7 +191,7 @@ void surface() {
     o = vec4(applyFog(c, v_pos), a);
     return;
   }
-  if (part == 12) {
+  if (part == PART_PROJECTION) {
     // the projection: fine needles of split light the diamond throws out
     // (v_t 0 at the crystal .. 1 at the ring, v_u round it), each ray its
     // own hue, pulses running out along them to the ring; between them
@@ -181,7 +199,6 @@ void surface() {
     float t = pc.eye_time.w;
     float reach = v_aux;
     if (v_t > reach) discard;
-    const float RAYS = 40.0;
     float a = v_u * RAYS;
     float id = mod(floor(a + 0.5), RAYS);
     vec3 h = hash33(vec3(id, v_phase * 7.3, 3.0));
@@ -199,41 +216,41 @@ void surface() {
   // how much of the key light reaches what is left (what stands between it
   // and the sun or moon shades it): it shades the light's glints, the
   // light carried through sap and leaves and the fibres' sheen with it
-  float sh = part == 7 ? 1.0 : keyShadow(v_pos, n);
-  if (part == 10) {
+  float sh = part == PART_SHADOW ? 1.0 : keyShadow(v_pos, n);
+  if (part == PART_PRISM) {
     // a cut crystal with no light of its own: each flat facet shades as
     // stone does and reflects a warm iridescent film that shifts with the
     // angle it is seen at and from facet to facet; the sun glints off it
     float ndv = clamp(dot(n, V), 0.0, 1.0);
-    float fres = pow(1.0 - ndv, 3.0);
+    float fres = pow(1.0 - ndv, PRISM_FRESNEL_POW);
     vec3 facet = hash33(floor(n * 7.0) + 3.0);
-    vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), vec3(1.0, 0.82, 0.6), 0.35);
+    vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), PRISM_FILM, 0.35);
     float day = pc.sun.w;
-    vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.96, 0.9), day);
+    vec3 lit = mix(NIGHT_LIT, PRISM_DAY, day);
     c = shadeLit(v_col * 0.55, n, v_pos, sh);
     c += film * lit * (0.18 + 0.55 * fres + 0.25 * facet.y * max(dot(n, SUN), 0.0) * sh);
     c += film * pointLight(v_pos, n, 0.0) * 0.5;
     vec3 H = normalize(SUN + V);
-    c += lit * pow(max(dot(n, H), 0.0), 120.0) * 1.6 * step(0.0, dot(n, SUN)) * sh;
+    c += lit * pow(max(dot(n, H), 0.0), PRISM_SPEC_POW) * 1.6 * step(0.0, dot(n, SUN)) * sh;
     c += film * fres * mix(0.25, 0.08, day);
     o = vec4(applyFog(c, v_pos), 1.0);
     return;
   }
-  if (part == 7) {
+  if (part == PART_SHADOW) {
     // a soft shadow on the ground: darkest at its centre, gone at its rim
     float r = clamp(v_t, 0.0, 1.0);
-    float a = v_fade * pow(1.0 - r, 1.6);
-    o = vec4(applyFog(vec3(0.015, 0.015, 0.025), v_pos), a);
+    float a = v_fade * pow(1.0 - r, GROUND_SHADOW_FALLOFF);
+    o = vec4(applyFog(GROUND_SHADOW, v_pos), a);
     return;
   }
-  if (part == 6) {
+  if (part == PART_RESIN) {
     // solidified sap, thick as resin: dense and dark where it meets the body
     // (v_u 0), thinning toward its surface (v_u 1). No light of its own:
     // what glows is light passing through it, so it dims with the day.
     if (dot(raw, V) < 0.0) discard;
     float h = clamp(v_u, 0.0, 1.0);
     float ndv = clamp(dot(raw, V), 0.0, 1.0);
-    float fres = pow(1.0 - ndv, 2.0);
+    float fres = pow(1.0 - ndv, FRESNEL_POW);
     float day = pc.sun.w;
     vec3 sap = SAP * hue;
     vec3 deep = SAP_DEEP * hue * mix(0.55, 1.6, h);
@@ -241,7 +258,7 @@ void surface() {
     // shows a warm core, thicker resin swallowing more of it
     float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
     float through = max(dot(-raw, SUN), 0.0) * sh;
-    vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
+    vec3 lit = mix(RESIN_NIGHT, vec3(1.0), day);
     c = shadeLit(deep, raw, v_pos, sh);
     c += sap * lit * wrap * mix(0.06, 0.32, h);
     c += sap * lit * through * 0.25 * h;
@@ -250,18 +267,18 @@ void surface() {
     // the polished face: amber at grazing angles and a tight highlight
     c += mix(deep, sap * 1.4, fres) * 0.3 * lit;
     vec3 H = normalize(SUN + V);
-    c += lit * pow(max(dot(raw, H), 0.0), 90.0) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN)) * sh;
+    c += lit * pow(max(dot(raw, H), 0.0), RESIN_SPEC_POW) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN)) * sh;
     // denser at the base: nearly opaque there, see-through only toward the face
     alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
     c = sapLife(c, sap, raw, V, h * (1.0 - fres), sh, alpha);
     o = vec4(applyFog(c, v_pos), alpha);
     return;
   }
-  if (part == 2 && v_fade < 0.999) {
+  if (part == PART_BLOOM && v_fade < 0.999) {
     // translucent sap sac: dark and see-through at the centre, amber at
     // grazing angles. Only the near side is drawn (it is a closed sac).
     if (dot(raw, V) < 0.0) discard;
-    float fres = pow(1.0 - clamp(dot(raw, V), 0.0, 1.0), 2.0);
+    float fres = pow(1.0 - clamp(dot(raw, V), 0.0, 1.0), FRESNEL_POW);
     vec3 deep = SAP_DEEP * hue * (0.6 + 0.8 * v_glow);
     c = shadeLit(deep, raw, v_pos, sh) + mix(deep, SAP * hue * 2.2, fres) * (0.35 + v_glow);
     c += SAP * hue * pointLight(v_pos, raw, 1.0) * 0.3;
@@ -270,7 +287,7 @@ void surface() {
   } else if (inner_ear && v_fade < 0.999) {
     // the inner ear is a sheet of sap: glowing at grazing angles, faintly
     // see-through face-on (the outer face stays solid vine)
-    float fres = pow(1.0 - clamp(-dot(raw, V), 0.0, 1.0), 2.0);
+    float fres = pow(1.0 - clamp(-dot(raw, V), 0.0, 1.0), FRESNEL_POW);
     vec3 deep = SAP_DEEP * 1.6;
     c = shadeLit(deep, -raw, v_pos, sh) + mix(deep, SAP * 1.8, fres) * 0.5;
     c += SAP * max(dot(raw, SUN), 0.0) * 0.25 * sh; // light through the ear
@@ -281,42 +298,38 @@ void surface() {
     vec3 albedo = v_col;
     float inner = 0.0;
     // the inner face of an ear (the side opposite its normal) is sap-lined
-    if (part == 5) {
+    if (part == PART_EAR) {
       inner = dot(raw, V) < 0.0 ? 1.0 : 0.0;
       albedo = mix(albedo, SAP * 0.6, inner * 0.8);
     }
     c = shadeLit(albedo, n, v_pos, sh);
     // leaves and sap are thin/translucent: back light shines through (a
     // bloom's or a mote's too)
-    if (part == 1 || part == 2 || part == 5) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pointLight(v_pos, -n, 0.0) * 0.3);
+    if (part == PART_LEAF || part == PART_BLOOM || part == PART_EAR) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pointLight(v_pos, -n, 0.0) * 0.3);
     c += SAP * inner * 0.25;
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets
     float tl = length(tgrad);
-    if ((part == 0 || part == 13) && tl > 0.0) {
+    if ((part == PART_STEM || part == PART_CORE) && tl > 0.0) {
       float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
       float lit = smoothstep(0.0, 0.3, dot(n, SUN));
-      vec3 light = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.95, 0.85), pc.sun.w);
+      vec3 light = mix(NIGHT_LIT, SUNLIGHT, pc.sun.w);
       c += mix(albedo, light, 0.5) * sheen * lit * 0.28 * smoothstep(0.3, 1.5, tl) * sh;
-
     }
     c += v_col * v_glow * 2.2;
   }
   // rim light keeps the silhouette readable at night
-  float rim = pow(1.0 - max(dot(n, V), 0.0), 3.0);
+  float rim = pow(1.0 - max(dot(n, V), 0.0), RIM_POW);
   c += v_col * rim * mix(0.35, 0.12, pc.sun.w);
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
-// two passes draw every surface: the solid one keeps the fragments that are
-// opaque and writes depth; the glass one (built with GLASS, after every
-// solid pass) blends the see-through ones over it, testing depth but writing
-// none, so nothing see-through hides what lies behind it
-const float SOLID = 0.996;
+// two passes draw every surface (SOLID, common.glsl), so nothing
+// see-through hides what lies behind it
 void main() {
   surface();
 #ifdef GLASS
-  if (o.a >= SOLID || o.a < 0.002) discard;
+  if (o.a >= SOLID || o.a < CLEAR) discard;
 #else
   if (o.a < SOLID) discard;
 #endif

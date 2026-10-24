@@ -41,7 +41,7 @@ fn faded(c:Color, a:f32) Color {
 }
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
-  try d.glow(W / 2, H / 2, @max(W, H) * 0.75, s.veil);
+  try d.glow(W / 2, H / 2, @max(W, H) * s.veil_reach, s.veil);
   const ph = header_h + list_h + acts_h + hint_h;
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
@@ -49,7 +49,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   try d.membrane(px, py, pw, ph, s.pause_panel, 0.83);
   g.rows.add(px, py, pw, ph, .panel);
   const title = txt.s.hud.gardens_title;
-  _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + 30, s.text_banner, s.gold, title);
+  _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
 
   // the list, scrolled to `garden_at`; rows fade in and out at its ends
   const top = py + header_h - 12;
@@ -97,7 +97,7 @@ fn row(g:*play.Game, d:*Draw, i:usize, px:f32, mid:f32, a:f32, t:f32) Allocator.
   if (i == 0) {
     // a fresh garden: a sprout from its pod
     try d.pod(x, mid, pod_r, faded(s.leaf, a), lit, 0.1);
-    try d.leaf(.{x, mid - pod_r * 0.5}, -m.pi / 2.0 + 0.15 * @sin(t * 2), 16, 9, faded(s.leaf, a), if (chosen or over) 1 else 0.6, 0.3);
+    try d.leaf(.{x, mid - pod_r * 0.5}, -m.half_pi + 0.15 * @sin(t * 2), 16, 9, faded(s.leaf, a), if (chosen or over) 1 else 0.6, 0.3);
     _ = try d.text(x + text_x, mid - 8, s.text_label, label_col, txt.s.hud.gardens_fresh);
     return;
   }

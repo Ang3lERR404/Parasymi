@@ -9,6 +9,21 @@ layout(location = 4) flat in vec2 v_param;
 layout(location = 0) out vec4 o;
 
 const float PAD = 28.0;
+const float PI = 3.14159;
+const float TAU = 6.2832;
+// sap's glow, what every shape brightens toward where sap shows
+const vec3 UI_SAP = vec3(1.0, 0.78, 0.35);
+// vine green: a membrane's rim, a pod's rim
+const vec3 MEMBRANE_RIM = vec3(0.18, 0.42, 0.20);
+const vec3 POD_RIM = vec3(0.25, 0.5, 0.25);
+// warm white: a tendril's bud, a gem's edges
+const vec3 BUD_GLOW = vec3(1.0, 0.85, 0.5);
+const vec3 GEM_EDGE = vec3(1.0, 0.97, 0.9);
+// a glyph cell's rounding (cells are 1 across)
+const float GLYPH_ROUND = 0.3;
+// coverage below which a fragment is dropped: shapes, glyphs
+const float SHAPE_CLEAR = 0.003;
+const float GLYPH_CLEAR = 0.01;
 
 // integer hash of a lattice point: exact at any magnitude (a sin()-based hash
 // loses precision as time grows and shows up as crawling speckle)
@@ -36,7 +51,7 @@ float sdRound(vec2 p, vec2 b, float r) {
   return length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - r;
 }
 
-vec3 sapColor(vec3 base, float k) { return mix(base, vec3(1.0, 0.78, 0.35), k); }
+vec3 sapColor(vec3 base, float k) { return mix(base, UI_SAP, k); }
 
 vec4 membrane(vec2 px, float seed) {
   float t = pc.time;
@@ -56,7 +71,7 @@ vec4 membrane(vec2 px, float seed) {
   // vine rim with sap pulses running around it
   float rim = smoothstep(4.0, 0.5, abs(d + 1.5));
   float pulse = pow(0.5 + 0.5 * sin(ang * 4.0 - t * 2.2 + seed * 9.0), 6.0);
-  vec3 rimc = sapColor(vec3(0.18, 0.42, 0.20), pulse * 0.9);
+  vec3 rimc = sapColor(MEMBRANE_RIM, pulse * 0.9);
   // soft outer aura
   float aura = exp(-max(d, 0.0) * 0.25) * (1.0 - fill) * 0.35 * smoothstep(PAD - 6.0, PAD - 16.0, d);
 
@@ -79,7 +94,7 @@ vec4 pod(vec2 px, float lit, float seed) {
   vec3 body = v_col.rgb * shade * (0.6 + 0.4 * lit);
   float glint = smoothstep(R * 0.35, 0.0, length(c - vec2(-R * 0.35, -R * 0.4)));
   float rim = smoothstep(3.0, 0.0, abs(d + 1.0));
-  vec3 rimc = sapColor(vec3(0.25, 0.5, 0.25), lit);
+  vec3 rimc = sapColor(POD_RIM, lit);
   float halo = exp(-max(d, 0.0) * 0.18) * (1.0 - fill) * lit * (0.6 + 0.4 * sin(t * 3.0)) * smoothstep(PAD - 6.0, PAD - 16.0, d);
   vec3 col = mix(body + glint * 0.25, rimc, rim) + rimc * halo;
   return vec4(col, clamp(max(fill * v_col.a, rim) + halo, 0.0, 1.0));
@@ -103,7 +118,7 @@ vec4 tendril(vec2 px, float value, float seed) {
   // a bud at the growing tip
   float tip = smoothstep(inner.y * 0.7, 0.0, length(vec2(p.x - value * inner.x, p.y - sin(value * 18.0 + t * 2.0 + seed * 7.0) * inner.y * 0.18)));
   float a = body * mix(0.35, 1.0, grown) + tip * step(0.001, value);
-  return vec4(col + vec3(1.0, 0.85, 0.5) * tip, clamp(a * v_col.a, 0.0, 1.0));
+  return vec4(col + BUD_GLOW * tip, clamp(a * v_col.a, 0.0, 1.0));
 }
 
 vec4 glow(vec2 px) {
@@ -146,7 +161,7 @@ vec4 leaf(vec2 px, float open, float seed) {
   float W = (v_size.y - 2.0 * PAD) * 0.5;
   vec2 p = px - vec2(PAD, v_size.y * 0.5);
   float kc = clamp(p.x / max(L, 1e-3), 0.0, 1.0);
-  float prof = pow(sin(3.14159 * pow(kc, mix(0.8, 0.62, open))), mix(1.1, 0.8, open));
+  float prof = pow(sin(PI * pow(kc, mix(0.8, 0.62, open))), mix(1.1, 0.8, open));
   float w = W * prof;
   float y = p.y - W * 0.3 * kc * kc * sin(seed * 6.0) * open;
   float d = max(abs(y) - w, max(-p.x, p.x - L));
@@ -154,7 +169,7 @@ vec4 leaf(vec2 px, float open, float seed) {
   float across = clamp(y / max(w, 0.5), -1.0, 1.0);
   float lit = across > 0.0 ? 1.0 : mix(0.7, 0.86, open);
   float midrib = smoothstep(1.2, 0.0, abs(y)) * open;
-  float veins = smoothstep(0.8, 1.0, sin((kc * 6.0 - abs(across) * 1.4) * 6.2832)) * open * (1.0 - abs(across));
+  float veins = smoothstep(0.8, 1.0, sin((kc * 6.0 - abs(across) * 1.4) * TAU)) * open * (1.0 - abs(across));
   float margin = smoothstep(0.55, 1.0, abs(across));
   vec3 col = v_col.rgb * lit * (0.85 + 0.15 * vnoise(p * 0.15 + seed * 9.0));
   col = mix(col, col * 1.3 + vec3(0.04, 0.06, 0.02), veins * 0.5 + midrib * 0.6);
@@ -218,13 +233,13 @@ vec4 gem(vec2 px, float lit, float seed) {
   // facets: sectors about the culet below the girdle, table and bevels above
   float sector = crown ? floor((q.x + 1.0) * 2.5) : floor(atan(q.x, 1.0 - q.y) * 5.0 + 5.0);
   float f = hash(vec2(sector, crown ? 7.0 : 3.0) + seed * 17.0);
-  float fire = pow(0.5 + 0.5 * sin(t * 1.7 + f * 6.2832), 4.0);
-  vec3 spec = 0.6 + 0.4 * cos(6.2832 * (f + t * 0.05 + vec3(0.0, 0.33, 0.67)));
+  float fire = pow(0.5 + 0.5 * sin(t * 1.7 + f * TAU), 4.0);
+  vec3 spec = 0.6 + 0.4 * cos(TAU * (f + t * 0.05 + vec3(0.0, 0.33, 0.67)));
   float shade = crown ? 0.85 + 0.15 * f : 0.55 + 0.35 * f;
   vec3 col = v_col.rgb * shade + spec * fire * 0.45 * (0.5 + lit);
   // edges: girdle, table and facet seams
   float edge = smoothstep(1.4, 0.0, abs(q.y + 0.15) * R) + smoothstep(1.2, 0.0, abs(dTop) * R) + smoothstep(1.0, 0.0, -d);
-  col += vec3(1.0, 0.97, 0.9) * min(edge, 1.0) * 0.4;
+  col += GEM_EDGE * min(edge, 1.0) * 0.4;
   float star = smoothstep(0.25, 0.0, length(q - vec2(-0.3, -0.35))) * (0.5 + 0.5 * sin(t * 2.3 + seed * 4.0));
   return vec4(col + star * 0.6, cover * v_col.a);
 }
@@ -250,7 +265,7 @@ void main() {
       case 6u: c = seedCoat(v_uv, v_param.x, v_param.y); break;
       default: c = gem(v_uv, v_param.x, v_param.y); break;
     }
-    if (c.a < 0.003) discard;
+    if (c.a < SHAPE_CLEAR) discard;
     o = c;
     return;
   }
@@ -263,11 +278,11 @@ void main() {
   for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
     ivec2 q = p + ivec2(dx, dy);
     if (!lit(q)) continue;
-    vec2 rel = abs(v_uv - (vec2(q) + 0.5)) - vec2(0.5 - 0.3);
-    d = min(d, length(max(rel, 0.0)) + min(max(rel.x, rel.y), 0.0) - 0.3);
+    vec2 rel = abs(v_uv - (vec2(q) + 0.5)) - vec2(0.5 - GLYPH_ROUND);
+    d = min(d, length(max(rel, 0.0)) + min(max(rel.x, rel.y), 0.0) - GLYPH_ROUND);
   }
   float cover = smoothstep(aa, -aa, d);
-  if (cover < 0.01) discard;
+  if (cover < GLYPH_CLEAR) discard;
   float shimmer = 0.88 + 0.12 * sin(pc.time * 2.0 + v_param.y * 8.0 + v_uv.y * 0.6);
   o = vec4(v_col.rgb * shimmer, v_col.a * cover);
 }

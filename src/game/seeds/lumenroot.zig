@@ -25,9 +25,9 @@ pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   }
   try ic.glow(top, 0.3, glow);
   for (0..PETALS) |i| {
-    try ic.leaf(top, m.pi / 2.0 + m.tau * m.ratio(i, PETALS), 0.2, 0.13, petal, 1);
+    try ic.leaf(top, m.half_pi + m.tau * m.ratio(i, PETALS), 0.2, 0.13, petal, 1);
   }
-  try ic.stamens(top, m.pi / 2.0, 0.75, 5, 0.17, filament);
+  try ic.stamens(top, m.half_pi, 0.75, 5, 0.17, filament);
   try ic.bud(top, 0.06, core, 1);
   try ic.coat(col);
 }

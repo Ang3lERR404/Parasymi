@@ -17,11 +17,10 @@ pub const cols = 6;
 const rows = player_mod.SLOTS / cols;
 comptime { std.debug.assert(player_mod.SLOTS % cols == 0); }
 
-const gap:f32 = 64;
+const gap = s.slot_gap;
 const pw:f32 = 780;
 const header_h:f32 = 72;
 const weave_row_h:f32 = 52;
-const panel_lift:f32 = 30; // shift up to clear the hotbar
 const slot_r:f32 = 24;
 const lifted_alpha:u8 = 50;
 /// a recipe's output, and how faded while it cannot be woven yet
@@ -36,11 +35,11 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const weave_h = 42 + weave_row_h * m.f(weave_rows);
   const ph = header_h + slots_h + weave_h + 40;
   const px = (W - pw) / 2;
-  const py = (H - ph) / 2 - panel_lift;
+  const py = (H - ph) / 2 - s.panel_lift;
 
   try d.membrane(px, py, pw, ph, s.membrane, 0.33);
   g.rows.add(px, py, pw, ph, .panel);
-  _ = try d.text(px + 72, py + 30, s.text_title, s.gold, txt.s.hud.belly_title);
+  _ = try d.text(px + 72, py + s.title_y, s.text_title, s.gold, txt.s.hud.belly_title);
   _ = try d.print(px + pw - 200, py + 38, s.text_sub, s.dim, txt.s.hud.belly_fill, .{g.player.inv.fill() * 100});
   _ = try d.text(px + 72, py + 58, s.text_fine, s.dim, txt.s.hud.belly_hint);
 

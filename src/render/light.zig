@@ -54,6 +54,8 @@ const REACH_MAX:f32 = 260;
 /// a slice's sphere grows in steps of this share (so a zoom moves it only
 /// now and then, and panning never does)
 const RADIUS_STEP:f32 = 1.0 / 32.0;
+/// and never in steps finer than this (world units)
+const STEP_MIN:f32 = 0.25;
 
 /// what the world shaders read about light each frame (common.glsl
 /// `Lighting`)
@@ -112,7 +114,7 @@ pub fn fit(vp:m.M4, eye:m.V3, target:m.V3, reach:f32, toward:m.V3) Fit {
   cut[CASCADES] = far;
 
   // the light's own frame, from the world origin: x, y across its rays, -z along them
-  const up = if (@abs(toward[1]) < 0.9) m.v3(0, 1, 0) else m.v3(1, 0, 0);
+  const up = if (@abs(toward[1]) < m.NEAR_PARALLEL) m.v3(0, 1, 0) else m.v3(1, 0, 0);
   const view = m.lookAt(m.v3(0, 0, 0), -toward, up);
   var out:Fit = undefined;
   out.reach = far;
@@ -127,7 +129,7 @@ pub fn fit(vp:m.M4, eye:m.V3, target:m.V3, reach:f32, toward:m.V3) Fit {
     }
     var r:f32 = 0;
     for (pts) |p| r = @max(r, m.len(p - mid));
-    const step = @max(r * RADIUS_STEP, 0.25);
+    const step = @max(r * RADIUS_STEP, STEP_MIN);
     r = @ceil(r / step) * step;
     const texel = 2 * r / RES;
     // its centre seen from the light, snapped to whole texels

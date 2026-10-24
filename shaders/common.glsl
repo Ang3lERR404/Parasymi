@@ -52,8 +52,60 @@ const float TAU = 6.2831853;
 // how tight the sheen along fibres is (anisotropic highlight exponent)
 const float SHEEN_POWER = 40.0;
 
-// a thin film's hue: one turn of the rainbow per unit of `x`.
-vec3 filmHue(float x) { return 0.5 + 0.5 * cos(TAU * (vec3(0.0, 0.33, 0.67) + x)); }
+// what a vertex's role is (gfx/vertex.zig `Part`, its u32 value; must match).
+// Untyped so they compare with the vertex stage's uint and the fragment
+// stage's int alike. (PART_SHADOW: not SHADOW, the shadow-variant define.)
+#define PART_STEM 0       // a stem, a vine
+#define PART_LEAF 1
+#define PART_BLOOM 2      // a petal, sap, a glow
+#define PART_THORN 3      // a thorn, a claw
+#define PART_TENDRIL 4    // a tendril, a frond, a root
+#define PART_EAR 5        // a sap-lined leaf (the ear)
+#define PART_RESIN 6
+#define PART_SHADOW 7     // a soft patch on the ground under a floater
+#define PART_THREAD 8     // a beam between blooms
+#define PART_FLASH 9      // the flash where a halo's blooms meet
+#define PART_PRISM 10     // the diamond's cut crystal
+#define PART_HALO 11      // the ring of split light
+#define PART_PROJECTION 12 // the rays that make the ring
+#define PART_CORE 13      // a conduit's core
+
+// a plant's form (sim/species.zig `Form`, instance ib.w; must match)
+const float FORM_HERB = 0.0;
+const float FORM_COIL = 1.0;
+const float FORM_DRIFT = 2.0;
+const float FORM_CONFLUENCE = 3.0;
+const float FORM_RADIANT = 4.0;
+bool isForm(float f, float form) { return abs(f - form) < 0.5; }
+
+// tile kinds (world tile `Kind`, info.x * 255; must match)
+const int TILE_WATER = 0;
+const int TILE_SOIL = 1;
+
+// light colours: the moon's cool blue (scaled down by night), the sun's warm
+// white, and the amber of sap (linear), the garden's one accent
+const vec3 MOONLIGHT = vec3(0.35, 0.45, 0.8);
+const vec3 SUNLIGHT = vec3(1.0, 0.95, 0.85);
+const vec3 AMBER = vec3(1.0, 0.43, 0.08);
+
+// fresnel falloff (1 - n.v)^this, and the night rim light's
+const float FRESNEL_POW = 2.0;
+const float RIM_POW = 3.0;
+
+// two passes draw every surface: the solid one keeps the fragments that are
+// opaque (alpha >= SOLID) and writes depth; the glass one (built with GLASS,
+// after every solid pass) blends the see-through ones over it (down to
+// CLEAR), testing depth but writing none
+const float SOLID = 0.996;
+const float CLEAR = 0.002;
+
+// a beam's half width at its middle (part.vert spindle, part.frag motes)
+const float BEAM_HALF_WIDTH = 0.42;
+
+// a thin film's hue: one turn of the rainbow per unit of `x`, its three
+// channels this far apart
+const vec3 FILM_PHASE = vec3(0.0, 0.33, 0.67);
+vec3 filmHue(float x) { return 0.5 + 0.5 * cos(TAU * (FILM_PHASE + x)); }
 
 // the highlight of light (half vector `H`) along fibres running `tgrad`
 // (unnormalised, its length `tl` > 0) over a surface with normal `n`.
@@ -67,13 +119,38 @@ float fibreSheen(vec3 tgrad, float tl, vec3 n, vec3 H) {
 // unit) drifts slowly, and broad gusts (z, 0..1, mostly calm) roll across
 // it as a wave, so neighbours lean together; w is the point's distance
 // along the wind, which later motion is phased by.
+const float WIND_HEADING = 0.6;        // its mean heading (radians)
+const float WIND_HEADING_SWING = 0.35; // how far the heading drifts either way
+const float WIND_HEADING_RATE = 0.031; // how fast it drifts (rad/s)
+const float GUST_RATE = 0.32;          // how fast the gust wave rolls (rad/s)
+const float GUST_WAVE = 0.16;          // its phase per unit along the wind
 vec4 gardenWind(float t, vec2 at) {
-  float head = 0.6 + 0.35 * sin(t * 0.031);
+  float head = WIND_HEADING + WIND_HEADING_SWING * sin(t * WIND_HEADING_RATE);
   vec2 wdir = vec2(cos(head), sin(head));
   float along = dot(at, wdir);
-  float gust = 0.5 + 0.5 * sin(t * 0.32 - along * 0.16);
+  float gust = 0.5 + 0.5 * sin(t * GUST_RATE - along * GUST_WAVE);
   return vec4(wdir, gust * gust, along);
 }
+
+// how far something grown leans in the wind (radians at its tip, before the
+// h^2 of its height): the gust's push plus a slow sway of its own, phased by
+// where it stands along the wind (`wind`, gardenWind) and its own `phase`,
+// reaching a point at height `h` (0 root .. 1 tip) late. Plants and
+// standing structures share it.
+const float LEAN_RATE = 0.85;   // its own sway (rad/s)
+const float LEAN_WAVE = 0.3;    // phase per unit along the wind
+const float LEAN_LAG = 0.9;     // phase the tip lags the base by
+const float LEAN_GUST = 0.05;   // lean per unit of gust
+const float LEAN_OWN = 0.025;   // its own sway's reach ...
+const float LEAN_CALM = 0.4;    // ... (this much even in a calm, more in gusts)
+float windLean(float t, vec4 wind, float phase, float h, float sway) {
+  float own = sin(t * LEAN_RATE - wind.w * LEAN_WAVE + phase - h * LEAN_LAG);
+  return sway * (LEAN_GUST * wind.z + LEAN_OWN * (LEAN_CALM + wind.z) * own);
+}
+
+// leaves and petals lift a touch in the gusts and breathe, tips most
+const float LEAF_LIFT = 0.012;     // lift in a full gust
+const float LEAF_LIFT_RATE = 1.7;  // its flutter (rad/s)
 
 // turn `v` about the origin by `ang` in the vertical plane holding `wdir`
 // (positive: its top toward the wind's heading).
@@ -95,14 +172,18 @@ vec3 hash33(vec3 p) {
 // bubbles floating up through sap: a rim-lit ring mask, sampled at two
 // depths behind the surface along the view so they hang inside it. `obj`
 // is the mesh-space point (they ride with the body), `view` toward the eye.
+const float BUBBLE_DEPTH = 0.012;  // how far behind the surface the near layer hangs
+const float BUBBLE_CELLS = 36.0;   // bubble cells per unit (near layer)
+const float BUBBLE_RISE = 0.3;     // how fast they rise (cells/s, near layer)
+const float BUBBLE_SHARE = 0.3;    // the share of cells holding one
 float sapBubbles(vec3 obj, vec3 view, float t) {
   float b = 0.0;
   for (int l = 0; l < 2; l++) {
     float fl = float(l);
-    vec3 q = (obj - view * (0.012 + 0.02 * fl)) * (36.0 - 10.0 * fl) - vec3(0.0, t * (0.3 + 0.12 * fl), 0.0);
+    vec3 q = (obj - view * (BUBBLE_DEPTH + 0.02 * fl)) * (BUBBLE_CELLS - 10.0 * fl) - vec3(0.0, t * (BUBBLE_RISE + 0.12 * fl), 0.0);
     vec3 id = floor(q);
     vec3 h = hash33(id + fl * 19.0);
-    if (h.x > 0.3) continue;
+    if (h.x > BUBBLE_SHARE) continue;
     vec3 c = id + 0.3 + 0.4 * h.yzx;
     c.x += 0.1 * sin(t * 0.8 + h.z * TAU);
     float r = 0.08 + 0.14 * h.y;
@@ -115,11 +196,15 @@ float sapBubbles(vec3 obj, vec3 view, float t) {
 
 // beads of sap clinging to a surface, sliding slowly down it: x the bead,
 // y its glint (a dome lit off-centre by `light`)
+const float DROP_CELLS = 52.0;    // bead cells per unit
+const float DROP_SLIDE = 0.1;     // how fast they slide down (cells/s)
+const float DROP_SHARE = 0.4;     // the share of cells holding one
+const float DROP_GLINT_POW = 48.0; // how tight a bead's glint is
 vec2 sapDroplets(vec3 obj, vec3 n, vec3 light, vec3 view, float t) {
-  vec3 q = obj * 52.0 + vec3(0.0, t * 0.1, 0.0);
+  vec3 q = obj * DROP_CELLS + vec3(0.0, t * DROP_SLIDE, 0.0);
   vec3 id = floor(q);
   vec3 h = hash33(id + 7.0);
-  if (h.x > 0.4) return vec2(0.0);
+  if (h.x > DROP_SHARE) return vec2(0.0);
   vec3 c = id + 0.28 + 0.44 * h.yzx;
   float r = 0.14 + 0.16 * h.z;
   // drawn out down the surface, heavier at the bottom
@@ -128,14 +213,26 @@ vec2 sapDroplets(vec3 obj, vec3 n, vec3 light, vec3 view, float t) {
   float l = length(d);
   float bead = smoothstep(r, r * 0.7, l);
   vec3 bn = normalize(n + (d / r) * 0.9);
-  float glint = pow(max(dot(reflect(-light, bn), view), 0.0), 48.0);
+  float glint = pow(max(dot(reflect(-light, bn), view), 0.0), DROP_GLINT_POW);
   return vec2(bead, bead * glint);
 }
 
-vec3 srgb2lin(vec3 c) { return pow(c, vec3(2.2)); }
+// the palette's sRGB colours to linear (a plain power curve)
+const float GAMMA = 2.2;
+vec3 srgb2lin(vec3 c) { return pow(c, vec3(GAMMA)); }
 
 // texels apart the shadow filter's taps are
 const float SHADOW_TAP = 1.2;
+// how far a point is pushed off its surface toward the light (texels), and
+// how much more where the light grazes it
+const float SHADOW_BIAS = 0.8;
+const float SHADOW_SLOPE_BIAS = 2.0;
+// how far out across a cascade (0 centre .. 1 rim) it starts blending into
+// the next, and is wholly the next
+const float CASCADE_BLEND_FROM = 0.82;
+const float CASCADE_BLEND_TO = 0.97;
+// the share of the shadows' reach past which they fade out
+const float SHADOW_FADE = 0.8;
 
 // how much of the key light reaches `wpos` through cascade `i` (1 lit, 0
 // in shadow), filtered over 2x2 taps of 2x2 compares each; `edge` how far
@@ -144,7 +241,7 @@ const float SHADOW_TAP = 1.2;
 // on slopes the light grazes) so a surface never shadows itself.
 float cascadeLit(Lighting L, int i, vec3 wpos, vec3 nl, float slope, out float edge) {
   float tx = L.texel[i];
-  vec4 q = L.cascade[i] * vec4(wpos + nl * tx * (0.8 + 2.0 * slope), 1.0);
+  vec4 q = L.cascade[i] * vec4(wpos + nl * tx * (SHADOW_BIAS + SHADOW_SLOPE_BIAS * slope), 1.0);
   edge = max(abs(q.x), abs(q.y));
   if (edge >= 1.0 || q.z >= 1.0) {
     edge = 2.0;
@@ -175,7 +272,7 @@ float keyShadow(vec3 wpos, vec3 n) {
     float edge;
     float s = cascadeLit(L, i, wpos, nl, slope, edge);
     if (edge > 1.0) continue;
-    float b = smoothstep(0.82, 0.97, edge);
+    float b = smoothstep(CASCADE_BLEND_FROM, CASCADE_BLEND_TO, edge);
     if (b > 0.0) {
       float e2;
       float s2 = i + 1 < CASCADES ? cascadeLit(L, i + 1, wpos, nl, slope, e2) : 1.0;
@@ -184,12 +281,13 @@ float keyShadow(vec3 wpos, vec3 n) {
     lit = s;
     break;
   }
-  return mix(lit, 1.0, smoothstep(far * 0.8, far, dist));
+  return mix(lit, 1.0, smoothstep(far * SHADOW_FADE, far, dist));
 }
 
 // the light the garden's points of light (blooms, motes, a halo) shed on a
 // surface at `wpos` facing `n`: each brightest beside it, gone at its
 // reach. `wrap` > 0 lets light reach round thin tissue (0 a plain surface).
+const float LIGHT_FALLOFF = 8.0; // how fast a point of light dims with (distance / reach)^2
 vec3 pointLight(vec3 wpos, vec3 n, float wrap) {
   Lighting L = Lighting(pc.light);
   int count = int(L.info.x + 0.5);
@@ -202,25 +300,36 @@ vec3 pointLight(vec3 wpos, vec3 n, float wrap) {
     if (k >= 1.0) continue;
     float win = (1.0 - k) * (1.0 - k);
     float facing = (dot(n, d) * inversesqrt(max(d2, 1e-6)) + wrap) / (1.0 + wrap);
-    sum += L.lights[i].col.rgb * max(facing, 0.0) * win / (1.0 + 8.0 * k);
+    sum += L.lights[i].col.rgb * max(facing, 0.0) * win / (1.0 + LIGHT_FALLOFF * k);
   }
   return sum;
 }
 
+// the key light's strength: the moon's by night, the sun's by day
+const float MOON_STRENGTH = 0.35;
+const float SUN_STRENGTH = 1.1;
 // the key light's colour and strength (the sun by day, the moon by night)
 vec3 keyLight() {
-  return mix(vec3(0.35, 0.45, 0.8) * 0.35, vec3(1.0, 0.95, 0.85) * 1.1, pc.sun.w);
+  return mix(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH, pc.sun.w);
 }
 
+// the ambient light: the sky's by day (veiled, toward violet), by night, the
+// ground's bounce (dimmed to this share by night), and how strong it all is
+const vec3 SKY_DAY = vec3(0.35, 0.40, 0.50);
+const vec3 SKY_VEILED = vec3(0.45, 0.30, 0.65);
+const vec3 SKY_NIGHT = vec3(0.07, 0.09, 0.18);
+const vec3 GROUND_BOUNCE = vec3(0.12, 0.10, 0.08);
+const float GROUND_NIGHT = 0.3;
+const float AMBIENT = 0.55;
 // a surface lit by the sky, the key light (`sh` of it reaching it, see
 // keyShadow) and the points of light
 vec3 shadeLit(vec3 albedo, vec3 n, vec3 wpos, float sh) {
   float ndl = max(dot(n, SUN), 0.0);
   float day = pc.sun.w;
-  vec3 sky = mix(vec3(0.35, 0.40, 0.50), vec3(0.45, 0.30, 0.65), pc.misc.x);
-  sky = mix(vec3(0.07, 0.09, 0.18), sky, day);
-  vec3 ground = vec3(0.12, 0.10, 0.08) * mix(0.3, 1.0, day);
-  vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * 0.55;
+  vec3 sky = mix(SKY_DAY, SKY_VEILED, pc.misc.x);
+  sky = mix(SKY_NIGHT, sky, day);
+  vec3 ground = GROUND_BOUNCE * mix(GROUND_NIGHT, 1.0, day);
+  vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * AMBIENT;
   vec3 sun = keyLight() * ndl * sh;
   return albedo * (amb + sun + pointLight(wpos, n, 0.0));
 }

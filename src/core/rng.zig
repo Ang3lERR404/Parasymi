@@ -23,7 +23,9 @@ pub inline fn hash2(seed:u64, x:i32, y:i32) u32 {
 
 /// top 24 bits of a u32 hash -> 0..1 (exclusive). The >> 8 discards the
 /// 8 weakest bits.
-pub inline fn unit(h:u32) f32 { return m.f(h >> 8) * (1.0 / 16777216.0); }
+pub inline fn unit(h:u32) f32 { return m.f(h >> 8) * UNIT_STEP; }
+/// 2^-24: one step of a 24-bit unit value
+const UNIT_STEP:f32 = 1.0 / 16777216.0;
 
 pub const Rng = struct {
   s:u64,

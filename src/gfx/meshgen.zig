@@ -300,7 +300,7 @@ pub const Growth = struct {
 pub fn grow(pts:[]V3, g:Growth) void {
   const n = pts.len;
   const axis = g.direction;
-  const up = m.norm(m.cross(axis, if (@abs(axis[1]) < 0.9) m.v3(0, 1, 0) else m.v3(1, 0, 0)));
+  const up = m.norm(m.cross(axis, if (@abs(axis[1]) < m.NEAR_PARALLEL) m.v3(0, 1, 0) else m.v3(1, 0, 0)));
   const side = m.norm(m.cross(axis, up));
   var rng = Rng.init(g.seed);
   const step = g.length / m.f(n - 1);
@@ -655,7 +655,7 @@ pub const Stamens = struct {
 pub fn stamens(b:*Builder, s:Stamens) Allocator.Error!void {
   const N = 6;
   const RES = 10;
-  const ref = if (@abs(s.axis[1]) < 0.9) m.v3(0, 1, 0) else m.v3(1, 0, 0);
+  const ref = if (@abs(s.axis[1]) < m.NEAR_PARALLEL) m.v3(0, 1, 0) else m.v3(1, 0, 0);
   const e1 = m.norm(m.cross(s.axis, ref));
   const e2 = m.cross(s.axis, e1);
   var rng = Rng.init(s.seed ^ 0x57A3);

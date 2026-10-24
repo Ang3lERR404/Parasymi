@@ -37,7 +37,7 @@ pub const Crystal = struct {
 /// a crystal: a faceted prism rising from its base (sunk a little) to a
 /// pyramidal point, its faces slightly uneven like a grown crystal
 pub fn crystal(b:*mg.Builder, c:Crystal, rng:*Rng) Allocator.Error!void {
-  const side = m.norm(m.cross(c.dir, if (@abs(c.dir[1]) < 0.9) v3(0, 1, 0) else v3(1, 0, 0)));
+  const side = m.norm(m.cross(c.dir, if (@abs(c.dir[1]) < m.NEAR_PARALLEL) v3(0, 1, 0) else v3(1, 0, 0)));
   const fwd = m.cross(c.dir, side);
   const top = c.base + c.dir * m.splat3(c.len * (1 - c.point));
   const apex = c.base + c.dir * m.splat3(c.len);

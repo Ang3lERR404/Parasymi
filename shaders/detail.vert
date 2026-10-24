@@ -19,7 +19,25 @@ layout(location = 1) out vec3 v_nrm;
 layout(location = 2) out vec3 v_col;
 layout(location = 3) out vec4 v_info;
 
-const int SOIL = 1;
+// a grass blade: how long it grows (min, max), its half width at the root,
+// how far it may lean
+const float BLADE_MIN = 0.09;
+const float BLADE_MAX = 0.23;
+const float BLADE_HALF_WIDTH = 0.014;
+const float BLADE_LEAN = 0.25;
+// grass in the wind: its own sway (rad/s, phase per unit along the wind),
+// the gust's push and its own sway's reach (this much even in a calm)
+const float GRASS_SWAY_RATE = 1.4;
+const float GRASS_SWAY_WAVE = 0.4;
+const float GRASS_GUST = 0.09;
+const float GRASS_OWN = 0.035;
+const float GRASS_CALM = 0.4;
+// how far a bent blade sinks (per bend squared)
+const float GRASS_DROOP = 0.3;
+// the share of soil tiles bare of clods and stones
+const float SOIL_BARE = 0.35;
+// a stone's grey (sRGB)
+const vec3 STONE_GREY = vec3(0.42, 0.4, 0.38);
 
 float hash13(vec3 p) {
   p = fract(p * 0.1031);
@@ -66,7 +84,7 @@ void main() {
   vec3 tile = srgb2lin(col.rgb);
   vec2 cell = at.xz;
 
-  if (kind != SOIL) {
+  if (kind != TILE_SOIL) {
     // a grass blade: two root corners and a tip
     int blade = vi / 3;
     int corner = vi - blade * 3;
@@ -74,11 +92,11 @@ void main() {
     vec3 k = vec3(cell, float(blade));
     float fx = mix(0.06, 0.94, hash13(k + 0.1));
     float fz = mix(0.06, 0.94, hash13(k + 1.7));
-    float len = mix(0.09, 0.23, hash13(k + 3.3));
+    float len = mix(BLADE_MIN, BLADE_MAX, hash13(k + 3.3));
     float ang = TAU * hash13(k + 5.9);
-    float lean = 0.25 * hash13(k + 7.1);
+    float lean = BLADE_LEAN * hash13(k + 7.1);
     vec3 base = vec3(cell.x + fx, groundAt(fx, fz) - 0.01, cell.y + fz);
-    vec3 side = vec3(cos(ang), 0.0, sin(ang)) * 0.014;
+    vec3 side = vec3(cos(ang), 0.0, sin(ang)) * BLADE_HALF_WIDTH;
     vec3 p;
     float hf;
     if (corner == 2) {
@@ -90,10 +108,10 @@ void main() {
     }
     // it bends in the garden's wind, the tip most, with a sway of its own
     vec4 wind = gardenWind(t, p.xz);
-    float own = sin(t * 1.4 - wind.w * 0.4 + dot(floor(base.xz * 8.0), vec2(1.7, 2.3)));
-    float bend = (0.09 * wind.z + 0.035 * (0.4 + wind.z) * own) * hf * hf;
+    float own = sin(t * GRASS_SWAY_RATE - wind.w * GRASS_SWAY_WAVE + dot(floor(base.xz * 8.0), vec2(1.7, 2.3)));
+    float bend = (GRASS_GUST * wind.z + GRASS_OWN * (GRASS_CALM + wind.z) * own) * hf * hf;
     p.xz += wind.xy * bend;
-    p.y -= 0.3 * bend * bend;
+    p.y -= GRASS_DROOP * bend * bend;
     v_pos = p;
     v_nrm = vec3(0.0, 1.0, 0.0);
     v_col = hf > 0.5 ? min(tile * vec3(1.35, 1.45, 1.3), vec3(1.0)) : tile * vec3(0.7, 0.75, 0.7);
@@ -109,7 +127,7 @@ void main() {
   int tri = j / 3;
   int corner = j - tri * 3;
   vec3 k = vec3(cell, float(lump) + 11.0);
-  if (hash13(vec3(cell, 0.5)) < 0.35) { hide(); return; }
+  if (hash13(vec3(cell, 0.5)) < SOIL_BARE) { hide(); return; }
   bool stone = lump == 1;
   float fx = mix(0.12, 0.88, hash13(k + 0.3));
   float fz = mix(0.12, 0.88, hash13(k + 2.1));
@@ -133,7 +151,7 @@ void main() {
   vec3 n = normalize(cross(q[1] - q[0], q[2] - q[0]));
   if (dot(n, q[0] + q[1] + q[2] - 3.0 * c) < 0.0) n = -n;
   vec3 p = corner == 0 ? q[0] : (corner == 1 ? q[1] : q[2]);
-  vec3 grey = vec3(0.42, 0.4, 0.38) * mix(0.75, 1.15, hash13(k + 10.7));
+  vec3 grey = STONE_GREY * mix(0.75, 1.15, hash13(k + 10.7));
   v_pos = p;
   v_nrm = n;
   v_col = stone ? srgb2lin(grey) : tile * vec3(0.78, 0.72, 0.68);

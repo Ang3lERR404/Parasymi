@@ -205,7 +205,7 @@ test "the free camera starts where the follow view is and eases home" {
   try testing.expect(m.len(c.view.free.forward() - d) < 1e-4);
   // fly up and over the top: pitch is not clamped and nothing degenerates
   c.fly(.{0, 3}, m.v3(0.5, 0, 1), 0.3, 0);
-  try testing.expect(c.view.free.pitch > m.pi / 2.0);
+  try testing.expect(c.view.free.pitch > m.half_pi);
   try testing.expect(m.len(c.view.free.up()) > 0.99);
   c.endFree();
   c.tick(0.15);

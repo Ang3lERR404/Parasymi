@@ -208,13 +208,12 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
 /// a bead of essence running along it (it carries things one way).
 pub fn icon(ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   const arch = [4]icon_kit.P{.{0, icon_kit.TOP}, .{-0.15, 0.62}, .{0.78, 0.9}, .{0.7, 0.02}};
-  try ic.stem(arch, 0.13, icon_root);
+  try ic.stem(arch, 0.13, icon_kit.root_col);
   try ic.leaf(.{-0.04, 0.32}, 2.5, 0.32, 0.18, icon_kit.sprout, 0.9);
   const k = @mod(ic.t * ICON_RUN + ic.phase, 1);
   try ic.bud(icon_kit.curve(arch, k), 0.09, icon_bead, @sin(k * m.pi));
   try ic.coat(col);
 }
-const icon_root:Color = .{150, 112, 72, 255};
 const icon_bead:Color = .{255, 215, 120, 255};
 /// beads along the arch a second
 const ICON_RUN:f32 = 0.45;

@@ -48,6 +48,8 @@ const JITTER_MIN:f32 = 0.9;
 const JITTER:f32 = 0.2;
 /// a tile is a fan of four triangles
 const VERTS_PER_TILE = 4 * 3;
+/// info.z of the ground's top surface (terrain.vert/frag read it as 1.0)
+const TOP_SURFACE:u8 = 255;
 
 /// the tiles around a chunk, one ring beyond it, read once
 const Ring = struct {
@@ -181,8 +183,7 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
     const wx = ox + lx;
     const wy = oy + ly;
     const ley = m.unorm8(c.ley_cap[t] / gen.LEY_MAX);
-    // info.z: 255 marks the ground's top surface (read back as 1.0)
-    const info:[4]u8 = .{@intFromEnum(k), ley, 255, 0};
+    const info:[4]u8 = .{@intFromEnum(k), ley, TOP_SURFACE, 0};
 
     // the tile: a fan of four triangles from its centre (at the tile's own
     // height) to its corners (shared with its neighbours). Water stays flat

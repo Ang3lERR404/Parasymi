@@ -8,6 +8,22 @@ layout(location = 2) in vec3 v_col;
 layout(location = 3) in vec4 v_info;
 layout(location = 0) out vec4 o;
 
+// ley sight: the currents' colour (plain, veiled), and the plexus's pale tint
+const vec3 LEY = vec3(0.45, 0.3, 1.0);
+const vec3 LEY_VEILED = vec3(1.0, 0.7, 1.0);
+const vec3 PLEXUS_PALE = vec3(0.9, 0.85, 1.0);
+// the hovered tile's highlight, pulsing at this rate (rad/s)
+const vec3 HOVER = vec3(0.25, 0.25, 0.2);
+const float HOVER_PULSE = 6.0;
+// a paw's contact shadow: its radii (side, forward) on the ground, and its
+// darkness there
+const vec2 PAW_SHADOW = vec2(0.12, 0.18);
+const float PAW_SHADOW_DARK = 0.7;
+// water's glint: its colour, tightness and strength
+const vec3 WATER_GLINT = vec3(0.6, 0.7, 0.8);
+const float WATER_SPEC_POW = 40.0;
+const float WATER_SPEC = 0.4;
+
 float hash12(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
   q += dot(q, q.yzx + 33.33);
@@ -61,15 +77,15 @@ void main() {
     // fading smoothly across tile borders (ley is shared at tile edges)
     float ley = v_info.y;
     float pulse = 0.5 + 0.5 * sin(t * 2.0 + v_pos.x * 0.45 + v_pos.z * 0.3);
-    vec3 leyc = mix(vec3(0.45, 0.3, 1.0), vec3(1.0, 0.7, 1.0), pc.misc.x);
+    vec3 leyc = mix(LEY, LEY_VEILED, pc.misc.x);
     c += leyc * pc.misc.y * ley * ley * 0.45 * pulse;
     // a faint plexus drifting over the ley lines themselves
     // (only evaluated where it shows: it is the costliest thing on the ground)
     float on = smoothstep(0.5, 0.85, ley);
-    if (ground && on > 0.0) c += mix(leyc, vec3(0.9, 0.85, 1.0), 0.4) * plexus(v_pos.xz, t) * on * mix(0.32, 0.16, pc.sun.w);
+    if (ground && on > 0.0) c += mix(leyc, PLEXUS_PALE, 0.4) * plexus(v_pos.xz, t) * on * mix(0.32, 0.16, pc.sun.w);
   }
   // hovered tile
-  if (ground && all(equal(floor(v_pos.xz), pc.misc.zw))) c += vec3(0.25, 0.25, 0.2) * (0.7 + 0.3 * sin(t * 6.0));
+  if (ground && all(equal(floor(v_pos.xz), pc.misc.zw))) c += HOVER * (0.7 + 0.3 * sin(t * HOVER_PULSE));
   // contact shadows: a soft ellipse under each paw, long along the facing,
   // spreading and fading as the paw lifts. Only upward faces at or below the
   // paw receive one.
@@ -81,15 +97,14 @@ void main() {
     vec2 d = v_pos.xz - f.xz;
     float s = sin(f.w), co = cos(f.w);
     vec2 local = vec2(d.x * co - d.y * s, d.x * s + d.y * co); // (side, forward)
-    vec2 radii = vec2(0.12, 0.18) * (1.0 + lift * 3.0);
+    vec2 radii = PAW_SHADOW * (1.0 + lift * 3.0);
     float e = length(local / radii);
-    float strength = 0.7 / ((1.0 + lift * 5.0) * (1.0 + lift * 5.0));
+    float strength = PAW_SHADOW_DARK / ((1.0 + lift * 5.0) * (1.0 + lift * 5.0));
     c *= 1.0 - strength * (1.0 - smoothstep(0.1, 1.0, e));
   }
-  if (kind == 0) {
-    float spec = pow(max(dot(reflect(-SUN, n), normalize(pc.eye_time.xyz - v_pos)), 0.0), 40.0);
-    c += vec3(0.6, 0.7, 0.8) * spec * 0.4 * sh;
-
+  if (kind == TILE_WATER) {
+    float spec = pow(max(dot(reflect(-SUN, n), normalize(pc.eye_time.xyz - v_pos)), 0.0), WATER_SPEC_POW);
+    c += WATER_GLINT * spec * WATER_SPEC * sh;
   }
   o = vec4(applyFog(c, v_pos), 1.0);
 }
