@@ -85,9 +85,10 @@ pub fn build(b:*Build) !void {
       });
       md.linkLibrary(glfw);
       for (names, sp) |s, spv| md.addAnonymousImport(s, .{.root_source_file = spv});
-      // the game ships its strings and controls, writing them out where the
-      // gardener can edit them; the tests check the strings file is complete
-      for ([_][]const u8{"parasymi.cfg", "controls.cfg"}) |c| md.addAnonymousImport(c, .{.root_source_file = bb.path(c)});
+      // the game ships its strings and controls (stock copies in `src/cfg/`),
+      // writing them out to the gardener's folder (%LOCALAPPDATA%\Parasymi)
+      // when missing; the tests check the strings file is complete
+      for ([_][]const u8{"parasymi.cfg", "controls.cfg"}) |c| md.addAnonymousImport(c, .{.root_source_file = bb.path(bb.fmt("src/cfg/{s}", .{c}))});
       return md;
     }
   };

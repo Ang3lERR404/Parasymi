@@ -38,7 +38,7 @@ hotbar item swaps or, dropped elsewhere, comes off; RMB clears a hotbar
 slot. Every item stacks to 100 (`items.STACK`). Delete (`discard`) throws
 away the belly stack under the cursor (or carried), never a structure's.
 Hovering a slot shows the item's full name. LMB on a structure that
-keeps items (`Def.store`: sap cache, germinator, research bloom, digger)
+keeps items (`Def.store`: sap cache, germinator, arsthraxia, digger)
 opens its panel (`Mode.structure`, `hud/structure.zig`): its slots beside
 the belly's, lifted/put down between them the same way (into it only what
 it `wants`), Shift+LMB moves a stack across; a germinator's panel also
@@ -201,10 +201,10 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   Plants and structures share occupancy; footprints 1×1, 2×2 or floating.
 - Structures: conduit (pulls from behind, pushes forward; grows a side root
   to a plant beside/behind it and harvests it once the root arrives), sap
-  cache, germinator, research bloom, root-digger (1×1 on soil/moss, digs an
+  cache, germinator, arsthraxia, root-digger (1×1 on soil/moss, digs an
   adjacent node 1 item/4 s into an 8-item buffer, feeds neighbours, idles
   with no node; 3 fibre + 2 grit + 1 ley shard; "Deep Rooting"). Put down,
-  they grow (`Def.grow`: germinator 6 s, research bloom 8, sap cache and
+  they grow (`Def.grow`: germinator 6 s, arsthraxia 8, sap cache and
   digger 4, conduit 1.5) and do no work until grown. `Def.carrier` marks
   item carriers (conduit): they face a way, chain, and are pulled through.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
@@ -246,10 +246,11 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - The gardener's folder (`game/home.zig`): `%LOCALAPPDATA%\Parasymi`
   holds `parasymi.cfg`, `controls.cfg`, `options.cfg` and `saves/`, all
   made on startup when missing (`home.open` first in main; `home.dir()`
-  for every file). The two cfgs are embedded (`@embedFile`) and written
+  for every file); no cfg ever lives beside the game. The two stock cfgs
+  are tracked in `src/cfg/`, embedded (`@embedFile`) and written
   with a `# stock <hash>` first line: an untouched copy is replaced when
   the repo's changes, an edited one is kept and read over the built-in
-  (what it lacks falls back). So repo cfg edits reach the game unless the
+  (what it lacks falls back). So `src/cfg/` edits reach the game unless the
   AppData copy was hand-edited. Old `options.cfg`/`parasymi.sav` beside
   the game are copied in once.
 - Save (`game/save.zig`, `saves/<name>.sav`): the world regenerates from the
