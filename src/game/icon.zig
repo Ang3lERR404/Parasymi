@@ -1,7 +1,8 @@
 //! item icons for the HUD: what sits in a belly slot, a hotbar pod or on the
-//! cursor. A structure's bulb is a seed broken open, its sprout or two
-//! showing what it will grow into (the structure's `icon` hook, drawn with
-//! the kit below); anything else is its colour, for now.
+//! cursor. A structure's bulb or a plant's seed is a seed broken open, its
+//! sprout or two showing what it will grow into (the structure's `icon`
+//! hook, or its module in `seeds.zig`, drawn with the kit below); anything
+//! else is its colour, for now.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
@@ -9,6 +10,7 @@ const Draw = @import("../ui/draw.zig").Draw;
 const Color = @import("../ui/draw.zig").Color;
 const items = @import("../sim/items.zig");
 const st = @import("structures.zig");
+const seeds = @import("seeds.zig");
 const s = @import("style.zig");
 const txt = @import("text.zig");
 
@@ -135,6 +137,7 @@ pub fn draw(d:*Draw, item:items.Item, c:[2]f32, r:f32, t:f32, phase:f32, lit:f32
     try st.icon(k, ic, info.col);
     return;
   }
+  if (try seeds.icon(item, ic, info.col)) return;
   try d.pod(c[0], c[1], r * FILL_R, ic.col(info.col), lit, phase);
   const short = txt.item(item).short;
   const size = s.text_heading * r / 24;

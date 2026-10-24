@@ -89,6 +89,7 @@ registry kinds outside the registry file; add a hook.
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
+| seed icons | `game/seeds.zig` | `item`, `icon` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
 | render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |
 
@@ -311,8 +312,10 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - Item icons (`game/icon.zig`): a structure's bulb is a split seed with a
   sprout or two showing what it does (its `icon` hook, drawn with the
   `Icon` kit: `coat`, `stem` along a Bézier, `leaf`, `bud`, `glow`, `gem`,
-  `kernel`; sprouts sway); any other item is its colour fill with its
-  short name, for now.
+  `kernel`; sprouts sway). A plant's seed likewise, from its module in
+  `game/seeds.zig` (`seeds/<species>.zig`: `item` + `icon`; the test fails
+  on a sown species without one). Any other item is its colour fill with
+  its short name, for now.
 - Research panel (T, `hud/research.zig`) is a sapling in soil, laid out
   from the prerequisites alone, so it never needs placing or adjusting:
   - Adding research: one file in `research/` + one line in `techs`. Set
