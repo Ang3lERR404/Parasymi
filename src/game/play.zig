@@ -333,6 +333,7 @@ pub const Game = struct {
       .bar => |i| g.bar[i] = null,
       else => {},
     };
+    if (ctl.pressed(in, .discard) and g.mode.sorting()) g.discard(ui_hit);
 
     // movement relative to the camera
     var mx:f32 = 0;
@@ -523,6 +524,22 @@ pub const Game = struct {
     }
   }
 
+  /// throw away a belly stack for good: the one carried, else the one under
+  /// the cursor. Only the belly's: a structure's slots and the hotbar keep theirs.
+  fn discard(g:*Game, hit:?hud.Pick) void {
+    const i = if (g.held) |h| switch (h) {
+      .slot => |j| j,
+      .bar, .store => return,
+    } else if (hit) |p| switch (p) {
+      .slot => |j| j,
+      else => return,
+    } else return;
+    const s = g.player.inv.slot[i] orelse return;
+    g.player.inv.slot[i] = null;
+    g.held = null;
+    g.prog.say(txt.s.msg.discarded, .{s.n, txt.item(s.item).name});
+  }
+
   /// move a whole stack straight across, belly to the open structure (as
   /// much as it will take) or back (as much as fits).
   fn moveAcross(g:*Game, from:Held) void {
@@ -546,7 +563,7 @@ pub const Game = struct {
   /// places if `trade`. Returns whether some of it is still in hand.
   fn putDown(from:*?items.Stack, to:*?items.Stack, cap:u32, trade:bool) bool {
     const f = if (from.*) |*p| p else return false;
-    var room:u32 = f.item.info().stack;
+    var room:u32 = items.STACK;
     if (to.*) |t| {
       if (t.item != f.item) {
         if (trade) swap(?items.Stack, from, to);
@@ -681,16 +698,19 @@ test "the wolf stays put without input" {
 /// headless clicks on the HUD
 const click = struct {
   /// press the left button over the middle of the first row picking `want`
-  fn on(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32) !void {
+  fn on(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32) !void { return press(gg, i, want, sc, .use); }
+
+  /// press `a` with the mouse over the middle of the first row picking `want`
+  fn press(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32, a:ctl.Action) !void {
     try hud.build(gg, sc);
     for (gg.rows.rect[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
       if (!eqlDeep(p, want)) continue;
       i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
       i.advance();
-      ctl.hold(i, .use, true);
+      ctl.hold(i, a, true);
       try gg.update(i, TICK, sc);
       i.advance();
-      ctl.hold(i, .use, false);
+      ctl.hold(i, a, false);
       return;
     }
     return error.TestUnexpectedResult;
@@ -831,7 +851,7 @@ test "a click lifts a stack, the next puts it down; dropped on the hotbar it ass
   g.player.inv = .{};
   g.player.inv.slot[0] = .{.item = .fibre, .n = 30};
   g.player.inv.slot[1] = .{.item = .conduit, .n = 3};
-  g.player.inv.slot[2] = .{.item = .fibre, .n = 40};
+  g.player.inv.slot[2] = .{.item = .fibre, .n = 80};
 
   // sort by hand: into an empty slot, then trade places
   try click.on(&g, &in, .{.slot = 0}, screen);
@@ -846,8 +866,8 @@ test "a click lifts a stack, the next puts it down; dropped on the hotbar it ass
   // onto a stack of the same: as much as fits, the rest stays in hand
   try click.on(&g, &in, .{.slot = 1}, screen);
   try click.on(&g, &in, .{.slot = 2}, screen);
-  try testing.expectEqual(@as(u16, 50), g.player.inv.slot[2].?.n);
-  try testing.expectEqual(@as(u16, 20), g.player.inv.slot[1].?.n);
+  try testing.expectEqual(items.STACK, g.player.inv.slot[2].?.n);
+  try testing.expectEqual(@as(u16, 10), g.player.inv.slot[1].?.n);
   try testing.expect(g.holds(.{.slot = 1}));
   try click.on(&g, &in, .{.slot = 1}, screen);
   try testing.expect(g.held == null);
@@ -868,4 +888,36 @@ test "a click lifts a stack, the next puts it down; dropped on the hotbar it ass
   try click.on(&g, &in, .{.bar = 0}, screen);
   try click.on(&g, &in, .panel, screen);
   try testing.expect(g.bar[0] == null and g.selected() == null);
+}
+
+test "discard throws away a belly stack, hovered or carried, never a structure's" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  const screen = TEST_SCREEN;
+  try ctl.fill(@embedFile("controls.cfg"));
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  g.mode = .belly;
+  g.player.inv = .{};
+  g.player.inv.slot[0] = .{.item = .fibre, .n = 30};
+  g.player.inv.slot[1] = .{.item = .grit, .n = 7};
+  g.bar[0] = .grit;
+
+  // under the cursor
+  try click.press(&g, &in, .{.slot = 0}, screen, .discard);
+  try testing.expect(g.player.inv.slot[0] == null);
+  try testing.expectEqual(@as(u32, 7), g.player.inv.count(.grit));
+  // carried: lifted, then thrown away wherever the cursor is
+  try click.on(&g, &in, .{.slot = 1}, screen);
+  try click.press(&g, &in, .{.bar = 0}, screen, .discard);
+  try testing.expect(g.held == null and g.player.inv.used() == 0);
+  // the hotbar keeps its item; with the belly closed nothing goes
+  try testing.expectEqual(@as(?items.Item, .grit), g.bar[0]);
+  g.player.inv.slot[2] = .{.item = .fibre, .n = 5};
+  g.mode = .roam;
+  in.advance();
+  ctl.hold(&in, .discard, true);
+  try g.update(&in, TICK, screen);
+  try testing.expectEqual(@as(u32, 5), g.player.inv.count(.fibre));
 }

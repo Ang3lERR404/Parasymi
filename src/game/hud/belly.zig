@@ -73,7 +73,7 @@ pub fn grid(g:*play.Game, d:*Draw, comptime side:Side, stacks:[]const ?items.Sta
     const it = slot orelse continue;
     // lifted onto the cursor: only a faint trace stays behind
     const lifted = g.holds(@unionInit(play.Held, @tagName(side), i));
-    const full = m.ratio(it.n, it.item.info().stack);
+    const full = m.ratio(it.n, items.STACK);
     try icon.draw(d, it.item, .{cx, cy}, slot_r, t, phase, 0.3 + 0.7 * full, if (lifted) lifted_alpha else 255);
     if (!lifted) try icon.count(d, .{cx, cy}, slot_r, it.n);
   }

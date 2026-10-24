@@ -31,7 +31,9 @@ panels. Hotbar slots start empty: in the belly a click lifts a stack onto
 the cursor, the next puts it down (empty slot, merge, or swap: sorting by
 hand); dropped on a hotbar slot it assigns that item (any item); a lifted
 hotbar item swaps or, dropped elsewhere, comes off; RMB clears a hotbar
-slot. Hovering a slot shows the item's full name. LMB on a structure that
+slot. Every item stacks to 100 (`items.STACK`). Delete (`discard`) throws
+away the belly stack under the cursor (or carried), never a structure's.
+Hovering a slot shows the item's full name. LMB on a structure that
 keeps items (`Def.store`: sap cache, germinator, research bloom, digger)
 opens its panel (`Mode.structure`, `hud/structure.zig`): its slots beside
 the belly's, lifted/put down between them the same way (into it only what

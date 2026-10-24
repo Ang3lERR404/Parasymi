@@ -39,7 +39,7 @@ pub const Strings = struct {
   /// said into the message log
   msg:struct {
     wake:S = "", night_hint:S = "",
-    belly_full:S = "", no_item:S = "", not_understood:S = "", cannot_weave:S = "", wove:S = "",
+    belly_full:S = "", no_item:S = "", not_understood:S = "", cannot_weave:S = "", wove:S = "", discarded:S = "",
     wants_nothing:S = "", spilled:S = "", still_growing:S = "", not_ripe:S = "", gives_up:S = "",
     lineages_strain:S = "", confluence_roots:S = "",
     researching:S = "", already_known:S = "", locked:S = "", researched:S = "",

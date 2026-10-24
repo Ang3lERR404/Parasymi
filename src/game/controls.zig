@@ -34,6 +34,8 @@ pub const Action = enum {
   take,
   configure,
   rotate,
+  /// with the belly open: throw away the belly stack under the cursor (or carried)
+  discard,
   belly,
   research,
   /// hotbar slots in order (see `slots`)
