@@ -1,22 +1,28 @@
-//! WOLF PECTORAL: one lobe of solidified sap on the chest, built around its
-//! centre (`CENTRE`, in the chest bone's frame) and skinned to the chest. A broad dish: wider
+//! WOLF PECTORAL: one lobe of solidified sap on the chest, laid over it
+//! around its centre (`CENTRE`, in the chest bone's frame) and grown out of
+//! the hide (wolf_kit.resinLobe): its base follows the chest wherever it
+//! curves, and its rim melts into it with no edge. A broad dish: wider
 //! along its top edge, the lower edge sweeping in toward the sternum, a
-//! shallow bowl in cross-section (flat-topped, falling steeply at the rim).
-//! The areola (a raised disc) and the nipple (a dome on it) sit in the
-//! lower-inner quadrant as part of the same smooth height field, so the
-//! surface stays one watertight sheet.
+//! shallow bowl in cross-section (flat-topped, falling steeply, easing
+//! into the hide). The areola (a raised disc) and the nipple (a dome on
+//! it) sit in the lower-inner quadrant as part of the same smooth height
+//! field, so the surface stays one watertight sheet.
 //!
 //! Every vertex is part `.resin` with tu.y its height through the lobe (0 at
 //! the base on the chest, 1 at the crown): the shader thins the resin toward
 //! the surface and the rig's spring moves the crown while the base holds.
-//! Built once per side (`left` / `right`), mirrored, not flipped
-//! by an instance, so normals and facing stay true.
+//! Each is weighted as the hide under it is, so it moves with the chest
+//! and breathes with it. Built once per side (`left` /
+//! `right`), mirrored, not flipped by an instance, so normals and facing
+//! stay true.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const skel = @import("wolf_skeleton.zig");
+const kit = @import("wolf_kit.zig");
+const body = @import("wolf_body.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -37,6 +43,8 @@ const SWEEP:f32 = 0.024;
 const DEPTH:f32 = 0.078;
 /// the lower half carries a little more mass
 const LOW_FULL:f32 = 0.15;
+/// the outer share of the radius over which it eases into the hide
+const FOOT:f32 = 0.3;
 /// areola and nipple: centre (below the crown, only just inside it, so the
 /// two sit well apart across the chest), radii and rise
 const NIPPLE_AT = [2]f32{ 0.005, -0.034 };
@@ -73,69 +81,44 @@ fn signedPow(x:f32, p:f32) f32 {
 /// the bump of a raised disc (smooth shoulder) of radius `r` at distance `d`
 fn disc(d:f32, r:f32) f32 { return 1 - m.smooth(m.clamp01((d - r * 0.7) / (r * 0.3))); }
 
-/// a point on the lobe's front surface at radial fraction `k` (0 crown ..
-/// 1 rim) and angle `a`, before it is posed on the chest
-fn front(k:f32, a:f32) V3 {
-  const o = outline(a);
-  const x = o[0] * k;
-  const y = o[1] * k;
-  // dish profile: flat-topped crown falling steeply to the rim
-  var z = DEPTH * m.pow(f32, @max(1 - m.pow(f32, k, 2.4), 0), 0.55) * (1 + LOW_FULL * @max(-@sin(a), 0) * k);
-  const dx = x - NIPPLE_AT[0];
-  const dy = y - NIPPLE_AT[1];
-  const d = @sqrt(dx * dx + dy * dy);
-  z += AREOLA_RISE * disc(d, AREOLA_R);
-  const n = m.clamp01(1 - (d * d) / (NIPPLE_R * NIPPLE_R));
-  z += NIPPLE_RISE * @sqrt(n);
-  return v3(x, y, z);
-}
 
-/// the base: a slightly concave back that meets the front exactly at the rim
-fn back(k:f32, a:f32) V3 {
-  const o = outline(a);
-  return v3(o[0] * k, o[1] * k, -0.012 * (1 - k * k));
-}
+/// the lobe's shape for the kit (wolf_kit.resinLobe): its outline and how
+/// high it rises off the hide at radial fraction `k` (0 crown .. 1 rim),
+/// angle `a`, point `x`, `y` across it
+const Shape = struct {
+  pub const CROWN = DEPTH;
+  pub fn outline(a:f32) [2]f32 { return pec.outline(a); }
+  pub fn height(k:f32, a:f32, x:f32, y:f32) f32 {
+    // dish profile: flat-topped crown falling steeply, then easing into
+    // the hide with no edge at all, so it grows out of the chest
+    var z = DEPTH * m.pow(f32, @max(1 - m.pow(f32, k, 2.4), 0), 0.55) * (1 + LOW_FULL * @max(-@sin(a), 0) * k);
+    z *= m.smooth(m.clamp01((1 - k) / FOOT));
+    const dx = x - NIPPLE_AT[0];
+    const dy = y - NIPPLE_AT[1];
+    const d = @sqrt(dx * dx + dy * dy);
+    z += AREOLA_RISE * disc(d, AREOLA_R);
+    const n = m.clamp01(1 - (d * d) / (NIPPLE_R * NIPPLE_R));
+    z += NIPPLE_RISE * @sqrt(n);
+    return z;
+  }
+};
+const pec = @This();
 
-fn surfaceNormal(comptime f:fn (f32, f32) V3, k:f32, a:f32) V3 {
-  const e:f32 = 1e-3;
-  // at the crown every angle meets in one point: step out a little first
-  const kk = @max(k, 2 * e);
-  const dk = f(kk + e, a) - f(@max(kk - e, 0), a);
-  const da = f(kk, a + e) - f(kk, a - e);
-  return m.norm(m.cross(dk, da));
-}
+/// the hide it grows over: the chest and the waist below it (its upper
+/// edge tucks under the shoulders and the neck rather than climbing them)
+const UNDER = [_]skel.Bone{ .chest, .waist };
 
 pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
-  const R = RINGS + 1;
-  const C = STEPS + 1; // the seam column repeats the first, at the same place
-  var pts:[R * C]V3 = undefined;
-  var nrm:[R * C]V3 = undefined;
-  var cols:[R * C]@TypeOf(pal.sap) = undefined;
-  var us:[R * C]f32 = undefined;
-  const start = b.mark();
-  inline for (.{ front, back }, 0..) |f, face| {
-    for (0..R) |i| for (0..C) |j| {
-      const k = m.ratio(i, RINGS);
-      // the back runs the other way round, so it faces away from the front
-      const t = if (face == 0) m.ratio(j, STEPS) else 1 - m.ratio(j, STEPS);
-      const a = t * m.tau;
-      const at = i * C + j;
-      pts[at] = f(k, a);
-      const n = surfaceNormal(f, k, a);
-      nrm[at] = if (face == 0) n else -n;
-      cols[at] = pal.sap;
-      us[at] = if (face == 0) m.clamp01(pts[at][2] / DEPTH) else 0;
-    };
-    try mg.patch(b, R, C, &pts, &nrm, &cols, &us, 0.6, .resin);
-  }
-  // pose on the chest; the left lobe is the right one mirrored
-  const chest = skel.bind()[@intFromEnum(skel.Bone.chest)];
-  b.xform(start, m.chain(&.{
-    chest, m.translate(CENTRE * v3(side, 1, 1)),
+  const w = skel.bind();
+  var s = try body.sculptedOf(b.gpa, &w, &UNDER);
+  defer s.deinit();
+  // on the chest; the left lobe is the right one mirrored
+  const at = m.chain(&.{
+    w[@intFromEnum(skel.Bone.chest)], m.translate(CENTRE * v3(side, 1, 1)),
     m.scale3(v3(side, 1, 1)),
     m.rotY(YAW_OUT), m.rotX(TILT_DOWN), m.rotZ(ROLL),
-  }));
-  for (try b.skinOf(start)) |*k| k.* = .{ .bones = @intFromEnum(skel.Bone.chest), .weights = .{ 255, 0, 0, 0 } };
+  });
+  try kit.resinLobe(b, &s, at, Shape, RINGS, STEPS, pal.sap, 0.6);
 }
 
 /// the two lobes, one library mesh each

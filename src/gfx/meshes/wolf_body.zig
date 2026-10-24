@@ -50,13 +50,24 @@ const EYE_R:f32 = 0.0125;
 pub const NOSE = v3(0, 0.038, 0.174);
 pub const NOSE_TILT:f32 = 0.45;
 
-/// where each paw's beans sit (hand and foot frames, x for the right side)
-pub const PALM = v3(-0.02, -0.05, 0.0);
-pub const FINGERS = [4]f32{ -0.027, -0.009, 0.009, 0.027 };
-pub const FINGER_AT:f32 = -0.088;
+/// where each paw's beans sit (hand, fingertip and foot frames, x for the
+/// right side): the palm's pad, one under each fingertip, the sole's
+pub const PALM = v3(-0.025, -0.05, 0.0);
+pub const TIP_PAD = v3(-0.0088, -0.016, 0);
 pub const SOLE_Y:f32 = -0.006;
 pub const PAD_AT = v3(0, SOLE_Y + 0.002, 0.035);
 pub const TOES = [4][2]f32{ .{ -0.027, 0.098 }, .{ -0.009, 0.108 }, .{ 0.009, 0.108 }, .{ 0.027, 0.098 } };
+
+/// the fingers: their radii at the knuckle, the middle joint and the tip,
+/// how softly they melt into each other (barely: they stay apart), and
+/// how tightly the skin passes across their joints
+const FINGER_R = [3]f32{ 0.0118, 0.0105, 0.0086 };
+const FINGER_K:f32 = 0.004;
+const FINGER_SOFT:f32 = 0.006;
+/// the dewclaw thumb: from high on the paw's leading edge, out and down
+/// (hand frame, x for the right side)
+const DEW_ROOT = v3(0, -0.026, 0.044);
+const DEW_TIP = v3(-0.006, -0.046, 0.062);
 
 fn bi(b:Bone) u8 { return @intFromEnum(b); }
 
@@ -101,8 +112,11 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
     try a.f(.head, ell(v3(x * 0.05, -0.016, 0.0), v3(0.026, 0.036, 0.036)), hide, 0.03);
     // the brow ridge, a shelf over each eye
     try a.turned(.head, m.rotY(x * 0.35), ell(v3(x * 0.022, 0.056, 0.058), v3(0.027, 0.011, 0.02)), hide, 0.022);
-    // the ear's root, grown out of the skull
-    try a.f(.head, ell(skel.EAR_AT * v3(x, 1, 1) + v3(0, -0.006, 0), v3(0.028, 0.024, 0.02)), hide, 0.025);
+    // the ear's root: a mound of the skull shaped to the ear's base, in
+    // the ear's own place, so the ear rises out of it (it holds with the
+    // head while the ear above it turns)
+    const ear = skel.sides[if (x < 0) 0 else 1].ear;
+    try s.add(.{ .shape = ell(v3(0, 0.002, -0.008), v3(0.037, 0.03, 0.017)), .at = w[bi(ear)], .bone = bi(.head), .col = hide, .k = 0.02 });
   }
   // the muzzle: short, its bridge rising a little to the upturned nose,
   // the cartilage of the nose at its end, the upper lip filling it below
@@ -134,7 +148,16 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
     try a.f(sd.forearm, ell(v3(0, 0.0, -0.022), v3(0.03, 0.032, 0.026)), hide, 0.02);
     try a.f(sd.forearm, cone(v3(0, 0, 0), v3(0, -skel.FOREARM, 0), 0.042, 0.028), hide, 0.03);
     try a.f(sd.forearm, ell(v3(0, -0.075, 0.014), v3(0.04, 0.075, 0.033)), muscle, 0.02);
-    try a.f(sd.hand, ell(v3(0, -0.045, 0), v3(0.019, 0.05, 0.04)), dark, 0.022);
+    // the paw: a thick palm, the knuckles across its end, four thick
+    // fingers each bending at its two joints (barely melted into each
+    // other, so they stay apart), and a dewclaw thumb high on its edge
+    try a.f(sd.hand, ell(v3(0, -0.045, 0), v3(0.025, 0.05, 0.05)), dark, 0.022);
+    for (skel.KNUCKLES) |z| try a.f(sd.hand, ell(v3(0, -skel.KNUCKLE_Y + 0.004, z), v3(0.0145, 0.014, 0.0135)), dark, 0.012);
+    for (sd.fingers, sd.tips, 0..) |fb, tb, i| {
+      try s.add(.{ .shape = cone(v3(0, 0.002, 0), v3(0, -skel.PROXIMAL[i], 0), FINGER_R[0], FINGER_R[1]), .at = w[bi(fb)], .bone = bi(fb), .col = dark, .k = FINGER_K, .soft = FINGER_SOFT });
+      try s.add(.{ .shape = cone(v3(0, 0, 0), v3(0, -skel.DISTAL[i], 0), FINGER_R[1], FINGER_R[2]), .at = w[bi(tb)], .bone = bi(tb), .col = dark, .k = FINGER_K, .soft = FINGER_SOFT });
+    }
+    try a.f(sd.hand, cone(DEW_ROOT, DEW_TIP * v3(x, 1, 1), 0.0095, 0.0075), dark, 0.01);
 
     // legs: the thigh's power (quadriceps before, hamstring behind), the
     // kneecap; the shin with the calf swelling on its back; the hock and
@@ -163,7 +186,17 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
 
 /// the sculpted wolf (forms only), for meshes that sit on its surface
 pub fn sculpted(gpa:Allocator, w:*const [skel.COUNT]M4) Allocator.Error!sculpt.Sculpt {
+  return sculptedOf(gpa, w, null);
+}
+
+/// only the forms of the bones in `only` (all when null): the part of the
+/// body a mesh lies on, without what stands near it (the tail by the rear)
+pub fn sculptedOf(gpa:Allocator, w:*const [skel.COUNT]M4, only:?[]const Bone) Allocator.Error!sculpt.Sculpt {
   var s:sculpt.Sculpt = .{ .gpa = gpa, .parents = &parents };
+  if (only) |bones| {
+    s.only = 0;
+    for (bones) |bn| s.only |= @as(u64, 1) << @intCast(bi(bn));
+  }
   errdefer s.deinit();
   try sculptBody(&s, w);
   return s;
@@ -425,24 +458,23 @@ fn fur(b:*mg.Builder, s:*const sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator
   try rigid(b, start, .tail3);
 }
 
-/// the hands' fingers and the feet's toes: knuckled forms of planes
-/// arching to curved claws, and a dewclaw high on each hand
+/// the claws of the fingers (sculpted into the hide) and the dewclaw, and
+/// the feet's toes: knuckled forms of planes arching to curved claws
 fn digits(b:*mg.Builder, w:*const [skel.COUNT]M4) Allocator.Error!void {
   for (skel.sides, 0..) |sd, si| {
     const x = skel.sign(si);
-    // the palm faces the body: fingers hang down (-y), spread along z
+    // the palm faces the body; each claw leaves the top of its fingertip
+    // and hooks down toward the palm
     const palm = v3(-x, 0, 0);
-    var start = b.mark();
-    for (FINGERS) |z| {
-      try kit.digit(b, .{
-        .base = v3(0, FINGER_AT + 0.045, z * 0.9), .dir = m.norm(v3(0, -1, z * 1.6)), .down = palm,
-        .len = 0.04, .r = 0.0105, .col = pal.wolf_core, .claw = pal.wolf_claw,
-      });
+    for (sd.tips, 0..) |tb, i| {
+      const start = b.mark();
+      try kit.claw(b, v3(x * 0.003, -skel.DISTAL[i] + 0.002, 0), v3(0, -1, 0), palm, 0.026, 0.0058, pal.wolf_claw);
+      b.xform(start, w[bi(tb)]);
+      try rigid(b, start, tb);
     }
-    try kit.digit(b, .{
-      .base = v3(0, -0.02, 0.036), .dir = m.norm(v3(0, -0.6, 0.6)), .down = palm,
-      .len = 0.018, .r = 0.007, .col = pal.wolf_core, .claw = pal.wolf_claw,
-    });
+    var start = b.mark();
+    const tip = DEW_TIP * v3(x, 1, 1);
+    try kit.claw(b, tip - m.norm(tip - DEW_ROOT) * m.splat3(0.004), m.norm(tip - DEW_ROOT), palm, 0.016, 0.0046, pal.wolf_claw);
     b.xform(start, w[bi(sd.hand)]);
     try rigid(b, start, sd.hand);
     start = b.mark();

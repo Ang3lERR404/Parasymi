@@ -8,9 +8,11 @@ const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const color = @import("../../core/color.zig");
 const vertex = @import("../vertex.zig");
+const Sculpt = @import("sculpt_kit.zig").Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;
+const M4 = m.M4;
 
 fn spow(c:f32, e:f32) f32 { return m.sign(c) * m.pow(f32, @abs(c), e); }
 
@@ -133,6 +135,164 @@ test "a fur leaf's base stays on the surface it grows from" {
   defer b.deinit();
   try leaf(&b, .{.base = v3(0, 1, 0), .along = v3(0, 0, -1), .out = v3(0, 1, 0), .len = 0.1, .width = 0.02, .col = .{.r = 0, .g = 0, .b = 0, .a = 255}, .tip = .{.r = 0, .g = 0, .b = 0, .a = 255}});
   for (b.v.items) |vx| if (vx.tu[1] == 0) try std.testing.expectApproxEqAbs(@as(f32, 1), vx.pos[1], 1e-5);
+}
+
+/// a lobe of resin grown over the hide (the pectorals, the rear): an
+/// outline laid over the body, every point of it found on the hide by
+/// casting out from inside the body along the lobe's facing, and the lobe raised off the hide
+/// along its normal there, so its base hugs the body wherever it curves.
+/// `Shape` gives the outline (`outline(a)`: x, y at unit radius for angle
+/// `a`), the rise off the hide (`height(k, a, x, y)`: k 0 crown .. 1 rim,
+/// falling to 0 with no slope at the rim so the resin melts into the
+/// hide) and `CROWN` (its crown's height). `at` places the lobe: x, y
+/// across the body, +z out of it.
+///
+/// Every vertex is part `.resin` with tu.y its height through the lobe (0
+/// on the body, 1 at its crown), weighted to the bones of the hide under
+/// it, so it moves exactly as the hide does. One watertight sheet: the
+/// raised face and a base sunk just under the hide, meeting at the rim.
+pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, comptime rings:usize, comptime steps:usize, col:color.Rgba8, t:f32) Allocator.Error!void {
+  const R = rings + 1;
+  const C = steps + 1; // the seam column repeats the first, at the same place
+  const N = R * C;
+  // how far in behind the lobe the casts start, and the base's sink
+  const REACH:f32 = 0.12;
+  const SINK:f32 = 0.004;
+  // how smooth the sheet it rises off is, and from how far out (share of
+  // the radius) it settles onto the hide
+  const SMOOTHING = 60;
+  const SETTLE:f32 = 0.55;
+  const Grid = struct { hide:[N]V3, up:[N]V3, face:[N]V3, us:[N]f32, skin:[N]vertex.Skin, pts:[N]V3, nrm:[N]V3, cols:[N]color.Rgba8, ts:[N]f32 };
+  const g = try b.gpa.create(Grid);
+  defer b.gpa.destroy(g);
+  const hide = &g.hide;
+  const up = &g.up;
+  const face = &g.face;
+  const us = &g.us;
+  const into = m.norm(v3(at[2][0], at[2][1], at[2][2]));
+  for (0..R) |i| for (0..C) |j| {
+    const k = m.ratio(i, rings);
+    const a = m.ratio(j, steps) * m.tau;
+    const o = Shape.outline(a);
+    const x = o[0] * k;
+    const y = o[1] * k;
+    const q = i * C + j;
+    if (try s.cast(xf(at, v3(x, y, -REACH)), into, 2 * REACH)) |h| {
+      hide[q] = h.p;
+      up[q] = h.n;
+    } else {
+      const pr = try s.project(xf(at, v3(x, y, 0)));
+      hide[q] = pr.p;
+      up[q] = pr.n;
+    }
+    g.skin[q] = try s.weigh(hide[q]);
+  };
+  // the lobe rises off a smooth sheet stretched over the hide (its rim
+  // held on it), not off every muscle and ridge under it; toward the rim
+  // it settles back onto the hide itself
+  const sheet = &g.pts;
+  const lift = &g.nrm;
+  @memcpy(sheet, hide);
+  @memcpy(lift, up);
+  for (0..SMOOTHING) |_| {
+    for (0..rings) |i| for (0..C) |j| {
+      const q = i * C + j;
+      if (i == 0) {
+        var ps = v3(0, 0, 0);
+        var ns = v3(0, 0, 0);
+        for (0..steps) |jj| {
+          ps += sheet[C + jj];
+          ns += lift[C + jj];
+        }
+        sheet[q] = ps / m.splat3(m.f(steps));
+        lift[q] = m.norm(ns);
+        continue;
+      }
+      const jl = if (j == 0) steps - 1 else j - 1;
+      const jr = if (j == steps) 1 else j + 1;
+      const nb = [4]usize{ (i - 1) * C + j, (i + 1) * C + j, i * C + jl, i * C + jr };
+      var ps = v3(0, 0, 0);
+      var ns = v3(0, 0, 0);
+      for (nb) |o| {
+        ps += sheet[o];
+        ns += lift[o];
+      }
+      sheet[q] = ps * m.splat3(0.25);
+      lift[q] = m.norm(ns);
+    };
+    // never sinking into the body: it drapes over it, bridging its
+    // hollows and creases but keeping its swell
+    for (sheet, hide, up) |*sp, hp, n| sp.* += n * m.splat3(@max(m.dot(hp - sp.*, n), 0));
+  }
+  for (0..R) |i| for (0..C) |j| {
+    const q = i * C + j;
+    const k = m.ratio(i, rings);
+    const a = m.ratio(j, steps) * m.tau;
+    const o = Shape.outline(a);
+    const on = m.smooth(m.clamp01((k - SETTLE) / (1 - SETTLE)));
+    const p0 = m.lerpV(sheet[q], hide[q], on);
+    const n0 = m.norm(m.lerpV(lift[q], up[q], on));
+    const h = Shape.height(k, a, o[0] * k, o[1] * k);
+    face[q] = p0 + n0 * m.splat3(h);
+    us[q] = m.clamp01(h / Shape.CROWN);
+  };
+  // which way round the columns run so the raised face faces out
+  const mid = (rings / 2) * C + 1;
+  const flip = m.dot(m.cross(face[mid + C] - face[mid - C], face[mid + 1] - face[mid - 1]), up[mid]) < 0;
+  const pts = &g.pts;
+  const nrm = &g.nrm;
+  const cols = &g.cols;
+  const ts = &g.ts;
+  for (0..2) |side| {
+    const back = side == 1;
+    for (0..R) |i| for (0..C) |jj| {
+      const j = if (flip != back) steps - jj else jj;
+      const q = i * C + j;
+      const o = i * C + jj;
+      if (back) {
+        pts[o] = hide[q] - up[q] * m.splat3(SINK);
+        nrm[o] = -up[q];
+        ts[o] = 0;
+      } else {
+        pts[o] = face[q];
+        // across the grid: down the rings and round the outline (wrapping)
+        const dk = face[@min(i + 1, rings) * C + j] - face[(if (i == 0) 0 else i - 1) * C + j];
+        const da = face[i * C + (if (j == steps) 1 else j + 1)] - face[i * C + (if (j == 0) steps - 1 else j - 1)];
+        var n = m.cross(dk, da);
+        if (m.len(n) < 1e-10) n = up[q];
+        if (m.dot(n, up[q]) < 0) n = -n;
+        nrm[o] = m.norm(n);
+        ts[o] = us[q];
+      }
+      cols[o] = col;
+    };
+    const first = b.mark();
+    try mg.patch(b, R, C, pts, nrm, cols, ts, t, .resin);
+    // each column moves with the hide under it, crown and base alike: the
+    // patch's vertices in the order it puts them (the rows and columns
+    // kept at this level of detail, two triangles a quad)
+    var kr:[R]usize = undefined;
+    var kc:[C]usize = undefined;
+    const nr = mg.stride(R, b.step(), &kr);
+    const nc = mg.stride(C, b.step(), &kc);
+    const skin = try b.skinOf(first);
+    var v:usize = 0;
+    for (0..nr - 1) |ri| for (0..nc - 1) |ci| {
+      const quad = [4][2]usize{ .{ kr[ri], kc[ci] }, .{ kr[ri], kc[ci + 1] }, .{ kr[ri + 1], kc[ci + 1] }, .{ kr[ri + 1], kc[ci] } };
+      for ([_]usize{ 0, 1, 2, 0, 2, 3 }) |c| {
+        const i = quad[c][0];
+        const jj = quad[c][1];
+        const j = if (flip != back) steps - jj else jj;
+        skin[v] = g.skin[i * C + j];
+        v += 1;
+      }
+    };
+  }
+}
+
+fn xf(mat:M4, p:V3) V3 {
+  const r = m.mulV(mat, .{ p[0], p[1], p[2], 1 });
+  return v3(r[0], r[1], r[2]);
 }
 
 /// a claw: a curved, tapering hook from `base` along `dir`, bending toward

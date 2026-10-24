@@ -40,6 +40,15 @@ const WORK_DRAG:f32 = 0.85; // velocity kept each frame while the hands work
 const FACE_MIN_SPEED:f32 = 0.3; // slower than this, the wolf keeps its facing
 const MIN_DT:f32 = 1e-4; // guards rates divided by the frame time
 const FULLNESS_RESPONSE:f32 = 2; // how quickly the belly's look follows its fill
+/// the belly answers every item carried: it is (1 - 1/e) of the way to
+/// full with this many held, and keeps swelling toward full past it
+const BELLY_ITEMS:f32 = 250;
+/// a full belly pushes the arms out round it (radians) and the feet apart
+/// (metres each side)
+const BELLY_ARMS:f32 = 0.42;
+const BELLY_STANCE:f32 = 0.07;
+/// stretched thin, the full sac lets more show through it
+const SAP_STRETCH:f32 = 0.14;
 const REACH_FREQ:f32 = 6; // spring frequency into and out of the work gesture
 /// what the wolf works on or carries sits this high above its feet
 const CHEST_HEIGHT:f32 = 1.0;
@@ -119,6 +128,25 @@ const EAR_FREQ:f32 = 14;
 const EAR_DAMP:f32 = 0.35;
 const EAR_FLICK:f32 = 9;
 const EAR_FLICK_EVERY:f32 = 3.5;
+/// fingers: a loose curl at rest (radians at the knuckle), curling more as
+/// the arm swings forward; idle, now and then they flex in a ripple one
+/// after the next; digging, they open and rake shut with each stroke, a
+/// beat apart. The tip joint follows the knuckle. Open fingers fan out.
+const CURL_REST:f32 = 0.42;
+const CURL_SWING:f32 = 0.45;
+const CURL_FLEX:f32 = 0.7;
+const FLEX_RATE:f32 = 0.35;
+const FLEX_WAVE:f32 = 5.5;
+const FLEX_LAG:f32 = 0.75;
+const GRIP_OPEN:f32 = 0.05;
+const GRIP_CLOSE:f32 = 1.35;
+const GRIP_LAG:f32 = 0.3;
+const TIP_SHARE:f32 = 0.9;
+const TIP_REST:f32 = 0.15;
+const SPREAD_OPEN:f32 = 0.6;
+const SPREAD_SHUT:f32 = -0.35;
+const FINGER_FREQ:f32 = 10;
+const FINGER_DAMP:f32 = 0.5;
 
 /// paw beans and the nose: sap made denser (80%) and browner than the belly
 const BEAN_OPACITY:f32 = 0.8;
@@ -263,6 +291,9 @@ pub const Player = struct {
   look:Swing = .{},
   nod:Swing = .{},
   ear:[2]Swing = @splat(.{}),
+  /// each finger's curl, each hand's spread
+  curl:[2][skel.FINGERS]Swing = @splat(@splat(.{ .x = CURL_REST })),
+  spread:[2]Swing = @splat(.{}),
   /// what hangs in the belly (relative to its centre) and the resin's
   /// give (relative to its rest)
   lump:[lumps.len]Spring3 = @splat(.{}),
@@ -314,7 +345,8 @@ pub const Player = struct {
 
   /// where a foot rests under the standing wolf, in the world
   fn rest(p:*const Player, s:usize) V3 {
-    const r = m.mulV(p.heading(), .{ restFoot[s][0], 0, restFoot[s][2], 1 });
+    const x = restFoot[s][0] + skel.sign(s) * BELLY_STANCE * p.fullness;
+    const r = m.mulV(p.heading(), .{ x, 0, restFoot[s][2], 1 });
     return v3(r[0], p.pos[1], r[2]);
   }
 
@@ -328,7 +360,7 @@ pub const Player = struct {
     const effort = m.clamp01(spd / SPRINT_SPEED);
     p.breath += dt * m.lerp(BREATH_RATE, BREATH_RATE_RUN, effort);
 
-    p.fullness += (p.inv.fill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
+    p.fullness += (p.bellyFill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
     p.reach.to(if (p.work != null) 1 else 0, REACH_FREQ, 1, dt);
 
     // what the body feels: its acceleration, turned into its own frame
@@ -341,6 +373,9 @@ pub const Player = struct {
     p.slosh(fell, dt);
     p.springs(dt);
   }
+
+  /// how full the belly is to look at (0..1) for what it holds
+  fn bellyFill(p:*const Player) f32 { return 1 - @exp(-m.f(p.inv.total()) / BELLY_ITEMS); }
 
   /// the feet: plant, lift, swing to where they are wanted. Returns whether
   /// one came down this frame.
@@ -416,6 +451,22 @@ pub const Player = struct {
       p.ear[s].to(-EAR_BACK * st, EAR_FREQ, EAR_DAMP, dt);
     }
     const idle = (1 - st) * (1 - work);
+    for (&p.curl, &p.spread, 0..) |*hand, *spread, s| {
+      const flex = m.clamp01(noise.grad(0xF1C +% s, p.t * FLEX_RATE, 0.5) * 2);
+      const stroke = p.t * DIG_RATE + m.f(s) * 1.7 - 0.6;
+      var sum:f32 = 0;
+      for (hand, 0..) |*c, i| {
+        const fi = m.f(i);
+        var target = CURL_REST + CURL_SWING * st * m.clamp01(-p.arm[s].x * 1.5);
+        target += CURL_FLEX * idle * flex * m.clamp01(@sin(p.t * FLEX_WAVE - fi * FLEX_LAG + m.f(s) * 2.1));
+        const rake = 0.5 + 0.5 * @sin(stroke - fi * GRIP_LAG);
+        target = m.lerp(target, m.lerp(GRIP_OPEN, GRIP_CLOSE, rake), work);
+        c.to(target, FINGER_FREQ, FINGER_DAMP, dt);
+        sum += c.x;
+      }
+      const shut = m.clamp01(sum / (skel.FINGERS * GRIP_CLOSE));
+      spread.to(m.lerp(SPREAD_OPEN, SPREAD_SHUT, shut), FINGER_FREQ, 0.7, dt);
+    }
     const look = m.clamp(p.turn * LOOK_TURN, -LOOK_MAX, LOOK_MAX) + LOOK_IDLE * idle * noise.grad(0x100C, p.t * LOOK_IDLE_RATE, 0.5);
     p.look.to(look, HEAD_FREQ, HEAD_DAMP, dt);
     p.nod.to(LOOK_WORK * work + 0.12 * idle * noise.grad(0x40D, p.t * LOOK_IDLE_RATE, 3.5), HEAD_FREQ, HEAD_DAMP, dt);
@@ -488,11 +539,16 @@ pub const Player = struct {
     for (0..2) |s| {
       const x = skel.sign(s);
       q.arms[s] = .{
-        .root = .{ .x = p.arm[s].x, .z = x * (ARM_OUT + 0.02 * breath + 0.1 * work), .y = -x * 0.15 * work },
+        .root = .{ .x = p.arm[s].x, .z = x * (ARM_OUT + BELLY_ARMS * p.fullness + 0.02 * breath + 0.1 * work), .y = -x * 0.15 * work },
         .mid = p.elbow[s].x,
         .low = .{ .x = 0.2 + 0.3 * work },
       };
       q.ears[s] = .{ .x = p.ear[s].x, .z = 0.15 * x * p.ear[s].x };
+      for (&q.hands[s].curl, &q.hands[s].tip, p.curl[s]) |*c, *tp, sp| {
+        c.* = sp.x;
+        tp.* = TIP_REST + TIP_SHARE * sp.x;
+      }
+      q.hands[s].spread = p.spread[s].x;
     }
     // the tail lifts with the stride and droops at rest, each joint bending
     // a little further
@@ -546,8 +602,10 @@ pub const Player = struct {
     for (p.lump[0..@min(held, lumps.len)]) |l| {
       try out.emit(.belly_lump, m.chain(&.{ gut, T(l.pos), S(m.splat3(LUMP_R)) }), .{ .glow = 0.25, .phase = 0.3 });
     }
+    // (the shader creases it as it fills, the folds crossing at its button)
+    const cross = belly_mesh.crossing();
     try out.emitSkinned(.wolf_belly, base, mid, .{
-      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .give = .{ b, 0, 0 },
+      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY - SAP_STRETCH * b, .give = .{ b, cross[1], cross[2] },
     });
 
     // the pectorals and the rear: resin, its surface given by its spring
@@ -564,13 +622,13 @@ pub const Player = struct {
     var feet:[2]V3 = undefined;
     for (skel.sides, 0..) |sd, s| {
       const x = skel.sign(s);
-      // the beans: a palm pad and four finger pads on each hand; one
+      // the beans: a palm pad and one under each fingertip; one
       // central pad on each foot that flattens while planted, four toe pads
       const bean:parts.Look = .{ .glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
       const hand = at(&w, sd.hand);
       try out.emit(.paw_pad, m.chain(&.{ hand, T(body_mesh.PALM * v3(x, 1, 1)), m.rotZ(x * m.pi / 2.0), S(v3(0.018, 0.005, 0.016)) }), bean);
-      for (body_mesh.FINGERS) |z| {
-        try out.emit(.paw_bean, m.chain(&.{ hand, T(v3(-x * 0.012, body_mesh.FINGER_AT, z * 1.1)), S(v3(0.0035, 0.0065, 0.006)) }), bean);
+      for (sd.tips) |tb| {
+        try out.emit(.paw_bean, m.chain(&.{ at(&w, tb), T(body_mesh.TIP_PAD * v3(x, 1, 1)), S(v3(0.0042, 0.0085, 0.0075)) }), bean);
       }
       const foot = at(&w, sd.foot);
       try out.emit(.paw_pad, m.chain(&.{ foot, T(body_mesh.PAD_AT), S(v3(0.021, 0.006 * (1 - PAD_FLATTEN * p.feet[s].pad), 0.02)) }), bean);

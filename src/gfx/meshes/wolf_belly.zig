@@ -7,10 +7,13 @@
 //!
 //! tu.x on every vertex is how much of the gut it is (1 low and in front,
 //! 0 toward the ribs): that share of it moves with the skeleton's gut bone,
-//! which swells, drops and pushes forward as the belly fills, while its top
-//! stays with the spine. The belly button's vertices carry tu.y =
-//! NAVEL: the shader raises it from inside the sap to the surface, and on
-//! out, the fuller the belly.
+//! which swells, rounds out toward a ball, drops and pushes forward as the
+//! belly fills, while its top stays with the spine. The sac and its net
+//! carry tu.y = BELLY: as it fills the shader folds creases into it, one
+//! down its middle and one across it, deepening the fuller it is (crossing
+//! at the belly button, `crossing`). The belly button is sap like the sac,
+//! a knot with a puckered ring round it, its vertices tu.y = NAVEL: the
+//! shader raises it from inside the sap to the surface, and on out.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -18,6 +21,7 @@ const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const kit = @import("wolf_kit.zig");
 const color = @import("../../core/color.zig");
+const vertex = @import("../vertex.zig");
 const skel = @import("wolf_skeleton.zig");
 const Sculpt = @import("sculpt_kit.zig").Sculpt;
 
@@ -27,14 +31,27 @@ const v3 = m.v3;
 /// the gut's centre in the waist bone's frame, and its radii: across,
 /// down, up (toward the ribs) and forward
 pub const CENTRE = skel.GUT_AT;
-pub const RX:f32 = 0.11;
-pub const DOWN:f32 = 0.095;
-pub const UP:f32 = 0.15;
-pub const RZ:f32 = 0.086;
+pub const RX:f32 = skel.GUT_R[0];
+pub const DOWN:f32 = skel.GUT_R[1];
+/// (it reaches up under the pectorals, so the two meet with no bare hide
+/// between them)
+pub const UP:f32 = 0.21;
+pub const RZ:f32 = skel.GUT_R[2];
 /// how far the sac narrows toward its top (share of its width)
-const TAPER:f32 = 0.38;
-/// tu.y marking the belly button for the shader
-pub const NAVEL:f32 = 2;
+const TAPER:f32 = 0.12;
+/// tu.y marking the sac (creased by the shader) and the belly button
+pub const BELLY:f32 = 3;
+pub const NAVEL:f32 = 4;
+/// the belly button: how far round from the bottom it sits, and how deep
+/// in the sap at rest
+const NAVEL_TH:f32 = m.pi * 0.47;
+const NAVEL_LIFT:f32 = 0.86;
+
+/// where the creases cross (the belly button, on the sac's surface), in
+/// the bind pose (wolf space)
+pub fn crossing() V3 {
+  return v3(0, skel.HIP_Y + skel.WAIST_AT[1], skel.WAIST_AT[2]) + surface(NAVEL_TH, m.pi / 2.0, 1);
+}
 
 const RINGS = 30;
 const SIDES = 40;
@@ -61,9 +78,10 @@ fn normal(th:f32, ph:f32) V3 {
   return if (m.dot(n, out) < 0) -n else n;
 }
 
-/// how much of the gut a point at `th` is: all of it below the middle,
-/// none toward the top
-fn gut(th:f32) f32 { return 1 - m.smooth(m.clamp01((-@cos(th) - 0.1) / 0.75)); }
+/// how much of the gut a point at `th` is: all of it up past the middle
+/// (so the whole sac swells round, up toward the ribs as well), easing to
+/// none at its top where it hangs from them
+fn gut(th:f32) f32 { return 1 - m.smooth(m.clamp01((-@cos(th) - 0.35) / 0.62)); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   const start = b.mark();
@@ -119,24 +137,29 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     }
   }
 
-  // the belly button: a small knot of vine sunk in the sap at the front of
-  // the gut, a puckered ring around it
-  const nth = m.pi * 0.47;
-  const at = surface(nth, m.pi / 2.0, 0.78);
+  // (the leaves keep theirs: it is how far along them, for their stir)
+  for (b.v.items[start..]) |*vx| if (vx.part != @intFromEnum(vertex.Part.leaf)) {
+    vx.tu[1] = BELLY;
+  };
+
+  // the belly button: a small knot of sap sunk in the sac at the front of
+  // the gut, a puckered ring of sap around it, all one with the sac
+  const nth = NAVEL_TH;
+  const at = surface(nth, m.pi / 2.0, NAVEL_LIFT);
   const out = normal(nth, m.pi / 2.0);
   const navel = b.mark();
-  const knot = color.mix(pal.wolf_core, pal.wolf_vine, 0.3);
-  try mg.ellipsoid(b, .{ .center = at, .radii = v3(0.011, 0.013, 0.009), .col = knot, .rings = 6, .segs = 9, .t = 1 });
+  const knot = pal.sap;
+  try mg.ellipsoid(b, .{ .center = at, .radii = v3(0.0068, 0.008, 0.0056), .col = knot, .part = .bloom, .rings = 8, .segs = 12, .t = 1 });
   var ring:[13]V3 = undefined;
   var rts:[13]f32 = undefined;
   const side = v3(1, 0, 0);
   const up = m.norm(m.cross(out, side));
   for (&ring, &rts, 0..) |*p, *t, j| {
     const a = m.ratio(j, 12) * m.tau;
-    p.* = at - out * m.splat3(0.004) + (side * m.splat3(@cos(a)) + up * m.splat3(@sin(a))) * m.splat3(0.017);
+    p.* = at - out * m.splat3(0.0025) + (side * m.splat3(@cos(a)) + up * m.splat3(@sin(a))) * m.splat3(0.0105);
     t.* = 1;
   }
-  try b.tube(&ring, &rts, 0.0045, 0.0045, knot, .stem, 5);
+  try b.tube(&ring, &rts, 0.003, 0.003, knot, .bloom, 8);
   for (b.v.items[navel..]) |*vx| vx.tu[1] = NAVEL;
 
   // into the waist's place in the bind pose: the gut with the gut bone,

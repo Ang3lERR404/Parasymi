@@ -1,4 +1,5 @@
-//! mesh: WOLF EARS. both ears, skinned to their bones (wolf_skeleton), each
+//! mesh: WOLF EARS. both ears, skinned to their bones (wolf_skeleton) above
+//! their roots and to the skull below (so the root never leaves it), each
 //! built at its root rising along the bone's +Y, its inner face toward +Z. A thick ear with weight: its base flares wide and sinks into the
 //! skull (below the origin) so it grows out of the head rather than sitting
 //! on it, narrowing to a softly rounded tip. The inner face is sap
@@ -12,6 +13,7 @@ const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("../../core/color.zig");
 const skel = @import("wolf_skeleton.zig");
+const Sculpt = @import("sculpt_kit.zig").Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -69,10 +71,24 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   for (skel.sides) |sd| {
     const start = b.mark();
     try ear(b);
+    // its root holds with the skull it is sunk in (rising from the root
+    // mound sculpted there), and only above that does it turn with its
+    // own bone, bending smoothly between
+    for (b.v.items[start..], try b.skinOf(start)) |vx, *k| {
+      const own = m.smooth(m.clamp01((vx.pos[1] - ROOT_HOLD) / ROOT_BEND));
+      var wt:[skel.COUNT]f32 = @splat(0);
+      wt[@intFromEnum(sd.ear)] = own;
+      wt[@intFromEnum(skel.Bone.head)] = 1 - own;
+      k.* = Sculpt.pack(&wt);
+    }
     b.xform(start, w[@intFromEnum(sd.ear)]);
-    for (try b.skinOf(start)) |*k| k.* = .{ .bones = @intFromEnum(sd.ear), .weights = .{ 255, 0, 0, 0 } };
   }
 }
+
+/// how high up the ear (its own frame) the skull still holds it, and over
+/// how much more it passes to the ear's bone
+const ROOT_HOLD:f32 = 0.004;
+const ROOT_BEND:f32 = 0.04;
 
 fn ear(b:*mg.Builder) Allocator.Error!void {
   var pts:[ROWS * COLS]V3 = undefined;

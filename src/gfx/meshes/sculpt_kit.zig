@@ -47,6 +47,9 @@ pub const Form = struct {
   /// only colours the surface where it lies (fading over this many metres
   /// outside it), adding nothing: a lip line, the dark round an eye
   ink:f32 = 0,
+  /// how softly the skin passes across the joints of its bone (metres;
+  /// 0 the sculpt's own): small for a finger, so it bends at its knuckles
+  soft:f32 = 0,
 };
 
 /// a form ready to evaluate: back from the build space to its shape space,
@@ -122,6 +125,9 @@ fn xf(mat:M4, p:V3) V3 {
 
 fn colV(c:color.Rgba8) V3 { return v3(m.f(c.r), m.f(c.g), m.f(c.b)); }
 
+/// a point on the surface and its outward normal there
+pub const Hit = struct { p:V3, n:V3 };
+
 pub const Sculpt = struct {
   gpa:Allocator,
   forms:std.ArrayList(Placed) = .empty,
@@ -134,6 +140,9 @@ pub const Sculpt = struct {
   soft:f32 = 0.02,
   /// how softly colours meet where forms meet (metres)
   blend:f32 = 0.012,
+  /// the bones whose forms it keeps (a bit each); the rest are left out,
+  /// for a surface cast onto only part of a body
+  only:u64 = ~@as(u64, 0),
 
   pub fn deinit(s:*Sculpt) void {
     s.forms.deinit(s.gpa);
@@ -141,6 +150,7 @@ pub const Sculpt = struct {
   }
 
   pub fn add(s:*Sculpt, f:Form) Allocator.Error!void {
+    if (s.only & (@as(u64, 1) << @intCast(f.bone)) == 0) return;
     const bound = shapeBound(f.shape);
     const grow = @reduce(.Max, f.stretch);
     try s.every.append(s.gpa, @intCast(s.forms.items.len));
@@ -184,7 +194,7 @@ pub const Sculpt = struct {
 
   /// the surface point nearest `p` (a few steps down the field) and the
   /// outward normal there
-  pub fn project(s:*const Sculpt, p0:V3) Allocator.Error!struct { p:V3, n:V3 } {
+  pub fn project(s:*const Sculpt, p0:V3) Allocator.Error!Hit {
     const list = s.every.items;
     var p = p0;
     for (0..6) |_| {
@@ -196,7 +206,7 @@ pub const Sculpt = struct {
 
   /// where a ray from `from` (inside the body) along `dir` comes out of it,
   /// and the outward normal there; null if it never does within `max`
-  pub fn cast(s:*const Sculpt, from:V3, dir:V3, max:f32) Allocator.Error!?struct { p:V3, n:V3 } {
+  pub fn cast(s:*const Sculpt, from:V3, dir:V3, max:f32) Allocator.Error!?Hit {
     const list = s.every.items;
     var t:f32 = 0;
     var last:f32 = 0;
@@ -228,10 +238,12 @@ pub const Sculpt = struct {
   fn weighFrom(s:*const Sculpt, p:V3, list:[]const u32) vertex.Skin {
     const MAXB = 64;
     var near:[MAXB]f32 = @splat(1e9);
+    var soft:[MAXB]f32 = @splat(s.soft);
     for (list) |i| {
       const pf = &s.forms.items[i];
       if (pf.f.carve or pf.f.ink > 0) continue;
       near[pf.f.bone] = @min(near[pf.f.bone], formDist(pf, p));
+      if (pf.f.soft > 0) soft[pf.f.bone] = @min(soft[pf.f.bone], pf.f.soft);
     }
     var first:usize = 0;
     for (near, 0..) |d, b| if (d < near[first]) {
@@ -241,7 +253,7 @@ pub const Sculpt = struct {
     for (0..s.parents.len) |b| {
       const joined = b == first or s.parents[first] == @as(u8, @intCast(b)) or s.parents[b] == @as(u8, @intCast(first));
       if (!joined or near[b] > 1e8) continue;
-      w[b] = @exp(-(near[b] - near[first]) / s.soft);
+      w[b] = @exp(-(near[b] - near[first]) / @min(soft[b], soft[first]));
     }
     return pack(&w);
   }

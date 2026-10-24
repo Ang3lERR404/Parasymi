@@ -61,9 +61,34 @@ void main() {
     for (int k = 0; k < 4; k++) M += sweights[k] * B.m[base + int((sbones >> (8u * uint(k))) & 255u)];
   }
   vec3 p = pos;
-  // the belly button (tu.y 2) surfaces from inside the sap as the belly
-  // fills (fill in iq.y), and pops out past it when full
-  if (tu.y > 1.5) p.z += 0.04 * pow(clamp(iq.y, 0.0, 1.0), 1.5);
+  vec3 nm = nrm;
+  // the belly (tu.y 3, its button 4; fill in iq.y): as it fills, creases
+  // fold into it down its middle and across it, deepening the fuller it
+  // is (in the bind pose, before the gut swells it, so they swell with
+  // it; iq.zw the y and z where they cross, at its button). A smooth
+  // field pushed in along the sac's normal, the normal turned by its
+  // slope so the folds catch the light. The button surfaces from inside
+  // the sap and pops out past it.
+  if (tu.y > 2.5 && tu.y < 4.5) {
+    const float CREASE = 0.024;  // depth when full
+    const float DOWN_W = 0.019;  // the crease down the middle: its width
+    const float ACROSS_W = 0.017; // the crease across it
+    const float POP = 0.03;
+    float fill = clamp(iq.y, 0.0, 1.0);
+    vec3 d = p - vec3(0.0, iq.z, iq.w);
+    // down the front, fading toward the ribs; across the front and sides
+    float gv = exp(-d.x * d.x / (DOWN_W * DOWN_W)) * smoothstep(-0.02, 0.05, d.z) * (1.0 - smoothstep(0.06, 0.13, d.y));
+    float gh = exp(-d.y * d.y / (ACROSS_W * ACROSS_W)) * smoothstep(-0.08, 0.02, d.z);
+    float g = gv + gh - gv * gh;
+    vec3 slope = vec3(-2.0 * d.x / (DOWN_W * DOWN_W) * gv * (1.0 - gh), -2.0 * d.y / (ACROSS_W * ACROSS_W) * gh * (1.0 - gv), 0.0);
+    float depth = CREASE * fill;
+    if (tu.y > 3.5) {
+      p.z += POP * pow(fill, 1.5) - depth;
+    } else {
+      p -= nrm * depth * g;
+      nm = normalize(nrm + depth * (slope - nrm * dot(slope, nrm)));
+    }
+  }
   // secondary motion. Offsets must be identical for every copy of a shared
   // vertex (faceted parts carry different normals per face), so they use a
   // fixed axis scaled by position along the leaf: tips move, bases stay put.
@@ -162,7 +187,9 @@ void main() {
     if (echo > 0.5) twinkle = 1.0;
   } else {
     w = M * vec4(p, 1.0);
-    wn = mat3(M) * nrm;
+    // a skinned mesh's bones may swell it unevenly (the belly): its
+    // normals take the inverse-transpose
+    wn = mode == 3 ? transpose(inverse(mat3(M))) * nm : mat3(M) * nm;
     // a shadow under a bloom a forming halo draws in follows it over the
     // ground (fading as the bloom folds, below)
     if (drawn && part == 7u) w.xz += haloSpiral(c3.xyz, ih.xyz, ih.w).xz - c3.xz;
