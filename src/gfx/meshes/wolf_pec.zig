@@ -1,5 +1,5 @@
-//! WOLF PECTORAL: one lobe of solidified sap on the chest, built in torso
-//! space around its centre (see wolf_torso `pec_centre`). A broad dish: wider
+//! WOLF PECTORAL: one lobe of solidified sap on the chest, built around its
+//! centre (`CENTRE`, in the chest bone's frame) and skinned to the chest. A broad dish: wider
 //! along its top edge, the lower edge sweeping in toward the sternum, a
 //! shallow bowl in cross-section (flat-topped, falling steeply at the rim).
 //! The areola (a raised disc) and the nipple (a dome on it) sit in the
@@ -16,28 +16,33 @@ const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
+const skel = @import("wolf_skeleton.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// each lobe's centre on the chest (x for the right one), in the chest
+/// bone's frame; the two meet at the sternum
+pub const CENTRE = v3(0.078, 0.09, 0.088);
+
 /// half-widths of the outline: top edge (wider) and bottom edge
-const W_TOP:f32 = 0.098;
-const W_BOT:f32 = 0.074;
+const W_TOP:f32 = 0.116;
+const W_BOT:f32 = 0.096;
 /// half-heights above and below the centre (the top edge is flatter)
-const H_TOP:f32 = 0.064;
-const H_BOT:f32 = 0.074;
+const H_TOP:f32 = 0.082;
+const H_BOT:f32 = 0.096;
 /// how far the lower edge sweeps toward the sternum (-x on the right lobe)
-const SWEEP:f32 = 0.018;
+const SWEEP:f32 = 0.024;
 /// crown height of the dish above the chest
-const DEPTH:f32 = 0.058;
+const DEPTH:f32 = 0.078;
 /// the lower half carries a little more mass
 const LOW_FULL:f32 = 0.15;
 /// areola and nipple: centre (below the crown, only just inside it, so the
 /// two sit well apart across the chest), radii and rise
-const NIPPLE_AT = [2]f32{ 0.004, -0.026 };
-const AREOLA_R:f32 = 0.022;
+const NIPPLE_AT = [2]f32{ 0.005, -0.034 };
+const AREOLA_R:f32 = 0.027;
 const AREOLA_RISE:f32 = 0.0035;
-const NIPPLE_R:f32 = 0.0085;
+const NIPPLE_R:f32 = 0.01;
 const NIPPLE_RISE:f32 = 0.0075;
 /// how the lobe sits: lower edge turned toward the sternum, face tilted
 /// down, and yawed out to follow the chest's curve
@@ -124,10 +129,13 @@ pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
     try mg.patch(b, R, C, &pts, &nrm, &cols, &us, 0.6, .resin);
   }
   // pose on the chest; the left lobe is the right one mirrored
+  const chest = skel.bind()[@intFromEnum(skel.Bone.chest)];
   b.xform(start, m.chain(&.{
+    chest, m.translate(CENTRE * v3(side, 1, 1)),
     m.scale3(v3(side, 1, 1)),
     m.rotY(YAW_OUT), m.rotX(TILT_DOWN), m.rotZ(ROLL),
   }));
+  for (try b.skinOf(start)) |*k| k.* = .{ .bones = @intFromEnum(skel.Bone.chest), .weights = .{ 255, 0, 0, 0 } };
 }
 
 /// the two lobes, one library mesh each

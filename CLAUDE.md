@@ -107,8 +107,8 @@ recipes (`game/craft.zig`) are plain data tables.
   point at both ends (no hard cuts).
 - meshgen primitives: `tubeR`/`tubeC`, `vine`, `braid`/`braidTurned`, `bundle`,
   `loft`, `patch`, `blade`/`bladeAlong`, `petal`, `leavesAlong`, `bands`,
-  `ellipsoid`, `cone`. Shared kits: `structure_kit`, `wolf_kit` (`form`,
-  `leaf`, `digit`, `claw`, `limbCore`, `muscle`, `tendon`), `mineral_kit`.
+  `ellipsoid`, `cone`. Shared kits: `structure_kit`, `wolf_kit` (`leaf`,
+  `digit`, `claw`), `sculpt_kit` (SDF forms meshed and skinned), `mineral_kit`.
 - Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from
   vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
 - See-through is two passes: `plants`/`parts` keep only fragments with
@@ -116,7 +116,7 @@ recipes (`game/craft.zig`) are plain data tables.
   instances, shaders built with `-DGLASS`, build.zig `variants`) blend the
   rest over every solid surface, testing depth but writing none. A new
   see-through part role goes in `vertex.seeThrough`.
-- `WorldPush` is 176 bytes (limit checked at pipeline creation).
+- `WorldPush` is 192 bytes (limit checked at pipeline creation).
 - UI: organic, animated, no boxes; SDFs in `shaders/ui.frag`.
 - **Never hard-code strings**: every player-facing string (messages, HUD
   labels, names/descriptions of items, plants, research, structures, tiles,
@@ -275,8 +275,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - Sky: gradient dome, sun/moon, stars; star motes (faceted core, ring,
   needle rays) turn, twinkle, hover and trail echoes while falling. Low
   pitch widens the view toward the horizon.
-- part.vert placement by `PartInstance.e.x`: 0 matrix, 1 curve (tail, beams;
-  `e.y` reach), 2 star mote.
+- part.vert placement by `PartInstance.e.x`: 0 matrix, 1 curve (beams;
+  `e.y` reach), 2 star mote, 3 skinned (`e.y` first bone).
 - Post-processing (`render/post.zig`): world passes draw into an HDR image;
   brighter-than-white light blooms (5-level 13-tap down chain with soft-knee
   threshold and anti-firefly weighting, tent filter back up); composite
@@ -327,27 +327,35 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
     crowd (> 0.5 slot); if it fails after adding research, fix the layout
     rules there, never hand-place a node.
 - Wolf (`game/player.zig` rig; muted greens/browns, amber only on belly,
-  eyes, inner ears, beans):
-  - Built of planes (`wolf_kit`): head one closed surface (`wolf_head.point`:
-    cranium, brow ridges, stop, long wedge muzzle, cheekbones, chamfered jaw
-    over a lower jaw); thick ears (sap inner face, vine back, rolled rim,
-    inner fold, base sunk in the skull, 12° forward/out, no flutter);
-    squared joints (condyles, tendon straps), deltoids, limb cores with
-    distinct muscles and vine tendons; hands and feet with knuckled digits,
-    curved claws, dewclaws, sap beans.
-  - Fur leaves (`wolf_kit.leaf`): rows over the skull into a nape ruff,
-    along the cheekbones, tail rings, shoulder/tail tufts, along the torso
-    weave and belly net.
-  - Torso: loose-woven chest, vine-corset waist, hips, over trapezius/lat
-    forms; pectorals are sprung dishes of resin sap (areola, nipple).
-  - Belly (`wolf_belly.zig`): teardrop sac whose tongue runs up between the
-    pectorals; filling swells only the gut, low and forward (`Look.sag`);
-    the belly button surfaces and pops out as it fills; up to 5 lumps inside
-    on spring-dampers.
-  - Rear: squared lobes pressed together, tailbone knot; tail (`wolf_tail`)
-    built once and bent on the GPU through the spring-steered joints.
-  - Legs digitigrade (high hock, long feet, central pad flattens planted).
-    Breathing 2% torso / 1% limbs; anisotropic sheen along vines.
+  eyes, inner ears, beans, pectorals and rear):
+  - One skin: `wolf_body` is sculpted (`sculpt_kit`: SDF ellipsoids, round
+    cones, round boxes per bone, smooth union/carve, `ink` paints colour
+    only) around the bind pose of `wolf_skeleton` (27 bones, `fk(Pose)`),
+    meshed once with surface nets (`CELL` 5 mm, doubled per LOD), each
+    vertex weighted to the bones of the forms nearest it (only across
+    joints that are joined). GPU skinning: `vertex.Skin` beside the mesh
+    buffer (binding 2), bones per frame via `Parts.pose`/`emitSkinned`
+    (part.vert mode 3, buffer device address in `WorldPush.bones`).
+    New wolf meshes are built in bind space and skinned; never rigid parts.
+  - Over the hide: vines cast onto it from bone axes (`wind`/`line`, so
+    they never jump across), fur leaves (`wolf_kit.leaf`) as hair over the
+    crown with a forelock and nape mane, along the cheekbones, shoulder
+    tufts, tail rings and tip; digits/claws (`wolf_kit.digit`); eyes set in
+    carved sockets under the brow.
+  - Head: short muzzle rising to an upturned nose (bean), lower jaw (own
+    bone) tucked up under it, ears (`wolf_ears`, skinned to ear bones).
+  - Resin sap (`.resin`, sprung `give`): pectorals (`wolf_pec`) on the
+    chest, the rear (`wolf_rump`) on the pelvis, its lower edge partly
+    following the thighs.
+  - Belly (`wolf_belly`): convex egg sac on the gut; filling scales and
+    drops the `gut` bone (tu.x = gut share of each vertex); the belly button
+    pops out; up to 5 lumps inside (in the gut bone's frame).
+  - Motion: feet planted in the world, swung on arcs when the gait's phase
+    (or, standing, a foot left behind) says; digitigrade leg IK
+    (`solveLeg`: thigh+metatarsal as one link); pelvis bobs at footfalls,
+    sways, turns and rolls, chest counter-turns; lean, bank, arms, head,
+    ears and tail on springs (`Swing`); head steadied against the bob,
+    idle look-around, ear flicks; breath and panting quicken with effort.
 - "Celestial / beyond comprehension" is the next phase target.
 
 ## Rules
@@ -388,7 +396,8 @@ footprints/floaters, research (10 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
 planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
 LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation,
-anti-aliasing (MSAA/FXAA) + options panel.
+anti-aliasing (MSAA/FXAA) + options panel, the wolf as one sculpted skinned
+mesh with procedural locomotion (planted feet, leg IK, springs).
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes

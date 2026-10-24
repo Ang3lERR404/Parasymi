@@ -107,6 +107,10 @@ pub const WorldPush = extern struct {
   /// x,z: what the camera looks at; z,w: horizontal distance from it where
   /// fog starts closing in and where the world is fully hidden
   view:[4]f32,
+  /// where the parts pass finds this frame's bones (a buffer address; 0 in
+  /// every other pass)
+  bones:[2]u32 = .{0, 0},
+  pad:[2]u32 = .{0, 0},
 };
 
 pub const Scene = struct {
@@ -116,6 +120,9 @@ pub const Scene = struct {
   instances:[PLANT_MESHES][]const vertex.PlantInstance,
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
   parts:[meshlib.SLOTS][]const vertex.PartInstance,
+  /// skinned parts' bones (see `vertex.Skin`): each matrix carries a vertex
+  /// from where it was built to where it is this frame
+  bones:[]const m.M4,
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)
   ui_time:f32,
@@ -176,6 +183,8 @@ pub const Renderer = struct {
   free_slots:std.ArrayList(ck.MeshSlot) = .empty,
   /// every built-once mesh (plant species + part library) in one buffer.
   meshes:Buffer = .{},
+  /// each vertex of `meshes`' skin weights (zero where a mesh is not skinned)
+  skins:Buffer = .{},
   /// (first vertex, count) per plant slot; slots a species does not use are empty
   plant_ranges:[PLANT_MESHES][2]u32 = @splat(.{0, 0}),
   /// per plant slot, the byte offset from its mesh to the next growth key's
@@ -328,6 +337,10 @@ pub const Renderer = struct {
     const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
     r.meshes.write(0, bytes);
+    _ = try b.skinOf(b.v.items.len);
+    const skin = sliceAsBytes(b.skin.items);
+    r.skins = try Buffer.init(&r.ctx, skin.len, .{.vertex_buffer = true});
+    r.skins.write(0, skin);
   }
 
   pub fn deinit(r:*Renderer) void {
@@ -364,6 +377,7 @@ pub const Renderer = struct {
     r.scratch.deinit(r.gpa);
     r.detail_scratch.deinit(r.gpa);
     r.meshes.deinit(c);
+    r.skins.deinit(c);
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
     r.post.deinit(c);

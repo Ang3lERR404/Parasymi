@@ -70,6 +70,8 @@ pub fn stride(n:usize, s:usize, out:[]usize) usize {
 pub const Builder = struct {
   gpa:Allocator,
   v:std.ArrayList(PV) = .empty,
+  /// skin weights beside `v`, as far as the last skinned vertex (see `skinOf`)
+  skin:std.ArrayList(vertex.Skin) = .empty,
   /// the level of detail being built (0 full): primitives keep every
   /// `step()`-th ring along their length and `around()` of their sides, the
   /// same way every time, so growth keys built at one level still match
@@ -80,7 +82,17 @@ pub const Builder = struct {
   /// how many sides a ring keeps at this level (never fewer than `min`)
   pub fn around(b:*const Builder, sides:u32, min:u32) u32 { return @max(@min(sides, min), sides >> @intCast(b.lod)); }
 
-  pub fn deinit(b:*Builder) void { b.v.deinit(b.gpa); }
+  pub fn deinit(b:*Builder) void {
+    b.v.deinit(b.gpa);
+    b.skin.deinit(b.gpa);
+  }
+
+  /// the skin weights of every vertex since `start`, to be filled in
+  /// (vertices before it without any are left unskinned)
+  pub fn skinOf(b:*Builder, start:usize) Allocator.Error![]vertex.Skin {
+    try b.skin.appendNTimes(b.gpa, .{}, b.v.items.len -| b.skin.items.len);
+    return b.skin.items[start..b.v.items.len];
+  }
 
   pub fn put(b:*Builder, p:V3, n:V3, col:color.Rgba8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
     try b.v.append(b.gpa, .{.pos = p, .nrm = m.norm(n), .col = col, .tu = .{t, u}, .part = @intFromEnum(part)});

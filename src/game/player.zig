@@ -1,27 +1,27 @@
 //! the player: an anthropomorphic wolf woven from vines, leaves and sap.
 //! Movement is tile-aware (no wading, one terrace step at a time) and every
-//! motion is procedural: a digitigrade gait, counter-swinging arms, a spring
-//! driven tail, breathing, and a sap belly that swells with what it carries.
+//! motion is procedural, posing one skeleton (gfx/meshes/wolf_skeleton.zig)
+//! that the GPU skins the wolf's single body over:
+//! - feet are planted in the world and stay there through their stance;
+//!   each swings on an arc to where it will be needed, the gait's phase
+//!   choosing when, or, standing, whenever a foot is left behind;
+//! - the digitigrade legs reach them by inverse kinematics;
+//! - the pelvis bobs low at each footfall, sways over the planted foot,
+//!   rolls and turns with the stride, and the chest turns against it;
+//! - arms, lean, head and ears follow on springs, so motion carries,
+//!   overshoots a little and settles; the head steadies against the bob;
+//! - a spring-driven tail, breathing that quickens with effort, panting,
+//!   and a sap belly that swells with what it carries.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const m = @import("../core/math.zig");
+const noise = @import("../core/noise.zig");
 const items = @import("../sim/items.zig");
 const World = @import("../world/world.zig").World;
-const mg = @import("../gfx/meshgen.zig");
-const pal = @import("../gfx/meshes/palette.zig");
-const wolf_kit = @import("../gfx/meshes/wolf_kit.zig");
-const torso_mesh = @import("../gfx/meshes/wolf_torso.zig");
-const rump_mesh = @import("../gfx/meshes/wolf_rump.zig");
-const thigh_mesh = @import("../gfx/meshes/wolf_thigh.zig");
-const calf_mesh = @import("../gfx/meshes/wolf_calf.zig");
-const tailbone = @import("../gfx/meshes/wolf_tailbone.zig");
-const head_mesh = @import("../gfx/meshes/wolf_head.zig");
-const upper_arm = @import("../gfx/meshes/wolf_upper_arm.zig");
-const forearm = @import("../gfx/meshes/wolf_forearm.zig");
-const foot_mesh = @import("../gfx/meshes/wolf_foot.zig");
-const tail_mesh = @import("../gfx/meshes/wolf_tail.zig");
-const paw_mesh = @import("../gfx/meshes/wolf_paw.zig");
+const skel = @import("../gfx/meshes/wolf_skeleton.zig");
+const body_mesh = @import("../gfx/meshes/wolf_body.zig");
+const belly_mesh = @import("../gfx/meshes/wolf_belly.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const parts = @import("parts.zig");
 const Parts = parts.Parts;
@@ -33,56 +33,119 @@ const WALK_SPEED:f32 = 4.0;
 const SPRINT_SPEED:f32 = 6.5;
 const ACCEL_RESPONSE:f32 = 12; // how quickly velocity matches the wish
 const PROBE:f32 = 0.25; // body radius probed ahead of the centre
-const GAIT_FREQ:f32 = 2.6; // phase advance per unit of speed
-const STRIDE_RESPONSE:f32 = 8; // how quickly stride eases in/out
+const STRIDE_RESPONSE:f32 = 6; // how quickly stride eases in/out
 const TURN_RESPONSE:f32 = 10; // how quickly facing matches the target
 const GROUND_FREQ:f32 = 18; // spring frequency for following terrain height
 const WORK_DRAG:f32 = 0.85; // velocity kept each frame while the hands work
 const FACE_MIN_SPEED:f32 = 0.3; // slower than this, the wolf keeps its facing
 const MIN_DT:f32 = 1e-4; // guards rates divided by the frame time
 const FULLNESS_RESPONSE:f32 = 2; // how quickly the belly's look follows its fill
-const REACH_FREQ:f32 = 10; // spring frequency into and out of the work gesture
-/// a foot's pad presses flat (spring frequency) once lifted less than 1/6
-const PAD_FREQ:f32 = 14;
-const PAD_LIFT_GAIN:f32 = 6;
-/// breathing: one tempo, the torso swells 2%, the limbs 1% a beat later
-const BREATH_RATE:f32 = 1.7;
-const BREATH_TORSO:f32 = 0.02;
-const BREATH_LIMB:f32 = 0.01;
-const BREATH_LAG:f32 = 0.5;
-/// the ears lean forward and out by this much
-const EAR_TILT:f32 = m.rad(12);
-/// a planted foot's central pad flattens by this fraction
-const PAD_FLATTEN:f32 = 0.1;
+const REACH_FREQ:f32 = 6; // spring frequency into and out of the work gesture
 /// what the wolf works on or carries sits this high above its feet
 const CHEST_HEIGHT:f32 = 1.0;
 
-/// leg segments, anthro digitigrade: a near-vertical thigh, a long calf
-/// angled back to a high hock, a shorter metatarsal angled forward, and a
-/// long flat foot on the ground (side view: a clear Z)
-const THIGH = thigh_mesh.LEN;
-const SHIN = calf_mesh.LEN;
-const META:f32 = 0.335;
+/// the gait: a full cycle (both feet) covers `CYCLE + CYCLE_PER_SPEED *
+/// speed` metres; a foot is planted for `duty` of it, more of it walking
+/// slowly than running
+const CYCLE:f32 = 1.2;
+const CYCLE_PER_SPEED:f32 = 0.2;
+const DUTY_SLOW:f32 = 0.6;
+const DUTY_FAST:f32 = 0.38;
+/// below this stride the wolf stands: feet only step to stay under it
+const STANDING:f32 = 0.15;
+/// a standing foot further than this from where it rests steps back under
+const SETTLE:f32 = 0.06;
+const SETTLE_TIME:f32 = 0.26;
+/// a planted foot never trails the hip by more than this before it lifts
+const TRAIL_MAX:f32 = 0.5;
+/// a foot this far from the body (a load, a teleport) is put straight back
+const LOST:f32 = 1.2;
+/// how high a swinging foot lifts (standing, and more at full stride), and
+/// how far its toes hang as it swings
+const LIFT:f32 = 0.05;
+const LIFT_STRIDE:f32 = 0.08;
+const TOE_HANG:f32 = 0.55;
+/// the metatarsal folds this much more under the leg mid-swing
+const SWING_FOLD:f32 = 0.45;
+/// the pelvis: how far it sinks with stride and bobs at each footfall,
+/// sways over the planted foot, turns and rolls with the stride
+const SINK:f32 = 0.045;
+const BOB:f32 = 0.028;
+const SWAY:f32 = 0.018;
+const HIP_TURN:f32 = 0.13;
+const HIP_ROLL:f32 = 0.05;
+/// the chest turns against the hips by this share
+const COUNTER:f32 = 1.4;
+/// lean: forward with stride, more into acceleration (radians per m/s^2),
+/// into turns (radians per rad/s), and down into the work
+const LEAN_STRIDE:f32 = 0.14;
+const LEAN_ACCEL:f32 = 0.018;
+const LEAN_MAX:f32 = 0.3;
+const BANK:f32 = 0.05;
+const BANK_MAX:f32 = 0.2;
+const LEAN_WORK:f32 = 0.38;
+const LEAN_FREQ:f32 = 5;
+/// arms: swing against the legs, hang out a little, bend at the elbow
+/// (more as they come forward); their springs make them lag and carry
+const ARM_SWING:f32 = 0.62;
+const ARM_OUT:f32 = 0.13;
+const ELBOW_REST:f32 = 0.3;
+const ELBOW_SWING:f32 = 0.55;
+const ARM_FREQ:f32 = 9;
+const ARM_DAMP:f32 = 0.55;
+/// the work gesture: reach forward and dig
+const DIG:f32 = -1.1;
+const DIG_RATE:f32 = 9;
+const DIG_DEPTH:f32 = 0.22;
+/// breathing: a tempo that quickens with effort, the chest swelling and
+/// panting with the jaw a little open at a run
+const BREATH_RATE:f32 = 1.7;
+const BREATH_RATE_RUN:f32 = 4.2;
+const BREATH:f32 = 0.02;
+const BREATH_RUN:f32 = 0.03;
+const PANT:f32 = 0.09;
+/// the head: steadied against the bob and lean, turning into turns,
+/// looking about when idle, down into the work
+const HEAD_FREQ:f32 = 7;
+const HEAD_DAMP:f32 = 0.8;
+const LOOK_TURN:f32 = 0.18;
+const LOOK_MAX:f32 = 0.6;
+const LOOK_IDLE:f32 = 0.28;
+const LOOK_IDLE_RATE:f32 = 0.23;
+const LOOK_WORK:f32 = 0.45;
+/// ears: lie back with speed, flick now and then
+const EAR_BACK:f32 = 0.45;
+const EAR_FREQ:f32 = 14;
+const EAR_DAMP:f32 = 0.35;
+const EAR_FLICK:f32 = 9;
+const EAR_FLICK_EVERY:f32 = 3.5;
+
 /// paw beans and the nose: sap made denser (80%) and browner than the belly
 const BEAN_OPACITY:f32 = 0.8;
 const BEAN_TINT = [4]f32{ 0.72, 0.5, 0.38, 1 };
 const NOSE_TINT = [4]f32{ 0.3, 0.22, 0.2, 1 };
+/// a planted foot's central pad flattens by this fraction
+const PAD_FLATTEN:f32 = 0.1;
+const PAD_FREQ:f32 = 14;
 /// the inner ears' sap
 const EAR_OPACITY:f32 = 0.5;
 /// the belly's sap at its centre lets the body behind show through faintly;
-/// the pectorals are solidified sap, 30% less see-through.
+/// the pectorals are solidified sap, 30% less see-through; the rear's
+/// resin is a little denser again
 const SAP_OPACITY:f32 = 0.72;
 const PEC_OPACITY:f32 = 1 - (1 - SAP_OPACITY) * 0.7;
-/// the empty belly's radii (torso space); full, it is 35% larger and sags
-const BELLY_R = v3(0.13, 0.12, 0.12);
-const BELLY_GROW:f32 = 0.35;
-/// how far the full gut swells out (torso units), most down and forward
-const BELLY_SWELL:f32 = 0.065;
+const RUMP_OPACITY:f32 = 1 - (1 - SAP_OPACITY) * 0.6;
 /// how strongly the wolf's acceleration is felt by what hangs in and on its
 /// body (m/s^2 down to a few centimetres of lag)
 const SLOSH:f32 = 0.05;
 /// a footfall drops the belly's contents a little
 const STEP_KICK:f32 = 0.18;
+/// the body's glow (the eyes carry it; the hide barely), how much its fur
+/// leaves stir
+const BODY_GLOW:f32 = 0.6;
+const BODY_FLUTTER:f32 = 0.3;
+/// a body this large is culled and detailed about its middle
+const BODY_MID:f32 = 0.8;
 
 /// one of the heavier things carried, hanging in the sap on its own spring.
 const Lump = struct {
@@ -99,55 +162,71 @@ const lumps = [_]Lump{
   .{ .rest = v3(0.4, 0.15, -0.2), .k = 80, .c = 7, .mass = 0.5 },
   .{ .rest = v3(-0.25, 0.05, 0.45), .k = 62, .c = 5.5, .mass = 0.6 },
 };
-const LUMP_R:f32 = 0.06;
+const LUMP_R:f32 = 0.055;
 /// the pectorals: dense gel on a spring each (left, right)
 const PEC_K = [2]f32{ 60, 55 };
 const PEC_C:f32 = 6;
 const PEC_MASS:f32 = 0.8;
 const PEC_MAX:f32 = 0.02;
-/// the rear: structural vine with a little sap, firmer than the chest and
-/// never idly moving
-const RUMP_K:f32 = 80;
-const RUMP_C:f32 = 7;
-const RUMP_MAX:f32 = 0.015;
-/// the rear's sap nodes are mostly see-through
-const RUMP_SAP_OPACITY:f32 = 0.4;
+/// the rear: resin a little firmer than the chest, bouncing with each step
+const RUMP_K:f32 = 70;
+const RUMP_C:f32 = 5;
+const RUMP_MAX:f32 = 0.02;
+const RUMP_KICK:f32 = 0.12;
+/// a lump keeps within this share of the sac, and at least this much room
+const BELLY_ROOM:f32 = 0.8;
+const BELLY_ROOM_MIN:f32 = 0.01;
+
+/// the tail's steering: turning swings it out (capped), an idle sway at rest
+/// gives way to the gait's swing in stride; it lifts with stride; each
+/// joint's spring is softer than the one before
+const TAIL_TURN:f32 = 0.1;
+const TAIL_TURN_MAX:f32 = 0.6;
+const TAIL_IDLE_RATE:f32 = 1.3;
+const TAIL_IDLE:f32 = 0.16;
+const TAIL_GAIT:f32 = 0.12;
+const TAIL_LIFT:f32 = 0.25;
+const TAIL_DROOP:f32 = 0.16;
+const TAIL_FREQ:f32 = 7;
+const TAIL_FREQ_STEP:f32 = 1.2;
+
+const V3 = m.V3;
+const v3 = m.v3;
+const M4 = m.M4;
+const T = m.translate;
+const S = m.scale3;
+const Bone = skel.Bone;
 
 /// a point mass on a spring: offset from its rest place and velocity.
 const Spring3 = struct {
   pos:V3 = v3(0, 0, 0),
   vel:V3 = v3(0, 0, 0),
 };
-/// the tail: spring-steered joints, each this long, and how finely the vine
-/// woven through them is sampled.
-const TAIL_JOINTS = 3;
-const TAIL_SEG:f32 = 0.16;
-comptime {
-  if (TAIL_SEG * TAIL_JOINTS != tail_mesh.LEN) @compileError("the tail mesh is built at the joints' length");
-}
-/// the tail leaves the tailbone up and back, 30 degrees above horizontal
-/// (the angle that turns +Y onto that direction), lifting a little with stride
-const TAIL_ROOT_TILT:f32 = -(m.pi / 2.0 - m.pi / 6.0);
-/// the tailbone's sap node is mostly see-through
-const TAILBONE_SAP_OPACITY:f32 = 0.3;
-/// the tail's steering: turning swings it out (capped), an idle sway at rest
-/// gives way to the gait's swing in stride; each joint's spring is softer
-/// than the one before
-const TAIL_TURN:f32 = 0.12;
-const TAIL_TURN_MAX:f32 = 0.8;
-const TAIL_IDLE_RATE:f32 = 2.3;
-const TAIL_IDLE:f32 = 0.25;
-const TAIL_GAIT:f32 = 0.15;
-const TAIL_FREQ:f32 = 7;
-const TAIL_FREQ_STEP:f32 = 1.5;
-/// a lump keeps within this share of the sac, and at least this much room
-const BELLY_ROOM:f32 = 0.8;
-const BELLY_ROOM_MIN:f32 = 0.01;
+/// a damped angular spring (critically damped is `damp` 1)
+const Swing = struct {
+  x:f32 = 0,
+  v:f32 = 0,
+  fn to(s:*Swing, target:f32, freq:f32, damp:f32, dt:f32) void {
+    const w = freq * m.tau / 4;
+    s.v += (w * w * (target - s.x) - 2 * damp * w * s.v) * dt;
+    s.x += s.v * dt;
+  }
+};
 
-const V3 = m.V3;
-const v3 = m.v3;
-const T = m.translate;
-const S = m.scale3;
+/// one foot: where its ball is in the world, and its swing (`t` 1 planted)
+const Foot = struct {
+  at:V3 = v3(0, 0, 0),
+  from:V3 = v3(0, 0, 0),
+  t:f32 = 1,
+  dur:f32 = SETTLE_TIME,
+  lift:f32 = LIFT,
+  /// where in the gait it was last frame
+  phase:f32 = 0,
+  /// 1 planted .. 0 lifted, eased (the central pad flattens with it)
+  pad:f32 = 1,
+  pad_v:f32 = 0,
+  fn planted(f:*const Foot) bool { return f.t >= 1; }
+};
 
 pub const Player = struct {
   /// feet position (y follows the terrain)
@@ -160,28 +239,38 @@ pub const Player = struct {
 
   // animation state
   t:f32 = 0,
+  /// where in the gait cycle (0..1), and how far into stride (0 standing)
   phase:f32 = 0,
   stride:f32 = 0,
+  /// the cycle's length and stance share this frame
+  cycle:f32 = CYCLE,
+  duty:f32 = DUTY_SLOW,
+  breath:f32 = 0,
   /// how full the belly looks, easing toward the inventory's fill
   fullness:f32 = 0,
   /// velocity last frame and the acceleration felt since, in the wolf's own
   /// frame (x right, z forward)
   last_vel:V3 = v3(0, 0, 0),
   accel:V3 = v3(0, 0, 0),
-  /// what hangs in the belly (relative to its centre) and the pectorals'
-  /// give (relative to their rest)
+  feet:[2]Foot = @splat(.{}),
+  placed:bool = false,
+  /// what lags on springs: the lean and bank of the body, each arm's swing
+  /// and elbow, the head's turn and nod, the ears
+  lean:Swing = .{},
+  bank:Swing = .{},
+  arm:[2]Swing = @splat(.{}),
+  elbow:[2]Swing = @splat(.{}),
+  look:Swing = .{},
+  nod:Swing = .{},
+  ear:[2]Swing = @splat(.{}),
+  /// what hangs in the belly (relative to its centre) and the resin's
+  /// give (relative to its rest)
   lump:[lumps.len]Spring3 = @splat(.{}),
   pec:[2]Spring3 = @splat(.{}),
   rump:[2]Spring3 = @splat(.{}),
-  /// each foot's contact with the ground (1 planted .. 0 lifted), eased;
-  /// the central pad flattens with it
-  pad:[2]f32 = @splat(1),
-  pad_v:[2]f32 = @splat(0),
-  tail:[TAIL_JOINTS]f32 = @splat(0),
-  tail_v:[TAIL_JOINTS]f32 = @splat(0),
+  tail:[skel.TAIL]Swing = @splat(.{}),
   /// 0..1 blend toward the work gesture (gathering, planting, harvesting)
-  reach:f32 = 0,
-  reach_v:f32 = 0,
+  reach:Swing = .{},
   /// where the hands are busy (gathering, weaving, ...); null while idle
   work:?V3 = null,
 
@@ -220,42 +309,133 @@ pub const Player = struct {
     p.turn = turn / @max(dt, MIN_DT);
   }
 
+  fn groundSpeed(p:*const Player) f32 { return @sqrt(p.vel[0] * p.vel[0] + p.vel[2] * p.vel[2]); }
+  fn heading(p:*const Player) M4 { return m.chain(&.{ T(p.pos), m.rotY(p.facing) }); }
+
+  /// where a foot rests under the standing wolf, in the world
+  fn rest(p:*const Player, s:usize) V3 {
+    const r = m.mulV(p.heading(), .{ restFoot[s][0], 0, restFoot[s][2], 1 });
+    return v3(r[0], p.pos[1], r[2]);
+  }
+
   pub fn animate(p:*Player, dt:f32) void {
     p.t += dt;
-    const spd = @sqrt(p.vel[0] * p.vel[0] + p.vel[2] * p.vel[2]);
-    const prev = p.phase;
-    p.phase += spd * dt * GAIT_FREQ;
+    const spd = p.groundSpeed();
     p.stride += (m.clamp01(spd / WALK_SPEED) - p.stride) * @min(1, dt * STRIDE_RESPONSE);
-    // a footfall every half cycle drops what the belly carries
-    const step = @floor(prev / m.pi) != @floor(p.phase / m.pi);
+    p.cycle = CYCLE + CYCLE_PER_SPEED * spd;
+    p.duty = m.lerp(DUTY_SLOW, DUTY_FAST, m.clamp01((spd - 1) / (SPRINT_SPEED - 1)));
+    p.phase = @mod(p.phase + spd / p.cycle * dt, 1);
+    const effort = m.clamp01(spd / SPRINT_SPEED);
+    p.breath += dt * m.lerp(BREATH_RATE, BREATH_RATE_RUN, effort);
 
     p.fullness += (p.inv.fill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
-    m.spring(&p.reach, &p.reach_v, if (p.work != null) 1 else 0, REACH_FREQ, dt);
+    p.reach.to(if (p.work != null) 1 else 0, REACH_FREQ, 1, dt);
 
     // what the body feels: its acceleration, turned into its own frame
     const a = (p.vel - p.last_vel) / m.splat3(@max(dt, MIN_DT));
     p.last_vel = p.vel;
     const al = m.mulV(m.rotY(-p.facing), .{ a[0], a[1], a[2], 0 });
     p.accel = v3(al[0], al[1], al[2]);
-    p.slosh(step, dt);
-    for (&p.pad, &p.pad_v, [_]f32{ -1, 1 }) |*c, *v, side| m.spring(c, v, 1 - m.clamp01(p.legLift(side) * PAD_LIFT_GAIN), PAD_FREQ, dt);
 
-    // tail: each segment chases the one before it, steered by turning and gait
-    var target = m.clamp(-p.turn * TAIL_TURN, -TAIL_TURN_MAX, TAIL_TURN_MAX) + @sin(p.t * TAIL_IDLE_RATE) * TAIL_IDLE * (1 - p.stride) + @sin(p.phase) * TAIL_GAIT * p.stride;
-    for (0..TAIL_JOINTS) |i| {
-      m.spring(&p.tail[i], &p.tail_v[i], target, TAIL_FREQ - m.f(i) * TAIL_FREQ_STEP, dt);
-      target = p.tail[i];
+    const fell = p.step(spd, dt);
+    p.slosh(fell, dt);
+    p.springs(dt);
+  }
+
+  /// the feet: plant, lift, swing to where they are wanted. Returns whether
+  /// one came down this frame.
+  fn step(p:*Player, spd:f32, dt:f32) bool {
+    if (!p.placed) {
+      for (&p.feet, 0..) |*f, s| f.at = p.rest(s);
+      p.placed = true;
+    }
+    const moving = p.stride > STANDING;
+    // how far ahead of the hip a foot lands, so it passes under the hip
+    // mid-stance
+    const ahead = if (spd > 0.1) p.vel / m.splat3(spd) * m.splat3(p.duty * p.cycle * 0.5 * m.clamp01(spd / 1.5)) else v3(0, 0, 0);
+    var fell = false;
+    for (&p.feet, 0..) |*f, s| {
+      const other = &p.feet[1 - s];
+      if (m.len(f.at - p.rest(s)) > LOST) {
+        f.* = .{ .at = p.rest(s), .phase = f.phase };
+        continue;
+      }
+      const ph = @mod(p.phase + 0.5 * m.f(s), 1);
+      if (f.planted()) {
+        const off = m.len(f.at - p.rest(s));
+        // a foot trailing too far always lifts (the other one is down by then)
+        var lift = off > TRAIL_MAX and other.planted();
+        if (moving) {
+          // the gait lifts it as its stance ends
+          lift = lift or (ph >= p.duty and f.phase < p.duty);
+        } else {
+          // standing, a foot left behind steps back under (one at a time)
+          lift = lift or (other.planted() and off > SETTLE and off >= m.len(other.at - p.rest(1 - s)));
+        }
+        if (lift) {
+          f.from = f.at;
+          f.t = 0;
+          f.dur = if (moving) m.clamp((1 - p.duty) * p.cycle / @max(spd, 0.5), 0.12, 0.4) else SETTLE_TIME;
+          f.lift = LIFT + LIFT_STRIDE * p.stride;
+        }
+      }
+      f.phase = ph;
+      if (!f.planted()) {
+        f.t = @min(1, f.t + dt / f.dur);
+        const left = (1 - f.t) * f.dur;
+        const to = p.rest(s) + p.vel * m.splat3(left) + ahead;
+        const k = m.smooth(f.t);
+        f.at = m.lerpV(f.from, to, k);
+        f.at[1] = m.lerp(f.from[1], to[1], k) + f.lift * m.pow(f32, @sin(f.t * m.pi), 0.8);
+        if (f.planted()) {
+          f.at[1] = to[1];
+          fell = true;
+        }
+      }
+      m.spring(&f.pad, &f.pad_v, if (f.planted()) 1 else 0, PAD_FREQ, dt);
+    }
+    return fell;
+  }
+
+  /// what lags on springs: lean and bank, arms, head, ears, tail
+  fn springs(p:*Player, dt:f32) void {
+    const st = p.stride;
+    const work = p.reach.x;
+    p.lean.to(m.clamp(LEAN_STRIDE * st + p.accel[2] * LEAN_ACCEL, -LEAN_MAX, LEAN_MAX) + LEAN_WORK * work, LEAN_FREQ, 0.7, dt);
+    p.bank.to(m.clamp(-p.turn * BANK * st, -BANK_MAX, BANK_MAX), LEAN_FREQ, 0.8, dt);
+    for (0..2) |s| {
+      // each arm swings with the opposite leg: back as its own leg comes forward
+      const ph = @mod(p.phase + 0.5 * m.f(s), 1);
+      const swing = @sin(ph * m.tau + m.pi * 0.5) * ARM_SWING * st;
+      const dig = DIG + @sin(p.t * DIG_RATE + m.f(s) * 1.7) * DIG_DEPTH;
+      p.arm[s].to(m.lerp(swing, dig, work), ARM_FREQ, ARM_DAMP, dt);
+      p.elbow[s].to(ELBOW_REST + ELBOW_SWING * st * m.clamp01(-p.arm[s].x * 2) + 0.7 * work, ARM_FREQ, ARM_DAMP, dt);
+      // ears lie back with speed and flick now and then, one, then the other
+      const due = @mod(p.t + m.f(s) * 1.3, EAR_FLICK_EVERY) < dt and noise.grad(0xEA2 +% s, p.t * 0.7, 0.5) > 0;
+      if (due) p.ear[s].v += EAR_FLICK;
+      p.ear[s].to(-EAR_BACK * st, EAR_FREQ, EAR_DAMP, dt);
+    }
+    const idle = (1 - st) * (1 - work);
+    const look = m.clamp(p.turn * LOOK_TURN, -LOOK_MAX, LOOK_MAX) + LOOK_IDLE * idle * noise.grad(0x100C, p.t * LOOK_IDLE_RATE, 0.5);
+    p.look.to(look, HEAD_FREQ, HEAD_DAMP, dt);
+    p.nod.to(LOOK_WORK * work + 0.12 * idle * noise.grad(0x40D, p.t * LOOK_IDLE_RATE, 3.5), HEAD_FREQ, HEAD_DAMP, dt);
+    // tail: each joint chases the one before it, steered by turning and gait
+    var target = m.clamp(-p.turn * TAIL_TURN, -TAIL_TURN_MAX, TAIL_TURN_MAX) + @sin(p.t * TAIL_IDLE_RATE) * TAIL_IDLE * (1 - st) + @sin(p.phase * m.tau) * TAIL_GAIT * st;
+    for (&p.tail, 0..) |*j, i| {
+      j.to(target, TAIL_FREQ - m.f(i) * TAIL_FREQ_STEP, 0.45, dt);
+      target = j.x;
     }
   }
 
-  /// the belly's lumps and the pectorals lag behind the body's acceleration
-  /// (inertia), overshoot when it stops, and settle back on their springs.
-  fn slosh(p:*Player, step:bool, dt:f32) void {
+  /// the belly's lumps and the resin lag behind the body's acceleration
+  /// (inertia), overshoot when it stops, and settle back on their springs;
+  /// a footfall drops them a little.
+  fn slosh(p:*Player, fell:bool, dt:f32) void {
     const room = p.bellyRoom();
+    const force = -p.accel * m.splat3(SLOSH);
     for (&p.lump, lumps) |*s, l| {
-      if (step) s.vel[1] -= STEP_KICK * p.stride;
-      const force = -p.accel * m.splat3(l.mass * SLOSH);
-      m.springDamper(&s.pos, &s.vel, l.rest * m.splat3(room), l.k, l.c, l.mass, force, dt);
+      if (fell) s.vel[1] -= STEP_KICK * p.stride;
+      m.springDamper(&s.pos, &s.vel, l.rest * m.splat3(room), l.k, l.c, l.mass, force * m.splat3(l.mass), dt);
       // stay inside the sac; hitting its wall stops the outward motion
       const d = m.len(s.pos);
       if (d > room) {
@@ -265,169 +445,141 @@ pub const Player = struct {
       }
     }
     for (&p.pec, PEC_K) |*s, k| {
-      m.springDamper(&s.pos, &s.vel, v3(0, 0, 0), k, PEC_C, PEC_MASS, -p.accel * m.splat3(PEC_MASS * SLOSH), dt);
+      if (fell) s.vel[1] -= RUMP_KICK * 0.6 * p.stride;
+      m.springDamper(&s.pos, &s.vel, v3(0, 0, 0), k, PEC_C, PEC_MASS, force * m.splat3(PEC_MASS), dt);
       const d = m.len(s.pos);
       if (d > PEC_MAX) s.pos *= m.splat3(PEC_MAX / d);
     }
     for (&p.rump) |*s| {
-      m.springDamper(&s.pos, &s.vel, v3(0, 0, 0), RUMP_K, RUMP_C, PEC_MASS, -p.accel * m.splat3(PEC_MASS * SLOSH), dt);
+      if (fell) s.vel[1] -= RUMP_KICK * p.stride;
+      m.springDamper(&s.pos, &s.vel, v3(0, 0, 0), RUMP_K, RUMP_C, PEC_MASS, force * m.splat3(PEC_MASS), dt);
       const d = m.len(s.pos);
       if (d > RUMP_MAX) s.pos *= m.splat3(RUMP_MAX / d);
     }
   }
 
-  /// a leg's place in the gait cycle, and how far it is lifted (0 planted)
-  fn legPhase(p:*const Player, side:f32) f32 { return p.phase + (if (side > 0) m.pi else @as(f32, 0)); }
-  fn legLift(p:*const Player, side:f32) f32 { return @max(0, @cos(p.legPhase(side))) * p.stride; }
+  /// how far a lump's centre may stray from the gut's centre (in the gut
+  /// bone's frame, which swells with it): within `BELLY_ROOM` of the sac,
+  /// and never poking through it
+  fn bellyRoom(_:*const Player) f32 {
+    return @max(@min(belly_mesh.DOWN, @min(belly_mesh.RX, belly_mesh.RZ)) * BELLY_ROOM - LUMP_R, BELLY_ROOM_MIN);
+  }
 
-  fn bellyScale(p:*const Player) f32 { return 1 + p.fullness * BELLY_GROW; }
-  fn lumpRadius(p:*const Player) f32 { return LUMP_R * p.bellyScale() / (1 + BELLY_GROW); }
-  /// how far a lump's centre may stray from the belly's centre: within `BELLY_ROOM`
-  /// of the sac, and never poking through it
-  fn bellyRoom(p:*const Player) f32 {
-    return @max(@reduce(.Min, BELLY_R) * p.bellyScale() * BELLY_ROOM - p.lumpRadius(), BELLY_ROOM_MIN);
+  /// the skeleton's pose this frame, in wolf space (see wolf_skeleton)
+  pub fn pose(p:*const Player) skel.Pose {
+    const st = p.stride;
+    const work = p.reach.x;
+    const ph = p.phase * m.tau;
+    var q:skel.Pose = .{};
+    // the pelvis: lowest just after each footfall, over the planted foot
+    const bob = BOB * st * (0.5 + 0.5 * @cos(2 * ph - p.duty * m.tau));
+    q.hip = v3(SWAY * st * @sin(ph), skel.HIP_Y - SINK * st - bob - 0.07 * work, 0);
+    q.pelvis = .{ .x = 0.25 * p.lean.x, .y = HIP_TURN * st * @sin(ph), .z = HIP_ROLL * st * @cos(ph) + p.bank.x };
+    q.waist = .{ .x = 0.35 * p.lean.x, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
+    q.chest = .{ .x = 0.4 * p.lean.x, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
+    const breath = @sin(p.breath);
+    q.breath = 1 + m.lerp(BREATH, BREATH_RUN, st) * breath;
+    // the head holds its gaze: it takes back the body's lean and bob
+    const body_pitch = q.pelvis.x + q.waist.x + q.chest.x;
+    q.neck = .{ .x = -0.4 * body_pitch + 0.5 * p.nod.x, .y = 0.4 * p.look.x - 0.3 * q.chest.y };
+    q.head = .{ .x = -0.6 * body_pitch + 0.5 * p.nod.x - bob * 1.5 + 0.02 * breath, .y = 0.6 * p.look.x - 0.3 * q.chest.y, .z = -0.5 * p.bank.x };
+    q.jaw = PANT * st * (0.6 + 0.4 * breath);
+    q.gut = p.fullness;
+    for (0..2) |s| {
+      const x = skel.sign(s);
+      q.arms[s] = .{
+        .root = .{ .x = p.arm[s].x, .z = x * (ARM_OUT + 0.02 * breath + 0.1 * work), .y = -x * 0.15 * work },
+        .mid = p.elbow[s].x,
+        .low = .{ .x = 0.2 + 0.3 * work },
+      };
+      q.ears[s] = .{ .x = p.ear[s].x, .z = 0.15 * x * p.ear[s].x };
+    }
+    // the tail lifts with the stride and droops at rest, each joint bending
+    // a little further
+    for (&q.tail, p.tail, 0..) |*j, sp, i| j.* = .{ .x = (if (i == 0) -TAIL_LIFT * st else TAIL_DROOP * (1 - 0.6 * st)), .z = sp.x };
+    q.legs = p.legs(q);
+    return q;
+  }
+
+  /// each leg reaching its foot, by inverse kinematics in the pelvis's frame
+  fn legs(p:*const Player, q:skel.Pose) [2]skel.Limb {
+    var out:[2]skel.Limb = undefined;
+    const to_wolf = m.inverseRigid(p.heading());
+    const pelvis = m.chain(&.{ T(q.hip), q.pelvis.m4() });
+    const into = m.inverseRigid(pelvis);
+    const pelvis_pitch = q.pelvis.x;
+    for (&out, 0..) |*l, s| {
+      const f = p.feet[s];
+      const fw = m.mulV(to_wolf, .{ f.at[0], f.at[1], f.at[2], 1 });
+      const fp = m.mulV(into, fw);
+      const swing = if (f.planted()) @as(f32, 0) else @sin(f.t * m.pi);
+      l.* = solveLeg(v3(fp[0], fp[1], fp[2]) - v3(skel.sign(s) * skel.HIP_X, 0, 0), SWING_FOLD * swing, pelvis_pitch, TOE_HANG * swing);
+    }
+    return out;
   }
 
   /// emit every part; returns where each paw (left, right) touches down.
   pub fn rig(p:*const Player, out:*Parts) Allocator.Error![2]V3 {
-    var feet:[2]V3 = undefined;
-    const t = p.t;
-    const st = p.stride;
-    const lean = 0.14 * st + 0.35 * p.reach;
-    const hip_y = 0.7 - 0.035 * st * @abs(@cos(p.phase)) - 0.06 * p.reach;
-    const root = m.chain(&.{ T(p.pos), m.rotY(p.facing) });
-    const hips = m.chain(&.{ root, T(v3(0, hip_y, 0)) });
-    const torso = m.chain(&.{ hips, m.rotY(@sin(p.phase) * 0.08 * st), m.rotX(lean) });
-    // the surface breathes (see `BREATH_RATE`)
-    const breath = 1 + BREATH_TORSO * @sin(t * BREATH_RATE);
-    const lb = 1 + BREATH_LIMB * @sin(t * BREATH_RATE + BREATH_LAG);
-    const vine_look:parts.Look = .{ .glow = 0.25, .phase = 0.1 };
+    const q = p.pose();
+    const root = p.heading();
+    var w = skel.fk(q);
+    for (&w) |*b| b.* = m.mul(root, b.*);
+    const skin = skel.skin(w, &bindInv(), q.breath);
+    const base = try out.pose(&skin);
+    const mid = p.pos + v3(0, BODY_MID, 0);
+    const at = struct {
+      fn f(ws:*const [skel.COUNT]M4, b:Bone) M4 { return ws[@intFromEnum(b)]; }
+    }.f;
 
-    try out.emit(.wolf_torso, m.chain(&.{ torso, S(v3(breath, 1, breath)) }), vine_look);
+    try out.emitSkinned(.wolf_body, base, mid, .{ .glow = BODY_GLOW, .flutter = BODY_FLUTTER, .phase = 0.1 });
+    try out.emitSkinned(.wolf_ears, base, mid, .{ .glow = 0.3, .phase = 0.5, .fade = EAR_OPACITY });
+    try out.emit(.paw_bean, m.chain(&.{ at(&w, .head), T(body_mesh.NOSE), m.rotX(-body_mesh.NOSE_TILT), S(v3(0.015, 0.0105, 0.011)) }), .{ .glow = 0.1, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
 
     // the belly: a sap sac that inflates with the inventory, drops and sags
     // as it fills, with the heavier things inside showing through as shadows
     const b = p.fullness;
-    // the sac stays on the chest (its tongue between the pectorals); its gut
-    // swells, drops and pushes forward in the shader, and the lumps with it
-    const sac = m.chain(&.{ torso, T(v3(0, 0.16, 0.05)) });
-    const belly = m.chain(&.{ sac, T(v3(0, -0.04 * b, 0.05 * b)) });
+    const gut = at(&w, .gut);
     var held:usize = 0;
-    for (p.inv.slot) |slot| if (slot != null) { held += 1; };
+    for (p.inv.slot) |slot| if (slot != null) {
+      held += 1;
+    };
     for (p.lump[0..@min(held, lumps.len)]) |l| {
-      try out.emit(.belly_lump, m.chain(&.{ belly, T(l.pos), S(m.splat3(p.lumpRadius())) }), .{ .glow = 0.25, .phase = 0.3 });
+      try out.emit(.belly_lump, m.chain(&.{ gut, T(l.pos), S(m.splat3(LUMP_R)) }), .{ .glow = 0.25, .phase = 0.3 });
     }
-    try out.emit(.wolf_belly, sac, .{
-      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .sag = BELLY_SWELL * b, .give = .{ b, 0, 0 },
+    try out.emitSkinned(.wolf_belly, base, mid, .{
+      .glow = 0.35 + 0.65 * b, .phase = 0.3, .fade = SAP_OPACITY, .give = .{ b, 0, 0 },
     });
 
-    // pectorals: broad dishes of solidified sap. Their bases sit on the
-    // chest; the spring (and a slow idle) moves their surface like dense gel
+    // the pectorals and the rear: resin, its surface given by its spring
+    // (and, on the chest, a slow idle) while its base holds
     for ([_]meshlib.Id{ .wolf_pec_l, .wolf_pec_r }, [_]f32{ -1, 1 }, 0..) |id, side, i| {
-      const idle = v3(0, 0.003 * @sin(t * m.tau / 3 + side * 1.3), 0);
-      const at = torso_mesh.pec_centre * v3(side * breath, 1, breath);
-      const give = p.pec[i].pos + idle;
-      try out.emit(id, m.chain(&.{ torso, T(at) }), .{ .phase = 0.6, .fade = PEC_OPACITY, .give = .{ give[0], give[1], give[2] } });
+      const give = p.pec[i].pos + v3(0, 0.003 * @sin(p.t * m.tau / 3 + side * 1.3), 0);
+      try out.emitSkinned(id, base, mid, .{ .phase = 0.6, .fade = PEC_OPACITY, .give = .{ give[0], give[1], give[2] } });
     }
-    // the rear: two knotted lobes of dense vine behind the hips
-    for ([_]meshlib.Id{ .wolf_rump_l, .wolf_rump_r }, [_]f32{ -1, 1 }, 0..) |id, side, i| {
-      const at = rump_mesh.centre * v3(side, 1, 1) + p.rump[i].pos;
-      try out.emit(id, m.chain(&.{ hips, T(at) }), .{ .glow = 0.25, .phase = 0.15, .fade = RUMP_SAP_OPACITY });
+    for ([_]meshlib.Id{ .wolf_rump_l, .wolf_rump_r }, 0..) |id, i| {
+      const give = p.rump[i].pos;
+      try out.emitSkinned(id, base, mid, .{ .phase = 0.15, .fade = RUMP_OPACITY, .give = .{ give[0], give[1], give[2] } });
     }
 
-    // head looks down into the work, nods with breath
-    const nod = @sin(t * BREATH_RATE) * 0.03 + p.reach * 0.35 - lean * 0.8;
-    const neck = m.chain(&.{ torso, T(v3(0, 0.5, 0.05)), m.rotX(nod) });
-    try joint(out, neck, 0.075);
-    const head = m.chain(&.{ neck, T(v3(0, 0.0, 0.02)) });
-    // its fur and cheek leaves barely stir: they lie on the head, not wave
-    try out.emit(.wolf_head, head, .{ .glow = 0.9, .flutter = 0.15, .phase = 0.5 });
-    try out.emit(.paw_bean, m.chain(&.{ head, T(head_mesh.nose), S(v3(0.021, 0.014, 0.013)) }), .{ .glow = 0.1, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
-    // ears: rooted in the skull, leaning a little forward and out; heavy,
-    // so they do not flutter
-    for ([_]f32{ -1, 1 }) |side| {
-      const ear = m.chain(&.{ head, T(head_mesh.ear_root * v3(side, 1, 1)), m.rotZ(-side * EAR_TILT), m.rotX(EAR_TILT) });
-      try out.emit(.wolf_ear, ear, .{ .glow = 0.3, .phase = 0.5 + side * 0.1, .fade = EAR_OPACITY });
-    }
-
-    for ([_]f32{ -1, 1 }) |side| {
-      try out.emit(.leaf_tuft, m.chain(&.{ torso, T(v3(side * 0.17, 0.47, -0.01)), m.rotZ(-side * 0.5) }), .{ .flutter = 1, .phase = 0.2 + side * 0.1 });
-
-      // arms swing against the legs; while working they reach and dig
-      const swing = @sin(p.phase + (if (side > 0) @as(f32, 0) else m.pi)) * 0.6 * st;
-      const dig = -1.15 + @sin(t * 9 + side) * 0.25;
-      const a = m.lerp(swing, dig, p.reach);
-      const shoulder = m.chain(&.{ torso, T(v3(side * 0.19, 0.43, 0)), m.rotZ(side * 0.15), m.rotX(a) });
-      // a deltoid caps the joint; bicep and tricep above a tapering forearm
-      try out.emit(.wolf_deltoid, m.chain(&.{ shoulder, S(m.splat3(lb)) }), vine_look);
-      try out.emit(.wolf_upper_arm, m.chain(&.{ shoulder, m.rotX(m.pi), S(v3(lb, 1, lb)) }), vine_look);
-      const elbow = m.chain(&.{ shoulder, T(v3(0, -upper_arm.LEN, 0)), m.rotX(-(0.3 + 0.35 * st * @max(0, -swing)) - p.reach * 0.7) });
-      try joint(out, elbow, 0.058);
-      try out.emit(.wolf_forearm, m.chain(&.{ elbow, m.rotX(m.pi), S(v3(lb, 1, lb)) }), vine_look);
-      const wrist = m.chain(&.{ elbow, T(v3(0, -forearm.LEN, 0)) });
-      try joint(out, wrist, 0.042);
-      const hand = m.chain(&.{ wrist, m.rotX(1.2) });
-      try out.emit(.wolf_paw, hand, vine_look);
-      // the hand's beans: a palm pad and four finger pads
-      const hand_bean:parts.Look = .{ .glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
-      try out.emit(.paw_pad, m.chain(&.{ hand, T(paw_mesh.palm_at), S(v3(0.019, 0.005, 0.017)) }), hand_bean);
-      for (paw_mesh.fingers) |fp| {
-        try out.emit(.paw_bean, m.chain(&.{ hand, T(v3(fp[0] * 1.05, paw_mesh.PALM_Y - 0.002, fp[1])), S(v3(0.0058, 0.0035, 0.007)) }), hand_bean);
-      }
-
-      // digitigrade legs, anthro proportions: near-vertical thigh, knee
-      // bending forward, the calf angled back to a high hock, the metatarsal
-      // angled forward to a long flat foot. At rest the ball lands under the hip.
-      const lp = p.legPhase(side);
-      const lift = p.legLift(side);
-      const th = -0.25 - @sin(lp) * 0.45 * st + 0.25 * p.reach;
-      const kn = 0.87 + 0.55 * lift + 0.3 * p.reach;
-      const mt = -1.23 - 0.4 * lift - 0.25 * p.reach;
-      const thigh = m.chain(&.{ hips, T(v3(side * 0.1, 0, 0)), m.rotX(th) });
-      try joint(out, thigh, 0.095);
-      try out.emit(.wolf_thigh, m.chain(&.{ thigh, m.rotX(m.pi), S(v3(lb, 1, lb)) }), vine_look);
-      const knee = m.chain(&.{ thigh, T(v3(0, -THIGH, 0)), m.rotX(kn) });
-      try joint(out, knee, 0.075);
-      try out.emit(.wolf_calf, m.chain(&.{ knee, m.rotX(m.pi), S(v3(lb, 1, lb)) }), vine_look);
-      const hock = m.chain(&.{ knee, T(v3(0, -SHIN, 0)), m.rotX(mt) });
-      try joint(out, hock, 0.058);
-      try out.emit(.wolf_limb, m.chain(&.{ hock, m.rotX(m.pi), S(v3(0.095 * lb, META, 0.095 * lb)) }), vine_look);
-      const heel = m.chain(&.{ hock, T(v3(0, -META, 0)) });
-      try joint(out, heel, 0.038);
-      const foot = m.chain(&.{ heel, m.rotX(-(th + kn + mt)) });
-      try out.emit(.wolf_foot, foot, vine_look);
-      // the beans: one central pad that flattens while planted, four toe pads
-      const fi:usize = if (side > 0) 1 else 0;
+    var feet:[2]V3 = undefined;
+    for (skel.sides, 0..) |sd, s| {
+      const x = skel.sign(s);
+      // the beans: a palm pad and four finger pads on each hand; one
+      // central pad on each foot that flattens while planted, four toe pads
       const bean:parts.Look = .{ .glow = 0.15, .fade = BEAN_OPACITY, .tint = BEAN_TINT };
-      try out.emit(.paw_pad, m.chain(&.{ foot, T(foot_mesh.pad_at), S(v3(0.021, 0.006 * (1 - PAD_FLATTEN * p.pad[fi]), 0.02)) }), bean);
-      for (foot_mesh.toes) |tp| {
-        try out.emit(.paw_bean, m.chain(&.{ foot, T(v3(tp[0], foot_mesh.SOLE_Y + 0.002, tp[1])), S(v3(0.0065, 0.004, 0.008)) }), bean);
+      const hand = at(&w, sd.hand);
+      try out.emit(.paw_pad, m.chain(&.{ hand, T(body_mesh.PALM * v3(x, 1, 1)), m.rotZ(x * m.pi / 2.0), S(v3(0.018, 0.005, 0.016)) }), bean);
+      for (body_mesh.FINGERS) |z| {
+        try out.emit(.paw_bean, m.chain(&.{ hand, T(v3(-x * 0.012, body_mesh.FINGER_AT, z * 1.1)), S(v3(0.0035, 0.0065, 0.006)) }), bean);
+      }
+      const foot = at(&w, sd.foot);
+      try out.emit(.paw_pad, m.chain(&.{ foot, T(body_mesh.PAD_AT), S(v3(0.021, 0.006 * (1 - PAD_FLATTEN * p.feet[s].pad), 0.02)) }), bean);
+      for (body_mesh.TOES) |tp| {
+        try out.emit(.paw_bean, m.chain(&.{ foot, T(v3(tp[0], body_mesh.SOLE_Y + 0.002, tp[1])), S(v3(0.0065, 0.004, 0.008)) }), bean);
       }
       const c = m.mulV(foot, .{ 0, 0, 0.04, 1 });
-      feet[fi] = v3(c[0], c[1], c[2]);
+      feet[s] = v3(c[0], c[1], c[2]);
     }
-
-    // tail: the spring-steered joint chain gives the control points, and the
-    // GPU bends the tail's braided vine through them (part.vert), so it lags
-    // and curves like a living thing instead of a row of rigid rods.
-    try out.emit(.wolf_tailbone, m.chain(&.{ hips, T(tailbone.at) }), .{ .glow = 0.25, .phase = 0.15, .fade = TAILBONE_SAP_OPACITY });
-    var seg = m.chain(&.{ hips, T(tailbone.at), m.rotX(TAIL_ROOT_TILT + 0.15 * st) });
-    var ctrl:[TAIL_JOINTS + 1]V3 = undefined;
-    ctrl[0] = m.origin(seg);
-    for (0..TAIL_JOINTS) |i| {
-      seg = m.chain(&.{ seg, m.rotZ(p.tail[i]), m.rotX(-0.18), T(v3(0, TAIL_SEG, 0)) });
-      ctrl[i + 1] = m.origin(seg);
-    }
-    mg.grow(&ctrl, .{
-      .start = ctrl[0], .direction = m.norm(ctrl[TAIL_JOINTS] - ctrl[0]), .length = TAIL_SEG * TAIL_JOINTS,
-      .wobble = 0.06, .curl = 0.15, .taper = 0.2, .seed = 0x7A11,
-    });
-    const side = m.mulV(hips, .{ 1, 0, 0, 0 });
-    try out.emitCurve(.wolf_tail, ctrl, v3(side[0], side[1], side[2]), tail_mesh.LEN, 1, vine_look);
-    // the tuft keeps the last joint's frame (smooth, no roll flips), moved
-    // onto the vine's actual tip, which growth shifted slightly off the joint
-    const tip = m.chain(&.{ T(ctrl[TAIL_JOINTS] - m.origin(seg)), seg });
-    try out.emit(.leaf_tuft, m.chain(&.{ tip, m.rotX(-0.6), S(v3(1.3, 1.3, 1.3)) }), .{ .flutter = 1.5, .phase = 0.7 });
     return feet;
   }
 
@@ -441,9 +593,53 @@ pub const Player = struct {
   }
 };
 
-/// a woven knot where two parts meet, so bent joints never show a seam.
-fn joint(out:*Parts, at:m.M4, r:f32) Allocator.Error!void {
-  try out.emit(.wolf_joint, m.chain(&.{ at, S(m.splat3(r)) }), .{ .glow = 0.25, .phase = 0.1 });
+/// where each foot's ball rests under the standing wolf (wolf space)
+const restFoot = blk: {
+  @setEvalBranchQuota(100000);
+  var out:[2]V3 = undefined;
+  const w = skel.fk(.{});
+  for (&out, skel.sides) |*o, sd| o.* = m.origin(w[@intFromEnum(sd.foot)]);
+  break :blk out;
+};
+
+/// the skeleton's bind pose, inverted (what the skin matrices start from)
+fn bindInv() [skel.COUNT]M4 { return skel.inverses(skel.bind()); }
+
+/// the leg reaching `d` (the ball, from the hip joint, in the pelvis's
+/// frame). Digitigrade: the metatarsal keeps its angle to the thigh (`fold`
+/// more mid-swing), so thigh and metatarsal act as one link and the shin as
+/// the other, solved by the law of cosines; the knee always folds back.
+/// The foot is kept level with the ground (the pelvis tilted by
+/// `pelvis_pitch`), its toes hanging by `hang`.
+pub fn solveLeg(d:V3, fold:f32, pelvis_pitch:f32, hang:f32) skel.Limb {
+  // out to the side first (the hip's roll), then in its own plane
+  const ab = m.atan2(d[0], -d[1]);
+  const plane = m.mulV(m.rotZ(-ab), .{ d[0], d[1], d[2], 0 });
+  const dy = plane[1];
+  const dz = plane[2];
+  const delta = skel.REST_KNEE + skel.REST_HOCK - fold;
+  // thigh and metatarsal as one link: its length and the angle it sits at
+  // from the thigh's own
+  const cy = skel.THIGH + skel.META * @cos(delta);
+  const cz = skel.META * @sin(delta);
+  const lv = @sqrt(cy * cy + cz * cz);
+  const phi = m.atan2(cz, cy);
+  const l2 = skel.SHIN;
+  const reach = @sqrt(dy * dy + dz * dz);
+  const dist = m.clamp(reach, @abs(lv - l2) + 1e-3, lv + l2 - 1e-3);
+  // the direction toward the ball, as a limb's turn about X
+  const beta = m.atan2(-dz, -dy);
+  const g1 = std.math.acos(m.clamp((lv * lv + dist * dist - l2 * l2) / (2 * lv * dist), -1, 1));
+  const g2 = std.math.acos(m.clamp((l2 * l2 + dist * dist - lv * lv) / (2 * l2 * dist), -1, 1));
+  const th = beta - g1 - phi;
+  const shin = beta + g2;
+  const meta = th + delta;
+  return .{
+    .root = .{ .x = th, .z = ab },
+    .mid = shin - th,
+    .low = .{ .x = meta - shin },
+    .foot = -meta - pelvis_pitch + hang,
+  };
 }
 
 /// tests step at the 60 Hz tick and allow this much float slack
@@ -455,36 +651,44 @@ test "belly contents lag a sprint, overshoot a stop, then settle" {
   _ = p.inv.add(.grit, 50);
   const dt:f32 = TEST_DT;
   for (0..120) |_| p.animate(dt);
-  const rest = p.lump[0].pos;
+  const rest_at = p.lump[0].pos;
   // a burst of speed forward (+z): the lump swings back
   p.vel = v3(0, 0, 4);
   p.animate(dt);
   for (0..3) |_| p.animate(dt);
-  try testing.expect(p.lump[0].pos[2] < rest[2] - 0.005);
+  try testing.expect(p.lump[0].pos[2] < rest_at[2] - 0.005);
   // run steadily, then stop dead: it overshoots forward
   for (0..120) |_| p.animate(dt);
   p.vel = v3(0, 0, 0);
   for (0..4) |_| p.animate(dt);
-  try testing.expect(p.lump[0].pos[2] > rest[2] + 0.005);
+  try testing.expect(p.lump[0].pos[2] > rest_at[2] + 0.005);
   // and it never leaves the sac
   for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + TEST_EPS);
   for (p.pec) |q| try testing.expect(m.len(q.pos) <= PEC_MAX + TEST_EPS);
   for (p.rump) |q| try testing.expect(m.len(q.pos) <= RUMP_MAX + TEST_EPS);
 }
 
-test "the tail's root clears the rear lobes" {
-  // its first 0.1 runs straight out of the tailbone along the root tilt,
-  // at rest and in full stride
-  for ([_]f32{ 0, 1 }) |st| {
-    const r = m.rotX(TAIL_ROOT_TILT + 0.15 * st);
-    const d4 = m.mulV(r, .{ 0, 1, 0, 0 });
-    const dir = v3(d4[0], d4[1], d4[2]);
-    for (0..11) |i| {
-      const p = tailbone.at + dir * m.splat3(0.01 * m.f(i));
-      for ([_]f32{ -1, 1 }) |side| {
-        const q = (p - rump_mesh.centre * v3(side, 1, 1)) / rump_mesh.radii;
-        try testing.expect(m.dot(q, q) > 1);
-      }
-    }
+test "the leg reaches its resting foot in its resting pose" {
+  const w = skel.fk(.{});
+  for (skel.sides, 0..) |sd, s| {
+    const foot = m.origin(w[@intFromEnum(sd.foot)]);
+    const l = solveLeg(foot - v3(skel.sign(s) * skel.HIP_X, skel.HIP_Y, 0), 0, 0, 0);
+    try testing.expectApproxEqAbs(skel.REST_THIGH, l.root.x, 1e-3);
+    try testing.expectApproxEqAbs(skel.REST_KNEE, l.mid, 1e-3);
+    try testing.expectApproxEqAbs(skel.REST_HOCK, l.low.x, 1e-3);
   }
+}
+
+test "a planted foot stays where it is planted while the wolf walks" {
+  var p:Player = .{ .pos = v3(0, 0, 0) };
+  p.animate(TEST_DT);
+  p.vel = v3(0, 0, WALK_SPEED);
+  for (0..240) |_| {
+    p.pos += p.vel * m.splat3(TEST_DT);
+    const before = p.feet;
+    p.animate(TEST_DT);
+    for (before, p.feet) |a, b| if (a.planted() and b.planted()) try testing.expect(m.len(a.at - b.at) < 1e-5);
+  }
+  // and both feet keep up with it
+  for (p.feet, 0..) |f, s| try testing.expect(m.len(f.at - p.rest(s)) < TRAIL_MAX + 0.1);
 }

@@ -1,16 +1,16 @@
-//! mesh: WOLF BELLY, in torso units around the gut's centre (+Z forward).
-//! A sac of sap shaped like the pectorals' lobes are: not a ball but a
-//! teardrop. A full, rounded gut below, its upper side drawing in along a
-//! smooth concave flank into a narrow tongue that runs up the chest to
-//! finish between the pectorals, at their middle. A net of grown vines
-//! wraps it (tapering at both ends, leaves along them) and a belly button
-//! sits sunk in the sap at the front of the gut.
+//! mesh: WOLF BELLY. a sac of sap on the gut, skinned to the spine: an egg
+//! rounded and full below, drawing in smoothly toward the ribs above, its
+//! back sunk in the body so only the swell shows. Convex everywhere, so
+//! its near side (the only side drawn) never folds away. A net of grown
+//! vines wraps it (tapering at both ends, leaves along them) and a belly
+//! button sits sunk in the sap at the front.
 //!
-//! tu.x on every vertex is how much of the gut it is (1 in the gut, 0 up
-//! the tongue): the part shader inflates the sac by it as the belly fills,
-//! so the gut swells and drops while the tongue stays on the chest. The
-//! belly button's vertices carry tu.y = NAVEL: the shader raises it from
-//! inside the sap to the surface, and on out, the fuller the belly.
+//! tu.x on every vertex is how much of the gut it is (1 low and in front,
+//! 0 toward the ribs): that share of it moves with the skeleton's gut bone,
+//! which swells, drops and pushes forward as the belly fills, while its top
+//! stays with the spine. The belly button's vertices carry tu.y =
+//! NAVEL: the shader raises it from inside the sap to the surface, and on
+//! out, the fuller the belly.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -18,88 +18,101 @@ const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const kit = @import("wolf_kit.zig");
 const color = @import("../../core/color.zig");
+const skel = @import("wolf_skeleton.zig");
+const Sculpt = @import("sculpt_kit.zig").Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;
 
-/// the gut's radii when empty (x, y, z)
-pub const GUT = v3(0.13, 0.12, 0.12);
-/// where the tongue finishes, between the pectorals (relative to the gut's
-/// centre when empty)
-const TIP_Y:f32 = 0.2;
-const TIP_Z:f32 = 0.07;
+/// the gut's centre in the waist bone's frame, and its radii: across,
+/// down, up (toward the ribs) and forward
+pub const CENTRE = skel.GUT_AT;
+pub const RX:f32 = 0.11;
+pub const DOWN:f32 = 0.095;
+pub const UP:f32 = 0.15;
+pub const RZ:f32 = 0.086;
+/// how far the sac narrows toward its top (share of its width)
+const TAPER:f32 = 0.38;
 /// tu.y marking the belly button for the shader
 pub const NAVEL:f32 = 2;
 
-const N = 28;
-const SIDES = 20;
+const RINGS = 30;
+const SIDES = 40;
 
-/// the sac's centreline and half-width/depth at s (0 bottom .. 1 tip)
-const Section = struct { at:V3, w:f32, d:f32, gut:f32 };
-
-fn section(s:f32) Section {
-  const y = m.lerp(-GUT[1], TIP_Y, s);
-  // the gut: round below its centre
-  const below = @sqrt(@max(0, 1 - m.pow(f32, @min(y, 0) / GUT[1], 2)));
-  // above it the flank draws in, concave, into the tongue
-  const up = m.clamp01(y / TIP_Y);
-  const draw = 1 - 0.82 * m.smooth(m.pow(f32, up, 0.8));
-  // the tongue's end rounds off
-  const end = @sqrt(@max(0, 1 - m.pow(f32, m.clamp01((y - (TIP_Y - 0.03)) / 0.03), 2)));
-  const r = (if (y < 0) below else draw) * end;
-  return .{
-    .at = v3(0, y, TIP_Z * m.smooth(up)),
-    .w = GUT[0] * r,
-    .d = GUT[2] * r * (if (y < 0) @as(f32, 1) else m.lerp(1, 0.35, m.smooth(up))),
-    .gut = 1 - m.smooth(m.clamp01((y - 0.02) / 0.15)),
-  };
+/// a point on the sac at `th` (0 bottom .. pi top) and `ph` around (0 the
+/// right side, pi/2 the front), `lift` times out from its surface, in the
+/// waist's frame
+fn surface(th:f32, ph:f32, lift:f32) V3 {
+  const y = -@cos(th);
+  const r = @sin(th);
+  const up = @max(y, 0);
+  const narrow = 1 - TAPER * up * up;
+  return CENTRE + v3(@cos(ph) * r * RX * narrow, y * (if (y > 0) UP else DOWN), @sin(ph) * r * RZ * narrow) * m.splat3(lift);
 }
 
-/// a point on the sac's surface at s, around it by a (0 the right side,
-/// pi/2 the front)
-fn surface(s:f32, a:f32, lift:f32) V3 {
-  const sc = section(s);
-  return sc.at + v3(@cos(a) * sc.w * lift, 0, @sin(a) * sc.d * lift);
+fn normal(th:f32, ph:f32) V3 {
+  const e:f32 = 1e-3;
+  const t0 = @max(th, 2 * e);
+  const t1 = @min(t0, m.pi - 2 * e);
+  const dt = surface(t1 + e, ph, 1) - surface(t1 - e, ph, 1);
+  const dp = surface(t1, ph + e, 1) - surface(t1, ph - e, 1);
+  const n = m.norm(m.cross(dp, dt));
+  const out = surface(t1, ph, 1) - CENTRE;
+  return if (m.dot(n, out) < 0) -n else n;
 }
+
+/// how much of the gut a point at `th` is: all of it below the middle,
+/// none toward the top
+fn gut(th:f32) f32 { return 1 - m.smooth(m.clamp01((-@cos(th) - 0.1) / 0.75)); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  var spine:[N]V3 = undefined;
-  var ts:[N]f32 = undefined;
-  var ws:[N]f32 = undefined;
-  var hs:[N]f32 = undefined;
-  for (0..N) |i| {
-    // finer toward the ends, where the shape turns fastest
-    const s = 0.5 - 0.5 * @cos(m.pi * m.ratio(i, N - 1));
-    const sc = section(s);
-    spine[i] = sc.at;
-    ts[i] = sc.gut;
-    ws[i] = @max(sc.w, 0.0015);
-    hs[i] = @max(sc.d, 0.0015);
+  const start = b.mark();
+  const R = RINGS + 1;
+  const C = SIDES + 1;
+  var pts:[R * C]V3 = undefined;
+  var nrm:[R * C]V3 = undefined;
+  var cols:[R * C]color.Rgba8 = undefined;
+  var us:[R * C]f32 = undefined;
+  for (0..R) |i| for (0..C) |j| {
+    const th = m.ratio(i, RINGS) * m.pi;
+    // round the other way, so the sheet faces out
+    const ph = (1 - m.ratio(j, SIDES)) * m.tau;
+    const at = i * C + j;
+    pts[at] = surface(th, ph, 1);
+    nrm[at] = normal(th, ph);
+    cols[at] = pal.sap;
+    us[at] = 0;
+  };
+  try mg.patch(b, R, C, &pts, &nrm, &cols, &us, 0, .bloom);
+  // tu.x: how much of the gut each vertex is
+  for (b.v.items[start..]) |*vx| {
+    const y = (vx.pos[1] - CENTRE[1]);
+    const th = m.pi / 2.0 + m.asin(m.clamp(y / (if (y > 0) UP else DOWN), -1, 1));
+    vx.tu[0] = gut(th);
   }
-  try mg.loft(b, &spine, &ts, &ws, &hs, v3(0, 0, 1), ellipse, pal.sap, .bloom, SIDES);
 
   // the net: grown vines from under the gut up over it, twisting, the
-  // front ones running on up the tongue; tapering at both ends, leaves
+  // front ones running on toward the ribs; tapering at both ends, leaves
   // lying along them
   for (0..6) |vi| {
     const a0 = m.ratio(vi, 6) * m.tau + 0.3;
     const front = @sin(a0) > 0.3;
-    const top:f32 = if (front) 0.9 else 0.62;
+    const top:f32 = if (front) 0.88 else 0.66;
     var path:[22]V3 = undefined;
     var vts:[22]f32 = undefined;
     var rs:[22]f32 = undefined;
     for (&path, &vts, &rs, 0..) |*p, *t, *r, j| {
       const k = m.ratio(j, 21);
-      const s = m.lerp(0.06, top, k);
-      p.* = surface(s, a0 + k * 0.9, 1.06);
-      t.* = section(s).gut;
-      r.* = @max(0.0075 * @sqrt(@sin(m.pi * k)), 0.0005);
+      const th = m.lerp(0.12, top, k) * m.pi;
+      p.* = surface(th, a0 + k * 0.9, 1.04);
+      t.* = gut(th);
+      r.* = @max(0.0072 * @sqrt(@sin(m.pi * k)), 0.0005);
     }
     try b.tubeR(&path, &vts, &rs, pal.wolf_vine, .stem, 5);
-    for ([_]usize{7, 14}) |j| {
-      const out = m.norm(path[j] - section(m.lerp(0.06, top, m.ratio(j, 21))).at);
+    for ([_]usize{ 7, 14 }) |j| {
+      const th = m.lerp(0.12, top, m.ratio(j, 21)) * m.pi;
       try kit.leaf(b, .{
-        .base = path[j], .along = m.norm(path[j - 1] - path[j + 1]), .out = out,
+        .base = path[j], .along = m.norm(path[j - 1] - path[j + 1]), .out = normal(th, a0 + m.ratio(j, 21) * 0.9),
         .len = 0.045, .width = 0.014, .lift = 0.35, .curl = 0.4, .cup = 0.3,
         .col = pal.wolf_leaf_dark, .tip = pal.wolf_leaf_lite, .t = vts[j],
       });
@@ -108,12 +121,12 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
 
   // the belly button: a small knot of vine sunk in the sap at the front of
   // the gut, a puckered ring around it
-  const s0 = navelS();
-  const at = surface(s0, m.pi / 2.0, 0.78);
-  const out = m.norm(surface(s0, m.pi / 2.0, 1) - section(s0).at);
-  const start = b.mark();
+  const nth = m.pi * 0.47;
+  const at = surface(nth, m.pi / 2.0, 0.78);
+  const out = normal(nth, m.pi / 2.0);
+  const navel = b.mark();
   const knot = color.mix(pal.wolf_core, pal.wolf_vine, 0.3);
-  try mg.ellipsoid(b, .{.center = at, .radii = v3(0.011, 0.013, 0.009), .col = knot, .rings = 6, .segs = 9, .t = 1});
+  try mg.ellipsoid(b, .{ .center = at, .radii = v3(0.011, 0.013, 0.009), .col = knot, .rings = 6, .segs = 9, .t = 1 });
   var ring:[13]V3 = undefined;
   var rts:[13]f32 = undefined;
   const side = v3(1, 0, 0);
@@ -124,18 +137,29 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     t.* = 1;
   }
   try b.tube(&ring, &rts, 0.0045, 0.0045, knot, .stem, 5);
-  for (b.v.items[start..]) |*vx| vx.tu[1] = NAVEL;
+  for (b.v.items[navel..]) |*vx| vx.tu[1] = NAVEL;
+
+  // into the waist's place in the bind pose: the gut with the gut bone,
+  // the rest with the spine, the hips below it and the ribs above
+  for (b.v.items[start..], try b.skinOf(start)) |vx, *k| {
+    const y = vx.pos[1];
+    const g = vx.tu[0];
+    var w:[skel.COUNT]f32 = @splat(0);
+    const low = 0.5 * m.smooth(m.clamp01(-y / 0.09));
+    const high = 0.6 * m.smooth(m.clamp01((y - 0.06) / 0.1));
+    w[@intFromEnum(skel.Bone.gut)] = g;
+    w[@intFromEnum(skel.Bone.pelvis)] = (1 - g) * low;
+    w[@intFromEnum(skel.Bone.chest)] = (1 - g) * high;
+    w[@intFromEnum(skel.Bone.waist)] = (1 - g) * (1 - low - high);
+    k.* = Sculpt.pack(&w);
+  }
+  b.xform(start, skel.bind()[@intFromEnum(skel.Bone.waist)]);
 }
 
-fn ellipse(a:f32) [2]f32 { return .{@cos(a), @sin(a)}; }
-
-/// where the belly button sits up the sac: a little below the gut's centre
-fn navelS() f32 { return (0.0 + GUT[1] - 0.012) / (GUT[1] + TIP_Y); }
-
-test "the belly tapers from a full gut to a narrow tongue between the pectorals" {
-  const gut = section(GUT[1] / (GUT[1] + TIP_Y));
-  const tongue = section(0.9);
-  try std.testing.expect(gut.w > 0.12);
-  try std.testing.expect(tongue.w < gut.w * 0.35);
-  try std.testing.expect(tongue.gut < 0.05 and gut.gut > 0.95);
+test "the belly is full below and narrows toward the ribs" {
+  const mid = surface(m.pi / 2.0, 0, 1)[0] - CENTRE[0];
+  const high = surface(m.pi * 0.85, 0, 1)[0] - CENTRE[0];
+  try std.testing.expect(mid > 0.1);
+  try std.testing.expect(high < mid * 0.6);
+  try std.testing.expect(gut(m.pi * 0.25) > 0.95 and gut(m.pi * 0.95) < 0.05);
 }

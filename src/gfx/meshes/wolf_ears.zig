@@ -1,5 +1,5 @@
-//! mesh: WOLF EAR. root at origin, rising along +Y, its inner face toward
-//! +Z. A thick ear with weight: its base flares wide and sinks into the
+//! mesh: WOLF EARS. both ears, skinned to their bones (wolf_skeleton), each
+//! built at its root rising along the bone's +Y, its inner face toward +Z. A thick ear with weight: its base flares wide and sinks into the
 //! skull (below the origin) so it grows out of the head rather than sitting
 //! on it, narrowing to a softly rounded tip. The inner face is sap
 //! (translucent through the instance's fade), cupped, with its outer rim
@@ -11,6 +11,7 @@ const m = @import("../../core/math.zig");
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("../../core/color.zig");
+const skel = @import("wolf_skeleton.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -64,6 +65,16 @@ fn gridNormal(comptime f:fn (f32, f32) V3, k:f32, u:f32, toward:f32) V3 {
 fn kAt(r:usize) f32 { return m.lerp(-SINK, 0.985, m.ratio(r, ROWS - 1)); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
+  const w = skel.bind();
+  for (skel.sides) |sd| {
+    const start = b.mark();
+    try ear(b);
+    b.xform(start, w[@intFromEnum(sd.ear)]);
+    for (try b.skinOf(start)) |*k| k.* = .{ .bones = @intFromEnum(sd.ear), .weights = .{ 255, 0, 0, 0 } };
+  }
+}
+
+fn ear(b:*mg.Builder) Allocator.Error!void {
   var pts:[ROWS * COLS]V3 = undefined;
   var nrms:[ROWS * COLS]V3 = undefined;
   var cols:[ROWS * COLS]color.Rgba8 = undefined;

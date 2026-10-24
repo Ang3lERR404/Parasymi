@@ -1,6 +1,7 @@
-//! shared pieces for the wolf's body: forms built of planes rather than
-//! balls (superellipsoids: flat faces, rounded edges), and the leaves that
-//! lie over it like fur. Not a mesh itself; the wolf's meshes use it.
+//! shared pieces for the wolf's body: the leaves that lie over it like fur
+//! and the digits of its hands and feet (forms of planes: superellipsoids,
+//! flat faces, rounded edges, with curved claws). Not a mesh itself; the
+//! wolf's meshes use it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -189,46 +190,3 @@ pub fn digit(b:*mg.Builder, d:Digit) Allocator.Error!void {
   try claw(b, tip, d.dir, d.down, d.r * 1.6, d.r * 0.42, d.claw);
 }
 
-/// a limb's section: a rounded square, so a limb has faces and edges
-/// instead of a round tube (use with `mg.loft`)
-pub fn squareSection(a:f32) [2]f32 { return .{spow(@cos(a), 0.55), spow(@sin(a), 0.55)}; }
-
-/// a limb's squared core along +Y from 0 to `len`, its half-thickness
-/// `radius(k)` at k (0..1) along it.
-pub fn limbCore(b:*mg.Builder, len:f32, comptime radius:fn (f32) f32, col:color.Rgba8) Allocator.Error!void {
-  const N = 14;
-  var spine:[N]V3 = undefined;
-  var ts:[N]f32 = undefined;
-  var ws:[N]f32 = undefined;
-  var hs:[N]f32 = undefined;
-  for (0..N) |i| {
-    const k = m.ratio(i, N - 1);
-    spine[i] = v3(0, k * len, 0);
-    ts[i] = k;
-    ws[i] = radius(k);
-    hs[i] = radius(k) * 0.92;
-  }
-  try mg.loft(b, &spine, &ts, &ws, &hs, v3(0, 0, 1), squareSection, col, .stem, 12);
-}
-
-/// a muscle lying along a limb (+Y): a form of planes centred at `at`,
-/// leaning `lean` radians about X (toward +Z for positive).
-pub fn muscle(b:*mg.Builder, at:V3, radii:V3, lean:f32, col:color.Rgba8) Allocator.Error!void {
-  const s = b.mark();
-  try form(b, .{.center = v3(0, 0, 0), .radii = radii, .ns = 0.72, .ew = 0.62, .col = col, .rings = 10, .segs = 12});
-  b.xform(s, m.chain(&.{m.translate(at), m.rotX(lean)}));
-}
-
-/// a tendon of vine running along a limb's surface from `from` to `to`
-pub fn tendon(b:*mg.Builder, from:V3, to:V3, bulge:V3, r:f32, col:color.Rgba8) Allocator.Error!void {
-  var path:[8]V3 = undefined;
-  var ts:[8]f32 = undefined;
-  var rs:[8]f32 = undefined;
-  for (&path, &ts, &rs, 0..) |*p, *t, *q, i| {
-    const k = m.ratio(i, 7);
-    p.* = m.lerpV(from, to, k) + bulge * m.splat3(@sin(m.pi * k));
-    t.* = k;
-    q.* = r * (1 - 0.3 * @abs(2 * k - 1));
-  }
-  try b.tubeR(&path, &ts, &rs, col, .stem, 5);
-}

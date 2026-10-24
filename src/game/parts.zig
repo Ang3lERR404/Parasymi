@@ -11,6 +11,7 @@ const PartInstance = vertex.PartInstance;
 /// bent along a curve, or as a star mote
 const PLACE_CURVE:f32 = 1;
 const PLACE_MOTE:f32 = 2;
+const PLACE_SKIN:f32 = 3;
 /// culling spheres: a mesh reaches `BOUND` times its scale plus
 /// `BOUND_PAD` from its origin; a mote `MOTE_BOUND`
 const BOUND:f32 = 2.5;
@@ -26,9 +27,6 @@ pub const Look = struct {
   fade:f32 = 1,
   /// rgb tint + weight (weight 0 = no tint, 1 = full tint)
   tint:[4]f32 = .{1, 1, 1, 0},
-  /// how far a sac swells outward as it fills, most low and forward
-  /// (mesh units, weighted by each vertex's tu.x)
-  sag:f32 = 0,
   /// how far a resin part's surface is pushed off its rest (mesh space);
   /// its base on the body stays put (see vertex.Part.resin)
   give:[3]f32 = .{0, 0, 0},
@@ -49,6 +47,8 @@ pub const Look = struct {
 pub const Parts = struct {
   gpa:Allocator,
   lists:[meshlib.SLOTS]std.ArrayList(PartInstance) = @splat(.empty),
+  /// this frame's bones for skinned meshes (see `pose`)
+  bones:std.ArrayList(m.M4) = .empty,
   /// where the eye is this frame and what it sees: parts are drawn at the
   /// level of detail their distance calls for, and not at all out of view
   eye:m.V3 = .{0, 0, 0},
@@ -56,9 +56,11 @@ pub const Parts = struct {
   pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa}; }
   pub fn deinit(p:*Parts) void {
     for (&p.lists) |*l| l.deinit(p.gpa);
+    p.bones.deinit(p.gpa);
   }
   pub fn clear(p:*Parts) void {
     for (&p.lists) |*l| l.clearRetainingCapacity();
+    p.bones.clearRetainingCapacity();
   }
 
   /// set this frame's eye and view before emitting
@@ -96,6 +98,23 @@ pub const Parts = struct {
     try p.add(id, ctrl[0], inst);
   }
 
+  /// a skeleton's bones this frame (each carrying a vertex from where its
+  /// mesh was built to where it is now); what `emitSkinned` takes
+  pub fn pose(p:*Parts, bones:[]const m.M4) Allocator.Error!u32 {
+    const base:u32 = @intCast(p.bones.items.len);
+    try p.bones.appendSlice(p.gpa, bones);
+    return base;
+  }
+
+  /// a skinned mesh, moved by the bones `pose` put from `base`; `at` is
+  /// about where it is (to cull it and pick its level of detail)
+  pub fn emitSkinned(p:*Parts, id:meshlib.Id, base:u32, at:m.V3, look_:Look) Allocator.Error!void {
+    if (p.view) |v| if (!v.sphere(at, BOUND + BOUND_PAD)) return;
+    var inst = instance(m.translate(at), look_);
+    inst.e = .{PLACE_SKIN, m.f(base), 0, 0};
+    try p.add(id, at, inst);
+  }
+
   /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
   /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
   pub fn emitMote(p:*Parts, at:m.V3, phase:f32, life:f32, echo:f32, glow:f32) Allocator.Error!void {
@@ -118,8 +137,8 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
     .p = .{look.glow, look.flutter, look.phase, look.fade},
     .tint = look.tint,
-    // q.x = sag; q.yzw = give
-    .q = .{look.sag, look.give[0], look.give[1], look.give[2]},
+    // q.yzw = give
+    .q = .{0, look.give[0], look.give[1], look.give[2]},
     .w = .{look.sway, look.tall, look.drop, look.grown},
     .h = look.halo,
   };

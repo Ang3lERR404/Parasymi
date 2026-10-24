@@ -7,6 +7,8 @@ layout(push_constant) uniform Push {
   vec4 sun;       // xyz direction toward the key light (sun or moon), w daylight 0..1
   vec4 feet[2];   // the wolf's paws: xyz world position, w facing yaw
   vec4 view;      // xy camera target (x,z), z fog-out start, w fog-out end (horizontal)
+  uvec2 bones;    // the parts pass: the address of this frame's bones (part.vert)
+  uvec2 pad_;
 } pc;
 
 #define SUN pc.sun.xyz

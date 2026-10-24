@@ -192,15 +192,20 @@ pub const Structures = struct {
   }
 
   /// swap-remove; returns the removed structure so its contents can be refunded.
+  /// note to CLAUDE, I changed the code, it is bad to do repeated get calls.
   pub fn remove(ss:*Structures, w:*World, id:Id) Structure {
     const s = ss.get(id).*;
-    if (!s.def().floating) w.setFootprint(s.x, s.y, s.def().size, .none);
+    // calls should always be at the top;
+    const stct = s.def();
+    const idx = id.idx();
+    if (!stct.floating) w.setFootprint(s.x, s.y, stct.size, .none);
     const last = ss.list.items.len - 1;
-    if (id.idx() != last) {
+    if (idx != last) {
       const l = ss.list.items[last];
-      if (!l.def().floating) w.moveFootprint(l.x, l.y, l.def().size, Occ.structure(id));
+      const lstct = l.def();
+      if (!lstct.floating) w.moveFootprint(l.x, l.y, lstct.size, Occ.structure(id));
     }
-    _ = ss.list.swapRemove(id.idx());
+    _ = ss.list.swapRemove(idx);
     return s;
   }
 

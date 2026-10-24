@@ -106,6 +106,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
     .clear = sky,
     .instances = undefined,
     .parts = g.parts.slices(),
+    .bones = g.parts.bones.items,
     .ui = g.ui.v.items,
     .ui_time = @floatCast(@mod(g.ui_time, TIME_WRAP)),
   };

@@ -1,9 +1,10 @@
 //! parts: library meshes (the wolf, nodes, motes, structures), one
-//! instanced draw per mesh with a per-instance transform (or, for the tail
-//! and the motes, the parameters part.vert places them by).
+//! instanced draw per mesh with a per-instance transform (or, for beams,
+//! motes and the skinned wolf, the parameters part.vert places them by).
 const std = @import("std");
 const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
+const m = @import("../../core/math.zig");
 const vertex = @import("../../gfx/vertex.zig");
 const pipeline = @import("../../gfx/pipeline.zig");
 const meshlib = @import("../../gfx/meshlib.zig");
@@ -14,29 +15,42 @@ const pass = R.pass;
 const R = @import("../renderer.zig");
 
 pub const MAX = 1 << 15;
+/// skinned parts' bones a frame can hold
+pub const MAX_BONES = 256;
 
-const bindings = &[_]vk.VertexInputBindingDescription{pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PartInstance, 1, .instance)};
-const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5));
+const bindings = &[_]vk.VertexInputBindingDescription{
+  pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PartInstance, 1, .instance), pipeline.binding(vertex.Skin, 2, .vertex),
+};
+const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5) ++ pipeline.attrs(vertex.Skin, 2, 15));
 
 pub const desc:pass.Desc = .{
   .vert = "part.vert", .frag = "part.frag",
   .bindings = bindings, .attrs = attrs, .per_sample = true,
 };
 
-/// this frame's instances, and where each mesh's run of them starts and how
-/// long it is (the glass pass draws the same runs)
+/// this frame's instances and bones, and where each mesh's run of instances
+/// starts and how long it is (the glass pass draws the same runs)
 pub const Frame = struct {
   inst:Buffer = .{},
+  bones:Buffer = .{},
   first:[meshlib.SLOTS]u32 = undefined,
   counts:[meshlib.SLOTS]u32 = @splat(0),
+  /// the push constants both passes draw with (the bones' address in them)
+  push:R.WorldPush = undefined,
 };
 
 pub fn initFrame(c:*const Ctx) ctx.Error!Frame {
-  return .{.inst = try Buffer.init(c, MAX * @sizeOf(vertex.PartInstance), .{.vertex_buffer = true})};
+  var f:Frame = .{.inst = try Buffer.init(c, MAX * @sizeOf(vertex.PartInstance), .{.vertex_buffer = true})};
+  errdefer f.inst.deinit(c);
+  f.bones = try Buffer.init(c, MAX_BONES * @sizeOf(m.M4), .{.storage_buffer = true, .shader_device_address = true});
+  return f;
 }
-pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
+pub fn deinitFrame(f:*Frame, c:*const Ctx) void {
+  f.inst.deinit(c);
+  f.bones.deinit(c);
+}
 
-/// upload every instance and draw their solid fragments.
+/// upload every instance and bone and draw their solid fragments.
 pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   var n:u32 = 0;
   for (scene.parts, 0..) |list, i| {
@@ -47,14 +61,18 @@ pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R
     n += k;
   }
   stats.parts = n;
-  draw(r, f, cmd, scene, stats, .parts);
+  f.bones.write(0, sliceAsBytes(scene.bones[0..@min(scene.bones.len, MAX_BONES)]));
+  const at = f.bones.address(&r.ctx);
+  f.push = scene.push;
+  f.push.bones = .{@truncate(at), @truncate(at >> 32)};
+  draw(r, f, cmd, stats, .parts);
 }
 
-fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats, p:R.Pass) void {
+fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, stats:*R.Stats, p:R.Pass) void {
   if (stats.parts == 0) return;
   cmd.bindPipeline(.graphics, r.pipe(p));
-  cmd.pushConstants(r.layout(.world), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
-  cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf}, &.{0, 0});
+  cmd.pushConstants(r.layout(.world), pass.stages, 0, @sizeOf(R.WorldPush), &f.push);
+  cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf, r.skins.buf}, &.{0, 0, 0});
   for (0..meshlib.SLOTS) |i| {
     if (f.counts[i] == 0 or (p == .parts_glass and !r.part_glassy[i])) continue;
     cmd.draw(r.part_ranges[i][1], f.counts[i], r.part_ranges[i][0], f.first[i]);
@@ -71,7 +89,7 @@ pub const glass = struct {
     .bindings = bindings, .attrs = attrs,
     .blend = true, .depth_write = false, .per_sample = true,
   };
-  pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
-    draw(r, &r.frames[r.fi].pass.parts, cmd, scene, stats, .parts_glass);
+  pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, _:*const R.Scene, stats:*R.Stats) void {
+    draw(r, &r.frames[r.fi].pass.parts, cmd, stats, .parts_glass);
   }
 };

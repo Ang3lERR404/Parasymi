@@ -41,6 +41,14 @@ pub const Mesh = extern struct {
   part:u32,
 };
 
+/// which bones move a skinned vertex (up to four indices, one per byte,
+/// lowest first) and how much each (unorm, summing to one), read beside the
+/// mesh buffer vertex for vertex. Meshes that are not skinned leave it zero.
+pub const Skin = extern struct {
+  bones:u32 = 0,
+  weights:[4]u8 = .{0, 0, 0, 0},
+};
+
 /// the leading fields of `Mesh`, read from a second growth key of the same
 /// mesh buffer (same stride) so a plant can blend between keys.
 pub const MeshPose = extern struct {
@@ -89,7 +97,7 @@ pub const PartInstance = extern struct {
   p:[4]f32,
   /// rgb colour multiply, w blend amount
   tint:[4]f32,
-  /// x sag: outward bulge of a sac, heavier at its bottom and front (0 = none);
+  /// x unused;
   /// yzw give: how far a resin part's surface is pushed (mesh space), its base held
   q:[4]f32,
   /// x sway: how far it bends from its root in the garden's wind (0 rigid);
@@ -97,13 +105,13 @@ pub const PartInstance = extern struct {
   /// rooted (a part hovering above its stalk bends with it); w how far a
   /// growing structure has come along (1 grown)
   w:[4]f32,
-  /// x how part.vert places it: 0 by the matrix; 1 along a curve (the
-  /// tail, a bloom thread: c0..c3 xyz its control points, tint.xyz the side
-  /// its x lies toward, y how far along it reaches (0: all of it), w its
-  /// rest length; z which of its ends a forming halo draws in: 1 its
-  /// first, 2 its last, 3 both); 2 a star mote (c3 its centre; y phase, z
-  /// life, w its
-  /// trail echo, -1 when resting)
+  /// x how part.vert places it: 0 by the matrix; 1 along a curve (a bloom
+  /// thread: c0..c3 xyz its control points, tint.xyz the side its x lies
+  /// toward, y how far along it reaches (0: all of it), w its rest length;
+  /// z which of its ends a forming halo draws in: 1 its first, 2 its last,
+  /// 3 both); 2 a star mote (c3 its centre; y phase, z life, w its trail
+  /// echo, -1 when resting); 3 skinned (y the first of its bones in the
+  /// frame's bone buffer; each vertex by its `Skin`)
   e:[4]f32 = .{0, 0, 0, 0},
   /// a forming halo it belongs to (see `NO_HALO`)
   h:[4]f32 = NO_HALO,

@@ -1,5 +1,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
+#extension GL_EXT_buffer_reference : require
+#extension GL_EXT_buffer_reference_uvec2 : require
 #include "common.glsl"
 
 // per-vertex (mesh library)
@@ -19,6 +21,13 @@ layout(location = 11) in vec4 iq;   // sag, give (resin surface push)
 layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted, grown
 layout(location = 13) in vec4 ie;   // placement: 0 matrix, 1 curve (tail), 2 star mote; then its parameters
 layout(location = 14) in vec4 ih;   // a forming halo it belongs to: its centre, how far along (< 0 none)
+// per-vertex skin (skinned meshes only): four bone indices, one per byte, and their weights
+layout(location = 15) in uint sbones;
+layout(location = 16) in vec4 sweights;
+
+// this frame's bones (renderer Scene.bones): each carries a vertex from
+// where it was built to where it is now
+layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer Bones { mat4 m[]; };
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -44,16 +53,14 @@ void main() {
   float t = pc.eye_time.w;
   int mode = int(ie.x + 0.5);
   mat4 M = mat4(c0, c1, c2, c3);
-  vec3 p = pos;
-  // a full sac sags: pushed out along its radius, most at the bottom and
-  // front. A field of position, so the vine net on it follows the surface.
-  // a filling sac swells from its centre, most low and forward, only where
-  // it is gut (tu.x), so its tongue stays put on the chest; a smooth field
-  // of position, so the net and leaves on it move with it
-  if (iq.x > 0.0) {
-    vec3 r = normalize(pos + vec3(0.0, 0.0, 1e-4));
-    p += r * iq.x * tu.x * (0.6 + 0.6 * max(-r.y, 0.0) + 0.4 * max(r.z, 0.0));
+  // a skinned mesh: its vertex goes where its bones, blended by weight, take it
+  if (mode == 3) {
+    Bones B = Bones(pc.bones);
+    int base = int(ie.y + 0.5);
+    M = mat4(0.0);
+    for (int k = 0; k < 4; k++) M += sweights[k] * B.m[base + int((sbones >> (8u * uint(k))) & 255u)];
   }
+  vec3 p = pos;
   // the belly button (tu.y 2) surfaces from inside the sap as the belly
   // fills (fill in iq.y), and pops out past it when full
   if (tu.y > 1.5) p.z += 0.04 * pow(clamp(iq.y, 0.0, 1.0), 1.5);

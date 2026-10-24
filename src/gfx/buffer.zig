@@ -22,7 +22,10 @@ pub const Buffer = struct {
     b.buf = try c.device.createBuffer(&.{.size = size, .usage = usage, .sharing_mode = .exclusive}, null);
     errdefer c.device.destroyBuffer(b.buf, null);
     const req = c.device.getBufferMemoryRequirements(b.buf);
+    // a buffer shaders reach by address needs memory that has one
+    const flags:vk.MemoryAllocateFlagsInfo = .{.flags = .{.device_address = true}, .device_mask = 0};
     b.mem = try c.device.allocateMemory(&.{
+      .p_next = if (usage.shader_device_address) &flags else null,
       .allocation_size = req.size,
       .memory_type_index = try c.memType(req.memory_type_bits, .{.host_visible = true, .host_coherent = true}),
     }, null);
@@ -37,6 +40,11 @@ pub const Buffer = struct {
     c.device.destroyBuffer(b.buf, null);
     c.device.freeMemory(b.mem, null);
     b.* = .{};
+  }
+
+  /// where shaders find it (made with `shader_device_address`)
+  pub fn address(b:*const Buffer, c:*const Ctx) u64 {
+    return c.device.getBufferDeviceAddress(&.{.buffer = b.buf});
   }
 
   pub fn write(b:*Buffer, offset:usize, bytes:[]const u8) void {
