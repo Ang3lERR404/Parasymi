@@ -458,7 +458,7 @@ pub const Game = struct {
     g.player.work = work;
 
     g.player.move(wish, ctl.down(in, .run), &g.world, dt);
-    g.player.animate(dt);
+    g.player.animate(&g.world, dt);
     const follow = g.player.pos + m.v3(0, FOLLOW_HEIGHT, 0);
     g.cam.target += (follow - g.cam.target) * m.splat3(@min(1, dt * FOLLOW_LERP));
 

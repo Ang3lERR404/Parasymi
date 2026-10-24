@@ -324,7 +324,8 @@ pub const Player = struct {
       const ok = if (ground.walkable(m.tileOf(probe[0]), m.tileOf(probe[2]))) |h| h - here <= STEP_UP else false;
       if (ok) p.pos[axis] = next[axis] else p.vel[axis] = 0;
     }
-    const h = ground.walkable(m.tileOf(p.pos[0]), m.tileOf(p.pos[2])) orelse here;
+    // the body follows the ground as it is drawn, so its paws meet it
+    const h = if (ground.walkable(m.tileOf(p.pos[0]), m.tileOf(p.pos[2])) != null) ground.surfaceAt(p.pos[0], p.pos[2]) else here;
     m.spring(&p.pos[1], &p.y_v, h, GROUND_FREQ, dt);
 
     // face where we move, or what we work on
@@ -344,13 +345,20 @@ pub const Player = struct {
   fn heading(p:*const Player) M4 { return m.chain(&.{ T(p.pos), m.rotY(p.facing) }); }
 
   /// where a foot rests under the standing wolf, in the world
-  fn rest(p:*const Player, s:usize) V3 {
+  fn rest(p:*const Player, ground:?*const World, s:usize) V3 {
     const x = restFoot[s][0] + skel.sign(s) * BELLY_STANCE * p.fullness;
     const r = m.mulV(p.heading(), .{ x, 0, restFoot[s][2], 1 });
-    return v3(r[0], p.pos[1], r[2]);
+    return p.onGround(ground, v3(r[0], 0, r[2]));
   }
 
-  pub fn animate(p:*Player, dt:f32) void {
+  /// `at` set down on the ground as it is drawn (level with the body
+  /// without a world), so a paw never sinks into a slope
+  fn onGround(p:*const Player, ground:?*const World, at:V3) V3 {
+    const y = if (ground) |g| g.surfaceAt(at[0], at[2]) else p.pos[1];
+    return v3(at[0], y, at[2]);
+  }
+
+  pub fn animate(p:*Player, ground:?*const World, dt:f32) void {
     p.t += dt;
     const spd = p.groundSpeed();
     p.stride += (m.clamp01(spd / WALK_SPEED) - p.stride) * @min(1, dt * STRIDE_RESPONSE);
@@ -369,7 +377,7 @@ pub const Player = struct {
     const al = m.mulV(m.rotY(-p.facing), .{ a[0], a[1], a[2], 0 });
     p.accel = v3(al[0], al[1], al[2]);
 
-    const fell = p.step(spd, dt);
+    const fell = p.step(ground, spd, dt);
     p.slosh(fell, dt);
     p.springs(dt);
   }
@@ -379,9 +387,9 @@ pub const Player = struct {
 
   /// the feet: plant, lift, swing to where they are wanted. Returns whether
   /// one came down this frame.
-  fn step(p:*Player, spd:f32, dt:f32) bool {
+  fn step(p:*Player, ground:?*const World, spd:f32, dt:f32) bool {
     if (!p.placed) {
-      for (&p.feet, 0..) |*f, s| f.at = p.rest(s);
+      for (&p.feet, 0..) |*f, s| f.at = p.rest(ground, s);
       p.placed = true;
     }
     const moving = p.stride > STANDING;
@@ -391,13 +399,13 @@ pub const Player = struct {
     var fell = false;
     for (&p.feet, 0..) |*f, s| {
       const other = &p.feet[1 - s];
-      if (m.len(f.at - p.rest(s)) > LOST) {
-        f.* = .{ .at = p.rest(s), .phase = f.phase };
+      if (m.len(f.at - p.rest(ground, s)) > LOST) {
+        f.* = .{ .at = p.rest(ground, s), .phase = f.phase };
         continue;
       }
       const ph = @mod(p.phase + 0.5 * m.f(s), 1);
       if (f.planted()) {
-        const off = m.len(f.at - p.rest(s));
+        const off = m.len(f.at - p.rest(ground, s));
         // a foot trailing too far always lifts (the other one is down by then)
         var lift = off > TRAIL_MAX and other.planted();
         if (moving) {
@@ -405,7 +413,7 @@ pub const Player = struct {
           lift = lift or (ph >= p.duty and f.phase < p.duty);
         } else {
           // standing, a foot left behind steps back under (one at a time)
-          lift = lift or (other.planted() and off > SETTLE and off >= m.len(other.at - p.rest(1 - s)));
+          lift = lift or (other.planted() and off > SETTLE and off >= m.len(other.at - p.rest(ground, 1 - s)));
         }
         if (lift) {
           f.from = f.at;
@@ -418,7 +426,7 @@ pub const Player = struct {
       if (!f.planted()) {
         f.t = @min(1, f.t + dt / f.dur);
         const left = (1 - f.t) * f.dur;
-        const to = p.rest(s) + p.vel * m.splat3(left) + ahead;
+        const to = p.onGround(ground, p.rest(ground, s) + p.vel * m.splat3(left) + ahead);
         const k = m.smooth(f.t);
         f.at = m.lerpV(f.from, to, k);
         f.at[1] = m.lerp(f.from[1], to[1], k) + f.lift * m.pow(f32, @sin(f.t * m.pi), 0.8);
@@ -708,17 +716,17 @@ test "belly contents lag a sprint, overshoot a stop, then settle" {
   var p:Player = .{ .pos = v3(0, 0, 0) };
   _ = p.inv.add(.grit, 50);
   const dt:f32 = TEST_DT;
-  for (0..120) |_| p.animate(dt);
+  for (0..120) |_| p.animate(null, dt);
   const rest_at = p.lump[0].pos;
   // a burst of speed forward (+z): the lump swings back
   p.vel = v3(0, 0, 4);
-  p.animate(dt);
-  for (0..3) |_| p.animate(dt);
+  p.animate(null, dt);
+  for (0..3) |_| p.animate(null, dt);
   try testing.expect(p.lump[0].pos[2] < rest_at[2] - 0.005);
   // run steadily, then stop dead: it overshoots forward
-  for (0..120) |_| p.animate(dt);
+  for (0..120) |_| p.animate(null, dt);
   p.vel = v3(0, 0, 0);
-  for (0..4) |_| p.animate(dt);
+  for (0..4) |_| p.animate(null, dt);
   try testing.expect(p.lump[0].pos[2] > rest_at[2] + 0.005);
   // and it never leaves the sac
   for (p.lump) |l| try testing.expect(m.len(l.pos) <= p.bellyRoom() + TEST_EPS);
@@ -739,14 +747,14 @@ test "the leg reaches its resting foot in its resting pose" {
 
 test "a planted foot stays where it is planted while the wolf walks" {
   var p:Player = .{ .pos = v3(0, 0, 0) };
-  p.animate(TEST_DT);
+  p.animate(null, TEST_DT);
   p.vel = v3(0, 0, WALK_SPEED);
   for (0..240) |_| {
     p.pos += p.vel * m.splat3(TEST_DT);
     const before = p.feet;
-    p.animate(TEST_DT);
+    p.animate(null, TEST_DT);
     for (before, p.feet) |a, b| if (a.planted() and b.planted()) try testing.expect(m.len(a.at - b.at) < 1e-5);
   }
   // and both feet keep up with it
-  for (p.feet, 0..) |f, s| try testing.expect(m.len(f.at - p.rest(s)) < TRAIL_MAX + 0.1);
+  for (p.feet, 0..) |f, s| try testing.expect(m.len(f.at - p.rest(null, s)) < TRAIL_MAX + 0.1);
 }

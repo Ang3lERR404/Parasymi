@@ -9,6 +9,8 @@ const rng = @import("../core/rng.zig");
 
 pub const TERRACE = 0.35;
 pub const WATER_H = 0.0;
+/// where the land meets the water it dips just under the surface
+pub const SHORE = WATER_H - 0.14;
 /// terrace levels per unit of elevation noise; below `SEA` is water
 const LEVELS:f32 = 7;
 const SEA:f32 = -0.28;

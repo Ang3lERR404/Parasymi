@@ -42,8 +42,7 @@ fn blades(k:ck.Kind) u32 {
   };
 }
 
-/// where the land meets the water it dips just under the surface
-const SHORE = gen.WATER_H - 0.14;
+const SHORE = gen.SHORE;
 /// each tile's colour varies by `JITTER` about `JITTER_MIN` of its kind's
 const JITTER_MIN:f32 = 0.9;
 const JITTER:f32 = 0.2;
