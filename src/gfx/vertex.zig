@@ -18,15 +18,16 @@ pub const Terrain = extern struct {
 /// while the base holds.
 /// `shadow`: a soft dark patch on the ground under something floating
 /// (tu.x its radial fraction; instance fade its darkness).
-/// `thread`: a beam between blooms (a halo's edges too). `flash`: a disc of
-/// light thrown out where a halo's blooms met (tu.x its radius). `prism`: a
-/// cut iridescent crystal that only catches light.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism };
+/// `thread`: a beam between blooms. `flash`: a disc of light thrown out where
+/// a halo's blooms met (tu.x its radius). `prism`: a cut iridescent crystal
+/// that only catches light. `halo`: the ring of split light a diamond
+/// projects; `projection`: the rays it throws to make it.
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism, halo, projection };
 
 /// roles a library part may draw see-through (part.frag)
 pub fn seeThrough(p:Part) bool {
   return switch (p) {
-    .bloom, .ear, .resin, .shadow, .thread, .flash => true,
+    .bloom, .ear, .resin, .shadow, .thread, .flash, .halo, .projection => true,
     .stem, .leaf, .thorn, .tendril, .prism => false,
   };
 }

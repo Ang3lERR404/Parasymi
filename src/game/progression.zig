@@ -34,10 +34,11 @@ const techs = struct {
   pub const seed_splicing = @import("research/seed_splicing.zig");
   pub const thinning_veil = @import("research/thinning_veil.zig");
   pub const convergence_theory = @import("research/convergence_theory.zig");
+  pub const celestial_defragmentation = @import("research/celestial_defragmentation.zig");
 };
 const reg = registry.Registry(techs);
 
-pub const Discovery = enum { convergence };
+pub const Discovery = enum { convergence, diamond };
 
 pub const Id = reg.Id;
 
@@ -180,6 +181,9 @@ pub const Progression = struct {
       .convergence => {
         g.say(txt.s.msg.entwine, .{});
         g.say(txt.s.msg.hybrid_stirs, .{});
+      },
+      .diamond => {
+        g.say(txt.s.msg.lattice_stirs, .{});
       },
     }
   }

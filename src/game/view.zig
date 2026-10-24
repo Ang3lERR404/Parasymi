@@ -245,7 +245,7 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     // tempo that followed activity jumped phase every time it changed)
     const breathe = 1 + (BREATH + BREATH_ACTIVE * a) * @sin(tf * BREATH_RATE + s.seed * 9);
     const size = s.grownScale() * m.v3(breathe, 2 - breathe, breathe);
-    try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(size)}), .{
+    if (!s.def().bare) try g.parts.emit(s.def().mesh, m.chain(&.{m.translate(ctr), m.rotY(yaw), m.scale3(size)}), .{
       .glow = GLOW + GLOW_ACTIVE * a, .flutter = 0.6, .phase = s.seed, .fade = s.def().sap,
       .sway = s.def().sway, .tall = s.def().tall, .grown = s.grown,
     });
@@ -268,7 +268,8 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   }
   const k = st.kindOf(item) orelse return;
   const def = st.defs.get(k);
-  const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + GHOST_LIFT);
+  // (a floating one where it will hang)
+  const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + GHOST_LIFT + def.hover);
   const tint = if (ok) GHOST_FITS else GHOST_BLOCKED;
   try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = 0.6 + 0.4 * @sin(tf * GHOST_PULSE_RATE), .tint = tint});
 }

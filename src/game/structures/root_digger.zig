@@ -198,9 +198,9 @@ fn fixture(w:*World, res:u8) !void {
   c.res[2] = res;
 }
 
-fn run(ss:*st.Structures, w:*World, plants:*Plants, g:*prog.Progression, seconds:f32) void {
+fn run(ss:*st.Structures, w:*World, plants:*Plants, g:*prog.Progression, seconds:f32) !void {
   var t:f32 = 0;
-  while (t < seconds) : (t += TEST_DT) ss.tick(w, plants, g, TEST_DT);
+  while (t < seconds) : (t += TEST_DT) try ss.tick(testing.allocator, w, plants, g, TEST_DT);
 }
 
 test "a digger beside a node draws one item every 4 seconds" {
@@ -215,9 +215,9 @@ test "a digger beside a node draws one item every 4 seconds" {
   var g:prog.Progression = .{};
   try testing.expect(try ss.place(gpa, &w, 1, 0, .root_digger, 0, 0));
   const id = ss.at(&w, 1, 0).?;
-  run(&ss, &w, &plants, &g, 3.9);
+  try run(&ss, &w, &plants, &g, 3.9);
   try testing.expectEqual(@as(u32, 0), ss.get(id).inv.count(.fibre));
-  run(&ss, &w, &plants, &g, 8.2);
+  try run(&ss, &w, &plants, &g, 8.2);
   try testing.expectEqual(@as(u32, 3), ss.get(id).inv.count(.fibre));
   try testing.expectEqual(@as(u8, 2), w.chunkOfTile(2, 0).?.res[2]);
 }
@@ -233,7 +233,7 @@ test "a digger with no node beside it idles" {
   defer ss.deinit(gpa);
   var g:prog.Progression = .{};
   try testing.expect(try ss.place(gpa, &w, 4, 1, .root_digger, 0, 0));
-  run(&ss, &w, &plants, &g, 20);
+  try run(&ss, &w, &plants, &g, 20);
   const s = ss.get(ss.at(&w, 4, 1).?);
   try testing.expectEqual(@as(u32, 0), s.inv.total());
   try testing.expect(s.state.root_digger.dig == null);
@@ -252,7 +252,7 @@ test "a digger with nowhere to send buffers 8, then pauses" {
   defer ss.deinit(gpa);
   var g:prog.Progression = .{};
   try testing.expect(try ss.place(gpa, &w, 1, 0, .root_digger, 0, 0));
-  run(&ss, &w, &plants, &g, 60);
+  try run(&ss, &w, &plants, &g, 60);
   try testing.expectEqual(@as(u32, BUFFER), ss.get(ss.at(&w, 1, 0).?).inv.total());
   try testing.expectEqual(@as(u8, 20 - BUFFER), w.chunkOfTile(2, 0).?.res[2]);
 }
@@ -279,7 +279,7 @@ test "a conduit behind the digger carries its items away" {
   var carried = false;
   var t:f32 = 0;
   while (t < 30) : (t += 0.05) {
-    ss.tick(&w, &plants, &g, 0.05);
+    try ss.tick(testing.allocator, &w, &plants, &g, 0.05);
     if (ss.get(conduit).state.conduit.held) |it| carried = carried or it == .fibre;
   }
   try testing.expect(carried);

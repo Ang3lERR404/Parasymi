@@ -3,7 +3,7 @@
 //! Each kind is its own module under `structures/` declaring:
 //!   def:Def                     name, bulb item, footprint, mesh   (required)
 //!   State                       per-kind data (optional, see `State` union)
-//!   tick(ctx, id, dt) bool      advance; returns whether it is active
+//!   tick(ctx, id, dt) [!]bool   advance; returns whether it is active
 //!   wants(s, g, item) u32       how many of `item` it will still take in
 //!   output(s) ?Item             what may leave it (pulled by conduits)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
@@ -39,6 +39,7 @@ const kinds = struct {
   pub const research_bloom = @import("structures/research_bloom.zig");
   pub const root_digger = @import("structures/root_digger.zig");
   pub const polyp = @import("structures/polyp.zig");
+  pub const diamond = @import("structures/diamond.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -65,6 +66,14 @@ pub const Def = struct {
   /// carries items tile to tile the way it faces (R turns it): carriers
   /// chain into one line, and producers leave them to pull through `output`
   carrier:bool = false,
+  /// floats over its tile, `hover` over the ground, instead of standing on
+  /// it: it takes no room there, so it may float over a structure or a
+  /// plant (never over water or another floating one)
+  floating:bool = false,
+  hover:f32 = 0,
+  /// its mesh is drawn by its own `emit` (a diamond: it forms on the GPU),
+  /// not breathing and growing in as the others do; `mesh` is its preview
+  bare:bool = false,
 };
 
 pub const defs = reg.table(Def, "def");
@@ -112,6 +121,8 @@ pub const Structure = struct {
 
 /// everything a structure's behaviour may touch.
 pub const Ctx = struct {
+  /// for a structure that puts another down (a polyp, its diamond)
+  gpa:Allocator,
   w:*World,
   plants:*Plants,
   g:*prog.Progression,
@@ -129,6 +140,9 @@ fn freshState(k:Kind) State {
 
 fn dry(k:ck.Kind) bool { return k != .water; }
 
+/// a hook result that may be an error union, as one
+fn orFail(r:anytype) Allocator.Error!bool { return r; }
+
 pub const Structures = struct {
   list:std.ArrayList(Structure) = .empty,
 
@@ -136,7 +150,12 @@ pub const Structures = struct {
 
   pub fn get(ss:*Structures, id:Id) *Structure { return &ss.list.items[id.idx()]; }
 
-  pub fn canPlace(_:*const Structures, w:*const World, wx:i32, wy:i32, k:Kind) bool {
+  pub fn canPlace(ss:*const Structures, w:*const World, wx:i32, wy:i32, k:Kind) bool {
+    if (defs.get(k).floating) {
+      // over any dry tile, whatever stands on it, but not over another
+      const c = w.chunkOfTile(wx, wy) orelse return false;
+      return c.kind[ck.localIndex(wx, wy)] != .water and ss.floaterAt(wx, wy) == null;
+    }
     return switch (k) {
       inline else => |t| w.footprintFree(wx, wy, defs.get(t).size, if (comptime reg.has(t, "ground")) reg.module(t).ground else dry),
     };
@@ -146,7 +165,7 @@ pub const Structures = struct {
     if (!ss.canPlace(w, wx, wy, k)) return false;
     const idx = Id.of(ss.list.items.len);
     try ss.list.append(gpa, .{ .x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k) });
-    w.setFootprint(wx, wy, defs.get(k).size, Occ.structure(idx));
+    if (!defs.get(k).floating) w.setFootprint(wx, wy, defs.get(k).size, Occ.structure(idx));
     return true;
   }
 
@@ -156,18 +175,26 @@ pub const Structures = struct {
     if (s.def().grow > 0) s.grown = 0;
   }
 
-  pub fn at(_:*const Structures, w:*const World, wx:i32, wy:i32) ?Id {
-    return w.occAt(wx, wy).asStructure();
+  /// what stands at a tile: what floats over it first (it is drawn over
+  /// whatever is under it), else what stands on it.
+  pub fn at(ss:*const Structures, w:*const World, wx:i32, wy:i32) ?Id {
+    return ss.floaterAt(wx, wy) orelse w.occAt(wx, wy).asStructure();
+  }
+
+  /// the floating structure over a tile; they are few, so the list is walked
+  pub fn floaterAt(ss:*const Structures, wx:i32, wy:i32) ?Id {
+    for (ss.list.items, 0..) |*s, i| if (s.def().floating and s.x == wx and s.y == wy) return Id.of(i);
+    return null;
   }
 
   /// swap-remove; returns the removed structure so its contents can be refunded.
   pub fn remove(ss:*Structures, w:*World, id:Id) Structure {
     const s = ss.get(id).*;
-    w.setFootprint(s.x, s.y, s.def().size, .none);
+    if (!s.def().floating) w.setFootprint(s.x, s.y, s.def().size, .none);
     const last = ss.list.items.len - 1;
     if (id.idx() != last) {
       const l = ss.list.items[last];
-      w.moveFootprint(l.x, l.y, l.def().size, Occ.structure(id));
+      if (!l.def().floating) w.moveFootprint(l.x, l.y, l.def().size, Occ.structure(id));
     }
     _ = ss.list.swapRemove(id.idx());
     return s;
@@ -197,8 +224,8 @@ pub const Structures = struct {
     return ss.get(id).inv.add(item, k);
   }
 
-  pub fn tick(ss:*Structures, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) void {
-    const ctx:Ctx = .{ .w = w, .plants = plants, .g = g, .ss = ss };
+  pub fn tick(ss:*Structures, gpa:Allocator, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) Allocator.Error!void {
+    const ctx:Ctx = .{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss };
     for (0..ss.list.items.len) |idx| {
       const id = Id.of(idx);
       const g0 = ss.get(id);
@@ -206,7 +233,8 @@ pub const Structures = struct {
         g0.grown = @min(1, g0.grown + dt / g0.def().grow);
         break :blk false;
       } else switch (g0.kind()) {
-        inline else => |k| if (comptime reg.has(k, "tick")) reg.module(k).tick(ctx, id, dt) else false,
+        // a tick that may put something down can fail for room
+        inline else => |k| if (comptime reg.has(k, "tick")) try orFail(reg.module(k).tick(ctx, id, dt)) else false,
       };
       const s = ss.get(id);
       s.activity += ((if (active) @as(f32, 1) else 0) - s.activity) * @min(1, dt * ACTIVITY_EASE);
@@ -294,7 +322,7 @@ test "conduits harvest plants into a cache" {
   try testing.expect(try ss.place(gpa, &w, 1, 0, .conduit, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 2, 0, .conduit, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 3, 0, .sap_cache, 0, 0));
-  for (0..200) |_| ss.tick(&w, &plants, &g, 0.05);
+  for (0..200) |_| try ss.tick(gpa, &w, &plants, &g, 0.05);
   const cache = ss.at(&w, 3, 0).?;
   try testing.expectEqual(@as(u32, 3), ss.get(cache).inv.count(.essence));
   // removing the middle conduit keeps the others addressable
@@ -318,9 +346,9 @@ test "a conduit's side root reaches a plant beside it and harvests it" {
   try testing.expect(try ss.place(gpa, &w, 1, 0, .conduit, 0, 0));
   try testing.expect(try ss.place(gpa, &w, 2, 0, .sap_cache, 0, 0));
   // nothing moves until the root has grown out to it
-  ss.tick(&w, &plants, &g, 0.05);
+  try ss.tick(gpa, &w, &plants, &g, 0.05);
   try testing.expect(ss.get(ss.at(&w, 1, 0).?).state.conduit.held == null);
-  for (0..200) |_| ss.tick(&w, &plants, &g, 0.05);
+  for (0..200) |_| try ss.tick(gpa, &w, &plants, &g, 0.05);
   try testing.expectEqual(@as(u32, 2), ss.get(ss.at(&w, 2, 0).?).inv.count(.essence));
 }
 
@@ -342,9 +370,9 @@ test "a structure put down grows before it works" {
   try testing.expectEqual(@as(f32, 0), ss.get(id).grown);
   const secs = defs.get(.germinator).grow;
   var t:f32 = 0;
-  while (t < secs * 0.5) : (t += 0.05) ss.tick(&w, &plants, &g, 0.05);
+  while (t < secs * 0.5) : (t += 0.05) try ss.tick(gpa, &w, &plants, &g, 0.05);
   try testing.expect(ss.get(id).grown > 0.4 and ss.get(id).grown < 0.6);
   try testing.expect(ss.get(id).activity < 0.01);
-  while (t < secs + 0.1) : (t += 0.05) ss.tick(&w, &plants, &g, 0.05);
+  while (t < secs + 0.1) : (t += 0.05) try ss.tick(gpa, &w, &plants, &g, 0.05);
   try testing.expectEqual(@as(f32, 1), ss.get(id).grown);
 }

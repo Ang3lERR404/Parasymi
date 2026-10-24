@@ -138,3 +138,14 @@ vec3 haloSpiral(vec3 p, vec3 centre, float k) {
   float c = cos(a), s = sin(a);
   return centre + vec3(d.x * c - d.z * s, d.y, d.x * s + d.z * c) * (1.0 - pull);
 }
+
+// light split into its spectrum, x 0 red .. 1 violet, as a prism or an ice
+// halo fans it out
+vec3 spectral(float x) {
+  x = clamp(x, 0.0, 1.0);
+  return vec3(
+    smoothstep(0.42, 0.0, x) + 0.55 * smoothstep(0.78, 1.0, x),
+    smoothstep(0.02, 0.32, x) * smoothstep(0.82, 0.45, x),
+    smoothstep(0.38, 0.75, x)
+  );
+}

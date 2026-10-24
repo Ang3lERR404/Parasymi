@@ -148,3 +148,48 @@ pub const diamond = struct {
     }
   }
 };
+
+/// mesh: HALO RING. the ring of fragmented light a diamond projects: a flat
+/// band around a circle of radius 1 in xz (scaled out to the halo's
+/// radius), tu.x its angle as a share of a turn from +x toward +z, tu.y
+/// across it from its inner edge (-1) to its outer (1), finely, so the
+/// spectrum part.frag splits across it stays smooth.
+pub const ring = struct {
+  /// half the band's width, as a share of the radius
+  const HALF:f32 = 0.065;
+
+  pub fn build(b:*mg.Builder) Allocator.Error!void {
+    const col = color.rgb(1.0, 1.0, 1.0).toRgba8(255);
+    const N = 160;
+    const across = [_]f32{ -1, -0.7, -0.4, -0.1, 0.2, 0.6, 1 };
+    for (0..N) |i| for (0..across.len - 1) |j| {
+      const q = [4][2]f32{ .{ m.ratio(i, N), across[j] }, .{ m.ratio(i + 1, N), across[j] }, .{ m.ratio(i + 1, N), across[j + 1] }, .{ m.ratio(i, N), across[j + 1] } };
+      for ([_]usize{ 0, 2, 1, 0, 3, 2 }) |c| {
+        const a = q[c][0] * m.tau;
+        const r = 1 + q[c][1] * HALF;
+        try b.put(v3(@cos(a) * r, 0, @sin(a) * r), v3(0, 1, 0), col, q[c][0], q[c][1], .halo);
+      }
+    };
+  }
+};
+
+/// mesh: HALO PROJECTION. the light a diamond throws out to make its ring:
+/// a cone from its apex at the crystal (origin) opening up to a circle of
+/// radius 1 one unit above (scaled to reach the ring), tu.x along it from
+/// the crystal (0) to the ring (1), tu.y its angle as a share of a turn.
+/// part.frag fills it with fine rays of split light.
+pub const projection = struct {
+  pub fn build(b:*mg.Builder) Allocator.Error!void {
+    const col = color.rgb(1.0, 1.0, 1.0).toRgba8(255);
+    const N = 96;
+    const L = 12;
+    for (0..N) |i| for (0..L) |j| {
+      const q = [4][2]f32{ .{ m.ratio(i, N), m.ratio(j, L) }, .{ m.ratio(i + 1, N), m.ratio(j, L) }, .{ m.ratio(i + 1, N), m.ratio(j + 1, L) }, .{ m.ratio(i, N), m.ratio(j + 1, L) } };
+      for ([_]usize{ 0, 2, 1, 0, 3, 2 }) |c| {
+        const a = q[c][0] * m.tau;
+        const k = q[c][1];
+        try b.put(v3(@cos(a) * k, k, @sin(a) * k), m.norm(v3(@cos(a), -1, @sin(a))), col, k, q[c][0], .projection);
+      }
+    };
+  }
+};

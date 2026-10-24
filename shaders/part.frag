@@ -129,6 +129,72 @@ void surface() {
     o = vec4(applyFog(c, v_pos), clamp((rim * 0.9 + burst * 0.6) * fade, 0.0, 1.0));
     return;
   }
+  if (part == 11) {
+    // the halo: light the diamond has split and thrown into a ring. Across
+    // its width (v_u, inner edge -1 .. outer 1) the spectrum fans out as in
+    // an ice halo: a sharp red inner edge, then orange, gold, green, blue,
+    // washing out pale toward violet beyond. Swells of light and fine
+    // motes run round it as along the blooms' beams. An arc dims with the
+    // points beside it (v_glow); the whole appears as the diamond forms
+    // (v_aux). All of it is periodic round the ring, so it has no seam.
+    float t = pc.eye_time.w;
+    float form = v_aux;
+    float x = (v_u + 1.0) * 0.5;
+    float body = smoothstep(0.0, 0.1, x) * exp(-x * 2.4);
+    vec3 col = mix(spectral(x * 1.2), vec3(1.0), smoothstep(0.45, 1.0, x) * 0.55);
+    float ang = v_t * TAU;
+    float lit = min(v_glow, 1.0);
+    float sw = 0.0;
+    for (int k = 0; k < 3; k++) {
+      float fk = float(k);
+      sw += pow(0.5 + 0.5 * sin(ang * (5.0 + 2.0 * fk) - t * (0.9 + 0.35 * fk) + fk * 2.1), 3.0);
+    }
+    sw /= 3.0;
+    // motes: one per cell round the ring, drifting round it, each at its
+    // own place across; neighbouring cells too, so none is cut at an edge
+    float cells = max(floor(TAU * v_fade / 0.35), 1.0);
+    float drift = fract(v_t - t * 0.012) * cells;
+    float mo = 0.0;
+    vec3 mc = vec3(0.0);
+    for (int k = -1; k <= 1; k++) {
+      float id = mod(floor(drift) + float(k), cells);
+      vec3 h = hash33(vec3(id, v_phase * 5.17, 11.0));
+      float dx = (drift - (floor(drift) + float(k)) - h.x) * TAU * v_fade / cells;
+      float du = (x - h.y) * 0.13 * v_fade;
+      float tw = 0.55 + 0.45 * sin(t * (2.5 + 3.0 * h.z) + h.x * TAU);
+      float d2 = dx * dx + du * du;
+      float gl = (exp(-d2 / 0.0006) + 0.3 * exp(-d2 / 0.006)) * tw;
+      mo += gl;
+      mc += spectral(h.y * 1.1) * gl;
+    }
+    c = (col * body * (0.5 + 1.1 * sw) + mix(mc, vec3(mo), 0.4) * 1.8) * (0.25 + 0.75 * lit) * form;
+    float a = clamp(body * (0.4 + 0.5 * sw) + mo * 0.8, 0.0, 1.0) * (0.35 + 0.65 * lit) * form * form;
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+  if (part == 12) {
+    // the projection: fine needles of split light the diamond throws out
+    // (v_t 0 at the crystal .. 1 at the ring, v_u round it), each ray its
+    // own hue, pulses running out along them to the ring; between them
+    // only a breath of haze. They reach out as the diamond forms (v_aux).
+    float t = pc.eye_time.w;
+    float reach = v_aux;
+    if (v_t > reach) discard;
+    const float RAYS = 40.0;
+    float a = v_u * RAYS;
+    float id = mod(floor(a + 0.5), RAYS);
+    vec3 h = hash33(vec3(id, v_phase * 7.3, 3.0));
+    float on = step(0.3, h.x);
+    float d = abs(a - floor(a + 0.5)) / RAYS * TAU * max(v_t * v_fade, 0.06);
+    float ray = exp(-d * d / 0.0012) * on;
+    float pulse = pow(0.5 + 0.5 * sin(v_t * 10.0 - t * (1.8 + h.y) + h.z * TAU), 4.0);
+    float ends = smoothstep(0.0, 0.12, v_t) * smoothstep(1.0, 0.88, v_t) * smoothstep(reach, reach - 0.06, v_t);
+    vec3 col = mix(spectral(h.y), vec3(1.0), 0.2);
+    c = col * ray * (0.25 + 1.3 * pulse) * v_glow;
+    float al = clamp(ray * (0.12 + 0.5 * pulse) + 0.015, 0.0, 1.0) * ends;
+    o = vec4(applyFog(c, v_pos), al);
+    return;
+  }
   if (part == 10) {
     // a cut crystal with no light of its own: each flat facet shades as
     // stone does and reflects a warm iridescent film that shifts with the

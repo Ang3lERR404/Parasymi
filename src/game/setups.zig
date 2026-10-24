@@ -7,7 +7,7 @@ const species = @import("../sim/species.zig");
 const prog = @import("progression.zig");
 const play = @import("play.zig");
 const m = @import("../core/math.zig");
-const polyp = @import("structures/polyp.zig");
+const halo = @import("structures/halo.zig");
 
 const Game = play.Game;
 
@@ -49,7 +49,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
 
   var t:f32 = 0;
   while (t < seconds) : (t += play.TICK) try g.step();
-  try halo(g, cx, cz);
+  try haloGarden(g, cx, cz);
   _ = g.player.inv.add(.grit, 34);
   _ = g.player.inv.add(.fibre, 21);
   _ = g.player.inv.add(.starlight, 7);
@@ -98,18 +98,18 @@ const LAST_FROM:f32 = 0.85;
 const LAST_SPAN:f32 = 133;
 
 /// west of the garden, put down after the fast-forward so it plays out
-/// live: a polyp growing in, three grown blooms on the corners of its
-/// halo's square and a fourth finishing (in ~20 s, time to walk over); as
-/// it does, the halo forms. Two vespers draw on the east corner's
-/// bloom: one inside the square, which the ring keeps once the bloom is
-/// drawn away, one outside it, which only the diamond's field reaches.
-fn halo(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
-  const r = polyp.HALF;
+/// live: a polyp growing in, three grown blooms on the points of its
+/// halo's ring and a fourth finishing (in ~20 s, time to walk over); as
+/// it does, the halo forms. Two vespers draw on the east point's
+/// bloom: one inside the ring, which it keeps once the bloom is drawn
+/// away, one outside it, which only the diamond's wider field reaches.
+fn haloGarden(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  const r = halo.R;
   const x = cx - 19;
   const z = cz + 2;
   if (!try g.structs.place(g.gpa, &g.world, x, z, .polyp, 0, 0.45)) return;
   g.structs.sprout(g.structs.at(&g.world, x, z).?);
-  for (polyp.CORNERS, 0..) |c, i| {
+  for (halo.POINTS, 0..) |c, i| {
     const bx = x + c[0] * r;
     const bz = z + c[1] * r;
     _ = try g.plants.placeEx(g.gpa, &g.world, bx, bz, .{
@@ -118,7 +118,7 @@ fn halo(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
     });
   }
   _ = try g.plants.place(g.gpa, &g.world, x + 3, z, .vesper, 0.5);
-  _ = try g.plants.place(g.gpa, &g.world, x + 4, z + 3, .vesper, 0.6);
+  _ = try g.plants.place(g.gpa, &g.world, x + 5, z + 3, .vesper, 0.6);
 }
 
 /// the nearest free spot beside a resource node gets a root-digger, with a

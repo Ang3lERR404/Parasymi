@@ -174,22 +174,35 @@ void main() {
   v_pos = w.xyz;
   v_nrm = normalize(wn);
   vec3 c = srgb2lin(col.rgb);
-  v_col = mode == 1 ? c : mix(c, c * tint.rgb, tint.w);
+  // (the ring's tint is its points' light, not a colour)
+  v_col = (mode == 1 || part == 11u) ? c : mix(c, c * tint.rgb, tint.w);
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
-  // a flash is as bright as it is young, never pulsing; a prism has no
-  // light of its own
-  if (part == 9u) v_glow = ip.x;
+  // a flash and a halo's projection shine as bright as their glow, never
+  // pulsing; a prism has no light of its own
+  if (part == 9u || part == 12u) v_glow = ip.x;
+  // the ring: an arc is as bright as the points at its ends (tint holds
+  // the four points' light, east, south, west, north; tu.x its angle)
+  if (part == 11u) {
+    float a = fract(tu.x) * 4.0;
+    int i = int(a) % 4;
+    v_glow = mix(tint[i], tint[(i + 1) % 4], fract(a));
+  }
   if (part == 10u) v_glow = 0.0;
   v_part = float(part);
   v_t = tu.x;
   // a beam carries its length instead, so its rays and motes keep their size
   v_fade = part == 8u ? length(c3.xyz - c0.xyz) : ip.w;
+  // the halo's ring and its projection carry their radius (their scale)
+  if (part == 11u || part == 12u) v_fade = length(c0.xyz);
   if (drawn && part == 7u) v_fade *= 1.0 - haloFold(ih.w);
   v_u = tu.y;
   v_obj = p;
   v_phase = ip.z;
   v_aux = ip.y;
+  // the halo's ring and the rays making it appear as its diamond forms
+  // (from its shards, as its blooms close in)
+  if (part == 11u || part == 12u) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
   gl_Position = pc.vp * w;
 }

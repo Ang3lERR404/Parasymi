@@ -26,23 +26,19 @@ pub const Mods = struct {
   fields:[]const Field = &.{},
 };
 
-/// an area of celestial energy around a tile: the square turned 45° on the
-/// grid with its corners `turned` tiles out along the axes, and every tile
-/// within `radius` of it (either 0 for none).
+/// a disc of celestial energy around a tile: every tile within `radius` of it.
 pub const Field = struct {
   x:i32,
   y:i32,
-  turned:i32 = 0,
   radius:f32 = 0,
 
   pub fn holds(fl:Field, wx:i32, wy:i32) bool {
     const dx = wx - fl.x;
     const dy = wy - fl.y;
-    if (@abs(dx) + @abs(dy) <= fl.turned) return true;
     return m.f(dx * dx + dy * dy) <= fl.radius * fl.radius;
   }
   /// how far out it reaches on either axis
-  pub fn reach(fl:Field) i32 { return @max(fl.turned, m.floorTo(i32, fl.radius)); }
+  pub fn reach(fl:Field) i32 { return m.floorTo(i32, fl.radius); }
 };
 
 pub const Events = struct {

@@ -75,7 +75,7 @@ const PICK_RANGE_MULT:f32 = 4;
 /// (`ctl.slots`).
 pub const hotbar = [_]items.Item{
   .seed_lumenroot, .seed_thornleech, .seed_vesper, .seed_driftwisp, .seed_hollowheart,
-  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom, .polyp,
+  .conduit, .sap_cache, .germinator, .research_bloom, .root_digger, .seed_bloom, .polyp, .diamond,
 };
 comptime { std.debug.assert(hotbar.len == ctl.slots.len); }
 
@@ -412,7 +412,7 @@ pub const Game = struct {
     const ev = try g.eco.tick(g.gpa, &g.plants, &g.world, mods, TICK);
     try g.converge.tick(g.gpa, &g.world, &g.plants, &g.structs, &g.prog);
     g.prog.absorb(ev, TICK);
-    g.structs.tick(&g.world, &g.plants, &g.prog, TICK);
+    try g.structs.tick(g.gpa, &g.world, &g.plants, &g.prog, TICK);
     g.ticks += 1;
   }
 };

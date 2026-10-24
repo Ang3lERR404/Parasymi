@@ -25,7 +25,7 @@ build. New shaders go in `build.zig`'s list.
 
 ## Controls
 Defaults in `controls.cfg` (rebindable there): WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
-RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate. 1–9/0/- pick
+RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate. 1–9/0/-/=/Backspace pick
 hotbar slots only; research nodes and weave recipes are clicked in their
 panels. Tab belly (weave), T research, F3 debug, Esc closes a panel else
 pauses (Q in pause = save and quit), F5 save, F9 load, F11 fullscreen.
@@ -75,7 +75,7 @@ registry kinds outside the registry file; add a hook.
 |---|---|---|
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
-| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground` |
+| structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground`, `field`, `hold` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
 | render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |
@@ -182,23 +182,26 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   only (pairwise links, then each radiating bloom's tiles). Hover panel
   shows RADIATING/DARK + links, DRAWING RADIANCE/WITHERING. Seed: 3
   starlight + 1 ley shard + 2 essence (hotbar `-`).
-- Halo (`structures/polyp.zig`): a polyp (1×1, grows 6 s; 4 fibre + 3
-  essence + 2 starlight + 2 ley shard, hotbar `=`) checks each tick for
-  grown blooms (HP > 0.5) at the corners of the 45°-turned square 5 tiles
-  out E/S/W/N. Then, once ever, over 5 s: the blooms spiral in (share
-  covered ∝ e^(4k), 1.25 turns) and fold to buds, all on the GPU
-  (common.glsl `haloSpiral`; the CPU sends only `[centre, k]`, instance
-  `h` / `vertex.NO_HALO`, and beams their held ends in `e.z`); the ring
-  is four `bloom_thread` beams (flutter 1: even width, no end fades)
-  reaching corner to corner at bloom hover; the diamond (`halo_diamond`,
-  part 10, a cut crystal model with a warm film, no light of its own)
-  gathers from its shards as they close in; as they meet they are
-  consumed and a flash (`halo_flash`, part 9) spreads and fades over
-  1.4 s. The ring powers |dx|+|dy| ≤ 5 (`ecology.Field` via
-  `Mods.fields`, `field` hook) from the start; the diamond adds a 7-tile
-  disc. A corner without a grown bloom dims its edges to 0.3. The
-  diamond is the world event's future launch point. Demo: west of the
-  garden, the fourth bloom finishes ~20 s in.
+- Halo (`structures/polyp.zig`, `halo.zig` shared, `diamond.zig`): a
+  polyp (1×1, grows 6 s; 4 fibre + 3 essence + 2 starlight + 2 ley shard,
+  hotbar `=`) checks each tick for grown blooms (HP > 0.5) on the four
+  points 5 tiles out E/S/W/N. Then, once ever, over 5 s: the blooms spiral
+  in (share ∝ e^(4k), 1.25 turns) and fold to buds, all on the GPU
+  (common.glsl `haloSpiral`; the CPU sends only `[centre, k]`, instance `h`
+  / `vertex.NO_HALO`, beams their held ends in `e.z`), while the diamond
+  gathers from its shards and projects the halo: needle rays of split
+  light (`halo_projection`, part 12) up to a ring at bloom hover through
+  the points (`halo_ring`, part 11: spectrum across its width, red inner
+  edge as an ice halo, beam-like swells and motes running round). As they
+  meet they are consumed, a flash spreads (`halo_flash`, part 9) and a
+  DIAMOND structure (floating over the cup, `Def.floating`/`hover`/`bare`)
+  is put down; the polyp stays as it is. Ring field: radius 5 while
+  forming; diamond field: radius 7. Points without a grown bloom dim their
+  arcs to 0.3. A diamond discovers `.diamond`, opening CELESTIAL
+  DEFRAGMENTATION, which lets diamonds be woven (hotbar BKSP) and put over
+  any dry tile (they gather as they grow, then flash). The diamond is the
+  world event's future launch point. Demo: west of the garden, the fourth
+  bloom finishes ~20 s in.
 - Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the
   seed; only the gardener's changes are stored. Bump `VERSION` when a stored
   layout changes (the fingerprint checks sizes only).
@@ -357,10 +360,10 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 
 ## Current state
 Done: engine, terrain, streaming, plants + 7 species, ecology, structures,
-footprints/floaters, research (9 nodes), hand weaving, save/load, pause,
+footprints/floaters, research (10 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
 planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
-LOD + culling, bloom post-processing, research sapling panel, halo + diamond.
+LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation.
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes

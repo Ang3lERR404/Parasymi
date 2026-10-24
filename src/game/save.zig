@@ -29,7 +29,7 @@ const Belly = @FieldType(player_mod.Player, "inv");
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 7;
+const VERSION:u32 = 8;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;
