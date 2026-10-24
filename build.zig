@@ -12,6 +12,18 @@ const shaders = [_][]const u8{
   "sky.vert", "sky.frag",
   "post.vert", "bloom_down.frag", "bloom_up.frag", "composite.frag",
 };
+/// shaders compiled a second time from the same source with a define,
+/// imported under their own name: (name, source, define). The glass
+/// variants draw only the see-through fragments the plain ones skip.
+const variants = [_][3][]const u8{
+  .{"plant_glass.frag", "plant.frag", "GLASS"},
+  .{"part_glass.frag", "part.frag", "GLASS"},
+};
+const names = shaders ++ blk: {
+  var n:[variants.len][]const u8 = undefined;
+  for (variants, &n) |v, *o| o.* = v[0];
+  break :blk n;
+};
 
 pub fn build(b:*Build) !void {
   const name = @tagName(zon.name);
@@ -41,12 +53,15 @@ pub fn build(b:*Build) !void {
   glfw_mod.addImport("vulkan", vulkan);
 
   // compile every shader once; both the game and the tests can import them
-  var spvs:[shaders.len]Build.LazyPath = undefined;
-  for (shaders, &spvs) |s, *spv| {
+  var spvs:[names.len]Build.LazyPath = undefined;
+  for (names, &spvs, 0..) |s, *spv, i| {
+    const v:?[3][]const u8 = if (i < shaders.len) null else variants[i - shaders.len];
     const cmd = b.addSystemCommand(&.{glslc, "--target-env=vulkan1.3", "-O"});
     cmd.addPrefixedDirectoryArg("-I", b.path("shaders"));
     cmd.addFileInput(b.path("shaders/common.glsl"));
-    cmd.addFileArg(b.path(b.fmt("shaders/{s}", .{s})));
+    if (v) |vv| cmd.addArg(b.fmt("-D{s}", .{vv[2]}));
+    // glslc reads the stage from the source's extension
+    cmd.addFileArg(b.path(b.fmt("shaders/{s}", .{if (v) |vv| vv[1] else s})));
     cmd.addArg("-o");
     spv.* = cmd.addOutputFileArg(b.fmt("{s}.spv", .{s}));
   }
@@ -63,7 +78,7 @@ pub fn build(b:*Build) !void {
         },
       });
       md.linkLibrary(glfw);
-      for (shaders, sp) |s, spv| md.addAnonymousImport(s, .{.root_source_file = spv});
+      for (names, sp) |s, spv| md.addAnonymousImport(s, .{.root_source_file = spv});
       return md;
     }
   };

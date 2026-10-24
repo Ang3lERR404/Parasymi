@@ -18,10 +18,18 @@ pub const Terrain = extern struct {
 /// while the base holds.
 /// `shadow`: a soft dark patch on the ground under something floating
 /// (tu.x its radial fraction; instance fade its darkness).
-/// `thread`: a beam between blooms. `halo`: a band of still light lying on
-/// the ground (tu.x along it from a corner, tu.y across -1..1). `prism`: a
+/// `thread`: a beam between blooms (a halo's edges too). `flash`: a disc of
+/// light thrown out where a halo's blooms met (tu.x its radius). `prism`: a
 /// cut iridescent crystal that only catches light.
-pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, halo, prism };
+pub const Part = enum(u32) { stem, leaf, bloom, thorn, tendril, ear, resin, shadow, thread, flash, prism };
+
+/// roles a library part may draw see-through (part.frag)
+pub fn seeThrough(p:Part) bool {
+  return switch (p) {
+    .bloom, .ear, .resin, .shadow, .thread, .flash => true,
+    .stem, .leaf, .thorn, .tendril, .prism => false,
+  };
+}
 
 pub const Mesh = extern struct {
   pos:[3]f32,
@@ -52,6 +60,8 @@ pub const PlantInstance = extern struct {
   /// x: blend toward the next growth key (0..1); y: 1 for a placement
   /// preview (ghost); z: 1 when that preview fits; w unused
   c:[4]f32 = .{0, 0, 0, 0},
+  /// a forming halo drawing it in (see `NO_HALO`)
+  h:[4]f32 = NO_HALO,
 };
 
 /// one tile's worth of ground detail, read per instance by detail.vert,
@@ -89,9 +99,13 @@ pub const PartInstance = extern struct {
   /// x how part.vert places it: 0 by the matrix; 1 along a curve (the
   /// tail, a bloom thread: c0..c3 xyz its control points, tint.xyz the side
   /// its x lies toward, y how far along it reaches (0: all of it), w its
-  /// rest length); 2 a star mote (c3 its centre; y phase, z life, w its
+  /// rest length; z which of its ends a forming halo draws in: 1 its
+  /// first, 2 its last, 3 both); 2 a star mote (c3 its centre; y phase, z
+  /// life, w its
   /// trail echo, -1 when resting)
   e:[4]f32 = .{0, 0, 0, 0},
+  /// a forming halo it belongs to (see `NO_HALO`)
+  h:[4]f32 = NO_HALO,
 };
 
 pub const Ui = extern struct {
@@ -108,3 +122,10 @@ pub const Ui = extern struct {
   /// shape parameters: x value/selection 0..1, y phase/seed
   param:[2]f32,
 };
+
+/// a halo forming around a polyp (game/structures/polyp.zig), as an
+/// instance carries it to the shaders: xyz its centre (where the diamond
+/// sits), w how far it has come (0 the blooms leave their corners .. 1 they
+/// meet; past 1, `FORM`s since). common.glsl `haloSpiral` draws the blooms
+/// in along it. This, w < 0, is none.
+pub const NO_HALO = [4]f32{0, 0, 0, -1};

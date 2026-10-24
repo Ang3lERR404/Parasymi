@@ -43,7 +43,7 @@ vec3 sapOf(float aff, float ndv, float seed) {
   return vec3(0.75, 0.55, 1.0);
 }
 
-void main() {
+void surface() {
   vec3 tgrad = surfaceTangent(); // derivatives first, in uniform control flow
   vec3 n = normalize(v_nrm);
   if (!gl_FrontFacing) n = -n;
@@ -143,4 +143,18 @@ void main() {
     alpha = mix(0.3, 0.6, fres) * (0.8 + 0.2 * pulse);
   }
   o = vec4(applyFog(c, v_pos), alpha);
+}
+
+// two passes draw every surface: the solid one keeps the fragments that are
+// opaque and writes depth; the glass one (built with GLASS, after every
+// solid pass) blends the see-through ones over it, testing depth but writing
+// none, so nothing see-through hides what lies behind it
+const float SOLID = 0.996;
+void main() {
+  surface();
+#ifdef GLASS
+  if (o.a >= SOLID || o.a < 0.002) discard;
+#else
+  if (o.a < SOLID) discard;
+#endif
 }

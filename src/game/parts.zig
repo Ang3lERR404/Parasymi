@@ -4,7 +4,8 @@ const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const meshlib = @import("../gfx/meshlib.zig");
 const mg = @import("../gfx/meshgen.zig");
-const PartInstance = @import("../gfx/vertex.zig").PartInstance;
+const vertex = @import("../gfx/vertex.zig");
+const PartInstance = vertex.PartInstance;
 
 /// how part.vert places an instance (`PartInstance.e.x`): by its matrix,
 /// bent along a curve, or as a star mote
@@ -39,6 +40,10 @@ pub const Look = struct {
   /// how far a grown structure has come along (0 sprout .. 1 grown): its
   /// leaves and petals unfold from the bottom up
   grown:f32 = 1,
+  /// a forming halo it rides with (see `vertex.NO_HALO`), and for a curve,
+  /// which of its ends that halo draws in (1 first, 2 last, 3 both)
+  halo:[4]f32 = vertex.NO_HALO,
+  ends:f32 = 0,
 };
 
 pub const Parts = struct {
@@ -87,7 +92,7 @@ pub const Parts = struct {
     inst.c2 = .{ctrl[2][0], ctrl[2][1], ctrl[2][2], 1};
     inst.c3 = .{ctrl[3][0], ctrl[3][1], ctrl[3][2], 1};
     inst.tint = .{side[0], side[1], side[2], 0};
-    inst.e = .{PLACE_CURVE, @max(reach, MIN_REACH), 0, len};
+    inst.e = .{PLACE_CURVE, @max(reach, MIN_REACH), look_.ends, len};
     try p.add(id, ctrl[0], inst);
   }
 
@@ -116,5 +121,6 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     // q.x = sag; q.yzw = give
     .q = .{look.sag, look.give[0], look.give[1], look.give[2]},
     .w = .{look.sway, look.tall, look.drop, look.grown},
+    .h = look.halo,
   };
 }

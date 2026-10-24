@@ -117,3 +117,24 @@ vec3 applyFog(vec3 c, vec3 wpos) {
   f = max(f, smoothstep(pc.view.z, pc.view.w, length(wpos.xz - pc.view.xy)));
   return mix(c, pc.fog.rgb, clamp(f, 0.0, 1.0));
 }
+
+// a halo forming (game/structures/polyp.zig): over k 0..1 its blooms spiral
+// in from their corners to its centre, the share of the way covered growing
+// as e^(HALO_RUSH k) (a crawl, then a rush) while they turn HALO_TURNS times
+// around it, folding back toward buds over the last HALO_FOLD of it
+const float HALO_RUSH = 4.0;
+const float HALO_TURNS = 1.25;
+const float HALO_FOLD = 0.3;
+float haloPull(float k) { return (exp(HALO_RUSH * clamp(k, 0.0, 1.0)) - 1.0) / (exp(HALO_RUSH) - 1.0); }
+float haloFold(float k) { return smoothstep(1.0 - HALO_FOLD, 1.0, k); }
+// how far around the centre a bloom has turned by k (radians)
+float haloTurn(float k) { return HALO_TURNS * TAU * haloPull(k); }
+// where a point riding with a bloom is at k: its way out from the centre
+// turned and shortened
+vec3 haloSpiral(vec3 p, vec3 centre, float k) {
+  float pull = haloPull(k);
+  float a = haloTurn(k);
+  vec3 d = p - centre;
+  float c = cos(a), s = sin(a);
+  return centre + vec3(d.x * c - d.z * s, d.y, d.x * s + d.z * c) * (1.0 - pull);
+}

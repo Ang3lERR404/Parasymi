@@ -14,8 +14,9 @@ layout(location = 6) in vec4 ia;    // growth, mana fill, seed, affinity
 layout(location = 7) in vec4 ib;    // flow, health, sway amplitude, form (species.Form)
 layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (0/1), ghost fits (0/1)
 // the same vertex in the next growth key (equals pos/nrm for keyless plants)
-layout(location = 9) in vec3 pos_next;
-layout(location = 10) in vec3 nrm_next;
+layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre, how far along (< 0 none)
+layout(location = 10) in vec3 pos_next;
+layout(location = 11) in vec3 nrm_next;
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -40,6 +41,11 @@ vec3 hueShift(vec3 c, float a) {
 void main() {
   float t = pc.eye_time.w;
   float growth = ia.x, fill = ia.y, seed = ia.z, aff = ia.w;
+  // a bloom a forming halo draws in spirals to its centre (see haloSpiral),
+  // folding back toward a bud as it arrives
+  bool drawn = ih.w >= 0.0;
+  vec3 base = drawn ? haloSpiral(ipos, ih.xyz, ih.w) : ipos;
+  if (drawn) growth = mix(growth, 0.12, haloFold(ih.w));
   float flow = ib.x, health = ib.y, sway = ib.z;
   // species.Form: 0 herb, 1 coil, 2 drift, 3 confluence, 4 radiant
   bool confluence = abs(ib.w - 3.0) < 0.5;
@@ -99,7 +105,13 @@ void main() {
     p.xz += (turn * dir) * far * 1.4;
     p.y += far * (-0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0));
     p *= 1.0 + 0.02 * sin(t * 0.6 + seed * TAU);
-    vec3 wp = ipos + p;
+    // drawn into a forming halo, it turns with its orbit
+    if (drawn) {
+      mat2 orbit = rot(-haloTurn(ih.w));
+      p.xz = orbit * p.xz;
+      n.xz = orbit * n.xz;
+    }
+    vec3 wp = base + p;
     v_pos = wp;
     v_nrm = n;
     v_col = srgb2lin(col.rgb);
@@ -176,7 +188,7 @@ void main() {
   n = bendIn(n, wdir, ang);
   // a confluence's growth keys already carry its size
   float s = (confluence ? 1.0 : mix(0.12, 1.0, g)) * (0.85 + 0.3 * fract(seed * 7.13));
-  vec3 wp = ipos + p * s;
+  vec3 wp = base + p * s;
 
   v_pos = wp;
   v_nrm = n;

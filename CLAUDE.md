@@ -78,7 +78,7 @@ registry kinds outside the registry file; add a hook.
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `wants`, `output`, `release`, `configure`, `emit`, `describe`, `ground` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
-| render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, ui) |
+| render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |
 
 Items (`sim/items.zig`, ids stored by value: new items go last) and weave
 recipes (`game/craft.zig`) are plain data tables.
@@ -105,6 +105,11 @@ recipes (`game/craft.zig`) are plain data tables.
   `leaf`, `digit`, `claw`, `limbCore`, `muscle`, `tendon`), `mineral_kit`.
 - Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from
   vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
+- See-through is two passes: `plants`/`parts` keep only fragments with
+  alpha ≥ 0.996 (writing depth); `plants_glass`/`parts_glass` (the same
+  instances, shaders built with `-DGLASS`, build.zig `variants`) blend the
+  rest over every solid surface, testing depth but writing none. A new
+  see-through part role goes in `vertex.seeThrough`.
 - `WorldPush` is 176 bytes (limit checked at pipeline creation).
 - UI: organic, animated, no boxes; SDFs in `shaders/ui.frag`.
 - **Never hard-code strings**: every player-facing string (messages, HUD
@@ -180,16 +185,20 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - Halo (`structures/polyp.zig`): a polyp (1×1, grows 6 s; 4 fibre + 3
   essence + 2 starlight + 2 ley shard, hotbar `=`) checks each tick for
   grown blooms (HP > 0.5) at the corners of the 45°-turned square 5 tiles
-  out E/S/W/N. Then, once ever: over 5 s the blooms spiral in (share
-  covered ∝ e^(4k), 1.25 turns), folding to buds, and are consumed; a still
-  iridescent ring (`halo_ring`, part 9, eight half edges in curve mode)
-  grows out from the corners, floating at bloom hover. The ring powers
-  |dx|+|dy| ≤ 5 (`ecology.Field`, fed through `Mods.fields` from the
-  `field` hook) from the moment it starts; the diamond (`halo_diamond`,
-  part 10: cut crystal, warm film, no light of its own) adds a 7-tile disc.
-  A corner without a grown bloom dims its edges to 0.3. The diamond is the
-  world event's future launch point. Demo: west of the garden, the fourth
-  bloom finishes ~20 s in.
+  out E/S/W/N. Then, once ever, over 5 s: the blooms spiral in (share
+  covered ∝ e^(4k), 1.25 turns) and fold to buds, all on the GPU
+  (common.glsl `haloSpiral`; the CPU sends only `[centre, k]`, instance
+  `h` / `vertex.NO_HALO`, and beams their held ends in `e.z`); the ring
+  is four `bloom_thread` beams (flutter 1: even width, no end fades)
+  reaching corner to corner at bloom hover; the diamond (`halo_diamond`,
+  part 10, a cut crystal model with a warm film, no light of its own)
+  gathers from its shards as they close in; as they meet they are
+  consumed and a flash (`halo_flash`, part 9) spreads and fades over
+  1.4 s. The ring powers |dx|+|dy| ≤ 5 (`ecology.Field` via
+  `Mods.fields`, `field` hook) from the start; the diamond adds a 7-tile
+  disc. A corner without a grown bloom dims its edges to 0.3. The
+  diamond is the world event's future launch point. Demo: west of the
+  garden, the fourth bloom finishes ~20 s in.
 - Save (`game/save.zig`, `parasymi.sav`): the world regenerates from the
   seed; only the gardener's changes are stored. Bump `VERSION` when a stored
   layout changes (the fingerprint checks sizes only).
@@ -256,7 +265,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - Sky: gradient dome, sun/moon, stars; star motes (faceted core, ring,
   needle rays) turn, twinkle, hover and trail echoes while falling. Low
   pitch widens the view toward the horizon.
-- part.vert placement by `PartInstance.e.x`: 0 matrix, 1 curve (tail, beams, halo ring;
+- part.vert placement by `PartInstance.e.x`: 0 matrix, 1 curve (tail, beams;
   `e.y` reach), 2 star mote.
 - Post-processing (`render/post.zig`): world passes draw into an HDR image;
   brighter-than-white light blooms (5-level 13-tap down chain with soft-knee

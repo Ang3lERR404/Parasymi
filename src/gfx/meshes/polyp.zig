@@ -1,8 +1,8 @@
 //! mesh: POLYP. the heart of a halo: a short woven stalk on a root mat,
 //! opening into a small cup of petals that holds a bead of resin, with a
 //! ring of pale tentacles curling up around it. The diamond (`diamond`)
-//! rests in the cup once the halo completes; the ring of light around it
-//! is `ring`.
+//! forms in the cup as the halo completes, with a flash of light (`flash`)
+//! as it does; the halo's ring is beams of light (`bloom_thread`).
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -16,7 +16,7 @@ const V3 = m.V3;
 const v3 = m.v3;
 const HEIGHT:f32 = 0.55;
 /// where the diamond sits in the cup (its centre, mesh space)
-pub const SEAT:f32 = 0.74;
+pub const SEAT:f32 = 0.86;
 const pearl = color.rgb(0.78, 0.74, 0.84);
 const lilac = color.rgb(0.62, 0.52, 0.78);
 const heart = color.rgb(0.34, 0.28, 0.44);
@@ -66,58 +66,85 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   }
 }
 
-/// mesh: HALO RING. one half of an edge of the halo's square, from a corner
-/// to the edge's middle: a flat band of still light, its length up +Y over
-/// 0..1 (tu.x), its width across x (tu.y -1..1). part.vert (curve mode)
-/// lays it on the ground along the edge; part.frag fills it. Both faces,
-/// so it reads from above and below a slope.
-pub const ring = struct {
-  /// half the band's width, world units
-  pub const HALF:f32 = 0.2;
-
+/// mesh: HALO FLASH. the light thrown out where a halo's blooms became one:
+/// a flat disc of radius 1 (tu.x its radius 0..1), fine near its rim where
+/// the light is a thin ring. part.vert spreads it with its age; part.frag
+/// lights it.
+pub const flash = struct {
   pub fn build(b:*mg.Builder) Allocator.Error!void {
-    const col = color.rgb(1.0, 0.95, 0.9).toRgba8(255);
-    const N = 24;
-    const across = [_]f32{-1, -0.4, 0, 0.4, 1};
-    for (0..N) |i| for (0..across.len - 1) |j| {
-      const k0 = m.ratio(i, N);
-      const k1 = m.ratio(i + 1, N);
-      const q = [4][2]f32{.{k0, across[j]}, .{k0, across[j + 1]}, .{k1, across[j + 1]}, .{k1, across[j]}};
-      for ([_]usize{0, 1, 2, 0, 2, 3}) |c| try b.put(v3(q[c][1] * HALF, q[c][0], 0), v3(0, 0, 1), col, q[c][0], q[c][1], .halo);
-      for ([_]usize{0, 2, 1, 0, 3, 2}) |c| try b.put(v3(q[c][1] * HALF, q[c][0], 0), v3(0, 0, -1), col, q[c][0], q[c][1], .halo);
+    const col = color.rgb(1.0, 0.97, 0.9).toRgba8(255);
+    const N = 48;
+    const radii = [_]f32{ 0, 0.4, 0.7, 0.82, 0.88, 0.92, 0.96, 1.0 };
+    for (0..N) |i| for (0..radii.len - 1) |j| {
+      const a0 = m.ratio(i, N) * m.tau;
+      const a1 = m.ratio(i + 1, N) * m.tau;
+      const q = [4][2]f32{ .{ a0, radii[j] }, .{ a1, radii[j] }, .{ a1, radii[j + 1] }, .{ a0, radii[j + 1] } };
+      for ([_]usize{ 0, 2, 1, 0, 3, 2 }) |c| try b.put(v3(@cos(q[c][0]) * q[c][1], 0, @sin(q[c][0]) * q[c][1]), v3(0, 1, 0), col, q[c][1], 0, .flash);
     };
   }
 };
 
-/// mesh: HALO DIAMOND. where the four blooms became one: a small
-/// double-terminated crystal, its six faces a little uneven like a grown
-/// one, standing upright. It has no light of its own; part.frag lays a warm
-/// iridescent film over its facets, so it only catches light. Centred on
-/// its girdle.
+/// mesh: HALO DIAMOND. where the four blooms became one: a cut crystal,
+/// eight-sided, its girdle bevelled into a crown and a pavilion of
+/// staggered triangular facets running up to a long point and down to a
+/// shorter one, three small crystals grown out at its foot. Each face a
+/// little uneven, like a grown one. It has no light of its own; part.frag
+/// lays a warm iridescent film over its facets, so it only catches light.
+/// Centred on its girdle. part.vert gathers its facets in from shards as
+/// the halo forms (they are separate faces, so each comes in on its own).
 pub const diamond = struct {
+  const S = 8;
+  /// rings from the bottom point to the top one: height, radius, twist
+  /// (in half steps), each staggered from the next
+  const rings = [_][3]f32{
+    .{ -0.24, 0, 0 },
+    .{ -0.09, 0.085, 1 },
+    .{ 0, 0.125, 0 },
+    .{ 0.07, 0.09, 1 },
+    .{ 0.13, 0.05, 0 },
+    .{ 0.28, 0, 1 },
+  };
+
   pub fn build(b:*mg.Builder) Allocator.Error!void {
     var rng = pal.rngFor("halo_diamond");
-    const S = 6;
-    const body = color.rgb(0.98, 0.9, 0.82).toRgba8(255);
+    const deep = color.rgb(0.95, 0.84, 0.76).toRgba8(255);
     const lite = color.rgb(1.0, 0.97, 0.92).toRgba8(255);
-    const top = v3(rng.range(-0.006, 0.006), 0.17, rng.range(-0.006, 0.006));
-    const bottom = v3(0, -0.14, 0);
-    var hi:[S]V3 = undefined;
-    var lo:[S]V3 = undefined;
-    const turn = rng.range(0, m.tau);
-    for (0..S) |i| {
-      const a = turn + m.tau * m.ratio(i, S);
-      const r = 0.07 * rng.range(0.88, 1.1);
-      hi[i] = v3(@cos(a) * r, 0.06 * rng.range(0.85, 1.15), @sin(a) * r);
-      lo[i] = v3(@cos(a) * r * 0.95, -0.05 * rng.range(0.85, 1.15), @sin(a) * r * 0.95);
+    var pts:[rings.len][S]V3 = undefined;
+    for (rings, &pts) |rg, *row| for (row, 0..) |*p, i| {
+      const a = (m.f(i) + rg[2] * 0.5) / S * m.tau;
+      const r = rg[1] * rng.range(0.92, 1.08);
+      p.* = v3(@cos(a) * r, rg[0] + rng.range(-0.006, 0.006) * @min(1, rg[1] * 20), @sin(a) * r);
+    };
+    const inside = v3(0, 0.01, 0);
+    for (0..rings.len - 1) |k| {
+      const lo = pts[k];
+      const hi = pts[k + 1];
+      const cl = if (k < 2) deep else lite;
+      const ch = if (k + 1 < 2) deep else lite;
+      const t0 = m.ratio(k, rings.len - 1);
+      // a point is a ring of one place: the faces along it vanish
+      const lo0 = rings[k][1] == 0;
+      const hi0 = rings[k + 1][1] == 0;
+      for (0..S) |i| {
+        const j = (i + 1) % S;
+        // the upper ring sits half a step on: stagger between them
+        if (rings[k + 1][2] > rings[k][2]) {
+          if (!lo0) try mineral.facet(b, .{ lo[i], lo[j], hi[i] }, inside, .{ cl, cl, ch }, t0, .prism);
+          if (!hi0) try mineral.facet(b, .{ hi[i], lo[j], hi[j] }, inside, .{ ch, cl, ch }, t0, .prism);
+        } else {
+          if (!hi0) try mineral.facet(b, .{ lo[i], hi[j], hi[i] }, inside, .{ cl, ch, ch }, t0, .prism);
+          if (!lo0) try mineral.facet(b, .{ lo[i], lo[j], hi[j] }, inside, .{ cl, cl, ch }, t0, .prism);
+        }
+      }
     }
-    const inside = v3(0, 0, 0);
-    for (0..S) |i| {
-      const j = (i + 1) % S;
-      try mineral.facet(b, .{lo[i], lo[j], hi[j]}, inside, .{body, body, lite}, 0.5, .prism);
-      try mineral.facet(b, .{lo[i], hi[j], hi[i]}, inside, .{body, lite, lite}, 0.5, .prism);
-      try mineral.facet(b, .{hi[i], hi[j], top}, inside, .{lite, lite, lite}, 1, .prism);
-      try mineral.facet(b, .{lo[i], bottom, lo[j]}, inside, .{body, body, body}, 0, .prism);
+    // small crystals grown out at its foot, leaning away
+    for (0..3) |i| {
+      const a = (m.f(i) + rng.range(-0.15, 0.15)) / 3 * m.tau + 0.4;
+      try mineral.crystal(b, .{
+        .base = v3(@cos(a) * 0.05, -0.12, @sin(a) * 0.05),
+        .dir = m.norm(v3(@cos(a) * 0.9, 0.6, @sin(a) * 0.9)),
+        .len = rng.range(0.12, 0.17), .r = rng.range(0.022, 0.03), .col = deep, .tip = lite, .part = .prism,
+      }, &rng);
     }
   }
 };

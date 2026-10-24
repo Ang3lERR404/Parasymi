@@ -214,11 +214,11 @@ pub const Structures = struct {
   }
 };
 
-/// a floating plant drawn in toward a structure: how far along the way
-/// (0 at its tile .. 1 there), how far it has turned around it on the way
-/// (radians), how far its petals have folded back in, and
-/// how high over the structure's ground it is drawn to.
-pub const Hold = struct { pull:f32, turn:f32 = 0, fold:f32, seat:f32 };
+/// a floating plant a structure draws in toward itself: how far along the
+/// way it is (0 leaving its tile .. 1 there; the GPU moves it, see
+/// common.glsl `haloSpiral`) and how high over the structure's ground it
+/// is drawn to.
+pub const Hold = struct { k:f32, seat:f32 };
 
 /// every field of celestial energy a structure holds, into `out`.
 pub fn fields(ss:*const Structures, gpa:Allocator, out:*std.ArrayList(Field)) Allocator.Error!void {

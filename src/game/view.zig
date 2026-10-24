@@ -9,6 +9,7 @@ const ck = @import("../world/chunk.zig");
 const species = @import("../sim/species.zig");
 const renderer = @import("../render/renderer.zig");
 const meshgen = @import("../gfx/meshgen.zig");
+const vertex = @import("../gfx/vertex.zig");
 const st = @import("structures.zig");
 const resources = @import("resources.zig");
 const actions = @import("actions.zig");
@@ -45,8 +46,6 @@ const BEAM_SAG:f32 = 0.03;
 const BEAM_SAG_RATE:f32 = 0.4;
 const BEAM_FROM:f32 = 0.85;
 const BEAM_DIM:f32 = 0.1;
-/// a bloom drawn into a halo folds back to this much of its growth
-const FOLDED:f32 = 0.12;
 /// structures breathe at one tempo, deeper with activity, and glow with it
 const BREATH_RATE:f32 = 1.6;
 const BREATH:f32 = 0.02;
@@ -138,27 +137,21 @@ fn floatAt(def:*const species.Species, x:i32, y:i32, ground:f32, seed:f32, tf:f3
   return m.v3(c[0] + DRIFT * @sin(tf * DRIFT_RATE[0] + seed * 7), @max(ground, 0) + def.hover + lift, c[2] + DRIFT * @cos(tf * DRIFT_RATE[1] + seed * 5));
 }
 
-/// where a floater is drawn this frame, and how far its petals have folded
-/// back in: over its tile, or on its way to a structure drawing it in (a
-/// forming halo's polyp).
-const Held = struct { at:m.V3, fold:f32 };
-fn floaterAt(g:*const Game, def:*const species.Species, x:i32, y:i32, ground:f32, seed:f32, tf:f32) Held {
-  const f = floatAt(def, x, y, ground, seed, tf);
-  if (def.radiance <= 0) return .{.at = f, .fold = 0};
-  const hd = st.hold(&g.structs, x, y) orelse return .{.at = f, .fold = 0};
+/// the forming halo drawing in the bloom at a tile, as the shaders take it
+/// (vertex.NO_HALO for none): they spiral it in (common.glsl `haloSpiral`).
+fn haloOf(g:*const Game, def:*const species.Species, x:i32, y:i32) [4]f32 {
+  if (def.radiance <= 0) return vertex.NO_HALO;
+  const hd = st.hold(&g.structs, x, y) orelse return vertex.NO_HALO;
   const to = structCentre(g, hd.s) + m.v3(0, hd.h.seat, 0);
-  // a spiral: the way out from the centre turned, and shortened
-  const out = f - to;
-  const c = @cos(hd.h.turn);
-  const sn = @sin(hd.h.turn);
-  const k = 1 - hd.h.pull;
-  return .{.at = to + m.v3((out[0] * c - out[2] * sn) * k, out[1] * k, (out[0] * sn + out[2] * c) * k), .fold = hd.h.fold};
+  return .{ to[0], to[1], to[2], hd.h.k };
 }
 
 /// the threads of light between linked blooms (see ecology `Radiance`):
 /// bent on the GPU from one bloom's core to the other's with a slight sag,
 /// bright where their network radiates, faint where it is dark. A thread
 /// reaches out from the more grown bloom as that bloom finishes assembling.
+/// A forming halo draws its blooms in, and the GPU bends the threads from
+/// them along (`Look.ends`).
 fn threads(g:*Game, tf:f32) Allocator.Error!void {
   const s = g.plants.list.slice();
   for (g.eco.radiance.links.items) |l| {
@@ -176,15 +169,23 @@ fn threads(g:*Game, tf:f32) Allocator.Error!void {
     const side = m.norm(m.cross(span, m.v3(0, 1, 0)));
     const reach = m.smooth(m.clamp01((s.items(.growth)[ia] - BEAM_FROM) / (1 - BEAM_FROM)));
     if (reach <= 0) continue;
-    try g.parts.emitCurve(.bloom_thread, ctrl, side, 1, reach, .{.glow = if (l.live) 1 else BEAM_DIM, .phase = s.items(.seed)[ia]});
+    // decision: one halo per beam; a beam between two halos' blooms (never
+    // at once in practice) follows the first
+    const ha = haloOf(g, species.get(s.items(.sp)[ia]), s.items(.x)[ia], s.items(.y)[ia]);
+    const hb = haloOf(g, species.get(s.items(.sp)[ib]), s.items(.x)[ib], s.items(.y)[ib]);
+    const ends:f32 = (if (ha[3] >= 0) @as(f32, 1) else 0) + (if (hb[3] >= 0) @as(f32, 2) else 0);
+    try g.parts.emitCurve(.bloom_thread, ctrl, side, 1, reach, .{
+      .glow = if (l.live) 1 else BEAM_DIM, .phase = s.items(.seed)[ia],
+      .halo = if (ha[3] >= 0) ha else hb, .ends = ends,
+    });
   }
 }
 
-/// a bloom's core this frame
+/// a bloom's core this frame (over its tile; a forming halo moves it on the GPU)
 fn end(g:*Game, i:usize, tf:f32) m.V3 {
   const s = g.plants.list.slice();
   const def = species.get(s.items(.sp)[i]);
-  return floaterAt(g, def, s.items(.x)[i], s.items(.y)[i], s.items(.chunk)[i].height[s.items(.tile)[i]], s.items(.seed)[i], tf).at;
+  return floatAt(def, s.items(.x)[i], s.items(.y)[i], s.items(.chunk)[i].height[s.items(.tile)[i]], s.items(.seed)[i], tf);
 }
 
 /// what drawing one plant needs to know about it.
@@ -203,30 +204,28 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   const lod = meshgen.lodAt(m.len(foot - g.parts.eye));
   var at = m.footprintCentre(d.x, d.y, def.size, 0);
   var y = d.ground;
-  var growth = d.growth;
+  const halo = if (d.ghost) vertex.NO_HALO else haloOf(g, def, d.x, d.y);
   if (def.floating) {
     // floaters hang in the air: a slow rise and fall and a lazy drift,
-    // never a bounce, over a soft shadow that shrinks as they rise
+    // never a bounce, over a soft shadow that shrinks as they rise (and
+    // follows one a halo draws in, fading as it folds)
     const ground = @max(y, 0);
-    const f = floatAt(def, d.x, d.y, d.ground, d.seed, tf);
-    const held:Held = if (d.ghost) .{.at = f, .fold = 0} else floaterAt(g, def, d.x, d.y, d.ground, d.seed, tf);
-    at = held.at;
+    at = floatAt(def, d.x, d.y, d.ground, d.seed, tf);
     y = at[1];
-    // drawn in, it folds back toward a bud and its shadow fades
-    growth = m.lerp(d.growth, FOLDED, held.fold);
-    const r = SHADOW_R - SHADOW_SHRINK * (f[1] - ground - def.hover);
-    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + SHADOW_LIFT, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = SHADOW_FADE * (1 - held.fold)});
+    const r = SHADOW_R - SHADOW_SHRINK * (at[1] - ground - def.hover);
+    if (!d.ghost) try g.parts.emit(.shadow, m.chain(&.{m.translate(m.v3(at[0], ground + SHADOW_LIFT, at[2])), m.scale3(m.v3(r, 1, r))}), .{.fade = SHADOW_FADE, .halo = halo});
   }
   // a confluence grows through its keys, blending from one to the next;
   // other plants pick a shape by tile
-  const key = meshgen.growthKey(d.sp, growth) orelse meshgen.Key{
+  const key = meshgen.growthKey(d.sp, d.growth) orelse meshgen.Key{
     .v = @intCast(rng.hash2(0x7A11, d.x, d.y) % meshgen.VARIANTS), .f = 0,
   };
   try g.inst[meshgen.plantSlot(d.sp, key.v, lod)].append(g.gpa, .{
     .pos = .{at[0], y, at[2]},
-    .a = .{growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
+    .a = .{d.growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
     .b = .{d.flow, d.health, def.sway, m.f(@intFromEnum(def.genome.form))},
     .c = .{key.f, if (d.ghost) 1 else 0, if (d.fits) 1 else 0, 0},
+    .h = halo,
   });
 }
 

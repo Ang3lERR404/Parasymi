@@ -59,7 +59,7 @@ const parts = struct {
   pub const polyp = @import("meshes/polyp.zig");
   pub const halo_diamond = @import("meshes/polyp.zig").diamond;
   // translucent, over everything
-  pub const halo_ring = @import("meshes/polyp.zig").ring;
+  pub const halo_flash = @import("meshes/polyp.zig").flash;
   pub const bloom_thread = @import("meshes/bloom_thread.zig");
 };
 const reg = registry.Registry(parts);

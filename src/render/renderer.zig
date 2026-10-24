@@ -43,6 +43,8 @@ pub const pass = struct {
     attrs:[]const vk.VertexInputAttributeDescription,
     layout:Layout = .world,
     depth:bool = true,
+    /// with `depth`: whether it writes depth (a glass pass only tests it)
+    depth_write:bool = true,
     blend:bool = false,
     /// drawn onto the screen after the world (and its glow): the UI. World
     /// passes draw into the HDR image the glow is taken from.
@@ -60,7 +62,7 @@ pub const pass = struct {
       .vert = vs, .frag = fs,
       .bindings = d.bindings, .attrs = d.attrs,
       .layout = layout, .color_format = if (d.screen) screen else HDR_FORMAT,
-      .depth = d.depth, .depth_attachment = !d.screen, .blend = d.blend, .cull = false,
+      .depth = d.depth, .depth_write = d.depth_write, .depth_attachment = !d.screen, .blend = d.blend, .cull = false,
     });
   }
 };
@@ -71,6 +73,9 @@ const passes = struct {
   pub const detail = @import("passes/detail.zig");
   pub const plants = @import("passes/plants.zig");
   pub const parts = @import("passes/parts.zig");
+  // see-through fragments of plants and parts, over every solid one
+  pub const plants_glass = @import("passes/plants.zig").glass;
+  pub const parts_glass = @import("passes/parts.zig").glass;
   pub const ui = @import("passes/ui.zig");
 };
 const reg = registry.Registry(passes);
@@ -169,6 +174,9 @@ pub const Renderer = struct {
   /// (the plant shader blends toward it); 0 where a species has no keys
   plant_morph:[PLANT_MESHES]u64 = @splat(0),
   part_ranges:[meshlib.SLOTS][2]u32 = undefined,
+  /// per part slot: whether any of its vertices can be see-through (sap,
+  /// resin, shadow, beam, halo); the glass pass draws only those
+  part_glassy:[meshlib.SLOTS]bool = @splat(false),
   scratch:std.ArrayList(vertex.Terrain) = .empty,
   detail_scratch:std.ArrayList(vertex.DetailTile) = .empty,
   /// buffers retired since the last frame began; any frame still in flight
@@ -246,6 +254,12 @@ pub const Renderer = struct {
     };
     b.lod = 0;
     try meshlib.build(&b, &r.part_ranges);
+    for (&r.part_glassy, r.part_ranges) |*g, rg| {
+      for (b.v.items[rg[0]..][0..rg[1]]) |v| if (vertex.seeThrough(@enumFromInt(v.part))) {
+        g.* = true;
+        break;
+      };
+    }
     const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
     r.meshes.write(0, bytes);

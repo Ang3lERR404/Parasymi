@@ -12,6 +12,7 @@ layout(location = 6) flat in float v_fade;
 layout(location = 7) in float v_u;
 layout(location = 8) in vec3 v_obj;
 layout(location = 9) flat in float v_phase; // per-instance phase (seeds a beam's motes)
+layout(location = 10) flat in float v_aux;  // a beam: 1 for a halo's edge; a flash: its age 0..1
 layout(location = 0) out vec4 o;
 
 const vec3 SAP = vec3(1.0, 0.43, 0.08);       // linear amber, the only accent
@@ -43,7 +44,7 @@ vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, inout float alpha)
   return c;
 }
 
-void main() {
+void surface() {
   vec3 tgrad = surfaceTangent(); // derivatives first, in uniform control flow
   vec3 raw = normalize(v_nrm);
   vec3 n = gl_FrontFacing ? raw : -raw;
@@ -104,7 +105,8 @@ void main() {
       mc += filmHue(roll + h.z * 0.3 + t * 0.05) * g;
     }
     // fade into each bloom's core at the ends
-    float ends = smoothstep(0.0, 0.08, v_t) * smoothstep(1.0, 0.92, v_t);
+    // (a halo's edges run on into each other at its corners instead)
+    float ends = v_aux > 0.5 ? 1.0 : smoothstep(0.0, 0.08, v_t) * smoothstep(1.0, 0.92, v_t);
     vec3 film = filmHue(roll);
     c = (film * haze * 0.25 + rays * 0.9 + mix(mc, vec3(m), 0.35) * 2.5) * (0.12 + 0.88 * lit);
     float a = clamp(haze * 0.18 + ray_a * 0.45 + m, 0.0, 1.0);
@@ -112,28 +114,19 @@ void main() {
     return;
   }
   if (part == 9) {
-    // a halo band: still light lying on the ground along an edge of the
-    // halo's square, from a corner (v_t 0) to the edge's middle. A soft
-    // haze across its width (v_u -1..1) around a fine core, a little
-    // brighter at the corner; its hue a film that turns with the angle it
-    // is seen from and runs along it. Nothing in it moves with time; its
-    // brightness (v_glow) dims where a corner has lost its bloom.
-    float reach = max(v_fade, 1e-3);
-    float u = v_u;
-    float along = v_t * reach; // share of the half edge from its corner
-    float ndv = abs(dot(raw, V));
-    float haze = exp(-u * u * 2.5) * (1.0 - u * u);
-    float core = exp(-u * u * 18.0);
-    float corner = 1.0 + 0.35 * exp(-along * 18.0);
-    vec3 film = mix(filmHue(0.55 + 0.6 * (1.0 - ndv) + along * 0.4 + u * 0.06), vec3(1.0), 0.35);
-    float b = v_glow;
-    c = film * (haze * 0.45 + core * 0.75) * b * corner;
-    float a = clamp(haze * 0.45 + core * 0.5, 0.0, 1.0) * mix(0.5, 1.0, b);
-    // its growing end softens; grown, it meets its neighbour at the middle
-    a *= mix(1.0, smoothstep(1.0, 0.75, v_t), clamp((1.0 - reach) * 8.0, 0.0, 1.0));
-    // it starts just behind its corner, fading into the band crossing it
-    a *= smoothstep(0.0, 0.03, along);
-    o = vec4(applyFog(c, v_pos), a);
+    // the flash where the blooms became one: a disc of light thrown out
+    // from the diamond (v_t its radius 0..1), its rim a bright ring that
+    // runs the film's colours around, its inside a burst that is gone
+    // almost at once; all of it fading as it spreads (age v_aux 0..1). It
+    // is light: brighter than white, so the glow takes it up.
+    float age = clamp(v_aux, 0.0, 1.0);
+    float r = clamp(v_t, 0.0, 1.0);
+    float rim = exp(-(r - 0.92) * (r - 0.92) * 220.0);
+    float burst = (1.0 - r * r) * pow(1.0 - age, 6.0);
+    float fade = pow(1.0 - age, 2.0);
+    vec3 film = mix(filmHue(atan(v_obj.z, v_obj.x) / TAU + age * 0.3), vec3(1.0), 0.45);
+    c = (film * rim * 3.0 + vec3(1.0, 0.97, 0.9) * burst * 2.5) * fade * v_glow;
+    o = vec4(applyFog(c, v_pos), clamp((rim * 0.9 + burst * 0.6) * fade, 0.0, 1.0));
     return;
   }
   if (part == 10) {
@@ -235,4 +228,18 @@ void main() {
   float rim = pow(1.0 - max(dot(n, V), 0.0), 3.0);
   c += v_col * rim * mix(0.35, 0.12, pc.sun.w);
   o = vec4(applyFog(c, v_pos), alpha);
+}
+
+// two passes draw every surface: the solid one keeps the fragments that are
+// opaque and writes depth; the glass one (built with GLASS, after every
+// solid pass) blends the see-through ones over it, testing depth but writing
+// none, so nothing see-through hides what lies behind it
+const float SOLID = 0.996;
+void main() {
+  surface();
+#ifdef GLASS
+  if (o.a >= SOLID || o.a < 0.002) discard;
+#else
+  if (o.a < SOLID) discard;
+#endif
 }

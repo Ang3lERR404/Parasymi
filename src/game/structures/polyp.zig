@@ -40,16 +40,11 @@ const ACTIVE_HEALTH:f32 = 0.5;
 /// `RING_BY` of that
 pub const FORM:f32 = 5;
 const RING_BY:f32 = 0.75;
-/// the way in: the share covered grows as e^(`RUSH` k), from a crawl to a
-/// rush, while the blooms turn `TURNS` times around the polyp
-const RUSH:f32 = 4;
-const TURNS:f32 = 1.25;
-/// the blooms fold their petals back in over the last `FOLD` of the way,
-/// and the diamond forms over `DIAMOND_GROW` s from `MERGE` s before they
-/// arrive
-const FOLD:f32 = 0.3;
-const MERGE:f32 = 0.25;
-const DIAMOND_GROW:f32 = 0.9;
+// (the way in, the diamond's forming as they close in, and the blooms
+// folding are the GPU's: common.glsl `haloSpiral`; it is sent how far the
+// halo has come, `t / FORM`)
+/// the flash where they meet spreads and fades over this many seconds
+const FLASH:f32 = 1.4;
 /// the diamond's field reaches this far (the ring's square reaches 5 out
 /// at its corners, 3.5 at its edges)
 const DIAMOND_R:f32 = 7;
@@ -66,10 +61,10 @@ pub const State = struct {
   t:f32 = 0,
   /// per corner: how brightly the edges beside it shine
   light:[4]f32 = @splat(1),
-  /// ground height under each half edge's four control points (sampled
-  /// once, when the halo forms; the terrain never changes); the band
-  /// floats a bloom's hover over it
-  ground:[8][4]f32 = @splat(@splat(0)),
+  /// ground height under each edge's four control points (sampled once,
+  /// when the halo forms; the terrain never changes); the ring floats a
+  /// bloom's hover over it
+  ground:[4][4]f32 = @splat(@splat(0)),
 };
 
 fn cornerAt(s:*const st.Structure, k:usize) [2]i32 {
@@ -84,26 +79,13 @@ fn active(p:*const Plants, w:*const World, at:[2]i32) bool {
   return species.get(s.items(.sp)[i]).radiance > 0 and s.items(.growth)[i] >= 1 and s.items(.health)[i] > ACTIVE_HEALTH;
 }
 
-/// half edge h: from corner h/2 toward the next corner (h even) or the
-/// previous one (h odd), as far as the edge's middle
-fn halfEdge(h:usize) struct { corner:usize, other:usize } {
-  const k = h / 2;
-  return .{ .corner = k, .other = if (h % 2 == 0) (k + 1) % 4 else (k + 3) % 4 };
-}
-
-/// the four control points of half edge h, tile space (y unset): from just
-/// behind its corner (so the bands overlap there, a little brighter) to the
-/// edge's middle
-fn halfEdgePoints(s:*const st.Structure, h:usize) [4]m.V3 {
-  const e = halfEdge(h);
-  const a = cornerAt(s, e.corner);
-  const b = cornerAt(s, e.other);
-  const from = m.tileCentre(a[0], a[1], 0);
-  const mid = (from + m.tileCentre(b[0], b[1], 0)) * m.splat3(0.5);
-  const dir = m.norm(mid - from);
-  const start = from - dir * m.splat3(mesh.ring.HALF);
+/// the four control points of edge e, from corner e to the next, tile
+/// space (y unset)
+fn edgePoints(s:*const st.Structure, e:usize) [4]m.V3 {
+  const a = cornerAt(s, e);
+  const b = cornerAt(s, (e + 1) % 4);
   var out:[4]m.V3 = undefined;
-  for (&out, 0..) |*o, i| o.* = m.lerpV(start, mid, m.ratio(i, 3));
+  for (&out, 0..) |*o, i| o.* = m.lerpV(m.tileCentre(a[0], a[1], 0), m.tileCentre(b[0], b[1], 0), m.ratio(i, 3));
   return out;
 }
 
@@ -136,7 +118,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
       h.phase = .forming;
       h.t = 0;
       h.light = @splat(1);
-      for (&h.ground, 0..) |*g, e| for (g, halfEdgePoints(self, e)) |*y, p| {
+      for (&h.ground, 0..) |*g, e| for (g, edgePoints(self, e)) |*y, p| {
         y.* = groundAt(ctx.w, p);
       };
       ctx.g.say(txt.s.msg.halo_forms, .{});
@@ -156,7 +138,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
       return true;
     },
     .complete => {
-      h.t = @min(h.t + dt, FORM + DIAMOND_GROW);
+      h.t = @min(h.t + dt, FORM + FLASH);
       for (&h.light, 0..) |*l, k| {
         const want:f32 = if (active(ctx.plants, ctx.w, cornerAt(self, k))) 1 else DIM;
         l.* += (want - l.*) * @min(1, dt * LIGHT_EASE);
@@ -177,52 +159,43 @@ pub fn field(s:*const st.Structure) ?Field {
   };
 }
 
-/// a bloom at one of a forming halo's corners spirals in toward the cup:
-/// barely moving at first, then exponentially faster, folding its petals
-/// back in over the last of the way.
+/// a bloom at one of a forming halo's corners is drawn in to the cup (the
+/// GPU spirals it there, see `emit`).
 pub fn hold(s:*const st.Structure, wx:i32, wy:i32) ?st.Hold {
   const h = &s.state.polyp;
   if (h.phase != .forming) return null;
   for (0..4) |k| {
     const at = cornerAt(s, k);
-    if (at[0] != wx or at[1] != wy) continue;
-    const k01 = m.clamp01(h.t / FORM);
-    const pull = (@exp(RUSH * k01) - 1) / (@exp(RUSH) - 1);
-    return .{
-      .pull = pull,
-      .turn = TURNS * m.tau * pull,
-      .fold = m.smooth(m.clamp01((k01 - (1 - FOLD)) / FOLD)),
-      .seat = mesh.SEAT * s.grownScale()[1],
-    };
+    if (at[0] == wx and at[1] == wy) return .{ .k = h.t / FORM, .seat = mesh.SEAT * s.grownScale()[1] };
   }
   return null;
 }
 
-/// the ring (eight half edges, each grown out from its corner as its bloom
-/// leaves it) and, once the blooms have met, the diamond in the cup.
+/// the ring: four edges of beams of light, as between linked blooms, each
+/// reaching from its corner to the next as its bloom leaves it, light
+/// running round it from corner to corner; the diamond in the cup, forming
+/// as the blooms close in; and, as they meet, a flash of light.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, _:f32) Allocator.Error!void {
   const h = &s.state.polyp;
   if (h.phase == .open) return;
-  const grown = m.smooth(m.clamp01(h.t / (FORM * RING_BY)));
-  for (0..8) |e| {
-    const he = halfEdge(e);
-    var ctrl = halfEdgePoints(s, e);
+  const reach = m.smooth(m.clamp01(h.t / (FORM * RING_BY)));
+  for (0..4) |e| {
+    var ctrl = edgePoints(s, e);
     for (&ctrl, h.ground[e]) |*p, y| p[1] = y + species.get(.bloom).hover;
     const span = ctrl[3] - ctrl[0];
     const side = m.norm(m.cross(span, m.v3(0, 1, 0)));
-    // brightest at its corner, meeting its neighbour's halfway at the middle
-    const at = h.light[he.corner];
-    const mid = (h.light[he.corner] + h.light[he.other]) * 0.5;
-    try out.emitCurve(.halo_ring, ctrl, side, m.len(span), grown, .{ .glow = at, .flutter = mid, .phase = s.seed });
+    // as bright as the corners at its ends; flutter 1 marks a halo's edge
+    const lit = (h.light[e] + h.light[(e + 1) % 4]) * 0.5;
+    try out.emitCurve(.bloom_thread, ctrl, side, 1, reach, .{ .glow = lit, .flutter = 1, .phase = s.seed + m.f(e) * 0.25 });
   }
-  const form = m.smooth(m.clamp01((h.t - (FORM - MERGE)) / DIAMOND_GROW));
-  if (form <= 0) return;
   const lift = mesh.SEAT * s.grownScale()[1];
-  try out.emit(.halo_diamond, m.chain(&.{
-    m.translate(ctr + m.v3(0, lift, 0)),
-    m.rotY(s.seed * m.tau),
-    m.scale3(m.splat3(form)),
-  }), .{ .phase = s.seed, .sway = def.sway, .tall = def.tall, .drop = lift });
+  const at = ctr + m.v3(0, lift, 0);
+  const halo = [4]f32{ at[0], at[1], at[2], h.t / FORM };
+  try out.emit(.halo_diamond, m.chain(&.{ m.translate(at), m.rotY(s.seed * m.tau) }), .{
+    .phase = s.seed, .sway = def.sway, .tall = def.tall, .drop = lift, .halo = halo,
+  });
+  const age = (h.t - FORM) / FLASH;
+  if (age >= 0 and age < 1) try out.emit(.halo_flash, m.translate(at), .{ .glow = 1, .flutter = age });
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
@@ -291,9 +264,9 @@ test "four grown blooms on a polyp's square form a halo whose ring and diamond p
   try testing.expectEqual(Phase.forming, ss.get(id).state.polyp.phase);
   try testing.expect(eco.radiance.powered.items[plants.at(&w, px - 1, py - 1).?.idx()]);
   try testing.expect(!eco.radiance.powered.items[plants.at(&w, px + 4, py + 4).?.idx()]);
-  // the blooms are drawn in, slowly first
+  // the blooms are being drawn in
   const early = hold(ss.get(id), px + HALF, py).?;
-  try testing.expect(early.pull > 0 and early.pull < 0.01);
+  try testing.expect(early.k > 0 and early.k < 0.05);
   // they meet: consumed into the diamond, whose field reaches further
   try step.run(&eco, &plants, &w, &ss, &g, &fl, FORM + 0.5);
   try testing.expectEqual(Phase.complete, ss.get(id).state.polyp.phase);

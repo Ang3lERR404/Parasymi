@@ -18,6 +18,7 @@ layout(location = 10) in vec4 tint; // rgb multiply, w amount
 layout(location = 11) in vec4 iq;   // sag, give (resin surface push)
 layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted, grown
 layout(location = 13) in vec4 ie;   // placement: 0 matrix, 1 curve (tail), 2 star mote; then its parameters
+layout(location = 14) in vec4 ih;   // a forming halo it belongs to: its centre, how far along (< 0 none)
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -29,6 +30,7 @@ layout(location = 6) flat out float v_fade; // opacity of translucent sap at its
 layout(location = 7) out float v_u;
 layout(location = 8) out vec3 v_obj;       // mesh-space point (sap bubbles ride with the body)
 layout(location = 9) flat out float v_phase; // per-instance phase (seeds a beam's motes)
+layout(location = 10) flat out float v_aux;  // a beam: 1 for a halo's edge; a flash: its age 0..1
 
 // Catmull-Rom through b..c (a, d the neighbours) at f, and its tangent
 vec3 catmull(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
@@ -75,6 +77,20 @@ void main() {
   // resin gives like dense gel: its surface follows the spring, its base on
   // the body holds (a smooth field of height, so shared vertices move alike)
   if (part == 6u) p += iq.yzw * smoothstep(0.0, 1.0, tu.y);
+  bool drawn = ih.w >= 0.0;
+  // the halo's diamond forms as its blooms close in (how far they have come,
+  // haloPull): its facets gather from shards turning in around it, each
+  // drawn in along its face and growing as it comes, fitting together as
+  // the blooms meet; then it is still
+  if (part == 10u && drawn) {
+    float form = sqrt(haloPull(ih.w));
+    float a = (1.0 - form) * 3.0;
+    p = p * form + nrm * (1.0 - form) * 0.45;
+    p.xz = mat2(cos(a), -sin(a), sin(a), cos(a)) * p.xz;
+  }
+  // the flash where the blooms met: a disc of light (tu.x its radius
+  // 0..1) thrown outward from the diamond, fast then slowing (age 0..1)
+  if (part == 9u) p.xz *= mix(0.1, 3.2, 1.0 - pow(1.0 - clamp(ip.y, 0.0, 1.0), 3.0));
 
   vec4 w;
   vec3 wn;
@@ -85,9 +101,17 @@ void main() {
     // ends extended in line), its x laid toward the side (tint.xyz) and its
     // z across, so the vine bends here instead of being rebuilt each frame
     vec3 P[4] = vec3[4](c0.xyz, c1.xyz, c2.xyz, c3.xyz);
-    // how far along it reaches (a bloom thread extends as its bloom
-    // finishes); a halo band grows whole along it, its end leading
-    float u = (part == 9u ? p.y * ie.y : clamp(p.y, 0.0, ie.y)) * 3.0;
+    // a beam from a bloom a forming halo draws in follows it: its ends
+    // (ie.z 1 first, 2 last) spiral with the bloom, the points between by
+    // how near they lie to it
+    if (drawn) {
+      int ends = int(ie.z + 0.5);
+      float w0 = (ends & 1) != 0 ? 1.0 : 0.0;
+      float w3 = (ends & 2) != 0 ? 1.0 : 0.0;
+      for (int k = 0; k < 4; k++) P[k] = mix(P[k], haloSpiral(P[k], ih.xyz, ih.w), mix(w0, w3, float(k) / 3.0));
+    }
+    // how far along it reaches (a bloom thread extends as its bloom finishes)
+    float u = clamp(p.y, 0.0, ie.y) * 3.0;
     int i = min(int(u), 2);
     float f = u - float(i);
     vec3 b = P[i], c = P[i + 1];
@@ -101,7 +125,9 @@ void main() {
       // face the eye from every side
       vec3 toEye = normalize(pc.eye_time.xyz - C);
       vec3 right = normalize(cross(T, toEye) + vec3(1e-5, 0.0, 0.0));
-      float spindle = mix(0.3, 1.0, pow(sin(0.5 * TAU * clamp(tu.x, 0.0, 1.0)), 0.6));
+      // a halo's edge (flutter 1) runs even from corner to corner, so the
+      // edges join into one ring
+      float spindle = ip.y > 0.5 ? 0.7 : mix(0.3, 1.0, pow(sin(0.5 * TAU * clamp(tu.x, 0.0, 1.0)), 0.6));
       w = vec4(C + right * p.x * 0.42 * spindle, 1.0);
       wn = toEye;
     } else {
@@ -130,6 +156,9 @@ void main() {
   } else {
     w = M * vec4(p, 1.0);
     wn = mat3(M) * nrm;
+    // a shadow under a bloom a forming halo draws in follows it over the
+    // ground (fading as the bloom folds, below)
+    if (drawn && part == 7u) w.xz += haloSpiral(c3.xyz, ih.xyz, ih.w).xz - c3.xz;
   }
   // ... and bend from their root in the garden's wind, as the plants do:
   // more toward the top, the lean slow and late at the tip (a smooth field
@@ -149,17 +178,18 @@ void main() {
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * 3.0 - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == 2u || part == 8u) ? 1.0 : 0.06) * pulse * twinkle;
-  // a halo band is still: its brightness runs from its corner's (glow) to
-  // its middle's (flutter), never pulsing; a prism has no light of its own
-  if (part == 9u) v_glow = mix(ip.x, ip.y, tu.x);
+  // a flash is as bright as it is young, never pulsing; a prism has no
+  // light of its own
+  if (part == 9u) v_glow = ip.x;
   if (part == 10u) v_glow = 0.0;
   v_part = float(part);
   v_t = tu.x;
-  // a beam carries its length instead, so its rays and motes keep their
-  // size; a halo band how far it has grown
-  v_fade = part == 8u ? length(c3.xyz - c0.xyz) : part == 9u ? ie.y : ip.w;
+  // a beam carries its length instead, so its rays and motes keep their size
+  v_fade = part == 8u ? length(c3.xyz - c0.xyz) : ip.w;
+  if (drawn && part == 7u) v_fade *= 1.0 - haloFold(ih.w);
   v_u = tu.y;
   v_obj = p;
   v_phase = ip.z;
+  v_aux = ip.y;
   gl_Position = pc.vp * w;
 }
