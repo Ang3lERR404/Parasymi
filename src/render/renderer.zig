@@ -298,7 +298,10 @@ pub const Renderer = struct {
 
   /// forget every chunk mesh: the world was replaced (e.g. a save was loaded).
   pub fn dropWorld(r:*Renderer) Allocator.Error!void {
-    for (r.slots.items) |s| try r.retire(s.buf);
+    for (r.slots.items) |s| {
+      try r.retire(s.buf);
+      try r.retire(s.detail);
+    }
     r.slots.clearRetainingCapacity();
     r.free_slots.clearRetainingCapacity();
   }
