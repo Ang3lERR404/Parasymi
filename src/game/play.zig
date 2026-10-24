@@ -370,7 +370,7 @@ pub const Game = struct {
       if (ctl.pressed(in, .configure)) if (on_struct) |j| st.configure(g.structs.get(j), &g.prog);
       if (ctl.pressed(in, .uproot) and ui_hit == null) {
         if (on_struct) |j| actions.unbuild(g, j)
-        else if (g.plants.removeAt(&g.world, h[0], h[1])) _ = g.player.inv.add(.fibre, 1);
+        else actions.uproot(g, h);
         g.linger = actions.LINGER_PUT;
       }
       if (working or g.linger > 0) work = m.tileCentre(h[0], h[1], c.height[t]);
@@ -617,9 +617,9 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
 
   g.mode = .belly;
   _ = g.player.inv.add(.fibre, 2);
-  _ = g.player.inv.add(.starlight, 1);
-  try testing.expect(craft.hand[0].out == .seed_lumenroot);
-  try click.on(&g, &in, .{.weave = 0}, screen);
+  _ = g.player.inv.add(.grit, 1);
+  try testing.expect(craft.hand[craft.by_hand[0]].out == .conduit);
+  try click.on(&g, &in, .{.weave = craft.by_hand[0]}, screen);
   try testing.expect(g.weave.busy());
 
   // with the belly open, a slot key picks the hotbar slot, not a recipe

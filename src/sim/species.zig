@@ -76,7 +76,8 @@ pub const Genome = struct {
 pub const Species = struct {
   lineage:Lineage,
   /// the item that plants this species; null when it cannot be sown and only
-  /// grows where its parents meet (it then ripens its parents' seeds).
+  /// grows where its parents meet. Plants never set seed: seeds are woven
+  /// by a germinator, and an uprooted plant comes back as its seed.
   seed:?items.Item,
   /// footprint: a size x size square of tiles, or none at all when floating
   /// (a floater hovers over any tile, even water or another plant).
@@ -94,8 +95,6 @@ pub const Species = struct {
   drain:f32,
   /// essence condensed per second from stored mana once mature.
   yield:f32,
-  /// seconds for a mature plant to ripen one seed.
-  seed_time:f32,
   genome:Genome,
   parents:?[2]Id = null,
   /// parasites within this many tiles of the mature plant drain at
@@ -134,13 +133,4 @@ pub inline fn get(id:Id) *const Species { return table.getPtrConst(id); }
 pub fn fromSeed(item:items.Item) ?Id {
   inline for (ids) |id| if (table.get(id).seed) |s| if (s == item) return id;
   return null;
-}
-
-/// the `k`th seed a plant of this species ripens: its own, or for one that
-/// cannot be sown, its parents' in turn.
-pub fn ripeSeed(id:Id, k:u32) items.Item {
-  const d = get(id);
-  if (d.seed) |s| return s;
-  const ps = d.parents.?;
-  return get(ps[k % 2]).seed.?;
 }

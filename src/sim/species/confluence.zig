@@ -2,7 +2,7 @@
 //! where a mature symbiote and a mature parasite meet (game/convergence.zig),
 //! grows for half again as long as the slower parent, and once mature
 //! contains the parasites around it rather than killing them. Condenses
-//! convergence essence and ripens its parents' seeds.
+//! convergence essence.
 const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
@@ -10,7 +10,7 @@ pub const def:species.Species = .{
   .lineage = .convergent, .seed = null, .size = 2, .yields = .convergence_essence,
   // decision: mature_time is the fallback for a confluence without parents
   // (1.5x the slower first pair); a spawned one carries its own span.
-  .mature_time = 18, .mana_cap = 40, .ley_draw = 1.6, .share = 0.5, .drain = 0, .yield = 0.12, .seed_time = 50,
+  .mature_time = 18, .mana_cap = 40, .ley_draw = 1.6, .share = 0.5, .drain = 0, .yield = 0.12,
   .contain = 3, .sway = 1.5,
   .stages = 4,
   .genome = .{

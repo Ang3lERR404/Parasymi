@@ -29,7 +29,7 @@ const unready_alpha:u8 = 150;
 pub fn visible(g:*const play.Game) bool { return g.mode == .belly; }
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
-  const weave_rows = (craft.hand.len + 1) / 2;
+  const weave_rows = (craft.by_hand.len + 1) / 2;
   const slots_h = gap * m.f(rows);
   const weave_h = 42 + weave_row_h * m.f(weave_rows);
   const ph = header_h + slots_h + weave_h + 40;
@@ -70,7 +70,8 @@ fn slots(g:*play.Game, d:*Draw, px:f32, py:f32) Allocator.Error!void {
   }
 }
 
-/// two columns of recipes; locked ones shown as unknown. Clicking one weaves it.
+/// two columns of the recipes woven by hand (no seeds: a germinator weaves
+/// those); locked ones shown as unknown. Clicking one weaves it.
 fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
   _ = try d.text(px + 72, wy, s.text_heading, s.gold, txt.s.hud.weave);
   _ = try d.text(px + pw - 260, wy + 6, s.text_fine, s.dim, txt.s.hud.weave_hint);
@@ -79,9 +80,10 @@ fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
     _ = try d.print(px + 346, wy + 2, s.text_note, s.dim, txt.s.hud.queued, .{g.weave.len});
   }
   const col_w = (pw - 60) / 2;
-  for (craft.hand, 0..) |r, i| {
-    const colx = px + 70 + m.f(i % 2) * col_w;
-    const y = wy + 42 + weave_row_h * m.f(i / 2);
+  for (craft.by_hand, 0..) |i, k| {
+    const r = craft.hand[i];
+    const colx = px + 70 + m.f(k % 2) * col_w;
+    const y = wy + 42 + weave_row_h * m.f(k / 2);
     g.rows.add(colx - 10, y - 24, col_w - 20, weave_row_h, .{.weave = i});
     const open = r.unlocked(&g.prog);
     const ok = open and craft.Crafter.can(g.player.inv.bag(), r);

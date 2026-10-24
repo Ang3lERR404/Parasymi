@@ -1,5 +1,7 @@
 //! weaving: turning gathered matter into seeds and structure bulbs. The wolf
-//! weaves by hand; a germinator runs the same recipes by itself. Ingredients
+//! weaves bulbs by hand; seeds only a germinator weaves (plants never set
+//! seed), so the germinator is the bootstrap: it is woven from gathered
+//! matter alone, and weaves the first essence flowers. Ingredients
 //! leave the inventory when a weave is queued (like Factorio hand crafting)
 //! and the result appears when it finishes.
 const std = @import("std");
@@ -21,7 +23,7 @@ pub const Recipe = struct {
   }
 };
 
-/// everything that can be woven. Seeds first (a germinator only weaves those).
+/// everything that can be woven. Seeds first (only a germinator weaves those).
 pub const hand = [_]Recipe{
   .{ .out = .seed_lumenroot, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
   .{ .out = .seed_thornleech, .in = &.{ .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
@@ -29,9 +31,12 @@ pub const hand = [_]Recipe{
   // decision: ungated, from starlight, ley and essence (the brief sets no cost)
   .{ .out = .seed_bloom, .in = &.{ .{ .item = .starlight, .n = 3 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .essence, .n = 2 } }, .time = 3 },
   .{ .out = .seed_hollowheart, .in = &.{ .{ .item = .essence, .n = 4 }, .{ .item = .fibre, .n = 3 }, .{ .item = .grit, .n = 2 } }, .time = 3, .needs = .canopy_weaving },
+  // decision: the hybrid is spliced from both lineages' essence and what their meeting condenses
+  .{ .out = .seed_vesper, .in = &.{ .{ .item = .essence, .n = 2 }, .{ .item = .convergence_essence, .n = 1 }, .{ .item = .fibre, .n = 1 } }, .time = 2.5, .needs = .seed_splicing },
   .{ .out = .conduit, .n = 2, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .grit, .n = 1 } }, .time = 1 },
   .{ .out = .sap_cache, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .grit, .n = 4 } }, .time = 2 },
-  .{ .out = .germinator, .in = &.{ .{ .item = .fibre, .n = 6 }, .{ .item = .grit, .n = 4 }, .{ .item = .essence, .n = 2 }, .{ .item = .starlight, .n = 2 } }, .time = 3 },
+  // no essence: nothing yields it until the germinator has woven a seed
+  .{ .out = .germinator, .in = &.{ .{ .item = .fibre, .n = 6 }, .{ .item = .grit, .n = 4 }, .{ .item = .starlight, .n = 2 } }, .time = 3 },
   .{ .out = .research_bloom, .in = &.{ .{ .item = .fibre, .n = 8 }, .{ .item = .grit, .n = 6 }, .{ .item = .essence, .n = 4 }, .{ .item = .starlight, .n = 4 }, .{ .item = .ley_shard, .n = 2 } }, .time = 4 },
   .{ .out = .root_digger, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2, .needs = .deep_rooting },
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
@@ -41,6 +46,16 @@ pub const hand = [_]Recipe{
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
+
+/// the recipes the wolf weaves by hand (indices into `hand`): all but seeds.
+pub const by_hand = blk: {
+  var n:usize = 0;
+  for (0..hand.len) |i| if (!isSeedRecipe(i)) { n += 1; };
+  var out:[n]u8 = undefined;
+  var k:usize = 0;
+  for (0..hand.len) |i| if (!isSeedRecipe(i)) { out[k] = i; k += 1; };
+  break :blk out;
+};
 
 /// max weaves queued at once (the wolf's hands can only do so much)
 const QUEUE_MAX = 8;

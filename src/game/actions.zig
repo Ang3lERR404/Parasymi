@@ -6,7 +6,6 @@ const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const ck = @import("../world/chunk.zig");
 const species = @import("../sim/species.zig");
-const plants_mod = @import("../sim/plants.zig");
 const items = @import("../sim/items.zig");
 const craft = @import("craft.zig");
 const st = @import("structures.zig");
@@ -79,6 +78,8 @@ pub fn canPut(g:*const Game, h:[2]i32) bool {
 }
 
 pub fn weaveByHand(g:*Game, i:usize) void {
+  // seeds come only from a germinator
+  if (craft.isSeedRecipe(i)) return;
   const r = craft.hand[i];
   if (!r.unlocked(&g.prog)) return g.prog.say(txt.s.msg.not_understood, .{txt.item(r.out).name});
   if (!g.weave.push(g.player.inv.bag(), i)) g.prog.say(txt.s.msg.cannot_weave, .{txt.item(r.out).name});
@@ -125,8 +126,7 @@ pub fn unbuild(g:*Game, j:st.Id) void {
   if (lost > 0) g.prog.say(txt.s.msg.spilled, .{lost});
 }
 
-/// take a mature plant's yield and ripe seeds. Where lineages touch and
-/// splicing is understood, one seed comes out a hybrid.
+/// take a mature plant's yield. Plants never set seed (a germinator weaves them).
 pub fn harvest(g:*Game, h:[2]i32) void {
   const id = g.plants.at(&g.world, h[0], h[1]) orelse return;
   const i = id.idx();
@@ -137,8 +137,7 @@ pub fn harvest(g:*Game, h:[2]i32) void {
     return;
   }
   const es = m.floorTo(u16, s.items(.essence)[i]);
-  var seeds = m.floorTo(u16, s.items(.seeds)[i]);
-  if (es == 0 and seeds == 0) {
+  if (es == 0) {
     g.prog.say(txt.s.msg.not_ripe, .{});
     return;
   }
@@ -147,30 +146,19 @@ pub fn harvest(g:*Game, h:[2]i32) void {
   s.items(.essence)[i] -= m.f(got_es);
   // what an unstudied plant gives is learned only by taking it
   if (got_es > 0 and !g.prog.yieldKnown(sp)) g.prog.say(txt.s.msg.gives_up, .{got_es, txt.item(yields).name});
-  if (seeds > 0 and g.prog.done.contains(.seed_splicing) and touchesOtherLineage(s, i)) {
-    if (g.player.inv.add(.seed_vesper, 1) == 1) {
-      seeds -= 1;
-      s.items(.seeds)[i] -= 1;
-    }
-  }
-  // one at a time: a plant that cannot be sown ripens its parents' seeds in turn
-  var got_sd:u16 = 0;
-  while (got_sd < seeds) : (got_sd += 1) {
-    if (g.player.inv.add(species.ripeSeed(sp, m.floorTo(u32, s.items(.seeds)[i])), 1) == 0) break;
-    s.items(.seeds)[i] -= 1;
-  }
   g.linger = LINGER_HARVEST;
-  if (got_es + got_sd < es + seeds) g.prog.say(txt.s.msg.belly_full, .{});
+  if (got_es < es) g.prog.say(txt.s.msg.belly_full, .{});
 }
 
-fn touchesOtherLineage(s:std.MultiArrayList(plants_mod.Plant).Slice, i:usize) bool {
-  const mine = species.get(s.items(.sp)[i]).lineage;
-  for (s.items(.n1)[i]) |id| {
-    if (id == .none) break;
-    const j = id.idx();
-    if (species.get(s.items(.sp)[j]).lineage != mine and s.items(.growth)[j] >= 1) return true;
+/// pull a plant up: a sown plant always comes back as its seed, ready to be
+/// sown again, so it stays in the ground while the belly has no room for it.
+/// One that was never sown (a confluence) gives nothing back.
+pub fn uproot(g:*Game, h:[2]i32) void {
+  const id = g.plants.at(&g.world, h[0], h[1]) orelse return;
+  if (species.get(g.plants.list.items(.sp)[id.idx()]).seed) |seed| {
+    if (g.player.inv.add(seed, 1) == 0) return g.prog.say(txt.s.msg.belly_full, .{});
   }
-  return false;
+  _ = g.plants.removeAt(&g.world, h[0], h[1]);
 }
 
 /// starlight drifts toward the wolf's chest and is absorbed on touch.
@@ -190,7 +178,35 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
   }
 }
 
-test "a confluence gives convergence essence and its parents' seeds" {
+test "plants never set seed; an uprooted plant comes back as its seed" {
+  const gpa = std.testing.allocator;
+  var g = try Game.init(gpa, play.DEFAULT_SEED);
+  defer g.deinit();
+  const x, const z = m.tileAt(g.player.pos);
+  const cc = g.world.chunkOfTile(x + 2, z).?;
+  const t = ck.localIndex(x + 2, z);
+  cc.kind[t] = .soil;
+  cc.res[t] = 0;
+  try std.testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
+    .x = x + 2, .y = z, .chunk = undefined, .tile = undefined, .sp = .lumenroot,
+    .seed = 0.5, .growth = 1, .essence = 2.5,
+  }));
+  harvest(&g, .{x + 2, z});
+  try std.testing.expectEqual(@as(u32, 2), g.player.inv.count(.essence));
+  try std.testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_lumenroot));
+  uproot(&g, .{x + 2, z});
+  try std.testing.expect(g.plants.at(&g.world, x + 2, z) == null);
+  try std.testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_lumenroot));
+}
+
+test "seeds are woven only by a germinator, which is woven from gathered matter" {
+  for (craft.by_hand) |i| try std.testing.expect(!craft.isSeedRecipe(i));
+  for (craft.hand) |r| if (r.out == .germinator) for (r.in) |ing| {
+    try std.testing.expect(ing.item == .fibre or ing.item == .grit or ing.item == .starlight);
+  };
+}
+
+test "a confluence gives only convergence essence" {
   const gpa = std.testing.allocator;
   var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
@@ -204,12 +220,15 @@ test "a confluence gives convergence essence and its parents' seeds" {
   }
   try std.testing.expect(try g.plants.placeEx(gpa, &g.world, x + 2, z, .{
     .x = x + 2, .y = z, .chunk = undefined, .tile = undefined, .sp = .confluence,
-    .seed = 0.5, .growth = 1, .essence = 3.5, .seeds = 2.2,
+    .seed = 0.5, .growth = 1, .essence = 3.5,
   }));
   harvest(&g, .{x + 3, z + 1});
   try std.testing.expectEqual(@as(u32, 3), g.player.inv.count(.convergence_essence));
-  // one seed of each parent lineage
-  try std.testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_lumenroot));
-  try std.testing.expectEqual(@as(u32, 1), g.player.inv.count(.seed_thornleech));
+  try std.testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_lumenroot));
+  try std.testing.expectEqual(@as(u32, 0), g.player.inv.count(.seed_thornleech));
   try std.testing.expect(species.fromSeed(.convergence_essence) == null);
+  // never sown, so uprooting it gives nothing back
+  uproot(&g, .{x + 3, z + 1});
+  try std.testing.expect(g.plants.at(&g.world, x + 3, z + 1) == null);
+  try std.testing.expectEqual(@as(u32, 3), g.player.inv.total());
 }

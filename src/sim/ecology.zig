@@ -45,7 +45,6 @@ pub const Events = struct {
   died:u32 = 0,
 };
 
-pub const MAX_SEEDS = 3;
 /// health lost per second by a plant that needs radiance and has none
 const UNPOWERED_WITHER:f32 = 0.06;
 /// floaters drink this share of their draw by day, all of it at full night
@@ -66,8 +65,6 @@ const STARVE_HURT:f32 = 0.08;
 const GROW_MIN:f32 = 0.3;
 const KIN_GROW:f32 = 0.15;
 const KIN_YIELD:f32 = 0.1;
-/// a mature plant sets seed while healthier than this
-const SEED_HEALTH:f32 = 0.5;
 /// health per second: a mature plant nearly out of mana fades, others heal
 const EMPTY:f32 = 0.05;
 const FADE:f32 = 0.05;
@@ -242,7 +239,6 @@ pub const Ecology = struct {
     const chunks = s.items(.chunk);
     const tiles = s.items(.tile);
     const essence = s.items(.essence);
-    const seeds = s.items(.seeds);
     const n1 = s.items(.n1);
     const n2 = s.items(.n2);
 
@@ -315,9 +311,7 @@ pub const Ecology = struct {
         const room = cap - essence[i];
         const conv = @min(@min(mana[i], sp.yield * fill * dt), room);
         dm[i] -= conv;
-        essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + KIN_YIELD * kin));
-        if (health[i] > SEED_HEALTH) seeds[i] = @min(MAX_SEEDS, seeds[i] + dt / sp.seed_time);
-      }
+        essence[i] = @min(cap, essence[i] + conv * mods.yield_mult[@intFromEnum(sps[i])] * (1 + KIN_YIELD * kin));      }
       dh[i] += if (fill < EMPTY and growth[i] >= 1) -FADE * dt else HEAL * dt;
     }
 

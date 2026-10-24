@@ -163,7 +163,13 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - No global resources: items live in the belly, structures or plants.
   Every plant is player-seeded and grows before use. Research is the
   Factorio-lab model (structures consume ingredients unit by unit).
-  Hand-weaving bootstraps (seeds from gathered matter + starlight).
+  Plants never set seed: only a germinator weaves seeds (hand-weaving
+  makes bulbs only, `craft.by_hand`). The germinator is the bootstrap,
+  woven from fibre, grit and starlight; always open: lumenroot/thornleech
+  seeds, conduits, sap caches, germinator; other species research-gated
+  (vesper by Seed Splicing: essence + convergence essence + fibre).
+  Uprooting a sown plant always gives its seed back (it stays put while
+  the belly is full); a confluence gives nothing.
   Plants and structures share occupancy; footprints 1×1, 2×2 or floating.
 - Structures: conduit (pulls from behind, pushes forward; grows a side root
   to a plant beside/behind it and harvests it once the root arrives), sap
@@ -176,7 +182,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
   unless one already holds them. Never sown; grows 1.5× the slower parent
-  (`span`) in 4 stages; yields convergence essence + its parents' seeds;
+  (`span`) in 4 stages; yields convergence essence;
   mature, halves parasite drain within 3 tiles. "Convergence Theory" only
   reveals its yield.
 - Celestial bloom (`species/bloom.zig`, `ecology.Radiance`): sown, floating

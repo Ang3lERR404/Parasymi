@@ -90,7 +90,7 @@ fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Alloca
     return;
   }
   const yields = if (g.prog.yieldKnown(p.sp)) txt.item(def.yields).short else txt.s.hud.unknown_yield;
-  _ = try d.print(text_x, y - 22, s.text_body, s.gold, txt.s.hud.plant, .{yields, p.essence, m.floorTo(u32, p.seeds), p.health * 100});
+  _ = try d.print(text_x, y - 22, s.text_body, s.gold, txt.s.hud.plant, .{yields, p.essence, p.health * 100});
   if (def.needs_radiance) {
     const lit = known and rad.powered.items[i.idx()];
     _ = try d.text(text_x, y, s.text_note, if (lit) s.gold else s.dim, if (lit) txt.s.hud.drawing_radiance else txt.s.hud.withering);

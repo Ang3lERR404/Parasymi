@@ -304,21 +304,13 @@ pub fn icon(k:Kind, ic:icon_kit.Icon, col:Color) Allocator.Error!void {
   }
 }
 
-/// take one ripe unit from a mature plant: its yield first, then a seed.
+/// take one ripe unit of a mature plant's yield (plants never set seed).
 pub fn harvestOne(plants:*Plants, id:PlantId) ?items.Item {
   const p = id.idx();
   const s = plants.list.slice();
-  if (s.items(.growth)[p] < 1) return null;
-  const sp = s.items(.sp)[p];
-  if (s.items(.essence)[p] >= 1) {
-    s.items(.essence)[p] -= 1;
-    return species.get(sp).yields;
-  }
-  if (s.items(.seeds)[p] >= 1) {
-    s.items(.seeds)[p] -= 1;
-    return species.ripeSeed(sp, m.floorTo(u32, s.items(.seeds)[p]));
-  }
-  return null;
+  if (s.items(.growth)[p] < 1 or s.items(.essence)[p] < 1) return null;
+  s.items(.essence)[p] -= 1;
+  return species.get(s.items(.sp)[p]).yields;
 }
 
 test "conduits harvest plants into a cache" {

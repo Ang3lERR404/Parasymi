@@ -6,7 +6,7 @@ const color = @import("../../core/color.zig");
 
 pub const def:species.Species = .{
   .lineage = .parasitic, .seed = .seed_thornleech,
-  .mature_time = 8, .mana_cap = 14, .ley_draw = 1.0, .share = 0, .drain = 1.2, .yield = 0.22, .seed_time = 20,
+  .mature_time = 8, .mana_cap = 14, .ley_draw = 1.0, .share = 0, .drain = 1.2, .yield = 0.22,
   .genome = .{
     .form = .coil,
     .stem_h = 0.6, .stem_r = 0.045, .segments = 6, .curl = 0.15, .wobble = 0.15,

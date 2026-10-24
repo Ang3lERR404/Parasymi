@@ -1,4 +1,4 @@
-//! SEED SPLICING: where the lineages touch, harvests yield Vesper seeds.
+//! SEED SPLICING: germinators weave Vesper seeds, spliced from both lineages.
 //! Needs both lineages studied, and their convergence witnessed.
 const prog = @import("../progression.zig");
 const species = @import("../../sim/species.zig");

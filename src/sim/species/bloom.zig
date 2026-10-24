@@ -11,8 +11,8 @@ const color = @import("../../core/color.zig");
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_bloom, .floating = true,
   // no item, no output: it radiates instead (the sky feeds it, as it does
-  // every floater; it never condenses essence or ripens seeds)
-  .mature_time = 30, .mana_cap = 10, .ley_draw = 0.5, .share = 0, .drain = 0, .yield = 0, .seed_time = 1e9,
+  // every floater; it never condenses essence)
+  .mature_time = 30, .mana_cap = 10, .ley_draw = 0.5, .share = 0, .drain = 0, .yield = 0,
   .radiance = 3.5, .link = 10,
   // the highest living thing in the garden, above the fallen starlight
   .hover = 3.2,

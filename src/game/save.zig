@@ -34,7 +34,7 @@ comptime { std.debug.assert(item_count < NO_ITEM); }
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 9;
+const VERSION:u32 = 10;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;
@@ -64,7 +64,6 @@ const PlantRec = extern struct {
   seed:f32,
   flow:f32,
   essence:f32,
-  seeds:f32,
 };
 
 /// one chunk whose resource nodes differ from what the generator made.
@@ -137,7 +136,7 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
   for (0..g.plants.len()) |i| try w.put(PlantRec, .{
     .x = s.items(.x)[i], .y = s.items(.y)[i], .sp = @intFromEnum(s.items(.sp)[i]),
     .growth = s.items(.growth)[i], .span = s.items(.span)[i], .mana = s.items(.mana)[i], .health = s.items(.health)[i],
-    .seed = s.items(.seed)[i], .flow = s.items(.flow)[i], .essence = s.items(.essence)[i], .seeds = s.items(.seeds)[i],
+    .seed = s.items(.seed)[i], .flow = s.items(.flow)[i], .essence = s.items(.essence)[i],
   });
   try w.put(u32, @intCast(g.structs.list.items.len));
   for (g.structs.list.items) |it| try w.put(st.Structure, it);
@@ -196,7 +195,7 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
     _ = try g.plants.placeEx(gpa, &g.world, p.x, p.y, .{
       .x = p.x, .y = p.y, .chunk = undefined, .tile = undefined, .sp = sp,
       .growth = p.growth, .span = p.span, .mana = p.mana, .health = p.health, .seed = p.seed,
-      .flow = p.flow, .essence = p.essence, .seeds = p.seeds,
+      .flow = p.flow, .essence = p.essence,
     });
   }
   const structs = try r.get(u32);

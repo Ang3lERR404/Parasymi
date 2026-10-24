@@ -47,9 +47,8 @@ pub const Plant = struct {
   seed:f32,
   /// smoothed magnitude of mana moving through the plant (animation/glow).
   flow:f32 = 0,
-  /// harvestable stores: the species' yield condensed from mana, and ripening seeds.
+  /// harvestable store: the species' yield condensed from mana.
   essence:f32 = 0,
-  seeds:f32 = 0,
   n1:[R1]Id = @splat(.none),
   n2:[R2]Id = @splat(.none),
 };
