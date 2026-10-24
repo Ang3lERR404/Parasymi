@@ -22,7 +22,7 @@ pub const MAX_BONES = 256;
 const bindings = &[_]vk.VertexInputBindingDescription{
   pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PartInstance, 1, .instance), pipeline.binding(vertex.Skin, 2, .vertex),
 };
-const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5) ++ pipeline.attrs(vertex.Skin, 2, 15));
+const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5) ++ pipeline.attrs(vertex.Skin, 2, 16));
 
 pub const desc:pass.Desc = .{
   .vert = "part.vert", .frag = "part.frag",

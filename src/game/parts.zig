@@ -52,6 +52,8 @@ pub const Look = struct {
   /// < 0 none) and its colour (sRGB 0..1)
   carry:f32 = -1,
   carry_col:[3]f32 = .{0, 0, 0},
+  /// a placement preview: drawn, but casts no shadow
+  ghost:bool = false,
 };
 
 pub const Parts = struct {
@@ -178,5 +180,6 @@ fn instance(mat:m.M4, look:Look) PartInstance {
     // placed by the matrix: e.yzw the carried essence's colour
     .e = .{0, look.carry_col[0], look.carry_col[1], look.carry_col[2]},
     .h = look.halo,
+    .flags = if (look.ghost) vertex.PART_GHOST else 0,
   };
 }

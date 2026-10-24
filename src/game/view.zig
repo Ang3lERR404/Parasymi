@@ -355,7 +355,7 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   // (a floating one where it will hang)
   const ctr = m.footprintCentre(h[0], h[1], def.size, g.heightAt(h[0], h[1]) + GHOST_LIFT + def.hover);
   const tint = if (ok) GHOST_FITS else GHOST_BLOCKED;
-  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = GHOST_GLOW + GHOST_PULSE * @sin(tf * GHOST_PULSE_RATE), .tint = tint});
+  try g.parts.emit(def.mesh, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(g.place_dir)), m.scale3(m.splat3(GHOST_SCALE))}), .{.glow = GHOST_GLOW + GHOST_PULSE * @sin(tf * GHOST_PULSE_RATE), .tint = tint, .ghost = true});
 }
 
 /// resource nodes within `nr` tiles of the camera focus.

@@ -124,7 +124,13 @@ pub const PartInstance = extern struct {
   e:[4]f32 = .{0, 0, 0, 0},
   /// a forming halo it belongs to (see `NO_HALO`)
   h:[4]f32 = NO_HALO,
+  /// `PART_GHOST`, ...: what it is beyond its mesh
+  flags:u32 = 0,
 };
+
+/// `PartInstance.flags`: a placement preview (casts no shadow); part.vert
+/// reads it as `PART_GHOST`
+pub const PART_GHOST:u32 = 1;
 
 /// a point of light (a bloom's core, a star mote, a halo's flash) as the
 /// shaders read it from the frame's lighting record: it lights what lies

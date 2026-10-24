@@ -19,13 +19,17 @@ layout(location = 11) in vec4 iq;   // essence carried along a conduit's core (<
 layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below the origin it is rooted, grown
 layout(location = 13) in vec4 ie;   // placement: 0 matrix, 1 curve (tail), 2 star mote; then its parameters
 layout(location = 14) in vec4 ih;   // a forming halo it belongs to: its centre, how far along (< 0 none)
+layout(location = 15) in uint iflags; // PART_GHOST, ... (vertex.zig)
 // per-vertex skin (skinned meshes only): four bone indices, one per byte, and their weights
-layout(location = 15) in uint sbones;
-layout(location = 16) in vec4 sweights;
+layout(location = 16) in uint sbones;
+layout(location = 17) in vec4 sweights;
 // how each of those weights changes across the mesh: its x, y and z
-layout(location = 17) in vec4 sgx;
-layout(location = 18) in vec4 sgy;
-layout(location = 19) in vec4 sgz;
+layout(location = 18) in vec4 sgx;
+layout(location = 19) in vec4 sgy;
+layout(location = 20) in vec4 sgz;
+
+// iflags: a placement preview (vertex.PART_GHOST)
+const uint PART_GHOST = 1u;
 
 // this frame's bones (renderer Scene.bones): each carries a vertex from
 // where it was built to where it is now
@@ -316,7 +320,8 @@ void main() {
 #ifdef SHADOW
   // what is light itself casts no shadow (a star mote, PARTS_LIGHT: a beam,
   // a halo's flash, ring and rays), nor does the soft shadow under a floater
-  if (mode == PLACE_MOTE || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part)) gl_Position = UNSEEN;
+  // or a placement preview
+  if (mode == PLACE_MOTE || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u) gl_Position = UNSEEN;
 #endif
 }
 
