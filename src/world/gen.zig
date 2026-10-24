@@ -34,14 +34,14 @@ const PATCH_L:f32 = 16;
 /// tiles, holding `RES_MIN` plus up to `RES_SPREAD` scaled by the tile hash
 const PATCH:f32 = 0.42;
 const NODE_CHANCE:f32 = 0.6;
-const RES_MIN:f32 = 6;
-const RES_SPREAD:f32 = 20;
+const RES_MIN:f32 = 1500;
+const RES_SPREAD:f32 = 3000;
 /// the yardstick for how full a node looks (drawn at full size)
 pub const RES_FULL:f32 = RES_MIN + RES_SPREAD;
 /// the most ley a tile holds (a ley line at full vein strength)
 pub const LEY_MAX:f32 = LEY_BASE + LEY_LINE;
 
-pub const Sample = struct { height:f32, kind:ck.Kind, ley:f32, res:u8 = 0 };
+pub const Sample = struct { height:f32, kind:ck.Kind, ley:f32, res:ck.Res = 0 };
 
 pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
   const x = m.f(wx);
@@ -65,7 +65,7 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
   // resource nodes cluster in noisy patches. No flora: every plant is seeded.
   const h = rng.unit(rng.hash2(seed +% 7, wx, wy));
   const patch = noise.fbm(seed +% 5, x / PATCH_L, y / PATCH_L, 2);
-  const res:u8 = if (patch > PATCH and h < NODE_CHANCE) @intFromFloat(RES_MIN + h * RES_SPREAD) else 0;
+  const res:ck.Res = if (patch > PATCH and h < NODE_CHANCE) @intFromFloat(RES_MIN + h * RES_SPREAD) else 0;
   return .{.height = height, .kind = kind, .ley = ley, .res = res};
 }
 

@@ -185,7 +185,7 @@ const TEST_DT:f32 = 0.05;
 
 /// a strip of soil at y = 0 (x = 0..5) with a moss node of `res` fibre at
 /// (2, 0); the digger goes at (1, 0).
-fn fixture(w:*World, res:u8) !void {
+fn fixture(w:*World, res:ck.Res) !void {
   try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
   var it = w.map.valueIterator();
   while (it.next()) |cp| @memset(&cp.*.res, 0);
@@ -221,7 +221,7 @@ test "a digger beside a node draws one item every 4 seconds" {
   try testing.expectEqual(@as(u32, 0), ss.get(id).inv.count(.fibre));
   try run(&ss, &w, &plants, &g, 8.2);
   try testing.expectEqual(@as(u32, 3), ss.get(id).inv.count(.fibre));
-  try testing.expectEqual(@as(u8, 2), w.chunkOfTile(2, 0).?.res[2]);
+  try testing.expectEqual(@as(ck.Res, 2), w.chunkOfTile(2, 0).?.res[2]);
 }
 
 test "a digger with no node beside it idles" {
@@ -256,7 +256,7 @@ test "a digger with nowhere to send buffers 8, then pauses" {
   try testing.expect(try ss.place(gpa, &w, 1, 0, .root_digger, 0, 0));
   try run(&ss, &w, &plants, &g, 60);
   try testing.expectEqual(@as(u32, BUFFER), ss.get(ss.at(&w, 1, 0).?).inv.total());
-  try testing.expectEqual(@as(u8, 20 - BUFFER), w.chunkOfTile(2, 0).?.res[2]);
+  try testing.expectEqual(@as(ck.Res, 20 - BUFFER), w.chunkOfTile(2, 0).?.res[2]);
 }
 
 test "a conduit behind the digger carries its items away" {

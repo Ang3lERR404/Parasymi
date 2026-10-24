@@ -3,6 +3,8 @@ const m = @import("../core/math.zig");
 
 pub const SIZE = 32;
 pub const N = SIZE * SIZE;
+/// how much a resource node holds (thousands, so a node lasts)
+pub const Res = u16;
 const NONE:u32 = m.maxInt(u32);
 
 pub const Kind = enum(u8) {
@@ -82,7 +84,7 @@ pub const Chunk = struct {
   ley:[N]f32,
   ley_cap:[N]f32,
   /// gatherable resource left on the tile (0 = no node). The item is decided by `kind`.
-  res:[N]u8,
+  res:[N]Res,
   /// occupant of each tile (see `Occ`).
   occ:[N]Occ,
   /// how many things the player grew here touch this chunk; a pinned chunk

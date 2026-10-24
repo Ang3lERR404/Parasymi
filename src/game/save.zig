@@ -34,7 +34,7 @@ comptime { std.debug.assert(item_count < NO_ITEM); }
 
 pub const PATH = "parasymi.sav";
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 10;
+const VERSION:u32 = 11;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;
@@ -69,7 +69,7 @@ const PlantRec = extern struct {
 /// one chunk whose resource nodes differ from what the generator made.
 const NodesRec = struct {
   at:ck.Coord,
-  res:[ck.N]u8,
+  res:[ck.N]ck.Res,
 };
 
 const Header = extern struct {
@@ -262,7 +262,7 @@ test "a garden survives a save round trip" {
   try testing.expect(back.prog.done.contains(.root_communion));
   try testing.expectEqual(g.player.pos, back.player.pos);
   const c2 = back.world.chunkOfTile(m.tileOf(g.player.pos[0]), m.tileOf(g.player.pos[2])).?;
-  try testing.expectEqualSlices(u8, &c.res, &c2.res);
+  try testing.expectEqualSlices(ck.Res, &c.res, &c2.res);
   // a structure's per-kind state comes back intact
   for (g.structs.list.items, 0..) |s, i| try testing.expectEqual(s.kind(), back.structs.list.items[i].kind());
 }
