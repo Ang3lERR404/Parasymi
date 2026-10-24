@@ -207,7 +207,13 @@ void main() {
     if (echo > 0.5) twinkle = 1.0;
   } else {
     w = M * vec4(p, 1.0);
+#ifdef SHADOW
+    // a shadow caster needs no normals
+    wn = nm;
+    if (false) {
+#else
     if (mode == 3) {
+#endif
       // a skinned mesh's bones may swell it unevenly (the belly): its
       // normals take the inverse-transpose of how the skin truly moves
       // there, the blended bones plus where each bone would take this
@@ -284,5 +290,11 @@ void main() {
   // the halo's ring and the rays making it appear as its diamond forms
   // (from its shards, as its blooms close in)
   if (part == 11u || part == 12u) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
-  gl_Position = pc.vp * w;
+  gl_Position = project(w.xyz);
+#ifdef SHADOW
+  // what is light itself casts no shadow (a star mote, a beam, a halo's
+  // flash, ring and rays), nor does the soft shadow under a floater
+  if (mode == 2 || part == 7u || part == 8u || part == 9u || part == 11u || part == 12u) gl_Position = UNSEEN;
+#endif
 }
+

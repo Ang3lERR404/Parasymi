@@ -17,6 +17,12 @@ const PLACE_SKIN:f32 = 3;
 const BOUND:f32 = 2.5;
 const BOUND_PAD:f32 = 0.5;
 const MOTE_BOUND:f32 = 0.6;
+/// what may cast a shadow into view is kept too: a thing this high over
+/// the ground, at most this far along the key light's rays
+const CAST_ABOVE:f32 = 2;
+const CAST_REACH:f32 = 24;
+/// the least rise of the key light the casting reach is worked out for
+const CAST_LOW:f32 = 0.15;
 /// a curve is always drawn at least this far along
 const MIN_REACH:f32 = 1e-3;
 
@@ -57,20 +63,44 @@ pub const Parts = struct {
   /// level of detail their distance calls for, and not at all out of view
   eye:m.V3 = .{0, 0, 0},
   view:?m.Frustum = null,
+  /// toward the key light (sun or moon): what stands out of view may still
+  /// cast its shadow into it
+  toward:m.V3 = .{0, 1, 0},
+  /// this frame's points of light (see `light`)
+  lights:std.ArrayList(vertex.Light) = .empty,
   pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa}; }
   pub fn deinit(p:*Parts) void {
     for (&p.lists) |*l| l.deinit(p.gpa);
     p.bones.deinit(p.gpa);
+    p.lights.deinit(p.gpa);
   }
   pub fn clear(p:*Parts) void {
     for (&p.lists) |*l| l.clearRetainingCapacity();
     p.bones.clearRetainingCapacity();
+    p.lights.clearRetainingCapacity();
   }
 
-  /// set this frame's eye and view before emitting
-  pub fn look(p:*Parts, eye:m.V3, view:m.Frustum) void {
+  /// set this frame's eye, view and the direction toward the key light
+  /// before emitting
+  pub fn look(p:*Parts, eye:m.V3, view:m.Frustum, toward:m.V3) void {
     p.eye = eye;
     p.view = view;
+    p.toward = toward;
+  }
+
+  /// whether a thing within `r` of `at` is worth drawing: it can be seen,
+  /// or its shadow can (it reaches down the key light's rays to the ground)
+  pub fn sees(p:*const Parts, at:m.V3, r:f32) bool {
+    const v = p.view orelse return true;
+    const reach = @min((@max(at[1], 0) + r + CAST_ABOVE) / @max(p.toward[1], CAST_LOW), CAST_REACH);
+    return v.capsule(at, at - p.toward * m.splat3(reach), r);
+  }
+
+  /// a point of light at `at` (linear `col` times its strength) lighting
+  /// what lies within `reach` of it: kept if any of that can be seen
+  pub fn light(p:*Parts, at:m.V3, col:m.V3, reach:f32) Allocator.Error!void {
+    if (p.view) |v| if (!v.sphere(at, reach)) return;
+    try p.lights.append(p.gpa, .{.pos = .{at[0], at[1], at[2], reach}, .col = .{col[0], col[1], col[2], 0}});
   }
 
   /// a mesh placed by its matrix: skipped when out of view (a sphere a few
@@ -78,7 +108,7 @@ pub const Parts = struct {
   pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look_:Look) Allocator.Error!void {
     const at = m.v3(mat[3][0], mat[3][1], mat[3][2]);
     const scale = @max(m.len(m.v3(mat[0][0], mat[0][1], mat[0][2])), @max(m.len(m.v3(mat[1][0], mat[1][1], mat[1][2])), m.len(m.v3(mat[2][0], mat[2][1], mat[2][2]))));
-    if (p.view) |v| if (!v.sphere(at, BOUND * scale + BOUND_PAD)) return;
+    if (!p.sees(at, BOUND * scale + BOUND_PAD)) return;
     try p.add(id, at, instance(mat, look_));
   }
 
@@ -113,7 +143,8 @@ pub const Parts = struct {
   /// a skinned mesh, moved by the bones `pose` put from `base`; `at` is
   /// about where it is (to cull it and pick its level of detail)
   pub fn emitSkinned(p:*Parts, id:meshlib.Id, base:u32, at:m.V3, look_:Look) Allocator.Error!void {
-    if (p.view) |v| if (!v.sphere(at, BOUND + BOUND_PAD)) return;
+    if (!p.sees(at, BOUND + BOUND_PAD)) return;
+
     var inst = instance(m.translate(at), look_);
     inst.e = .{PLACE_SKIN, m.f(base), 0, 0};
     try p.add(id, at, inst);

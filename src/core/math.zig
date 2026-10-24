@@ -261,6 +261,18 @@ pub fn perspective(fovy:f32, aspect:f32, near:f32, far:f32) M4 {
   };
 }
 
+/// right-handed orthographic projection for Vulkan (depth 0..1, `near`
+/// and `far` distances along -z), of the box (l..r, b..t) in view space;
+/// y is not flipped (shadow maps sample it as drawn)
+pub fn ortho(l:f32, r:f32, b:f32, t:f32, near:f32, far:f32) M4 {
+  return .{
+    .{2 / (r - l), 0, 0, 0},
+    .{0, 2 / (t - b), 0, 0},
+    .{0, 0, -1 / (far - near), 0},
+    .{-(r + l) / (r - l), -(t + b) / (t - b), -near / (far - near), 1},
+  };
+}
+
 pub fn lookAt(eye:V3, at:V3, up:V3) M4 {
   const fw = norm(at - eye);
   const s = norm(cross(fw, up));
@@ -431,6 +443,17 @@ pub const Frustum = struct {
     }
     return true;
   }
+
+  /// whether any of a capsule from `a` to `b` with radius `r` can be seen
+  /// (conservatively: only a plane both ends lie beyond culls it)
+  pub fn capsule(fr:*const Frustum, a:V3, b:V3, r:f32) bool {
+    for (fr.planes) |pl| {
+      const da = pl[0] * a[0] + pl[1] * a[1] + pl[2] * a[2] + pl[3];
+      const db = pl[0] * b[0] + pl[1] * b[1] + pl[2] * b[2] + pl[3];
+      if (@max(da, db) < -r) return false;
+    }
+    return true;
+  }
 };
 
 test "spring-damper settles where its force balances" {
@@ -522,6 +545,16 @@ test "a frustum keeps what is inside it and culls what is not" {
   try std.testing.expect(!fr.sphere(v3(3, 0, 0.5), 0.5));
   try std.testing.expect(fr.sphere(v3(1.3, 0, 0.5), 0.5));
   try std.testing.expect(!fr.sphere(v3(0, 0, -1), 0.5));
+  // a capsule reaching in from outside is kept, one wholly outside is not
+  try std.testing.expect(fr.capsule(v3(3, 0, 0.5), v3(0, 0, 0.5), 0.1));
+  try std.testing.expect(!fr.capsule(v3(3, 0, 0.5), v3(2, 0, 0.5), 0.5));
+}
+test "ortho maps its box onto clip space, near to depth 0, far to 1" {
+  const o = ortho(-2, 6, -1, 3, 1, 11);
+  const lo = mulV(o, .{-2, -1, -1, 1});
+  const hi = mulV(o, .{6, 3, -11, 1});
+  inline for (0..3) |i| try testing.expectApproxEqAbs(@as(f32, if (i == 2) 0 else -1), lo[i], 1e-6);
+  inline for (0..3) |i| try testing.expectApproxEqAbs(@as(f32, 1), hi[i], 1e-6);
 }
 test "degrees to radians, and a triangle's centroid" {
   try testing.expectApproxEqAbs(pi / 2.0, rad(90), 1e-6);

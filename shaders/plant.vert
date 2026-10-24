@@ -125,7 +125,11 @@ void main() {
     // how far each fragment has settled (it fades in as it arrives)
     v_young = motes ? settle * smoothstep(0.0, 0.15, fract(t * 0.07 + order + seed)) * (1.0 - smoothstep(0.75, 1.0, fract(t * 0.07 + order + seed))) : settle;
     v_inst = vec4(aff, seed, health, float(part));
-    gl_Position = pc.vp * vec4(wp, 1.0);
+    gl_Position = project(wp);
+#ifdef SHADOW
+    // a celestial bloom is light itself: it casts no shadow
+    gl_Position = UNSEEN;
+#endif
     return;
   }
 
@@ -225,5 +229,10 @@ void main() {
   v_young = clamp((h - growth + 0.55) / 0.55, 0.0, 1.0);
   if (part == 1u || part == 2u) v_young = max(v_young, 0.5);
   v_inst = vec4(aff, seed, health, float(part));
-  gl_Position = pc.vp * vec4(wp, 1.0);
+  gl_Position = project(wp);
+#ifdef SHADOW
+  // a placement preview casts no shadow, nor does a floater's clear lantern
+  if (ic.y > 0.5 || (drift && part == 2u && h < 0.75)) gl_Position = UNSEEN;
+#endif
 }
+

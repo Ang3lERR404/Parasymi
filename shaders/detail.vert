@@ -99,7 +99,7 @@ void main() {
     v_col = hf > 0.5 ? min(tile * vec3(1.35, 1.45, 1.3), vec3(1.0)) : tile * vec3(0.7, 0.75, 0.7);
     // w > 0 marks grass for terrain.frag (ley glow), z 0: not the ground
     v_info = vec4(info.x, info.y, 0.0, max(hf, 0.004));
-    gl_Position = pc.vp * vec4(p, 1.0);
+    gl_Position = project(p);
     return;
   }
 
@@ -138,5 +138,5 @@ void main() {
   v_nrm = n;
   v_col = stone ? srgb2lin(grey) : tile * vec3(0.78, 0.72, 0.68);
   v_info = vec4(info.x, info.y, 0.0, 0.0);
-  gl_Position = pc.vp * vec4(p, 1.0);
+  gl_Position = project(p);
 }

@@ -11,13 +11,18 @@ const shaders = [_][]const u8{
   "ui.vert", "ui.frag",
   "sky.vert", "sky.frag",
   "post.vert", "bloom_down.frag", "bloom_up.frag", "composite.frag", "fxaa.frag",
+  "shadow.frag",
 };
 /// shaders compiled a second time from the same source with a define,
 /// imported under their own name: (name, source, define). The glass
-/// variants draw only the see-through fragments the plain ones skip.
+/// variants draw only the see-through fragments the plain ones skip; the
+/// shadow variants place what casts into each cascade of the key light's
+/// shadow map.
 const variants = [_][3][]const u8{
   .{"plant_glass.frag", "plant.frag", "GLASS"},
   .{"part_glass.frag", "part.frag", "GLASS"},
+  .{"plant_shadow.vert", "plant.vert", "SHADOW"},
+  .{"part_shadow.vert", "part.vert", "SHADOW"},
 };
 const names = shaders ++ blk: {
   var n:[variants.len][]const u8 = undefined;

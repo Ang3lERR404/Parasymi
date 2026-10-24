@@ -6,6 +6,8 @@ const Allocator = std.mem.Allocator;
 const eql = std.mem.eql;
 const sliceAsBytes = std.mem.sliceAsBytes;
 const sliceTo = std.mem.sliceTo;
+const indexOf = std.mem.indexOf;
+const span = std.mem.span;
 const builtin = @import("builtin");
 const vk = @import("vulkan");
 const glfw = @import("zglfw");
@@ -110,11 +112,13 @@ pub const Ctx = struct {
     var f13:vk.PhysicalDeviceVulkan13Features = .{.dynamic_rendering = .true, .synchronization_2 = .true, .shader_demote_to_helper_invocation = .true};
     // skinned meshes read their bones through a buffer's address (core in 1.2)
     var f12:vk.PhysicalDeviceVulkan12Features = .{.p_next = &f13, .buffer_device_address = .true};
+    // the shadow map's cascades are drawn in one pass, one view each (core in 1.1)
+    var f11:vk.PhysicalDeviceVulkan11Features = .{.p_next = &f12, .multiview = .true};
     const dev_exts = [_][*:0]const u8{vk.extensions.khr_swapchain.name};
     c.sample_shading = c.instance.getPhysicalDeviceFeatures(c.pdev).sample_rate_shading == .true;
     const f10:vk.PhysicalDeviceFeatures = .{.sample_rate_shading = if (c.sample_shading) .true else .false};
     const dev = try c.instance.createDevice(c.pdev, &.{
-      .p_next = &f12,
+      .p_next = &f11,
       .p_enabled_features = &f10,
       .queue_create_info_count = qci.len,
       .p_queue_create_infos = &qci,
@@ -199,6 +203,10 @@ fn onDebug(
   _:?*anyopaque,
 ) callconv(vk.vulkan_call_conv) vk.Bool32 {
   const msg = if (data) |d| (d.p_message orelse "?") else "?";
+  // decision: a shadow caster's vertex shader is the drawn one, its
+  // outputs left to a depth-only fragment shader on purpose (render/light.zig)
+  const id:[]const u8 = if (data) |d| if (d.p_message_id_name) |n| span(n) else "" else "";
+  if (indexOf(u8, id, "OutputNotConsumed") != null) return .false;
   if (sev.error_ext) log.err("vk: {s}", .{msg}) else log.warn("vk: {s}", .{msg});
   return .false;
 }

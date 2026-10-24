@@ -126,6 +126,16 @@ pub const PartInstance = extern struct {
   h:[4]f32 = NO_HALO,
 };
 
+/// a point of light (a bloom's core, a star mote, a halo's flash) as the
+/// shaders read it from the frame's lighting record: it lights what lies
+/// within its reach, brightest beside it, gone at the edge
+pub const Light = extern struct {
+  /// xyz where it is, w how far it reaches (world units)
+  pos:[4]f32,
+  /// linear rgb times its strength; w unused
+  col:[4]f32,
+};
+
 pub const Ui = extern struct {
   pos:[2]f32,
   /// local coordinates inside the quad: glyph cells (0..6, 0..8) for text,

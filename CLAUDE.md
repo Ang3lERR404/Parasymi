@@ -101,7 +101,7 @@ registry kinds outside the registry file; add a hook.
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
-| render passes | `render/renderer.zig` | `desc`, `Frame`, `initFrame`/`deinitFrame`, `record` (sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |
+| render passes | `render/renderer.zig` | `desc` (`.target`: shadow/world/screen), `Frame`, `initFrame`/`deinitFrame`, `prepare`, `record` (plants_shadow, parts_shadow, sky, terrain, detail, plants, parts, plants_glass, parts_glass, ui) |
 
 Items (`sim/items.zig`, ids stored by value: new items go last) and weave
 recipes (`game/craft.zig`) are plain data tables.
@@ -334,6 +334,18 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   pitch widens the view toward the horizon.
 - part.vert placement by `PartInstance.e.x`: 0 matrix, 1 curve (beams;
   `e.y` reach), 2 star mote, 3 skinned (`e.y` first bone).
+- Lighting (`render/light.zig`): the key light (sun/moon) casts shadows
+  through a cascaded shadow map (3 cascades, 1536², `fit` snaps them to
+  texels so they hold still), drawn in one multiview pass per caster
+  (`gl_ViewIndex`, `project()`), casters at their coarsest LOD
+  (`light.caster`); shader variants with SHADOW leave out what is light
+  itself (blooms, motes, beams, halo, ghosts, lanterns). Terrain receives
+  but does not cast. Points of light (`Parts.light`: blooms, motes, ley
+  shards, diamond and flash; at most `MAX_LIGHTS` 32, ranked in
+  view.zig) and the cascades travel in `Lighting`, reached by address
+  (`WorldPush.light`); common.glsl `keyShadow`, `pointLight`, `shadeLit`.
+  Culling keeps what may cast into view (`Parts.sees`). Cost ~+3 ms on
+  this machine's 35 ms demo frame.
 - Post-processing (`render/post.zig`): world passes draw into an HDR image;
   brighter-than-white light blooms (5-level 13-tap down chain with soft-knee
   threshold and anti-firefly weighting, tent filter back up); composite

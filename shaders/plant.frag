@@ -55,6 +55,11 @@ void surface() {
   float fres = pow(1.0 - ndv, 2.0);
   vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
   float fill = v_sap.x, moving = v_sap.y;
+  // how much of the key light reaches here (what stands between it and the
+  // sun or moon shades it), and that light: what it carries through thin
+  // tissue, its sheen and its glints all fall in shadow with it
+  float sh = keyShadow(v_pos, n);
+  vec3 klit = lit * sh;
 
   if (abs(v_form - 4.0) < 0.5) {
     // a celestial bloom: the only thing in the garden that truly glows, and
@@ -68,7 +73,7 @@ void surface() {
     float core = part == 2 ? 1.3 : 1.1;
     vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + seed * 3.0 + pc.eye_time.w * 0.03);
     vec3 col = mix(v_col, film, part == 2 ? 0.25 : 0.4 + 0.35 * fres);
-    vec3 c = shade(col * 0.2, n, v_pos);
+    vec3 c = shadeLit(col * 0.2, n, v_pos, sh);
     c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
     c += col * max(dot(-n, SUN), 0.0) * 0.4;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5;
@@ -82,8 +87,9 @@ void surface() {
     // a confluence's sap petal: see-through violet face-on, amber at grazing
     // angles. Hue follows the vertex colour.
     vec3 deep = v_col * 0.18 * health;
-    vec3 c = shade(deep, n, v_pos) + mix(v_col * 0.8, mix(v_col, AMBER, 0.45) * 2.0, fres) * (0.3 + fill * 0.3) * lit;
-    c += mix(v_col, AMBER, 0.3) * max(dot(-n, SUN), 0.0) * 0.25 * lit;
+    vec3 c = shadeLit(deep, n, v_pos, sh) + mix(v_col * 0.8, mix(v_col, AMBER, 0.45) * 2.0, fres) * (0.3 + fill * 0.3) * lit;
+    c += mix(v_col, AMBER, 0.3) * max(dot(-n, SUN), 0.0) * 0.25 * klit;
+    c += mix(v_col, AMBER, 0.3) * pointLight(v_pos, n, 1.0) * 0.5;
     o = vec4(applyFog(c, v_pos), mix(0.5, 1.0, fres));
     return;
   }
@@ -95,11 +101,12 @@ void surface() {
     // turning with the view angle, and bubbles rise inside it
     vec3 film = filmHue(ndv * 1.3 + seed * 3.0 + pc.eye_time.w * 0.05);
     vec3 col = mix(v_col, v_col * film * 1.8, 0.3 + 0.4 * fres);
-    vec3 c = shade(col * 0.25, n, v_pos) * health;
+    vec3 c = shadeLit(col * 0.25, n, v_pos, sh) * health;
     c += col * (0.2 + 0.85 * fres) * lit;
-    c += col * max(dot(-n, SUN), 0.0) * 0.3 * lit;
+    c += col * max(dot(-n, SUN), 0.0) * 0.3 * klit;
+    c += col * pointLight(v_pos, n, 1.0) * 0.6;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * lit * 0.5;
-    c += lit * pow(max(dot(n, normalize(SUN + V)), 0.0), 80.0) * 0.5 * smoothstep(0.0, 0.2, dot(n, SUN));
+    c += klit * pow(max(dot(n, normalize(SUN + V)), 0.0), 80.0) * 0.5 * smoothstep(0.0, 0.2, dot(n, SUN));
     float a = mix(0.18, 0.85, fres);
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
@@ -116,35 +123,38 @@ void surface() {
   vec3 body = mix(vec3(lum), v_col, 0.5) * 0.78;
   body = mix(body, vec3(0.06, 0.055, 0.035), (1.0 - thin) * (1.0 - smoothstep(0.0, 0.55, v_t)) * 0.75);
   body = mix(vec3(0.18, 0.12, 0.06), body, health);
-  vec3 c = shade(body, n, v_pos);
+  vec3 c = shadeLit(body, n, v_pos, sh);
 
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
   if (tl > 0.0 && part != 1 && part != 2) {
     float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
-    c += mix(body, lit, 0.5) * sheen * smoothstep(0.0, 0.3, dot(n, SUN)) * 0.22 * smoothstep(0.3, 1.5, tl);
+    c += mix(body, lit, 0.5) * sheen * smoothstep(0.0, 0.3, dot(n, SUN)) * 0.22 * smoothstep(0.3, 1.5, tl) * sh;
   }
 
   // sap, seen through the skin: light from behind and at grazing angles,
   // more where the growth is thin and the plant is full
   vec3 sap = mix(sapOf(aff, ndv, seed), v_col, 0.25);
   sap = mix(sap, vec3(1.0, 0.85, 1.0), pc.misc.x * 0.5);
-  float through = max(dot(-n, SUN), 0.0);
-  float wrap = clamp(dot(n, SUN) * 0.5 + 0.5, 0.0, 1.0);
+  float through = max(dot(-n, SUN), 0.0) * sh;
+  float wrap = clamp(dot(n, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
   float show = mix(0.1, 1.0, thin) * (0.35 + 0.65 * fill);
   // light scattered inside thin tissue tints it with its sap; light from
-  // behind and at grazing angles shows the sap most
+  // behind and at grazing angles shows the sap most (a bloom's or a mote's
+  // light too, wrapping round the tissue it falls on)
   c += sap * lit * (through * 0.8 + fres * 0.45 + wrap * 0.22) * show * health;
+  c += sap * pointLight(v_pos, n, 1.0) * 0.6 * show * health;
   // sap moving through the plant (sharing, draining) brightens it as it passes
   c += sap * lit * moving * 0.3 * show;
   // sap is alive: bubbles drifting up inside thin growth, beads of it
   // sliding down the skin of a full plant
   c += mix(sap, vec3(1.0), 0.3) * sapBubbles(v_obj, V, pc.eye_time.w) * show * lit * 0.4;
   vec2 drop = sapDroplets(v_obj * 0.8, n, SUN, V, pc.eye_time.w) * (0.25 + 0.75 * fill) * health;
-  c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + lit * drop.y * 0.7;
+  c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + klit * drop.y * 0.7;
   // thin sap-filled growth has a polished face
   vec3 Hs = normalize(SUN + V);
-  c += lit * pow(max(dot(n, Hs), 0.0), 60.0) * 0.25 * thin * smoothstep(0.0, 0.2, dot(n, SUN));
+  c += klit * pow(max(dot(n, Hs), 0.0), 60.0) * 0.25 * thin * smoothstep(0.0, 0.2, dot(n, SUN));
+
 
   // rim light keeps the silhouette readable at night (as on the wolf)
   float rim = pow(1.0 - ndv, 3.0);

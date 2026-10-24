@@ -50,7 +50,10 @@ void main() {
   vec3 n = normalize(v_nrm);
   int kind = int(v_info.x * 255.0 + 0.5);
   float t = pc.eye_time.w;
-  vec3 c = shade(v_col, n, v_pos);
+  // how much of the key light reaches here: what stands between it and the
+  // sun or moon (a plant, a structure, the wolf, a hill) shades it
+  float sh = keyShadow(v_pos, n);
+  vec3 c = shadeLit(v_col, n, v_pos, sh);
 
   bool ground = v_info.z > 0.5;
   if (ground || v_info.w > 0.0) {
@@ -85,7 +88,8 @@ void main() {
   }
   if (kind == 0) {
     float spec = pow(max(dot(reflect(-SUN, n), normalize(pc.eye_time.xyz - v_pos)), 0.0), 40.0);
-    c += vec3(0.6, 0.7, 0.8) * spec * 0.4;
+    c += vec3(0.6, 0.7, 0.8) * spec * 0.4 * sh;
+
   }
   o = vec4(applyFog(c, v_pos), 1.0);
 }

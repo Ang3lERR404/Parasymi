@@ -13,6 +13,7 @@ const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
 const pass = R.pass;
 const R = @import("../renderer.zig");
+const light = @import("../light.zig");
 
 pub const MAX = 1 << 15;
 /// skinned parts' bones a frame can hold
@@ -50,8 +51,8 @@ pub fn deinitFrame(f:*Frame, c:*const Ctx) void {
   f.bones.deinit(c);
 }
 
-/// upload every instance and bone and draw their solid fragments.
-pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
+/// upload every instance and bone (before any pass draws them).
+pub fn prepare(r:*R.Renderer, f:*Frame, scene:*const R.Scene, stats:*R.Stats) void {
   var n:u32 = 0;
   for (scene.parts, 0..) |list, i| {
     const k:u32 = @intCast(@min(list.len, MAX - n));
@@ -65,6 +66,10 @@ pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R
   const at = f.bones.address(&r.ctx);
   f.push = scene.push;
   f.push.bones = .{@truncate(at), @truncate(at >> 32)};
+}
+
+/// their solid fragments.
+pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, _:*const R.Scene, stats:*R.Stats) void {
   draw(r, f, cmd, stats, .parts);
 }
 
@@ -75,7 +80,8 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, stats:*R.Stats
   cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf, r.skins.buf}, &.{0, 0, 0});
   for (0..meshlib.SLOTS) |i| {
     if (f.counts[i] == 0 or (p == .parts_glass and !r.part_glassy[i])) continue;
-    cmd.draw(r.part_ranges[i][1], f.counts[i], r.part_ranges[i][0], f.first[i]);
+    const mesh = if (p == .parts_shadow) light.caster(i) else i;
+    cmd.draw(r.part_ranges[mesh][1], f.counts[i], r.part_ranges[mesh][0], f.first[i]);
     stats.draws += 1;
   }
 }
@@ -93,3 +99,18 @@ pub const glass = struct {
     draw(r, &r.frames[r.fi].pass.parts, cmd, stats, .parts_glass);
   }
 };
+
+/// the parts as the key light sees them, into every cascade of its shadow
+/// map: the wolf skinned as drawn, structures swaying and growing (what is
+/// light itself, the beams, motes and the halo, casts none; part.vert
+/// under SHADOW)
+pub const shadow = struct {
+  pub const desc:pass.Desc = .{
+    .vert = "part_shadow.vert", .frag = "shadow.frag",
+    .bindings = bindings, .attrs = attrs, .target = .shadow,
+  };
+  pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, _:*const R.Scene, stats:*R.Stats) void {
+    draw(r, &r.frames[r.fi].pass.parts, cmd, stats, .parts_shadow);
+  }
+};
+

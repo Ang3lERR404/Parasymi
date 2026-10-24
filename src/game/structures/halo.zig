@@ -37,6 +37,16 @@ pub const FORM:f32 = 5;
 pub const FLASH:f32 = 1.4;
 /// a formed diamond's field reaches this far (the ring's, `R`)
 pub const DIAMOND_R:f32 = 7;
+/// the blooms' spiral in (common.glsl `HALO_RUSH`, `HALO_TURNS`, `HALO_FOLD`)
+const RUSH:f32 = 4;
+const TURNS:f32 = 1.25;
+const FOLD:f32 = 0.3;
+/// points of light: the diamond's (warm, reaching past the ring as it
+/// forms) and the flash's (a burst, fading as it spreads)
+const DIAMOND_LIGHT = m.V3{ 1.0, 0.93, 0.82 };
+const DIAMOND_REACH:f32 = 6;
+const FLASH_LIGHT = m.V3{ 6.0, 5.6, 5.0 };
+const FLASH_REACH:f32 = 16;
 /// the diamond floats at the centre of the ring, where the blooms' cross
 /// of beams meets: as high as they hang, the ring with it
 pub const HOVER:f32 = species.get(.bloom).hover;
@@ -46,6 +56,23 @@ const LEVEL:f32 = 0.02;
 /// quickly they follow
 pub const DIM:f32 = 0.3;
 const LIGHT_EASE:f32 = 0.4;
+
+/// where a forming halo (`halo`: its centre xyz, how far along w; w < 0
+/// none) has drawn a point riding with one of its blooms, and how far that
+/// bloom is still open: the CPU's twin of common.glsl `haloSpiral` and
+/// `haloFold`
+pub fn spiral(p:m.V3, halo:[4]f32) struct { at:m.V3, open:f32 } {
+  if (halo[3] < 0) return .{ .at = p, .open = 1 };
+  const k = m.clamp01(halo[3]);
+  const pull = (@exp(RUSH * k) - 1) / (@exp(RUSH) - 1);
+  const a = TURNS * m.tau * pull;
+  const ctr = m.v3(halo[0], halo[1], halo[2]);
+  const d = p - ctr;
+  const c = @cos(a);
+  const s = @sin(a);
+  const at = ctr + m.v3(d[0] * c - d[2] * s, d[1], d[0] * s + d[2] * c) * m.splat3(1 - pull);
+  return .{ .at = at, .open = 1 - m.smooth(m.clamp01((k - (1 - FOLD)) / FOLD)) };
+}
 
 pub fn pointAt(x:i32, y:i32, k:usize) [2]i32 {
   return .{ x + POINTS[k][0] * R, y + POINTS[k][1] * R };
@@ -88,4 +115,10 @@ pub fn draw(out:*Parts, seed:f32, at:m.V3, ground:m.V3, k:f32, light:[4]f32) All
   try out.emit(.halo_ring, m.chain(&.{ m.translate(ring), m.scale3(m.v3(r, 1, r)) }), .{ .glow = 1, .phase = seed, .tint = light, .halo = halo });
   const age = (k - 1) * FORM / FLASH;
   if (age >= 0 and age < 1) try out.emit(.halo_flash, m.translate(at), .{ .glow = 1, .flutter = age });
+  // the diamond holds the light it gathers, more as it forms; as it does,
+  // the flash bursts out over the garden
+  const formed = @sqrt((@exp(RUSH * m.clamp01(k)) - 1) / (@exp(RUSH) - 1));
+  try out.light(at, DIAMOND_LIGHT * m.splat3(formed), DIAMOND_REACH);
+  if (age >= 0 and age < 1) try out.light(at, FLASH_LIGHT * m.splat3((1 - age) * (1 - age)), FLASH_REACH);
+
 }

@@ -9,6 +9,7 @@ const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
 const pass = R.pass;
 const R = @import("../renderer.zig");
+const light = @import("../light.zig");
 
 pub const MAX = 1 << 16;
 
@@ -35,8 +36,9 @@ pub fn initFrame(c:*const Ctx) ctx.Error!Frame {
 }
 pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.inst.deinit(c); }
 
-/// upload every instance and draw their solid fragments.
-pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
+/// upload every instance (before any pass draws them).
+pub fn prepare(r:*R.Renderer, f:*Frame, scene:*const R.Scene, stats:*R.Stats) void {
+  _ = r;
   var n:u32 = 0;
   for (scene.instances, 0..) |list, i| {
     const k:u32 = @intCast(@min(list.len, MAX - n));
@@ -46,6 +48,10 @@ pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R
     n += k;
   }
   stats.instances = n;
+}
+
+/// their solid fragments.
+pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
   draw(r, f, cmd, scene, stats, .plants);
 }
 
@@ -56,8 +62,9 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, scene:*const R
   cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf}, &.{0, 0});
   for (0..R.PLANT_MESHES) |i| {
     if (f.counts[i] == 0) continue;
-    cmd.bindVertexBuffers(2, &.{r.meshes.buf}, &.{r.plant_morph[i]});
-    cmd.draw(r.plant_ranges[i][1], f.counts[i], r.plant_ranges[i][0], f.first[i]);
+    const mesh = if (p == .plants_shadow) light.caster(i) else i;
+    cmd.bindVertexBuffers(2, &.{r.meshes.buf}, &.{r.plant_morph[mesh]});
+    cmd.draw(r.plant_ranges[mesh][1], f.counts[i], r.plant_ranges[mesh][0], f.first[i]);
     stats.draws += 1;
   }
 }
@@ -75,3 +82,17 @@ pub const glass = struct {
     draw(r, &r.frames[r.fi].pass.plants, cmd, scene, stats, .plants_glass);
   }
 };
+
+/// the plants as the key light sees them, into every cascade of its shadow
+/// map: the same instances, swaying and growing as they are drawn (what
+/// is light itself or clear sap casts none; plant.vert under SHADOW)
+pub const shadow = struct {
+  pub const desc:pass.Desc = .{
+    .vert = "plant_shadow.vert", .frag = "shadow.frag",
+    .bindings = bindings, .attrs = attrs, .target = .shadow,
+  };
+  pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
+    draw(r, &r.frames[r.fi].pass.plants, cmd, scene, stats, .plants_shadow);
+  }
+};
+

@@ -11,6 +11,8 @@ const renderer = @import("../render/renderer.zig");
 const meshgen = @import("../gfx/meshgen.zig");
 const vertex = @import("../gfx/vertex.zig");
 const st = @import("structures.zig");
+const halo_mod = @import("structures/halo.zig");
+
 const resources = @import("resources.zig");
 const actions = @import("actions.zig");
 const hud = @import("hud.zig");
@@ -66,6 +68,26 @@ const NODE_MIN:f32 = 0.55;
 const MOTE_SIZE:f32 = 1.8;
 const ECHOES = 3;
 const ECHO_SIZE:f32 = 1.2;
+/// points of light. A celestial bloom: how far its light reaches, how
+/// strong it is (a dark network's a share of it), how high over its float
+/// its core is, how much of its pearl's film tints it, and its slow pulse
+const BLOOM_REACH:f32 = 9;
+const BLOOM_LIGHT:f32 = 3.5;
+const BLOOM_DARK:f32 = 0.2;
+const BLOOM_CORE:f32 = 0.35;
+const BLOOM_FILM:f32 = 0.35;
+const BLOOM_PULSE:f32 = 0.15;
+const BLOOM_PULSE_RATE:f32 = 1.1;
+/// a bloom sheds light only once it has assembled this far
+const BLOOM_LIT_FROM:f32 = 0.6;
+/// a star mote: its reach, strength and colour (linear)
+const MOTE_REACH:f32 = 3.2;
+const MOTE_LIGHT:f32 = 0.9;
+const MOTE_COL = m.V3{ 1.0, 0.86, 0.62 };
+/// a glowing resource node (ley shards): its reach and strength, and colour
+const NODE_REACH:f32 = 2.6;
+const NODE_LIGHT:f32 = 0.45;
+const NODE_COL = m.V3{ 0.5, 0.3, 1.0 };
 
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
@@ -75,7 +97,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   // Everything is culled to what the camera sees and drawn at the level of
   // detail its distance from the eye calls for.
   g.parts.clear();
-  g.parts.look(g.cam.viewEye(), m.Frustum.of(g.cam.viewProj()));
+  g.parts.look(g.cam.viewEye(), m.Frustum.of(g.cam.viewProj()), g.sky.lightDir());
   try plants(g, reach, tf);
   try threads(g, tf);
   const feet = try g.player.rig(&g.parts);
@@ -83,6 +105,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   try structures(g, reach, tf);
   try ghost(g, tf);
   try motes(g);
+  rankLights(g);
   try hud.build(g, screen);
 
   const veil = g.prog.veil;
@@ -107,6 +130,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
     .instances = undefined,
     .parts = g.parts.slices(),
     .bones = g.parts.bones.items,
+    .lights = g.parts.lights.items,
     .ui = g.ui.v.items,
     .ui_time = @floatCast(@mod(g.ui_time, TIME_WRAP)),
   };
@@ -119,6 +143,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
 fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   for (&g.inst) |*l| l.clearRetainingCapacity();
   const s = g.plants.list.slice();
+  const radiating = g.eco.radiance.radiating.items;
   for (0..g.plants.len()) |i| {
     const ctr = g.plants.centre(i);
     if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[1] - g.cam.target[2]) > reach) continue;
@@ -126,8 +151,41 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
       .sp = s.items(.sp)[i], .x = s.items(.x)[i], .y = s.items(.y)[i], .ground = s.items(.chunk)[i].height[s.items(.tile)[i]],
       .growth = s.items(.growth)[i], .mana = s.items(.mana)[i], .seed = s.items(.seed)[i],
       .flow = s.items(.flow)[i], .health = s.items(.health)[i],
+      // (worked out each tick: a plant sown since has none yet)
+      .radiating = i < radiating.len and radiating[i],
     }, tf);
   }
+}
+
+/// a thin film's hue as the shaders take it (common.glsl `filmHue`): one
+/// turn of the rainbow per unit of `x`
+fn filmHue(x:f32) m.V3 {
+  return .{
+    0.5 + 0.5 * @cos(m.tau * x),
+    0.5 + 0.5 * @cos(m.tau * (0.33 + x)),
+    0.5 + 0.5 * @cos(m.tau * (0.67 + x)),
+  };
+}
+
+
+
+/// the most telling points of light first, the rest dropped: the renderer
+/// takes `renderer.MAX_LIGHTS` (strong, far reaching lights near what the
+/// camera looks at win)
+fn rankLights(g:*Game) void {
+  const ls = g.parts.lights.items;
+  if (ls.len <= renderer.MAX_LIGHTS) return;
+  const Rank = struct {
+    focus:m.V3,
+    fn score(ctx:@This(), l:vertex.Light) f32 {
+      const d = m.v3(l.pos[0], l.pos[1], l.pos[2]) - ctx.focus;
+      const strength = @max(l.col[0], @max(l.col[1], l.col[2]));
+      return strength * l.pos[3] * l.pos[3] / (1 + m.dot(d, d));
+    }
+    fn before(ctx:@This(), a:vertex.Light, b:vertex.Light) bool { return score(ctx, a) > score(ctx, b); }
+  };
+  std.sort.pdq(vertex.Light, ls, Rank{ .focus = g.cam.target }, Rank.before);
+  g.parts.lights.shrinkRetainingCapacity(renderer.MAX_LIGHTS);
 }
 
 /// where a floater hangs this frame: its hover height with a slow rise and
@@ -195,13 +253,15 @@ const Drawn = struct {
   growth:f32, mana:f32 = 0, seed:f32, flow:f32 = 0, health:f32 = 1,
   /// a placement preview, and whether it fits
   ghost:bool = false, fits:bool = true,
+  /// a celestial bloom: whether its network radiates (it shines in full)
+  radiating:bool = false,
 };
 
 fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   const def = species.get(d.sp);
   const foot = m.footprintCentre(d.x, d.y, def.size, d.ground);
   const reach = PLANT_BOUND + m.f(def.size);
-  if (g.parts.view) |v| if (!v.sphere(foot + m.v3(0, reach * PLANT_BOUND_UP, 0), reach)) return;
+  if (!g.parts.sees(foot + m.v3(0, reach * PLANT_BOUND_UP, 0), reach)) return;
   const lod = meshgen.lodAt(m.len(foot - g.parts.eye));
   var at = m.footprintCentre(d.x, d.y, def.size, 0);
   var y = d.ground;
@@ -228,6 +288,20 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
     .c = .{key.f, if (d.ghost) 1 else 0, if (d.fits) 1 else 0, 0},
     .h = halo,
   });
+  // a celestial bloom is the garden's light: its core sheds it round
+  // about, pearl tinted by its film, pulsing slowly, brighter as it
+  // assembles (a dark network's only faintly), following it as a forming
+  // halo draws it in and dimming as it folds
+  if (def.radiance > 0 and !d.ghost) {
+    const assembled = m.smooth(m.clamp01((d.growth - BLOOM_LIT_FROM) / (1 - BLOOM_LIT_FROM)));
+    const drawn = halo_mod.spiral(m.v3(at[0], y + BLOOM_CORE, at[2]), halo);
+    const pulse = 1 + BLOOM_PULSE * @sin(tf * BLOOM_PULSE_RATE + d.seed * m.tau);
+    const strength = BLOOM_LIGHT * assembled * d.health * drawn.open * pulse * (if (d.radiating) @as(f32, 1) else BLOOM_DARK);
+    if (strength > 0) {
+      const tint = m.lerpV(m.v3(1, 1, 1), filmHue(d.seed * 3 + tf * 0.03), BLOOM_FILM);
+      try g.parts.light(drawn.at, tint * m.splat3(strength), BLOOM_REACH);
+    }
+  }
 }
 
 fn structCentre(g:*const Game, s:*const st.Structure) m.V3 {
@@ -295,6 +369,8 @@ fn nodes(g:*Game, nr:i32) Allocator.Error!void {
           m.translate(m.tileCentre(wx, wz, c.height[t])),
           m.rotY(hsh * m.tau), m.scale3(m.splat3(sc)),
         }), .{.glow = node.glow, .phase = hsh, .sway = node.sway, .tall = node.tall * sc});
+        // a glowing node (ley shards) lights the ground round it
+        if (node.glow > 0) try g.parts.light(m.tileCentre(wx, wz, c.height[t] + 0.3), NODE_COL * m.splat3(NODE_LIGHT * node.glow * sc), NODE_REACH);
       }
     }
   }
@@ -307,6 +383,10 @@ fn motes(g:*Game) Allocator.Error!void {
   for (g.stars.motes.items) |mo| {
     const fade = m.clamp01(mo.life);
     try g.parts.emitMote(mo.pos, mo.phase, fade, if (mo.falling) 0 else -1, MOTE_SIZE * fade);
+    // a mote is a spark of starlight: it lights what it falls past and the
+    // ground it rests over
+    try g.parts.light(mo.pos, MOTE_COL * m.splat3(MOTE_LIGHT * fade), MOTE_REACH);
+
     if (!mo.falling) continue;
     for (1..ECHOES + 1) |k| try g.parts.emitMote(mo.pos, mo.phase, fade, m.f(k), ECHO_SIZE * fade / (1 + m.f(k)));
   }

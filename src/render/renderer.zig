@@ -1,7 +1,8 @@
-//! frame orchestration: acquire, record every pass inside one dynamic
-//! rendering scope, submit, present. What gets drawn lives in the pass
-//! modules under `passes/` (shape in `pass` below); they record in the order
-//! listed in `passes`. A new pass is one new file plus one line.
+//! frame orchestration: acquire, record every pass, submit, present. What
+//! gets drawn lives in the pass modules under `passes/` (shape in `pass`
+//! below); they record in the order listed in `passes`, by target: the
+//! shadow casters into the key light's shadow map, then the world into the
+//! HDR image, then the screen. A new pass is one new file plus one line.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const sliceAsBytes = std.mem.sliceAsBytes;
@@ -23,6 +24,7 @@ const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
 const terrain_mesh = @import("terrain_mesh.zig");
 const post_mod = @import("post.zig");
+const light = @import("light.zig");
 const Post = post_mod.Post;
 const HDR_FORMAT = post_mod.HDR_FORMAT;
 pub const Antialias = post_mod.Antialias;
@@ -32,11 +34,17 @@ pub const Antialias = post_mod.Antialias;
 ///   Frame                              per-frame resources (optional)
 ///   initFrame(c) Error!Frame / deinitFrame(*Frame, c)
 ///                                      (Frame fields default to empty)
-///   record(r, *Frame, cmd, scene, stats) upload this frame's data, draw it
-/// Passes record in declaration order inside one dynamic-rendering scope.
+///   prepare(r, *Frame, scene, stats)   upload this frame's data (optional;
+///                                      every pass's, before any draws)
+///   record(r, *Frame, cmd, scene, stats) draw it
+/// Passes record in declaration order inside their target's scope.
 pub const pass = struct {
   /// which push-constant block the pass uses.
   pub const Layout = enum { world, ui };
+  /// what a pass draws into: the key light's shadow map (depth alone, every
+  /// cascade at once), the world's HDR image, or the screen after the world
+  /// (and its glow): the UI
+  pub const Target = enum { shadow, world, screen };
 
   pub const Desc = struct {
     vert:[]const u8,
@@ -48,9 +56,7 @@ pub const pass = struct {
     /// with `depth`: whether it writes depth (a glass pass only tests it)
     depth_write:bool = true,
     blend:bool = false,
-    /// drawn onto the screen after the world (and its glow): the UI. World
-    /// passes draw into the HDR image the glow is taken from.
-    screen:bool = false,
+    target:Target = .world,
     /// with MSAA, shade every sample: its fragments choose for themselves
     /// whether they are solid or see-through, so the edge between the two
     /// (and the silhouette it makes) lies inside the pixel, not on geometry
@@ -68,14 +74,20 @@ pub const pass = struct {
     return pipeline.create(c, .{
       .vert = vs, .frag = fs,
       .bindings = d.bindings, .attrs = d.attrs,
-      .layout = layout, .color_format = if (d.screen) screen else HDR_FORMAT,
-      .depth = d.depth, .depth_write = d.depth_write, .depth_attachment = !d.screen, .blend = d.blend, .cull = false,
-      .samples = post_mod.sampleFlags(if (d.screen) 1 else samples), .per_sample = d.per_sample,
+      .layout = layout,
+      .color_format = switch (d.target) { .shadow => .undefined, .world => HDR_FORMAT, .screen => screen },
+      .depth = d.depth, .depth_write = d.depth_write, .depth_attachment = d.target != .screen, .blend = d.blend, .cull = false,
+      .samples = post_mod.sampleFlags(if (d.target == .world) samples else 1), .per_sample = d.per_sample,
+      .view_mask = if (d.target == .shadow) light.VIEWS else 0,
+      .depth_bias = if (d.target == .shadow) light.BIAS else null,
     });
   }
 };
 
 const passes = struct {
+  // what casts the key light's shadows, drawn first into its shadow map
+  pub const plants_shadow = @import("passes/plants.zig").shadow;
+  pub const parts_shadow = @import("passes/parts.zig").shadow;
   pub const sky = @import("passes/sky.zig");
   pub const terrain = @import("passes/terrain.zig");
   pub const detail = @import("passes/detail.zig");
@@ -90,6 +102,8 @@ const reg = registry.Registry(passes);
 pub const Pass = reg.Id;
 
 pub const FRAMES = 2;
+/// points of light a frame can hold (the rest of `Scene.lights` is dropped)
+pub const MAX_LIGHTS = light.MAX_LIGHTS;
 /// every grown plant mesh: each species in each of its variants.
 pub const PLANT_MESHES = species.count * meshgen.MAX_VARIANTS * meshgen.LODS;
 
@@ -110,7 +124,9 @@ pub const WorldPush = extern struct {
   /// where the parts pass finds this frame's bones (a buffer address; 0 in
   /// every other pass)
   bones:[2]u32 = .{0, 0},
-  pad:[2]u32 = .{0, 0},
+  /// where every pass finds this frame's `light.Lighting` (a buffer
+  /// address, set by the renderer)
+  light:[2]u32 = .{0, 0},
 };
 
 pub const Scene = struct {
@@ -123,6 +139,9 @@ pub const Scene = struct {
   /// skinned parts' bones (see `vertex.Skin`): each matrix carries a vertex
   /// from where it was built to where it is this frame
   bones:[]const m.M4,
+  /// points of light, most telling first (the renderer takes the first
+  /// `light.MAX_LIGHTS`)
+  lights:[]const vertex.Light,
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)
   ui_time:f32,
@@ -131,7 +150,7 @@ pub const Scene = struct {
 /// a captured frame: 4 bytes a pixel, row by row from the top
 pub const Shot = struct { w:u32, h:u32, px:[]const u8, bgra:bool };
 
-pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0 };
+pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0, lights:u32 = 0 };
 
 const Frame = struct {
   pool:vk.CommandPool = .null_handle,
@@ -141,6 +160,8 @@ const Frame = struct {
   acquired:vk.Semaphore = .null_handle,
   /// each pass's per-frame resources, side by side
   pass:reg.Struct("Frame") = undefined,
+  /// this frame's `light.Lighting`, which every world shader reads by address
+  lighting:Buffer = .{},
   /// buffers retired while this frame was in flight; freed when it comes round again.
   garbage:std.ArrayList(Buffer) = .empty,
 };
@@ -176,6 +197,8 @@ pub const Renderer = struct {
   sc:sw.Swapchain,
   /// the HDR image the world is drawn into, and the glow taken from it
   post:Post = .{},
+  /// the key light's shadow map
+  shadow:light.Shadow = .{},
   vsync:bool,
   frames:[FRAMES]Frame = @splat(.{}),
   fi:usize = 0,
@@ -233,7 +256,9 @@ pub const Renderer = struct {
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, .null_handle);
     r.post = try Post.init(c, r.sc.format.format, r.sc.extent.width, r.sc.extent.height, r.fit(r.post.aa));
 
+    r.shadow = try light.Shadow.init(c);
     for (&r.frames) |*f| {
+      f.lighting = try Buffer.init(c, @sizeOf(light.Lighting), .{.storage_buffer = true, .shader_device_address = true});
       f.pool = try c.device.createCommandPool(&.{.flags = .{.reset_command_buffer = true}, .queue_family_index = c.family}, null);
       f.fence = try c.device.createFence(&.{.flags = .{.signaled = true}}, null);
       f.acquired = try c.device.createSemaphore(&.{}, null);
@@ -243,8 +268,8 @@ pub const Renderer = struct {
       try c.device.allocateCommandBuffers(&.{.command_pool = f.pool, .level = .primary, .command_buffer_count = 1}, @ptrCast(&f.cmd));
     }
 
-    r.layouts[@intFromEnum(pass.Layout.world)] = try pipeline.layout(c, @sizeOf(WorldPush));
-    r.layouts[@intFromEnum(pass.Layout.ui)] = try pipeline.layout(c, @sizeOf(passes.ui.Push));
+    r.layouts[@intFromEnum(pass.Layout.world)] = try pipeline.layout(c, @sizeOf(WorldPush), &.{r.shadow.set_layout});
+    r.layouts[@intFromEnum(pass.Layout.ui)] = try pipeline.layout(c, @sizeOf(passes.ui.Push), &.{});
     try r.makePipes(false);
     try r.buildMeshes();
   }
@@ -255,7 +280,7 @@ pub const Renderer = struct {
     const n = r.post.aa.samples();
     inline for (reg.ids) |id| {
       const d = reg.module(id).desc;
-      if (!(world_only and d.screen)) {
+      if (!world_only or d.target == .world) {
         r.pipes[@intFromEnum(id)] = try pass.create(&r.ctx, d, r.layout(d.layout), r.sc.format.format, n);
       }
     }
@@ -292,7 +317,7 @@ pub const Renderer = struct {
     r.post.antialias(c, a) catch |e| return ctx.fold(e);
     if (!remake) return;
     inline for (reg.ids) |id| {
-      if (comptime !reg.module(id).desc.screen) {
+      if (comptime reg.module(id).desc.target == .world) {
         c.device.destroyPipeline(r.pipes[@intFromEnum(id)], null);
         r.pipes[@intFromEnum(id)] = .null_handle;
       }
@@ -372,6 +397,7 @@ pub const Renderer = struct {
       inline for (reg.ids) |id| {
         if (comptime reg.has(id, "Frame")) reg.module(id).deinitFrame(&@field(f.pass, @tagName(id)), c);
       }
+      f.lighting.deinit(c);
       c.device.destroySemaphore(f.acquired, null);
       c.device.destroyFence(f.fence, null);
       c.device.destroyCommandPool(f.pool, null);
@@ -390,6 +416,7 @@ pub const Renderer = struct {
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);
     r.post.deinit(c);
+    r.shadow.deinit(c);
     r.sc.deinit(c, r.gpa, false);
   }
 
@@ -527,20 +554,26 @@ pub const Renderer = struct {
     const cmd = vk.CommandBufferProxy.init(f.cmd, c.vkd);
     try cmd.resetCommandBuffer(.{});
     try cmd.beginCommandBuffer(&.{.flags = .{.one_time_submit = true}});
-    // the world into the HDR image, then its glow, then the screen: the
-    // world and its glow composed (and with FXAA filtered), the UI over it
+    // every pass's data up, then the shadow casters into the shadow map,
+    // the world into the HDR image, its glow, then the screen: the world
+    // and its glow composed (and with FXAA filtered), the UI over it
     var stats:Stats = .{.meshed = r.stats.meshed};
-    r.beginWorld(cmd, scene.clear);
+    var sc = scene.*;
+    stats.lights = r.lightUp(f, &sc);
     inline for (reg.ids) |id| {
-      if (comptime !reg.module(id).desc.screen) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
+      if (comptime reg.has(id, "prepare")) reg.module(id).prepare(r, &@field(f.pass, @tagName(id)), &sc, &stats);
     }
+    r.shadow.begin(cmd);
+    r.record(f, cmd, .shadow, &sc, &stats);
+    r.shadow.end(cmd);
+    r.beginWorld(cmd, scene.clear);
+    cmd.bindDescriptorSets(.graphics, r.layout(.world), 0, &.{r.shadow.set}, null);
+    r.record(f, cmd, .world, &sc, &stats);
     cmd.endRendering();
     r.post.glow(cmd);
     r.beginScreen(cmd, img);
     r.post.compose(cmd, r.sc.extent);
-    inline for (reg.ids) |id| {
-      if (comptime reg.module(id).desc.screen) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, &stats);
-    }
+    r.record(f, cmd, .screen, &sc, &stats);
     r.end(cmd, img, cap);
     try cmd.endCommandBuffer();
     try r.submit(f, img);
@@ -564,7 +597,39 @@ pub const Renderer = struct {
     if (pres != .success or acq.result == .suboptimal_khr) try r.recreate();
   }
 
+  /// every pass drawing into `target`, in declaration order
+  fn record(r:*Renderer, f:*Frame, cmd:vk.CommandBufferProxy, comptime target:pass.Target, scene:*const Scene, stats:*Stats) void {
+    inline for (reg.ids) |id| {
+      if (comptime reg.module(id).desc.target == target) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, stats);
+    }
+  }
+
+  /// write this frame's lighting (the cascades fitted to the view, the
+  /// points of light) and point the scene's push constants at it; how many
+  /// points it holds
+  fn lightUp(r:*Renderer, f:*Frame, scene:*Scene) u32 {
+    const p = &scene.push;
+    const eye = m.v3(p.eye_time[0], p.eye_time[1], p.eye_time[2]);
+    const target = m.v3(p.view[0], 0, p.view[1]);
+    // shadows reach the drawn world's far edge as the eye sees it
+    const reach = m.len(eye - target) + p.view[3];
+    const cas = light.fit(p.vp, eye, target, reach, m.v3(p.sun[0], p.sun[1], p.sun[2]));
+    const n:u32 = @intCast(@min(scene.lights.len, light.MAX_LIGHTS));
+    var l:light.Lighting = .{
+      .cascades = cas.mats, .texel = undefined,
+      .info = .{m.f(n), cas.reach, 0, 0},
+      .lights = undefined,
+    };
+    @memcpy(l.texel[0..light.CASCADES], &cas.texel);
+    @memcpy(l.lights[0..n], scene.lights[0..n]);
+    f.lighting.write(0, std.mem.asBytes(&l));
+    const at = f.lighting.address(&r.ctx);
+    p.light = .{@truncate(at), @truncate(at >> 32)};
+    return n;
+  }
+
   /// open the world's rendering scope: the HDR image and the depth buffer
+
   /// (with MSAA, multisampled ones resolved into the HDR image).
   fn beginWorld(r:*Renderer, cmd:vk.CommandBufferProxy, clear:[3]f32) void {
     r.post.beginWorld(cmd);

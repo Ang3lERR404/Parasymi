@@ -23,5 +23,5 @@ void main() {
   v_nrm = nrm;
   v_col = srgb2lin(col.rgb);
   v_info = info;
-  gl_Position = pc.vp * vec4(p, 1.0);
+  gl_Position = project(p);
 }

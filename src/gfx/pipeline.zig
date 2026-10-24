@@ -45,6 +45,7 @@ pub const Desc = struct {
   bindings:[]const vk.VertexInputBindingDescription,
   attrs:[]const vk.VertexInputAttributeDescription,
   layout:vk.PipelineLayout,
+  /// `.undefined`: no colour attachment (depth only, a shadow map)
   color_format:vk.Format,
   depth:bool = true,
   /// with `depth`: whether it writes depth too (see-through surfaces only test it)
@@ -60,9 +61,15 @@ pub const Desc = struct {
   /// with several samples: run the fragment shader for each one (where a
   /// shader, not the geometry, decides what a fragment draws), if the GPU can
   per_sample:bool = false,
+  /// with several views (multiview), one bit each: one draw renders into
+  /// every layer they name
+  view_mask:u32 = 0,
+  /// pushes depth away by a constant and with the slope (shadow casters)
+  depth_bias:?[2]f32 = null,
 };
 
-pub fn layout(c:*const Ctx, push_size:u32) ctx.Error!vk.PipelineLayout {
+/// `sets`: descriptor set layouts the pipelines also bind (0..)
+pub fn layout(c:*const Ctx, push_size:u32, sets:[]const vk.DescriptorSetLayout) ctx.Error!vk.PipelineLayout {
   // 128 bytes is all Vulkan guarantees; desktop GPUs offer 256
   if (push_size > c.props.limits.max_push_constants_size) return error.NoSuitableGpu;
   const range = [_]vk.PushConstantRange{.{
@@ -70,7 +77,10 @@ pub fn layout(c:*const Ctx, push_size:u32) ctx.Error!vk.PipelineLayout {
     .offset = 0,
     .size = push_size,
   }};
-  return c.device.createPipelineLayout(&.{.push_constant_range_count = 1, .p_push_constant_ranges = &range}, null) catch |e| ctx.fold(e);
+  return c.device.createPipelineLayout(&.{
+    .set_layout_count = @intCast(sets.len), .p_set_layouts = sets.ptr,
+    .push_constant_range_count = 1, .p_push_constant_ranges = &range,
+  }, null) catch |e| ctx.fold(e);
 }
 
 pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
@@ -92,10 +102,10 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
     .polygon_mode = .fill,
     .cull_mode = if (d.cull) .{.back = true} else .{},
     .front_face = .counter_clockwise,
-    .depth_bias_enable = .false,
-    .depth_bias_constant_factor = 0,
+    .depth_bias_enable = if (d.depth_bias != null) .true else .false,
+    .depth_bias_constant_factor = if (d.depth_bias) |b| b[0] else 0,
     .depth_bias_clamp = 0,
-    .depth_bias_slope_factor = 0,
+    .depth_bias_slope_factor = if (d.depth_bias) |b| b[1] else 0,
     .line_width = 1,
   };
   const ms:vk.PipelineMultisampleStateCreateInfo = .{
@@ -126,10 +136,11 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
     .alpha_blend_op = .add,
     .color_write_mask = .{.r = true, .g = true, .b = true, .a = true},
   }};
+  const colour = d.color_format != .undefined;
   const cb:vk.PipelineColorBlendStateCreateInfo = .{
     .logic_op_enable = .false,
     .logic_op = .copy,
-    .attachment_count = 1,
+    .attachment_count = if (colour) 1 else 0,
     .p_attachments = &att,
     .blend_constants = .{0, 0, 0, 0},
   };
@@ -137,8 +148,8 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
   const dy:vk.PipelineDynamicStateCreateInfo = .{.dynamic_state_count = dyn.len, .p_dynamic_states = &dyn};
   const fmts = [_]vk.Format{d.color_format};
   const rendering:vk.PipelineRenderingCreateInfo = .{
-    .view_mask = 0,
-    .color_attachment_count = 1,
+    .view_mask = d.view_mask,
+    .color_attachment_count = if (colour) 1 else 0,
     .p_color_attachment_formats = &fmts,
     .depth_attachment_format = if (d.depth_attachment) swapchain.depth_format else .undefined,
     .stencil_attachment_format = .undefined,

@@ -32,14 +32,15 @@ vec3 surfaceTangent() {
 }
 
 // sap is alive: bubbles drifting up inside it, beads sliding down its
-// surface. Added to every sap material.
-vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, inout float alpha) {
+// surface. Added to every sap material. `sh`: how much of the key light
+// reaches it (its glints fall in shadow with it)
+vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout float alpha) {
   float t = pc.eye_time.w;
   vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0), pc.sun.w);
   float bub = sapBubbles(v_obj, V, t) * inside;
   c += mix(sapc, vec3(1.0, 0.95, 0.85), 0.35) * bub * 0.45 * lit;
   vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
-  c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + lit * drop.y * 0.9;
+  c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + lit * drop.y * 0.9 * sh;
   alpha = max(alpha, drop.x * 0.85);
   return c;
 }
@@ -195,6 +196,10 @@ void surface() {
     o = vec4(applyFog(c, v_pos), al);
     return;
   }
+  // how much of the key light reaches what is left (what stands between it
+  // and the sun or moon shades it): it shades the light's glints, the
+  // light carried through sap and leaves and the fibres' sheen with it
+  float sh = part == 7 ? 1.0 : keyShadow(v_pos, n);
   if (part == 10) {
     // a cut crystal with no light of its own: each flat facet shades as
     // stone does and reflects a warm iridescent film that shifts with the
@@ -205,10 +210,11 @@ void surface() {
     vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), vec3(1.0, 0.82, 0.6), 0.35);
     float day = pc.sun.w;
     vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.96, 0.9), day);
-    c = shade(v_col * 0.55, n, v_pos);
-    c += film * lit * (0.18 + 0.55 * fres + 0.25 * facet.y * max(dot(n, SUN), 0.0));
+    c = shadeLit(v_col * 0.55, n, v_pos, sh);
+    c += film * lit * (0.18 + 0.55 * fres + 0.25 * facet.y * max(dot(n, SUN), 0.0) * sh);
+    c += film * pointLight(v_pos, n, 0.0) * 0.5;
     vec3 H = normalize(SUN + V);
-    c += lit * pow(max(dot(n, H), 0.0), 120.0) * 1.6 * step(0.0, dot(n, SUN));
+    c += lit * pow(max(dot(n, H), 0.0), 120.0) * 1.6 * step(0.0, dot(n, SUN)) * sh;
     c += film * fres * mix(0.25, 0.08, day);
     o = vec4(applyFog(c, v_pos), 1.0);
     return;
@@ -233,19 +239,21 @@ void surface() {
     vec3 deep = SAP_DEEP * hue * mix(0.55, 1.6, h);
     // light carried through the mass: wrapped, so the shadow side still
     // shows a warm core, thicker resin swallowing more of it
-    float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0);
-    float through = max(dot(-raw, SUN), 0.0);
+    float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
+    float through = max(dot(-raw, SUN), 0.0) * sh;
     vec3 lit = mix(vec3(0.35, 0.45, 0.8) * 0.25, vec3(1.0), day);
-    c = shade(deep, raw, v_pos);
+    c = shadeLit(deep, raw, v_pos, sh);
     c += sap * lit * wrap * mix(0.06, 0.32, h);
     c += sap * lit * through * 0.25 * h;
+    // light from a bloom or a mote nearby carried through the mass too
+    c += sap * pointLight(v_pos, raw, 1.0) * mix(0.1, 0.4, h);
     // the polished face: amber at grazing angles and a tight highlight
     c += mix(deep, sap * 1.4, fres) * 0.3 * lit;
     vec3 H = normalize(SUN + V);
-    c += lit * pow(max(dot(raw, H), 0.0), 90.0) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN));
+    c += lit * pow(max(dot(raw, H), 0.0), 90.0) * 0.55 * smoothstep(0.0, 0.2, dot(raw, SUN)) * sh;
     // denser at the base: nearly opaque there, see-through only toward the face
     alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
-    c = sapLife(c, sap, raw, V, h * (1.0 - fres), alpha);
+    c = sapLife(c, sap, raw, V, h * (1.0 - fres), sh, alpha);
     o = vec4(applyFog(c, v_pos), alpha);
     return;
   }
@@ -255,18 +263,20 @@ void surface() {
     if (dot(raw, V) < 0.0) discard;
     float fres = pow(1.0 - clamp(dot(raw, V), 0.0, 1.0), 2.0);
     vec3 deep = SAP_DEEP * hue * (0.6 + 0.8 * v_glow);
-    c = shade(deep, raw, v_pos) + mix(deep, SAP * hue * 2.2, fres) * (0.35 + v_glow);
+    c = shadeLit(deep, raw, v_pos, sh) + mix(deep, SAP * hue * 2.2, fres) * (0.35 + v_glow);
+    c += SAP * hue * pointLight(v_pos, raw, 1.0) * 0.3;
     alpha = mix(v_fade, 1.0, fres);
-    c = sapLife(c, SAP * hue, raw, V, 1.0 - fres, alpha);
+    c = sapLife(c, SAP * hue, raw, V, 1.0 - fres, sh, alpha);
   } else if (inner_ear && v_fade < 0.999) {
     // the inner ear is a sheet of sap: glowing at grazing angles, faintly
     // see-through face-on (the outer face stays solid vine)
     float fres = pow(1.0 - clamp(-dot(raw, V), 0.0, 1.0), 2.0);
     vec3 deep = SAP_DEEP * 1.6;
-    c = shade(deep, -raw, v_pos) + mix(deep, SAP * 1.8, fres) * 0.5;
-    c += SAP * max(dot(raw, SUN), 0.0) * 0.25; // light through the ear
+    c = shadeLit(deep, -raw, v_pos, sh) + mix(deep, SAP * 1.8, fres) * 0.5;
+    c += SAP * max(dot(raw, SUN), 0.0) * 0.25 * sh; // light through the ear
+    c += SAP * pointLight(v_pos, raw, 0.0) * 0.25;
     alpha = mix(v_fade, 1.0, fres);
-    c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), alpha);
+    c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), sh, alpha);
   } else {
     vec3 albedo = v_col;
     float inner = 0.0;
@@ -275,9 +285,10 @@ void surface() {
       inner = dot(raw, V) < 0.0 ? 1.0 : 0.0;
       albedo = mix(albedo, SAP * 0.6, inner * 0.8);
     }
-    c = shade(albedo, n, v_pos);
-    // leaves and sap are thin/translucent: back light shines through
-    if (part == 1 || part == 2 || part == 5) c += albedo * max(dot(-n, SUN), 0.0) * 0.3;
+    c = shadeLit(albedo, n, v_pos, sh);
+    // leaves and sap are thin/translucent: back light shines through (a
+    // bloom's or a mote's too)
+    if (part == 1 || part == 2 || part == 5) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pointLight(v_pos, -n, 0.0) * 0.3);
     c += SAP * inner * 0.25;
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets
@@ -286,7 +297,8 @@ void surface() {
       float sheen = fibreSheen(tgrad, tl, n, normalize(SUN + V));
       float lit = smoothstep(0.0, 0.3, dot(n, SUN));
       vec3 light = mix(vec3(0.35, 0.45, 0.8) * 0.3, vec3(1.0, 0.95, 0.85), pc.sun.w);
-      c += mix(albedo, light, 0.5) * sheen * lit * 0.28 * smoothstep(0.3, 1.5, tl);
+      c += mix(albedo, light, 0.5) * sheen * lit * 0.28 * smoothstep(0.3, 1.5, tl) * sh;
+
     }
     c += v_col * v_glow * 2.2;
   }
