@@ -32,6 +32,46 @@ Needs `VULKAN_SDK` (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`,
 zglfw `f04fdbf` (upstream heads need 0.17). A stray `CPATH` breaks GLFW's C
 build. New shaders go in `build.zig`'s list.
 
+## Testing one plant (`--plant`, `game/specimen.zig`)
+The way to check a species' growth, look and states: no demo garden, no
+scratch edits. Use it whenever a species, its genome, a plant kit
+(`parasite_kit`, `convergence_kit`, `radiant_kit` plants, meshgen herb/
+drift) or plant.vert/plant.frag changes.
+- `--plant=<species>` (a `species.Id` tag) sows it on the free tile nearest
+  spawn in a fresh world, the wolf (not drawn) and camera over it. Only its
+  meshes are built (plus `shadow` for floaters), so loading is quick; the
+  wolf, nodes, structures, motes, ghosts and starfall are left out. Saves,
+  loads and autosave are ignored. `--demo`/`--stress`/`--load` are ignored
+  with it.
+- `--state=` (default `grow`); looping ones run `--period=` seconds
+  (default 8), hold their end 1.5 s, start again:
+  | state | shows |
+  |---|---|
+  | `grow` | growth 0 → 1, looped (the growing animation) |
+  | `0.2..0.8` | growth between two shares, looped |
+  | `0.4` / `mature` | held at that growth / grown |
+  | `wither` | grown, health 1 → 0, looped (wilt; radiant ones come loose, dim) |
+  | `flow` | grown, sap flow rising and ebbing (sine, one period) |
+  | `drain` | grown, mana 1 → 0, looped (sap fill) |
+  | `dark` | grown, a bloom's network dark |
+  | `live` | real ecology from seed; resown 4 s after grown or dead |
+  Every state but `live` skips the ecology tick and writes growth, mana,
+  flow, health, radiating itself, so nothing withers or grows on its own;
+  uprooted, it comes back.
+- Unattended, with screenshots: add `--inspect=<same species>` and shape
+  the orbit, e.g.
+  `zig build run -- --plant=vesper --state=grow --period=5 --inspect=vesper --shots=6 --orbit=9 --dist=3.5 --pitch=25 --tod=0.5`
+  (shots land in `shots/<species>_<n>.png` after a 3 s settle; the loop
+  runs from the start, so shot k of n over a turn of `--orbit` seconds
+  shows growth about `((3 + k·orbit/n) mod (period+1.5)) / period`). Read
+  the PNGs to verify. Wilt/wither: `--state=wither`; a stage held still
+  from every side: `--state=0.5`.
+- A new visual input to plants (a new `PlantInstance` field the shaders
+  read) gets a state: a tag in `State` (+ `parse`) and a line in `look`,
+  plus its row here; the test checks parsing and loop timing.
+- Structures are not covered: they still use the scratch edit below
+  (Conventions, growth splines, "To watch growth").
+
 ## Controls
 Defaults in `controls.cfg` (rebindable there): WASD move, Shift run, Q/E yaw, Ctrl+W/S pitch, wheel zoom. LMB gather/place,
 RMB uproot, F harvest/feed, Shift+F take, C configure, R rotate. 1–9/0/-/=/Backspace pick
@@ -237,7 +277,7 @@ recipes (`game/craft.zig`) are plain data tables.
     research progress) gets its own skeleton and that progress as `.grown`.
   - To watch growth, loop `grown` (and the emitted pieces' state) in a
     scratch edit of `view.zig` `structures` and `--inspect=<structure>`;
-    revert it after.
+    revert it after. (Plants: `--plant`, see Testing one plant.)
 - **Leaves and petals have a body** (`meshgen.lamina`): a thin closed shell
   (`LAMINA_THICK` of the broadest half-width) rounded over at the edges, a
   small bevel; leaves (blades, fur leaves) fold toward a pale midrib vein
