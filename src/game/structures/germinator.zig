@@ -22,6 +22,7 @@ const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Look = @import("../parts.zig").Look;
 const mesh = @import("../../gfx/meshes/germinator.zig");
+const growth = @import("../../gfx/growth.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 
@@ -30,7 +31,7 @@ const v3 = m.v3;
 
 pub const def:st.Def = .{
   .item = .germinator, .size = 2, .mesh = .germinator, .preview = .germinator_whole, .store = true,
-  .sway = 0.55, .tall = mesh.TALL, .grow = 6, .still = true,
+  .sway = 0.55, .tall = mesh.TALL, .grow = 6, .still = true, .splined = true,
 };
 
 /// weave speed multiplier relative to hand-weaving
@@ -73,8 +74,6 @@ const SPIN_GLOW:f32 = 0.6;
 const SEED_GLOW:f32 = 0.45;
 /// how see-through the core's sap is at its thinnest
 const CORE_SAP:f32 = 0.22;
-/// its cups and core come once the tree has nearly grown
-const FORMS:f32 = 0.7;
 
 pub const State = struct {
   /// which recipe (index into craft.hand) it weaves
@@ -174,10 +173,11 @@ fn turned(p:f32, time:f32, tf:f32) f32 {
 fn colOf(item:items.Item) [4]f32 { return color.Rgba8.of(item.info().col).toF4(); }
 
 /// the tree's cups, core and what it weaves: placed on its mesh as it
-/// stands (`place`), swaying with it from its root.
+/// stands (`place`), swaying with it from its root. The cups and core
+/// form once the tree has grown (their meshes carry `mesh.FORM`, grown by
+/// the structure's growth on the GPU).
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
-  const form = m.smooth(m.clamp01((s.grown - FORMS) / (1 - FORMS)));
-  if (form <= 0) return;
+  if (growth.formed(mesh.FORM, s.grown) <= 0) return;
   const base = s.place(ctr);
   const lift = s.grownScale()[1];
   const g = &s.state.germinator;
@@ -192,7 +192,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   const grown_seed = if (busy) m.smooth(m.clamp01((p - SEED_FROM) / (SEED_TO - SEED_FROM))) else 0;
   const turn = turned(p, r.time, tf);
   // it all sways with the tree, from its root (`drop`: how high over it)
-  const sway:Look = .{.phase = s.seed, .sway = def.sway, .tall = def.tall};
+  const sway:Look = .{.phase = s.seed, .sway = def.sway, .tall = def.tall, .grown = s.grown};
 
   // the cups: each holds one of what the weave is woven from, standing
   // in it as deep as the tree has it in store, and tips to pour it
@@ -201,7 +201,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const tip = mesh.tip(k);
     const ing:?items.Ingredient = if (k < r.in.len) r.in[k] else null;
     const tilt = (if (ing != null) pour * TILT else 0) + NOD * @sin(tf * NOD_RATE + m.f(k) * 1.3 + s.seed * 7);
-    const cup = m.mul(base, m.chain(&.{m.translate(tip), m.rotY(mesh.cupFacing(k)), m.rotZ(-tilt), m.scale3(m.splat3(form))}));
+    const cup = m.mul(base, m.chain(&.{m.translate(tip), m.rotY(mesh.cupFacing(k)), m.rotZ(-tilt)}));
     var look = sway;
     look.drop = tip[1] * lift;
     try out.emit(.germinator_cup, cup, look);
@@ -219,7 +219,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     if (pour <= 0) continue;
     // the stream: off the lip, out over the core and down into its crown
     const lip = m.mulPoint(cup, mesh.CUP_LIP);
-    const land = top + m.norm(v3(lip[0] - top[0], 0, lip[2] - top[2])) * m.splat3(LAND * form);
+    const land = top + m.norm(v3(lip[0] - top[0], 0, lip[2] - top[2])) * m.splat3(LAND);
     const d = land - lip;
     const across = v3(d[0], 0, d[2]);
     const ctrl = [4]V3{lip, lip + across * m.splat3(0.35) + v3(0, 0.01, 0), lip + across * m.splat3(0.85) + v3(0, d[1] * 0.55, 0), land};
@@ -237,7 +237,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   const bulge = 1 + BULGE * spin;
   var core = look;
   core.fade = CORE_SAP;
-  try out.emit(.germinator_core, m.mul(heart, m.chain(&.{m.rotY(turn), m.scale3(v3(bulge, 1 / (bulge * bulge), bulge) * m.splat3(form))})), core);
+  try out.emit(.germinator_core, m.mul(heart, m.chain(&.{m.rotY(turn), m.scale3(v3(bulge, 1 / (bulge * bulge), bulge))})), core);
   if (!busy) return;
   const n = r.in.len;
 

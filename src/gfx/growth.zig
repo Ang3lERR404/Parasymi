@@ -84,6 +84,10 @@ pub const Skeleton = struct {
   first:usize,
   /// set by `finish`: no more may be added
   sealed:bool = false,
+  /// the share of the whole growth kept after everything on it is grown,
+  /// for pieces emitted on their own that form last (a germinator's cups
+  /// and core): they `tag` themselves with `tailWindow`
+  tail:f32 = 0,
 
   /// a skeleton for what `b` builds from here on
   pub fn begin(b:*const mg.Builder) Skeleton { return .{.first = b.mark()}; }
@@ -133,7 +137,8 @@ pub const Skeleton = struct {
   }
 
   /// done building: every time on it, and in what was built on it, made
-  /// a share of the whole growth, the last piece closing at 1.
+  /// a share of the whole growth, the last piece closing at 1 (less its
+  /// `tail`).
   pub fn finish(k:*Skeleton, b:*mg.Builder) void {
     assert(!k.sealed);
     k.sealed = true;
@@ -141,6 +146,7 @@ pub const Skeleton = struct {
     for (k.s[0..k.n]) |sp| end = @max(end, sp.start + sp.time * (1 + sp.front));
     const gs:[]vertex.Grow = if (k.first < b.grow.items.len) b.grow.items[k.first..] else &.{};
     for (gs) |g| end = @max(end, g.at[0] + g.at[1]);
+    end /= 1 - k.tail;
     for (k.s[0..k.n]) |*sp| {
       sp.start /= end;
       sp.time /= end;
@@ -316,6 +322,22 @@ pub const Skeleton = struct {
   }
 };
 
+/// the window (when it begins, how long it takes, shares of the whole
+/// growth) of the last `tail` of a structure's growth
+pub fn tailWindow(tail:f32) [2]f32 { return .{1 - tail, tail}; }
+
+/// how far a piece forming over the last `tail` of its structure's growth
+/// has come when that growth is `g`: the same curve part.vert grows a
+/// tagged piece by, for one the structure places itself
+pub fn formed(tail:f32, g:f32) f32 { return m.smooth(m.clamp01((g - (1 - tail)) / tail)); }
+
+/// everything built since `start` grows out of `from` over `window` of its
+/// structure's growth: a piece built as a mesh of its own (emitted by the
+/// structure) kept in step with the skeleton it stands on.
+pub fn tag(b:*mg.Builder, start:usize, from:V3, window:[2]f32) Allocator.Error!void {
+  for (try b.growOf(start)) |*g| g.* = .{.from = from, .at = .{window[0], window[1], 0, 0}};
+}
+
 test "branches wait for their spline, the whole closing at one" {
   var b:mg.Builder = .{.gpa = testing.allocator};
   defer b.deinit();
@@ -353,8 +375,9 @@ test "pieces built along a spline grow from its root to its tip" {
   const l = b.mark();
   try b.blade(m.v3(0, 1, 0), m.v3(1, 0, 0), 0.3, 0.1, 0, WHITE, WHITE, 0, .leaf);
   try k.on(&b, l, t, 1, .{});
+  k.tail = 0.2;
   k.finish(&b);
-  try testing.expectApproxEqAbs(@as(f32, 1), b.grow.items[b.grow.items.len - 1].at[0] + b.grow.items[b.grow.items.len - 1].at[1], 1e-5);
+  try testing.expectApproxEqAbs(@as(f32, 0.8), b.grow.items[b.grow.items.len - 1].at[0] + b.grow.items[b.grow.items.len - 1].at[1], 1e-5);
   try testing.expect(b.grow.items[0].at[1] == 0);
   for (b.v.items[s..l], b.grow.items[s..l]) |v, g| {
     try testing.expect(m.len(@as(V3, g.from) - m.v3(0, v.pos[1], 0)) < 0.02);

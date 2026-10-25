@@ -22,13 +22,14 @@ const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
 const Look = @import("../parts.zig").Look;
 const mesh = @import("../../gfx/meshes/arsthraxia.zig");
+const growth = @import("../../gfx/growth.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8 };
+pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8, .splined = true };
 
 /// most of one ingredient it will hold
 const STOCK = 20;
@@ -45,11 +46,10 @@ const SHOOT_SCALE = [SHOOTS]f32{1.0, 0.86, 0.72};
 const SHOOT_GROW:f32 = 6;
 const SIZE_STEP:f32 = 0.1;
 /// its core: this high over the ground, bobbing; it forms over the last
-/// quarter of growth
+/// of its growth, once the flower has opened (`mesh.FORM`)
 const CORE_H:f32 = 2.2;
 const CORE_BOB:f32 = 0.08;
 const CORE_BOB_RATE:f32 = 1.4;
-const FORMS:f32 = 0.75;
 /// the energy condensing in it: its radius as a unit starts .. as it is done
 const CORE_R = [2]f32{0.05, 0.19};
 /// its light: as a unit starts .. done, more while fed, a burst at a flare
@@ -170,9 +170,9 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   // the offshoots, growing out of the stalk with what is learned
   for (a.shoot, 0..) |g, k| {
     if (g <= 0) continue;
+    // it grows along its own growth splines by `g` (part.vert)
     const at = mesh.stalkAt(SHOOT_AT[k]);
-    const grow = m.smooth(g);
-    const shoot = m.mul(base, m.chain(&.{m.translate(at), m.rotY(SHOOT_BEARING[k]), m.scale3(m.splat3(SHOOT_SCALE[k] * m.lerp(0.08, 1, grow)))}));
+    const shoot = m.mul(base, m.chain(&.{m.translate(at), m.rotY(SHOOT_BEARING[k]), m.scale3(m.splat3(SHOOT_SCALE[k]))}));
     var look = sway;
     look.drop = at[1] * lift;
     look.grown = g;
@@ -183,7 +183,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   }
 
   // the core forms last, once the flower has opened
-  const form = m.smooth(m.clamp01((s.grown - FORMS) / (1 - FORMS)));
+  const form = growth.formed(mesh.FORM, s.grown);
   if (form <= 0) return;
   const heart = ctr + v3(0, (CORE_H + CORE_BOB * @sin(tf * CORE_BOB_RATE + s.seed * 5)) * lift, 0);
   // studying, the satellites split apart and spin out round it
@@ -216,7 +216,8 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   // its wisp into the core too
   const tip = mesh.shootTip();
   for (a.shoot, 0..) |g, k| {
-    const grow = m.smooth(m.clamp01((g - 0.6) / 0.4));
+    // (once its flower has opened)
+    const grow = growth.formed(mesh.SHOOT_FORM, g);
     if (grow <= 0) continue;
     const shoot = m.mul(base, m.chain(&.{m.translate(mesh.stalkAt(SHOOT_AT[k])), m.rotY(SHOOT_BEARING[k]), m.scale3(m.splat3(SHOOT_SCALE[k]))}));
     const turn = tf * TIP_SPIN + m.f(k) * 2.1;

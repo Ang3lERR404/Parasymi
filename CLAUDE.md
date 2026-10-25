@@ -133,8 +133,11 @@ recipes (`game/craft.zig`) are plain data tables.
   `along`/`on`), then `finish`; each vertex carries `vertex.Grow` (binding
   3) and part.vert grows it out of its spline as the front passes, branches
   after their parent is done (`After`). `Def.splined` turns off the
-  whole-structure scale; kit helpers take an optional `kit.On`. Sap cache
-  is the first built this way. Shared kits: `structure_kit`, `wolf_kit` (`leaf`,
+  whole-structure scale; kit helpers take an optional `kit.On`. Sap cache,
+  germinator and arsthraxia are built this way. Pieces a structure emits
+  on its own form in a reserved last share (`Skeleton.tail`): tagged
+  meshes carry it (`growth.tag`, `tailWindow`), CPU-placed ones scale by
+  `growth.formed` (the same curve). Shared kits: `structure_kit`, `wolf_kit` (`leaf`,
   `digit`, `claw`), `sculpt_kit` (SDF forms meshed and skinned), `mineral_kit`.
 - **Leaves and petals have a body** (`meshgen.lamina`): a thin closed shell
   (`LAMINA_THICK` of the broadest half-width) rounded over at the edges, a

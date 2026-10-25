@@ -7,6 +7,10 @@
 //! seed of them on the spindle (`thread`, `seed`, `winding`); those pieces
 //! are emitted by it, each built here in its own space. `whole` is all of
 //! it at rest: the placement preview.
+//! It grows on hidden growth splines (gfx/growth.zig): the trunk with its
+//! roots spreading, the foot leaves unfolding as it passes, then the
+//! boughs, calyx and spindle off its crown, the twigs off the boughs, and
+//! last (`FORM`) the cups and core, which carry that window themselves.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -15,6 +19,7 @@ const pal = @import("palette.zig");
 const kit = @import("structure_kit.zig");
 const color = @import("../../core/color.zig");
 const Rng = @import("../../core/rng.zig").Rng;
+const growth = @import("../growth.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -48,6 +53,17 @@ const cup_stamen = color.rgb(0.82, 0.78, 0.6);
 /// essence is coloured per instance (the item it is): white under its tint
 const essence_white = color.rgb(1, 1, 1).toRgba8(255);
 
+/// the last share of its growth, once the tree is grown, over which its
+/// cups and core form (they are emitted, so carry it in their vertices)
+pub const FORM:f32 = 0.2;
+/// the trunk grows this slowly per unit of its length (a growth spline's pace)
+const TRUNK_PACE:f32 = 1.4;
+/// where up the trunk the boughs leave it, and the foot leaves unfold
+const BOUGH_FROM:f32 = 0.92;
+const FOOT_AT:f32 = 0.1;
+/// how much later each sepal of the calyx opens than the one before
+const SEPAL_STAGGER:f32 = 0.03;
+
 /// bough `k`'s heading round the trunk
 pub fn boughAngle(k:usize) f32 { return m.ratio(k, BOUGHS) * m.tau + 0.3; }
 
@@ -63,23 +79,26 @@ pub fn cupFacing(k:usize) f32 { return -(boughAngle(k) + m.pi); }
 pub fn build(b:*mg.Builder) Allocator.Error!void { try tree(b); }
 
 fn tree(b:*mg.Builder) Allocator.Error!void {
-  try kit.rootMat(b, 8, 1.0, 0.08, 0x6E41, null);
-  try kit.footLeaves(b, 7, 0.3, 0.48, 0.19, 0x6E42, null);
-  try trunk(b);
-  for (0..BOUGHS) |k| try bough(b, k);
-  try calyx(b);
-  try spindle(b);
+  var sk = growth.Skeleton.begin(b);
+  sk.tail = FORM;
+  const stem = try trunk(b, &sk);
+  try kit.rootMat(b, 8, 1.0, 0.08, 0x6E41, .{.k = &sk, .id = stem});
+  try kit.footLeaves(b, 7, 0.3, 0.48, 0.19, 0x6E42, .{.k = &sk, .id = stem, .u = FOOT_AT});
+  for (0..BOUGHS) |k| try bough(b, &sk, stem, k);
+  try calyx(b, &sk, stem);
+  try spindle(b, &sk, stem);
+  sk.finish(b);
 }
 
 /// the trunk: strands woven round a dark core, flared where it roots,
-/// leaning a little as anything grown does
-fn trunk(b:*mg.Builder) Allocator.Error!void {
-  const N = 14;
+/// leaning a little as anything grown does; its growth spline
+fn trunk(b:*mg.Builder, sk:*growth.Skeleton) Allocator.Error!growth.Id {
+  const N = growth.RES;
   var ctrl:[5]V3 = undefined;
   mg.growthPath(.{.start = v3(0, 0, 0), .direction = v3(0, 1, 0), .length = TRUNK_H + 0.06, .wobble = 0.3, .seed = 0x6E43}, &ctrl);
   ctrl[ctrl.len - 1] = v3(0, TRUNK_H + 0.06, 0);
-  var spine:[N]V3 = undefined;
-  m.splineResample(&ctrl, &spine);
+  const stem = sk.trunk(&ctrl, .{.pace = TRUNK_PACE});
+  const spine = &sk.get(stem).pts;
   var ts:[N]f32 = undefined;
   var rs:[N]f32 = undefined;
   for (&ts, &rs, spine, 0..) |*t, *r, p, i| {
@@ -87,13 +106,16 @@ fn trunk(b:*mg.Builder) Allocator.Error!void {
     t.* = p[1] / TALL;
     r.* = 0.1 + 0.09 * @exp(-k * 5) - 0.015 * k;
   }
-  try mg.braid(b, &spine, &ts, &rs, 6, 2.6, pal.STRAND_WOBBLE, 0x6E44, pal.core, pal.vine);
+  const s = b.mark();
+  try mg.braid(b, spine, &ts, &rs, 6, 2.6, pal.STRAND_WOBBLE, 0x6E44, pal.core, pal.vine);
+  try sk.along(b, s, stem);
+  return stem;
 }
 
 /// bough `k`: out of the trunk's crown, twisting a little as it rises
 /// round the core (clear of it), out and up, then arching over to hold its
 /// cup up above the core. Leaves along it and a leafy twig off its back.
-fn bough(b:*mg.Builder, k:usize) Allocator.Error!void {
+fn bough(b:*mg.Builder, sk:*growth.Skeleton, stem:growth.Id, k:usize) Allocator.Error!void {
   const a = boughAngle(k);
   // (out from the axis, height) at each control point
   const at = [_][2]f32{
@@ -109,63 +131,70 @@ fn bough(b:*mg.Builder, k:usize) Allocator.Error!void {
   mg.grow(&ctrl, .{.start = ctrl[0], .direction = m.norm(ctrl[at.len - 1] - ctrl[0]), .length = m.len(ctrl[at.len - 1] - ctrl[0]), .wobble = 0.12, .seed = 0x6E50 +% k * 31});
   // the tip stays where the cup stands
   ctrl[at.len - 1] = tip(k);
-  const N = 24;
-  var path:[N]V3 = undefined;
-  m.splineResample(&ctrl, &path);
+  const id = sk.branch(stem, BOUGH_FROM, &ctrl, .{});
+  const N = growth.RES;
+  const path = &sk.get(id).pts;
   var ts:[N]f32 = undefined;
   var rs:[N]f32 = undefined;
   mg.taperRadii(0.055, 0.42, &rs);
   for (&ts, path) |*t, p| t.* = p[1] / TALL;
-  try mg.braid(b, &path, &ts, &rs, 3, 3.2, pal.STRAND_WOBBLE, 0x6E60 +% k * 7, pal.core, pal.vine);
-  try mg.leavesAlong(b, &path, 6, 0.24, 0.08, 0.3, 0.92, ts[0], ts[N - 1], pal.leaf_dark, pal.leaf_lite, 0x6E70 +% k * 11);
+  const s = b.mark();
+  try mg.braid(b, path, &ts, &rs, 3, 3.2, pal.STRAND_WOBBLE, 0x6E60 +% k * 7, pal.core, pal.vine);
+  try sk.along(b, s, id);
+  try sk.leaves(b, id, .{.n = 6, .len = 0.24, .width = 0.08, .from = 0.3, .to = 0.92, .t0 = ts[0], .t1 = ts[N - 1], .col = pal.leaf_dark, .tip = pal.leaf_lite, .seed = 0x6E70 +% k * 11});
 
   // the crown: a twig off the bough's back, leaning out and up, and a
   // fan of leaves behind the cup
   const out = v3(@cos(a), 0, @sin(a));
-  const from = m.alongPath(&path, 0.62);
-  try kit.leafyVine(b, from, from + out * m.splat3(0.38) + v3(0, 0.3, 0), 0.022, 0.2, 5, from[1] / TALL, 1, 0x6E80 +% k * 13, null);
-  const low = m.alongPath(&path, 0.4);
-  try kit.leafyVine(b, low, low + out * m.splat3(0.34) + v3(0, 0.12, 0), 0.018, 0.25, 4, low[1] / TALL, 0.8, 0x6EB0 +% k * 17, null);
+  const from = m.alongPath(path, 0.62);
+  try kit.leafyVine(b, from, from + out * m.splat3(0.38) + v3(0, 0.3, 0), 0.022, 0.2, 5, from[1] / TALL, 1, 0x6E80 +% k * 13, .{.k = sk, .id = id, .u = 0.62});
+  const low = m.alongPath(path, 0.4);
+  try kit.leafyVine(b, low, low + out * m.splat3(0.34) + v3(0, 0.12, 0), 0.018, 0.25, 4, low[1] / TALL, 0.8, 0x6EB0 +% k * 17, .{.k = sk, .id = id, .u = 0.4});
   var rng = Rng.init(0x6E90 +% k);
-  const behind = m.alongPath(&path, 0.9);
+  const behind = m.alongPath(path, 0.9);
   for (0..3) |i| {
     const side = v3(-out[2], 0, out[0]) * m.splat3((m.f(i) - 1) * 0.7 + rng.range(-0.1, 0.1));
     const dir = m.norm(out + side + v3(0, 0.7, 0));
+    const s1 = b.mark();
     try b.blade(behind, dir, 0.27 * rng.range(0.85, 1.1), 0.1, 0.55, pal.leaf_dark, pal.leaf_lite, behind[1] / TALL, .leaf);
+    try sk.on(b, s1, id, 0.9, .{.from = behind});
   }
 }
 
 /// the calyx on the trunk's crown: broad sepals cupped up round the
 /// core's lower half, holding it
-fn calyx(b:*mg.Builder) Allocator.Error!void {
+fn calyx(b:*mg.Builder, sk:*growth.Skeleton, stem:growth.Id) Allocator.Error!void {
   const heart = v3(0, TRUNK_H + 0.03, 0);
   for (0..6) |i| {
     const a = (m.f(i) + 0.5) / 6 * m.tau;
     const out = v3(@cos(a), 0, @sin(a));
+    const s = b.mark();
     try mg.petal(b, .{
       .base = heart + out * m.splat3(0.05), .out = out, .len = 0.3, .width = 0.14,
       .rise = 0.85, .flare = 0.25, .cup = 0.5,
       .col = pal.leaf_dark, .tip = pal.leaf_lite, .t = heart[1] / TALL, .part = .leaf,
     });
+    try sk.on(b, s, stem, 1, .{.from = heart + out * m.splat3(0.05), .delay = SEPAL_STAGGER * m.f(i)});
   }
 }
 
 /// the spindle: a sapwood needle up through the core, from the calyx's
 /// heart to just over the core's crown, tapering to a point at both ends
-fn spindle(b:*mg.Builder) Allocator.Error!void {
-  const N = 12;
-  const y0 = TRUNK_H + 0.02;
+fn spindle(b:*mg.Builder, sk:*growth.Skeleton, stem:growth.Id) Allocator.Error!void {
+  const N = growth.RES;
   const y1 = CORE_AT[1] + CORE_R[1] + 0.1;
-  var path:[N]V3 = undefined;
+  const id = sk.branch(stem, 1, &.{v3(0, TRUNK_H, 0), v3(0, y1, 0)}, .{});
+  const path = &sk.get(id).pts;
   var ts:[N]f32 = undefined;
   var rs:[N]f32 = undefined;
-  for (&path, &ts, &rs, 0..) |*p, *t, *r, i| {
+  for (&ts, &rs, path, 0..) |*t, *r, p, i| {
     const k = m.ratio(i, N - 1);
-    p.* = v3(0, m.lerp(y0, y1, k), 0);
-    t.* = p.*[1] / TALL;
+    t.* = p[1] / TALL;
     r.* = @max(0.014 * @sqrt(@sin(m.pi * k)), 2e-4);
   }
-  try b.tubeR(&path, &ts, &rs, pal.sapwood, .stem, 6);
+  const s = b.mark();
+  try b.tubeR(path, &ts, &rs, pal.sapwood, .stem, 6);
+  try sk.along(b, s, id);
 }
 
 /// mesh: GERMINATOR CUP. a flower cup on a bough's tip, opening up +y, its
@@ -173,6 +202,7 @@ fn spindle(b:*mg.Builder) Allocator.Error!void {
 /// stamens rising from its heart.
 pub const cup = struct {
   pub fn build(b:*mg.Builder) Allocator.Error!void {
+    const s = b.mark();
     try mg.ellipsoid(b, .{.center = v3(0, 0.012, 0), .radii = v3(0.036, 0.03, 0.036), .col = pal.vine, .rings = 5, .segs = 8, .t = 0.95});
     const n = 7;
     for (0..n) |i| {
@@ -190,6 +220,8 @@ pub const cup = struct {
       .heart = v3(0, 0.02, 0), .axis = v3(0, 1, 0), .n = 6, .len = 0.075, .r = 0.004, .anther = 0.016,
       .lean = 0.22, .arch = 0.3, .col = cup_stamen.toRgba8(255), .t = 0.97, .seed = 0x6EA0,
     });
+    // it opens on its bough's tip as the tree finishes
+    try growth.tag(b, s, v3(0, 0, 0), growth.tailWindow(FORM));
   }
 };
 
@@ -197,7 +229,9 @@ pub const cup = struct {
 /// unit across (scaled by how much there is). Still (tu.x < 0).
 pub const pool = struct {
   pub fn build(b:*mg.Builder) Allocator.Error!void {
+    const s = b.mark();
     try mg.ellipsoid(b, .{.center = v3(0, 0, 0), .radii = v3(1, 0.22, 1), .col = essence_white, .part = .essence, .rings = 5, .segs = 10, .t = -1});
+    try growth.tag(b, s, v3(0, 0, 0), growth.tailWindow(FORM));
   }
 };
 
@@ -321,6 +355,8 @@ pub const core = struct {
     const start = b.mark();
     try kit.resinPod(b, v3(0, 0, 0), CORE_R, 12, 16);
     for (b.v.items[start..]) |*vx| vx.tu[1] = m.lerp(CORE_THIN, 1, vx.tu[1]);
+    // it swells up out of the calyx as the tree finishes
+    try growth.tag(b, start, v3(0, -CORE_R[1], 0), growth.tailWindow(FORM));
   }
 };
 
