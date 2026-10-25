@@ -3,7 +3,9 @@
 //! would gather there) into a small buffer. Conduits behind it pull from
 //! that buffer; any other structure beside it that wants the item is fed
 //! directly. When the node runs dry it idles, and it takes up any node that
-//! appears beside it later by itself.
+//! appears beside it later by itself. Its digging root reaches out to the
+//! node it works and withers back from one gone; what it draws out swells
+//! up the root home into the gourd its knot of roots grips.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
@@ -24,6 +26,8 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
+const Look = @import("../parts.zig").Look;
+const mesh = @import("../../gfx/meshes/root_digger.zig");
 
 pub const def:st.Def = .{ .item = .root_digger, .size = 1, .mesh = .root_digger, .store = true, .grow = 4, .sway = 0.5, .tall = 0.6 };
 
@@ -31,25 +35,27 @@ pub const def:st.Def = .{ .item = .root_digger, .size = 1, .mesh = .root_digger,
 pub const RATE:f32 = 4;
 /// items it holds before it stops digging
 pub const BUFFER = 8;
-/// roots radiating from the knot (see `emit`)
-const ROOTS = 6;
-/// idle roots breathe this deep at this tempo; roots facing the node
-/// (within 60 degrees) stretch by `STRETCH` with each item drawn
-const BREATH:f32 = 0.02;
-const BREATH_RATE:f32 = 1.3;
-const FACING:f32 = 0.5;
-const STRETCH:f32 = 0.15;
-/// each root's size varies by `SIZE_SPREAD` about `SIZE_MIN` (it grows out
-/// along its spline with the digger, `grown`)
-const SIZE_MIN:f32 = 0.9;
-const SIZE_SPREAD:f32 = 0.2;
-const GLOW:f32 = 0.2;
-const GLOW_ACTIVE:f32 = 0.6;
-/// the item drawn in arcs from `ARC_BASE` up by `ARC`, carried at this size
-const ARC_BASE:f32 = 0.12;
-const ARC:f32 = 0.15;
-const MOTE_SIZE:f32 = 0.5;
-const MOTE_GLOW:f32 = 0.9;
+/// how fast its digging root reaches out to a node (its length a second)
+/// and withers back from one gone
+const ROOT_GROW:f32 = 0.6;
+const ROOT_WITHER:f32 = 0.9;
+const ROOT_FLUTTER:f32 = 0.3;
+const GLOW:f32 = 0.15;
+const GLOW_ACTIVE:f32 = 0.5;
+/// each item drawn: over the first `PRISE` of it the root prises it loose,
+/// clods of the node flung up about its claw, then it swells up the root's
+/// core in its own colour, home into the gourd
+const PRISE:f32 = 0.3;
+const CLODS = 4;
+const CLOD_SIZE:f32 = 0.034;
+const CLOD_FLING:f32 = 0.13;
+const CLOD_OUT:f32 = 0.11;
+/// what it has dug hangs in its gourd, in a ring, bobbing
+const RING:f32 = 0.45;
+const LUMP_R:f32 = 0.022;
+const LUMP_GROW:f32 = 0.018;
+const BOB:f32 = 0.008;
+const TURN:f32 = 0.25;
 /// its describe bar sits further right (a longer line) and is shorter
 const BAR_X:f32 = 300;
 const BAR_W:f32 = 60;
@@ -65,6 +71,8 @@ pub const Dig = struct {
 pub const State = struct {
   /// null while there is no node beside it
   dig:?Dig = null,
+  /// how far its digging root toward each side has reached (0..1)
+  reach:[4]f32 = @splat(0),
 };
 
 /// it roots in living ground only.
@@ -74,17 +82,24 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const self = ctx.ss.get(i);
   _ = st.handOff(ctx, i);
   const d = &self.state.root_digger;
-  const found = findNode(ctx.w, self.x, self.y, if (d.dig) |dg| dg.dir else 0) orelse {
+  const found = findNode(ctx.w, self.x, self.y, if (d.dig) |dg| dg.dir else 0);
+  // its root reaches out to the node it works, and withers from any other
+  for (&d.reach, 0..) |*r, k| {
+    const there = if (found) |f| f.dir == k else false;
+    r.* = if (there) @min(1, r.* + dt * ROOT_GROW / mesh.root.REACH) else @max(0, r.* - dt * ROOT_WITHER);
+  }
+  if (found == null) {
     d.dig = null;
     return false;
-  };
-  if (d.dig == null or d.dig.?.dir != found.dir) d.dig = .{ .dir = found.dir, .item = found.item };
+  }
+  const f = found.?;
+  if (d.dig == null or d.dig.?.dir != f.dir) d.dig = .{ .dir = f.dir, .item = f.item };
   const dg = &d.dig.?;
   if (self.inv.total() >= BUFFER) return false;
   dg.t += dt;
   if (dg.t < RATE) return true;
   dg.t -= RATE;
-  found.chunk.res[found.tile] -= 1;
+  f.chunk.res[f.tile] -= 1;
   _ = self.inv.add(dg.item, 1);
   return true;
 }
@@ -122,35 +137,56 @@ pub fn output(s:*const st.Structure) ?items.Item {
 /// anything it has dug.
 pub fn gives(s:*const st.Structure, item:items.Item) bool { return s.inv.count(item) > 0; }
 
-/// roots radiating from the knot; those facing the node stretch toward it
-/// in time with each item drawn, and a mote of it travels in. Idle roots
-/// only breathe.
+/// its digging root, reaching to the node (or withering from one gone);
+/// while it works each item is prised loose, clods flung up about the
+/// claw, and swells up the root's core home into the gourd, where what it
+/// has dug hangs. All but the root sway with the knot.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
-  const dg = s.state.root_digger.dig;
+  const d = &s.state.root_digger;
+  const dg = d.dig;
   const working = dg != null and s.inv.total() < BUFFER;
-  const k = if (dg) |d| d.t / RATE else 0;
-  const node_yaw = if (dg) |d| m.dirYaw(d.dir) else 0;
-  for (0..ROOTS) |r| {
-    const yaw = m.ratio(r, ROOTS) * m.tau + s.seed * 2;
-    const breathe = 1 + BREATH * @sin(tf * BREATH_RATE + m.f(r) * 1.7);
-    const facing = working and @cos(m.angleDiff(yaw, node_yaw)) > FACING;
-    const reach = if (facing) 1 + STRETCH * (0.5 - 0.5 * @cos(k * m.tau)) else breathe;
-    const size = SIZE_MIN + SIZE_SPREAD * @abs(@sin(s.seed * 13 + m.f(r) * 2.3));
-    try out.emit(.digger_root, m.chain(&.{
-      m.translate(ctr),
-      m.rotY(yaw),
-      m.scale3(m.v3(reach * size, size, size)),
-    }), .{ .glow = GLOW + GLOW_ACTIVE * s.activity, .phase = s.seed, .grown = s.grown });
+  const k = if (dg) |g| g.t / RATE else 0;
+  for (d.reach, 0..) |r, side| {
+    if (r <= 0) continue;
+    const dir:m.Dir = @intCast(side);
+    const on = working and dg.?.dir == dir and r >= 1;
+    const v = m.dirVec(dir);
+    const col:[4]u8 = if (dg) |g| g.item.info().col else .{0, 0, 0, 255};
+    const c = color.Rgba8.of(col).toF4();
+    try out.emit(.digger_root, m.chain(&.{m.translate(ctr), m.rotY(m.atan2(-m.f(v.z), m.f(v.x)))}), .{
+      .glow = GLOW + GLOW_ACTIVE * s.activity, .flutter = ROOT_FLUTTER, .phase = s.seed + m.f(side) * 0.1, .grown = r * s.grown,
+      .carry = if (on and k > PRISE) m.smooth((k - PRISE) / (1 - PRISE)) else -1, .carry_col = .{c[0], c[1], c[2]},
+    });
+    if (!on or k > PRISE) continue;
+    // clods of the node flung up about the claw, falling back
+    const node = ctr + m.v3(m.f(v.x), 0, m.f(v.z)) * m.splat3(mesh.root.REACH);
+    const t = k / PRISE;
+    for (0..CLODS) |j| {
+      const a = m.ratio(j, CLODS) * m.tau + s.seed * 5 + m.f(j) * 0.7;
+      const reach = CLOD_OUT * (0.7 + 0.3 * m.f(j % 2));
+      const p = node + m.v3(@cos(a) * reach * t, CLOD_FLING * (0.8 + 0.2 * m.f(j % 3)) * 4 * t * (1 - t), @sin(a) * reach * t);
+      const size = CLOD_SIZE * (0.75 + 0.25 * m.f(j % 2)) * (1 - m.smooth(m.clamp01((t - 0.85) / 0.15)));
+      try out.emit(.digger_clod, m.chain(&.{m.translate(p), m.rotY(a + t * 4), m.rotX(t * 3 + m.f(j)), m.scale3(m.splat3(size))}), .{.phase = s.seed});
+    }
   }
-  if (!working) return;
-  const d = dg.?;
-  const v = m.dirVec(d.dir);
-  const from = ctr + m.v3(m.f(v.x), 0, m.f(v.z));
-  const p = m.lerpV(from, ctr, k) + m.v3(0, ARC_BASE + ARC * @sin(k * m.pi), 0);
-  try out.emit(.item_pod, m.chain(&.{
-    m.translate(p),
-    m.scale3(m.splat3(MOTE_SIZE)),
-  }), .{ .glow = MOTE_GLOW, .tint = color.Rgba8.of(d.item.info().col).toF4() });
+  // what it has dug, hanging in its gourd
+  if (s.grown < 1) return;
+  const base = s.place(ctr);
+  var n:usize = 0;
+  for (s.inv.slot) |slot| { if (slot != null) n += 1; }
+  var j:usize = 0;
+  for (s.inv.slot) |slot| {
+    const it = slot orelse continue;
+    const a = m.ratio(j, n) * m.tau + tf * TURN + s.seed * 6;
+    const ring = if (n == 1) 0 else mesh.POD_R[0] * RING;
+    const at = mesh.POD_AT + m.v3(@cos(a) * ring, BOB * @sin(tf * 0.9 + m.f(j) * 2), @sin(a) * ring);
+    const r = LUMP_R + LUMP_GROW * m.ratio(it.n, BUFFER);
+    try out.emit(.belly_lump, m.mul(base, m.chain(&.{m.translate(at), m.scale3(m.splat3(r))})), Look{
+      .glow = GLOW, .phase = s.seed, .tint = color.Rgba8.of(it.item.info().col).toF4(),
+      .sway = def.sway, .tall = def.tall, .drop = at[1],
+    });
+    j += 1;
+  }
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {

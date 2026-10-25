@@ -189,7 +189,7 @@ recipes (`game/craft.zig`) are plain data tables.
   structure mesh (and any piece of one that grows) is built this way, never
   grown by scaling the whole. Every structure is: sap cache, germinator,
   arsthraxia (and its research vines and offshoots), root-digger (and its roots, in
-  the first share of its growth: `sk.tail`), polyp, conduit (each arch
+  the digging root to its node, grown by how far it reaches), polyp, conduit (each arch
   its own spline; side roots grown by how far they reach), loomfern,
   lithophage (and its roots), braided conduit (weave and each lane its
   own mesh on the same spline), ganglion (and its nerves), gathering crown
@@ -535,8 +535,17 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   (part.vert), a unit done sends a surge up (`flutter` = flare). Research
   grows on it: vines climbing the stems (Arsthraxia, `Study.vines`), a
   braided offshoot bough with a vine round it and its own flower per
-  minor study. Sap cache: clear pod
-  in a vine basket, contents hanging inside. Conduit (`Def.bare`, its own
+  minor study. Sap cache: a resin gourd
+  cupped by a calyx on a woven bole, a wicker basket over it (green vines
+  one way, pale roots the other, over and under), a collar at its neck and
+  a bud of sepals closing its mouth (`sap_cache_lid`, emitted): it opens
+  as an item drops in (sinking to its stack, which swells) or rises out;
+  contents hang inside. Root-digger: four braided roots break the ground
+  (soil heaved round them) and twine up to grip a small resin gourd, a
+  leaf tuft on top; its digging root (`digger_root`, a conduit arch whose
+  `.core` runs home, tu.x 0 in the node) reaches to the node it works and
+  withers from one gone; each item is prised loose (`digger_clod`s flung
+  up about the claw), then swells up the core in its colour to the gourd. Conduit (`Def.bare`, its own
   `emit`): per tile a root digs up out of the soil at each edge it is fed
   from (`link` hook: `feeds`; `conduit`/`conduit_left`/`conduit_right`),
   arches (rising long, diving short) and digs back in at its front, so
