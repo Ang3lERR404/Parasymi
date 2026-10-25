@@ -9,6 +9,13 @@ effects) is not ours to take: flag it to the user and stop.
 
 ## 0. Measure first, per pass, on the GPU
 
+**Lesson from the first round:** the shaders were not the problem. Every
+buffer was host memory, so each draw fetched its vertices over PCIe:
+plant/part passes cost the same with AA off as at msaa8, with a trivial
+fragment shader and with a trivial vertex shader, and scaled with bytes
+per vertex. Before touching shader math, knock things out one at a time
+(trivial frag, trivial vert, AA off) and see which one moves the time.
+
 - The CPU frame hides behind the GPU (frames in flight), so `frame_ms` says
   little about a shader change. Read GPU time per pass: Vulkan timestamp
   queries written around every pass (`vkCmdWriteTimestamp2`, a query pool
@@ -29,7 +36,7 @@ effects) is not ours to take: flag it to the user and stop.
   test early; `layout(early_fragment_tests) in;` forces it (safe only when
   the shader writes no depth). (NVIDIA "Advanced API Performance: Shaders";
   OpenGL wiki "Early Fragment Test".)
-- **Two-pass solid/glass (ours).** `plants`/`parts` keep alpha >= SOLID and
+- **Two-pass solid/glass (ours, applied).** `plants`/`parts` keep alpha >= SOLID and
   write depth; `*_glass` blend the rest testing depth `less_or_equal`. So
   every visible opaque fragment passes depth *again* in the glass pass
   (equal depth), is shaded in full and then discarded by `keepPass`. Art-
@@ -106,7 +113,15 @@ effects) is not ours to take: flag it to the user and stop.
   constant buffers serialize. Our `Lighting` is read uniformly (same index
   across the warp) — good.
 
-## 5. Vertex stage
+## 5. Vertex stage and memory
+
+- **Static vertex data in device-local memory** (applied: `Buffer.initWith`,
+  staging copy). Host-visible memory on a discrete GPU is system RAM read
+  over PCIe on every draw. Per-frame data (instances, chunk meshes) may stay
+  host-visible; anything read every frame and written once must not.
+- The compiler already shares repeated buffer loads and simplifies
+  `transpose(inverse(J))`: hand-rewriting the skinned normal (bones read
+  once, cofactors) gained nothing measurable. Don't redo it.
 
 - Our vertex shaders do growth, wind, skinning per vertex every frame per
   pass: the shadow variant (3 views, multiview) runs it again per caster.
@@ -115,16 +130,42 @@ effects) is not ours to take: flag it to the user and stop.
 
 ## Measurement (scratch procedure)
 
-1. `zig build -Drelease=true`.
-2. Scratch edit in `main.zig`'s loop: after N (e.g. 600) frames log
-   `r.gpu_ms` per pass and quit. Revert after.
-3. `zig-out/bin/parasymi --demo --novsync` (and `--stress`), fixed camera.
-4. Change the shader, repeat; compare per pass; check shots for sameness.
+1. Scratch edit in `main.zig`'s play loop, after `r.draw`: count frames;
+   at 1500 log each `renderer.Pass` field name with `r.gpu_ms[i]`, then
+   `r.gpu_ms[renderer.GLOW]`, `[renderer.COMPOSE]`, `r.gpu_total`, and
+   `window.setShouldClose(true)`. Revert after (never commit it).
+2. `zig build -Drelease=true`, then
+   `zig-out/bin/Parasymi.exe --demo --novsync --tod=0.45` (and `--stress`).
+   AA comes from the gardener's `options.cfg` (`%LOCALAPPDATA%/Parasymi`):
+   back it up, switch `antialias`, restore it.
+3. Knock-outs: swap one snippet (e.g. `return 1.0` at the top of
+   `keyShadow`), rebuild, bench, restore. Run twice; noise is ~0.01 ms.
+4. Prove the look held: `--demo --inspect --shots=3 --tod=0.9` before and
+   after (git stash), compare the shots; debug build for validation.
 
-## Applied (2026-10-25)
+## Applied (2026-10-25), RTX 4060 Ti, 1600x900, demo, GPU ms
 
-See git log "Shaders: ..." for what was applied and the measured gains;
-the table at the end of this file is updated with each round.
+| step | msaa8 total | notes |
+|---|---|---|
+| baseline | 69.1 | parts 27.0, parts_glass 17.6, plants 10.8, plants_glass 8.5 |
+| glass `less` + early tests | 68.6 | lost in the bus-bound noise |
+| meshes/skins/grows device-local | 8.2 | parts 1.6, plants 3.1; glass `less` now -0.2 |
+| one pass over point lights, glisten skipped at 0 | 7.2 | plants 2.2 |
+
+Now: demo off 5.0, msaa4 5.9, msaa8 7.2; stress msaa8 11.1 (plants 4.9).
+Knock-outs at msaa8 (what each still costs): point lights ~0.45 (plants),
+key shadow ~0.3, sap bubbles ~0.25, glisten ~0.2, droplets ~0.15, the
+skinned normal's Jacobian ~0.3 (parts, vertex). Tried, no gain: drawing the
+sky after the solids (the clear's cost just moves to the first pass); the
+skinned-normal rewrite above.
+
+**Open, the user's call (changes the look):** per-sample shading on the
+plant/part passes is now the largest single cost (plants 1.0 ms at AA off,
+2.2 at msaa8). Options: lower `min_sample_shading`, shade per pixel and
+keep MSAA edges, alpha-to-coverage for the solid/glass split.
+**Open, art-safe but bigger builds:** clustered/tiled light lists (at most
+~0.45 ms here), splitting part.frag's rare roles into their own pipeline
+(occupancy; measure in Nsight first).
 
 ## Sources
 

@@ -58,8 +58,11 @@ Q/E roll, wheel dolly; eases back in 0.3 s.
 - Target 8 ms (120 FPS), RTX 3060-class, validation on; 30 Hz fixed sim
   tick (currently 60 Hz, `play.TICK`); chunks 64×64 (currently 32×32),
   < 2 ms gen+upload; < 200 draw calls at stress.
-- Measured release (4060 Ti, 1600×900, no vsync): demo ~3.0 ms, stress
-  ~2.5 ms. Streaming meshes at most `MESH_MS` (3 ms) of chunks a frame.
+- Measured release GPU time (4060 Ti, 1600×900, no vsync; timestamp
+  queries per pass, `Renderer.gpu_ms`, F3 shows the total): demo 5.0 ms
+  (AA off) / 5.9 (msaa4) / 7.2 (msaa8), stress 11.1 (msaa8). Built-once
+  meshes live in device memory (`Buffer.initWith`); per-frame buffers are
+  host-visible. Streaming meshes at most `MESH_MS` (3 ms) of chunks a frame.
 - **Computation-heavy work goes on the GPU**: dense or per-element visual
   work (grass, scatter, particles, procedural detail, deformation, animation
   fields) is generated in shaders (instancing, vertex/fragment fields,
