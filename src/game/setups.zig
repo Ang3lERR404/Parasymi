@@ -112,6 +112,28 @@ fn convergent(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
     _ = g.structs.insert(&g.prog, a.?, .fibre, 20);
     _ = g.structs.insert(&g.prog, b.?, .grit, 20);
   }
+  try loom(g, cx, cz + 16);
+}
+
+/// a heartloom weaving a diamond, fed by four Vultrixi, each pulling one
+/// of its kinds out of a sap cache beside it
+fn loom(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  for ([_]prog.Id{ .interweaving, .shared_nerves, .celestial_defragmentation }) |id| g.prog.done.insert(id);
+  const j = try nearest(g, cx, cz, .heartloom, 0.5) orelse return;
+  const at = [2]i32{ g.structs.get(j).x, g.structs.get(j).y };
+  const r = craft.hand[g.structs.get(j).state.heartloom.recipe];
+  for (r.in, 0..) |ing, k| {
+    const side:i32 = if (k % 2 == 0) -1 else 1;
+    const x = at[0] + side * 4;
+    const z = at[1] - 2 + 3 * @as(i32, @intCast(k / 2));
+    const cache = try nearest(g, x, z, .sap_cache, 0.3 + 0.1 * m.f(k)) orelse continue;
+    _ = g.structs.insert(&g.prog, cache, ing.item, 40);
+    const c = g.structs.get(cache);
+    const vx = c.x - side;
+    if (!try g.structs.place(g.gpa, &g.world, vx, c.y, .vultrixi, 0, 0.2 + 0.15 * m.f(k))) continue;
+    st.configure(&g.structs, g.structs.floaterAt(vx, c.y).?, &g.prog);
+    st.configure(&g.structs, j, &g.prog);
+  }
 }
 
 /// an arc of celestial blooms around the garden, each ~5 tiles from the next

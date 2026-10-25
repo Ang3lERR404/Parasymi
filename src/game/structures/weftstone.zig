@@ -32,6 +32,8 @@ const v3 = m.v3;
 
 // decision: its hover is carried by its mesh (`mesh.HOVER`), so `hover`
 // stays 0 (the preview would lift it twice); breathing bobs it
+/// a driftbraid grown beside it: the study of interweaving
+pub const meets:st.Meeting = .{ .kind = .driftbraid, .found = .weft_and_drift };
 pub const def:st.Def = .{ .item = .weftstone, .size = 1, .mesh = .weftstone, .store = true, .grow = 7, .sway = 0.3, .tall = 1.2, .sap = 0.3, .floating = true };
 
 /// how far its tendrils reach (tiles, every way), and how many it latches

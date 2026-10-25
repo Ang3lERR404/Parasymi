@@ -428,7 +428,9 @@ pub const Game = struct {
     }
     if (g.hover) |h| if (g.player.inReach(h[0], h[1])) if (g.world.chunkOfTile(h[0], h[1])) |c| {
       const t = ck.localIndex(h[0], h[1]);
-      const on_struct = g.structs.at(&g.world, h[0], h[1]);
+      // a floater is reached where nothing stands under it, and then takes
+      // the click: decision: nothing is sown or put under a floater
+      const on_struct = g.structs.at(&g.world, h[0], h[1]) orelse if (c.occ[t] == .none) g.structs.floaterAt(h[0], h[1]) else null;
       if (ctl.down(in, .use) and on_struct == null and ui_hit == null and !g.use_spent) {
         if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
         else if (g.plant_cd <= 0) try actions.put(g, h);
@@ -498,7 +500,7 @@ pub const Game = struct {
   /// the structure whose panel is open, while it stands within reach.
   pub fn opened(g:*const Game) ?st.Id {
     if (g.mode != .structure or !g.player.inReach(g.open[0], g.open[1])) return null;
-    return g.structs.at(&g.world, g.open[0], g.open[1]);
+    return g.structs.touched(&g.world, g.open[0], g.open[1]);
   }
 
   /// slot `i` of the open structure, if it holds a stack.

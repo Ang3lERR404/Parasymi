@@ -457,7 +457,7 @@ pub fn weaveOn(b:*mg.Builder, k:*growth.Skeleton, id:growth.Id, s:pk.Stalk, w:We
 
 /// a root from `at` toward bearing `a`: out of the bulb at `from`, low over
 /// the ground to `reach`, then down into it
-fn rootPath(at:V3, a:f32, from:f32, reach:f32, wobble:f32, seed:u64, c:*[6]V3) void {
+pub fn rootPath(at:V3, a:f32, from:f32, reach:f32, wobble:f32, seed:u64, c:*[6]V3) void {
   const out = v3(@cos(a), 0, @sin(a));
   const s = at + out * m.splat3(from) + v3(0, 0.02, 0);
   for (c, 0..) |*p, j| {

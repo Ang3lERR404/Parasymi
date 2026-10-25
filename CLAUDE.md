@@ -321,9 +321,19 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
     the approved reference): paired both ways by configuring one then the
     other; sends what it is fed by spore, takes in what comes back, lets
     go only what came by spore (`kept` counts per kind).
-  - Still to come: a 2x2 interwoven crafting tree (6 inputs max) and the
-    Vultrixi (ganglion + gathering crown), floating structures that pull
-    resources straight out of structures for it.
+  - Heartloom (weftstone + driftbraid, INTERWEAVING; placeholder name):
+    2x2, four corner weaves twining into one crowned trunk; weaves only the
+    advanced tier (`Recipe.advanced`, `craft.advanced`; the germinator's
+    `craft.all` leaves it out): for now the diamond (from ley crystals).
+    Fed by at most 6 Vultrixi (`heartloom.TETHERS`, an advanced weave has
+    at most 6 kinds), by hand, or by conduits.
+  - Vultrixi (gathering crown + ganglion, SHARED NERVES): floating;
+    configure it, then a heartloom, to tether it. It takes the ingredient
+    of the weave at its place among the tethered, reaches a tendril into
+    the nearest structure within 6 tiles that `gives` it (never a
+    heartloom or Vultrixi), pulls 1/s and sends it along its tether.
+  - Floaters are reached (panel, feed, configure, unbuild) where nothing
+    stands under them; nothing is sown or put under one.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
   unless one already holds them. Never sown; grows 1.5× the slower parent

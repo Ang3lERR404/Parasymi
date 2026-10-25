@@ -67,6 +67,8 @@ const kinds = struct {
   pub const sporecaster = @import("structures/sporecaster.zig");
   pub const weftstone = @import("structures/weftstone.zig");
   pub const driftbraid = @import("structures/driftbraid.zig");
+  pub const heartloom = @import("structures/heartloom.zig");
+  pub const vultrixi = @import("structures/vultrixi.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -239,6 +241,12 @@ pub const Structures = struct {
   /// whatever is under it), else what stands on it.
   pub fn at(ss:*const Structures, w:*const World, wx:i32, wy:i32) ?Id {
     return ss.floaterAt(wx, wy) orelse w.occAt(wx, wy).asStructure();
+  }
+
+  /// what the gardener reaches at a tile: the structure standing there, else
+  /// the one floating over it
+  pub fn touched(ss:*const Structures, w:*const World, wx:i32, wy:i32) ?Id {
+    return ss.at(w, wx, wy) orelse ss.floaterAt(wx, wy);
   }
 
   /// the floating structure over a tile; they are few, so the list is walked
@@ -531,8 +539,10 @@ test "a germinator weaves structure bulbs as well as seeds, and lets go only wha
   try testing.expect(try ss.place(gpa, &w, 0, 0, .germinator, 0, 0));
   const id = ss.at(&w, 0, 0).?;
   const craft = @import("craft.zig");
-  // every weave is on offer, the bulbs too
-  try testing.expectEqual(craft.hand.len, recipes(.germinator).len);
+  // every weave is on offer, the bulbs too, but the advanced tier, which
+  // only a heartloom weaves
+  try testing.expectEqual(craft.hand.len - craft.advanced.len, recipes(.germinator).len);
+  for (recipes(.heartloom)) |r| try testing.expect(craft.hand[r].advanced);
   const conduit = for (recipes(.germinator)) |r| {
     if (craft.hand[r].out == .conduit) break r;
   } else unreachable;

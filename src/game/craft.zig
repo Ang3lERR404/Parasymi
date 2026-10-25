@@ -21,6 +21,9 @@ pub const Recipe = struct {
   /// only a germinator weaves it (seeds always are; so are the convergent
   /// structures, the hands cannot bind two lineages into one)
   germinator:bool = false,
+  /// the advanced tier: only a heartloom weaves it, never a germinator or
+  /// the hands
+  advanced:bool = false,
 
   pub fn unlocked(r:Recipe, g:*const prog.Progression) bool {
     return if (r.needs) |id| g.done.contains(id) else true;
@@ -46,8 +49,9 @@ pub const hand = [_]Recipe{
   .{ .out = .root_digger, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2, .needs = .deep_rooting },
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
   .{ .out = .polyp, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 2 } }, .time = 3 },
-  // decision: a diamond is woven from what a halo is grown from, condensed (the brief sets no cost)
-  .{ .out = .diamond, .in = &.{ .{ .item = .starlight, .n = 6 }, .{ .item = .ley_shard, .n = 4 }, .{ .item = .convergence_essence, .n = 3 }, .{ .item = .fibre, .n = 2 } }, .time = 6, .needs = .celestial_defragmentation },
+  // decision: a diamond is woven from what a halo is grown from, condensed
+  // (the brief sets no cost); the advanced tier's, from ley crystals
+  .{ .out = .diamond, .in = &.{ .{ .item = .starlight, .n = 6 }, .{ .item = .ley_crystal, .n = 3 }, .{ .item = .convergence_essence, .n = 3 }, .{ .item = .fibre, .n = 2 } }, .time = 6, .needs = .celestial_defragmentation, .advanced = true },
   // decision: costs for the lineages' structures are set here (the brief sets none)
   .{ .out = .loomfern, .in = &.{ .{ .item = .fibre, .n = 5 }, .{ .item = .essence, .n = 2 }, .{ .item = .grit, .n = 2 } }, .time = 2.5, .needs = .living_looms },
   .{ .out = .lithophage, .in = &.{ .{ .item = .grit, .n = 6 }, .{ .item = .ley_shard, .n = 2 }, .{ .item = .essence, .n = 2 }, .{ .item = .fibre, .n = 2 } }, .time = 3, .needs = .lithophagy },
@@ -61,23 +65,29 @@ pub const hand = [_]Recipe{
   // no cost); last, so the weaves chosen in saved gardens keep their places
   .{ .out = .weftstone, .in = &.{ .{ .item = .loomfern, .n = 1 }, .{ .item = .lithophage, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .starlight, .n = 2 } }, .time = 4, .needs = .woven_stone, .germinator = true },
   .{ .out = .driftbraid, .in = &.{ .{ .item = .braided_conduit, .n = 1 }, .{ .item = .sporecaster, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .essence, .n = 2 } }, .time = 4, .needs = .braided_drift, .germinator = true },
+  // decision: the heartloom from the two convergent structures it grows
+  // out of, the Vultrixi from the pair it does, both bound by convergence
+  // essence and ley crystals (the brief sets no cost)
+  .{ .out = .heartloom, .in = &.{ .{ .item = .weftstone, .n = 1 }, .{ .item = .driftbraid, .n = 1 }, .{ .item = .convergence_essence, .n = 4 }, .{ .item = .ley_crystal, .n = 2 } }, .time = 6, .needs = .interweaving, .germinator = true },
+  .{ .out = .vultrixi, .in = &.{ .{ .item = .gathering_crown, .n = 1 }, .{ .item = .ganglion, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .ley_crystal, .n = 1 } }, .time = 4, .needs = .shared_nerves, .germinator = true },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
-/// whether only a germinator weaves it: a seed, or one marked so
-pub fn germinatorOnly(idx:usize) bool { return isSeedRecipe(idx) or hand[idx].germinator; }
+/// whether the hands cannot weave it: a seed, one marked for a germinator,
+/// or the advanced tier
+pub fn germinatorOnly(idx:usize) bool { return isSeedRecipe(idx) or hand[idx].germinator or hand[idx].advanced; }
+pub fn isAdvanced(idx:usize) bool { return hand[idx].advanced; }
 
 /// the recipes the wolf weaves by hand (indices into `hand`): all but what
 /// only a germinator weaves.
 pub const by_hand = recipesWhere(germinatorOnly, false);
 /// the seed weaves (indices into `hand`).
 pub const seeds = recipesWhere(isSeedRecipe, true);
-/// every weave: what a germinator may be set to (indices into `hand`).
-pub const all = blk: {
-  var out:[hand.len]u8 = undefined;
-  for (&out, 0..) |*o, i| o.* = i;
-  break :blk out;
-};
+/// every weave but the advanced tier: what a germinator may be set to
+/// (indices into `hand`).
+pub const all = recipesWhere(isAdvanced, false);
+/// the advanced tier: what a heartloom may be set to (indices into `hand`).
+pub const advanced = recipesWhere(isAdvanced, true);
 
 /// whether some weave makes `item` (what a germinator lets go of).
 pub fn woven(item:items.Item) bool {

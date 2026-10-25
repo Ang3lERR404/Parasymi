@@ -19,6 +19,7 @@ pub const Item = enum(u8) {
   weftstone, driftbraid,
   /// formed by a weftstone's electrostatic ionization of what it drains
   ley_crystal,
+  heartloom, vultrixi,
 
   pub fn info(i:Item) Info { return infos.get(i); }
 
@@ -60,6 +61,8 @@ const infos = EnumArray(Item, Info).init(.{
   .weftstone = .{.col = .{185, 200, 150, 255}},
   .driftbraid = .{.col = .{175, 190, 235, 255}},
   .ley_crystal = .{.col = .{200, 160, 255, 255}},
+  .heartloom = .{.col = .{210, 175, 230, 255}},
+  .vultrixi = .{.col = .{230, 200, 215, 255}},
 });
 
 pub const Stack = struct { item:Item, n:u16 };
