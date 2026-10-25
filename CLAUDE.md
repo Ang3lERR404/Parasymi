@@ -81,6 +81,10 @@ Q/E roll, wheel dolly; eases back in 0.3 s.
   profile before threading anything else.
 - Culling: chunks (`CHUNK_RADIUS`), plants and parts are culled to the view
   frustum (`m.Frustum`; `Parts.look` sets the frame's eye and view).
+- Shader optimization: read `docs/shader-optimization.md` first (researched
+  methods, what is art-safe, how to measure per pass, what was applied).
+  Optimizations change cost, never the picture; anything that alters the
+  look (sample shading, hashes, precision) is the user's call.
 
 ## Layers (import only downward)
 ```
