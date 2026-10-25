@@ -1,6 +1,6 @@
 # sculpt_kit
 
-`src/gfx/meshes/sculpt_kit.zig` (493 lines). Imports: `meshgen` (`mg`),
+`src/gfx/meshes/sculpt_kit.zig` (524 lines). Imports: `meshgen` (`mg`),
 `vertex`, `core/math`, `core/color`.
 
 ## What it is
@@ -31,7 +31,8 @@ evaluated, each with only the forms whose bounding sphere reaches it.
 | `Sculpt{gpa, parents:[]const ?u8, soft = 0.02, blend = 0.012, only = all bones}` | the sculpt; `parents` per bone (weights spread only along joints); `blend` how softly colours meet; `only` bitmask keeps a subset of bones (a surface cast onto part of a body, e.g. ears) |
 | `deinit()` / `add(form)` | add a form (skipped if its bone isn't in `only`); computes inverse (`m.inverseAffine`), bound centre and reach |
 | `project(p) Hit` | nearest surface point (6 steps down the field) and normal |
-| `cast(from, dir, max) ?Hit` | where a ray from inside comes out of the body (sphere-trace + 12 bisections); null if never within `max` |
+| `cast(from, dir, max) ?Hit` | where a ray from inside comes out of the body (sphere-trace + 12 bisections); null if never within `max` or `from` is not inside |
+| `castOut(from, dir, max) ?Hit` | where a ray from inside *last* comes out within `max` (marched back in from the far end), past any part it re-enters: what a sheet laid over the body lies on; null if `from` is not inside or `max` still is |
 | `weigh(p) vertex.Skin` | skin weights at `p` (exp falloff over `soft`, only joined bones) |
 | `pack(w)` | per-bone weights → the four heaviest, dropping < 3% of the top, unorm summing to 255 |
 | `packWith(w, slope)` | `pack` plus each kept bone's weight gradient (`gx/gy/gz`), so normals bend by the true Jacobian |
@@ -44,7 +45,7 @@ evaluated, each with only the forms whose bounding sphere reaches it.
 | `wolf_body.zig` | `Sculpt`, `Form`, `Shape`: `sculptBody` adds forms per bone of `wolf_skeleton`'s bind pose; `mesh(b, CELL << lod, 0.5, .stem)` (`CELL` 5 mm, doubled per LOD); `cast` to lay vines onto the hide; `project` + `weigh` for fur leaves |
 | `wolf_ears.zig` | `Sculpt.pack` (ear skins) |
 | `wolf_belly.zig` | `Sculpt.packWith` (belly weights + slopes for the swelling sac) |
-| `wolf_kit.zig` | `Sculpt` (`resinLobe` casts onto it and weighs) |
+| `wolf_kit.zig` | `Sculpt` (`resinLobe` casts out onto it with `castOut`, `project`s strays, weighs) |
 
 ## GPU side
 

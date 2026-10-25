@@ -201,9 +201,11 @@ pub const Sculpt = struct {
   }
 
   /// where a ray from `from` (inside the body) along `dir` comes out of it,
-  /// and the outward normal there; null if it never does within `max`
+  /// and the outward normal there; null if it never does within `max`, or
+  /// if `from` is not inside at all (it would come out where it started)
   pub fn cast(s:*const Sculpt, from:V3, dir:V3, max:f32) Allocator.Error!?Hit {
     const list = s.every.items;
+    if (s.dist(from, list) >= 0) return null;
     var t:f32 = 0;
     var last:f32 = 0;
     while (t < max) {
@@ -221,6 +223,35 @@ pub const Sculpt = struct {
       }
       last = t;
       t += @max(-d, 0.002);
+    }
+    return null;
+  }
+
+  /// where a ray from `from` (inside the body) along `dir` last comes out
+  /// of it within `max` (past every part it crosses into again, as a
+  /// sheet laid over the body must), and the outward normal there; null if
+  /// `from` is not inside or the ray is still inside at `max`
+  pub fn castOut(s:*const Sculpt, from:V3, dir:V3, max:f32) Allocator.Error!?Hit {
+    const list = s.every.items;
+    if (s.dist(from, list) >= 0) return null;
+    // marched back in from the far end, the first point inside
+    var t = max;
+    var last = max;
+    if (s.dist(from + dir * m.splat3(t), list) < 0) return null;
+    while (t > 0) {
+      const d = s.dist(from + dir * m.splat3(t), list);
+      if (d < 0) {
+        var lo = t;
+        var hi = last;
+        for (0..12) |_| {
+          const mid = (lo + hi) * 0.5;
+          if (s.dist(from + dir * m.splat3(mid), list) < 0) lo = mid else hi = mid;
+        }
+        const p = from + dir * m.splat3(lo);
+        return .{ .p = p, .n = s.grad(p, list, 0.001) };
+      }
+      last = t;
+      t -= @max(d, 0.002);
     }
     return null;
   }

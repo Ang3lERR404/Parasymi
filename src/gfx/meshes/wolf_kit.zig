@@ -132,9 +132,10 @@ test "a fur leaf's base stays on the surface it grows from" {
 }
 
 /// a lobe of resin grown over the hide (the pectorals, the rear): an
-/// outline laid over the body, every point of it found on the hide by
-/// casting out from inside the body along the lobe's facing, and the lobe raised off the hide
-/// along its normal there, so its base hugs the body wherever it curves.
+/// outline laid over the body (`s`: the part of it the lobe lies on), every
+/// point of it found on the hide by casting out from one point deep inside
+/// the body behind the lobe, and the lobe raised off the hide along its
+/// normal there, so its base hugs the body wherever it curves.
 /// `Shape` gives the outline (`outline(a)`: x, y at unit radius for angle
 /// `a`), the rise off the hide (`height(k, a, x, y)`: k 0 crown .. 1 rim,
 /// falling to 0 with no slope at the rim so the resin melts into the
@@ -142,9 +143,9 @@ test "a fur leaf's base stays on the surface it grows from" {
 /// across the body, +z out of it.
 ///
 /// Every vertex is part `.resin` with tu.y its height through the lobe (0
-/// on the body, 1 at its crown), weighted to the bones of the hide under
-/// it, so it moves exactly as the hide does. One watertight sheet: the
-/// raised face and a base sunk just under the hide, meeting at the rim.
+/// on the body, 1 at its crown), weighted to the bones of the hide where
+/// it lies, so it moves exactly as the hide does. One watertight sheet:
+/// the raised face and a base sunk just under it, meeting at the rim.
 pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, comptime rings:usize, comptime steps:usize, col:color.Rgba8, t:f32) Allocator.Error!void {
   const R = rings + 1;
   const C = steps + 1; // the seam column repeats the first, at the same place
@@ -152,18 +153,31 @@ pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, com
   // how far in behind the lobe the casts start, and the base's sink
   const REACH:f32 = 0.12;
   const SINK:f32 = 0.004;
+  // farther than this from where a point was expected, a cast went astray
+  const JUMP:f32 = 0.012;
   // how smooth the sheet it rises off is, and from how far out (share of
   // the radius) it settles onto the hide
   const SMOOTHING = 60;
   const SETTLE:f32 = 0.55;
-  const Grid = struct { hide:[N]V3, up:[N]V3, face:[N]V3, us:[N]f32, skin:[N]vertex.Skin, pts:[N]V3, nrm:[N]V3, cols:[N]color.Rgba8, ts:[N]f32 };
+  // and from how far out it rises along the hide's facing, not the sheet's
+  const TURN:f32 = 0.85;
+  // the face stands this far clear of the hide (the hide's flat facets lie
+  // outside its true surface in a crease and would show through), diving
+  // under it to the base over this outer share of the radius
+  const CLEAR:f32 = 0.0015;
+  const DIVE:f32 = 0.08;
+  const Grid = struct { hide:[N]V3, up:[N]V3, base:[N]V3, bn:[N]V3, face:[N]V3, us:[N]f32, skin:[N]vertex.Skin, pts:[N]V3, nrm:[N]V3, cols:[N]color.Rgba8, ts:[N]f32 };
   const g = try b.gpa.create(Grid);
   defer b.gpa.destroy(g);
   const hide = &g.hide;
   const up = &g.up;
   const face = &g.face;
   const us = &g.us;
-  const into = m.norm(v3(at[2][0], at[2][1], at[2][2]));
+  // decision: every cast starts from one point deep behind the lobe's
+  // centre (always inside the body) toward its point on the lobe, so a
+  // rim point never starts outside it (between the legs, under an arm)
+  // and neighbouring points come out of the hide next to each other
+  const deep = m.mulPoint(at, v3(0, 0, -REACH));
   for (0..R) |i| for (0..C) |j| {
     const k = m.ratio(i, rings);
     const a = m.ratio(j, steps) * m.tau;
@@ -171,15 +185,16 @@ pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, com
     const x = o[0] * k;
     const y = o[1] * k;
     const q = i * C + j;
-    if (try s.cast(m.mulPoint(at, v3(x, y, -REACH)), into, 2 * REACH)) |h| {
-      hide[q] = h.p;
-      up[q] = h.n;
-    } else {
-      const pr = try s.project(m.mulPoint(at, v3(x, y, 0)));
-      hide[q] = pr.p;
-      up[q] = pr.n;
-    }
-    g.skin[q] = try s.weigh(hide[q]);
+    const on = m.mulPoint(at, v3(x, y, 0));
+    // where the last ring's point plus this step across the lobe would be:
+    // a hit much farther off came out through another part (the thigh
+    // under the buttock), so the hide there is followed on instead
+    const guess = if (i == 0) on else hide[q - C] + on - m.mulPoint(at, v3(o[0] * m.ratio(i - 1, rings), o[1] * m.ratio(i - 1, rings), 0));
+    const hit = try s.castOut(deep, m.norm(on - deep), 3 * REACH);
+    const near = if (hit) |c| i == 0 or m.len(c.p - guess) < JUMP else false;
+    const h = if (near) hit.? else try s.project(guess);
+    hide[q] = h.p;
+    up[q] = h.n;
   };
   // the lobe rises off a smooth sheet stretched over the hide (its rim
   // held on it), not off every muscle and ridge under it; toward the rim
@@ -225,9 +240,18 @@ pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, com
     const o = Shape.outline(a);
     const on = m.smooth(m.clamp01((k - SETTLE) / (1 - SETTLE)));
     const p0 = m.lerpV(sheet[q], hide[q], on);
-    const n0 = m.norm(m.lerpV(lift[q], up[q], on));
+    // it rises along the smooth sheet's facing until close to the rim,
+    // where it is low: raised far along the hide's own facing over a
+    // crease tighter than its height (under the buttock), it would fold
+    const turn = m.smooth(m.clamp01((k - TURN) / (1 - TURN)));
+    const n0 = m.norm(m.lerpV(lift[q], up[q], turn));
     const h = Shape.height(k, a, o[0] * k, o[1] * k);
-    face[q] = p0 + n0 * m.splat3(h);
+    g.base[q] = p0;
+    // weighted where it really lies (over a crease, the sheet bridging it)
+    g.skin[q] = try s.weigh(p0);
+    g.bn[q] = n0;
+    const dive = m.smooth(m.clamp01((k - (1 - DIVE)) / DIVE));
+    face[q] = p0 + n0 * m.splat3(h + m.lerp(CLEAR, -SINK, dive));
     us[q] = m.clamp01(h / Shape.CROWN);
   };
   // which way round the columns run so the raised face faces out
@@ -244,8 +268,10 @@ pub fn resinLobe(b:*mg.Builder, s:*const Sculpt, at:M4, comptime Shape:type, com
       const q = i * C + j;
       const o = i * C + jj;
       if (back) {
-        pts[o] = hide[q] - up[q] * m.splat3(SINK);
-        nrm[o] = -up[q];
+        // just under the surface the face rises off, where the face dives
+        // to meet it at the rim
+        pts[o] = g.base[q] - g.bn[q] * m.splat3(SINK);
+        nrm[o] = -g.bn[q];
         ts[o] = 0;
       } else {
         pts[o] = face[q];

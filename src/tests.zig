@@ -31,6 +31,7 @@ test {
   _ = @import("gfx/growth.zig");
   _ = @import("gfx/meshes/wolf_skeleton.zig");
   _ = @import("gfx/meshes/wolf_belly.zig");
+  _ = @import("gfx/meshes/wolf_rump.zig");
   _ = @import("gfx/meshes/radiant_kit.zig");
   _ = @import("render/camera.zig");
   _ = @import("render/light.zig");

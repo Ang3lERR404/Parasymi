@@ -38,8 +38,8 @@ const DEPTH:f32 = 0.098;
 const LOW_FULL:f32 = 0.22;
 /// the outer share of the radius over which it eases into the hide
 const FOOT:f32 = 0.3;
-const RINGS = 36;
-const STEPS = 72;
+pub const RINGS = 36;
+pub const STEPS = 72;
 
 
 /// outline at angle `a` (x outward, y up), unit radius
@@ -88,3 +88,34 @@ pub fn lobe(b:*mg.Builder, side:f32) Allocator.Error!void {
 /// the two lobes, one library mesh each
 pub const left = struct { pub fn build(b:*mg.Builder) Allocator.Error!void { try lobe(b, -1); } };
 pub const right = struct { pub fn build(b:*mg.Builder) Allocator.Error!void { try lobe(b, 1); } };
+
+/// a quad's facing in a lobe's patch (`first` its first vertex): the
+/// cross of its diagonals
+fn facing(b:*const mg.Builder, first:usize) V3 {
+  const p = struct {
+    fn f(bb:*const mg.Builder, i:usize) V3 { return v3(bb.v.items[i].pos[0], bb.v.items[i].pos[1], bb.v.items[i].pos[2]); }
+  }.f;
+  return m.cross(p(b, first + 2) - p(b, first), p(b, first + 5) - p(b, first + 1));
+}
+
+test "a resin lobe never folds over itself" {
+  const pec = @import("wolf_pec.zig");
+  inline for (.{ .{ lobe, RINGS, STEPS }, .{ pec.lobe, pec.RINGS, pec.STEPS } }) |l| {
+    for ([_]f32{ -1, 1 }) |side| {
+      var b:mg.Builder = .{.gpa = std.testing.allocator};
+      defer b.deinit();
+      try l[0](&b, side);
+      // the raised face, then the base under it, quad for quad (the base's
+      // columns run the other way): each face quad faces away from its base
+      const steps = l[2];
+      const half = l[1] * steps * 6;
+      try std.testing.expectEqual(2 * half, b.v.items.len);
+      for (0..l[1]) |ri| for (0..steps) |ci| {
+        const f = facing(&b, (ri * steps + ci) * 6);
+        const u = facing(&b, half + (ri * steps + (steps - 1 - ci)) * 6);
+        if (m.len(f) < 1e-12 or m.len(u) < 1e-12) continue;
+        try std.testing.expect(m.dot(f, u) < 0);
+      };
+    }
+  }
+}

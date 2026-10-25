@@ -59,8 +59,8 @@ const TILT_DOWN:f32 = 0.2;
 const YAW_OUT:f32 = 0.22;
 /// polar grid: rings from the crown out to the rim, and steps around it
 /// (fine enough that the nipple spans several vertices)
-const RINGS = 44;
-const STEPS = 96;
+pub const RINGS = 44;
+pub const STEPS = 96;
 
 /// outline point at angle `a` (x right, y up), unit radius
 fn outline(a:f32) [2]f32 {
