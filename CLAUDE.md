@@ -97,7 +97,7 @@ registry kinds outside the registry file; add a hook.
 |---|---|---|
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
-| structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
+| structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `gives`, `receive`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
@@ -130,13 +130,21 @@ recipes (`game/craft.zig`) are plain data tables.
   `ellipsoid`, `cone`. Shared kits: `structure_kit` (`rootMat`,
   `footLeaves`, `leafyVine` take an optional `kit.On` to grow on a
   spline), `wolf_kit` (`leaf`, `digit`, `claw`), `sculpt_kit` (SDF forms
-  meshed and skinned), `mineral_kit`.
+  meshed and skinned), `mineral_kit`, `parasite_kit` (the parasitic
+  lineage's structures: `foot`, `nodule`, `roots`, `stalk`, `bladder`,
+  `clinging`, `frond`/`frondPath`, all on growth splines; pale skin with
+  pearl/core by facing, lilac fronds, `sac` sap). Symbiotic structures use
+  `structure_kit` and the conduit's `arch` (its weave, spine and side
+  roots: `conduit.arch`, `spineCtrl`, `core = null` for a bare weave).
 - **Structures grow along growth splines** (`gfx/growth.zig`); every new
   structure mesh (and any piece of one that grows) is built this way, never
   grown by scaling the whole. Every structure is: sap cache, germinator,
   arsthraxia (and its research offshoots), root-digger (and its roots, in
   the first share of its growth: `sk.tail`), polyp, conduit (each arch
-  its own spline; side roots grown by how far they reach). The diamond
+  its own spline; side roots grown by how far they reach), loomfern,
+  lithophage (and its roots), braided conduit (weave and each lane its
+  own mesh on the same spline), ganglion (and its nerves), gathering crown
+  (and its roots, `Root(n)` per distance), sporecaster. The diamond
   is the radiant lineage's and forms its own way (left as it is).
   - A mesh's `build` lays out a hidden `Skeleton`: `var sk =
     growth.Skeleton.begin(b)`, `sk.trunk(ctrl, .{})`, then `sk.branch(parent,
@@ -254,7 +262,35 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   they grow (`Def.grow`: germinator 6 s, arsthraxia 8, sap cache and
   digger 4, conduit 1.5) and do no work until grown, growing along their
   growth splines. `Def.carrier` marks
-  item carriers (conduit): they face a way, chain, and are pulled through.
+  item carriers (conduit, braided conduit): they face a way, chain, and
+  hand on to each other through `receive` (`Structures.handIn`, at the edge
+  an item comes in by); carriers are never pulled from. `gives` says what
+  a structure lets go (a braid pulls a different kind per lane);
+  `st.handOff` feeds a producer's `output` to a non-carrier neighbour.
+- Lineage structures (2nd tier of automation, each its own research):
+  - Symbiotic (woven, green, amber sap):
+    - Loomfern (1×1 soil/moss, "Living Looms"): weaves fibre, 1/12 s unfed,
+      4 per essence fed at 3 s each; holds 12. A fern: fronds, croziers,
+      a sheaf winding on its spindle from threads off the fronds.
+    - Gathering crown ("Living Looms"): roots out to every plant within 2
+      tiles (one root per plant's own tile) and gathers what is ripe, one
+      unit/1.5 s in turn; holds 12.
+    - Braided conduit ("Braided Roots", woven from 4 conduits): 4 lanes,
+      one kind each, 3.5 tiles/s; joins and turns with conduits.
+  - Parasitic (pale, alien, `parasite_kit`):
+    - Lithophage ("Lithophagy"): drains grit/ley nodes on the 8 tiles
+      round it (one per 3 s) into a crystal in its crop (6 grit, ley shard
+      = 3), sapped back out as 6 grit into its cup; fed ley shards only,
+      so the grit it holds is what it sapped (the gardener's call: grit).
+    - Ganglion ("Lithophagy"): holds 8, hands one each 0.35 s round its
+      sides in turn to whatever wants it, and to carriers not facing in:
+      splits lines, feeds several germinators each what it needs.
+    - Sporecaster ("Spore Casting"): paired by configuring one then its
+      partner (`Structures.pairing`, the `configure(ss, id, g)` hook); spore
+      carriers (free, 0.25 s apart, 5 of a kind) drift at 2.5 tiles/s,
+      unlimited range, into the partner; home again if it is gone, hang
+      over it while it is full. `Def.far`: its spores are drawn however
+      far it stands.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
   unless one already holds them. Never sown; grows 1.5× the slower parent
@@ -538,16 +574,17 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 
 ## Current state
 Done: engine, terrain, streaming, plants + 7 species, ecology, structures,
-footprints/floaters, research (10 nodes), hand weaving, save/load, pause,
+footprints/floaters, research (18 nodes), hand weaving, save/load, pause,
 fullscreen, root-digger, adjustable/free camera, sky, wolf anatomy and
 planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
 LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation,
 anti-aliasing (MSAA/FXAA) + options panel, the wolf as one sculpted skinned
 mesh with procedural locomotion (planted feet, leg IK, springs), saved gardens
 menu + autosave, files in `%LOCALAPPDATA%\Parasymi`, growth splines
-(every structure but the diamond).
+(every structure but the diamond), lineage structures (3 per lineage, see
+Design).
 **Next (vertical slice):**
-1. 2–3 more species per lineage
+1. ~~2–3 more per lineage~~ done as structures (the gardener's call)
 2. Research tree to ~12 nodes
 3. First world event (something that *happens*, not just a research unlock)
 4. One "wow" visual moment (sky shift at convergence)
