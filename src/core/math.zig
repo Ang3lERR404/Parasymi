@@ -31,6 +31,8 @@ pub const MAX_SPLINE:usize = 64;
 
 /// milliseconds per second (frame timings are shown and budgeted in ms).
 pub const MS_PER_S = 1000;
+/// nanoseconds per millisecond (GPU time stamps count in ns).
+pub const NS_PER_MS = 1_000_000;
 /// seconds per minute (autosave intervals are set in minutes).
 pub const S_PER_MIN = 60;
 

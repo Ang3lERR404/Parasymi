@@ -14,6 +14,13 @@ vec3 surfaceTangent(vec3 pos, float t) {
   return abs(det) < 1e-12 ? vec3(0.0) : (r1 * dFdx(t) + r2 * dFdy(t)) / det;
 }
 
+#ifdef GLASS
+// the glass pass writes no depth, so the depth test may always run before
+// the shader: a fragment its solid pass kept (at the same depth, failing
+// the strict `less` test) or anything solid in front is never shaded
+layout(early_fragment_tests) in;
+#endif
+
 // two passes draw every surface (SOLID, common.glsl), so nothing
 // see-through hides what lies behind it: this pass keeps only its share
 // of fragments of opacity `a`

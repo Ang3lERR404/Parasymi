@@ -1,6 +1,9 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
+// the solid and glass passes rasterize it at the very same depth (the
+// glass pass tests `less` against what the solid one wrote)
+invariant gl_Position;
 
 // per-vertex (mesh library)
 layout(location = 0) in vec3 pos;

@@ -50,6 +50,9 @@ pub const Desc = struct {
   depth:bool = true,
   /// with `depth`: whether it writes depth too (see-through surfaces only test it)
   depth_write:bool = true,
+  /// with `depth`: what passes it (`.less`: only what lies nearer than
+  /// anything drawn there yet)
+  depth_compare:vk.CompareOp = .less_or_equal,
   /// whether the rendering scope it draws in has a depth attachment
   depth_attachment:bool = true,
   blend:bool = false,
@@ -118,7 +121,7 @@ pub fn create(c:*const Ctx, d:Desc) ctx.Error!vk.Pipeline {
   const ds:vk.PipelineDepthStencilStateCreateInfo = .{
     .depth_test_enable = if (d.depth) .true else .false,
     .depth_write_enable = if (d.depth and d.depth_write) .true else .false,
-    .depth_compare_op = .less_or_equal,
+    .depth_compare_op = d.depth_compare,
     .depth_bounds_test_enable = .false,
     .stencil_test_enable = .false,
     .front = zeroes(vk.StencilOpState),

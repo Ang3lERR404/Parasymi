@@ -78,7 +78,7 @@ pub const Strings = struct {
     gardens_title:S = "", gardens_fresh:S = "", gardens_auto:S = "", gardens_playing:S = "", gardens_age:S = "",
     gardens_save:S = "", gardens_overwrite:S = "", gardens_load:S = "", gardens_hint:S = "",
     free_cam:S = "", free_cam_hint:S = "",
-    fps:S = "", sim:S = "", counts:S = "", draws:S = "", pos:S = "", motes:S = "",
+    fps:S = "", gpu:S = "", sim:S = "", counts:S = "", draws:S = "", pos:S = "", motes:S = "",
   } = .{},
   /// one-line hover descriptions of structures
   describe:struct {

@@ -86,7 +86,7 @@ pub const glass = struct {
   pub const desc:pass.Desc = .{
     .vert = "part.vert", .frag = "part_glass.frag",
     .bindings = bindings, .attrs = attrs,
-    .blend = true, .depth_write = false, .per_sample = true,
+    .blend = true, .depth_write = false, .nearer = true, .per_sample = true,
   };
   pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, _:*const R.Scene, stats:*R.Stats) void {
     draw(r, &r.frames[r.fi].pass.parts, cmd, stats, .parts_glass);

@@ -59,6 +59,12 @@ pub const pass = struct {
     depth:bool = true,
     /// with `depth`: whether it writes depth (a glass pass only tests it)
     depth_write:bool = true,
+    /// with `depth`: only what lies strictly nearer passes. A glass pass
+    /// draws the same instances as its solid pass at the very same depth
+    /// (`invariant gl_Position`): the fragments the solid pass kept fail
+    /// it before they are shaded, the see-through ones (which wrote no
+    /// depth there) pass.
+    nearer:bool = false,
     blend:bool = false,
     target:Target = .world,
     /// with MSAA, shade every sample: its fragments choose for themselves
@@ -95,7 +101,7 @@ pub const pass = struct {
       .bindings = d.bindings, .attrs = d.attrs,
       .layout = layout,
       .color_format = switch (d.target) { .shadow => .undefined, .world => HDR_FORMAT, .screen => screen },
-      .depth = d.depth, .depth_write = d.depth_write, .depth_attachment = d.target != .screen, .blend = d.blend, .cull = false,
+      .depth = d.depth, .depth_write = d.depth_write, .depth_compare = if (d.nearer) .less else .less_or_equal, .depth_attachment = d.target != .screen, .blend = d.blend, .cull = false,
       .samples = post_mod.sampleFlags(if (d.target == .world) samples else 1), .per_sample = d.per_sample,
       .view_mask = if (d.target == .shadow) light.VIEWS else 0,
       .depth_bias = if (d.target == .shadow) light.BIAS else null,
@@ -169,7 +175,18 @@ pub const Scene = struct {
 /// a captured frame: 4 bytes a pixel, row by row from the top
 pub const Shot = struct { w:u32, h:u32, px:[]const u8, bgra:bool };
 
-pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0, lights:u32 = 0 };
+/// `gpu_ms`: the GPU's time for a whole frame (eased; 0 where it keeps no time stamps)
+pub const Stats = struct { draws:u32 = 0, chunks:u32 = 0, instances:u32 = 0, parts:u32 = 0, meshed:u32 = 0, lights:u32 = 0, gpu_ms:f32 = 0 };
+
+/// what the GPU's time is told apart by: each pass (`Pass` order), then the
+/// glow and the composite (`GLOW`, `COMPOSE`)
+pub const STAGES = reg.count + 2;
+pub const GLOW = reg.count;
+pub const COMPOSE = reg.count + 1;
+/// time stamps a frame writes: one before it, one after each stage
+const STAMPS = STAGES + 1;
+/// how fast the GPU times follow the frames (share of the way a frame)
+const GPU_EASE:f32 = 0.05;
 
 const Frame = struct {
   pool:vk.CommandPool = .null_handle,
@@ -181,6 +198,11 @@ const Frame = struct {
   pass:reg.Struct("Frame") = undefined,
   /// this frame's `light.Lighting`, which every world shader reads by address
   lighting:Buffer = .{},
+  /// its GPU time stamps (null where the GPU keeps none), how many it
+  /// wrote and the stage each one ends (the first: none)
+  queries:vk.QueryPool = .null_handle,
+  stamped:u32 = 0,
+  stage:[STAMPS]u32 = undefined,
   /// buffers retired while this frame was in flight; freed when it comes round again.
   garbage:std.ArrayList(Buffer) = .empty,
 };
@@ -332,6 +354,9 @@ pub const Renderer = struct {
   shot_ready:bool = false,
   /// the meshes while they are still growing (see `meshesReady`)
   growing:?*Growing = null,
+  /// the GPU's time for each stage of a frame (ms, eased; see `STAGES`)
+  gpu_ms:[STAGES]f32 = @splat(0),
+  gpu_total:f32 = 0,
 
   /// `aa` falls back to the most samples the GPU offers (see `antialias`)
   pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool, aa:Antialias) Error!*Renderer {
@@ -362,6 +387,9 @@ pub const Renderer = struct {
       f.pool = try c.device.createCommandPool(&.{.flags = .{.reset_command_buffer = true}, .queue_family_index = c.family}, null);
       f.fence = try c.device.createFence(&.{.flags = .{.signaled = true}}, null);
       f.acquired = try c.device.createSemaphore(&.{}, null);
+      if (c.props.limits.timestamp_compute_and_graphics == .true) {
+        f.queries = try c.device.createQueryPool(&.{.query_type = .timestamp, .query_count = STAMPS}, null);
+      }
       inline for (reg.ids) |id| {
         if (comptime reg.has(id, "Frame")) @field(f.pass, @tagName(id)) = try reg.module(id).initFrame(c);
       }
@@ -473,15 +501,10 @@ pub const Renderer = struct {
     r.plant_morph = g.plant_morph;
     r.part_ranges = g.part_ranges;
     r.part_glassy = g.part_glassy;
-    const bytes = sliceAsBytes(b.v.items);
-    r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
-    r.meshes.write(0, bytes);
-    const skin = sliceAsBytes(b.skin.items);
-    r.skins = try Buffer.init(&r.ctx, skin.len, .{.vertex_buffer = true});
-    r.skins.write(0, skin);
-    const grow = sliceAsBytes(b.grow.items);
-    r.grows = try Buffer.init(&r.ctx, grow.len, .{.vertex_buffer = true});
-    r.grows.write(0, grow);
+    // read by every plant and part draw, every frame: in device memory
+    r.meshes = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.v.items));
+    r.skins = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.skin.items));
+    r.grows = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.grow.items));
     return true;
   }
 
@@ -509,6 +532,7 @@ pub const Renderer = struct {
         if (comptime reg.has(id, "Frame")) reg.module(id).deinitFrame(&@field(f.pass, @tagName(id)), c);
       }
       f.lighting.deinit(c);
+      c.device.destroyQueryPool(f.queries, null);
       c.device.destroySemaphore(f.acquired, null);
       c.device.destroyFence(f.fence, null);
       c.device.destroyCommandPool(f.pool, null);
@@ -683,6 +707,7 @@ pub const Renderer = struct {
     f.garbage.clearRetainingCapacity();
     try f.garbage.appendSlice(r.gpa, r.pending.items);
     r.pending.clearRetainingCapacity();
+    r.readTimes(f);
 
     if (resized) { try r.recreate(); return; }
     const acq = c.device.acquireNextImageKHR(r.sc.handle, m.maxInt(u64), f.acquired, .null_handle) catch |e| switch (e) {
@@ -704,10 +729,13 @@ pub const Renderer = struct {
     const cmd = vk.CommandBufferProxy.init(f.cmd, c.vkd);
     try cmd.resetCommandBuffer(.{});
     try cmd.beginCommandBuffer(&.{.flags = .{.one_time_submit = true}});
+    if (f.queries != .null_handle) cmd.resetQueryPool(f.queries, 0, STAMPS);
+    f.stamped = 0;
+    stamp(cmd, f, STAGES);
     // every pass's data up, then the shadow casters into the shadow map,
     // the world into the HDR image, its glow, then the screen: the world
     // and its glow composed (and with FXAA filtered), the UI over it
-    var stats:Stats = .{.meshed = r.stats.meshed};
+    var stats:Stats = .{.meshed = r.stats.meshed, .gpu_ms = r.gpu_total};
     var sc = scene.*;
     stats.lights = r.lightUp(f, &sc);
     inline for (reg.ids) |id| {
@@ -721,8 +749,10 @@ pub const Renderer = struct {
     r.record(f, cmd, .world, &sc, &stats);
     cmd.endRendering();
     r.post.glow(cmd);
+    stamp(cmd, f, GLOW);
     r.beginScreen(cmd, img);
     r.post.compose(cmd, r.sc.extent);
+    stamp(cmd, f, COMPOSE);
     r.record(f, cmd, .screen, &sc, &stats);
     r.end(cmd, img, cap);
     try cmd.endCommandBuffer();
@@ -750,8 +780,36 @@ pub const Renderer = struct {
   /// every pass drawing into `target`, in declaration order
   fn record(r:*Renderer, f:*Frame, cmd:vk.CommandBufferProxy, comptime target:pass.Target, scene:*const Scene, stats:*Stats) void {
     inline for (reg.ids) |id| {
-      if (comptime reg.module(id).desc.target == target) reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, stats);
+      if (comptime reg.module(id).desc.target == target) {
+        reg.module(id).record(r, &@field(f.pass, @tagName(id)), cmd, scene, stats);
+        stamp(cmd, f, @intFromEnum(id));
+      }
     }
+  }
+
+  /// a time stamp once the GPU is through what was recorded before it,
+  /// ending `stage`
+  fn stamp(cmd:vk.CommandBufferProxy, f:*Frame, stage:u32) void {
+    if (f.queries == .null_handle) return;
+    cmd.writeTimestamp2(.{.all_commands = true}, f.queries, f.stamped);
+    f.stage[f.stamped] = stage;
+    f.stamped += 1;
+  }
+
+  /// the time stamps `f` wrote when last drawn (its fence is signalled) into
+  /// each stage's time and the whole frame's
+  fn readTimes(r:*Renderer, f:*Frame) void {
+    if (f.stamped < 2) return;
+    var t:[STAMPS]u64 = undefined;
+    const res = r.ctx.device.getQueryPoolResults(f.queries, 0, f.stamped, f.stamped * @sizeOf(u64), &t, @sizeOf(u64), .{.@"64" = true}) catch return;
+    if (res != .success) return;
+    const ms_per_tick = r.ctx.props.limits.timestamp_period / m.NS_PER_MS;
+    for (1..f.stamped) |i| {
+      const ms = m.f(t[i] -% t[i - 1]) * ms_per_tick;
+      r.gpu_ms[f.stage[i]] += (ms - r.gpu_ms[f.stage[i]]) * GPU_EASE;
+    }
+    const whole = m.f(t[f.stamped - 1] -% t[0]) * ms_per_tick;
+    r.gpu_total += (whole - r.gpu_total) * GPU_EASE;
   }
 
   /// write this frame's lighting (the cascades fitted to the view, the
