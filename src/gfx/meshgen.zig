@@ -10,6 +10,7 @@ const vertex = @import("vertex.zig");
 const species = @import("../sim/species.zig");
 const color = @import("../core/color.zig");
 const noise = @import("../core/noise.zig");
+const parasite_kit = @import("meshes/parasite_kit.zig");
 
 const V3 = m.V3;
 const PV = vertex.Mesh;
@@ -796,7 +797,7 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
   const seed = @as(u64, @intFromEnum(id)) * 977 + 77;
   switch (g.form) {
     .herb => try herb(b, g, seed + @as(u64, variant) * 131, variant, !def.floating),
-    .coil => try coil(b, g, seed + @as(u64, variant) * 131, variant),
+    .coil => try parasite_kit.plant(b, g, seed + @as(u64, variant) * 131),
     .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
     .radiant => try radiant(b, g, seed + @as(u64, variant) * 131, variant),
     // a confluence's variants are its growth keys, all grown from one seed
@@ -1104,125 +1105,6 @@ pub fn leafAt(b:*Builder, path:[]const V3, k:f32, i:usize, len:f32, width:f32, t
   out = m.norm(out);
   const l = len * m.lerp(1, 0.6, k) * rng.range(0.85, 1.15);
   try b.blade(at, out, l, width * m.lerp(1, 0.7, k), 0.35, col, tip, m.lerp(t0, t1, k), .leaf);
-}
-
-/// a parasite's body: alien rather than hostile. A ribbed, twisted stalk on
-/// a bulbous foot half sunk in the soil, translucent bladders clinging up
-/// it, and a crown of fronds that arc out and curl into spirals at their
-/// tips around a bulb at its heart. No leaves, no spikes.
-fn coil(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!void {
-  var rng = Rng.init(seed);
-  const golden = 2.39996;
-  const core = color.shade(g.stem_col, 0.7);
-  const skin = g.stem_col.toRgba8(255);
-
-  // the stalk: three strands wound tight, swelling into its foot
-  const RES = 20;
-  const lean = m.v3(rng.range(-0.1, 0.1), 1, rng.range(-0.1, 0.1));
-  var ctrl:[8]V3 = undefined;
-  growthPath(.{.start = m.v3(0, 0, 0), .direction = m.norm(lean), .length = g.stem_h, .wobble = g.wobble, .curl = g.curl, .seed = seed ^ 0x57E4}, &ctrl);
-  var spine:[RES]V3 = undefined;
-  m.splineResample(&ctrl, &spine);
-  var ts:[RES]f32 = undefined;
-  var radii:[RES]f32 = undefined;
-  for (&ts, &radii, 0..) |*t, *r, i| {
-    const k = m.ratio(i, RES - 1);
-    t.* = k * 0.85;
-    const low = 1 - k;
-    r.* = g.stem_r * 1.2 * m.lerp(1, 0.6, k) * (1 + 0.9 * low * low * low * low * low);
-  }
-  try braid(b, &spine, &ts, &radii, 3, 4.5 + m.f(variant) * 0.3, 0.05, seed, core, skin);
-  try ellipsoid(b, .{
-    .center = m.v3(0, g.stem_r * 0.3, 0), .radii = m.v3(g.stem_r * 2.1, g.stem_r * 1.1, g.stem_r * 2.1),
-    .col = skin, .part = .stem, .rings = 6, .segs = 10, .t = 0,
-  });
-
-  // bladders: translucent bulbs clinging up the stalk, smaller higher up
-  for (0..g.thorns) |i| {
-    const k = 0.45 + 0.38 * m.ratio(i, @max(g.thorns, 1));
-    const at = m.alongPath(&spine, k);
-    const ang = m.f(i) * golden + m.f(variant);
-    const out = m.v3(@cos(ang), 0, @sin(ang));
-    const r = g.stem_r * m.lerp(1.0, 0.65, k) * rng.range(0.85, 1.15);
-    const ri = g.stem_r * 1.2 * m.lerp(1, 0.6, k);
-    try ellipsoid(b, .{
-      .center = at + out * m.splat3(ri + r * 0.5), .radii = m.v3(r, r * 1.3, r),
-      .col = g.bloom_col.toRgba8(255), .part = .bloom, .rings = 4, .segs = 6, .t = k,
-    });
-  }
-
-  // offshoots: thin stalks peeling off the main one, each holding
-  // up a bladder, bare and clasped shut by curled fronds (a bud) or
-  // crowned by a small ring of them opening (a bloom)
-  var srng = Rng.init(seed ^ 0x0FF5);
-  const shoots = shootCount(g, &srng);
-  for (0..shoots) |i| {
-    const k = m.lerp(0.3, 0.75, (m.f(i) + srng.range(0.2, 0.8)) / m.f(shoots));
-    const ang = m.f(i) * golden * 1.7 + 0.6 + m.f(variant) * 1.3 + srng.range(-0.3, 0.3);
-    const len = g.stem_h * srng.range(0.35, 0.55);
-    const tip = try offshoot(b, &spine, k, k * 0.85, ang, len, g.stem_r * 0.55, srng.range(0.25, 0.6), skin, .stem, seed +% i * 211);
-    const s = b.mark();
-    const r = g.bloom_r * srng.range(0.55, 0.75);
-    const open = srng.float() < 0.5;
-    try ellipsoid(b, .{
-      .center = tip.at + tip.axis * m.splat3(r * 0.9), .radii = m.v3(r * 0.8, r * 1.15, r * 0.8),
-      .col = g.bloom_col.toRgba8(255), .part = .bloom, .rings = 6, .segs = 8, .t = tip.t1,
-    });
-    const fronds:u32 = if (open) 5 else 3;
-    for (0..fronds) |j| {
-      const a = m.ratio(j, fronds) * m.tau + srng.range(-0.3, 0.3);
-      const out = m.v3(@cos(a), 0, @sin(a));
-      if (open) {
-        // a little crown, rising and curling out like the main one
-        try frond(b, tip.at + tip.axis * m.splat3(r * 1.6), out, len * 0.5, g.stem_r * 0.45, 1.25, 5.2, tip.t1, g.leaf_col.toRgba8(255), seed +% i * 71 +% j * 13);
-      } else {
-        // clasping the bladder: up its flank, curling in over its crown
-        try frond(b, tip.at + out * m.splat3(r * 0.55), out, r * 2.6, g.stem_r * 0.4, 1.15, -2.3, tip.t1, g.leaf_col.toRgba8(255), seed +% i * 71 +% j * 13);
-      }
-    }
-    shootFold(b, s, 1);
-  }
-
-  // the crown: fronds whose heading turns ever faster toward the tip, so
-  // they rise, arc out and curl inward like unfurling ferns
-  const top = spine[RES - 1];
-  for (0..g.tendrils) |i| {
-    const ang = m.ratio(i, g.tendrils) * m.tau + rng.range(-0.3, 0.3);
-    const len = g.stem_h * 0.6 * rng.range(0.85, 1.15);
-    try frond(b, top, m.v3(@cos(ang), 0, @sin(ang)), len, g.stem_r * 0.85, 1.25, 5.2, 0.85, g.leaf_col.toRgba8(255), seed +% i * 31);
-  }
-
-  // a bulb at the heart of the crown
-  try ellipsoid(b, .{
-    .center = top + m.v3(0, g.bloom_r * 0.5, 0), .radii = m.v3(g.bloom_r, g.bloom_r * 1.25, g.bloom_r),
-    .col = g.bloom_col.toRgba8(255), .part = .bloom, .rings = 7, .segs = 9, .t = 1,
-  });
-}
-
-/// a parasite's frond from `from` out along `out`: its heading starts at
-/// `rise` and turns ever faster (by `curl` at its tip), so it rises, arcs
-/// out and curls inward like an unfurling fern; tu.x from `t0` to 1.
-fn frond(b:*Builder, from:V3, out:V3, len:f32, r:f32, rise:f32, curl:f32, t0:f32, col:color.Rgba8, seed:u64) Allocator.Error!void {
-  const N = 12;
-  var pts:[N]V3 = undefined;
-  pts[0] = from;
-  for (1..N) |j| {
-    const s = m.ratio(j, N - 1);
-    const heading = rise - s * s * curl;
-    const step = len / (N - 1) * (1 - 0.55 * s);
-    pts[j] = pts[j - 1] + (out * m.splat3(@cos(heading)) + m.v3(0, @sin(heading), 0)) * m.splat3(step);
-  }
-  grow(&pts, .{.start = from, .direction = m.norm(pts[N - 1] - from), .length = len, .wobble = 0.08, .seed = seed});
-  var path:[14]V3 = undefined;
-  m.splineResample(&pts, &path);
-  var pt:[14]f32 = undefined;
-  var pr:[14]f32 = undefined;
-  for (&pt, &pr, 0..) |*t, *rr, j| {
-    const k = m.ratio(j, 13);
-    t.* = m.lerp(t0, 1, k);
-    rr.* = r * m.lerp(1, 0.35, k);
-  }
-  try b.tubeR(&path, &pt, &pr, col, .tendril, 4);
 }
 
 /// a floater: nothing reaches the ground. A translucent sap float holds it

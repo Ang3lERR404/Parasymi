@@ -178,12 +178,16 @@ void main() {
   // where it grows from, on the stem or along a vine.
   if (sheet && !keyed && !crowned && trunk) p.xz *= unfold(0.25, open, tu.y);
   if (!trunk) p.xz *= unfold(0.2, passed, shoot);
-  // a parasite's crown comes up closed, its fronds a tight upright bundle,
-  // and opens out as it matures; its bladders swell in as the stalk passes them
+  // a parasite's crown comes up closed, its fronds (and the pods and sacs
+  // at their ends) a tight upright bundle, and opens out as it matures; the
+  // sacs in its cage swell in as the stalk passes them; and its cage comes
+  // up woven tight round the core and parts from the foot up (tu.y how far
+  // each strand has parted, parasite_kit `lattice`)
   if (crowned && trunk) {
     float unfurl = smoothstep(0.3, 1.0, growth);
-    if (part == PART_TENDRIL) p.xz *= mix(0.3, 1.0, unfurl);
-    if (part == PART_BLOOM && tu.x < 0.9) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
+    if (part == PART_TENDRIL || (part == PART_BLOOM && tu.x >= 0.9)) p.xz *= mix(0.3, 1.0, unfurl);
+    else if (part == PART_BLOOM) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
+    if (part == PART_STEM && tu.y > 0.0) p.xz *= mix(1.0 - tu.y, 1.0, grownPast(tu.x, 0.8, 0.35, growth));
   }
 
   // ---- motion: rooted and heavy. Nothing jitters: plants bend from the

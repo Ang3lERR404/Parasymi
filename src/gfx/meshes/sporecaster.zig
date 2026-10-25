@@ -1,13 +1,14 @@
 //! mesh: SPORECASTER. a parasite that sends: a bulbous foot half sunk in
-//! the soil, a tall stalk of three strands wound tight, small bladders
-//! clinging up it, and on it a great translucent spore sac where what it
+//! the soil, a tall stalk of the lineage's lattice parting into a cage
+//! round the sacs on its core, and on it a great translucent spore sac where what it
 //! holds hangs (emitted, `belly_lump`s), pursed at its crown into a pore
 //! its spore carriers rise out of and drift down into (`carrier`), a crown
-//! of lilac fronds flaring out round the pore and curling down and back.
+//! of five lilac fronds flaring out round the pore and curling down and
+//! back, each ending in a small cage of its own crowned in turn (a pod).
 //! It grows on a hidden stalk (gfx/growth.zig): the foot swells and its
-//! roots spread with it, the stalk rises, the bladders cling as it passes,
+//! roots spread with it, the stalk rises, its sacs swell as it passes,
 //! the sac swells out of its top, the pore purses and the fronds flare
-//! last, one after another.
+//! last, all at once, their pods after them.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -19,22 +20,23 @@ const V3 = m.V3;
 const v3 = m.v3;
 
 const NECK = v3(0, 0.36, 0);
-const STALK_R:f32 = 0.03;
+const STALK:pk.Stalk = .{.girth = 0.03, .part = 2.6, .from = 0.15, .to = 0.85};
 /// the sac at the stalk's top, where the seeds it holds hang
 pub const SAC_AT = v3(0, 0.49, 0);
 pub const SAC_R = v3(0.12, 0.14, 0.12);
 /// the pore at its crown it casts from
 pub const PORE = SAC_AT + v3(0, SAC_R[1] * 1.05, 0);
-const FRONDS = 7;
-const FROND_STAGGER:f32 = 0.04;
+const FRONDS = pk.FOLD;
+/// the pods the fronds end in
+const POD:f32 = 0.075;
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   var k = growth.Skeleton.begin(b);
   const stalk = k.trunk(&.{v3(0, -0.03, 0), v3(0.014, 0.12, -0.01), v3(-0.012, 0.25, 0.008), NECK}, .{.pace = 1.8});
   try pk.foot(b, &k, stalk, v3(0, -0.012, 0), v3(0.12, 0.08, 0.12));
-  try pk.roots(b, &k, stalk, 6, 0.24, 0.015, 0x5C01);
-  try pk.stalk(b, &k, stalk, STALK_R, 0x5C02);
-  try pk.clinging(b, &k, stalk, 4, 0.3, 0.8, 0.03, STALK_R);
+  try pk.roots(b, &k, stalk, pk.FOLD, 0.24, 0.015, 0x5C01);
+  try pk.stalk(b, &k, stalk, STALK);
+  try pk.organs(b, &k, stalk, STALK, 3, 0.6);
   try pk.bladder(b, &k, stalk, 1, SAC_AT, SAC_R, 1, .{.from = NECK});
   // the pore: a pursed pearl lip at the sac's crown
   const pore = b.mark();
@@ -50,7 +52,8 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   }
   try b.tubeR(&ring, &ts, &rs, pk.pearl, .stem, 10);
   try k.on(b, pore, stalk, 1, .{.from = SAC_AT, .delay = 0.05});
-  // fronds flaring out round the pore and curling down and back
+  // fronds flaring out round the pore and curling down and back, alike,
+  // each ending in a pod
   for (0..FRONDS) |i| {
     const a = (m.f(i) + 0.5) / FRONDS * m.tau;
     var c:[9]V3 = undefined;
@@ -60,9 +63,10 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
       p.* = SAC_AT + v3(@sin(th) * @cos(a) * SAC_R[0] * 1.08, @cos(th) * SAC_R[1] * 1.08, @sin(th) * @sin(a) * SAC_R[2] * 1.08);
     }
     // ...then flaring out over the pore and curling down and back
-    pk.frondPath(c[3], v3(@cos(a), 0, @sin(a)), 0.3, 0.9, 3.4, 0x5C10 +% i * 13, c[3..]);
-    const id = k.branch(stalk, 1, &c, .{.delay = 0.08 + FROND_STAGGER * m.f(i)});
-    try k.tube(b, id, .{.r0 = 0.012, .tip = 0.12, .col = pk.lilac, .part = .tendril, .sides = 5, .t0 = 0.75, .t1 = 1});
+    pk.frondPath(c[3], v3(@cos(a), 0, @sin(a)), 0.3, 0.9, 3.4, 0x5C10, c[3..]);
+    const id = k.branch(stalk, 1, &c, .{.delay = 0.08});
+    try k.tube(b, id, .{.r0 = 0.012, .tip = pk.podFoot(pk.podGirth(POD)) / 0.012, .col = pk.lilac, .part = .tendril, .sides = 5, .t0 = 0.75, .t1 = 1});
+    _ = try pk.pod(b, &k, id, .{.len = POD, .girth = pk.podGirth(POD), .seed = 0x5C20});
   }
   k.finish(b);
 }

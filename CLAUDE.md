@@ -131,9 +131,16 @@ recipes (`game/craft.zig`) are plain data tables.
   `footLeaves`, `leafyVine` take an optional `kit.On` to grow on a
   spline), `wolf_kit` (`leaf`, `digit`, `claw`), `sculpt_kit` (SDF forms
   meshed and skinned), `mineral_kit`, `parasite_kit` (the parasitic
-  lineage's structures: `foot`, `nodule`, `roots`, `stalk`, `bladder`,
-  `clinging`, `frond`/`frondPath`, all on growth splines; pale skin with
-  pearl/core by facing, lilac fronds, `sac` sap). Symbiotic structures use
+  lineage, its plant (`plant`, the coil form) and structures: a symbiote's
+  braid gone strange. `lattice`: `FOLD` (5) strands wound each way, woven
+  tight round the core, parting into an open cage (pearl beads where they
+  cross, tu.y = how far parted) and gathering again; `stalk`/`section`/
+  `parted`, `organs` (sacs on the core inside the cage), `crown` (`FOLD`
+  fronds alike: one seed, exact turns, all at once, never a golden angle),
+  `pod`/`podAt` (the body again, small, at a frond's tip, crowned by
+  frondlets: it repeats itself), `foot`, `nodule`, `roots` (exact),
+  `bladder`, `frond`/`frondPath`; structures on growth splines; pale skin
+  with pearl/core by facing, lilac fronds, `sac` sap). Symbiotic structures use
   `structure_kit` and the conduit's `arch` (its weave, spine and side
   roots: `conduit.arch`, `spineCtrl`, `core = null` for a bare weave).
 - **Structures grow along growth splines** (`gfx/growth.zig`); every new
@@ -370,9 +377,12 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   (`meshgen.offshoot`, genome `shoots` = per-variant count range): side
   stems off the main stem ending in a closed bud or a small bloom (looks
   only); colour alpha = 1 - how far out along one, and plant.vert folds
-  them in against the stem until growth passes them. Parasites (`coil`):
-  alien not hostile, pale pearl/lilac with thin-film sap: twisted 3-strand
-  stalk on a bulbous foot, bladders, fronds curling around a bulb.
+  them in against the stem until growth passes them. Parasites (`coil`,
+  `parasite_kit.plant`): alien not hostile, exactly symmetric and dead
+  upright (variants differ in proportion only): a lattice cage stalk on a
+  bulbous foot, sacs hanging on its core inside, a bulb at its neck, a
+  candelabrum of 5 fronds each ending in a pod crowned by 5 frondlets;
+  plant.vert parts the cage from the foot up (tu.y) and opens the crown.
   Floaters (`drift`): a comb-jelly lantern (`meshgen.lantern`: clear sap,
   8 twisting comb rows in split-light colours, a golden spore inside;
   plant.frag shades it apart by tu.x 0.5, bright iridescent film, approved
