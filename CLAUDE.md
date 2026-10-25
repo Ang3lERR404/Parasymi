@@ -71,12 +71,14 @@ Q/E roll, wheel dolly; eases back in 0.3 s.
   other ring/row and half the sides), so new meshes get it free. Picked by
   eye distance (`lodAt`, `LOD_AT` 36/70). Plant slots (species, variant,
   lod); part slots `meshlib.slot(id, lod)`.
-- Worker threads: `core/jobs.zig` `each` is a parallel-for over main's
-  `Io` pool (`World.io`, set by main; null in tests = in place). Used where
-  each item writes only its own outputs, so results match the serial ones:
-  `Plants.rebuildLinks`, `World.stream` generation, `syncWorld` meshing
-  batches (`MESH_BATCH`; Vulkan uploads stay on main). The rest of the CPU
-  frame is under 1 ms and hides behind the GPU (frames in flight).
+- Worker threads: CPU loops heavy enough to matter are split over cores
+  with `jobs.each` (see Conventions). In use: `Plants.rebuildLinks` (per
+  plant), `World.stream` generation (per fresh chunk), `syncWorld` meshing
+  (`MESH_BATCH` chunks, each its own scratch; Vulkan uploads stay on main).
+  Measured gains (release): stress sim 1.6–10 → 0.6–5.6 ms/frame, chunk
+  gen 0.50 → 0.20 ms, mesh+upload 0.36 → 0.27 ms. The rest of the CPU
+  frame is under 1 ms and hides behind the GPU (frames in flight), so
+  profile before threading anything else.
 - Culling: chunks (`CHUNK_RADIUS`), plants and parts are culled to the view
   frustum (`m.Frustum`; `Parts.look` sets the frame's eye and view).
 
@@ -113,7 +115,7 @@ Items (`sim/items.zig`, ids stored by value: new items go last) and weave
 recipes (`game/craft.zig`) are plain data tables.
 
 ## Conventions
-- 2-space indent, `name:Type`, terse `//!`/`///` docs, LF.
+- 2-space indent, `name:Type`, terse `//!`/`///` docs, each file's own line endings (see Edits).
 - All math via `core/math.zig` (`m`): scalars, `unorm8`, tiles (`footprint`
   and `ring` iterators, `Chunk.tileOf` back from a local index), `dirs`/`dirVec`/`dirYaw`,
   vectors/matrices, `spring`, `springDamper`, `catmullRom`/`splineResample`,
@@ -242,7 +244,32 @@ recipes (`game/craft.zig`) are plain data tables.
   `parasymi.cfg` (`FEED ({@harvest})`); `txt.load` (after `controls.load`)
   replaces it once with the bound key's `[key]`/`[mouse]` name (else its
   binding name in capitals), so labels follow rebinding.
+- **Parallel loops** (`core/jobs.zig`): `jobs.each(io, n, min, Ctx, ctx,
+  Ctx.run)` runs `run(ctx, lo, hi)` over [0, n) in ranges of at least
+  `min` items (first range on the calling thread, the rest on main's
+  `Io` pool) and returns once all are done. Never spawn threads or keep
+  a pool of your own.
+  - The pool: `w.io` (`World.io`, set by main after `Game.init` and in
+    `restore`); anything holding the world uses it. `null` (headless
+    tests, `Game.init`'s first stream) runs it all in place.
+  - Only for work where each index writes only its own outputs and reads
+    shared state that nothing writes meanwhile (the caller blocks, so the
+    sim is still). Results must be identical to the serial loop: no
+    shared accumulators, no order-dependent sums (the ecology tick
+    scatters into neighbours, so it stays serial).
+  - The pattern: a small struct of the inputs (slices, `*const`) with
+    `fn run(c:Ctx, lo:usize, hi:usize) void`; see `Plants.Relink`,
+    `World.Generate`, `Renderer.Meshing`. Errors go in a per-item
+    `[]?E` checked after `each` returns; scratch is one per item, never
+    shared. Allocate with the gpa (thread-safe); no Vulkan, GLFW, txt
+    or controls calls inside `run`.
+  - `min`: enough work a range to pay for a hand-off (~0.1 ms; e.g.
+    `LINKS_MIN` 512 plants, 1 chunk).
+  - Every new use gets a test that it matches the serial result
+    (`testing.io` vs `null`, as in plants/world).
 - Edits: write to files, pass files to scripts; no inline heredocs.
+  Line endings are mixed (most files CRLF, some LF): keep each file's own
+  (Python on Windows writes CRLF unless `newline=''`).
 
 ## Zig 0.16 notes
 `std.Io` replaces old I/O (pass an `Io` like an allocator). "Juicy Main":

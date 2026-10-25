@@ -3,6 +3,15 @@
 //! Each index's work must stand alone (it reads what is shared and writes
 //! only its own outputs), so the result never depends on the split. With no
 //! `Io` (headless tests) or too few items it runs in place.
+//!
+//!   const Double = struct {
+//!     src:[]const f32,
+//!     dst:[]f32,
+//!     fn run(d:Double, lo:usize, hi:usize) void {
+//!       for (d.src[lo..hi], d.dst[lo..hi]) |s, *o| o.* = s * 2;
+//!     }
+//!   };
+//!   jobs.each(w.io, src.len, 4096, Double, .{.src = src, .dst = dst}, Double.run);
 const std = @import("std");
 const Io = std.Io;
 const Thread = std.Thread;
