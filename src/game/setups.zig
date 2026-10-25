@@ -307,7 +307,7 @@ fn nodeBeside(g:*const Game, x:i32, z:i32) bool {
     const v = m.dirVec(d);
     const c = g.world.chunkOfTile(x + v.x, z + v.z) orelse continue;
     const t = ck.localIndex(x + v.x, z + v.z);
-    if (c.res[t] > 0 and c.occ[t] == .none and c.kind[t] != .water) return true;
+    if (c.res[t] > 0 and c.occ[t] == .none) return true;
   }
   return false;
 }

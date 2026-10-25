@@ -334,7 +334,7 @@ pub const Player = struct {
     if (p.work != null) p.vel *= m.splat3(WORK_DRAG);
 
     const here = ground.walkable(m.tileOf(p.pos[0]), m.tileOf(p.pos[2])) orelse p.pos[1];
-    // resolve each axis separately so the wolf slides along cliffs and shores
+    // resolve each axis separately so the wolf slides along cliffs
     inline for (.{ 0, 2 }) |axis| {
       var next = p.pos;
       next[axis] += p.vel[axis] * dt;

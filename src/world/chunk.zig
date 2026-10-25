@@ -8,7 +8,7 @@ pub const Res = u16;
 const NONE:u32 = m.maxInt(u32);
 
 pub const Kind = enum(u8) {
-  water, soil, moss, stone, ley,
+  soil, moss, stone, ley,
 
   /// tiles a seed can take root in.
   pub fn fertile(k:Kind) bool { return k == .soil or k == .moss or k == .ley; }

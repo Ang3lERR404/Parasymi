@@ -17,7 +17,6 @@ pub const Node = struct {
 };
 
 pub const nodes = EnumArray(ck.Kind, ?Node).init(.{
-  .water = null,
   .soil = .{ .item = .grit, .mesh = .node_grit },
   .stone = .{ .item = .grit, .mesh = .node_grit },
   .moss = .{ .item = .fibre, .mesh = .node_fibre, .sway = 1, .tall = 0.45 },

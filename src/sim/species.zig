@@ -89,7 +89,7 @@ pub const Species = struct {
   /// by a germinator, and an uprooted plant comes back as its seed.
   seed:?items.Item,
   /// footprint: a size x size square of tiles, or none at all when floating
-  /// (a floater hovers over any tile, even water or another plant).
+  /// (a floater hovers over any tile, even another plant).
   size:u8 = 1,
   floating:bool = false,
   /// what condenses inside the plant from its mana, harvested by hand or conduit.

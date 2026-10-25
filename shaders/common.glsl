@@ -115,8 +115,7 @@ const float LANTERN_TOP = 0.75;
 bool isLantern(float form, int part, float h) { return part == PART_BLOOM && h < LANTERN_TOP && formIn(FORMS_LANTERN, form); }
 
 // tile kinds (world tile `Kind`, info.x * 255; must match)
-const int TILE_WATER = 0;
-const int TILE_SOIL = 1;
+const int TILE_SOIL = 0;
 
 // light colours: the moon's cool blue (scaled down by night), the sun's warm
 // white, and the amber of sap (linear), the garden's one accent

@@ -19,10 +19,6 @@ const float HOVER_PULSE = 6.0;
 // darkness there
 const vec2 PAW_SHADOW = vec2(0.12, 0.18);
 const float PAW_SHADOW_DARK = 0.7;
-// water's glint: its colour, tightness and strength
-const vec3 WATER_GLINT = vec3(0.6, 0.7, 0.8);
-const float WATER_SPEC_POW = 40.0;
-const float WATER_SPEC = 0.4;
 
 float hash12(vec2 p) {
   vec3 q = fract(vec3(p.xyx) * 0.1031);
@@ -64,7 +60,6 @@ float plexus(vec2 wp, float t) {
 
 void main() {
   vec3 n = normalize(v_nrm);
-  int kind = int(v_info.x * 255.0 + 0.5);
   float t = pc.eye_time.w;
   // how much of the key light reaches here: what stands between it and the
   // sun or moon (a plant, a structure, the wolf, a hill) shades it
@@ -101,10 +96,6 @@ void main() {
     float e = length(local / radii);
     float strength = PAW_SHADOW_DARK / ((1.0 + lift * 5.0) * (1.0 + lift * 5.0));
     c *= 1.0 - strength * (1.0 - smoothstep(0.1, 1.0, e));
-  }
-  if (kind == TILE_WATER) {
-    float spec = pow(max(dot(reflect(-SUN, n), normalize(pc.eye_time.xyz - v_pos)), 0.0), WATER_SPEC_POW);
-    c += WATER_GLINT * spec * WATER_SPEC * sh;
   }
   o = vec4(applyFog(c, v_pos), 1.0);
 }

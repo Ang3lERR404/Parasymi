@@ -12,18 +12,8 @@ layout(location = 1) out vec3 v_nrm;
 layout(location = 2) out vec3 v_col;
 layout(location = 3) out vec4 v_info;
 
-// water's surface: how far its swell rises and falls, and how far below the
-// shore it lies
-const float SWELL = 0.04;
-const float WATER_SINK = 0.08;
-
 void main() {
   vec3 p = pos;
-  int kind = int(info.x * 255.0 + 0.5);
-  if (kind == TILE_WATER && info.z > 0.5) {
-    float t = pc.eye_time.w;
-    p.y += SWELL * sin(t * 1.3 + p.x * 0.9) * cos(t * 0.9 + p.z * 0.7) - WATER_SINK;
-  }
   v_pos = p;
   v_nrm = nrm;
   v_col = srgb2lin(col.rgb);

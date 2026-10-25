@@ -517,9 +517,9 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   and lift a little; only parasites writhe.
 - Terrain (`render/terrain_mesh.zig`): smooth, no walls; each tile a fan of
   four triangles, centre at the tile's height, corners shared (height,
-  colour, ley averaged), smooth normals; land dips under water at the shore.
+  colour, ley averaged), smooth normals; no water (basins are level lowland).
   Detail grown on the GPU (detail pass, `detail.vert`) from one `DetailTile`
-  per tile: grass blades on all but water/soil (tile-coloured, wind-swayed),
+  per tile: grass blades on all but soil (tile-coloured, wind-swayed),
   clods and stones on soil; within `DETAIL_R` (28 tiles). Ley lines carry a
   faint drifting plexus; ley sight glows smoothly across tiles. info.z = 255
   marks the top surface. Fog closes in before the edge; paw contact shadows.

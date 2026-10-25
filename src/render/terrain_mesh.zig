@@ -2,9 +2,8 @@
 //! centre at the tile's own height (where everything on it stands), its
 //! corners shared with its neighbours (the average of the tiles that meet
 //! there), so the ground rolls from one terrace to the next with no walls
-//! or hard ramps, and its colour blends across tile borders. Land dips
-//! under the water at the shore. The detail on top (grass on every tile but
-//! water and soil, clods and stones on soil) is not meshed here: each such
+//! or hard ramps, and its colour blends across tile borders. The detail on
+//! top (grass on every tile but soil, clods and stones on soil) is not meshed here: each such
 //! tile gets one `DetailTile` record and the GPU grows the detail from it.
 //! Border neighbours come from the generator directly, so a chunk can be
 //! meshed without its neighbours being loaded.
@@ -24,7 +23,6 @@ const v3 = m.v3;
 
 fn baseColor(k:ck.Kind) color.Rgb {
   return switch (k) {
-    .water => color.rgb(0.10, 0.22, 0.35),
     .soil => color.rgb(0.36, 0.27, 0.19),
     .moss => color.rgb(0.20, 0.36, 0.20),
     .stone => color.rgb(0.42, 0.42, 0.46),
@@ -35,14 +33,13 @@ fn baseColor(k:ck.Kind) color.Rgb {
 /// how many grass blades grow on a tile of each kind (detail.vert grows them)
 fn blades(k:ck.Kind) u32 {
   return switch (k) {
-    .water, .soil => 0,
+    .soil => 0,
     .moss => 8,
     .ley => 6,
     .stone => 2,
   };
 }
 
-const SHORE = gen.SHORE;
 /// each tile's colour varies by `JITTER` about `JITTER_MIN` of its kind's
 const JITTER_MIN:f32 = 0.9;
 const JITTER:f32 = 0.2;
@@ -113,30 +110,22 @@ fn point(r:*const Ring, px:i32, py:i32) Shared {
 
 const Shared = struct { h:f32, col:color.Rgb, ley:f32 };
 
-/// a shared point among the tiles `ts`: the land's average height (or under
-/// the water when any of them is water) and the land's average colour
+/// a shared point among the tiles `ts`: their average height, colour and ley
 fn shared(r:*const Ring, ts:[]const usize) Shared {
   var h:f32 = 0;
   var cr:f32 = 0;
   var cg:f32 = 0;
   var cb:f32 = 0;
-  var land:f32 = 0;
-  var wet = false;
   var ley:f32 = 0;
-  for (ts) |t| ley += r.ley[t] / m.f(ts.len);
+  const n = m.f(ts.len);
   for (ts) |t| {
-    if (r.kind[t] == .water) {
-      wet = true;
-      continue;
-    }
     h += r.h[t];
     cr += r.col[t].r;
     cg += r.col[t].g;
     cb += r.col[t].b;
-    land += 1;
+    ley += r.ley[t];
   }
-  if (land == 0) return .{.h = gen.WATER_H, .col = r.col[ts[0]], .ley = ley};
-  return .{.h = if (wet) SHORE else h / land, .col = color.rgb(cr / land, cg / land, cb / land), .ley = ley};
+  return .{.h = h / n, .col = color.rgb(cr / n, cg / n, cb / n), .ley = ley / n};
 }
 
 fn put(out:*std.ArrayList(TV), gpa:Allocator, p:V3, n:V3, c:color.Rgba8, info:[4]u8) Allocator.Error!void {
@@ -186,8 +175,8 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
     const info:[4]u8 = .{@intFromEnum(k), ley, TOP_SURFACE, 0};
 
     // the tile: a fan of four triangles from its centre (at the tile's own
-    // height) to its corners (shared with its neighbours). Water stays flat
-    // at its own level; land is lit by the ground's smooth slope.
+    // height) to its corners (shared with its neighbours), lit by the
+    // ground's smooth slope.
     var gh:[3][3]f32 = undefined;
     var gc:[3][3]color.Rgba8 = undefined;
     var gn:[3][3]V3 = undefined;
@@ -197,13 +186,6 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
       const gy = g[1];
       const px = 2 * lx + @as(i32, @intCast(gx));
       const py = 2 * ly + @as(i32, @intCast(gy));
-      if (k == .water) {
-        gh[gy][gx] = r.h[i];
-        gc[gy][gx] = r.col[i].toRgba8(255);
-        gn[gy][gx] = v3(0, 1, 0);
-        gl[gy][gx] = ley;
-        continue;
-      }
       const s = grid.at(px, py);
       // ley fades across tile borders like the colour does
       gl[gy][gx] = m.unorm8(s.ley);
@@ -223,8 +205,6 @@ pub fn build(gpa:Allocator, seed:u64, c:*const ck.Chunk, out:*std.ArrayList(TV),
         try put(out, gpa, at, gn[cn[1]][cn[0]], gc[cn[1]][cn[0]], .{info[0], gl[cn[1]][cn[0]], info[2], info[3]});
       }
     }
-    if (k == .water) continue;
-
     // the detail on it (grass, or clods and stones on soil) is grown on the
     // GPU from this one record (shaders/detail.vert)
     const n = blades(k);

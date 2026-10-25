@@ -69,52 +69,34 @@ pub const World = struct {
     }
   }
 
-  /// height of a loaded tile something can stand on (null over water or void).
+  /// height of a loaded tile something can stand on (null over void).
   pub fn walkable(w:*const World, wx:i32, wy:i32) ?f32 {
     const c = w.chunkOfTile(wx, wy) orelse return null;
-    const t = ck.localIndex(wx, wy);
-    return if (c.kind[t] == .water) null else c.height[t];
+    return c.height[ck.localIndex(wx, wy)];
   }
 
-  /// a tile's height and whether it is water (generated when not loaded)
-  fn tileH(w:*const World, wx:i32, wy:i32) struct { h:f32, wet:bool } {
-    if (w.chunkOfTile(wx, wy)) |c| {
-      const t = ck.localIndex(wx, wy);
-      return .{.h = c.height[t], .wet = c.kind[t] == .water};
-    }
-    const s = gen.sample(w.seed, wx, wy);
-    return .{.h = s.height, .wet = s.kind == .water};
+  /// a tile's height (generated when not loaded)
+  fn tileH(w:*const World, wx:i32, wy:i32) struct { h:f32 } {
+    if (w.chunkOfTile(wx, wy)) |c| return .{.h = c.height[ck.localIndex(wx, wy)]};
+    return .{.h = gen.sample(w.seed, wx, wy).height};
   }
 
   /// the ground's height at a corner where four tiles meet (the corner at
-  /// the low x/z of tile (wx, wy)): the land's average, just under the
-  /// water at a shore, the water's level in open water
+  /// the low x/z of tile (wx, wy)): their average
   fn cornerH(w:*const World, wx:i32, wy:i32) f32 {
     var h:f32 = 0;
-    var land:f32 = 0;
-    var wet = false;
-    for ([_][2]i32{.{-1, -1}, .{0, -1}, .{-1, 0}, .{0, 0}}) |d| {
-      const t = w.tileH(wx + d[0], wy + d[1]);
-      if (t.wet) {
-        wet = true;
-        continue;
-      }
-      h += t.h;
-      land += 1;
-    }
-    if (land == 0) return gen.WATER_H;
-    return if (wet) gen.SHORE else h / land;
+    for ([_][2]i32{.{-1, -1}, .{0, -1}, .{-1, 0}, .{0, 0}}) |d| h += w.tileH(wx + d[0], wy + d[1]).h;
+    return h / 4;
   }
 
   /// the ground's height at (x, z) as it is drawn (render/terrain_mesh):
   /// each tile a fan of four triangles from its centre, at its own height,
-  /// to its corners, shared with its neighbours; water flat. Whatever
-  /// stands on the ground (the wolf's paws) stands on this, not on the tile.
+  /// to its corners, shared with its neighbours. Whatever stands on the
+  /// ground (the wolf's paws) stands on this, not on the tile.
   pub fn surfaceAt(w:*const World, x:f32, z:f32) f32 {
     const wx = m.tileOf(x);
     const wy = m.tileOf(z);
     const c = w.tileH(wx, wy);
-    if (c.wet) return c.h;
     const dx = x - m.f(wx) - 0.5;
     const dz = z - m.f(wy) - 0.5;
     const ax = @abs(dx);
@@ -136,7 +118,7 @@ pub const World = struct {
   }
 
   /// a footprint is free if every tile is loaded, unoccupied, level with the
-  /// anchor and passes `ok` (e.g. fertile for roots, dry for structures).
+  /// anchor and passes `ok` (e.g. fertile for roots).
   pub fn footprintFree(w:*const World, wx:i32, wy:i32, size:u8, comptime ok:fn (ck.Kind) bool) bool {
     const c0 = w.chunkOfTile(wx, wy) orelse return false;
     const h0 = c0.height[ck.localIndex(wx, wy)];
@@ -247,7 +229,6 @@ test "the drawn ground meets each tile's height at its centre and runs on unbrok
     while (wx < 6) : (wx += 1) {
       const t = w.tileH(wx, wy);
       try testing.expectApproxEqAbs(t.h, w.surfaceAt(m.f(wx) + 0.5, m.f(wy) + 0.5), 1e-5);
-      if (t.wet) continue;
       // either side of a shared edge, and at a corner, the tiles agree
       const e = 1e-4;
       try testing.expectApproxEqAbs(w.surfaceAt(m.f(wx) + 0.3, m.f(wy) - e), w.surfaceAt(m.f(wx) + 0.3, m.f(wy) + e), 1e-3);

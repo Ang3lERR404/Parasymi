@@ -261,10 +261,10 @@ test "no room, no confluence" {
   const gpa = testing.allocator;
   var gd = try Garden.init(gpa, 12);
   defer gd.deinit(gpa);
-  // a 3x2 patch of fertile ground in water (well inside the chunk, so the
-  // search never reaches generated land): no 2x2 spot beside the pair
+  // a 3x2 patch of fertile ground in bare stone (well inside the chunk, so
+  // the search never reaches generated land): no 2x2 spot beside the pair
   const c = gd.w.chunkOfTile(0, 0).?;
-  for (0..12) |y| for (0..12) |xx| { c.kind[y * ck.SIZE + xx] = .water; };
+  for (0..12) |y| for (0..12) |xx| { c.kind[y * ck.SIZE + xx] = .stone; };
   for (5..7) |y| for (5..8) |xx| { c.kind[y * ck.SIZE + xx] = .soil; };
   try gd.mature(gpa, 5, 5, .lumenroot);
   try gd.mature(gpa, 7, 6, .thornleech);

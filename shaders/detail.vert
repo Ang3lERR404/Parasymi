@@ -3,7 +3,7 @@
 #include "common.glsl"
 
 // The ground's detail, grown here from one record per tile (DetailTile):
-// up to 8 thin grass blades on any tile but water and soil, coloured by the
+// up to 8 thin grass blades on any tile but soil, coloured by the
 // tile, swaying in the garden wind; on soil, a clod heaped up and a small
 // stone half sunk in it, each a faceted lump. Every tile runs 60 vertices;
 // what it does not use folds to nothing outside the view. All placement is

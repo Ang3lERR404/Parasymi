@@ -21,7 +21,7 @@
 //!   emit(s, out, ctr, tf)       extra visuals beyond its mesh (placed as it is:
 //!                               `place(s, ctr)`)
 //!   describe(s, d, g, x, y)     one line of hover text
-//!   ground(kind) bool           which tiles it may stand on (default: any dry tile)
+//!   ground(kind) bool           which tiles it may stand on (default: any tile)
 //!   field(s) ?Field             a field of celestial energy it holds
 //!   hold(s, x, y) ?Hold         how it draws the floater at a tile toward itself
 //!   size(s) f32                 how much larger than its mesh it has grown
@@ -105,7 +105,7 @@ pub const Def = struct {
   store:bool = false,
   /// floats over its tile, `hover` over the ground, instead of standing on
   /// it: it takes no room there, so it may float over a structure or a
-  /// plant (never over water or another floating one)
+  /// plant (never over another floating one)
   floating:bool = false,
   hover:f32 = 0,
   /// its mesh is drawn by its own `emit` (a diamond: it forms on the GPU),
@@ -209,7 +209,7 @@ fn freshState(k:Kind) State {
   };
 }
 
-fn dry(k:ck.Kind) bool { return k != .water; }
+fn anyTile(_:ck.Kind) bool { return true; }
 
 /// empty tiles between two structures' footprints (0: touching)
 fn gap(a:*const Structure, b:*const Structure) i32 {
@@ -235,12 +235,12 @@ pub const Structures = struct {
 
   pub fn canPlace(ss:*const Structures, w:*const World, wx:i32, wy:i32, k:Kind) bool {
     if (defs.get(k).floating) {
-      // over any dry tile, whatever stands on it, but not over another
-      const c = w.chunkOfTile(wx, wy) orelse return false;
-      return c.kind[ck.localIndex(wx, wy)] != .water and ss.floaterAt(wx, wy) == null;
+      // over any tile, whatever stands on it, but not over another
+      _ = w.chunkOfTile(wx, wy) orelse return false;
+      return ss.floaterAt(wx, wy) == null;
     }
     return switch (k) {
-      inline else => |t| w.footprintFree(wx, wy, defs.get(t).size, if (comptime reg.has(t, "ground")) reg.module(t).ground else dry),
+      inline else => |t| w.footprintFree(wx, wy, defs.get(t).size, if (comptime reg.has(t, "ground")) reg.module(t).ground else anyTile),
     };
   }
 

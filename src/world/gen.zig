@@ -8,12 +8,10 @@ const ck = @import("chunk.zig");
 const rng = @import("../core/rng.zig");
 
 pub const TERRACE = 0.35;
-pub const WATER_H = 0.0;
-/// where the land meets the water it dips just under the surface
-pub const SHORE = WATER_H - 0.14;
-/// terrace levels per unit of elevation noise; below `SEA` is water
+/// terrace levels per unit of elevation noise; below `LOW` the ground lies
+/// level on the lowest terrace (basins are lowland meadows)
 const LEVELS:f32 = 7;
-const SEA:f32 = -0.28;
+const LOW:f32 = -0.28;
 /// elevation above which the ground is bare stone
 const STONE:f32 = 0.62;
 /// ridged vein noise above this is a ley line; ley lines carry 4x the ley
@@ -62,8 +60,7 @@ pub fn sample(seed:u64, wx:i32, wy:i32) Sample {
   const wet = noise.fbm(seed +% 2, x / WET_L, y / WET_L, WET_OCT);
   const vein = noise.ridged(seed +% 3, wx2 / VEIN_L, wy2 / VEIN_L, VEIN_OCT);
 
-  if (e < SEA) return .{.height = WATER_H, .kind = .water, .ley = 0};
-  const level:f32 = @floor((e - SEA) * LEVELS) + 1;
+  const level:f32 = @floor(@max(e - LOW, 0) * LEVELS) + 1;
   const height = level * TERRACE;
   const kind:ck.Kind = if (e > STONE) .stone
     else if (vein > VEIN) .ley
