@@ -194,7 +194,7 @@ structure but the diamond), lineage structures (3 per lineage).
 
 **Next (vertical slice):**
 1. ~~2–3 more per lineage~~ done as structures (the gardener's call)
-2. Research tree to ~12 nodes
+2. ~~Research tree to ~12 nodes~~
 3. First world event (something that *happens*, not just a research unlock)
 4. One "wow" visual moment (sky shift at convergence)
 
