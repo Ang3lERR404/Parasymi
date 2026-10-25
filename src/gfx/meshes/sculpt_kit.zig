@@ -388,13 +388,18 @@ pub const Sculpt = struct {
     var cand:std.ArrayList(u32) = .empty;
     defer cand.deinit(gpa);
 
-    // which blocks the surface can pass through, sampled
+    // which blocks the surface can pass through, sampled. A form is left
+    // out of a block only past the widest melt of any form: a far form
+    // still melts into a nearer one by the nearer one's `k`, so leaving it
+    // out by its own `k` alone makes neighbouring blocks disagree (cracks)
     const half = h * B * 0.5 * @sqrt(3.0);
+    var kmax:f32 = 0;
+    for (s.forms.items) |pf| kmax = @max(kmax, pf.f.k);
     for (0..nb[2]) |bz| for (0..nb[1]) |by| for (0..nb[0]) |bx| {
       const c = lo + v3(m.f(bx * B) + B * 0.5, m.f(by * B) + B * 0.5, m.f(bz * B) + B * 0.5) * m.splat3(h);
       cand.clearRetainingCapacity();
       for (s.forms.items, 0..) |pf, i| {
-        if (m.len(c - pf.centre) - pf.reach < half + 2 * h) {
+        if (m.len(c - pf.centre) - pf.reach < half + 2 * h + kmax) {
           try cand.append(gpa, @intCast(i));
         }
       }

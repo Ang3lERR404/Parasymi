@@ -224,7 +224,9 @@ item is its colour fill with its short name, for now.
 
 ## Wolf (`game/player.zig` rig)
 Muted greens/browns, amber only on belly, eyes, inner ears, beans,
-pectorals and rear.
+pectorals and rear. The ribcage is broad but melts into a waist only a
+little narrower (`RIB_*`, `LAT_*` in `wolf_body`): no barrel rim over the
+waist, front or back.
 - One skin: `wolf_body` is sculpted (`sculpt_kit`: SDF ellipsoids, round
   cones, round boxes per bone, smooth union/carve, `ink` paints colour
   only) around the bind pose of `wolf_skeleton` (27 bones, `fk(Pose)`),

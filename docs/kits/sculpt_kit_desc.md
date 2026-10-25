@@ -19,7 +19,10 @@ Sculpts **one seamless surface out of many forms** (the wolf's skin):
    part.vert skinned mode 3).
 
 Sampling is sparse: only 8³-cell blocks the surface can pass through are
-evaluated, each with only the forms whose bounding sphere reaches it.
+evaluated, each with only the forms whose bounding sphere reaches it, padded
+by the widest melt `k` of any form (a far form still melts into a nearer one
+by the nearer one's `k`; padding by its own alone cracked the skin where
+neighbouring blocks disagreed). A very wide melt makes sampling slower.
 
 ## API
 

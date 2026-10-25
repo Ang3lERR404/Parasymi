@@ -69,6 +69,17 @@ const FINGER_SOFT:f32 = 0.006;
 const DEW_ROOT = v3(0, -0.026, 0.044);
 const DEW_TIP = v3(-0.006, -0.046, 0.062);
 
+/// how far the ribcage stands over the waist: the waist's half-width and
+/// depth, the ribcage's lower edge lifted (its height kept at the top),
+/// how softly the two melt, and the lats' depth and melt
+const RIB_WAIST = [2]f32{ 0.12, 0.093 };
+const RIB_LIFT:f32 = 0.012;
+const RIB_MELT:f32 = 0.1;
+const LAT_DEPTH:f32 = 0.032;
+const LAT_MELT:f32 = 0.07;
+/// the lats end higher, their lower ends lifted off the waist
+const LAT_LIFT:f32 = 0.02;
+
 fn bi(b:Bone) u8 { return @intFromEnum(b); }
 
 fn ell(c:V3, r:V3) sculpt.Shape { return .{ .ellipsoid = .{ .c = c, .r = r } }; }
@@ -91,14 +102,16 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
 
   // hips: the pelvis's mass (the resin rear sits on its back)
   try a.f(.pelvis, ell(v3(0, 0.045, -0.008), v3(0.14, 0.1, 0.105)), hide, 0.04);
-  // the waist drawn in between hips and ribs
-  try a.f(.waist, ell(v3(0, 0.045, -0.006), v3(0.112, 0.105, 0.088)), hide, 0.05);
-  // the ribcage, broad and deep; the trapezius sloping from the neck to
-  // each shoulder; the lats fanning down the back into the waist
-  try a.f(.chest, ell(v3(0, 0.085, -0.004), v3(0.148, 0.135, 0.108)), hide, 0.05);
+  // the waist drawn in between hips and ribs, only a little: the
+  // ribcage's lower edge eases into it rather than standing over it
+  try a.f(.waist, ell(v3(0, 0.045, -0.006), v3(RIB_WAIST[0], 0.105, RIB_WAIST[1])), hide, 0.05);
+  // the ribcage, broad and deep but melted into the waist (no barrel's
+  // rim); the trapezius sloping from the neck to each shoulder; the lats
+  // fanning down the back into the waist, as softly
+  try a.f(.chest, ell(v3(0, 0.085 + RIB_LIFT, -0.004), v3(0.148, 0.135 - RIB_LIFT, 0.108)), hide, RIB_MELT);
   for ([_]f32{ -1, 1 }) |x| {
     try a.turned(.chest, m.rotZ(x * 0.35), ell(v3(x * 0.075, 0.185, -0.03), v3(0.08, 0.038, 0.058)), muscle, 0.035);
-    try a.turned(.chest, m.chain(&.{ m.translate(v3(x * 0.088, 0.05, -0.055)), m.rotZ(x * 0.3) }), ell(v3(0, 0, 0), v3(0.048, 0.11, 0.042)), muscle, 0.03);
+    try a.turned(.chest, m.chain(&.{ m.translate(v3(x * 0.088, 0.05 + LAT_LIFT, -0.055)), m.rotZ(x * 0.3) }), ell(v3(0, 0, 0), v3(0.048, 0.11 - LAT_LIFT, LAT_DEPTH)), muscle, LAT_MELT);
   }
   // the neck: a thick column, the throat under it
   try a.f(.neck, cone(v3(0, -0.05, -0.012), v3(0, 0.09, 0.015), 0.068, 0.055), hide, 0.05);
