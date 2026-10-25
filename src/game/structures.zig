@@ -67,7 +67,7 @@ const kinds = struct {
   pub const sporecaster = @import("structures/sporecaster.zig");
   pub const weftstone = @import("structures/weftstone.zig");
   pub const driftbraid = @import("structures/driftbraid.zig");
-  pub const heartloom = @import("structures/heartloom.zig");
+  pub const monfris = @import("structures/monfris.zig");
   pub const vultrixi = @import("structures/vultrixi.zig");
 };
 const reg = registry.Registry(kinds);
@@ -540,9 +540,9 @@ test "a germinator weaves structure bulbs as well as seeds, and lets go only wha
   const id = ss.at(&w, 0, 0).?;
   const craft = @import("craft.zig");
   // every weave is on offer, the bulbs too, but the advanced tier, which
-  // only a heartloom weaves
+  // only a monfris weaves
   try testing.expectEqual(craft.hand.len - craft.advanced.len, recipes(.germinator).len);
-  for (recipes(.heartloom)) |r| try testing.expect(craft.hand[r].advanced);
+  for (recipes(.monfris)) |r| try testing.expect(craft.hand[r].advanced);
   const conduit = for (recipes(.germinator)) |r| {
     if (craft.hand[r].out == .conduit) break r;
   } else unreachable;

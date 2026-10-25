@@ -1,4 +1,4 @@
-//! mesh: HEARTLOOM. a weftstone and a driftbraid grown into one 2x2 tree
+//! mesh: MONFRIS. a weftstone and a driftbraid grown into one 2x2 tree
 //! (convergence_kit, the driftbraid's look): out of each corner of its
 //! ground a weave of green and pale strands rises, its foot rooted both
 //! ways, the four winding round one another as they climb and closing in
@@ -122,7 +122,7 @@ fn corner(b:*mg.Builder, k:*growth.Skeleton, trunk:growth.Id, i:usize) Allocator
   }
 }
 
-/// mesh: VULTRIXI TETHER. the tether from a Vultrixi to its heartloom, built
+/// mesh: VULTRIXI TETHER. the tether from a Vultrixi to its monfris, built
 /// straight up +Y over 0..1 (bent on the GPU along its curve): a green
 /// strand and a pale one twined round each other, a violet knot where they
 /// cross, as thin at either end as along it (it hangs between two).

@@ -1,5 +1,5 @@
 //! INTERWEAVING: what a weftstone and a driftbraid make between them,
-//! grown side by side: heartlooms, 2x2 trees of both lineages that weave
+//! grown side by side: monfris, 2x2 trees of both lineages that weave
 //! the advanced tier, fed by the Vultrixi tethered to them.
 const prog = @import("../progression.zig");
 

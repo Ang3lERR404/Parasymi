@@ -1,4 +1,4 @@
-//! HEARTLOOM: a weftstone and a driftbraid grown into one 2x2 tree that
+//! MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that
 //! weaves the advanced tier (`craft.advanced`), which nothing else can:
 //! its panel picks the weave, as a germinator's does. It is fed by the
 //! Vultrixi tethered to it, at most `TETHERS`, each bringing it one kind of
@@ -27,14 +27,14 @@ const Parts = @import("../parts.zig").Parts;
 const Look = @import("../parts.zig").Look;
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
-const mesh = @import("../../gfx/meshes/heartloom.zig");
+const mesh = @import("../../gfx/meshes/monfris.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub const def:st.Def = .{ .item = .heartloom, .size = 2, .mesh = .heartloom, .store = true, .grow = 10, .sway = 0.2, .tall = 1.7, .sap = 0.3 };
+pub const def:st.Def = .{ .item = .monfris, .size = 2, .mesh = .monfris, .store = true, .grow = 10, .sway = 0.2, .tall = 1.7, .sap = 0.3 };
 
-/// most Vultrixi tethered to one heartloom (an advanced weave needs at
+/// most Vultrixi tethered to one monfris (an advanced weave needs at
 /// most this many kinds)
 pub const TETHERS = 6;
 /// how many weaves' worth of each ingredient it stocks
@@ -68,7 +68,7 @@ pub const State = struct {
 pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   _ = st.handOff(ctx, i);
   const self = ctx.ss.get(i);
-  const h = &self.state.heartloom;
+  const h = &self.state.monfris;
   h.tethered = @intCast(tethers(ctx.ss, .{self.x, self.y}));
   const r = craft.hand[h.recipe];
   if (!h.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(self.inv.bag(), r)) _ = h.weave.push(self.inv.bag(), h.recipe);
@@ -78,7 +78,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
 
 /// what its weave needs, `STOCK` weaves' worth.
 pub fn wants(s:*const st.Structure, _:*const prog.Progression, item:items.Item) u32 {
-  for (craft.hand[s.state.heartloom.recipe].in) |ing| {
+  for (craft.hand[s.state.monfris.recipe].in) |ing| {
     if (ing.item == item) return @as(u32, ing.n) * STOCK -| s.inv.count(item);
   }
   return 0;
@@ -98,16 +98,16 @@ pub fn gives(s:*const st.Structure, item:items.Item) bool { return made(item) an
 
 /// its panel offers the advanced tier.
 pub fn recipes() []const u8 { return &craft.advanced; }
-pub fn chosen(s:*const st.Structure) ?u8 { return s.state.heartloom.recipe; }
+pub fn chosen(s:*const st.Structure) ?u8 { return s.state.monfris.recipe; }
 
 /// set what it weaves, if the gardener understands it (a weave under way
 /// finishes first).
 pub fn choose(s:*st.Structure, g:*prog.Progression, r:u8) void {
   const out = txt.item(craft.hand[r].out).name;
   if (!craft.hand[r].unlocked(g)) return g.say(txt.s.msg.not_understood, .{out});
-  if (indexOfScalar(u8, &craft.advanced, r) == null or s.state.heartloom.recipe == r) return;
-  s.state.heartloom.recipe = r;
-  g.say(txt.s.msg.heartloom_weaves, .{out});
+  if (indexOfScalar(u8, &craft.advanced, r) == null or s.state.monfris.recipe == r) return;
+  s.state.monfris.recipe = r;
+  g.say(txt.s.msg.monfris_weaves, .{out});
 }
 
 /// a Vultrixi waiting to be tethered is tethered here (`ss.pairing`, set by
@@ -128,7 +128,7 @@ pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
   g.say(txt.s.msg.tethered, .{});
 }
 
-/// how many Vultrixi are tethered to the heartloom on `at`
+/// how many Vultrixi are tethered to the monfris on `at`
 pub fn tethers(ss:*const st.Structures, at:[2]i32) u32 {
   var n:u32 = 0;
   for (ss.list.items) |*o| if (o.kind() == .vultrixi) {
@@ -141,7 +141,7 @@ pub fn tethers(ss:*const st.Structures, at:[2]i32) u32 {
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   if (s.grown < 1) return;
   const base = s.place(ctr);
-  const h = &s.state.heartloom;
+  const h = &s.state.monfris;
   var n:usize = 0;
   for (s.inv.slot) |slot| { if (slot != null) n += 1; }
   var j:usize = 0;
@@ -168,7 +168,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 }
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
-  const h = &s.state.heartloom;
+  const h = &s.state.monfris;
   const name = txt.item(craft.hand[h.recipe].out).name;
   if (h.weave.busy()) {
     _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.loom_weaves, .{name, h.tethered});

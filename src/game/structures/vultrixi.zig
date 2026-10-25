@@ -1,11 +1,11 @@
 //! VULTRIXI: a gathering crown and a ganglion grown into one floating body
-//! that feeds a heartloom. Configured, then the heartloom configured, it is
-//! tethered there (at most `heartloom.TETHERS` to one). It takes on one
-//! kind of what the heartloom's weave needs, by its place among the
+//! that feeds a monfris. Configured, then the monfris configured, it is
+//! tethered there (at most `monfris.TETHERS` to one). It takes on one
+//! kind of what the monfris's weave needs, by its place among the
 //! Vultrixi tethered there (the first the weave's first ingredient, and so
 //! on), reaches a tendril into the nearest structure within `R` tiles that
 //! would let that kind go, pulls it out a unit at a time and sends each
-//! along its tether into the heartloom, while the heartloom wants it.
+//! along its tether into the monfris, while the monfris wants it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
@@ -26,9 +26,9 @@ const Look = @import("../parts.zig").Look;
 const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 const mesh = @import("../../gfx/meshes/vultrixi.zig");
-const loom_mesh = @import("../../gfx/meshes/heartloom.zig");
+const loom_mesh = @import("../../gfx/meshes/monfris.zig");
 const caster = @import("sporecaster.zig");
-const heartloom = @import("heartloom.zig");
+const monfris = @import("monfris.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -52,7 +52,7 @@ const GLOW:f32 = 0.18;
 pub const Carry = struct { item:items.Item, t:f32 = 0 };
 
 pub const State = struct {
-  /// the heartloom it feeds (by tile) and the ground under it
+  /// the monfris it feeds (by tile) and the ground under it
   dest:?[2]i32 = null,
   dest_h:f32 = 0,
   /// the kind it brings (from its place among the tethered)
@@ -70,11 +70,11 @@ pub const State = struct {
 
 fn loomAt(ss:*st.Structures, w:*const World, at:[2]i32) ?st.Id {
   const j = ss.at(w, at[0], at[1]) orelse return null;
-  return if (ss.get(j).kind() == .heartloom) j else null;
+  return if (ss.get(j).kind() == .monfris) j else null;
 }
 
-/// configured, it waits to be tethered by configuring a heartloom next
-/// (`heartloom.configure`); configured twice over, it is cut loose.
+/// configured, it waits to be tethered by configuring a monfris next
+/// (`monfris.configure`); configured twice over, it is cut loose.
 pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
   const s = ss.get(id);
   const here = [2]i32{s.x, s.y};
@@ -87,7 +87,7 @@ pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
   g.say(txt.s.msg.tether_choose, .{});
 }
 
-/// the kind the Vultrixi `i` brings its heartloom `j`: the ingredient of
+/// the kind the Vultrixi `i` brings its monfris `j`: the ingredient of
 /// its weave at its place among those tethered there
 fn assigned(ss:*st.Structures, i:st.Id, j:st.Id) ?items.Item {
   const loom = ss.get(j);
@@ -98,7 +98,7 @@ fn assigned(ss:*st.Structures, i:st.Id, j:st.Id) ?items.Item {
     if (o.kind() != .vultrixi) continue;
     if (o.state.vultrixi.dest) |d| if (d[0] == at[0] and d[1] == at[1]) { rank += 1; };
   }
-  const r = craft.hand[loom.state.heartloom.recipe];
+  const r = craft.hand[loom.state.monfris.recipe];
   return if (rank < r.in.len) r.in[rank].item else null;
 }
 
@@ -118,9 +118,9 @@ fn source(ss:*st.Structures, i:st.Id, kind:items.Item) ?st.Id {
   var near:i32 = R + 1;
   for (ss.list.items, 0..) |*o, k| {
     if (k == i.idx() or o.def().carrier or o.grown < 1) continue;
-    // never from a heartloom (what it weaves is the gardener's) or another
+    // never from a monfris (what it weaves is the gardener's) or another
     // Vultrixi
-    if (o.kind() == .heartloom or o.kind() == .vultrixi) continue;
+    if (o.kind() == .monfris or o.kind() == .vultrixi) continue;
     const d = gap(here, o);
     if (d >= near) continue;
     const id = st.Id.of(k);
@@ -144,7 +144,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   };
   vs.dest_h = caster.groundAt(ctx.w, to);
   vs.kind = assigned(ctx.ss, i, j);
-  // what runs along the tether goes into the heartloom at its end
+  // what runs along the tether goes into the monfris at its end
   if (vs.carry) |*c| {
     const self = ctx.ss.get(i);
     const far = @max(m.len(v3(m.f(to[0] + 1 - self.x), 0, m.f(to[1] + 1 - self.y))), 1);
@@ -212,14 +212,14 @@ fn sideOf(c:[4]V3) V3 {
   return if (m.len(flat) > m.EPS) m.norm(m.cross(flat, v3(0, 1, 0))) else v3(1, 0, 0);
 }
 
-/// its tether to its heartloom, what runs along it, and its tendril into
+/// its tether to its monfris, what runs along it, and its tendril into
 /// the structure it pulls from.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   _ = tf;
   const vs = &s.state.vultrixi;
   const base = s.place(ctr);
   if (tetherCtrl(s, base)) |c| {
-    try out.emitCurve(.heartloom_tether, c, sideOf(c), 1, s.grown, .{.flutter = TENDRIL_FLUTTER, .phase = s.seed, .glow = GLOW});
+    try out.emitCurve(.monfris_tether, c, sideOf(c), 1, s.grown, .{.flutter = TENDRIL_FLUTTER, .phase = s.seed, .glow = GLOW});
     if (vs.carry) |cr| {
       const look:Look = .{.glow = MOTE_GLOW, .phase = s.seed, .tint = color.Rgba8.of(cr.item.info().col).toF4()};
       try out.emit(.item_pod, m.chain(&.{m.translate(along(c, m.smooth(cr.t))), m.scale3(m.splat3(MOTE_SIZE))}), look);
@@ -299,7 +299,7 @@ fn tether(ss:*st.Structures, w:*World, g:*prog.Progression, v:[2]i32, loom:[2]i3
   st.configure(ss, ss.at(w, loom[0], loom[1]).?, g);
 }
 
-test "Vultrixi tether to a heartloom, six at most, each bringing one kind of its weave" {
+test "Vultrixi tether to a monfris, six at most, each bringing one kind of its weave" {
   const gpa = testing.allocator;
   var w = World.init(gpa, 5);
   defer w.deinit();
@@ -310,21 +310,21 @@ test "Vultrixi tether to a heartloom, six at most, each bringing one kind of its
   defer ss.deinit(gpa);
   var g:prog.Progression = .{};
   g.done.insert(.celestial_defragmentation);
-  try testing.expect(try ss.place(gpa, &w, 6, 6, .heartloom, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 6, 6, .monfris, 0, 0));
   for (0..7) |k| try testing.expect(try ss.place(gpa, &w, @intCast(k + 1), 2, .vultrixi, 0, 0));
   for (0..7) |k| tether(&ss, &w, &g, .{@intCast(k + 1), 2}, .{6, 6});
-  try testing.expectEqual(@as(u32, heartloom.TETHERS), heartloom.tethers(&ss, .{6, 6}));
+  try testing.expectEqual(@as(u32, monfris.TETHERS), monfris.tethers(&ss, .{6, 6}));
   try testing.expect(ss.get(ss.floaterAt(7, 2).?).state.vultrixi.dest == null);
   try run(&ss, &w, &plants, &g, 0.1);
   // the diamond's four kinds go to the first four, in order; the rest idle
-  const r = craft.hand[ss.get(ss.at(&w, 6, 6).?).state.heartloom.recipe];
+  const r = craft.hand[ss.get(ss.at(&w, 6, 6).?).state.monfris.recipe];
   for (0..6) |k| {
     const kind = ss.get(ss.floaterAt(@intCast(k + 1), 2).?).state.vultrixi.kind;
     if (k < r.in.len) try testing.expectEqual(r.in[k].item, kind.?) else try testing.expect(kind == null);
   }
 }
 
-test "a Vultrixi pulls what a structure lets go into its heartloom, which weaves it" {
+test "a Vultrixi pulls what a structure lets go into its monfris, which weaves it" {
   const gpa = testing.allocator;
   var w = World.init(gpa, 5);
   defer w.deinit();
@@ -335,9 +335,9 @@ test "a Vultrixi pulls what a structure lets go into its heartloom, which weaves
   defer ss.deinit(gpa);
   var g:prog.Progression = .{};
   g.done.insert(.celestial_defragmentation);
-  try testing.expect(try ss.place(gpa, &w, 8, 8, .heartloom, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 8, 8, .monfris, 0, 0));
   const loom = ss.at(&w, 8, 8).?;
-  const r = craft.hand[ss.get(loom).state.heartloom.recipe];
+  const r = craft.hand[ss.get(loom).state.monfris.recipe];
   // a cache of each kind beside a Vultrixi of its own, all tethered
   for (r.in, 0..) |ing, k| {
     const x:i32 = @intCast(1 + 3 * k);

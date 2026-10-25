@@ -4,7 +4,7 @@
 //! knot), cupped from below by warm living petals each its own (the
 //! gathering crown's), stamens standing on its crown, and five pale nerves
 //! trailing beneath it exactly alike, curling as they hang. Its tether to
-//! its heartloom leaves from its crown (emitted, `heartloom_tether`), the
+//! its monfris leaves from its crown (emitted, `monfris_tether`), the
 //! tendril it reaches into a structure with from under it (emitted).
 //! It grows on a hidden stalk through it (gfx/growth.zig): the sac swells
 //! first, the nerves trail out with it, the nodules swell ring by ring,

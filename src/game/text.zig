@@ -54,7 +54,7 @@ pub const Strings = struct {
     essence_converges:S = "", veil_thins:S = "", arsthraxia_grows:S = "",
     germinator_weaves:S = "", halo_forms:S = "", diamond_forms:S = "", lattice_stirs:S = "",
     loom_meets_stone:S = "", braid_meets_spore:S = "", crown_meets_nerve:S = "", weft_meets_drift:S = "", research_named:S = "",
-    tether_choose:S = "", tethered:S = "", tether_full:S = "", tether_cut:S = "", heartloom_weaves:S = "",
+    tether_choose:S = "", tethered:S = "", tether_full:S = "", tether_cut:S = "", monfris_weaves:S = "",
     braid_choose:S = "", braid_paired:S = "", braid_still:S = "",
     spores_choose:S = "", spores_paired:S = "", spores_still:S = "",
     saved:S = "", autosaved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_gardens:S = "",

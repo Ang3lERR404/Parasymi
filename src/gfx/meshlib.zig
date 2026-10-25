@@ -95,9 +95,9 @@ const parts = struct {
   pub const spore_carrier = @import("meshes/sporecaster.zig").carrier;
   // the convergent structures (see-through: blend over what hangs inside)
   pub const weftstone_tendril = @import("meshes/weftstone.zig").tendril;
-  pub const heartloom_tether = @import("meshes/heartloom.zig").tether;
+  pub const monfris_tether = @import("meshes/monfris.zig").tether;
   pub const driftbraid = @import("meshes/driftbraid.zig");
-  pub const heartloom = @import("meshes/heartloom.zig");
+  pub const monfris = @import("meshes/monfris.zig");
   pub const vultrixi = @import("meshes/vultrixi.zig");
   pub const weftstone = @import("meshes/weftstone.zig");
   // the halo: its polyp and the diamond it forms

@@ -115,13 +115,13 @@ fn convergent(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   try loom(g, cx, cz + 16);
 }
 
-/// a heartloom weaving a diamond, fed by four Vultrixi, each pulling one
+/// a monfris weaving a diamond, fed by four Vultrixi, each pulling one
 /// of its kinds out of a sap cache beside it
 fn loom(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   for ([_]prog.Id{ .interweaving, .shared_nerves, .celestial_defragmentation }) |id| g.prog.done.insert(id);
-  const j = try nearest(g, cx, cz, .heartloom, 0.5) orelse return;
+  const j = try nearest(g, cx, cz, .monfris, 0.5) orelse return;
   const at = [2]i32{ g.structs.get(j).x, g.structs.get(j).y };
-  const r = craft.hand[g.structs.get(j).state.heartloom.recipe];
+  const r = craft.hand[g.structs.get(j).state.monfris.recipe];
   for (r.in, 0..) |ing, k| {
     const side:i32 = if (k % 2 == 0) -1 else 1;
     const x = at[0] + side * 4;

@@ -21,7 +21,7 @@ pub const Recipe = struct {
   /// only a germinator weaves it (seeds always are; so are the convergent
   /// structures, the hands cannot bind two lineages into one)
   germinator:bool = false,
-  /// the advanced tier: only a heartloom weaves it, never a germinator or
+  /// the advanced tier: only a monfris weaves it, never a germinator or
   /// the hands
   advanced:bool = false,
 
@@ -65,10 +65,10 @@ pub const hand = [_]Recipe{
   // no cost); last, so the weaves chosen in saved gardens keep their places
   .{ .out = .weftstone, .in = &.{ .{ .item = .loomfern, .n = 1 }, .{ .item = .lithophage, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .starlight, .n = 2 } }, .time = 4, .needs = .woven_stone, .germinator = true },
   .{ .out = .driftbraid, .in = &.{ .{ .item = .braided_conduit, .n = 1 }, .{ .item = .sporecaster, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .essence, .n = 2 } }, .time = 4, .needs = .braided_drift, .germinator = true },
-  // decision: the heartloom from the two convergent structures it grows
+  // decision: the monfris from the two convergent structures it grows
   // out of, the Vultrixi from the pair it does, both bound by convergence
   // essence and ley crystals (the brief sets no cost)
-  .{ .out = .heartloom, .in = &.{ .{ .item = .weftstone, .n = 1 }, .{ .item = .driftbraid, .n = 1 }, .{ .item = .convergence_essence, .n = 4 }, .{ .item = .ley_crystal, .n = 2 } }, .time = 6, .needs = .interweaving, .germinator = true },
+  .{ .out = .monfris, .in = &.{ .{ .item = .weftstone, .n = 1 }, .{ .item = .driftbraid, .n = 1 }, .{ .item = .convergence_essence, .n = 4 }, .{ .item = .ley_crystal, .n = 2 } }, .time = 6, .needs = .interweaving, .germinator = true },
   .{ .out = .vultrixi, .in = &.{ .{ .item = .gathering_crown, .n = 1 }, .{ .item = .ganglion, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .ley_crystal, .n = 1 } }, .time = 4, .needs = .shared_nerves, .germinator = true },
 };
 
@@ -86,7 +86,7 @@ pub const seeds = recipesWhere(isSeedRecipe, true);
 /// every weave but the advanced tier: what a germinator may be set to
 /// (indices into `hand`).
 pub const all = recipesWhere(isAdvanced, false);
-/// the advanced tier: what a heartloom may be set to (indices into `hand`).
+/// the advanced tier: what a monfris may be set to (indices into `hand`).
 pub const advanced = recipesWhere(isAdvanced, true);
 
 /// whether some weave makes `item` (what a germinator lets go of).
