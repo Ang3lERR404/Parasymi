@@ -40,7 +40,8 @@ const save = @import("save.zig");
 const Specimen = @import("specimen.zig").Specimen;
 
 pub const TICK = 1.0 / 60.0;
-/// the world every new game grows from, unless `--seed=` says otherwise
+/// the test gardens' world (`--demo`, `--stress`, `--plant`/`--structure`,
+/// tests); a played game grows from a fresh seed each start
 pub const DEFAULT_SEED:u64 = 0x5EED_0F_11FE;
 /// the window's size when it opens
 pub const WINDOW = [2]u16{ 1600, 900 };

@@ -11,6 +11,7 @@ const parseInt = std.fmt.parseInt;
 const eql = std.mem.eql;
 const eqlDeep = std.meta.eql;
 const startsWith = std.mem.startsWith;
+const asBytes = std.mem.asBytes;
 const Init = std.process.Init;
 const log = std.log;
 const glfw = @import("zglfw");
@@ -73,7 +74,8 @@ pub fn main(init:Init) !void {
   var stress = false;
   var load = false;
   var tod:?f32 = null;
-  var seed:u64 = play.DEFAULT_SEED;
+  // the world's seed: `--seed=`, else one of its own (see below)
+  var seed:?u64 = null;
   // `--inspect[=player|<species>|<structure>|x,z]` turns the camera round
   // it, saving screenshots, then closes; `--shots=`, `--orbit=` (seconds a
   // turn), `--dist=`, `--pitch=` (degrees) shape it
@@ -146,7 +148,17 @@ pub fn main(init:Init) !void {
   }
   if (!try loadFrame(&load_screen, r, &input, &last, .world, .{.done = forms, .total = whole})) return;
 
-  var game = try Game.init(gpa, seed);
+  // decision: every start grows a world of its own, unless `--seed=` names
+  // one; the test gardens (`--demo`, `--stress`, one thing alone) keep the
+  // stock world, so they and their screenshots stay alike run to run. A
+  // loaded garden brings its own seed.
+  const world = seed orelse if (demo or stress or lone != null) play.DEFAULT_SEED else fresh: {
+    var s:u64 = undefined;
+    io.random(asBytes(&s));
+    break :fresh s;
+  };
+  log.info("world seed 0x{x}", .{world});
+  var game = try Game.init(gpa, world);
   defer game.deinit();
   // the world's heavy work (chunks generated and meshed, plants relinked)
   // is split over the pool

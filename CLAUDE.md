@@ -17,6 +17,10 @@ zig build run -- --demo           # test garden + structures, fast-forwarded
 zig build run -- --stress         # 120×120 plant field
 zig build run -- --tod=0.9        # time of day (0=midnight, 0.5=noon)
 zig build run -- --novsync --seed=0x1234
+                                  # each start grows a fresh world (seed logged,
+                                  # kept in its saves); --seed= repeats one;
+                                  # --demo/--stress/--plant/--structure use
+                                  # play.DEFAULT_SEED
 zig build run -- --load           # load the newest saved garden
 zig build run -- --demo --inspect # orbit the wolf, screenshots to shots/, then quit
 zig build run -- --inspect=bloom --shots=12 --orbit=30 --dist=6 --pitch=25
