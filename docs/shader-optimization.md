@@ -159,10 +159,11 @@ skinned normal's Jacobian ~0.3 (parts, vertex). Tried, no gain: drawing the
 sky after the solids (the clear's cost just moves to the first pass); the
 skinned-normal rewrite above.
 
-**Open, the user's call (changes the look):** per-sample shading on the
-plant/part passes is now the largest single cost (plants 1.0 ms at AA off,
-2.2 at msaa8). Options: lower `min_sample_shading`, shade per pixel and
-keep MSAA edges, alpha-to-coverage for the solid/glass split.
+**Decided (the user, 2026-10-25): per-sample shading stays as it is.**
+It is the largest single cost left on the plant/part passes (plants 1.0
+ms at AA off, 2.2 at msaa8), but lowering `min_sample_shading`, shading
+per pixel or alpha-to-coverage would change the edges: don't propose it
+again unless the user raises it.
 **Open, art-safe but bigger builds:** clustered/tiled light lists (at most
 ~0.45 ms here), splitting part.frag's rare roles into their own pipeline
 (occupancy; measure in Nsight first).
