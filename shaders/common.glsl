@@ -399,8 +399,8 @@ const vec3 GROUND_BOUNCE = vec3(0.12, 0.10, 0.08);
 const float GROUND_NIGHT = 0.3;
 const float AMBIENT = 0.55;
 // a surface lit by the sky, the key light (`sh` of it reaching it, see
-// keyShadow) and the points of light
-vec3 shadeLit(vec3 albedo, vec3 n, vec3 wpos, float sh) {
+// keyShadow) and the points of light (`points`, as pointLight gives them)
+vec3 shadeLitWith(vec3 albedo, vec3 n, float sh, vec3 points) {
   float ndl = max(dot(n, SUN), 0.0);
   float day = DAYLIGHT;
   vec3 sky = mix(SKY_DAY, SKY_VEILED, VEIL);
@@ -408,8 +408,9 @@ vec3 shadeLit(vec3 albedo, vec3 n, vec3 wpos, float sh) {
   vec3 ground = GROUND_BOUNCE * mix(GROUND_NIGHT, 1.0, day);
   vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * AMBIENT;
   vec3 sun = keyLight() * ndl * sh;
-  return albedo * (amb + sun + pointLight(wpos, n, 0.0));
+  return albedo * (amb + sun + points);
 }
+vec3 shadeLit(vec3 albedo, vec3 n, vec3 wpos, float sh) { return shadeLitWith(albedo, n, sh, pointLight(wpos, n, 0.0)); }
 
 vec3 shade(vec3 albedo, vec3 n, vec3 wpos) { return shadeLit(albedo, n, wpos, keyShadow(wpos, n)); }
 
@@ -439,10 +440,42 @@ const float EDGE_LINE = 0.14;       // n.v below which the edge line shows
 const float EDGE_GAIN = 0.6;
 const float SKY_SPOT = 0.05;        // the bright sky overhead mirrored: a hard window
 const float SKY_SPOT_GAIN = 0.45;
+
+// the points of light as a surface at `wpos` facing `n` sees them, all in
+// one pass over them (a material wanting several views of them reads the
+// lights once; the views it leaves unused are compiled away): as
+// pointLight gives them facing `n` (plain), wrapping round thin tissue
+// (wrap 1) and facing away (-n), and, with `mirror`, mirrored in wet
+// skin along `R`
+struct PointLit { vec3 plain; vec3 wrapped; vec3 behind; vec3 mirrored; };
+PointLit pointLights(vec3 wpos, vec3 n, vec3 R, bool mirror) {
+  Lighting L = Lighting(pc.light);
+  int count = int(L.info.x + 0.5);
+  PointLit p = PointLit(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
+  for (int i = 0; i < count; i++) {
+    vec4 lp = L.lights[i].pos;
+    vec3 d = lp.xyz - wpos;
+    float d2 = dot(d, d);
+    float k = d2 / (lp.w * lp.w);
+    if (k >= 1.0) continue;
+    vec3 col = L.lights[i].col.rgb;
+    float win = (1.0 - k) * (1.0 - k);
+    float inv = inversesqrt(max(d2, 1e-6));
+    float f = dot(n, d) * inv;
+    vec3 lit = col * win / (1.0 + LIGHT_FALLOFF * k);
+    p.plain += lit * max(f, 0.0);
+    p.wrapped += lit * max((f + 1.0) * 0.5, 0.0);
+    p.behind += lit * max(-f, 0.0);
+    if (mirror) p.mirrored += col * hardSpot(R, d * inv, POINT_SPOT) * POINT_SPOT_GAIN * win;
+  }
+  return p;
+}
+
 // the hard light on sap at `wpos` (mesh-space `obj`, its glints ride with
 // it) facing `n`, seen from `V`: `sapc` its colour, `clear` how see-through
-// (0 opaque: no caustic), `sh` the key light reaching it (keyShadow)
-vec3 sapGlisten(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, float sh) {
+// (0 opaque: no caustic), `sh` the key light reaching it (keyShadow),
+// `mirrored` the points of light mirrored in it (pointLights)
+vec3 sapGlistenWith(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, float sh, vec3 mirrored) {
   vec3 R = reflect(-V, n);
   vec3 key = keyLight();
   vec3 c = key * (hardSpot(R, SUN, SUN_SPOT) * SUN_SPOT_GAIN + hardSpot(R, SUN, SUN_CORE) * SUN_CORE_GAIN) * sh;
@@ -450,15 +483,7 @@ vec3 sapGlisten(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, flo
   vec3 sky = byDay(MOONLIGHT * 0.25, mix(SKY_DAY, SKY_VEILED, VEIL) + 0.5);
   c += sky * hardSpot(R, vec3(0.0, 1.0, 0.0), SKY_SPOT) * SKY_SPOT_GAIN;
   // every point of light nearby (blooms, motes) is mirrored too
-  Lighting L = Lighting(pc.light);
-  int count = int(L.info.x + 0.5);
-  for (int i = 0; i < count; i++) {
-    vec4 lp = L.lights[i].pos;
-    vec3 d = lp.xyz - wpos;
-    float k = dot(d, d) / (lp.w * lp.w);
-    if (k >= 1.0) continue;
-    c += L.lights[i].col.rgb * hardSpot(R, normalize(d), POINT_SPOT) * POINT_SPOT_GAIN * (1.0 - k) * (1.0 - k);
-  }
+  c += mirrored;
   // facets of the rippling skin, each leaning its own way and turning
   // slowly, flashing as one swings through the light's mirror
   float t = pc.eye_time.w;
@@ -483,6 +508,9 @@ vec3 sapGlisten(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, flo
   float edge = (1.0 - smoothstep(EDGE_LINE * 0.75, EDGE_LINE, ndv)) * step(0.0, ndv);
   c += mix(sapc, vec3(1.0), 0.6) * byDay(MOONLIGHT * 0.3, vec3(1.0)) * edge * EDGE_GAIN;
   return c;
+}
+vec3 sapGlisten(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, float sh) {
+  return sapGlistenWith(n, V, wpos, obj, sapc, clear, sh, pointLights(wpos, n, reflect(-V, n), true).mirrored);
 }
 
 

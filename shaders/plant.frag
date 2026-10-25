@@ -99,10 +99,11 @@ void surface() {
     // warming to amber at grazing angles. Hue follows the vertex colour, so
     // its two saps swirl in it.
     vec3 deep = v_col * 0.18 * health;
-    vec3 c = shadeLit(deep, n, v_pos, sh) + mix(v_col * 0.8, mix(v_col, AMBER, 0.2) * 2.0, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.3 + fill * 0.3) * lit;
+    PointLit pl = pointLights(v_pos, n, reflect(-V, n), true);
+    vec3 c = shadeLitWith(deep, n, sh, pl.plain) + mix(v_col * 0.8, mix(v_col, AMBER, 0.2) * 2.0, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.3 + fill * 0.3) * lit;
     c += mix(v_col, AMBER, 0.3) * max(dot(-n, SUN), 0.0) * 0.25 * klit;
-    c += mix(v_col, AMBER, 0.3) * pointLight(v_pos, n, 1.0) * 0.5;
-    vec3 g = sapGlisten(n, V, v_pos, v_obj, mix(v_col, AMBER, 0.3), 1.0 - fres, sh) * health;
+    c += mix(v_col, AMBER, 0.3) * pl.wrapped * 0.5;
+    vec3 g = sapGlistenWith(n, V, v_pos, v_obj, mix(v_col, AMBER, 0.3), 1.0 - fres, sh, pl.mirrored) * health;
     float a = max(mix(0.5, 1.0, fres), clamp(dot(g, vec3(0.33)), 0.0, 1.0));
     o = vec4(applyFog(c + g, v_pos), a);
     return;
@@ -115,12 +116,13 @@ void surface() {
     // turning with the view angle, and bubbles rise inside it
     vec3 film = filmHue(ndv * 1.3 + seed * 3.0 + pc.eye_time.w * 0.05);
     vec3 col = mix(v_col, v_col * film * 1.8, 0.3 + 0.4 * fres);
-    vec3 c = shadeLit(col * 0.25, n, v_pos, sh) * health;
+    PointLit pl = pointLights(v_pos, n, reflect(-V, n), true);
+    vec3 c = shadeLitWith(col * 0.25, n, sh, pl.plain) * health;
     c += col * (0.2 + 0.85 * fres) * lit;
     c += col * max(dot(-n, SUN), 0.0) * 0.3 * klit;
-    c += col * pointLight(v_pos, n, 1.0) * 0.6;
+    c += col * pl.wrapped * 0.6;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * lit * 0.5;
-    vec3 g = sapGlisten(n, V, v_pos, v_obj, col, 1.0 - fres, sh) * health;
+    vec3 g = sapGlistenWith(n, V, v_pos, v_obj, col, 1.0 - fres, sh, pl.mirrored) * health;
     c += g;
     float a = max(mix(0.18, 0.85, fres), clamp(dot(g, vec3(0.33)), 0.0, 1.0));
     if (v_ghost.x > 0.5) a *= 0.5;
@@ -138,7 +140,11 @@ void surface() {
   vec3 body = mix(vec3(lum), v_col, 0.5) * 0.78;
   body = mix(body, ROOT_BROWN, (1.0 - thin) * (1.0 - smoothstep(0.0, 0.55, v_t)) * 0.75);
   body = mix(DEAD_BROWN, body, health);
-  vec3 c = shadeLit(body, n, v_pos, sh);
+  // how strongly it glistens (below): only thin, living growth does, so the
+  // points of light are mirrored only there
+  float glisten = thin * (0.35 + 0.65 * fill) * health * SKIN_GLISTEN;
+  PointLit pl = pointLights(v_pos, n, reflect(-V, n), glisten > 0.0);
+  vec3 c = shadeLitWith(body, n, sh, pl.plain);
 
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
@@ -155,7 +161,7 @@ void surface() {
   // behind and at grazing angles shows the sap most (a bloom's or a mote's
   // light too, wrapping round the tissue it falls on)
   c += sap * lit * (through * 0.8 + fres * 0.45 + wrap * 0.22) * show * health;
-  c += sap * pointLight(v_pos, n, 1.0) * 0.6 * show * health;
+  c += sap * pl.wrapped * 0.6 * show * health;
   // sap moving through the plant (sharing, draining) brightens it as it passes
   c += sap * lit * moving * 0.3 * show;
   // sap is alive: bubbles drifting up inside thin growth, beads of it
@@ -165,7 +171,7 @@ void surface() {
   c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + keyLight() * drop.y * sh * 0.8;
   // thin sap-filled growth is wet: it glistens, as bare sap does, a little
   // less under its skin
-  c += sapGlisten(n, V, v_pos, v_obj, sap, thin * show, sh) * thin * (0.35 + 0.65 * fill) * health * SKIN_GLISTEN;
+  if (glisten > 0.0) c += sapGlistenWith(n, V, v_pos, v_obj, sap, thin * show, sh, pl.mirrored) * glisten;
 
 
   // rim light keeps the silhouette readable at night (as on the wolf)

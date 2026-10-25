@@ -63,8 +63,9 @@ const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE);
 // sap is alive and wet: bubbles drifting up inside it, beads sliding down
 // its surface, and hard light glistening on it (sapGlisten). Added to every
 // sap material. `inside` how see-through it is there; `sh`: how much of the
-// key light reaches it (its glints fall in shadow with it)
-vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout float alpha) {
+// key light reaches it (its glints fall in shadow with it); `mirrored`: the
+// points of light mirrored in it (pointLights)
+vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, vec3 mirrored, inout float alpha) {
   float t = pc.eye_time.w;
   vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
   float bub = sapBubbles(v_obj, V, t) * inside;
@@ -72,7 +73,7 @@ vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, inout fl
   vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
   c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + keyLight() * drop.y * sh;
   alpha = max(alpha, drop.x * 0.85);
-  vec3 g = sapGlisten(n, V, v_pos, v_obj, sapc, inside, sh);
+  vec3 g = sapGlistenWith(n, V, v_pos, v_obj, sapc, inside, sh, mirrored);
   // a glint is opaque light: it shows whole even on clear sap
   alpha = max(alpha, clamp(dot(g, vec3(0.33)), 0.0, 1.0));
   return c + g;
@@ -278,11 +279,12 @@ void surface() {
     float flow = v_t < 0.0 ? 0.0 : pow(0.5 + 0.5 * sin(v_t * TAU * ESSENCE_STREAKS - t * ESSENCE_RUN + v_phase * TAU), 3.0);
     float fres = pow(1.0 - clamp(dot(n, V), 0.0, 1.0), FRESNEL_POW);
     vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
-    c = shadeLit(v_col * 0.5, n, v_pos, sh);
+    PointLit pl = pointLights(v_pos, n, reflect(-V, n), true);
+    c = shadeLitWith(v_col * 0.5, n, sh, pl.plain);
     c += v_col * v_glow * (0.7 + 1.1 * flow);
     c += mix(v_col, vec3(1.0), 0.5) * fres * 0.5 * lit;
-    c += v_col * pointLight(v_pos, n, 0.0) * 0.3;
-    c += sapGlisten(n, V, v_pos, v_obj, v_col, 0.0, sh);
+    c += v_col * pl.plain * 0.3;
+    c += sapGlistenWith(n, V, v_pos, v_obj, v_col, 0.0, sh, pl.mirrored);
     o = vec4(applyFog(c, v_pos), 1.0);
     return;
   }
@@ -296,9 +298,10 @@ void surface() {
     vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), PRISM_FILM, 0.35);
     float day = DAYLIGHT;
     vec3 lit = byDay(NIGHT_LIT, PRISM_DAY);
-    c = shadeLit(v_col * 0.55, n, v_pos, sh);
+    PointLit pl = pointLights(v_pos, n, n, false);
+    c = shadeLitWith(v_col * 0.55, n, sh, pl.plain);
     c += film * lit * (0.18 + 0.55 * fres + 0.25 * facet.y * max(dot(n, SUN), 0.0) * sh);
-    c += film * pointLight(v_pos, n, 0.0) * 0.5;
+    c += film * pl.plain * 0.5;
     vec3 H = normalize(SUN + V);
     c += lit * pow(max(dot(n, H), 0.0), PRISM_SPEC_POW) * 1.6 * step(0.0, dot(n, SUN)) * sh;
     c += film * fres * mix(0.25, 0.08, day);
@@ -328,17 +331,18 @@ void surface() {
     float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
     float through = max(dot(-raw, SUN), 0.0) * sh;
     vec3 lit = byDay(RESIN_NIGHT, vec3(1.0));
-    c = shadeLit(deep, raw, v_pos, sh);
+    PointLit pl = pointLights(v_pos, raw, reflect(-V, raw), true);
+    c = shadeLitWith(deep, raw, sh, pl.plain);
     c += sap * lit * wrap * mix(0.05, 0.22, h);
     c += sap * lit * through * 0.25 * h;
     // light from a bloom or a mote nearby carried through the mass too
-    c += sap * pointLight(v_pos, raw, 1.0) * mix(0.1, 0.4, h);
+    c += sap * pl.wrapped * mix(0.1, 0.4, h);
     // the polished face: amber gathered to a narrow band at its edge (its
     // highlights are the glisten's, in sapLife)
     c += mix(deep, sap * 1.4, pow(1.0 - ndv, SAP_EDGE_POW)) * 0.3 * lit;
     // denser at the base: nearly opaque there, see-through only toward the face
     alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
-    c = sapLife(c, sap, raw, V, h * (1.0 - fres), sh, alpha);
+    c = sapLife(c, sap, raw, V, h * (1.0 - fres), sh, pl.mirrored, alpha);
     o = vec4(applyFog(c, v_pos), alpha);
     return;
   }
@@ -349,21 +353,23 @@ void surface() {
     float ndv = clamp(dot(raw, V), 0.0, 1.0);
     float fres = pow(1.0 - ndv, FRESNEL_POW);
     vec3 deep = SAP_DEEP * hue * (0.6 + 0.8 * v_glow);
-    c = shadeLit(deep, raw, v_pos, sh) + mix(deep, SAP * hue * 2.2, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.35 + v_glow);
-    c += SAP * hue * pointLight(v_pos, raw, 1.0) * 0.3;
+    PointLit pl = pointLights(v_pos, raw, reflect(-V, raw), true);
+    c = shadeLitWith(deep, raw, sh, pl.plain) + mix(deep, SAP * hue * 2.2, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.35 + v_glow);
+    c += SAP * hue * pl.wrapped * 0.3;
     alpha = mix(v_fade, 1.0, fres);
-    c = sapLife(c, SAP * hue, raw, V, 1.0 - fres, sh, alpha);
+    c = sapLife(c, SAP * hue, raw, V, 1.0 - fres, sh, pl.mirrored, alpha);
   } else if (inner_ear && v_fade < 0.999) {
     // the inner ear is a sheet of sap: glowing at grazing angles, faintly
     // see-through face-on (the outer face stays solid vine)
     float ndv = clamp(-dot(raw, V), 0.0, 1.0);
     float fres = pow(1.0 - ndv, FRESNEL_POW);
     vec3 deep = SAP_DEEP * 1.6;
-    c = shadeLit(deep, -raw, v_pos, sh) + mix(deep, SAP * 1.8, pow(1.0 - ndv, SAP_EDGE_POW)) * 0.5;
+    PointLit pl = pointLights(v_pos, -raw, reflect(-V, -raw), true);
+    c = shadeLitWith(deep, -raw, sh, pl.plain) + mix(deep, SAP * 1.8, pow(1.0 - ndv, SAP_EDGE_POW)) * 0.5;
     c += SAP * max(dot(raw, SUN), 0.0) * 0.25 * sh; // light through the ear
-    c += SAP * pointLight(v_pos, raw, 0.0) * 0.25;
+    c += SAP * pl.behind * 0.25;
     alpha = mix(v_fade, 1.0, fres);
-    c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), sh, alpha);
+    c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), sh, pl.mirrored, alpha);
   } else {
     vec3 albedo = v_col;
     float inner = 0.0;
@@ -372,10 +378,11 @@ void surface() {
       inner = dot(raw, V) < 0.0 ? 1.0 : 0.0;
       albedo = mix(albedo, SAP * 0.6, inner * 0.8);
     }
-    c = shadeLit(albedo, n, v_pos, sh);
+    PointLit pl = pointLights(v_pos, n, n, false);
+    c = shadeLitWith(albedo, n, sh, pl.plain);
     // leaves and sap are thin/translucent: back light shines through (a
     // bloom's or a mote's too)
-    if (PART_IN(THIN, part)) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pointLight(v_pos, -n, 0.0) * 0.3);
+    if (PART_IN(THIN, part)) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pl.behind * 0.3);
     c += SAP * inner * 0.25;
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets
