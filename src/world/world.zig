@@ -6,6 +6,8 @@ const testing = std.testing;
 const m = @import("../core/math.zig");
 const ck = @import("chunk.zig");
 const gen = @import("gen.zig");
+const jobs = @import("../core/jobs.zig");
+const Io = std.Io;
 
 pub const Chunk = ck.Chunk;
 pub const Coord = ck.Coord;
@@ -20,6 +22,11 @@ pub const World = struct {
   fresh:std.ArrayList(*Chunk) = .empty,
   /// gpu slots of chunks that were unloaded; the renderer drains this.
   evicted:std.ArrayList(ck.MeshSlot) = .empty,
+  /// the thread pool work on the world is split over (chunks generated,
+  /// meshed, plants relinked); none (headless) does it all in place.
+  // decision: the pool rides on the world, which every such caller holds,
+  // set by main once the game is made or loaded
+  io:?Io = null,
 
   pub fn init(gpa:Allocator, seed:u64) World { return .{.gpa = gpa, .seed = seed}; }
 
@@ -163,20 +170,40 @@ pub const World = struct {
   /// the chunk at `at`, generating it first if it is not resident.
   pub fn ensure(w:*World, at:Coord) Error!*Chunk { return w.map.get(at) orelse w.load(at); }
 
-  /// generate missing chunks nearest-first, at most `budget` per call.
+  /// generate missing chunks nearest-first, at most `budget` per call: made
+  /// blank here, generated together over the pool (each fills only itself)
   pub fn stream(w:*World, focus:Coord, radius:i32, budget:u32) Error!void {
     w.fresh.clearRetainingCapacity();
+    errdefer {
+      for (w.fresh.items) |c| w.gpa.destroy(c);
+      w.fresh.clearRetainingCapacity();
+    }
     var r:i32 = 0;
-    while (r <= radius) : (r += 1) {
+    rings: while (r <= radius) : (r += 1) {
       var it = m.ring(r);
       while (it.next()) |o| {
         const at:Coord = .{.x = focus.x + o[0], .y = focus.y + o[1]};
         if (w.map.contains(at)) continue;
-        if (w.fresh.items.len >= budget) return;
-        _ = try w.load(at);
+        if (w.fresh.items.len >= budget) break :rings;
+        try w.fresh.ensureUnusedCapacity(w.gpa, 1);
+        const c = try w.gpa.create(Chunk);
+        c.* = ck.blank(at);
+        w.fresh.appendAssumeCapacity(c);
       }
     }
+    const made = w.fresh.items;
+    try w.map.ensureUnusedCapacity(w.gpa, @intCast(made.len));
+    jobs.each(w.io, made.len, 1, Generate, .{.seed = w.seed, .cs = made}, Generate.run);
+    for (made) |c| w.map.putAssumeCapacityNoClobber(c.at, c);
   }
+
+  /// one range of fresh chunks generated
+  const Generate = struct {
+    seed:u64,
+    cs:[]const *Chunk,
+
+    fn run(g:Generate, lo:usize, hi:usize) void { for (g.cs[lo..hi]) |c| gen.generate(g.seed, c); }
+  };
 
   /// unpinned chunks well outside `radius`, ready to `unload`.
   pub fn far(w:*World, focus:Coord, radius:i32, out:*std.ArrayList(*Chunk)) Error!void {
@@ -227,5 +254,23 @@ test "the drawn ground meets each tile's height at its centre and runs on unbrok
       try testing.expectApproxEqAbs(w.surfaceAt(m.f(wx) - e, m.f(wy) + 0.7), w.surfaceAt(m.f(wx) + e, m.f(wy) + 0.7), 1e-3);
       try testing.expectApproxEqAbs(w.cornerH(wx, wy), w.surfaceAt(m.f(wx) + e, m.f(wy) + e), 1e-3);
     }
+  }
+}
+
+test "chunks generated over the pool match those made one by one" {
+  var a = World.init(testing.allocator, 9);
+  defer a.deinit();
+  var b = World.init(testing.allocator, 9);
+  defer b.deinit();
+  b.io = testing.io;
+  try a.stream(.{.x = 0, .y = 0}, 2, 100);
+  try b.stream(.{.x = 0, .y = 0}, 2, 100);
+  try testing.expectEqual(a.map.count(), b.map.count());
+  var it = a.map.valueIterator();
+  while (it.next()) |c| {
+    const d = b.get(c.*.at).?;
+    try testing.expectEqualSlices(f32, &c.*.height, &d.height);
+    try testing.expectEqualSlices(ck.Kind, &c.*.kind, &d.kind);
+    try testing.expectEqualSlices(f32, &c.*.ley, &d.ley);
   }
 }

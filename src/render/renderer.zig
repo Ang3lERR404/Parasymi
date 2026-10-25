@@ -26,6 +26,7 @@ const species = @import("../sim/species.zig");
 const World = @import("../world/world.zig").World;
 const ck = @import("../world/chunk.zig");
 const terrain_mesh = @import("terrain_mesh.zig");
+const jobs = @import("../core/jobs.zig");
 const post_mod = @import("post.zig");
 const light = @import("light.zig");
 const Post = post_mod.Post;
@@ -192,6 +193,8 @@ pub const CHUNK_RADIUS:f32 = m.f(ck.SIZE) * 0.71 + 2;
 
 /// milliseconds a frame may spend meshing streamed chunks
 pub const MESH_MS:f64 = 3;
+/// streamed chunks meshed together over the pool, each into its own scratch
+const MESH_BATCH = 8;
 /// smallest buffer made for a chunk (an empty chunk still gets one)
 const MIN_CHUNK_BYTES = 64;
 
@@ -314,8 +317,9 @@ pub const Renderer = struct {
   /// per part slot: whether any of its vertices can be see-through (sap,
   /// resin, shadow, beam, halo); the glass pass draws only those
   part_glassy:[meshlib.SLOTS]bool = @splat(false),
-  scratch:std.ArrayList(vertex.Terrain) = .empty,
-  detail_scratch:std.ArrayList(vertex.DetailTile) = .empty,
+  /// one chunk's ground and detail per place in a meshing batch
+  scratch:[MESH_BATCH]std.ArrayList(vertex.Terrain) = @splat(.empty),
+  detail_scratch:[MESH_BATCH]std.ArrayList(vertex.DetailTile) = @splat(.empty),
   /// buffers retired since the last frame began; any frame still in flight
   /// may use them, so they join the next frame's garbage (freed only once
   /// that frame, and every frame before it, has finished on the GPU).
@@ -515,8 +519,10 @@ pub const Renderer = struct {
     }
     r.slots.deinit(r.gpa);
     r.free_slots.deinit(r.gpa);
-    r.scratch.deinit(r.gpa);
-    r.detail_scratch.deinit(r.gpa);
+    for (&r.scratch, &r.detail_scratch) |*v, *d| {
+      v.deinit(r.gpa);
+      d.deinit(r.gpa);
+    }
     r.meshes.deinit(c);
     r.skins.deinit(c);
     r.grows.deinit(c);
@@ -557,42 +563,77 @@ pub const Renderer = struct {
 
     r.stats.meshed = 0;
     const start = glfw.getTime();
-    var it = w.map.valueIterator();
-    while (it.next()) |cp| {
-      const c = cp.*;
-      if (!c.dirty) continue;
-      // at most `budget` chunks, and no more once a frame's share of time
-      // is spent (at least one, so streaming always moves on)
-      if (r.stats.meshed >= budget) break;
+    // dirty chunks a batch at a time: meshed together over the pool, then
+    // uploaded here. At most `budget` chunks, and no more batches once a
+    // frame's share of time is spent (at least one, so streaming moves on).
+    while (r.stats.meshed < budget) {
       if (r.stats.meshed > 0 and (glfw.getTime() - start) * m.MS_PER_S > ms) break;
-      try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch, &r.detail_scratch);
-      const bytes = sliceAsBytes(r.scratch.items);
-      var buf = try Buffer.init(&r.ctx, @max(bytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});
-      errdefer buf.deinit(&r.ctx);
-      buf.write(0, bytes);
-      const dbytes = sliceAsBytes(r.detail_scratch.items);
-      var detail = try Buffer.init(&r.ctx, @max(dbytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});
-      errdefer detail.deinit(&r.ctx);
-      detail.write(0, dbytes);
-      const slot = if (c.gpu_slot) |s| s else r.free_slots.pop() orelse blk: {
-        try r.slots.append(r.gpa, .{});
-        break :blk @as(ck.MeshSlot, @enumFromInt(r.slots.items.len - 1));
-      };
-      const at = @intFromEnum(slot);
-      if (c.gpu_slot != null) {
-        try r.retire(r.slots.items[at].buf);
-        try r.retire(r.slots.items[at].detail);
+      var batch:[MESH_BATCH]*ck.Chunk = undefined;
+      var n:usize = 0;
+      var it = w.map.valueIterator();
+      while (it.next()) |cp| {
+        if (n == batch.len or r.stats.meshed + n >= budget) break;
+        if (cp.*.dirty) {
+          batch[n] = cp.*;
+          n += 1;
+        }
       }
-      c.gpu_slot = slot;
-      const half = m.f(ck.SIZE) / 2;
-      r.slots.items[at] = .{
-        .buf = buf, .count = @intCast(r.scratch.items.len), .live = true,
-        .detail = detail, .tiles = @intCast(r.detail_scratch.items.len),
-        .centre = .{m.f(c.originX()) + half, m.f(c.originY()) + half},
-      };
-      c.dirty = false;
-      r.stats.meshed += 1;
+      if (n == 0) break;
+      var failed:[MESH_BATCH]?Allocator.Error = @splat(null);
+      jobs.each(w.io, n, 1, Meshing, .{
+        .gpa = r.gpa, .seed = w.seed, .cs = batch[0..n],
+        .out = r.scratch[0..n], .detail = r.detail_scratch[0..n], .failed = failed[0..n],
+      }, Meshing.run);
+      for (failed[0..n]) |e| if (e) |err| return err;
+      for (batch[0..n], r.scratch[0..n], r.detail_scratch[0..n]) |c, vs, ds| try r.upload(c, vs.items, ds.items);
     }
+  }
+
+  /// one range of a batch of chunks' ground meshed, each into its own scratch
+  const Meshing = struct {
+    gpa:Allocator,
+    seed:u64,
+    cs:[]const *ck.Chunk,
+    out:[]std.ArrayList(vertex.Terrain),
+    detail:[]std.ArrayList(vertex.DetailTile),
+    failed:[]?Allocator.Error,
+
+    fn run(j:Meshing, lo:usize, hi:usize) void {
+      for (lo..hi) |k| terrain_mesh.build(j.gpa, j.seed, j.cs[k], &j.out[k], &j.detail[k]) catch |e| {
+        j.failed[k] = e;
+      };
+    }
+  };
+
+  /// a meshed chunk's ground and detail into buffers of its own slot (the
+  /// old ones retired), and it is clean
+  fn upload(r:*Renderer, c:*ck.Chunk, verts:[]const vertex.Terrain, tiles:[]const vertex.DetailTile) Error!void {
+    const bytes = sliceAsBytes(verts);
+    var buf = try Buffer.init(&r.ctx, @max(bytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});
+    errdefer buf.deinit(&r.ctx);
+    buf.write(0, bytes);
+    const dbytes = sliceAsBytes(tiles);
+    var detail = try Buffer.init(&r.ctx, @max(dbytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});
+    errdefer detail.deinit(&r.ctx);
+    detail.write(0, dbytes);
+    const slot = if (c.gpu_slot) |s| s else r.free_slots.pop() orelse blk: {
+      try r.slots.append(r.gpa, .{});
+      break :blk @as(ck.MeshSlot, @enumFromInt(r.slots.items.len - 1));
+    };
+    const at = @intFromEnum(slot);
+    if (c.gpu_slot != null) {
+      try r.retire(r.slots.items[at].buf);
+      try r.retire(r.slots.items[at].detail);
+    }
+    c.gpu_slot = slot;
+    const half = m.f(ck.SIZE) / 2;
+    r.slots.items[at] = .{
+      .buf = buf, .count = @intCast(verts.len), .live = true,
+      .detail = detail, .tiles = @intCast(tiles.len),
+      .centre = .{m.f(c.originX()) + half, m.f(c.originY()) + half},
+    };
+    c.dirty = false;
+    r.stats.meshed += 1;
   }
 
   fn recreate(r:*Renderer) Error!void {

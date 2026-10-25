@@ -9,6 +9,7 @@ test {
   _ = @import("core/rng.zig");
   _ = @import("core/noise.zig");
   _ = @import("core/png.zig");
+  _ = @import("core/jobs.zig");
   _ = @import("world/gen.zig");
   _ = @import("world/world.zig");
   _ = @import("sim/ecology.zig");

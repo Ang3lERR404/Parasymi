@@ -128,6 +128,9 @@ pub fn main(init:Init) !void {
 
   var game = try Game.init(gpa, seed);
   defer game.deinit();
+  // the world's heavy work (chunks generated and meshed, plants relinked)
+  // is split over the pool
+  game.world.io = io;
   game.opts = opts;
   game.most_samples = r.maxSamples();
   // what is in effect; the window opens windowed, so a fullscreen setting
@@ -287,6 +290,7 @@ fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer, name:save.Name) !bool 
   // the settings belong to the gardener, not the garden
   loaded.opts = game.opts;
   loaded.most_samples = game.most_samples;
+  loaded.world.io = io;
   game.deinit();
   game.* = loaded;
   loaded = undefined;

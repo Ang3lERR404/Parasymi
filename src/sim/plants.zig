@@ -11,6 +11,7 @@ const indexOfScalar = std.mem.indexOfScalar;
 const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("species.zig");
+const jobs = @import("../core/jobs.zig");
 
 pub const Id = ck.PlantId;
 const Occ = ck.Occ;
@@ -18,6 +19,8 @@ const Error = Allocator.Error;
 /// neighbours touching the footprint (ring 1) and one tile further (ring 2).
 pub const R1 = 12;
 pub const R2 = 20;
+/// fewer plants than this a thread are relinked in one go
+const LINKS_MIN = 512;
 
 /// a square of tiles: a footprint.
 pub const Rect = struct {
@@ -162,35 +165,48 @@ pub const Plants = struct {
   }
 
   pub fn rebuildLinks(p:*Plants, w:*World) void {
-    const s = p.list.slice();
-    const xs = s.items(.x);
-    const ys = s.items(.y);
-    const sps = s.items(.sp);
-    const n1 = s.items(.n1);
-    const n2 = s.items(.n2);
-    const any_floaters = p.floaters.count() > 0;
-    for (0..p.list.len) |i| {
-      n1[i] = @splat(.none);
-      n2[i] = @splat(.none);
-      const def = species.get(sps[i]);
-      const size:i32 = if (def.floating) 1 else def.size;
-      var dy:i32 = -2;
-      while (dy < size + 2) : (dy += 1) {
-        var dx:i32 = -2;
-        while (dx < size + 2) : (dx += 1) {
-          const rx = if (dx < 0) -dx else if (dx >= size) dx - size + 1 else 0;
-          const ry = if (dy < 0) -dy else if (dy >= size) dy - size + 1 else 0;
-          // tiles under the footprint count as touching (a floater over a root)
-          const ring = @max(@max(rx, ry), 1);
-          const wx = xs[i] + dx;
-          const wy = ys[i] + dy;
-          if (w.occAt(wx, wy).asPlant()) |j| link(n1, n2, i, j, ring);
-          if (any_floaters) if (p.floaters.get(.{wx, wy})) |f| link(n1, n2, i, f, ring);
+    // each plant fills only its own rows, so they are split over the pool
+    jobs.each(w.io, p.list.len, LINKS_MIN, Relink, .{.p = p, .w = w}, Relink.run);
+    p.topology_dirty = false;
+  }
+
+  /// one range of plants' neighbour rows, made afresh from occupancy
+  const Relink = struct {
+    p:*const Plants,
+    w:*const World,
+
+    fn run(r:Relink, lo:usize, hi:usize) void {
+      const p = r.p;
+      const w = r.w;
+      const s = p.list.slice();
+      const xs = s.items(.x);
+      const ys = s.items(.y);
+      const sps = s.items(.sp);
+      const n1 = s.items(.n1);
+      const n2 = s.items(.n2);
+      const any_floaters = p.floaters.count() > 0;
+      for (lo..hi) |i| {
+        n1[i] = @splat(.none);
+        n2[i] = @splat(.none);
+        const def = species.get(sps[i]);
+        const size:i32 = if (def.floating) 1 else def.size;
+        var dy:i32 = -2;
+        while (dy < size + 2) : (dy += 1) {
+          var dx:i32 = -2;
+          while (dx < size + 2) : (dx += 1) {
+            const rx = if (dx < 0) -dx else if (dx >= size) dx - size + 1 else 0;
+            const ry = if (dy < 0) -dy else if (dy >= size) dy - size + 1 else 0;
+            // tiles under the footprint count as touching (a floater over a root)
+            const ring = @max(@max(rx, ry), 1);
+            const wx = xs[i] + dx;
+            const wy = ys[i] + dy;
+            if (w.occAt(wx, wy).asPlant()) |j| link(n1, n2, i, j, ring);
+            if (any_floaters) if (p.floaters.get(.{wx, wy})) |f| link(n1, n2, i, f, ring);
+          }
         }
       }
     }
-    p.topology_dirty = false;
-  }
+  };
 
   fn link(n1:[][R1]Id, n2:[][R2]Id, i:usize, j:Id, ring:i32) void {
     if (j.idx() == i) return;
@@ -279,4 +295,32 @@ test "links stay valid right after a remove, matching a rebuild" {
       }
     }
   }
+}
+
+test "links made over the pool match links made in place" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{.x = 0, .y = 0}, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (&c.kind, &c.height) |*k, *h| { k.* = .soil; h.* = 1; }
+  var p:Plants = .{};
+  defer p.deinit(gpa);
+  // a chunk sown full (enough plants to split), a floater over every third
+  for (0..ck.SIZE) |y| for (0..ck.SIZE) |x| {
+    const wx:i32 = @intCast(x);
+    const wy:i32 = @intCast(y);
+    _ = try p.place(gpa, &w, wx, wy, .lumenroot, 0.5);
+    if ((x + y) % 3 == 0) _ = try p.place(gpa, &w, wx, wy, .driftwisp, 0.5);
+  };
+  try testing.expect(p.len() > 2 * LINKS_MIN);
+  p.rebuildLinks(&w);
+  const n1 = try gpa.dupe([R1]Id, p.list.items(.n1));
+  defer gpa.free(n1);
+  const n2 = try gpa.dupe([R2]Id, p.list.items(.n2));
+  defer gpa.free(n2);
+  w.io = testing.io;
+  p.rebuildLinks(&w);
+  for (n1, p.list.items(.n1)) |a, b| try testing.expectEqualSlices(Id, &a, &b);
+  for (n2, p.list.items(.n2)) |a, b| try testing.expectEqualSlices(Id, &a, &b);
 }
