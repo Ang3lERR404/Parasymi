@@ -39,11 +39,10 @@ const BREATH:f32 = 0.02;
 const BREATH_RATE:f32 = 1.3;
 const FACING:f32 = 0.5;
 const STRETCH:f32 = 0.15;
-/// each root's size varies by `SIZE_SPREAD` about `SIZE_MIN`, and a sprout
-/// starts at `SPROUT` of it
+/// each root's size varies by `SIZE_SPREAD` about `SIZE_MIN` (it grows out
+/// along its spline with the digger, `grown`)
 const SIZE_MIN:f32 = 0.9;
 const SIZE_SPREAD:f32 = 0.2;
-const SPROUT:f32 = 0.15;
 const GLOW:f32 = 0.2;
 const GLOW_ACTIVE:f32 = 0.6;
 /// the item drawn in arcs from `ARC_BASE` up by `ARC`, carried at this size
@@ -149,12 +148,12 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const breathe = 1 + BREATH * @sin(tf * BREATH_RATE + m.f(r) * 1.7);
     const facing = working and @cos(m.angleDiff(yaw, node_yaw)) > FACING;
     const reach = if (facing) 1 + STRETCH * (0.5 - 0.5 * @cos(k * m.tau)) else breathe;
-    const size = (SIZE_MIN + SIZE_SPREAD * @abs(@sin(s.seed * 13 + m.f(r) * 2.3))) * m.lerp(SPROUT, 1, m.smooth(s.grown));
+    const size = SIZE_MIN + SIZE_SPREAD * @abs(@sin(s.seed * 13 + m.f(r) * 2.3));
     try out.emit(.digger_root, m.chain(&.{
       m.translate(ctr),
       m.rotY(yaw),
       m.scale3(m.v3(reach * size, size, size)),
-    }), .{ .glow = GLOW + GLOW_ACTIVE * s.activity, .phase = s.seed });
+    }), .{ .glow = GLOW + GLOW_ACTIVE * s.activity, .phase = s.seed, .grown = s.grown });
   }
   if (!working) return;
   const d = dg.?;

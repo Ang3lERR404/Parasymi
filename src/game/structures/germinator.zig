@@ -31,7 +31,7 @@ const v3 = m.v3;
 
 pub const def:st.Def = .{
   .item = .germinator, .size = 2, .mesh = .germinator, .preview = .germinator_whole, .store = true,
-  .sway = 0.55, .tall = mesh.TALL, .grow = 6, .still = true, .splined = true,
+  .sway = 0.55, .tall = mesh.TALL, .grow = 6, .still = true,
 };
 
 /// weave speed multiplier relative to hand-weaving

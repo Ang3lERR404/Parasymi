@@ -9,6 +9,9 @@
 //! forward the way it carries, as weed combs out downstream. Soil is heaped
 //! where it breaks the ground, rootlets reaching into it.
 //! `left`/`right`: the same root turning in from the tile's +Z / -Z edge.
+//! It grows along a growth spline (gfx/growth.zig) through its spine: up
+//! out of the soil at its back edge (where the root behind went down),
+//! over, and down in at its front.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -19,6 +22,7 @@ const noise = @import("../../core/noise.zig");
 const vertex = @import("../vertex.zig");
 const Rng = @import("../../core/rng.zig").Rng;
 const kit = @import("structure_kit.zig");
+const growth = @import("../growth.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -91,25 +95,38 @@ fn height(a:Arch, s:f32) f32 {
   return -a.depth + (a.peak + a.depth) * 0.5 * (b + @sqrt(b));
 }
 
-pub fn build(b:*mg.Builder) Allocator.Error!void { try arch(b, .{.seed = 0xC0D}); }
+pub fn build(b:*mg.Builder) Allocator.Error!void { try grown(b, .{.seed = 0xC0D}); }
 pub const left = struct {
-  pub fn build(b:*mg.Builder) Allocator.Error!void { try arch(b, .{.turn = 1, .seed = 0xC1D}); }
+  pub fn build(b:*mg.Builder) Allocator.Error!void { try grown(b, .{.turn = 1, .seed = 0xC1D}); }
 };
 pub const right = struct {
-  pub fn build(b:*mg.Builder) Allocator.Error!void { try arch(b, .{.turn = -1, .seed = 0xC2D}); }
+  pub fn build(b:*mg.Builder) Allocator.Error!void { try grown(b, .{.turn = -1, .seed = 0xC2D}); }
 };
 
-/// the root: its spine (tu.x 0 where it enters .. 1 where it leaves).
-pub fn arch(b:*mg.Builder, a:Arch) Allocator.Error!void {
+/// one arch on a skeleton of its own: it grows up out of the soil at its
+/// back edge, over and down into it at its front.
+fn grown(b:*mg.Builder, a:Arch) Allocator.Error!void {
+  var k = growth.Skeleton.begin(b);
+  _ = try arch(b, &k, a);
+  k.finish(b);
+}
+
+/// the root: its spine (tu.x 0 where it enters .. 1 where it leaves), the
+/// spline it grows along on `k` (returned). The core and its weave grow
+/// along it as its front digs on; leaves unfold and soil heaps up as the
+/// front passes them.
+pub fn arch(b:*mg.Builder, k:*growth.Skeleton, a:Arch) Allocator.Error!growth.Id {
   var rng = Rng.init(a.seed);
   var ctrl:[CTRL]V3 = undefined;
-  for (&ctrl, 0..) |*c, k| {
-    const s = m.ratio(k, CTRL - 1);
+  for (&ctrl, 0..) |*c, i| {
+    const s = m.ratio(i, CTRL - 1);
     const xz = plan(a, s);
     // never quite smooth, the ends held where the neighbours' meet them
     const j = 0.012 * @sin(m.pi * s);
     c.* = v3(xz[0] + j * rng.range(-1, 1), height(a, s) + j * rng.range(-0.5, 0.5), xz[1] + j * rng.range(-1, 1));
   }
+  const spine = k.trunk(&ctrl, .{});
+  const start = b.mark();
   var sp:[RES]V3 = undefined;
   m.splineResample(&ctrl, &sp);
   var ts:[RES]f32 = undefined;
@@ -130,9 +147,12 @@ pub fn arch(b:*mg.Builder, a:Arch) Allocator.Error!void {
   mg.transport(&sp, &fn_, &fb);
   try weave(b, a, &sp, &ts, &rs, &fn_, &fb);
   if (a.runners) for ([_][2]f32{.{0.2, 0.42}, .{0.55, 0.8}}, [_]f32{1, -1}) |span, side| try runner(b, &sp, &rs, span, side);
+  try k.along(b, start, spine);
   for (a.leaves, 0..) |n, ci| {
     const u = m.lerp(0.2, 0.78, (m.f(ci) + 0.5) / m.f(a.leaves.len));
+    const s = b.mark();
     try cluster(b, &sp, &rs, u, n, if (ci % 2 == 0) 1 else -1, &rng);
+    try k.on(b, s, spine, u, .{});
   }
   // where it breaks the ground, coming up and going down
   for (1..RES) |i| {
@@ -142,8 +162,11 @@ pub fn arch(b:*mg.Builder, a:Arch) Allocator.Error!void {
     const at = m.lerpV(sp[i - 1], sp[i], y0 / (y0 - y1));
     // away from the arch: back where it comes up, on where it goes down
     const away = m.norm(if (y1 > y0) sp[i - 1] - sp[i] else sp[i] - sp[i - 1]);
+    const s = b.mark();
     try ground(b, at, m.norm(v3(away[0], 0, away[2])), a.core_r, y1 < y0, &rng);
+    try k.on(b, s, spine, k.nearest(spine, at), .{.from = at});
   }
+  return spine;
 }
 
 /// smaller roots wound over and under each other round the core, each set
@@ -263,15 +286,22 @@ fn tangent(sp:[]const V3, u:f32) V3 {
 /// mesh: CONDUIT TAP. a side root a conduit sends from under its middle
 /// along +X to the plant on the next tile: woven as the conduit's own, it
 /// comes up beside it, arches low over the ground and digs in at the
-/// plant's foot, splitting into rootlets around it. Instances stretch it
-/// along X as it grows out.
+/// plant's foot, splitting into rootlets around it. It grows along its own
+/// spline by how far it has reached (emitted with that as `grown`), the
+/// rootlets last, and withers back down it.
 pub const tap = struct {
   pub const REACH:f32 = 0.74;
+  /// how much later each rootlet spreads than the one before
+  const ROOTLET_STAGGER:f32 = 0.04;
   pub fn build(b:*mg.Builder) Allocator.Error!void {
-    try arch(b, .{.from = 0, .to = REACH, .peak = 0.1, .depth = 0.07, .core_r = 0.02, .strands = 2, .turns = 1.5, .core = .stem, .leaves = &.{2}, .runners = false, .seed = 0x7A9});
+    var k = growth.Skeleton.begin(b);
+    const spine = try arch(b, &k, .{.from = 0, .to = REACH, .peak = 0.1, .depth = 0.07, .core_r = 0.02, .strands = 2, .turns = 1.5, .core = .stem, .leaves = &.{2}, .runners = false, .seed = 0x7A9});
     const end = v3(REACH, -0.02, 0);
     for ([_]f32{-0.9, -0.1, 0.8}, 0..) |a, i| {
+      const s = b.mark();
       try kit.rootlet(b, end, m.norm(v3(@cos(a) * 0.8, -0.45, @sin(a) * 0.8)), 0.24, 0.014, 0x7AA +% i * 29);
+      try k.on(b, s, spine, 1, .{.from = end, .delay = ROOTLET_STAGGER * m.f(i)});
     }
+    k.finish(b);
   }
 };

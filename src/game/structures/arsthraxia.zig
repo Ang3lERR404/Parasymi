@@ -29,7 +29,7 @@ const Color = @import("../../ui/draw.zig").Color;
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8, .splined = true };
+pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8 };
 
 /// most of one ingredient it will hold
 const STOCK = 20;

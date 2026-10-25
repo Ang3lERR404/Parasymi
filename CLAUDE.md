@@ -133,9 +133,11 @@ recipes (`game/craft.zig`) are plain data tables.
   meshed and skinned), `mineral_kit`.
 - **Structures grow along growth splines** (`gfx/growth.zig`); every new
   structure mesh (and any piece of one that grows) is built this way, never
-  grown by scaling the whole. Built: sap cache, germinator, arsthraxia (and
-  its research offshoots). Still on the old whole-structure scale: conduit,
-  root-digger, polyp, diamond (port them when touched).
+  grown by scaling the whole. Every structure is: sap cache, germinator,
+  arsthraxia (and its research offshoots), root-digger (and its roots, in
+  the first share of its growth: `sk.tail`), polyp, conduit (each arch
+  its own spline; side roots grown by how far they reach). The diamond
+  is the radiant lineage's and forms its own way (left as it is).
   - A mesh's `build` lays out a hidden `Skeleton`: `var sk =
     growth.Skeleton.begin(b)`, `sk.trunk(ctrl, .{})`, then `sk.branch(parent,
     u, ctrl, .{})` / `sk.vine(parent, u, mg.Growth, n, .{})` off it (a
@@ -161,8 +163,8 @@ recipes (`game/craft.zig`) are plain data tables.
     growth (`PartInstance.w.w`, `Look.grown`) reaches it, grows it out,
     thin (`SPROUT_THIN`) until its spline is done; foliage tips lag
     (`LEAF_LAG`). `b.xform` carries `from` along.
-  - The structure's `Def` sets `.splined = true` (`grownScale` is then its
-    research size only, no shoot-up/fill-out).
+  - `grownScale` is a structure's research size only; nothing shoots up
+    or fills out (the old whole-structure scale is gone).
   - Pieces a structure emits on its own (cups, cores, satellites) form in a
     last share kept free by `sk.tail = FORM` (a `pub const` in the mesh
     file): a mesh of its own carries that window
@@ -250,8 +252,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   adjacent node 1 item/4 s into an 8-item buffer, feeds neighbours, idles
   with no node; 3 fibre + 2 grit + 1 ley shard; "Deep Rooting"). Put down,
   they grow (`Def.grow`: germinator 6 s, arsthraxia 8, sap cache and
-  digger 4, conduit 1.5) and do no work until grown; `Def.splined` ones
-  grow along their growth splines. `Def.carrier` marks
+  digger 4, conduit 1.5) and do no work until grown, growing along their
+  growth splines. `Def.carrier` marks
   item carriers (conduit): they face a way, chain, and are pulled through.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
@@ -386,7 +388,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   chains stay joined; hung parts follow via `Look.drop`), breathe at a fixed
   tempo, and grow in along their growth splines (trunk first, branches
   after, leaves unfolding as the front passes, emitted pieces last; see
-  Conventions); the unported ones still shoot up, fill out, leaves unfold.
+  Conventions).
 - Resource nodes (`mineral_kit`, flat facets): ley shards a violet crystal
   cluster; grit faceted stones with quartz chips; fibre a swaying clump of
   arching stalks.
@@ -543,7 +545,7 @@ LOD + culling, bloom post-processing, research sapling panel, halo + diamond str
 anti-aliasing (MSAA/FXAA) + options panel, the wolf as one sculpted skinned
 mesh with procedural locomotion (planted feet, leg IK, springs), saved gardens
 menu + autosave, files in `%LOCALAPPDATA%\Parasymi`, growth splines
-(sap cache, germinator, arsthraxia).
+(every structure but the diamond).
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes

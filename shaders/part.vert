@@ -166,11 +166,6 @@ void main() {
   // vertex (faceted parts carry different normals per face), so they use a
   // fixed axis scaled by position along the leaf: tips move, bases stay put.
   float sway = iw.x;
-  // a growing structure's leaves and petals come up folded and open from
-  // the bottom up, tips last (weighted along the leaf so its base holds)
-  if (iw.w < 1.0 && !on_spline && PART_IN(FOLIAGE, part)) {
-    p.xz *= unfold(0.2, grownPast(pos.y / iw.y, 0.7, 0.35, iw.w), tu.y);
-  }
   vec4 wind = gardenWind(t, c3.xz);
   // grown structures move as the plants do: leaves and petals breathe
   // slowly and lift a little in the gusts, tips most, bases held

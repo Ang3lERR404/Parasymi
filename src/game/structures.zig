@@ -72,12 +72,10 @@ pub const Def = struct {
   sway:f32 = 0,
   tall:f32 = 1,
   /// seconds it takes to grow from a sprout once the gardener puts it down
-  /// (0: there at once); it does no work until grown
+  /// (0: there at once); it does no work until grown. Its mesh is built
+  /// along growth splines (gfx/growth.zig) and grows along them on the
+  /// GPU, branch after branch (`PartInstance` `grown`)
   grow:f32 = 0,
-  /// its mesh is built along growth splines (gfx/growth.zig) and grows
-  /// along them on the GPU, branch after branch, instead of shooting up
-  /// and filling out as a whole
-  splined:bool = false,
   /// carries items tile to tile the way it faces (R turns it): carriers
   /// chain into one line, and producers leave them to pull through `output`
   carrier:bool = false,
@@ -114,11 +112,6 @@ pub const SLOTS = 16;
 const ACTIVITY_EASE:f32 = 3;
 /// how see-through structures' sap is at its thinnest, unless a def says otherwise
 pub const SAP:f32 = 0.78;
-/// growing in: it reaches full height by 1/`SHOOT` of its growth, from
-/// `SPROUT_H` of it, and fills out from `SPROUT_W` of its width
-const SHOOT:f32 = 1.4;
-const SPROUT_H:f32 = 0.1;
-const SPROUT_W:f32 = 0.2;
 
 pub const Structure = struct {
   x:i32,
@@ -133,15 +126,9 @@ pub const Structure = struct {
   grown:f32 = 1,
 
   pub fn kind(s:*const Structure) Kind { return activeTag(s.state); }
-  /// how big a growing structure is drawn: it shoots up from the ground
-  /// first and fills out after, as the plants do
-  /// (and at the size research has grown it to, `size`)
-  pub fn grownScale(s:*const Structure) m.V3 {
-    if (s.def().splined) return m.splat3(s.size());
-    const up = m.smooth(m.clamp01(s.grown * SHOOT));
-    const out = m.smooth(s.grown);
-    return m.v3(m.lerp(SPROUT_W, 1, out), m.lerp(SPROUT_H, 1, up), m.lerp(SPROUT_W, 1, out)) * m.splat3(s.size());
-  }
+  /// how big it is drawn: the size research has grown it to (`size`);
+  /// growing in is its growth splines' alone
+  pub fn grownScale(s:*const Structure) m.V3 { return m.splat3(s.size()); }
   pub fn size(s:*const Structure) f32 {
     return switch (s.kind()) {
       inline else => |k| if (comptime reg.has(k, "size")) reg.module(k).size(s) else 1,

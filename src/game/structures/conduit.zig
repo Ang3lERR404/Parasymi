@@ -21,8 +21,8 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 const meshlib = @import("../../gfx/meshlib.zig");
 
-/// decision: a conduit grows (pushing up out of the soil) but does not
-/// sway: its arches join the next conduit's under the ground, and a bend
+/// decision: a conduit grows (along its arch's growth spline, up out of
+/// the soil and back in) but does not sway: its arches join the next conduit's under the ground, and a bend
 /// per conduit would pull them apart. It draws its own arches (`emit`),
 /// one per edge it is fed from; `mesh` (the straight one) is its preview.
 pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true, .bare = true };
@@ -31,10 +31,6 @@ pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow =
 /// (1 the side +Z of it in its own frame, 2 behind, 3 the other side)
 const ARCH = [4]?meshlib.Id{null, .conduit_left, .conduit, .conduit_right};
 const BEHIND:m.Dir = 2;
-/// how deep a sprouting root lies before it has pushed up out of the soil,
-/// and a side root before it has reached its plant
-const SINK:f32 = 0.35;
-const TAP_SINK:f32 = 0.15;
 /// essence waiting for room ahead shows here, where the root goes down
 const WAIT_AT:f32 = 0.86;
 const FLUTTER:f32 = 0.5;
@@ -45,8 +41,6 @@ const SPEED:f32 = 2.5;
 /// and withers back when the plant is gone
 const ROOT_GROW:f32 = 0.6;
 const ROOT_WITHER:f32 = 1.5;
-/// a side root grows long first, then thickens from `TAP_GIRTH` of its girth
-const TAP_GIRTH:f32 = 0.35;
 const TAP_FLUTTER:f32 = 0.3;
 
 pub const State = struct {
@@ -175,11 +169,11 @@ pub fn release(s:*st.Structure) ?items.Item {
 
 /// its arches, one up out of the soil from each edge it is fed at, the
 /// item in transit running through the core of the one it came in by; and
-/// the roots it has sent out to plants beside it. Sprouting, all of it
-/// pushes up out of the soil.
+/// the roots it has sent out to plants beside it. Each grows along its
+/// growth spline: an arch with the conduit, a side root as it reaches.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, _:f32) Allocator.Error!void {
   const c = &s.state.conduit;
-  const place = m.chain(&.{m.translate(ctr - m.v3(0, SINK * (1 - m.smooth(s.grown)), 0)), m.rotY(m.dirYaw(s.dir))});
+  const place = m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(s.dir))});
   // (essence pulled from a plant beside it, with no arch there, runs
   // through the first)
   const by = if (c.feeds & bit(c.came) != 0) c.came else @as(m.Dir, @intCast(@ctz(c.feeds)));
@@ -192,11 +186,9 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, _:f32) Allocator.Error!
   }
   for (c.reach, 0..) |r, d| {
     if (r <= 0) continue;
-    // a root grows out from the conduit: longer first, then thicker,
-    // coming up out of the soil as it goes
-    const len = m.smooth(r) * m.smooth(s.grown);
-    const girth = TAP_GIRTH + (1 - TAP_GIRTH) * m.smooth(m.clamp01(r * 1.5 - 0.5));
-    try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr - m.v3(0, TAP_SINK * (1 - len), 0)), m.rotY(m.dirYaw(@intCast(d))), m.scale3(m.v3(len, girth, girth))}), .{.flutter = TAP_FLUTTER, .phase = s.seed, .grown = len});
+    // a root grows out from the conduit along its spline as it reaches,
+    // thickening once there (and withers back down it)
+    try out.emit(.conduit_tap, m.chain(&.{m.translate(ctr), m.rotY(m.dirYaw(@intCast(d)))}), .{.flutter = TAP_FLUTTER, .phase = s.seed, .grown = r * s.grown});
   }
 }
 

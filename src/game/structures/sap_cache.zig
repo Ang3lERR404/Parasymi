@@ -14,7 +14,7 @@ const color = @import("../../core/color.zig");
 const Parts = @import("../parts.zig").Parts;
 const pod = @import("../../gfx/meshes/sap_cache.zig");
 
-pub const def:st.Def = .{ .item = .sap_cache, .size = 1, .mesh = .sap_cache, .store = true, .sap = 0.3, .sway = 0.5, .tall = 0.9, .grow = 4, .splined = true };
+pub const def:st.Def = .{ .item = .sap_cache, .size = 1, .mesh = .sap_cache, .store = true, .sap = 0.3, .sway = 0.5, .tall = 0.9, .grow = 4 };
 
 /// effectively unlimited: conduits and diggers will always hand off to a cache
 const WANTS_MAX:u32 = 1 << 16;

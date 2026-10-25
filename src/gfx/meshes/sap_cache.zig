@@ -21,10 +21,10 @@ pub const POD_AT = v3(0, 0.38, 0);
 pub const POD_R = v3(0.3, 0.32, 0.3);
 
 /// the neck where the basket's vines gather, at the pod's crown
-const NECK = POD_AT + v3(0, POD_R[1] * 0.95, 0);
+pub const NECK = POD_AT + v3(0, POD_R[1] * 0.95, 0);
 /// the stem grows this much slower than a unit a second's share, so the
 /// pod fills and its basket wraps unhurried
-const STEM_PACE:f32 = 1.6;
+pub const STEM_PACE:f32 = 1.6;
 /// where along the stem the foot leaves unfold
 const FOOT_AT:f32 = 0.12;
 
