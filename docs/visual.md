@@ -249,6 +249,13 @@ two-headed calves, neck cords, obliques), melted only a little
 - Resin sap (`.resin`, sprung `give`): pectorals (`wolf_pec`) on the chest,
   the rear (`wolf_rump`) on the pelvis, its lower edge partly following the
   thighs.
+- Gathering (`Player.pry`, `armsToWrists`, `solveArm`): a deep squat
+  (`SQUAT_*`: hips drop, body leans in, feet step out, tail lifts), both
+  paws on the node by arm IK, a pry each unit (`pryPull`: pull back and
+  up, wrench with a wrist twist, back to the grip; the body rocks back),
+  fingers shut on the node and opening to regrip; each unit that comes
+  loose sends one paw, in turn, cupped to the front of the belly
+  (`STOW_TIME`). The generic work gesture gives way to it.
 - Belly (`wolf_belly`): convex egg sac on the gut; filling scales and drops
   the `gut` bone (lower half) and `gut_top` (upper half: as wide, its top
   kept where it hangs), so the swollen sac never folds (tested); tu.x = gut

@@ -11,7 +11,10 @@
 //! - arms, lean, head and ears follow on springs, so motion carries,
 //!   overshoots a little and settles; the head steadies against the bob;
 //! - a spring-driven tail, breathing that quickens with effort, panting,
-//!   and a sap belly that swells with what it carries.
+//!   and a sap belly that swells with what it carries;
+//! - gathering, it drops into a deep squat over the node, both paws grip it
+//!   (arms by inverse kinematics) and wrench it back once a unit, and each
+//!   unit that comes loose is pressed into the belly by one paw, in turn.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
@@ -50,6 +53,33 @@ const BELLY_STANCE:f32 = 0.07;
 /// stretched thin, the full sac lets more show through it
 const SAP_STRETCH:f32 = 0.14;
 const REACH_FREQ:f32 = 6; // spring frequency into and out of the work gesture
+/// gathering: the squat (how far the hips drop, the body leans in, the feet
+/// step out), where the paws grip the node (above its ground, either side
+/// of it), and the pry once a unit: pulled back and up over the first
+/// `PULL_END` of it, wrenched (twisting at the wrists) until `WRENCH_END`,
+/// back to the grip after; the body rocks back with the pull. A paw
+/// pressing a loose unit into the belly takes `STOW_TIME`.
+const SQUAT_DROP:f32 = 0.24;
+const SQUAT_LEAN:f32 = 0.95;
+const SQUAT_STANCE:f32 = 0.06;
+const SQUAT_FREQ:f32 = 5;
+const GRIP_UP:f32 = 0.11;
+const GRIP_SIDE:f32 = 0.085;
+const PRY_BACK:f32 = 0.07;
+const PRY_UP:f32 = 0.04;
+const PRY_ROCK:f32 = 0.16;
+const PRY_TWIST:f32 = 0.55;
+const PULL_END:f32 = 0.55;
+const WRENCH_END:f32 = 0.72;
+const STOW_TIME:f32 = 0.3;
+const HAND_FREQ:f32 = 14;
+const HAND_DAMP:f32 = 0.75;
+/// the gripping paws are closed this far; a stowing paw cups
+const PRY_GRIP:f32 = 1.2;
+const STOW_CUP:f32 = 0.6;
+/// the wolf steps up to a node it gathers from, until it is this far ahead
+/// of its feet (and the paws can reach it)
+pub const GATHER_AT:f32 = 0.45;
 /// what the wolf works on or carries sits this high above its feet
 const CHEST_HEIGHT:f32 = 1.0;
 
@@ -324,6 +354,18 @@ pub const Player = struct {
   reach:Swing = .{},
   /// where the hands are busy (gathering, weaving, ...); null while idle
   work:?V3 = null,
+  /// gathering from the node at `work`: how far through the unit being
+  /// pried loose (0..1); null otherwise
+  gather:?f32 = null,
+  /// 0..1 blend into the gathering squat
+  squat:Swing = .{},
+  /// where each wrist is wanted while gathering (wolf space), on a spring
+  wrist:[2]Spring3 = @splat(.{}),
+  /// seconds left of each paw pressing a unit into the belly, which paw
+  /// takes the next one, and the unit share last frame
+  stow:[2]f32 = @splat(0),
+  next_stow:u1 = 0,
+  last_pry:f32 = 0,
 
   /// tile-aware: no wading, one terrace step at a time.
   pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:*const World, dt:f32) void {
@@ -366,7 +408,7 @@ pub const Player = struct {
 
   /// where a foot rests under the standing wolf, in the world
   fn rest(p:*const Player, ground:?*const World, s:usize) V3 {
-    const x = restFoot[s][0] + skel.sign(s) * BELLY_STANCE * p.fullness;
+    const x = restFoot[s][0] + skel.sign(s) * (BELLY_STANCE * p.fullness + SQUAT_STANCE * p.squat.x);
     const r = m.mulV(p.heading(), .{ x, 0, restFoot[s][2], 1 });
     return p.onGround(ground, v3(r[0], 0, r[2]));
   }
@@ -390,6 +432,7 @@ pub const Player = struct {
 
     p.fullness += (p.bellyFill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
     p.reach.to(if (p.work != null) 1 else 0, REACH_FREQ, 1, dt);
+    p.pry(dt);
 
     // what the body feels: its acceleration, turned into its own frame
     const a = (p.vel - p.last_vel) / m.splat3(@max(dt, MIN_DT));
@@ -460,10 +503,56 @@ pub const Player = struct {
     return fell;
   }
 
+  /// gathering: the squat eases in and out, each unit come loose sends a
+  /// paw (one, then the other) to the belly, and the wrists chase where the
+  /// pry wants them
+  fn pry(p:*Player, dt:f32) void {
+    p.squat.to(if (p.gather != null) 1 else 0, SQUAT_FREQ, 1, dt);
+    for (&p.stow) |*t| t.* = @max(t.* - dt, 0);
+    const k = p.gather orelse {
+      p.last_pry = 0;
+      return;
+    };
+    if (k < p.last_pry and p.squat.x > 0.5) {
+      p.stow[p.next_stow] = STOW_TIME;
+      p.next_stow +%= 1;
+    }
+    p.last_pry = k;
+    const q = p.pose();
+    for (&p.wrist, 0..) |*w, s| {
+      const want = p.wristWant(q, s, k);
+      // just crouching, the wrists start where they are wanted
+      if (p.squat.x < 0.02) w.* = .{ .pos = want };
+      m.springDamper(&w.pos, &w.vel, want, HAND_FREQ * HAND_FREQ, 2 * HAND_DAMP * HAND_FREQ, 1, v3(0, 0, 0), dt);
+    }
+  }
+
+  /// where wrist `s` is wanted (wolf space) at unit share `k`: on the node,
+  /// pulled back and up through the pry, or at the belly while stowing
+  fn wristWant(p:*const Player, q:skel.Pose, s:usize, k:f32) V3 {
+    const node = p.workLocal();
+    const x = skel.sign(s);
+    const pull = pryPull(k);
+    const grip = node + v3(x * GRIP_SIDE, GRIP_UP + PRY_UP * pull, -PRY_BACK * pull);
+    const stow = m.smooth(m.clamp01(@sin(p.stow[s] / STOW_TIME * m.pi) * 1.6));
+    if (stow <= 0) return grip;
+    const w = skel.fk(q);
+    const belly = m.mulPoint(w[@intFromEnum(Bone.gut)], v3(x * belly_mesh.RX * 0.3, belly_mesh.DOWN * 0.15, belly_mesh.RZ * 1.15));
+    return m.lerpV(grip, belly, stow);
+  }
+
+  /// the node worked on, in the wolf's own frame (a little ahead without one)
+  fn workLocal(p:*const Player) V3 {
+    const at = p.work orelse return v3(0, 0, GATHER_AT);
+    const l = m.mulV(m.inverseRigid(p.heading()), .{ at[0], at[1], at[2], 1 });
+    return v3(l[0], l[1], l[2]);
+  }
+
   /// what lags on springs: lean and bank, arms, head, ears, tail
   fn springs(p:*Player, dt:f32) void {
     const st = p.stride;
-    const work = p.reach.x;
+    // the generic gesture gives way to the gathering pose
+    const work = p.reach.x * (1 - p.squat.x);
     p.lean.to(m.clamp(LEAN_STRIDE * st + p.accel[2] * LEAN_ACCEL, -LEAN_MAX, LEAN_MAX) + LEAN_WORK * work, LEAN_FREQ, LEAN_DAMP, dt);
     p.bank.to(m.clamp(-p.turn * BANK * st, -BANK_MAX, BANK_MAX), LEAN_FREQ, BANK_DAMP, dt);
     for (0..2) |s| {
@@ -489,6 +578,13 @@ pub const Player = struct {
         target += CURL_FLEX * idle * flex * m.clamp01(@sin(p.t * FLEX_WAVE - fi * FLEX_LAG + m.f(s) * 2.1));
         const rake = 0.5 + 0.5 * @sin(stroke - fi * GRIP_LAG);
         target = m.lerp(target, m.lerp(GRIP_OPEN, GRIP_CLOSE, rake), work);
+        // gathering: shut on the node, opening as the paw comes back to it,
+        // cupped round a unit on its way to the belly
+        const k = p.gather orelse 0;
+        const regrip = 1 - m.smooth(m.clamp01((k - WRENCH_END) / (1 - WRENCH_END) * 2)) * m.smooth(m.clamp01((1 - k) * 8));
+        const hold = m.lerp(GRIP_OPEN, PRY_GRIP, regrip);
+        const cup = m.clamp01(p.stow[s] / STOW_TIME * 4);
+        target = m.lerp(target, m.lerp(hold, STOW_CUP, cup), p.squat.x);
         c.to(target, FINGER_FREQ, FINGER_DAMP, dt);
         sum += c.x;
       }
@@ -497,7 +593,7 @@ pub const Player = struct {
     }
     const look = m.clamp(p.turn * LOOK_TURN, -LOOK_MAX, LOOK_MAX) + LOOK_IDLE * idle * noise.grad(0x100C, p.t * LOOK_IDLE_RATE, 0.5);
     p.look.to(look, HEAD_FREQ, HEAD_DAMP, dt);
-    p.nod.to(LOOK_WORK * work + 0.12 * idle * noise.grad(0x40D, p.t * LOOK_IDLE_RATE, 3.5), HEAD_FREQ, HEAD_DAMP, dt);
+    p.nod.to(LOOK_WORK * (work + p.squat.x) + 0.12 * idle * noise.grad(0x40D, p.t * LOOK_IDLE_RATE, 3.5), HEAD_FREQ, HEAD_DAMP, dt);
     // tail: each joint chases the one before it, steered by turning and gait
     var target = m.clamp(-p.turn * TAIL_TURN, -TAIL_TURN_MAX, TAIL_TURN_MAX) + @sin(p.t * TAIL_IDLE_RATE) * TAIL_IDLE * (1 - st) + @sin(p.phase * m.tau) * TAIL_GAIT * st;
     for (&p.tail, 0..) |*j, i| {
@@ -547,15 +643,20 @@ pub const Player = struct {
   /// the skeleton's pose this frame, in wolf space (see wolf_skeleton)
   pub fn pose(p:*const Player) skel.Pose {
     const st = p.stride;
-    const work = p.reach.x;
+    const work = p.reach.x * (1 - p.squat.x);
+    const sq = p.squat.x;
     const ph = p.phase * m.tau;
     var q:skel.Pose = .{};
-    // the pelvis: lowest just after each footfall, over the planted foot
+    // the pelvis: lowest just after each footfall, over the planted foot;
+    // gathering, down in a squat, the body leaning in and rocking back
+    // with each pull
     const bob = BOB * st * (0.5 + 0.5 * @cos(2 * ph - p.duty * m.tau));
-    q.hip = v3(SWAY * st * @sin(ph), skel.HIP_Y - SINK * st - bob - 0.07 * work, 0);
-    q.pelvis = .{ .x = 0.25 * p.lean.x, .y = HIP_TURN * st * @sin(ph), .z = HIP_ROLL * st * @cos(ph) + p.bank.x };
-    q.waist = .{ .x = 0.35 * p.lean.x, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
-    q.chest = .{ .x = 0.4 * p.lean.x, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
+    const rock = PRY_ROCK * pryPull(p.gather orelse 0) * sq;
+    const lean = p.lean.x + (SQUAT_LEAN - rock) * sq;
+    q.hip = v3(SWAY * st * @sin(ph), skel.HIP_Y - SINK * st - bob - 0.07 * work - SQUAT_DROP * sq, -0.04 * sq);
+    q.pelvis = .{ .x = 0.25 * lean, .y = HIP_TURN * st * @sin(ph), .z = HIP_ROLL * st * @cos(ph) + p.bank.x };
+    q.waist = .{ .x = 0.35 * lean, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
+    q.chest = .{ .x = 0.4 * lean, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
     const breath = @sin(p.breath);
     q.breath = 1 + m.lerp(BREATH, BREATH_RUN, st) * breath;
     // the head holds its gaze: it takes back the body's lean and bob
@@ -580,9 +681,30 @@ pub const Player = struct {
     }
     // the tail lifts with the stride and droops at rest, each joint bending
     // a little further
-    for (&q.tail, p.tail, 0..) |*j, sp, i| j.* = .{ .x = (if (i == 0) -TAIL_LIFT * st else TAIL_DROOP * (1 - 0.6 * st)), .z = sp.x };
+    // (crouching, it lifts to balance the lean)
+    for (&q.tail, p.tail, 0..) |*j, sp, i| j.* = .{ .x = (if (i == 0) -TAIL_LIFT * @max(st, sq) else TAIL_DROOP * (1 - 0.6 * st)), .z = sp.x };
     q.legs = p.legs(q);
+    if (sq > 0) p.armsToWrists(&q, sq);
     return q;
+  }
+
+  /// gathering: each arm blended (by `sq`) toward reaching its wrist's
+  /// target by inverse kinematics, the wrist twisting with the wrench
+  fn armsToWrists(p:*const Player, q:*skel.Pose, sq:f32) void {
+    const w = skel.fk(q.*);
+    const into = m.inverseRigid(w[@intFromEnum(Bone.chest)]);
+    const k = p.gather orelse 0;
+    const twist = PRY_TWIST * m.smooth(m.clamp01((k - PULL_END) / (WRENCH_END - PULL_END))) * (1 - m.smooth(m.clamp01((k - WRENCH_END) / (1 - WRENCH_END))));
+    for (0..2) |s| {
+      const x = skel.sign(s);
+      const at = m.mulPoint(into, p.wrist[s].pos) - skel.SHOULDER * v3(x, 1, 1);
+      const ik = solveArm(at);
+      const a = &q.arms[s];
+      a.root = .{ .x = m.lerp(a.root.x, ik.root.x, sq), .y = m.lerp(a.root.y, 0, sq), .z = m.lerp(a.root.z, ik.root.z, sq) };
+      a.mid = m.lerp(a.mid, ik.mid, sq);
+      const stowing = m.clamp01(p.stow[s] / STOW_TIME * 3);
+      a.low = .{ .x = m.lerp(a.low.x, 0.35 * (1 - stowing) + 0.9 * stowing, sq), .y = m.lerp(a.low.y, -x * twist * (1 - stowing), sq), .z = a.low.z };
+    }
   }
 
   /// each leg reaching its foot, by inverse kinematics in the pelvis's frame
@@ -727,6 +849,34 @@ pub fn solveLeg(d:V3, fold:f32, pelvis_pitch:f32, hang:f32) skel.Limb {
   };
 }
 
+/// the arm reaching its wrist to `d` (from the shoulder joint, in the
+/// chest's frame): the elbow's bend from the law of cosines (always
+/// forward), then the shoulder turned out (about Z) and forward (about X)
+/// to carry the bent arm's wrist onto `d`.
+pub fn solveArm(d:V3) skel.Limb {
+  const a = skel.UPPER_ARM;
+  const b = skel.FOREARM;
+  const l = m.clamp(m.len(d), @abs(a - b) + 1e-3, a + b - 1e-3);
+  const mid = m.acos(m.clamp((l * l - a * a - b * b) / (2 * a * b), -1, 1));
+  // the bent arm's wrist in its own frame: down the upper arm, the forearm
+  // bent forward from it
+  const y0 = -(a + b * @cos(mid));
+  const z0 = b * @sin(mid);
+  const dd = d * m.splat3(l / @max(m.len(d), 1e-6));
+  const zr = m.asin(m.clamp(dd[0] / -y0, -1, 1));
+  const y1 = y0 * @cos(zr);
+  const xr = m.atan2(dd[2], dd[1]) - m.atan2(z0, y1);
+  return .{ .root = .{ .x = xr, .z = zr }, .mid = mid };
+}
+
+/// how far through its pull and wrench the pry is at unit share `k` (0 on
+/// the grip .. 1 wrenched), easing back to the grip after
+fn pryPull(k:f32) f32 {
+  if (k < PULL_END) return 0.75 * m.smooth(k / PULL_END);
+  if (k < WRENCH_END) return 0.75 + 0.25 * m.smooth((k - PULL_END) / (WRENCH_END - PULL_END));
+  return 1 - m.smooth((k - WRENCH_END) / (1 - WRENCH_END));
+}
+
 /// tests step at the 60 Hz tick and allow this much float slack
 const TEST_DT:f32 = 1.0 / 60.0;
 const TEST_EPS:f32 = 1e-4;
@@ -776,4 +926,37 @@ test "a planted foot stays where it is planted while the wolf walks" {
   }
   // and both feet keep up with it
   for (p.feet, 0..) |f, s| try testing.expect(m.len(f.at - p.rest(null, s)) < TRAIL_MAX + 0.1);
+}
+
+test "an arm's wrist reaches what it is solved for" {
+  const w0 = skel.fk(.{});
+  const chest = w0[@intFromEnum(Bone.chest)];
+  for ([_]V3{ v3(0.1, -0.35, 0.2), v3(0.02, -0.25, 0.3), v3(0.15, -0.4, 0.05) }) |d| {
+    var q:skel.Pose = .{};
+    q.arms[1] = solveArm(d);
+    const w = skel.fk(q);
+    const got = m.mulPoint(m.inverseRigid(chest), m.origin(w[@intFromEnum(skel.sides[1].hand)])) - skel.SHOULDER;
+    try testing.expect(m.len(got - d) < 2e-3);
+  }
+}
+
+test "gathering, the wolf squats, grips the node and each unit sends a paw to the belly" {
+  var p:Player = .{ .pos = v3(0, 0, 0) };
+  p.work = v3(0, 0, GATHER_AT);
+  var t:f32 = 0;
+  var stowed = [2]bool{ false, false };
+  while (t < 3) : (t += TEST_DT) {
+    p.gather = @mod(t, 0.45) / 0.45;
+    p.animate(null, TEST_DT);
+    for (p.stow, 0..) |s, i| stowed[i] = stowed[i] or s > 0;
+  }
+  try testing.expect(p.squat.x > 0.95);
+  try testing.expect(p.pose().hip[1] < skel.HIP_Y - SQUAT_DROP * 0.9);
+  try testing.expect(stowed[0] and stowed[1]);
+  // stopping, it stands back up
+  p.gather = null;
+  p.work = null;
+  t = 0;
+  while (t < 2) : (t += TEST_DT) p.animate(null, TEST_DT);
+  try testing.expect(p.squat.x < 0.02);
 }

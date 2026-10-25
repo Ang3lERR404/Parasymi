@@ -28,7 +28,8 @@ const renderer = @import("../render/renderer.zig");
 const vertex = @import("../gfx/vertex.zig");
 const Draw = @import("../ui/draw.zig").Draw;
 const sky_mod = @import("sky.zig");
-const Player = @import("player.zig").Player;
+const player_mod = @import("player.zig");
+const Player = player_mod.Player;
 const Parts = @import("parts.zig").Parts;
 const craft = @import("craft.zig");
 const st = @import("structures.zig");
@@ -61,6 +62,9 @@ const STREAM_FRAME = 4;
 const FOLLOW_LERP:f32 = 6;
 /// the camera follows a point this far above the wolf's feet
 const FOLLOW_HEIGHT:f32 = 0.6;
+/// gathering, the wolf walks up to the node this eagerly (wish per metre
+/// still to go)
+const APPROACH:f32 = 2;
 /// how quickly the shown frame and sim timings follow the measured ones
 pub const TIMING_EASE:f32 = 0.05;
 /// free camera: Shift multiplies the fly speed; the wheel dollies this much a notch
@@ -421,6 +425,7 @@ pub const Game = struct {
     // interaction with the hovered tile (none while inspecting)
     g.hover = if (inspecting) null else g.pick(in, screen);
     var working = false;
+    var gathering = false;
     var work:?m.V3 = null;
     g.plant_cd -= dt;
     g.remove_cd -= dt;
@@ -474,7 +479,10 @@ pub const Game = struct {
             g.remove_cd = actions.REMOVE_COOLDOWN;
             g.linger = actions.LINGER_PUT;
           }
-        } else if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt);
+        } else if (c.res[t] > 0 and c.occ[t] == .none) {
+          working = actions.gather(g, c, t, dt);
+          gathering = working;
+        }
       }
       if (working or g.linger > 0) work = m.tileCentre(h[0], h[1], c.height[t]);
     };
@@ -484,6 +492,16 @@ pub const Game = struct {
     // a one-off gesture keeps facing where it happened
     if (work == null and g.linger > 0) work = g.player.work;
     g.player.work = work;
+    g.player.gather = if (gathering) m.clamp01(g.gather_t / actions.GATHER_TIME) else null;
+    // decision: gathering with no move held, the wolf steps up to the node
+    // until its paws can grip it (it crouches and pries it by hand)
+    if (gathering and wish[0] == 0 and wish[1] == 0) if (work) |at| {
+      const dx = at[0] - g.player.pos[0];
+      const dz = at[2] - g.player.pos[2];
+      const d = @sqrt(dx * dx + dz * dz);
+      const go = m.clamp01((d - player_mod.GATHER_AT) * APPROACH);
+      if (d > 1e-3) wish = .{ dx / d * go, dz / d * go };
+    };
 
     g.player.move(wish, ctl.down(in, .run), &g.world, dt);
     g.player.animate(&g.world, dt);

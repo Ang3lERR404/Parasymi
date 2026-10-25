@@ -14,7 +14,9 @@ Defaults in `src/cfg/controls.cfg` (rebindable in the gardener's copy; see
   configured, any other is fed from the belly.
 - RMB pressed or held is the universal remove: uproots a plant, takes up
   a structure (one tile at a time as the cursor sweeps,
-  `REMOVE_COOLDOWN`), gathers from a resource node while held.
+  `REMOVE_COOLDOWN`), gathers from a resource node while held (with no
+  move held, the wolf steps up to the node, `GATHER_AT`, and pries it by
+  hand).
 - Q picks the seed/bulb of what is under the cursor: selects its hotbar
   slot, else puts it from the belly on the selected slot (if empty, else
   the first empty one, else over the selected one), and takes its facing.
