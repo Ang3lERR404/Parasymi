@@ -1,4 +1,5 @@
 #version 450
+//! terrain tiles (the smooth fans of render/terrain_mesh.zig) to clip space.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 

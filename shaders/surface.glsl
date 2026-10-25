@@ -1,3 +1,4 @@
+//! fragment-stage helpers for plant and part materials: what needs screen-space derivatives or discards.
 // fragment-stage helpers for the plant and part materials (after common.glsl):
 // what needs screen-space derivatives or discards.
 

@@ -1,4 +1,5 @@
 #version 450
+//! ground detail grown per tile from one DetailTile: grass blades, and clods and stones on soil.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 

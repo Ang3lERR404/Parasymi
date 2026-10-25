@@ -1,4 +1,5 @@
 #version 450
+//! the sky dome: gradient by night and day, sun, moon and stars.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 

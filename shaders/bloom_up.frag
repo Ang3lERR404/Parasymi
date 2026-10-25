@@ -1,4 +1,5 @@
 #version 450
+//! bloom: one step up the glow's blur chain (3x3 tent, added onto the larger level).
 #extension GL_GOOGLE_include_directive : require
 #include "post.glsl"
 

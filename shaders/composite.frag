@@ -1,4 +1,5 @@
 #version 450
+//! the world and its glow onto the screen: highlights rolled off above 0.8, faint vignette, luma in alpha for FXAA.
 #extension GL_GOOGLE_include_directive : require
 #include "post.glsl"
 

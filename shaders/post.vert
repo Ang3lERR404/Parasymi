@@ -1,4 +1,5 @@
 #version 450
+//! one triangle covering the screen for the post-processing passes.
 
 // one triangle covering the screen; uv 0..1 across it
 layout(location = 0) out vec2 v_uv;

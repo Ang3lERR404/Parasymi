@@ -1,4 +1,5 @@
 #version 450
+//! terrain shading: tile colour, ley sight and its plexus, shadows, fog.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 

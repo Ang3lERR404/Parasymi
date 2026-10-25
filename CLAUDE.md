@@ -10,6 +10,8 @@ are `src/cfg/parasymi.cfg` (strings) and `src/cfg/controls.cfg` (bindings).
 ## Read before you touch
 | Working on | Read first |
 |---|---|
+| finding a file | [docs/files.md](docs/files.md) (one line per source file and shader) |
+| adding a structure, species, research, item, mesh, panel, pass, input, string | [docs/recipes.md](docs/recipes.md) (every place to wire it) |
 | gameplay, structures' behaviour, research, saves | [docs/design.md](docs/design.md) |
 | how anything looks or moves | [docs/visual.md](docs/visual.md) |
 | a structure mesh / anything that grows | [docs/growth.md](docs/growth.md) |
@@ -148,8 +150,12 @@ Meshes:
   for batch work; `std.testing.allocator` in tests; SoA for hot loops;
   `try` by default, translate errors at module boundaries.
 - Edits: write content to files and pass files to scripts; no big inline
-  heredocs. Line endings are mixed (most files CRLF, some LF): keep each
-  file's own (Python on Windows writes CRLF unless `newline=''`).
+  heredocs.
+- Line endings: always LF (`.gitattributes` `eol=lf`). Python on Windows
+  writes CRLF unless `newline=''`.
+- Every source file and shader starts with a `//!` header (a shader's
+  right after `#version`); after adding, removing or re-describing one,
+  run `zig run tools/filemap.zig` to refresh `docs/files.md`.
 
 ## Zig 0.16
 `std.Io` replaces old I/O (pass an `Io` like an allocator). "Juicy Main":

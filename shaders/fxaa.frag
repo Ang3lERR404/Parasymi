@@ -1,4 +1,5 @@
 #version 450
+//! FXAA 3.11 (quality) on the tone-mapped scene, before the UI.
 #extension GL_GOOGLE_include_directive : require
 #include "post.glsl"
 

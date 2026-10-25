@@ -1,4 +1,5 @@
 #version 450
+//! places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 // the solid and glass passes rasterize it at the very same depth (the

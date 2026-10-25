@@ -1,4 +1,5 @@
 #version 450
+//! material of library parts (structures, the wolf, nodes, beams, motes): fibre, sap, resin, essence, light.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "surface.glsl"

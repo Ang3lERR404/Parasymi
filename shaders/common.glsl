@@ -1,4 +1,4 @@
-// shared push constants + lighting for world passes.
+//! shared by every world pass: push constants, garden wind, growth, gathering, halo spiral and lighting (shadows, points of light).
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference_uvec2 : require
 #ifdef SHADOW

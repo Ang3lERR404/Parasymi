@@ -1,5 +1,5 @@
 #version 450
-// organic UI: every shape is an animated signed-distance field. No boxes.
+//! organic UI: every shape is an animated signed-distance field. No boxes.
 layout(push_constant) uniform Push { vec2 screen; float time; float pad; } pc;
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_col;

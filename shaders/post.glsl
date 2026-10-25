@@ -1,3 +1,4 @@
+//! shared by the post-processing passes: the screen triangle's uv in, one colour out, their own push constants.
 // shared by the post-processing passes (render/post.zig): each reads the
 // screen triangle's uv (post.vert) and writes one colour. Their push
 // constants (not common.glsl's: these passes draw no world).

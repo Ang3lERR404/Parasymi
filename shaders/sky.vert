@@ -1,4 +1,5 @@
 #version 450
+//! one full-screen triangle at the far plane, turned back into view directions.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 

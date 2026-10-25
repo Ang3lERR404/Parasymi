@@ -1,4 +1,5 @@
 #version 450
+//! bloom: one step down the glow's blur chain (13 taps; the first step keeps only what is brighter than white).
 #extension GL_GOOGLE_include_directive : require
 #include "post.glsl"
 

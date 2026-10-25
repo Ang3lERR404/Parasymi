@@ -1,4 +1,5 @@
 #version 450
+//! plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "surface.glsl"
