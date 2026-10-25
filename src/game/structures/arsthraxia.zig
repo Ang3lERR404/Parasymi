@@ -35,6 +35,9 @@ const v3 = m.v3;
 
 // decision: drawn by its own `emit` (`bare`), so its look carries what it
 // is doing (its nerves' light, a unit's surge) instead of the shared breath
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .arsthraxia_core, .arsthraxia_cup, .arsthraxia_satellite, .arsthraxia_shoot, .arsthraxia_vines, .arsthraxia_whorl, .arsthraxia_wisp };
+
 pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .preview = .arsthraxia_whole, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8, .bare = true };
 
 /// most of one ingredient it will hold

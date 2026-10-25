@@ -34,6 +34,9 @@ const V3 = m.V3;
 const v3 = m.v3;
 
 // decision: its hover is carried by its mesh (`mesh.HOVER`), as a weftstone's
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .item_pod, .monfris_tether, .weftstone_tendril };
+
 pub const def:st.Def = .{ .item = .vultrixi, .size = 1, .mesh = .vultrixi, .grow = 6, .sway = 0.3, .tall = 1.3, .sap = 0.3, .floating = true, .far = true };
 
 /// how far its tendril reaches (tiles between it and a structure's edge)

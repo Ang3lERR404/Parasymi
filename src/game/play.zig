@@ -235,8 +235,8 @@ pub const Game = struct {
   inst:[renderer.PLANT_MESHES]std.ArrayList(vertex.PlantInstance) = @splat(.empty),
   far:std.ArrayList(*ck.Chunk) = .empty,
   render_stats:renderer.Stats = .{},
-  /// `--plant`: one plant alone, its state set by hand (see specimen.zig);
-  /// nothing else falls, grows or is drawn
+  /// `--plant`/`--structure`: one thing alone, its state set by hand (see
+  /// specimen.zig); nothing else falls, grows or is drawn
   specimen:?Specimen = null,
 
   pub fn init(gpa:Allocator, seed:u64) Error!Game {
@@ -802,7 +802,7 @@ pub const Game = struct {
     try g.converge.tick(g.gpa, &g.world, &g.plants, &g.structs, &g.prog);
     g.prog.absorb(ev, TICK);
     try g.structs.tick(g.gpa, &g.world, &g.plants, &g.prog, TICK);
-    if (g.specimen) |*sp| try sp.regrow(g, TICK);
+    if (g.specimen) |*sp| try sp.after(g, TICK);
     g.ticks += 1;
   }
 };

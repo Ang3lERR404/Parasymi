@@ -34,6 +34,9 @@ const meshlib = @import("../../gfx/meshlib.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .lithophage_root, .lithophage_root_far, .lithophage_crystal, .germinator_pool, .germinator_pour, .item_pod };
+
 pub const def:st.Def = .{ .item = .lithophage, .size = 1, .mesh = .lithophage, .store = true, .grow = 6, .sway = 0.35, .tall = 0.7, .sap = 0.32 };
 
 /// seconds it takes to draw one mineral up out of the ground (or eat one

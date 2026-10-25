@@ -30,6 +30,9 @@ const v3 = m.v3;
 
 /// a ganglion grown beside it: the study of shared nerves
 pub const meets:st.Meeting = .{ .kind = .ganglion, .found = .crown_and_nerve };
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .belly_lump, .item_pod, .crown_root1, .crown_root2, .crown_root3, .crown_root4, .crown_root5 };
+
 pub const def:st.Def = .{ .item = .gathering_crown, .size = 1, .mesh = .gathering_crown, .store = true, .grow = 5, .sway = 0.6, .tall = 0.45, .sap = 0.35 };
 
 /// how far it reaches (tiles, every way), and the tiles that makes

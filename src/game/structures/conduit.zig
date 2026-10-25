@@ -21,6 +21,9 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 const meshlib = @import("../../gfx/meshlib.zig");
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .conduit_left, .conduit_right, .conduit_tap };
+
 /// decision: a conduit grows (along its arch's growth spline, up out of
 /// the soil and back in) but does not sway: its arches join the next conduit's under the ground, and a bend
 /// per conduit would pull them apart. It draws its own arches (`emit`),

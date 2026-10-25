@@ -29,6 +29,9 @@ const actions = @import("../actions.zig");
 const Look = @import("../parts.zig").Look;
 const mesh = @import("../../gfx/meshes/root_digger.zig");
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .belly_lump, .digger_clod, .digger_root };
+
 pub const def:st.Def = .{ .item = .root_digger, .size = 1, .mesh = .root_digger, .store = true, .grow = 4, .sway = 0.5, .tall = 0.6 };
 
 /// seconds per item drawn from the node

@@ -28,6 +28,9 @@ const mesh = @import("../../gfx/meshes/loomfern.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .germinator_pool, .loomfern_sheaf, .loomfern_thread };
+
 pub const def:st.Def = .{ .item = .loomfern, .size = 1, .mesh = .loomfern, .store = true, .grow = 5, .sway = 0.7, .tall = 0.5 };
 
 /// a lithophage grown beside it: the study of woven stone

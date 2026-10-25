@@ -36,6 +36,9 @@ const caster = @import("sporecaster.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .belly_lump, .spore_carrier };
+
 pub const def:st.Def = .{ .item = .driftbraid, .size = 1, .mesh = .driftbraid, .store = true, .grow = 7, .sway = 0.4, .tall = 0.9, .sap = 0.3, .far = true };
 
 /// most it holds, fed and received together; spores as a sporecaster's

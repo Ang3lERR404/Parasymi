@@ -24,6 +24,9 @@ const Draw = @import("../../ui/draw.zig").Draw;
 const Color = @import("../../ui/draw.zig").Color;
 const halo = @import("halo.zig");
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .halo_diamond, .halo_flash, .halo_projection, .halo_ring };
+
 pub const def:st.Def = .{ .item = .polyp, .size = 1, .mesh = .polyp, .sway = 0.4, .tall = 0.9, .grow = 6, .sap = 0.6 };
 
 pub const Phase = enum(u8) { open, forming, formed };

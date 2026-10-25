@@ -233,6 +233,13 @@ pub const Slot = struct {
   live:bool = false,
 };
 
+/// the meshes built when one thing stands alone (`--plant`, `--structure`):
+/// one species' (or none) and these library meshes
+pub const Only = struct {
+  species:?species.Id = null,
+  parts:[]const meshlib.Id,
+};
+
 /// every built-once mesh (plant species + part library), grown on a thread
 /// of its own while the loading screen shows, one mesh at one level of
 /// detail at a time (`done` of `units`); `Renderer.meshesReady` takes them
@@ -251,19 +258,16 @@ const Growing = struct {
   plant_morph:[PLANT_MESHES]u64 = @splat(0),
   part_ranges:[meshlib.SLOTS][2]u32 = @splat(.{0, 0}),
   part_glassy:[meshlib.SLOTS]bool = @splat(false),
-  /// `--plant`: that species' meshes alone (and the shadow under a
-  /// floater); every other range stays empty, so draws of it draw nothing
-  only:?species.Id = null,
+  /// `--plant`/`--structure`: those meshes alone; every other range stays
+  /// empty, so draws of it draw nothing
+  only:?Only = null,
 
   /// each species' variants at one level of detail, then each library mesh
   /// at one level of detail
   fn units(g:*const Growing) u32 {
-    const n = if (g.only != null) ONLY_PARTS.len + 1 else species.ids.len + meshlib.count;
+    const n = if (g.only) |o| @as(usize, if (o.species != null) 1 else 0) + o.parts.len else species.ids.len + meshlib.count;
     return @intCast(n * meshgen.LODS);
   }
-
-  /// the library meshes a lone plant may draw
-  const ONLY_PARTS = [_]meshlib.Id{.shadow};
 
   fn run(g:*Growing) void {
     g.failed = std.meta.isError(g.all());
@@ -274,7 +278,7 @@ const Growing = struct {
     const b = &g.b;
     for (species.ids) |id| for (0..meshgen.LODS) |l| {
       if (g.stop.load(.monotonic)) return;
-      if (g.only) |o| if (o != id) continue;
+      if (g.only) |o| if (o.species != id) continue;
       const lod:u32 = @intCast(l);
       b.lod = lod;
       const n = meshgen.variants(id);
@@ -292,7 +296,7 @@ const Growing = struct {
       };
       _ = g.done.fetchAdd(1, .monotonic);
     };
-    const lib:[]const meshlib.Id = if (g.only != null) &ONLY_PARTS else meshlib.ids;
+    const lib:[]const meshlib.Id = if (g.only) |o| o.parts else meshlib.ids;
     for (0..meshgen.LODS) |l| for (lib) |id| {
       if (g.stop.load(.monotonic)) return;
       try meshlib.buildOne(b, id, @intCast(l), &g.part_ranges);
@@ -370,8 +374,8 @@ pub const Renderer = struct {
   gpu_total:f32 = 0,
 
   /// `aa` falls back to the most samples the GPU offers (see `antialias`);
-  /// with `only` it builds that species' meshes alone (`--plant`)
-  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool, aa:Antialias, only:?species.Id) Error!*Renderer {
+  /// with `only` it builds those meshes alone (`--plant`, `--structure`)
+  pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool, aa:Antialias, only:?Only) Error!*Renderer {
     const r = try gpa.create(Renderer);
     errdefer gpa.destroy(r);
     r.* = .{.gpa = gpa, .window = window, .vsync = vsync, .ctx = undefined, .sc = .{}};
@@ -387,7 +391,7 @@ pub const Renderer = struct {
     return r;
   }
 
-  fn build(r:*Renderer, only:?species.Id) !void {
+  fn build(r:*Renderer, only:?Only) !void {
     const c = &r.ctx;
     const fb = r.window.getFramebufferSize();
     r.sc = try sw.Swapchain.init(c, r.gpa, @intCast(fb[0]), @intCast(fb[1]), r.vsync, .null_handle);
@@ -477,7 +481,7 @@ pub const Renderer = struct {
 
   /// start growing every species' mesh and every library part on a thread
   /// of their own (here, if no thread can be had)
-  fn growMeshes(r:*Renderer, only:?species.Id) Allocator.Error!void {
+  fn growMeshes(r:*Renderer, only:?Only) Allocator.Error!void {
     const g = try r.gpa.create(Growing);
     g.* = .{.arena = ArenaAllocator.init(r.gpa), .only = only};
     g.b = .{.gpa = g.arena.allocator()};

@@ -32,6 +32,9 @@ const mesh = @import("../../gfx/meshes/sporecaster.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .belly_lump, .spore_carrier };
+
 pub const def:st.Def = .{ .item = .sporecaster, .size = 1, .mesh = .sporecaster, .store = true, .grow = 5, .sway = 0.45, .tall = 0.65, .sap = 0.3, .far = true };
 
 /// most it holds, how many of one kind a spore carries, and seconds

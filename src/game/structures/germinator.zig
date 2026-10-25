@@ -29,6 +29,9 @@ const Color = @import("../../ui/draw.zig").Color;
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .germinator_core, .germinator_cup, .germinator_pool, .germinator_seed, .germinator_thread, .germinator_vortex, .germinator_winding, .germinator_pour };
+
 pub const def:st.Def = .{
   .item = .germinator, .size = 2, .mesh = .germinator, .preview = .germinator_whole, .store = true,
   .sway = 0.55, .tall = mesh.TALL, .grow = 6, .still = true,

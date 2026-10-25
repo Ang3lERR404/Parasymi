@@ -111,13 +111,15 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   g.parts.look(g.cam.viewEye(), m.Frustum.of(g.cam.viewProj()), g.sky.lightDir());
   try plants(g, reach, tf);
   try threads(g, tf);
-  // a specimen stands alone: no wolf, nodes, structures or motes (their
-  // meshes were never built)
+  // a specimen stands alone: no wolf, ghosts or motes, and a plant no
+  // nodes or structures (their meshes were never built)
   const alone = g.specimen != null;
   const feet = if (alone) NO_FEET else try g.player.rig(&g.parts);
-  if (!alone) {
+  if (!alone or g.specimen.?.what == .structure) {
     try nodes(g, @intFromFloat(reach));
     try structures(g, reach, tf);
+  }
+  if (!alone) {
     try ghost(g, tf);
     try motes(g);
   }

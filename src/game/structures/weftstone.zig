@@ -34,6 +34,9 @@ const v3 = m.v3;
 // stays 0 (the preview would lift it twice); breathing bobs it
 /// a driftbraid grown beside it: the study of interweaving
 pub const meets:st.Meeting = .{ .kind = .driftbraid, .found = .weft_and_drift };
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .item_pod, .lithophage_crystal, .weftstone_tendril };
+
 pub const def:st.Def = .{ .item = .weftstone, .size = 1, .mesh = .weftstone, .store = true, .grow = 7, .sway = 0.3, .tall = 1.2, .sap = 0.3, .floating = true };
 
 /// how far its tendrils reach (tiles, every way), and how many it latches

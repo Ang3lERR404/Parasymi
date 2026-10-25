@@ -32,6 +32,9 @@ const mesh = @import("../../gfx/meshes/monfris.zig");
 const V3 = m.V3;
 const v3 = m.v3;
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .belly_lump, .item_pod };
+
 pub const def:st.Def = .{ .item = .monfris, .size = 2, .mesh = .monfris, .store = true, .grow = 10, .sway = 0.2, .tall = 1.7, .sap = 0.3 };
 
 /// most Vultrixi tethered to one monfris (an advanced weave needs at

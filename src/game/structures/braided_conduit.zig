@@ -28,6 +28,9 @@ const Color = @import("../../ui/draw.zig").Color;
 const meshlib = @import("../../gfx/meshlib.zig");
 const mesh = @import("../../gfx/meshes/braided_conduit.zig");
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .braid_wrap, .braid_wrap_left, .braid_wrap_right, .braid_lane0, .braid_lane1, .braid_lane2, .braid_lane3, .braid_lane0_left, .braid_lane1_left, .braid_lane2_left, .braid_lane3_left, .braid_lane0_right, .braid_lane1_right, .braid_lane2_right, .braid_lane3_right };
+
 /// decision: like a conduit, it grows along its arches' growth splines but
 /// never sways (its arches join the next one's under the ground) and draws
 /// its own arches, one per edge it is fed from; `mesh` is its preview.

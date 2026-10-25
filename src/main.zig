@@ -31,6 +31,7 @@ const orbit = @import("game/orbit.zig");
 const loading = @import("game/loading.zig");
 const specimen = @import("game/specimen.zig");
 const species = @import("sim/species.zig");
+const st = @import("game/structures.zig");
 const stringToEnum = std.meta.stringToEnum;
 const Loading = loading.Loading;
 const World = @import("world/world.zig").World;
@@ -78,9 +79,10 @@ pub fn main(init:Init) !void {
   // turn), `--dist=`, `--pitch=` (degrees) shape it
   var inspect:?orbit.Focus = null;
   var turn:orbit.Orbit = .{};
-  // `--plant=<species>` grows that plant alone (its meshes alone built),
-  // `--state=` held or looped (grow, mature, 0.4, 0.2..0.8, wither, flow,
-  // drain, dark, live; default grow), `--period=` seconds a loop
+  // `--plant=<species>` / `--structure=<kind>` stands it alone (its
+  // meshes alone built), `--state=` held or looped (grow, mature, 0.4,
+  // 0.2..0.8; plants wither, flow, drain, dark, live; structures idle,
+  // active; default grow), `--period=` seconds a loop
   var lone:?specimen.Specimen = null;
   var state:specimen.State = .grow;
   var period:?f32 = null;
@@ -97,11 +99,13 @@ pub fn main(init:Init) !void {
     if (eql(u8, a, "--load")) load = true;
     if (startsWith(u8, a, "--tod=")) tod = try parseFloat(f32, a["--tod=".len..]);
     if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a["--seed=".len..], 0);
-    if (startsWith(u8, a, "--plant=")) lone = .{.sp = stringToEnum(species.Id, a["--plant=".len..]) orelse return error.BadPlant};
+    if (startsWith(u8, a, "--plant=")) lone = .{.what = .{.plant = stringToEnum(species.Id, a["--plant=".len..]) orelse return error.BadPlant}};
+    if (startsWith(u8, a, "--structure=")) lone = .{.what = .{.structure = stringToEnum(st.Kind, a["--structure=".len..]) orelse return error.BadStructure}};
     if (startsWith(u8, a, "--state=")) state = try specimen.State.parse(a["--state=".len..]);
     if (startsWith(u8, a, "--period=")) period = try parseFloat(f32, a["--period=".len..]);
   }
   if (lone) |*l| {
+    if (!state.suits(l.what)) return error.BadState;
     l.state = state;
     if (period) |t| l.period = @max(t, 0.1);
   }
@@ -125,7 +129,7 @@ pub fn main(init:Init) !void {
   input.attach();
   var display:Display = .{.win = window};
 
-  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa, if (lone) |l| l.sp else null);
+  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa, if (lone) |*l| try l.only(init.arena.allocator()) else null);
   defer r.deinit();
   opts.aa = r.antialiasing();
 
@@ -187,7 +191,7 @@ pub fn main(init:Init) !void {
     try game.update(&input, @floatCast(dt), screen);
     if (game.request) |rq| {
       game.request = null;
-      // a lone plant's world is never saved, and no garden replaces it
+      // a lone thing's world is never saved, and no garden replaces it
       if (game.specimen != null) {
         if (rq == .quit) window.setShouldClose(true);
         continue;

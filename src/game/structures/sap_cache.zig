@@ -18,6 +18,9 @@ const Look = @import("../parts.zig").Look;
 const growth = @import("../../gfx/growth.zig");
 const pod = @import("../../gfx/meshes/sap_cache.zig");
 
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .belly_lump, .item_pod, .sap_cache_lid };
+
 pub const def:st.Def = .{ .item = .sap_cache, .size = 1, .mesh = .sap_cache, .store = true, .sap = 0.3, .sway = 0.5, .tall = 0.9, .grow = 4 };
 
 /// effectively unlimited: conduits and diggers will always hand off to a cache

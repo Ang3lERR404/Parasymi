@@ -30,6 +30,9 @@
 //!                               sprout or two showing what it does (`icon.zig`)
 //!   meets:Meeting               the other lineage's structure that, grown
 //!                               beside it, is a discovery (`Structures.meetings`)
+//!   meshes                      the library meshes it draws beyond `mesh` and
+//!                               `preview` (a tuple: `.{ .item_pod, ... }`);
+//!                               `--structure` builds only these (tested)
 //! Missing hooks fall back to doing nothing. A new structure is one new file
 //! plus one line in `kinds`.
 const std = @import("std");
@@ -128,6 +131,24 @@ pub const Meeting = struct { kind:Kind, found:prog.Discovery };
 pub const MEET = 3;
 /// per-kind state; the active tag is the structure's kind.
 pub const State = reg.Union("State");
+
+/// every library mesh kind `k` draws: its mesh, its preview and what it
+/// emits (its `meshes`)
+pub fn meshes(k:Kind) []const meshlib.Id {
+  return switch (k) {
+    inline else => |t| comptime blk: {
+      const d:Def = reg.module(t).def;
+      const extra = if (reg.has(t, "meshes")) reg.module(t).meshes else .{};
+      const own:usize = if (d.preview != null) 2 else 1;
+      var out:[own + extra.len]meshlib.Id = undefined;
+      out[0] = d.mesh;
+      if (d.preview) |p| out[1] = p;
+      for (extra, own..) |e, i| out[i] = e;
+      const all = out;
+      break :blk &all;
+    },
+  };
+}
 
 pub fn kindOf(item:items.Item) ?Kind {
   inline for (reg.ids) |k| if (defs.get(k).item == item) return k;
@@ -331,6 +352,15 @@ pub const Structures = struct {
         }
       }
     }
+  }
+
+  /// every structure notices its neighbours (`link`) without working
+  /// (`--structure` holding one still)
+  pub fn link(ss:*Structures, gpa:Allocator, w:*World, plants:*Plants, g:*prog.Progression) void {
+    const ctx:Ctx = .{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss };
+    for (0..ss.list.items.len) |idx| switch (ss.get(Id.of(idx)).kind()) {
+      inline else => |k| if (comptime reg.has(k, "link")) reg.module(k).link(ctx, Id.of(idx)),
+    };
   }
 
   pub fn tick(ss:*Structures, gpa:Allocator, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) Allocator.Error!void {

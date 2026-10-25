@@ -23,6 +23,9 @@ const halo = @import("halo.zig");
 
 // it floats as high as the blooms hang, at the heart of its ring, over
 // whatever is under it
+/// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
+pub const meshes = .{ .halo_flash, .halo_projection, .halo_ring };
+
 pub const def:st.Def = .{ .item = .diamond, .size = 1, .mesh = .halo_diamond, .floating = true, .hover = halo.HOVER, .bare = true, .grow = 8 };
 
 pub const State = struct {
