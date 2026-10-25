@@ -71,6 +71,12 @@ Q/E roll, wheel dolly; eases back in 0.3 s.
   other ring/row and half the sides), so new meshes get it free. Picked by
   eye distance (`lodAt`, `LOD_AT` 36/70). Plant slots (species, variant,
   lod); part slots `meshlib.slot(id, lod)`.
+- Worker threads: `core/jobs.zig` `each` is a parallel-for over main's
+  `Io` pool (`World.io`, set by main; null in tests = in place). Used where
+  each item writes only its own outputs, so results match the serial ones:
+  `Plants.rebuildLinks`, `World.stream` generation, `syncWorld` meshing
+  batches (`MESH_BATCH`; Vulkan uploads stay on main). The rest of the CPU
+  frame is under 1 ms and hides behind the GPU (frames in flight).
 - Culling: chunks (`CHUNK_RADIUS`), plants and parts are culled to the view
   frustum (`m.Frustum`; `Parts.look` sets the frame's eye and view).
 
