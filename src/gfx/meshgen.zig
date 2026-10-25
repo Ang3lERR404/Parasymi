@@ -801,7 +801,6 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
     .coil => try parasite_kit.plant(b, g, seed + @as(u64, variant) * 131),
     .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
     .radiant => try radiant(b, g, seed + @as(u64, variant) * 131, variant),
-    .entwined => try convergence_kit.plant(b, g, seed + @as(u64, variant) * 131),
     // a confluence's variants are its growth keys, all grown from one seed
     .confluence => try convergence_kit.confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
   }
@@ -1409,7 +1408,7 @@ pub const KEYS = 8;
 /// confluence its growth keys.
 pub fn variants(id:species.Id) u32 {
   return switch (species.get(id).genome.form) {
-    .herb, .coil, .drift, .radiant, .entwined => VARIANTS,
+    .herb, .coil, .drift, .radiant => VARIANTS,
     .confluence => KEYS,
   };
 }
@@ -1419,7 +1418,7 @@ pub fn variants(id:species.Id) u32 {
 pub const Key = struct { v:u32, f:f32 };
 pub fn growthKey(id:species.Id, growth:f32) ?Key {
   switch (species.get(id).genome.form) {
-    .herb, .coil, .drift, .radiant, .entwined => return null,
+    .herb, .coil, .drift, .radiant => return null,
     .confluence => {
       const x = m.clamp01(growth) * (KEYS - 1);
       const v = @min(m.floorTo(u32, x), KEYS - 2);

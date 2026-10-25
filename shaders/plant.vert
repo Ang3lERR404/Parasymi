@@ -38,8 +38,6 @@ const float SPIN[6] = float[6](0.03, 0.05, -0.035, 0.025, 0.1, 0.04);
 const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
 // how far a fragment comes in from (horizontally) as it settles
 const float ARRIVE_REACH = 1.4;
-// how far a sown hybrid is drawn in to its axis before growth reaches a piece
-const float DRAWN_IN = 0.3;
 // a wilting plant sinks to this share of its height
 const float WILT = 0.55;
 // a sown plant's size: seedling share, and the spread between instances
@@ -62,12 +60,7 @@ const uint FORMS_KEYED = FORM_BIT(FORM_CONFLUENCE);
 const uint FORMS_CROWNED = FORM_BIT(FORM_COIL);
 // a stalk woven tight round its core that parts into a cage from the foot
 // up (tu.y how far each strand has parted, parasite_kit `lattice`)
-const uint FORMS_PARTING = FORM_BIT(FORM_COIL) | FORM_BIT(FORM_ENTWINED);
-// comes up drawn in to its axis, every piece opening out as growth passes
-// it, whatever it is (each shares the tu.x of where it grows from, so what
-// hangs on it opens with it; its leaves and petals not unfolding on their
-// own); its flowers are held on their stems, never turning about its axis
-const uint FORMS_DRAWN = FORM_BIT(FORM_ENTWINED);
+const uint FORMS_PARTING = FORM_BIT(FORM_COIL);
 // filaments hanging from a float, rippling like a jelly's
 const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
 
@@ -84,7 +77,6 @@ void main() {
   // species.Form (ib.w): what it does its own way (the FORMS_ sets above)
   bool keyed = formIn(FORMS_KEYED, ib.w);
   bool crowned = formIn(FORMS_CROWNED, ib.w);
-  bool drawnIn = formIn(FORMS_DRAWN, ib.w);
   bool sheet = PART_IN(SHEETS, part);
   // a confluence blends between the growth keys around its growth, so it
   // grows smoothly instead of stepping from one shape to the next
@@ -180,7 +172,7 @@ void main() {
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
   // where it grows from, on the stem or along a vine.
-  if (sheet && !keyed && !crowned && !drawnIn && trunk) p.xz *= unfold(0.25, open, tu.y);
+  if (sheet && !keyed && !crowned && trunk) p.xz *= unfold(0.25, open, tu.y);
   if (!trunk) p.xz *= unfold(0.2, passed, shoot);
   // a parasite's crown comes up closed, its fronds (and the pods and sacs
   // at their ends) a tight upright bundle, and opens out as it matures; the
@@ -190,8 +182,6 @@ void main() {
     if (part == PART_TENDRIL || (part == PART_BLOOM && tu.x >= 0.9)) p.xz *= mix(0.3, 1.0, unfurl);
     else if (part == PART_BLOOM) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
   }
-  // a sown hybrid opens out piece by piece as growth passes it
-  if (drawnIn) p.xz *= mix(DRAWN_IN, 1.0, grownPast(tu.x, 0.8, 0.3, growth));
   // a cage comes up woven tight round its core and parts from the foot up
   if (formIn(FORMS_PARTING, ib.w) && trunk && part == PART_STEM && tu.y > 0.0) p.xz *= mix(1.0 - tu.y, 1.0, grownPast(tu.x, 0.8, 0.35, growth));
 
@@ -225,9 +215,8 @@ void main() {
     float ph = t * 1.4 - down * 8.0 + seed * TAU;
     p.xz += vec2(sin(ph + p.x * 9.0), cos(ph * 0.83 + p.z * 9.0)) * 0.03 * down;
   }
-  // convergent: blooms turn, very slowly (a confluence's and a sown
-  // hybrid's are held on their stems)
-  if (abs(aff) < 0.5 && part == PART_BLOOM && !keyed && !drawnIn && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
+  // convergent: blooms turn, very slowly (a confluence's canopy stays on its stems)
+  if (abs(aff) < 0.5 && part == PART_BLOOM && !keyed && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
 
   // wilt when unhealthy
   p.y *= mix(WILT, 1.0, health);

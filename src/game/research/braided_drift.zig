@@ -1,8 +1,7 @@
 //! BRAIDED DRIFT: what a braided conduit and a sporecaster make between
-//! them, grown side by side: germinators weave driftbraid seeds, a spore
-//! crown of both lineages that condenses ley shards.
+//! them, grown side by side: driftbraids, paired, sending what each is fed
+//! to the other by spore and taking in what it sends back.
 const prog = @import("../progression.zig");
-const species = @import("../../sim/species.zig");
 
 pub const def:prog.Research = .{
   .per_unit = &.{
@@ -16,5 +15,3 @@ pub const def:prog.Research = .{
   .needs = .braid_and_spore,
   .branch = true,
 };
-
-pub const unlocks = [_]species.Id{.driftbraid};

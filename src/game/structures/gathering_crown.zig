@@ -30,9 +30,6 @@ const v3 = m.v3;
 
 pub const def:st.Def = .{ .item = .gathering_crown, .size = 1, .mesh = .gathering_crown, .store = true, .grow = 5, .sway = 0.6, .tall = 0.45, .sap = 0.35 };
 
-/// a ganglion grown beside it: the study of shared nerves
-pub const meets:st.Meeting = .{ .kind = .ganglion, .found = .crown_and_nerve };
-
 /// how far it reaches (tiles, every way), and the tiles that makes
 pub const R = 2;
 const SIDE = 2 * R + 1;

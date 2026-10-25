@@ -39,7 +39,7 @@ const float SAP_EDGE_POW = 5.0;
 // how much thin sap-filled growth glistens (under its skin, less than bare sap)
 const float SKIN_GLISTEN = 0.6;
 // the forms whose `.bloom` is bare sap of both lineages, not a petal
-const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE) | FORM_BIT(FORM_ENTWINED);
+const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE);
 // a placement preview: green where it fits, red where it cannot be sown,
 // breathing at this rate (rad/s)
 const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);

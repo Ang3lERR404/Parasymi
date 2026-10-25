@@ -49,7 +49,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   try digger(g, cx, cz);
   try lineages(g, cx, cz);
   try confluences(g, cx, cz);
-  try hybrids(g, cx, cz);
+  try convergent(g, cx, cz);
   try blooms(g, cx, cz);
 
   var t:f32 = 0;
@@ -87,20 +87,30 @@ fn confluences(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   }
 }
 
-/// a row of the sown hybrids south of the confluences, each held half
-/// grown and grown (their studies known)
-fn hybrids(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
-  for ([_]prog.Id{ .woven_stone, .shared_nerves, .braided_drift }) |id| g.prog.done.insert(id);
-  for ([_]species.Id{ .weftstone, .nervecrown, .driftbraid }, 0..) |sp, i| {
-    for ([_]f32{ 0.45, 1 }, 0..) |growth, j| {
-      // the grown one nearer the middle (where `--inspect` looks first)
-      const near:i32 = if (i < 2) @as(i32, @intCast(j)) else 1 - @as(i32, @intCast(j));
-      const x = cx - 6 + 4 * @as(i32, @intCast(i)) + 2 * near;
-      _ = try g.plants.placeEx(g.gpa, &g.world, x, cz + 12, .{
-        .x = x, .y = cz + 12, .chunk = undefined, .tile = undefined, .sp = sp,
-        .seed = 0.17 + 0.23 * m.f(i * 2 + j), .growth = growth, .span = 1e9, .mana = 20,
-      });
+/// the convergent structures south of the confluences: a weftstone
+/// floating among stone, and two driftbraids trading, one fed fibre, the
+/// other grit
+fn convergent(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  for ([_]prog.Id{ .woven_stone, .braided_drift }) |id| g.prog.done.insert(id);
+  // the weftstone over the nearest stone it can reach
+  var r:i32 = 3;
+  outer: while (r < 16) : (r += 1) {
+    var it = m.ring(r);
+    while (it.next()) |o| {
+      const x = cx + o[0];
+      const z = cz + o[1];
+      if (!mineralAround(g, x, z) or !g.structs.canPlace(&g.world, x, z, .weftstone)) continue;
+      _ = try g.structs.place(g.gpa, &g.world, x, z, .weftstone, 0, 0.4);
+      break :outer;
     }
+  }
+  const a = try nearest(g, cx - 5, cz + 12, .driftbraid, 0.2);
+  const b = try nearest(g, cx + 3, cz + 12, .driftbraid, 0.7);
+  if (a != null and b != null) {
+    st.configure(&g.structs, a.?, &g.prog);
+    st.configure(&g.structs, b.?, &g.prog);
+    _ = g.structs.insert(&g.prog, a.?, .fibre, 20);
+    _ = g.structs.insert(&g.prog, b.?, .grit, 20);
   }
 }
 

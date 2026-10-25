@@ -93,6 +93,10 @@ const parts = struct {
   // (see-through: blends over what hangs inside it)
   pub const sporecaster = @import("meshes/sporecaster.zig");
   pub const spore_carrier = @import("meshes/sporecaster.zig").carrier;
+  // the convergent structures (see-through: blend over what hangs inside)
+  pub const weftstone_tendril = @import("meshes/weftstone.zig").tendril;
+  pub const driftbraid = @import("meshes/driftbraid.zig");
+  pub const weftstone = @import("meshes/weftstone.zig");
   // the halo: its polyp and the diamond it forms
   pub const polyp = @import("meshes/polyp.zig");
   pub const halo_diamond = @import("meshes/polyp.zig").diamond;

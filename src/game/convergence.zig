@@ -293,6 +293,6 @@ test "lineage structures grown side by side are witnessed, once each" {
   gd.g.done.insert(.lithophagy);
   gd.g.done.insert(.living_looms);
   try testing.expectEqual(prog.Status.open, gd.g.status(.woven_stone));
-  try testing.expectEqual(prog.Status.locked, gd.g.status(.shared_nerves));
-  try testing.expect(!gd.g.found.contains(.crown_and_nerve) and !gd.g.found.contains(.braid_and_spore));
+  try testing.expectEqual(prog.Status.locked, gd.g.status(.braided_drift));
+  try testing.expect(!gd.g.found.contains(.braid_and_spore));
 }

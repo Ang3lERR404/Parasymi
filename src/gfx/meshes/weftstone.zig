@@ -1,0 +1,111 @@
+//! mesh: WEFTSTONE. a loomfern and a lithophage grown into one floating
+//! body (convergence_kit), hanging `HOVER` over the tile it floats above:
+//! at its bottom a bulb of both saps where what it draws from the nodes
+//! gathers and is ionized into ley crystals (emitted), clasped by five pale
+//! frondlets that run down its flank exactly alike and curl in beneath it,
+//! where its tendrils leave (emitted, `tendril`, one to each node it
+//! latches onto); above the bulb a short weave of green and pale strands
+//! rising to a crown of five fronds arching out alike, their leaflets
+//! every one their own, their tips rolled into croziers.
+//! It grows on a hidden stalk (gfx/growth.zig): the bulb swells first,
+//! the frondlets clasp it, the weave rises and the fronds arch out of its
+//! top, their leaflets opening as each front passes.
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const m = @import("../../core/math.zig");
+const mg = @import("../meshgen.zig");
+const color = @import("../../core/color.zig");
+const growth = @import("../growth.zig");
+const pk = @import("parasite_kit.zig");
+const kit = @import("convergence_kit.zig");
+
+const V3 = m.V3;
+const v3 = m.v3;
+
+/// how high it hangs over its tile (its mesh carries it: breathing lifts
+/// and lowers it, a slow bob)
+pub const HOVER:f32 = 0.85;
+/// the bulb, and the point under it its tendrils leave from
+pub const BULB_AT = v3(0, HOVER, 0);
+pub const BULB_R = v3(0.12, 0.13, 0.12);
+pub const UNDER = BULB_AT - v3(0, BULB_R[1] * 1.05, 0);
+/// the weave from the bulb's top to its crown
+const BASE = BULB_AT + v3(0, BULB_R[1] * 0.85, 0);
+const CROWN = BASE + v3(0, 0.2, 0);
+const STALK:pk.Stalk = .{.girth = 0.03, .part = 2.1, .from = 0.15, .to = 0.85, .foot = 0.3};
+
+pub fn build(b:*mg.Builder) Allocator.Error!void {
+  var k = growth.Skeleton.begin(b);
+  const stalk = k.trunk(&.{BASE, BASE + v3(0.008, 0.07, -0.006), BASE + v3(-0.006, 0.14, 0.004), CROWN}, .{.pace = 1.4});
+  // the bulb first, out of the stalk's foot
+  const bulb = b.mark();
+  try kit.sac(b, .{.center = BULB_AT, .radii = BULB_R, .t = 0.1, .arms = 2, .swirl = 1.1, .phase = 1.3});
+  try k.on(b, bulb, stalk, 0, .{.from = BASE, .span = k.get(stalk).time * 0.5});
+  // pale frondlets clasping it, down its flank from its shoulder and
+  // curling in under it, exactly alike
+  for (0..kit.FOLD) |i| {
+    const a = m.ratio(i, kit.FOLD) * m.tau;
+    var c:[7]V3 = undefined;
+    for (&c, 0..) |*q, j| {
+      const th = m.lerp(0.35, m.pi * 0.93, m.ratio(j, 6));
+      const r = 1.1 - 0.12 * m.smooth(m.ratio(j, 6));
+      q.* = BULB_AT + v3(@sin(th) * @cos(a) * BULB_R[0] * r, @cos(th) * BULB_R[1] * 1.08, @sin(th) * @sin(a) * BULB_R[2] * r);
+    }
+    const id = k.branch(stalk, 0, &c, .{.after = .with, .delay = 0.05});
+    try k.tube(b, id, .{.r0 = 0.011, .tip = 0.3, .col = kit.pale, .part = .tendril, .sides = 5, .t0 = 0.1, .t1 = 0.2});
+    const bead = b.mark();
+    const end = k.point(id, 1);
+    try pk.nodule(b, end, m.splat3(0.012), 0.2, kit.pearl, kit.pale, kit.pearl);
+    try k.on(b, bead, id, 1, .{.from = end});
+  }
+  var sp:[growth.RES]V3 = undefined;
+  var sec:[growth.RES]pk.Section = undefined;
+  try kit.weaveOn(b, &k, stalk, STALK, .{.twist = 0.9 * m.pi, .seed = 0x3EF1}, 0.2, 0.4, &sp, &sec);
+  // the crown: five fronds arching out of its top, alike
+  for (0..kit.FOLD) |i| {
+    const a = 0.4 + m.ratio(i, kit.FOLD) * m.tau;
+    _ = try kit.frondOn(b, &k, stalk, 1, .{
+      .from = CROWN, .out = v3(@cos(a), 0, @sin(a)), .len = 0.55, .r = 0.011,
+      .rise = 1.0, .curl = 3.0, .pairs = 8, .leaf_len = 0.1, .leaf_w = 0.022,
+      .t0 = 0.4, .t1 = 1, .seed = 0x3EF2, .leaf_seed = 0x3EF3 +% i * 131,
+    }, .{.delay = 0.04 * m.f(i)});
+  }
+  k.finish(b);
+}
+
+/// mesh: WEFTSTONE TENDRIL. one tendril from under the bulb to a node it
+/// latches onto: built straight up +Y over 0..1 (bent on the GPU along its
+/// curve, drawn out as far as it has reached): a lilac stem greening
+/// toward its end, two small leaves of its own along it, and at its end
+/// three pale claws gripping the node.
+pub const tendril = struct {
+  pub fn build(b:*mg.Builder) Allocator.Error!void {
+    const N = 24;
+    var p:[N]V3 = undefined;
+    var ts:[N]f32 = undefined;
+    var rs:[N]f32 = undefined;
+    var cs:[N]color.Rgba8 = undefined;
+    for (&p, &ts, &rs, &cs, 0..) |*q, *t, *r, *c, i| {
+      const f = m.ratio(i, N - 1) * 0.94;
+      q.* = v3(0.004 * @sin(f * 11), f, 0.004 * @cos(f * 9));
+      t.* = f;
+      r.* = 0.009 * m.lerp(1, 0.55, f);
+      c.* = color.mix(kit.lilac, kit.leaf_lite, m.smooth(m.clamp01((f - 0.3) / 0.6)));
+    }
+    try b.tubeC(&p, &ts, &rs, &cs, null, .tendril, 5);
+    try mg.leavesAlong(b, &p, 2, 0.05, 0.018, 0.3, 0.7, 0, 0.94, kit.leaf_dark, kit.leaf_lite, 0x3E71);
+    // the grip: three claws splaying out of its end and hooking in
+    for (0..3) |i| {
+      const a = m.ratio(i, 3) * m.tau;
+      const out = v3(@cos(a), 0, @sin(a));
+      var c:[5]V3 = undefined;
+      for (&c, 0..) |*q, j| {
+        const f = m.ratio(j, 4);
+        q.* = v3(0, 0.94, 0) + out * m.splat3(0.035 * @sin(m.pi * 0.8 * f)) + v3(0, 0.06 * f, 0);
+      }
+      var cp:[10]V3 = undefined;
+      m.splineResample(&c, &cp);
+      try kit.taper(b, &cp, 0.006, 0.15, 0.94, 1, kit.pearl, .tendril, 4);
+    }
+  }
+};

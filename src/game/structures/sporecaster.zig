@@ -86,7 +86,7 @@ fn casterAt(ss:*st.Structures, w:*const World, at:[2]i32) ?st.Id {
   return if (ss.get(j).kind() == .sporecaster) j else null;
 }
 
-fn groundAt(w:*const World, at:[2]i32) f32 {
+pub fn groundAt(w:*const World, at:[2]i32) f32 {
   if (w.chunkOfTile(at[0], at[1])) |c| return c.height[ck.localIndex(at[0], at[1])];
   return gen.heightAt(w.seed, at[0], at[1]);
 }
@@ -225,7 +225,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 /// where a spore is `t` along its drift from `from` to `to`: up out of the
 /// pore, a long rise and fall over the ground, straight down into the
 /// pore it seeks, wandering a little off its line as it goes
-fn flight(from:V3, to:V3, t:f32, ph:f32, tf:f32) V3 {
+pub fn flight(from:V3, to:V3, t:f32, ph:f32, tf:f32) V3 {
   const k = m.clamp01(t);
   const d = to - from;
   const flat = v3(d[0], 0, d[2]);

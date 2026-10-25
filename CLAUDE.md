@@ -306,14 +306,24 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
       unlimited range, into the partner; home again if it is gone, hang
       over it while it is full. `Def.far`: its spores are drawn however
       far it stands.
-- Sown hybrids (`entwined` form, `species.Body`; their function is still
-  being decided): weftstone (loomfern + lithophage, yields grit),
-  nervecrown (gathering crown + ganglion, essence, contains parasites),
-  driftbraid (braided conduit + sporecaster, ley shards; its look is the
-  approved reference). Each pair of structures grown within
-  `structures.MEET` (3) tiles is a discovery (`meets` hook,
-  `Structures.meetings`) that opens its research (WOVEN STONE, SHARED
-  NERVES, BRAIDED DRIFT), which lets germinators weave its seed.
+- Convergent structures (3rd tier; each pair of lineage structures grown
+  within `structures.MEET` (3) tiles is a discovery, `meets` hook +
+  `Structures.meetings`, opening its research; woven by a germinator
+  only, `Recipe.germinator`, from the pair's bulbs + 2 convergence
+  essence; the confluence stays the only convergent plant):
+  - Weftstone (loomfern + lithophage, WOVEN STONE): floating (its mesh
+    carries `HOVER`, `Def.hover` 0), latches tendrils (emitted curves,
+    `weftstone_tendril`) onto the nearest 6 grit/ley nodes within 2 tiles,
+    draws one unit/2 s in turn into its bulb (12 grit, 4 ley), ionizes 4
+    grit + 1 ley into a ley crystal in 6 s (crystal + sparks in the bulb),
+    holds 8, hands them on.
+  - Driftbraid (braided conduit + sporecaster, BRAIDED DRIFT; its look is
+    the approved reference): paired both ways by configuring one then the
+    other; sends what it is fed by spore, takes in what comes back, lets
+    go only what came by spore (`kept` counts per kind).
+  - Still to come: a 2x2 interwoven crafting tree (6 inputs max) and the
+    Vultrixi (ganglion + gathering crown), floating structures that pull
+    resources straight out of structures for it.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
   unless one already holds them. Never sown; grows 1.5× the slower parent

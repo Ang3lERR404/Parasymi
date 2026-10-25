@@ -65,6 +65,8 @@ const kinds = struct {
   pub const ganglion = @import("structures/ganglion.zig");
   pub const gathering_crown = @import("structures/gathering_crown.zig");
   pub const sporecaster = @import("structures/sporecaster.zig");
+  pub const weftstone = @import("structures/weftstone.zig");
+  pub const driftbraid = @import("structures/driftbraid.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;

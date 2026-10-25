@@ -1,6 +1,7 @@
 //! the lineages mixed: what grows where symbiote and parasite have become
-//! one body, shared by the confluence and the sown hybrids (the `entwined`
-//! form). Not one laid over the other (a braid below, a cage above) but
+//! one body, shared by the confluence (a plant, grown through keys) and
+//! the convergent structures (grown on their growth splines, gfx/growth.zig:
+//! the `*On` pieces). Not one laid over the other (a braid below, a cage above) but
 //! woven through each other at every scale, so neither is ever seen alone:
 //! - a stalk (`weave`) is the parasites' lattice with every other strand a
 //!   symbiote's: green strands wound one way, each wandering a little off
@@ -18,11 +19,9 @@
 //!   frondlets holding warm living petals (`bloom`);
 //! - it roots both ways (`foot`): a pale bulb half sunk in the soil, its
 //!   five exact pale roots between the green braided roots of a symbiote.
-//! A plant grows by tu.x (plant.vert): it comes up drawn in to its axis
-//! and opens as growth passes each piece, its cage parting from the foot
-//! up (tu.y, as the parasites'); so a piece shares the tu.x of where it
-//! grows from. The confluence is grown through keys instead (sizes passed
-//! in, never counts, so every key keeps one vertex layout).
+//! A cage's strands carry how far they have parted in tu.y, as the
+//! parasites' do. The confluence is grown through keys (sizes passed in,
+//! never counts, so every key keeps one vertex layout).
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
@@ -31,6 +30,7 @@ const mg = @import("../meshgen.zig");
 const color = @import("../../core/color.zig");
 const vertex = @import("../vertex.zig");
 const species = @import("../../sim/species.zig");
+const growth = @import("../growth.zig");
 const Rng = @import("../../core/rng.zig").Rng;
 const pal = @import("palette.zig");
 const pk = @import("parasite_kit.zig");
@@ -241,6 +241,24 @@ const FROND_RES = 30;
 /// foot, each pair its own; furled nubs on the coil
 pub fn frond(b:*mg.Builder, f:Frond) Allocator.Error!void {
   var c:[ARC + COIL]V3 = undefined;
+  frondCtrl(f, &c);
+  try frondAlong(b, f, &c, null);
+}
+
+/// a frond grown on its own spline off `parent` at `u` (`o` when), its
+/// leaflets unfolding as the front passes them; returns its spline
+pub fn frondOn(b:*mg.Builder, k:*growth.Skeleton, parent:growth.Id, u:f32, f:Frond, o:growth.Branch) Allocator.Error!growth.Id {
+  var c:[ARC + COIL]V3 = undefined;
+  frondCtrl(f, &c);
+  const id = k.branch(parent, u, &c, o);
+  try frondAlong(b, f, &c, .{.k = k, .id = id});
+  return id;
+}
+
+const On = struct { k:*growth.Skeleton, id:growth.Id };
+
+/// a frond's control points: its arc, then the coil of its crozier
+fn frondCtrl(f:Frond, c:*[ARC + COIL]V3) void {
   pk.frondPath(f.from, f.out, f.len, f.rise, f.curl, f.seed, c[0..ARC]);
   // the crozier: the heading turns on, ever tighter, about the frond's side
   const side = m.norm(m.cross(v3(0, 1, 0), f.out));
@@ -253,8 +271,12 @@ pub fn frond(b:*mg.Builder, f:Frond) Allocator.Error!void {
     c[ARC + j] = c[ARC + j - 1] + d * m.splat3(step);
     step *= 0.72;
   }
+}
+
+fn frondAlong(b:*mg.Builder, f:Frond, c:*const [ARC + COIL]V3, on:?On) Allocator.Error!void {
   var p:[FROND_RES]V3 = undefined;
-  m.splineResample(&c, &p);
+  m.splineResample(c, &p);
+  const stem = b.mark();
   var ts:[FROND_RES]f32 = undefined;
   var rs:[FROND_RES]f32 = undefined;
   var cs:[FROND_RES]Rgba8 = undefined;
@@ -265,6 +287,7 @@ pub fn frond(b:*mg.Builder, f:Frond) Allocator.Error!void {
     cl.* = color.mix(lilac, leaf_lite, m.smooth(m.clamp01((k - 0.45) / 0.5)));
   }
   try b.tubeC(&p, &ts, &rs, &cs, null, .tendril, 5);
+  if (on) |o| try o.k.along(b, stem, o.id);
   // where the arc ends and the coil begins along the resampled frond
   const arc_end:f32 = 0.7;
   var rng = Rng.init(f.leaf_seed);
@@ -274,21 +297,26 @@ pub fn frond(b:*mg.Builder, f:Frond) Allocator.Error!void {
     const tan = m.norm(m.alongPath(&p, @min(k + 0.02, 1)) - m.alongPath(&p, @max(k - 0.02, 0)));
     const sd = m.norm(m.cross(tan, v3(0, 1, 0)));
     const len = f.leaf_len * (1 - 0.6 * m.smooth(m.ratio(j, @max(f.pairs, 2) - 1)));
+    const pair = b.mark();
     for ([_]f32{1, -1}) |sgn| {
       const dir = m.norm(sd * m.splat3(sgn) + tan * m.splat3(0.5 + rng.range(-0.12, 0.12)) + v3(0, rng.range(0.05, 0.25), 0));
       try b.blade(at, dir, len * rng.range(0.85, 1.12), f.leaf_w * rng.range(0.85, 1.1), 0.4, leaf_dark, leaf_lite, m.lerp(f.t0, f.t1, k), .leaf);
     }
+    if (on) |o| try o.k.on(b, pair, o.id, o.k.nearest(o.id, at), .{.from = at});
   }
   // decision: furled nubs only at full detail; past `LOD_AT[0]` they are
   // under a pixel
   if (b.lod > 0) return;
+  const side = m.norm(m.cross(v3(0, 1, 0), f.out));
   for (0..4) |j| {
     const k = m.lerp(arc_end + 0.04, 0.95, m.ratio(j, 3));
     const at = m.alongPath(&p, k);
     const r = f.r * m.lerp(1, 0.18, k);
+    const nubs = b.mark();
     for ([_]f32{1, -1}) |sgn| {
       try mg.ellipsoid(b, .{.center = at + side * m.splat3(sgn * r * 1.2), .radii = m.splat3(r * 0.85), .col = leaf_lite, .part = .leaf, .rings = 3, .segs = 5, .t = m.lerp(f.t0, f.t1, k)});
     }
+    if (on) |o| try o.k.on(b, nubs, o.id, o.k.nearest(o.id, at), .{.from = at});
   }
 }
 
@@ -397,6 +425,36 @@ pub fn foot(b:*mg.Builder, f:Foot) Allocator.Error!void {
   }
 }
 
+/// `foot` on a structure: the bulb swelling out of spline `id`'s start,
+/// every root a branch growing with it
+pub fn footOn(b:*mg.Builder, k:*growth.Skeleton, id:growth.Id, f:Foot) Allocator.Error!void {
+  const bulb = b.mark();
+  try pk.nodule(b, f.at + v3(0, f.r * 0.12, 0), v3(f.r, f.r * 0.5, f.r), f.t, pale, core_par, pearl);
+  try k.on(b, bulb, id, 0, .{.from = f.at, .span = k.get(id).time * 0.3});
+  var rng = Rng.init(f.seed);
+  for (0..FOLD) |i| {
+    var c:[6]V3 = undefined;
+    rootPath(f.at, m.ratio(i, FOLD) * m.tau, f.r * 0.6, f.reach, 0.25, f.seed ^ 0x9A1E, &c);
+    const pale_root = k.branch(id, 0, &c, .{.after = .with});
+    try k.tube(b, pale_root, .{.r0 = f.root_r * 0.75, .tip = 0.04, .col = pearl, .sides = 5, .t0 = f.t, .t1 = f.t + 0.03});
+    rootPath(f.at, (m.f(i) + 0.5 + rng.range(-0.18, 0.18)) / m.f(FOLD) * m.tau, f.r * 0.5, f.reach * rng.range(0.8, 1.1), 0.3, f.seed +% i * 41, &c);
+    const green_root = k.branch(id, 0, &c, .{.after = .with});
+    try k.braid(b, green_root, .{.girth = f.root_r * 1.3, .tip = 0.3, .wobble = pal.STRAND_WOBBLE, .seed = f.seed +% i * 7, .core = pal.core, .strand = green, .t0 = f.t + 0.03, .t1 = f.t});
+  }
+}
+
+/// a weave grown along spline `id` (its tu.x `t0`..`t1`), sections from
+/// `s`; returns where on it each section lies, for what rides inside
+pub fn weaveOn(b:*mg.Builder, k:*growth.Skeleton, id:growth.Id, s:pk.Stalk, w:Weave, t0:f32, t1:f32, sp:*[growth.RES]V3, sec:*[growth.RES]Section) Allocator.Error!void {
+  var ts:[growth.RES]f32 = undefined;
+  k.path(id, 0, 1, sp);
+  for (&ts, 0..) |*t, i| t.* = m.lerp(t0, t1, m.ratio(i, growth.RES - 1));
+  sections(s, sec);
+  const mk = b.mark();
+  try weave(b, sp, &ts, sec, w);
+  try k.along(b, mk, id);
+}
+
 /// a root from `at` toward bearing `a`: out of the bulb at `from`, low over
 /// the ground to `reach`, then down into it
 fn rootPath(at:V3, a:f32, from:f32, reach:f32, wobble:f32, seed:u64, c:*[6]V3) void {
@@ -420,221 +478,6 @@ pub fn taper(b:*mg.Builder, p:[]const V3, r:f32, tip:f32, t0:f32, t1:f32, col:Rg
     q.* = @max(r * m.lerp(1, tip, k), 2e-4);
   }
   try b.tubeR(p, ts[0..p.len], rs[0..p.len], col, part, sides);
-}
-
-/// points up an upright stalk `h` tall from `base`, leaning a little
-/// (`lean`) and wandering as a grown thing does
-fn stalkPath(base:V3, h:f32, lean:V3, wobble:f32, seed:u64, out:[]V3) void {
-  var c:[7]V3 = undefined;
-  mg.growthPath(.{.start = base, .direction = m.norm(v3(lean[0], 1, lean[2])), .length = h, .wobble = wobble, .curl = 0, .seed = seed}, &c);
-  m.splineResample(&c, out);
-}
-
-// ---- the sown hybrids (the `entwined` form) ----
-
-/// a sown hybrid from its genome (`body` says which); its variants differ
-/// in proportion and in their symbiotic half alone (the parasitic half is
-/// exact in every one)
-pub fn plant(b:*mg.Builder, g:species.Genome, seed:u64) Allocator.Error!void {
-  switch (g.body) {
-    .weft => try weft(b, g, seed),
-    .nerve => try nerve(b, g, seed),
-    .drift => try drift(b, g, seed),
-  }
-}
-
-/// the tu.x a stalk reaches at its top, in each hybrid: what stands on it
-/// starts there
-const WEFT_TOP:f32 = 0.35;
-const NERVE_TOP:f32 = 0.55;
-const DRIFT_TOP:f32 = 0.7;
-const RES = 25;
-
-/// a stalk of the weave from the foot up to `h`, its tu.x 0..`top`;
-/// returns its top
-fn stalk(b:*mg.Builder, g:species.Genome, s:pk.Stalk, h:f32, top:f32, rng:*Rng, seed:u64) Allocator.Error!V3 {
-  return stalkTwisted(b, g, s, h, top, pk.TWIST, rng, seed);
-}
-
-/// `stalk` with its strands turning `twist` each way (fewer crossings on a
-/// short one, so its knots never crowd)
-fn stalkTwisted(b:*mg.Builder, g:species.Genome, s:pk.Stalk, h:f32, top:f32, twist:f32, rng:*Rng, seed:u64) Allocator.Error!V3 {
-  var sp:[RES]V3 = undefined;
-  stalkPath(v3(0, 0, 0), h, v3(rng.range(-0.04, 0.04), 0, rng.range(-0.04, 0.04)), g.wobble, seed ^ 0x57A1, &sp);
-  var ts:[RES]f32 = undefined;
-  var sec:[RES]Section = undefined;
-  for (&ts, 0..) |*t, i| t.* = m.ratio(i, RES - 1) * top;
-  sections(s, &sec);
-  try weave(b, &sp, &ts, &sec, .{.twist = twist, .seed = seed ^ 0x3EA});
-  return sp[RES - 1];
-}
-
-/// WEFTSTONE: a loomfern of the lithophage's body. A short weave out of a
-/// rooted foot, holding up a crop of both saps with a grit crystal
-/// standing in it, and five fronds arching out of its neck exactly alike,
-/// their leaflets every one their own, their tips rolled into croziers.
-fn weft(b:*mg.Builder, g:species.Genome, seed:u64) Allocator.Error!void {
-  var rng = Rng.init(seed);
-  const h = g.stem_h * rng.range(0.9, 1.1);
-  try foot(b, .{.r = g.stem_r * 1.8, .reach = g.stem_r * 7, .root_r = g.stem_r * 0.32, .seed = seed ^ 0xF007});
-  const neck = try stalkTwisted(b, g, .{.girth = g.stem_r, .part = rng.range(2.0, 2.4), .from = 0.18, .to = 0.82}, h, WEFT_TOP, 0.9 * m.pi, &rng, seed);
-  // the crop, and the grit it weaves standing in it
-  const cr = g.bloom_r * rng.range(0.92, 1.08);
-  const crop = neck + v3(0, cr * 0.7, 0);
-  try sac(b, .{.center = crop, .radii = v3(cr, cr * 1.15, cr), .t = WEFT_TOP + 0.03, .phase = rng.range(0, m.tau)});
-  var crng = Rng.init(seed ^ 0xC7A);
-  for (0..FOLD) |i| {
-    const a = m.ratio(i, FOLD) * m.tau;
-    const dir = m.norm(v3(@cos(a) * 0.45, 1, @sin(a) * 0.45));
-    try @import("mineral_kit.zig").crystal(b, .{
-      .base = crop - v3(0, cr * 0.4, 0), .dir = dir, .len = cr * crng.range(0.8, 1.05), .r = cr * 0.18,
-      .col = color.rgb(0.6, 0.56, 0.52).toRgba8(255), .tip = color.rgb(0.82, 0.76, 0.92).toRgba8(255), .part = .thorn,
-    }, &crng);
-  }
-  // fronds out of its neck, exactly even and alike
-  const spin = rng.range(0, m.tau);
-  const reach = h * rng.range(2.1, 2.5);
-  for (0..FOLD) |i| {
-    const a = spin + m.ratio(i, FOLD) * m.tau;
-    try frond(b, .{
-      .from = neck, .out = v3(@cos(a), 0, @sin(a)), .len = reach, .r = g.stem_r * 0.28,
-      .rise = 1.05, .curl = 3.1, .pairs = g.leaves, .leaf_len = g.leaf_len, .leaf_w = g.leaf_w,
-      .t0 = WEFT_TOP, .t1 = 1, .seed = seed ^ 0xF20D, .leaf_seed = seed +% i * 131,
-    });
-  }
-}
-
-/// NERVECROWN: a gathering crown of the ganglion's body. A rosette of
-/// broad leaves, each its own, a pale nerve running down every midrib to
-/// the foot; a short weave up to a knot of five pearl nodules round a sac
-/// of both saps, a second five above them turned half a step; round the
-/// knot living petals and lilac fronds in turn, stamens on its crown.
-fn nerve(b:*mg.Builder, g:species.Genome, seed:u64) Allocator.Error!void {
-  var rng = Rng.init(seed);
-  const h = g.stem_h * rng.range(0.9, 1.1);
-  try foot(b, .{.r = g.stem_r * 1.8, .reach = g.stem_r * 7, .root_r = g.stem_r * 0.3, .seed = seed ^ 0xF007});
-  // the rosette: the symbiotes' golden turn, every leaf its own
-  for (0..g.leaves) |i| {
-    const a = m.f(i) * 2.39996 + rng.range(-0.2, 0.2);
-    const t = 0.04 + 0.015 * m.f(i);
-    const base = v3(@cos(a) * g.stem_r * 1.1, 0.03 + 0.004 * m.f(i), @sin(a) * g.stem_r * 1.1);
-    const dir = m.norm(v3(@cos(a), 0.35 + rng.range(-0.1, 0.1), @sin(a)));
-    const len = g.leaf_len * rng.range(0.82, 1.1);
-    const droop = g.leaf_droop * rng.range(0.8, 1.2);
-    try b.blade(base, dir, len, g.leaf_w * rng.range(0.85, 1.1), droop, leaf_dark, leaf_lite, t, .leaf);
-    // its nerve, down the midrib to the foot: riding the leaf (the same
-    // tu, so it opens with it), pale, ending in a pearl
-    var cs:[mg.BLADE_SEGS + 1]V3 = undefined;
-    mg.bladeSpine(&cs, base, dir, len, droop);
-    var p:[mg.BLADE_SEGS + 1]V3 = undefined;
-    var ts:[mg.BLADE_SEGS + 1]f32 = undefined;
-    var rs:[mg.BLADE_SEGS + 1]f32 = undefined;
-    var us:[mg.BLADE_SEGS + 1]f32 = undefined;
-    var nc:[mg.BLADE_SEGS + 1]Rgba8 = undefined;
-    for (&p, &ts, &rs, &us, &nc, cs, 0..) |*q, *tt, *r, *u, *c, cp, j| {
-      const k = m.ratio(j, mg.BLADE_SEGS) * 0.85;
-      q.* = m.lerpV(base, cp, 0.85) + v3(0, g.leaf_w * 0.06 + 0.002, 0);
-      tt.* = t;
-      r.* = @max(g.leaf_w * 0.05 * (1 - 0.6 * k), 2e-4);
-      u.* = k;
-      c.* = color.mix(pale, pearl, k);
-    }
-    try b.tubeC(&p, &ts, &rs, &nc, &us, .leaf, 4);
-  }
-  const top = try stalkTwisted(b, g, .{.girth = g.stem_r, .part = rng.range(2.0, 2.4), .from = 0.2, .to = 0.8}, h, NERVE_TOP, 1.1 * m.pi, &rng, seed);
-  // the knot: a sac of both saps, two rings of five pearl nodules round it
-  const sr = g.bloom_r * 0.42;
-  const heart = top + v3(0, sr * 0.8, 0);
-  try sac(b, .{.center = heart, .radii = v3(sr, sr * 1.1, sr), .t = NERVE_TOP + 0.05, .phase = rng.range(0, m.tau)});
-  const spin = rng.range(0, m.tau);
-  for (0..2) |ring| for (0..FOLD) |i| {
-    const a = spin + (m.f(i) + 0.5 * m.f(ring)) / m.f(FOLD) * m.tau;
-    const y = if (ring == 0) -sr * 0.2 else sr * 0.55;
-    const rr = sr * (if (ring == 0) @as(f32, 1.0) else 0.78);
-    const nr = sr * (if (ring == 0) @as(f32, 0.36) else 0.27);
-    // pale all round (a ganglion's knot, not dark seeds)
-    try pk.nodule(b, heart + v3(@cos(a) * rr, y, @sin(a) * rr), v3(nr, nr * 0.9, nr), NERVE_TOP + 0.08, pale, color.mix(pale, core_par, 0.4), pearl);
-  };
-  // the crown round it: petals and fronds in turn, five each
-  var prng = Rng.init(seed ^ 0xC20);
-  for (0..FOLD) |i| {
-    const a = spin + m.ratio(i, FOLD) * m.tau;
-    const sc = prng.range(0.85, 1.12);
-    try mg.petal(b, .{
-      .base = top + v3(0, sr * 0.1, 0), .out = v3(@cos(a), 0, @sin(a)), .len = g.bloom_r * sc, .width = g.bloom_r * 0.45 * sc,
-      .rise = 0.95 + prng.range(-0.12, 0.12), .flare = 0.8, .cup = 0.5, .col = petal_base, .tip = petal_tip, .t = NERVE_TOP + 0.1, .part = .leaf,
-    });
-    const fa = a + m.pi / m.f(FOLD);
-    var c:[8]V3 = undefined;
-    pk.frondPath(heart + v3(0, sr * 0.6, 0), v3(@cos(fa), 0, @sin(fa)), g.bloom_r * 0.9, 1.3, 4.2, seed ^ 0xF20D, &c);
-    var p:[16]V3 = undefined;
-    m.splineResample(&c, &p);
-    try taper(b, &p, g.stem_r * 0.2, 0.15, NERVE_TOP + 0.1, 1, lilac, .tendril, 5);
-  }
-  try mg.stamens(b, .{
-    .heart = heart + v3(0, sr * 0.95, 0), .axis = v3(0, 1, 0), .n = FOLD,
-    .len = g.bloom_r * 0.45, .r = g.bloom_r * 0.022, .anther = g.bloom_r * 0.11,
-    .lean = 0.4, .arch = 0.55, .col = pearl, .t = 1, .spin = spin, .seed = seed ^ 0x57A,
-  });
-}
-
-/// DRIFTBRAID: a sporecaster of the braided conduit's body. A tall weave
-/// out of a rooted foot, four lanes of sapwood (each tinted as a lane's
-/// load tints it) winding up its core through the cage; at its top a
-/// spore sac of both saps pursed into a pearl pore, and a crown of five
-/// lilac fronds flaring round it, alike, each carrying leaves of its own
-/// and ending in a flower of both.
-fn drift(b:*mg.Builder, g:species.Genome, seed:u64) Allocator.Error!void {
-  var rng = Rng.init(seed);
-  const h = g.stem_h * rng.range(0.9, 1.1);
-  try foot(b, .{.r = g.stem_r * 1.9, .reach = g.stem_r * 7.5, .root_r = g.stem_r * 0.34, .seed = seed ^ 0xF007});
-  const s:pk.Stalk = .{.girth = g.stem_r, .part = rng.range(3.0, 3.4), .from = 0.12, .to = rng.range(0.78, 0.84)};
-  var sp:[RES]V3 = undefined;
-  stalkPath(v3(0, 0, 0), h, v3(rng.range(-0.03, 0.03), 0, rng.range(-0.03, 0.03)), g.wobble, seed ^ 0x57A1, &sp);
-  var ts:[RES]f32 = undefined;
-  var sec:[RES]Section = undefined;
-  for (&ts, 0..) |*t, i| t.* = m.ratio(i, RES - 1) * DRIFT_TOP;
-  sections(s, &sec);
-  try weave(b, &sp, &ts, &sec, .{.seed = seed ^ 0x3EA});
-  // the lanes: four sapwood cores wound round each other up the core,
-  // laid bare where the cage parts
-  var fn_:[RES]V3 = undefined;
-  var fb:[RES]V3 = undefined;
-  mg.transport(&sp, &fn_, &fb);
-  const tints = [4]Rgba8{pal.sapwood, color.mix(pal.sapwood, amber, 0.45), color.mix(pal.sapwood, violet, 0.5), color.mix(pal.sapwood, blue, 0.5)};
-  for (tints, 0..) |tint, li| {
-    var p:[RES]V3 = undefined;
-    var rs:[RES]f32 = undefined;
-    for (&p, &rs, sec, 0..) |*q, *r, c, i| {
-      const u = m.ratio(i, RES - 1);
-      const a = m.ratio(li, 4) * m.tau + u * 3.2 * m.tau;
-      q.* = round(sp[i], fn_[i], fb[i], a, c.tight * 0.42);
-      r.* = c.tight * 0.3;
-    }
-    try b.tubeR(&p, &ts, &rs, tint, .stem, 5);
-  }
-  // the spore sac and its pore
-  const top = sp[RES - 1];
-  const sr = g.bloom_r * rng.range(0.95, 1.08);
-  const heart = top + v3(0, sr * 0.85, 0);
-  try sac(b, .{.center = heart, .radii = v3(sr, sr * 1.2, sr), .t = DRIFT_TOP + 0.04, .arms = 3, .phase = rng.range(0, m.tau)});
-  const pore = heart + v3(0, sr * 1.15, 0);
-  try pk.nodule(b, pore, v3(sr * 0.32, sr * 0.22, sr * 0.32), DRIFT_TOP + 0.08, pale, core_par, pearl);
-  // the crown: five fronds flaring and curling down, exactly alike, each
-  // with its own leaves and a flower at its tip
-  const spin = rng.range(0, m.tau);
-  var lrng = Rng.init(seed ^ 0x1EA);
-  for (0..FOLD) |i| {
-    const a = spin + m.ratio(i, FOLD) * m.tau;
-    var c:[10]V3 = undefined;
-    pk.frondPath(pore, v3(@cos(a), 0, @sin(a)), h * 0.5, 0.55, 2.2, seed ^ 0xF20D, &c);
-    var p:[20]V3 = undefined;
-    m.splineResample(&c, &p);
-    const t0 = DRIFT_TOP + 0.08;
-    try taper(b, &p, g.stem_r * 0.3, 0.45, t0, 0.97, lilac, .tendril, 5);
-    try mg.leavesAlong(b, &p, g.leaves / 2, g.leaf_len, g.leaf_w, 0.25, 0.8, t0, 0.97, leaf_dark, leaf_lite, seed +% i * 97 +% lrng.below(1000));
-    try bloom(b, .{.heart = p[19], .len = g.bloom_r * 0.55, .t = 1, .spin = a, .petals = g.petals, .seed = seed ^ 0xB1});
-  }
 }
 
 // ---- the confluence (grown through keys) ----

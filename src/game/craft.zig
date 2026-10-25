@@ -18,6 +18,9 @@ pub const Recipe = struct {
   time:f32,
   /// research that must be known before this can be woven
   needs:?prog.Id = null,
+  /// only a germinator weaves it (seeds always are; so are the convergent
+  /// structures, the hands cannot bind two lineages into one)
+  germinator:bool = false,
 
   pub fn unlocked(r:Recipe, g:*const prog.Progression) bool {
     return if (r.needs) |id| g.done.contains(id) else true;
@@ -53,20 +56,22 @@ pub const hand = [_]Recipe{
   .{ .out = .ganglion, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2.5, .needs = .lithophagy },
   .{ .out = .gathering_crown, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .grit, .n = 1 } }, .time = 2.5, .needs = .living_looms },
   .{ .out = .sporecaster, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 3, .needs = .spore_casting },
-  // decision: the sown hybrids are spliced from what their pair works in,
-  // bound by what the lineages' meeting condenses (the brief sets no cost);
-  // last, so the weaves chosen in saved gardens keep their places
-  .{ .out = .seed_weftstone, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .grit, .n = 2 }, .{ .item = .convergence_essence, .n = 1 } }, .time = 3, .needs = .woven_stone },
-  .{ .out = .seed_nervecrown, .in = &.{ .{ .item = .essence, .n = 2 }, .{ .item = .fibre, .n = 1 }, .{ .item = .convergence_essence, .n = 1 } }, .time = 3, .needs = .shared_nerves },
-  .{ .out = .seed_driftbraid, .in = &.{ .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .convergence_essence, .n = 1 } }, .time = 3.5, .needs = .braided_drift },
+  // decision: the convergent structures are woven from the pair they grow
+  // out of, bound by what the lineages' meeting condenses (the brief sets
+  // no cost); last, so the weaves chosen in saved gardens keep their places
+  .{ .out = .weftstone, .in = &.{ .{ .item = .loomfern, .n = 1 }, .{ .item = .lithophage, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .starlight, .n = 2 } }, .time = 4, .needs = .woven_stone, .germinator = true },
+  .{ .out = .driftbraid, .in = &.{ .{ .item = .braided_conduit, .n = 1 }, .{ .item = .sporecaster, .n = 1 }, .{ .item = .convergence_essence, .n = 2 }, .{ .item = .essence, .n = 2 } }, .time = 4, .needs = .braided_drift, .germinator = true },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
+/// whether only a germinator weaves it: a seed, or one marked so
+pub fn germinatorOnly(idx:usize) bool { return isSeedRecipe(idx) or hand[idx].germinator; }
 
-/// the recipes the wolf weaves by hand (indices into `hand`): all but seeds.
-pub const by_hand = recipesWhere(false);
+/// the recipes the wolf weaves by hand (indices into `hand`): all but what
+/// only a germinator weaves.
+pub const by_hand = recipesWhere(germinatorOnly, false);
 /// the seed weaves (indices into `hand`).
-pub const seeds = recipesWhere(true);
+pub const seeds = recipesWhere(isSeedRecipe, true);
 /// every weave: what a germinator may be set to (indices into `hand`).
 pub const all = blk: {
   var out:[hand.len]u8 = undefined;
@@ -80,18 +85,18 @@ pub fn woven(item:items.Item) bool {
   return false;
 }
 
-fn countWhere(comptime seed:bool) usize {
+fn countWhere(comptime pred:fn (usize) bool, comptime want:bool) usize {
   @setEvalBranchQuota(10_000);
   var n:usize = 0;
-  for (0..hand.len) |i| if (isSeedRecipe(i) == seed) { n += 1; };
+  for (0..hand.len) |i| if (pred(i) == want) { n += 1; };
   return n;
 }
 
-fn recipesWhere(comptime seed:bool) [countWhere(seed)]u8 {
+fn recipesWhere(comptime pred:fn (usize) bool, comptime want:bool) [countWhere(pred, want)]u8 {
   @setEvalBranchQuota(10_000);
-  var out:[countWhere(seed)]u8 = undefined;
+  var out:[countWhere(pred, want)]u8 = undefined;
   var k:usize = 0;
-  for (0..hand.len) |i| if (isSeedRecipe(i) == seed) { out[k] = i; k += 1; };
+  for (0..hand.len) |i| if (pred(i) == want) { out[k] = i; k += 1; };
   return out;
 }
 

@@ -1,8 +1,7 @@
 //! WOVEN STONE: what a loomfern and a lithophage make between them, grown
-//! side by side: germinators weave weftstone seeds, a fern of both
-//! lineages that weaves grit out of the ley.
+//! side by side: weftstones, floating over the nodes, drawing them up and
+//! ionizing what they draw into ley crystals.
 const prog = @import("../progression.zig");
-const species = @import("../../sim/species.zig");
 
 pub const def:prog.Research = .{
   .per_unit = &.{
@@ -16,5 +15,3 @@ pub const def:prog.Research = .{
   .needs = .loom_and_stone,
   .branch = true,
 };
-
-pub const unlocks = [_]species.Id{.weftstone};

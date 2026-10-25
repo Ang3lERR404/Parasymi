@@ -79,8 +79,8 @@ pub fn canPut(g:*const Game, h:[2]i32) bool {
 }
 
 pub fn weaveByHand(g:*Game, i:usize) void {
-  // seeds come only from a germinator
-  if (craft.isSeedRecipe(i)) return;
+  // seeds (and what binds the lineages) come only from a germinator
+  if (craft.germinatorOnly(i)) return;
   const r = craft.hand[i];
   if (!r.unlocked(&g.prog)) return g.prog.say(txt.s.msg.not_understood, .{txt.item(r.out).name});
   if (!g.weave.push(g.player.inv.bag(), i)) g.prog.say(txt.s.msg.cannot_weave, .{txt.item(r.out).name});
@@ -202,7 +202,7 @@ test "plants never set seed; an uprooted plant comes back as its seed" {
 }
 
 test "seeds are woven only by a germinator, which is woven from gathered matter" {
-  for (craft.by_hand) |i| try testing.expect(!craft.isSeedRecipe(i));
+  for (craft.by_hand) |i| try testing.expect(!craft.germinatorOnly(i));
   for (craft.hand) |r| if (r.out == .germinator) for (r.in) |ing| {
     try testing.expect(ing.item == .fibre or ing.item == .grit or ing.item == .starlight);
   };
