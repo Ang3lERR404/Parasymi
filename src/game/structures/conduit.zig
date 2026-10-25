@@ -25,7 +25,7 @@ const meshlib = @import("../../gfx/meshlib.zig");
 /// the soil and back in) but does not sway: its arches join the next conduit's under the ground, and a bend
 /// per conduit would pull them apart. It draws its own arches (`emit`),
 /// one per edge it is fed from; `mesh` (the straight one) is its preview.
-pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true, .bare = true };
+pub const def:st.Def = .{ .item = .conduit, .size = 1, .mesh = .conduit, .grow = 1.5, .carrier = true, .bare = true, .tall = 0.25 };
 
 /// its arch by the edge it comes in at, counted from the way it faces
 /// (1 the side +Z of it in its own frame, 2 behind, 3 the other side)

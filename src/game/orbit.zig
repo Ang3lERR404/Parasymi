@@ -18,9 +18,10 @@ const Game = play.Game;
 /// the point looked at sits this far above a thing's ground (the wolf's
 /// follow height; floaters add their hover)
 const FOCUS_UP:f32 = 0.6;
-// decision: a structure is looked at this far up its height (a tall one's
-// crown, where its work shows, stays in frame)
-const TALL_FOCUS:f32 = 0.75;
+// decision: a structure is looked at halfway up its height (`Def.tall`),
+// over its hover: its middle, so it sits at the frame's centre however
+// low or tall it is
+const TALL_FOCUS:f32 = 0.5;
 
 /// what the camera turns round
 pub const Focus = union(enum) {
@@ -121,7 +122,7 @@ pub const Orbit = struct {
         var near:f32 = m.inf(f32);
         for (g.structs.list.items) |*s| if (s.kind() == k) {
           const def = s.def();
-          const c = m.footprintCentre(s.x, s.y, def.size, g.heightAt(s.x, s.y) + @max(FOCUS_UP, def.tall * TALL_FOCUS) + def.hover);
+          const c = m.footprintCentre(s.x, s.y, def.size, g.heightAt(s.x, s.y) + def.tall * TALL_FOCUS + def.hover);
           const d = m.len(c - wolf);
           if (d < near) { near = d; best = c; }
         };

@@ -31,7 +31,7 @@ const mesh = @import("../../gfx/meshes/braided_conduit.zig");
 /// decision: like a conduit, it grows along its arches' growth splines but
 /// never sways (its arches join the next one's under the ground) and draws
 /// its own arches, one per edge it is fed from; `mesh` is its preview.
-pub const def:st.Def = .{ .item = .braided_conduit, .size = 1, .mesh = .braided_conduit, .grow = 2, .carrier = true, .bare = true };
+pub const def:st.Def = .{ .item = .braided_conduit, .size = 1, .mesh = .braided_conduit, .grow = 2, .carrier = true, .bare = true, .tall = 0.3 };
 
 pub const LANES = mesh.LANES;
 /// tiles per second a lane carries (a conduit carries 2.5)

@@ -50,6 +50,7 @@ pub const hand = [_]Recipe{
   .{ .out = .lithophage, .in = &.{ .{ .item = .grit, .n = 6 }, .{ .item = .ley_shard, .n = 2 }, .{ .item = .essence, .n = 2 }, .{ .item = .fibre, .n = 2 } }, .time = 3, .needs = .lithophagy },
   // woven from conduits: four grown into one
   .{ .out = .braided_conduit, .in = &.{ .{ .item = .conduit, .n = 4 }, .{ .item = .fibre, .n = 2 }, .{ .item = .essence, .n = 1 } }, .time = 2, .needs = .braided_roots },
+  .{ .out = .ganglion, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2.5, .needs = .lithophagy },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }

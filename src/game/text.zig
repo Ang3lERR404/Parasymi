@@ -81,6 +81,7 @@ pub const Strings = struct {
     loom:S = "", loom_fed:S = "", loom_full:S = "",
     lith_draws:S = "", lith_saps:S = "", lith_starved:S = "",
     lanes:S = "", lane_empty:S = "",
+    shares:S = "",
     halo_open:S = "", halo_forming:S = "", halo_formed:S = "", diamond:S = "",
   } = .{},
   sky:struct { dawn:S = "", dusk:S = "", day:S = "", night:S = "" } = .{},

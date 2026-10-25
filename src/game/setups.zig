@@ -163,6 +163,13 @@ fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   g.prog.done.insert(.lithophagy);
   g.prog.done.insert(.braided_roots);
   try braids(g, cx - 10, cz - 2);
+  // a ganglion splitting a line three ways, each branch into a cache
+  try layout(g, cx - 10, cz + 4, &.{
+    .{.at = .{0, 1}, .k = .sap_cache}, .{.at = .{1, 1}, .k = .conduit},
+    .{.at = .{2, 1}, .k = .ganglion},
+    .{.at = .{2, 0}, .k = .conduit, .dir = 3}, .{.at = .{3, 1}, .k = .conduit}, .{.at = .{2, 2}, .k = .conduit, .dir = 1},
+    .{.at = .{2, -1}, .k = .sap_cache}, .{.at = .{4, 1}, .k = .sap_cache}, .{.at = .{2, 3}, .k = .sap_cache},
+  }, &.{.essence, .fibre, .ley_shard});
   // the nearest spot with stone round it to eat, its cup emptied into a cache
   var r:i32 = 3;
   outer: while (r < 14) : (r += 1) {
@@ -209,6 +216,24 @@ fn braids(g:*Game, x:i32, z:i32) Allocator.Error!void {
       for (at, kinds, dirs, 0..) |a, k, d, i| _ = try g.structs.place(g.gpa, &g.world, x + o[0] + a[0], z + o[1] + a[1], k, d, 0.1 * m.f(i));
       const src = g.structs.at(&g.world, x + o[0], z + o[1]).?;
       for ([_]items.Item{.essence, .fibre, .ley_shard, .grit}) |item| _ = g.structs.insert(&g.prog, src, item, items.STACK);
+      return;
+    }
+  }
+}
+
+const Piece = struct { at:[2]i32, k:st.Kind, dir:m.Dir = 0 };
+
+/// a set of structures put down together on the free ground nearest (x, z),
+/// the first (a cache) stocked with `stock`
+fn layout(g:*Game, x:i32, z:i32, pieces:[]const Piece, stock:[]const items.Item) Allocator.Error!void {
+  var r:i32 = 0;
+  while (r < 8) : (r += 1) {
+    var it = m.ring(r);
+    search: while (it.next()) |o| {
+      for (pieces) |p| if (!g.structs.canPlace(&g.world, x + o[0] + p.at[0], z + o[1] + p.at[1], p.k)) continue :search;
+      for (pieces, 0..) |p, i| _ = try g.structs.place(g.gpa, &g.world, x + o[0] + p.at[0], z + o[1] + p.at[1], p.k, p.dir, 0.1 * m.f(i));
+      const src = g.structs.at(&g.world, x + o[0] + pieces[0].at[0], z + o[1] + pieces[0].at[1]).?;
+      for (stock) |item| _ = g.structs.insert(&g.prog, src, item, items.STACK);
       return;
     }
   }

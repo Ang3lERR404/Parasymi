@@ -86,8 +86,20 @@ pub fn stalk(b:*mg.Builder, k:*growth.Skeleton, id:growth.Id, girth:f32, seed:u6
 /// stalk's root as it starts
 pub fn foot(b:*mg.Builder, k:*growth.Skeleton, id:growth.Id, at:V3, radii:V3) Allocator.Error!void {
   const s = b.mark();
-  try mg.ellipsoid(b, .{.center = at, .radii = radii, .col = skin, .rings = 7, .segs = 12, .t = 0});
+  try nodule(b, at, radii, 0);
   try k.on(b, s, id, 0, .{.from = at, .span = k.get(id).time * 0.3});
+}
+
+/// a bulb of the lineage's skin at `at`: pearl where it swells toward the
+/// light, its core showing dark underneath, so it reads round however
+/// pale (a smooth field of its normal, so shared vertices match)
+pub fn nodule(b:*mg.Builder, at:V3, radii:V3, t:f32) Allocator.Error!void {
+  const s = b.mark();
+  try mg.ellipsoid(b, .{.center = at, .radii = radii, .col = skin, .rings = 9, .segs = 14, .t = t});
+  for (b.v.items[s..]) |*vx| {
+    const up = m.clamp01(0.5 + 0.5 * vx.nrm[1]);
+    vx.col = if (up > 0.5) color.mix(skin, pearl, (up - 0.5) * 2) else color.mix(core, skin, up * 2);
+  }
 }
 
 /// `n` pale roots out of the foot, reaching `reach` and sinking into the
