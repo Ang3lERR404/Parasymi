@@ -160,6 +160,26 @@ fn digger(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
 /// it works from.
 fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   g.prog.done.insert(.living_looms);
+  g.prog.done.insert(.lithophagy);
+  // the nearest spot with stone round it to eat, its cup emptied into a cache
+  var r:i32 = 3;
+  outer: while (r < 14) : (r += 1) {
+    var it = m.ring(r);
+    while (it.next()) |o| {
+      const x = cx + o[0];
+      const z = cz + o[1];
+      if (!mineralAround(g, x, z) or !g.structs.canPlace(&g.world, x, z, .lithophage)) continue;
+      _ = try g.structs.place(g.gpa, &g.world, x, z, .lithophage, 0, 0.35);
+      for (m.dirs) |d| {
+        const v = m.dirVec(d);
+        // (never over the stone it eats)
+        const c = g.world.chunkOfTile(x + v.x, z + v.z) orelse continue;
+        if (c.res[ck.localIndex(x + v.x, z + v.z)] > 0) continue;
+        if (try g.structs.place(g.gpa, &g.world, x + v.x, z + v.z, .sap_cache, 0, 0.45)) break;
+      }
+      break :outer;
+    }
+  }
   if (try nearest(g, cx + 3, cz - 4, .loomfern, 0.15)) |j| {
     _ = g.structs.insert(&g.prog, j, .essence, 3);
     const s = g.structs.get(j);
@@ -184,6 +204,17 @@ fn nearest(g:*Game, x:i32, z:i32, k:st.Kind, seed:f32) Allocator.Error!?st.Id {
     }
   }
   return null;
+}
+
+/// a free grit or ley node on one of the eight tiles round (x, z)
+fn mineralAround(g:*const Game, x:i32, z:i32) bool {
+  var it = m.ring(1);
+  while (it.next()) |o| {
+    const c = g.world.chunkOfTile(x + o[0], z + o[1]) orelse continue;
+    const t = ck.localIndex(x + o[0], z + o[1]);
+    if (c.res[t] > 0 and c.occ[t] == .none and (c.kind[t] == .soil or c.kind[t] == .stone or c.kind[t] == .ley)) return true;
+  }
+  return false;
 }
 
 fn nodeBeside(g:*const Game, x:i32, z:i32) bool {

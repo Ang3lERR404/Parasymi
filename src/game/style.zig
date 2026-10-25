@@ -92,3 +92,5 @@ pub const sap:C = .{255, 190, 90, 255};
 pub const research_tendril:C = .{200, 160, 255, 255};
 /// root-digger progress tendril (warm amber-brown)
 pub const digger:C = .{200, 170, 110, 255};
+/// a lithophage condensing its crystal (pale lilac)
+pub const lith:C = .{190, 165, 235, 255};

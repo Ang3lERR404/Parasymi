@@ -55,6 +55,7 @@ const kinds = struct {
   pub const polyp = @import("structures/polyp.zig");
   pub const diamond = @import("structures/diamond.zig");
   pub const loomfern = @import("structures/loomfern.zig");
+  pub const lithophage = @import("structures/lithophage.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;

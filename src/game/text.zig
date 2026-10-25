@@ -79,6 +79,7 @@ pub const Strings = struct {
     carries:S = "", nothing:S = "", weaves:S = "", choose_study:S = "", studies:S = "",
     no_node:S = "", digger_full:S = "", digs:S = "", cache:S = "",
     loom:S = "", loom_fed:S = "", loom_full:S = "",
+    lith_draws:S = "", lith_saps:S = "", lith_starved:S = "",
     halo_open:S = "", halo_forming:S = "", halo_formed:S = "", diamond:S = "",
   } = .{},
   sky:struct { dawn:S = "", dusk:S = "", day:S = "", night:S = "" } = .{},

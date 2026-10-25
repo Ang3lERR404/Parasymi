@@ -61,6 +61,10 @@ const parts = struct {
   pub const loomfern = @import("meshes/loomfern.zig");
   pub const loomfern_sheaf = @import("meshes/loomfern.zig").sheaf;
   pub const loomfern_thread = @import("meshes/loomfern.zig").thread;
+  pub const lithophage = @import("meshes/lithophage.zig");
+  pub const lithophage_crystal = @import("meshes/lithophage.zig").crystal;
+  pub const lithophage_root = @import("meshes/lithophage.zig").root;
+  pub const lithophage_root_far = @import("meshes/lithophage.zig").root_far;
   // the halo: its polyp and the diamond it forms
   pub const polyp = @import("meshes/polyp.zig");
   pub const halo_diamond = @import("meshes/polyp.zig").diamond;

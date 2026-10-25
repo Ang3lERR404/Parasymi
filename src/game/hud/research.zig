@@ -93,7 +93,7 @@ const EASE_DT_MAX:f64 = 0.1;
 
 fn isBranch(i:usize) bool { return prog.tree.values[i].branch; }
 /// stem index of a host: 0 the trunk, 1 + id a branch.
-fn stemOf(h:?Id) usize { return if (h) |id| 1 + @intFromEnum(id) else 0; }
+fn stemOf(h:?Id) usize { return if (h) |id| 1 + @as(usize, @intFromEnum(id)) else 0; }
 fn firstPrereq(id:Id) ?Id {
   const r = prog.tree.get(id);
   return if (r.prereq.len > 0) r.prereq[0] else null;
@@ -206,7 +206,7 @@ fn layout(t:f32, amp:f32) Layout {
   l.stems[0] = .build(m.splat3(0), UP, stemLen(0), BEND, amp * sway(0, t) * TRUNK_SWAY);
   place(&l, null, t, amp);
   for (plan.order[0..plan.branches]) |b| {
-    const i = @intFromEnum(b);
+    const i:usize = @intFromEnum(b);
     l.stems[1 + i] = .build(l.base[i], l.ang[i], stemLen(1 + i), BEND, amp * sway(1 + i, t));
     place(&l, b, t, amp);
   }
@@ -305,7 +305,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   grown[0] = @min(sp.trunk, l.stems[0].len);
   rad[0] = TRUNK_R0 + TRUNK_RK * @sqrt(m.f(g.prog.done.count()));
   for (plan.order[0..plan.branches]) |b| {
-    const i = @intFromEnum(b);
+    const i:usize = @intFromEnum(b);
     const h = stemOf(plan.host[i]);
     if (!shown(&grown, i)) continue;
     const st = g.prog.status(b);
@@ -322,7 +322,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   }
   try stem(d, f, &l.stems[0], grown[0], rad[0]);
   for (plan.order[0..plan.branches]) |b| {
-    const k = 1 + @intFromEnum(b);
+    const k = 1 + @as(usize, @intFromEnum(b));
     try stem(d, f, &l.stems[k], grown[k], rad[k]);
   }
 
@@ -389,7 +389,7 @@ fn stem(d:*Draw, f:Fit, st:*const Stem, gl:f32, r0:f32) Allocator.Error!void {
 
 /// one node: a leaf (petiole and blade) or a branch's bloom or bud.
 fn node(d:*Draw, f:Fit, l:*const Layout, g:*const play.Game, id:Id, gl:f32, trunk_r:f32) Allocator.Error!void {
-  const i = @intFromEnum(id);
+  const i:usize = @intFromEnum(id);
   const st = g.prog.status(id);
   const cur = g.prog.current == id;
   const seed = m.f(i) * 0.37;

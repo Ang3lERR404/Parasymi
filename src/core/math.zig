@@ -42,6 +42,7 @@ pub const NEAR_PARALLEL:f32 = 0.9;
 
 pub const pi = math.pi;
 pub const tau = math.tau;
+pub const sqrt2 = math.sqrt2;
 /// a quarter turn (pi / 2).
 pub const half_pi = pi / 2.0;
 pub const clamp = math.clamp;

@@ -47,6 +47,7 @@ pub const hand = [_]Recipe{
   .{ .out = .diamond, .in = &.{ .{ .item = .starlight, .n = 6 }, .{ .item = .ley_shard, .n = 4 }, .{ .item = .convergence_essence, .n = 3 }, .{ .item = .fibre, .n = 2 } }, .time = 6, .needs = .celestial_defragmentation },
   // decision: costs for the lineages' structures are set here (the brief sets none)
   .{ .out = .loomfern, .in = &.{ .{ .item = .fibre, .n = 5 }, .{ .item = .essence, .n = 2 }, .{ .item = .grit, .n = 2 } }, .time = 2.5, .needs = .living_looms },
+  .{ .out = .lithophage, .in = &.{ .{ .item = .grit, .n = 6 }, .{ .item = .ley_shard, .n = 2 }, .{ .item = .essence, .n = 2 }, .{ .item = .fibre, .n = 2 } }, .time = 3, .needs = .lithophagy },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
