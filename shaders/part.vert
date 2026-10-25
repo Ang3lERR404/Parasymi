@@ -64,6 +64,13 @@ const int PLACE_CURVE = 1;   // along a Catmull-Rom curve (the tail, beams)
 const int PLACE_MOTE = 2;    // a star mote
 const int PLACE_SKINNED = 3; // by its bones
 
+// how a diamond gathers (common.glsl gatherAway, gatherIn): its facets
+// settle PRISM_PACE of the way apart by order, each over PRISM_SPAN,
+// drawn in PRISM_REACH along its face, turning PRISM_TURN radians
+const float PRISM_PACE = 0.4;
+const float PRISM_SPAN = 0.6;
+const float PRISM_REACH = 0.45;
+const float PRISM_TURN = 3.0;
 // a flash spreads out from this share of its size to this many times it
 const float FLASH_FROM = 0.1;
 const float FLASH_TO = 3.2;
@@ -188,15 +195,15 @@ void main() {
   // the body holds (a smooth field of height, so shared vertices move alike)
   if (part == PART_RESIN) p += iq.yzw * smoothstep(0.0, 1.0, tu.y);
   bool drawn = ih.w >= 0.0;
-  // the halo's diamond forms as its blooms close in (how far they have come,
-  // haloPull): its facets gather from shards turning in around it, each
-  // drawn in along its face and growing as it comes, fitting together as
-  // the blooms meet; then it is still
+  // the halo's diamond is gathered as its blooms close in (how far they
+  // have come, haloPull), the radiant way (common.glsl gatherIn): its
+  // facets come in as shards turning round it, each drawn in along its
+  // face and growing as it comes, one after another from its foot up,
+  // fitting together as the blooms meet; then it is still
   if (part == PART_PRISM && drawn) {
-    float form = sqrt(haloPull(ih.w));
-    float a = (1.0 - form) * 3.0;
-    p = p * form + nrm * (1.0 - form) * 0.45;
-    p.xz = rot(a) * p.xz;
+    float away = gatherAway(fragmentOf(tu, col.a).order, PRISM_PACE, PRISM_SPAN, sqrt(haloPull(ih.w)));
+    p = gatherIn(p, nrm * PRISM_REACH, away, 1.0, PRISM_TURN);
+    nm = gatherTurn(nm, away, PRISM_TURN);
   }
   // the flash where the blooms met: a disc of light (tu.x its radius
   // 0..1) thrown outward from the diamond, fast then slowing (age 0..1)

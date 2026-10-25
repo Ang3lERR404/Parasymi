@@ -162,7 +162,24 @@ recipes (`game/craft.zig`) are plain data tables.
   swirling in arms, violet between; exact fives carrying living leaves
   and petals: `frond` (lilac, green leaflets, crozier tip), `bloom`
   (pale frondlet calyx, warm petals, stamens); `foot` rooted both ways;
-  `plant` for the `entwined` form, `confluence` grown through keys).
+  `plant` for the `entwined` form, `confluence` grown through keys),
+  `radiant_kit` (the radiant/celestial lineage, its plant (`plant`, the
+  celestial bloom, `radiant` form) and structures (the diamond,
+  meshes/halo.zig): **never grown, only gathered**. No root, stem,
+  growth spline or scaling: rigid fragments joined to nothing, each
+  marked by `fragment` (tu.x assembly order, tu.y `Ring` + `THREAD`
+  share on a thread, colour alpha bearing), coming in from afar on its
+  own way, turning round the heart, settling in its turn, held by
+  light (`thread`). Pieces: `core` (luminous core, stamen crown of
+  light), `whorl` (floating petals, each threaded to the core),
+  `motes`, `halo` (thin tilted ring), `cut` (a cut crystal, facets
+  gathered foot up), `shards`. On the GPU one way for all: common.glsl
+  `fragmentOf`, `gatherAway(order, pace, span, k)`, `gatherIn(p, from,
+  away, shrink, turn)`/`gatherTurn`; plant.vert (`ARRIVE_*`) by the
+  bloom's growth, part.vert (`PRISM_*`) by its halo's pull. A new
+  radiant thing is built from these and gathered the same way, never
+  with the other kits or growth splines (the test checks every vertex
+  is a fragment on no spline).
   Symbiotic structures use
   `structure_kit` and the conduit's `arch` (its weave, spine and side
   roots: `conduit.arch`, `spineCtrl`, `core = null` for a bare weave).
@@ -175,7 +192,7 @@ recipes (`game/craft.zig`) are plain data tables.
   lithophage (and its roots), braided conduit (weave and each lane its
   own mesh on the same spline), ganglion (and its nerves), gathering crown
   (and its roots, `Root(n)` per distance), sporecaster. The diamond
-  is the radiant lineage's and forms its own way (left as it is).
+  is the radiant lineage's: gathered, not grown (`radiant_kit`).
   - A mesh's `build` lays out a hidden `Skeleton`: `var sk =
     growth.Skeleton.begin(b)`, `sk.trunk(ctrl, .{})`, then `sk.branch(parent,
     u, ctrl, .{})` / `sk.vine(parent, u, mg.Growth, n, .{})` off it (a
@@ -471,7 +488,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   narrow cupped petals (inner upright .. outer open) floating apart from it,
   each held by a thread of light, motes spiralling in, tilted halo. Pearl
   with an iridescent film (plant.frag `filmHue` by view angle). Fragments
-  carry assembly order (tu.x), `meshgen.Ring` (tu.y; a thread adds its
+  carry assembly order (tu.x), `radiant_kit.Ring` (tu.y; a thread adds its
   distance from its petal) and bearing (colour alpha): plant.vert spirals
   each in folded as a bud and opens it as growth passes it; grown, whorls
   turn slowly, alternating, and drift apart and back; it bobs and never

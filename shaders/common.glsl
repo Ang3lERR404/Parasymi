@@ -545,6 +545,33 @@ vec3 haloSpiral(vec3 p, vec3 centre, float k) {
   return centre + vec3(d.x * c - d.z * s, d.y, d.x * s + d.z * c) * (1.0 - pull);
 }
 
+// the radiant lineage's one way of forming (gfx/meshes/radiant_kit.zig):
+// never grown, gathered. Each fragment (petal, thread, mote, facet), joined
+// to nothing, comes in from afar on its own way, turning round the heart as
+// it comes, and settles in its place in its turn.
+// a fragment as the kit marks it: tu.x its assembly order, tu.y its ring
+// (radiant_kit.Ring) plus, on a thread, how far it is from what it holds
+// (held 1 there .. 0 at the heart), colour alpha its bearing
+const float RADIANT_THREAD = 0.9;
+struct Fragment { float order; float ring; float held; float bearing; };
+Fragment fragmentOf(vec2 tu, float a) {
+  return Fragment(tu.x, floor(tu.y + 0.01), 1.0 - fract(tu.y + 0.01) / RADIANT_THREAD, a * TAU);
+}
+// how far a fragment still is from its place (1 setting out .. 0 settled)
+// when its thing is `k` gathered: each `pace` of its order later than the
+// first, taking `span` to come in
+float gatherAway(float order, float pace, float span, float k) { return 1.0 - grownPast(order, pace, span, k); }
+// where a fragment `away` from its place is: drawn in from `from` (its
+// offset when furthest out, mesh space), shrunk toward the heart by
+// `shrink` (a shard), turned `turn` radians round the heart's up axis
+vec3 gatherIn(vec3 p, vec3 from, float away, float shrink, float turn) {
+  vec3 q = p * (1.0 - shrink * away) + from * away;
+  q.xz = rot(away * turn) * q.xz;
+  return q;
+}
+// its normal, turned with it
+vec3 gatherTurn(vec3 n, float away, float turn) { return gatherIn(n, vec3(0.0), away, 0.0, turn); }
+
 // light split into its spectrum, x 0 red .. 1 violet, as a prism or an ice
 // halo fans it out
 vec3 spectral(float x) {

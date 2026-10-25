@@ -35,12 +35,17 @@ layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubb
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
 // a celestial bloom's turning: each ring's pace (rad/s, alternating ways),
-// by its meshgen.Ring: core, inner, middle, outer whorl, motes, threads
+// by its radiant_kit.Ring: core, inner, middle, outer whorl, motes, halo
 // (a ring past the table turns as the last)
 const float SPIN[6] = float[6](0.03, 0.05, -0.035, 0.025, 0.1, 0.04);
 const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
-// how far a fragment comes in from (horizontally) as it settles
+// how it gathers (common.glsl gatherAway, gatherIn): fragments settle
+// ARRIVE_PACE of growth apart by order, each over ARRIVE_SPAN, coming in
+// from ARRIVE_REACH out (horizontally), turning ARRIVE_TURN radians
+const float ARRIVE_PACE = 0.7;
+const float ARRIVE_SPAN = 0.3;
 const float ARRIVE_REACH = 1.4;
+const float ARRIVE_TURN = 1.4;
 // a wilting plant sinks to this share of its height
 const float WILT = 0.55;
 // a sown plant's size: seedling share, and the spread between instances
@@ -87,20 +92,19 @@ void main() {
   vec3 n = normalize(mix(nrm, nrm_next, ic.x));
 
   if (formIn(FORMS_FREE, ib.w)) {
-    // a flower whose petals float free of it, gathered by its core: each
-    // fragment (tu.x its order, colour alpha its bearing, tu.y its ring,
-    // meshgen.Ring) drifts in from its bearing, spiralling, folded up like
-    // a bud, and opens as it settles. Grown, the whorls never quite close:
-    // each petal drifts a little away and back, slowly, held by its thread
-    // (a thread's core end, fract(tu.y) high, stays with the core). Motes
-    // of light spiral in and are taken up. It never bends from a root.
-    float order = tu.x, bearing = col.a * TAU;
-    float ring = floor(tu.y + 0.01);
-    float held = 1.0 - fract(tu.y + 0.01) / 0.9;
+    // a flower whose petals float free of it, gathered by its core (the
+    // radiant way, common.glsl gatherIn): each fragment drifts in from its
+    // bearing, spiralling, folded up like a bud, and opens as it settles.
+    // Grown, the whorls never quite close: each petal drifts a little away
+    // and back, slowly, held by its thread (a thread's core end stays with
+    // the core). Motes of light spiral in and are taken up. It never bends
+    // from a root.
+    Fragment f = fragmentOf(tu, col.a);
+    float order = f.order, bearing = f.bearing, ring = f.ring, held = f.held;
     bool petals = ring > 0.5 && ring < 3.5;
     bool motes = abs(ring - 4.0) < 0.5;
-    float settle = grownPast(order, 0.7, 0.3, growth);
-    float away = 1.0 - settle;
+    float away = gatherAway(order, ARRIVE_PACE, ARRIVE_SPAN, growth);
+    float settle = 1.0 - away;
     vec2 dir = vec2(cos(bearing), sin(bearing));
     float ph = bearing * 3.0 + ring * 1.7 + seed * 9.0;
     if (petals) {
@@ -125,15 +129,16 @@ void main() {
       p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
       p.xz = rot(c * 2.2) * p.xz;
     }
+    // arriving from afar along its bearing, rising in from below, turning
+    // round the core as it comes
+    vec3 from = vec3(dir.x * ARRIVE_REACH, -0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0), dir.y * ARRIVE_REACH) * held;
+    p = gatherIn(p, from, away, 0.0, ARRIVE_TURN);
+    n = gatherTurn(n, away, ARRIVE_TURN);
     // each ring turns at its own slow pace, alternating ways
     float spin = SPIN[clamp(int(ring), 0, 5)];
-    mat2 turn = rot(t * spin + seed * TAU + away * 1.4);
+    mat2 turn = rot(t * spin + seed * TAU);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
-    // arriving from afar along its bearing, rising in from below
-    float far = away * held;
-    p.xz += (turn * dir) * far * ARRIVE_REACH;
-    p.y += far * (-0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0));
     p *= 1.0 + 0.02 * sin(t * 0.6 + seed * TAU);
     // drawn into a forming halo, it turns with its orbit
     if (drawn) {

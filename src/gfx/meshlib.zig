@@ -106,11 +106,11 @@ const parts = struct {
   pub const weftstone = @import("meshes/weftstone.zig");
   // the halo: its polyp and the diamond it forms
   pub const polyp = @import("meshes/polyp.zig");
-  pub const halo_diamond = @import("meshes/polyp.zig").diamond;
+  pub const halo_diamond = @import("meshes/halo.zig").diamond;
   // translucent, over everything
-  pub const halo_projection = @import("meshes/polyp.zig").projection;
-  pub const halo_ring = @import("meshes/polyp.zig").ring;
-  pub const halo_flash = @import("meshes/polyp.zig").flash;
+  pub const halo_projection = @import("meshes/halo.zig").projection;
+  pub const halo_ring = @import("meshes/halo.zig").ring;
+  pub const halo_flash = @import("meshes/halo.zig").flash;
   pub const bloom_thread = @import("meshes/bloom_thread.zig");
 };
 const reg = registry.Registry(parts);

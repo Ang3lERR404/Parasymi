@@ -12,6 +12,7 @@ const color = @import("../core/color.zig");
 const noise = @import("../core/noise.zig");
 const parasite_kit = @import("meshes/parasite_kit.zig");
 const convergence_kit = @import("meshes/convergence_kit.zig");
+const radiant_kit = @import("meshes/radiant_kit.zig");
 
 const V3 = m.V3;
 const PV = vertex.Mesh;
@@ -806,7 +807,7 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
     .herb => try herb(b, g, seed + @as(u64, variant) * 131, variant, !def.floating),
     .coil => try parasite_kit.plant(b, g, seed + @as(u64, variant) * 131),
     .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
-    .radiant => try radiant(b, g, seed + @as(u64, variant) * 131, variant),
+    .radiant => try radiant_kit.plant(b, g, seed + @as(u64, variant) * 131, variant),
     // a confluence's variants are its growth keys, all grown from one seed
     .confluence => try convergence_kit.confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
   }
@@ -1275,134 +1276,6 @@ fn lanternAt(R:f32, s:f32, ph:f32) V3 {
   const k = m.clamp01(s);
   const r = R * m.pow(f32, @sin(k * m.pi), 0.7) * (1.08 - 0.22 * k) * (1 + LANTERN_RIB * lanternCrest(k, ph));
   return m.v3(@cos(ph) * r, R * m.lerp(-0.85, 1.0, k), @sin(ph) * r);
-}
-
-/// a celestial bloom: a flower whose petals are not joined to it. A small
-/// luminous core with a crown of stamens holds three whorls of petals
-/// floating free around it (an upright inner cup, a middle whorl, an outer
-/// one opening wide), each bound to the core by a thread of light, and
-/// motes of light spiralling in to it; a thin tilted halo rings it all.
-/// Each fragment is rigid and carries, for plant.vert: tu.x its assembly
-/// order (0 the core .. 1 the last to arrive), tu.y its ring (`Ring`; a
-/// thread adds how far it is from its petal, so its core end stays put
-/// while the rest follows the petal) and colour alpha its bearing around
-/// the core. The origin is the core.
-fn radiant(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!void {
-  var rng = Rng.init(seed);
-  const body = g.stem_col.toRgba8(255);
-  const lite = g.bloom_col.toRgba8(255);
-  // petals pale toward their tips, where the light inside them gathers
-  const pale = color.mix(lite, color.rgb(1, 1, 1).toRgba8(255), 0.6);
-  const R = g.bloom_r;
-
-  // the core and its nucleus, a little taller than wide, like a seed
-  var s = b.mark();
-  try ellipsoid(b, .{.center = m.v3(0, 0, 0), .radii = m.v3(R * 0.4, R * 0.48, R * 0.4), .col = body, .part = .bloom, .rings = 6, .segs = 8});
-  try ellipsoid(b, .{.center = m.v3(0, R * 0.04, 0), .radii = m.splat3(R * 0.22), .col = lite, .part = .bloom, .rings = 4, .segs = 6});
-  // a crown of stamens rising out of its top and arching out, each tipped
-  // with a bead of light (their roots sunk in the core)
-  const crown = 7;
-  for (0..crown) |i| {
-    const a = m.ratio(i, crown) * m.tau + rng.range(-0.2, 0.2);
-    const out = m.v3(@cos(a), 0, @sin(a));
-    const from = out * m.splat3(R * 0.12) + m.v3(0, R * 0.3, 0);
-    const len = R * rng.range(0.55, 0.8);
-    const tip = try lightThread(b, .{.start = from, .direction = m.norm(out * m.splat3(0.55) + m.v3(0, 1, 0)), .length = len, .wobble = 0.3, .curl = 0.08, .seed = seed +% i * 13}, R * 0.03, lite);
-    try ellipsoid(b, .{.center = tip, .radii = m.splat3(R * 0.06), .col = lite, .part = .bloom, .rings = 3, .segs = 5});
-  }
-  fragment(b, s, 0, @intFromEnum(Ring.core), 0);
-
-  // the whorls, innermost first: each petal floats a gap off the core and
-  // is held to it by a thread of light from the core's flank to its claw
-  const whorls = [_]struct { n:u32, at:f32, y:f32, len:f32, w:f32, rise:f32, flare:f32, cup:f32, order:[2]f32, col:color.Rgba8, ring:Ring }{
-    .{.n = 5, .at = 0.62, .y = -0.05, .len = 1.0, .w = 0.26, .rise = 1.3, .flare = 0.5, .cup = 0.7, .order = .{0.12, 0.3}, .col = lite, .ring = .inner},
-    .{.n = 6 + variant % 2, .at = 1.1, .y = -0.2, .len = 1.25, .w = 0.3, .rise = 0.95, .flare = 0.6, .cup = 0.6, .order = .{0.3, 0.55}, .col = body, .ring = .middle},
-    .{.n = 8 + variant % 2, .at = 1.6, .y = -0.4, .len = 1.4, .w = 0.28, .rise = 0.6, .flare = 0.7, .cup = 0.5, .order = .{0.5, 0.8}, .col = body, .ring = .outer},
-  };
-  for (whorls, 0..) |wh, k| {
-    const off = if (k % 2 == 1) m.pi / m.f(wh.n) else 0;
-    for (0..wh.n) |i| {
-      const a = m.ratio(i, wh.n) * m.tau + off + rng.range(-0.12, 0.12);
-      const out = m.v3(@cos(a), 0, @sin(a));
-      const base = out * m.splat3(R * wh.at) + m.v3(0, R * (wh.y + rng.range(-0.05, 0.05)), 0);
-      const order = m.lerp(wh.order[0], wh.order[1], m.ratio(i, wh.n));
-      s = b.mark();
-      try petal(b, .{
-        .base = base, .out = out,
-        .len = R * wh.len * rng.range(0.9, 1.1), .width = R * wh.w,
-        .rise = wh.rise + rng.range(-0.1, 0.1), .flare = wh.flare, .cup = wh.cup,
-        .col = wh.col, .tip = pale, .part = .leaf,
-      });
-      fragment(b, s, order, @intFromEnum(wh.ring), a);
-      // the thread: from just inside the core's skin to just short of the claw
-      s = b.mark();
-      const from = out * m.splat3(R * 0.3) + m.v3(0, -R * 0.05, 0);
-      const to = base - out * m.splat3(R * 0.04);
-      _ = try lightThread(b, .{.start = from, .direction = m.norm(to - from), .length = m.len(to - from), .wobble = 0.25, .curl = 0.1, .seed = seed +% k * 97 +% i * 7}, R * 0.022, lite);
-      fragment(b, s, order, @intFromEnum(wh.ring), a);
-      for (b.v.items[s..]) |*v| {
-        const along = m.clamp01(m.dot(v.pos - from, to - from) / m.dot(to - from, to - from));
-        v.tu[1] += (1 - along) * THREAD;
-      }
-    }
-  }
-
-  // motes of light, each on its own bearing, spiralling in to the core
-  // (plant.vert carries them in and fades them as they are taken up)
-  const motes = 9;
-  for (0..motes) |i| {
-    const a = m.ratio(i, motes) * m.tau + rng.range(-0.3, 0.3);
-    s = b.mark();
-    try ellipsoid(b, .{.center = m.v3(@cos(a), 0, @sin(a)) * m.splat3(R * 0.5), .radii = m.splat3(R * rng.range(0.04, 0.07)), .col = lite, .part = .bloom, .rings = 3, .segs = 4});
-    fragment(b, s, m.ratio(i, motes), @intFromEnum(Ring.motes), a);
-  }
-
-  // the halo: a thin ring of light at a tilt, the last to close
-  s = b.mark();
-  var ring:[25]V3 = undefined;
-  var ts:[25]f32 = undefined;
-  const tilt:f32 = 0.35;
-  for (&ring, &ts, 0..) |*p, *t, j| {
-    const a = m.ratio(j, 24) * m.tau;
-    const q = m.v3(@cos(a) * R * 1.55, 0, @sin(a) * R * 1.55);
-    p.* = m.v3(q[0], q[1] * @cos(tilt) - q[2] * @sin(tilt), q[1] * @sin(tilt) + q[2] * @cos(tilt));
-    t.* = 1;
-  }
-  try b.tube(&ring, &ts, R * 0.025, R * 0.025, lite, .bloom, 4);
-  fragment(b, s, 0.95, @intFromEnum(Ring.halo), 0);
-}
-
-/// what each fragment of a celestial bloom belongs to (tu.y; plant.vert
-/// moves each its own way)
-const Ring = enum(u8) { core, inner, middle, outer, motes, halo };
-/// tu.y a bloom's thread adds at its core end (0 at its petal)
-const THREAD = 0.9;
-
-/// mark every vertex since `start` as one fragment of a radiant bloom
-fn fragment(b:*Builder, start:usize, order:f32, ring:u8, bearing:f32) void {
-  const a:u8 = @intFromFloat(@mod(bearing, m.tau) / m.tau * 255);
-  for (b.v.items[start..]) |*v| {
-    v.tu = .{order, m.f(ring)};
-    v.col.a = a;
-  }
-}
-
-/// a thread of light along a grown path, tapering to a point at both ends;
-/// returns its far end
-fn lightThread(b:*Builder, g:Growth, r:f32, col:color.Rgba8) Allocator.Error!V3 {
-  var ctrl:[6]V3 = undefined;
-  growthPath(g, &ctrl);
-  var path:[14]V3 = undefined;
-  m.splineResample(&ctrl, &path);
-  var ts:[14]f32 = undefined;
-  var radii:[14]f32 = undefined;
-  for (&ts, &radii, 0..) |*t, *rr, j| {
-    const k = m.ratio(j, 13);
-    t.* = k;
-    rr.* = r * @sqrt(@sin(m.pi * k)) + r * 0.05;
-  }
-  try b.tubeR(&path, &ts, &radii, col, .bloom, 4);
-  return path[13];
 }
 
 /// growth keys a confluence is built at, evenly from sprout (0) to bloom (1).
