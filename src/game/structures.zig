@@ -60,6 +60,7 @@ const kinds = struct {
   pub const lithophage = @import("structures/lithophage.zig");
   pub const braided_conduit = @import("structures/braided_conduit.zig");
   pub const ganglion = @import("structures/ganglion.zig");
+  pub const gathering_crown = @import("structures/gathering_crown.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;

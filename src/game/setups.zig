@@ -162,6 +162,8 @@ fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   g.prog.done.insert(.living_looms);
   g.prog.done.insert(.lithophagy);
   g.prog.done.insert(.braided_roots);
+  // a crown in the lumenroot bed, gathering it
+  _ = try nearest(g, cx - 2, cz + 1, .gathering_crown, 0.55);
   try braids(g, cx - 10, cz - 2);
   // a ganglion splitting a line three ways, each branch into a cache
   try layout(g, cx - 10, cz + 4, &.{
