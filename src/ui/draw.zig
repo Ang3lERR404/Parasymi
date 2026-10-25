@@ -33,6 +33,9 @@ pub const Shape = enum(u32) {
   grain,
   /// a cut gem, table up; param.x = how much fire, param.y = seed
   gem,
+  /// a living night filling the quad: soil-dark, sap veins drifting through
+  /// it, spores rising, darker toward its edges; param.y = seed
+  night,
 };
 
 const shape_mark:u32 = 0xffff_ffff;
@@ -113,6 +116,10 @@ pub const Draw = struct {
   /// a seed `w` x `h` centred on (cx, cy), split open by `crack`.
   pub fn grain(d:*Draw, cx:f32, cy:f32, w:f32, h:f32, col:Color, crack:f32, phase:f32) Allocator.Error!void {
     try d.shape(.grain, cx - w / 2, cy - h / 2, w, h, col, .{m.clamp01(crack), phase});
+  }
+  /// the night over the whole `w` x `h` screen (opaque at full alpha)
+  pub fn night(d:*Draw, w:f32, h:f32, col:Color, seed:f32) Allocator.Error!void {
+    try d.shape(.night, 0, 0, w, h, col, .{0, seed});
   }
   pub fn gem(d:*Draw, cx:f32, cy:f32, r:f32, col:Color, fire:f32, phase:f32) Allocator.Error!void {
     try d.shape(.gem, cx - r, cy - r, 2 * r, 2 * r, col, .{fire, phase});

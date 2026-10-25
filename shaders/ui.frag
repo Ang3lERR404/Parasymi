@@ -35,6 +35,7 @@ const uint SHAPE_LIMB = 4u;
 const uint SHAPE_LEAF = 5u;
 const uint SHAPE_GRAIN = 6u;
 const uint SHAPE_GEM = 7u;
+const uint SHAPE_NIGHT = 8u;
 
 // integer hash of a lattice point: exact at any magnitude (a sin()-based hash
 // loses precision as time grows and shows up as crawling speckle)
@@ -255,6 +256,34 @@ vec4 gem(vec2 px, float lit, float seed) {
   return vec4(col + star * 0.6, cover * v_col.a);
 }
 
+// a living night over the whole quad: soil-dark, slow clouds of sap veins
+// drifting through it, spores rising in sparse cells and glinting, a faint
+// warm breath about the middle, darker toward the edges.
+vec4 night(vec2 px, float seed) {
+  float t = pc.time;
+  vec2 inner = v_size - 2.0 * PAD;
+  vec2 c = (px - v_size * 0.5) / max(inner.x, inner.y);
+  float cloud = vnoise(px * 0.0035 + vec2(t * 0.02 + seed * 5.0, -t * 0.013));
+  vec3 col = v_col.rgb * (0.65 + 0.7 * cloud);
+  float veins = smoothstep(0.975, 1.0, 1.0 - abs(vnoise(px * 0.006 + vec2(seed * 3.0 - t * 0.025, t * 0.01)) * 2.0 - 1.0));
+  col += MEMBRANE_RIM * 0.08 * veins * cloud;
+  col += UI_SAP * 0.035 * exp(-dot(c, c) * 9.0) * (0.85 + 0.15 * sin(t * 0.9));
+  // spores: at most one a cell, rising, swaying, twinkling
+  const float CELL = 46.0;
+  vec2 q = px + vec2(0.0, t * 14.0);
+  vec2 cell = floor(q / CELL);
+  float h = hash(cell + seed * 31.0);
+  if (h > 0.82) {
+    vec2 at = (cell + vec2(hash(cell + 3.0), hash(cell + 9.0))) * CELL;
+    at.x += sin(t * 0.7 + h * TAU) * 6.0;
+    float r = length(q - at);
+    float tw = 0.5 + 0.5 * sin(t * (1.5 + h * 2.0) + h * 40.0);
+    col += BUD_GLOW * (smoothstep(2.2, 0.0, r) * 0.55 + exp(-r * 0.35) * 0.08) * tw;
+  }
+  col *= 1.0 - 0.75 * smoothstep(0.15, 0.75, length(c * vec2(1.0, 1.3)));
+  return vec4(col, v_col.a);
+}
+
 // is glyph cell q set? (5x7 bitmap, row-major, bit 0 top-left)
 bool lit(ivec2 q) {
   if (q.x < 0 || q.y < 0 || q.x >= 5 || q.y >= 7) return false;
@@ -274,7 +303,8 @@ void main() {
       case SHAPE_LIMB: c = limb(v_uv, v_param.x, v_param.y); break;
       case SHAPE_LEAF: c = leaf(v_uv, v_param.x, v_param.y); break;
       case SHAPE_GRAIN: c = seedCoat(v_uv, v_param.x, v_param.y); break;
-      default: c = gem(v_uv, v_param.x, v_param.y); break; // SHAPE_GEM
+      case SHAPE_GEM: c = gem(v_uv, v_param.x, v_param.y); break;
+      default: c = night(v_uv, v_param.y); break; // SHAPE_NIGHT
     }
     if (c.a < SHAPE_CLEAR) discard;
     o = c;

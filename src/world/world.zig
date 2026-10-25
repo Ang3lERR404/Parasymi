@@ -152,6 +152,14 @@ pub const World = struct {
     return c;
   }
 
+  /// resident chunks whose ground is not meshed yet (or has changed since).
+  pub fn unmeshed(w:*const World) u32 {
+    var n:u32 = 0;
+    var it = w.map.valueIterator();
+    while (it.next()) |c| n += @intFromBool(c.*.dirty);
+    return n;
+  }
+
   /// the chunk at `at`, generating it first if it is not resident.
   pub fn ensure(w:*World, at:Coord) Error!*Chunk { return w.map.get(at) orelse w.load(at); }
 

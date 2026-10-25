@@ -43,6 +43,8 @@ pub const ResearchText = struct { name:S = "", desc:S = "" };
 
 pub const Strings = struct {
   window:struct { title:S = "" } = .{},
+  /// the loading screen: `stages` a list, one name per stage
+  loading:struct { stages:S = "", percent:S = "", left:S = "" } = .{},
   /// said into the message log
   msg:struct {
     wake:S = "", night_hint:S = "",

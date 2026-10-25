@@ -44,6 +44,8 @@ pub const DEFAULT_SEED:u64 = 0x5EED_0F_11FE;
 /// the window's size when it opens
 pub const WINDOW = [2]u16{ 1600, 900 };
 const STREAM_RADIUS = 4;
+/// the chunks resident round the gardener once streamed (a square of rings)
+pub const STREAM_CHUNKS = (2 * STREAM_RADIUS + 1) * (2 * STREAM_RADIUS + 1);
 /// nothing is drawn further than this from the camera target (inside the
 /// streamed radius, so a low camera never runs off the generated world)
 pub const DRAW_LIMIT:f32 = (STREAM_RADIUS - 0.5) * ck.SIZE;

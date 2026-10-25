@@ -7,6 +7,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const sliceAsBytes = std.mem.sliceAsBytes;
 const ArenaAllocator = std.heap.ArenaAllocator;
+const Thread = std.Thread;
+const Atomic = std.atomic.Value;
 const asBytes = std.mem.asBytes;
 const vk = @import("vulkan");
 const glfw = @import("zglfw");
@@ -189,7 +191,7 @@ pub const CHUNK_MID_Y:f32 = 1.5;
 pub const CHUNK_RADIUS:f32 = m.f(ck.SIZE) * 0.71 + 2;
 
 /// milliseconds a frame may spend meshing streamed chunks
-const MESH_MS:f64 = 3;
+pub const MESH_MS:f64 = 3;
 /// smallest buffer made for a chunk (an empty chunk still gets one)
 const MIN_CHUNK_BYTES = 64;
 
@@ -204,6 +206,80 @@ pub const Slot = struct {
   /// the chunk's centre (x, z)
   centre:[2]f32 = .{0, 0},
   live:bool = false,
+};
+
+/// every built-once mesh (plant species + part library), grown on a thread
+/// of its own while the loading screen shows, one mesh at one level of
+/// detail at a time (`done` of `UNITS`); `Renderer.meshesReady` takes them
+/// in once it is through.
+const Growing = struct {
+  /// the builder's vertices are scratch: one arena, freed in one go once uploaded
+  arena:ArenaAllocator,
+  b:meshgen.Builder = undefined,
+  thread:?Thread = null,
+  done:Atomic(u32) = .init(0),
+  finished:Atomic(bool) = .init(false),
+  /// set when the renderer goes before the meshes are through: stop early
+  stop:Atomic(bool) = .init(false),
+  failed:bool = false,
+  plant_ranges:[PLANT_MESHES][2]u32 = @splat(.{0, 0}),
+  plant_morph:[PLANT_MESHES]u64 = @splat(0),
+  part_ranges:[meshlib.SLOTS][2]u32 = undefined,
+  part_glassy:[meshlib.SLOTS]bool = @splat(false),
+
+  /// each species' variants at one level of detail, then each library mesh
+  /// at one level of detail
+  const UNITS:u32 = @intCast((species.ids.len + meshlib.count) * meshgen.LODS);
+
+  fn run(g:*Growing) void {
+    g.failed = std.meta.isError(g.all());
+    g.finished.store(true, .release);
+  }
+
+  fn all(g:*Growing) Allocator.Error!void {
+    const b = &g.b;
+    for (species.ids) |id| for (0..meshgen.LODS) |l| {
+      if (g.stop.load(.monotonic)) return;
+      const lod:u32 = @intCast(l);
+      b.lod = lod;
+      const n = meshgen.variants(id);
+      for (0..n) |v| {
+        const first:u32 = @intCast(b.v.items.len);
+        try meshgen.plant(b, id, @intCast(v));
+        g.plant_ranges[meshgen.plantSlot(id, @intCast(v), lod)] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
+      }
+      // growth keys blend vertex for vertex into the next key
+      if (meshgen.growthKey(id, 0) != null) for (0..n - 1) |v| {
+        const a = g.plant_ranges[meshgen.plantSlot(id, @intCast(v), lod)];
+        const z = g.plant_ranges[meshgen.plantSlot(id, @intCast(v + 1), lod)];
+        if (a[1] != z[1]) @panic("growth keys differ in vertex count");
+        g.plant_morph[meshgen.plantSlot(id, @intCast(v), lod)] = @as(u64, z[0] - a[0]) * @sizeOf(vertex.Mesh);
+      };
+      _ = g.done.fetchAdd(1, .monotonic);
+    };
+    for (0..meshgen.LODS) |l| for (0..meshlib.count) |i| {
+      if (g.stop.load(.monotonic)) return;
+      try meshlib.buildOne(b, @enumFromInt(i), @intCast(l), &g.part_ranges);
+      _ = g.done.fetchAdd(1, .monotonic);
+    };
+    b.lod = 0;
+    for (&g.part_glassy, g.part_ranges) |*gl, rg| {
+      for (b.v.items[rg[0]..][0..rg[1]]) |v| if (vertex.seeThrough(@enumFromInt(v.part))) {
+        gl.* = true;
+        break;
+      };
+    }
+    _ = try b.skinOf(b.v.items.len);
+    _ = try b.growOf(b.v.items.len);
+  }
+
+  /// wait for the thread (asked to stop early) and free what it built
+  fn end(g:*Growing, gpa:Allocator) void {
+    g.stop.store(true, .monotonic);
+    if (g.thread) |t| t.join();
+    g.arena.deinit();
+    gpa.destroy(g);
+  }
 };
 
 pub const Renderer = struct {
@@ -250,6 +326,8 @@ pub const Renderer = struct {
   /// where a captured frame lands, and whether it holds one
   shot_buf:Buffer = .{},
   shot_ready:bool = false,
+  /// the meshes while they are still growing (see `meshesReady`)
+  growing:?*Growing = null,
 
   /// `aa` falls back to the most samples the GPU offers (see `antialias`)
   pub fn init(gpa:Allocator, window:*glfw.Window, vsync:bool, aa:Antialias) Error!*Renderer {
@@ -289,7 +367,7 @@ pub const Renderer = struct {
     r.layouts[@intFromEnum(pass.Layout.world)] = try pipeline.layout(c, @sizeOf(WorldPush), &.{r.shadow.set_layout});
     r.layouts[@intFromEnum(pass.Layout.ui)] = try pipeline.layout(c, @sizeOf(passes.ui.Push), &.{});
     try r.makePipes(false);
-    try r.buildMeshes();
+    try r.growMeshes();
   }
 
   /// every pass's pipeline (or with `world_only`, those drawing into the
@@ -353,49 +431,54 @@ pub const Renderer = struct {
   pub fn pipe(r:*const Renderer, p:Pass) vk.Pipeline { return r.pipes[@intFromEnum(p)]; }
   pub fn layout(r:*const Renderer, l:pass.Layout) vk.PipelineLayout { return r.layouts[@intFromEnum(l)]; }
 
-  /// grow every species' mesh and every library part once into one buffer.
-  fn buildMeshes(r:*Renderer) Error!void {
-    // the builder's vertices are scratch: one arena, freed in one go once uploaded
-    var arena = ArenaAllocator.init(r.gpa);
-    defer arena.deinit();
-    var b:meshgen.Builder = .{.gpa = arena.allocator()};
-    for (species.ids) |id| for (0..meshgen.LODS) |l| {
-      const lod:u32 = @intCast(l);
-      b.lod = lod;
-      const n = meshgen.variants(id);
-      for (0..n) |v| {
-        const first:u32 = @intCast(b.v.items.len);
-        try meshgen.plant(&b, id, @intCast(v));
-        r.plant_ranges[meshgen.plantSlot(id, @intCast(v), lod)] = .{first, @as(u32, @intCast(b.v.items.len)) - first};
-      }
-      // growth keys blend vertex for vertex into the next key
-      if (meshgen.growthKey(id, 0) == null) continue;
-      for (0..n - 1) |v| {
-        const a = r.plant_ranges[meshgen.plantSlot(id, @intCast(v), lod)];
-        const z = r.plant_ranges[meshgen.plantSlot(id, @intCast(v + 1), lod)];
-        if (a[1] != z[1]) @panic("growth keys differ in vertex count");
-        r.plant_morph[meshgen.plantSlot(id, @intCast(v), lod)] = @as(u64, z[0] - a[0]) * @sizeOf(vertex.Mesh);
-      }
+  /// start growing every species' mesh and every library part on a thread
+  /// of their own (here, if no thread can be had)
+  fn growMeshes(r:*Renderer) Allocator.Error!void {
+    const g = try r.gpa.create(Growing);
+    g.* = .{.arena = ArenaAllocator.init(r.gpa)};
+    g.b = .{.gpa = g.arena.allocator()};
+    r.growing = g;
+    g.thread = Thread.spawn(.{}, Growing.run, .{g}) catch |e| blk: {
+      std.log.warn("meshes grown without a thread: {t}", .{e});
+      g.run();
+      break :blk null;
     };
-    b.lod = 0;
-    try meshlib.build(&b, &r.part_ranges);
-    for (&r.part_glassy, r.part_ranges) |*g, rg| {
-      for (b.v.items[rg[0]..][0..rg[1]]) |v| if (vertex.seeThrough(@enumFromInt(v.part))) {
-        g.* = true;
-        break;
-      };
+  }
+
+  /// how many of the meshes' units are grown, of how many
+  pub fn meshProgress(r:*const Renderer) [2]u32 {
+    const g = r.growing orelse return .{Growing.UNITS, Growing.UNITS};
+    return .{g.done.load(.monotonic), Growing.UNITS};
+  }
+
+  /// whether every mesh is grown and in one buffer: once they are through,
+  /// uploads them (the first call after that) and frees the scratch. The
+  /// world can be drawn only after this says so.
+  pub fn meshesReady(r:*Renderer) Error!bool {
+    const g = r.growing orelse return true;
+    if (!g.finished.load(.acquire)) return false;
+    if (g.thread) |t| t.join();
+    g.thread = null;
+    defer {
+      g.end(r.gpa);
+      r.growing = null;
     }
+    if (g.failed) return error.OutOfMemory;
+    const b = &g.b;
+    r.plant_ranges = g.plant_ranges;
+    r.plant_morph = g.plant_morph;
+    r.part_ranges = g.part_ranges;
+    r.part_glassy = g.part_glassy;
     const bytes = sliceAsBytes(b.v.items);
     r.meshes = try Buffer.init(&r.ctx, bytes.len, .{.vertex_buffer = true});
     r.meshes.write(0, bytes);
-    _ = try b.skinOf(b.v.items.len);
     const skin = sliceAsBytes(b.skin.items);
     r.skins = try Buffer.init(&r.ctx, skin.len, .{.vertex_buffer = true});
     r.skins.write(0, skin);
-    _ = try b.growOf(b.v.items.len);
     const grow = sliceAsBytes(b.grow.items);
     r.grows = try Buffer.init(&r.ctx, grow.len, .{.vertex_buffer = true});
     r.grows.write(0, grow);
+    return true;
   }
 
   pub fn deinit(r:*Renderer) void {
@@ -409,6 +492,8 @@ pub const Renderer = struct {
   /// free every GPU object the renderer made (null handles are skipped).
   fn release(r:*Renderer) void {
     const c = &r.ctx;
+    if (r.growing) |g| g.end(r.gpa);
+    r.growing = null;
     for (&r.frames) |*f| {
       for (f.garbage.items) |*b| b.deinit(c);
       f.garbage.deinit(r.gpa);
@@ -458,8 +543,9 @@ pub const Renderer = struct {
     r.free_slots.clearRetainingCapacity();
   }
 
-  /// upload meshes for new/dirty chunks (at most `budget`) and drop evicted ones.
-  pub fn syncWorld(r:*Renderer, w:*World, budget:u32) Error!void {
+  /// upload meshes for new/dirty chunks (at most `budget`, and no more once
+  /// `ms` milliseconds are spent) and drop evicted ones.
+  pub fn syncWorld(r:*Renderer, w:*World, budget:u32, ms:f64) Error!void {
     for (w.evicted.items) |si| {
       const i = @intFromEnum(si);
       try r.retire(r.slots.items[i].buf);
@@ -478,7 +564,7 @@ pub const Renderer = struct {
       // at most `budget` chunks, and no more once a frame's share of time
       // is spent (at least one, so streaming always moves on)
       if (r.stats.meshed >= budget) break;
-      if (r.stats.meshed > 0 and (glfw.getTime() - start) * m.MS_PER_S > MESH_MS) break;
+      if (r.stats.meshed > 0 and (glfw.getTime() - start) * m.MS_PER_S > ms) break;
       try terrain_mesh.build(r.gpa, w.seed, c, &r.scratch, &r.detail_scratch);
       const bytes = sliceAsBytes(r.scratch.items);
       var buf = try Buffer.init(&r.ctx, @max(bytes.len, MIN_CHUNK_BYTES), .{.vertex_buffer = true});

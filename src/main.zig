@@ -28,6 +28,9 @@ const controls = @import("game/controls.zig");
 const options = @import("game/options.zig");
 const home = @import("game/home.zig");
 const orbit = @import("game/orbit.zig");
+const loading = @import("game/loading.zig");
+const Loading = loading.Loading;
+const World = @import("world/world.zig").World;
 const png = @import("core/png.zig");
 const bufPrint = std.fmt.bufPrint;
 const Dir = Io.Dir;
@@ -43,6 +46,8 @@ const DEMO_FORWARD = 25;
 const STRESS_SIDE = 120;
 /// most streamed chunks meshed in one frame (`MESH_MS` also caps it)
 const MESH_BUDGET = 6;
+/// behind the loading screen a frame meshes the ground for this long (ms)
+const LOAD_MESH_MS:f64 = 25;
 /// `--inspect` writes its screenshots here, under the working directory
 /// (kept out of git)
 const SHOTS = "shots";
@@ -108,6 +113,19 @@ pub fn main(init:Init) !void {
   defer r.deinit();
   opts.aa = r.antialiasing();
 
+  // the loading screen shows while every mesh grows (on a thread of its
+  // own), the world wakes and its ground is meshed. Until the world is
+  // woken its chunks are counted as many as stream in round the gardener.
+  var load_screen = Loading.init(gpa);
+  defer load_screen.deinit();
+  var last = glfw.getTime();
+  const forms = r.meshProgress()[1];
+  const whole = forms + 1 + play.STREAM_CHUNKS;
+  while (!try r.meshesReady()) {
+    if (!try loadFrame(&load_screen, r, &input, &last, .forms, .{.done = r.meshProgress()[0], .total = whole})) return;
+  }
+  if (!try loadFrame(&load_screen, r, &input, &last, .world, .{.done = forms, .total = whole})) return;
+
   var game = try Game.init(gpa, seed);
   defer game.deinit();
   game.opts = opts;
@@ -118,7 +136,7 @@ pub fn main(init:Init) !void {
   applied.fullscreen = false;
   if (load) {
     relist(gpa, io, &game);
-    if (game.gardens.items.len > 0) try restore(gpa, io, &game, r, game.gardens.items[0].name);
+    if (game.gardens.items.len > 0) _ = try restore(gpa, io, &game, r, game.gardens.items[0].name);
   }
   if (demo) try setups.demo(&game, DEMO_FORWARD);
   if (stress) try setups.stress(&game, STRESS_SIDE);
@@ -127,8 +145,10 @@ pub fn main(init:Init) !void {
     turn.focus = f;
     Dir.cwd().createDirPath(io, SHOTS) catch |e| log.err("{s}: {t}", .{SHOTS, e});
   }
+  if (!try ground(&load_screen, r, &input, &last, &game.world, forms + 1)) return;
+  // play's clock runs on from the screen's, so it fades off without a jump
+  game.ui_time = load_screen.time;
 
-  var last = glfw.getTime();
   while (!window.shouldClose()) {
     glfw.pollEvents();
     input.update();
@@ -156,9 +176,13 @@ pub fn main(init:Init) !void {
             }
             break :newest game.gardens.items[0].name;
           };
-          if (n) |nn| try restore(gpa, io, &game, r, nn);
+          if (n) |nn| if (try restore(gpa, io, &game, r, nn)) {
+            if (!try reground(&load_screen, r, &input, &last, &game)) break;
+          };
         },
-        .load_from => |n| try restore(gpa, io, &game, r, n),
+        .load_from => |n| if (try restore(gpa, io, &game, r, n)) {
+          if (!try reground(&load_screen, r, &input, &last, &game)) break;
+        },
         .list => relist(gpa, io, &game),
         .quit => {
           keep(gpa, io, &game, game.slot);
@@ -172,11 +196,19 @@ pub fn main(init:Init) !void {
     const t0 = glfw.getTime();
     try game.simulate(dt);
     game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * m.MS_PER_S)) - game.sim_ms) * play.TIMING_EASE;
-    try r.syncWorld(&game.world, MESH_BUDGET);
+    try r.syncWorld(&game.world, MESH_BUDGET, renderer.MESH_MS);
     game.render_stats = r.stats;
 
     var scene = try view.scene(&game, screen);
-    if (inspect != null) scene.ui = &.{};
+    if (inspect != null) {
+      scene.ui = &.{};
+    } else if (load_screen.fading()) {
+      // the loading screen fades off the first frames of play, over the HUD
+      load_screen.fadeStep(@floatCast(dt));
+      load_screen.time = game.ui_time;
+      try load_screen.draw(&game.ui, screen[0], screen[1]);
+      scene.ui = game.ui.v.items;
+    }
     const resized = input.resized;
     input.resized = false;
     r.capture = shoot;
@@ -241,11 +273,11 @@ fn relist(gpa:Allocator, io:Io, game:*Game) void {
 }
 
 /// replace the running game with the saved garden `name` (keeping it on
-/// failure).
-fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer, name:save.Name) !void {
+/// failure); whether it was.
+fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer, name:save.Name) !bool {
   var loaded = save.load(gpa, io, name) catch |e| {
     game.prog.say(txt.s.msg.no_save, .{e});
-    return;
+    return false;
   };
   // played on as itself, unless it is the autosave (saved by hand, it
   // becomes a garden of its own)
@@ -258,4 +290,46 @@ fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer, name:save.Name) !void 
   game.deinit();
   game.* = loaded;
   loaded = undefined;
+  return true;
+}
+
+/// one frame of the loading screen, `at` of the way through `stage`;
+/// false once the window is closed
+fn loadFrame(l:*Loading, r:*Renderer, input:*Input, last:*f64, stage:loading.Stage, at:loading.Progress) !bool {
+  glfw.pollEvents();
+  input.update();
+  if (r.window.shouldClose()) return false;
+  const now = glfw.getTime();
+  const dt = @min(now - last.*, MAX_FRAME_DT);
+  last.* = now;
+  l.step(stage, at, @floatCast(dt));
+  var scene = try l.scene(r.extent());
+  const resized = input.resized;
+  input.resized = false;
+  try r.draw(&scene, resized);
+  return true;
+}
+
+/// mesh the world's ground behind the loading screen, `before` units of the
+/// whole already made; false once the window is closed
+fn ground(l:*Loading, r:*Renderer, input:*Input, last:*f64, w:*World, before:u32) !bool {
+  const chunks = w.unmeshed();
+  const total = before + chunks;
+  while (true) {
+    const left = w.unmeshed();
+    if (!try loadFrame(l, r, input, last, .ground, .{.done = total - left, .total = total})) return false;
+    if (left == 0) return true;
+    try r.syncWorld(w, m.maxInt(u32), LOAD_MESH_MS);
+  }
+}
+
+/// a garden just loaded in play: its ground meshed behind the loading
+/// screen, which fades off again; false once the window is closed
+fn reground(l:*Loading, r:*Renderer, input:*Input, last:*f64, game:*Game) !bool {
+  l.again();
+  l.time = game.ui_time;
+  last.* = glfw.getTime();
+  if (!try ground(l, r, input, last, &game.world, 1)) return false;
+  game.ui_time = l.time;
+  return true;
 }

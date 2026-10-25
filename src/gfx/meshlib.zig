@@ -114,7 +114,6 @@ const reg = registry.Registry(parts);
 pub const Id = reg.Id;
 pub const count = reg.count;
 
-/// build every mesh into `b`, recording each one's (first vertex, count).
 /// every library mesh at each level of detail (one slot per mesh and level,
 /// see `slot`).
 pub const SLOTS = count * mg.LODS;
@@ -122,16 +121,15 @@ pub const SLOTS = count * mg.LODS;
 /// where a mesh at a level of detail sits in per-slot tables.
 pub fn slot(id:Id, lod:u32) usize { return @as(usize, @intFromEnum(id)) * mg.LODS + lod; }
 
-pub fn build(b:*mg.Builder, ranges:*[SLOTS][2]u32) Allocator.Error!void {
-  for (0..mg.LODS) |l| {
-    b.lod = @intCast(l);
-    inline for (reg.ids) |id| {
-      const first = b.mark();
-      try reg.module(id).build(b);
-      // a skeleton left unfinished leaves its times past one (never grown)
-      if (b.grow.items.len > first) for (b.grow.items[first..]) |g| assert(g.at[0] + g.at[1] <= 1 + 1e-4);
-      ranges[slot(id, @intCast(l))] = .{@intCast(first), @intCast(b.mark() - first)};
-    }
+/// build one mesh at one level of detail into `b` (leaving `b.lod` there),
+/// recording its (first vertex, count).
+pub fn buildOne(b:*mg.Builder, id:Id, lod:u32, ranges:*[SLOTS][2]u32) Allocator.Error!void {
+  b.lod = lod;
+  const first = b.mark();
+  switch (id) {
+    inline else => |k| try reg.module(k).build(b),
   }
-  b.lod = 0;
+  // a skeleton left unfinished leaves its times past one (never grown)
+  if (b.grow.items.len > first) for (b.grow.items[first..]) |g| assert(g.at[0] + g.at[1] <= 1 + 1e-4);
+  ranges[slot(id, lod)] = .{@intCast(first), @intCast(b.mark() - first)};
 }
