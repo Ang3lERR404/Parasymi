@@ -55,6 +55,11 @@ pub const Form = enum(u8) {
   /// (`petals` lens plates, `bloom_r` its size); it assembles rather than
   /// grows, and drifts rather than bends
   radiant,
+  /// an evening star's flower: the radiant body brought down to hang over
+  /// its tile (`stem_h` up, nothing under it), a star of `petals` rays
+  /// round its core (`bloom_r`) and `leaves` floating free beneath, all
+  /// gathered, falling in from the sky (radiant_kit `star`)
+  star,
 };
 
 /// procedural mesh parameters (see gfx/meshgen.zig).

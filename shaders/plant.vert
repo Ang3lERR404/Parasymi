@@ -31,13 +31,17 @@ layout(location = 4) flat out vec4 v_inst; // affinity, seed, health, part
 layout(location = 5) flat out float v_form;
 layout(location = 8) flat out vec2 v_ghost; // a placement preview, and whether it fits
 layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubbles ride with it)
+layout(location = 10) out float v_glow;       // how much light a radiant fragment carries (1 elsewhere)
 
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
-// a celestial bloom's turning: each ring's pace (rad/s, alternating ways),
-// by its radiant_kit.Ring: core, inner, middle, outer whorl, motes, halo
-// (a ring past the table turns as the last)
-const float SPIN[6] = float[6](0.03, 0.05, -0.035, 0.025, 0.1, 0.04);
+// a radiant plant's turning: each ring's pace (rad/s, alternating ways),
+// by its radiant_kit.Ring: core, inner, middle, outer whorl, motes, halo,
+// leaves (a ring past the table turns as the last)
+const float SPIN[7] = float[7](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02);
+// the light each ring carries (v_glow): the core and its threads fullest,
+// a vesper's floating leaves living tissue that carries little
+const float GLOW[7] = float[7](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3);
 const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
 // how it gathers (common.glsl gatherAway, gatherIn): fragments settle
 // ARRIVE_PACE of growth apart by order, each over ARRIVE_SPAN, coming in
@@ -46,6 +50,17 @@ const float ARRIVE_PACE = 0.7;
 const float ARRIVE_SPAN = 0.3;
 const float ARRIVE_REACH = 1.4;
 const float ARRIVE_TURN = 1.4;
+// what falls in from the sky instead (the vesper, an evening star come
+// down): each piece starts FALL_FROM above its place (and ARRIVE_REACH
+// out), turning FALL_TURN round its heart as it comes down
+const float FALL_FROM = 1.8;
+const float FALL_TURN = 2.4;
+// withering out of radiance, a radiant plant comes loose: its pieces sink
+// LOOSE_SINK, drift back out (LOOSE_AWAY of the way they came in) and its
+// petals and leaves hang open
+const float LOOSE_SINK = 0.14;
+const float LOOSE_AWAY = 0.22;
+const float LOOSE_HANG = 0.7;
 // a wilting plant sinks to this share of its height
 const float WILT = 0.55;
 // a sown plant's size: seedling share, and the spread between instances
@@ -57,9 +72,9 @@ const float YOUNG_SPAN = 0.55;
 
 // what each form does its own way (sets of FORM_ bits, common.glsl): a new
 // form, or a new species of one, takes up a behaviour by joining its set.
-// Petals float free of a core, gathered and turned by it, never bending
-// from a root (the celestial bloom)
-const uint FORMS_FREE = FORM_BIT(FORM_RADIANT);
+// (Petals floating free of a core: FORMS_FREE, common.glsl.) Gathered
+// falling from the sky rather than drifting in from around it
+const uint FORMS_FALLING = FORM_BIT(FORM_STAR);
 // its growth keys carry its size, its canopy and its offshoots (blended
 // between keys; nothing scaled or unfolded here)
 const uint FORMS_KEYED = FORM_BIT(FORM_CONFLUENCE);
@@ -98,28 +113,37 @@ void main() {
     // Grown, the whorls never quite close: each petal drifts a little away
     // and back, slowly, held by its thread (a thread's core end stays with
     // the core). Motes of light spiral in and are taken up. It never bends
-    // from a root.
+    // from a root. A vesper's pieces fall to it out of the sky instead, and
+    // its floating leaves (ring 6) fold and breathe as the petals do.
     Fragment f = fragmentOf(tu, col.a);
     float order = f.order, bearing = f.bearing, ring = f.ring, held = f.held;
-    bool petals = ring > 0.5 && ring < 3.5;
+    bool leaves = ring > 5.5;
+    bool petals = (ring > 0.5 && ring < 3.5) || leaves;
     bool motes = abs(ring - 4.0) < 0.5;
+    bool falling = formIn(FORMS_FALLING, ib.w);
+    // out of radiance it comes loose (health falls as it withers)
+    float loose = 1.0 - clamp(health, 0.0, 1.0);
     float away = gatherAway(order, ARRIVE_PACE, ARRIVE_SPAN, growth);
     float settle = 1.0 - away;
+    if (ring > 0.5) away = max(away, loose * LOOSE_AWAY);
     vec2 dir = vec2(cos(bearing), sin(bearing));
     float ph = bearing * 3.0 + ring * 1.7 + seed * 9.0;
     if (petals) {
       // fold up toward a bud while it comes in, then open; breathing
-      // slowly once it has settled, the outer whorls most
-      float fold = away * 0.9 + 0.07 * (ring / 3.0) * sin(t * 0.35 + ph);
+      // slowly once it has settled, the outer whorls most; coming loose,
+      // hanging open
+      float wide = leaves ? 1.0 : ring;
+      float fold = away * 0.9 + 0.07 * (wide / 3.0) * sin(t * 0.35 + ph) - loose * LOOSE_HANG;
       vec3 ax = vec3(-dir.y, 0.0, dir.x);
       float ang = fold * held;
       p = turnAbout(p, ax, ang);
       n = turnAbout(n, ax, ang);
       // drifting apart and together, and bobbing out of step
-      float drift = 0.035 * ring * (0.5 + 0.5 * sin(t * 0.3 + ph));
+      float drift = 0.035 * wide * (0.5 + 0.5 * sin(t * 0.3 + ph));
       p.xz += dir * drift * held;
       p.y += 0.025 * sin(t * 0.55 + ph * 1.3) * held;
     }
+    if (ring > 0.5) p.y -= loose * LOOSE_SINK * held;
     // each mote spirals in from beyond the outer whorl to the core and
     // fades as it is taken up, then begins again (c 0..1 of the way)
     float c = fract(t * MOTE_RATE + order + seed);
@@ -129,13 +153,18 @@ void main() {
       p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
       p.xz = rot(c * 2.2) * p.xz;
     }
-    // arriving from afar along its bearing, rising in from below, turning
-    // round the core as it comes
-    vec3 from = vec3(dir.x * ARRIVE_REACH, -0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0), dir.y * ARRIVE_REACH) * held;
-    p = gatherIn(p, from, away, 0.0, ARRIVE_TURN);
-    n = gatherTurn(n, away, ARRIVE_TURN);
+    // arriving from afar along its bearing, rising in from below (or, an
+    // evening star's, falling from high above), turning round the core as
+    // it comes; the heart itself comes down first, alone
+    float rise = falling ? FALL_FROM * (0.8 + 0.4 * fract(bearing * 1.3 + seed * 5.0)) : -0.35 + 0.45 * sin(bearing * 3.0 + seed * 9.0);
+    vec3 from = vec3(dir.x * ARRIVE_REACH, rise, dir.y * ARRIVE_REACH) * held;
+    if (falling && ring < 0.5) from = vec3(0.0, FALL_FROM, 0.0);
+    float turns = falling ? FALL_TURN : ARRIVE_TURN;
+    p = gatherIn(p, from, away, 0.0, turns);
+    n = gatherTurn(n, away, turns);
     // each ring turns at its own slow pace, alternating ways
-    float spin = SPIN[clamp(int(ring), 0, 5)];
+    int ri = clamp(int(ring), 0, 6);
+    float spin = SPIN[ri];
     mat2 turn = rot(t * spin + seed * TAU);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
@@ -158,11 +187,13 @@ void main() {
     v_t = order;
     // how far each fragment has settled (it fades in as it arrives)
     v_young = motes ? settle * smoothstep(0.0, 0.15, c) * (1.0 - smoothstep(0.75, 1.0, c)) : settle;
+    v_glow = GLOW[ri];
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = project(wp);
 #ifdef SHADOW
-    // a celestial bloom is light itself: it casts no shadow
-    gl_Position = UNSEEN;
+    // a radiant plant is light itself: it casts no shadow, but for the
+    // living leaves a vesper carries (once they have come down)
+    if (!leaves || settle < 0.5) gl_Position = UNSEEN;
 #endif
     return;
   }
@@ -259,6 +290,7 @@ void main() {
   // tips once grown) is thinner and more translucent than the old base
   v_young = clamp((h - growth + YOUNG_SPAN) / YOUNG_SPAN, 0.0, 1.0);
   if (sheet) v_young = max(v_young, 0.5);
+  v_glow = 1.0;
   v_inst = vec4(aff, seed, health, float(part));
   gl_Position = project(wp);
 #ifdef SHADOW

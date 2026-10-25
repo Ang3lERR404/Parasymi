@@ -163,8 +163,9 @@ recipes (`game/craft.zig`) are plain data tables.
   and petals: `frond` (lilac, green leaflets, crozier tip), `bloom`
   (pale frondlet calyx, warm petals, stamens); `foot` rooted both ways;
   `plant` for the `entwined` form, `confluence` grown through keys),
-  `radiant_kit` (the radiant/celestial lineage, its plant (`plant`, the
-  celestial bloom, `radiant` form) and structures (the diamond,
+  `radiant_kit` (the radiant/celestial lineage, its plants (`plant`, the
+  celestial bloom, `radiant` form; `star`, the vesper, `star` form) and
+  structures (the diamond,
   meshes/halo.zig): **never grown, only gathered**. No root, stem,
   growth spline or scaling: rigid fragments joined to nothing, each
   marked by `fragment` (tu.x assembly order, tu.y `Ring` + `THREAD`
@@ -172,7 +173,8 @@ recipes (`game/craft.zig`) are plain data tables.
   own way, turning round the heart, settling in its turn, held by
   light (`thread`). Pieces: `core` (luminous core, stamen crown of
   light), `whorl` (floating petals, each threaded to the core),
-  `motes`, `halo` (thin tilted ring), `cut` (a cut crystal, facets
+  `leaves` (floating leaves under it, threaded up to it; ring `.leaves`,
+  the only fragments that cast shadows), `motes`, `halo` (thin tilted ring), `cut` (a cut crystal, facets
   gathered foot up), `shards`. On the GPU one way for all: common.glsl
   `fragmentOf`, `gatherAway(order, pace, span, k)`, `gatherIn(p, from,
   away, shrink, turn)`/`gatherTurn`; plant.vert (`ARRIVE_*`) by the
@@ -464,7 +466,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   self-glow (rim at night), see-through petals. Plants scale up as they
   grow; parasites open their closed crowns. Holding a seed shows a ghost of
   the grown plant (green fits, red not). Forms (`species.Form`: herb 0,
-  coil 1, drift 2, confluence 3, radiant 4): symbiotes (`herb`) flare into
+  coil 1, drift 2, confluence 3, radiant 4, star 5; common.glsl
+  `FORMS_FREE` = the radiant ones): symbiotes (`herb`) flare into
   roots, one vase leaf envelope (`leaf_from` for tree crowns), calyx and two
   whorls of real petals; vines grow leaves along them. Offshoots
   (`meshgen.offshoot`, genome `shoots` = per-variant count range): side
@@ -483,6 +486,17 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   runs down them in plant.vert), slow bob over a ground shadow. Confluence: 8 growth keys of one vertex layout
   blended in plant.vert (binding 2), braid strands running on into red
   vines, translucent violet petals, sway ×1.5.
+- Vesper (`star`, `radiant_kit.star`): an evening star come down,
+  hanging `stem_h` (0.62) over its tile, nothing under it: a dusk-violet
+  core (gold nucleus, 5 stamens), an upright cup of 5 pale-gold petals, a
+  star of 5 long narrow violet rays lying open, 5 dusky leaves floating
+  beneath (`GLOW` 0.3: living tissue, little light, they cast shadows),
+  motes; no halo. It gathers as the bloom does but falls in from the sky
+  (plant.vert `FORMS_FALLING`, `FALL_*`): the heart first, straight down,
+  then each piece spiralling down on its thread. Keeps more of its own
+  hue under the film (plant.frag `FORMS_OWN_HUE`). Withering out of
+  radiance any radiant plant comes loose (`LOOSE_*`: pieces sink, drift
+  out, hang open) and its light dims with health.
 - Celestial bloom (`radiant`): a flower whose petals float free, gathered
   by its core: a luminous core with a crown of stamens, three whorls of
   narrow cupped petals (inner upright .. outer open) floating apart from it,
@@ -492,7 +506,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   distance from its petal) and bearing (colour alpha): plant.vert spirals
   each in folded as a bud and opens it as growth passes it; grown, whorls
   turn slowly, alternating, and drift apart and back; it bobs and never
-  bends. The garden's only true glow. Beams
+  bends. With the vesper, the garden's only true glow. Beams
   between linked blooms (`bloom_thread`, part `.thread`): soft rays, a
   camera-facing spindle bent in part.vert curve mode; no core, a faint haze
   with five soft streaks swelling from sender to receiver, iridescent

@@ -20,6 +20,7 @@ layout(location = 6) in float v_t;
 layout(location = 7) in float v_young;
 layout(location = 8) flat in vec2 v_ghost; // a placement preview, and whether it fits
 layout(location = 9) in vec3 v_obj;
+layout(location = 10) in float v_glow; // the light a radiant fragment carries
 layout(location = 0) out vec4 o;
 
 // what the sap carries at night (moonlight; by day plain white)
@@ -40,6 +41,10 @@ const float SAP_EDGE_POW = 5.0;
 const float SKIN_GLISTEN = 0.6;
 // the forms whose `.bloom` is bare sap of both lineages, not a petal
 const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE);
+// radiant forms that keep more of their own colour under the iridescent
+// film (OWN_HUE_FILM of it): the vesper's dusk violet and evening gold
+const uint FORMS_OWN_HUE = FORM_BIT(FORM_STAR);
+const float OWN_HUE_FILM = 0.45;
 // a placement preview: green where it fits, red where it cannot be sown,
 // breathing at this rate (rad/s)
 const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
@@ -72,24 +77,30 @@ void surface() {
   float sh = keyShadow(v_pos, n);
   vec3 klit = lit * sh;
 
-  if (isForm(v_form, FORM_RADIANT)) {
-    // a celestial bloom: the only thing in the garden that truly glows, and
+  if (formIn(FORMS_FREE, v_form)) {
+    // a radiant plant (the celestial bloom, the vesper): the only things in
+    // the garden that truly glow, and
     // the glow is light carried inside thin living tissue, not a flat
     // emission: brightest where the tissue is thinnest (its edges, at
     // grazing angles) and in its core, pulsing out from the heart, with sap
     // bubbles rising through it. Fragments fade in as they lock into place.
     // Its tissue is iridescent: a pearl whose thin film turns its hue with
     // the view angle, drifting slowly along each petal; the core and its
-    // threads stay near white, with only a breath of the film.
+    // threads stay near white, with only a breath of the film. What carries
+    // less light (v_glow: a vesper's living leaves) keeps more of its own
+    // colour and body; withering out of radiance, the light goes out of it.
     float core = part == PART_BLOOM ? 1.3 : 1.1;
+    float glow = v_glow * mix(0.25, 1.0, health);
     vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + seed * 3.0 + pc.eye_time.w * 0.03);
-    vec3 col = mix(v_col, film, part == PART_BLOOM ? 0.25 : 0.4 + 0.35 * fres);
-    vec3 c = shadeLit(col * 0.2, n, v_pos, sh);
-    c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4;
+    float filmy = (formIn(FORMS_OWN_HUE, v_form) ? OWN_HUE_FILM : 1.0) * mix(0.3, 1.0, v_glow);
+    vec3 col = mix(v_col, film, (part == PART_BLOOM ? 0.25 : 0.4 + 0.35 * fres) * filmy);
+    vec3 c = shadeLit(col * mix(0.6, 0.2, v_glow), n, v_pos, sh);
+    c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4 * glow;
     c += col * max(dot(-n, SUN), 0.0) * 0.4;
-    c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5;
-    // petals are thin: see-through face-on, their edges bright
-    float a = (part == PART_LEAF ? mix(0.3, 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
+    c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5 * glow;
+    // petals are thin: see-through face-on, their edges bright (living
+    // leaves denser)
+    float a = (part == PART_LEAF ? mix(mix(0.85, 0.3, v_glow), 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
     return;

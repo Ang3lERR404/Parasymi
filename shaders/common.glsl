@@ -97,11 +97,16 @@ const float FORM_COIL = 1.0;
 const float FORM_DRIFT = 2.0;
 const float FORM_CONFLUENCE = 3.0;
 const float FORM_RADIANT = 4.0;
+const float FORM_STAR = 5.0;
 bool isForm(float f, float form) { return abs(f - form) < 0.5; }
 // sets of forms, one bit each (as the roles' sets): what forms do alike is
 // keyed off a set (formIn), so a new form joins a behaviour by joining it
 #define FORM_BIT(f) (1u << uint(f))
 bool formIn(uint set, float f) { return ((set >> uint(f + 0.5)) & 1u) != 0u; }
+// the radiant lineage's plants (radiant_kit): petals and leaves floating
+// free of a core, gathered and turned by it, never bending from a root and
+// glowing with the light they carry (the celestial bloom, the vesper)
+const uint FORMS_FREE = FORM_BIT(FORM_RADIANT) | FORM_BIT(FORM_STAR);
 // the forms whose petals are a lantern of clear sap (meshgen `lantern`,
 // below LANTERN_TOP along the plant): it is drawn see-through and, being
 // clear, casts no shadow (plant.vert SHADOW and plant.frag agree on it)
