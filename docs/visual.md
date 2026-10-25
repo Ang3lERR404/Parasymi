@@ -226,7 +226,10 @@ item is its colour fill with its short name, for now.
 Muted greens/browns, amber only on belly, eyes, inner ears, beans,
 pectorals and rear. The ribcage is broad but melts into a waist only a
 little narrower (`RIB_*`, `LAT_*` in `wolf_body`): no barrel rim over the
-waist, front or back.
+waist, front or back. The limbs carry heavy, distinct muscle (three-headed
+deltoids, bicep/tricep, brachioradialis, quadriceps with an inner teardrop,
+two-headed calves, neck cords, obliques), melted only a little
+(`MEAT_MELT`) so a groove reads between each mass.
 - One skin: `wolf_body` is sculpted (`sculpt_kit`: SDF ellipsoids, round
   cones, round boxes per bone, smooth union/carve, `ink` paints colour
   only) around the bind pose of `wolf_skeleton` (27 bones, `fk(Pose)`),

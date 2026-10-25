@@ -80,6 +80,10 @@ const LAT_MELT:f32 = 0.07;
 /// the lats end higher, their lower ends lifted off the waist
 const LAT_LIFT:f32 = 0.02;
 
+/// how softly the limbs' muscles melt into each other and the bone under
+/// them: small, so each reads as its own mass with a groove between
+const MEAT_MELT:f32 = 0.014;
+
 fn bi(b:Bone) u8 { return @intFromEnum(b); }
 
 fn ell(c:V3, r:V3) sculpt.Shape { return .{ .ellipsoid = .{ .c = c, .r = r } }; }
@@ -105,16 +109,20 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
   // the waist drawn in between hips and ribs, only a little: the
   // ribcage's lower edge eases into it rather than standing over it
   try a.f(.waist, ell(v3(0, 0.045, -0.006), v3(RIB_WAIST[0], 0.105, RIB_WAIST[1])), hide, 0.05);
+  // the obliques: a soft mass over each flank from ribs to hip
+  for ([_]f32{ -1, 1 }) |x| try a.f(.waist, ell(v3(x * 0.082, 0.035, 0.004), v3(0.048, 0.085, 0.062)), muscle, 0.045);
   // the ribcage, broad and deep but melted into the waist (no barrel's
   // rim); the trapezius sloping from the neck to each shoulder; the lats
   // fanning down the back into the waist, as softly
   try a.f(.chest, ell(v3(0, 0.085 + RIB_LIFT, -0.004), v3(0.148, 0.135 - RIB_LIFT, 0.108)), hide, RIB_MELT);
   for ([_]f32{ -1, 1 }) |x| {
-    try a.turned(.chest, m.rotZ(x * 0.35), ell(v3(x * 0.075, 0.185, -0.03), v3(0.08, 0.038, 0.058)), muscle, 0.035);
+    try a.turned(.chest, m.rotZ(x * 0.35), ell(v3(x * 0.077, 0.188, -0.03), v3(0.088, 0.046, 0.064)), muscle, 0.03);
     try a.turned(.chest, m.chain(&.{ m.translate(v3(x * 0.088, 0.05 + LAT_LIFT, -0.055)), m.rotZ(x * 0.3) }), ell(v3(0, 0, 0), v3(0.048, 0.11 - LAT_LIFT, LAT_DEPTH)), muscle, LAT_MELT);
   }
-  // the neck: a thick column, the throat under it
-  try a.f(.neck, cone(v3(0, -0.05, -0.012), v3(0, 0.09, 0.015), 0.068, 0.055), hide, 0.05);
+  // the neck: a thick column, the throat under it, a cord of muscle down
+  // each side from behind the jaw to the collarbone
+  try a.f(.neck, cone(v3(0, -0.05, -0.012), v3(0, 0.09, 0.015), 0.075, 0.059), hide, 0.05);
+  for ([_]f32{ -1, 1 }) |x| try a.f(.neck, cone(v3(x * 0.04, 0.075, 0.0), v3(x * 0.022, -0.035, 0.05), 0.02, 0.017), muscle, 0.025);
   try a.f(.neck, ell(v3(0, 0.03, 0.03), v3(0.045, 0.06, 0.038)), hide, 0.04);
 
   // the head
@@ -154,13 +162,18 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
   // elbow and tapering to the wrist; the back of the hand
   for (skel.sides, 0..) |sd, si| {
     const x = skel.sign(si);
-    try a.f(sd.arm, ell(v3(0, -0.035, 0), v3(0.068, 0.085, 0.07)), muscle, 0.04);
-    try a.f(sd.arm, cone(v3(0, -0.02, 0), v3(0, -skel.UPPER_ARM, 0), 0.05, 0.041), hide, 0.03);
-    try a.f(sd.arm, ell(v3(0, -0.105, 0.024), v3(0.04, 0.07, 0.034)), muscle, 0.02);
-    try a.f(sd.arm, ell(v3(0, -0.145, -0.024), v3(0.04, 0.075, 0.034)), muscle, 0.02);
-    try a.f(sd.forearm, ell(v3(0, 0.0, -0.022), v3(0.03, 0.032, 0.026)), hide, 0.02);
-    try a.f(sd.forearm, cone(v3(0, 0, 0), v3(0, -skel.FOREARM, 0), 0.042, 0.028), hide, 0.03);
-    try a.f(sd.forearm, ell(v3(0, -0.075, 0.014), v3(0.04, 0.075, 0.033)), muscle, 0.02);
+    // the deltoid in three heads (front, side, rear) capping the shoulder
+    try a.f(sd.arm, ell(v3(0, -0.035, 0), v3(0.082, 0.092, 0.082)), muscle, MEAT_MELT * 1.6);
+    try a.f(sd.arm, ell(v3(x * 0.014, -0.06, 0.034), v3(0.054, 0.074, 0.044)), muscle, MEAT_MELT);
+    try a.f(sd.arm, ell(v3(x * 0.014, -0.06, -0.034), v3(0.054, 0.074, 0.044)), muscle, MEAT_MELT);
+    try a.f(sd.arm, cone(v3(0, -0.02, 0), v3(0, -skel.UPPER_ARM, 0), 0.06, 0.047), hide, 0.03);
+    try a.f(sd.arm, ell(v3(0, -0.11, 0.036), v3(0.054, 0.08, 0.05)), muscle, MEAT_MELT);
+    try a.f(sd.arm, ell(v3(0, -0.135, -0.036), v3(0.056, 0.088, 0.05)), muscle, MEAT_MELT);
+    try a.f(sd.forearm, ell(v3(0, 0.0, -0.022), v3(0.032, 0.034, 0.028)), hide, 0.02);
+    try a.f(sd.forearm, cone(v3(0, 0, 0), v3(0, -skel.FOREARM, 0), 0.05, 0.03), hide, 0.03);
+    try a.f(sd.forearm, ell(v3(0, -0.068, 0.018), v3(0.05, 0.075, 0.044)), muscle, MEAT_MELT);
+    // the brachioradialis swelling on the outer edge below the elbow
+    try a.f(sd.forearm, ell(v3(x * 0.024, -0.045, 0.006), v3(0.034, 0.062, 0.036)), muscle, MEAT_MELT);
     // the paw: a thick palm, the knuckles across its end, four thick
     // fingers each bending at its two joints (barely melted into each
     // other, so they stay apart), and a dewclaw thumb high on its edge
@@ -175,13 +188,16 @@ fn sculptBody(s:*sculpt.Sculpt, w:*const [skel.COUNT]M4) Allocator.Error!void {
     // legs: the thigh's power (quadriceps before, hamstring behind), the
     // kneecap; the shin with the calf swelling on its back; the hock and
     // the long metatarsal down to the ball; the long flat foot
-    try a.f(sd.thigh, cone(v3(0, 0.0, 0), v3(0, -skel.THIGH, 0), 0.074, 0.06), hide, 0.04);
-    try a.f(sd.thigh, ell(v3(0, -0.1, 0.03), v3(0.064, 0.1, 0.054)), muscle, 0.025);
-    try a.f(sd.thigh, ell(v3(0, -0.1, -0.032), v3(0.058, 0.095, 0.05)), muscle, 0.025);
-    try a.f(sd.thigh, ell(v3(x * 0.028, -0.06, 0), v3(0.05, 0.09, 0.058)), hide, 0.03);
+    try a.f(sd.thigh, cone(v3(0, 0.0, 0), v3(0, -skel.THIGH, 0), 0.08, 0.063), hide, 0.04);
+    try a.f(sd.thigh, ell(v3(0, -0.1, 0.036), v3(0.07, 0.106, 0.062)), muscle, MEAT_MELT);
+    try a.f(sd.thigh, ell(v3(0, -0.1, -0.038), v3(0.064, 0.1, 0.058)), muscle, MEAT_MELT);
+    try a.f(sd.thigh, ell(v3(x * 0.032, -0.06, 0), v3(0.056, 0.095, 0.062)), muscle, MEAT_MELT * 1.2);
+    // the teardrop of the inner quadriceps just above the knee
+    try a.f(sd.thigh, ell(v3(-x * 0.026, -0.17, 0.034), v3(0.036, 0.046, 0.036)), muscle, MEAT_MELT);
     try a.f(sd.thigh, ell(v3(0, -skel.THIGH, 0.042), v3(0.038, 0.04, 0.028)), hide, 0.02);
-    try a.f(sd.shin, cone(v3(0, 0, 0), v3(0, -skel.SHIN, 0), 0.058, 0.04), hide, 0.035);
-    try a.f(sd.shin, ell(v3(0, -0.085, -0.034), v3(0.05, 0.085, 0.044)), muscle, 0.02);
+    try a.f(sd.shin, cone(v3(0, 0, 0), v3(0, -skel.SHIN, 0), 0.06, 0.04), hide, 0.035);
+    // the calf in two heads, inner and outer, high on the shin's back
+    for ([_]f32{ -1, 1 }) |hx| try a.f(sd.shin, ell(v3(hx * 0.019, -0.075, -0.038), v3(0.036, 0.08, 0.046)), muscle, MEAT_MELT);
     try a.f(sd.meta, ell(v3(0, 0, -0.018), v3(0.034, 0.034, 0.03)), hide, 0.02);
     try a.f(sd.meta, cone(v3(0, 0, 0), v3(0, -skel.META, 0), 0.04, 0.029), dark, 0.03);
     try a.f(sd.foot, ell(v3(0, 0.013, 0.03), v3(0.035, 0.019, 0.06)), dark, 0.03);
