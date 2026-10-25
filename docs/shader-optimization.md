@@ -92,14 +92,49 @@ per vertex. Before touching shader math, knock things out one at a time
   projection, energy) into their own pipeline/variant can raise occupancy
   for the common materials, at the cost of more draws. Measure with
   Nsight before/after. (GPUOpen "Register pressure"; AMD GDC2017 GCN.)
-- **MAD form, cheap ops** (Persson, "Low-Level Thinking in High-Level
-  Shading Languages", GDC 2013; PowerVR Low-Level GLSL guide): write
-  `a*b+c`; fold constants into one side (`x * (1/k)`), `clamp(x,0,1)` is
-  free as a modifier, `inversesqrt` over `1/sqrt`, `dot(v,v)` over
-  `length` when comparing, `normalize` once and reuse. `pow(x, n)` for
-  small integer n → multiplies (exp2/log2 run on the quarter-rate SFU).
-  These are float-identical only when the algebra is (x*x*x vs pow(x,3)
-  differs in the last bits: acceptable rounding, not a look change).
+- **Low-level rules** (Persson, "Low-Level Thinking in High-Level Shading
+  Languages", GDC 2013; checked against the deck's speaker notes; the
+  slides' code is images. Its examples target VLIW Radeon HD 4870
+  disassembly, but most rules are general):
+  - *What you write is what you get.* IEEE reordering is unsafe, so the
+    compiler won't turn `(x - 0.3) * 2.5` into `x * 2.5 - 0.75`; the
+    author has to. Reordering changes rounding (fine for us) and can turn
+    a value that should be exactly 0 slightly negative, so `sqrt`/`pow`
+    of it gives NaN. Check the inputs' range before rewriting.
+  - *MAD form:* any range remap is one multiply-add, plus a clamp at most:
+    `clamp(x * scale + offset, 0, 1)`. Write a division as a multiply by
+    the reciprocal so an add folds into it. `acc += a*b + c*d` costs one
+    more op than `acc += a*b; acc += c*d`, because the parentheses order it.
+  - *Modifiers:* `abs` and negation are free on an operation's inputs but
+    cost a move on its output. `saturate`/`clamp(…,0,1)` is free on the
+    output: put the math inside it rather than clamping inputs
+    (interpolants, constants, fetches).
+  - *Scalar before vector:* `normalize`, `length` and `distance` each hide
+    a `dot`. Work out the scalar factor (an `inversesqrt` times any other
+    scalar) and multiply the vector once. The compiler shares a `dot` only
+    between textually identical subexpressions (`distance(a,b)` and
+    `distance(b,a)` don't match). Rather than comparing squared lengths,
+    reuse the `inversesqrt` that is computed anyway (clamping a length
+    becomes `v * min(1, maxLen * rsqrt(dot(v,v)))`). The deck calls this
+    the most widely applicable win, on every GPU.
+  - *Cheap vs suspect:* conditional assignment (`c ? a : b`) beats `sign()`
+    and `step()`. Trigonometry is fine, but angles often mean the math
+    wasn't finished (a `dot` may do it). Inverse trig (`atan`, `acos`) is
+    almost always a sign of that. Merge chained transforms into one matrix
+    on the CPU.
+  - *Branches meant to skip work* must stay branches. HLSL has `[branch]`;
+    in GLSL the equivalent is `GL_EXT_control_flow_attributes`
+    `[[dont_flatten]]` (it gives SPIR-V `DontFlatten`). Use it on our skip
+    branches (glisten, mirror) if a compiler flattens them.
+  - *Tooling:* Just Cause 2 diffed the instruction and register counts of
+    every shader edit and attached the diff to code reviews (catching
+    über-shader variants that a change shouldn't have touched). Our
+    equivalent: Nsight Graphics shader profiler / RGA on the SPIR-V.
+  - Breaking dependency chains into trees helps VLIW/vector GPUs only, not
+    scalar ones (NVIDIA DX10+, AMD GCN+, so not our RTX).
+  - Whether float results stay identical depends on the algebra
+    (`x*x*x` vs `pow(x,3)` differs in the last bits): that rounding is
+    acceptable and not a look change; NaNs and infinities are not.
 - **Hashes.** Integer PCG (`pcg3d`, Jarzynski & Olano, JCGT 2020) is fast
   and good, but a different hash moves every bubble/glint/star: an art
   change. Keep our hashes; use PCG only for new effects.
@@ -173,7 +208,7 @@ again unless the user raises it.
 - NVIDIA, Advanced API Performance: Shaders — developer.nvidia.com/blog/advanced-api-performance-shaders
 - Khronos Vulkan Samples, MSAA — docs.vulkan.org/samples/latest/samples/performance/msaa/README.html
 - Khronos Vulkan Samples, Specialization constants — docs.vulkan.org/samples/latest/samples/performance/specialization_constants/README.html
-- E. Persson, Low-Level Thinking in High-Level Shading Languages (GDC 2013) — humus.name/Articles/Persson_LowLevelThinking.pdf
+- E. Persson, Low-Level Thinking in High-Level Shading Languages (GDC 2013) — humus.name/Articles/Persson_LowLevelThinking.pdf (read in full from the gardener's copy; not kept in the repo)
 - Imagination, Low-level GLSL optimisation (MAD form) — docs.imgtec.com/performance-guides/low-level-glsl
 - AMD GPUOpen, register pressure / occupancy; GDC2017 Advanced Shader Programming on GCN — gpuopen.com
 - Jarzynski & Olano, Hash Functions for GPU Rendering (JCGT 9(3), 2020) — jcgt.org/published/0009/03/02
