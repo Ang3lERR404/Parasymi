@@ -44,8 +44,10 @@ before the edge; paw contact shadows.
   `.resin`) held in a cup of five sepals: two whorls of real petals and
   stamens on its crown. The bead shades as the structures' resin
   (surface.glsl `resinSurface`, tu.y dense base → thin crown), dimmed by
-  health. Lumenroot: vine/leaf greens (richer than the palette's, the
-  plant material mutes them), cyan bloom.
+  health. Their leaves and sepals are not muted: plant.frag shades them
+  in their own green (`green`, light through them `GREEN_THROUGH` of it),
+  as the structures' leaves. Lumenroot: the palette's leaf green, a vine
+  green richer than the palette's (the stem is still muted), cyan bloom.
 - Parasites (`coil`, `parasite_kit.plant`): alien not hostile, exactly
   symmetric and dead upright (variants differ in proportion only): a
   lattice cage stalk on a bulbous foot, sacs hanging on its core inside, a

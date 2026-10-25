@@ -40,6 +40,9 @@ const vec3 DEAD_BROWN = vec3(0.18, 0.12, 0.06);
 const float SAP_EDGE_POW = 5.0;
 // how much thin sap-filled growth glistens (under its skin, less than bare sap)
 const float SKIN_GLISTEN = 0.6;
+// how much of a symbiote leaf's own green light through it carries (its
+// structures' leaves: part.frag's back light)
+const float GREEN_THROUGH = 0.45;
 // the forms whose `.bloom` is bare sap of both lineages, not a petal
 const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE);
 // radiant forms that keep more of their own colour under the iridescent
@@ -162,6 +165,10 @@ void surface() {
   float lum = dot(v_col, LUMA);
   vec3 body = mix(vec3(lum), v_col, 0.5) * 0.78;
   body = mix(body, ROOT_BROWN, (1.0 - thin) * (1.0 - smoothstep(0.0, 0.55, v_t)) * 0.75);
+  // but a symbiote's leaves (and sepals) are the lineage's own green, as
+  // on its structures (part.frag): unmuted, the light through them theirs
+  bool green = aff > 0.5 && part == PART_LEAF;
+  if (green) body = v_col;
   body = mix(DEAD_BROWN, body, health);
   // how strongly it glistens (below): only thin, living growth does, so the
   // points of light are mirrored only there
@@ -177,6 +184,7 @@ void surface() {
   // more where the growth is thin and the plant is full
   vec3 sap = mix(sapOf(aff, ndv, seed), v_col, 0.25);
   sap = mix(sap, vec3(1.0, 0.85, 1.0), VEIL * 0.5);
+  if (green) sap = v_col * GREEN_THROUGH;
   float through = max(dot(-n, SUN), 0.0) * sh;
   float wrap = clamp(dot(n, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
   float show = mix(0.1, 1.0, thin) * (0.35 + 0.65 * fill);
