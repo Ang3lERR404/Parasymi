@@ -27,6 +27,8 @@ const gen = @import("../world/gen.zig");
 const TIME_WRAP:f64 = 3600;
 /// no hovered tile: a position far off any tile
 const NO_HOVER:f32 = 1e9;
+/// no wolf: its paws' contact shadows far off any tile
+const NO_FEET = [2]m.V3{ m.splat3(NO_HOVER), m.splat3(NO_HOVER) };
 /// fog thickens over this many chunks' eighths past the camera distance
 const FOG_REACH:f32 = 32 * ck.SIZE / 8;
 /// fog starts to close in at this share of the drawn reach
@@ -109,11 +111,16 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   g.parts.look(g.cam.viewEye(), m.Frustum.of(g.cam.viewProj()), g.sky.lightDir());
   try plants(g, reach, tf);
   try threads(g, tf);
-  const feet = try g.player.rig(&g.parts);
-  try nodes(g, @intFromFloat(reach));
-  try structures(g, reach, tf);
-  try ghost(g, tf);
-  try motes(g);
+  // a specimen stands alone: no wolf, nodes, structures or motes (their
+  // meshes were never built)
+  const alone = g.specimen != null;
+  const feet = if (alone) NO_FEET else try g.player.rig(&g.parts);
+  if (!alone) {
+    try nodes(g, @intFromFloat(reach));
+    try structures(g, reach, tf);
+    try ghost(g, tf);
+    try motes(g);
+  }
   rankLights(g);
   try hud.build(g, screen);
 

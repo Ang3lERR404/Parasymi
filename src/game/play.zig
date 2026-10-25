@@ -37,6 +37,7 @@ const convergence = @import("convergence.zig");
 const hud = @import("hud.zig");
 const options = @import("options.zig");
 const save = @import("save.zig");
+const Specimen = @import("specimen.zig").Specimen;
 
 pub const TICK = 1.0 / 60.0;
 /// the world every new game grows from, unless `--seed=` says otherwise
@@ -234,6 +235,9 @@ pub const Game = struct {
   inst:[renderer.PLANT_MESHES]std.ArrayList(vertex.PlantInstance) = @splat(.empty),
   far:std.ArrayList(*ck.Chunk) = .empty,
   render_stats:renderer.Stats = .{},
+  /// `--plant`: one plant alone, its state set by hand (see specimen.zig);
+  /// nothing else falls, grows or is drawn
+  specimen:?Specimen = null,
 
   pub fn init(gpa:Allocator, seed:u64) Error!Game {
     var g:Game = .{
@@ -468,8 +472,10 @@ pub const Game = struct {
     const follow = g.player.pos + m.v3(0, FOLLOW_HEIGHT, 0);
     g.cam.target += (follow - g.cam.target) * m.splat3(@min(1, dt * FOLLOW_LERP));
 
-    try g.stars.update(g.gpa, &g.sky, g.player.pos, &g.world, dt);
-    actions.catchStarlight(g, dt);
+    if (g.specimen == null) {
+      try g.stars.update(g.gpa, &g.sky, g.player.pos, &g.world, dt);
+      actions.catchStarlight(g, dt);
+    }
 
     // stream the world around the player; chunks holding what we grew stay
     try g.world.stream(g.focus(), STREAM_RADIUS, STREAM_FRAME);
@@ -784,6 +790,10 @@ pub const Game = struct {
   /// progression, structures.
   /// (see the test below for the headless harness)
   pub fn step(g:*Game) Error!void {
+    if (g.specimen) |*sp| if (try sp.hold(g, TICK)) {
+      g.ticks += 1;
+      return;
+    };
     var mods = g.prog.mods();
     mods.night = 1 - g.sky.daylight();
     try st.fields(&g.structs, g.gpa, &g.fields);
@@ -792,6 +802,7 @@ pub const Game = struct {
     try g.converge.tick(g.gpa, &g.world, &g.plants, &g.structs, &g.prog);
     g.prog.absorb(ev, TICK);
     try g.structs.tick(g.gpa, &g.world, &g.plants, &g.prog, TICK);
+    if (g.specimen) |*sp| try sp.regrow(g, TICK);
     g.ticks += 1;
   }
 };

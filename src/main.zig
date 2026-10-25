@@ -29,6 +29,9 @@ const options = @import("game/options.zig");
 const home = @import("game/home.zig");
 const orbit = @import("game/orbit.zig");
 const loading = @import("game/loading.zig");
+const specimen = @import("game/specimen.zig");
+const species = @import("sim/species.zig");
+const stringToEnum = std.meta.stringToEnum;
 const Loading = loading.Loading;
 const World = @import("world/world.zig").World;
 const png = @import("core/png.zig");
@@ -75,6 +78,12 @@ pub fn main(init:Init) !void {
   // turn), `--dist=`, `--pitch=` (degrees) shape it
   var inspect:?orbit.Focus = null;
   var turn:orbit.Orbit = .{};
+  // `--plant=<species>` grows that plant alone (its meshes alone built),
+  // `--state=` held or looped (grow, mature, 0.4, 0.2..0.8, wither, flow,
+  // drain, dark, live; default grow), `--period=` seconds a loop
+  var lone:?specimen.Specimen = null;
+  var state:specimen.State = .grow;
+  var period:?f32 = null;
   for (args[1..]) |a| {
     if (eql(u8, a, "--inspect")) inspect = .player;
     if (startsWith(u8, a, "--inspect=")) inspect = try orbit.Focus.parse(a["--inspect=".len..]);
@@ -88,6 +97,13 @@ pub fn main(init:Init) !void {
     if (eql(u8, a, "--load")) load = true;
     if (startsWith(u8, a, "--tod=")) tod = try parseFloat(f32, a["--tod=".len..]);
     if (startsWith(u8, a, "--seed=")) seed = try parseInt(u64, a["--seed=".len..], 0);
+    if (startsWith(u8, a, "--plant=")) lone = .{.sp = stringToEnum(species.Id, a["--plant=".len..]) orelse return error.BadPlant};
+    if (startsWith(u8, a, "--state=")) state = try specimen.State.parse(a["--state=".len..]);
+    if (startsWith(u8, a, "--period=")) period = try parseFloat(f32, a["--period=".len..]);
+  }
+  if (lone) |*l| {
+    l.state = state;
+    if (period) |t| l.period = @max(t, 0.1);
   }
 
   // the only read of the controls file: no key or button is named in code.
@@ -109,7 +125,7 @@ pub fn main(init:Init) !void {
   input.attach();
   var display:Display = .{.win = window};
 
-  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa);
+  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa, if (lone) |l| l.sp else null);
   defer r.deinit();
   opts.aa = r.antialiasing();
 
@@ -137,12 +153,18 @@ pub fn main(init:Init) !void {
   // is applied on the first frame
   var applied = opts;
   applied.fullscreen = false;
-  if (load) {
-    relist(gpa, io, &game);
-    if (game.gardens.items.len > 0) _ = try restore(gpa, io, &game, r, game.gardens.items[0].name);
+  if (lone) |l| {
+    // alone in a fresh world: no garden loaded, sown or saved
+    game.specimen = l;
+    try game.specimen.?.sow(&game);
+  } else {
+    if (load) {
+      relist(gpa, io, &game);
+      if (game.gardens.items.len > 0) _ = try restore(gpa, io, &game, r, game.gardens.items[0].name);
+    }
+    if (demo) try setups.demo(&game, DEMO_FORWARD);
+    if (stress) try setups.stress(&game, STRESS_SIDE);
   }
-  if (demo) try setups.demo(&game, DEMO_FORWARD);
-  if (stress) try setups.stress(&game, STRESS_SIDE);
   if (tod) |t| game.sky.tod = t;
   if (inspect) |f| {
     turn.focus = f;
@@ -165,6 +187,11 @@ pub fn main(init:Init) !void {
     try game.update(&input, @floatCast(dt), screen);
     if (game.request) |rq| {
       game.request = null;
+      // a lone plant's world is never saved, and no garden replaces it
+      if (game.specimen != null) {
+        if (rq == .quit) window.setShouldClose(true);
+        continue;
+      }
       switch (rq) {
         .save => keep(gpa, io, &game, game.slot),
         .save_as => |n| keep(gpa, io, &game, n),

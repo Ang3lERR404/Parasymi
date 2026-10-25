@@ -21,6 +21,11 @@ zig build run -- --load           # load the newest saved garden
 zig build run -- --demo --inspect # orbit the wolf, screenshots to shots/, then quit
 zig build run -- --inspect=bloom --shots=12 --orbit=30 --dist=6 --pitch=25
                                   # focus: player | <species> | <structure> | x,z
+zig build run -- --plant=bloom --state=wither --period=6
+                                  # one plant alone (only its meshes built; no
+                                  # wolf/nodes/motes, never saved); states loop:
+                                  # grow | a..b | 0.4 | mature | wither | flow |
+                                  # drain | dark | live (game/specimen.zig)
 zig build test                    # headless logic tests (no window/GPU)
 ```
 Needs `VULKAN_SDK` (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`,

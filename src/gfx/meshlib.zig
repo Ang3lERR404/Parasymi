@@ -119,6 +119,7 @@ const reg = registry.Registry(parts);
 
 pub const Id = reg.Id;
 pub const count = reg.count;
+pub const ids = reg.ids;
 
 /// every library mesh at each level of detail (one slot per mesh and level,
 /// see `slot`).

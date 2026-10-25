@@ -21,6 +21,7 @@ test {
   _ = @import("game/seeds.zig");
   _ = @import("game/play.zig");
   _ = @import("game/orbit.zig");
+  _ = @import("game/specimen.zig");
   _ = @import("game/player.zig");
   _ = @import("game/save.zig");
   _ = @import("game/options.zig");
