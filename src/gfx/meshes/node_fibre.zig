@@ -16,7 +16,7 @@ const v3 = m.v3;
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("node_fibre");
-  try kit.rootMat(b, 5, 0.22, 0.025, 0x1F1B);
+  try kit.rootMat(b, 5, 0.22, 0.025, 0x1F1B, null);
   const straw = color.rgb(0.62, 0.52, 0.3).toRgba8(255);
   const green = color.rgb(0.32, 0.5, 0.24).toRgba8(255);
   for (0..16) |i| {

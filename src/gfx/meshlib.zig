@@ -7,6 +7,7 @@
 //!
 //! A new mesh is one new file (or struct) plus one line in `parts`.
 const std = @import("std");
+const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const mg = @import("meshgen.zig");
 const registry = @import("../core/registry.zig");
@@ -85,6 +86,8 @@ pub fn build(b:*mg.Builder, ranges:*[SLOTS][2]u32) Allocator.Error!void {
     inline for (reg.ids) |id| {
       const first = b.mark();
       try reg.module(id).build(b);
+      // a skeleton left unfinished leaves its times past one (never grown)
+      if (b.grow.items.len > first) for (b.grow.items[first..]) |g| assert(g.at[0] + g.at[1] <= 1 + 1e-4);
       ranges[slot(id, @intCast(l))] = .{@intCast(first), @intCast(b.mark() - first)};
     }
   }

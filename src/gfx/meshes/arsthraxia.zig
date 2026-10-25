@@ -29,8 +29,8 @@ const energy_white = color.rgb(1, 1, 1).toRgba8(255);
 fn stalkProfile(k:f32) f32 { return 0.14 * (1 - 0.45 * k) + 0.05 * @exp(-k * 12) + 0.03 * @exp(-(1 - k) * 10); }
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
-  try kit.rootMat(b, 6, 0.9, 0.07, 0x7B01);
-  try kit.footLeaves(b, 6, 0.25, 0.5, 0.18, 0x7B02);
+  try kit.rootMat(b, 6, 0.9, 0.07, 0x7B01, null);
+  try kit.footLeaves(b, 6, 0.25, 0.5, 0.18, 0x7B02, null);
   const s = b.mark();
   try mg.bundle(b, stalkProfile, 6, 3.2, pal.STRAND_WOBBLE, 0x7B03, pal.core, color.rgb(0.36, 0.3, 0.46).toRgba8(255));
   b.xform(s, m.scale3(v3(GIRTH, HEIGHT, GIRTH)));

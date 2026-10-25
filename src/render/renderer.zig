@@ -227,6 +227,8 @@ pub const Renderer = struct {
   meshes:Buffer = .{},
   /// each vertex of `meshes`' skin weights (zero where a mesh is not skinned)
   skins:Buffer = .{},
+  /// beside `meshes`: where each vertex grows out of (`vertex.Grow`)
+  grows:Buffer = .{},
   /// (first vertex, count) per plant slot; slots a species does not use are empty
   plant_ranges:[PLANT_MESHES][2]u32 = @splat(.{0, 0}),
   /// per plant slot, the byte offset from its mesh to the next growth key's
@@ -390,6 +392,10 @@ pub const Renderer = struct {
     const skin = sliceAsBytes(b.skin.items);
     r.skins = try Buffer.init(&r.ctx, skin.len, .{.vertex_buffer = true});
     r.skins.write(0, skin);
+    _ = try b.growOf(b.v.items.len);
+    const grow = sliceAsBytes(b.grow.items);
+    r.grows = try Buffer.init(&r.ctx, grow.len, .{.vertex_buffer = true});
+    r.grows.write(0, grow);
   }
 
   pub fn deinit(r:*Renderer) void {
@@ -428,6 +434,7 @@ pub const Renderer = struct {
     r.detail_scratch.deinit(r.gpa);
     r.meshes.deinit(c);
     r.skins.deinit(c);
+    r.grows.deinit(c);
     r.shot_buf.deinit(c);
     for (r.pipes) |p| c.device.destroyPipeline(p, null);
     for (r.layouts) |l| c.device.destroyPipelineLayout(l, null);

@@ -21,8 +21,9 @@ pub const MAX_BONES = 256;
 
 const bindings = &[_]vk.VertexInputBindingDescription{
   pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PartInstance, 1, .instance), pipeline.binding(vertex.Skin, 2, .vertex),
+  pipeline.binding(vertex.Grow, 3, .vertex),
 };
-const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5) ++ pipeline.attrs(vertex.Skin, 2, 16));
+const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5) ++ pipeline.attrs(vertex.Skin, 2, 16) ++ pipeline.attrs(vertex.Grow, 3, 21));
 
 pub const desc:pass.Desc = .{
   .vert = "part.vert", .frag = "part.frag",
@@ -69,7 +70,7 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, stats:*R.Stats
   if (stats.parts == 0) return;
   cmd.bindPipeline(.graphics, r.pipe(p));
   cmd.pushConstants(r.layout(.world), pass.stages, 0, @sizeOf(R.WorldPush), &f.push);
-  cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf, r.skins.buf}, &.{0, 0, 0});
+  cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf, r.skins.buf, r.grows.buf}, &.{0, 0, 0, 0});
   for (0..meshlib.SLOTS) |i| {
     if (f.counts[i] == 0 or (p == .parts_glass and !r.part_glassy[i])) continue;
     const mesh = if (p == .parts_shadow) light.caster(i) else i;

@@ -27,6 +27,11 @@ layout(location = 17) in vec4 sweights;
 layout(location = 18) in vec4 sgx;
 layout(location = 19) in vec4 sgy;
 layout(location = 20) in vec4 sgz;
+// per-vertex growth (structures grown along growth splines, gfx/growth.zig):
+// where it grows out of, and when it begins, how long it takes, when its
+// spline began and was done (gat.y 0: not on a spline)
+layout(location = 21) in vec3 gfrom;
+layout(location = 22) in vec4 gat;
 
 // iflags: a placement preview (vertex.PART_GHOST)
 const uint PART_GHOST = 1u;
@@ -77,6 +82,10 @@ const float ENERGY_QUIVER_FLARE = 0.12;
 // the roles that are a structure's foliage (leaves, an ear): they unfold as
 // it grows and breathe and lift in the wind
 const uint FOLIAGE = PART_BIT(PART_LEAF) | PART_BIT(PART_EAR);
+// grown along a growth spline: how thin it is while its spline is still
+// growing, and how far into its own growth a leaf's tip lags its base
+const float SPROUT_THIN = 0.5;
+const float LEAF_LAG = 0.6;
 
 // Catmull-Rom through b..c (a, d the neighbours) at f, and its tangent
 vec3 catmull(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
@@ -99,6 +108,17 @@ void main() {
   }
   vec3 p = pos;
   vec3 nm = nrm;
+  // grown along a growth spline: shrunk into it (or the point it grows
+  // from) until its front comes by, then grown out, thin at first and
+  // thickening as its spline finishes; a leaf unfolds from its base, tips
+  // last. Shrunk about a point, so its normal holds.
+  bool on_spline = gat.y > 0.0;
+  if (on_spline) {
+    float lag = PART_IN(FOLIAGE, part) ? LEAF_LAG * gat.y * tu.y : 0.0;
+    float out_ = smoothstep(gat.x + lag, gat.x + gat.y, iw.w);
+    if (gat.w > gat.z) out_ *= mix(SPROUT_THIN, 1.0, smoothstep(gat.z, gat.w, iw.w));
+    p = gfrom + (p - gfrom) * out_;
+  }
   // the belly (tu.y 3, its button 4; fill in iq.y): as it fills, creases
   // fold into it down its middle and across it, deepening the fuller it
   // is (in the bind pose, before the gut swells it, so they swell with
@@ -148,7 +168,7 @@ void main() {
   float sway = iw.x;
   // a growing structure's leaves and petals come up folded and open from
   // the bottom up, tips last (weighted along the leaf so its base holds)
-  if (iw.w < 1.0 && PART_IN(FOLIAGE, part)) {
+  if (iw.w < 1.0 && !on_spline && PART_IN(FOLIAGE, part)) {
     p.xz *= unfold(0.2, grownPast(pos.y / iw.y, 0.7, 0.35, iw.w), tu.y);
   }
   vec4 wind = gardenWind(t, c3.xz);

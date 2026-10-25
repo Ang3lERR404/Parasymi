@@ -73,6 +73,9 @@ pub const Builder = struct {
   v:std.ArrayList(PV) = .empty,
   /// skin weights beside `v`, as far as the last skinned vertex (see `skinOf`)
   skin:std.ArrayList(vertex.Skin) = .empty,
+  /// growth records beside `v`, as far as the last vertex grown along a
+  /// growth spline (see `growOf`, gfx/growth.zig)
+  grow:std.ArrayList(vertex.Grow) = .empty,
   /// the level of detail being built (0 full): primitives keep every
   /// `step()`-th ring along their length and `around()` of their sides, the
   /// same way every time, so growth keys built at one level still match
@@ -86,6 +89,7 @@ pub const Builder = struct {
   pub fn deinit(b:*Builder) void {
     b.v.deinit(b.gpa);
     b.skin.deinit(b.gpa);
+    b.grow.deinit(b.gpa);
   }
 
   /// the skin weights of every vertex since `start`, to be filled in
@@ -93,6 +97,13 @@ pub const Builder = struct {
   pub fn skinOf(b:*Builder, start:usize) Allocator.Error![]vertex.Skin {
     try b.skin.appendNTimes(b.gpa, .{}, b.v.items.len -| b.skin.items.len);
     return b.skin.items[start..b.v.items.len];
+  }
+
+  /// the growth records of every vertex since `start`, to be filled in
+  /// (vertices before it without any grow as their structure does)
+  pub fn growOf(b:*Builder, start:usize) Allocator.Error![]vertex.Grow {
+    try b.grow.appendNTimes(b.gpa, .{}, b.v.items.len -| b.grow.items.len);
+    return b.grow.items[start..b.v.items.len];
   }
 
   pub fn put(b:*Builder, p:V3, n:V3, col:color.Rgba8, t:f32, u:f32, part:vertex.Part) Allocator.Error!void {
@@ -107,6 +118,10 @@ pub const Builder = struct {
       v.pos = m.mulPoint(mat, v.pos);
       v.nrm = m.norm(m.mulCovector(nm, v.nrm));
     }
+    // where a vertex grows out of moves with it
+    if (start < b.grow.items.len) for (b.grow.items[start..]) |*g| {
+      g.from = m.mulPoint(mat, g.from);
+    };
     // a weight's gradient is a covector too: it goes as the normals do
     if (start >= b.skin.items.len) return;
     for (b.skin.items[start..]) |*k| for (0..4) |i| {
@@ -1070,19 +1085,25 @@ pub fn leavesAlong(b:*Builder, path:[]const V3, n:u32, len:f32, width:f32, k0:f3
   var rng = Rng.init(seed);
   for (0..n) |i| {
     const k = m.lerp(k0, k1, (m.f(i) + 0.5) / m.f(n));
-    const at = m.alongPath(path, k);
-    const tan = m.norm(m.alongPath(path, @min(k + 0.03, 1)) - m.alongPath(path, @max(k - 0.03, 0)));
-    const ref = if (@abs(tan[1]) > 0.9) m.v3(1, 0, 0) else m.v3(0, 1, 0);
-    const s1 = m.norm(m.cross(tan, ref));
-    const s2 = m.cross(tan, s1);
-    const a = m.f(i) * 2.4 + rng.range(-0.3, 0.3) + m.f(seed % 7);
-    var out = s1 * m.splat3(@cos(a)) + s2 * m.splat3(@sin(a)) + m.v3(0, 0.5, 0) + tan * m.splat3(0.3);
-    // a blade needs some sideways lean to find its width
-    out[1] = m.clamp(out[1], -0.6, 0.7);
-    out = m.norm(out);
-    const l = len * m.lerp(1, 0.6, k) * rng.range(0.85, 1.15);
-    try b.blade(at, out, l, width * m.lerp(1, 0.7, k), 0.35, col, tip, m.lerp(t0, t1, k), .leaf);
+    try leafAt(b, path, k, i, len, width, t0, t1, col, tip, seed, &rng);
   }
+}
+
+/// the `i`th of `leavesAlong`'s leaves, `k` along `path` (`rng` its draws,
+/// in order): one at a time, for a piece grown on its own (gfx/growth.zig).
+pub fn leafAt(b:*Builder, path:[]const V3, k:f32, i:usize, len:f32, width:f32, t0:f32, t1:f32, col:color.Rgba8, tip:color.Rgba8, seed:u64, rng:*Rng) Allocator.Error!void {
+  const at = m.alongPath(path, k);
+  const tan = m.norm(m.alongPath(path, @min(k + 0.03, 1)) - m.alongPath(path, @max(k - 0.03, 0)));
+  const ref = if (@abs(tan[1]) > 0.9) m.v3(1, 0, 0) else m.v3(0, 1, 0);
+  const s1 = m.norm(m.cross(tan, ref));
+  const s2 = m.cross(tan, s1);
+  const a = m.f(i) * 2.4 + rng.range(-0.3, 0.3) + m.f(seed % 7);
+  var out = s1 * m.splat3(@cos(a)) + s2 * m.splat3(@sin(a)) + m.v3(0, 0.5, 0) + tan * m.splat3(0.3);
+  // a blade needs some sideways lean to find its width
+  out[1] = m.clamp(out[1], -0.6, 0.7);
+  out = m.norm(out);
+  const l = len * m.lerp(1, 0.6, k) * rng.range(0.85, 1.15);
+  try b.blade(at, out, l, width * m.lerp(1, 0.7, k), 0.35, col, tip, m.lerp(t0, t1, k), .leaf);
 }
 
 /// a parasite's body: alien rather than hostile. A ribbed, twisted stalk on

@@ -12,7 +12,7 @@ const v3 = m.v3;
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   try mg.ellipsoid(b, .{.center = v3(0, 0.05, 0), .radii = v3(0.17, 0.09, 0.17), .col = pal.core, .rings = 6, .segs = 10, .t = 0.2});
   const s = b.mark();
-  try sap_cache.gourd(b, 0.4);
+  try sap_cache.gourd(b, 0.4, null);
   b.xform(s, m.translate(v3(0, 0.06, 0)));
 }
 

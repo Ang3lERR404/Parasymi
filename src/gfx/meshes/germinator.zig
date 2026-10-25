@@ -63,8 +63,8 @@ pub fn cupFacing(k:usize) f32 { return -(boughAngle(k) + m.pi); }
 pub fn build(b:*mg.Builder) Allocator.Error!void { try tree(b); }
 
 fn tree(b:*mg.Builder) Allocator.Error!void {
-  try kit.rootMat(b, 8, 1.0, 0.08, 0x6E41);
-  try kit.footLeaves(b, 7, 0.3, 0.48, 0.19, 0x6E42);
+  try kit.rootMat(b, 8, 1.0, 0.08, 0x6E41, null);
+  try kit.footLeaves(b, 7, 0.3, 0.48, 0.19, 0x6E42, null);
   try trunk(b);
   for (0..BOUGHS) |k| try bough(b, k);
   try calyx(b);
@@ -123,9 +123,9 @@ fn bough(b:*mg.Builder, k:usize) Allocator.Error!void {
   // fan of leaves behind the cup
   const out = v3(@cos(a), 0, @sin(a));
   const from = m.alongPath(&path, 0.62);
-  try kit.leafyVine(b, from, from + out * m.splat3(0.38) + v3(0, 0.3, 0), 0.022, 0.2, 5, from[1] / TALL, 1, 0x6E80 +% k * 13);
+  try kit.leafyVine(b, from, from + out * m.splat3(0.38) + v3(0, 0.3, 0), 0.022, 0.2, 5, from[1] / TALL, 1, 0x6E80 +% k * 13, null);
   const low = m.alongPath(&path, 0.4);
-  try kit.leafyVine(b, low, low + out * m.splat3(0.34) + v3(0, 0.12, 0), 0.018, 0.25, 4, low[1] / TALL, 0.8, 0x6EB0 +% k * 17);
+  try kit.leafyVine(b, low, low + out * m.splat3(0.34) + v3(0, 0.12, 0), 0.018, 0.25, 4, low[1] / TALL, 0.8, 0x6EB0 +% k * 17, null);
   var rng = Rng.init(0x6E90 +% k);
   const behind = m.alongPath(&path, 0.9);
   for (0..3) |i| {

@@ -74,6 +74,10 @@ pub const Def = struct {
   /// seconds it takes to grow from a sprout once the gardener puts it down
   /// (0: there at once); it does no work until grown
   grow:f32 = 0,
+  /// its mesh is built along growth splines (gfx/growth.zig) and grows
+  /// along them on the GPU, branch after branch, instead of shooting up
+  /// and filling out as a whole
+  splined:bool = false,
   /// carries items tile to tile the way it faces (R turns it): carriers
   /// chain into one line, and producers leave them to pull through `output`
   carrier:bool = false,
@@ -133,6 +137,7 @@ pub const Structure = struct {
   /// first and fills out after, as the plants do
   /// (and at the size research has grown it to, `size`)
   pub fn grownScale(s:*const Structure) m.V3 {
+    if (s.def().splined) return m.splat3(s.size());
     const up = m.smooth(m.clamp01(s.grown * SHOOT));
     const out = m.smooth(s.grown);
     return m.v3(m.lerp(SPROUT_W, 1, out), m.lerp(SPROUT_H, 1, up), m.lerp(SPROUT_W, 1, out)) * m.splat3(s.size());

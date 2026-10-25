@@ -59,6 +59,17 @@ pub const Skin = extern struct {
   gz:[4]f32 = @splat(0),
 };
 
+/// where a vertex of a structure grown along its growth splines
+/// (gfx/growth.zig) grows out of and when, read beside the mesh buffer
+/// vertex for vertex (binding 3). part.vert keeps it shrunk into `from`
+/// until the structure's growth reaches `at[0]`, grows it out over
+/// `at[1]`, and thickens it as its spline goes from started (`at[2]`) to
+/// done (`at[3]`; equal: no thickening). `at[1]` 0: not on a spline.
+pub const Grow = extern struct {
+  from:[3]f32 = @splat(0),
+  at:[4]f32 = @splat(0),
+};
+
 /// the leading fields of `Mesh`, read from a second growth key of the same
 /// mesh buffer (same stride) so a plant can blend between keys.
 pub const MeshPose = extern struct {

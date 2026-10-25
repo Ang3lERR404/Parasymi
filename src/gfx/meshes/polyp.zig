@@ -23,8 +23,8 @@ fn stalkProfile(k:f32) f32 { return 0.1 * (1 - 0.35 * k) + 0.04 * @exp(-k * 10) 
 
 pub fn build(b:*mg.Builder) Allocator.Error!void {
   var rng = pal.rngFor("polyp");
-  try kit.rootMat(b, 6, 0.55, 0.05, 0x9071);
-  try kit.footLeaves(b, 5, 0.16, 0.34, 0.13, 0x9072);
+  try kit.rootMat(b, 6, 0.55, 0.05, 0x9071, null);
+  try kit.footLeaves(b, 5, 0.16, 0.34, 0.13, 0x9072, null);
   const s = b.mark();
   try mg.bundle(b, stalkProfile, 5, 2.6, pal.STRAND_WOBBLE, 0x9073, pal.core, color.rgb(0.42, 0.38, 0.5).toRgba8(255));
   b.xform(s, m.scale3(v3(1.5, HEIGHT, 1.5)));
