@@ -58,7 +58,7 @@ const float RAYS = 40.0;
 // the roles thin enough for light from behind to shine through (leaves,
 // sap, an ear), and the woven ones with a sheen along their fibres
 const uint THIN = PART_BIT(PART_LEAF) | PART_BIT(PART_BLOOM) | PART_BIT(PART_EAR);
-const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE);
+const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE) | PART_BIT(PART_NERVE);
 
 // sap is alive and wet: bubbles drifting up inside it, beads sliding down
 // its surface, and hard light glistening on it (sapGlisten). Added to every

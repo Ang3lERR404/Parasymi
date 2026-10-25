@@ -367,13 +367,19 @@ pub fn braid(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, st
 /// point i: winding fast spreads them into a loose diagonal weave, winding
 /// slowly gathers them tight and nearly vertical.
 pub fn braidTurned(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, turn:[]const f32, strands:u32, wobble:f32, seed:u64, core:color.Rgba8, strand:color.Rgba8) Allocator.Error!void {
+  try braidAround(b, spine, ts, radii, turn, strands, wobble, seed, core, strand, .stem);
+}
+
+/// `braidTurned` round a core of role `core_part` (an arsthraxia's nerve
+/// showing between its strands)
+pub fn braidAround(b:*Builder, spine:[]const V3, ts:[]const f32, radii:[]const f32, turn:[]const f32, strands:u32, wobble:f32, seed:u64, core:color.Rgba8, strand:color.Rgba8, core_part:vertex.Part) Allocator.Error!void {
   const n = spine.len;
   var fn_:[MAX_SPINE]V3 = undefined;
   var fb:[MAX_SPINE]V3 = undefined;
   transport(spine, fn_[0..n], fb[0..n]);
   var r:[MAX_SPINE]f32 = undefined;
   for (0..n) |i| r[i] = radii[i] * BRAID_CORE;
-  try b.tubeR(spine, ts, r[0..n], core, .stem, 8);
+  try b.tubeR(spine, ts, r[0..n], core, core_part, 8);
   for (0..n) |i| r[i] = radii[i] * BRAID_STRAND;
   for (0..strands) |si| {
     const a0 = m.ratio(si, strands) * m.tau;

@@ -66,6 +66,10 @@ const parts = struct {
   // (see-through: blends over what spins inside it)
   pub const germinator_core = @import("meshes/germinator.zig").core;
   pub const arsthraxia = @import("meshes/arsthraxia.zig");
+  pub const arsthraxia_whole = @import("meshes/arsthraxia.zig").whole;
+  pub const arsthraxia_whorl = @import("meshes/arsthraxia.zig").whorl;
+  pub const arsthraxia_cup = @import("meshes/arsthraxia.zig").cup;
+  pub const arsthraxia_vines = @import("meshes/arsthraxia.zig").vines;
   pub const arsthraxia_shoot = @import("meshes/arsthraxia.zig").shoot;
   pub const arsthraxia_satellite = @import("meshes/arsthraxia.zig").satellite;
   // (light: blends over the satellites spinning round it)

@@ -279,19 +279,23 @@ pub const Skeleton = struct {
     strand:color.Rgba8,
     t0:f32 = 0,
     t1:f32 = 0,
+    /// the role of the core showing between its strands
+    core_part:vertex.Part = .stem,
   };
 
   /// a braid (`mg.braid`) the length of spline `id`, grown along it.
   pub fn braid(k:*const Skeleton, b:*mg.Builder, id:Id, o:Braid) Allocator.Error!void {
     var rs:[RES]f32 = undefined;
     var ts:[RES]f32 = undefined;
-    for (&rs, &ts, 0..) |*r, *t, i| {
+    var turn:[RES]f32 = undefined;
+    for (&rs, &ts, &turn, 0..) |*r, *t, *a, i| {
       const u = m.ratio(i, RES - 1);
       r.* = o.girth * m.lerp(1, o.tip, u);
       t.* = m.lerp(o.t0, o.t1, u);
+      a.* = u * o.twist;
     }
     const s = b.mark();
-    try mg.braid(b, &k.s[id.idx()].pts, &ts, &rs, o.strands, o.twist, o.wobble, o.seed, o.core, o.strand);
+    try mg.braidAround(b, &k.s[id.idx()].pts, &ts, &rs, &turn, o.strands, o.wobble, o.seed, o.core, o.strand, o.core_part);
     try k.along(b, s, id);
   }
 

@@ -169,7 +169,7 @@ recipes (`game/craft.zig`) are plain data tables.
 - **Structures grow along growth splines** (`gfx/growth.zig`); every new
   structure mesh (and any piece of one that grows) is built this way, never
   grown by scaling the whole. Every structure is: sap cache, germinator,
-  arsthraxia (and its research offshoots), root-digger (and its roots, in
+  arsthraxia (and its research vines and offshoots), root-digger (and its roots, in
   the first share of its growth: `sk.tail`), polyp, conduit (each arch
   its own spline; side roots grown by how far they reach), loomfern,
   lithophage (and its roots), braided conduit (weave and each lane its
@@ -495,8 +495,16 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   core spins it into a whirl round the spindle (one arm per essence,
   turned by the area under the spin stage, whole turns per weave) and
   threads wind a seed of them on the spindle (kernel in the output's
-  colour, a winding per essence). Research bloom: woven
-  stalk, violet flower, banded resin orb (forms last). Sap cache: clear pod
+  colour, a winding per essence). Arsthraxia (`Def.bare`, its own
+  `emit`; never breathes or bobs): three braided stems twine up from a
+  root mat, part into a cage round a resin pod threaded on a nerve and
+  gather in a calyx under a violet flower (two whorls, emitted, opening
+  and counter-turning while it studies). Each stem's core is a nerve
+  (part `.nerve`, `mg.braidAround`): studying, violet thought climbs it
+  (part.vert), a unit done sends a surge up (`flutter` = flare). Research
+  grows on it: vines climbing the stems (Arsthraxia, `Study.vines`), a
+  braided offshoot bough with a vine round it and its own flower per
+  minor study. Sap cache: clear pod
   in a vine basket, contents hanging inside. Conduit (`Def.bare`, its own
   `emit`): per tile a root digs up out of the soil at each edge it is fed
   from (`link` hook: `feeds`; `conduit`/`conduit_left`/`conduit_right`),

@@ -103,6 +103,8 @@ pub const Study = struct {
   speed:f32 = 1,
   /// how many times the labs have grown (each an offshoot, a satellite)
   growth:u32 = 0,
+  /// the labs' thought has quickened (Arsthraxia): vines climb them
+  vines:bool = false,
 };
 /// a lab condenses this share of its fed pace unfed, knowing nothing yet
 const UNFED:f32 = 0.2;

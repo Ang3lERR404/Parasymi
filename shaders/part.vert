@@ -76,6 +76,13 @@ const float PULSE_RATE = 3.0;
 const float DIM_GLOW = 0.06;
 // a conduit's amber pulses: how fast they run (rad/s)
 const float CORE_RUN_RATE = 2.6;
+// thought climbing an arsthraxia's nerves: its colour (linear violet), how
+// many pulses along a nerve at once, how fast they climb (rad/s), how long
+// the surge of a unit done is (a share of the nerve)
+const vec3 THOUGHT = vec3(0.42, 0.2, 1.0);
+const float NERVE_PULSES = 3.0;
+const float NERVE_RISE = 7.0;
+const float NERVE_SURGE_W = 0.08;
 // a stream of essence poured into a germinator's core: how far it ripples
 // off its fall at the bottom
 const float POUR_RIPPLE = 0.012;
@@ -345,6 +352,19 @@ void main() {
     v_col = mix(v_col, AMBER * 0.8, run * 0.6);
     v_col = mix(v_col, srgb2lin(clamp(ie.yzw, 0.0, 1.0)), max(carried, wake * 0.6));
     v_glow = run * (0.1 + 0.2 * ip.x) + carried * 0.55 + wake * 0.2;
+  }
+  // an arsthraxia's nerve (tu.x 0 at its roots .. 1 at its crown, or out
+  // along an offshoot): while it studies (ip.x) thought climbs it in violet
+  // pulses, and a unit done (ip.y, 1 fading to 0) sends one surge up it from
+  // the roots, its front climbing as the flare fades. At rest, dark wood.
+  if (part == PART_NERVE) {
+    float study = clamp(ip.x, 0.0, 1.0);
+    float rise = pow(0.5 + 0.5 * sin(tu.x * TAU * NERVE_PULSES - t * NERVE_RISE + ip.z * TAU), 6.0) * study;
+    float front = tu.x - (1.0 - ip.y);
+    float surge = ip.y > 0.0 ? exp(-front * front / (NERVE_SURGE_W * NERVE_SURGE_W)) * sqrt(ip.y) : 0.0;
+    float lit = max(rise, surge);
+    v_col = mix(v_col, THOUGHT, lit * 0.85);
+    v_glow = rise * 0.45 + surge * 1.1 + study * 0.03;
   }
   v_part = float(part);
   v_t = tu.x;

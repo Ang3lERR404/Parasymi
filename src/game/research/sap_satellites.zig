@@ -1,5 +1,5 @@
 //! SAP SATELLITES: a minor study along Arsthraxia. Every arsthraxia grows:
-//! larger, an offshoot off its stalk, another satellite sap round its core.
+//! an offshoot out of its stems, another satellite sap round its core.
 const prog = @import("../progression.zig");
 const txt = @import("../text.zig");
 

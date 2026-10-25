@@ -3,13 +3,17 @@
 //! full pace for each unit whose per-unit ingredients it is fed (eaten as
 //! the unit starts).
 //!
-//! It is seen through by its work: idle, its satellite saps rest fused as
-//! one core of sap over the flower; studying, they split apart and spin
-//! round where it stood, shedding wisps of energy that condense into a new
-//! core there, swelling as the unit condenses and flaring as it is done.
-//! Each minor study along Arsthraxia grows every arsthraxia: larger, an
-//! offshoot off its stalk (a satellite of its own over its flower), and
-//! another satellite round its core.
+//! It is seen through by its work, never by bobbing or breathing: idle, it
+//! stands still in the wind, its satellite saps fused as one core of sap
+//! over its flower. Studying, thought climbs its nerves from the roots in
+//! violet pulses (part.vert), its flower's whorls open and turn against
+//! each other, the satellites split apart and spin round where the core
+//! stood, shedding wisps of energy that condense into a new core there,
+//! swelling as the unit condenses; a unit done flares it and sends one
+//! surge of light up its nerves.
+//! What is learned grows on it: Arsthraxia sends vines climbing its stems;
+//! each minor study along it an offshoot out of them (a bough with a
+//! flower and a satellite of its own) and another satellite round its core.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const m = @import("../../core/math.zig");
@@ -29,24 +33,27 @@ const Color = @import("../../ui/draw.zig").Color;
 const V3 = m.V3;
 const v3 = m.v3;
 
-pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8 };
+// decision: drawn by its own `emit` (`bare`), so its look carries what it
+// is doing (its nerves' light, a unit's surge) instead of the shared breath
+pub const def:st.Def = .{ .item = .arsthraxia, .size = 2, .mesh = .arsthraxia, .preview = .arsthraxia_whole, .store = true, .sway = 0.8, .tall = 2.0, .grow = 8, .bare = true };
 
 /// most of one ingredient it will hold
 const STOCK = 20;
 /// the satellites round its core from the start; one more per growth
 const SATELLITES = 3;
-/// offshoots it may grow (one per minor study along Arsthraxia): how far
-/// up the stalk each leaves it (0..1), toward what bearing, how large
+/// offshoots it may grow (one per minor study along Arsthraxia): how high
+/// up the stems each leaves them, toward what bearing, how large
 const SHOOTS = 3;
-const SHOOT_AT = [SHOOTS]f32{0.42, 0.62, 0.8};
+const SHOOT_AT = [SHOOTS]f32{0.48, 0.66, 0.8};
 const SHOOT_BEARING = [SHOOTS]f32{0.6, 2.85, 4.85};
-const SHOOT_SCALE = [SHOOTS]f32{1.0, 0.86, 0.72};
-/// seconds an offshoot takes to grow out; the bloom grows this much
-/// larger with each
+const SHOOT_SCALE = [SHOOTS]f32{1.3, 1.15, 1.0};
+/// seconds an offshoot (or the vines) takes to grow out; its satellites
+/// spin this much wider with each offshoot
 const SHOOT_GROW:f32 = 6;
-const SIZE_STEP:f32 = 0.1;
+const VINES_GROW:f32 = 9;
+const REACH_STEP:f32 = 0.1;
 /// its core: this high over the ground, bobbing; it forms over the last
-/// of its growth, once the flower has opened (`mesh.FORM`)
+/// of its growth, once the flower has opened (`mesh.CORE_FORM`)
 const CORE_H:f32 = 2.2;
 const CORE_BOB:f32 = 0.08;
 const CORE_BOB_RATE:f32 = 1.4;
@@ -56,7 +63,8 @@ const CORE_R = [2]f32{0.05, 0.19};
 const CORE_GLOW = [2]f32{0.3, 0.75};
 const FED_GLOW:f32 = 0.6;
 const FLARE_GLOW:f32 = 1.4;
-/// a unit's flare fades out over 1/this seconds
+/// a unit's flare fades out over 1/this seconds (its surge climbs the
+/// nerves as it does)
 const FLARE_FADE:f32 = 1.6;
 /// how quickly it eases into running brighter for a fed unit (per second)
 const FED_EASE:f32 = 2;
@@ -64,6 +72,13 @@ const FED_EASE:f32 = 2;
 const LIGHT_COL = v3(0.55, 0.32, 1.0);
 const LIGHT:f32 = 0.5;
 const LIGHT_REACH:f32 = 4.5;
+/// its flower while it studies: the whorls turn against each other (rad/s
+/// at full study, the inner cup the other way, faster), and the outer one
+/// opens, laid flatter and wider
+const WHORL_TURN:f32 = 0.35;
+const CUP_TURN:f32 = -0.6;
+const WHORL_OPEN:f32 = 0.16;
+const WHORL_WIDE:f32 = 0.05;
 /// the satellites: how far out they spin and how fast (rad/s, a little
 /// faster each, so they never fall in step), how their orbits tilt, how
 /// fast each turns about itself
@@ -87,22 +102,22 @@ const TIP_LIFT:f32 = 0.12;
 const TIP_ORBIT:f32 = 0.045;
 const TIP_SPIN:f32 = 2.2;
 const TIP_SCALE:f32 = 0.7;
-/// the offshoots' light and leaf flutter (as the stalk's, view.zig)
-const SHOOT_GLOW = [2]f32{0.25, 1.1};
-const FLUTTER:f32 = 0.6;
 /// spread round the fused core, as round a sphere
 const GOLDEN:f32 = 2.39996;
 
 pub const State = struct {
   lab:prog.Lab = .{},
-  /// how far each offshoot has grown out (0..1), and how much larger than
-  /// its mesh the bloom has grown with them
+  /// how far each offshoot has grown out (0..1), and the vines (0..1)
   shoot:[SHOOTS]f32 = @splat(0),
-  size:f32 = 1,
+  vines:f32 = 0,
+  /// how much wider its satellites spin, grown with its offshoots
+  reach:f32 = 1,
   /// a unit just finished: 1, fading to 0
   flare:f32 = 0,
   /// eases toward 1 while the unit under way was fed
   fed:f32 = 0,
+  /// how far its flower's outer whorl and inner cup have turned
+  turn:[2]f32 = @splat(0),
 };
 
 pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
@@ -112,17 +127,20 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   if (ctx.g.labTick(&a.lab, self.inv.bag(), study, dt)) a.flare = 1;
   a.flare = @max(0, a.flare - dt * FLARE_FADE);
   a.fed += ((if (a.lab.fed) @as(f32, 1) else 0) - a.fed) * @min(1, dt * FED_EASE);
+  // its flower turns while it studies, easing in and out with it
+  const busy = m.smooth(self.activity);
+  a.turn[0] = @mod(a.turn[0] + dt * WHORL_TURN * busy, m.tau);
+  a.turn[1] = @mod(a.turn[1] + dt * CUP_TURN * busy, m.tau);
   // it grows with what is learned along Arsthraxia, an offshoot at a time
+  if (study.vines) a.vines = @min(1, a.vines + dt / VINES_GROW);
   var grown:f32 = 0;
   for (&a.shoot, 0..) |*sh, k| {
     sh.* = if (k < study.growth) @min(1, sh.* + dt / SHOOT_GROW) else sh.*;
     grown += m.smooth(sh.*);
   }
-  a.size = 1 + SIZE_STEP * grown;
+  a.reach = 1 + REACH_STEP * grown;
   return a.lab.active;
 }
-
-pub fn size(s:*const st.Structure) f32 { return s.state.arsthraxia.size; }
 
 pub fn wants(s:*const st.Structure, g:*const prog.Progression, item:items.Item) u32 {
   const id = g.current orelse return 0;
@@ -159,36 +177,58 @@ fn wisp(out:*Parts, from:V3, ahead:V3, heart:V3, reach:f32, look:Look) Allocator
   try out.emitCurve(.arsthraxia_wisp, ctrl, m.norm(m.cross(d, v3(0, 1, 0))), 1, reach, look);
 }
 
-/// its offshoots, the satellites and the energy condensing among them:
-/// placed on its mesh as it stands (`place`), swaying with it from its root.
+/// where offshoot `k` is placed on its mesh as it stands
+fn shootAt(base:m.M4, k:usize) m.M4 {
+  return m.mul(base, m.chain(&.{m.translate(mesh.stalkAt(SHOOT_AT[k])), m.rotY(SHOOT_BEARING[k]), m.scale3(m.splat3(SHOOT_SCALE[k]))}));
+}
+
+/// all of it: its stems, its flower's whorls, what research has grown on
+/// it, the satellites and the energy condensing among them; placed on its
+/// mesh as it stands (`place`), swaying with it from its root.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {
   const a = &s.state.arsthraxia;
   const base = s.place(ctr);
-  const lift = s.grownScale()[1];
+  const busy = m.smooth(s.activity);
   const sway:Look = .{.phase = s.seed, .sway = def.sway, .tall = def.tall};
+  // its nerves light with its study (glow) and carry a unit's surge (flutter)
+  var body = sway;
+  body.glow = busy;
+  body.flutter = a.flare;
+  body.fade = def.sap;
+  body.grown = s.grown;
+  try out.emit(.arsthraxia, base, body);
 
-  // the offshoots, growing out of the stalk with what is learned
+  // its flower: the whorls open and turn against each other while it studies
+  var flower = body;
+  flower.drop = mesh.HEART[1];
+  const open = v3(1 + WHORL_WIDE * busy, 1 - WHORL_OPEN * busy, 1 + WHORL_WIDE * busy);
+  try out.emit(.arsthraxia_whorl, m.mul(base, m.chain(&.{m.translate(mesh.HEART), m.rotY(a.turn[0]), m.scale3(open)})), flower);
+  try out.emit(.arsthraxia_cup, m.mul(base, m.chain(&.{m.translate(mesh.HEART), m.rotY(a.turn[1])})), flower);
+
+  // the vines Arsthraxia sends climbing its stems, by how far they have grown
+  if (a.vines > 0) {
+    var vines = sway;
+    vines.grown = a.vines * s.grown;
+    try out.emit(.arsthraxia_vines, base, vines);
+  }
+
+  // the offshoots, growing out of the stems with what is learned; thought
+  // runs out along their nerves too
   for (a.shoot, 0..) |g, k| {
     if (g <= 0) continue;
-    // it grows along its own growth splines by `g` (part.vert)
-    const at = mesh.stalkAt(SHOOT_AT[k]);
-    const shoot = m.mul(base, m.chain(&.{m.translate(at), m.rotY(SHOOT_BEARING[k]), m.scale3(m.splat3(SHOOT_SCALE[k]))}));
-    var look = sway;
-    look.drop = at[1] * lift;
-    look.grown = g;
-    look.glow = m.lerp(SHOOT_GLOW[0], SHOOT_GLOW[1], s.activity);
-    look.flutter = FLUTTER;
-    look.fade = def.sap;
-    try out.emit(.arsthraxia_shoot, shoot, look);
+    var look = body;
+    look.drop = SHOOT_AT[k];
+    look.grown = g * s.grown;
+    try out.emit(.arsthraxia_shoot, shootAt(base, k), look);
   }
 
   // the core forms last, once the flower has opened
-  const form = growth.formed(mesh.FORM, s.grown);
+  const form = growth.formed(mesh.CORE_FORM, s.grown);
   if (form <= 0) return;
-  const heart = ctr + v3(0, (CORE_H + CORE_BOB * @sin(tf * CORE_BOB_RATE + s.seed * 5)) * lift, 0);
+  const heart = ctr + v3(0, CORE_H + CORE_BOB * @sin(tf * CORE_BOB_RATE + s.seed * 5), 0);
   // studying, the satellites split apart and spin out round it
-  const split = m.smooth(s.activity);
-  const reach = ORBIT_R * a.size;
+  const split = busy;
+  const reach = ORBIT_R * a.reach;
   const fed = a.fed;
   var sat = sway;
   sat.fade = SAT_SAP;
@@ -202,8 +242,8 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     const appear = if (k < SATELLITES) 1 else m.smooth(a.shoot[k - SATELLITES]);
     if (appear <= 0) continue;
     const o = orbit(k, tf);
-    const at = m.lerpV(heart + fused(k, tf) * m.splat3(FUSED_R * a.size), heart + o.at * m.splat3(reach), split);
-    const r = m.lerp(FUSED_SCALE, 1, split) * a.size * form * appear;
+    const at = m.lerpV(heart + fused(k, tf) * m.splat3(FUSED_R * a.reach), heart + o.at * m.splat3(reach), split);
+    const r = m.lerp(FUSED_SCALE, 1, split) * a.reach * form * appear;
     sat.drop = at[1] - ctr[1];
     try out.emit(.arsthraxia_satellite, m.chain(&.{m.translate(at), m.rotY(tf * SELF_SPIN + m.f(k)), m.scale3(m.splat3(r))}), sat);
     if (split > 0.02) {
@@ -219,12 +259,11 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
     // (once its flower has opened)
     const grow = growth.formed(mesh.SHOOT_FORM, g);
     if (grow <= 0) continue;
-    const shoot = m.mul(base, m.chain(&.{m.translate(mesh.stalkAt(SHOOT_AT[k])), m.rotY(SHOOT_BEARING[k]), m.scale3(m.splat3(SHOOT_SCALE[k]))}));
     const turn = tf * TIP_SPIN + m.f(k) * 2.1;
-    const over = m.mulPoint(shoot, tip.at + tip.axis * m.splat3(TIP_LIFT));
-    const at = over + v3(@cos(turn), 0, @sin(turn)) * m.splat3(TIP_ORBIT * a.size);
+    const over = m.mulPoint(shootAt(base, k), tip.at + tip.axis * m.splat3(TIP_LIFT));
+    const at = over + v3(@cos(turn), 0, @sin(turn)) * m.splat3(TIP_ORBIT * a.reach);
     sat.drop = at[1] - ctr[1];
-    try out.emit(.arsthraxia_satellite, m.chain(&.{m.translate(at), m.rotY(tf * SELF_SPIN), m.scale3(m.splat3(TIP_SCALE * a.size * grow * form))}), sat);
+    try out.emit(.arsthraxia_satellite, m.chain(&.{m.translate(at), m.rotY(tf * SELF_SPIN), m.scale3(m.splat3(TIP_SCALE * a.reach * grow * form))}), sat);
     if (split > 0.02) {
       thread.phase = s.seed + 0.5 + m.f(k) * 0.23;
       try wisp(out, at, v3(-@sin(turn), 0, @cos(turn)), heart, split * grow, thread);
@@ -234,7 +273,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
   // the energy condensing where the old core stood: swelling as the unit
   // condenses, flaring as it is done and gathering anew
   const dense = m.smooth(m.clamp01(a.lab.t));
-  const rad = @max(m.lerp(CORE_R[0], CORE_R[1], dense), CORE_R[1] * a.flare) * a.size * split * form;
+  const rad = @max(m.lerp(CORE_R[0], CORE_R[1], dense), CORE_R[1] * a.flare) * a.reach * split * form;
   if (rad <= 1e-3) return;
   const glow = m.lerp(CORE_GLOW[0], CORE_GLOW[1], dense) * (1 + FED_GLOW * fed) + FLARE_GLOW * a.flare;
   var core = sway;
