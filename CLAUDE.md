@@ -127,18 +127,53 @@ recipes (`game/craft.zig`) are plain data tables.
   point at both ends (no hard cuts).
 - meshgen primitives: `tubeR`/`tubeC`, `vine`, `braid`/`braidTurned`, `bundle`,
   `loft`, `patch`, `lamina`, `blade`/`bladeAlong`, `petal`, `stamens`, `leavesAlong`, `bands`,
-  `ellipsoid`, `cone`. Growth splines (`gfx/growth.zig`): a structure
-  mesh lays out a hidden `Skeleton` (`trunk`, `branch`/`vine` off it at
-  `u`), builds along it (`tube`, `braid`, `leaves`, or any primitive then
-  `along`/`on`), then `finish`; each vertex carries `vertex.Grow` (binding
-  3) and part.vert grows it out of its spline as the front passes, branches
-  after their parent is done (`After`). `Def.splined` turns off the
-  whole-structure scale; kit helpers take an optional `kit.On`. Sap cache,
-  germinator and arsthraxia are built this way. Pieces a structure emits
-  on its own form in a reserved last share (`Skeleton.tail`): tagged
-  meshes carry it (`growth.tag`, `tailWindow`), CPU-placed ones scale by
-  `growth.formed` (the same curve). Shared kits: `structure_kit`, `wolf_kit` (`leaf`,
-  `digit`, `claw`), `sculpt_kit` (SDF forms meshed and skinned), `mineral_kit`.
+  `ellipsoid`, `cone`. Shared kits: `structure_kit` (`rootMat`,
+  `footLeaves`, `leafyVine` take an optional `kit.On` to grow on a
+  spline), `wolf_kit` (`leaf`, `digit`, `claw`), `sculpt_kit` (SDF forms
+  meshed and skinned), `mineral_kit`.
+- **Structures grow along growth splines** (`gfx/growth.zig`); every new
+  structure mesh (and any piece of one that grows) is built this way, never
+  grown by scaling the whole. Built: sap cache, germinator, arsthraxia (and
+  its research offshoots). Still on the old whole-structure scale: conduit,
+  root-digger, polyp, diamond (port them when touched).
+  - A mesh's `build` lays out a hidden `Skeleton`: `var sk =
+    growth.Skeleton.begin(b)`, `sk.trunk(ctrl, .{})`, then `sk.branch(parent,
+    u, ctrl, .{})` / `sk.vine(parent, u, mg.Growth, n, .{})` off it (a
+    branch's first point is moved onto its parent at `u`). Splines are
+    Catmull-Rom, resampled to `growth.RES` points (`sk.get(id).pts`).
+  - Build along it: `sk.tube`, `sk.braid`, `sk.leaves` do it in one call;
+    for anything else build with the usual primitives, then tag what was
+    built since a `b.mark()`: `sk.along(b, mark, id)` (each vertex grows out
+    of its nearest point on the spline as the front passes: tubes, braids,
+    lofts, pods, bundles) or `sk.on(b, mark, id, u, .{.from, .delay, .span})`
+    (one piece grown out of one point once the front reaches `u`: a leaf,
+    petal, cup, stamens; stagger a whorl with `.delay`).
+  - End with `sk.finish(b)` (it turns times into shares of the growth; a
+    debug assert in `meshlib.build` catches a skeleton left unfinished).
+  - Timing is the skeleton's alone, never hand-set: a spline takes time ∝
+    its length (`Branch.pace`), its front tapers over `Branch.front`; a
+    branch starts once its parent is done (`After.done`, default), or as
+    the parent's front passes it (`.passing`), or with it (`.with`, e.g.
+    roots); `.delay` waits longer.
+  - On the GPU: each vertex carries `vertex.Grow` (`from`, `at`: start,
+    span, spline start, spline done; binding 3, locations 21–22, zero = not
+    on a spline). part.vert shrinks it into `from` until the structure's
+    growth (`PartInstance.w.w`, `Look.grown`) reaches it, grows it out,
+    thin (`SPROUT_THIN`) until its spline is done; foliage tips lag
+    (`LEAF_LAG`). `b.xform` carries `from` along.
+  - The structure's `Def` sets `.splined = true` (`grownScale` is then its
+    research size only, no shoot-up/fill-out).
+  - Pieces a structure emits on its own (cups, cores, satellites) form in a
+    last share kept free by `sk.tail = FORM` (a `pub const` in the mesh
+    file): a mesh of its own carries that window
+    (`growth.tag(b, mark, from, growth.tailWindow(FORM))`, emitted with
+    `.grown = s.grown`); one the game places and sizes itself scales by
+    `growth.formed(mesh.FORM, s.grown)`, the same curve. Never a separate
+    hand-tuned threshold. A piece grown by something else (an offshoot by
+    research progress) gets its own skeleton and that progress as `.grown`.
+  - To watch growth, loop `grown` (and the emitted pieces' state) in a
+    scratch edit of `view.zig` `structures` and `--inspect=<structure>`;
+    revert it after.
 - **Leaves and petals have a body** (`meshgen.lamina`): a thin closed shell
   (`LAMINA_THICK` of the broadest half-width) rounded over at the edges, a
   small bevel; leaves (blades, fur leaves) fold toward a pale midrib vein
@@ -215,7 +250,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   adjacent node 1 item/4 s into an 8-item buffer, feeds neighbours, idles
   with no node; 3 fibre + 2 grit + 1 ley shard; "Deep Rooting"). Put down,
   they grow (`Def.grow`: germinator 6 s, arsthraxia 8, sap cache and
-  digger 4, conduit 1.5) and do no work until grown. `Def.carrier` marks
+  digger 4, conduit 1.5) and do no work until grown; `Def.splined` ones
+  grow along their growth splines. `Def.carrier` marks
   item carriers (conduit): they face a way, chain, and are pulled through.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
@@ -348,7 +384,9 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   `Look.carry`/`carry_col`), amber pulses run the way it carries; side
   roots (`conduit_tap`) are smaller woven arches. Standing structures sway (`Def.sway`; conduits don't, so
   chains stay joined; hung parts follow via `Look.drop`), breathe at a fixed
-  tempo, and grow in (shoot up, fill out, leaves unfold).
+  tempo, and grow in along their growth splines (trunk first, branches
+  after, leaves unfolding as the front passes, emitted pieces last; see
+  Conventions); the unported ones still shoot up, fill out, leaves unfold.
 - Resource nodes (`mineral_kit`, flat facets): ley shards a violet crystal
   cluster; grit faceted stones with quartz chips; fibre a swaying clump of
   arching stalks.
@@ -475,7 +513,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 - **Cohesion rule**: each visual overhaul sets the bar for everything of its
   kind; the whole wolf and all plants/structures are kept up with it; new
   grown things follow the current look, motion and growth via the shared
-  kits, never older primitives.
+  kits, never older primitives (structures: growth splines, never the
+  whole-structure scale).
 - **Visual authority**: the user calls the shots on art direction, with NO
   compromises, period. Their word on look, motion, proportions,
   silhouette, material, technique (e.g. "on the GPU") and "does this read
@@ -503,7 +542,8 @@ planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
 LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation,
 anti-aliasing (MSAA/FXAA) + options panel, the wolf as one sculpted skinned
 mesh with procedural locomotion (planted feet, leg IK, springs), saved gardens
-menu + autosave, files in `%LOCALAPPDATA%\Parasymi`.
+menu + autosave, files in `%LOCALAPPDATA%\Parasymi`, growth splines
+(sap cache, germinator, arsthraxia).
 **Next (vertical slice):**
 1. 2–3 more species per lineage
 2. Research tree to ~12 nodes
