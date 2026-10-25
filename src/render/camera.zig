@@ -1,15 +1,21 @@
 //! angled top-down camera: pans over the ground plane, zooms along its view
-//! ray, turns (yaw) and tilts (pitch) between near-horizontal and near-overhead.
+//! ray, and orbits its target: turns (yaw) freely and tilts (pitch) from
+//! just over the horizon to just short of overhead.
 //! For close inspection it can also fly free, then ease back to following.
 const std = @import("std");
 const testing = std.testing;
 const m = @import("../core/math.zig");
 
 /// pitch limits and resting angle, radians above the horizon: never fully
-/// level, never straight down.
-pub const MIN_PITCH:f32 = m.rad(30.0);
-pub const MAX_PITCH:f32 = m.rad(85.0);
+/// level, never straight down (looking along `UP` has no up).
+pub const MIN_PITCH:f32 = m.rad(8.0);
+pub const MAX_PITCH:f32 = m.rad(89.0);
 pub const REST_PITCH:f32 = m.rad(55.0);
+/// below rest the view widens and lifts toward the horizon, fully by this
+/// pitch (and no further below it)
+const LOW_PITCH:f32 = m.rad(30.0);
+/// orbiting: radians turned per pixel dragged
+pub const ORBIT:f32 = 0.006;
 /// field of view at the lowest pitch (radians, vertical)
 const WIDE_FOVY:f32 = 1.0;
 /// the free camera: its field of view, how long it takes to ease back to
@@ -148,7 +154,7 @@ pub const Camera = struct {
   }
 
   /// 0 at the resting pitch and above, 1 at the lowest.
-  fn lowness(c:*const Camera) f32 { return m.clamp01((REST_PITCH - c.pitch) / (REST_PITCH - MIN_PITCH)); }
+  fn lowness(c:*const Camera) f32 { return m.clamp01((REST_PITCH - c.pitch) / (REST_PITCH - LOW_PITCH)); }
 
   /// vertical field of view: it widens as the camera drops, so the wolf and
   /// the horizon fit in one frame.
@@ -171,6 +177,13 @@ pub const Camera = struct {
   }
 
   pub fn tilt(c:*Camera, by:f32) void { c.pitch = m.clamp(c.pitch + by, MIN_PITCH, MAX_PITCH); }
+
+  /// drag round the target by `px` pixels (x turns, y tilts): the world is
+  /// grabbed and turned with the cursor
+  pub fn orbit(c:*Camera, px:[2]f32) void {
+    c.yaw = @mod(c.yaw - px[0] * ORBIT, m.tau);
+    c.tilt(px[1] * ORBIT);
+  }
 
   /// how far around the target the world is worth drawing: further the
   /// lower the camera looks, never beyond what is streamed in.
@@ -213,4 +226,20 @@ test "the free camera starts where the follow view is and eases home" {
   c.tick(0.2);
   try testing.expect(c.view == .follow);
   try testing.expect(m.len(c.viewEye() - e) < 1e-5);
+}
+
+test "orbiting turns freely and tilts only within its limits" {
+  var c:Camera = .{};
+  c.orbit(.{-m.tau / ORBIT * 3.5, 0});
+  try testing.expect(c.yaw >= 0 and c.yaw < m.tau);
+  c.orbit(.{0, 1e6});
+  try testing.expectEqual(MAX_PITCH, c.pitch);
+  c.orbit(.{0, -1e6});
+  try testing.expectEqual(MIN_PITCH, c.pitch);
+  // nothing degenerates at either end
+  for ([_]f32{MIN_PITCH, MAX_PITCH}) |p| {
+    c.pitch = p;
+    const r = c.ray(800, 450, 1600, 900);
+    try testing.expect(m.len(r.d) > 0.99);
+  }
 }

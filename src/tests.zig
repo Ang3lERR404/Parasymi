@@ -17,6 +17,7 @@ test {
   _ = @import("game/progression.zig");
   _ = @import("game/craft.zig");
   _ = @import("sim/plants.zig");
+  _ = @import("sim/turn.zig");
   _ = @import("game/structures.zig");
   _ = @import("game/seeds.zig");
   _ = @import("game/play.zig");

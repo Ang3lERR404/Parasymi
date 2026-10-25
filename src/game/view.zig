@@ -9,6 +9,7 @@ const m = @import("../core/math.zig");
 const rng = @import("../core/rng.zig");
 const ck = @import("../world/chunk.zig");
 const species = @import("../sim/species.zig");
+const turn = @import("../sim/turn.zig");
 const renderer = @import("../render/renderer.zig");
 const meshgen = @import("../gfx/meshgen.zig");
 const vertex = @import("../gfx/vertex.zig");
@@ -99,6 +100,23 @@ const NODE_LIGHT:f32 = 0.45;
 const NODE_COL = m.V3{ 0.5, 0.3, 1.0 };
 /// and how high over its tile the light sits
 const NODE_LIFT:f32 = 0.3;
+/// turning (R, sim/turn.zig): how high a rooted thing heaves itself up on
+/// its roots (plus this much a tile of its size); its roots (this many a
+/// tile of its size, at least `ROOTS_MIN`): where they leave its foot and
+/// how far out they dig in (shares of its size), how deep their tips lie,
+/// how high they arch while out, how high their tips step as it turns
+/// round on them and how many steps it takes, and how they flutter
+const HEAVE:f32 = 0.16;
+const HEAVE_PER:f32 = 0.12;
+const ROOTS_PER:f32 = 3;
+const ROOTS_MIN:f32 = 4;
+const ROOT_FOOT:f32 = 0.14;
+const ROOT_REACH:f32 = 0.5;
+const ROOT_DEEP:f32 = 0.35;
+const ROOT_ARCH:f32 = 0.22;
+const ROOT_STEP:f32 = 0.1;
+const ROOT_STEPS:f32 = 3;
+const ROOT_FLUTTER:f32 = 0.35;
 
 pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   const reach = g.cam.reach(play.DRAW_LIMIT);
@@ -169,6 +187,7 @@ fn plants(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
       .sp = s.items(.sp)[i], .x = s.items(.x)[i], .y = s.items(.y)[i], .ground = s.items(.chunk)[i].height[s.items(.tile)[i]],
       .growth = s.items(.growth)[i], .mana = s.items(.mana)[i], .seed = s.items(.seed)[i],
       .flow = s.items(.flow)[i], .health = s.items(.health)[i],
+      .dir = s.items(.dir)[i], .turn = s.items(.turn)[i],
       // (worked out each tick: a plant sown since has none yet)
       .radiating = i < radiating.len and radiating[i],
     }, tf);
@@ -273,6 +292,9 @@ const Drawn = struct {
   ghost:bool = false, fits:bool = true,
   /// a celestial bloom: whether its network radiates (it shines in full)
   radiating:bool = false,
+  /// the way it faces, and how it got there (R)
+  dir:m.Dir = 0,
+  turn:turn.Turn = .{},
 };
 
 fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
@@ -284,6 +306,13 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
   var at = m.footprintCentre(d.x, d.y, def.size, 0);
   var y = d.ground;
   const halo = if (d.ghost) vertex.NO_HALO else haloOf(g, def, d.x, d.y);
+  // turning, a rooted one heaves itself up on its roots; a floater only turns
+  const pose = turn.pose(d.turn, d.dir, g.time, !def.floating);
+  if (!pose.still() and !def.floating) {
+    const size = m.f(def.size);
+    y += heave(size) * pose.lift;
+    try roots(g, m.footprintCentre(d.x, d.y, def.size, d.ground), size, m.dirYaw(d.dir) + pose.spin, pose, d.seed, def.lineage.affinity() < -0.5);
+  }
   if (def.floating) {
     // floaters hang in the air: a slow rise and fall and a lazy drift,
     // never a bounce, over a soft shadow that shrinks as they rise (and
@@ -303,7 +332,7 @@ fn plant(g:*Game, d:Drawn, tf:f32) Allocator.Error!void {
     .pos = .{at[0], y, at[2]},
     .a = .{d.growth, d.mana / def.mana_cap, d.seed, def.lineage.affinity()},
     .b = .{d.flow, d.health, def.sway, m.f(@intFromEnum(def.genome.form))},
-    .c = .{key.f, if (d.ghost) 1 else 0, if (d.fits) 1 else 0, 0},
+    .c = .{key.f, if (d.ghost) 1 else 0, if (d.fits) 1 else 0, m.dirYaw(d.dir) + pose.spin},
     .h = halo,
   });
   // a celestial bloom is the garden's light: its core sheds it round
@@ -341,11 +370,53 @@ fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
     // a fixed tempo: activity deepens the breath but never retimes it (a
     // tempo that followed activity jumped phase every time it changed)
     const breathe = if (s.def().still) 1 else 1 + (BREATH + BREATH_ACTIVE * a) * @sin(tf * BREATH_RATE + s.seed * 9);
+    // turning, all it draws is carried with its body: lifted on its roots,
+    // rocking, turned the rest of the way
+    const rooted = !s.def().floating;
+    const pose = turn.pose(s.turn, s.dir, g.time, rooted);
+    if (!pose.still()) g.parts.around = m.chain(&.{
+      m.translate(ctr + m.v3(0, heave(m.f(s.def().size)) * pose.lift, 0)),
+      m.rotY(pose.spin), m.rotX(pose.rock[0]), m.rotZ(pose.rock[1]), m.translate(-ctr),
+    });
+    defer g.parts.around = null;
     if (!s.def().bare) try g.parts.emit(s.def().mesh, m.mul(s.place(ctr), m.scale3(m.v3(breathe, 2 - breathe, breathe))), .{
       .glow = GLOW + GLOW_ACTIVE * a, .flutter = FLUTTER, .phase = s.seed, .fade = s.def().sap,
       .sway = s.def().sway, .tall = s.def().tall, .grown = s.grown,
     });
     try st.emit(s, &g.parts, ctr, tf);
+    g.parts.around = null;
+    if (rooted and !pose.still()) try roots(g, ctr, m.f(s.def().size), m.dirYaw(s.dir) + pose.spin, pose, s.seed, s.def().pale);
+  }
+}
+
+/// how high a rooted thing `size` tiles across heaves itself as it turns
+fn heave(size:f32) f32 { return HEAVE + HEAVE_PER * size; }
+
+/// the roots a rooted thing turns on (R), round its foot at `ctr` (on the
+/// ground), `size` tiles across, facing `yaw` this moment: at rest all in
+/// the soil; pulled out, they arch from under its lifted body to tips
+/// laid on the ground round it, which step as it turns round on them,
+/// then dig back in where it now faces
+fn roots(g:*Game, ctr:m.V3, size:f32, yaw:f32, p:turn.Pose, seed:f32, pale:bool) Allocator.Error!void {
+  if (p.out <= 0) return;
+  const n = m.floorTo(u32, @max(ROOTS_MIN, ROOTS_PER * size));
+  const foot_y = heave(size) * p.lift;
+  for (0..n) |i| {
+    const h = rng.unit(rng.hash2(0x7007, @intCast(i), m.floorTo(i32, seed * 1000)));
+    const a = yaw + (m.f(i) + 0.4 * h) / m.f(n) * m.tau;
+    const out = m.v3(@cos(a), 0, @sin(a));
+    const foot = ctr + out * m.splat3(ROOT_FOOT * size) + m.v3(0, foot_y + 0.04, 0);
+    const reach = ROOT_REACH * size * (0.85 + 0.3 * h);
+    const sunk = ctr + out * m.splat3(reach) - m.v3(0, ROOT_DEEP * size, 0);
+    // a tip steps (lifts and comes down again) as the body turns on it,
+    // neighbours out of step
+    const step = ROOT_STEP * size * p.lift * @max(@sin(p.k * ROOT_STEPS * m.tau + m.f(i) * 2.4), 0);
+    const laid = ctr + out * m.splat3(reach * 1.1) + m.v3(0, 0.03 + step, 0);
+    const tip = m.lerpV(sunk, laid, p.out);
+    const arch = m.v3(0, ROOT_ARCH * size * p.out, 0);
+    const ctrl = [4]m.V3{foot, m.lerpV(foot, tip, 0.33) + arch, m.lerpV(foot, tip, 0.7) + arch * m.splat3(0.6), tip};
+    const side = m.norm(m.cross(tip - foot, m.v3(0, 1, 0)));
+    try g.parts.emitCurve(if (pale) .turn_root_pale else .turn_root, ctrl, side, 1, 1, .{.flutter = ROOT_FLUTTER, .phase = seed + m.f(i) * 0.13});
   }
 }
 
@@ -360,7 +431,7 @@ fn ghost(g:*Game, tf:f32) Allocator.Error!void {
   const ok = actions.canPut(g, h) and g.player.inReach(h[0], h[1]) and g.player.inv.count(item) > 0;
   if (item.plants()) |sp| {
     // a fixed seed so the preview does not spin about as the cursor moves
-    return plant(g, .{.sp = sp, .x = h[0], .y = h[1], .ground = g.heightAt(h[0], h[1]), .growth = 1, .seed = GHOST_SEED, .ghost = true, .fits = ok}, tf);
+    return plant(g, .{.sp = sp, .x = h[0], .y = h[1], .ground = g.heightAt(h[0], h[1]), .growth = 1, .seed = GHOST_SEED, .ghost = true, .fits = ok, .dir = g.place_dir}, tf);
   }
   const k = st.kindOf(item) orelse return;
   const def = st.defs.get(k);

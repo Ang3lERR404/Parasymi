@@ -32,7 +32,7 @@ const v3 = m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes = .{ .belly_lump, .ganglion_nerve };
 
-pub const def:st.Def = .{ .item = .ganglion, .size = 1, .mesh = .ganglion, .store = true, .grow = 4, .sway = 0.4, .tall = 0.45, .sap = 0.3 };
+pub const def:st.Def = .{ .item = .ganglion, .size = 1, .mesh = .ganglion, .store = true, .grow = 4, .sway = 0.4, .tall = 0.45, .sap = 0.3, .pale = true };
 
 /// most it holds at once, and seconds between one hand-off and the next
 pub const HOLD = 8;

@@ -58,8 +58,6 @@ const STREAM_INIT = 1 << 10;
 const STREAM_FRAME = 4;
 
 /// camera feel parameters (tune here, not scattered through update)
-const YAW_SPEED:f32 = 1.5;
-const TILT_SPEED:f32 = 1.2;
 const FOLLOW_LERP:f32 = 6;
 /// the camera follows a point this far above the wolf's feet
 const FOLLOW_HEIGHT:f32 = 0.6;
@@ -218,8 +216,13 @@ pub const Game = struct {
   /// a click spent putting down or dropping what was carried does nothing
   /// in the garden until the button is let go
   use_spent:bool = false,
-  /// facing for the next structure placed (R rotates)
+  /// facing for the next thing put down (R turns it while nothing is under
+  /// the cursor; picking a seed takes the picked thing's)
   place_dir:m.Dir = 0,
+  /// remove, held: the tile last removed from (it is not removed from
+  /// again until the cursor leaves it) and the wait before the next
+  removed:?[2]i32 = null,
+  remove_cd:f32 = 0,
   debug:bool = false,
   hover:?[2]i32 = null,
   /// progress of the current gather, and a short linger for one-off gestures
@@ -347,7 +350,6 @@ pub const Game = struct {
       if (ctl.pressed(in, .research)) g.mode = if (g.mode == .research) .roam else .research;
     }
     if (ctl.pressed(in, .debug)) g.debug = !g.debug;
-    if (ctl.pressed(in, .rotate)) g.place_dir +%= 1;
     // slot keys pick the hotbar slot, whichever panel is open
     if (!inspecting) for (ctl.slots, 0..) |a, i| {
       if (ctl.pressed(in, a)) g.hot = i;
@@ -388,7 +390,7 @@ pub const Game = struct {
         g.use_spent = true;
       }
     }
-    if (ctl.pressed(in, .uproot)) if (ui_hit) |hit| switch (hit) {
+    if (ctl.pressed(in, .remove)) if (ui_hit) |hit| switch (hit) {
       .bar => |i| g.bar[i] = null,
       .panel, .research, .weave, .slot, .store, .recipe, .pause, .option, .back, .garden, .garden_act, .scroll => {},
     };
@@ -397,18 +399,11 @@ pub const Game = struct {
     // movement relative to the camera
     var mx:f32 = 0;
     var mz:f32 = 0;
-    // decision: Ctrl+W/S tilts the camera (Shift is already sprint); W/S do
-    // not move the wolf while Ctrl is held.
     if (inspecting) {
       g.fly(in, dt);
     } else {
       if (ctl.down(in, .move_left)) mx -= 1;
       if (ctl.down(in, .move_right)) mx += 1;
-    }
-    if (inspecting) {} else if (alt) {
-      if (ctl.down(in, .move_forward)) g.cam.tilt(dt * TILT_SPEED);
-      if (ctl.down(in, .move_back)) g.cam.tilt(-dt * TILT_SPEED);
-    } else {
       if (ctl.down(in, .move_forward)) mz += 1;
       if (ctl.down(in, .move_back)) mz -= 1;
     }
@@ -417,9 +412,9 @@ pub const Game = struct {
     const wl = @sqrt(wish[0] * wish[0] + wish[1] * wish[1]);
     if (wl > 1) wish = .{ wish[0] / wl, wish[1] / wl };
 
+    // the camera orbits round the wolf while dragged
     if (!inspecting) {
-      if (ctl.down(in, .yaw_left)) g.cam.yaw -= dt * YAW_SPEED;
-      if (ctl.down(in, .yaw_right)) g.cam.yaw += dt * YAW_SPEED;
+      if (ctl.down(in, .orbit)) g.cam.orbit(in.mouse_delta);
       if (in.scroll != 0) g.cam.zoom(in.scroll);
     }
 
@@ -428,36 +423,58 @@ pub const Game = struct {
     var working = false;
     var work:?m.V3 = null;
     g.plant_cd -= dt;
+    g.remove_cd -= dt;
     g.linger -= dt;
-    if (!ctl.down(in, .use)) {
+    const removing = ctl.down(in, .remove) and ui_hit == null;
+    if (!removing) {
       g.gather_t = 0;
       g.full_warned = false;
+      g.removed = null;
     }
-    if (g.hover) |h| if (g.player.inReach(h[0], h[1])) if (g.world.chunkOfTile(h[0], h[1])) |c| {
+    const near = if (g.hover) |h| g.player.inReach(h[0], h[1]) else false;
+    // R turns what is under the cursor (within reach), else the next thing
+    // put down; held with counter, the other way
+    if (ctl.pressed(in, .rotate) and !inspecting) {
+      const back = ctl.down(in, .counter);
+      const turned = if (g.hover) |h| near and actions.turnAt(g, h, back) else false;
+      if (!turned) g.place_dir +%= @as(m.Dir, if (back) 3 else 1);
+    }
+    if (g.hover) |h| if (near) if (g.world.chunkOfTile(h[0], h[1])) |c| {
       const t = ck.localIndex(h[0], h[1]);
-      // a floater is reached where nothing stands under it, and then takes
-      // the click: decision: nothing is sown or put under a floater
-      const on_struct = g.structs.at(&g.world, h[0], h[1]) orelse if (c.occ[t] == .none) g.structs.floaterAt(h[0], h[1]) else null;
-      if (ctl.down(in, .use) and on_struct == null and ui_hit == null and !g.use_spent) {
-        if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt)
-        else if (g.plant_cd <= 0) try actions.put(g, h);
+      // what floats over a tile is reached first (it is drawn over what is under it)
+      const on_struct = g.structs.at(&g.world, h[0], h[1]);
+      const on_plant = if (on_struct == null) g.plants.at(&g.world, h[0], h[1]) else null;
+      const using = ui_hit == null and !g.use_spent;
+      // held, use puts what is in hand down wherever it fits as the cursor
+      // sweeps; where it does not, a click interacts with a structure or
+      // harvests a plant (so does interact, always)
+      if (using and ctl.down(in, .use) and actions.canPut(g, h)) {
+        if (g.plant_cd <= 0) try actions.put(g, h);
+      } else if ((using and ctl.pressed(in, .use)) or ctl.pressed(in, .interact)) {
+        if (on_struct) |j| {
+          actions.interact(g, h, j);
+          g.use_spent = ctl.down(in, .use);
+        } else if (on_plant != null) actions.harvest(g, h);
       }
-      // a click on a structure that keeps items opens its panel
-      if (ctl.pressed(in, .use) and ui_hit == null and !g.use_spent) if (on_struct) |j| if (g.structs.get(j).def().store) {
-        g.open = h;
-        g.mode = .structure;
-        g.use_spent = true;
-      };
+      if (ctl.pressed(in, .pick)) _ = actions.pick(g, h);
       if (ctl.pressed(in, .harvest) and !alt) {
         if (on_struct) |j| {
           if (ctl.down(in, .take)) actions.takeFrom(g, j) else actions.feed(g, j);
         } else actions.harvest(g, h);
       }
       if (ctl.pressed(in, .configure)) if (on_struct) |j| st.configure(&g.structs, j, &g.prog);
-      if (ctl.pressed(in, .uproot) and ui_hit == null) {
-        if (on_struct) |j| actions.unbuild(g, j)
-        else actions.uproot(g, h);
-        g.linger = actions.LINGER_PUT;
+      // remove, pressed or held: what stands goes (one tile at a time as
+      // the cursor sweeps), a resource node is gathered from
+      if (removing) {
+        if (on_struct != null or on_plant != null) {
+          const fresh = if (g.removed) |r| r[0] != h[0] or r[1] != h[1] else true;
+          if (ctl.pressed(in, .remove) or (fresh and g.remove_cd <= 0)) {
+            if (on_struct) |j| actions.unbuild(g, j) else actions.uproot(g, h);
+            g.removed = h;
+            g.remove_cd = actions.REMOVE_COOLDOWN;
+            g.linger = actions.LINGER_PUT;
+          }
+        } else if (c.res[t] > 0 and c.occ[t] == .none) working = actions.gather(g, c, t, dt);
       }
       if (working or g.linger > 0) work = m.tileCentre(h[0], h[1], c.height[t]);
     };
@@ -658,7 +675,7 @@ pub const Game = struct {
       if (ctl.pressed(in, .gardens)) g.openGardens();
     }
     if (g.mode == .gardens) g.scroll(in, hit, dt);
-    const dir:i32 = if (ctl.pressed(in, .use)) 1 else if (ctl.pressed(in, .uproot)) -1 else 0;
+    const dir:i32 = if (ctl.pressed(in, .use)) 1 else if (ctl.pressed(in, .remove)) -1 else 0;
     if (dir == 0) return;
     switch (hit orelse return) {
       .pause => |row| if (dir > 0) g.choose(row),
@@ -1126,4 +1143,92 @@ test "discard throws away a belly stack, hovered or carried, never a structure's
   ctl.hold(&in, .discard, true);
   try g.update(&in, TICK, screen);
   try testing.expectEqual(@as(u32, 5), g.player.inv.count(.fibre));
+}
+
+/// headless: the mouse over the middle of tile `t`, as the camera sees it now
+fn aim(g:*const Game, in:*Input, t:[2]i32, sc:[2]f32) void {
+  const q = m.mulV(g.cam.viewProj(), .{m.f(t[0]) + 0.5, g.heightAt(t[0], t[1]), m.f(t[1]) + 0.5, 1});
+  in.mouse = .{(q[0] / q[3] + 1) / 2 * sc[0], (q[1] / q[3] + 1) / 2 * sc[1]};
+}
+
+/// headless: one frame with `a` pressed (held down this frame only) over tile `t`
+fn pressAt(g:*Game, in:*Input, t:[2]i32, a:ctl.Action) !void {
+  aim(g, in, t, TEST_SCREEN);
+  in.advance();
+  ctl.hold(in, a, true);
+  try g.update(in, TICK, TEST_SCREEN);
+  in.advance();
+  ctl.hold(in, a, false);
+  try g.update(in, TICK, TEST_SCREEN);
+}
+
+test "R turns what is under the cursor (Shift back), Q picks its bulb, a click opens it, remove takes it up, held use puts one down" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  const x, const z = m.tileAt(g.player.pos);
+  for (0..4) |dx| {
+    const tx = x + 1 + @as(i32, @intCast(dx));
+    const c = g.world.chunkOfTile(tx, z).?;
+    const t = ck.localIndex(tx, z);
+    c.kind[t] = .soil;
+    c.res[t] = 0;
+    c.occ[t] = .none;
+  }
+  const at = [2]i32{x + 2, z};
+  try testing.expect(try g.structs.place(gpa, &g.world, at[0], at[1], .sap_cache, 0, 0));
+  g.player.inv = .{};
+
+  // R: a quarter clockwise, rooted, and not again until it has turned
+  try pressAt(&g, &in, at, .rotate);
+  const id = g.structs.at(&g.world, at[0], at[1]).?;
+  try testing.expectEqual(@as(m.Dir, 1), g.structs.get(id).dir);
+  try testing.expect(g.structs.get(id).turn.busy(g.time, true));
+  try pressAt(&g, &in, at, .rotate);
+  try testing.expectEqual(@as(m.Dir, 1), g.structs.get(id).dir);
+  // the next thing put down keeps its own facing
+  try testing.expectEqual(@as(m.Dir, 0), g.place_dir);
+  // once turned, Shift+R turns it back
+  g.time += @import("../sim/turn.zig").TIME;
+  ctl.hold(&in, .counter, true);
+  try pressAt(&g, &in, at, .rotate);
+  ctl.hold(&in, .counter, false);
+  try testing.expectEqual(@as(m.Dir, 0), g.structs.get(id).dir);
+
+  // Q: none in the belly, nothing to pick; with one, onto the hotbar
+  try pressAt(&g, &in, at, .pick);
+  try testing.expect(g.selected() == null);
+  _ = g.player.inv.add(.sap_cache, 1);
+  g.hot = 4;
+  try pressAt(&g, &in, at, .pick);
+  try testing.expectEqual(@as(?items.Item, .sap_cache), g.selected());
+  try testing.expectEqual(@as(usize, 4), g.hot);
+
+  // a click on it opens its panel, even with a bulb in hand
+  try pressAt(&g, &in, at, .use);
+  try testing.expectEqual(Mode.structure, g.mode);
+  g.mode = .roam;
+  // so does interact
+  try pressAt(&g, &in, at, .interact);
+  try testing.expectEqual(Mode.structure, g.mode);
+  g.mode = .roam;
+
+  // remove takes it up: its bulb comes back
+  try pressAt(&g, &in, at, .remove);
+  try testing.expect(g.structs.at(&g.world, at[0], at[1]) == null);
+  try testing.expectEqual(@as(u32, 2), g.player.inv.count(.sap_cache));
+
+  // held, use puts the bulb in hand down where it fits, turned as R left it
+  g.place_dir = 3;
+  aim(&g, &in, at, TEST_SCREEN);
+  in.advance();
+  ctl.hold(&in, .use, true);
+  for (0..3) |_| try g.update(&in, TICK, TEST_SCREEN);
+  ctl.hold(&in, .use, false);
+  const put = g.structs.at(&g.world, at[0], at[1]) orelse return error.TestUnexpectedResult;
+  try testing.expectEqual(@as(m.Dir, 3), g.structs.get(put).dir);
+  try testing.expectEqual(@as(u32, 1), g.player.inv.count(.sap_cache));
 }

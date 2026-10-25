@@ -53,6 +53,7 @@ const Parts = @import("parts.zig").Parts;
 const Draw = @import("../ui/draw.zig").Draw;
 const Color = @import("../ui/draw.zig").Color;
 const icon_kit = @import("icon.zig");
+const turn = @import("../sim/turn.zig");
 
 const kinds = struct {
   pub const conduit = @import("structures/conduit.zig");
@@ -120,6 +121,8 @@ pub const Def = struct {
   /// what it emits travels far from it (a sporecaster's spores): it is
   /// emitted however far it stands from the view
   far:bool = false,
+  /// a parasite's: the roots it turns on (R) are pale, not bark
+  pale:bool = false,
 };
 
 pub const defs = reg.table(Def, "def");
@@ -172,6 +175,8 @@ pub const Structure = struct {
   activity:f32 = 0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
   grown:f32 = 1,
+  /// how it got to face `dir` (R turns it)
+  turn:turn.Turn = .{},
 
   pub fn kind(s:*const Structure) Kind { return activeTag(s.state); }
   /// how big it is drawn: the size research has grown it to (`size`);
@@ -427,6 +432,13 @@ pub fn hold(ss:*const Structures, wx:i32, wy:i32) ?struct { s:*const Structure, 
 pub fn release(s:*Structure) ?items.Item {
   return switch (s.kind()) {
     inline else => |k| if (comptime reg.has(k, "release")) reg.module(k).release(s) else null,
+  };
+}
+
+/// does kind `k` do anything when configured?
+pub fn configurable(k:Kind) bool {
+  return switch (k) {
+    inline else => |t| comptime reg.has(t, "configure"),
   };
 }
 

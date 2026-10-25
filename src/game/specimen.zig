@@ -26,6 +26,8 @@ const prog = @import("progression.zig");
 const resources = @import("resources.zig");
 const Parts = @import("parts.zig").Parts;
 const play = @import("play.zig");
+const actions = @import("actions.zig");
+const turn = @import("../sim/turn.zig");
 const Game = play.Game;
 
 /// a loop's animation runs `period` seconds, then holds its end this long
@@ -35,6 +37,8 @@ const HOLD:f32 = 1.5;
 /// long enough for a weave or a study unit
 const PERIOD:f32 = 8;
 const ACTIVE_PERIOD:f32 = 30;
+/// turning, it turns a quarter this often (s) unless `--period` says
+const TURN_PERIOD:f32 = turn.TIME + 1;
 /// live, a grown (or dead) plant is sown afresh this long after
 const REGROW:f32 = 4;
 /// held, a plant never grows on its own
@@ -76,12 +80,15 @@ pub const State = union(enum) {
   /// a structure grown and working: fed what it wants, what it makes taken
   /// away, put down afresh each loop (its emitted pieces as in play)
   active,
+  /// grown, turned a quarter (R) each loop: a rooted one uproots itself on
+  /// its roots, turns and digs back in; a floater only turns
+  turn,
 
   /// a name, a share of growth (`0.4`) or a span (`0.2..0.8`)
   pub fn parse(s:[]const u8) error{BadState}!State {
     if (eql(u8, s, "mature") or eql(u8, s, "idle")) return .{.held = 1};
-    if (stringToEnum(enum { grow, wither, flow, drain, dark, live, active }, s)) |k| return switch (k) {
-      .grow => .grow, .wither => .wither, .flow => .flow, .drain => .drain, .dark => .dark, .live => .live, .active => .active,
+    if (stringToEnum(enum { grow, wither, flow, drain, dark, live, active, turn }, s)) |k| return switch (k) {
+      .grow => .grow, .wither => .wither, .flow => .flow, .drain => .drain, .dark => .dark, .live => .live, .active => .active, .turn => .turn,
     };
     if (indexOf(u8, s, "..")) |dots| {
       const a = parseFloat(f32, s[0..dots]) catch return error.BadState;
@@ -95,7 +102,7 @@ pub const State = union(enum) {
   /// wither, flow, drain, darken and live; structures work)
   pub fn suits(s:State, what:Subject) bool {
     return switch (s) {
-      .grow, .span, .held => true,
+      .grow, .span, .held, .turn => true,
       .wither, .flow, .drain, .dark, .live => what == .plant,
       .active => what == .structure,
     };
@@ -121,10 +128,11 @@ pub const Specimen = struct {
   /// the structure draws and the resource nodes round it
   pub fn only(s:*const Specimen, arena:Allocator) Allocator.Error!renderer.Only {
     switch (s.what) {
-      .plant => |sp| return .{.species = sp, .parts = &.{.shadow}},
+      .plant => |sp| return .{.species = sp, .parts = &.{.shadow, .turn_root, .turn_root_pale}},
       .structure => |k| {
         var list:std.ArrayList(meshlib.Id) = .empty;
         try list.appendSlice(arena, st.meshes(k));
+        try list.appendSlice(arena, &.{.turn_root, .turn_root_pale});
         for (values(ck.Kind)) |t| if (resources.of(t)) |n| try list.append(arena, n.mesh);
         return .{.parts = list.items};
       },
@@ -190,6 +198,14 @@ pub const Specimen = struct {
     if (s.state == .live or s.state == .active) return false;
     s.t += dt;
     const l = s.look();
+    // turning: a quarter each loop, as R does it in play
+    if (s.state == .turn) {
+      s.feed_t -= dt;
+      if (s.feed_t <= 0) {
+        s.feed_t = s.loop();
+        _ = actions.turnAt(g, s.at, false);
+      }
+    }
     switch (s.what) {
       .plant => |sp| {
         // uprooted: back it comes
@@ -277,7 +293,11 @@ pub const Specimen = struct {
 
   /// seconds one loop runs
   fn loop(s:*const Specimen) f32 {
-    return s.period orelse if (s.state == .active) ACTIVE_PERIOD else PERIOD;
+    return s.period orelse switch (s.state) {
+      .active => ACTIVE_PERIOD,
+      .turn => TURN_PERIOD,
+      else => PERIOD,
+    };
   }
 
   /// how far through this loop's animation (0..1; 1 through the hold)
@@ -297,7 +317,7 @@ pub const Specimen = struct {
       .drain => .{.mana = 1 - k},
       .dark => .{.radiating = false},
       .live => .{.growth = 0},
-      .active => .{},
+      .active, .turn => .{},
     };
   }
 };

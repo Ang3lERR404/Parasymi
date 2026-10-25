@@ -1,5 +1,7 @@
-//! what is under the cursor: a structure (its own description and contents),
-//! or the tile with its resource node and any plant growing there.
+//! what is under the cursor, on a membrane beside it: a structure (its name
+//! and what it is doing), a plant (its name, how far grown and what it
+//! gives or draws) or a resource node; bare ground by the top-left, its kind
+//! and ley.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ck = @import("../../world/chunk.zig");
@@ -10,79 +12,87 @@ const resources = @import("../resources.zig");
 const Draw = @import("../../ui/draw.zig").Draw;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
-const m = @import("../../core/math.zig");
 
+/// bare ground's panel, by the top-left
 const panel_x = s.edge;
 const panel_y:f32 = 104;
 const text_x:f32 = 32;
 const text_top:f32 = 116;
+/// the card beside the cursor: how far off it, its widths (a structure's
+/// line of work is wider), margin, line height, and how far it keeps from
+/// the screen's edges
+const offset = [2]f32{24, 20};
+const card_w:f32 = 400;
+const plant_w:f32 = 360;
+const node_w:f32 = 240;
+const margin:f32 = 14;
 const line_h:f32 = 24;
-const inv_cols:usize = 8;
-const inv_gap:f32 = 44;
-/// the line saying a click opens a structure's panel
-const hint_h:f32 = 22;
+const keep:f32 = 8;
+/// where "too far" sits on the name's line, from the card's right
+const far_x:f32 = 96;
 
-/// (a structure's open panel shows all of this itself)
-pub fn visible(g:*const play.Game) bool { return g.hover != null and g.mode != .structure; }
+/// (a structure's open panel shows all of this itself; a HUD panel under
+/// the cursor has its own)
+pub fn visible(g:*const play.Game) bool { return g.hover != null and g.mode != .structure and g.pointed == null; }
 
-pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
+pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const h = g.hover.?;
   const c = g.world.chunkOfTile(h[0], h[1]) orelse return;
   const near = g.player.inReach(h[0], h[1]);
-  if (g.structs.at(&g.world, h[0], h[1])) |j| return structure(g, d, g.structs.get(j), near);
-  return tile(g, d, c, ck.localIndex(h[0], h[1]), h, near);
-}
-
-fn structure(g:*play.Game, d:*Draw, sp:*const st.Structure, near:bool) Allocator.Error!void {
-  const inv_rows = @max((sp.inv.used() + inv_cols - 1) / inv_cols, 1);
-  const opens = sp.def().store;
-  const ph = 60 + 14 + inv_gap * m.f(inv_rows) + 16 + @as(f32, if (opens) hint_h else 0);
-  try d.membrane(panel_x, panel_y, 400, ph, s.skin, 0.6);
-  if (opens) _ = try d.text(text_x, panel_y + ph - hint_h - 4, s.text_note, if (near) s.gold else s.dim, txt.s.hud.open_hint);
-  _ = try d.text(text_x, text_top, s.text_label, s.gold, txt.structure(sp.kind()));
-  if (!near) _ = try d.text(text_x + 290, text_top, s.text_note, s.dim, txt.s.hud.too_far);
-  try st.describe(sp, d, &g.prog, text_x, text_top + 26);
-  const y = text_top + 60;
-  var k:usize = 0;
-  for (sp.inv.slot) |slot| if (slot) |it| {
-    const px = text_x + 16 + inv_gap * m.f(k % inv_cols);
-    const py = y + 14 + inv_gap * m.f(k / inv_cols);
-    try d.pod(px, py, 16, it.item.info().col, 0.6, m.f(k) * 0.2);
-    _ = try d.number(px - 8, py - 6, s.text_small, s.dark, it.n);
-    k += 1;
-  };
-  if (k == 0) _ = try d.text(text_x, y + 6, s.text_note, s.dim, txt.s.hud.empty);
-}
-
-fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Allocator.Error!void {
-  const pi = g.plants.at(&g.world, h[0], h[1]);
-  const ph:f32 = if (pi != null) 134 else 60;
-  try d.membrane(panel_x, panel_y, 360, ph, s.skin, 0.6);
+  if (g.structs.at(&g.world, h[0], h[1])) |j| return structure(g, d, W, H, g.structs.get(j), near);
+  if (g.plants.at(&g.world, h[0], h[1])) |i| return plant(g, d, W, H, i, near);
+  const t = ck.localIndex(h[0], h[1]);
   if (c.res[t] > 0 and c.occ[t] == .none) {
     const item = resources.of(c.kind[t]).?.item;
-    _ = try d.print(text_x, text_top, s.text_label, item.info().col, txt.s.hud.node, .{txt.item(item).name, c.res[t]});
-  } else {
-    _ = try d.print(text_x, text_top, s.text_label, s.white, txt.s.hud.tile, .{txt.tile(c.kind[t]), c.ley_cap[t]});
+    const at = try card(g, d, W, H, node_w, 1, near);
+    _ = try d.print(at[0], at[1], s.text_label, item.info().col, txt.s.hud.node, .{txt.item(item).name, c.res[t]});
+    return;
   }
+  try d.membrane(panel_x, panel_y, 360, 60, s.skin, 0.6);
+  _ = try d.print(text_x, text_top, s.text_label, s.white, txt.s.hud.tile, .{txt.tile(c.kind[t]), c.ley_cap[t]});
   if (!near) _ = try d.text(text_x + 248, text_top + 2, s.text_note, s.dim, txt.s.hud.too_far);
-  const i = pi orelse return;
+}
+
+/// a card `w` wide and `lines` lines high beside the cursor, kept on
+/// screen; returns where its first line goes. Out of reach, it says so.
+fn card(g:*const play.Game, d:*Draw, W:f32, H:f32, w:f32, lines:f32, near:bool) Allocator.Error![2]f32 {
+  const ch = line_h * lines + 2 * margin;
+  const x = @max(@min(g.mouse[0] + offset[0], W - w - keep), keep);
+  const y = @max(@min(g.mouse[1] + offset[1], H - ch - keep), keep);
+  try d.membrane(x, y, w, ch, s.skin, 0.7);
+  if (!near) _ = try d.text(x + w - far_x, y + margin + 2, s.text_note, s.dim, txt.s.hud.too_far);
+  return .{x + margin, y + margin};
+}
+
+fn structure(g:*play.Game, d:*Draw, W:f32, H:f32, sp:*const st.Structure, near:bool) Allocator.Error!void {
+  const opens = sp.def().store;
+  const at = try card(g, d, W, H, card_w, if (opens) 3 else 2, near);
+  _ = try d.text(at[0], at[1], s.text_label, s.gold, txt.structure(sp.kind()));
+  try st.describe(sp, d, &g.prog, at[0], at[1] + line_h);
+  if (opens) _ = try d.text(at[0], at[1] + 2 * line_h, s.text_note, if (near) s.gold else s.dim, txt.s.hud.open_hint);
+}
+
+fn plant(g:*play.Game, d:*Draw, W:f32, H:f32, i:ck.PlantId, near:bool) Allocator.Error!void {
   const p = g.plants.list.get(i.idx());
   const def = species.get(p.sp);
-  var y = text_top + 26;
-  _ = try d.text(text_x, y, s.text_label, s.white, txt.plant(p.sp).name);
+  const rad = &g.eco.radiance;
+  const known = i.idx() < rad.powered.items.len;
+  // a bloom waiting on its network, or a plant that draws radiance, says so
+  const waits = (def.radiance > 0 and !(known and rad.radiating.items[i.idx()])) or def.needs_radiance;
+  const at = try card(g, d, W, H, plant_w, if (waits) 4 else 3, near);
+  const x = at[0];
+  var y = at[1];
+  _ = try d.text(x, y, s.text_label, s.white, txt.plant(p.sp).name);
   y += line_h;
-  try d.tendril(text_x, y, 150, s.bar_h, s.growth, p.growth, 0.5);
+  try d.tendril(x, y + 4, 140, s.bar_h, s.growth, p.growth, 0.5);
   if (def.stages > 0) {
     const k = def.stage(p.growth);
     const name = txt.nth(txt.plant(p.sp).stages orelse "", k);
-    _ = try d.print(text_x + 164, y - 4, s.text_note, s.dim, txt.s.hud.stage, .{name, k + 1, def.stages, p.growth * 100});
+    _ = try d.print(x + 152, y, s.text_note, s.dim, txt.s.hud.stage, .{name, k + 1, def.stages, p.growth * 100});
   } else {
-    _ = try d.print(text_x + 164, y - 4, s.text_note, s.dim, txt.s.hud.growth, .{p.growth * 100});
+    _ = try d.print(x + 152, y, s.text_note, s.dim, txt.s.hud.growth, .{p.growth * 100});
   }
-  y += 22;
-  y += 22;
-  const rad = &g.eco.radiance;
-  const known = i.idx() < rad.powered.items.len;
+  y += line_h;
   if (def.radiance > 0) {
     // a bloom: it yields nothing; it radiates, or waits on its network
     var links:u32 = 0;
@@ -90,14 +100,15 @@ fn tile(g:*play.Game, d:*Draw, c:*ck.Chunk, t:usize, h:[2]i32, near:bool) Alloca
       if (l.a == i or l.b == i) links += 1;
     }
     const lit = known and rad.radiating.items[i.idx()];
-    _ = try d.print(text_x, y - 22, s.text_body, if (lit) s.gold else s.dim, txt.s.hud.bloom, .{if (lit) txt.s.hud.radiating else txt.s.hud.dark, links, p.health * 100});
-    if (!lit) _ = try d.text(text_x, y, s.text_note, s.dim, txt.s.hud.no_mature);
+    _ = try d.print(x, y, s.text_body, if (lit) s.gold else s.dim, txt.s.hud.bloom, .{if (lit) txt.s.hud.radiating else txt.s.hud.dark, links, p.health * 100});
+    if (!lit) _ = try d.text(x, y + line_h, s.text_note, s.dim, txt.s.hud.no_mature);
     return;
   }
   const yields = if (g.prog.yieldKnown(p.sp)) txt.item(def.yields).short else txt.s.hud.unknown_yield;
-  _ = try d.print(text_x, y - 22, s.text_body, s.gold, txt.s.hud.plant, .{yields, p.essence, p.health * 100});
+  _ = try d.print(x, y, s.text_body, s.gold, txt.s.hud.plant, .{yields, p.essence, p.health * 100});
   if (def.needs_radiance) {
     const lit = known and rad.powered.items[i.idx()];
-    _ = try d.text(text_x, y, s.text_note, if (lit) s.gold else s.dim, if (lit) txt.s.hud.drawing_radiance else txt.s.hud.withering);
+    _ = try d.text(x, y + line_h, s.text_note, if (lit) s.gold else s.dim, if (lit) txt.s.hud.drawing_radiance else txt.s.hud.withering);
   }
 }
+

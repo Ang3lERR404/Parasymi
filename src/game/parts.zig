@@ -70,6 +70,9 @@ pub const Parts = struct {
   toward:m.V3 = .{0, 1, 0},
   /// this frame's points of light (see `light`)
   lights:std.ArrayList(vertex.Light) = .empty,
+  /// while set, everything emitted (and every light) is carried by it: a
+  /// structure turning (R) takes all it draws along with its body
+  around:?m.M4 = null,
   pub fn init(gpa:Allocator) Parts { return .{.gpa = gpa}; }
   pub fn deinit(p:*Parts) void {
     for (&p.lists) |*l| l.deinit(p.gpa);
@@ -100,14 +103,16 @@ pub const Parts = struct {
 
   /// a point of light at `at` (linear `col` times its strength) lighting
   /// what lies within `reach` of it: kept if any of that can be seen
-  pub fn light(p:*Parts, at:m.V3, col:m.V3, reach:f32) Allocator.Error!void {
+  pub fn light(p:*Parts, at_:m.V3, col:m.V3, reach:f32) Allocator.Error!void {
+    const at = if (p.around) |a| m.mulPoint(a, at_) else at_;
     if (p.view) |v| if (!v.sphere(at, reach)) return;
     try p.lights.append(p.gpa, .{.pos = .{at[0], at[1], at[2], reach}, .col = .{col[0], col[1], col[2], 0}});
   }
 
   /// a mesh placed by its matrix: skipped when out of view (a sphere a few
   /// times its scale), at the level of detail for its distance.
-  pub fn emit(p:*Parts, id:meshlib.Id, mat:m.M4, look_:Look) Allocator.Error!void {
+  pub fn emit(p:*Parts, id:meshlib.Id, mat_:m.M4, look_:Look) Allocator.Error!void {
+    const mat = if (p.around) |a| m.mul(a, mat_) else mat_;
     const at = m.v3(mat[3][0], mat[3][1], mat[3][2]);
     const scale = @max(m.len(m.v3(mat[0][0], mat[0][1], mat[0][2])), @max(m.len(m.v3(mat[1][0], mat[1][1], mat[1][2])), m.len(m.v3(mat[2][0], mat[2][1], mat[2][2]))));
     if (!p.sees(at, BOUND * scale + BOUND_PAD)) return;
@@ -123,7 +128,13 @@ pub const Parts = struct {
   /// Catmull-Rom curve through `ctrl`, its x laid toward `side`; `len` is
   /// the length the mesh was built at, `reach` how far along it is drawn
   /// (0..1; what lies beyond gathers at its end).
-  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl:[4]m.V3, side:m.V3, len:f32, reach:f32, look_:Look) Allocator.Error!void {
+  pub fn emitCurve(p:*Parts, id:meshlib.Id, ctrl_:[4]m.V3, side_:m.V3, len:f32, reach:f32, look_:Look) Allocator.Error!void {
+    var ctrl = ctrl_;
+    var side = side_;
+    if (p.around) |a| {
+      for (&ctrl) |*c| c.* = m.mulPoint(a, c.*);
+      side = m.mulDir(a, side);
+    }
     var inst = instance(m.identity, look_);
     inst.c0 = .{ctrl[0][0], ctrl[0][1], ctrl[0][2], 1};
     inst.c1 = .{ctrl[1][0], ctrl[1][1], ctrl[1][2], 1};

@@ -1,8 +1,10 @@
 //! what the wolf does to the world: gather, put (sow/grow), weave, feed and
-//! take from structures, harvest, uproot, catch starlight. Each action works
+//! take from structures, interact with them, harvest, uproot, turn what
+//! stands, pick up the seed of what stands, catch starlight. Each action works
 //! on the Game and reports through the progression log.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const indexOfScalar = std.mem.indexOfScalar;
 const testing = std.testing;
 const m = @import("../core/math.zig");
 const ck = @import("../world/chunk.zig");
@@ -24,6 +26,8 @@ const LINGER_TRADE:f32 = 0.4;
 const LINGER_HARVEST:f32 = 0.5;
 /// wait before the next put (s): after one, and after warning of none left
 const PUT_COOLDOWN:f32 = 0.25;
+/// remove, held and swept: the wait before the next tile's thing goes (s)
+pub const REMOVE_COOLDOWN:f32 = 0.2;
 const WARN_COOLDOWN:f32 = 1.5;
 /// starlight within `ATTRACT` drifts to the chest, faster the closer
 /// (`PULL` less `PULL_FALLOFF` per unit away), and is absorbed within `ABSORB`
@@ -58,8 +62,11 @@ pub fn put(g:*Game, h:[2]i32) Allocator.Error!void {
     g.plant_cd = WARN_COOLDOWN;
     return;
   }
+  // a plant faces the way the next thing put down does, as a structure
   const ok = if (item.plants()) |sp|
-    try g.plants.place(g.gpa, &g.world, h[0], h[1], sp, g.rng.float())
+    try g.plants.placeEx(g.gpa, &g.world, h[0], h[1], .{
+      .x = h[0], .y = h[1], .chunk = undefined, .tile = undefined, .sp = sp, .seed = g.rng.float(), .dir = g.place_dir,
+    })
   else if (st.kindOf(item)) |k|
     try g.structs.place(g.gpa, &g.world, h[0], h[1], k, g.place_dir, g.rng.float())
   else false;
@@ -99,6 +106,73 @@ pub fn feed(g:*Game, j:st.Id) void {
   };
   g.linger = LINGER_TRADE;
   if (moved == 0) g.prog.say(txt.s.msg.wants_nothing, .{});
+}
+
+/// what a click (or the interact key) on a structure does: one that keeps
+/// items opens its panel, one that is paired is configured, any other is
+/// fed from the belly.
+pub fn interact(g:*Game, h:[2]i32, j:st.Id) void {
+  const s = g.structs.get(j);
+  if (s.def().store) {
+    g.open = h;
+    g.mode = .structure;
+  } else if (st.configurable(s.kind())) st.configure(&g.structs, j, &g.prog)
+  else feed(g, j);
+}
+
+/// turn what stands at a tile a quarter, clockwise or `back`: a rooted
+/// thing uproots itself on its roots and digs back in facing its new way,
+/// a floater only turns (sim/turn.zig). Not again until it has finished.
+/// Returns whether anything stands there.
+pub fn turnAt(g:*Game, h:[2]i32, back:bool) bool {
+  const by:m.Dir = if (back) 3 else 1;
+  if (g.structs.at(&g.world, h[0], h[1])) |j| {
+    const s = g.structs.get(j);
+    if (!s.turn.busy(g.time, !s.def().floating)) {
+      s.turn = .{.from = s.dir, .at = g.time};
+      s.dir +%= by;
+    }
+    return true;
+  }
+  const id = g.plants.at(&g.world, h[0], h[1]) orelse return false;
+  const p = g.plants.list.slice();
+  const i = id.idx();
+  const rooted = !species.get(p.items(.sp)[i]).floating;
+  if (!p.items(.turn)[i].busy(g.time, rooted)) {
+    p.items(.turn)[i] = .{.from = p.items(.dir)[i], .at = g.time};
+    p.items(.dir)[i] +%= by;
+  }
+  return true;
+}
+
+/// take up the seed (or bulb) of what stands at a tile, facing as it does:
+/// the hotbar slot holding it is chosen; else, from the belly, it goes on
+/// the chosen slot if that is empty, else the first empty one, else over
+/// the chosen one. Returns whether anything stands there.
+pub fn pick(g:*Game, h:[2]i32) bool {
+  const item:items.Item, const dir:m.Dir = if (g.structs.at(&g.world, h[0], h[1])) |j| blk: {
+    const s = g.structs.get(j);
+    // (what forms by itself, a diamond, has no bulb to pick)
+    if (st.kindOf(s.def().item) != s.kind()) return true;
+    break :blk .{s.def().item, s.dir};
+  } else if (g.plants.at(&g.world, h[0], h[1])) |id| blk: {
+    const p = g.plants.list.slice();
+    const seed = species.get(p.items(.sp)[id.idx()]).seed orelse return true;
+    break :blk .{seed, p.items(.dir)[id.idx()]};
+  } else return false;
+  g.place_dir = dir;
+  if (indexOfScalar(?items.Item, &g.bar, item)) |i| {
+    g.hot = i;
+    return true;
+  }
+  if (g.player.inv.count(item) == 0) {
+    g.prog.say(txt.s.msg.no_item, .{txt.item(item).name});
+    return true;
+  }
+  const slot = if (g.bar[g.hot] == null) g.hot else indexOfScalar(?items.Item, &g.bar, null) orelse g.hot;
+  g.bar[slot] = item;
+  g.hot = slot;
+  return true;
 }
 
 /// empty a structure into the belly (what fits).

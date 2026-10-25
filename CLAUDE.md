@@ -5,7 +5,8 @@ infused plants (symbiotic, parasitic and radiant lineages that converge).
 Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3), Windows only. No asset files:
 every mesh, the font and all UI shapes are procedural; the only data files
 are `src/cfg/parasymi.cfg` (strings) and `src/cfg/controls.cfg` (bindings).
-2.5D top-down 3D camera (pitch 30°–85°, yaw only; free cam for inspection).
+2.5D top-down 3D camera orbiting the wolf (MMB drag: yaw free, pitch
+8°–89°; free cam for inspection).
 
 ## Read before you touch
 | Working on | Read first |

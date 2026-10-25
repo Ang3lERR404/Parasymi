@@ -12,6 +12,7 @@ const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("species.zig");
 const jobs = @import("../core/jobs.zig");
+const Turn = @import("turn.zig").Turn;
 
 pub const Id = ck.PlantId;
 const Occ = ck.Occ;
@@ -52,6 +53,9 @@ pub const Plant = struct {
   flow:f32 = 0,
   /// harvestable store: the species' yield condensed from mana.
   essence:f32 = 0,
+  /// the way it was turned to (R), and how it got there
+  dir:m.Dir = 0,
+  turn:Turn = .{},
   n1:[R1]Id = @splat(.none),
   n2:[R2]Id = @splat(.none),
 };

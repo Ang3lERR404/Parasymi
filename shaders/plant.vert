@@ -16,7 +16,7 @@ layout(location = 4) in uint part;  // 0 stem 1 leaf 2 bloom 3 thorn 4 tendril
 layout(location = 5) in vec3 ipos;
 layout(location = 6) in vec4 ia;    // growth, mana fill, seed, affinity
 layout(location = 7) in vec4 ib;    // flow, health, sway amplitude, form (species.Form)
-layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (0/1), ghost fits (0/1)
+layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (0/1), ghost fits (0/1), the way it faces (yaw)
 // the same vertex in the next growth key (equals pos/nrm for keyless plants)
 layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre, how far along (< 0 none)
 layout(location = 10) in vec3 pos_next;
@@ -170,6 +170,10 @@ void main() {
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
     p *= 1.0 + 0.02 * sin(t * 0.6 + seed * TAU);
+    // and as it is turned (R)
+    mat2 faced = rot(ic.w);
+    p.xz = faced * p.xz;
+    n.xz = faced * n.xz;
     // drawn into a forming halo, it turns with its orbit
     if (drawn) {
       mat2 orbit = rot(-haloTurn(ih.w));
@@ -261,8 +265,8 @@ void main() {
   // wilt when unhealthy
   p.y *= mix(WILT, 1.0, health);
 
-  // per-instance variation
-  float yaw = seed * TAU;
+  // per-instance variation, turned the way it faces (R)
+  float yaw = seed * TAU + ic.w;
   p.xz = rot(yaw) * p.xz;
   n.xz = rot(yaw) * n.xz;
 

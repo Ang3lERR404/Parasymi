@@ -88,7 +88,8 @@ pub const PlantInstance = extern struct {
   /// flow, health, sway amplitude, genome form (species.Form)
   b:[4]f32,
   /// x: blend toward the next growth key (0..1); y: 1 for a placement
-  /// preview (ghost); z: 1 when that preview fits; w unused
+  /// preview (ghost); z: 1 when that preview fits; w the yaw it is turned
+  /// to (R), on top of its own
   c:[4]f32 = .{0, 0, 0, 0},
   /// a forming halo drawing it in (see `NO_HALO`)
   h:[4]f32 = NO_HALO,

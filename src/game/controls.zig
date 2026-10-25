@@ -28,17 +28,28 @@ pub const Action = enum {
   move_forward, move_back, move_left, move_right,
   /// held with movement
   run,
-  yaw_left, yaw_right,
-  /// held: move forward/back tilt the camera, free_cam toggles it, rise sinks
+  /// held: dragging the mouse orbits the camera round the wolf
+  orbit,
+  /// held: free_cam toggles the free camera, rise sinks
   alt,
-  /// gather, place, click a panel row; in the free camera, look
+  /// held: plant what is in hand; on a structure, interact; click a panel
+  /// row; in the free camera, look
   use,
-  uproot,
+  /// interact with a structure (as `use` on it), harvest a plant
+  interact,
+  /// pressed or held: the universal remove (uproot a plant, take up a
+  /// structure, gather from a resource node); clear a hotbar slot
+  remove,
+  /// take up the seed or bulb of what stands under the cursor
+  pick,
   harvest,
   /// held with harvest: take from a structure instead of feeding it
   take,
   configure,
+  /// turn what stands under the cursor, else the next thing put down
   rotate,
+  /// held with rotate: turn the other way (counter-clockwise)
+  counter,
   /// with the belly open: throw away the belly stack under the cursor (or carried)
   discard,
   belly,

@@ -93,6 +93,9 @@ const parts = struct {
   pub const lithophage_crystal = @import("meshes/lithophage.zig").crystal;
   pub const lithophage_root = @import("meshes/lithophage.zig").root;
   pub const lithophage_root_far = @import("meshes/lithophage.zig").root_far;
+  // what a rooted thing walks on while it turns (R)
+  pub const turn_root = @import("meshes/turn_root.zig");
+  pub const turn_root_pale = @import("meshes/turn_root.zig").pale;
   pub const ganglion_nerve = @import("meshes/ganglion.zig").nerve;
   // (see-through: blends over what hangs inside it)
   pub const ganglion = @import("meshes/ganglion.zig");

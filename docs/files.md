@@ -36,7 +36,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `text.zig` — runtime text: templates (`{0}`, `{1:.2}`) filled at runtime, and the `key = value` cfg format they are loaded from (see `game/text.zig`).
 
 ## src/game/
-- `actions.zig` — what the wolf does to the world: gather, put (sow/grow), weave, feed and take from structures, harvest, uproot, catch starlight.
+- `actions.zig` — what the wolf does to the world: gather, put (sow/grow), weave, feed and take from structures, interact with them, harvest, uproot, turn…
 - `controls.zig` — what every key and mouse button does, loaded once at startup from `PATH` (`controls.cfg`) and never read again.
 - `convergence.zig` — convergence: where a mature symbiote and a mature parasite meet, within two tiles of each other or joined by a chain of conduits, a…
 - `craft.zig` — weaving: turning gathered matter into seeds and structure bulbs.
@@ -50,7 +50,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `gardens.zig` — the saved gardens (pause menu): the world stays frozen behind the veil.
 - `gather.zig` — gathering progress grows a tendril above the wolf's focus.
 - `hotbar.zig` — the hotbar: a row of pods, each empty or holding an item the gardener dropped on it from the belly, with the belly's count of it and the…
-- `hover.zig` — what is under the cursor: a structure (its own description and contents), or the tile with its resource node and any plant growing there.
+- `hover.zig` — what is under the cursor, on a membrane beside it: a structure (its name and what it is doing), a plant (its name, how far grown and what it
 - `inspect.zig` — the free camera's reminder: a small glowing tendril by the top-left with how to get back.
 - `log.zig` — recent messages (newest first, fading) and the control hint line.
 - `options.zig` — the options panel (pause menu, OPTIONS): the world stays frozen behind the veil.
@@ -175,6 +175,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
 - `structure_kit.zig` — shared pieces for grown structures, in the plants' language: a woven root mat they rise from, grown vines with leaves along them, and pods…
+- `turn_root.zig` — mesh: TURN ROOT.
 - `vultrixi.zig` — mesh: VULTRIXI.
 - `weftstone.zig` — mesh: WEFTSTONE.
 - `wolf_belly.zig` — mesh: WOLF BELLY.
@@ -200,7 +201,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `input.zig` — per-frame input snapshot with edge detection, fed by GLFW.
 
 ## src/render/
-- `camera.zig` — angled top-down camera: pans over the ground plane, zooms along its view ray, turns (yaw) and tilts (pitch) between near-horizontal and…
+- `camera.zig` — angled top-down camera: pans over the ground plane, zooms along its view ray, and orbits its target: turns (yaw) freely and tilts (pitch)…
 - `light.zig` — light that moves: the key light's (sun or moon) shadows and the points of light the garden makes (blooms, motes, a halo's flash).
 
 ## src/render/passes/
@@ -230,6 +231,9 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `lumenroot.zig` — LUMENROOT: the first symbiote.
 - `thornleech.zig` — THORNLEECH: the first parasite, alien rather than hostile (a coil, built by gfx/meshes/parasite_kit.zig: a lattice cage of a stalk with its…
 - `vesper.zig` — VESPER BLOOM: the first convergent hybrid, spliced where symbiote and parasite touch.
+
+## src/sim/
+- `turn.zig` — turning what stands in the garden (R): a rooted plant or structure pulls its roots up out of the ground, heaves itself up on them, steps…
 
 ## src/
 - `tests.zig` — pure-logic test root: no window, no GPU.

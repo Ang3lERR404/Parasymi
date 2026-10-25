@@ -58,7 +58,7 @@ pub const FRESH = "garden ";
 pub const MAX_NAME = 48;
 const MAX_PATH = home.SAVES.len + 1 + MAX_NAME + EXT.len + TMP.len;
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 18;
+const VERSION:u32 = 19;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;
@@ -88,6 +88,7 @@ const PlantRec = extern struct {
   seed:f32,
   flow:f32,
   essence:f32,
+  dir:u32,
 };
 
 /// one chunk whose resource nodes differ from what the generator made.
@@ -161,6 +162,7 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
     .x = s.items(.x)[i], .y = s.items(.y)[i], .sp = @intFromEnum(s.items(.sp)[i]),
     .growth = s.items(.growth)[i], .span = s.items(.span)[i], .mana = s.items(.mana)[i], .health = s.items(.health)[i],
     .seed = s.items(.seed)[i], .flow = s.items(.flow)[i], .essence = s.items(.essence)[i],
+    .dir = s.items(.dir)[i],
   });
   try w.put(u32, @intCast(g.structs.list.items.len));
   for (g.structs.list.items) |it| try w.put(st.Structure, it);
@@ -213,13 +215,13 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
   const plants = try r.get(u32);
   for (0..plants) |_| {
     const p = try r.get(PlantRec);
-    if (p.sp >= species.count) return error.CorruptSave;
+    if (p.sp >= species.count or p.dir >= m.dirs.len) return error.CorruptSave;
     const sp:species.Id = @enumFromInt(p.sp);
     try ensureFootprint(&g, p.x, p.y, species.get(sp).size);
     _ = try g.plants.placeEx(gpa, &g.world, p.x, p.y, .{
       .x = p.x, .y = p.y, .chunk = undefined, .tile = undefined, .sp = sp,
       .growth = p.growth, .span = p.span, .mana = p.mana, .health = p.health, .seed = p.seed,
-      .flow = p.flow, .essence = p.essence,
+      .flow = p.flow, .essence = p.essence, .dir = @intCast(p.dir),
     });
   }
   const structs = try r.get(u32);
