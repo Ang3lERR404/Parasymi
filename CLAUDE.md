@@ -203,7 +203,9 @@ recipes (`game/craft.zig`) are plain data tables.
   point at both ends (no hard cuts).
 - meshgen primitives: `tubeR`/`tubeC`, `vine`, `braid`/`braidTurned`, `bundle`,
   `loft`, `patch`, `lamina`, `blade`/`bladeAlong`, `petal`, `stamens`, `leavesAlong`, `bands`,
-  `ellipsoid`, `cone`. Shared kits: `structure_kit` (`rootMat`,
+  `ellipsoid`, `cone`. Shared kits (each fully described in
+  `docs/kits/<kit>_desc.md`, index `docs/kits/README.md`; update it with
+  the kit): `structure_kit` (`rootMat`,
   `footLeaves`, `leafyVine` take an optional `kit.On` to grow on a
   spline), `wolf_kit` (`leaf`, `digit`, `claw`), `sculpt_kit` (SDF forms
   meshed and skinned), `mineral_kit`, `parasite_kit` (the parasitic
