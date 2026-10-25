@@ -58,6 +58,9 @@ const parts = struct {
   pub const item_pod = @import("meshes/item_pod.zig");
   pub const root_digger = @import("meshes/root_digger.zig");
   pub const digger_root = @import("meshes/root_digger.zig").root;
+  pub const loomfern = @import("meshes/loomfern.zig");
+  pub const loomfern_sheaf = @import("meshes/loomfern.zig").sheaf;
+  pub const loomfern_thread = @import("meshes/loomfern.zig").thread;
   // the halo: its polyp and the diamond it forms
   pub const polyp = @import("meshes/polyp.zig");
   pub const halo_diamond = @import("meshes/polyp.zig").diamond;

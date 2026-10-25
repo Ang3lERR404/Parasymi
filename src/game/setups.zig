@@ -47,6 +47,7 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = try g.plants.place(g.gpa, &g.world, cx - 5, cz - 1, .driftwisp, 0.8);
   _ = try g.plants.place(g.gpa, &g.world, cx - 4, cz + 2, .driftwisp, 0.9);
   try digger(g, cx, cz);
+  try lineages(g, cx, cz);
   try confluences(g, cx, cz);
   try blooms(g, cx, cz);
 
@@ -152,6 +153,37 @@ fn digger(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
       return;
     }
   }
+}
+
+/// the lineages' structures, south of the garden's conduit line: each put
+/// down on the nearest spot it may stand to where it is shown, fed what
+/// it works from.
+fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
+  g.prog.done.insert(.living_looms);
+  if (try nearest(g, cx + 3, cz - 4, .loomfern, 0.15)) |j| {
+    _ = g.structs.insert(&g.prog, j, .essence, 3);
+    const s = g.structs.get(j);
+    // a cache beside it takes its fibre, so it is always weaving
+    for (m.dirs) |d| {
+      const v = m.dirVec(d);
+      if (try g.structs.place(g.gpa, &g.world, s.x + v.x, s.y + v.z, .sap_cache, 0, 0.25)) break;
+    }
+  }
+}
+
+/// put a structure of kind `k` down on the free spot nearest (x, z) it may
+/// stand on.
+fn nearest(g:*Game, x:i32, z:i32, k:st.Kind, seed:f32) Allocator.Error!?st.Id {
+  var r:i32 = 0;
+  while (r < 8) : (r += 1) {
+    var it = m.ring(r);
+    while (it.next()) |o| {
+      if (!g.structs.canPlace(&g.world, x + o[0], z + o[1], k)) continue;
+      _ = try g.structs.place(g.gpa, &g.world, x + o[0], z + o[1], k, 0, seed);
+      return g.structs.at(&g.world, x + o[0], z + o[1]);
+    }
+  }
+  return null;
 }
 
 fn nodeBeside(g:*const Game, x:i32, z:i32) bool {

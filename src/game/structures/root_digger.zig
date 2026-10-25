@@ -72,7 +72,7 @@ pub fn ground(k:ck.Kind) bool { return k == .soil or k == .moss; }
 
 pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const self = ctx.ss.get(i);
-  handOff(ctx, i);
+  _ = st.handOff(ctx, i);
   const d = &self.state.root_digger;
   const found = findNode(ctx.w, self.x, self.y, if (d.dig) |dg| dg.dir else 0) orelse {
     d.dig = null;
@@ -87,22 +87,6 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   found.chunk.res[found.tile] -= 1;
   _ = self.inv.add(dg.item, 1);
   return true;
-}
-
-/// feed the next buffered item to a neighbour that wants it. Carriers are
-/// left alone: one behind the digger pulls through `output` itself.
-fn handOff(ctx:st.Ctx, i:st.Id) void {
-  const self = ctx.ss.get(i);
-  const item = output(self) orelse return;
-  for (m.dirs) |d| {
-    const v = m.dirVec(d);
-    const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
-    if (ctx.ss.get(j).def().carrier) continue;
-    if (ctx.ss.insert(ctx.g, j, item, 1) == 1) {
-      _ = self.inv.take(item, 1);
-      return;
-    }
-  }
 }
 
 const Found = struct {
@@ -134,6 +118,9 @@ pub fn output(s:*const st.Structure) ?items.Item {
   for (s.inv.slot) |slot| if (slot) |it| return it.item;
   return null;
 }
+
+/// anything it has dug.
+pub fn gives(s:*const st.Structure, item:items.Item) bool { return s.inv.count(item) > 0; }
 
 /// roots radiating from the knot; those facing the node stretch toward it
 /// in time with each item drawn, and a mote of it travels in. Idle roots

@@ -45,6 +45,8 @@ pub const hand = [_]Recipe{
   .{ .out = .polyp, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 2 } }, .time = 3 },
   // decision: a diamond is woven from what a halo is grown from, condensed (the brief sets no cost)
   .{ .out = .diamond, .in = &.{ .{ .item = .starlight, .n = 6 }, .{ .item = .ley_shard, .n = 4 }, .{ .item = .convergence_essence, .n = 3 }, .{ .item = .fibre, .n = 2 } }, .time = 6, .needs = .celestial_defragmentation },
+  // decision: costs for the lineages' structures are set here (the brief sets none)
+  .{ .out = .loomfern, .in = &.{ .{ .item = .fibre, .n = 5 }, .{ .item = .essence, .n = 2 }, .{ .item = .grit, .n = 2 } }, .time = 2.5, .needs = .living_looms },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }

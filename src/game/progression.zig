@@ -41,6 +41,7 @@ const techs = struct {
   pub const sap_satellites = @import("research/sap_satellites.zig");
   pub const condensing_whorl = @import("research/condensing_whorl.zig");
   pub const lattice_of_thought = @import("research/lattice_of_thought.zig");
+  pub const living_looms = @import("research/living_looms.zig");
 };
 const reg = registry.Registry(techs);
 

@@ -104,6 +104,9 @@ pub fn output(s:*const st.Structure) ?items.Item {
   return null;
 }
 
+/// anything woven it holds.
+pub fn gives(s:*const st.Structure, item:items.Item) bool { return craft.woven(item) and s.inv.count(item) > 0; }
+
 /// its panel offers every weave.
 pub fn recipes() []const u8 { return &craft.all; }
 pub fn chosen(s:*const st.Structure) ?u8 { return s.state.germinator.recipe; }

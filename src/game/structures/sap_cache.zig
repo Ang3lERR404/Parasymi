@@ -44,6 +44,9 @@ pub fn output(s:*const st.Structure) ?items.Item {
   return null;
 }
 
+/// anything it holds.
+pub fn gives(s:*const st.Structure, item:items.Item) bool { return s.inv.count(item) > 0; }
+
 /// what it holds hangs in its resin, one dark shape per stack (larger for
 /// a larger stack), turning slowly around the pod's heart.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {

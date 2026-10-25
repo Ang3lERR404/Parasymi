@@ -7,6 +7,9 @@
 //!   link(ctx, id)               notice its neighbours, every tick, grown or not
 //!   wants(s, g, item) u32       how many of `item` it will still take in
 //!   output(s) ?Item             what may leave it (pulled by conduits)
+//!   gives(s, item) bool         whether `item` may leave it (default: it is
+//!                               its `output`); a braided conduit's lanes
+//!                               pull a different item each
 //!   release(s) ?Item            hand back anything it holds outside `inv`
 //!   configure(s, g)             the player's "C" interaction
 //!   recipes() []const u8        what its panel offers to weave (indices into
@@ -51,6 +54,7 @@ const kinds = struct {
   pub const root_digger = @import("structures/root_digger.zig");
   pub const polyp = @import("structures/polyp.zig");
   pub const diamond = @import("structures/diamond.zig");
+  pub const loomfern = @import("structures/loomfern.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -244,6 +248,13 @@ pub const Structures = struct {
     };
   }
 
+  pub fn gives(ss:*Structures, id:Id, item:items.Item) bool {
+    const s = ss.get(id);
+    return switch (s.kind()) {
+      inline else => |k| if (comptime reg.has(k, "gives")) reg.module(k).gives(s, item) else ss.output(id) == item,
+    };
+  }
+
   /// insert up to `n` of `item` (capped by what the structure still wants).
   /// Returns how many were actually inserted.
   pub fn insert(ss:*Structures, g:*const prog.Progression, id:Id, item:items.Item, n:u16) u16 {
@@ -272,6 +283,24 @@ pub const Structures = struct {
     }
   }
 };
+
+/// hand one of what structure `i` lets go (`output`) to a neighbour that
+/// wants it; returns whether one went. Carriers are left alone: one behind
+/// it pulls through `output` itself.
+pub fn handOff(ctx:Ctx, i:Id) bool {
+  const self = ctx.ss.get(i);
+  const item = ctx.ss.output(i) orelse return false;
+  for (m.dirs) |d| {
+    const v = m.dirVec(d);
+    const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
+    if (j == i or ctx.ss.get(j).def().carrier) continue;
+    if (ctx.ss.insert(ctx.g, j, item, 1) == 1) {
+      _ = self.inv.take(item, 1);
+      return true;
+    }
+  }
+  return false;
+}
 
 /// a floating plant a structure draws in toward itself: how far along the
 /// way it is (0 leaving its tile .. 1 there; the GPU moves it, see
