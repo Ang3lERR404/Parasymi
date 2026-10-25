@@ -71,7 +71,7 @@ pub fn link(ctx:st.Ctx, i:st.Id) void {
     const v = m.dirVec(d);
     const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
     const t = ctx.ss.get(j);
-    if (t.kind() == .conduit) {
+    if (t.def().carrier) {
       if (t.dir == d +% 2) feeds |= bit(r);
     } else if (r == BEHIND) feeds |= bit(r);
   }
@@ -101,7 +101,7 @@ fn pull(ctx:st.Ctx, self:*st.Structure) ?items.Item {
   const taps = tapDirs(self.dir);
   const bv = m.dirVec(taps[0]);
   if (ss.at(ctx.w, self.x + bv.x, self.y + bv.z)) |j| {
-    if (ss.get(j).kind() == .conduit) return null; // conduits push, they never pull
+    if (ss.get(j).def().carrier) return null; // carriers push, they are never pulled
     const item = ss.output(j) orelse return null;
     _ = ss.get(j).inv.take(item, 1);
     c.came = BEHIND;
@@ -145,19 +145,25 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const j = ss.at(ctx.w, fx, fz) orelse return false;
   const t = ss.get(j);
 
-  if (t.kind() == .conduit) {
+  if (t.def().carrier) {
     const back = m.dirVec(t.dir);
-    // never hand back into a conduit facing us
-    if (t.state.conduit.held != null or (back.x == -v.x and back.z == -v.z)) return false;
-    t.state.conduit.held = item;
-    t.state.conduit.move_t = 0;
-    // (it comes in at the edge facing this one)
-    t.state.conduit.came = (self.dir +% 2) -% t.dir;
-    self.state.conduit.held = null;
-    return true;
+    // never hand back into a carrier facing us
+    if (back.x == -v.x and back.z == -v.z) return false;
   }
+  // (it comes in at the edge facing this one)
+  if (!ss.handIn(ctx.g, j, item, (self.dir +% 2) -% t.dir)) return !t.def().carrier;
+  self.state.conduit.held = null;
+  return true;
+}
 
-  if (ss.insert(ctx.g, j, item, 1) == 1) self.state.conduit.held = null;
+/// take an item handed in at `edge` (counted from the way it faces) into
+/// its core, if nothing runs through it.
+pub fn receive(s:*st.Structure, _:*const prog.Progression, item:items.Item, edge:m.Dir) bool {
+  const c = &s.state.conduit;
+  if (c.held != null) return false;
+  c.held = item;
+  c.move_t = 0;
+  c.came = edge;
   return true;
 }
 

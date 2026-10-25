@@ -161,6 +161,8 @@ fn digger(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
 fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   g.prog.done.insert(.living_looms);
   g.prog.done.insert(.lithophagy);
+  g.prog.done.insert(.braided_roots);
+  try braids(g, cx - 10, cz - 2);
   // the nearest spot with stone round it to eat, its cup emptied into a cache
   var r:i32 = 3;
   outer: while (r < 14) : (r += 1) {
@@ -187,6 +189,27 @@ fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
     for (m.dirs) |d| {
       const v = m.dirVec(d);
       if (try g.structs.place(g.gpa, &g.world, s.x + v.x, s.y + v.z, .sap_cache, 0, 0.25)) break;
+    }
+  }
+}
+
+/// a line of braided conduits carrying four kinds at once from one cache to
+/// another, turning a corner, on the free ground nearest (x, z):
+///   cache > braid > braid (turning)
+///                   braid (fed from its side) > cache
+fn braids(g:*Game, x:i32, z:i32) Allocator.Error!void {
+  const at = [_][2]i32{.{0, 0}, .{1, 0}, .{2, 0}, .{2, 1}, .{3, 1}};
+  const kinds = [_]st.Kind{.sap_cache, .braided_conduit, .braided_conduit, .braided_conduit, .sap_cache};
+  const dirs = [_]m.Dir{0, 0, 1, 0, 0};
+  var r:i32 = 0;
+  while (r < 8) : (r += 1) {
+    var it = m.ring(r);
+    search: while (it.next()) |o| {
+      for (at, kinds) |a, k| if (!g.structs.canPlace(&g.world, x + o[0] + a[0], z + o[1] + a[1], k)) continue :search;
+      for (at, kinds, dirs, 0..) |a, k, d, i| _ = try g.structs.place(g.gpa, &g.world, x + o[0] + a[0], z + o[1] + a[1], k, d, 0.1 * m.f(i));
+      const src = g.structs.at(&g.world, x + o[0], z + o[1]).?;
+      for ([_]items.Item{.essence, .fibre, .ley_shard, .grit}) |item| _ = g.structs.insert(&g.prog, src, item, items.STACK);
+      return;
     }
   }
 }

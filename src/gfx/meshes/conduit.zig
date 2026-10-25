@@ -29,18 +29,18 @@ const v3 = m.v3;
 
 /// rings along the root, and the control points its spline runs through
 const RES = 48;
-const CTRL = 11;
+pub const CTRL = 11;
 /// how high its arch stands over the ground, how deep its ends lie at the
 /// tile's edges, and how far the peak leans back from the middle (it
 /// rises long and dives short: the way it carries)
-const PEAK:f32 = 0.23;
+pub const PEAK:f32 = 0.23;
 const DEPTH:f32 = 0.12;
 const SKEW:f32 = 0.4;
 /// how far a straight one wanders sideways over its tile
 const MEANDER:f32 = 0.06;
 const CORE_R:f32 = 0.036;
 /// the core flares where it breaks the ground
-const FLARE:f32 = 0.25;
+pub const FLARE:f32 = 0.25;
 /// the weave: strands each way round the core, their girth, how many turns
 /// they make along it and how far over and under they pass each other
 const STRAND_R:f32 = 0.011;
@@ -72,7 +72,8 @@ pub const Arch = struct {
   /// alternate all the way round) and the turns each makes along it
   strands:u32 = 4,
   turns:f32 = 2,
-  core:vertex.Part = .core,
+  /// its core's part (none: a braided conduit lays its own cores)
+  core:?vertex.Part = .core,
   /// clusters of leaves over its top: how many leaves each
   leaves:[]const u8 = &.{2, 3, 2, 3, 2},
   runners:bool = true,
@@ -80,7 +81,7 @@ pub const Arch = struct {
 };
 
 /// where along its tile (s 0..1) it runs over the ground, x and z
-fn plan(a:Arch, s:f32) [2]f32 {
+pub fn plan(a:Arch, s:f32) [2]f32 {
   if (a.turn == 0) return .{m.lerp(a.from, a.to, s), MEANDER * @sin(m.tau * s) * @sin(m.pi * s)};
   // a quarter circle from the side edge's middle to the front edge's
   const t = m.pi + s * m.pi / 2;
@@ -89,7 +90,7 @@ fn plan(a:Arch, s:f32) [2]f32 {
 
 /// its height over the ground at s: up out of the soil steeply, a round
 /// arch leaning back, steeply down again
-fn height(a:Arch, s:f32) f32 {
+pub fn height(a:Arch, s:f32) f32 {
   const w = s + SKEW * s * (1 - s);
   const b = @max(@sin(m.pi * w), 0);
   return -a.depth + (a.peak + a.depth) * 0.5 * (b + @sqrt(b));
@@ -111,12 +112,14 @@ fn grown(b:*mg.Builder, a:Arch) Allocator.Error!void {
   k.finish(b);
 }
 
-/// the root: its spine (tu.x 0 where it enters .. 1 where it leaves), the
-/// spline it grows along on `k` (returned). The core and its weave grow
-/// along it as its front digs on; leaves unfold and soil heaps up as the
-/// front passes them.
-pub fn arch(b:*mg.Builder, k:*growth.Skeleton, a:Arch) Allocator.Error!growth.Id {
+/// the control points of an arch's spine (what its growth spline runs
+/// through), the same every time for the same arch
+pub fn spineCtrl(a:Arch) [CTRL]V3 {
   var rng = Rng.init(a.seed);
+  return spineWith(a, &rng);
+}
+
+fn spineWith(a:Arch, rng:*Rng) [CTRL]V3 {
   var ctrl:[CTRL]V3 = undefined;
   for (&ctrl, 0..) |*c, i| {
     const s = m.ratio(i, CTRL - 1);
@@ -125,6 +128,16 @@ pub fn arch(b:*mg.Builder, k:*growth.Skeleton, a:Arch) Allocator.Error!growth.Id
     const j = 0.012 * @sin(m.pi * s);
     c.* = v3(xz[0] + j * rng.range(-1, 1), height(a, s) + j * rng.range(-0.5, 0.5), xz[1] + j * rng.range(-1, 1));
   }
+  return ctrl;
+}
+
+/// the root: its spine (tu.x 0 where it enters .. 1 where it leaves), the
+/// spline it grows along on `k` (returned). The core and its weave grow
+/// along it as its front digs on; leaves unfold and soil heaps up as the
+/// front passes them.
+pub fn arch(b:*mg.Builder, k:*growth.Skeleton, a:Arch) Allocator.Error!growth.Id {
+  var rng = Rng.init(a.seed);
+  const ctrl = spineWith(a, &rng);
   const spine = k.trunk(&ctrl, .{});
   const start = b.mark();
   var sp:[RES]V3 = undefined;
@@ -140,7 +153,7 @@ pub fn arch(b:*mg.Builder, k:*growth.Skeleton, a:Arch) Allocator.Error!growth.Id
     r.* = a.core_r * (1 + knot + flare);
     c.* = color.mix(pal.sapwood_dark, pal.sapwood, m.clamp01(0.55 + 2.5 * noise.grad(a.seed +% 1, u * 9, 1.5)));
   }
-  try b.tubeC(&sp, &ts, &rs, &cols, null, a.core, 8);
+  if (a.core) |part| try b.tubeC(&sp, &ts, &rs, &cols, null, part, 8);
 
   var fn_:[RES]V3 = undefined;
   var fb:[RES]V3 = undefined;

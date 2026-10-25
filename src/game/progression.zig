@@ -43,6 +43,7 @@ const techs = struct {
   pub const lattice_of_thought = @import("research/lattice_of_thought.zig");
   pub const living_looms = @import("research/living_looms.zig");
   pub const lithophagy = @import("research/lithophagy.zig");
+  pub const braided_roots = @import("research/braided_roots.zig");
 };
 const reg = registry.Registry(techs);
 

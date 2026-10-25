@@ -48,6 +48,8 @@ pub const hand = [_]Recipe{
   // decision: costs for the lineages' structures are set here (the brief sets none)
   .{ .out = .loomfern, .in = &.{ .{ .item = .fibre, .n = 5 }, .{ .item = .essence, .n = 2 }, .{ .item = .grit, .n = 2 } }, .time = 2.5, .needs = .living_looms },
   .{ .out = .lithophage, .in = &.{ .{ .item = .grit, .n = 6 }, .{ .item = .ley_shard, .n = 2 }, .{ .item = .essence, .n = 2 }, .{ .item = .fibre, .n = 2 } }, .time = 3, .needs = .lithophagy },
+  // woven from conduits: four grown into one
+  .{ .out = .braided_conduit, .in = &.{ .{ .item = .conduit, .n = 4 }, .{ .item = .fibre, .n = 2 }, .{ .item = .essence, .n = 1 } }, .time = 2, .needs = .braided_roots },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }
@@ -70,12 +72,14 @@ pub fn woven(item:items.Item) bool {
 }
 
 fn countWhere(comptime seed:bool) usize {
+  @setEvalBranchQuota(10_000);
   var n:usize = 0;
   for (0..hand.len) |i| if (isSeedRecipe(i) == seed) { n += 1; };
   return n;
 }
 
 fn recipesWhere(comptime seed:bool) [countWhere(seed)]u8 {
+  @setEvalBranchQuota(10_000);
   var out:[countWhere(seed)]u8 = undefined;
   var k:usize = 0;
   for (0..hand.len) |i| if (isSeedRecipe(i) == seed) { out[k] = i; k += 1; };

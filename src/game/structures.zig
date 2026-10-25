@@ -10,6 +10,8 @@
 //!   gives(s, item) bool         whether `item` may leave it (default: it is
 //!                               its `output`); a braided conduit's lanes
 //!                               pull a different item each
+//!   receive(s, g, item, edge) bool  a carrier taking an item handed in at
+//!                               `edge` (counted from the way it faces)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
 //!   configure(s, g)             the player's "C" interaction
 //!   recipes() []const u8        what its panel offers to weave (indices into
@@ -56,6 +58,7 @@ const kinds = struct {
   pub const diamond = @import("structures/diamond.zig");
   pub const loomfern = @import("structures/loomfern.zig");
   pub const lithophage = @import("structures/lithophage.zig");
+  pub const braided_conduit = @import("structures/braided_conduit.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -246,6 +249,16 @@ pub const Structures = struct {
     const s = ss.get(id);
     return switch (s.kind()) {
       inline else => |k| if (comptime reg.has(k, "output")) reg.module(k).output(s) else null,
+    };
+  }
+
+  /// hand one `item` to structure `id`, coming in at `edge` (counted from
+  /// the way it faces): a carrier takes it into its core or a lane
+  /// (`receive`), anything else as `insert` does. Returns whether it went.
+  pub fn handIn(ss:*Structures, g:*const prog.Progression, id:Id, item:items.Item, edge:m.Dir) bool {
+    const s = ss.get(id);
+    return switch (s.kind()) {
+      inline else => |k| if (comptime reg.has(k, "receive")) reg.module(k).receive(s, g, item, edge) else ss.insert(g, id, item, 1) == 1,
     };
   }
 
