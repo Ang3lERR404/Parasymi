@@ -33,4 +33,4 @@ pub const wolf_claw = color.rgb(0.58, 0.54, 0.44).toRgba8(255);
 /// the same mesh always grows the same way.
 pub fn rngFor(comptime name:[]const u8) Rng {
   return Rng.init(comptime Wyhash.hash(0x9A27, name));
-}
+}
