@@ -140,7 +140,15 @@ recipes (`game/craft.zig`) are plain data tables.
   `pod`/`podAt` (the body again, small, at a frond's tip, crowned by
   frondlets: it repeats itself), `foot`, `nodule`, `roots` (exact),
   `bladder`, `frond`/`frondPath`; structures on growth splines; pale skin
-  with pearl/core by facing, lilac fronds, `sac` sap). Symbiotic structures use
+  with pearl/core by facing, lilac fronds, `sac` sap), `convergence_kit`
+  (the lineages mixed at every scale, never layered: `weave` = a lattice
+  of green wandering strands one way and pale exact ones the other,
+  violet knots where they cross, banded core; `sac` = amber and blue sap
+  swirling in arms, violet between; exact fives carrying living leaves
+  and petals: `frond` (lilac, green leaflets, crozier tip), `bloom`
+  (pale frondlet calyx, warm petals, stamens); `foot` rooted both ways;
+  `plant` for the `entwined` form, `confluence` grown through keys).
+  Symbiotic structures use
   `structure_kit` and the conduit's `arch` (its weave, spine and side
   roots: `conduit.arch`, `spineCtrl`, `core = null` for a bare weave).
 - **Structures grow along growth splines** (`gfx/growth.zig`); every new
@@ -298,6 +306,14 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
       unlimited range, into the partner; home again if it is gone, hang
       over it while it is full. `Def.far`: its spores are drawn however
       far it stands.
+- Sown hybrids (`entwined` form, `species.Body`; their function is still
+  being decided): weftstone (loomfern + lithophage, yields grit),
+  nervecrown (gathering crown + ganglion, essence, contains parasites),
+  driftbraid (braided conduit + sporecaster, ley shards; its look is the
+  approved reference). Each pair of structures grown within
+  `structures.MEET` (3) tiles is a discovery (`meets` hook,
+  `Structures.meetings`) that opens its research (WOVEN STONE, SHARED
+  NERVES, BRAIDED DRIFT), which lets germinators weave its seed.
 - Confluence (`game/convergence.zig`): a mature symbiote and parasite within
   2 tiles (or joined by a conduit chain) root a 2×2 confluence beside them
   unless one already holds them. Never sown; grows 1.5× the slower parent
