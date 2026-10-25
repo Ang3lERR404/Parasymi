@@ -24,7 +24,7 @@ pub const Recipe = struct {
   }
 };
 
-/// everything that can be woven. Seeds first (only a germinator weaves those;
+/// everything that can be woven, seeds among them (only a germinator weaves those;
 /// it weaves the rest too).
 pub const hand = [_]Recipe{
   .{ .out = .seed_lumenroot, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .starlight, .n = 1 } }, .time = 1.5 },
@@ -53,6 +53,12 @@ pub const hand = [_]Recipe{
   .{ .out = .ganglion, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2.5, .needs = .lithophagy },
   .{ .out = .gathering_crown, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .grit, .n = 1 } }, .time = 2.5, .needs = .living_looms },
   .{ .out = .sporecaster, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 3, .needs = .spore_casting },
+  // decision: the sown hybrids are spliced from what their pair works in,
+  // bound by what the lineages' meeting condenses (the brief sets no cost);
+  // last, so the weaves chosen in saved gardens keep their places
+  .{ .out = .seed_weftstone, .in = &.{ .{ .item = .fibre, .n = 2 }, .{ .item = .grit, .n = 2 }, .{ .item = .convergence_essence, .n = 1 } }, .time = 3, .needs = .woven_stone },
+  .{ .out = .seed_nervecrown, .in = &.{ .{ .item = .essence, .n = 2 }, .{ .item = .fibre, .n = 1 }, .{ .item = .convergence_essence, .n = 1 } }, .time = 3, .needs = .shared_nerves },
+  .{ .out = .seed_driftbraid, .in = &.{ .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 1 }, .{ .item = .convergence_essence, .n = 1 } }, .time = 3.5, .needs = .braided_drift },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }

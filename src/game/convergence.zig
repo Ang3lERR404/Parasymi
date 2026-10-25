@@ -39,6 +39,8 @@ pub const Seeker = struct {
   cramped:bool = false,
 
   pub fn tick(sk:*Seeker, gpa:Allocator, w:*World, p:*Plants, ss:*st.Structures, g:*prog.Progression) Allocator.Error!void {
+    // lineage structures side by side are witnessed once per sweep
+    if (sk.cursor == 0) ss.meetings(g);
     if (p.topology_dirty) p.rebuildLinks(w);
     const n = p.len();
     if (n == 0) return;
@@ -269,4 +271,28 @@ test "no room, no confluence" {
   try gd.sweep(gpa);
   try testing.expectEqual(@as(usize, 0), gd.hybrids());
   try testing.expect(gd.sk.cramped);
+}
+test "lineage structures grown side by side are witnessed, once each" {
+  const gpa = testing.allocator;
+  var gd = try Garden.init(gpa, 12);
+  defer gd.deinit(gpa);
+  // four tiles apart (three between): not yet
+  try testing.expect(try gd.ss.place(gpa, &gd.w, 1, 1, .loomfern, 0, 0));
+  try testing.expect(try gd.ss.place(gpa, &gd.w, 6, 1, .lithophage, 0, 0));
+  try gd.sweep(gpa);
+  try testing.expect(!gd.g.found.contains(.loom_and_stone));
+  // a still growing one does not count
+  try testing.expect(try gd.ss.place(gpa, &gd.w, 4, 3, .lithophage, 0, 0));
+  gd.ss.sprout(gd.ss.at(&gd.w, 4, 3).?);
+  try gd.sweep(gpa);
+  try testing.expect(!gd.g.found.contains(.loom_and_stone));
+  gd.ss.get(gd.ss.at(&gd.w, 4, 3).?).grown = 1;
+  try gd.sweep(gpa);
+  try testing.expect(gd.g.found.contains(.loom_and_stone));
+  // its study opens, the other pairs' stay dormant
+  gd.g.done.insert(.lithophagy);
+  gd.g.done.insert(.living_looms);
+  try testing.expectEqual(prog.Status.open, gd.g.status(.woven_stone));
+  try testing.expectEqual(prog.Status.locked, gd.g.status(.shared_nerves));
+  try testing.expect(!gd.g.found.contains(.crown_and_nerve) and !gd.g.found.contains(.braid_and_spore));
 }

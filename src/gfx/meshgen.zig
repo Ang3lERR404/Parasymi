@@ -11,6 +11,7 @@ const species = @import("../sim/species.zig");
 const color = @import("../core/color.zig");
 const noise = @import("../core/noise.zig");
 const parasite_kit = @import("meshes/parasite_kit.zig");
+const convergence_kit = @import("meshes/convergence_kit.zig");
 
 const V3 = m.V3;
 const PV = vertex.Mesh;
@@ -800,8 +801,9 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
     .coil => try parasite_kit.plant(b, g, seed + @as(u64, variant) * 131),
     .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
     .radiant => try radiant(b, g, seed + @as(u64, variant) * 131, variant),
+    .entwined => try convergence_kit.plant(b, g, seed + @as(u64, variant) * 131),
     // a confluence's variants are its growth keys, all grown from one seed
-    .confluence => try confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
+    .confluence => try convergence_kit.confluence(b, g, seed, m.ratio(variant, KEYS - 1)),
   }
 }
 
@@ -1398,242 +1400,16 @@ fn lightThread(b:*Builder, g:Growth, r:f32, col:color.Rgba8) Allocator.Error!V3 
   return path[13];
 }
 
-/// tu.x where the confluence's braid gives way to its vines.
-const FRAY = 0.55;
-/// control points over which a vine peels off the line of its strand.
-const PEEL = 4;
 /// growth keys a confluence is built at, evenly from sprout (0) to bloom (1).
 /// Every key has the same vertices in the same order, so the plant shader
 /// blends between the two around a plant's growth: it grows, never jumps.
 pub const KEYS = 8;
 
-/// how each part of a confluence has come along at `growth` (0..1)
-const Grown = struct {
-  /// the braid's height and girth
-  rise:f32,
-  /// the vines' length
-  reach:f32,
-  /// the canopy's petals
-  bloom:f32,
-
-  fn at(growth:f32) Grown {
-    return .{
-      .rise = m.lerp(0.3, 1, m.smooth(m.clamp01(growth / 0.5))),
-      .reach = m.smooth(m.clamp01((growth - 0.15) / 0.6)),
-      .bloom = m.smooth(m.clamp01((growth - 0.72) / 0.28)),
-    };
-  }
-};
-
-/// the confluence at `growth` (0..1): a symbiotic braid below whose strands
-/// gather at its crown and carry on, each as one unbroken tube, into a
-/// parasitic vine reaching up and out, green blending to red along it. The
-/// leader returns to the axis and opens into a canopy of sap petals.
-/// Nothing appears or vanishes with growth (a part not yet grown is folded
-/// to nothing), so every growth gives the same vertex layout.
-fn confluence(b:*Builder, g:species.Genome, seed:u64, growth:f32) Allocator.Error!void {
-  const gr = Grown.at(growth);
-  var rng = Rng.init(seed);
-  const core = color.shade(g.stem_col, 0.55);
-  const strand = color.shade(g.stem_col, 1.3);
-  const orange = color.rgb(g.leaf_col.r * 1.2, g.leaf_col.g * 1.9, g.leaf_col.b * 1.1).toRgba8(255);
-  const red = g.leaf_col.toRgba8(255);
-
-  // the braid: dense symbiotic weave, flaring into the ground and gathering
-  // at its crown, where the strands leave it
-  const RES = 24;
-  const STRANDS = 7;
-  const TWIST:f32 = 3;
-  const WOBBLE:f32 = 0.04;
-  const trunk_h = g.stem_h * FRAY;
-  const lean = m.norm(m.v3(rng.range(-0.05, 0.05), 1, rng.range(-0.05, 0.05)));
-  var ctrl:[8]V3 = undefined;
-  growthPath(.{.start = m.v3(0, 0, 0), .direction = lean, .length = trunk_h * gr.rise, .wobble = g.wobble, .curl = g.curl, .seed = seed ^ 0x57E4}, &ctrl);
-  var spine:[RES]V3 = undefined;
-  m.splineResample(&ctrl, &spine);
-  var ts:[RES]f32 = undefined;
-  var radii:[RES]f32 = undefined;
-  var core_r:[RES]f32 = undefined;
-  for (&ts, &radii, &core_r, 0..) |*t, *r, *cr, i| {
-    const k = m.ratio(i, RES - 1);
-    t.* = k * FRAY * gr.rise;
-    const flare = 1 - k;
-    const crown = m.smooth(m.clamp01((k - 0.8) / 0.2));
-    r.* = g.stem_r * (0.7 + 0.3 * gr.rise) * m.lerp(1, 0.75, k) * (1 + 0.6 * flare * flare * flare * flare) * m.lerp(1, 0.55, crown);
-    // the core closes over at the crown instead of ending in a flat cut
-    cr.* = r.* * BRAID_CORE * (1 - 0.85 * m.smooth(m.clamp01((k - 0.85) / 0.15)));
-  }
-  try b.tubeR(&spine, &ts, &core_r, core, .stem, 8);
-
-  // buttress roots splay toward the corners of the footprint
-  for (0..4) |i| {
-    const a = (m.f(i) + 0.5) / 4 * m.tau + rng.range(-0.2, 0.2);
-    const from = m.v3(0, trunk_h * gr.rise * 0.18, 0);
-    const spread = 0.75 * (0.6 + 0.4 * gr.rise);
-    const to = m.v3(@cos(a) * spread, -0.02, @sin(a) * spread);
-    var rc:[6]V3 = undefined;
-    growthPath(.{.start = from, .direction = m.norm(to - from), .length = m.len(to - from), .wobble = 0.15, .seed = seed +% i * 53}, &rc);
-    var rs:[12]V3 = undefined;
-    m.splineResample(&rc, &rs);
-    var rt:[12]f32 = undefined;
-    var rr:[12]f32 = undefined;
-    for (&rt, &rr, 0..) |*t, *r, j| {
-      const k = m.ratio(j, 11);
-      t.* = 0.05 * (1 - k);
-      r.* = g.stem_r * 0.42 * m.lerp(1, 0.45, k);
-    }
-    try braid(b, &rs, &rt, &rr, 3, 2, 0.05, seed +% i * 7, core, strand);
-  }
-
-  // each strand: wound around the core up the braid (as `braidTurned` winds
-  // them), then on past the crown as its vine, one tube from root to tip
-  var fn_:[RES]V3 = undefined;
-  var fb:[RES]V3 = undefined;
-  transport(&spine, &fn_, &fb);
-  const top = spine[RES - 1];
-  const VC = 10;
-  const VR = 28;
-  const N = RES + VR - 1;
-  var leader_tip = top;
-  for (0..STRANDS) |si| {
-    var path:[N]V3 = undefined;
-    var pt:[N]f32 = undefined;
-    var pu:[N]f32 = undefined;
-    var pr:[N]f32 = undefined;
-    var cols:[N]color.Rgba8 = undefined;
-    const a0 = m.ratio(si, STRANDS) * m.tau;
-    const sd = seed +% si * STRAND_SALT;
-    for (0..RES) |i| {
-      const u = m.ratio(i, RES - 1);
-      const a = a0 + u * TWIST + strandTurn(sd, u, WOBBLE);
-      const off = radii[i] * BRAID_OFF * strandSwell(sd, u, WOBBLE);
-      path[i] = spine[i] + (fn_[i] * m.splat3(@cos(a)) + fb[i] * m.splat3(@sin(a))) * m.splat3(off);
-      pt[i] = ts[i];
-      pu[i] = 0;
-      pr[i] = radii[i] * BRAID_STRAND;
-      cols[i] = strand;
-    }
-    const root = path[RES - 1];
-    const along = m.norm(root - path[RES - 2]);
-    // the leader climbs back over the axis; the rest reach up and out
-    const leader = si == 0;
-    const e = rng.range(0.5, 1.0);
-    const span = (g.stem_h - trunk_h) * rng.range(0.8, 1.05);
-    const target = if (leader)
-      top + m.v3(0, (g.stem_h - trunk_h) * gr.reach, 0)
-    else blk: {
-      const out = m.norm(m.v3(root[0] - top[0], 0, root[2] - top[2]));
-      break :blk root + (out * m.splat3(@cos(e)) + m.v3(0, @sin(e), 0)) * m.splat3(span * gr.reach);
-    };
-    // a vine not yet grown is a bud at the strand's end, never nothing
-    const to = target - root;
-    const len = @max(m.len(to), 0.004);
-    const dir = if (m.len(to) > 1e-4) m.norm(to) else along;
-    var vc:[VC]V3 = undefined;
-    growthPath(.{
-      .start = root, .direction = dir, .length = len,
-      .wobble = g.tendril_wobble, .curl = g.tendril_curl, .seed = seed +% si * 31,
-    }, &vc);
-    // over the first PEEL control points the vine leaves the line the
-    // strand was on for its own path
-    for (vc[1..], 1..) |*p, j| {
-      const w = m.smooth(@min(1, m.ratio(j, PEEL)));
-      const hug = root + along * m.splat3(m.len(p.* - root));
-      p.* = hug + (p.* - hug) * m.splat3(w);
-    }
-    var vp:[VR]V3 = undefined;
-    m.splineResample(&vc, &vp);
-    const body = g.stem_r * (if (leader) @as(f32, 0.36) else 0.28) * m.lerp(0.3, 1, gr.reach);
-    const t0 = ts[RES - 1];
-    const t1 = m.lerp(t0, if (leader) @as(f32, 1) else 0.92, gr.reach);
-    // vp[0] is the strand's last point: the vine starts one ring on
-    for (1..VR) |j| {
-      const k = m.ratio(j, VR - 1);
-      const at = RES - 1 + j;
-      path[at] = vp[j];
-      pt[at] = m.lerp(t0, t1, k);
-      pu[at] = k;
-      // the strand swells into the vine, then tapers to its tip
-      pr[at] = @max(m.lerp(pr[RES - 1], body, m.smooth(@min(1, k / 0.15))) * m.lerp(1, 0.25, k), 1e-3);
-      // the transition zone: a gradient, never a line
-      const warm = color.mix(strand, orange, m.smooth(m.clamp01((k - 0.12) / 0.4)));
-      cols[at] = color.mix(warm, red, m.smooth(m.clamp01((k - 0.45) / 0.45)));
-    }
-    try b.tubeC(&path, &pt, &pr, &cols, &pu, .tendril, 6);
-    // the green, braid-side length of each vine grows leaves like any vine
-    // (sized by growth, never absent, so every key keeps one layout)
-    try leavesAlong(b, path[RES - 1 ..], 3, @max(g.stem_r * 1.5 * gr.reach, 0.01), g.stem_r * 0.5 * @max(gr.reach, 0.2), 0.06, 0.38, pt[RES - 1], pt[N - 1], color.shade(g.stem_col, 0.9), color.shade(g.stem_col, 1.4), seed +% si * 17);
-    if (leader) leader_tip = path[N - 1];
-  }
-
-  const heart = color.shade(g.bloom_col, 0.8);
-  const rim = color.rgb(0.82, 0.6, 1.0).toRgba8(255);
-  // its stamens: pale violet filaments, anthers of amber pollen
-  const stamen_col = color.rgb(0.86, 0.78, 0.96).toRgba8(255);
-  const pollen = color.rgb(0.95, 0.66, 0.26).toRgba8(255);
-
-  // offshoots: woven side stems reaching out of the braid as it rises, each
-  // ending in a sap bud, some of which open into small canopies with the
-  // crown's (grown in the keys like everything else: a stem not yet grown
-  // is a nub on the braid, a bud not yet opened stays closed)
-  var srng = Rng.init(seed ^ 0x0FF5);
-  const shoots = shootCount(g, &srng);
-  for (0..shoots) |i| {
-    const k = m.lerp(0.35, 0.85, (m.f(i) + srng.range(0.2, 0.8)) / m.f(shoots));
-    const ang = m.f(i) * 2.39996 * 1.7 + 0.8 + srng.range(-0.3, 0.3);
-    const len = g.stem_h * srng.range(0.22, 0.32) * m.lerp(0.05, 1, gr.reach);
-    const tip = try offshoot(b, &spine, k, ts[0] + (ts[RES - 1] - ts[0]) * k, ang, len, g.stem_r * 0.16 * m.lerp(0.4, 1, gr.reach), srng.range(0.3, 0.6), strand, .stem, seed +% i * 211);
-    try leavesAlong(b, tip.path[0..], 2, @max(g.stem_r * 1.1 * gr.reach, 0.01), g.stem_r * 0.4 * @max(gr.reach, 0.2), 0.3, 0.7, tip.t0, tip.t1, color.shade(g.stem_col, 0.9), color.shade(g.stem_col, 1.4), seed +% i * 59);
-    const opens = srng.float() < 0.5;
-    const op = if (opens) gr.bloom else 0;
-    const sc = srng.range(0.35, 0.45) * m.lerp(0.3, 1, gr.reach);
-    for (0..6) |j| {
-      const a = m.ratio(j, 6) * m.tau + m.f(i);
-      try petal(b, .{
-        .base = tip.at, .out = m.v3(@cos(a), 0, @sin(a)),
-        .len = g.bloom_r * sc * m.lerp(0.55, 1, op),
-        .width = g.bloom_r * sc * m.lerp(0.3, 0.5, op),
-        .rise = m.lerp(1.35, 0.55, op), .flare = m.lerp(-0.45, 0.7, op),
-        .cup = m.lerp(0.7, 0.4, op), .col = heart, .tip = rim, .t = tip.t1,
-      });
-    }
-    try stamens(b, .{
-      .heart = tip.at, .axis = tip.axis, .n = 5,
-      .len = g.bloom_r * sc * m.lerp(0.2, 0.55, op), .r = g.bloom_r * sc * 0.03, .anther = g.bloom_r * sc * m.lerp(0.08, 0.16, op),
-      .lean = m.lerp(0.05, 0.35, op), .arch = m.lerp(0.1, 0.6, op), .col = stamen_col, .tip = pollen, .t = tip.t1, .spin = m.f(i), .seed = seed +% i * 41,
-    });
-  }
-
-  // the canopy: translucent sap petals, violet at the heart, amber at the
-  // rim
-  // a closed upright bud that opens with growth: the petals lengthen, lean
-  // out and flare, an outer whorl and a smaller inner one
-  const op = gr.bloom;
-  for (0..g.petals + 6) |i| {
-    const outer = i < g.petals;
-    const a = if (outer) m.ratio(i, g.petals) * m.tau else (m.f(i - g.petals) + 0.5) / 6 * m.tau;
-    try petal(b, .{
-      .base = leader_tip, .out = m.v3(@cos(a), 0, @sin(a)),
-      .len = g.bloom_r * m.lerp(0.3, if (outer) @as(f32, 1) else 0.65, op),
-      .width = g.bloom_r * m.lerp(0.12, if (outer) @as(f32, 0.5) else 0.38, op),
-      .rise = m.lerp(1.45, if (outer) @as(f32, 0.5) else 1.05, op),
-      .flare = m.lerp(0.0, if (outer) @as(f32, 0.75) else 0.45, op),
-      .cup = 0.4, .col = heart, .tip = rim,
-    });
-  }
-  // stamens: a tight sheaf inside the bud, spreading as it opens
-  try stamens(b, .{
-    .heart = leader_tip, .axis = m.v3(0, 1, 0), .n = 9,
-    .len = g.bloom_r * m.lerp(0.18, 0.5, op), .r = g.bloom_r * m.lerp(0.012, 0.022, op), .anther = g.bloom_r * m.lerp(0.05, 0.1, op),
-    .lean = m.lerp(0.05, 0.4, op), .arch = m.lerp(0.1, 0.6, op), .col = stamen_col, .tip = pollen, .seed = seed ^ 0x5A3E,
-  });
-}
-
 /// how many meshes a species is built as: shapes picked by tile, or for a
 /// confluence its growth keys.
 pub fn variants(id:species.Id) u32 {
   return switch (species.get(id).genome.form) {
-    .herb, .coil, .drift, .radiant => VARIANTS,
+    .herb, .coil, .drift, .radiant, .entwined => VARIANTS,
     .confluence => KEYS,
   };
 }
@@ -1643,7 +1419,7 @@ pub fn variants(id:species.Id) u32 {
 pub const Key = struct { v:u32, f:f32 };
 pub fn growthKey(id:species.Id, growth:f32) ?Key {
   switch (species.get(id).genome.form) {
-    .herb, .coil, .drift, .radiant => return null,
+    .herb, .coil, .drift, .radiant, .entwined => return null,
     .confluence => {
       const x = m.clamp01(growth) * (KEYS - 1);
       const v = @min(m.floorTo(u32, x), KEYS - 2);

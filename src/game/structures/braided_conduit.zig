@@ -33,6 +33,9 @@ const mesh = @import("../../gfx/meshes/braided_conduit.zig");
 /// its own arches, one per edge it is fed from; `mesh` is its preview.
 pub const def:st.Def = .{ .item = .braided_conduit, .size = 1, .mesh = .braided_conduit, .grow = 2, .carrier = true, .bare = true, .tall = 0.3 };
 
+/// a sporecaster grown beside it: the study of braided drift
+pub const meets:st.Meeting = .{ .kind = .sporecaster, .found = .braid_and_spore };
+
 pub const LANES = mesh.LANES;
 /// tiles per second a lane carries (a conduit carries 2.5)
 pub const SPEED:f32 = 3.5;

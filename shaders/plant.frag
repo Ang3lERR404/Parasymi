@@ -38,6 +38,8 @@ const vec3 DEAD_BROWN = vec3(0.18, 0.12, 0.06);
 const float SAP_EDGE_POW = 5.0;
 // how much thin sap-filled growth glistens (under its skin, less than bare sap)
 const float SKIN_GLISTEN = 0.6;
+// the forms whose `.bloom` is bare sap of both lineages, not a petal
+const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE) | FORM_BIT(FORM_ENTWINED);
 // a placement preview: green where it fits, red where it cannot be sown,
 // breathing at this rate (rad/s)
 const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
@@ -92,11 +94,12 @@ void surface() {
     o = vec4(applyFog(c, v_pos), a);
     return;
   }
-  if (isForm(v_form, FORM_CONFLUENCE) && part == PART_BLOOM) {
-    // a confluence's sap petal: see-through violet face-on, amber at grazing
-    // angles. Hue follows the vertex colour.
+  if (formIn(FORMS_SAP_BLOOM, v_form) && part == PART_BLOOM) {
+    // the lineages' sap mixed (convergence_kit `sac`): see-through face-on,
+    // warming to amber at grazing angles. Hue follows the vertex colour, so
+    // its two saps swirl in it.
     vec3 deep = v_col * 0.18 * health;
-    vec3 c = shadeLit(deep, n, v_pos, sh) + mix(v_col * 0.8, mix(v_col, AMBER, 0.45) * 2.0, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.3 + fill * 0.3) * lit;
+    vec3 c = shadeLit(deep, n, v_pos, sh) + mix(v_col * 0.8, mix(v_col, AMBER, 0.2) * 2.0, pow(1.0 - ndv, SAP_EDGE_POW)) * (0.3 + fill * 0.3) * lit;
     c += mix(v_col, AMBER, 0.3) * max(dot(-n, SUN), 0.0) * 0.25 * klit;
     c += mix(v_col, AMBER, 0.3) * pointLight(v_pos, n, 1.0) * 0.5;
     vec3 g = sapGlisten(n, V, v_pos, v_obj, mix(v_col, AMBER, 0.3), 1.0 - fres, sh) * health;

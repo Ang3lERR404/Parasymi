@@ -23,6 +23,9 @@ const kinds = struct {
   pub const driftwisp = @import("seeds/driftwisp.zig");
   pub const hollowheart = @import("seeds/hollowheart.zig");
   pub const bloom = @import("seeds/bloom.zig");
+  pub const weftstone = @import("seeds/weftstone.zig");
+  pub const nervecrown = @import("seeds/nervecrown.zig");
+  pub const driftbraid = @import("seeds/driftbraid.zig");
 };
 const reg = registry.Registry(kinds);
 

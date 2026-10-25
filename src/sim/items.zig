@@ -16,6 +16,7 @@ pub const Item = enum(u8) {
   // later additions go last, so stored item ids never shift
   seed_bloom, polyp, diamond,
   loomfern, lithophage, braided_conduit, ganglion, gathering_crown, sporecaster,
+  seed_weftstone, seed_nervecrown, seed_driftbraid,
 
   pub fn info(i:Item) Info { return infos.get(i); }
 
@@ -54,6 +55,9 @@ const infos = EnumArray(Item, Info).init(.{
   .ganglion = .{.col = .{200, 185, 225, 255}},
   .gathering_crown = .{.col = .{235, 180, 95, 255}},
   .sporecaster = .{.col = .{215, 205, 240, 255}},
+  .seed_weftstone = .{.col = .{185, 200, 150, 255}},
+  .seed_nervecrown = .{.col = .{225, 175, 205, 255}},
+  .seed_driftbraid = .{.col = .{175, 190, 235, 255}},
 });
 
 pub const Stack = struct { item:Item, n:u16 };

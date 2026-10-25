@@ -28,6 +28,8 @@
 //!                               (by research), its growing in aside
 //!   icon(ic, col)               its bulb in the HUD: the seed (`ic.coat`) and a
 //!                               sprout or two showing what it does (`icon.zig`)
+//!   meets:Meeting               the other lineage's structure that, grown
+//!                               beside it, is a discovery (`Structures.meetings`)
 //! Missing hooks fall back to doing nothing. A new structure is one new file
 //! plus one line in `kinds`.
 const std = @import("std");
@@ -114,6 +116,12 @@ pub const Def = struct {
 };
 
 pub const defs = reg.table(Def, "def");
+
+/// a structure of the other lineage that, both grown within `MEET` tiles of
+/// each other, is witnessed as `found`
+pub const Meeting = struct { kind:Kind, found:prog.Discovery };
+/// tiles apart (between footprints) that still count as side by side
+pub const MEET = 3;
 /// per-kind state; the active tag is the structure's kind.
 pub const State = reg.Union("State");
 
@@ -177,6 +185,15 @@ fn freshState(k:Kind) State {
 }
 
 fn dry(k:ck.Kind) bool { return k != .water; }
+
+/// empty tiles between two structures' footprints (0: touching)
+fn gap(a:*const Structure, b:*const Structure) i32 {
+  const sa:i32 = a.def().size;
+  const sb:i32 = b.def().size;
+  const dx = @max(b.x - (a.x + sa), a.x - (b.x + sb), -1);
+  const dy = @max(b.y - (a.y + sa), a.y - (b.y + sb), -1);
+  return @max(dx, dy, 0);
+}
 
 /// a hook result that may be an error union, as one
 fn orFail(r:anytype) Allocator.Error!bool { return r; }
@@ -285,6 +302,25 @@ pub const Structures = struct {
     const k:u16 = @intCast(@min(n, ss.wants(g, id, item)));
     if (k == 0) return 0;
     return ss.get(id).inv.add(item, k);
+  }
+
+  /// witness every pair of grown structures that `meets` the other (once
+  /// each: a discovery found is never looked for again)
+  pub fn meetings(ss:*const Structures, g:*prog.Progression) void {
+    for (ss.list.items) |*a| {
+      if (a.grown < 1) continue;
+      const mt:Meeting = switch (a.kind()) {
+        inline else => |k| if (comptime reg.has(k, "meets")) reg.module(k).meets else continue,
+      };
+      if (g.found.contains(mt.found)) continue;
+      for (ss.list.items) |*b| {
+        if (b.kind() != mt.kind or b.grown < 1) continue;
+        if (gap(a, b) <= MEET) {
+          g.discover(mt.found);
+          break;
+        }
+      }
+    }
   }
 
   pub fn tick(ss:*Structures, gpa:Allocator, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) Allocator.Error!void {

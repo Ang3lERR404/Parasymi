@@ -53,6 +53,7 @@ pub const Strings = struct {
     entwine:S = "", hybrid_stirs:S = "", withered:S = "",
     essence_converges:S = "", veil_thins:S = "", arsthraxia_grows:S = "",
     germinator_weaves:S = "", halo_forms:S = "", diamond_forms:S = "", lattice_stirs:S = "",
+    loom_meets_stone:S = "", crown_meets_nerve:S = "", braid_meets_spore:S = "", research_named:S = "",
     spores_choose:S = "", spores_paired:S = "", spores_still:S = "",
     saved:S = "", autosaved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_gardens:S = "",
     no_fullscreen:S = "", options_unsaved:S = "",

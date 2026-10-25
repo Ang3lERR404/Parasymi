@@ -2,7 +2,9 @@
 //! where a mature symbiote and a mature parasite meet (game/convergence.zig),
 //! grows for half again as long as the slower parent, and once mature
 //! contains the parasites around it rather than killing them. Condenses
-//! convergence essence.
+//! convergence essence. Its body tells the meeting (gfx/meshes/
+//! convergence_kit.zig `confluence`): a trunk of each lineage winding up
+//! round the other and fusing into one weave of both, crowned by flowers.
 const species = @import("../species.zig");
 const color = @import("../../core/color.zig");
 
@@ -15,15 +17,12 @@ pub const def:species.Species = .{
   .stages = 4,
   .genome = .{
     .form = .confluence,
-    .stem_h = 2.8, .stem_r = 0.34, .segments = 10, .curl = 0.04, .wobble = 0.08,
+    // its height and the girth of its trunks, its flowers' petals and
+    // size (the rest of its body is the kit's; colours too)
+    .stem_h = 2.8, .stem_r = 0.2, .segments = 0, .curl = 0, .wobble = 0.08,
     .leaves = 0, .leaf_len = 0, .leaf_w = 0, .leaf_droop = 0,
-    .petals = 11, .bloom_r = 0.55, .thorns = 0, .tendrils = 7,
-    .tendril_curl = 0.15, .tendril_wobble = 0.2,
-    // one shape grown through keys: the count is drawn once, from the seed
-    .shoots = .{3, 5},
-    // stem: the symbiotic weave; leaf: where it frays into the parasitic
-    // reach; bloom: violet sap at the heart of a petal, amber at its rim
-    .stem_col = color.rgb(0.2, 0.48, 0.38), .leaf_col = color.rgb(0.52, 0.2, 0.18), .bloom_col = color.rgb(0.55, 0.3, 0.95),
+    .petals = 8, .bloom_r = 0.55, .thorns = 0, .tendrils = 0, .shoots = .{0, 0},
+    .stem_col = color.rgb(0.36, 0.58, 0.24), .leaf_col = color.rgb(0.68, 0.62, 0.82), .bloom_col = color.rgb(0.58, 0.36, 0.9),
   },
   .parents = .{.lumenroot, .thornleech},
 };

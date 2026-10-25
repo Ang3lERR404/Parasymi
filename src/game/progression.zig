@@ -45,10 +45,18 @@ const techs = struct {
   pub const lithophagy = @import("research/lithophagy.zig");
   pub const braided_roots = @import("research/braided_roots.zig");
   pub const spore_casting = @import("research/spore_casting.zig");
+  pub const woven_stone = @import("research/woven_stone.zig");
+  pub const shared_nerves = @import("research/shared_nerves.zig");
+  pub const braided_drift = @import("research/braided_drift.zig");
 };
 const reg = registry.Registry(techs);
 
-pub const Discovery = enum { convergence, diamond };
+pub const Discovery = enum {
+  convergence, diamond,
+  /// a pair of lineage structures grown side by side (structures `meets`):
+  /// each opens the study of the hybrid they would make
+  loom_and_stone, crown_and_nerve, braid_and_spore,
+};
 
 pub const Id = reg.Id;
 
@@ -241,6 +249,18 @@ pub const Progression = struct {
       },
       .diamond => {
         g.say(txt.s.msg.lattice_stirs, .{});
+      },
+      .loom_and_stone => {
+        g.say(txt.s.msg.loom_meets_stone, .{});
+        g.say(txt.s.msg.research_named, .{txt.research(.woven_stone).name});
+      },
+      .crown_and_nerve => {
+        g.say(txt.s.msg.crown_meets_nerve, .{});
+        g.say(txt.s.msg.research_named, .{txt.research(.shared_nerves).name});
+      },
+      .braid_and_spore => {
+        g.say(txt.s.msg.braid_meets_spore, .{});
+        g.say(txt.s.msg.research_named, .{txt.research(.braided_drift).name});
       },
     }
   }

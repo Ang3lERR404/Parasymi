@@ -17,6 +17,9 @@ const parts = struct {
   pub const hollowheart = @import("species/hollowheart.zig");
   pub const confluence = @import("species/confluence.zig");
   pub const bloom = @import("species/bloom.zig");
+  pub const weftstone = @import("species/weftstone.zig");
+  pub const nervecrown = @import("species/nervecrown.zig");
+  pub const driftbraid = @import("species/driftbraid.zig");
 };
 const reg = registry.Registry(parts);
 
@@ -47,18 +50,35 @@ pub const Form = enum(u8) {
   /// (`stem_h`) lifting a wide catcher dish (`petals`), and filaments
   /// (`tendrils`) trailing beneath; nothing reaches the ground
   drift,
-  /// a symbiotic braid below that frays into parasitic vines above, crowned
-  /// by translucent sap petals: both lineages in one body
+  /// where the lineages first meet: two trunks, one of each, winding round
+  /// each other and fusing into one entwined crown (gfx/meshes/
+  /// convergence_kit.zig), grown through keys
   confluence,
   /// a structure of light: a luminous core with fragments orbiting it
   /// (`petals` lens plates, `bloom_r` its size); it assembles rather than
   /// grows, and drifts rather than bends
   radiant,
+  /// the sown hybrids, both lineages woven into one body at every scale
+  /// (gfx/meshes/convergence_kit.zig): its `body` says which
+  entwined,
+};
+
+/// which of the sown hybrids an `entwined` genome grows into: each the
+/// plant of one pair of lineage structures meeting
+pub const Body = enum(u8) {
+  /// loomfern and lithophage: a fern of five exact fronds round a crop
+  weft,
+  /// gathering crown and ganglion: a rosette and a knot of nerves
+  nerve,
+  /// braided conduit and sporecaster: lanes winding up to a spore crown
+  drift,
 };
 
 /// procedural mesh parameters (see gfx/meshgen.zig).
 pub const Genome = struct {
   form:Form = .herb,
+  /// an `entwined` form's body (ignored by the others)
+  body:Body = .weft,
   /// the stem grows as a vine (gfx/meshgen.zig `Growth`): `segments`+1
   /// control points, `curl` spiral (0 none .. 0.5 tight), `wobble` noise.
   stem_h:f32, stem_r:f32, segments:u8, curl:f32, wobble:f32 = 0.1,

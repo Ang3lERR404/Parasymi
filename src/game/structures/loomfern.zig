@@ -30,6 +30,9 @@ const v3 = m.v3;
 
 pub const def:st.Def = .{ .item = .loomfern, .size = 1, .mesh = .loomfern, .store = true, .grow = 5, .sway = 0.7, .tall = 0.5 };
 
+/// a lithophage grown beside it: the study of woven stone
+pub const meets:st.Meeting = .{ .kind = .lithophage, .found = .loom_and_stone };
+
 /// seconds a fibre takes unfed, and fed
 pub const SLOW:f32 = 12;
 pub const FAST:f32 = 3;
