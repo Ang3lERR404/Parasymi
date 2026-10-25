@@ -514,6 +514,13 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   autosave, stored in `options.cfg` (in the gardener's folder, written when one
   changes, kept across save loads); main applies `Game.opts` when it
   differs from what is in effect.
+- Loading screen (`game/loading.zig`, wired in main): a living night
+  (`Draw.night`, ui.frag) with the name, a tendril growing as far as what
+  is made (leaves opening as it passes), the stage, percent, made/left.
+  Stages: every mesh grown on a thread of its own (`Renderer.meshProgress`
+  / `meshesReady` uploads once through), the world woken, its ground
+  meshed in 25 ms slices (`World.unmeshed`); also after a load in play.
+  It fades off play's first frames (0.6 s).
 - UI: wobbling membranes, seed-pod slots, tendril bars, soft glow, stems
   (`Draw.limb`) and leaves/buds (`Draw.leaf`), seeds (`Draw.grain`) and
   gems (`Draw.gem`); 150 ms anim.
@@ -626,7 +633,7 @@ planes/fur passes, confluence, celestial bloom + radiance, GPU detail,
 LOD + culling, bloom post-processing, research sapling panel, halo + diamond structure + Celestial Defragmentation,
 anti-aliasing (MSAA/FXAA) + options panel, the wolf as one sculpted skinned
 mesh with procedural locomotion (planted feet, leg IK, springs), saved gardens
-menu + autosave, files in `%LOCALAPPDATA%\Parasymi`, growth splines
+menu + autosave, files in `%LOCALAPPDATA%\Parasymi`, loading screen, growth splines
 (every structure but the diamond), lineage structures (3 per lineage, see
 Design).
 **Next (vertical slice):**
