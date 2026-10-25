@@ -50,7 +50,6 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   try lineages(g, cx, cz);
   try confluences(g, cx, cz);
   try convergent(g, cx, cz);
-  try blooms(g, cx, cz);
 
   var t:f32 = 0;
   while (t < seconds) : (t += play.TICK) try g.step();
@@ -72,19 +71,11 @@ pub fn demo(g:*Game, seconds:f32) Allocator.Error!void {
   _ = g.player.inv.add(.root_digger, 2);
 }
 
-/// a symbiote and a parasite two tiles apart, left to converge, and a row of
-/// confluences held at each growth stage.
+/// a symbiote and a parasite two tiles apart, left to converge (a
+/// confluence's stages are viewed with `--plant=confluence`).
 fn confluences(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   _ = try g.plants.place(g.gpa, &g.world, cx + 4, cz - 7, .lumenroot, 0.3);
   _ = try g.plants.place(g.gpa, &g.world, cx + 6, cz - 7, .thornleech, 0.6);
-  for ([_]f32{ 0.1, 0.35, 0.6, 0.95 }, 0..) |growth, i| {
-    const x = cx - 6 + 3 * @as(i32, @intCast(i));
-    // effectively infinite: holds the stage for viewing without growing
-    _ = try g.plants.placeEx(g.gpa, &g.world, x, cz + 9, .{
-      .x = x, .y = cz + 9, .chunk = undefined, .tile = undefined, .sp = .confluence,
-      .seed = 0.2 * m.f(i), .growth = growth, .span = 1e9, .mana = 20,
-    });
-  }
 }
 
 /// the convergent structures south of the confluences: a weftstone
@@ -133,25 +124,6 @@ fn loom(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
     if (!try g.structs.place(g.gpa, &g.world, vx, c.y, .vultrixi, 0, 0.2 + 0.15 * m.f(k))) continue;
     st.configure(&g.structs, g.structs.floaterAt(vx, c.y).?, &g.prog);
     st.configure(&g.structs, j, &g.prog);
-  }
-}
-
-/// an arc of celestial blooms around the garden, each ~5 tiles from the next
-/// and > 10 (their link reach) from the one after, so they link in a chain
-/// whose beams never overlap. Mature ones keep the network radiating; the
-/// others are held mid-assembly and as a beam still reaching out (> 0.85).
-/// None sits beside a parasite (the thornleech bed, the converging pair): it
-/// would be drained and wither.
-fn blooms(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
-  const at = [_][2]i32{ .{ -8, -3 }, .{ -4, -7 }, .{ 1, -8 }, .{ 8, -6 }, .{ 10, -2 } };
-  const growth = [_]f32{ 1, 0.3, 1, 0.6, 0.95 };
-  for (at, growth, 0..) |o, gr, i| {
-    const x = cx + o[0];
-    const z = cz + o[1];
-    _ = try g.plants.placeEx(g.gpa, &g.world, x, z, .{
-      .x = x, .y = z, .chunk = undefined, .tile = undefined, .sp = .bloom,
-      .seed = 0.13 + 0.21 * m.f(i), .growth = gr, .span = 1e9, .mana = 10,
-    });
   }
 }
 

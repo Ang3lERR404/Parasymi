@@ -517,8 +517,8 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
   with five soft streaks swelling from sender to receiver, iridescent
   (rainbow end to end, rolling along), tiny motes drifting inside shifting
   hue (seeded by the instance phase); dim when the network is dark; sent
-  from the more grown bloom as it finishes. Demo: a chain of five blooms
-  arced around the garden, clear of parasites (they drain floaters).
+  from the more grown bloom as it finishes. Demo: the halo garden's
+  blooms; a bloom's stages are viewed with `--plant=bloom`.
 - Structures (`structure_kit`) speak the plants' language: woven root mats,
   leafy vines, real petals, pods of resin sap (`Def.sap`, no own light).
   Germinator (`Def.still`: no breath, so its emitted pieces stay on it;
