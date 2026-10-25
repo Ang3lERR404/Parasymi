@@ -45,7 +45,7 @@ Rules that apply to every kit (from CLAUDE.md): Catmull-Rom grown vines tapering
 at both ends, watertight geometry (shared rings, capped tubes), leaves/petals
 with a body (`meshgen.lamina`), every flower has stamens, LOD comes free from the
 `Builder` primitives, and visual changes are checked with
-`zig build run -- --plant=<species>` / `--structure=<kind>` (see CLAUDE.md,
-"Testing one plant or structure").
+`zig build run -- --plant=<species>` / `--structure=<kind>` (see
+[../testing.md](../testing.md)).
 
 When a kit changes, update its file here in the same commit.

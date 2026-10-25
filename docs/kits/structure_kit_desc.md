@@ -15,7 +15,7 @@ Every piece works two ways:
   fibre node and rootlets).
 - **On a growth spline** (`on = On{k, id, u}`): the piece becomes a branch of the
   structure's `growth.Skeleton` and grows with it. This is the required way for
-  any structure mesh (CLAUDE.md: "Structures grow along growth splines").
+  any structure mesh ([../growth.md](../growth.md)).
 
 ## Colours (from `palette.zig`)
 
