@@ -162,6 +162,19 @@ fn lineages(g:*Game, cx:i32, cz:i32) Allocator.Error!void {
   g.prog.done.insert(.living_looms);
   g.prog.done.insert(.lithophagy);
   g.prog.done.insert(.braided_roots);
+  // a sporecaster fed by a conduit line sends over the garden to one
+  // emptying into a cache
+  g.prog.done.insert(.spore_casting);
+  try layout(g, cx + 8, cz + 3, &.{
+    .{.at = .{0, 0}, .k = .sap_cache}, .{.at = .{1, 0}, .k = .conduit}, .{.at = .{2, 0}, .k = .sporecaster},
+  }, &.{.essence, .fibre, .ley_shard, .grit});
+  try layout(g, cx - 3, cz + 7, &.{.{.at = .{0, 0}, .k = .sporecaster}, .{.at = .{1, 0}, .k = .sap_cache}}, &.{});
+  var from:?*st.Structure = null;
+  var to:?*st.Structure = null;
+  for (g.structs.list.items) |*s| if (s.kind() == .sporecaster) {
+    if (from == null) from = s else to = s;
+  };
+  if (from != null and to != null) from.?.state.sporecaster.dest = .{to.?.x, to.?.y};
   // a crown in the lumenroot bed, gathering it
   _ = try nearest(g, cx - 2, cz + 1, .gathering_crown, 0.55);
   try braids(g, cx - 10, cz - 2);

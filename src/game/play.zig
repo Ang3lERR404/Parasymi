@@ -444,7 +444,7 @@ pub const Game = struct {
           if (ctl.down(in, .take)) actions.takeFrom(g, j) else actions.feed(g, j);
         } else actions.harvest(g, h);
       }
-      if (ctl.pressed(in, .configure)) if (on_struct) |j| st.configure(g.structs.get(j), &g.prog);
+      if (ctl.pressed(in, .configure)) if (on_struct) |j| st.configure(&g.structs, j, &g.prog);
       if (ctl.pressed(in, .uproot) and ui_hit == null) {
         if (on_struct) |j| actions.unbuild(g, j)
         else actions.uproot(g, h);

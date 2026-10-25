@@ -322,7 +322,12 @@ fn structCentre(g:*const Game, s:*const st.Structure) m.V3 {
 fn structures(g:*Game, reach:f32, tf:f32) Allocator.Error!void {
   for (g.structs.list.items) |*s| {
     const ctr = structCentre(g, s);
-    if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[2] - g.cam.target[2]) > reach) continue;
+    if (@abs(ctr[0] - g.cam.target[0]) > reach or @abs(ctr[2] - g.cam.target[2]) > reach) {
+      // what it sends far off is drawn wherever it is (each piece culled
+      // to the view on its own)
+      if (s.def().far) try st.emit(s, &g.parts, ctr, tf);
+      continue;
+    }
     const a = s.activity;
     // a fixed tempo: activity deepens the breath but never retimes it (a
     // tempo that followed activity jumped phase every time it changed)

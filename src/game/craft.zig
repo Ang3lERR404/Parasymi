@@ -52,6 +52,7 @@ pub const hand = [_]Recipe{
   .{ .out = .braided_conduit, .in = &.{ .{ .item = .conduit, .n = 4 }, .{ .item = .fibre, .n = 2 }, .{ .item = .essence, .n = 1 } }, .time = 2, .needs = .braided_roots },
   .{ .out = .ganglion, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .grit, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 2.5, .needs = .lithophagy },
   .{ .out = .gathering_crown, .in = &.{ .{ .item = .fibre, .n = 4 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .grit, .n = 1 } }, .time = 2.5, .needs = .living_looms },
+  .{ .out = .sporecaster, .in = &.{ .{ .item = .fibre, .n = 3 }, .{ .item = .essence, .n = 3 }, .{ .item = .starlight, .n = 2 }, .{ .item = .ley_shard, .n = 1 } }, .time = 3, .needs = .spore_casting },
 };
 
 pub fn isSeedRecipe(idx:usize) bool { return hand[idx].out.plants() != null; }

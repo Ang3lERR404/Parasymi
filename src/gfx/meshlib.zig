@@ -90,6 +90,9 @@ const parts = struct {
   pub const ganglion_nerve = @import("meshes/ganglion.zig").nerve;
   // (see-through: blends over what hangs inside it)
   pub const ganglion = @import("meshes/ganglion.zig");
+  // (see-through: blends over what hangs inside it)
+  pub const sporecaster = @import("meshes/sporecaster.zig");
+  pub const spore_carrier = @import("meshes/sporecaster.zig").carrier;
   // the halo: its polyp and the diamond it forms
   pub const polyp = @import("meshes/polyp.zig");
   pub const halo_diamond = @import("meshes/polyp.zig").diamond;

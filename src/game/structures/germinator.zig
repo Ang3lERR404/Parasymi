@@ -122,7 +122,8 @@ pub fn choose(s:*st.Structure, g:*prog.Progression, r:u8) void {
 }
 
 /// cycle through the weaves the gardener understands.
-pub fn configure(s:*st.Structure, g:*prog.Progression) void {
+pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
+  const s = ss.get(id);
   const at = indexOfScalar(u8, &craft.all, s.state.germinator.recipe) orelse 0;
   for (1..craft.all.len + 1) |k| {
     const r = craft.all[(at + k) % craft.all.len];

@@ -13,7 +13,8 @@
 //!   receive(s, g, item, edge) bool  a carrier taking an item handed in at
 //!                               `edge` (counted from the way it faces)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
-//!   configure(s, g)             the player's "C" interaction
+//!   configure(ss, id, g)        the player's "C" interaction (it may reach
+//!                               another structure: `Structures.pairing`)
 //!   recipes() []const u8        what its panel offers to weave (indices into
 //!                               `craft.hand`); `chosen(s)` is the one it
 //!                               weaves, `choose(s, g, r)` sets it
@@ -61,6 +62,7 @@ const kinds = struct {
   pub const braided_conduit = @import("structures/braided_conduit.zig");
   pub const ganglion = @import("structures/ganglion.zig");
   pub const gathering_crown = @import("structures/gathering_crown.zig");
+  pub const sporecaster = @import("structures/sporecaster.zig");
 };
 const reg = registry.Registry(kinds);
 const Occ = ck.Occ;
@@ -106,6 +108,9 @@ pub const Def = struct {
   /// what the gardener sees before putting it down, if not `mesh` (a
   /// germinator's emitted pieces at rest with it)
   preview:?meshlib.Id = null,
+  /// what it emits travels far from it (a sporecaster's spores): it is
+  /// emitted however far it stands from the view
+  far:bool = false,
 };
 
 pub const defs = reg.table(Def, "def");
@@ -178,6 +183,9 @@ fn orFail(r:anytype) Allocator.Error!bool { return r; }
 
 pub const Structures = struct {
   list:std.ArrayList(Structure) = .empty,
+  /// the tile of a structure waiting to be paired with another (a
+  /// sporecaster choosing where it sends): the next one configured
+  pairing:?[2]i32 = null,
 
   pub fn deinit(ss:*Structures, gpa:Allocator) void { ss.list.deinit(gpa); }
 
@@ -346,9 +354,9 @@ pub fn release(s:*Structure) ?items.Item {
   };
 }
 
-pub fn configure(s:*Structure, g:*prog.Progression) void {
-  switch (s.kind()) {
-    inline else => |k| if (comptime reg.has(k, "configure")) reg.module(k).configure(s, g),
+pub fn configure(ss:*Structures, id:Id, g:*prog.Progression) void {
+  switch (ss.get(id).kind()) {
+    inline else => |k| if (comptime reg.has(k, "configure")) reg.module(k).configure(ss, id, g),
   }
 }
 

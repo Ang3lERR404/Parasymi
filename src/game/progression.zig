@@ -44,6 +44,7 @@ const techs = struct {
   pub const living_looms = @import("research/living_looms.zig");
   pub const lithophagy = @import("research/lithophagy.zig");
   pub const braided_roots = @import("research/braided_roots.zig");
+  pub const spore_casting = @import("research/spore_casting.zig");
 };
 const reg = registry.Registry(techs);
 

@@ -120,10 +120,11 @@ pub fn unbuild(g:*Game, j:st.Id) void {
   var lost:u32 = 0;
   // add returns how many fit; 1 - that = how many were lost
   lost += 1 - g.player.inv.add(s.def().item, 1);
+  // (first: it may put what it has out back into its slots)
+  if (st.release(&s)) |h| lost += 1 - g.player.inv.add(h, 1);
   for (s.inv.slot) |slot| if (slot) |it| {
     lost += it.n - g.player.inv.add(it.item, it.n);
   };
-  if (st.release(&s)) |h| lost += 1 - g.player.inv.add(h, 1);
   if (lost > 0) g.prog.say(txt.s.msg.spilled, .{lost});
 }
 
