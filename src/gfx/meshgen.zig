@@ -13,6 +13,7 @@ const noise = @import("../core/noise.zig");
 const parasite_kit = @import("meshes/parasite_kit.zig");
 const convergence_kit = @import("meshes/convergence_kit.zig");
 const radiant_kit = @import("meshes/radiant_kit.zig");
+const structure_kit = @import("meshes/structure_kit.zig");
 
 const V3 = m.V3;
 const PV = vertex.Mesh;
@@ -804,7 +805,7 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
   const g = def.genome;
   const seed = @as(u64, @intFromEnum(id)) * 977 + 77;
   switch (g.form) {
-    .herb => try herb(b, g, seed + @as(u64, variant) * 131, variant, !def.floating),
+    .herb => try structure_kit.plant(b, g, seed + @as(u64, variant) * 131, variant, !def.floating),
     .coil => try parasite_kit.plant(b, g, seed + @as(u64, variant) * 131),
     .drift => try drift(b, g, seed + @as(u64, variant) * 131, variant),
     .radiant => try radiant_kit.plant(b, g, seed + @as(u64, variant) * 131, variant),
@@ -814,127 +815,8 @@ pub fn plant(b:*Builder, id:species.Id, variant:u32) Allocator.Error!void {
   }
 }
 
-fn herb(b:*Builder, g:species.Genome, seed:u64, variant:u32, rooted:bool) Allocator.Error!void {
-  var rng = Rng.init(seed);
-  const golden = 2.39996;
-
-  // stem: a grown vine rising from the root, smoothed into evenly spaced
-  // rings, flaring where it meets the ground so it grows out of the soil
-  // rather than standing on it
-  const RES = 32;
-  const lean = m.v3(rng.range(-0.08, 0.08), 1, rng.range(-0.08, 0.08));
-  const stem:Growth = .{
-    .start = m.v3(0, 0, 0), .direction = m.norm(lean), .length = g.stem_h,
-    .wobble = g.wobble, .curl = g.curl, .taper = 0.35, .seed = seed ^ 0x57E4,
-  };
-  var ctrl:[17]V3 = undefined;
-  const cn = @as(usize, @max(@min(g.segments, 16), 3)) + 1;
-  growthPath(stem, ctrl[0..cn]);
-  var spine:[RES]V3 = undefined;
-  m.splineResample(ctrl[0..cn], &spine);
-  var ts:[RES]f32 = undefined;
-  var radii:[RES]f32 = undefined;
-  taperRadii(g.stem_r, stem.taper, &radii);
-  for (&ts, &radii, 0..) |*t, *r, i| {
-    const k = m.ratio(i, RES - 1);
-    t.* = k;
-    if (rooted) {
-      const low = 1 - k;
-      r.* *= 1 + 0.9 * low * low * low * low * low * low;
-    }
-  }
-  try b.tubeR(&spine, &ts, &radii, g.stem_col.toRgba8(255), .stem, 6);
-
-  // root flare: a few short roots splay from the foot into the soil
-  if (rooted) for (0..3) |i| {
-    const a = (m.f(i) + rng.float() * 0.6) / 3 * m.tau;
-    const foot = m.v3(0, g.stem_h * 0.05, 0);
-    const to = m.v3(@cos(a), 0, @sin(a)) * m.splat3(g.stem_r * 4.5) - m.v3(0, g.stem_r * 0.6, 0);
-    try vine(b, .{
-      .start = foot, .direction = m.norm(to - foot), .length = m.len(to - foot),
-      .wobble = 0.2, .curl = 0, .taper = 0.2, .seed = seed +% i * 97,
-    }, 4, 6, g.stem_r * 0.75, g.stem_col.toRgba8(255), .stem, 4, 0.02, 0);
-  };
-
-  // leaves in a phyllotactic spiral up the stem, all on one envelope: the
-  // lowest longest and drooping most, rising and shortening toward the
-  // crown, their bases tucked into the stem
-  const from = g.leaf_from;
-  for (0..g.leaves) |i| {
-    const k = from + (0.92 - from) * m.ratio(i, @max(g.leaves, 1));
-    const up = m.ratio(i, @max(g.leaves, 1));
-    const at = m.alongPath(&spine, k);
-    const ang = m.f(i) * golden + m.f(variant);
-    const dir = m.norm(m.v3(@cos(ang), 0.15 + 0.45 * up, @sin(ang)));
-    const len = g.leaf_len * m.lerp(1.25, 0.55, up) * rng.range(0.93, 1.07);
-    const droop = g.leaf_droop * m.lerp(1.3, 0.6, up);
-    const base = at - m.v3(@cos(ang), 0, @sin(ang)) * m.splat3(g.stem_r * 0.4);
-    try b.blade(base, dir, len, g.leaf_w * m.lerp(1.1, 0.8, up), droop, color.shade(g.leaf_col, 0.6), g.leaf_col.toRgba8(255), k, .leaf);
-  }
-
-  // thorns: small, short, pressed to the stem
-  for (0..g.thorns) |i| {
-    const k = 0.15 + 0.7 * rng.float();
-    const at = m.alongPath(&spine, k);
-    const ang = m.f(i) * golden * 1.3;
-    const dir = m.norm(m.v3(@cos(ang), 0.4, @sin(ang)));
-    try b.cone(at, dir, 0.045, 0.01, color.shade(g.bloom_col, 0.7), k, .thorn);
-  }
-
-  // tendrils: rooted plants put down prop roots from low on the stem, close
-  // around the foot; a floater trails them beneath it. Both grow small
-  // leaves along their length, like any vine.
-  const start = m.alongPath(&spine, if (rooted) 0.2 else 0.35);
-  for (0..g.tendrils) |i| {
-    const ang = m.ratio(i, g.tendrils) * m.tau + 0.4 + 0.3 * m.f(variant);
-    const spread:f32 = if (rooted) g.stem_r * 3 + g.stem_h * 0.12 else 0.35;
-    const reach = m.v3(@cos(ang) * spread, -start[1] * 0.98, @sin(ang) * spread);
-    var tc:[7]V3 = undefined;
-    growthPath(.{
-      .start = start, .direction = m.norm(reach), .length = m.len(reach),
-      .wobble = g.tendril_wobble, .curl = g.tendril_curl, .seed = seed +% i * 31,
-    }, &tc);
-    var tp:[20]V3 = undefined;
-    m.splineResample(&tc, &tp);
-    var tt:[20]f32 = undefined;
-    var tr:[20]f32 = undefined;
-    const t0:f32 = if (rooted) 0.2 else 0.35;
-    const t1:f32 = if (rooted) 0.05 else 1;
-    taperRadii(if (rooted) g.stem_r * 0.4 else 0.014, 0.3, &tr);
-    for (&tt, 0..) |*t, j| t.* = m.lerp(t0, t1, m.ratio(j, 19));
-    try b.tubeR(&tp, &tt, &tr, g.stem_col.toRgba8(255), .tendril, 4);
-    try leavesAlong(b, &tp, 3, g.leaf_len * 0.4, g.leaf_w * 0.55, 0.12, 0.6, t0, t1, color.shade(g.leaf_col, 0.6), g.leaf_col.toRgba8(255), seed +% i * 13);
-  }
-
-  // offshoots: side stems leaving the main one between the leaves, each
-  // curving up to the light and ending in a bud or a small bloom
-  const shoot_r = g.stem_r * 0.5;
-  // (below a tree's crown too: they branch from the trunk)
-  const shoot_from = @max(from * 0.6, 0.3);
-  var srng = Rng.init(seed ^ 0x0FF5);
-  const shoots = shootCount(g, &srng);
-  for (0..shoots) |i| {
-    const k = m.lerp(shoot_from, 0.85, (m.f(i) + srng.range(0.2, 0.8)) / m.f(shoots));
-    const ang = m.f(i) * golden * 1.7 + 1.1 + m.f(variant) * 0.9 + srng.range(-0.3, 0.3);
-    const len = g.stem_h * srng.range(0.32, 0.46) * m.lerp(1.15, 0.75, k);
-    const tip = try offshoot(b, &spine, k, k, ang, len, shoot_r, srng.range(0.3, 0.6), g.stem_col.toRgba8(255), .stem, seed +% i * 211);
-    try leavesAlong(b, tip.path[0..], 2, g.leaf_len * 0.45, g.leaf_w * 0.6, 0.25, 0.7, tip.t0, tip.t1, color.shade(g.leaf_col, 0.6), g.leaf_col.toRgba8(255), seed +% i * 59);
-    shootFoldAlong(b, tip.leaves, &tip.path);
-    const s = b.mark();
-    if (srng.float() < 0.5)
-      try flower(b, g, tip.at, tip.axis, srng.range(0.55, 0.7), m.f(variant) + m.f(i), tip.t1)
-    else
-      try bud(b, g, tip.at, tip.axis, srng.range(0.65, 0.85), m.f(i) * 1.3, tip.t1);
-    shootFold(b, s, 1);
-  }
-
-  // bloom: a calyx swelling at the tip with sepals folded back beneath it,
-  // and the petals rising from it into a cup
-  try flower(b, g, spine[RES - 1], m.norm(spine[RES - 1] - spine[RES - 4]), 1, m.f(variant), 1);
-}
-
 /// how many offshoots a variant grows, between the genome's two counts.
-fn shootCount(g:species.Genome, rng:*Rng) u32 {
+pub fn shootCount(g:species.Genome, rng:*Rng) u32 {
   const lo = g.shoots[0];
   const hi = @max(g.shoots[1], lo);
   return lo + rng.below(hi - lo + 1);
@@ -943,7 +825,8 @@ fn shootCount(g:species.Genome, rng:*Rng) u32 {
 /// where an offshoot ends: its tip and heading, its smoothed path, its
 /// tu.x at the stem and the tip, and the first vertex after its stem
 /// (for whatever grows along it).
-const Shoot = struct { at:V3, axis:V3, path:[16]V3, t0:f32, t1:f32, leaves:usize };
+pub const Shoot = struct { at:V3, axis:V3, path:[SHOOT_RES]V3, t0:f32, t1:f32, leaves:usize };
+pub const SHOOT_RES = 16;
 
 /// an offshoot: a side stem grown from `k` along `spine`, leaving it toward
 /// bearing `ang` at elevation `rise` and curving up toward the light as it
@@ -951,8 +834,28 @@ const Shoot = struct { at:V3, axis:V3, path:[16]V3, t0:f32, t1:f32, leaves:usize
 /// Its root is inside the main stem, at that stem's tu.x there (`t0`), so the two bend
 /// alike; each ring is marked for `shootFold` by how far out it is.
 pub fn offshoot(b:*Builder, spine:[]const V3, k:f32, t0:f32, ang:f32, len:f32, r0:f32, rise:f32, col:color.Rgba8, part:vertex.Part, seed:u64) Allocator.Error!Shoot {
+  const RES = SHOOT_RES;
+  var sh = shootPath(spine, k, t0, ang, len, rise, seed);
+  var ts:[RES]f32 = undefined;
+  var rs:[RES]f32 = undefined;
+  var cs:[RES]color.Rgba8 = undefined;
+  for (&ts, &rs, &cs, 0..) |*t, *r, *c, j| {
+    const s = m.ratio(j, RES - 1);
+    t.* = m.lerp(sh.t0, sh.t1, s);
+    r.* = r0 * m.lerp(1, 0.55, s);
+    c.* = col;
+    c.a = m.unorm8(1 - s);
+  }
+  try b.tubeC(&sh.path, &ts, &rs, &cs, null, part, 5);
+  sh.leaves = b.mark();
+  return sh;
+}
+
+/// where an `offshoot` runs, built by the caller: its smoothed path, tip
+/// and heading, its tu.x at the stem (`t0`) and the tip.
+pub fn shootPath(spine:[]const V3, k:f32, t0:f32, ang:f32, len:f32, rise:f32, seed:u64) Shoot {
   const N = 8;
-  const RES = 16;
+  const RES = SHOOT_RES;
   const root = m.alongPath(spine, k);
   const out = m.v3(@cos(ang), 0, @sin(ang));
   var ctrl:[N]V3 = undefined;
@@ -966,21 +869,21 @@ pub fn offshoot(b:*Builder, spine:[]const V3, k:f32, t0:f32, ang:f32, len:f32, r
   grow(&ctrl, .{.start = root, .direction = m.norm(ctrl[N - 1] - root), .length = len, .wobble = 0.12, .curl = 0.03, .seed = seed});
   var sh:Shoot = .{.at = undefined, .axis = undefined, .path = undefined, .t0 = t0, .t1 = @min(t0 + 0.15 + len * 0.2, 1), .leaves = 0};
   m.splineResample(&ctrl, &sh.path);
-  var ts:[RES]f32 = undefined;
-  var rs:[RES]f32 = undefined;
-  var cs:[RES]color.Rgba8 = undefined;
-  for (&ts, &rs, &cs, 0..) |*t, *r, *c, j| {
-    const s = m.ratio(j, RES - 1);
-    t.* = m.lerp(sh.t0, sh.t1, s);
-    r.* = r0 * m.lerp(1, 0.55, s);
-    c.* = col;
-    c.a = m.unorm8(1 - s);
-  }
-  try b.tubeC(&sh.path, &ts, &rs, &cs, null, part, 5);
   sh.at = sh.path[RES - 1];
   sh.axis = m.norm(sh.path[RES - 1] - sh.path[RES - 4]);
-  sh.leaves = b.mark();
   return sh;
+}
+
+/// `shootFold` for a stem built along an offshoot's `path` by its caller
+/// (a braid): each vertex takes the weight of its nearest point of it.
+pub fn shootFoldNearest(b:*Builder, start:usize, path:[]const V3) void {
+  for (b.v.items[start..]) |*v| {
+    var best:usize = 0;
+    for (path, 0..) |p, j| {
+      if (m.len(p - v.pos) < m.len(path[best] - v.pos)) best = j;
+    }
+    v.col.a = m.unorm8(1 - m.ratio(best, path.len - 1));
+  }
 }
 
 /// mark every vertex since `start` as `w` of the way out along an offshoot
@@ -1016,22 +919,52 @@ fn shootFoldRange(b:*Builder, start:usize, end:usize, w:f32) void {
   for (b.v.items[start..end]) |*v| v.col.a = m.unorm8(1 - w);
 }
 
+/// what a bloom sits on: a calyx of skin with its sepals folded back, or a
+/// bead of resin sap (this colour) held up in a cup of sepals
+pub const Calyx = union(enum) { skin, resin:color.Rgba8 };
+
+/// how many sepals cup a bloom's bead of resin
+const BEAD_SEPALS = 5;
+
 /// a bloom at `top` heading along `axis`, `sc` the size of the species'
-/// own: a calyx swelling at the tip with sepals folded back beneath it, and
-/// two overlapping whorls of petals rising from it into a cup.
-fn flower(b:*Builder, g:species.Genome, top:V3, axis:V3, sc:f32, spin:f32, t:f32) Allocator.Error!void {
+/// own: a calyx at the tip (`cx`), and two overlapping whorls of petals
+/// rising from its crown into a cup.
+pub fn flower(b:*Builder, g:species.Genome, top:V3, axis:V3, sc:f32, spin:f32, t:f32, cx:Calyx) Allocator.Error!void {
   const calyx = (g.bloom_r * 0.12 + g.stem_r * 0.6) * sc;
-  try ellipsoid(b, .{
-    .center = top + axis * m.splat3(calyx * 0.4), .radii = m.v3(calyx, calyx * 0.85, calyx),
-    .col = g.stem_col.toRgba8(255), .part = .stem, .rings = 6, .segs = 8, .t = t,
-  });
-  for (0..4) |i| {
-    const a = (m.f(i) + 0.5) / 4 * m.tau + spin;
-    try b.blade(top, m.norm(m.v3(@cos(a), -0.1, @sin(a))), g.bloom_r * 0.55 * sc, g.bloom_r * 0.22 * sc, 0.5, color.shade(g.leaf_col, 0.55), g.leaf_col.toRgba8(255), t - 0.03, .leaf);
+  var heart = top + axis * m.splat3(calyx * 0.5);
+  switch (cx) {
+    .skin => {
+      try ellipsoid(b, .{
+        .center = top + axis * m.splat3(calyx * 0.4), .radii = m.v3(calyx, calyx * 0.85, calyx),
+        .col = g.stem_col.toRgba8(255), .part = .stem, .rings = 6, .segs = 8, .t = t,
+      });
+      for (0..4) |i| {
+        const a = (m.f(i) + 0.5) / 4 * m.tau + spin;
+        try b.blade(top, m.norm(m.v3(@cos(a), -0.1, @sin(a))), g.bloom_r * 0.55 * sc, g.bloom_r * 0.22 * sc, 0.5, color.shade(g.leaf_col, 0.55), g.leaf_col.toRgba8(255), t - 0.03, .leaf);
+      }
+    },
+    .resin => |sap| {
+      // the bead: dense at its base, thin at its crown (tu.y, the resin
+      // shading reads it), the sepals cupped up round its lower half
+      const r = calyx * 1.15;
+      const c = top + axis * m.splat3(r * 0.8);
+      const s = b.mark();
+      try ellipsoid(b, .{.center = c, .radii = m.v3(r, r * 1.12, r), .col = sap, .part = .resin, .rings = 8, .segs = 10, .t = t});
+      for (b.v.items[s..]) |*v| v.tu[1] = m.clamp01(m.dot(v.pos - c, axis) / (2 * r * 1.12) + 0.5);
+      for (0..BEAD_SEPALS) |i| {
+        const a = (m.f(i) + 0.5) / BEAD_SEPALS * m.tau + spin;
+        const out = m.v3(@cos(a), 0, @sin(a));
+        try petal(b, .{
+          .base = top + out * m.splat3(r * 0.3), .out = out, .len = r * 1.9, .width = r * 0.85,
+          .rise = 0.95, .flare = 0.35, .cup = 0.55,
+          .col = color.shade(g.leaf_col, 0.55), .tip = g.leaf_col.toRgba8(255), .t = t - 0.03, .part = .leaf,
+        });
+      }
+      heart = c + axis * m.splat3(r * 0.9);
+    },
   }
   // broad outer petals opening out, a smaller inner ring standing more
   // upright between them
-  const heart = top + axis * m.splat3(calyx * 0.5);
   const inner = @max(g.petals / 2, 3);
   for (0..g.petals + inner) |i| {
     const outer = i < g.petals;
@@ -1059,7 +992,7 @@ fn filament(g:species.Genome) color.Rgba8 {
 
 /// a closed bud at `top`: a calyx, sepals clasping up around it, and the
 /// petals folded over one another into a teardrop round a coloured heart.
-fn bud(b:*Builder, g:species.Genome, top:V3, axis:V3, sc:f32, spin:f32, t:f32) Allocator.Error!void {
+pub fn bud(b:*Builder, g:species.Genome, top:V3, axis:V3, sc:f32, spin:f32, t:f32) Allocator.Error!void {
   const calyx = (g.bloom_r * 0.12 + g.stem_r * 0.6) * sc;
   const len = g.bloom_r * 0.6 * sc;
   try ellipsoid(b, .{
@@ -1176,7 +1109,7 @@ fn drift(b:*Builder, g:species.Genome, seed:u64, variant:u32) Allocator.Error!vo
     const tip = try offshoot(b, &np, k, m.lerp(0.55, 0.9, k), ang, len, g.stem_r * 0.6, srng.range(0.15, 0.45), g.stem_col.toRgba8(255), .stem, seed +% i * 211);
     const s = b.mark();
     if (srng.float() < 0.5)
-      try flower(b, g, tip.at, tip.axis, srng.range(0.35, 0.45), m.f(i) * 2.1, tip.t1)
+      try flower(b, g, tip.at, tip.axis, srng.range(0.35, 0.45), m.f(i) * 2.1, tip.t1, .skin)
     else
       try bud(b, g, tip.at, tip.axis, srng.range(0.4, 0.55), m.f(i) * 1.3, tip.t1);
     shootFold(b, s, 1);

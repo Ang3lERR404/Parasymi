@@ -1,14 +1,16 @@
 # structure_kit
 
-`src/gfx/meshes/structure_kit.zig` (133 lines). Imports: `meshgen` (`mg`),
-`palette` (`pal`), `growth`, `core/math`, `core/color`, `core/rng`.
+`src/gfx/meshes/structure_kit.zig` (338 lines). Imports: `meshgen` (`mg`),
+`palette` (`pal`), `growth`, `sim/species`, `core/math`, `core/color`,
+`core/rng`.
 
 ## What it is
 
-Shared pieces for the **symbiotic structures**, in the plants' language: a woven
-root mat they rise from, grown vines with leaves along them, broad foot leaves,
-forking rootlets, and pods of the wolf's resin sap (dense at the base,
-see-through at the crown, no light of its own). Not a mesh itself.
+The **symbiotic lineage's body**: shared pieces for its structures, in the
+plants' language (a woven root mat they rise from, grown vines with leaves
+along them, broad foot leaves, forking rootlets, and pods of the wolf's resin
+sap: dense at the base, see-through at the crown, no light of its own), and its
+plants (`plant`, the `herb` form), built of the same. Not a mesh itself.
 
 Every piece works two ways:
 - **Plain** (`on = null`): built with fixed tu.x (old style, still used by the
@@ -33,11 +35,13 @@ Every piece works two ways:
 | `resinPod(b, center, radii, rings, segs)` | an ellipsoid of part `.resin`, colour `pal.sap`; tu.y 0 at its dense base → 1 at its thin crown (the resin shader reads it) | not tagged: tag it yourself (`sk.on` / `growth.tag`) |
 | `footLeaves(b, n, r, len, width, seed, on)` | `n` broad blades in a ring at the foot on one envelope | each blade `k.on(b, mark, id, u, .{.from = base, .delay = FOOT_STAGGER * i})`: they unfold from their bases one after another (`FOOT_STAGGER` 0.025 of the growth) |
 | `rootlet(b, from, dir, len, r0, seed)` | a root heading down into the soil, tapering to a hair (tip 0.12), two forks off its far half; `pal.root_bark`, tu.x 0..0.3 | plain only (the caller tags it) |
+| `plant(b, g, seed, variant, rooted)` | a symbiote from its genome: braided stem (4 strands, 6 past `THICK` 0.1, turn `PITCH` 0.46 × length / radius) flaring into 5 braided roots (`ROOTS`) hugging the ground, genome `rosette` foot leaves, `vines` leafy vines twining up it (pointed at both ends), the leaf envelope, thorns, braided prop roots (`tendrils`), braided offshoots (`mg.shootPath`, folded by `mg.shootFoldNearest`) ending in buds or blooms, and its bloom on a resin bead (`mg.flower`, `.{.resin = pal.sap}`). Colours from the genome (core = stem shaded 0.55) | plants grow by tu.x in plant.vert (whole-plant scale, leaves and petals unfolding), not on a skeleton |
 
 ## Who uses it
 
 | Mesh | Uses |
 |---|---|
+| `meshgen.plant` (`herb` form: lumenroot, hollowheart) | `plant` |
 | `germinator.zig` | `rootMat`, `footLeaves`, `leafyVine`, `resinPod` |
 | `sap_cache.zig` | `rootMat`, `footLeaves`, `leafyVine`, `resinPod` |
 | `arsthraxia.zig` | `rootMat`, `footLeaves`, `resinPod` |
@@ -81,6 +85,9 @@ the tail kept free by `sk.tail = FORM`.
 - `.resin` (pods): translucent sap, tu.y base→crown, `sapGlisten`,
   `sapBubbles`/`sapDroplets` (common.glsl); drawn in the glass pass
   (`vertex.seeThrough(.resin)`).
+- `.resin` beads on a plant's blooms: plant.frag shades them as the
+  structures' resin (surface.glsl `resinSurface`, shared with part.frag),
+  tu.y (passed as `v_young`) base→crown, dimmed by health.
 - `.leaf` blades fold toward a pale midrib (`meshgen.lamina`), breathe and sway
   with `gardenWind`.
 

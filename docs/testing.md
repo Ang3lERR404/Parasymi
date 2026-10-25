@@ -4,8 +4,8 @@
 
 The way to check a species' or structure's growth, look and work: no demo
 garden, no scratch edits. Use it whenever a species, its genome, a plant
-kit (`parasite_kit`, `convergence_kit`, `radiant_kit`, meshgen herb/
-drift), a structure, its mesh/growth skeleton/`emit`, or plant/part
+kit (`structure_kit` plant, `parasite_kit`, `convergence_kit`,
+`radiant_kit`, meshgen drift), a structure, its mesh/growth skeleton/`emit`, or plant/part
 shaders change.
 
 - `--plant=<species>` (a `species.Id` tag) / `--structure=<kind>` (a

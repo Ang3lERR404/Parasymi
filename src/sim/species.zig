@@ -74,6 +74,9 @@ pub const Genome = struct {
   leaf_from:f32 = 0.2,
   petals:u8, bloom_r:f32,
   thorns:u8, tendrils:u8,
+  /// a symbiote's rosette of broad leaves round its foot, and leafy vines
+  /// twining up its stem (gfx/meshes/structure_kit.zig `plant`)
+  rosette:u8 = 0, vines:u8 = 0,
   /// offshoots: side stems off the main stem, each ending in a bud or a
   /// small bloom (looks only); each variant grows between the two
   shoots:[2]u8 = .{1, 3},

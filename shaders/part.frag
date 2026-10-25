@@ -18,12 +18,9 @@ layout(location = 10) flat in float v_aux;  // a beam: 1 for a halo's edge; a fl
 layout(location = 0) out vec4 o;
 
 const vec3 SAP = AMBER;                        // linear amber, the only accent
-const vec3 SAP_DEEP = vec3(0.12, 0.035, 0.004); // the sac's dark heart
-const vec3 SAP_SRGB_LIN = vec3(1.0, 0.428, 0.036); // palette sap (1, .68, .22), linearised
+const vec3 SAP_DEEP = RESIN_DEEP;             // the sac's dark heart
 // what light reaches sap and fibres at night (moonlight; by day near white)
-const vec3 NIGHT_LIT = MOONLIGHT * 0.3;
-// resin's light at night (it is denser)
-const vec3 RESIN_NIGHT = MOONLIGHT * 0.25;
+const vec3 NIGHT_LIT = SAP_NIGHT;
 // the diamond's crystal: its daylight, the warm film it reflects, its glint
 const vec3 PRISM_DAY = vec3(1.0, 0.96, 0.9);
 const vec3 PRISM_FILM = vec3(1.0, 0.82, 0.6);
@@ -61,23 +58,9 @@ const float RAYS = 40.0;
 const uint THIN = PART_BIT(PART_LEAF) | PART_BIT(PART_BLOOM) | PART_BIT(PART_EAR);
 const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE) | PART_BIT(PART_NERVE);
 
-// sap is alive and wet: bubbles drifting up inside it, beads sliding down
-// its surface, and hard light glistening on it (sapGlisten). Added to every
-// sap material. `inside` how see-through it is there; `sh`: how much of the
-// key light reaches it (its glints fall in shadow with it); `mirrored`: the
-// points of light mirrored in it (pointLights)
+// sapLifeAt (surface.glsl) for this fragment
 vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, vec3 mirrored, inout float alpha) {
-  float t = pc.eye_time.w;
-  vec3 lit = byDay(NIGHT_LIT, vec3(1.0));
-  float bub = sapBubbles(v_obj, V, t) * inside;
-  c += mix(sapc, vec3(1.0, 0.95, 0.85), 0.35) * bub * 0.45 * lit;
-  vec2 drop = sapDroplets(v_obj, n, SUN, V, t);
-  c = mix(c, c * 0.8 + sapc * 0.35 * lit, drop.x * 0.7) + keyLight() * drop.y * sh;
-  alpha = max(alpha, drop.x * 0.85);
-  vec3 g = sapGlistenWith(n, V, v_pos, v_obj, sapc, inside, sh, mirrored);
-  // a glint is opaque light: it shows whole even on clear sap
-  alpha = max(alpha, clamp(dot(g, vec3(0.33)), 0.0, 1.0));
-  return c + g;
+  return sapLifeAt(c, sapc, n, V, v_pos, v_obj, inside, sh, mirrored, alpha);
 }
 
 void surface() {
@@ -317,34 +300,10 @@ void surface() {
     return;
   }
   if (part == PART_RESIN) {
-    // solidified sap, thick as resin: dense and dark where it meets the body
-    // (v_u 0), thinning toward its surface (v_u 1). No light of its own:
-    // what glows is light passing through it, so it dims with the day.
+    // solidified sap (surface.glsl resinSurface): v_u 0 where it meets
+    // the body, 1 at its surface; only its outer face is drawn
     if (dot(raw, V) < 0.0) discard;
-    float h = clamp(v_u, 0.0, 1.0);
-    float ndv = clamp(dot(raw, V), 0.0, 1.0);
-    float fres = pow(1.0 - ndv, FRESNEL_POW);
-    float day = DAYLIGHT;
-    vec3 sap = SAP * hue;
-    vec3 deep = SAP_DEEP * hue * mix(0.55, 1.6, h);
-    // light carried through the mass: wrapped, so the shadow side still
-    // shows a warm core, thicker resin swallowing more of it
-    float wrap = clamp(dot(raw, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
-    float through = max(dot(-raw, SUN), 0.0) * sh;
-    vec3 lit = byDay(RESIN_NIGHT, vec3(1.0));
-    PointLit pl = pointLights(v_pos, raw, reflect(-V, raw), true);
-    c = shadeLitWith(deep, raw, sh, pl.plain);
-    c += sap * lit * wrap * mix(0.05, 0.22, h);
-    c += sap * lit * through * 0.25 * h;
-    // light from a bloom or a mote nearby carried through the mass too
-    c += sap * pl.wrapped * mix(0.1, 0.4, h);
-    // the polished face: amber gathered to a narrow band at its edge (its
-    // highlights are the glisten's, in sapLife)
-    c += mix(deep, sap * 1.4, pow(1.0 - ndv, SAP_EDGE_POW)) * 0.3 * lit;
-    // denser at the base: nearly opaque there, see-through only toward the face
-    alpha = mix(v_fade, 1.0, max(fres, (1.0 - h) * 0.85));
-    c = sapLife(c, sap, raw, V, h * (1.0 - fres), sh, pl.mirrored, alpha);
-    o = vec4(applyFog(c, v_pos), alpha);
+    o = resinSurface(raw, V, v_pos, v_obj, hue, clamp(v_u, 0.0, 1.0), v_fade, sh);
     return;
   }
   if (part == PART_BLOOM && v_fade < 0.999) {

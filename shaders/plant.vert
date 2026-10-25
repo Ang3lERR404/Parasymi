@@ -295,6 +295,8 @@ void main() {
   // tips once grown) is thinner and more translucent than the old base
   v_young = clamp((h - growth + YOUNG_SPAN) / YOUNG_SPAN, 0.0, 1.0);
   if (sheet) v_young = max(v_young, 0.5);
+  // a bead of resin carries its dense base .. thin crown (tu.y) instead
+  if (part == PART_RESIN) v_young = tu.y;
   v_glow = 1.0;
   v_inst = vec4(aff, seed, health, float(part));
   gl_Position = project(wp);

@@ -121,6 +121,17 @@ void surface() {
     return;
   }
 
+  if (part == PART_RESIN) {
+    // a symbiote's bead of resin sap (structure_kit `plant`): the
+    // structures' resin (surface.glsl), v_young its dense base .. thin crown,
+    // the plant's health dimming it; only its outer face is drawn
+    if (dot(normalize(v_nrm), V) < 0.0) discard;
+    vec3 hue = clamp(v_col / SAP_SRGB_LIN, 0.0, 1.5) * mix(0.4, 1.0, health);
+    o = resinSurface(normalize(v_nrm), V, v_pos, v_obj, hue, clamp(v_young, 0.0, 1.0), 0.35, sh);
+    if (v_ghost.x > 0.5) o.a *= 0.5;
+    return;
+  }
+
   if (isLantern(v_form, part, v_t)) {
     // a floater's lantern (meshgen `lantern`, tu.x 0.5): clear sap, the
     // spore inside showing through face-on and its rim bright; its comb

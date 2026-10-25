@@ -8,7 +8,7 @@ read from it, its rules and tests.
 
 | Kit | File | Lineage / domain | Grows how | Used by |
 |---|---|---|---|---|
-| structure_kit | [structure_kit_desc.md](structure_kit_desc.md) | symbiotic structures | growth splines (`On`), or plain | germinator, sap cache, arsthraxia, root-digger, gathering crown, loomfern, polyp, conduit, fibre node |
+| structure_kit | [structure_kit_desc.md](structure_kit_desc.md) | symbiotic (structures and plants) | growth splines (`On`), or plain; plants by tu.x | `herb` plants (lumenroot, hollowheart), germinator, sap cache, arsthraxia, root-digger, gathering crown, loomfern, polyp, conduit, fibre node |
 | parasite_kit | [parasite_kit_desc.md](parasite_kit_desc.md) | parasitic (pale, exact fives) | growth splines; plants by tu.x | `coil` plants (thornleech), lithophage, ganglion, sporecaster; convergence_kit and convergent structures |
 | convergence_kit | [convergence_kit_desc.md](convergence_kit_desc.md) | both lineages mixed | growth splines (`*On`); confluence by keys | confluence, weftstone, driftbraid, monfris, vultrixi |
 | radiant_kit | [radiant_kit_desc.md](radiant_kit_desc.md) | radiant / celestial | **gathered, never grown** | celestial bloom, vesper, diamond (halo) |
@@ -33,6 +33,7 @@ never by radiant_kit (enforced by its test).
 
 - A new **symbiotic structure**: `structure_kit` + the conduit's `arch`
   (`conduit.arch`, `spineCtrl`). Build on a `growth.Skeleton`.
+- A new **symbiotic plant**: a `herb` genome (`structure_kit.plant`).
 - A new **parasitic plant or structure**: `parasite_kit`.
 - A new **convergent structure** (3rd tier): `convergence_kit` (it already
   mixes the two lineages; never layer `structure_kit` over `parasite_kit`).

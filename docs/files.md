@@ -174,7 +174,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sculpt_kit.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box) is a signed distance field, the…
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
-- `structure_kit.zig` — shared pieces for grown structures, in the plants' language: a woven root mat they rise from, grown vines with leaves along them, and pods…
+- `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with
 - `turn_root.zig` — mesh: TURN ROOT.
 - `vultrixi.zig` — mesh: VULTRIXI.
 - `weftstone.zig` — mesh: WEFTSTONE.

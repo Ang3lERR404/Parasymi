@@ -29,12 +29,23 @@ before the edge; paw contact shadows.
   grown plant (green fits, red not).
 - Forms (`species.Form`: herb 0, coil 1, drift 2, confluence 3, radiant 4,
   star 5; common.glsl `FORMS_FREE` = the radiant ones).
-- Symbiotes (`herb`): flare into roots, one vase leaf envelope (`leaf_from`
-  for tree crowns), calyx and two whorls of real petals; vines grow leaves
-  along them. Offshoots (`meshgen.offshoot`, genome `shoots` = per-variant
-  count range): side stems off the main stem ending in a closed bud or a
-  small bloom (looks only); colour alpha = 1 - how far out along one, and
-  plant.vert folds them in against the stem until growth passes them.
+- Symbiotes (`herb`, `structure_kit.plant`): the symbiotic structures'
+  body. A braided stem (4 strands round a darker core, 6 on a trunk
+  thicker than `THICK`, wound at one `PITCH` per radius so thin and thick
+  wind alike) flaring into a mat of 5 braided roots that arch down to hug
+  the ground and sink in; a rosette of broad leaves round the foot
+  (genome `rosette`), leafy vines twining up the stem, tapering at both
+  ends (`vines`), one vase leaf envelope up it (`leaf_from` for tree
+  crowns), braided offshoots (`meshgen.shootPath`, genome `shoots` =
+  per-variant count range) ending in a closed bud or a small bloom (looks
+  only; colour alpha = 1 - how far out along one, plant.vert folds them
+  in against the stem until growth passes them). Each bloom opens out of
+  a bead of the lineage's amber resin (`meshgen.Calyx.resin`, part
+  `.resin`) held in a cup of five sepals: two whorls of real petals and
+  stamens on its crown. The bead shades as the structures' resin
+  (surface.glsl `resinSurface`, tu.y dense base → thin crown), dimmed by
+  health. Lumenroot: vine/leaf greens (richer than the palette's, the
+  plant material mutes them), cyan bloom.
 - Parasites (`coil`, `parasite_kit.plant`): alien not hostile, exactly
   symmetric and dead upright (variants differ in proportion only): a
   lattice cage stalk on a bulbous foot, sacs hanging on its core inside, a
