@@ -15,8 +15,12 @@ streaming, UI) is its own package in `engine/`, reached as
 inspection).
 
 ## Read before you touch
+**Before writing any code, read [docs/zig.md](docs/zig.md)** (Zig 0.16
+idioms and what not to do), every session.
+
 | Working on | Read first |
 |---|---|
+| any code | [docs/zig.md](docs/zig.md) |
 | finding a file | [docs/files.md](docs/files.md) (one line per source file and shader) |
 | the engine package, what is generic, how the game plugs in | [docs/engine.md](docs/engine.md) |
 | adding a structure, species, research, item, mesh, panel, pass, input, string | [docs/recipes.md](docs/recipes.md) (every place to wire it) |
