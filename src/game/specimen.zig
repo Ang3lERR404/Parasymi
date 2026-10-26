@@ -228,7 +228,7 @@ pub const Specimen = struct {
       .structure => {
         if (g.structs.list.items.len == 0) try s.put(g);
         // it notices its neighbours (a conduit its arches) but never works
-        g.structs.link(g.gpa, &g.world, &g.plants, &g.prog);
+        lib.structures.Structures.linkWith(g.structCtx(.{}));
         const one = &g.structs.list.items[0];
         one.grown = l.growth;
         one.activity = 0;

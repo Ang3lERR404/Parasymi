@@ -4,6 +4,8 @@
 //!   def:Def                     name, bulb item, footprint, mesh   (required)
 //!   State                       per-kind data (optional, see `State` union)
 //!   tick(ctx, id, dt) [!]bool   advance; returns whether it is active
+//!                               (`Ctx`: the garden, and in the game the
+//!                               wolf, the sky and this tick's events)
 //!   link(ctx, id)               notice its neighbours, every tick, grown or not
 //!   wants(s, g, item) u32       how many of `item` it will still take in
 //!   output(s) ?Item             what may leave it (pulled by conduits)
@@ -59,6 +61,9 @@ const items = lib.items;
 const species = lib.species;
 const Plants = lib.plants.Plants;
 const Field = lib.ecology.Field;
+const Events = lib.ecology.Events;
+const Player = lib.player.Player;
+const Sky = lib.sky.Sky;
 const meshlib = lib.meshlib;
 const prog = lib.progression;
 const Parts = lib.parts.Parts;
@@ -257,6 +262,14 @@ pub const Ctx = struct {
   plants:*Plants,
   g:*prog.Progression,
   ss:*Structures,
+  // decision: the world beyond the garden is read-only to structures and
+  // left out by headless callers (tests), so each is optional
+  /// the wolf, for a structure that answers it coming near
+  player:?*const Player = null,
+  /// the time of day (`daylight`, `tod`), for one that works by day or night
+  sky:?*const Sky = null,
+  /// what befell the garden this tick (plants withered)
+  events:Events = .{},
 };
 
 fn freshState(k:Kind) State {
@@ -573,14 +586,26 @@ pub const Structures = struct {
   /// every structure notices its neighbours (`link`) without working
   /// (`--structure` holding one still)
   pub fn link(ss:*Structures, gpa:Allocator, w:*World, plants:*Plants, g:*prog.Progression) void {
-    const ctx:Ctx = .{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss };
+    linkWith(.{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss });
+  }
+
+  /// `link`, with the whole of `ctx` (the wolf, the sky) as the game has it
+  pub fn linkWith(ctx:Ctx) void {
+    const ss = ctx.ss;
     for (0..ss.list.items.len) |idx| switch (ss.get(Id.of(idx)).kind()) {
       inline else => |k| if (comptime reg.has(k, "link")) reg.module(k).link(ctx, Id.of(idx)),
     };
   }
 
+  /// a tick with only the garden: no wolf, no sky, nothing befallen
   pub fn tick(ss:*Structures, gpa:Allocator, w:*World, plants:*Plants, g:*prog.Progression, dt:f32) Allocator.Error!void {
-    const ctx:Ctx = .{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss };
+    return tickWith(.{ .gpa = gpa, .w = w, .plants = plants, .g = g, .ss = ss }, dt);
+  }
+
+  /// `tick`, with the whole of `ctx` (the wolf, the sky, this tick's
+  /// events) as the game has it
+  pub fn tickWith(ctx:Ctx, dt:f32) Allocator.Error!void {
+    const ss = ctx.ss;
     for (0..ss.list.items.len) |idx| {
       const id = Id.of(idx);
       switch (ss.get(id).kind()) {

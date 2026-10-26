@@ -852,6 +852,12 @@ pub const Game = struct {
     g.cam.fly(look, move, roll, in.scroll * DOLLY_PER_NOTCH);
   }
 
+  /// what structures' behaviour may touch, the wolf and the sky with the
+  /// garden, and what befell it this tick (`ev`)
+  pub fn structCtx(g:*Game, ev:lib.ecology.Events) st.Ctx {
+    return .{ .gpa = g.gpa, .w = &g.world, .plants = &g.plants, .g = &g.prog, .ss = &g.structs, .player = &g.player, .sky = &g.sky, .events = ev };
+  }
+
   /// fixed-step simulation; never more than `MAX_CATCHUP` ticks per frame.
   pub fn simulate(g:*Game, frame_dt:f64) Error!void {
     if (!g.mode.live()) return;
@@ -874,7 +880,7 @@ pub const Game = struct {
     const ev = try g.eco.tick(g.gpa, &g.plants, &g.world, mods, TICK);
     try g.converge.tick(g.gpa, &g.world, &g.plants, &g.structs, &g.prog);
     g.prog.absorb(ev, TICK);
-    try g.structs.tick(g.gpa, &g.world, &g.plants, &g.prog, TICK);
+    try st.Structures.tickWith(g.structCtx(ev), TICK);
     if (g.specimen) |*sp| try sp.after(g, TICK);
     g.ticks += 1;
   }
