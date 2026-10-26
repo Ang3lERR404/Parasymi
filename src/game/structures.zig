@@ -334,6 +334,12 @@ fn gap(a:*const Structure, b:*const Structure) i32 {
   return @max(dx, dy, 0);
 }
 
+/// `o` once the slot at `gone` is taken out of the list
+fn slotDown(o:?Id, gone:usize) ?Id {
+  const i = o orelse return null;
+  return if (i.idx() > gone) Id.of(i.idx() - 1) else i;
+}
+
 /// a hook result that may be an error union, as one
 fn orFail(r:anytype) Allocator.Error!bool { return r; }
 
@@ -420,15 +426,15 @@ pub const Structures = struct {
     return ss.where.get(.{ .x = wx, .y = wy, .floating = true });
   }
 
-  /// swap-remove; returns the removed structure so its contents can be refunded.
+  /// ordered remove: the others keep the order they were put down in (the
+  /// order they tick in), each after it one slot down. Returns the removed
+  /// structure so its contents can be refunded.
   /// note to CLAUDE, I changed the code, it is bad to do repeated get calls.
   pub fn remove(ss:*Structures, w:*World, id:Id) Structure {
     const s = ss.get(id).*;
     // calls should always be at the top;
     const stct = s.def();
     const idx = id.idx();
-    const last = ss.list.items.len - 1;
-    const moved = Id.of(last);
     // it leaves its parent, and what depended on it is cut loose
     ss.setParent(id, null);
     var c = ss.kin.items[idx].first;
@@ -438,21 +444,21 @@ pub const Structures = struct {
       ss.get(k).parent = null;
     }
     ss.kin.items[idx].first = null;
-    // the last one takes its slot: out of its parent's children till it is there
-    const up = if (idx != last) ss.getParent(moved) else null;
-    if (up) |p| ss.leave(moved, p);
     if (!stct.floating) w.setFootprint(s.x, s.y, stct.size, .none);
     _ = ss.where.remove(s.ref());
-    if (idx != last) {
-      const l = ss.list.items[last];
+    _ = ss.list.orderedRemove(idx);
+    _ = ss.kin.orderedRemove(idx);
+    // each after it is one slot down: its tiles, where it is found, and the
+    // child lists naming it (still in list order, as all move alike)
+    for (ss.list.items[idx..], idx..) |*l, k| {
       const lstct = l.def();
-      if (!lstct.floating) w.moveFootprint(l.x, l.y, lstct.size, Occ.structure(id));
-      ss.where.getPtr(l.ref()).?.* = id;
+      if (!lstct.floating) w.moveFootprint(l.x, l.y, lstct.size, Occ.structure(Id.of(k)));
+      ss.where.getPtr(l.ref()).?.* = Id.of(k);
     }
-    _ = ss.list.swapRemove(idx);
-    _ = ss.kin.swapRemove(idx);
-    // its children name it by `Ref`, which did not move
-    if (up) |p| ss.join(id, p);
+    for (ss.kin.items) |*e| {
+      e.first = slotDown(e.first, idx);
+      e.next = slotDown(e.next, idx);
+    }
     // what was paired with it is cut loose
     const gone = s.ref();
     for (ss.list.items) |*o| _ = o.dropPartner(gone);
@@ -1133,6 +1139,30 @@ test "the tile index and the children agree with the list through placing, adopt
   again.relink();
   try expectIndexed(&again);
   for (0..ss.list.items.len) |i| try testing.expectEqual(ss.childCount(Id.of(i)), again.childCount(Id.of(i)));
+}
+
+test "uprooting keeps the others in the order they were put down, each found on its own tiles" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..12) |x| for (0..2) |y| { const t = y * ck.SIZE + x; c.kind[t] = .soil; c.height[t] = 1; c.res[t] = 0; };
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  const put = [_]struct { x:i32, k:Kind }{ .{ .x = 0, .k = .sap_cache }, .{ .x = 1, .k = .monfris }, .{ .x = 3, .k = .sap_cache }, .{ .x = 4, .k = .monfris }, .{ .x = 6, .k = .loomfern } };
+  for (put) |p| try testing.expect(try ss.place(gpa, &w, p.x, 0, p.k, 0, 0));
+  _ = ss.remove(&w, ss.at(&w, 0, 0).?);
+  _ = ss.remove(&w, ss.at(&w, 3, 0).?);
+  const left = [_]i32{ 1, 4, 6 };
+  try testing.expectEqual(left.len, ss.list.items.len);
+  for (ss.list.items, left, 0..) |*s, x, i| {
+    try testing.expectEqual(x, s.x);
+    var it = m.footprint(s.x, s.y, s.def().size);
+    while (it.next()) |t| try testing.expectEqual(Id.of(i), w.occAt(t[0], t[1]).asStructure().?);
+  }
+  try testing.expect(w.occAt(0, 0).asStructure() == null and w.occAt(3, 0).asStructure() == null);
+  try expectIndexed(&ss);
 }
 
 test "several partners: each once, oldest first, the oldest let go past `most`" {

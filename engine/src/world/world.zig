@@ -75,7 +75,7 @@ pub fn World(comptime L:type) type {
       }
     }
 
-    /// re-point an existing footprint at a new occupant id (after a swap-remove).
+    /// re-point an existing footprint at a new occupant id (its slot moved).
     pub fn moveFootprint(w:*W, wx:i32, wy:i32, size:u8, o:Occ) void {
       var it = m.footprint(wx, wy, size);
       while (it.next()) |p| {
