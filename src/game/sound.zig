@@ -7,6 +7,11 @@
 //!   crackle, thick at the footfall and thinning as it fades) and a muffled
 //!   pad landing under both. The heavier the wolf the lower and fuller, the
 //!   faster the louder and shorter; no two steps are alike.
+//! - out of the wolf's eyes (first person) its sap is heard settling now and
+//!   then, from inside: a soft slow groan, a low reedy hum through a closing
+//!   throat sagging as it sinks, with a few thick gloops rising through it,
+//!   all muffled. It settles more often while the wolf stands; a full belly
+//!   groans lower.
 const lib = @import("../lib.zig");
 const std = lib.std;
 const testing = std.testing;
@@ -132,21 +137,170 @@ const Step = struct {
   }
 };
 
+// ---- the sap settling (first person) ----
+
+/// how long a settling lasts (s)
+const SETTLE_LEN = [2]f32{2.4, 3.8};
+/// seconds between settlings while the wolf stands and while it walks; the
+/// first comes this soon after the view enters the eyes
+const GAP_STILL = [2]f32{3.5, 8};
+const GAP_WALK = [2]f32{9, 18};
+const GAP_FIRST = [2]f32{1.2, 3};
+/// the wolf stands once no step has landed for this long (s)
+const STILL_AFTER:f32 = 1.2;
+/// the groan: a low reedy hum (Hz) sagging this share as it settles,
+/// wavering slowly (Hz, share), voiced through a throat (Hz) closing from
+/// the first to the second, ringing this much (q); breath in it (noise
+/// share) and its level. A full belly pulls it all this share lower.
+const GROAN_HZ:f32 = 48;
+const GROAN_SAG:f32 = 0.18;
+const WAVER_HZ:f32 = 2.3;
+const WAVER:f32 = 0.025;
+const THROAT_HZ = [2]f32{260, 150};
+const THROAT_Q:f32 = 3.5;
+const BREATH:f32 = 0.35;
+const GROAN:f32 = 1.2;
+const SAP_HEAVY:f32 = 0.25;
+/// samples between retunings of the closing throat
+const RETUNE = 32;
+/// the gloops: how many (fewest, most), when (shares of the settling), their
+/// pitch (Hz) rising this share as each fades, its attack and fall (s), level
+const GLOOPS = [2]u32{2, 5};
+const GLOOP_AT = [2]f32{0.1, 0.65};
+const GLOOP_HZ = [2]f32{110, 210};
+const GLOOP_RISE:f32 = 0.7;
+const GLOOP_ATTACK:f32 = 0.006;
+const GLOOP_FALL = [2]f32{0.06, 0.12};
+const GLOOP:f32 = 0.6;
+/// heard from inside: what muffles it (Hz), its loudness, and how fast it
+/// fades in and out with the view (s)
+const SAP_SOFT_HZ:f32 = 650;
+const SAP:f32 = 0.07;
+const SAP_FADE:f32 = 0.35;
+
+/// seconds in `span` as samples
+fn samples(r:*rng.Rng, span:[2]f32, rate:f32) u32 { return m.floorTo(u32, r.range(span[0], span[1]) * rate); }
+
+/// one thick bubble rising through the sap
+const Gloop = struct {
+  osc:dsp.Osc,
+  base:f32,
+  /// the settling's sample it starts on (never, for a gloop not used)
+  start:u32,
+  attack:u32,
+  fall:f32,
+  amp:f32 = 1,
+  age:u32 = 0,
+
+  fn tick(g:*Gloop, at:u32) f32 {
+    if (at < g.start or g.amp < SILENT) return 0;
+    const rise = m.clamp01(m.f(g.age) / m.f(g.attack));
+    if (g.age >= g.attack) g.amp *= g.fall;
+    g.age +|= 1;
+    g.osc.freq = g.base * (1 + GLOOP_RISE * (1 - g.amp));
+    return g.osc.next() * rise * g.amp;
+  }
+};
+
+/// one settling of the sap playing out
+const Settle = struct {
+  rate:f32,
+  hum:dsp.Osc,
+  waver:dsp.Osc,
+  noise:dsp.Noise,
+  throat:dsp.Biquad,
+  soft:dsp.OnePole,
+  gloops:[GLOOPS[1]]Gloop,
+  /// the hum's pitch before it sags, and the belly's lowering
+  base:f32,
+  low:f32,
+  at:u32 = 0,
+  len:u32,
+  gain:f32,
+
+  fn init(weight:f32, r:*rng.Rng, rate:f32) Settle {
+    const low = 1 - SAP_HEAVY * weight;
+    const len = samples(r, SETTLE_LEN, rate) + 1;
+    const n = GLOOPS[0] + r.below(GLOOPS[1] - GLOOPS[0] + 1);
+    var gloops:[GLOOPS[1]]Gloop = undefined;
+    for (&gloops, 0..) |*g, i| g.* = .{
+      .osc = .{.rate = rate},
+      .base = r.range(GLOOP_HZ[0], GLOOP_HZ[1]) * low,
+      .start = if (i < n) m.floorTo(u32, r.range(GLOOP_AT[0], GLOOP_AT[1]) * m.f(len)) else m.maxInt(u32),
+      .attack = m.floorTo(u32, GLOOP_ATTACK * rate) + 1,
+      .fall = @exp(-1 / (r.range(GLOOP_FALL[0], GLOOP_FALL[1]) * rate)),
+    };
+    const base = vary(r, GROAN_HZ) * low;
+    return .{
+      .rate = rate,
+      .hum = .{.rate = rate, .shape = .saw, .freq = base},
+      .waver = .{.rate = rate, .freq = vary(r, WAVER_HZ)},
+      .noise = .init(r.next()),
+      .throat = .init(.band, THROAT_HZ[0] * low, THROAT_Q, rate),
+      .soft = .init(SAP_SOFT_HZ, rate),
+      .gloops = gloops,
+      .base = base,
+      .low = low,
+      .len = len,
+      .gain = vary(r, SAP),
+    };
+  }
+
+  /// mixes the settling into `out`, faded with the view; false once ended
+  fn render(st:*Settle, out:[]f32, fade:*dsp.Smooth) bool {
+    for (out) |*s| {
+      if (st.at >= st.len) return false;
+      const u = m.f(st.at) / m.f(st.len);
+      if (st.at % RETUNE == 0) st.throat.tune(.band, m.lerp(THROAT_HZ[0], THROAT_HZ[1], m.smooth(u)) * st.low, THROAT_Q, st.rate);
+      st.hum.freq = st.base * (1 - GROAN_SAG * u) * (1 + WAVER * st.waver.next());
+      // swells early, sinks away slowly
+      const sw = @sin(m.pi * m.pow(f32, u, 0.6));
+      const groan = st.throat.tick(st.hum.next() + BREATH * st.noise.next()) * GROAN * sw * sw;
+      var gl:f32 = 0;
+      for (&st.gloops) |*g| gl += g.tick(st.at);
+      s.* += st.soft.low(groan + gl * GLOOP) * st.gain * fade.next();
+      st.at += 1;
+    }
+    return st.at < st.len;
+  }
+};
+
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
 pub const Sounds = struct {
-  pub const Cmd = union(enum) { step:Footfall };
+  /// a paw landed; the view entered or left the wolf's eyes
+  pub const Cmd = union(enum) { step:Footfall, eyes:bool };
 
   rate:f32,
   r:rng.Rng,
   steps:[VOICES]?Step = @splat(null),
   /// the voice taken when none is free (round the pool: the oldest)
   steal:usize = 0,
+  eyes:bool = false,
+  /// how much of the settling is heard (1 in the eyes)
+  fade:dsp.Smooth,
+  settle:?Settle = null,
+  /// samples until the next settling, and since a paw last landed
+  wait:u32 = 0,
+  since_step:u32 = m.maxInt(u32),
+  /// the belly at the last step
+  weight:f32 = 0,
 
-  pub fn init(seed:u64, rate:f32) Sounds { return .{.rate = rate, .r = .init(seed)}; }
+  pub fn init(seed:u64, rate:f32) Sounds {
+    return .{.rate = rate, .r = .init(seed), .fade = .init(0, SAP_FADE, rate)};
+  }
 
   pub fn apply(s:*Sounds, cmd:Cmd) void {
     switch (cmd) {
-      .step => |f| s.steps[s.free()] = .init(f, &s.r, s.rate),
+      .step => |f| {
+        s.steps[s.free()] = .init(f, &s.r, s.rate);
+        s.since_step = 0;
+        s.weight = f.weight;
+      },
+      .eyes => |e| {
+        if (e and !s.eyes) s.wait = samples(&s.r, GAP_FIRST, s.rate);
+        s.eyes = e;
+        s.fade.target = if (e) 1 else 0;
+      },
     }
   }
 
@@ -154,7 +308,25 @@ pub const Sounds = struct {
     for (&s.steps) |*v| if (v.*) |*st| {
       if (!st.render(out)) v.* = null;
     };
+    s.sap(out);
     for (out) |*x| x.* = dsp.softClip(x.*);
+  }
+
+  /// the sap settling now and then while in the eyes
+  fn sap(s:*Sounds, out:[]f32) void {
+    const n:u32 = @intCast(out.len);
+    s.since_step +|= n;
+    if (s.eyes) {
+      s.wait -|= n;
+      if (s.wait == 0 and s.settle == null) {
+        s.settle = .init(s.weight, &s.r, s.rate);
+        const still = m.f(s.since_step) > STILL_AFTER * s.rate;
+        s.wait = s.settle.?.len + samples(&s.r, if (still) GAP_STILL else GAP_WALK, s.rate);
+      }
+    }
+    if (s.settle) |*st| {
+      if (!st.render(out, &s.fade) or (!s.eyes and s.fade.value < SILENT)) s.settle = null;
+    }
   }
 
   fn free(s:*Sounds) usize {
@@ -210,5 +382,37 @@ test "steps vary, a busy pool steals the oldest, and it ends silent" {
     s.render(&buf);
   }
   for (s.steps) |v| try testing.expect(v == null);
+  for (buf) |x| try testing.expectEqual(@as(f32, 0), x);
+}
+
+test "the sap settles only in the eyes, softly, and fades out with the view" {
+  var s:Sounds = .init(3, TEST_RATE);
+  var buf:[480]f32 = undefined;
+  // a minute out of the eyes: nothing
+  for (0..6000) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+    for (buf) |x| try testing.expectEqual(@as(f32, 0), x);
+  }
+  s.apply(.{.eyes = true});
+  var peak:f32 = 0;
+  var settles:u32 = 0;
+  var was = false;
+  for (0..3000) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+    for (buf) |x| peak = @max(peak, @abs(x));
+    if (s.settle != null and !was) settles += 1;
+    was = s.settle != null;
+  }
+  // half a minute standing in the eyes settles a few times, softly
+  try testing.expect(settles >= 2 and settles <= 6);
+  try testing.expect(peak > 0.01 and peak < 0.3);
+  s.apply(.{.eyes = false});
+  for (0..400) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+  }
+  try testing.expect(s.settle == null);
   for (buf) |x| try testing.expectEqual(@as(f32, 0), x);
 }

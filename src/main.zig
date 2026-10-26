@@ -207,6 +207,8 @@ pub fn main(init:Init) !void {
   // play's clock runs on from the screen's, so it fades off without a jump
   game.ui_time = load_screen.time;
 
+  // what the sound was last told of the view
+  var in_eyes = false;
   while (!window.shouldClose()) {
     glfw.pollEvents();
     input.update();
@@ -220,6 +222,11 @@ pub fn main(init:Init) !void {
     try game.update(&input, @floatCast(dt), screen);
     for (game.player.footfalls()) |ff| if (ff) |f| if (sounds) |o| {
       o.send(.{.step = f}) catch |e| log.warn("footstep: {t}", .{e});
+    };
+    // out of the wolf's eyes its sap is heard settling
+    if (game.cam.inEyes() != in_eyes) if (sounds) |o| {
+      o.send(.{.eyes = !in_eyes}) catch |e| log.warn("eyes: {t}", .{e});
+      in_eyes = !in_eyes;
     };
     if (game.request) |rq| {
       game.request = null;
