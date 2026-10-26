@@ -11,6 +11,7 @@ const play = lib.play;
 const opt = lib.options;
 const Draw = lib.engine.ui.draw.Draw;
 const s = lib.style;
+const hud = lib.hud;
 const txt = lib.txt;
 
 const pw:f32 = 620;
@@ -36,7 +37,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
   const t = g.uiT();
-  try d.membrane(px, py, pw, ph, s.pause_panel, 0.71);
+  try d.trellis(px, py, pw, ph, s.pause_panel, 0.71);
   g.rows.add(px, py, pw, ph, .panel);
   const title = txt.s.hud.options_title;
   _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
@@ -63,7 +64,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const back = txt.s.hud.options_back;
   const over = g.points(.back);
   if (over) try d.glow(W / 2, by + 8, pw * 0.25, s.menu_hover);
-  try d.pod(W / 2 - Draw.width(back, s.text_label) / 2 - 26, by + 8, 9, s.gold, if (over) 1 else 0.5, 0.2);
+  try hud.bullet(d, W / 2 - Draw.width(back, s.text_label) / 2 - 26, by + 8, 9, s.gold, if (over) 1 else 0.15, 0.2);
   _ = try d.text(W / 2 - Draw.width(back, s.text_label) / 2, by, s.text_label, if (over) s.gold else s.white, back);
   g.rows.add(W / 2 - pw / 4, by - back_h / 2 + 8, pw / 2, back_h, .back);
 

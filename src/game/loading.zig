@@ -147,7 +147,7 @@ pub const Loading = struct {
   /// a loading frame: nothing of the world (none of it is made yet) under
   /// the screen, a midnight sky behind it for the world passes
   pub fn scene(l:*Loading, screen:[2]f32) Allocator.Error!renderer.Scene {
-    l.ui.clear();
+    l.ui.clear(@floatCast(l.time));
     try l.draw(&l.ui, screen[0], screen[1]);
     const cam:Camera = .{.aspect = screen[0] / @max(screen[1], 1)};
     const sky:Sky = .{.tod = TOD};

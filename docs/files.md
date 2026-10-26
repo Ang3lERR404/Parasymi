@@ -13,7 +13,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `post.glsl` — shared by the post-processing passes: the screen triangle's uv in, one colour out, their own push constants.
 - `post.vert` — one triangle covering the screen for the post-processing passes.
 - `shadow.frag` — shadow casters write depth alone.
-- `ui.frag` — organic UI: every shape is an animated signed-distance field.
+- `ui.frag` — organic UI, all of it grown: every shape is an animated signed-distance field.
 - `ui.vert` — UI shapes to the screen; the palette's sRGB colours to linear.
 
 ## engine/src/anim/
@@ -85,17 +85,17 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `convergence.zig` — convergence: where a mature symbiote and a mature parasite meet, within two tiles of each other or joined by a chain of conduits, a…
 - `craft.zig` — weaving: turning gathered matter into seeds and structure bulbs.
 - `home.zig` — where the gardener's files live: `%LOCALAPPDATA%\Parasymi` (the strings, the controls, the options and `saves/`), made on first start.
-- `hud.zig` — the HUD, composed only from living shapes (ui/draw.zig): membranes for panels, seed pods for slots, tendrils for progress, glows for focus.
+- `hud.zig` — the HUD, composed only from grown shapes (ui/draw.zig): vine trellises for panels, husks hanging from vines for slots, leafy stems for…
 
 ## src/game/hud/
-- `belly.zig` — the sap belly (Tab): the wolf's inventory, and the weave list below it.
+- `belly.zig` — the sap belly (Tab): the wolf's inventory, slots hanging in rows from vines on a trellis whose main stem fills with sap as the belly does…
 - `carry.zig` — what the cursor carries: the lifted stack (or hotbar item) hangs just off the pointer, glowing, until a click puts it down.
 - `debug.zig` — F3: frame/sim timings and world counts.
 - `eyes.zig` — looking out of the wolf's eyes: a small lit seed at the middle of the screen, in a soft glow, marking what a click lands on.
 - `gardens.zig` — the saved gardens (pause menu): the world stays frozen behind the veil.
 - `gather.zig` — gathering progress grows a tendril above the wolf's focus.
-- `hotbar.zig` — the hotbar: a row of pods, each empty or holding an item the gardener dropped on it from the belly, with the belly's count of it and the…
-- `hover.zig` — what is under the cursor, on a membrane beside it: a structure (its name and what it is doing), a plant (its name, how far grown and what it
+- `hotbar.zig` — the hotbar: a row of husks hanging from a vine, each empty or holding an item the gardener dropped on it from the belly, with the belly's…
+- `hover.zig` — what is under the cursor, on a trellis beside it: a structure (its name and what it is doing), a plant (its name, how far grown and what it…
 - `inspect.zig` — the free camera's reminder: a small glowing tendril by the top-left with how to get back.
 - `log.zig` — recent messages (newest first, fading) and the control hint line.
 - `options.zig` — the options panel (pause menu, OPTIONS): the world stays frozen behind the veil.
@@ -103,7 +103,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `research.zig` — the research tree (T) as a living sapling growing out of the soil.
 - `status.zig` — time of day (a sun or moon pod) and how full the wolf's sap belly is.
 - `structure.zig` — a structure's panel (a click on one that keeps items): its slots beside the belly's, lifted and put down between them as in the belly, and…
-- `tooltip.zig` — an item's full name, on a small membrane beside the cursor, while the mouse rests on a belly or hotbar slot holding one.
+- `tooltip.zig` — an item's full name, on a small trellis beside the cursor, while the mouse rests on a belly or hotbar slot holding one.
 
 ## src/game/
 - `icon.zig` — item icons for the HUD: what sits in a belly slot, a hotbar pod or on the cursor.
@@ -179,7 +179,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `weftstone.zig` — WEFTSTONE: a loomfern and a lithophage grown into one floating body.
 
 ## src/game/
-- `style.zig` — shared HUD colours, type scale and bar sizes.
+- `style.zig` — shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes.
 - `text.zig` — every player-facing string, loaded once at startup from `PATH` (`parasymi.cfg`) and never read again.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 

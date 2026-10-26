@@ -1,5 +1,6 @@
-//! the HUD, composed only from living shapes (ui/draw.zig): membranes for
-//! panels, seed pods for slots, tendrils for progress, glows for focus.
+//! the HUD, composed only from grown shapes (ui/draw.zig): vine trellises
+//! for panels, husks hanging from vines for slots, leafy stems for progress,
+//! buds for bullets, seeds for ingredients, glows for focus.
 //!
 //! Each panel is its own module under `hud/` declaring
 //!   draw(g, d, W, H) !void
@@ -14,6 +15,9 @@ const registry = lib.engine.core.registry;
 const play = lib.play;
 const prog = lib.progression;
 const opt = lib.options;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const m = lib.engine.core.math;
 
 /// what a click on the HUD lands on: a research node, a weave recipe, a
 /// belly slot, a hotbar slot, a slot of the open structure, a recipe it may
@@ -89,9 +93,15 @@ const panels = struct {
 };
 const reg = registry.Registry(panels);
 
+/// a row's bullet: a bud of radius `r` at (cx, cy), opening as `open` runs
+/// to 1 (the row under the mouse).
+pub fn bullet(d:*Draw, cx:f32, cy:f32, r:f32, col:Color, open:f32, seed:f32) Allocator.Error!void {
+  try d.leaf(.{cx, cy + r}, -m.half_pi, 2 * r, 1.1 * r, col, open, seed);
+}
+
 pub fn build(g:*play.Game, screen:[2]f32) Allocator.Error!void {
   const d = &g.ui;
-  d.clear();
+  d.clear(@floatCast(g.ui_time));
   g.rows.len = 0;
   inline for (reg.ids) |id| {
     const p = reg.module(id);

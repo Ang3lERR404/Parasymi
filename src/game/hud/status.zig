@@ -18,7 +18,7 @@ const glow_r:f32 = 30;
 const glow_alpha:u8 = 90;
 
 pub fn draw(g:*play.Game, d:*Draw, _:f32, _:f32) Allocator.Error!void {
-  try d.membrane(panel_x, panel_y, panel_w, panel_h, s.skin, 0.1);
+  try d.trellis(panel_x, panel_y, panel_w, panel_h, s.card, 0.1);
   const day = g.sky.daylight();
   const orb = if (day > 0.5) s.sun else s.moon;
   const glow = [4]u8{ orb[0], orb[1], orb[2], glow_alpha };

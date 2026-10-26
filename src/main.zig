@@ -90,6 +90,9 @@ pub fn main(init:Init) !void {
   var lone:?specimen.Specimen = null;
   var state:specimen.State = .grow;
   var period:?f32 = null;
+  // `--panel=<belly|research|paused|options|gardens>` holds that panel open
+  // (and keeps the HUD in `--inspect` shots)
+  var panel:?play.Mode = null;
   for (args[1..]) |a| {
     if (eql(u8, a, "--inspect")) inspect = .player;
     if (startsWith(u8, a, "--inspect=")) inspect = try orbit.Focus.parse(a["--inspect=".len..]);
@@ -107,6 +110,10 @@ pub fn main(init:Init) !void {
     if (startsWith(u8, a, "--structure=")) lone = .{.what = .{.structure = stringToEnum(st.Kind, a["--structure=".len..]) orelse return error.BadStructure}};
     if (startsWith(u8, a, "--state=")) state = try specimen.State.parse(a["--state=".len..]);
     if (startsWith(u8, a, "--period=")) period = try parseFloat(f32, a["--period=".len..]);
+    if (startsWith(u8, a, "--panel=")) panel = switch (stringToEnum(play.Mode, a["--panel=".len..]) orelse return error.BadPanel) {
+      inline .belly, .research, .paused, .options, .gardens => |p| p,
+      else => return error.BadPanel,
+    };
   }
   if (lone) |*l| {
     if (!state.suits(l.what)) return error.BadState;
@@ -247,8 +254,9 @@ pub fn main(init:Init) !void {
     try renderer.syncWorld(r, &game.world, MESH_BUDGET, renderer.MESH_MS);
     game.render_stats = r.stats;
 
+    if (panel) |p| game.mode = p;
     var scene = try view.scene(&game, screen);
-    if (inspect != null) {
+    if (inspect != null and panel == null) {
       scene.ui = &.{};
     } else if (load_screen.fading()) {
       // the loading screen fades off the first frames of play, over the HUD

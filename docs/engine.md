@@ -60,5 +60,5 @@ Copy or reference `engine/` (a path or git dependency), then write a
 `G` and an `L` like Parasymi's: a `render/renderer.zig` with your passes,
 and a land if you want streamed chunks. Wire a `main` the way
 `src/main.zig` does: window, `Input`, `Renderer.init`, then loop on
-`draw`. The UI shapes in `ui.frag` (membranes, pods, tendrils) come in
+`draw`. The UI shapes in `ui.frag` (trellises, husks, pods, leafy tendrils) come in
 Parasymi's style; restyle them there.

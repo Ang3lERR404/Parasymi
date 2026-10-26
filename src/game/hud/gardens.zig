@@ -14,6 +14,7 @@ const save = lib.save;
 const Draw = lib.engine.ui.draw.Draw;
 const Color = lib.engine.ui.draw.Color;
 const s = lib.style;
+const hud = lib.hud;
 const txt = lib.txt;
 
 const pw:f32 = 680;
@@ -47,7 +48,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
   const t = g.uiT();
-  try d.membrane(px, py, pw, ph, s.pause_panel, 0.83);
+  try d.trellis(px, py, pw, ph, s.pause_panel, 0.83);
   g.rows.add(px, py, pw, ph, .panel);
   const title = txt.s.hud.gardens_title;
   _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
@@ -103,7 +104,7 @@ fn row(g:*play.Game, d:*Draw, i:usize, px:f32, mid:f32, a:f32, t:f32) Allocator.
     return;
   }
   const e = &g.gardens.items[i - 1];
-  try d.pod(x, mid, pod_r, faded(s.gold, a), lit, m.f(i) * 0.4);
+  try d.grain(x, mid, pod_r * 1.5, pod_r * 2.1, faded(s.gold, a), lit, m.f(i) * 0.4);
   const name = if (e.name.is(save.AUTO)) txt.s.hud.gardens_auto else e.name.slice();
   const end = try d.text(x + text_x, mid - 8, s.text_label, label_col, name);
   if (g.slot) |sl| if (sl.is(e.name.slice())) {
@@ -145,7 +146,7 @@ fn button(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, p:Pick, live
   const w = Draw.width(label, s.text_label);
   if (over or call > 0) try d.glow(cx, mid, w * 0.8 + 30, faded(s.menu_hover, if (over) 1 else call * 2));
   const col = if (!live) s.unknown else if (over or call > 0) s.gold else s.white;
-  try d.pod(cx - w / 2 - 22, mid, pod_r, if (live) s.gold else s.unknown, if (over) 1 else 0.5, cx * 0.01);
+  try hud.bullet(d, cx - w / 2 - 22, mid, pod_r, if (live) s.gold else s.unknown, if (over) 1 else 0.15, cx * 0.01);
   _ = try d.text(cx - w / 2, mid - 8, s.text_label, col, label);
   g.rows.add(cx - w / 2 - 40, mid - acts_h / 2 + 6, w + 60, acts_h - 12, p);
 }

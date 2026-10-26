@@ -115,7 +115,7 @@ const SEL:Color = s.gold;
 const PLAIN:Color = s.white;
 const BARE:Color = s.dim;
 const CARVE:Color = s.growth;
-const PANEL:Color = s.membrane;
+const PANEL:Color = s.panel;
 
 const HELP = [_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   tab next form",
@@ -380,7 +380,6 @@ const Editor = struct {
 
   fn draw(e:*Editor, d:*Draw, screen:[2]f32, handles:[]const ?[2]f32) Allocator.Error!void {
     const W = screen[0];
-    d.clear();
     var y:f32 = PAD;
     for (HELP) |h| {
       _ = try d.text(PAD, y, TEXT, BARE, h);
@@ -394,7 +393,7 @@ const Editor = struct {
 
     // the forms
     const rows = listRows(e.pieces().len);
-    try d.membrane(PAD, LIST_Y - 6, LIST_W, m.f(rows) * ROW + 12, PANEL, 0.3);
+    try d.trellis(PAD, LIST_Y - 6, LIST_W, m.f(rows) * ROW + 12, PANEL, 0.3);
     for (0..rows) |r| {
       const i = e.top + r;
       if (i >= e.pieces().len) break;
@@ -412,7 +411,7 @@ const Editor = struct {
     const vy = valuesY(rows);
     if (e.pieces().len > 0) {
       const p = e.pieces()[e.sel];
-      try d.membrane(PAD, vy - 6, LIST_W, m.f(Ch.count) * ROW + 12, PANEL, 0.6);
+      try d.trellis(PAD, vy - 6, LIST_W, m.f(Ch.count) * ROW + 12, PANEL, 0.6);
       for (Ch.names, 0..) |n, i| {
         const ry = vy + m.f(i) * ROW;
         const col = if (i == e.ch) SEL else PLAIN;
@@ -600,6 +599,7 @@ pub fn main(init:std.process.Init) !void {
     // handles drawn where the forms are now (one may have gone or come)
     handles.clearRetainingCapacity();
     for (e.pieces()) |p| try handles.append(gpa, onScreen(game.cam.viewProj(), origin + p.v.pos, screen));
+    ui.clear(@floatCast(game.ui_time));
     try e.draw(&ui, screen, handles.items);
     scene.ui = ui.v.items;
     const resized = input.resized;

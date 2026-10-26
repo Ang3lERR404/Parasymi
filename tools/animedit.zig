@@ -87,7 +87,7 @@ const KEYED:Color = s.white;
 const BARE:Color = s.dim;
 const HEAD:Color = s.growth;
 const KEY_DIM:Color = .{190, 210, 190, 220};
-const PANEL:Color = s.membrane;
+const PANEL:Color = s.panel;
 
 const HELP = [_][]const u8{
   "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
@@ -271,7 +271,6 @@ const Editor = struct {
   fn draw(e:*const Editor, d:*Draw, screen:[2]f32) Allocator.Error!void {
     const W = screen[0];
     const H = screen[1];
-    d.clear();
     var y:f32 = PAD;
     for (HELP) |h| {
       _ = try d.text(PAD, y, TEXT, BARE, h);
@@ -283,7 +282,7 @@ const Editor = struct {
 
     // the channel list
     const rows = e.fits(screen);
-    try d.membrane(PAD, LIST_Y - 6, LIST_W, m.f(@min(rows, e.shown.len)) * ROW + 12, PANEL, 0.3);
+    try d.trellis(PAD, LIST_Y - 6, LIST_W, m.f(@min(rows, e.shown.len)) * ROW + 12, PANEL, 0.3);
     for (0..rows) |r| {
       const i = e.top + r;
       if (i >= e.shown.len) break;
@@ -304,7 +303,7 @@ const Editor = struct {
     const tx = PAD;
     const tw = W - 2 * PAD;
     const ty = H - TL_BOTTOM - TL_H;
-    try d.membrane(tx, ty, tw, TL_H, PANEL, 0.7);
+    try d.trellis(tx, ty, tw, TL_H, PANEL, 0.7);
     const at = struct {
       fn f(x0:f32, w:f32, len:f32, t:f32) f32 { return x0 + w * t / len; }
     }.f;
@@ -498,6 +497,7 @@ pub fn main(init:std.process.Init) !void {
     try renderer.syncWorld(r, &game.world, 6, renderer.MESH_MS);
 
     var scene = try ps.view.scene(&game, screen);
+    ui.clear(@floatCast(game.ui_time));
     try e.draw(&ui, screen);
     scene.ui = ui.v.items;
     const resized = input.resized;

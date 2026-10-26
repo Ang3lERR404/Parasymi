@@ -1,4 +1,4 @@
-//! shared HUD colours, type scale and bar sizes. Muted greens/browns base,
+//! shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes. Muted greens/browns base,
 //! amber accents.
 const C = [4]u8;
 
@@ -36,10 +36,10 @@ pub const white:C = .{235, 240, 225, 255};
 pub const dim:C = .{150, 170, 150, 255};
 pub const gold:C = .{255, 215, 130, 255};
 pub const dark:C = .{20, 20, 20, 255};
-/// large panel membrane (belly, research, etc) — dark purple-green
-pub const membrane:C = .{30, 22, 40, 225};
-/// small panel membrane (tooltips, info cards) — greener
-pub const skin:C = .{24, 40, 30, 215};
+/// a large panel's bed under its trellis (belly, a structure's): dark leaf litter
+pub const panel:C = .{24, 30, 18, 242};
+/// a small panel's bed (tooltips, info cards): mossier
+pub const card:C = .{24, 36, 22, 232};
 /// empty inventory slot
 pub const pod_empty:C = .{40, 55, 45, 160};
 /// a slot under the mouse; one that will take what the cursor carries
@@ -61,12 +61,12 @@ pub const aim:C = .{225, 245, 210, 230};
 pub const aim_glow:C = .{150, 230, 190, 70};
 /// pause menu veil (near-black, soft)
 pub const veil:C = .{4, 6, 10, 200};
-/// pause menu panel membrane
-pub const pause_panel:C = .{24, 30, 40, 235};
+/// pause menu panel's bed: night-dark moss
+pub const pause_panel:C = .{18, 26, 20, 244};
 /// a pause menu row or option under the mouse
 pub const menu_hover:C = .{255, 215, 130, 40};
-/// research panel membrane (dark purple)
-pub const research_panel:C = .{26, 18, 44, 225};
+/// research panel's bed: dusk-dark, a little violet, the sapling's sky
+pub const research_panel:C = .{24, 22, 30, 240};
 /// research row: completed
 pub const research_done:C = .{140, 230, 170, 255};
 /// research row: locked

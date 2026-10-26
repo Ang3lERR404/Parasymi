@@ -11,6 +11,7 @@ const st = lib.structures;
 const craft = lib.craft;
 const Draw = lib.engine.ui.draw.Draw;
 const s = lib.style;
+const hud = lib.hud;
 const txt = lib.txt;
 const icon = lib.icon;
 const belly = lib.hud_belly;
@@ -46,7 +47,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = (W - pw) / 2;
   const py = (H - ph) / 2 - s.panel_lift;
 
-  try d.membrane(px, py, pw, ph, s.membrane, 0.41);
+  try d.trellis(px, py, pw, ph, s.panel, 0.41);
   g.rows.add(px, py, pw, ph, .panel);
   _ = try d.text(px + margin, py + 40, s.text_title, s.gold, txt.structure(sp.kind()));
   try st.describe(sp, d, &g.prog, px + margin, py + 80);
@@ -86,10 +87,10 @@ fn recipes(g:*play.Game, d:*Draw, sp:*const st.Structure, choices:[]const u8, x:
       try d.glow(cx, cy, 34, s.slot_hover);
     }
     if (on) try d.glow(cx, cy, 38, s.research_active);
-    try d.pod(cx, cy, recipe_r + 3, s.pod_empty, if (on) 1 else 0, phase);
+    try d.husk(cx, cy, recipe_r + 3, s.pod_empty, if (on) 1 else 0, phase);
     if (craft.hand[r].unlocked(&g.prog)) {
       try icon.draw(d, craft.hand[r].out, .{cx, cy}, recipe_r, t, phase, if (on) 1 else 0.3, if (on) 255 else unready_alpha);
-    } else try d.pod(cx, cy, recipe_r * 0.7, s.unknown, 0.1, phase);
+    } else try hud.bullet(d, cx, cy - recipe_r * 0.3, recipe_r * 0.6, s.unknown, 0, phase);
   }
 
   const r = craft.hand[shown orelse return];
@@ -105,7 +106,7 @@ fn recipes(g:*play.Game, d:*Draw, sp:*const st.Structure, choices:[]const u8, x:
     const have = sp.inv.count(ing.item);
     const enough = have >= ing.n;
     const ly = cy + 4 + recipe_line * m.f(j);
-    try d.pod(ix + 10, ly + 5, 6, ing.item.info().col, if (enough) 0.7 else 0.05, m.f(j) * 0.3);
+    try d.grain(ix + 10, ly + 5, 9, 13, ing.item.info().col, if (enough) 0.7 else 0, m.f(j) * 0.3);
     _ = try d.print(ix + 22, ly, s.text_fine, if (enough) s.white else s.dim, txt.s.hud.stock, .{have, ing.n, txt.item(ing.item).short});
   }
 }

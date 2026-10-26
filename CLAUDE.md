@@ -77,6 +77,8 @@ zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
+zig build run -- --panel=<belly|research|paused|options|gardens>
+                                  # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
 zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --shot]
                                   # animation editor (tools/animedit.zig): keys a clip

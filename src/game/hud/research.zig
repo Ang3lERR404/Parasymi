@@ -282,7 +282,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const ph = @min(H - 2 * margin, max_h);
   const px = W - pw - margin;
   const py = (H - ph) / 2;
-  try d.membrane(px, py, pw, ph, s.research_panel, 0.77);
+  try d.trellis(px, py, pw, ph, s.research_panel, 0.77);
   g.rows.add(px, py, pw, ph, .panel);
   _ = try d.text(px + 56, py + s.title_y, s.text_title, s.gold, txt.s.hud.research_title);
   _ = try d.text(px + 56, py + 58, s.text_small, s.dim, txt.s.hud.research_hint);
@@ -447,7 +447,7 @@ fn card(g:*const play.Game, d:*Draw, px:f32, y:f32, focus:?Id) Allocator.Error!v
   }
   var cx = x;
   for (r.per_unit, 0..) |ing, j| {
-    try d.pod(cx + 6, y + 51, 6, ing.item.info().col, 0.6, m.f(j) * 0.3);
+    try d.grain(cx + 6, y + 51, 9, 13, ing.item.info().col, 0.6, m.f(j) * 0.3);
     cx = try d.print(cx + 14, y + 46, s.text_fine, s.dim, txt.s.hud.ingredient, .{ing.n, txt.item(ing.item).short}) + 10;
   }
   _ = try d.print(cx + 8, y + 46, s.text_fine, s.dim, txt.s.hud.research_cost, .{r.units, r.unit_time});

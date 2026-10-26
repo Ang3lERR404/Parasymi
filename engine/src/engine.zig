@@ -86,4 +86,5 @@ test {
   _ = @import("world/world.zig");
   _ = render.camera;
   _ = render.light;
+  _ = ui.draw;
 }

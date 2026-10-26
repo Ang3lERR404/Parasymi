@@ -1,4 +1,4 @@
-//! what is under the cursor, on a membrane beside it: a structure (its name
+//! what is under the cursor, on a trellis beside it: a structure (its name
 //! and what it is doing), a plant (its name, how far grown and what it
 //! gives or draws) or a resource node; bare ground by the top-left, its kind
 //! and ley.
@@ -49,7 +49,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     _ = try d.print(at[0], at[1], s.text_label, item.info().col, txt.s.hud.node, .{txt.item(item).name, c.res[t]});
     return;
   }
-  try d.membrane(panel_x, panel_y, 360, 60, s.skin, 0.6);
+  try d.trellis(panel_x, panel_y, 360, 60, s.card, 0.6);
   _ = try d.print(text_x, text_top, s.text_label, s.white, txt.s.hud.tile, .{txt.tile(c.kind[t]), c.ley_cap[t]});
   if (!near) _ = try d.text(text_x + 248, text_top + 2, s.text_note, s.dim, txt.s.hud.too_far);
 }
@@ -60,7 +60,7 @@ fn card(g:*const play.Game, d:*Draw, W:f32, H:f32, w:f32, lines:f32, near:bool) 
   const ch = line_h * lines + 2 * margin;
   const x = @max(@min(g.mouse[0] + offset[0], W - w - keep), keep);
   const y = @max(@min(g.mouse[1] + offset[1], H - ch - keep), keep);
-  try d.membrane(x, y, w, ch, s.skin, 0.7);
+  try d.trellis(x, y, w, ch, s.card, 0.7);
   if (!near) _ = try d.text(x + w - far_x, y + margin + 2, s.text_note, s.dim, txt.s.hud.too_far);
   return .{x + margin, y + margin};
 }

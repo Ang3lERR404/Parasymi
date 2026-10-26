@@ -1,4 +1,4 @@
-//! an item's full name, on a small membrane beside the cursor, while the
+//! an item's full name, on a small trellis beside the cursor, while the
 //! mouse rests on a belly or hotbar slot holding one.
 const lib = @import("../../lib.zig");
 const std = lib.std;
@@ -42,7 +42,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   // beside the cursor, kept on screen
   const x = @min(g.mouse[0] + offset[0], W - w - edge);
   const y = @max(@min(g.mouse[1] - h - offset[1], H - h - edge), edge);
-  try d.membrane(x, y, w, h, s.skin, 0.8);
+  try d.trellis(x, y, w, h, s.card, 0.8);
   _ = try d.text(x + margin, y + margin * 0.75, s.text_sub, item.info().col, name);
   if (!known) _ = try d.text(x + margin, y + margin * 0.75 + line_h, s.text_fine, s.dim, txt.s.hud.not_understood);
 }

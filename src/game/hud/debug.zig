@@ -19,7 +19,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, _:f32) Allocator.Error!void {
   const bx = W - bw - margin;
   const lines = 7;
   const bh = line_h * m.f(lines) + 28;
-  try d.membrane(bx, 14, bw, bh, s.skin, 0.8);
+  try d.trellis(bx, 14, bw, bh, s.card, 0.85);
   var y:f32 = 28;
   _ = try d.print(bx + 18, y, s.text_label, s.white, txt.s.hud.fps, .{m.MS_PER_S / @max(g.frame_ms, 0.01), g.frame_ms});
   y += line_h;

@@ -1,5 +1,7 @@
 #version 450
-//! organic UI: every shape is an animated signed-distance field. No boxes.
+//! organic UI, all of it grown: every shape is an animated signed-distance
+//! field. No boxes: panels are vine trellises, slots hanging husks, bars
+//! leafy stems.
 layout(push_constant) uniform Push { vec2 screen; float time; float pad; } pc;
 layout(location = 0) in vec2 v_uv;
 layout(location = 1) in vec4 v_col;
@@ -13,9 +15,46 @@ const float PI = 3.14159;
 const float TAU = 6.2832;
 // sap's glow, what every shape brightens toward where sap shows
 const vec3 UI_SAP = vec3(1.0, 0.78, 0.35);
-// vine green: a membrane's rim, a pod's rim
+// vine green: the night's veins, a pod's rim
 const vec3 MEMBRANE_RIM = vec3(0.18, 0.42, 0.20);
 const vec3 POD_RIM = vec3(0.25, 0.5, 0.25);
+// a trellis panel: its vines (bark lit, bark shaded), their leaves, buds of
+// sap on them, and the woven withies of the lattice behind
+const vec3 VINE_LIT = vec3(0.30, 0.50, 0.20);
+const vec3 VINE_SHADE = vec3(0.10, 0.19, 0.08);
+const vec3 TRELLIS_LEAF = vec3(0.27, 0.58, 0.22);
+const vec3 TRELLIS_BUD = vec3(0.95, 0.66, 0.26);
+const vec3 WITHY = vec3(0.24, 0.19, 0.12);
+// strands' radius and how far they swing about the rim as they braid (px),
+// braid crossings per px of rim, how far a tip tapers off (px)
+const float VINE_R = 3.4;
+const float VINE_BRAID = 3.2;
+const float VINE_TWIST = 0.011;
+const float VINE_TIP = 46.0;
+// px of rim between leaf nodes; a leaf's length and half width (px); how
+// far past a node the growing tip is when its leaf has opened (px)
+const float LEAF_EVERY = 30.0;
+const float TRELLIS_LEAF_LEN = 16.0;
+const float TRELLIS_LEAF_WID = 5.5;
+const float LEAF_UNFURL = 70.0;
+// share of nodes that put out a bud of sap, a curling tendril
+const float NODE_BUD = 0.22;
+const float NODE_CURL = 0.16;
+// the lattice: spacing of its diagonal withies (px), their half width
+const float LATTICE = 46.0;
+const float WITHY_R = 1.1;
+// how strongly the lattice shows through the bed (kept low: text sits on it)
+const float LATTICE_SHOW = 0.16;
+// a husk slot: the stalk's reach above its centre, and its sepals
+const float HUSK_STALK = 1.6;
+const float HUSK_SEPAL_LEN = 0.55;
+const float HUSK_SEPAL_WID = 0.2;
+// a stem bar: px between its leaves, a leaf's length and width as shares of
+// the bar's height, px past a leaf the tip is when it has opened
+const float STEM_LEAF_EVERY = 22.0;
+const float STEM_LEAF_LEN = 1.05;
+const float STEM_LEAF_WID = 0.36;
+const float STEM_UNFURL = 18.0;
 // warm white: a tendril's bud, a gem's edges
 const vec3 BUD_GLOW = vec3(1.0, 0.85, 0.5);
 const vec3 GEM_EDGE = vec3(1.0, 0.97, 0.9);
@@ -47,7 +86,7 @@ const float GLYPH_CLEAR = 0.01;
 // a quad is a shape when its bits' x is SHAPE_MARK (else a glyph's bitmap),
 // its bits' y which (ui/draw.zig `Shape`, its u32 value; must match)
 const uint SHAPE_MARK = 0xffffffffu;
-const uint SHAPE_MEMBRANE = 0u;
+const uint SHAPE_TRELLIS = 0u;
 const uint SHAPE_POD = 1u;
 const uint SHAPE_TENDRIL = 2u;
 const uint SHAPE_GLOW = 3u;
@@ -56,6 +95,7 @@ const uint SHAPE_LEAF = 5u;
 const uint SHAPE_GRAIN = 6u;
 const uint SHAPE_GEM = 7u;
 const uint SHAPE_NIGHT = 8u;
+const uint SHAPE_HUSK = 9u;
 
 // integer hash of a lattice point: exact at any magnitude (a sin()-based hash
 // loses precision as time grows and shows up as crawling speckle)
@@ -85,31 +125,179 @@ float sdRound(vec2 p, vec2 b, float r) {
 
 vec3 sapColor(vec3 base, float k) { return mix(base, UI_SAP, k); }
 
-vec4 membrane(vec2 px, float seed) {
+vec2 rot(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
+
+// distance to a stem tapering from radius ra at a to rb at b
+float sdStem(vec2 p, vec2 a, vec2 b, float ra, float rb) {
+  vec2 ab = b - a;
+  float h = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+  return length(p - a - ab * h) - mix(ra, rb, h);
+}
+
+// distance to a leaf from `base` along unit `u`, `len` long, `wid` across
+float sdGlyphLeaf(vec2 p, vec2 base, vec2 u, float len, float wid) {
+  vec2 r = p - base;
+  float x = dot(r, u);
+  float y = dot(r, vec2(-u.y, u.x));
+  float k = clamp(x / len, 0.0, 1.0);
+  float w = wid * pow(sin(PI * pow(k, 0.7)), 0.8);
+  return max(abs(y - wid * 0.4 * k * k) - w, max(-x, x - len));
+}
+
+// a small leaf's colour at `p`, `u` its direction from `base`: lit and
+// shaded halves about the midrib, sap in the thin margin
+vec3 leafShade(vec2 p, vec2 base, vec2 u, float wid, vec3 green) {
+  float y = dot(p - base, vec2(-u.y, u.x));
+  float across = clamp(y / max(wid, 0.5), -1.0, 1.0);
+  vec3 col = green * (across > 0.0 ? 1.0 : 0.72);
+  col *= 1.0 + 0.3 * smoothstep(0.9, 0.0, abs(y));
+  return sapColor(col, smoothstep(0.6, 1.0, abs(across)) * 0.25);
+}
+
+// arc length round a rounded rect's outline (half extents b, corner radius
+// r), clockwise on screen from the top edge's left end; P the whole way round
+float rimS(vec2 c, vec2 b, float r, out float P) {
+  vec2 h = b - r;
+  float q = 0.5 * PI * r;
+  P = 4.0 * (h.x + h.y + q);
+  if (abs(c.x) <= h.x) return c.y < 0.0 ? c.x + h.x : 2.0 * h.x + 2.0 * q + 2.0 * h.y + (h.x - c.x);
+  if (abs(c.y) <= h.y) return c.x > 0.0 ? 2.0 * h.x + q + (c.y + h.y) : 4.0 * h.x + 3.0 * q + 2.0 * h.y + (h.y - c.y);
+  vec2 k = c - sign(c) * h;
+  float a = atan(k.x, -k.y);                 // 0 up, pi/2 right, ±pi down
+  if (c.x > 0.0 && c.y < 0.0) return 2.0 * h.x + r * a;
+  if (c.x > 0.0) return 2.0 * h.x + q + 2.0 * h.y + r * (a - 0.5 * PI);
+  if (c.y > 0.0) return 4.0 * h.x + 2.0 * q + 2.0 * h.y + r * (a + PI);
+  return 4.0 * h.x + 3.0 * q + 4.0 * h.y + r * (a + 0.5 * PI);
+}
+
+// a panel: a dark bed of leaf litter behind a lattice of woven withies,
+// framed by two vines braided round its rim, rooted at its lower left
+// corner. They grow both ways round as `grow` runs 0..1 (meeting at the
+// upper right), tips tapering; leaves unfurl off their nodes once the tips
+// have passed, some nodes bear a bud of sap or a curling tendril; leaves
+// sway, sap pulses climb out from the root.
+vec4 trellis(vec2 px, float grow, float seed) {
   float t = pc.time;
   vec2 inner = v_size - 2.0 * PAD;
   vec2 c = px - v_size * 0.5;
-  // perimeter coordinate drives the travelling wobble and sap pulses
-  float ang = atan(c.y, c.x);
-  float wob = (ringNoise(ang, 1.6, seed, t * 0.6) - 0.5) * 7.0
-            + sin(ang * 5.0 + t * 1.3 + seed * 6.0) * 1.5;
-  float r = min(inner.x, inner.y) * 0.32;
-  float d = sdRound(c, inner * 0.5, r) - wob;
+  float r = min(min(inner.x, inner.y) * 0.3, 40.0);
+  float d = sdRound(c, inner * 0.5, r) + (vnoise(px * 0.05 + seed * 9.0) - 0.5) * 1.5;
+  float P;
+  float s = rimS(c, inner * 0.5, r, P);
+  // the root: the middle of the lower left corner's arc
+  float root = 4.0 * (inner.x * 0.5 - r) + 2.5 * 0.5 * PI * r + 2.0 * (inner.y * 0.5 - r);
+  float reach = grow * P * 0.5;
+  float from = abs(s - root);
+  from = min(from, P - from);
 
+  // the bed and its lattice
   float fill = smoothstep(1.5, -1.5, d);
-  // veins inside the membrane
-  float veins = smoothstep(0.92, 1.0, 1.0 - abs(vnoise(px * 0.035 + vec2(seed * 7.0, t * 0.05)) * 2.0 - 1.0));
-  vec3 body = v_col.rgb * (0.75 + 0.25 * vnoise(px * 0.02 + t * 0.1)) + vec3(0.06, 0.12, 0.05) * veins;
-  // vine rim with sap pulses running around it
-  float rim = smoothstep(4.0, 0.5, abs(d + 1.5));
-  float pulse = pow(0.5 + 0.5 * sin(ang * 4.0 - t * 2.2 + seed * 9.0), 6.0);
-  vec3 rimc = sapColor(MEMBRANE_RIM, pulse * 0.9);
-  // soft outer aura
-  float aura = exp(-max(d, 0.0) * 0.25) * (1.0 - fill) * 0.35 * smoothstep(PAD - 6.0, PAD - 16.0, d);
+  float bed = smoothstep(0.0, 0.6, grow);
+  vec3 col = v_col.rgb * (0.78 + 0.22 * vnoise(px * 0.018 + seed * 3.0) + 0.08 * vnoise(px * 0.11 + seed));
+  vec2 dg = vec2(c.x + c.y, c.x - c.y) * 0.7071 + seed * 17.0;
+  vec2 cell = floor(dg / LATTICE + 0.5);
+  vec2 off = abs(dg - cell * LATTICE);
+  float wu = smoothstep(WITHY_R + 0.8, WITHY_R - 0.4, off.x);
+  float wv = smoothstep(WITHY_R + 0.8, WITHY_R - 0.4, off.y);
+  // over and under in turn at each crossing
+  bool uTop = mod(cell.x + cell.y, 2.0) < 0.5;
+  float under = smoothstep(0.0, 6.0, uTop ? off.x : off.y);
+  vec3 withy = WITHY * (0.75 + 0.25 * vnoise(dg * vec2(0.3, 0.05)));
+  float lat = smoothstep(0.3, 1.0, grow) * LATTICE_SHOW;
+  col = mix(col, withy * (uTop ? 1.0 : mix(0.55, 1.0, under)), wv * lat);
+  col = mix(col, withy * (uTop ? mix(0.55, 1.0, under) : 1.0), wu * lat * (uTop ? 1.0 : 1.0 - wv * (1.0 - under)));
+  // the vines' shade falls in a little from the rim
+  col *= 1.0 - 0.35 * smoothstep(-16.0, 0.0, d) * bed;
+  float a = fill * v_col.a * bed;
+  // a soft shadow round the panel, so it lifts off the world
+  float shadow = exp(-max(d, 0.0) * 0.2) * (1.0 - fill) * 0.45 * bed * smoothstep(PAD - 4.0, PAD - 14.0, d);
+  col = mix(col, vec3(0.0), shadow / max(a + shadow, 1e-3));
+  a = max(a, shadow);
 
-  vec3 col = mix(body, rimc, rim);
-  float a = max(fill * v_col.a, rim) + aura * pulse;
-  return vec4(col + rimc * aura, clamp(a, 0.0, 1.0));
+  // the braid: two strands crossing about the rim
+  float nb = max(2.0, floor(P * VINE_TWIST + 0.5));
+  float ph = TAU * nb * s / P;
+  float drift = sin(s * 0.03 + t * 0.7 + seed * 5.0) * 0.6;
+  float o1 = VINE_BRAID * sin(ph) + drift;
+  float o2 = -VINE_BRAID * sin(ph) + drift;
+  float tipR = VINE_R * sqrt(clamp((reach - from) / VINE_TIP, 0.0, 1.0));
+  float r1 = tipR * (0.92 + 0.12 * vnoise(vec2(s * 0.04, 1.0)));
+  float r2 = tipR * (0.82 + 0.12 * vnoise(vec2(s * 0.04, 7.0)));
+  float pulse = pow(0.5 + 0.5 * sin(from * 0.045 - t * 2.2 + seed * 9.0), 6.0);
+  bool oneTop = cos(ph) > 0.0;
+  for (int k = 0; k < 2; k++) {
+    bool first = (k == 0) != oneTop;           // the strand under goes first
+    float o = first ? o1 : o2;
+    float rr = first ? r1 : r2;
+    float dv = abs(d - o) - rr;
+    float cov = smoothstep(0.8, -0.8, dv) * step(0.05, rr);
+    float across = clamp((d - o) / max(rr, 0.5), -1.0, 1.0);
+    float shade = 0.55 + 0.45 * sqrt(max(0.0, 1.0 - across * across)) - 0.15 * across;
+    float groove = vnoise(vec2(s * 0.12, across * 2.5 + (first ? 3.0 : 9.0)));
+    vec3 bark = mix(VINE_SHADE, VINE_LIT, shade) * (0.85 + 0.3 * groove);
+    bark = sapColor(bark, pulse * 0.45 * (1.0 - abs(across)));
+    col = mix(col, bark, cov);
+    a = max(a, cov);
+  }
+
+  // nodes along the rim: a leaf each, now and then a bud or a curl
+  float n = max(4.0, floor(P / LEAF_EVERY + 0.5));
+  float sp = P / n;
+  float i0 = floor(s / sp);
+  for (int j = -1; j <= 1; j++) {
+    float i = mod(i0 + float(j), n);
+    float h = hash(vec2(i, seed * 53.0));
+    float h2 = hash(vec2(i + 31.0, seed * 19.0));
+    float si = (i + 0.5 + (h - 0.5) * 0.5) * sp;
+    float x = s - si;
+    x -= P * floor(x / P + 0.5);
+    float fi = abs(si - root);
+    fi = min(fi, P - fi);
+    float open = smoothstep(0.0, LEAF_UNFURL, reach - fi);
+    if (open <= 0.0) continue;
+    float yo = mod(i, 2.0) < 0.5 ? o1 : o2;
+    vec2 q = vec2(x, d);
+    vec2 base = vec2(0.0, yo);
+    // leaves lean along the rim, most out over the world, some in over the bed
+    float side = h2 > 0.5 ? 1.0 : -1.0;
+    float outward = h > 0.3 ? 1.0 : -1.0;
+    float ang = side * (0.55 + 0.45 * h2) + sin(t * 1.6 + h * TAU) * 0.12;
+    vec2 u = vec2(sin(ang), cos(ang) * outward);
+    float len = TRELLIS_LEAF_LEN * (0.7 + 0.5 * h) * (outward > 0.0 ? 1.0 : 0.7) * mix(0.35, 1.0, open);
+    float wid = TRELLIS_LEAF_WID * mix(0.4, 1.0, open) * (0.8 + 0.3 * h2);
+    float dl = sdGlyphLeaf(q, base + u * VINE_R * 0.5, u, len, wid);
+    float cov = smoothstep(0.8, -0.8, dl);
+    if (cov > 0.0) {
+      vec3 green = mix(TRELLIS_LEAF, TRELLIS_LEAF * vec3(1.2, 1.1, 0.7), h2 * 0.5);
+      col = mix(col, leafShade(q, base, u, wid, green), cov);
+      a = max(a, cov);
+    }
+    float pick = fract(h * 7.31 + h2 * 3.7);
+    if (pick < NODE_BUD) {
+      // a bud of sap on the strand, swelling as it opens
+      vec2 bc = base + vec2(-side * 5.0, outward * 3.0);
+      float db = length(q - bc) - 3.4 * open;
+      float bcov = smoothstep(0.8, -0.8, db);
+      vec2 bq = (q - bc) / max(3.4 * open, 0.5);
+      vec3 bud = TRELLIS_BUD * (0.7 + 0.3 * smoothstep(1.0, -0.6, bq.x + bq.y)) + BUD_GLOW * smoothstep(0.5, 0.0, length(bq - vec2(-0.35, -0.35))) * 0.6;
+      col = mix(col, bud, bcov);
+      a = max(a, bcov);
+    } else if (pick > 1.0 - NODE_CURL) {
+      // a tendril curling off the node, out over the world
+      vec2 cc = base + vec2(-side * 8.0, 11.0);
+      vec2 cq = q - cc;
+      float rr = length(cq);
+      float an = atan(cq.y, cq.x * -side);
+      const float PITCH = 3.0;
+      float kk = rr / PITCH - an / TAU;
+      float dc = max(abs(kk - floor(kk + 0.5)) * PITCH - 0.8, rr - 7.5 * open);
+      dc = min(dc, sdStem(q, base, cc + vec2(side * 7.0, 0.0) * open, 1.2, 0.8));
+      float ccov = smoothstep(0.7, -0.7, dc) * step(1.0, rr + 1.0);
+      col = mix(col, VINE_LIT * 1.1, ccov);
+      a = max(a, ccov);
+    }
+  }
+  return vec4(col, clamp(a, 0.0, 1.0));
 }
 
 vec4 pod(vec2 px, float lit, float seed) {
@@ -132,25 +320,113 @@ vec4 pod(vec2 px, float lit, float seed) {
   return vec4(col, clamp(max(fill * v_col.a, rim) + halo, 0.0, 1.0));
 }
 
+// a slot: a seed husk hanging from its stalk, fuller below like a gourd,
+// ribbed, a calyx of sepals cupping its shoulders. It swings a little on
+// its stalk; `lit` fills it with sap light.
+vec4 husk(vec2 px, float lit, float seed) {
+  float t = pc.time;
+  float R = (v_size.x - 2.0 * PAD) * 0.5;
+  vec2 top = vec2(0.0, -R * HUSK_STALK);
+  vec2 c = rot(px - v_size * 0.5 - top, sin(t * 1.2 + seed * 6.0) * 0.045) + top;
+  float breathe = 1.0 + 0.03 * sin(t * 1.8 + seed * 6.0);
+  vec2 q = c / (R * breathe);
+  float w = mix(0.84, 1.04, smoothstep(-1.0, 0.6, q.y));
+  vec2 e = vec2(q.x / w, q.y);
+  float l = length(e);
+  float d = (l - 1.0) * R * mix(w, 1.0, 0.5);
+  float fill = smoothstep(1.2, -1.2, d);
+  vec3 n = normalize(vec3(e, sqrt(max(0.0, 1.0 - min(l * l, 1.0)))));
+  float shade = 0.5 + 0.5 * max(dot(n, normalize(vec3(-0.5, -0.6, 0.65))), 0.0);
+  // ribs running from stalk to tip, darker in their seams
+  float phi = asin(clamp(e.x / sqrt(max(1.0 - e.y * e.y, 1e-3)), -1.0, 1.0));
+  float rib = 0.82 + 0.18 * cos(phi * 5.0);
+  vec3 body = v_col.rgb * shade * rib * (0.65 + 0.35 * lit);
+  body += UI_SAP * lit * 0.22 * (1.0 - min(l, 1.0)) * (0.85 + 0.15 * sin(t * 2.4 + seed * 4.0));
+  float glint = smoothstep(0.35, 0.0, length(q - vec2(-0.35, -0.1)));
+  float rim = smoothstep(2.5, 0.0, abs(d + 1.0));
+  vec3 rimc = sapColor(POD_RIM, lit * 0.8);
+  vec3 col = mix(body + glint * 0.2, rimc, rim * 0.8);
+  float a = max(fill * v_col.a, rim * 0.9);
+  // the calyx: sepals fanned over its shoulders from the stalk's foot
+  vec2 foot = vec2(0.0, -R * 0.84);
+  float ds = 1e3;
+  vec2 su = vec2(0.0, 1.0);
+  for (int k = 0; k < 5; k++) {
+    float ang = (float(k) - 2.0) * 0.62;
+    vec2 u = vec2(sin(ang), cos(ang));
+    float len = R * HUSK_SEPAL_LEN * (k == 2 ? 0.6 : 1.0);
+    float dk = sdGlyphLeaf(c, foot, u, len, R * HUSK_SEPAL_WID);
+    if (dk < ds) { ds = dk; su = u; }
+  }
+  float scov = smoothstep(0.8, -0.8, ds);
+  col = mix(col, leafShade(c, foot, su, R * HUSK_SEPAL_WID, TRELLIS_LEAF * 0.85), scov);
+  a = max(a, scov);
+  // the stalk it hangs by
+  float dst = sdStem(c, foot, top, max(R * 0.11, 0.8), max(R * 0.07, 0.6));
+  float tcov = smoothstep(0.8, -0.8, dst);
+  float across = clamp(c.x / max(R * 0.1, 0.6), -1.0, 1.0);
+  col = mix(col, mix(VINE_SHADE, VINE_LIT, 0.6 - 0.4 * across), tcov);
+  a = max(a, tcov);
+  float halo = exp(-max(d, 0.0) * 0.18) * (1.0 - fill) * lit * (0.6 + 0.4 * sin(t * 3.0)) * smoothstep(PAD - 6.0, PAD - 16.0, d);
+  return vec4(col + rimc * halo, clamp(a + halo, 0.0, 1.0));
+}
+
+// a bar: a stem growing along local x to `value` of its length. The grown
+// stem is bark tinted its colour, sap pulsing toward its tip, putting out
+// leaves in turn on either side that unfurl once the tip has passed; a bud
+// at the tip. Ahead of it only a faint twine marks the way.
 vec4 tendril(vec2 px, float value, float seed) {
   float t = pc.time;
   vec2 inner = v_size - 2.0 * PAD;
   vec2 p = px - vec2(PAD, v_size.y * 0.5);
-  float k = p.x / inner.x;                   // 0..1 along the tendril
-  // distance to the wavy centreline, clamped so both ends round off
-  float kc = clamp(k, 0.0, 1.0);
-  float wave = sin(kc * 18.0 + t * 2.0 + seed * 7.0) * inner.y * 0.18;
-  float thick = inner.y * 0.5 * (1.0 - 0.35 * kc);
-  float d = length(vec2((k - kc) * inner.x, p.y - wave)) - thick;
-  float grown = smoothstep(value + 0.015, value - 0.015, k);
-  // grown part glows with sap; the rest is a faint dry husk
-  float body = smoothstep(1.0, -1.0, d);
-  float pulse = 0.6 + 0.4 * sin(k * 30.0 - t * 4.0);
-  vec3 col = mix(v_col.rgb * 0.25, sapColor(v_col.rgb, 0.25 * pulse), grown);
-  // a bud at the growing tip
-  float tip = smoothstep(inner.y * 0.7, 0.0, length(vec2(p.x - value * inner.x, p.y - sin(value * 18.0 + t * 2.0 + seed * 7.0) * inner.y * 0.18)));
-  float a = body * mix(0.35, 1.0, grown) + tip * step(0.001, value);
-  return vec4(col + BUD_GLOW * tip, clamp(a * v_col.a, 0.0, 1.0));
+  float L = inner.x;
+  float H = inner.y;
+  float at = value * L;
+  float wave = sin(p.x * 0.06 + t * 1.5 + seed * 7.0) * H * 0.1;
+  float y = p.y - wave;
+  float xc = clamp(p.x, 0.0, L);
+  // the twine ahead
+  float twine = smoothstep(1.0, 0.0, abs(y)) * step(at, p.x) * step(p.x, L) * 0.35;
+  vec3 col = v_col.rgb * 0.3;
+  float a = twine;
+  // the stem
+  float k = clamp(p.x / max(at, 1.0), 0.0, 1.0);
+  float r = H * 0.32 * mix(1.0, 0.55, k);
+  float dsx = length(vec2(p.x - clamp(p.x, 0.0, at), y)) - r;
+  float scov = smoothstep(0.8, -0.8, dsx) * step(0.001, value);
+  float across = clamp(y / max(r, 0.5), -1.0, 1.0);
+  float shade = 0.6 + 0.4 * sqrt(max(0.0, 1.0 - across * across)) - 0.12 * across;
+  float pulse = pow(0.5 + 0.5 * sin(p.x * 0.08 - t * 4.0), 4.0);
+  vec3 bark = mix(VINE_SHADE, mix(VINE_LIT, v_col.rgb, 0.55), shade);
+  bark = sapColor(bark, pulse * 0.4 * (1.0 - abs(across)));
+  col = mix(col, bark, scov);
+  a = max(a, scov);
+  // leaves, alternating, leaning toward the tip
+  float i0 = floor(p.x / STEM_LEAF_EVERY);
+  for (int j = -1; j <= 1; j++) {
+    float i = i0 + float(j);
+    float xi = (i + 0.5) * STEM_LEAF_EVERY;
+    if (xi < 4.0 || xi > at - 6.0) continue;
+    float open = smoothstep(0.0, STEM_UNFURL, at - xi - 6.0);
+    float side = mod(i, 2.0) < 0.5 ? -1.0 : 1.0;
+    float h = hash(vec2(i, seed * 41.0));
+    float ang = side * (1.0 + 0.25 * h + sin(t * 1.9 + h * TAU) * 0.1);
+    vec2 u = vec2(cos(ang), sin(ang));
+    vec2 base = vec2(xi, sin(xi * 0.06 + t * 1.5 + seed * 7.0) * H * 0.1);
+    float len = H * STEM_LEAF_LEN * mix(0.3, 1.0, open) * (0.85 + 0.3 * h);
+    float wid = H * STEM_LEAF_WID * mix(0.45, 1.0, open);
+    float dl = sdGlyphLeaf(p, base, u, len, wid);
+    float lcov = smoothstep(0.8, -0.8, dl);
+    col = mix(col, leafShade(p, base, u, wid, mix(TRELLIS_LEAF, v_col.rgb, 0.3)), lcov);
+    a = max(a, lcov);
+  }
+  // the bud at the growing tip
+  vec2 tip = vec2(at, sin(at * 0.06 + t * 1.5 + seed * 7.0) * H * 0.1);
+  float db = sdGlyphLeaf(p, tip - vec2(H * 0.15, 0.0), vec2(1.0, 0.0), H * 0.6, H * 0.26);
+  float bcov = smoothstep(0.8, -0.8, db) * step(0.001, value) * step(value, 0.999);
+  col = mix(col, sapColor(v_col.rgb, 0.5) + BUD_GLOW * 0.25, bcov);
+  a = max(a, bcov);
+  return vec4(col, clamp(a * v_col.a, 0.0, 1.0));
 }
 
 vec4 glow(vec2 px) {
@@ -340,23 +616,6 @@ float nodeRadius(int n, float thick) {
   return thick * (n == 0 ? GLYPH_SEED : n == 1 ? GLYPH_TIP : n == 2 ? 1.0 : GLYPH_NODE);
 }
 
-// distance to a stem tapering from radius ra at a to rb at b
-float sdStem(vec2 p, vec2 a, vec2 b, float ra, float rb) {
-  vec2 ab = b - a;
-  float h = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
-  return length(p - a - ab * h) - mix(ra, rb, h);
-}
-
-// distance to a leaf from `base` along unit `u`, `len` long, `wid` across
-float sdGlyphLeaf(vec2 p, vec2 base, vec2 u, float len, float wid) {
-  vec2 r = p - base;
-  float x = dot(r, u);
-  float y = dot(r, vec2(-u.y, u.x));
-  float k = clamp(x / len, 0.0, 1.0);
-  float w = wid * pow(sin(PI * pow(k, 0.7)), 0.8);
-  return max(abs(y - wid * 0.4 * k * k) - w, max(-x, x - len));
-}
-
 // glyphs grow as vines: each lit cell is a node, joined to its lit
 // neighbours by tapering stems; a stem's free tips point and, once text is
 // big enough to show them, put out a leaf. The whole glyph sways from its
@@ -425,7 +684,8 @@ void main() {
   if (v_bits.x == SHAPE_MARK) {
     vec4 c;
     switch (v_bits.y) {
-      case SHAPE_MEMBRANE: c = membrane(v_uv, v_param.y); break;
+      case SHAPE_TRELLIS: c = trellis(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_HUSK: c = husk(v_uv, v_param.x, v_param.y); break;
       case SHAPE_POD: c = pod(v_uv, v_param.x, v_param.y); break;
       case SHAPE_TENDRIL: c = tendril(v_uv, v_param.x, v_param.y); break;
       case SHAPE_GLOW: c = glow(v_uv); break;

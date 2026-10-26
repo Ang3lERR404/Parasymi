@@ -210,10 +210,26 @@ woken, its ground meshed in 25 ms slices (`World.unmeshed`); also after a
 load in play. It fades off play's first frames (0.6 s).
 
 ## UI
-Organic, animated, no boxes; SDFs in `engine/shaders/ui.frag`. Wobbling membranes,
-seed-pod slots, tendril bars, soft glow, stems (`Draw.limb`) and
-leaves/buds (`Draw.leaf`), seeds (`Draw.grain`) and gems (`Draw.gem`);
-150 ms anim.
+Every interface is grown, never boxed; SDFs in `engine/shaders/ui.frag`.
+- Panels (`Draw.trellis`): a dark bed of leaf litter behind a faint
+  diagonal lattice of woven withies (over-under, `LATTICE_SHOW` kept low
+  for the text), framed by two vines braided round the rim. They root at
+  the lower left corner and grow both ways round in `trellis_grow` s from
+  the frame the panel is first drawn (`Draw.grown`, keyed by its seed; a
+  frame's break regrows it), tips tapering; leaves unfurl off the nodes
+  behind the tips, some nodes bear an amber sap bud or a curling tendril;
+  leaves sway, sap pulses climb out from the root.
+- Slots (`Draw.husk`): ribbed husks fuller below, a calyx of sepals, each
+  hanging by its stalk from its row's vine (`hud_belly.Vine`: belly,
+  hotbar, a structure's store), which grows across with leaf pairs between
+  the husks; a husk swells as the vine reaches it, swings a little, sap
+  light fills it when lit.
+- Bars (`Draw.tendril`, any angle `Draw.stem`): a stem grows to the value,
+  alternating leaves unfurling behind a bud at its tip, a faint twine
+  ahead. The belly's main stem rises up its left side filling with sap.
+- Bullets: buds (`hud.bullet`) that open under the mouse; ingredients and
+  saved gardens: seeds (`Draw.grain`); also stems (`Draw.limb`),
+  leaves/buds (`Draw.leaf`), gems (`Draw.gem`), soft glow.
 
 ## Item icons (`game/icon.zig`)
 A structure's bulb is a split seed with a sprout or two showing what it
