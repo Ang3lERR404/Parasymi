@@ -261,6 +261,12 @@ two-headed calves, neck cords, obliques), melted only a little
   sprints a little slower (full: 86% / 80%), steps shorter and lower,
   sways and rolls the pelvis more (full: a waddle), sinks and bobs
   lower and leans back under the weight.
+- Belly-rest idle (`restArms`, `REST_*`): standing still `REST_AFTER` s
+  with the belly past a third full (fully by `REST_FULL_IN`), the right
+  paw lies palm down over the top of the sac and the left fist sits on
+  the hip, elbow out (`solveArmTurned` swings the elbow round the
+  shoulder-wrist line); eased in on a slow spring, gone once he moves,
+  works or gathers.
 - Belly (`wolf_belly`): convex egg sac on the gut; filling scales and drops
   the `gut` bone (lower half) and `gut_top` (upper half: as wide, its top
   kept where it hangs), so the swollen sac never folds (tested); tu.x = gut

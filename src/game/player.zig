@@ -13,7 +13,8 @@
 //! - a spring-driven tail, breathing that quickens with effort, panting,
 //!   and a sap belly that swells with what it carries; the fuller it is the
 //!   heavier the gait, in three stages (light, heavy, full: a waddle), and a
-//!   little slower;
+//!   little slower; standing idle with a heavy belly, one paw rests on top
+//!   of it and the other leans on the hip;
 //! - gathering, it drops into a deep squat over the node, both paws grip it
 //!   (arms by inverse kinematics) and wrench it back once a unit, and each
 //!   unit that comes loose is pressed into the belly by one paw, in turn.
@@ -101,6 +102,26 @@ const GAITS = [3]Gait{
 };
 const STAGE_AT = [2]f32{ 1.0 / 3.0, 2.0 / 3.0 };
 const STAGE_BLEND:f32 = 0.08;
+/// the belly-rest idle: standing still this long with the belly at least
+/// `REST_FULL` full (fully in by `REST_FULL_IN`), the right paw rests on top
+/// of the belly (at `REST_ON`, the sac's upper half's frame, in its own
+/// shares: its radii and height) and the left leans on the hip (at
+/// `REST_HIP`, the pelvis's frame, x outward), its knuckles curled, the
+/// elbow out; the two ease in on a slow spring
+const REST_AFTER:f32 = 1.2;
+const REST_FULL:f32 = 1.0 / 3.0;
+const REST_FULL_IN:f32 = 0.45;
+const REST_FREQ:f32 = 2.2;
+const REST_ON = v3(0.1, 0.92, 0.45);
+/// the wrist sits this far off the sac, the paw lying on it
+const REST_LIFT:f32 = 0.045;
+const REST_HIP = v3(0.22, 0.08, -0.01);
+const REST_ELBOW_OUT:f32 = 1.0;
+const REST_FLAT:f32 = 0.12;
+const REST_FIST:f32 = 1.1;
+/// the paw on the belly turns palm down and bends onto it this far
+const REST_PRONATE:f32 = 1.4;
+const REST_DRAPE:f32 = 0.7;
 /// the gait: a full cycle (both feet) covers `CYCLE + CYCLE_PER_SPEED *
 /// speed` metres; a foot is planted for `duty` of it, more of it walking
 /// slowly than running
@@ -384,6 +405,10 @@ pub const Player = struct {
   stow:[2]f32 = @splat(0),
   next_stow:u1 = 0,
   last_pry:f32 = 0,
+  /// seconds stood still with idle hands, and the blend into the
+  /// belly-rest idle
+  still:f32 = 0,
+  rest_pose:Swing = .{},
 
   /// tile-aware: no wading, one terrace step at a time.
   pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:*const World, dt:f32) void {
@@ -455,6 +480,9 @@ pub const Player = struct {
     p.fullness += (p.bellyFill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
     p.reach.to(if (p.work != null) 1 else 0, REACH_FREQ, 1, dt);
     p.pry(dt);
+    p.still = if (p.stride < STANDING and p.work == null and p.gather == null) p.still + dt else 0;
+    const heavy = m.smooth(m.clamp01((p.fullness - REST_FULL) / (REST_FULL_IN - REST_FULL)));
+    p.rest_pose.to(if (p.still > REST_AFTER) heavy else 0, REST_FREQ, 1, dt);
 
     // what the body feels: its acceleration, turned into its own frame
     const a = (p.vel - p.last_vel) / m.splat3(@max(dt, MIN_DT));
@@ -627,6 +655,8 @@ pub const Player = struct {
         const hold = m.lerp(GRIP_OPEN, PRY_GRIP, regrip);
         const cup = m.clamp01(p.stow[s] / STOW_TIME * 4);
         target = m.lerp(target, m.lerp(hold, STOW_CUP, cup), p.squat.x);
+        // resting: the paw on the belly lies flat, the one on the hip curls
+        target = m.lerp(target, if (s == 1) REST_FLAT else REST_FIST, p.rest_pose.x * (1 - p.squat.x));
         c.to(target, FINGER_FREQ, FINGER_DAMP, dt);
         sum += c.x;
       }
@@ -728,7 +758,34 @@ pub const Player = struct {
     for (&q.tail, p.tail, 0..) |*j, sp, i| j.* = .{ .x = (if (i == 0) -TAIL_LIFT * @max(st, sq) else TAIL_DROOP * (1 - 0.6 * st)), .z = sp.x };
     q.legs = p.legs(q);
     if (sq > 0) p.armsToWrists(&q, sq);
+    const resting = p.rest_pose.x * (1 - sq);
+    if (resting > 0) restArms(&q, resting);
     return q;
+  }
+
+  /// the belly-rest idle, blended in by `r`: the right wrist onto the top
+  /// of the belly, the palm laid on it; the left on the hip, the wrist
+  /// bent back and the elbow turned out
+  fn restArms(q:*skel.Pose, r:f32) void {
+    const w = skel.fk(q.*);
+    const into = m.inverseRigid(w[@intFromEnum(Bone.chest)]);
+    const on = REST_ON * v3(belly_mesh.RX, belly_mesh.UP, belly_mesh.RZ);
+    const at = [2]V3{
+      m.mulPoint(w[@intFromEnum(Bone.pelvis)], REST_HIP * v3(-1, 1, 1)),
+      m.mulPoint(w[@intFromEnum(Bone.gut_top)], on) + v3(0, REST_LIFT, 0),
+    };
+    for (0..2) |s| {
+      const x = skel.sign(s);
+      const out:f32 = if (s == 0) REST_ELBOW_OUT else 0;
+      const ik = solveArmTurned(m.mulPoint(into, at[s]) - skel.SHOULDER * v3(x, 1, 1), -x * out);
+      const a = &q.arms[s];
+      a.root = .{ .x = m.lerp(a.root.x, ik.root.x, r), .y = m.lerp(a.root.y, ik.root.y, r), .z = m.lerp(a.root.z, ik.root.z, r) };
+      a.mid = m.lerp(a.mid, ik.mid, r);
+      // (on the belly the paw turns palm down and bends onto the sac; on
+      // the hip the wrist cocks back)
+      const low:skel.Turn = if (s == 0) .{ .x = -0.5, .z = x * 0.3 } else .{ .y = -x * REST_PRONATE, .z = -x * REST_DRAPE };
+      a.low = .{ .x = m.lerp(a.low.x, low.x, r), .y = m.lerp(a.low.y, low.y, r), .z = m.lerp(a.low.z, low.z, r) };
+    }
   }
 
   /// gathering: each arm blended (by `sq`) toward reaching its wrist's
@@ -912,6 +969,15 @@ pub fn solveArm(d:V3) skel.Limb {
   return .{ .root = .{ .x = xr, .z = zr }, .mid = mid };
 }
 
+/// `solveArm` with the shoulder first turned by `y` about the chest's
+/// vertical: the wrist still reaches `d`, but the elbow swings round the
+/// line from shoulder to wrist (out from the body, or in)
+pub fn solveArmTurned(d:V3, y:f32) skel.Limb {
+  var ik = solveArm(m.mulPoint(m.rotY(-y), d));
+  ik.root.y = y;
+  return ik;
+}
+
 /// how far through its pull and wrench the pry is at unit share `k` (0 on
 /// the grip .. 1 wrenched), easing back to the grip after
 fn pryPull(k:f32) f32 {
@@ -1025,4 +1091,26 @@ test "the belly's stages: light, heavy, full, each a little slower and never slo
     try testing.expect(@abs(p.stage() - prev) < 0.12);
     prev = p.stage();
   }
+}
+
+test "standing still with a heavy belly, one paw rests on it and the other on the hip" {
+  var p:Player = .{ .pos = v3(0, 0, 0) };
+  p.fullness = 0.6;
+  p.inv = .{};
+  var t:f32 = 0;
+  while (t < 4) : (t += TEST_DT) {
+    p.animate(null, TEST_DT);
+    p.fullness = 0.6;
+  }
+  try testing.expect(p.rest_pose.x > 0.95);
+  const w = skel.fk(p.pose());
+  const belly = m.mulPoint(w[@intFromEnum(Bone.gut_top)], REST_ON * v3(belly_mesh.RX, belly_mesh.UP, belly_mesh.RZ)) + v3(0, REST_LIFT, 0);
+  const hip = m.mulPoint(w[@intFromEnum(Bone.pelvis)], REST_HIP * v3(-1, 1, 1));
+  try testing.expect(m.len(m.origin(w[@intFromEnum(skel.sides[1].hand)]) - belly) < 0.03);
+  try testing.expect(m.len(m.origin(w[@intFromEnum(skel.sides[0].hand)]) - hip) < 0.03);
+  // a light belly never takes the pose
+  var q:Player = .{ .pos = v3(0, 0, 0) };
+  t = 0;
+  while (t < 4) : (t += TEST_DT) q.animate(null, TEST_DT);
+  try testing.expect(q.rest_pose.x < 0.01);
 }
