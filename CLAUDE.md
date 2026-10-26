@@ -44,7 +44,7 @@ When a change alters what one of these says, update it in the same commit.
   substitute, never a stand-in called done. If it can't be done as
   described, research another way that delivers exactly that. Ambiguous →
   ask. "Off", "weak", "generic", "too X" is the acceptance criterion.
-- **Scope guard**: no audio, multiplayer, PBR/IBL, further post-processing
+- **Scope guard**: no multiplayer, PBR/IBL, further post-processing
   or Linux/macOS without explicit direction; flag and stop if a task drifts
   there.
 - **Decision authority**: a layer boundary or build/run interface change →
@@ -91,8 +91,7 @@ Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`
 (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`, zglfw
 `f04fdbf` (upstream heads need 0.17), zig-wsapi `4f64035` (its `zig-0.16`
-branch; the engine's `wasapi`, added on explicit direction despite the
-audio scope guard). A stray `CPATH` breaks GLFW's C
+branch; the engine's `wasapi`, Windows audio). A stray `CPATH` breaks GLFW's C
 build. New shaders go in `build.zig`'s list (the engine's in
 `engine/build.zig`'s); `zig build test` also runs the engine's tests.
 
