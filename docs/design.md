@@ -41,7 +41,8 @@ grows a grand garden. 2.5D top-down 3D.
   (`Structures.handIn`, at the edge an item comes in by); carriers are
   never pulled from. `gives` says what a structure lets go (a braid pulls a
   different kind per lane); `st.handOff` feeds a producer's `output` to a
-  non-carrier neighbour.
+  non-carrier neighbour beside any side of its footprint; `st.handOffWith`
+  reaches `.range` steps out and hands up to `.amount`, nearest first.
 
 ## Lineage structures (2nd tier, each its own research)
 ### Symbiotic (woven, green, amber sap)

@@ -625,23 +625,89 @@ pub const Structures = struct {
   }
 };
 
-/// hand one of what structure `i` lets go (`output`) to a neighbour that
-/// wants it; returns whether one went. Carriers are left alone: one behind
-/// it pulls through `output` itself.
-pub fn handOff(ctx:Ctx, i:Id) bool {
+/// how far and how much `handOffWith` hands on
+pub const HandOff = struct {
+  /// steps out from its footprint (four ways) it reaches; 1 is the tiles
+  /// beside it
+  range:u8 = 1,
+  /// at most how many it hands on, to one neighbour or several
+  amount:u16 = 1,
+};
+
+/// hand one of what structure `i` lets go (`output`) to a neighbour beside
+/// it that wants it; returns whether one went.
+pub fn handOff(ctx:Ctx, i:Id) bool { return handOffWith(ctx, i, .{}) > 0; }
+
+/// hand up to `h.amount` of what structure `i` lets go (`output`, asked
+/// again after each neighbour) to those within `h.range` of its footprint
+/// that want it, nearest first; returns how many went. Carriers are left
+/// alone: one behind it pulls through `output` itself.
+// decision: a footprint's every side hands on (a 2×2 monfris once handed
+// only from its corner tile's neighbours)
+pub fn handOffWith(ctx:Ctx, i:Id, h:HandOff) u16 {
   const self = ctx.ss.get(i);
-  const item = ctx.ss.output(i) orelse return false;
-  for (m.dirs) |d| {
-    const v = m.dirVec(d);
-    const j = ctx.ss.at(ctx.w, self.x + v.x, self.y + v.z) orelse continue;
-    if (j == i or ctx.ss.get(j).def().carrier) continue;
-    if (ctx.ss.insert(ctx.g, j, item, 1) == 1) {
-      _ = self.inv.take(item, 1);
-      return true;
+  const n:i32 = self.def().size;
+  var left = h.amount;
+  for (1..@as(usize, h.range) + 1) |d| {
+    var r:Ring = .{ .x0 = self.x, .y0 = self.y, .x1 = self.x + n - 1, .y1 = self.y + n - 1, .d = @intCast(d) };
+    while (r.next()) |t| {
+      const j = ctx.ss.at(ctx.w, t[0], t[1]) orelse continue;
+      if (j == i or ctx.ss.get(j).def().carrier) continue;
+      const item = ctx.ss.output(i) orelse return h.amount - left;
+      const have:u16 = @intCast(@min(left, self.inv.count(item)));
+      const k = ctx.ss.insert(ctx.g, j, item, have);
+      if (k == 0) continue;
+      _ = self.inv.take(item, k);
+      left -= k;
+      if (left == 0) return h.amount;
     }
   }
-  return false;
+  return h.amount - left;
 }
+
+/// the tiles exactly `d` steps (four ways) out from a footprint
+/// `x0..x1` × `y0..y1`, clockwise from its east side: each side, then the
+/// corner after it (a 1×1's ring 1 is its neighbours in `m.dirs` order)
+const Ring = struct {
+  x0:i32,
+  y0:i32,
+  x1:i32,
+  y1:i32,
+  d:i32,
+  /// east, south-east, south, south-west, west, north-west, north, north-east
+  seg:u4 = 0,
+  k:i32 = 0,
+
+  fn len(r:*const Ring) i32 {
+    return switch (r.seg) {
+      0, 4 => r.y1 - r.y0 + 1,
+      2, 6 => r.x1 - r.x0 + 1,
+      else => r.d - 1,
+    };
+  }
+
+  fn next(r:*Ring) ?[2]i32 {
+    while (r.seg < 8 and r.k >= r.len()) {
+      r.seg += 1;
+      r.k = 0;
+    }
+    if (r.seg == 8) return null;
+    const k = r.k;
+    const d = r.d;
+    r.k += 1;
+    return switch (r.seg) {
+      0 => .{ r.x1 + d, r.y0 + k },
+      1 => .{ r.x1 + d - 1 - k, r.y1 + 1 + k },
+      2 => .{ r.x1 - k, r.y1 + d },
+      3 => .{ r.x0 - 1 - k, r.y1 + d - 1 - k },
+      4 => .{ r.x0 - d, r.y1 - k },
+      5 => .{ r.x0 - d + 1 + k, r.y0 - 1 - k },
+      6 => .{ r.x0 + k, r.y0 - d },
+      7 => .{ r.x1 + 1 + k, r.y0 - d + 1 + k },
+      else => unreachable,
+    };
+  }
+};
 
 /// a floating plant a structure draws in toward itself: how far along the
 /// way it is (0 leaving its tile .. 1 there; the GPU moves it, see
@@ -775,6 +841,58 @@ test "a conduit's side root reaches a plant beside it and harvests it" {
   try testing.expect(ss.get(ss.at(&w, 1, 0).?).state.conduit.held == null);
   for (0..200) |_| try ss.tick(gpa, &w, &plants, &g, 0.05);
   try testing.expectEqual(@as(u32, 2), ss.get(ss.at(&w, 2, 0).?).inv.count(.essence));
+}
+
+test "a footprint's ring holds every tile that many steps out, once, beside ones first in `m.dirs` order" {
+  var one:Ring = .{ .x0 = 0, .y0 = 0, .x1 = 0, .y1 = 0, .d = 1 };
+  for (m.dirs) |d| {
+    const v = m.dirVec(d);
+    try testing.expectEqual([2]i32{ v.x, v.z }, one.next().?);
+  }
+  try testing.expect(one.next() == null);
+  for ([_]i32{ 1, 2 }) |n| for ([_]i32{ 1, 2, 3 }) |d| {
+    var r:Ring = .{ .x0 = 0, .y0 = 0, .x1 = n - 1, .y1 = n - 1, .d = d };
+    var seen:[64][2]i32 = undefined;
+    var c:usize = 0;
+    while (r.next()) |t| : (c += 1) {
+      const dx = @max(0 - t[0], 0, t[0] - (n - 1));
+      const dy = @max(0 - t[1], 0, t[1] - (n - 1));
+      try testing.expectEqual(d, dx + dy);
+      for (seen[0..c]) |s| try testing.expect(!(s[0] == t[0] and s[1] == t[1]));
+      seen[c] = t;
+    }
+    try testing.expectEqual(@as(usize, @intCast(4 * n + 4 * (d - 1))), c);
+  };
+}
+
+test "handing off reaches further and hands more when asked, the nearest first" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..4) |x| { c.kind[x] = .soil; c.height[x] = 1; c.res[x] = 0; }
+  var plants:Plants = .{};
+  defer plants.deinit(gpa);
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression = .{};
+  const ctx:Ctx = .{ .gpa = gpa, .w = &w, .plants = &plants, .g = &g, .ss = &ss };
+  // loomfern, a gap, a cache two steps out
+  try testing.expect(try ss.place(gpa, &w, 0, 0, .loomfern, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 2, 0, .sap_cache, 0, 0));
+  const fern = ss.at(&w, 0, 0).?;
+  const cache = ss.at(&w, 2, 0).?;
+  _ = ss.get(fern).inv.add(.fibre, 6);
+  try testing.expect(!handOff(ctx, fern));
+  try testing.expectEqual(@as(u16, 4), handOffWith(ctx, fern, .{ .range = 2, .amount = 4 }));
+  try testing.expectEqual(@as(u32, 4), ss.get(cache).inv.count(.fibre));
+  // a cache beside it now comes first; asked for more than it has, all go
+  try testing.expect(try ss.place(gpa, &w, 1, 0, .sap_cache, 0, 0));
+  const near = ss.at(&w, 1, 0).?;
+  try testing.expectEqual(@as(u16, 2), handOffWith(ctx, fern, .{ .range = 2, .amount = 9 }));
+  try testing.expectEqual(@as(u32, 2), ss.get(near).inv.count(.fibre));
+  try testing.expectEqual(@as(u32, 0), ss.get(fern).inv.count(.fibre));
 }
 
 test "a structure put down grows before it works" {
