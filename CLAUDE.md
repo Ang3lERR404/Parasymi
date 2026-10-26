@@ -90,7 +90,9 @@ zig build meshedit -- [--mesh=<name> --shot]
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`
 (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`, zglfw
-`f04fdbf` (upstream heads need 0.17). A stray `CPATH` breaks GLFW's C
+`f04fdbf` (upstream heads need 0.17), zig-wsapi `4f64035` (its `zig-0.16`
+branch; the engine's `wasapi`, added on explicit direction despite the
+audio scope guard). A stray `CPATH` breaks GLFW's C
 build. New shaders go in `build.zig`'s list (the engine's in
 `engine/build.zig`'s); `zig build test` also runs the engine's tests.
 

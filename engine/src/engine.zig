@@ -13,6 +13,8 @@
 /// the libraries underneath, for the game's own Vulkan and windowing code
 pub const vk = @import("vulkan");
 pub const glfw = @import("zglfw");
+/// Windows audio (WASAPI), for the game's own audio code
+pub const wasapi = @import("wasapi");
 
 pub const core = struct {
   pub const math = @import("core/math.zig");

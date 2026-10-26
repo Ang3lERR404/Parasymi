@@ -5,8 +5,8 @@
 and Parasymi depends on it by path (`.engine = .{ .path = "engine" }`).
 Game code reaches it as `@import("engine")` (`engine/src/engine.zig`):
 `engine.core.math`, `engine.gfx.ctx`, `engine.render.renderer`,
-`engine.ui.draw`, and also `engine.vk` and `engine.glfw` for the libraries
-underneath. It never imports the game.
+`engine.ui.draw`, and also `engine.vk`, `engine.glfw` and `engine.wasapi`
+(Windows audio, jcollie/zig-wsapi) for the libraries underneath. It never imports the game.
 
 | Layer | Engine | Game (`src/`) |
 |---|---|---|

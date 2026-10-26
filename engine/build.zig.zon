@@ -10,6 +10,10 @@
             .url = "git+https://github.com/zig-gamedev/zglfw#f04fdbfc5b6d8c9a12025013992ac1d48653931e",
             .hash = "zglfw-0.10.0-dev-zgVDNNu5IQAk-UK7gIg0LWMmMzxj4sK9xCSTisLhjgI1",
         },
+        .wasapi = .{
+            .url = "git+https://github.com/jcollie/zig-wsapi#4f640353e82115e592d07e083565b557a6e1d475",
+            .hash = "wasapi-0.1.0-Y48zc-f6BgBcr3wtWtGpKU53cBefhd8Tt_m9nouqBQfH",
+        },
     },
     .fingerprint = 0xe8a81a8db771660b,
     .minimum_zig_version = "0.16.0",

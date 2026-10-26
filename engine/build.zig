@@ -1,5 +1,5 @@
 //! builds the engine as the module `engine` (Vulkan through vulkan-zig,
-//! windows through zglfw, its shaders compiled to SPIR-V and embedded) and
+//! windows through zglfw, WASAPI through zig-wsapi, its shaders compiled to SPIR-V and embedded) and
 //! its tests. A game's build.zig depends on it by path or URL and uses the
 //! helpers below (`@import("engine")`) to find glslc and vk.xml and compile
 //! its own shaders, which may `#include` the engine's (`light.glsl`,
@@ -60,6 +60,7 @@ pub fn build(b:*Build) void {
   });
   const glfw_mod = zglfw.module("root");
   glfw_mod.addImport("vulkan", vulkan);
+  const wasapi = b.dependency("wasapi", .{.target = t, .optimize = o}).module("wasapi");
 
   const mod = b.addModule("engine", .{
     .target = t,
@@ -68,6 +69,7 @@ pub fn build(b:*Build) void {
     .imports = &.{
       .{.name = "vulkan", .module = vulkan},
       .{.name = "zglfw", .module = glfw_mod},
+      .{.name = "wasapi", .module = wasapi},
     },
   });
   mod.linkLibrary(zglfw.artifact("glfw"));
