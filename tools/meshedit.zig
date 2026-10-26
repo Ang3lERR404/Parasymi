@@ -6,6 +6,7 @@
 //! in `src/mesh/<name>.mesh`. The game does not read these yet. From the
 //! repo root:
 //!   zig build meshedit -- [--mesh=<name>]
+//! (a name not yet kept starts a new mesh, written there at once)
 //! (`--gizmo=move|turn|size` starts the gizmo so; `--shot` saves one frame
 //! to `shots/meshedit.png` and closes, for checking it headless.)
 //! Each form is placed by `pos`, turned by `rot` (degrees, y then x then
@@ -32,6 +33,7 @@ const Dir = Io.Dir;
 const Writer = Io.Writer;
 const eql = std.mem.eql;
 const startsWith = std.mem.startsWith;
+const indexOfAny = std.mem.indexOfAny;
 const stringToEnum = std.meta.stringToEnum;
 const splitScalar = std.mem.splitScalar;
 const tokenizeScalar = std.mem.tokenizeScalar;
@@ -70,6 +72,8 @@ const v3 = m.v3;
 /// meshes are kept here (from the repo root)
 const DIR = "src/mesh";
 const EXT = ".mesh";
+/// a mesh's name is a plain file name: none of these
+const NOT_IN_NAME = "/\\:.*?\"<>|";
 /// the first line of a mesh's text
 const HEADER = "# mesh";
 /// `--shot` writes here, this many frames in (the world settled)
@@ -559,14 +563,21 @@ pub fn main(init:std.process.Init) !void {
     if (startsWith(u8, a, "--gizmo=")) mode = stringToEnum(gizmo.Mode, a["--gizmo=".len..]) orelse return error.BadGizmo;
     if (eql(u8, a, "--shot")) shot = true;
   }
+  if (name.len == 0 or indexOfAny(u8, name, NOT_IN_NAME) != null) {
+    log.err("--mesh={s}: a plain file name, kept as " ++ DIR ++ "/<name>" ++ EXT, .{name});
+    return error.BadName;
+  }
   const path = try std.fmt.allocPrint(arena, DIR ++ "/{s}" ++ EXT, .{name});
 
-  // the mesh: as kept, else one form to start from
+  // the mesh: as kept, else one form to start from, written at once so a
+  // new name is a file from the start
+  var made = false;
   const doc = load: {
     const text = Dir.cwd().readFileAlloc(io, path, gpa, .limited(1 << 22)) catch |er| switch (er) {
       error.FileNotFound => {
         var fresh:Doc = .{};
         try fresh.pieces.append(gpa, .{});
+        made = true;
         break :load fresh;
       },
       else => return er,
@@ -576,6 +587,13 @@ pub fn main(init:std.process.Init) !void {
   };
   var e:Editor = .{ .gpa = gpa, .io = io, .path = path, .doc = doc, .mode = mode };
   defer e.doc.deinit(gpa);
+  if (made) {
+    e.dirty = true;
+    e.save();
+    if (e.dirty) return error.SaveFailed;
+    e.say("new {s}", .{path});
+    log.info("new {s}", .{path});
+  }
 
   // the game's files (controls, strings), as the game reads them
   try ps.home.open(io, init.environ_map);

@@ -3,6 +3,7 @@
 //! the game's own renderer, and keeps it as text in `src/anim/<name>.anim`.
 //! The game does not play clips back yet. From the repo root:
 //!   zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name>]
+//! (a name not yet kept starts a new clip, written there at once)
 //! (`--at=<s>` starts the playhead there, `--channel=<name>` on that
 //! channel; `--shot` saves one frame to `shots/animedit.png` and closes,
 //! for checking it headless.)
@@ -26,6 +27,7 @@ const Dir = Io.Dir;
 const Writer = Io.Writer;
 const eql = std.mem.eql;
 const startsWith = std.mem.startsWith;
+const indexOfAny = std.mem.indexOfAny;
 const stringToEnum = std.meta.stringToEnum;
 const bufPrint = std.fmt.bufPrint;
 const log = std.log;
@@ -59,6 +61,8 @@ const DIR = "src/anim";
 const SHOT = "shots/animedit.png";
 const SHOT_FRAMES = 30;
 const EXT = ".anim";
+/// a clip's name is a plain file name: none of these
+const NOT_IN_NAME = "/\\:.*?\"<>|";
 /// a stalled frame counts as at most this long (s)
 const MAX_DT:f64 = 0.1;
 /// the playhead snaps to frames of this rate
@@ -586,16 +590,24 @@ pub fn main(init:std.process.Init) !void {
     log.err("usage: zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name>]", .{});
     return error.NoSubject;
   };
-  const path = try std.fmt.allocPrint(arena, DIR ++ "/{s}" ++ EXT, .{name orelse sj.name()});
+  const named = name orelse sj.name();
+  if (named.len == 0 or indexOfAny(u8, named, NOT_IN_NAME) != null) {
+    log.err("--clip={s}: a plain file name, kept as " ++ DIR ++ "/<name>" ++ EXT, .{named});
+    return error.BadName;
+  }
+  const path = try std.fmt.allocPrint(arena, DIR ++ "/{s}" ++ EXT, .{named});
 
-  // the clip: as kept, else a fresh one
+  // the clip: as kept, else a fresh one, written at once so a new name is
+  // a file from the start
   var wb:[64]u8 = undefined;
   const word = sj.word(&wb);
+  var made = false;
   const c = load: {
     const text = Dir.cwd().readFileAlloc(io, path, gpa, .limited(1 << 22)) catch |er| switch (er) {
       error.FileNotFound => {
         var fresh = try clip.Clip.init(gpa, word);
         fresh.length = LENGTH;
+        made = true;
         break :load fresh;
       },
       else => return er,
@@ -622,6 +634,13 @@ pub fn main(init:std.process.Init) !void {
   if (!eql(u8, e.clip.subject, word)) {
     log.err("{s} animates {s}, not {s}", .{ path, e.clip.subject, word });
     return error.WrongSubject;
+  }
+  if (made) {
+    e.dirty = true;
+    e.save();
+    if (e.dirty) return error.SaveFailed;
+    e.say("new {s}", .{path});
+    log.info("new {s}", .{path});
   }
 
   // the game's files (controls, strings), as the game reads them
