@@ -17,6 +17,9 @@ const icon = lib.icon;
 const items = lib.items;
 const hud = lib.hud;
 const Slot = lib.hud_slot.Slot;
+const ctl = lib.controls;
+const actions = lib.actions;
+const Input = lib.engine.platform.input.Input;
 
 pub const cols = 6;
 const rows = player_mod.SLOTS / cols;
@@ -40,6 +43,38 @@ const stem_x:f32 = 40;
 const stem_top:f32 = 26;
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .belly; }
+
+/// a belly slot, a slot of the open structure (its grid is drawn here
+/// too), a recipe woven by hand
+pub const Pick = union(enum) { slot:usize, store:usize, weave:usize };
+
+/// a slot lifts or puts down (with take held, a stack moves straight across
+/// to the other side); discard throws a belly stack away; a recipe weaves
+/// (or, carrying something, the click just puts it down).
+pub fn click(g:*play.Game, p:Pick, press:hud.Press, in:*const Input) void {
+  const across = ctl.down(in, .take) and g.held == null and g.mode == .structure;
+  switch (press) {
+    .use => switch (p) {
+      .slot => |i| if (across) g.moveAcross(.{.slot = i}) else g.clickSlot(i),
+      .store => |i| if (across) g.moveAcross(.{.store = i}) else g.clickStore(i),
+      .weave => |i| if (g.held != null) g.drop() else actions.weaveByHand(g, i),
+    },
+    .discard => switch (p) {
+      .slot => |i| g.discard(i),
+      .store, .weave => {},
+    },
+    .remove => {},
+  }
+}
+
+/// the stack's item on a slot (not one lifted from it)
+pub fn shows(g:*const play.Game, p:Pick) ?items.Item {
+  return switch (p) {
+    .slot => |i| if (g.holds(.{.slot = i})) null else if (g.player.inv.slot[i]) |it| it.item else null,
+    .store => |i| if (g.holds(.{.store = i})) null else if (g.storeSlot(i)) |it| it.item else null,
+    .weave => null,
+  };
+}
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const weave_rows = (craft.by_hand.len + 1) / 2;
@@ -139,7 +174,7 @@ pub fn grid(g:*play.Game, d:*Draw, comptime side:Side, stacks:[]const ?items.Sta
   for (stacks, 0..) |slot, i| {
     const cx = gx + gap * (m.f(i % columns) + 0.5);
     const cy = py + gap * (m.f(i / columns) + 0.5);
-    var sl = Slot.around(.{cx, cy}, gap, gap, @unionInit(hud.Pick, @tagName(side), i), husk_r / gap);
+    var sl = Slot.around(.{cx, cy}, gap, gap, hud.row(.belly, @unionInit(Pick, @tagName(side), i)), husk_r / gap);
     sl.grown = rowVine(d, gx, cy, columns, rowSeed(side, i / columns)).reached(cx);
     sl.phase = m.f(i) * 0.13;
     if (!try sl.draw(g, d)) continue;
@@ -178,7 +213,7 @@ fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
     const r = craft.hand[i];
     const colx = px + 70 + m.f(k % 2) * col_w;
     const y = wy + 42 + weave_row_h * m.f(k / 2);
-    g.rows.add(.{.x = colx - 10, .y = y - 24, .w = col_w - 20, .h = weave_row_h}, .{.weave = i});
+    g.rows.add(.{.x = colx - 10, .y = y - 24, .w = col_w - 20, .h = weave_row_h}, hud.row(.belly, .{.weave = i}));
     const open = r.unlocked(&g.prog);
     const ok = open and craft.Crafter.can(g.player.inv.bag(), r);
     if (open) try icon.draw(d, r.out, .{colx + 16, y}, recipe_r, g.uiT(), m.f(i) * 0.5, if (ok) 0.9 else 0.1, if (ok) 255 else unready_alpha)

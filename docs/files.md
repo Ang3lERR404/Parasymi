@@ -106,7 +106,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `slot.zig` — a slot, the first of the HUD's components: a husk hanging in its box.
 - `status.zig` — time of day (a sun or moon pod) and how full the wolf's sap belly is.
 - `structure.zig` — a structure's panel (a click on one that keeps items): its slots beside the belly's, lifted and put down between them as in the belly, and…
-- `tooltip.zig` — an item's full name, on a small trellis beside the cursor, while the mouse rests on a belly or hotbar slot holding one.
+- `tooltip.zig` — an item's full name, on a small trellis beside the cursor, while the mouse rests on a row showing one (a slot holding one, a recipe).
 
 ## src/game/
 - `icon.zig` — item icons for the HUD: what sits in a belly slot, a hotbar pod or on the cursor.

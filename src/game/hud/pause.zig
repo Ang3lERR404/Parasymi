@@ -10,6 +10,7 @@ const Draw = lib.engine.ui.draw.Draw;
 const s = lib.style;
 const hud = lib.hud;
 const txt = lib.txt;
+const Input = lib.engine.platform.input.Input;
 
 const pw:f32 = 480;
 const header_h:f32 = 100;
@@ -23,6 +24,14 @@ const row_inset:f32 = 50;
 const rows = fields(play.PauseRow).len;
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .paused; }
+
+/// a row of the menu
+pub const Pick = union(enum) { row:play.PauseRow };
+
+/// a click does what the row says
+pub fn click(g:*play.Game, p:Pick, press:hud.Press, _:*const Input) void {
+  if (press == .use) switch (p) { .row => |r| g.choose(r) };
+}
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   try d.glow(W / 2, H / 2, @max(W, H) * s.veil_reach, s.veil);
@@ -40,11 +49,11 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   for (0..n) |i| {
     const y = py + header_h + option_h * m.f(i);
     const row:play.PauseRow = @enumFromInt(i);
-    const over = g.points(.{.pause = row});
+    const over = g.points(hud.row(.pause, .{.row = row}));
     if (over) try d.glow(px + pw / 2, y + 8, pw * 0.42, s.menu_hover);
     try hud.bullet(d, px + pod_x, y + 8, 9, s.gold, if (over) 1 else 0.15, m.f(i) * 0.4);
     _ = try d.text(px + key_x, y, s.text_label, s.dim, txt.nth(keys, i));
     _ = try d.text(px + label_x, y, s.text_label, if (over) s.gold else s.white, txt.nth(labels, i));
-    g.rows.add(.{.x = px + pod_x - row_inset, .y = y - option_h / 2 + 8, .w = pw - 2 * (pod_x - row_inset), .h = option_h}, .{.pause = row});
+    g.rows.add(.{.x = px + pod_x - row_inset, .y = y - option_h / 2 + 8, .w = pw - 2 * (pod_x - row_inset), .h = option_h}, hud.row(.pause, .{.row = row}));
   }
 }

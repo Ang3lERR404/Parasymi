@@ -144,7 +144,7 @@ registry kinds outside the registry file; add a hook.
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `gives`, `receive`, `release`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon`, `meshes`, `meets`, `adopts`, `pairs` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
-| hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
+| hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order), `Pick`, `click`, `shows` |
 | render passes | `render/renderer.zig` (`passes`; engine `Renderer(G)`) | `desc` (`.target`: shadow/world/screen), `Frame`, `initFrame`/`deinitFrame`, `prepare`, `record` |
 
 Items (`sim/items.zig`, ids stored by value: new items go last) and weave

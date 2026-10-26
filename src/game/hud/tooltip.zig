@@ -1,5 +1,5 @@
 //! an item's full name, on a small trellis beside the cursor, while the
-//! mouse rests on a belly or hotbar slot holding one.
+//! mouse rests on a row showing one (a slot holding one, a recipe).
 const lib = @import("../../lib.zig");
 const std = lib.std;
 const Allocator = std.mem.Allocator;
@@ -8,7 +8,7 @@ const items = lib.items;
 const Draw = lib.engine.ui.draw.Draw;
 const s = lib.style;
 const txt = lib.txt;
-const craft = lib.craft;
+const hud = lib.hud;
 
 /// from the cursor to the card, the card's margin and line height
 const offset = [2]f32{20, 10};
@@ -16,17 +16,9 @@ const margin:f32 = 12;
 const line_h:f32 = 22;
 const edge:f32 = 8;
 
-/// the item on the slot under the mouse (not one lifted from it).
+/// the item on the row under the mouse, as its panel shows it.
 fn pointed(g:*const play.Game) ?items.Item {
-  const p = g.pointed orelse return null;
-  return switch (p) {
-    .slot => |i| if (g.holds(.{.slot = i})) null else if (g.player.inv.slot[i]) |it| it.item else null,
-    .bar => |i| if (g.holds(.{.bar = i})) null else g.bar[i],
-    .store => |i| if (g.holds(.{.store = i})) null else if (g.storeSlot(i)) |it| it.item else null,
-    // what a recipe weaves, once it is understood
-    .recipe => |r| if (craft.hand[r].unlocked(&g.prog)) craft.hand[r].out else null,
-    .panel, .research, .weave, .pause, .option, .back, .garden, .garden_act, .scroll => null,
-  };
+  return hud.shows(g, g.pointed orelse return null);
 }
 
 pub fn visible(g:*const play.Game) bool {

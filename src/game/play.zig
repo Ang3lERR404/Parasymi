@@ -413,30 +413,19 @@ pub const Game = struct {
     g.pointed = ui_hit;
     if (!ctl.down(in, .use)) g.use_spent = false;
     if (ctl.pressed(in, .use)) {
-      // held with use: a stack moves straight across to the other side
-      const across = ctl.down(in, .take) and g.held == null and g.mode == .structure;
-      if (ui_hit) |hit| switch (hit) {
-        .panel, .research, .weave, .recipe => if (g.held != null) g.drop() else switch (hit) {
-          .research => |id| g.prog.select(id),
-          .weave => |i| actions.weaveByHand(g, i),
-          .recipe => |r| if (g.opened()) |j| st.choose(g.structs.get(j), &g.prog, r),
-          else => {},
-        },
-        .slot => |i| if (across) g.moveAcross(.{.slot = i}) else g.clickSlot(i),
-        .store => |i| if (across) g.moveAcross(.{.store = i}) else g.clickStore(i),
-        .bar => |i| if (g.mode.sorting()) g.clickBar(i) else { g.hot = i; },
-        // drawn only while the world is frozen (see `menu`)
-        .pause, .option, .back, .garden, .garden_act, .scroll => {},
-      } else if (g.held != null) {
+      if (ui_hit) |hit| hud.click(g, hit, .use, in) else if (g.held != null) {
         g.drop();
         g.use_spent = true;
       }
     }
-    if (ctl.pressed(in, .remove)) if (ui_hit) |hit| switch (hit) {
-      .bar => |i| g.bar[i] = null,
-      .panel, .research, .weave, .slot, .store, .recipe, .pause, .option, .back, .garden, .garden_act, .scroll => {},
-    };
-    if (ctl.pressed(in, .discard) and g.mode.sorting()) g.discard(ui_hit);
+    if (ctl.pressed(in, .remove)) if (ui_hit) |hit| hud.click(g, hit, .remove, in);
+    // discard throws away the belly stack carried, else the one under the cursor
+    if (ctl.pressed(in, .discard) and g.mode.sorting()) {
+      if (g.held) |h| switch (h) {
+        .slot => |i| g.discard(i),
+        .bar, .store => {},
+      } else if (ui_hit) |hit| hud.click(g, hit, .discard, in);
+    }
 
     // movement relative to the camera
     var mx:f32 = 0;
@@ -608,7 +597,7 @@ pub const Game = struct {
   /// a click on belly slot `i`: lift its stack, or put down what is carried
   /// there (`putDown`). A hotbar item carried off its slot is taken off the
   /// hotbar. A structure's stack trades places only with one it would take.
-  fn clickSlot(g:*Game, i:usize) void {
+  pub fn clickSlot(g:*Game, i:usize) void {
     const slot = &g.player.inv.slot;
     const h = g.held orelse {
       if (slot[i] != null) g.held = .{.slot = i};
@@ -630,7 +619,7 @@ pub const Game = struct {
   /// what is carried there, as much of it as the structure will take (it
   /// trades places only when it takes the whole stack). A hotbar item is
   /// just put down.
-  fn clickStore(g:*Game, i:usize) void {
+  pub fn clickStore(g:*Game, i:usize) void {
     const id = g.opened() orelse return;
     const slot = &g.structs.get(id).inv.slot;
     const h = g.held orelse {
@@ -651,7 +640,7 @@ pub const Game = struct {
 
   /// a click on hotbar slot `i`: put what is carried there (a stack
   /// assigns its item, a hotbar item trades places), or lift its item.
-  fn clickBar(g:*Game, i:usize) void {
+  pub fn clickBar(g:*Game, i:usize) void {
     const h = g.held orelse {
       if (g.bar[i] != null) g.held = .{.bar = i};
       return;
@@ -665,7 +654,7 @@ pub const Game = struct {
 
   /// put down what is carried anywhere but a slot: a stack goes back where
   /// it was, a hotbar item comes off the hotbar.
-  fn drop(g:*Game) void {
+  pub fn drop(g:*Game) void {
     const h = g.held orelse return;
     g.held = null;
     switch (h) {
@@ -674,16 +663,9 @@ pub const Game = struct {
     }
   }
 
-  /// throw away a belly stack for good: the one carried, else the one under
-  /// the cursor. Only the belly's: a structure's slots and the hotbar keep theirs.
-  fn discard(g:*Game, hit:?hud.Pick) void {
-    const i = if (g.held) |h| switch (h) {
-      .slot => |j| j,
-      .bar, .store => return,
-    } else if (hit) |p| switch (p) {
-      .slot => |j| j,
-      .panel, .research, .weave, .bar, .store, .recipe, .pause, .option, .back, .garden, .garden_act, .scroll => return,
-    } else return;
+  /// throw away belly slot `i`'s stack for good. Only the belly's: a
+  /// structure's slots and the hotbar keep theirs.
+  pub fn discard(g:*Game, i:usize) void {
     const s = g.player.inv.slot[i] orelse return;
     g.player.inv.slot[i] = null;
     g.held = null;
@@ -692,7 +674,7 @@ pub const Game = struct {
 
   /// move a whole stack straight across, belly to the open structure (as
   /// much as it will take) or back (as much as fits).
-  fn moveAcross(g:*Game, from:Held) void {
+  pub fn moveAcross(g:*Game, from:Held) void {
     const id = g.opened() orelse return;
     switch (from) {
       .slot => |i| if (g.player.inv.slot[i]) |*s| {
@@ -744,26 +726,15 @@ pub const Game = struct {
       if (ctl.pressed(in, .options)) g.mode = .options;
       if (ctl.pressed(in, .gardens)) g.openGardens();
     }
-    if (g.mode == .gardens) g.scroll(in, hit, dt);
     if (g.mode == .naming) g.typeName(in);
-    const dir:i32 = if (ctl.pressed(in, .use)) 1 else if (ctl.pressed(in, .remove)) -1 else 0;
-    if (dir == 0) return;
-    switch (hit orelse return) {
-      .pause => |row| if (dir > 0) g.choose(row),
-      .option => |set| options.step(&g.opts, set, dir, g.most_samples),
-      .back => if (dir > 0) { g.mode = .paused; },
-      .garden => |i| if (dir > 0 and i != g.garden) {
-        g.garden = i;
-        g.overwrite = false;
-        g.deleting = false;
-      },
-      .garden_act => |a| if (dir > 0) g.gardenAct(a),
-      // the world's own rows, not the menus'
-      .panel, .research, .weave, .slot, .bar, .store, .recipe, .scroll => {},
+    if (hit) |p| {
+      if (ctl.pressed(in, .use)) hud.click(g, p, .use, in)
+      else if (ctl.pressed(in, .remove)) hud.click(g, p, .remove, in);
     }
+    if (g.mode == .gardens) g.scroll(in, dt);
   }
 
-  fn choose(g:*Game, row:PauseRow) void {
+  pub fn choose(g:*Game, row:PauseRow) void {
     switch (row) {
       .@"resume" => g.mode = .roam,
       .options => g.mode = .options,
@@ -802,12 +773,12 @@ pub const Game = struct {
   }
 
   /// the wheel scrolls the gardens list; its groove, held, drags it
-  fn scroll(g:*Game, in:*const Input, hit:?hud.Pick, dt:f32) void {
+  /// (a click on it takes hold of it: the gardens panel's `click`)
+  fn scroll(g:*Game, in:*const Input, dt:f32) void {
     const most = g.gardenScroll();
     g.garden_top -= in.scroll * GARDEN_NOTCH;
     if (!ctl.down(in, .use)) g.scrolling = false;
-    if (ctl.pressed(in, .use)) if (hit) |h| if (h == .scroll) { g.scrolling = true; };
-    if (g.scrolling) if (g.rows.find(.scroll)) |r| {
+    if (g.scrolling) if (g.rows.find(hud.row(.gardens, .scroll))) |r| {
       g.garden_top = m.clamp(r.local(in.mouse)[1], 0, 1) * most;
     };
     g.garden_top = m.clamp(g.garden_top, 0, most);
@@ -817,7 +788,7 @@ pub const Game = struct {
   /// SAVE: a fresh garden asks for its name; over a saved one only when
   /// asked twice. LOAD: the chosen saved garden. DELETE: the chosen one,
   /// when asked twice. OK and CANCEL: the name prompt's.
-  fn gardenAct(g:*Game, a:GardenAct) void {
+  pub fn gardenAct(g:*Game, a:GardenAct) void {
     const chosen:?save.Name = if (g.garden == 0) null else g.gardens.items[g.garden - 1].name;
     switch (a) {
       .save => if (chosen) |n| {
@@ -1000,14 +971,14 @@ test "clicking a research node or weave recipe picks it; number keys only pick t
   var in:Input = .{.win = undefined};
 
   g.mode = .research;
-  try click.on(&g, &in, .{.research = .ley_sight}, screen);
+  try click.on(&g, &in, hud.row(.research, .{.node = .ley_sight}), screen);
   try testing.expect(g.prog.current == .ley_sight);
 
   g.mode = .belly;
   _ = g.player.inv.add(.fibre, 2);
   _ = g.player.inv.add(.grit, 1);
   try testing.expect(craft.hand[craft.by_hand[0]].out == .conduit);
-  try click.on(&g, &in, .{.weave = craft.by_hand[0]}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.weave = craft.by_hand[0]}), screen);
   try testing.expect(g.weave.busy());
 
   // with the belly open, a slot key picks the hotbar slot, not a recipe
@@ -1030,15 +1001,15 @@ test "the pause menu opens the options; clicks turn them and lead back" {
   g.opts = .{.aa = .off};
 
   g.mode = .paused;
-  try click.on(&g, &in, .{.pause = .options}, screen);
+  try click.on(&g, &in, hud.row(.pause, .{.row = .options}), screen);
   try testing.expectEqual(Mode.options, g.mode);
-  try click.on(&g, &in, .{.option = .antialias}, screen);
+  try click.on(&g, &in, hud.row(.options, .{.setting = .antialias}), screen);
   try testing.expectEqual(renderer.Antialias.fxaa, g.opts.aa);
-  try click.on(&g, &in, .{.option = .vsync}, screen);
+  try click.on(&g, &in, hud.row(.options, .{.setting = .vsync}), screen);
   try testing.expect(!g.opts.vsync);
-  try click.on(&g, &in, .back, screen);
+  try click.on(&g, &in, hud.row(.options, .back), screen);
   try testing.expectEqual(Mode.paused, g.mode);
-  try click.on(&g, &in, .{.pause = .@"resume"}, screen);
+  try click.on(&g, &in, hud.row(.pause, .{.row = .@"resume"}), screen);
   try testing.expectEqual(Mode.roam, g.mode);
   // nothing moved while frozen
   try testing.expectEqual(@as(u64, 0), g.ticks);
@@ -1054,7 +1025,7 @@ test "the saved gardens scroll, save over one or delete it only when asked twice
   var in:Input = .{.win = undefined};
 
   g.mode = .paused;
-  try click.on(&g, &in, .{.pause = .gardens}, screen);
+  try click.on(&g, &in, hud.row(.pause, .{.row = .gardens}), screen);
   try testing.expectEqual(Mode.gardens, g.mode);
   try testing.expect(g.request.? == .list);
   g.request = null;
@@ -1079,31 +1050,31 @@ test "the saved gardens scroll, save over one or delete it only when asked twice
   try testing.expectApproxEqAbs(m.f(4), g.garden_at, 0.01);
 
   // a fresh garden asks its name first
-  try click.on(&g, &in, .{.garden_act = .save}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .save}), screen);
   try testing.expectEqual(Mode.naming, g.mode);
   try testing.expect(g.request.? == .list);
   g.request = null;
-  try click.on(&g, &in, .{.garden_act = .cancel}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .cancel}), screen);
   try testing.expectEqual(Mode.gardens, g.mode);
   try testing.expect(g.request == null);
   // a saved one only on the second click
-  try click.on(&g, &in, .{.garden = 9}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.garden = 9}), screen);
   try testing.expectEqual(@as(usize, 9), g.garden);
-  try click.on(&g, &in, .{.garden_act = .save}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .save}), screen);
   try testing.expect(g.request == null and g.overwrite);
-  try click.on(&g, &in, .{.garden_act = .save}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .save}), screen);
   try testing.expectEqualStrings("garden 8", g.request.?.save_as.slice());
   g.request = null;
-  try click.on(&g, &in, .{.garden_act = .load}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .load}), screen);
   try testing.expectEqualStrings("garden 8", g.request.?.load_from.slice());
   g.request = null;
   // the chosen one's delete, only on the second click
-  try click.on(&g, &in, .{.garden_act = .delete}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .delete}), screen);
   try testing.expect(g.request == null and g.deleting);
-  try click.on(&g, &in, .{.garden_act = .delete}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .delete}), screen);
   try testing.expectEqualStrings("garden 8", g.request.?.delete.slice());
   g.request = null;
-  try click.on(&g, &in, .back, screen);
+  try click.on(&g, &in, hud.row(.gardens, .back), screen);
   try testing.expectEqual(Mode.paused, g.mode);
   try testing.expectEqual(@as(u64, 0), g.ticks);
 }
@@ -1137,9 +1108,9 @@ test "the save key asks a garden without a name for one: typed, taken asks twice
   try testing.expectEqual(@as(u64, 0), g.ticks);
   try testing.expectEqual(Mode.naming, g.mode);
   // taken: OK asks first, then saves over it
-  try click.on(&g, &in, .{.garden_act = .ok}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .ok}), screen);
   try testing.expect(g.request == null and g.overwrite);
-  try click.on(&g, &in, .{.garden_act = .ok}, screen);
+  try click.on(&g, &in, hud.row(.gardens, .{.act = .ok}), screen);
   try testing.expectEqualStrings("moss", g.request.?.save_as.slice());
   try testing.expectEqual(Mode.roam, g.mode);
   g.request = null;
@@ -1212,34 +1183,34 @@ test "a germinator's panel: choose its seed, put in only what it weaves from, mo
   const thorn = for (craft.seeds) |r| {
     if (craft.hand[r].out == .seed_thornleech) break r;
   } else unreachable;
-  try click.on(&g, &in, .{.recipe = thorn}, screen);
+  try click.on(&g, &in, hud.row(.structure, .{.recipe = thorn}), screen);
   try testing.expectEqual(@as(?u8, thorn), st.chosen(g.structs.get(id)));
-  try click.on(&g, &in, .{.slot = 0}, screen);
-  try click.on(&g, &in, .{.store = 0}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 0}), screen);
+  try click.on(&g, &in, hud.row(.belly, .{.store = 0}), screen);
   try testing.expect(g.holds(.{.slot = 0}));
   try testing.expect(g.structs.get(id).inv.slot[0] == null);
   try click.on(&g, &in, .panel, screen);
   // grit it takes, the whole stack
-  try click.on(&g, &in, .{.slot = 1}, screen);
-  try click.on(&g, &in, .{.store = 2}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 1}), screen);
+  try click.on(&g, &in, hud.row(.belly, .{.store = 2}), screen);
   try testing.expectEqual(@as(u32, 5), g.structs.get(id).inv.count(.grit));
   try testing.expect(g.held == null and g.player.inv.slot[1] == null);
   // a locked seed is not chosen
   const vesper = for (craft.seeds) |r| {
     if (craft.hand[r].out == .seed_vesper) break r;
   } else unreachable;
-  try click.on(&g, &in, .{.recipe = vesper}, screen);
+  try click.on(&g, &in, hud.row(.structure, .{.recipe = vesper}), screen);
   try testing.expectEqual(@as(?u8, thorn), st.chosen(g.structs.get(id)));
   // back to lumenroot: fibre goes in up to what it stocks, the rest in hand
-  try click.on(&g, &in, .{.recipe = craft.seeds[0]}, screen);
-  try click.on(&g, &in, .{.slot = 0}, screen);
-  try click.on(&g, &in, .{.store = 0}, screen);
+  try click.on(&g, &in, hud.row(.structure, .{.recipe = craft.seeds[0]}), screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 0}), screen);
+  try click.on(&g, &in, hud.row(.belly, .{.store = 0}), screen);
   try testing.expectEqual(@as(u32, 20), g.structs.get(id).inv.count(.fibre));
   try testing.expectEqual(@as(u32, 10), g.player.inv.count(.fibre));
   try click.on(&g, &in, .panel, screen);
   // with take held, a click moves a stack straight back
   ctl.hold(&in, .take, true);
-  try click.on(&g, &in, .{.store = 2}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.store = 2}), screen);
   ctl.hold(&in, .take, false);
   try testing.expectEqual(@as(u32, 5), g.player.inv.count(.grit));
   try testing.expectEqual(@as(u32, 0), g.structs.get(id).inv.count(.grit));
@@ -1265,38 +1236,38 @@ test "a click lifts a stack, the next puts it down; dropped on the hotbar it ass
   g.player.inv.slot[2] = .{.item = .fibre, .n = 80};
 
   // sort by hand: into an empty slot, then trade places
-  try click.on(&g, &in, .{.slot = 0}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 0}), screen);
   try testing.expectEqual(@as(?items.Item, .fibre), g.carried());
-  try click.on(&g, &in, .{.slot = 5}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 5}), screen);
   try testing.expect(g.held == null and g.player.inv.slot[0] == null);
   try testing.expectEqual(@as(u16, 30), g.player.inv.slot[5].?.n);
-  try click.on(&g, &in, .{.slot = 5}, screen);
-  try click.on(&g, &in, .{.slot = 1}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 5}), screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 1}), screen);
   try testing.expectEqual(items.Item.fibre, g.player.inv.slot[1].?.item);
   try testing.expectEqual(items.Item.conduit, g.player.inv.slot[5].?.item);
   // onto a stack of the same: as much as fits, the rest stays in hand
-  try click.on(&g, &in, .{.slot = 1}, screen);
-  try click.on(&g, &in, .{.slot = 2}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 1}), screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 2}), screen);
   try testing.expectEqual(items.STACK, g.player.inv.slot[2].?.n);
   try testing.expectEqual(@as(u16, 10), g.player.inv.slot[1].?.n);
   try testing.expect(g.holds(.{.slot = 1}));
-  try click.on(&g, &in, .{.slot = 1}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 1}), screen);
   try testing.expect(g.held == null);
 
   // onto the hotbar: the slot takes the item, the stack stays in the belly
-  try click.on(&g, &in, .{.slot = 5}, screen);
-  try click.on(&g, &in, .{.bar = 3}, screen);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 5}), screen);
+  try click.on(&g, &in, hud.row(.hotbar, .{.slot = 3}), screen);
   try testing.expectEqual(@as(?items.Item, .conduit), g.bar[3]);
   try testing.expectEqual(@as(u32, 3), g.player.inv.count(.conduit));
   // hotbar items trade places, and come off when dropped elsewhere
-  try click.on(&g, &in, .{.bar = 3}, screen);
-  try click.on(&g, &in, .{.bar = 0}, screen);
+  try click.on(&g, &in, hud.row(.hotbar, .{.slot = 3}), screen);
+  try click.on(&g, &in, hud.row(.hotbar, .{.slot = 0}), screen);
   try testing.expect(g.bar[3] == null and g.bar[0] == .conduit);
   g.mode = .roam;
-  try click.on(&g, &in, .{.bar = 0}, screen);
+  try click.on(&g, &in, hud.row(.hotbar, .{.slot = 0}), screen);
   try testing.expectEqual(@as(?items.Item, .conduit), g.selected());
   g.mode = .belly;
-  try click.on(&g, &in, .{.bar = 0}, screen);
+  try click.on(&g, &in, hud.row(.hotbar, .{.slot = 0}), screen);
   try click.on(&g, &in, .panel, screen);
   try testing.expect(g.bar[0] == null and g.selected() == null);
 }
@@ -1316,12 +1287,12 @@ test "discard throws away a belly stack, hovered or carried, never a structure's
   g.bar[0] = .grit;
 
   // under the cursor
-  try click.press(&g, &in, .{.slot = 0}, screen, .discard);
+  try click.press(&g, &in, hud.row(.belly, .{.slot = 0}), screen, .discard);
   try testing.expect(g.player.inv.slot[0] == null);
   try testing.expectEqual(@as(u32, 7), g.player.inv.count(.grit));
   // carried: lifted, then thrown away wherever the cursor is
-  try click.on(&g, &in, .{.slot = 1}, screen);
-  try click.press(&g, &in, .{.bar = 0}, screen, .discard);
+  try click.on(&g, &in, hud.row(.belly, .{.slot = 1}), screen);
+  try click.press(&g, &in, hud.row(.hotbar, .{.slot = 0}), screen, .discard);
   try testing.expect(g.held == null and g.player.inv.used() == 0);
   // the hotbar keeps its item; with the belly closed nothing goes
   try testing.expectEqual(@as(?items.Item, .grit), g.bar[0]);

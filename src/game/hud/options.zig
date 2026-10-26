@@ -13,6 +13,7 @@ const Draw = lib.engine.ui.draw.Draw;
 const s = lib.style;
 const hud = lib.hud;
 const txt = lib.txt;
+const Input = lib.engine.platform.input.Input;
 
 const pw:f32 = 620;
 const header_h:f32 = 104;
@@ -30,6 +31,19 @@ const settings = fields(opt.Setting).len;
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .options; }
 
+/// a setting's row, or BACK
+pub const Pick = union(enum) { setting:opt.Setting, back };
+
+/// a click turns a setting on, the other button turns it back; BACK
+/// returns to the pause menu
+pub fn click(g:*play.Game, p:Pick, press:hud.Press, _:*const Input) void {
+  const dir:i32 = switch (press) { .use => 1, .remove => -1, .discard => return };
+  switch (p) {
+    .setting => |set| opt.step(&g.opts, set, dir, g.most_samples),
+    .back => if (dir > 0) { g.mode = .paused; },
+  }
+}
+
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   try d.glow(W / 2, H / 2, @max(W, H) * s.veil_reach, s.veil);
   const labels = txt.s.hud.option_labels;
@@ -46,7 +60,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const set:opt.Setting = @enumFromInt(i);
     const y = py + header_h + row_h * m.f(i);
     const mid = y + 8;
-    const over = g.points(.{.option = set});
+    const over = g.points(hud.row(.options, .{.setting = set}));
     if (over) try d.glow(px + pw / 2, mid, pw * 0.45, s.menu_hover);
     _ = try d.text(px + pad_x, y, s.text_label, if (over) s.gold else s.white, txt.nth(labels, i));
     const val = opt.shown(&g.opts, set);
@@ -57,16 +71,16 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const sway = 0.08 * @sin(t * 2 + m.f(i));
     try d.leaf(.{vx - leaf_off, mid}, m.pi + sway, leaf_len, leaf_w, s.leaf, open, m.f(i) * 0.3);
     try d.leaf(.{vx + leaf_off, mid}, -sway, leaf_len, leaf_w, s.leaf, open, m.f(i) * 0.3 + 0.5);
-    g.rows.add(.{.x = px + pad_x / 2, .y = y - row_h / 2 + 8, .w = pw - pad_x, .h = row_h}, .{.option = set});
+    g.rows.add(.{.x = px + pad_x / 2, .y = y - row_h / 2 + 8, .w = pw - pad_x, .h = row_h}, hud.row(.options, .{.setting = set}));
   }
 
   const by = py + header_h + row_h * m.f(settings) + 14;
   const back = txt.s.hud.options_back;
-  const over = g.points(.back);
+  const over = g.points(hud.row(.options, .back));
   if (over) try d.glow(W / 2, by + 8, pw * 0.25, s.menu_hover);
   try hud.bullet(d, W / 2 - Draw.width(back, s.text_label) / 2 - 26, by + 8, 9, s.gold, if (over) 1 else 0.15, 0.2);
   _ = try d.text(W / 2 - Draw.width(back, s.text_label) / 2, by, s.text_label, if (over) s.gold else s.white, back);
-  g.rows.add(.{.x = W / 2 - pw / 4, .y = by - back_h / 2 + 8, .w = pw / 2, .h = back_h}, .back);
+  g.rows.add(.{.x = W / 2 - pw / 4, .y = by - back_h / 2 + 8, .w = pw / 2, .h = back_h}, hud.row(.options, .back));
 
   const hint = txt.s.hud.options_hint;
   _ = try d.text(W / 2 - Draw.width(hint, s.text_fine) / 2, py + ph - hint_h + 4, s.text_fine, s.dim, hint);

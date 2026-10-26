@@ -72,8 +72,13 @@ Tests: a sown species without a seed icon; cfg keys.
 
 ## A HUD panel
 `game/hud/<name>.zig` with `draw(g, d, W, H)` (+ `visible(g)`), one line in
-`panels` in `game/hud.zig` (later draws on top). Clickable things: a tag
-in `hud.Pick`, their area a `hud.Box` (x, y, w, h) passed to `g.rows.add`.
+`panels` in `game/hud.zig` (later draws on top). Clickable things: the
+panel's own `pub const Pick` union, made into a HUD pick with
+`hud.row(.<panel>, ...)`, their area a `hud.Box` (x, y, w, h) passed to
+`g.rows.add`; what a click on one does is the panel's
+`click(g, p, press, in)` hook (play.zig never switches over picks), the
+item a row shows (for the tooltip) its `shows(g, p)`; `hud.own` reads the
+pointed row back as the panel's `Pick`.
 Item slots use the `hud/slot.zig` component (`Slot`: a box, a pick, the
 husk's share of the box; it registers its box, draws the husk and glows,
 and its look scales with the box), never a hand-drawn husk. Strings under

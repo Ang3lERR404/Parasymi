@@ -28,6 +28,8 @@ const s = lib.style;
 const txt = lib.txt;
 const m = lib.engine.core.math;
 const color = lib.engine.core.color;
+const hud = lib.hud;
+const Input = lib.engine.platform.input.Input;
 
 const Id = prog.Id;
 const V3 = m.V3;
@@ -278,6 +280,16 @@ fn mix(a:Color, b:Color, t:f32) Color {
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .research; }
 
+/// a research node
+pub const Pick = union(enum) { node:Id };
+
+/// a click chooses what is studied (carrying something, it just puts it down)
+pub fn click(g:*play.Game, p:Pick, press:hud.Press, _:*const Input) void {
+  if (press != .use) return;
+  if (g.held != null) return g.drop();
+  switch (p) { .node => |id| g.prog.select(id) }
+}
+
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const ph = @min(H - 2 * margin, max_h);
   const px = W - pw - margin;
@@ -328,7 +340,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   }
 
   // each shown node's look: where it is hit, and what it grows into
-  const hover:?Id = if (g.pointed) |p| switch (p) { .research => |id| id, else => null } else null;
+  const hover:?Id = if (hud.own(.research, g.pointed)) |p| switch (p) { .node => |id| id } else null;
   var mark:[N]?[2]f32 = @splat(null);
   for (0..N) |i| if (shown(&grown, i)) {
     const id:Id = @enumFromInt(i);
@@ -353,7 +365,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const id:Id = @enumFromInt(i);
     try node(d, f, &l, g, id, grown[1 + i], rad[0]);
     const hit = @max(0.7 * f.k, min_hit);
-    g.rows.add(.{.x = c[0] - hit / 2, .y = c[1] - hit / 2, .w = hit, .h = hit}, .{.research = id});
+    g.rows.add(.{.x = c[0] - hit / 2, .y = c[1] - hit / 2, .w = hit, .h = hit}, hud.row(.research, .{.node = id}));
   };
 
   try card(g, d, px, py + ph - card_h, hover orelse g.prog.current);

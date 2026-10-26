@@ -10,13 +10,13 @@ const std = lib.std;
 const Allocator = std.mem.Allocator;
 const m = lib.engine.core.math;
 const play = lib.play;
-const Pick = lib.hud.Pick;
 const save = lib.save;
 const Draw = lib.engine.ui.draw.Draw;
 const Color = lib.engine.ui.draw.Color;
 const s = lib.style;
 const hud = lib.hud;
 const txt = lib.txt;
+const Input = lib.engine.platform.input.Input;
 
 const pw:f32 = 680;
 const header_h:f32 = 104;
@@ -37,6 +37,26 @@ const fade_rows:f32 = 0.5;
 const seconds_per = [_]i64{ 60, 3600, 86400 };
 
 pub fn visible(g:*const play.Game) bool { return g.mode == .gardens; }
+
+/// a garden's row (0: a fresh one), a button (the name prompt's too), BACK,
+/// the scroll stem
+pub const Pick = union(enum) { garden:usize, act:play.GardenAct, back, scroll };
+
+/// a click chooses a garden, presses a button, returns to the pause menu,
+/// or takes hold of the stem (dragged while held)
+pub fn click(g:*play.Game, p:Pick, press:hud.Press, _:*const Input) void {
+  if (press != .use) return;
+  switch (p) {
+    .garden => |i| if (i != g.garden) {
+      g.garden = i;
+      g.overwrite = false;
+      g.deleting = false;
+    },
+    .act => |a| g.gardenAct(a),
+    .back => g.mode = .paused,
+    .scroll => g.scrolling = true,
+  }
+}
 
 /// `c` with its alpha scaled by `a`
 pub fn faded(c:Color, a:f32) Color {
@@ -67,7 +87,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     if (a > 0.5) {
       const y0 = @max(mid - row_h / 2, top);
       const y1 = @min(mid + row_h / 2, top + list_h);
-      g.rows.add(.{.x = px + pad_x / 2, .y = y0, .w = pw - pad_x - stem_w, .h = y1 - y0}, .{.garden = i});
+      g.rows.add(.{.x = px + pad_x / 2, .y = y0, .w = pw - pad_x - stem_w, .h = y1 - y0}, hud.row(.gardens, .{.garden = i}));
     }
     try row(g, d, i, px, mid, a, t);
   }
@@ -77,9 +97,9 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const by = top + list_h + acts_h / 2;
   const saved = g.garden > 0;
   const save_label = if (g.overwrite) txt.s.hud.gardens_overwrite else txt.s.hud.gardens_save;
-  try button(g, d, px + pw * 0.22, by, save_label, .{.garden_act = .save}, true, if (g.overwrite) 0.5 + 0.5 * @sin(t * 6) else 0);
-  try button(g, d, px + pw * 0.55, by, txt.s.hud.gardens_load, .{.garden_act = .load}, saved, 0);
-  try button(g, d, px + pw * 0.82, by, txt.s.hud.options_back, .back, true, 0);
+  try button(g, d, px + pw * 0.22, by, save_label, hud.row(.gardens, .{.act = .save}), true, if (g.overwrite) 0.5 + 0.5 * @sin(t * 6) else 0);
+  try button(g, d, px + pw * 0.55, by, txt.s.hud.gardens_load, hud.row(.gardens, .{.act = .load}), saved, 0);
+  try button(g, d, px + pw * 0.82, by, txt.s.hud.options_back, hud.row(.gardens, .back), true, 0);
 
   const hint = txt.s.hud.gardens_hint;
   _ = try d.text(W / 2 - Draw.width(hint, s.text_fine) / 2, py + ph - hint_h + 4, s.text_fine, s.dim, hint);
@@ -88,7 +108,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
 /// row `i` (0: a fresh garden) centred at `mid`, at opacity `a`
 fn row(g:*play.Game, d:*Draw, i:usize, px:f32, mid:f32, a:f32, t:f32) Allocator.Error!void {
   const chosen = g.garden == i;
-  const over = g.points(.{.garden = i});
+  const over = g.points(hud.row(.gardens, .{.garden = i}));
   const x = px + pad_x;
   if (over) try d.glow(px + pw / 2, mid, pw * 0.3, faded(s.menu_hover, a));
   // the chosen one: its pod glows and a tendril runs under it
@@ -127,7 +147,7 @@ fn row(g:*play.Game, d:*Draw, i:usize, px:f32, mid:f32, a:f32, t:f32) Allocator.
 /// the chosen garden's DELETE: a small button centred on (cx, mid), its
 /// glow pulsing with `call` (asking)
 fn small(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, call:f32) Allocator.Error!void {
-  const p:Pick = .{.garden_act = .delete};
+  const p:hud.Pick = hud.row(.gardens, .{.act = .delete});
   const over = g.points(p);
   const w = Draw.width(label, s.text_note);
   if (over or call > 0) try d.glow(cx, mid, w * 0.7 + 16, faded(s.menu_hover, if (over) 1 else call * 2));
@@ -150,17 +170,17 @@ fn ago(buf:[]u8, secs:i64) []const u8 {
 fn stem(g:*play.Game, d:*Draw, x:f32, top:f32, t:f32) Allocator.Error!void {
   const most = m.f((g.gardens.items.len + 1) -| play.GARDENS_SHOWN);
   if (most <= 0) return;
-  const over = g.points(.scroll) or g.scrolling;
+  const over = g.points(hud.row(.gardens, .scroll)) or g.scrolling;
   const sway = 1.5 * @sin(t * 1.3);
   try d.limb(.{x + sway, top + 4}, .{x - sway, top + list_h - 4}, 3, 2, s.bark_young, 0);
   const y = top + 12 + (list_h - 24) * m.clamp01(g.garden_at / most);
   try d.grain(x, y, 14, 22, if (over) s.gold else s.bud, if (over) 0.4 else 0.1, t * 0.2);
-  g.rows.add(.{.x = x - stem_w / 2, .y = top, .w = stem_w, .h = list_h}, .scroll);
+  g.rows.add(.{.x = x - stem_w / 2, .y = top, .w = stem_w, .h = list_h}, hud.row(.gardens, .scroll));
 }
 
 /// a button: a pod and its label centred on (cx, mid); dim when it would
 /// do nothing; `call` pulses its glow (asking)
-pub fn button(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, p:Pick, live:bool, call:f32) Allocator.Error!void {
+pub fn button(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, p:hud.Pick, live:bool, call:f32) Allocator.Error!void {
   const over = live and g.points(p);
   const w = Draw.width(label, s.text_label);
   if (over or call > 0) try d.glow(cx, mid, w * 0.8 + 30, faded(s.menu_hover, if (over) 1 else call * 2));

@@ -16,6 +16,8 @@ const txt = lib.txt;
 const icon = lib.icon;
 const belly = lib.hud_belly;
 const Slot = lib.hud_slot.Slot;
+const items = lib.items;
+const Input = lib.engine.platform.input.Input;
 
 /// its slots, this many across (the belly's grid sits to their right)
 const cols = 4;
@@ -40,6 +42,23 @@ const recipe_r:f32 = 19;
 const unready_alpha:u8 = 120;
 
 pub fn visible(g:*const play.Game) bool { return g.opened() != null; }
+
+/// a weave the structure may be set to (its slots are the belly's grid's)
+pub const Pick = union(enum) { recipe:u8 };
+
+/// a click chooses the weave (carrying something, it just puts it down)
+pub fn click(g:*play.Game, p:Pick, press:hud.Press, _:*const Input) void {
+  if (press != .use) return;
+  if (g.held != null) return g.drop();
+  const r = switch (p) { .recipe => |r| r };
+  if (g.opened()) |j| st.choose(g.structs.get(j), &g.prog, r);
+}
+
+/// what a recipe weaves, once it is understood
+pub fn shows(g:*const play.Game, p:Pick) ?items.Item {
+  const r = switch (p) { .recipe => |r| r };
+  return if (craft.hand[r].unlocked(&g.prog)) craft.hand[r].out else null;
+}
 
 pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const sp = g.structs.get(g.opened().?);
@@ -81,7 +100,7 @@ fn recipes(g:*play.Game, d:*Draw, sp:*const st.Structure, choices:[]const u8, x:
     const cx = x + recipe_gap * (m.f(k % recipe_cols) + 0.5);
     const cy = row0 + recipe_gap * m.f(k / recipe_cols);
     const on = chosen == r;
-    var sl = Slot.around(.{cx, cy}, recipe_gap, recipe_gap, .{.recipe = r}, (recipe_r + 3) / recipe_gap);
+    var sl = Slot.around(.{cx, cy}, recipe_gap, recipe_gap, hud.row(.structure, .{.recipe = r}),(recipe_r + 3) / recipe_gap);
     sl.lit = if (on) 1 else 0;
     sl.halo = if (on) s.research_active else null;
     sl.takes = false;

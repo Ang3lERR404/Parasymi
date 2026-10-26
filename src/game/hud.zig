@@ -5,6 +5,9 @@
 //! Each panel is its own module under `hud/` declaring
 //!   draw(g, d, W, H) !void
 //!   visible(g) bool              (optional; always drawn when absent)
+//!   Pick                         (optional; what its rows are, as `row` makes them)
+//!   click(g, p, press, in) void  (optional; what a click on one of its rows does)
+//!   shows(g, p) ?Item            (optional; the item a row shows, for the tooltip)
 //! Panels draw in declaration order, so later ones sit on top. A new panel is
 //! one new file plus one line in `panels`.
 const lib = @import("../lib.zig");
@@ -13,25 +16,56 @@ const Allocator = std.mem.Allocator;
 const eqlDeep = std.meta.eql;
 const registry = lib.engine.core.registry;
 const play = lib.play;
-const prog = lib.progression;
-const opt = lib.options;
+const items = lib.items;
+const Input = lib.engine.platform.input.Input;
 const Draw = lib.engine.ui.draw.Draw;
 const Color = lib.engine.ui.draw.Color;
 pub const Box = lib.engine.ui.box.Box;
 const m = lib.engine.core.math;
 
-/// what a click on the HUD lands on: a research node, a weave recipe, a
-/// belly slot, a hotbar slot, a slot of the open structure, a recipe it may
-/// be set to weave, a pause menu row, an option, the way back to the pause
-/// menu, a saved garden (0: a fresh one), a button under them, their
-/// scroll groove, or just a panel (which keeps the click out of the world
-/// beneath it).
-pub const Pick = union(enum) {
-  panel, research:prog.Id, weave:usize, slot:usize, bar:usize,
-  store:usize, recipe:u8,
-  pause:play.PauseRow, option:opt.Setting, back,
-  garden:usize, garden_act:play.GardenAct, scroll,
-};
+/// what a click on the HUD lands on: one of a panel's own rows (its `Pick`),
+/// or just a panel (which keeps the click out of the world beneath it).
+pub const Pick = union(enum) { panel, row:Row };
+/// a row of some panel: tagged by the panel, holding that panel's `Pick`
+/// (void for a panel without one)
+const Row = reg.Union("Pick");
+/// the panels, by name
+pub const Panel = reg.Id;
+
+/// panel `id`'s row `p`, as the HUD picks it
+pub fn row(comptime id:Panel, p:@FieldType(Row, @tagName(id))) Pick {
+  return .{.row = @unionInit(Row, @tagName(id), p)};
+}
+/// `p`, if it is one of panel `id`'s rows
+pub fn own(comptime id:Panel, p:?Pick) ?@FieldType(Row, @tagName(id)) {
+  const r = switch (p orelse return null) { .panel => return null, .row => |r| r };
+  return if (r == id) @field(r, @tagName(id)) else null;
+}
+
+/// how a row was clicked: used (left), the other button (taking back, or
+/// turning an option back), or thrown away
+pub const Press = enum { use, remove, discard };
+
+/// a click on `p`: the panel that owns the row does what it does (its
+/// `click` hook); a click on a bare panel puts down what is carried.
+pub fn click(g:*play.Game, p:Pick, press:Press, in:*const Input) void {
+  switch (p) {
+    .panel => if (press == .use and g.mode.live()) g.drop(),
+    .row => |r| switch (r) {
+      inline else => |q, id| if (comptime reg.has(id, "click")) reg.module(id).click(g, q, press, in),
+    },
+  }
+}
+
+/// the item shown on the row `p`, if any (its panel's `shows` hook)
+pub fn shows(g:*const play.Game, p:Pick) ?items.Item {
+  return switch (p) {
+    .panel => null,
+    .row => |r| switch (r) {
+      inline else => |q, id| if (comptime reg.has(id, "shows")) reg.module(id).shows(g, q) else null,
+    },
+  };
+}
 
 /// the research sapling's growth, kept between frames.
 pub const Sapling = panels.research.Sapling;

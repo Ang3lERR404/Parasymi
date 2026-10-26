@@ -11,7 +11,8 @@ const play = lib.play;
 const Draw = lib.engine.ui.draw.Draw;
 const s = lib.style;
 const txt = lib.txt;
-const gardens = lib.hud.panels.gardens;
+const hud = lib.hud;
+const gardens = hud.panels.gardens;
 
 const pw:f32 = 560;
 const ph:f32 = 260;
@@ -49,8 +50,8 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const by = py + acts_y;
   const ok = g.typed.typed() != null;
   const ok_label = if (g.overwrite) txt.s.hud.gardens_overwrite else txt.s.hud.naming_ok;
-  try gardens.button(g, d, px + pw * 0.32, by, ok_label, .{.garden_act = .ok}, ok, if (g.overwrite) 0.5 + 0.5 * @sin(t * 6) else 0);
-  try gardens.button(g, d, px + pw * 0.7, by, txt.s.hud.naming_cancel, .{.garden_act = .cancel}, true, 0);
+  try gardens.button(g, d, px + pw * 0.32, by, ok_label, hud.row(.gardens, .{.act = .ok}), ok, if (g.overwrite) 0.5 + 0.5 * @sin(t * 6) else 0);
+  try gardens.button(g, d, px + pw * 0.7, by, txt.s.hud.naming_cancel, hud.row(.gardens, .{.act = .cancel}), true, 0);
 
   const hint = txt.s.hud.naming_hint;
   _ = try d.text(W / 2 - Draw.width(hint, s.text_fine) / 2, py + ph - 36, s.text_fine, s.dim, hint);
