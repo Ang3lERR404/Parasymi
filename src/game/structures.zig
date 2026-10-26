@@ -36,6 +36,10 @@
 //!                               parent: `getParent`, `getChildren`,
 //!                               `getChild`; `spawnChild` puts one down
 //!                               already its child (no `adopts` asked)
+//!   pairs:Pairs                 how it pairs with a partner, one way (it sends
+//!                               there) or both ways (`pairWith`, `pairStep`,
+//!                               `getPartner`, `pairedTo`, `unpair`;
+//!                               default: never)
 //!   meshes                      the library meshes it draws beyond `mesh` and
 //!                               `preview` (a tuple: `.{ .item_pod, ... }`);
 //!                               `--structure` builds only these (tested)
@@ -187,6 +191,28 @@ pub const Ref = struct {
 /// what `spawnChild` puts down
 pub const Spawn = struct { x:i32, y:i32, kind:Kind, dir:m.Dir = 0, seed:f32 = 0 };
 
+/// how a kind pairs (its `pairs`): with a structure of kind `with` (its
+/// own if null), one way (its partner is where it sends) or both ways
+/// (each is the other's, and either leaves whatever it had before)
+pub const Pairs = struct { way:Way = .one_way, with:?Kind = null };
+pub const Way = enum { one_way, both_ways };
+
+fn pairsOf(k:Kind) ?Pairs {
+  return switch (k) {
+    inline else => |t| if (comptime reg.has(t, "pairs")) reg.module(t).pairs else null,
+  };
+}
+
+/// where configuring a structure that pairs leaves it (`pairStep`)
+pub const PairStep = enum {
+  /// it waits for the next one configured
+  waiting,
+  /// configured twice over: it is cut loose
+  cut,
+  /// the one waiting is paired with it
+  paired,
+};
+
 pub const Structure = struct {
   x:i32,
   y:i32,
@@ -196,6 +222,8 @@ pub const Structure = struct {
   state:State,
   /// the structure it depends on (`dependOn`, `spawnChild`), if any
   parent:?Ref = null,
+  /// the structure it is paired with (`pairWith`), if any
+  partner:?Ref = null,
   /// smoothed 0..1, drives glow and motion
   activity:f32 = 0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
@@ -256,9 +284,9 @@ fn orFail(r:anytype) Allocator.Error!bool { return r; }
 
 pub const Structures = struct {
   list:std.ArrayList(Structure) = .empty,
-  /// the tile of a structure waiting to be paired with another (a
-  /// sporecaster choosing where it sends): the next one configured
-  pairing:?[2]i32 = null,
+  /// a structure waiting to be paired with another (a sporecaster
+  /// choosing where it sends): the next one configured
+  pairing:?Ref = null,
 
   pub fn deinit(ss:*Structures, gpa:Allocator) void { ss.list.deinit(gpa); }
 
@@ -322,10 +350,74 @@ pub const Structures = struct {
       if (!lstct.floating) w.moveFootprint(l.x, l.y, lstct.size, Occ.structure(id));
     }
     _ = ss.list.swapRemove(idx);
-    // what depended on it is cut loose
+    // what depended on it, or was paired with it, is cut loose
     const gone = s.ref();
-    for (ss.list.items) |*o| if (o.parent) |p| if (p.eql(gone)) { o.parent = null; };
+    for (ss.list.items) |*o| {
+      if (o.parent) |p| if (p.eql(gone)) { o.parent = null; };
+      if (o.partner) |p| if (p.eql(gone)) { o.partner = null; };
+    }
+    if (ss.pairing) |p| if (p.eql(gone)) { ss.pairing = null; };
     return s;
+  }
+
+  // ---- partners: paired one way or both ways (`pairs`) ----
+
+  /// pair `a` with `b` as `a`'s kind pairs (`pairs`): one way, `a` sends to
+  /// `b`; both ways, each leaves whatever it was paired with and is the
+  /// other's. Returns whether they are paired now.
+  pub fn pairWith(ss:*Structures, a:Id, b:Id) bool {
+    if (a == b) return false;
+    const ka = ss.get(a).kind();
+    const pa = pairsOf(ka) orelse return false;
+    if (ss.get(b).kind() != (pa.with orelse ka)) return false;
+    switch (pa.way) {
+      .one_way => ss.get(a).partner = ss.get(b).ref(),
+      .both_ways => {
+        ss.unpair(a);
+        ss.unpair(b);
+        ss.get(a).partner = ss.get(b).ref();
+        ss.get(b).partner = ss.get(a).ref();
+      },
+    }
+    return true;
+  }
+
+  /// cut `id` from its partner; paired both ways, every pairing that
+  /// reaches it is cut too.
+  pub fn unpair(ss:*Structures, id:Id) void {
+    const s = ss.get(id);
+    s.partner = null;
+    const p = pairsOf(s.kind()) orelse return;
+    if (p.way != .both_ways) return;
+    const here = s.ref();
+    for (ss.list.items) |*o| if (o.partner) |r| if (r.eql(here)) { o.partner = null; };
+  }
+
+  /// the configure handshake of a structure that pairs: the first
+  /// configured waits, the next is paired with it (`pairWith`, from the
+  /// one waiting); configured twice over, it is cut loose (`unpair`).
+  pub fn pairStep(ss:*Structures, id:Id) PairStep {
+    const here = ss.get(id).ref();
+    if (ss.pairing) |p| {
+      ss.pairing = null;
+      if (p.eql(here)) {
+        ss.unpair(id);
+        return .cut;
+      }
+      if (ss.find(p)) |o| if (ss.pairWith(o, id)) return .paired;
+    }
+    ss.pairing = here;
+    return .waiting;
+  }
+
+  pub fn getPartner(ss:*const Structures, id:Id) ?Id {
+    const r = ss.list.items[id.idx()].partner orelse return null;
+    return ss.find(r);
+  }
+
+  /// every structure whose partner is `id`, in list order.
+  pub fn pairedTo(ss:*const Structures, id:Id) Paired {
+    return .{ .ss = ss, .of = ss.list.items[id.idx()].ref() };
   }
 
   // ---- parents and children: a child depends on its parent ----
@@ -397,20 +489,26 @@ pub const Structures = struct {
     return n;
   }
 
-  pub const Children = struct {
-    ss:*const Structures,
-    of:Ref,
-    i:usize = 0,
+  pub const Children = Linked("parent");
+  pub const Paired = Linked("partner");
 
-    pub fn next(it:*Children) ?Id {
-      while (it.i < it.ss.list.items.len) {
-        const i = it.i;
-        it.i += 1;
-        if (it.ss.list.items[i].parent) |p| if (p.eql(it.of)) return Id.of(i);
+  /// walks every structure whose `field` (a `?Ref`) names `of`
+  fn Linked(comptime field:[]const u8) type {
+    return struct {
+      ss:*const Structures,
+      of:Ref,
+      i:usize = 0,
+
+      pub fn next(it:*@This()) ?Id {
+        while (it.i < it.ss.list.items.len) {
+          const i = it.i;
+          it.i += 1;
+          if (@field(it.ss.list.items[i], field)) |p| if (p.eql(it.of)) return Id.of(i);
+        }
+        return null;
       }
-      return null;
-    }
-  };
+    };
+  }
 
   // ---- hook dispatch: one comptime switch each, no per-kind code here ----
 
@@ -751,4 +849,33 @@ test "parents and children: spawned, adopted, found again after a shift, cut loo
   // uprooting the parent cuts its children loose
   _ = ss.remove(&w, loom2);
   try testing.expect(ss.get(ss.floaterAt(4, 4).?).parent == null);
+}
+
+test "partners: one way or both ways, re-pairing leaves the old one, uprooting cuts it" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..8) |x| { c.kind[x] = .soil; c.height[x] = 1; c.res[x] = 0; }
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  for (0..3) |x| try testing.expect(try ss.place(gpa, &w, @intCast(x), 0, .driftbraid, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 4, 0, .sporecaster, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 5, 0, .sap_cache, 0, 0));
+  const a = ss.at(&w, 0, 0).?;
+  const b = ss.at(&w, 1, 0).?;
+  const d = ss.at(&w, 2, 0).?;
+  // only with its own kind, never with itself, never what does not pair
+  try testing.expect(!ss.pairWith(a, ss.at(&w, 4, 0).?));
+  try testing.expect(!ss.pairWith(a, a));
+  try testing.expect(!ss.pairWith(ss.at(&w, 5, 0).?, a));
+  try testing.expect(ss.pairWith(a, b));
+  try testing.expectEqual(a, ss.getPartner(b).?);
+  // both ways: d pairing with b leaves a alone
+  try testing.expect(ss.pairWith(d, b));
+  try testing.expect(ss.get(a).partner == null);
+  try testing.expectEqual(d, ss.getPartner(b).?);
+  _ = ss.remove(&w, b);
+  try testing.expect(ss.get(ss.at(&w, 2, 0).?).partner == null);
 }

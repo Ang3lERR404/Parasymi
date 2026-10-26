@@ -61,8 +61,8 @@ grows a grand garden. 2.5D top-down 3D.
 - Ganglion ("Lithophagy"): holds 8, hands one each 0.35 s round its sides
   in turn to whatever wants it, and to carriers not facing in: splits
   lines, feeds several germinators each what it needs.
-- Sporecaster ("Spore Casting"): paired by configuring one then its partner
-  (`Structures.pairing`, the `configure(ss, id, g)` hook); spore carriers
+- Sporecaster ("Spore Casting"): paired one way by configuring one then its
+  partner (`pairs`, `Structures.pairStep` in its `configure` hook); spore carriers
   (free, 0.25 s apart, 5 of a kind) drift at 2.5 tiles/s, unlimited range,
   into the partner; home again if it is gone, hang over it while it is
   full. `Def.far`: its spores are drawn however far it stands.
@@ -74,8 +74,14 @@ down already a child (the polyp's diamond), `dependOn` adopts one if the
 parent's `adopts(s, kind, have)` hook takes it (default: none; never a
 loop), `detach` cuts it loose, `getParent`/`getChildren`/`getChild`/
 `childCount` walk them. Uprooting a parent cuts its children loose.
-Pairings between peers (sporecaster, driftbraid) stay `Structures.pairing`
-+ their own `dest`.
+
+Partners are peers (`Structure.partner`, held the same way): a kind that
+declares `pairs:Pairs` pairs with its own kind (or `.with`), one way (it
+sends there: the sporecaster) or both ways (each is the other's, and
+either leaves its old partner: the driftbraid). `pairWith`, `unpair`,
+`getPartner`, `pairedTo` (who names it); `pairStep` is the shared
+configure handshake (`Structures.pairing`: the first configured waits, the
+next is paired, the same one twice cuts it). Uprooting cuts its pairings.
 
 ## Convergent structures (3rd tier)
 Each pair of lineage structures grown within `structures.MEET` (3) tiles is

@@ -60,7 +60,7 @@ pub const FRESH = "garden ";
 pub const MAX_NAME = 48;
 const MAX_PATH = home.SAVES.len + 1 + MAX_NAME + EXT.len + TMP.len;
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 20;
+const VERSION:u32 = 21;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;

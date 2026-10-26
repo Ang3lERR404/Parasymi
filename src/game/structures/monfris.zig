@@ -119,7 +119,7 @@ pub fn choose(s:*st.Structure, g:*prog.Progression, r:u8) void {
 /// for one more.
 pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
   const p = ss.pairing orelse return;
-  const v = ss.floaterAt(p[0], p[1]) orelse return;
+  const v = ss.find(p) orelse return;
   if (ss.get(v).kind() != .vultrixi) return;
   ss.pairing = null;
   if (!ss.dependOn(v, id)) return g.say(txt.s.msg.tether_full, .{});

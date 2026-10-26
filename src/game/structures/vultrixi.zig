@@ -81,9 +81,8 @@ fn loomOf(ss:*st.Structures, i:st.Id) ?st.Id {
 /// configured, it waits to be tethered by configuring a monfris next
 /// (`monfris.configure`); configured twice over, it is cut loose.
 pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
-  const s = ss.get(id);
-  const here = [2]i32{s.x, s.y};
-  if (ss.pairing) |p| if (p[0] == here[0] and p[1] == here[1]) {
+  const here = ss.get(id).ref();
+  if (ss.pairing) |p| if (p.eql(here)) {
     ss.pairing = null;
     ss.detach(id);
     return g.say(txt.s.msg.tether_cut, .{});

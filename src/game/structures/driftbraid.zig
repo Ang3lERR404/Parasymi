@@ -40,6 +40,9 @@ const v3 = m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes = .{ .belly_lump, .spore_carrier };
 
+/// paired both ways: each trades with the other
+pub const pairs:st.Pairs = .{ .way = .both_ways };
+
 pub const def:st.Def = .{ .item = .driftbraid, .size = 1, .mesh = .driftbraid, .store = true, .grow = 7, .sway = 0.4, .tall = 0.9, .sap = 0.3, .far = true };
 
 /// most it holds, fed and received together; spores as a sporecaster's
@@ -61,8 +64,6 @@ const TURN:f32 = 0.25;
 const GLOW:f32 = 0.2;
 
 pub const State = struct {
-  /// the driftbraid it trades with (by tile: a structure's id may shift)
-  dest:?[2]i32 = null,
   spores:[AIR]?caster.Spore = @splat(null),
   t:f32 = 0,
   /// how many of each kind it holds came by spore
@@ -74,38 +75,15 @@ fn braidAt(ss:*st.Structures, w:*const World, at:[2]i32) ?st.Id {
   return if (ss.get(j).kind() == .driftbraid) j else null;
 }
 
-/// break every pairing that reaches the driftbraid on `at`
-fn unpair(ss:*st.Structures, at:[2]i32) void {
-  for (ss.list.items) |*o| if (o.kind() == .driftbraid) {
-    const d = &o.state.driftbraid.dest;
-    if (d.*) |to| if ((to[0] == at[0] and to[1] == at[1]) or (o.x == at[0] and o.y == at[1])) {
-      d.* = null;
-    };
-  };
-}
-
-/// pair it: the first configured waits, the next trades with it, both
-/// ways (each leaving whatever it traded with before). Configured twice
-/// over, it stops trading.
+/// pair it (`pairStep`): the first configured waits, the next trades with
+/// it, both ways (each leaving whatever it traded with before). Configured
+/// twice over, it stops trading.
 pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
-  const s = ss.get(id);
-  const here = [2]i32{s.x, s.y};
-  if (ss.pairing) |p| {
-    ss.pairing = null;
-    if (p[0] == here[0] and p[1] == here[1]) {
-      unpair(ss, here);
-      return g.say(txt.s.msg.braid_still, .{});
-    }
-    for (ss.list.items) |*o| if (o.kind() == .driftbraid and o.x == p[0] and o.y == p[1]) {
-      unpair(ss, p);
-      unpair(ss, here);
-      o.state.driftbraid.dest = here;
-      ss.get(id).state.driftbraid.dest = p;
-      return g.say(txt.s.msg.braid_paired, .{});
-    };
+  switch (ss.pairStep(id)) {
+    .waiting => g.say(txt.s.msg.braid_choose, .{}),
+    .cut => g.say(txt.s.msg.braid_still, .{}),
+    .paired => g.say(txt.s.msg.braid_paired, .{}),
   }
-  ss.pairing = here;
-  g.say(txt.s.msg.braid_choose, .{});
 }
 
 /// what it holds of `item` that it was fed (and may send)
@@ -162,8 +140,8 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
     sp.n -= @intCast(took);
     if (sp.n == 0) slot.* = null;
   }
-  const to = db.dest orelse return busy;
-  if (braidAt(ctx.ss, ctx.w, to) == null or (to[0] == self.x and to[1] == self.y)) return busy;
+  if (ctx.ss.getPartner(i) == null) return busy;
+  const to = self.partner.?.tile();
   sc: {
     db.t += dt;
     if (db.t < LAUNCH) break :sc;
@@ -252,7 +230,8 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
   for (db.spores) |sp| { if (sp != null) air += 1; }
   var got:u32 = 0;
   for (db.kept.values) |n| got += n;
-  if (db.dest) |to| {
+  if (s.partner) |p| {
+    const to = p.tile();
     _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.trades, .{to[0] - s.x, to[1] - s.y, air, s.inv.total() -| got, got, HOLD});
   } else {
     _ = try d.print(x, y, style.text_body, style.dim, txt.s.describe.untraded, .{s.inv.total(), HOLD});
@@ -321,8 +300,8 @@ test "driftbraids pair both ways and trade what each is fed, never sending it ba
   const b = ss.at(&w, 26, 1).?;
   st.configure(&ss, a, &g);
   st.configure(&ss, b, &g);
-  try testing.expectEqual([2]i32{26, 1}, ss.get(a).state.driftbraid.dest.?);
-  try testing.expectEqual([2]i32{0, 0}, ss.get(b).state.driftbraid.dest.?);
+  try testing.expectEqual(b, ss.getPartner(a).?);
+  try testing.expectEqual(a, ss.getPartner(b).?);
   _ = ss.insert(&g, a, .essence, 12);
   _ = ss.insert(&g, b, .grit, 9);
   // nothing fed may leave by conduit
@@ -337,7 +316,7 @@ test "driftbraids pair both ways and trade what each is fed, never sending it ba
   // configured twice over, both stop trading
   st.configure(&ss, a, &g);
   st.configure(&ss, a, &g);
-  try testing.expect(ss.get(a).state.driftbraid.dest == null and ss.get(b).state.driftbraid.dest == null);
+  try testing.expect(ss.get(a).partner == null and ss.get(b).partner == null);
 }
 
 test "what a driftbraid received is handed on to its neighbours" {
