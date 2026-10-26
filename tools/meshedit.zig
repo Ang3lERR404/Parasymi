@@ -1,9 +1,10 @@
 //! a rudimentary mesh editor: sculpts one seamless surface out of forms
 //! (engine gfx/sculpt.zig: ellipsoids, rounded cones, rounded boxes, each
 //! melted into the ones before it or carved out of them), meshed again as
-//! it is edited and shown on the game's own renderer beside the wolf, and
-//! keeps it as text in `src/mesh/<name>.mesh`. The game does not read
-//! these yet. From the repo root:
+//! it is edited and shown on the game's own renderer, alone on the
+//! generated ground (no wolf, plants or structures), and keeps it as text
+//! in `src/mesh/<name>.mesh`. The game does not read these yet. From the
+//! repo root:
 //!   zig build meshedit -- [--mesh=<name>]
 //! (`--gizmo=move|turn|size` starts the gizmo so; `--shot` saves one frame
 //! to `shots/meshedit.png` and closes, for checking it headless.)
@@ -14,6 +15,8 @@
 //! The selected form carries a gizmo (tools/gizmo.zig): `1` moves it
 //! (arrows along each axis, the centre across the view), `2` turns it
 //! (a ring for each of its turns), `3` sizes it (along its own axes).
+//! The camera orbits the sculpt freely (middle drag, over the top and
+//! under it alike; the wheel zooms); `.` eases it onto the selected form.
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
@@ -43,6 +46,7 @@ const Input = engine.platform.input.Input;
 const Key = engine.platform.input.Key;
 const Draw = engine.ui.draw.Draw;
 const Color = engine.ui.draw.Color;
+const camera = engine.render.camera;
 const ps = @import("parasymi");
 const gizmo = @import("gizmo.zig");
 const play = ps.play;
@@ -92,17 +96,23 @@ const ROT = Ch.find("rot.x").?;
 const SIZE = Ch.find("size.x").?;
 /// a new form stands this far from the one it was made from
 const NEW_OFF = v3(0.1, 0, 0);
-/// the sculpt stands this far to the wolf's side; the camera looks at this
-/// height over it, from this far and this high (rad) to start
-const BESIDE = v3(1.2, 0, 0);
-const LOOK_UP:f32 = 0.35;
-const CAM_DIST:f32 = 2.6;
+/// the camera looks at this height over the sculpt's ground, from this far
+/// and this high (rad) to start; the wheel zooms it this much a notch,
+/// between these (m); it eases half way to where it is sent in this (s)
+const LOOK_UP:f32 = 0.3;
+const CAM_DIST:f32 = 1.6;
 const CAM_PITCH:f32 = m.rad(20);
-/// the library slot the sculpt is drawn from: nothing else is drawn from
-/// it here (the wolf's own slots aside, every other is emptied)
+const ZOOM_STEP:f32 = 0.88;
+const DIST_MIN:f32 = 0.08;
+const DIST_MAX:f32 = 40;
+const EASE:f32 = 0.06;
+/// `.` frames a form from this many times its largest size, at least this
+const FOCUS_FIT:f32 = 4;
+const FOCUS_MIN:f32 = 0.15;
+/// the library slot the sculpt is drawn from: nothing else is drawn
 const SLOT_ID:meshlib.Id = meshlib.ids[0];
-/// what the wolf is made of, built once
-const WOLF = [_]meshlib.Id{ .wolf_body, .wolf_ears, .belly_lump, .wolf_belly, .wolf_pec_l, .wolf_pec_r, .wolf_rump_l, .wolf_rump_r, .paw_pad, .paw_bean };
+/// no wolf: its paws' contact shadows far off any tile
+const NO_FEET:f32 = 1e9;
 /// layout (px): the form list, the selected form's values under it
 const PAD:f32 = 16;
 const TEXT:f32 = s.text_small;
@@ -127,7 +137,7 @@ const PANEL:Color = s.panel;
 const HELP = [_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   tab next form",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save",
-  "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom",
+  "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
 
 const Kind = enum { ellipsoid, cone, box };
@@ -236,6 +246,49 @@ const Doc = struct {
 
 const Drag = enum { none, value, gizmo };
 
+/// the editor's camera: a free view turning round `target` from `dist`
+/// away, with no limit on its pitch (over the top and under the sculpt
+/// alike); zooms and focusing ease it to `goal` and `goal_dist`
+const Orbit = struct {
+  target:V3,
+  goal:V3,
+  dist:f32 = CAM_DIST,
+  goal_dist:f32 = CAM_DIST,
+  yaw:f32 = 0,
+  pitch:f32 = CAM_PITCH,
+
+  fn init(at:V3) Orbit { return .{ .target = at, .goal = at }; }
+
+  /// drag round by `px` pixels, as the game's camera turns
+  fn turn(o:*Orbit, px:[2]f32) void {
+    o.yaw = @mod(o.yaw - px[0] * camera.ORBIT, m.tau);
+    o.pitch = @mod(o.pitch + px[1] * camera.ORBIT, m.tau);
+  }
+
+  fn zoom(o:*Orbit, steps:f32) void {
+    o.goal_dist = m.clamp(o.goal_dist * m.pow(f32, ZOOM_STEP, steps), DIST_MIN, DIST_MAX);
+  }
+
+  /// look at `at`, near enough that something `size` across fills the view
+  fn focus(o:*Orbit, at:V3, size:f32) void {
+    o.goal = at;
+    o.goal_dist = m.clamp(@max(size * FOCUS_FIT, FOCUS_MIN), DIST_MIN, DIST_MAX);
+  }
+
+  /// ease on by `dt` and place `c` (a free view aimed at the target)
+  fn step(o:*Orbit, c:*camera.Camera, dt:f32) void {
+    const k = 1 - m.pow(f32, 0.5, dt / EASE);
+    o.target = m.lerpV(o.target, o.goal, k);
+    o.dist = m.lerp(o.dist, o.goal_dist, k);
+    c.target = o.target;
+    c.dist = o.dist;
+    c.yaw = o.yaw;
+    const cp = @cos(o.pitch);
+    const out = v3(@sin(o.yaw) * cp, @sin(o.pitch), @cos(o.yaw) * cp);
+    c.view = .{ .free = .{ .pos = o.target + out * m.splat3(o.dist), .yaw = o.yaw, .pitch = -o.pitch } };
+  }
+};
+
 const Editor = struct {
   gpa:Allocator,
   io:Io,
@@ -258,6 +311,8 @@ const Editor = struct {
   coarse:bool = false,
   note:[96]u8 = undefined,
   note_len:usize = 0,
+  /// the camera is asked onto the selected form
+  focus:bool = false,
 
   fn pieces(e:*Editor) []Piece { return e.doc.pieces.items; }
 
@@ -390,6 +445,7 @@ const Editor = struct {
       if (hit(in, .up) and e.ch > 0) e.ch -= 1;
       if (hit(in, .down) and e.ch + 1 < Ch.count) e.ch += 1;
       if (hit(in, .r)) e.set(Ch.get(&Vals{}, e.ch));
+      if (hit(in, .period)) e.focus = true;
     }
     if (hit(in, .one)) e.mode = .move;
     if (hit(in, .two)) e.mode = .turn;
@@ -576,36 +632,28 @@ pub fn main(init:std.process.Init) !void {
   while (!try renderer.meshesReady(r)) {
     if (!try loadFrame(&screen_l, r, &input, &last, .forms, .{ .done = 0, .total = whole })) return;
   }
-  // the wolf, for its size beside the sculpt, built once at every level
-  // of detail; the sculpt goes after it, meshed again as it changes
+  // the sculpt alone, meshed again as it changes
   var b:meshgen.Builder = .{ .gpa = gpa };
   defer b.deinit();
   var ranges:[meshlib.SLOTS][2]u32 = @splat(.{ 0, 0 });
-  for (0..meshgen.LODS) |l| for (WOLF) |id| try meshlib.buildOne(&b, id, @intCast(l), &ranges);
-  b.lod = 0;
-  const wolf_end = b.mark();
   _ = try loadFrame(&screen_l, r, &input, &last, .forms, .{ .done = 1, .total = whole });
 
   var game = try Game.init(gpa, play.DEFAULT_SEED);
   defer game.deinit();
   game.world.io = io;
   game.opts = opts;
-  game.cam.dist = CAM_DIST;
-  game.cam.pitch = CAM_PITCH;
   while (game.world.unmeshed() > 0) {
     if (!try loadFrame(&screen_l, r, &input, &last, .ground, .{ .done = whole - game.world.unmeshed(), .total = whole })) return;
     try renderer.syncWorld(r, &game.world, m.maxInt(u32), renderer.MESH_MS * 8);
   }
-  const origin = game.player.pos + BESIDE;
+  // the sculpt stands where the wolf would have woken (dry ground)
+  const origin = game.player.pos;
+  var cam = Orbit.init(origin + v3(0, LOOK_UP, 0));
 
   var ui:Draw = .{ .gpa = gpa };
   defer ui.deinit();
   var handles:std.ArrayList(?[2]f32) = .empty;
   defer handles.deinit(gpa);
-  var keep:[meshlib.SLOTS]bool = @splat(false);
-  for (WOLF) |id| for (0..meshgen.LODS) |l| {
-    keep[meshlib.slot(id, @intCast(l))] = true;
-  };
 
   var frames:u32 = 0;
   while (!window.shouldClose()) {
@@ -630,38 +678,40 @@ pub fn main(init:std.process.Init) !void {
     if (e.drag == .none and e.coarse) e.stale = true;
     if (e.stale and (e.drag == .none or e.since >= REMESH)) {
       const coarse = e.drag != .none;
-      b.v.shrinkRetainingCapacity(wolf_end);
-      b.skin.shrinkRetainingCapacity(@min(b.skin.items.len, wolf_end));
-      b.grow.shrinkRetainingCapacity(@min(b.grow.items.len, wolf_end));
+      b.v.clearRetainingCapacity();
+      b.skin.clearRetainingCapacity();
+      b.grow.clearRetainingCapacity();
       try e.doc.mesh(gpa, io, coarse, &b);
-      const run:[2]u32 = .{ @intCast(wolf_end), @intCast(b.mark() - wolf_end) };
+      const run:[2]u32 = .{ 0, @intCast(b.mark()) };
       for (0..meshgen.LODS) |l| ranges[meshlib.slot(SLOT_ID, @intCast(l))] = run;
-      try renderer.setParts(r, &b, ranges, wolf_end);
+      try renderer.setParts(r, &b, ranges, 0);
       e.stale = false;
       e.coarse = coarse;
       e.since = 0;
     }
 
-    // the camera orbits and zooms as in play; nothing else of play runs
-    // but the world's tick
+    // the camera orbits the sculpt freely and zooms; nothing of play runs
+    // (no plants grow), only the clocks for the sky and the grass
     game.ui_time += dt;
     game.time += dt;
     game.cam.aspect = screen[0] / @max(screen[1], 1);
-    game.cam.tick(dt);
     const over_ui = overUi(listRows(e.pieces().len), input.mouse[0], input.mouse[1]);
-    if (ctl.down(&input, .orbit) and !game.cam.inEyes()) game.cam.orbit(input.mouse_delta);
-    if (input.scroll != 0 and !over_ui) game.cam.zoom(input.scroll, game.player.eyes());
-    game.player.animate(&game.world, dt);
-    game.cam.see(game.player.eyes());
-    game.cam.target = origin + v3(0, LOOK_UP, 0);
-    try game.simulate(dt);
+    if (ctl.down(&input, .orbit)) cam.turn(input.mouse_delta);
+    if (input.scroll != 0 and !over_ui) cam.zoom(input.scroll);
+    if (e.focus and e.pieces().len > 0) {
+      const v = e.pieces()[e.sel].v;
+      cam.focus(origin + v.pos, @reduce(.Max, v.size));
+    }
+    e.focus = false;
+    cam.step(&game.cam, dt);
     try renderer.syncWorld(r, &game.world, 6, renderer.MESH_MS);
 
-    // the scene as the game sees it, but only the wolf and the sculpt
+    // the scene as the game sees it, but only the ground and the sculpt
     var scene = try ps.view.scene(&game, screen);
-    for (&scene.parts, keep) |*p, k| if (!k) {
-      p.* = &.{};
-    };
+    for (&scene.parts) |*p| p.* = &.{};
+    for (&scene.instances) |*p| p.* = &.{};
+    scene.lights = &.{};
+    for (&scene.push.feet) |*f| f.* = .{ NO_FEET, NO_FEET, NO_FEET, 0 };
     const inst = [1]ps.vertex.PartInstance{ps.parts.instance(m.translate(origin), .{})};
     scene.parts[meshlib.slot(SLOT_ID, 0)] = &inst;
     // handles drawn where the forms are now (one may have gone or come)
@@ -740,4 +790,18 @@ test "carving alone makes no surface, a form makes a closed one" {
   try d.mesh(gpa, null, false, &b);
   try testing.expect(b.v.items.len > 0);
   try testing.expectEqual(@as(usize, 0), b.v.items.len % 3);
+}
+
+test "the camera eases onto a focused form and turns past straight up" {
+  var o = Orbit.init(v3(0, 0, 0));
+  var c:camera.Camera = .{};
+  o.focus(v3(1, 2, 3), 0.1);
+  for (0..200) |_| o.step(&c, 0.02);
+  try testing.expect(m.len(o.target - v3(1, 2, 3)) < 1e-3);
+  try testing.expectApproxEqAbs(@max(0.1 * FOCUS_FIT, FOCUS_MIN), o.dist, 1e-3);
+  try testing.expectApproxEqAbs(o.dist, m.len(c.view.free.pos - o.target), 1e-3);
+  // dragged over the top, the view still looks at the target
+  o.pitch = m.rad(120);
+  o.step(&c, 0);
+  try testing.expect(m.len(c.view.free.pos + c.view.free.forward() * m.splat3(o.dist) - o.target) < 1e-3);
 }

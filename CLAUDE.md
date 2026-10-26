@@ -86,8 +86,9 @@ zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<n
                                   # wolf joints are clickable, their gizmo keys them
 zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # mesh editor (tools/meshedit.zig): SDF forms melted
-                                  # into one surface beside the wolf, saves src/mesh/<name>.mesh;
-                                  # the selected form's gizmo (1/2/3) moves, turns, sizes it
+                                  # into one surface on bare ground, saves src/mesh/<name>.mesh;
+                                  # the selected form's gizmo (1/2/3) moves, turns, sizes it;
+                                  # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
 ```
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
