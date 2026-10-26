@@ -12,7 +12,7 @@ underneath. It never imports the game.
 |---|---|---|
 | core | math, color, rng, noise, registry, jobs, text, png | — |
 | platform | input, display | — |
-| gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Ui`, `Light`) | meshgen, meshlib, growth, kits, `vertex` (the rest; re-exports `Ui`, `Light`) |
+| gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
 | world | `chunk` (grid: `SIZE`, `Coord`, `MeshSlot`, `localIndex`), `World(L)` (streaming) | `chunk` (the garden's tiles), `gen`, `world` (`World` over the garden's land) |
 | render | `Renderer(G)`, post, light, camera, `passes/ui` | `renderer` (the garden's `G`), passes, terrain meshing |
 | ui | draw, font | — |
@@ -30,6 +30,11 @@ underneath. It never imports the game.
   lists the full contract. Pass descriptors carry SPIR-V bytes
   (`.vert = @embedFile("plant.vert")`), so each module embeds its own
   shaders.
+- **Meshes**: `engine.gfx.meshgen.Mesher(Part, stem)`, where `Part` is the
+  game's `enum(u32)` of vertex roles and `stem` the role plain woody
+  surfaces take. Parasymi's is `mg.gen` (`src/gfx/meshgen.zig`), whose
+  `Builder` every mesh is built in. A sculpt meshes into it with
+  `s.mesh(mg.gen, b, h, t, part)`.
 - **World**: `engine.world.World(L)`, where `L` declares `Chunk` (holding
   `at`, `height`, `kind`, `occ`, `pins`, `gpu_slot`, `dirty`), `Kind`,
   `Occ` (with `.none`), `blank`, `generate` and `heightAt`. Parasymi's is

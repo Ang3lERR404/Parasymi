@@ -31,9 +31,11 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## engine/src/gfx/
 - `buffer.zig` — GPU buffers.
 - `ctx.zig` — Vulkan instance + device bring-up.
+- `meshgen.zig` — procedural mesh construction, the generic half: a `Builder` holding a mesh's vertices (with skin weights and growth records beside them, and
 - `pipeline.zig` — graphics pipeline construction for dynamic rendering.
+- `sculpt.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box) is a signed distance field, the…
 - `swapchain.zig` — swapchain + matching depth buffer.
-- `vertex.zig` — the GPU layouts the engine itself draws with: UI quads and points of light.
+- `vertex.zig` — the GPU layouts the engine itself defines: built meshes (with skin and growth records beside them), UI quads and points of light.
 
 ## engine/src/platform/
 - `display.zig` — fullscreen toggling: borderless on the primary monitor at its native mode, returning to the exact windowed position and size it left.
@@ -205,7 +207,6 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
 - `sap_cache.zig` — mesh: SAP CACHE.
-- `sculpt_kit.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box) is a signed distance field, the…
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with
@@ -221,7 +222,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `wolf_skeleton.zig` — the vine-wolf's skeleton: its bones, how they hang together and the pose they take.
 
 ## src/gfx/
-- `meshgen.zig` — procedural mesh construction.
+- `meshgen.zig` — the garden's meshes: every plant grown from its species genome out of the engine's primitives (engine gfx/meshgen.zig: tubes, lofts, vines…
 - `meshlib.zig` — catalogue of rigid procedural part meshes, one module (or a companion struct inside its owner's module) each under `meshes/` exposing…
 - `vertex.zig` — GPU vertex/instance layouts.
 

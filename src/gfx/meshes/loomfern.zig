@@ -137,7 +137,7 @@ fn frond(b:*mg.Builder, k:*growth.Skeleton, bole:growth.Id, i:usize) Allocator.E
     const s = b.mark();
     for ([_]f32{1, -1}) |sgn| {
       const dir = m.norm(side * m.splat3(sgn) + tan * m.splat3(0.55) + v3(0, 0.12, 0));
-      try b.blade(at, dir, len, PINNA_W * (1 - 0.5 * m.ratio(j, PINNAE - 1)), 0.45, pal.leaf_dark, pal.leaf_lite, m.lerp(0.3, 1, u), .leaf);
+      try mg.blade(b, at, dir, len, PINNA_W * (1 - 0.5 * m.ratio(j, PINNAE - 1)), 0.45, pal.leaf_dark, pal.leaf_lite, m.lerp(0.3, 1, u), .leaf);
     }
     try k.on(b, s, id, u, .{});
   }

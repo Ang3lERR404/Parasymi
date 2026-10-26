@@ -377,7 +377,7 @@ test "pieces built along a spline grow from its root to its tip" {
   try k.along(&b, s, t);
   // a leaf on it, built later, still closes by the end
   const l = b.mark();
-  try b.blade(m.v3(0, 1, 0), m.v3(1, 0, 0), 0.3, 0.1, 0, WHITE, WHITE, 0, .leaf);
+  try mg.blade(&b, m.v3(0, 1, 0), m.v3(1, 0, 0), 0.3, 0.1, 0, WHITE, WHITE, 0, .leaf);
   try k.on(&b, l, t, 1, .{});
   k.tail = 0.2;
   k.finish(&b);

@@ -13,7 +13,7 @@ const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const color = @import("engine").core.color;
 const skel = @import("wolf_skeleton.zig");
-const Sculpt = @import("sculpt_kit.zig").Sculpt;
+const Sculpt = @import("engine").gfx.sculpt.Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;

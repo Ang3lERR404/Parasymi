@@ -6,17 +6,16 @@
 //! its normal the field's gradient. Every form belongs to a bone, so each
 //! vertex is also weighted to the bones of the forms it lies nearest
 //! (smoothly, only along joints that are actually joined), and the mesh
-//! bends as one skin (vertex.Skin, part.vert's skinned mode).
+//! bends as one skin (vertex.Skin; a game's shader carries each vertex with its bones).
 //!
 //! The field is sampled sparsely: only blocks of cells the surface can
 //! pass through are evaluated, and each block only with the forms that
 //! can reach it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
+const m = @import("../core/math.zig");
+const color = @import("../core/color.zig");
+const vertex = @import("vertex.zig");
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -352,9 +351,10 @@ pub const Sculpt = struct {
     return c / m.splat3(@max(sum, 1e-9));
   }
 
-  /// mesh the surface with cells `h` across, every vertex `part` with tu
+  /// mesh the surface with cells `h` across into `b`, a builder of the
+  /// mesher `M` (gfx/meshgen.zig `Mesher`), every vertex `part` with tu
   /// (`t`, 0), weighted to its bones.
-  pub fn mesh(s:*const Sculpt, b:*mg.Builder, h:f32, t:f32, part:vertex.Part) Allocator.Error!void {
+  pub fn mesh(s:*const Sculpt, comptime M:type, b:*M.Builder, h:f32, t:f32, part:M.Part) Allocator.Error!void {
     const gpa = s.gpa;
     var lo = m.splat3(1e9);
     var hi = m.splat3(-1e9);

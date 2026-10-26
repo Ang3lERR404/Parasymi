@@ -99,7 +99,7 @@ pub fn footLeaves(b:*mg.Builder, n:u32, r:f32, len:f32, width:f32, seed:u64, on:
     const dir = m.norm(v3(@cos(a), 0.25, @sin(a)));
     const base = v3(@cos(a) * r, 0.08, @sin(a) * r);
     const s = b.mark();
-    try b.blade(base, dir, len * rng.range(0.85, 1.1), width, 0.7, pal.leaf_dark, pal.leaf_lite, 0.4, .leaf);
+    try mg.blade(b, base, dir, len * rng.range(0.85, 1.1), width, 0.7, pal.leaf_dark, pal.leaf_lite, 0.4, .leaf);
     if (on) |o| try o.k.on(b, s, o.id, o.u, .{.from = base, .delay = FOOT_STAGGER * m.f(i)});
   }
 }
@@ -217,7 +217,7 @@ pub fn plant(b:*mg.Builder, g:species.Genome, seed:u64, variant:u32, rooted:bool
       const a = (m.f(i) + rng.range(-0.2, 0.2)) / m.f(g.rosette) * m.tau + m.f(variant) * 0.7 + 0.5;
       const out = v3(@cos(a), 0, @sin(a));
       const base = out * m.splat3(g.stem_r * 1.2) + v3(0, g.stem_r * 1.5, 0);
-      try b.blade(base, m.norm(out + v3(0, 0.3, 0)), g.leaf_len * rng.range(1.05, 1.25), g.leaf_w * 1.3, 0.7, leaf, leaf_tip, 0.04, .leaf);
+      try mg.blade(b, base, m.norm(out + v3(0, 0.3, 0)), g.leaf_len * rng.range(1.05, 1.25), g.leaf_w * 1.3, 0.7, leaf, leaf_tip, 0.04, .leaf);
     }
   }
 
@@ -266,7 +266,7 @@ pub fn plant(b:*mg.Builder, g:species.Genome, seed:u64, variant:u32, rooted:bool
     const len = g.leaf_len * m.lerp(1.25, 0.55, up) * rng.range(0.93, 1.07);
     const droop = g.leaf_droop * m.lerp(1.3, 0.6, up);
     const base = at - v3(@cos(ang), 0, @sin(ang)) * m.splat3(g.stem_r * 0.4);
-    try b.blade(base, dir, len, g.leaf_w * m.lerp(1.1, 0.8, up), droop, leaf, leaf_tip, k, .leaf);
+    try mg.blade(b, base, dir, len, g.leaf_w * m.lerp(1.1, 0.8, up), droop, leaf, leaf_tip, k, .leaf);
   }
 
   // thorns: small, short, pressed to the stem

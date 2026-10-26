@@ -1,7 +1,7 @@
 # wolf_kit
 
 `src/gfx/meshes/wolf_kit.zig` (391 lines). Imports: `meshgen` (`mg`),
-`vertex`, `sculpt_kit` (`Sculpt`), `core/math`, `core/color`.
+`vertex`, `sculpt_kit` (engine `gfx/sculpt.zig`, `Sculpt`), `core/math`, `core/color`.
 
 ## What it is
 

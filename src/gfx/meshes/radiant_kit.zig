@@ -193,7 +193,7 @@ pub fn leaves(b:*mg.Builder, R:f32, l:Leaves, lite:Rgba8, seed:u64, rng:*Rng) Al
     const base = out * m.splat3(R * l.at) + v3(0, -R * (l.y + rng.range(-0.15, 0.15)), 0);
     const f:Fragment = .{.order = m.lerp(l.order[0], l.order[1], m.ratio(i, l.n)), .ring = .leaves, .bearing = a};
     const s = b.mark();
-    try b.blade(base, m.norm(out + v3(0, 0.3, 0)), l.len * rng.range(0.85, 1.1), l.w, l.droop, l.col, l.tip, 1, .leaf);
+    try mg.blade(b, base, m.norm(out + v3(0, 0.3, 0)), l.len * rng.range(0.85, 1.1), l.w, l.droop, l.col, l.tip, 1, .leaf);
     fragment(b, s, f);
     try tether(b, out * m.splat3(R * 0.12) + v3(0, -R * 0.4, 0), base - out * m.splat3(R * 0.05), R * 0.018, lite, seed +% i * 11, f);
   }

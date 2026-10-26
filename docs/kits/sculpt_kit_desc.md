@@ -1,7 +1,8 @@
 # sculpt_kit
 
-`src/gfx/meshes/sculpt_kit.zig` (524 lines). Imports: `meshgen` (`mg`),
-`vertex`, `core/math`, `core/color`.
+`engine/src/gfx/sculpt.zig` (the engine's, `engine.gfx.sculpt`; kept as a
+kit by name). Imports: engine `vertex`, `core/math`, `core/color`. It meshes
+into any `meshgen.Mesher`'s builder: `s.mesh(mg.gen, b, h, t, part)`.
 
 ## What it is
 

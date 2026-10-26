@@ -4,7 +4,7 @@
 //! `world.World`) a namespace describing itself.
 //!   core      math, colour, rng, noise, registry, jobs, text, png
 //!   platform  input, display (fullscreen)
-//!   gfx       Vulkan context, swapchain, buffers, pipelines, engine vertex layouts
+//!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting
 //!   world     the chunk grid and the streamed chunk map
 //!   render    frame orchestration and passes, post (bloom, AA), light, camera
 //!   ui        SDF draw batch, font
@@ -35,6 +35,8 @@ pub const gfx = struct {
   pub const buffer = @import("gfx/buffer.zig");
   pub const pipeline = @import("gfx/pipeline.zig");
   pub const vertex = @import("gfx/vertex.zig");
+  pub const meshgen = @import("gfx/meshgen.zig");
+  pub const sculpt = @import("gfx/sculpt.zig");
 };
 
 pub const world = struct {
@@ -68,6 +70,8 @@ test {
   _ = core.text;
   _ = core.png;
   _ = platform.input;
+  _ = gfx.meshgen;
+  _ = gfx.sculpt;
   _ = world.chunk;
   _ = @import("world/world.zig");
   _ = render.camera;

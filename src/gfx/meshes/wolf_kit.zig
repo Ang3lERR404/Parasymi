@@ -9,7 +9,7 @@ const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const color = @import("engine").core.color;
 const vertex = @import("../vertex.zig");
-const Sculpt = @import("sculpt_kit.zig").Sculpt;
+const Sculpt = @import("engine").gfx.sculpt.Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;

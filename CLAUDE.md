@@ -84,14 +84,15 @@ build. New shaders go in `build.zig`'s list (the engine's in
 ```
 core      math, color, rng, noise, registry, jobs, text, png
 platform  input, display (fullscreen)
-gfx       Vulkan ctx, swapchain, buffers, pipelines, UI/light vertex layouts
+gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
+          mesh builder + primitives (Mesher), SDF sculpting
 world     chunk grid, World(L) streaming
 render    Renderer(G) frame orchestration, post (bloom, AA), light, camera, ui pass
 ui        SDF draw batch, font
 ```
 `src/` (the game):
 ```
-gfx       meshgen, meshlib, growth, kits, game vertex layouts
+gfx       meshgen (plant pieces), meshlib, growth, kits, instance layouts
 world     chunks (tile SoA + occupancy), generation, the garden's World
 sim       items, species, plants (footprints, floaters), ecology tick
 game      player, actions, structures, research, craft, sky, hud, view, play, save

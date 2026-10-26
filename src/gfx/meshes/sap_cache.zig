@@ -183,7 +183,7 @@ fn rib(b:*mg.Builder, k:*growth.Skeleton, bole:growth.Id, set:usize, i:usize) Al
     const up = onPod(v + 0.03, th + sgn * 0.08, RIB_R * (RIB_SINK + 1))[0] - at[0];
     const dir = m.norm(at[1] * m.splat3(0.75) + m.norm(up) * m.splat3(0.8));
     const ls = b.mark();
-    try b.blade(at[0], dir, 0.12 * rng.range(0.85, 1.1), 0.042, 0.45, pal.leaf_dark, pal.leaf_lite, m.lerp(0.3, 0.75, f), .leaf);
+    try mg.blade(b, at[0], dir, 0.12 * rng.range(0.85, 1.1), 0.042, 0.45, pal.leaf_dark, pal.leaf_lite, m.lerp(0.3, 0.75, f), .leaf);
     try k.on(b, ls, id, f, .{.from = at[0]});
   }
 }

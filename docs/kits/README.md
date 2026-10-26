@@ -1,6 +1,7 @@
 # Mesh kits
 
-A kit is a shared library of mesh pieces in `src/gfx/meshes/*_kit.zig`. It is
+A kit is a shared library of mesh pieces in `src/gfx/meshes/*_kit.zig`
+(sculpt_kit lives in the engine, `engine/src/gfx/sculpt.zig`). It is
 not a mesh itself (it has no `build` and no slot in `meshlib`); meshes, plant
 forms and structures call into it so a lineage keeps one look. Each kit has one
 file here with everything about it: its look, API, who uses it, what the shaders
@@ -19,12 +20,14 @@ read from it, its rules and tests.
 ## How they depend on each other
 
 ```
-meshgen (primitives) ─┬─ structure_kit ── palette
+engine meshgen (Builder, tubes, lofts, vines, braids, ellipsoids, patches)
+   └─ meshgen (the garden's: blades, laminae, petals, stamens, flowers)
+meshgen ──────────────┬─ structure_kit ── palette
                       ├─ mineral_kit ──────────────┐
                       ├─ parasite_kit ─┐           │
                       │                └─ convergence_kit (+ palette)
                       ├─ radiant_kit ──────────────┘ (uses mineral_kit)
-                      └─ sculpt_kit ── wolf_kit
+                      └─ sculpt_kit (engine) ── wolf_kit
 growth.zig (Skeleton) is used by structure_kit, parasite_kit, convergence_kit;
 never by radiant_kit (enforced by its test).
 ```

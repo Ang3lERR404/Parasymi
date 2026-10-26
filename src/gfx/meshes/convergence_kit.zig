@@ -300,7 +300,7 @@ fn frondAlong(b:*mg.Builder, f:Frond, c:*const [ARC + COIL]V3, on:?On) Allocator
     const pair = b.mark();
     for ([_]f32{1, -1}) |sgn| {
       const dir = m.norm(sd * m.splat3(sgn) + tan * m.splat3(0.5 + rng.range(-0.12, 0.12)) + v3(0, rng.range(0.05, 0.25), 0));
-      try b.blade(at, dir, len * rng.range(0.85, 1.12), f.leaf_w * rng.range(0.85, 1.1), 0.4, leaf_dark, leaf_lite, m.lerp(f.t0, f.t1, k), .leaf);
+      try mg.blade(b, at, dir, len * rng.range(0.85, 1.12), f.leaf_w * rng.range(0.85, 1.1), 0.4, leaf_dark, leaf_lite, m.lerp(f.t0, f.t1, k), .leaf);
     }
     if (on) |o| try o.k.on(b, pair, o.id, o.k.nearest(o.id, at), .{.from = at});
   }

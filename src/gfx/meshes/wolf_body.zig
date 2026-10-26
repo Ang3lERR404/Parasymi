@@ -1,7 +1,7 @@
 //! mesh: WOLF BODY. the vine-wolf as one skin: every form of its body (the
 //! ribcage, waist and hips, the muscles of its limbs, its neck and head,
 //! its tail) is sculpted around the skeleton's bind pose (wolf_skeleton)
-//! and melted into the next (sculpt_kit), so shoulder runs into arm,
+//! and melted into the next (engine gfx/sculpt.zig), so shoulder runs into arm,
 //! thigh into hip and neck into skull without a seam, and the whole bends
 //! with its bones on the GPU. Over the hide lie the things grown on it:
 //! vines along the limbs and round the torso, fur leaves over the skull,
@@ -22,7 +22,7 @@ const pal = @import("palette.zig");
 const color = @import("engine").core.color;
 const vertex = @import("../vertex.zig");
 const kit = @import("wolf_kit.zig");
-const sculpt = @import("sculpt_kit.zig");
+const sculpt = @import("engine").gfx.sculpt;
 const skel = @import("wolf_skeleton.zig");
 
 const V3 = m.V3;
@@ -241,7 +241,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
   const w = skel.bind();
   var s = try sculpted(b.gpa, &w);
   defer s.deinit();
-  try s.mesh(b, CELL * m.f(@as(u32, 1) << @intCast(b.lod)), 0.5, .stem);
+  try s.mesh(mg.gen, b, CELL * m.f(@as(u32, 1) << @intCast(b.lod)), 0.5, .stem);
   try eyes(b, &w);
   try vines(b, &s, &w);
   try fur(b, &s, &w);

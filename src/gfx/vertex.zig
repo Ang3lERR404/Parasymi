@@ -41,51 +41,11 @@ pub fn seeThrough(p:Part) bool {
   };
 }
 
-pub const Mesh = extern struct {
-  pos:[3]f32,
-  nrm:[3]f32,
-  col:color.Rgba8,
-  /// x: height along the plant 0..1 (growth/sway), y: position along a leaf/petal 0..1
-  tu:[2]f32,
-  part:u32,
-};
-
-/// which bones move a skinned vertex (up to four indices, one per byte,
-/// lowest first) and how much each (unorm, summing to one), read beside the
-/// mesh buffer vertex for vertex. Meshes that are not skinned leave it zero.
-pub const Skin = extern struct {
-  bones:u32 = 0,
-  weights:[4]u8 = .{0, 0, 0, 0},
-  /// how each of the four weights changes across the mesh (per unit of
-  /// mesh space, its x, y and z): a skin swelling under a scaled bone
-  /// (the belly) bends its normals by them, not by the blended bones alone
-  /// (part.vert). Zero where the weights hold still or are not known.
-  gx:[4]f32 = @splat(0),
-  gy:[4]f32 = @splat(0),
-  gz:[4]f32 = @splat(0),
-};
-
-/// where a vertex of a structure grown along its growth splines
-/// (gfx/growth.zig) grows out of and when, read beside the mesh buffer
-/// vertex for vertex (binding 3). part.vert keeps it shrunk into `from`
-/// until the structure's growth reaches `at[0]`, grows it out over
-/// `at[1]`, and thickens it as its spline goes from started (`at[2]`) to
-/// done (`at[3]`; equal: no thickening). `at[1]` 0: not on a spline.
-pub const Grow = extern struct {
-  from:[3]f32 = @splat(0),
-  at:[4]f32 = @splat(0),
-};
-
-/// the leading fields of `Mesh`, read from a second growth key of the same
-/// mesh buffer (same stride) so a plant can blend between keys.
-pub const MeshPose = extern struct {
-  pos:[3]f32,
-  nrm:[3]f32,
-};
-comptime {
-  if (@offsetOf(MeshPose, "pos") != @offsetOf(Mesh, "pos") or @offsetOf(MeshPose, "nrm") != @offsetOf(Mesh, "nrm"))
-    @compileError("MeshPose must mirror the start of Mesh");
-}
+/// the engine's mesh layouts (gfx/meshgen.zig builds them)
+pub const Mesh = ev.Mesh;
+pub const Skin = ev.Skin;
+pub const Grow = ev.Grow;
+pub const MeshPose = ev.MeshPose;
 
 pub const PlantInstance = extern struct {
   pos:[3]f32,

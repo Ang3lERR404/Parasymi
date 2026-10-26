@@ -156,7 +156,7 @@ fn bough(b:*mg.Builder, sk:*growth.Skeleton, stem:growth.Id, k:usize) Allocator.
     const side = v3(-out[2], 0, out[0]) * m.splat3((m.f(i) - 1) * 0.7 + rng.range(-0.1, 0.1));
     const dir = m.norm(out + side + v3(0, 0.7, 0));
     const s1 = b.mark();
-    try b.blade(behind, dir, 0.27 * rng.range(0.85, 1.1), 0.1, 0.55, pal.leaf_dark, pal.leaf_lite, behind[1] / TALL, .leaf);
+    try mg.blade(b, behind, dir, 0.27 * rng.range(0.85, 1.1), 0.1, 0.55, pal.leaf_dark, pal.leaf_lite, behind[1] / TALL, .leaf);
     try sk.on(b, s1, id, 0.9, .{.from = behind});
   }
 }

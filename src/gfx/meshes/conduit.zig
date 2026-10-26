@@ -256,7 +256,7 @@ fn cluster(b:*mg.Builder, sp:[]const V3, rs:[]const f32, u:f32, n:u8, side:f32, 
     const dir = m.norm(flat * m.splat3(@cos(a)) + out * m.splat3(@sin(a)) + v3(0, LEAF_LIFT, 0));
     // the middle leaf of three the longest
     const len = LEAF_LEN * rng.range(0.85, 1.1) * (if (n == 3 and l == 1) @as(f32, 1.2) else 1);
-    try b.blade(tip, dir, len, LEAF_W, 0.4, pal.leaf_dark, pal.leaf_lite, u, .leaf);
+    try mg.blade(b, tip, dir, len, LEAF_W, 0.4, pal.leaf_dark, pal.leaf_lite, u, .leaf);
   }
 }
 

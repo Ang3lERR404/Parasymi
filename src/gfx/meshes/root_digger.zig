@@ -85,7 +85,7 @@ pub fn build(b:*mg.Builder) Allocator.Error!void {
     const a = (m.f(i) + 0.3) / 5 * m.tau;
     const dir = m.norm(v3(@cos(a), 1.1 + 0.25 * m.f(i % 2), @sin(a)));
     const s = b.mark();
-    try b.blade(CROWN, dir, 0.16 + 0.04 * m.f(i % 2), 0.055, 0.55, pal.leaf_dark, pal.leaf_lite, 1, .leaf);
+    try mg.blade(b, CROWN, dir, 0.16 + 0.04 * m.f(i % 2), 0.055, 0.55, pal.leaf_dark, pal.leaf_lite, 1, .leaf);
     try k.on(b, s, sprout, 1, .{.from = CROWN, .delay = 0.025 * m.f(i)});
   }
   k.finish(b);
