@@ -23,6 +23,8 @@ const CAST_ABOVE:f32 = 2;
 const CAST_REACH:f32 = 24;
 /// the least rise of the key light the casting reach is worked out for
 const CAST_LOW:f32 = 0.15;
+/// a skinned mesh's hidden bones go to the GPU this many to a float
+const HIDE_WORD = 24;
 /// a curve is always drawn at least this far along
 const MIN_REACH:f32 = 1e-3;
 
@@ -54,6 +56,10 @@ pub const Look = struct {
   carry_col:[3]f32 = .{0, 0, 0},
   /// a placement preview: drawn, but casts no shadow
   ghost:bool = false,
+  /// a skinned mesh: the bones (one bit each) whose part of it is not
+  /// drawn, though it still casts its shadow (the wolf's head, seen from
+  /// its eyes)
+  hide:u64 = 0,
 };
 
 pub const Parts = struct {
@@ -161,7 +167,9 @@ pub const Parts = struct {
     if (!p.sees(at, BOUND + BOUND_PAD)) return;
 
     var inst = instance(m.translate(at), look_);
-    inst.e = .{PLACE_SKIN, m.f(base), 0, 0};
+    // (the mask 24 bones to a float, as part.vert reads it)
+    std.debug.assert(look_.hide < 1 << 2 * HIDE_WORD);
+    inst.e = .{PLACE_SKIN, m.f(base), m.f(look_.hide & (1 << HIDE_WORD) - 1), m.f(look_.hide >> HIDE_WORD)};
     try p.add(id, at, inst);
   }
 

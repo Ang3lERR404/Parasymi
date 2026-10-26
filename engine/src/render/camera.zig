@@ -2,6 +2,8 @@
 //! ray, and orbits its target: turns (yaw) freely and tilts (pitch) from
 //! just over the horizon to just short of overhead.
 //! For close inspection it can also fly free, then ease back to following.
+//! Zoomed all the way in, it goes on into the eyes of what it follows (first
+//! person) and back out when zoomed out again.
 const std = @import("std");
 const testing = std.testing;
 const m = @import("../core/math.zig");
@@ -43,6 +45,14 @@ const REACH_MARGIN:f32 = 12;
 /// each wheel notch scales the distance by this, within these bounds
 const ZOOM_STEP:f32 = 0.88;
 const MIN_DIST:f32 = 4;
+/// the first-person view: its field of view and near plane, how long it
+/// takes to ease in from following (and back out), and how far it looks up
+/// and down (radians from level)
+const EYES_FOVY:f32 = 1.1;
+const EYES_NEAR:f32 = 0.03;
+const EYES_TIME:f32 = 0.35;
+pub const EYES_UP:f32 = m.rad(75.0);
+pub const EYES_DOWN:f32 = m.rad(-70.0);
 const MAX_DIST:f32 = 120;
 const UP = m.v3(0, 1, 0);
 
@@ -55,10 +65,7 @@ pub const Free = struct {
   /// the window holds the cursor for mouse look
   captured:bool = false,
 
-  pub fn forward(f:*const Free) m.V3 {
-    const cp = @cos(f.pitch);
-    return m.v3(-@sin(f.yaw) * cp, @sin(f.pitch), -@cos(f.yaw) * cp);
-  }
+  pub fn forward(f:*const Free) m.V3 { return toward(f.yaw, f.pitch); }
   /// independent of pitch, so looking past straight up or down never flips
   pub fn right(f:*const Free) m.V3 { return m.v3(@cos(f.yaw), 0, -@sin(f.yaw)); }
   pub fn up(f:*const Free) m.V3 {
@@ -67,12 +74,32 @@ pub const Free = struct {
   }
 };
 
+/// which way a view turned by `yaw` and tilted by `pitch` (up +) looks
+fn toward(yaw:f32, pitch:f32) m.V3 {
+  const cp = @cos(pitch);
+  return m.v3(-@sin(yaw) * cp, @sin(pitch), -@cos(yaw) * cp);
+}
+
+/// the first-person view, from the eyes of what is followed: where they are
+/// (`see`, every frame), how far they look up or down (they turn with the
+/// camera's own yaw, so moving and following stay as they were), and how far
+/// the view has eased in from following (0) to them (1)
+pub const Eyes = struct {
+  pos:m.V3,
+  pitch:f32 = 0,
+  k:f32 = 0,
+  /// easing back out to following
+  leaving:bool = false,
+};
+
 pub const View = union(enum) {
   /// following the target (the normal game camera)
   follow,
   free:Free,
   /// easing from a free view back to following
   returning:struct { from:Free, t:f32 = 0 },
+  /// first person (and easing into it or out of it)
+  eyes:Eyes,
 };
 
 pub const Camera = struct {
@@ -95,6 +122,12 @@ pub const Camera = struct {
     return switch (c.view) {
       .follow => m.mul(m.perspective(c.fov(), c.aspect, NEAR, far), m.lookAt(c.eye(), c.aim(), UP)),
       .free => |f| m.mul(m.perspective(FREE_FOVY, c.aspect, FREE_NEAR, far), m.lookAt(f.pos, f.pos + f.forward(), f.up())),
+      .eyes => |y| blk: {
+        const k = m.smooth(y.k);
+        const e = c.viewEye();
+        const dir = m.norm(m.lerpV(follow_dir, toward(c.yaw, y.pitch), k));
+        break :blk m.mul(m.perspective(m.lerp(c.fov(), EYES_FOVY, k), c.aspect, m.lerp(NEAR, EYES_NEAR, k), far), m.lookAt(e, e + dir, UP));
+      },
       .returning => |r| blk: {
         const w = 1 - m.smooth(m.clamp01(r.t / RETURN_TIME));
         const e = c.viewEye();
@@ -111,7 +144,43 @@ pub const Camera = struct {
       .follow => c.eye(),
       .free => |f| f.pos,
       .returning => |r| m.lerpV(c.eye(), r.from.pos, 1 - m.smooth(m.clamp01(r.t / RETURN_TIME))),
+      .eyes => |y| m.lerpV(c.eye(), y.pos, m.smooth(y.k)),
     };
+  }
+
+  /// looking out of the eyes (or easing in), not on the way back out.
+  pub fn inEyes(c:*const Camera) bool {
+    return switch (c.view) {
+      .eyes => |y| !y.leaving,
+      .follow, .free, .returning => false,
+    };
+  }
+
+  /// how far up (+) or down the eyes look; level outside them.
+  pub fn gaze(c:*const Camera) f32 {
+    return switch (c.view) {
+      .eyes => |y| y.pitch,
+      .follow, .free, .returning => 0,
+    };
+  }
+
+  /// where the eyes are this frame (first person follows them).
+  pub fn see(c:*Camera, at:m.V3) void {
+    switch (c.view) {
+      .eyes => |*y| y.pos = at,
+      .follow, .free, .returning => {},
+    }
+  }
+
+  /// turn the eyes by `px` pixels of mouse (x turns, y looks up and down).
+  pub fn look(c:*Camera, px:[2]f32) void {
+    switch (c.view) {
+      .eyes => |*y| {
+        c.yaw = @mod(c.yaw - px[0] * LOOK, m.tau);
+        y.pitch = m.clamp(y.pitch - px[1] * LOOK, EYES_DOWN, EYES_UP);
+      },
+      .follow, .free, .returning => {},
+    }
   }
 
   /// leave following: fly from exactly where the camera is, looking the same way.
@@ -125,7 +194,7 @@ pub const Camera = struct {
   pub fn endFree(c:*Camera) void {
     switch (c.view) {
       .free => |f| c.view = .{.returning = .{.from = f}},
-      .follow, .returning => {},
+      .follow, .returning, .eyes => {},
     }
   }
 
@@ -135,21 +204,25 @@ pub const Camera = struct {
         r.t += dt;
         if (r.t >= RETURN_TIME) c.view = .follow;
       },
+      .eyes => |*y| {
+        y.k = m.clamp01(y.k + (if (y.leaving) -dt else dt) / EYES_TIME);
+        if (y.leaving and y.k == 0) c.view = .follow;
+      },
       .follow, .free => {},
     }
   }
 
-  /// steer a free view: turn by `look` (radians), move by `move` (right,
+  /// steer a free view: turn by `turn` (radians), move by `move` (right,
   /// up, forward, world units), roll, and dolly along the view.
-  pub fn fly(c:*Camera, look:[2]f32, move:m.V3, roll:f32, dolly:f32) void {
+  pub fn fly(c:*Camera, turn:[2]f32, move:m.V3, roll:f32, dolly:f32) void {
     switch (c.view) {
       .free => |*f| {
-        f.yaw += look[0];
-        f.pitch += look[1];
+        f.yaw += turn[0];
+        f.pitch += turn[1];
         f.roll += roll;
         f.pos += f.right() * m.splat3(move[0]) + f.up() * m.splat3(move[1]) + f.forward() * m.splat3(move[2] + dolly);
       },
-      .follow, .returning => {},
+      .follow, .returning, .eyes => {},
     }
   }
 
@@ -188,11 +261,29 @@ pub const Camera = struct {
   /// how far around the target the world is worth drawing: further the
   /// lower the camera looks, never beyond what is streamed in.
   pub fn reach(c:*const Camera, limit:f32) f32 {
-    return @min(c.dist * (REACH_HIGH + REACH_LOW * (1 - @sin(c.pitch))) + REACH_MARGIN, limit);
+    const r = @min(c.dist * (REACH_HIGH + REACH_LOW * (1 - @sin(c.pitch))) + REACH_MARGIN, limit);
+    // (out of the eyes it looks out level, as far as anything is drawn)
+    return switch (c.view) {
+      .eyes => |y| m.lerp(r, limit, m.smooth(y.k)),
+      .follow, .free, .returning => r,
+    };
   }
 
-  pub fn zoom(c:*Camera, steps:f32) void {
-    c.dist = m.clamp(c.dist * m.pow(f32, ZOOM_STEP, steps), MIN_DIST, MAX_DIST);
+  /// the wheel: following, in (+) and out by `steps` notches; zoomed all
+  /// the way in, a notch further goes into the eyes (from `at`), and a
+  /// notch out of them comes back out (a notch in turns back again).
+  pub fn zoom(c:*Camera, steps:f32, at:m.V3) void {
+    switch (c.view) {
+      .follow => if (steps > 0 and c.dist <= MIN_DIST) {
+        c.view = .{.eyes = .{.pos = at}};
+      } else {
+        c.dist = m.clamp(c.dist * m.pow(f32, ZOOM_STEP, steps), MIN_DIST, MAX_DIST);
+      },
+      .eyes => |*y| if (steps != 0) {
+        y.leaving = steps < 0;
+      },
+      .free, .returning => {},
+    }
   }
 
   /// world-space ray through a pixel.
@@ -226,6 +317,36 @@ test "the free camera starts where the follow view is and eases home" {
   c.tick(0.2);
   try testing.expect(c.view == .follow);
   try testing.expect(m.len(c.viewEye() - e) < 1e-5);
+}
+
+test "zoomed all the way in, the camera goes into the eyes and back out" {
+  var c:Camera = .{.target = m.v3(3, 1, -2), .dist = MIN_DIST * 1.5};
+  const eyes = m.v3(3, 1.3, -1.9);
+  c.zoom(10, eyes);
+  try testing.expect(c.view == .follow and c.dist == MIN_DIST);
+  c.zoom(1, eyes);
+  try testing.expect(c.inEyes());
+  // easing in, it starts where following left off
+  try testing.expect(m.len(c.viewEye() - c.eye()) < 1e-5);
+  c.tick(EYES_TIME);
+  try testing.expect(m.len(c.viewEye() - eyes) < 1e-5);
+  // the eyes look the way the camera faced, level; turning them turns it
+  const yaw = c.yaw;
+  c.look(.{-100, 1e6});
+  try testing.expectApproxEqAbs(@mod(yaw + 100 * LOOK, m.tau), c.yaw, 1e-4);
+  try testing.expectEqual(EYES_DOWN, c.gaze());
+  c.look(.{0, -1e7});
+  try testing.expectEqual(EYES_UP, c.gaze());
+  try testing.expect(c.reach(50) == 50);
+  try testing.expect(m.len(c.ray(800, 450, 1600, 900).d - toward(c.yaw, EYES_UP)) < 1e-3);
+  // a notch out leaves, easing back to following
+  c.zoom(-1, eyes);
+  try testing.expect(!c.inEyes() and c.view == .eyes);
+  c.tick(EYES_TIME * 0.5);
+  try testing.expect(c.view == .eyes);
+  c.tick(EYES_TIME);
+  try testing.expect(c.view == .follow);
+  try testing.expect(m.len(c.viewEye() - c.eye()) < 1e-5);
 }
 
 test "orbiting turns freely and tilts only within its limits" {

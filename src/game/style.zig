@@ -55,6 +55,10 @@ pub const growth:C = .{120, 230, 150, 255};
 pub const freecam:C = .{150, 230, 190, 255};
 /// free cam glow (same hue, low alpha)
 pub const freecam_glow:C = .{150, 230, 190, 90};
+/// the middle of the screen, looking out of the wolf's eyes: a lit seed
+/// and its glow
+pub const aim:C = .{225, 245, 210, 230};
+pub const aim_glow:C = .{150, 230, 190, 70};
 /// pause menu veil (near-black, soft)
 pub const veil:C = .{4, 6, 10, 200};
 /// pause menu panel membrane

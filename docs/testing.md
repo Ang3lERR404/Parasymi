@@ -52,6 +52,9 @@ shaders change.
   from the start, so shot k of n over a turn of `--orbit` seconds shows
   growth about `((3 + k·orbit/n) mod (period+1.5)) / period`). Read the
   PNGs to verify. A stage held still from every side: `--state=0.5`.
+- First person: `--inspect=eyes` looks out of the wolf's eyes, turning
+  round where it stands, `--pitch=` degrees down (65 shows its chest and
+  belly), e.g. `zig build run -- --demo --inspect=eyes --shots=4 --orbit=8 --pitch=30`.
 - A structure that emits a library mesh lists it in its `meshes` hook
   (`pub const meshes = .{ .item_pod, ... };`), or `--structure` never
   builds it. The test "a structure alone draws only the meshes it

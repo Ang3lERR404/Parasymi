@@ -79,6 +79,7 @@ const panels = struct {
   pub const log = @import("hud/log.zig");
   pub const debug = @import("hud/debug.zig");
   pub const inspect = @import("hud/inspect.zig");
+  pub const eyes = @import("hud/eyes.zig");
   pub const tooltip = @import("hud/tooltip.zig");
   pub const carry = @import("hud/carry.zig");
   pub const pause = @import("hud/pause.zig");

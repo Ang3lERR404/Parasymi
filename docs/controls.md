@@ -7,6 +7,14 @@ Defaults in `src/cfg/controls.cfg` (rebindable in the gardener's copy; see
 - WASD move, Shift run, MMB drag orbits the camera round the wolf (yaw
   free, pitch 8°–89°, default 55°), wheel zoom. Free inspection camera on
   Ctrl+F.
+- First person: zoomed all the way in, a wheel notch further eases into
+  the wolf's eyes; a notch out eases back. The cursor is held: the mouse
+  looks (up 75°, down 70°), WASD moves relative to the look, the wolf
+  turns to face it (its head leads) and every action lands on what the
+  seed at the screen's middle is on. A panel or the pause menu gives the
+  cursor back. The head (head, jaw and ear bones) is clipped away on the
+  GPU (`parts.Look.hide`, part.vert `gl_ClipDistance`) once the view is
+  within `HEAD_CLEAR` of the eyes; its shadow still falls.
 - LMB held plants the selected seed/bulb wherever it fits as the cursor
   sweeps; where it does not, a click on a structure interacts, on a plant
   harvests. E always interacts (harvests a plant). Interact: a structure

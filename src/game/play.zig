@@ -70,6 +70,9 @@ pub const TIMING_EASE:f32 = 0.05;
 /// free camera: Shift multiplies the fly speed; the wheel dollies this much a notch
 const FLY_FAST:f32 = 3;
 const DOLLY_PER_NOTCH:f32 = 0.4;
+/// first person: the wolf's head is hidden once the view comes this close
+/// to its eyes (easing in, it is seen until then)
+const HEAD_CLEAR:f32 = 0.3;
 
 /// the simulation never runs more than this many catch-up ticks a frame
 const MAX_CATCHUP = 8;
@@ -215,8 +218,12 @@ pub const Game = struct {
   /// the tile of the structure whose panel is open (mode `.structure`); a
   /// tile, not an id, since ids move when a structure is removed
   open:[2]i32 = .{0, 0},
-  /// the cursor, in screen pixels (tooltips and what is carried follow it)
+  /// the cursor, in screen pixels (tooltips and what is carried follow it);
+  /// looking out of the wolf's eyes, the middle of the screen
   mouse:[2]f32 = .{0, 0},
+  /// the window holds the cursor for looking out of the wolf's eyes; the
+  /// frame it is taken its jump is not a look
+  looking:bool = false,
   /// a click spent putting down or dropping what was carried does nothing
   /// in the garden until the button is let go
   use_spent:bool = false,
@@ -302,9 +309,9 @@ pub const Game = struct {
     return gen.heightAt(g.world.seed, wx, wy);
   }
 
-  /// march the mouse ray until it dips below the terraced ground.
-  fn pick(g:*const Game, in:*const Input, screen:[2]f32) ?[2]i32 {
-    const ray = g.cam.ray(in.mouse[0], in.mouse[1], screen[0], screen[1]);
+  /// march the ray through the cursor until it dips below the terraced ground.
+  fn pick(g:*const Game, cursor:[2]f32, screen:[2]f32) ?[2]i32 {
+    const ray = g.cam.ray(cursor[0], cursor[1], screen[0], screen[1]);
     var t:f32 = 0;
     const max_t = g.cam.dist * PICK_RANGE_MULT;
     while (t < max_t) : (t += PICK_STEP) {
@@ -330,7 +337,12 @@ pub const Game = struct {
       .options, .gardens => g.mode = .paused,
       .inspect => g.inspect(in, false),
     } else if (!g.mode.live()) g.menu(in, dt);
-    if (!g.mode.live()) return;
+    if (!g.mode.live()) {
+      // (the frozen world's menus give back a cursor held for looking)
+      if (g.looking) in.capture(false);
+      g.looking = false;
+      return;
+    }
 
     g.time += dt;
     // the garden saves itself every so often (only time played counts)
@@ -348,6 +360,15 @@ pub const Game = struct {
     const inspecting = g.mode == .inspect;
     g.cam.tick(dt);
 
+    // out of the wolf's eyes, the mouse looks round while nothing else wants
+    // the cursor; what is used is what the middle of the screen is on
+    const looking = g.cam.inEyes() and g.mode == .roam;
+    if (looking != g.looking) {
+      in.capture(looking);
+      g.looking = looking;
+    } else if (looking) g.cam.look(in.mouse_delta);
+    const cursor = if (looking) [2]f32{screen[0] / 2, screen[1] / 2} else in.mouse;
+
     // panels and selection
     if (!inspecting) {
       if (ctl.pressed(in, .belly)) g.mode = if (g.mode == .belly) .roam else .belly;
@@ -362,7 +383,7 @@ pub const Game = struct {
     // a click lands on the HUD panel under the mouse before the world: rows
     // choose research, weave a recipe, lift or put down an item; a panel's
     // backdrop just absorbs it
-    g.mouse = in.mouse;
+    g.mouse = cursor;
     // a structure's panel closes once it is gone or out of reach
     if (g.mode == .structure and g.opened() == null) g.mode = .roam;
     if (!g.mode.sorting()) g.held = null;
@@ -371,7 +392,7 @@ pub const Game = struct {
       .bar => |i| if (g.bar[i] == null) { g.held = null; },
       .store => |i| if (g.storeSlot(i) == null) { g.held = null; },
     };
-    const ui_hit = if (inspecting) null else g.rows.at(in.mouse);
+    const ui_hit = if (inspecting or looking) null else g.rows.at(cursor);
     g.pointed = ui_hit;
     if (!ctl.down(in, .use)) g.use_spent = false;
     if (ctl.pressed(in, .use)) {
@@ -416,14 +437,15 @@ pub const Game = struct {
     const wl = @sqrt(wish[0] * wish[0] + wish[1] * wish[1]);
     if (wl > 1) wish = .{ wish[0] / wl, wish[1] / wl };
 
-    // the camera orbits round the wolf while dragged
+    // the camera orbits round the wolf while dragged; the wheel zooms, all
+    // the way in into its eyes
     if (!inspecting) {
-      if (ctl.down(in, .orbit)) g.cam.orbit(in.mouse_delta);
-      if (in.scroll != 0) g.cam.zoom(in.scroll);
+      if (ctl.down(in, .orbit) and !g.cam.inEyes()) g.cam.orbit(in.mouse_delta);
+      if (in.scroll != 0) g.cam.zoom(in.scroll, g.player.eyes());
     }
 
     // interaction with the hovered tile (none while inspecting)
-    g.hover = if (inspecting) null else g.pick(in, screen);
+    g.hover = if (inspecting) null else g.pick(cursor, screen);
     var working = false;
     var gathering = false;
     var work:?m.V3 = null;
@@ -503,8 +525,13 @@ pub const Game = struct {
       if (d > 1e-3) wish = .{ dx / d * go, dz / d * go };
     };
 
+    // out of its eyes, the wolf turns to face where they look
+    // (the camera's yaw looks down -z turned, the wolf's facing down +z)
+    g.player.aim = if (g.cam.inEyes()) g.cam.yaw + m.pi else null;
+    g.player.gaze = if (g.cam.inEyes()) g.cam.gaze() else null;
     g.player.move(wish, ctl.down(in, .run), &g.world, dt);
     g.player.animate(&g.world, dt);
+    g.cam.see(g.player.eyes());
     const follow = g.player.pos + m.v3(0, FOLLOW_HEIGHT, 0);
     g.cam.target += (follow - g.cam.target) * m.splat3(@min(1, dt * FOLLOW_LERP));
 
@@ -517,6 +544,14 @@ pub const Game = struct {
     try g.world.stream(g.focus(), STREAM_RADIUS, STREAM_FRAME);
     try g.world.far(g.focus(), STREAM_RADIUS, &g.far);
     for (g.far.items) |c| try g.world.unload(c);
+  }
+
+  /// the view is in the wolf's eyes: its head is not drawn (its shadow is)
+  pub fn headless(g:*const Game) bool {
+    return switch (g.cam.view) {
+      .eyes => |y| m.len(g.cam.viewEye() - y.pos) < HEAD_CLEAR,
+      .follow, .free, .returning => false,
+    };
   }
 
   /// is the cursor carrying `h`?
@@ -792,7 +827,7 @@ pub const Game = struct {
   fn fly(g:*Game, in:*const Input, dt:f32) void {
     const f = switch (g.cam.view) {
       .free => |*f| f,
-      .follow, .returning => return,
+      .follow, .returning, .eyes => return,
     };
     // the frame the cursor is taken its jump is not a look
     var look:[2]f32 = .{ 0, 0 };

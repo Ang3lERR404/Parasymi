@@ -6,6 +6,9 @@
 // the solid and glass passes rasterize it at the very same depth (the
 // glass pass tests `less` against what the solid one wrote)
 invariant gl_Position;
+#ifndef SHADOW
+out float gl_ClipDistance[1];
+#endif
 
 // per-vertex (mesh library)
 layout(location = 0) in vec3 pos;
@@ -382,6 +385,21 @@ void main() {
   // (from its shards, as its blooms close in)
   if (part == PART_HALO || part == PART_PROJECTION) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
   gl_Position = project(w.xyz);
+#ifndef SHADOW
+  // a skinned mesh may hide what some of its bones carry (the wolf's head,
+  // seen from its own eyes): ie.zw a mask of bones, 24 to a float. Clipped
+  // where those bones carry it more than half, so the cut follows the skin
+  // weights, clean across the mesh; its shadow is still cast.
+  float hidden = 0.0;
+  if (mode == PLACE_SKINNED && ie.z + ie.w > 0.0) {
+    for (int k = 0; k < 4; k++) {
+      uint b = (sbones >> (8u * uint(k))) & 255u;
+      uint word = b < 24u ? uint(ie.z) : uint(ie.w);
+      hidden += sweights[k] * float((word >> (b % 24u)) & 1u);
+    }
+  }
+  gl_ClipDistance[0] = 0.5 - hidden;
+#endif
 #ifdef SHADOW
   // what is light itself casts no shadow (a star mote, PARTS_LIGHT: a beam,
   // a halo's flash, ring and rays), nor does the soft shadow under a floater

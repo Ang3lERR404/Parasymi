@@ -132,7 +132,7 @@ pub fn scene(g:*Game, screen:[2]f32) Allocator.Error!renderer.Scene {
   // a specimen stands alone: no wolf, ghosts or motes, and a plant no
   // nodes or structures (their meshes were never built)
   const alone = g.specimen != null;
-  const feet = if (alone) NO_FEET else try g.player.rig(&g.parts);
+  const feet = if (alone) NO_FEET else try g.player.rig(&g.parts, g.headless());
   if (!alone or g.specimen.?.what == .structure) {
     try nodes(g, @intFromFloat(reach));
     try structures(g, reach, tf);

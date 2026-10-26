@@ -121,7 +121,9 @@ pub const Ctx = struct {
     var f11:vk.PhysicalDeviceVulkan11Features = .{.p_next = &f12, .multiview = .true};
     const dev_exts = [_][*:0]const u8{vk.extensions.khr_swapchain.name};
     c.sample_shading = c.instance.getPhysicalDeviceFeatures(c.pdev).sample_rate_shading == .true;
-    const f10:vk.PhysicalDeviceFeatures = .{.sample_rate_shading = if (c.sample_shading) .true else .false};
+    // (a vertex may be clipped away by a distance of its own: what a
+    // skinned mesh hides, see part.vert; every desktop GPU has it)
+    const f10:vk.PhysicalDeviceFeatures = .{.sample_rate_shading = if (c.sample_shading) .true else .false, .shader_clip_distance = .true};
     c.vkd = try gpa.create(vk.DeviceWrapper);
     errdefer gpa.destroy(c.vkd);
     const dev = try c.instance.createDevice(c.pdev, &.{

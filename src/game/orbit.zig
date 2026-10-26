@@ -2,6 +2,8 @@
 //! of a species or structure of a kind, or a tile), turning slowly round
 //! it and asking for a screenshot at evenly spaced bearings; once every
 //! shot is taken the game closes. For looking at visual work unattended.
+//! `eyes` looks out of the wolf's own eyes instead, turning round where it
+//! stands, `--pitch` down.
 const std = @import("std");
 const stringToEnum = std.meta.stringToEnum;
 const parseInt = std.fmt.parseInt;
@@ -26,6 +28,8 @@ const TALL_FOCUS:f32 = 0.5;
 /// what the camera turns round
 pub const Focus = union(enum) {
   player,
+  /// out of the wolf's eyes (first person)
+  eyes,
   /// the nearest to the wolf (the wolf itself while there is none)
   species:species.Id,
   structure:st.Kind,
@@ -34,6 +38,7 @@ pub const Focus = union(enum) {
   /// `player`, a species or structure name, or `x,z`
   pub fn parse(s:[]const u8) error{BadFocus}!Focus {
     if (eql(u8, s, "player")) return .player;
+    if (eql(u8, s, "eyes")) return .eyes;
     if (stringToEnum(species.Id, s)) |id| return .{.species = id};
     if (stringToEnum(st.Kind, s)) |k| return .{.structure = k};
     const comma = indexOfScalar(u8, s, ',') orelse return error.BadFocus;
@@ -46,6 +51,7 @@ pub const Focus = union(enum) {
   pub fn name(f:Focus, buf:[]u8) []const u8 {
     return switch (f) {
       .player => "player",
+      .eyes => "eyes",
       .species => |id| @tagName(id),
       .structure => |k| @tagName(k),
       .tile => |t| bufPrint(buf, "{d}_{d}", .{t[0], t[1]}) catch "tile",
@@ -74,6 +80,13 @@ pub const Orbit = struct {
     const yaw = o.turn() * m.tau;
     const at = o.point(g);
     const c = &g.cam;
+    if (o.focus == .eyes) {
+      c.yaw = yaw;
+      c.view = .{.eyes = .{.pos = g.player.eyes(), .pitch = -o.pitch, .k = 1}};
+      g.since_save = 0;
+      g.hover = null;
+      return o.due();
+    }
     c.target = at;
     c.dist = o.dist;
     c.yaw = yaw;
@@ -103,7 +116,7 @@ pub const Orbit = struct {
   fn point(o:*const Orbit, g:*const Game) m.V3 {
     const wolf = g.player.pos + m.v3(0, FOCUS_UP, 0);
     switch (o.focus) {
-      .player => return wolf,
+      .player, .eyes => return wolf,
       .tile => |t| return m.tileCentre(t[0], t[1], g.heightAt(t[0], t[1]) + FOCUS_UP),
       .species => |id| {
         const s = g.plants.list.slice();

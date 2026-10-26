@@ -9,7 +9,8 @@ The generic half (core, platform, Vulkan base, generic renderer and world
 streaming, UI) is its own package in `engine/`, reached as
 `@import("engine")`; see [docs/engine.md](docs/engine.md).
 2.5D top-down 3D camera orbiting the wolf (MMB drag: yaw free, pitch
-8°–89°; free cam for inspection).
+8°–89°; zoomed all the way in, first person from its eyes; free cam for
+inspection).
 
 ## Read before you touch
 | Working on | Read first |
@@ -68,7 +69,7 @@ zig build run -- --stress         # 120×120 plant field
 zig build run -- --load           # newest saved garden
 zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
-zig build run -- --inspect=<player|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
+zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
 ```

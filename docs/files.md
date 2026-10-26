@@ -90,6 +90,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `belly.zig` — the sap belly (Tab): the wolf's inventory, and the weave list below it.
 - `carry.zig` — what the cursor carries: the lifted stack (or hotbar item) hangs just off the pointer, glowing, until a click puts it down.
 - `debug.zig` — F3: frame/sim timings and world counts.
+- `eyes.zig` — looking out of the wolf's eyes: a small lit seed at the middle of the screen, in a soft glow, marking what a click lands on.
 - `gardens.zig` — the saved gardens (pause menu): the world stays frozen behind the veil.
 - `gather.zig` — gathering progress grows a tendril above the wolf's focus.
 - `hotbar.zig` — the hotbar: a row of pods, each empty or holding an item the gardener dropped on it from the belly, with the belly's count of it and the…

@@ -201,6 +201,16 @@ const LOOK_MAX:f32 = 0.6;
 const LOOK_IDLE:f32 = 0.28;
 const LOOK_IDLE_RATE:f32 = 0.23;
 const LOOK_WORK:f32 = 0.45;
+/// seen from its own eyes: the head nods this share of how far they look
+/// up or down, within these limits (down +)
+const GAZE_NOD:f32 = 0.6;
+const GAZE_NOD_UP:f32 = -0.5;
+const GAZE_NOD_DOWN:f32 = 0.7;
+/// the eyes, between the two (head frame), a little forward of their sockets
+const EYES_AT = v3(0, body_mesh.EYE[1], body_mesh.EYE[2] + 0.01);
+/// what is hidden from its own eyes: the bones of the head (its muzzle,
+/// eyes, hair, jaw and ears)
+const HEAD_BONES:u64 = bit(.head) | bit(.jaw) | bit(.ear_l) | bit(.ear_r);
 /// ears: lie back with speed, flick now and then
 const EAR_BACK:f32 = 0.45;
 const EAR_FREQ:f32 = 14;
@@ -410,6 +420,10 @@ pub const Player = struct {
   /// belly-rest idle
   still:f32 = 0,
   rest_pose:Swing = .{},
+  /// seen from its own eyes: the facing they want (the body turns to it,
+  /// the head leads) and how far up (+) or down they look; null otherwise
+  aim:?f32 = null,
+  gaze:?f32 = null,
 
   /// tile-aware: no wading, one terrace step at a time.
   pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:*const World, dt:f32) void {
@@ -435,10 +449,12 @@ pub const Player = struct {
     const h = if (ground.walkable(m.tileOf(p.pos[0]), m.tileOf(p.pos[2])) != null) ground.surfaceAt(p.pos[0], p.pos[2]) else here;
     m.spring(&p.pos[1], &p.y_v, h, GROUND_FREQ, dt);
 
-    // face where we move, or what we work on
+    // face what we work on, where the eyes look, or where we move
     var want = p.facing;
     if (p.work) |w| {
       want = m.atan2(w[0] - p.pos[0], w[2] - p.pos[2]);
+    } else if (p.aim) |a| {
+      want = a;
     } else if (@abs(p.vel[0]) + @abs(p.vel[2]) > FACE_MIN_SPEED) {
       want = m.atan2(p.vel[0], p.vel[2]);
     }
@@ -664,9 +680,14 @@ pub const Player = struct {
       const shut = m.clamp01(sum / (skel.FINGERS * GRIP_CLOSE));
       spread.to(m.lerp(SPREAD_OPEN, SPREAD_SHUT, shut), FINGER_FREQ, SPREAD_DAMP, dt);
     }
-    const look = m.clamp(p.turn * LOOK_TURN, -LOOK_MAX, LOOK_MAX) + LOOK_IDLE * idle * noise.grad(0x100C, p.t * LOOK_IDLE_RATE, 0.5);
+    var look = m.clamp(p.turn * LOOK_TURN, -LOOK_MAX, LOOK_MAX) + LOOK_IDLE * idle * noise.grad(0x100C, p.t * LOOK_IDLE_RATE, 0.5);
+    var nod = LOOK_WORK * (work + p.squat.x) + 0.12 * idle * noise.grad(0x40D, p.t * LOOK_IDLE_RATE, 3.5);
+    // seen from its own eyes, the head looks where they do, ahead of the
+    // body still turning to them, and nods up and down with them
+    if (p.aim) |a| look = m.clamp(m.angleDiff(p.facing, a), -LOOK_MAX, LOOK_MAX);
+    if (p.gaze) |up| nod = m.clamp(-up * GAZE_NOD, GAZE_NOD_UP, GAZE_NOD_DOWN) + LOOK_WORK * (work + p.squat.x);
     p.look.to(look, HEAD_FREQ, HEAD_DAMP, dt);
-    p.nod.to(LOOK_WORK * (work + p.squat.x) + 0.12 * idle * noise.grad(0x40D, p.t * LOOK_IDLE_RATE, 3.5), HEAD_FREQ, HEAD_DAMP, dt);
+    p.nod.to(nod, HEAD_FREQ, HEAD_DAMP, dt);
     // tail: each joint chases the one before it, steered by turning and gait
     var target = m.clamp(-p.turn * TAIL_TURN, -TAIL_TURN_MAX, TAIL_TURN_MAX) + @sin(p.t * TAIL_IDLE_RATE) * TAIL_IDLE * (1 - st) + @sin(p.phase * m.tau) * TAIL_GAIT * st;
     for (&p.tail, 0..) |*j, i| {
@@ -825,8 +846,16 @@ pub const Player = struct {
     return out;
   }
 
+  /// where its eyes are in the world this frame
+  pub fn eyes(p:*const Player) V3 {
+    const w = skel.fk(p.pose());
+    return m.mulPoint(m.mul(p.heading(), w[@intFromEnum(Bone.head)]), EYES_AT);
+  }
+
   /// emit every part; returns where each paw (left, right) touches down.
-  pub fn rig(p:*const Player, out:*Parts) Allocator.Error![2]V3 {
+  /// Seen from its own eyes (`headless`) its head is not drawn, though it
+  /// still casts its shadow.
+  pub fn rig(p:*const Player, out:*Parts, headless:bool) Allocator.Error![2]V3 {
     const q = p.pose();
     const root = p.heading();
     var w = skel.fk(q);
@@ -838,9 +867,10 @@ pub const Player = struct {
       fn f(ws:*const [skel.COUNT]M4, b:Bone) M4 { return ws[@intFromEnum(b)]; }
     }.f;
 
-    try out.emitSkinned(.wolf_body, base, mid, .{ .glow = BODY_GLOW, .flutter = BODY_FLUTTER, .phase = 0.1 });
-    try out.emitSkinned(.wolf_ears, base, mid, .{ .glow = EAR_GLOW, .phase = 0.5, .fade = EAR_OPACITY });
-    try out.emit(.paw_bean, m.chain(&.{ at(&w, .head), T(body_mesh.NOSE), m.rotX(-body_mesh.NOSE_TILT), S(v3(0.015, 0.0105, 0.011)) }), .{ .glow = NOSE_GLOW, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
+    const hide:u64 = if (headless) HEAD_BONES else 0;
+    try out.emitSkinned(.wolf_body, base, mid, .{ .glow = BODY_GLOW, .flutter = BODY_FLUTTER, .phase = 0.1, .hide = hide });
+    try out.emitSkinned(.wolf_ears, base, mid, .{ .glow = EAR_GLOW, .phase = 0.5, .fade = EAR_OPACITY, .hide = hide });
+    if (!headless) try out.emit(.paw_bean, m.chain(&.{ at(&w, .head), T(body_mesh.NOSE), m.rotX(-body_mesh.NOSE_TILT), S(v3(0.015, 0.0105, 0.011)) }), .{ .glow = NOSE_GLOW, .fade = BEAN_OPACITY, .tint = NOSE_TINT });
 
     // the belly: a sap sac that inflates with the inventory, drops and sags
     // as it fills, with the heavier things inside showing through as shadows
@@ -909,6 +939,9 @@ const restFoot = blk: {
   for (&out, skel.sides) |*o, sd| o.* = m.origin(w[@intFromEnum(sd.foot)]);
   break :blk out;
 };
+
+/// bone `b`'s bit in a mask of bones (`parts.Look.hide`)
+fn bit(b:Bone) u64 { return @as(u64, 1) << @intFromEnum(b); }
 
 /// the skeleton's bind pose, inverted (what the skin matrices start from)
 fn bindInv() [skel.COUNT]M4 { return skel.inverses(skel.bind()); }
@@ -1021,6 +1054,21 @@ test "the leg reaches its resting foot in its resting pose" {
     try testing.expectApproxEqAbs(skel.REST_KNEE, l.mid, 1e-3);
     try testing.expectApproxEqAbs(skel.REST_HOCK, l.low.x, 1e-3);
   }
+}
+
+test "seen from its own eyes, the head leads toward where they look and nods with them" {
+  var p:Player = .{ .pos = v3(0, 0, 0) };
+  const level = p.eyes();
+  // the eyes are up in the head, ahead of the chest
+  try testing.expect(level[1] > p.chest()[1] and level[2] > 0);
+  p.aim = 0.4;
+  p.gaze = -0.5;
+  for (0..240) |_| p.animate(null, TEST_DT);
+  try testing.expectApproxEqAbs(@as(f32, 0.4), p.look.x, 0.02);
+  try testing.expectApproxEqAbs(0.5 * GAZE_NOD, p.nod.x, 0.02);
+  // looking down and to its right (+x), the eyes go with the head
+  const e = p.eyes();
+  try testing.expect(e[0] > level[0] and e[1] < level[1]);
 }
 
 test "a planted foot stays where it is planted while the wolf walks" {
