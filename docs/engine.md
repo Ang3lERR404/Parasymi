@@ -12,7 +12,7 @@ underneath. It never imports the game.
 |---|---|---|
 | core | math, color, rng, noise, registry, jobs, text, png | — |
 | platform | input, display | — |
-| anim | `rig`: `Turn` (Y·X·Z, `blend`), `twoBone` (law-of-cosines IK), `inverses`, `skin` | the wolf's skeleton (`wolf_skeleton`: bones, offsets, `fk`, breath swell) and limb solvers (`player.solveLeg`/`solveArm`, built on `twoBone`) |
+| anim | `rig`: `Turn` (Y·X·Z, `blend`), `twoBone` (law-of-cosines IK), `inverses`, `skin`; `clip`: keyed channels eased between, their text form, `Channels(T)` (every f32 of a struct as a named channel) | the wolf's skeleton (`wolf_skeleton`: bones, offsets, `fk`, breath swell) and limb solvers (`player.solveLeg`/`solveArm`, built on `twoBone`) |
 | gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights), `growth` (`Grower(M, leaf)`: the growth-spline `Skeleton`, `tag`, `formed`) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
 | world | `chunk` (grid: `SIZE`, `Coord`, `MeshSlot`, `localIndex`), `World(L)` (streaming) | `chunk` (the garden's tiles), `gen`, `world` (`World` over the garden's land) |
 | render | `Renderer(G)`, post, light, camera, `passes/ui` | `renderer` (the garden's `G`), passes, terrain meshing |

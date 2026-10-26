@@ -1,0 +1,14 @@
+# clip
+subject wolf
+length 2
+key arms.1.root.z 0 0.3
+key arms.1.root.z 1 2.6
+key arms.1.root.z 2 0.3
+key arms.1.mid 0 0.25
+key arms.1.mid 1 1.4
+key arms.1.mid 2 0.25
+key head.y 0 0
+key head.y 1 0.5
+key head.y 2 0
+key jaw 1 0.3
+key jaw 0 0

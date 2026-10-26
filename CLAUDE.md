@@ -4,7 +4,8 @@ Parasymi: a player-centric Factorio-like automation game of magically
 infused plants (symbiotic, parasitic and radiant lineages that converge).
 Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3), Windows only. No asset files:
 every mesh, the font and all UI shapes are procedural; the only data files
-are `src/cfg/parasymi.cfg` (strings) and `src/cfg/controls.cfg` (bindings).
+are `src/cfg/parasymi.cfg` (strings), `src/cfg/controls.cfg` (bindings) and
+animation clips in `src/anim/*.anim` (from the editor; not played back yet).
 The generic half (core, platform, Vulkan base, generic renderer and world
 streaming, UI) is its own package in `engine/`, reached as
 `@import("engine")`; see [docs/engine.md](docs/engine.md).
@@ -72,6 +73,9 @@ zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
+zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --shot]
+                                  # animation editor (tools/animedit.zig): keys a clip
+                                  # on the real renderer, saves src/anim/<name>.anim
 ```
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`
@@ -85,7 +89,7 @@ build. New shaders go in `build.zig`'s list (the engine's in
 ```
 core      math, color, rng, noise, registry, jobs, text, png
 platform  input, display (fullscreen)
-anim      joint turns, two-bone IK, skinning matrices
+anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
           mesh builder + primitives (Mesher), SDF sculpting,
           growth splines (Grower)
@@ -102,6 +106,7 @@ sim       items, species, plants (footprints, floaters), ecology tick
 game      player, actions, structures, research, craft, sky, hud, view, play, save
 render    the garden's renderer (passes, scene, mesh growing), terrain meshing
 main      wiring, frame loop, save/load/fullscreen requests
+lib       the game's modules for tools/ (`@import("parasymi")`)
 ```
 
 ## Registries

@@ -424,6 +424,9 @@ pub const Player = struct {
   /// the head leads) and how far up (+) or down they look; null otherwise
   aim:?f32 = null,
   gaze:?f32 = null,
+  /// a pose set from outside (the animation editor, tools/animedit.zig),
+  /// shown in place of the procedural one; null in play
+  posed:?skel.Pose = null,
 
   /// tile-aware: no wading, one terrace step at a time.
   pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:*const World, dt:f32) void {
@@ -736,6 +739,7 @@ pub const Player = struct {
 
   /// the skeleton's pose this frame, in wolf space (see wolf_skeleton)
   pub fn pose(p:*const Player) skel.Pose {
+    if (p.posed) |q| return q;
     const st = p.stride;
     const work = p.reach.x * (1 - p.squat.x);
     const sq = p.squat.x;

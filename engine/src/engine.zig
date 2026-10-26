@@ -4,7 +4,7 @@
 //! `world.World`) a namespace describing itself.
 //!   core      math, colour, rng, noise, registry, jobs, text, png
 //!   platform  input, display (fullscreen)
-//!   anim      joint turns, two-bone IK, skinning matrices
+//!   anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 //!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
 //!   world     the chunk grid and the streamed chunk map
 //!   render    frame orchestration and passes, post (bloom, AA), light, camera
@@ -32,6 +32,7 @@ pub const platform = struct {
 
 pub const anim = struct {
   pub const rig = @import("anim/rig.zig");
+  pub const clip = @import("anim/clip.zig");
 };
 
 pub const gfx = struct {
@@ -77,6 +78,7 @@ test {
   _ = core.png;
   _ = platform.input;
   _ = anim.rig;
+  _ = anim.clip;
   _ = gfx.meshgen;
   _ = gfx.sculpt;
   _ = gfx.growth;

@@ -17,6 +17,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `ui.vert` — UI shapes to the screen; the palette's sRGB colours to linear.
 
 ## engine/src/anim/
+- `clip.zig` — keyframed animation, the generic half: a clip is a set of named channels, each a run of keys (time, value) eased between, and the text it…
 - `rig.zig` — skeletal animation, the generic half: a joint's turn, blending turns the short way round, two-bone inverse kinematics, and the matrices a…
 
 ## engine/src/core/
@@ -233,6 +234,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `vertex.zig` — GPU vertex/instance layouts.
 
 ## src/
+- `lib.zig` — the game's modules, for the tools built beside it (tools/animedit.zig): they reach them as `@import("parasymi")`; the game itself starts…
 - `main.zig` — Parasymi: a garden of magically infused plants, parasitic and symbiotic, growing toward something beyond comprehension.
 
 ## src/render/passes/

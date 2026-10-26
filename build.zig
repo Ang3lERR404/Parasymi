@@ -94,6 +94,28 @@ pub fn build(b:*Build) !void {
   run.step.dependOn(&run.cmd.step);
   if (b.args) |args| run.cmd.addArgs(args);
 
+  // the animation editor (tools/animedit.zig): its own window over the
+  // game's renderer, reaching the game's modules through src/lib.zig
+  const editor = b.addExecutable(.{
+    .name = "animedit",
+    .root_module = b.createModule(.{
+      .optimize = o,
+      .target = t,
+      .root_source_file = b.path("tools/animedit.zig"),
+      .imports = &.{
+        .{.name = "engine", .module = engine},
+        .{.name = "parasymi", .module = Mods.make(b, "src/lib.zig", t, o, engine, &spvs)},
+      },
+    }),
+  });
+  const edit_install = b.addInstallArtifact(editor, .{});
+  const edit_cmd = b.addRunArtifact(editor);
+  edit_cmd.step.dependOn(&edit_install.step);
+  // (it keeps its clips under the repo, so it runs from there)
+  edit_cmd.setCwd(b.path("."));
+  if (b.args) |args| edit_cmd.addArgs(args);
+  b.step("animedit", "run the animation editor.").dependOn(&edit_cmd.step);
+
   // logic tests (world/sim/game, and the engine's own) need no window or
   // GPU, but share the game's imports so game-level code can be exercised
   // headless.

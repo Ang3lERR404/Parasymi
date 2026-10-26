@@ -83,6 +83,8 @@ pub const State = union(enum) {
   /// grown, turned a quarter (R) each loop: a rooted one uproots itself on
   /// its roots, turns and digs back in; a floater only turns
   turn,
+  /// shown as set from outside (the animation editor, tools/animedit.zig)
+  look:Look,
 
   /// a name, a share of growth (`0.4`) or a span (`0.2..0.8`)
   pub fn parse(s:[]const u8) error{BadState}!State {
@@ -102,7 +104,7 @@ pub const State = union(enum) {
   /// wither, flow, drain, darken and live; structures work)
   pub fn suits(s:State, what:Subject) bool {
     return switch (s) {
-      .grow, .span, .held, .turn => true,
+      .grow, .span, .held, .turn, .look => true,
       .wither, .flow, .drain, .dark, .live => what == .plant,
       .active => what == .structure,
     };
@@ -110,7 +112,7 @@ pub const State = union(enum) {
 };
 
 /// what it shows this moment (a structure: `growth` only)
-const Look = struct { growth:f32 = 1, mana:f32 = 1, flow:f32 = 0, health:f32 = 1, radiating:bool = true };
+pub const Look = struct { growth:f32 = 1, mana:f32 = 1, flow:f32 = 0, health:f32 = 1, radiating:bool = true };
 
 pub const Specimen = struct {
   what:Subject,
@@ -317,6 +319,7 @@ pub const Specimen = struct {
       .drain => .{.mana = 1 - k},
       .dark => .{.radiating = false},
       .live => .{.growth = 0},
+      .look => |l| l,
       .active, .turn => .{},
     };
   }
