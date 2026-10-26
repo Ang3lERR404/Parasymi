@@ -100,7 +100,7 @@ fn assigned(ss:*st.Structures, i:st.Id, j:st.Id) ?items.Item {
     if (o == i) break;
     if (ss.get(o).kind() == .vultrixi) rank += 1;
   }
-  const r = craft.hand[ss.get(j).state.monfris.recipe];
+  const r = craft.hand[st.chosen(ss.get(j)) orelse return null];
   return if (rank < r.in.len) r.in[rank].item else null;
 }
 

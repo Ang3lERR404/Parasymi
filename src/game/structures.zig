@@ -16,6 +16,9 @@
 //!   receive(s, g, item, edge) bool  a carrier taking an item handed in at
 //!                               `edge` (counted from the way it faces)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
+//!   message(ctx, id, msg) Reply what it makes of a `Msg` another sends it
+//!                               (`Structures.send`; `.ignored`: the
+//!                               message's default)
 //!   configure(ss, id, g)        the player's "C" interaction (it may reach
 //!                               another structure: `Structures.pairing`)
 //!   recipes() []const u8        what its panel offers to weave (indices into
@@ -197,6 +200,29 @@ pub const Ref = struct {
 
 /// what `spawnChild` puts down
 pub const Spawn = struct { x:i32, y:i32, kind:Kind, dir:m.Dir = 0, seed:f32 = 0 };
+
+/// what one structure tells another (`Structures.send`): taken at once by
+/// the other's `message` hook, nothing left pending (so nothing is saved).
+/// One reads another through its hooks (`chosen`, `gives`, ...), never its
+/// `state`.
+// decision: synchronous, chosen by the user over a queued mailbox and
+// one-off typed hooks
+pub const Msg = union(enum) {
+  /// born whole: its light already full (a diamond a halo formed)
+  lit,
+  /// `n` of `item` came in from afar (spores landing); by default it is
+  /// taken in as `insert` does
+  arrived: struct { item:items.Item, n:u16 },
+};
+
+/// what a structure makes of a `Msg`
+pub const Reply = union(enum) {
+  /// nothing: it does not take that message
+  ignored,
+  done,
+  /// how many of what `arrived` it took in
+  took:u16,
+};
 
 /// how a kind pairs (its `pairs`): with a structure of kind `with` (its
 /// own if null), one way (its partner is where it sends) or both ways
@@ -709,6 +735,19 @@ pub const Structures = struct {
     };
   }
 
+  /// tell structure `to` something (`Msg`): its `message` hook takes it at
+  /// once, else the message's default does (`arrived`: `insert`)
+  pub fn send(ss:*Structures, ctx:Ctx, to:Id, msg:Msg) Reply {
+    const r:Reply = switch (ss.get(to).kind()) {
+      inline else => |k| if (comptime reg.has(k, "message")) reg.module(k).message(ctx, to, msg) else .ignored,
+    };
+    if (r != .ignored) return r;
+    return switch (msg) {
+      .lit => .ignored,
+      .arrived => |a| .{ .took = ss.insert(ctx.g, to, a.item, a.n) },
+    };
+  }
+
   /// everything that may leave structure `id`: its `output` first, then
   /// each other kind it holds that it `gives`, in slot order
   pub fn outputs(ss:*Structures, id:Id) Outputs {
@@ -1163,6 +1202,48 @@ test "uprooting keeps the others in the order they were put down, each found on 
   }
   try testing.expect(w.occAt(0, 0).asStructure() == null and w.occAt(3, 0).asStructure() == null);
   try expectIndexed(&ss);
+}
+
+test "a message is taken by its hook, else by its default" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..4) |x| { c.kind[x] = .soil; c.height[x] = 1; c.res[x] = 0; }
+  var plants:Plants = .{};
+  defer plants.deinit(gpa);
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression = .{};
+  const ctx:Ctx = .{ .gpa = gpa, .w = &w, .plants = &plants, .g = &g, .ss = &ss };
+  try testing.expect(try ss.place(gpa, &w, 0, 0, .sap_cache, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 1, 0, .diamond, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 2, 0, .loomfern, 0, 0));
+  const cache = ss.at(&w, 0, 0).?;
+  const dia = ss.at(&w, 1, 0).?;
+  const fern = ss.at(&w, 2, 0).?;
+  try testing.expectEqual(Reply{ .took = 3 }, ss.send(ctx, cache, .{ .arrived = .{ .item = .grit, .n = 3 } }));
+  try testing.expectEqual(@as(u32, 3), ss.get(cache).inv.count(.grit));
+  // taken only as far as it wants
+  try testing.expectEqual(Reply{ .took = 0 }, ss.send(ctx, fern, .{ .arrived = .{ .item = .grit, .n = 3 } }));
+  try testing.expectEqual(Reply.ignored, ss.send(ctx, cache, .lit));
+  try testing.expectEqual(Reply.done, ss.send(ctx, dia, .lit));
+  for (ss.get(dia).state.diamond.light) |l| try testing.expectEqual(@as(f32, 1), l);
+}
+
+test "no kind reads or writes another kind's state outside its tests" {
+  @setEvalBranchQuota(2_000_000);
+  inline for (comptime std.meta.declarations(kinds)) |d| {
+    const src = @embedFile("structures/" ++ d.name ++ ".zig");
+    const body = comptime src[0 .. std.mem.indexOf(u8, src, "\ntest \"") orelse src.len];
+    inline for (comptime std.meta.declarations(kinds)) |o| {
+      if (comptime !std.mem.eql(u8, o.name, d.name)) {
+        if (comptime std.mem.indexOf(u8, body, ".state." ++ o.name) != null)
+          @compileError(d.name ++ " reaches into " ++ o.name ++ "'s state: send it a `Msg` or read a hook");
+      }
+    }
+  }
 }
 
 test "several partners: each once, oldest first, the oldest let go past `most`" {

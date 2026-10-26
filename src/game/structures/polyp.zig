@@ -66,7 +66,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) Allocator.Error!bool {
       // hand) takes the halo's place; no second one is formed
       if (try ctx.ss.spawnChild(ctx.gpa, ctx.w, i, .{ .x = x, .y = y, .kind = .diamond, .seed = seed })) |d| {
         // it is born whole (no growing in), its light still the blooms'
-        ctx.ss.get(d).state.diamond.light = @splat(1);
+        _ = ctx.ss.send(ctx, d, .lit);
       }
       ctx.g.say(txt.s.msg.diamond_forms, .{});
       ctx.g.discover(.diamond);

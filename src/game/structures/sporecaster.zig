@@ -132,7 +132,10 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
       sp.home = true;
       continue;
     };
-    const took = ctx.ss.insert(ctx.g, j, sp.item, sp.n);
+    const took = switch (ctx.ss.send(ctx, j, .{ .arrived = .{ .item = sp.item, .n = sp.n } })) {
+      .took => |k| k,
+      .ignored, .done => 0,
+    };
     sp.n -= @intCast(took);
     if (sp.n == 0) slot.* = null;
   }

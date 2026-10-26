@@ -89,6 +89,16 @@ once; one more lets go of its oldest, both ways that one lets go too.
 configure handshake (`Structures.pairing`: the first configured waits, the
 next is paired, the same one twice cuts it). Uprooting cuts its pairings.
 
+## Messages
+A structure never reads or writes another kind's `state` (a test fails the
+build if one does). It reads another through its hooks (`chosen`, `gives`,
+`wants`, ...) and tells it something with `Structures.send(ctx, to, msg)`:
+an `st.Msg` (`lit`: a diamond born whole; `arrived`: items come in from
+afar) taken at once by the target's `message(ctx, id, msg) Reply` hook,
+else by the message's default (`arrived` is taken in as `insert`). Nothing
+is left pending, so nothing is saved. A new kind of interaction is one more
+`Msg` tag.
+
 ## Convergent structures (3rd tier)
 Each pair of lineage structures grown within `structures.MEET` (3) tiles is
 a discovery (`meets` hook + `Structures.meetings`), opening its research.

@@ -44,6 +44,17 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   return false;
 }
 
+/// `lit`: born whole of a halo, its light still the blooms'
+pub fn message(ctx:st.Ctx, i:st.Id, msg:st.Msg) st.Reply {
+  switch (msg) {
+    .lit => {
+      ctx.ss.get(i).state.diamond.light = @splat(1);
+      return .done;
+    },
+    .arrived => return .ignored,
+  }
+}
+
 pub fn field(s:*const st.Structure) ?Field {
   if (s.grown < 1) return null;
   return .{ .x = s.x, .y = s.y, .radius = halo.DIAMOND_R };

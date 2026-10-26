@@ -135,8 +135,10 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
       sp.home = true;
       continue;
     };
-    const took = ctx.ss.insert(ctx.g, j, sp.item, sp.n);
-    ctx.ss.get(j).state.driftbraid.kept.getPtr(sp.item).* += took;
+    const took = switch (ctx.ss.send(ctx, j, .{ .arrived = .{ .item = sp.item, .n = sp.n } })) {
+      .took => |k| k,
+      .ignored, .done => 0,
+    };
     sp.n -= @intCast(took);
     if (sp.n == 0) slot.* = null;
   }
@@ -180,6 +182,19 @@ pub fn release(s:*st.Structure) ?items.Item {
 
 /// anything, while it has room.
 pub fn wants(s:*const st.Structure, _:*const prog.Progression, _:items.Item) u32 { return HOLD -| s.inv.total(); }
+
+/// `arrived`: what came by spore is taken in and kept apart (`kept`), to be
+/// let go rather than sent back
+pub fn message(ctx:st.Ctx, i:st.Id, msg:st.Msg) st.Reply {
+  switch (msg) {
+    .arrived => |a| {
+      const took = ctx.ss.insert(ctx.g, i, a.item, a.n);
+      ctx.ss.get(i).state.driftbraid.kept.getPtr(a.item).* += took;
+      return .{ .took = took };
+    },
+    .lit => return .ignored,
+  }
+}
 
 /// the first thing it holds that came by spore.
 pub fn output(s:*const st.Structure) ?items.Item {
