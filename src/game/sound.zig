@@ -296,9 +296,9 @@ const HUSH = [2]f32{0.35, 1};
 /// the whistle: narrow-banded noise (Hz range of its pitch, how narrow,
 /// level), rising this share in a full gust and gliding to a new pitch
 /// in this (s); heard only as the gust passes this strength
-const WHISTLE_HZ = [2]f32{340, 520};
+const WHISTLE_HZ = [2]f32{470, 720};
 const WHISTLE_Q:f32 = 14;
-const WHISTLE:f32 = 6.5;
+const WHISTLE:f32 = 5.6;
 const WHISTLE_RISE:f32 = 0.1;
 const WHISTLE_GLIDE:f32 = 2.5;
 const WHISTLE_FROM:f32 = 0.35;
