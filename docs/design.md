@@ -40,9 +40,12 @@ grows a grand garden. 2.5D top-down 3D.
   way, chain, and hand on to each other through `receive`
   (`Structures.handIn`, at the edge an item comes in by); carriers are
   never pulled from. `gives` says what a structure lets go (a braid pulls a
-  different kind per lane); `st.handOff` feeds a producer's `output` to a
-  non-carrier neighbour beside any side of its footprint; `st.handOffWith`
-  reaches `.range` steps out and hands up to `.amount`, nearest first.
+  different kind per lane); `Structures.outputs` walks everything that may
+  leave one (its `output` first, then each other kind it holds and
+  `gives`). `st.handOff` feeds a producer's `outputs` to a non-carrier
+  neighbour beside any side of its footprint (each the first it wants);
+  `st.handOffWith` reaches `.range` steps out and hands up to `.amount`,
+  nearest first.
 
 ## Lineage structures (2nd tier, each its own research)
 ### Symbiotic (woven, green, amber sap)
@@ -76,11 +79,13 @@ parent's `adopts(s, kind, have)` hook takes it (default: none; never a
 loop), `detach` cuts it loose, `getParent`/`getChildren`/`getChild`/
 `childCount` walk them. Uprooting a parent cuts its children loose.
 
-Partners are peers (`Structure.partner`, held the same way): a kind that
-declares `pairs:Pairs` pairs with its own kind (or `.with`), one way (it
-sends there: the sporecaster) or both ways (each is the other's, and
-either leaves its old partner: the driftbraid). `pairWith`, `unpair`,
-`getPartner`, `pairedTo` (who names it); `pairStep` is the shared
+Partners are peers (`Structure.partners`, up to `PARTNERS`, oldest first,
+held the same way): a kind that declares `pairs:Pairs` pairs with its own
+kind (or `.with`), one way (it sends there: the sporecaster) or both ways
+(each is the other's: the driftbraid), with up to `.most` (default 1) at
+once; one more lets go of its oldest, both ways that one lets go too.
+`pairWith`, `unpair`, `getPartner` (the first), `getPartners`, `pairedTo`
+(who names it); `pairStep` is the shared
 configure handshake (`Structures.pairing`: the first configured waits, the
 next is paired, the same one twice cuts it). Uprooting cuts its pairings.
 

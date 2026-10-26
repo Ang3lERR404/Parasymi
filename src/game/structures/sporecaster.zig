@@ -110,7 +110,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const self = ctx.ss.get(i);
   const sc = &self.state.sporecaster;
   // a caster that sends hands nothing to its neighbours: it sends it all
-  if (self.partner == null) _ = st.handOff(ctx, i);
+  if (self.partner() == null) _ = st.handOff(ctx, i);
   var busy = false;
   for (&sc.spores) |*slot| {
     const sp = &(slot.* orelse continue);
@@ -137,7 +137,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
     if (sp.n == 0) slot.* = null;
   }
   if (ctx.ss.getPartner(i) == null) return busy;
-  const to = self.partner.?.tile();
+  const to = self.partner().?.tile();
   if (self.inv.total() == 0) return busy;
   sc.t += dt;
   if (sc.t < LAUNCH) return true;
@@ -172,11 +172,11 @@ pub fn wants(s:*const st.Structure, _:*const prog.Progression, _:items.Item) u32
 
 /// the oldest thing it holds (what a caster that sends nowhere lets go).
 pub fn output(s:*const st.Structure) ?items.Item {
-  if (s.partner != null) return null;
+  if (s.partner() != null) return null;
   for (s.inv.slot) |slot| if (slot) |it| return it.item;
   return null;
 }
-pub fn gives(s:*const st.Structure, item:items.Item) bool { return s.partner == null and s.inv.count(item) > 0; }
+pub fn gives(s:*const st.Structure, item:items.Item) bool { return s.partner() == null and s.inv.count(item) > 0; }
 
 /// the spores it sent, drifting over to the caster they seek (or home),
 /// each its tip leading and a bead of what it carries inside; and what it
@@ -236,7 +236,7 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
   const sc = &s.state.sporecaster;
   var air:u32 = 0;
   for (sc.spores) |sp| { if (sp != null) air += 1; }
-  if (s.partner) |p| {
+  if (s.partner()) |p| {
     const to = p.tile();
     _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.sends, .{to[0] - s.x, to[1] - s.y, air, s.inv.total(), HOLD});
   } else {
@@ -301,14 +301,14 @@ test "sporecasters pair by configuring one, then the one it sends to" {
   try testing.expect(ss.pairing != null);
   st.configure(&ss, b, &g);
   try testing.expectEqual(b, ss.getPartner(a).?);
-  try testing.expect(ss.get(b).partner == null and ss.pairing == null);
+  try testing.expect(ss.get(b).partner() == null and ss.pairing == null);
   var to_b = ss.pairedTo(b);
   try testing.expectEqual(a, to_b.next().?);
   try testing.expect(to_b.next() == null);
   // configured twice over, it stops sending
   st.configure(&ss, a, &g);
   st.configure(&ss, a, &g);
-  try testing.expect(ss.get(a).partner == null);
+  try testing.expect(ss.get(a).partner() == null);
 }
 
 test "spores carry what a caster is fed to the one it is paired with, however far" {
@@ -356,7 +356,7 @@ test "spores whose caster is uprooted turn home with what they carry" {
   try run(&ss, &w, &plants, &g, 1);
   _ = ss.remove(&w, ss.at(&w, 28, 0).?);
   // uprooting it cut the pairing
-  try testing.expect(ss.get(ss.at(&w, 0, 0).?).partner == null);
+  try testing.expect(ss.get(ss.at(&w, 0, 0).?).partner() == null);
   try run(&ss, &w, &plants, &g, 24);
   const back = ss.get(ss.at(&w, 0, 0).?);
   try testing.expectEqual(@as(u32, 10), back.inv.count(.fibre));

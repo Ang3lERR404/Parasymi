@@ -141,7 +141,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
     if (sp.n == 0) slot.* = null;
   }
   if (ctx.ss.getPartner(i) == null) return busy;
-  const to = self.partner.?.tile();
+  const to = self.partner().?.tile();
   sc: {
     db.t += dt;
     if (db.t < LAUNCH) break :sc;
@@ -230,7 +230,7 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
   for (db.spores) |sp| { if (sp != null) air += 1; }
   var got:u32 = 0;
   for (db.kept.values) |n| got += n;
-  if (s.partner) |p| {
+  if (s.partner()) |p| {
     const to = p.tile();
     _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.trades, .{to[0] - s.x, to[1] - s.y, air, s.inv.total() -| got, got, HOLD});
   } else {
@@ -316,7 +316,7 @@ test "driftbraids pair both ways and trade what each is fed, never sending it ba
   // configured twice over, both stop trading
   st.configure(&ss, a, &g);
   st.configure(&ss, a, &g);
-  try testing.expect(ss.get(a).partner == null and ss.get(b).partner == null);
+  try testing.expect(ss.get(a).partner() == null and ss.get(b).partner() == null);
 }
 
 test "what a driftbraid received is handed on to its neighbours" {

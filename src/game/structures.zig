@@ -8,10 +8,11 @@
 //!                               wolf, the sky and this tick's events)
 //!   link(ctx, id)               notice its neighbours, every tick, grown or not
 //!   wants(s, g, item) u32       how many of `item` it will still take in
-//!   output(s) ?Item             what may leave it (pulled by conduits)
+//!   output(s) ?Item             what may leave it first (pulled by conduits)
 //!   gives(s, item) bool         whether `item` may leave it (default: it is
 //!                               its `output`); a braided conduit's lanes
-//!                               pull a different item each
+//!                               pull a different item each. `outputs` walks
+//!                               all that may leave (`handOff` offers each)
 //!   receive(s, g, item, edge) bool  a carrier taking an item handed in at
 //!                               `edge` (counted from the way it faces)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
@@ -38,9 +39,10 @@
 //!                               parent: `getParent`, `getChildren`,
 //!                               `getChild`; `spawnChild` puts one down
 //!                               already its child (no `adopts` asked)
-//!   pairs:Pairs                 how it pairs with a partner, one way (it sends
-//!                               there) or both ways (`pairWith`, `pairStep`,
-//!                               `getPartner`, `pairedTo`, `unpair`;
+//!   pairs:Pairs                 how it pairs with partners (`.most` at once),
+//!                               one way (it sends there) or both ways
+//!                               (`pairWith`, `pairStep`, `getPartner`,
+//!                               `getPartners`, `pairedTo`, `unpair`;
 //!                               default: never)
 //!   meshes                      the library meshes it draws beyond `mesh` and
 //!                               `preview` (a tuple: `.{ .item_pod, ... }`);
@@ -198,13 +200,20 @@ pub const Spawn = struct { x:i32, y:i32, kind:Kind, dir:m.Dir = 0, seed:f32 = 0 
 
 /// how a kind pairs (its `pairs`): with a structure of kind `with` (its
 /// own if null), one way (its partner is where it sends) or both ways
-/// (each is the other's, and either leaves whatever it had before)
-pub const Pairs = struct { way:Way = .one_way, with:?Kind = null };
+/// (each is the other's), with up to `most` partners at once: paired with
+/// one more, it lets go of its oldest (both ways, that one lets go of it)
+pub const Pairs = struct { way:Way = .one_way, with:?Kind = null, most:u8 = 1 };
+/// the most partners any structure keeps
+pub const PARTNERS = 4;
 pub const Way = enum { one_way, both_ways };
 
 fn pairsOf(k:Kind) ?Pairs {
   return switch (k) {
-    inline else => |t| if (comptime reg.has(t, "pairs")) reg.module(t).pairs else null,
+    inline else => |t| if (comptime reg.has(t, "pairs")) blk: {
+      const p:Pairs = reg.module(t).pairs;
+      if (comptime p.most < 1 or p.most > PARTNERS) @compileError(@tagName(t) ++ ": pairs.most must be 1..PARTNERS");
+      break :blk p;
+    } else null,
   };
 }
 
@@ -227,8 +236,9 @@ pub const Structure = struct {
   state:State,
   /// the structure it depends on (`dependOn`, `spawnChild`), if any
   parent:?Ref = null,
-  /// the structure it is paired with (`pairWith`), if any
-  partner:?Ref = null,
+  /// the structures it is paired with (`pairWith`), oldest first, the
+  /// empty slots last
+  partners:[PARTNERS]?Ref = @splat(null),
   /// smoothed 0..1, drives glow and motion
   activity:f32 = 0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
@@ -247,6 +257,38 @@ pub const Structure = struct {
   }
   pub fn def(s:*const Structure) Def { return defs.get(s.kind()); }
   pub fn ref(s:*const Structure) Ref { return .{ .x = s.x, .y = s.y, .floating = s.def().floating }; }
+  /// the first it was paired with, if any
+  pub fn partner(s:*const Structure) ?Ref { return s.partners[0]; }
+  pub fn partnerCount(s:*const Structure) usize {
+    for (s.partners, 0..) |p, k| if (p == null) return k;
+    return PARTNERS;
+  }
+  pub fn pairedWith(s:*const Structure, r:Ref) bool {
+    for (s.partners) |p| if (p) |q| if (q.eql(r)) return true;
+    return false;
+  }
+  /// pair it with `r` (once), letting go of the oldest when it already has
+  /// `most`; returns the one let go
+  fn addPartner(s:*Structure, r:Ref, most:u8) ?Ref {
+    if (s.pairedWith(r)) return null;
+    var old:?Ref = null;
+    if (s.partnerCount() >= most) {
+      old = s.partners[0];
+      _ = s.dropPartner(old.?);
+    }
+    s.partners[s.partnerCount()] = r;
+    return old;
+  }
+  /// cut it from `r`, the later ones moving up; returns whether they were paired
+  fn dropPartner(s:*Structure, r:Ref) bool {
+    const n = s.partnerCount();
+    for (0..n) |k| if (s.partners[k].?.eql(r)) {
+      std.mem.copyForwards(?Ref, s.partners[k .. n - 1], s.partners[k + 1 .. n]);
+      s.partners[n - 1] = null;
+      return true;
+    };
+    return false;
+  }
   /// where its mesh is drawn from, at its centre `ctr`: turned its way,
   /// at the size it has grown to (breathing aside)
   pub fn place(s:*const Structure, ctr:m.V3) m.M4 {
@@ -413,7 +455,7 @@ pub const Structures = struct {
     if (up) |p| ss.join(id, p);
     // what was paired with it is cut loose
     const gone = s.ref();
-    for (ss.list.items) |*o| if (o.partner) |p| if (p.eql(gone)) { o.partner = null; };
+    for (ss.list.items) |*o| _ = o.dropPartner(gone);
     if (ss.pairing) |p| if (p.eql(gone)) { ss.pairing = null; };
     return s;
   }
@@ -421,34 +463,39 @@ pub const Structures = struct {
   // ---- partners: paired one way or both ways (`pairs`) ----
 
   /// pair `a` with `b` as `a`'s kind pairs (`pairs`): one way, `a` sends to
-  /// `b`; both ways, each leaves whatever it was paired with and is the
-  /// other's. Returns whether they are paired now.
+  /// `b`; both ways, each is the other's. One already holding its `most`
+  /// lets go of its oldest. Returns whether they are paired now.
   pub fn pairWith(ss:*Structures, a:Id, b:Id) bool {
     if (a == b) return false;
     const ka = ss.get(a).kind();
     const pa = pairsOf(ka) orelse return false;
-    if (ss.get(b).kind() != (pa.with orelse ka)) return false;
-    switch (pa.way) {
-      .one_way => ss.get(a).partner = ss.get(b).ref(),
-      .both_ways => {
-        ss.unpair(a);
-        ss.unpair(b);
-        ss.get(a).partner = ss.get(b).ref();
-        ss.get(b).partner = ss.get(a).ref();
-      },
+    const kb = ss.get(b).kind();
+    if (kb != (pa.with orelse ka)) return false;
+    const ra = ss.get(a).ref();
+    const rb = ss.get(b).ref();
+    const old = ss.get(a).addPartner(rb, pa.most);
+    if (pa.way == .both_ways) {
+      if (old) |o| ss.letGo(o, ra);
+      const mb = if (pairsOf(kb)) |pb| pb.most else pa.most;
+      if (ss.get(b).addPartner(ra, mb)) |o| ss.letGo(o, rb);
     }
     return true;
   }
 
-  /// cut `id` from its partner; paired both ways, every pairing that
+  /// the structure at `r`, if one stands there, is cut from `from`
+  fn letGo(ss:*Structures, r:Ref, from:Ref) void {
+    if (ss.find(r)) |o| _ = ss.get(o).dropPartner(from);
+  }
+
+  /// cut `id` from its partners; paired both ways, every pairing that
   /// reaches it is cut too.
   pub fn unpair(ss:*Structures, id:Id) void {
     const s = ss.get(id);
-    s.partner = null;
+    s.partners = @splat(null);
     const p = pairsOf(s.kind()) orelse return;
     if (p.way != .both_ways) return;
     const here = s.ref();
-    for (ss.list.items) |*o| if (o.partner) |r| if (r.eql(here)) { o.partner = null; };
+    for (ss.list.items) |*o| _ = o.dropPartner(here);
   }
 
   /// the configure handshake of a structure that pairs: the first
@@ -468,12 +515,19 @@ pub const Structures = struct {
     return .waiting;
   }
 
+  /// the first `id` was paired with
   pub fn getPartner(ss:*const Structures, id:Id) ?Id {
-    const r = ss.list.items[id.idx()].partner orelse return null;
+    const r = ss.list.items[id.idx()].partner() orelse return null;
     return ss.find(r);
   }
 
-  /// every structure whose partner is `id`, in list order.
+  /// every structure `id` is paired with, oldest first.
+  pub fn getPartners(ss:*const Structures, id:Id) Partners {
+    return .{ .ss = ss, .of = &ss.list.items[id.idx()].partners };
+  }
+
+  /// every structure paired with `id` (one of its partners is `id`), in
+  /// list order.
   pub fn pairedTo(ss:*const Structures, id:Id) Paired {
     return .{ .ss = ss, .of = ss.list.items[id.idx()].ref() };
   }
@@ -590,25 +644,38 @@ pub const Structures = struct {
       return c;
     }
   };
-  pub const Paired = Linked("partner");
 
-  /// walks every structure whose `field` (a `?Ref`) names `of`
-  fn Linked(comptime field:[]const u8) type {
-    return struct {
-      ss:*const Structures,
-      of:Ref,
-      i:usize = 0,
+  /// walks a structure's partners (`partners`)
+  pub const Partners = struct {
+    ss:*const Structures,
+    of:*const [PARTNERS]?Ref,
+    k:usize = 0,
 
-      pub fn next(it:*@This()) ?Id {
-        while (it.i < it.ss.list.items.len) {
-          const i = it.i;
-          it.i += 1;
-          if (@field(it.ss.list.items[i], field)) |p| if (p.eql(it.of)) return Id.of(i);
-        }
-        return null;
+    pub fn next(it:*Partners) ?Id {
+      while (it.k < PARTNERS) {
+        const r = it.of[it.k] orelse return null;
+        it.k += 1;
+        if (it.ss.find(r)) |id| return id;
       }
-    };
-  }
+      return null;
+    }
+  };
+
+  /// walks every structure one of whose partners is `of`
+  pub const Paired = struct {
+    ss:*const Structures,
+    of:Ref,
+    i:usize = 0,
+
+    pub fn next(it:*Paired) ?Id {
+      while (it.i < it.ss.list.items.len) {
+        const i = it.i;
+        it.i += 1;
+        if (it.ss.list.items[i].pairedWith(it.of)) return Id.of(i);
+      }
+      return null;
+    }
+  };
 
   // ---- hook dispatch: one comptime switch each, no per-kind code here ----
 
@@ -635,6 +702,40 @@ pub const Structures = struct {
       inline else => |k| if (comptime reg.has(k, "receive")) reg.module(k).receive(s, g, item, edge) else ss.insert(g, id, item, 1) == 1,
     };
   }
+
+  /// everything that may leave structure `id`: its `output` first, then
+  /// each other kind it holds that it `gives`, in slot order
+  pub fn outputs(ss:*Structures, id:Id) Outputs {
+    return .{ .ss = ss, .id = id, .first = ss.output(id) };
+  }
+
+  pub const Outputs = struct {
+    ss:*Structures,
+    id:Id,
+    first:?items.Item,
+    /// -1: `first` not yet given
+    k:i32 = -1,
+
+    pub fn next(it:*Outputs) ?items.Item {
+      if (it.k < 0) {
+        it.k = 0;
+        if (it.first) |f| return f;
+      }
+      const slot = &it.ss.get(it.id).inv.slot;
+      while (it.k < SLOTS) {
+        const k:usize = @intCast(it.k);
+        it.k += 1;
+        const item = (slot[k] orelse continue).item;
+        if (item == it.first) continue;
+        // once per kind: the first slot holding it
+        const again = for (slot[0..k]) |o| {
+          if (o) |e| if (e.item == item) break true;
+        } else false;
+        if (!again and it.ss.gives(it.id, item)) return item;
+      }
+      return null;
+    }
+  };
 
   pub fn gives(ss:*Structures, id:Id, item:items.Item) bool {
     const s = ss.get(id);
@@ -721,12 +822,12 @@ pub const HandOff = struct {
   amount:u16 = 1,
 };
 
-/// hand one of what structure `i` lets go (`output`) to a neighbour beside
+/// hand one of what structure `i` lets go (`outputs`) to a neighbour beside
 /// it that wants it; returns whether one went.
 pub fn handOff(ctx:Ctx, i:Id) bool { return handOffWith(ctx, i, .{}) > 0; }
 
-/// hand up to `h.amount` of what structure `i` lets go (`output`, asked
-/// again after each neighbour) to those within `h.range` of its footprint
+/// hand up to `h.amount` of what structure `i` lets go (`outputs`, asked
+/// again for each neighbour) to those within `h.range` of its footprint
 /// that want it, nearest first; returns how many went. Carriers are left
 /// alone: one behind it pulls through `output` itself.
 // decision: a footprint's every side hands on (a 2×2 monfris once handed
@@ -740,13 +841,15 @@ pub fn handOffWith(ctx:Ctx, i:Id, h:HandOff) u16 {
     while (r.next()) |t| {
       const j = ctx.ss.at(ctx.w, t[0], t[1]) orelse continue;
       if (j == i or ctx.ss.get(j).def().carrier) continue;
-      const item = ctx.ss.output(i) orelse return h.amount - left;
-      const have:u16 = @intCast(@min(left, self.inv.count(item)));
-      const k = ctx.ss.insert(ctx.g, j, item, have);
-      if (k == 0) continue;
-      _ = self.inv.take(item, k);
-      left -= k;
-      if (left == 0) return h.amount;
+      var out = ctx.ss.outputs(i);
+      while (out.next()) |item| {
+        const have:u16 = @intCast(@min(left, self.inv.count(item)));
+        const k = ctx.ss.insert(ctx.g, j, item, have);
+        if (k == 0) continue;
+        _ = self.inv.take(item, k);
+        left -= k;
+        if (left == 0) return h.amount;
+      }
     }
   }
   return h.amount - left;
@@ -1032,6 +1135,46 @@ test "the tile index and the children agree with the list through placing, adopt
   for (0..ss.list.items.len) |i| try testing.expectEqual(ss.childCount(Id.of(i)), again.childCount(Id.of(i)));
 }
 
+test "several partners: each once, oldest first, the oldest let go past `most`" {
+  var s:Structure = .{ .x = 0, .y = 0, .seed = 0, .state = freshState(.driftbraid) };
+  const r = [_]Ref{ .{ .x = 1, .y = 0, .floating = false }, .{ .x = 2, .y = 0, .floating = false }, .{ .x = 3, .y = 0, .floating = false } };
+  try testing.expect(s.addPartner(r[0], 2) == null);
+  try testing.expect(s.addPartner(r[0], 2) == null);
+  try testing.expect(s.addPartner(r[1], 2) == null);
+  try testing.expectEqual(@as(usize, 2), s.partnerCount());
+  try testing.expect(s.addPartner(r[2], 2).?.eql(r[0]));
+  try testing.expect(s.partner().?.eql(r[1]) and s.pairedWith(r[2]) and !s.pairedWith(r[0]));
+  try testing.expect(s.dropPartner(r[1]) and !s.dropPartner(r[1]));
+  try testing.expect(s.partner().?.eql(r[2]) and s.partnerCount() == 1);
+}
+
+test "several outputs: what a neighbour wants goes, even when it is not the first" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..4) |x| { c.kind[x] = .soil; c.height[x] = 1; c.res[x] = 0; }
+  var plants:Plants = .{};
+  defer plants.deinit(gpa);
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression = .{};
+  const ctx:Ctx = .{ .gpa = gpa, .w = &w, .plants = &plants, .g = &g, .ss = &ss };
+  try testing.expect(try ss.place(gpa, &w, 0, 0, .sap_cache, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 1, 0, .loomfern, 0, 0));
+  const cache = ss.at(&w, 0, 0).?;
+  _ = ss.get(cache).inv.add(.essence, 2);
+  _ = ss.get(cache).inv.add(.fibre, 3);
+  // the newest stack first, then the rest it gives
+  var out = ss.outputs(cache);
+  try testing.expect(out.next() == .fibre and out.next() == .essence and out.next() == null);
+  // a loomfern takes no fibre, only essence
+  try testing.expect(handOff(ctx, cache));
+  try testing.expectEqual(@as(u32, 1), ss.get(ss.at(&w, 1, 0).?).inv.count(.essence));
+  try testing.expectEqual(@as(u32, 3), ss.get(cache).inv.count(.fibre));
+}
+
 test "a structure put down grows before it works" {
   const gpa = testing.allocator;
   var w = World.init(gpa, 5);
@@ -1154,8 +1297,8 @@ test "partners: one way or both ways, re-pairing leaves the old one, uprooting c
   try testing.expectEqual(a, ss.getPartner(b).?);
   // both ways: d pairing with b leaves a alone
   try testing.expect(ss.pairWith(d, b));
-  try testing.expect(ss.get(a).partner == null);
+  try testing.expect(ss.get(a).partner() == null);
   try testing.expectEqual(d, ss.getPartner(b).?);
   _ = ss.remove(&w, b);
-  try testing.expect(ss.get(ss.at(&w, 2, 0).?).partner == null);
+  try testing.expect(ss.get(ss.at(&w, 2, 0).?).partner() == null);
 }
