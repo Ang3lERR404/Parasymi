@@ -49,6 +49,8 @@ const Sounds = engine.platform.audio.Output(sound.Sounds);
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
 const MAX_FRAME_DT:f64 = 0.1;
+/// the sound hears of the daylight once it has changed this much
+const DAY_TOLD:f32 = 0.01;
 /// `--demo` fast-forwards its garden this many seconds; `--stress` sows a
 /// field this many tiles on a side
 const DEMO_FORWARD = 25;
@@ -209,6 +211,8 @@ pub fn main(init:Init) !void {
 
   // what the sound was last told of the view
   var in_eyes = false;
+  // and of the daylight (none yet, so the first frame tells it)
+  var told_day:f32 = -1;
   while (!window.shouldClose()) {
     glfw.pollEvents();
     input.update();
@@ -225,6 +229,11 @@ pub fn main(init:Init) !void {
     };
     if (game.stars.twinkled()) |t| if (sounds) |o| {
       o.send(.{.twinkle = t}) catch |e| log.warn("twinkle: {t}", .{e});
+    };
+    // the day's music follows the daylight
+    if (@abs(game.sky.daylight() - told_day) > DAY_TOLD) if (sounds) |o| {
+      o.send(.{.daylight = game.sky.daylight()}) catch |e| log.warn("daylight: {t}", .{e});
+      told_day = game.sky.daylight();
     };
     // out of the wolf's eyes its sap is heard settling
     if (game.cam.inEyes() != in_eyes) if (sounds) |o| {

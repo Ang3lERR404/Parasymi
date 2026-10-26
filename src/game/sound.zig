@@ -20,6 +20,12 @@
 //!   glassy pings in quick succession (high bell partials, a little
 //!   out of tune with each other), dying away in a soft shimmer; the
 //!   nearer the mote, the louder.
+//! - by day, music: light piano plunks (felt-hammered strings, a little
+//!   stretched and beating) on a steady eighth-note pulse, a wandering
+//!   pentatonic line over a soft left hand, phrased as a motif and its
+//!   variation over a slow chord progression, a soft low drum on some bars,
+//!   all with a dark echo three steps behind; it rises with the morning and
+//!   fades out at dusk.
 const lib = @import("../lib.zig");
 const std = lib.std;
 const testing = std.testing;
@@ -474,11 +480,442 @@ const Twinkle = struct {
   }
 };
 
+// ---- the day's music ----
+
+/// the pulse: eighth notes at this tempo (beats a minute), eight to a bar,
+/// four bars to a phrase
+const TEMPO:f32 = 84;
+const STEP_S:f32 = 60.0 / TEMPO / 2.0;
+const BAR = 8;
+const BARS = 4;
+const PHRASE = BAR * BARS;
+/// a motif is two bars; the phrase plays it, then a variation of it
+const MOTIF = 2 * BAR;
+/// the key (MIDI note of D4) and its pentatonic scale (semitones)
+const KEY:u8 = 62;
+const PENTA = [_]u8{0, 2, 4, 7, 9};
+/// the melody's range, in steps of the scale above the key (B4..E6)
+const MEL_LO:u8 = 4;
+const MEL_HI:u8 = 11;
+/// how likely a note is on a bar's first step, on a beat, off the beat
+const NOTE_CHANCE = [3]f32{0.9, 0.6, 0.3};
+/// how loud a note is there (before it strays by `VARY`)
+const NOTE_VEL = [3]f32{1, 0.8, 0.62};
+/// a new motif instead of a variation of the last, a new progression
+/// instead of the last, and each step's chance to change in a variation
+const NEW_MOTIF:f32 = 0.4;
+const NEW_CHORDS:f32 = 0.4;
+const MUTATE:f32 = 0.25;
+/// the phrase breathes out: its last two steps rest this often
+const BREATHE:f32 = 0.7;
+
+/// a chord: its root (semitones above the key) and whether it is minor
+const Chord = struct { root:u8, minor:bool = false };
+/// I vi IV V, IV I ii V, I V vi IV
+const PROGRESSIONS = [_][BARS]Chord{
+  .{.{.root = 0}, .{.root = 9, .minor = true}, .{.root = 5}, .{.root = 7}},
+  .{.{.root = 5}, .{.root = 0}, .{.root = 2, .minor = true}, .{.root = 7}},
+  .{.{.root = 0}, .{.root = 7}, .{.root = 9, .minor = true}, .{.root = 5}},
+};
+/// the left hand: each bar's root low (D3, roots above this many semitones
+/// an octave lower), its fifth on the third beat this often, and how loud
+const LOW:u8 = 50;
+const LOW_FOLD:u8 = 4;
+const FIFTH_CHANCE:f32 = 0.6;
+const LOW_VEL:f32 = 0.55;
+
+/// the plunk: a struck string's partials (harmonics a little stretched,
+/// as a piano's are), their levels, and a second string a hair sharp
+/// beating against the first
+const HARMONICS = 5;
+const STRETCH:f32 = 0.0004;
+const HARMONIC_LEVEL = [HARMONICS]f32{1, 0.5, 0.28, 0.14, 0.07};
+const DETUNE:f32 = 1.0007;
+const DETUNE_LEVEL:f32 = 0.7;
+/// how long it rings (s, ~63%) at this pitch (Hz), shorter for higher
+/// notes and within these bounds; each higher partial dies this much faster
+const PLUNK_FALL:f32 = 0.55;
+const PLUNK_REF_HZ:f32 = 400;
+const PLUNK_FALL_SPAN = [2]f32{0.22, 1.3};
+const PLUNK_DAMP:f32 = 0.9;
+/// a softer note is this much duller (its partials fall by this power)
+const DULL:f32 = 0.7;
+/// the felt hammer: a tick of noise this many times the pitch (Hz at most),
+/// falling in this (s), at this level; the attack (s)
+const HAMMER_AT:f32 = 5;
+const HAMMER_HZ:f32 = 4500;
+const HAMMER_FALL:f32 = 0.004;
+const HAMMER:f32 = 0.3;
+const PLUNK_ATTACK:f32 = 0.0015;
+/// what softens it (Hz), its loudness, and how many may ring at once
+const PLUNK_SOFT_HZ:f32 = 3600;
+const PLUNK:f32 = 0.032;
+const PLUNKS = 10;
+
+/// the drum: a soft low tom on a bar's first step this often, on its third
+/// beat this often (lighter); its pitch (Hz) dropping from the first to
+/// the second in this (s), its fall (s), the skin's noise (Hz, fall, level)
+const DRUM_CHANCE:f32 = 0.5;
+const TAP_CHANCE:f32 = 0.12;
+const TAP_VEL:f32 = 0.5;
+const DRUM_HZ = [2]f32{110, 62};
+const DRUM_DROP:f32 = 0.05;
+const DRUM_FALL:f32 = 0.22;
+const SKIN_HZ:f32 = 220;
+const SKIN_FALL:f32 = 0.03;
+const SKIN:f32 = 0.5;
+/// what muffles it (Hz), its loudness, and how many may sound at once
+const DRUM_SOFT_HZ:f32 = 700;
+const DRUM:f32 = 0.06;
+const DRUMS = 2;
+
+/// a soft echo three steps behind, kept at a quarter of the rate (it is
+/// dark anyway), feeding back this much, darkened (Hz) and at this level
+const ECHO_STEPS:f32 = 3;
+const ECHO_DOWN = 4;
+const ECHO_LEN = m.floorTo(usize, ECHO_STEPS * STEP_S * m.f(RATE) / ECHO_DOWN) + 4;
+const ECHO_FEEDBACK:f32 = 0.3;
+const ECHO_SOFT_HZ:f32 = 1800;
+const ECHO:f32 = 0.35;
+/// how fast the music follows the daylight (s); it plays only past this
+const MUSIC_GLIDE:f32 = 3;
+const MUSIC_FROM:f32 = 0.05;
+/// the music's loudness (tests hush it to hear the rest alone)
+const MUSIC:f32 = 1;
+
+/// a MIDI note of the scale, `i` steps above the key
+fn scaleNote(i:u8) u8 { return KEY + 12 * (i / PENTA.len) + PENTA[i % PENTA.len]; }
+
+/// the note nearest `note` (within a whole tone) that is in `c`
+fn chordTone(note:u8, c:Chord) u8 {
+  const third:u8 = if (c.minor) 3 else 4;
+  var best = note;
+  var dist:u8 = 3;
+  for ([_]u8{0, 1, 2}) |d| for ([_]u8{note -| d, note + d}) |n| {
+    const in = (n + 12 - KEY % 12 + 12 - c.root) % 12;
+    if ((in == 0 or in == third or in == 7) and d < dist) {
+      best = n;
+      dist = d;
+    }
+  };
+  return best;
+}
+
+/// one piano note: a plunk of a felt-hammered string
+const Plunk = struct {
+  parts:[HARMONICS + 1]dsp.Sine,
+  amp:[HARMONICS + 1]f32 = @splat(1),
+  fall:[HARMONICS + 1]f32,
+  level:[HARMONICS + 1]f32,
+  noise:dsp.Noise,
+  hammer:dsp.Biquad,
+  knock:f32 = 1,
+  knock_fall:f32,
+  soft:dsp.OnePole,
+  at:u32 = 0,
+  attack:u32,
+  gain:f32,
+
+  fn init(note:u8, vel:f32, r:*rng.Rng, rate:f32) Plunk {
+    const hz = dsp.noteToHz(m.f(note));
+    const ring = m.clamp(PLUNK_FALL * @sqrt(PLUNK_REF_HZ / hz), PLUNK_FALL_SPAN[0], PLUNK_FALL_SPAN[1]);
+    var p:Plunk = .{
+      .parts = undefined,
+      .fall = undefined,
+      .level = undefined,
+      .noise = .init(r.next()),
+      .hammer = .init(.band, @min(hz * HAMMER_AT, HAMMER_HZ), 1.2, rate),
+      .knock_fall = @exp(-1 / (HAMMER_FALL * rate)),
+      .soft = .init(PLUNK_SOFT_HZ, rate),
+      .attack = m.floorTo(u32, PLUNK_ATTACK * rate) + 1,
+      .gain = vel * PLUNK,
+    };
+    for (0..HARMONICS) |k| {
+      const n = m.f(k + 1);
+      const f = hz * n * @sqrt(1 + STRETCH * n * n);
+      p.parts[k] = .init(f, rate);
+      p.fall[k] = @exp(-1 / (ring / (1 + PLUNK_DAMP * m.f(k)) * rate));
+      // above Nyquist a partial is left out, not folded back
+      const heard:f32 = if (f < 0.45 * rate) 1 else 0;
+      p.level[k] = HARMONIC_LEVEL[k] * m.pow(f32, vel, DULL * m.f(k)) * heard;
+    }
+    p.parts[HARMONICS] = .init(hz * DETUNE, rate);
+    p.fall[HARMONICS] = p.fall[0];
+    p.level[HARMONICS] = DETUNE_LEVEL;
+    return p;
+  }
+
+  /// mixes the note into `out`; false once it has ended
+  fn render(p:*Plunk, out:[]f32) bool {
+    for (out) |*s| {
+      const rise = m.clamp01(m.f(p.at) / m.f(p.attack));
+      p.at +|= 1;
+      var y:f32 = 0;
+      inline for (0..HARMONICS + 1) |k| {
+        p.amp[k] *= p.fall[k];
+        y += p.parts[k].next() * p.amp[k] * p.level[k];
+      }
+      p.knock *= p.knock_fall;
+      y += p.hammer.tick(p.noise.next()) * HAMMER * p.knock;
+      s.* += p.soft.low(y * rise) * p.gain;
+    }
+    return p.amp[0] > SILENT;
+  }
+};
+
+/// one soft tom
+const Drum = struct {
+  osc:dsp.Osc,
+  noise:dsp.Noise,
+  skin:dsp.Biquad,
+  soft:dsp.OnePole,
+  /// the pitch's drop still to fall, the body's and the skin's loudness
+  drop:f32 = 1,
+  body:f32 = 1,
+  hit:f32 = 1,
+  drop_fall:f32,
+  body_fall:f32,
+  hit_fall:f32,
+  gain:f32,
+
+  fn init(vel:f32, r:*rng.Rng, rate:f32) Drum {
+    return .{
+      .osc = .{.rate = rate},
+      .noise = .init(r.next()),
+      .skin = .init(.band, vary(r, SKIN_HZ), 1, rate),
+      .soft = .init(DRUM_SOFT_HZ, rate),
+      .drop_fall = @exp(-1 / (DRUM_DROP * rate)),
+      .body_fall = @exp(-1 / (vary(r, DRUM_FALL) * rate)),
+      .hit_fall = @exp(-1 / (SKIN_FALL * rate)),
+      .gain = vary(r, vel) * DRUM,
+    };
+  }
+
+  fn render(d:*Drum, out:[]f32) bool {
+    for (out) |*s| {
+      d.osc.freq = m.lerp(DRUM_HZ[1], DRUM_HZ[0], d.drop);
+      d.drop *= d.drop_fall;
+      d.body *= d.body_fall;
+      d.hit *= d.hit_fall;
+      const y = d.osc.next() * d.body + d.skin.tick(d.noise.next()) * SKIN * d.hit;
+      s.* += d.soft.low(y) * d.gain;
+    }
+    return d.body > SILENT;
+  }
+};
+
+/// an echo kept at a quarter of the rate in a ring of its own
+const Echo = struct {
+  buf:[ECHO_LEN]f32 = @splat(0),
+  at:usize = 0,
+  /// samples summed toward the next slot
+  sum:f32 = 0,
+  sub:u32 = 0,
+  /// slots behind
+  delay:usize,
+  soft:dsp.OnePole,
+
+  fn init(rate:f32) Echo {
+    const d = m.floorTo(usize, ECHO_STEPS * STEP_S * rate / ECHO_DOWN);
+    return .{.delay = m.clamp(d, 2, ECHO_LEN - 2), .soft = .init(ECHO_SOFT_HZ, rate)};
+  }
+
+  /// `x` in, what it heard `delay` slots ago out (between two slots)
+  fn tick(e:*Echo, x:f32) f32 {
+    const back = e.at + ECHO_LEN - e.delay;
+    const y = m.lerp(e.buf[back % ECHO_LEN], e.buf[(back + 1) % ECHO_LEN], m.f(e.sub) / ECHO_DOWN);
+    e.sum += x;
+    e.sub += 1;
+    if (e.sub == ECHO_DOWN) {
+      e.buf[e.at] = e.sum / ECHO_DOWN + ECHO_FEEDBACK * y;
+      e.at = (e.at + 1) % ECHO_LEN;
+      e.sum = 0;
+      e.sub = 0;
+    }
+    return e.soft.low(y);
+  }
+};
+
+/// samples the music renders at a time between its steps
+const CHUNK = 256;
+
+/// the day's music: light piano plunks over a slow steady pulse, a soft
+/// drum now and then, fading in with the morning and out at dusk
+const Music = struct {
+  rate:f32,
+  r:rng.Rng,
+  plunks:[PLUNKS]?Plunk = @splat(null),
+  drums:[DRUMS]?Drum = @splat(null),
+  next_plunk:usize = 0,
+  next_drum:usize = 0,
+  echo:Echo,
+  fade:dsp.Smooth,
+  /// the step about to play, and samples until it does
+  step:u32 = 0,
+  left:u32 = 0,
+  step_len:u32,
+  chords:[BARS]Chord = PROGRESSIONS[0],
+  /// scale steps (null rests) of the motif and of its variation
+  motif:[MOTIF]?u8 = @splat(null),
+  varied:[MOTIF]?u8 = @splat(null),
+  fresh:bool = true,
+  /// silent through the night: nothing rings, the next day starts a phrase
+  resting:bool = true,
+  /// notes and drums struck (tests count them)
+  struck:u32 = 0,
+  drummed:u32 = 0,
+  level:f32 = MUSIC,
+
+  fn init(r:*rng.Rng, rate:f32) Music {
+    return .{
+      .rate = rate,
+      .r = .init(r.next()),
+      .echo = .init(rate),
+      .fade = .init(0, MUSIC_GLIDE, rate),
+      .step_len = m.floorTo(u32, STEP_S * rate),
+    };
+  }
+
+  fn daylight(mu:*Music, d:f32) void { mu.fade.target = if (d > MUSIC_FROM) m.clamp01(d) else 0; }
+
+  fn render(mu:*Music, out:[]f32) void {
+    if (mu.fade.target == 0 and mu.fade.value < SILENT) {
+      if (!mu.resting) mu.rest();
+      return;
+    }
+    mu.resting = false;
+    var off:usize = 0;
+    while (off < out.len) {
+      const n = @min(CHUNK, out.len - off);
+      var buf:[CHUNK]f32 = @splat(0);
+      mu.chunk(buf[0..n]);
+      for (out[off..][0..n], buf[0..n]) |*o, x| o.* += x;
+      off += n;
+    }
+  }
+
+  fn rest(mu:*Music) void {
+    mu.plunks = @splat(null);
+    mu.drums = @splat(null);
+    mu.echo = .init(mu.rate);
+    mu.step = 0;
+    mu.left = 0;
+    mu.resting = true;
+  }
+
+  /// plays `buf` (zeroed) out, striking each step as it comes
+  fn chunk(mu:*Music, buf:[]f32) void {
+    var i:usize = 0;
+    while (i < buf.len) {
+      if (mu.left == 0) {
+        mu.strikeStep();
+        mu.left = mu.step_len;
+      }
+      const n:u32 = @intCast(@min(mu.left, buf.len - i));
+      const part = buf[i..][0..n];
+      for (&mu.plunks) |*v| if (v.*) |*p| {
+        if (!p.render(part)) v.* = null;
+      };
+      for (&mu.drums) |*v| if (v.*) |*d| {
+        if (!d.render(part)) v.* = null;
+      };
+      mu.left -= n;
+      i += n;
+    }
+    for (buf) |*s| s.* = (s.* + ECHO * mu.echo.tick(s.*)) * mu.level * mu.fade.next();
+  }
+
+  fn strikeStep(mu:*Music) void {
+    if (mu.step == 0) mu.phrase();
+    const bar = mu.step / BAR;
+    const s = mu.step % BAR;
+    const c = mu.chords[bar];
+    const at:usize = if (s == 0) 0 else if (s % 2 == 0) 1 else 2;
+    const line = if (mu.step < MOTIF) mu.motif else mu.varied;
+    if (line[mu.step % MOTIF]) |i| {
+      const n = scaleNote(i);
+      mu.plunk(if (s == 0) chordTone(n, c) else n, vary(&mu.r, NOTE_VEL[at]));
+    }
+    const low = LOW + c.root - (if (c.root > LOW_FOLD) @as(u8, 12) else 0);
+    if (s == 0) mu.plunk(low, vary(&mu.r, LOW_VEL));
+    if (s == BAR / 2 and mu.r.float() < FIFTH_CHANCE) mu.plunk(low + 7, vary(&mu.r, LOW_VEL * 0.8));
+    if (s == 0 and mu.r.float() < DRUM_CHANCE) mu.drum(1);
+    if (s == BAR / 2 and mu.r.float() < TAP_CHANCE) mu.drum(TAP_VEL);
+    mu.step = (mu.step + 1) % PHRASE;
+  }
+
+  /// a new phrase: maybe new chords, a new motif or a variation of the last
+  fn phrase(mu:*Music) void {
+    if (mu.r.float() < NEW_CHORDS) mu.chords = PROGRESSIONS[mu.r.below(PROGRESSIONS.len)];
+    if (mu.fresh or mu.r.float() < NEW_MOTIF) {
+      mu.motif = mu.newMotif();
+      mu.fresh = false;
+    } else mu.motif = mu.alter(mu.varied);
+    mu.varied = mu.alter(mu.motif);
+    if (mu.r.float() < BREATHE) {
+      mu.varied[MOTIF - 2] = null;
+      mu.varied[MOTIF - 1] = null;
+    }
+  }
+
+  /// a wandering line: small steps up and down the scale, mostly on beats
+  fn newMotif(mu:*Music) [MOTIF]?u8 {
+    var out:[MOTIF]?u8 = undefined;
+    var i:u8 = @intCast(MEL_LO + 2 + mu.r.below(MEL_HI - MEL_LO - 3));
+    for (&out, 0..) |*o, k| {
+      const s = k % BAR;
+      const at:usize = if (s == 0) 0 else if (s % 2 == 0) 1 else 2;
+      if (mu.r.float() >= NOTE_CHANCE[at]) {
+        o.* = null;
+        continue;
+      }
+      i = mu.wander(i, 2);
+      o.* = i;
+    }
+    return out;
+  }
+
+  /// `line` with some of its steps changed: a note moved a step, dropped,
+  /// or a rest filled
+  fn alter(mu:*Music, line:[MOTIF]?u8) [MOTIF]?u8 {
+    var out = line;
+    var last:u8 = MEL_LO + (MEL_HI - MEL_LO) / 2;
+    for (&out) |*o| {
+      if (mu.r.float() < MUTATE) o.* = if (o.*) |i| (if (mu.r.float() < 0.3) null else mu.wander(i, 1)) else mu.wander(last, 1);
+      if (o.*) |i| last = i;
+    }
+    return out;
+  }
+
+  /// `i` moved up to `by` steps either way, kept in the melody's range
+  fn wander(mu:*Music, i:u8, by:u8) u8 {
+    const d:i32 = @as(i32, @intCast(mu.r.below(2 * by + 1))) - by;
+    return @intCast(m.clamp(@as(i32, i) + d, MEL_LO, MEL_HI));
+  }
+
+  fn plunk(mu:*Music, note:u8, vel:f32) void {
+    mu.plunks[mu.freePlunk()] = .init(note, vel, &mu.r, mu.rate);
+    mu.struck += 1;
+  }
+
+  fn drum(mu:*Music, vel:f32) void {
+    mu.drums[mu.next_drum] = .init(vel, &mu.r, mu.rate);
+    mu.next_drum = (mu.next_drum + 1) % DRUMS;
+    mu.drummed += 1;
+  }
+
+  fn freePlunk(mu:*Music) usize {
+    for (mu.plunks, 0..) |v, i| if (v == null) return i;
+    defer mu.next_plunk = (mu.next_plunk + 1) % PLUNKS;
+    return mu.next_plunk;
+  }
+};
+
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
 pub const Sounds = struct {
   /// a paw landed; the view entered or left the wolf's eyes; a mote near
-  /// the wolf twinkled
-  pub const Cmd = union(enum) { step:Footfall, eyes:bool, twinkle:lib.sky.Twinkle };
+  /// the wolf twinkled; the daylight changed (0 night .. 1 day)
+  pub const Cmd = union(enum) { step:Footfall, eyes:bool, twinkle:lib.sky.Twinkle, daylight:f32 };
 
   rate:f32,
   r:rng.Rng,
@@ -498,11 +935,13 @@ pub const Sounds = struct {
   /// a new twinkle takes the oldest's place when both are sounding
   twinkles:[TWINKLES]?Twinkle = @splat(null),
   next_twinkle:usize = 0,
+  music:Music,
 
   pub fn init(seed:u64, rate:f32) Sounds {
     var r:rng.Rng = .init(seed);
     const wind:Wind = .init(&r, rate);
-    return .{.rate = rate, .r = r, .fade = .init(0, SAP_FADE, rate), .wind = wind};
+    const music:Music = .init(&r, rate);
+    return .{.rate = rate, .r = r, .fade = .init(0, SAP_FADE, rate), .wind = wind, .music = music};
   }
 
   pub fn apply(s:*Sounds, cmd:Cmd) void {
@@ -521,6 +960,7 @@ pub const Sounds = struct {
         s.twinkles[s.next_twinkle] = .init(m.clamp01(t.near), &s.r, s.rate);
         s.next_twinkle = (s.next_twinkle + 1) % TWINKLES;
       },
+      .daylight => |d| s.music.daylight(d),
     }
   }
 
@@ -533,6 +973,7 @@ pub const Sounds = struct {
     };
     s.sap(out);
     s.wind.render(out);
+    s.music.render(out);
     for (out) |*x| x.* = dsp.softClip(x.*);
   }
 
@@ -700,4 +1141,57 @@ test "the wind is gentle, swells in gusts and whistles only in some" {
   try testing.expect(peak > 0.005 and peak < 0.15);
   try testing.expect(lo > 0.0005 and hi > 2 * lo);
   try testing.expect(whistled > 10 and whistled < 400);
+}
+
+test "the music is silent at night and plays softly by day, on a steady pulse" {
+  var s:Sounds = .init(17, TEST_RATE);
+  s.wind.level = 0;
+  var buf:[480]f32 = undefined;
+  // ten seconds of night: nothing
+  for (0..1000) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+    for (buf) |x| try testing.expectEqual(@as(f32, 0), x);
+  }
+  try testing.expectEqual(@as(u32, 0), s.music.struck);
+  s.apply(.{.daylight = 1});
+  var peak:f32 = 0;
+  // two minutes of day
+  const secs = 120;
+  for (0..secs * 100) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+    for (buf) |x| peak = @max(peak, @abs(x));
+  }
+  try testing.expect(peak > 0.02 and peak < 0.35);
+  // steps of the pulse that passed: notes on many of them, a drum on some bars
+  const steps = m.f(secs) / STEP_S;
+  try testing.expect(m.f(s.music.struck) > 0.5 * steps and m.f(s.music.struck) < 1.5 * steps);
+  const bars = steps / BAR;
+  try testing.expect(m.f(s.music.drummed) > 0.25 * bars and m.f(s.music.drummed) < 0.8 * bars);
+  // dusk: it fades out and rests
+  s.apply(.{.daylight = 0});
+  for (0..3000) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+  }
+  try testing.expect(s.music.resting);
+  for (buf) |x| try testing.expectEqual(@as(f32, 0), x);
+}
+
+test "a phrase's second half varies its first, and melody stays in range" {
+  var r:rng.Rng = .init(4);
+  var mu:Music = .init(&r, TEST_RATE);
+  for (0..50) |_| {
+    mu.phrase();
+    var same:u32 = 0;
+    for (mu.motif, mu.varied) |a, b| {
+      if (a) |i| try testing.expect(i >= MEL_LO and i <= MEL_HI);
+      if (std.meta.eql(a, b)) same += 1;
+    }
+    try testing.expect(same >= MOTIF / 2);
+  }
+  // a bar's first note sits in its chord
+  try testing.expectEqual(@as(u8, 62), chordTone(63, .{.root = 0}));
+  try testing.expectEqual(@as(u8, 71), chordTone(72, .{.root = 9, .minor = true}));
 }

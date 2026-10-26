@@ -73,6 +73,26 @@ pub const Osc = struct {
   }
 };
 
+/// a sine at a fixed pitch by recurrence (y = 2cos(w)·y₁ − y₂): two
+/// multiplies a sample instead of a `@sin`, for the many partials of a
+/// struck string or bell. Starts at phase 0, rising.
+pub const Sine = struct {
+  c:f32,
+  y1:f32 = 0,
+  y2:f32,
+
+  pub fn init(freq:f32, rate:f32) Sine {
+    const w = m.tau * m.clamp(freq, 0, MAX_CUTOFF * rate) / rate;
+    return .{.c = 2 * @cos(w), .y2 = -@sin(w)};
+  }
+  pub fn next(s:*Sine) f32 {
+    const y = s.c * s.y1 - s.y2;
+    s.y2 = s.y1;
+    s.y1 = y;
+    return y;
+  }
+};
+
 /// polyBLEP: the correction that rounds off a unit jump at phase 0 over one
 /// sample each side, `dt` being one sample's phase step
 fn blep(t:f32, dt:f32) f32 {
@@ -358,6 +378,14 @@ test "conversions" {
 test "sine at a quarter of the rate walks 0, 1, 0, -1" {
   var o:Osc = .{.rate = TEST_RATE, .freq = TEST_RATE / 4};
   for ([_]f32{0, 1, 0, -1}) |want| try testing.expectApproxEqAbs(want, o.next(), 0.001);
+}
+
+test "a recurrence sine follows @sin for seconds" {
+  var s:Sine = .init(1234, TEST_RATE);
+  for (0..2 * 48000) |i| {
+    const want = @sin(m.tau * 1234 * m.f(i + 1) / TEST_RATE);
+    try testing.expectApproxEqAbs(want, s.next(), 0.01);
+  }
 }
 
 test "band-limited saw and square stay bounded and centred" {
