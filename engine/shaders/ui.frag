@@ -19,8 +19,28 @@ const vec3 POD_RIM = vec3(0.25, 0.5, 0.25);
 // warm white: a tendril's bud, a gem's edges
 const vec3 BUD_GLOW = vec3(1.0, 0.85, 0.5);
 const vec3 GEM_EDGE = vec3(1.0, 0.97, 0.9);
-// a glyph cell's rounding (cells are 1 across)
-const float GLYPH_ROUND = 0.3;
+// glyph stems (cells are 1 across): radius where text is small (stout to
+// stay legible) and big (slender vines); a tip's, a lone seed's and a fork's
+// radius as shares of it
+const float GLYPH_THICK = 0.42;
+const float GLYPH_SLENDER = 0.27;
+const float GLYPH_TIP = 0.6;
+const float GLYPH_SEED = 1.25;
+const float GLYPH_NODE = 1.15;
+// leaves on stem tips fade in between these sizes (screen pixels per cell)
+const float GLYPH_LEAF_FROM = 1.8;
+const float GLYPH_LEAF_FULL = 3.0;
+const float GLYPH_LEAF_LEN = 1.1;
+const float GLYPH_LEAF_WID = 0.3;
+// share of a big glyph's plain stem nodes that put out a leaf too
+const float GLYPH_LEAF_MID = 0.3;
+// how far (cells) a big glyph's stems bow, like grown ones
+const float GLYPH_BOW = 0.3;
+// glyph quads reach this far (cells) past the bitmap, room for leaves
+const float GLYPH_PAD = 1.0;
+const vec3 GLYPH_LEAF_GREEN = vec3(0.35, 0.75, 0.3);
+// how far (cells) a glyph's top sways
+const float GLYPH_SWAY = 0.08;
 // coverage below which a fragment is dropped: shapes, glyphs
 const float SHAPE_CLEAR = 0.003;
 const float GLYPH_CLEAR = 0.01;
@@ -292,6 +312,115 @@ bool lit(ivec2 q) {
   return ((word >> uint(b & 31)) & 1u) != 0u;
 }
 
+// do lit cells q and q + o share a stem? Orthogonal neighbours always; a
+// diagonal only where no orthogonal pair already turns that corner (so a
+// staircase becomes one smooth slanting stem, a filled block no web)
+bool joined(ivec2 q, ivec2 o) {
+  if (!lit(q) || !lit(q + o)) return false;
+  if (o.x == 0 || o.y == 0) return true;
+  return !lit(q + ivec2(o.x, 0)) && !lit(q + ivec2(0, o.y));
+}
+
+// a lit cell's stems: how many, and the sum of their directions
+int stems(ivec2 q, out vec2 dir) {
+  dir = vec2(0.0);
+  int n = 0;
+  for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
+    ivec2 o = ivec2(dx, dy);
+    if (o == ivec2(0) || !joined(q, o)) continue;
+    dir += normalize(vec2(o));
+    n++;
+  }
+  return n;
+}
+
+// a cell's node radius (cells): a lone cell is a round seed, a tip tapers,
+// a fork swells like a plant's node
+float nodeRadius(int n, float thick) {
+  return thick * (n == 0 ? GLYPH_SEED : n == 1 ? GLYPH_TIP : n == 2 ? 1.0 : GLYPH_NODE);
+}
+
+// distance to a stem tapering from radius ra at a to rb at b
+float sdStem(vec2 p, vec2 a, vec2 b, float ra, float rb) {
+  vec2 ab = b - a;
+  float h = clamp(dot(p - a, ab) / dot(ab, ab), 0.0, 1.0);
+  return length(p - a - ab * h) - mix(ra, rb, h);
+}
+
+// distance to a leaf from `base` along unit `u`, `len` long, `wid` across
+float sdGlyphLeaf(vec2 p, vec2 base, vec2 u, float len, float wid) {
+  vec2 r = p - base;
+  float x = dot(r, u);
+  float y = dot(r, vec2(-u.y, u.x));
+  float k = clamp(x / len, 0.0, 1.0);
+  float w = wid * pow(sin(PI * pow(k, 0.7)), 0.8);
+  return max(abs(y - wid * 0.4 * k * k) - w, max(-x, x - len));
+}
+
+// glyphs grow as vines: each lit cell is a node, joined to its lit
+// neighbours by tapering stems; a stem's free tips point and, once text is
+// big enough to show them, put out a leaf. The whole glyph sways from its
+// foot and sap shimmers up it. Small text keeps its stems stout to stay legible.
+vec4 glyph() {
+  float t = pc.time;
+  float px = 1.0 / max(fwidth(v_uv.x), 1e-3);  // screen pixels per cell
+  float big = smoothstep(GLYPH_LEAF_FROM, GLYPH_LEAF_FULL, px);
+  float thick = mix(GLYPH_THICK, GLYPH_SLENDER, big);
+  // sway grows toward the glyph's top, a wave running along the line
+  vec2 uv = v_uv - GLYPH_PAD;
+  float seed = v_param.y * 13.0;
+  uv += (vec2(vnoise(uv * 0.4 + seed), vnoise(uv * 0.4 - seed + 5.0)) - 0.5) * GLYPH_BOW * big;
+  uv.x += sin(t * 1.3 + v_param.y * 9.0) * GLYPH_SWAY * (1.0 - uv.y / 7.0);
+  ivec2 p = ivec2(floor(uv));
+  int reach = big > 0.0 ? 2 : 1;
+  float aa = 0.75 / px;
+  float ds = 1e3, dl = 1e3;
+  for (int dy = -reach; dy <= reach; dy++) for (int dx = -reach; dx <= reach; dx++) {
+    ivec2 q = p + ivec2(dx, dy);
+    if (!lit(q)) continue;
+    vec2 c = vec2(q) + 0.5;
+    bool near = abs(dx) <= 1 && abs(dy) <= 1;
+    vec2 dir;
+    int n = stems(q, dir);
+    float ra = nodeRadius(n, thick);
+    // a leaf: off a tip that does not point down, angled off its stem, or
+    // now and then off a straight stem node, slanting up
+    if (big > 0.0 && (n == 1 || n == 2)) {
+      float h = hash(vec2(q) + seed * 37.0);
+      vec2 tip = n == 1 ? -normalize(dir) : vec2(0.0);
+      bool grows = n == 1 ? tip.y < 0.5 : h < GLYPH_LEAF_MID && length(dir) < 0.1;
+      if (grows) {
+        float side = fract(h * 7.0) > 0.5 ? 1.0 : -1.0;
+        float a = side * ((n == 1 ? 0.75 : 1.2) + 0.25 * sin(t * 2.1 + h * TAU));
+        vec2 from = n == 1 ? tip : vec2(0.0, -1.0);
+        vec2 u = vec2(from.x * cos(a) - from.y * sin(a), from.x * sin(a) + from.y * cos(a));
+        float len = GLYPH_LEAF_LEN * big * (n == 1 ? 1.0 : 0.8);
+        dl = min(dl, sdGlyphLeaf(uv, c + tip * ra * 0.5, u, len, GLYPH_LEAF_WID * big));
+      }
+    }
+    if (!near) continue;
+    ds = min(ds, length(uv - c) - ra);
+    // each stem once: toward the right and downward neighbours
+    for (int k = 0; k < 4; k++) {
+      ivec2 o = k == 0 ? ivec2(1, 0) : k == 1 ? ivec2(0, 1) : k == 2 ? ivec2(1, 1) : ivec2(-1, 1);
+      if (!joined(q, o)) continue;
+      vec2 od;
+      float rb = nodeRadius(stems(q + o, od), thick);
+      ds = min(ds, sdStem(uv, c, c + vec2(o), ra, rb));
+    }
+  }
+  float d = min(ds, dl);
+  float cover = smoothstep(aa, -aa, d);
+  if (cover < GLYPH_CLEAR) return vec4(0.0);
+  // a stem's core catches the light; sap pulses climb it
+  float core = smoothstep(0.0, -thick * 0.8, ds);
+  float sap = 0.88 + 0.12 * sin(t * 2.0 + v_param.y * 8.0 + uv.y * 0.9);
+  vec3 col = v_col.rgb * sap * mix(1.0, 0.82 + 0.3 * core, big);
+  // leaves take on green, keeping the text's own hue
+  col = mix(col, mix(col, GLYPH_LEAF_GREEN, 0.5), smoothstep(-aa, aa, ds - dl));
+  return vec4(col, v_col.a * cover);
+}
+
 void main() {
   if (v_bits.x == SHAPE_MARK) {
     vec4 c;
@@ -310,20 +439,7 @@ void main() {
     o = c;
     return;
   }
-  // glyphs: each lit cell is a rounded square that merges with its lit
-  // neighbours; coverage is antialiased per pixel so text stays clean at any
-  // scale, softly shimmering like sap catching light
-  ivec2 p = ivec2(floor(v_uv));
-  float aa = max(fwidth(v_uv.x), 1e-3) * 0.75;
-  float d = 1e3;
-  for (int dy = -1; dy <= 1; dy++) for (int dx = -1; dx <= 1; dx++) {
-    ivec2 q = p + ivec2(dx, dy);
-    if (!lit(q)) continue;
-    vec2 rel = abs(v_uv - (vec2(q) + 0.5)) - vec2(0.5 - GLYPH_ROUND);
-    d = min(d, length(max(rel, 0.0)) + min(max(rel.x, rel.y), 0.0) - GLYPH_ROUND);
-  }
-  float cover = smoothstep(aa, -aa, d);
-  if (cover < GLYPH_CLEAR) discard;
-  float shimmer = 0.88 + 0.12 * sin(pc.time * 2.0 + v_param.y * 8.0 + v_uv.y * 0.6);
-  o = vec4(v_col.rgb * shimmer, v_col.a * cover);
+  vec4 c = glyph();
+  if (c.a < GLYPH_CLEAR) discard;
+  o = c;
 }

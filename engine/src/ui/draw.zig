@@ -42,6 +42,9 @@ const shape_mark:u32 = 0xffff_ffff;
 /// a glyph's cell: the font's bitmap plus one pixel of spacing each way
 const cell_w = font.W + 1;
 const cell_h = font.H + 1;
+/// a glyph's quad reaches this many cells past its cell each way, room for
+/// the leaves its stems put out (must match GLYPH_PAD in shaders/ui.frag)
+const glyph_pad = 1;
 /// text shimmers along its length by this phase per pixel
 const shimmer:f32 = 0.01;
 
@@ -129,7 +132,9 @@ pub const Draw = struct {
   pub fn text(d:*Draw, x:f32, y:f32, s:f32, col:Color, str:[]const u8) Allocator.Error!f32 {
     var cx = x;
     for (str) |ch| {
-      if (ch != ' ') try d.quad(cx, y, cell_w * s, cell_h * s, cell_w, cell_h, col, font.bits(ch), .{0, cx * shimmer});
+      const pw = cell_w + 2 * glyph_pad;
+      const ph = cell_h + 2 * glyph_pad;
+      if (ch != ' ') try d.quad(cx - glyph_pad * s, y - glyph_pad * s, pw * s, ph * s, pw, ph, col, font.bits(ch), .{0, cx * shimmer});
       cx += cell_w * s;
     }
     return cx;
