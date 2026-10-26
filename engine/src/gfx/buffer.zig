@@ -25,31 +25,49 @@ pub const Buffer = struct {
   /// again (`map` and `write` are not for it): copied in through a staging
   /// buffer, waiting for the queue (made once, at load)
   pub fn initWith(c:*const Ctx, usage:vk.BufferUsageFlags, bytes:[]const u8) ctx.Error!Buffer {
-    return fill(c, usage, bytes) catch |e| ctx.fold(e);
+    return initRoom(c, usage, bytes.len, bytes);
   }
 
-  fn fill(c:*const Ctx, usage:vk.BufferUsageFlags, bytes:[]const u8) !Buffer {
+  /// as `initWith`, `size` bytes long (at least `bytes`), the rest left
+  /// for `overwrite` to fill later
+  pub fn initRoom(c:*const Ctx, usage:vk.BufferUsageFlags, size:u64, bytes:[]const u8) ctx.Error!Buffer {
+    assert(size >= bytes.len);
+    var to = usage;
+    to.transfer_dst = true;
+    var b = create(c, size, to, .{.device_local = true}) catch |e| return ctx.fold(e);
+    errdefer b.deinit(c);
+    copyIn(c, &b, 0, bytes) catch |e| return ctx.fold(e);
+    return b;
+  }
+
+  /// copy `bytes` into a device-local buffer at `offset`, once the device
+  /// is idle (no frame in flight may read it while it changes): for a tool
+  /// remaking a mesh as it is edited, not for every frame
+  pub fn overwrite(b:*Buffer, c:*const Ctx, offset:u64, bytes:[]const u8) ctx.Error!void {
+    assert(offset + bytes.len <= b.size);
+    c.device.deviceWaitIdle() catch |e| return ctx.fold(e);
+    copyIn(c, b, offset, bytes) catch |e| return ctx.fold(e);
+  }
+
+  /// through a staging buffer, waiting for the queue
+  fn copyIn(c:*const Ctx, b:*Buffer, offset:u64, bytes:[]const u8) !void {
+    if (bytes.len == 0) return;
     var stage = try init(c, bytes.len, .{.transfer_src = true});
     defer stage.deinit(c);
     stage.write(0, bytes);
-    var to = usage;
-    to.transfer_dst = true;
-    var b = try create(c, bytes.len, to, .{.device_local = true});
-    errdefer b.deinit(c);
     const pool = try c.device.createCommandPool(&.{.flags = .{.transient = true}, .queue_family_index = c.family}, null);
     defer c.device.destroyCommandPool(pool, null);
     var cb:vk.CommandBuffer = undefined;
     try c.device.allocateCommandBuffers(&.{.command_pool = pool, .level = .primary, .command_buffer_count = 1}, @ptrCast(&cb));
     const cmd = vk.CommandBufferProxy.init(cb, c.vkd);
     try cmd.beginCommandBuffer(&.{.flags = .{.one_time_submit = true}});
-    cmd.copyBuffer(stage.buf, b.buf, &.{.{.src_offset = 0, .dst_offset = 0, .size = bytes.len}});
+    cmd.copyBuffer(stage.buf, b.buf, &.{.{.src_offset = 0, .dst_offset = offset, .size = bytes.len}});
     try cmd.endCommandBuffer();
     const fence = try c.device.createFence(&.{}, null);
     defer c.device.destroyFence(fence, null);
     const cbi = [_]vk.CommandBufferSubmitInfo{.{.command_buffer = cb, .device_mask = 0}};
     try c.device.queueSubmit2(c.queue, &.{.{.command_buffer_info_count = cbi.len, .p_command_buffer_infos = &cbi}}, fence);
     _ = try c.device.waitForFences(&.{fence}, .true, m.maxInt(u64));
-    return b;
   }
 
   fn create(c:*const Ctx, size:u64, usage:vk.BufferUsageFlags, props:vk.MemoryPropertyFlags) !Buffer {

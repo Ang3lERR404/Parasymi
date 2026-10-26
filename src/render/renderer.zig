@@ -16,6 +16,7 @@ const glfw = engine.glfw;
 const m = engine.core.math;
 const jobs = engine.core.jobs;
 const Buffer = engine.gfx.buffer.Buffer;
+const vk = engine.vk;
 const er = engine.render.renderer;
 const vertex = lib.vertex;
 const meshgen = lib.meshgen;
@@ -116,6 +117,8 @@ pub fn caster(slot:usize) usize { return slot - slot % meshgen.LODS + meshgen.LO
 pub const CHUNK_MID_Y:f32 = 1.5;
 pub const CHUNK_RADIUS:f32 = m.f(ck.SIZE) * 0.71 + 2;
 
+/// a tool's meshes are made with room for one this-th more (`setParts`)
+const TOOL_ROOM = 2;
 /// milliseconds a frame may spend meshing streamed chunks
 pub const MESH_MS:f64 = 3;
 /// streamed chunks meshed together over the pool, each into its own scratch
@@ -170,6 +173,8 @@ pub const Ext = struct {
   detail_scratch:[MESH_BATCH]std.ArrayList(vertex.DetailTile) = @splat(.empty),
   /// the meshes while they are still growing (see `meshesReady`)
   growing:?*Growing = null,
+  /// how many vertices of `meshes` a tool last put in (`setParts`; 0: none)
+  tool_verts:usize = 0,
 };
 
 /// every built-once mesh (plant species + part library), grown on a thread
@@ -329,9 +334,12 @@ fn glassy(verts:[]const vertex.Mesh, ranges:*const [meshlib.SLOTS][2]u32, out:*[
 
 /// put the meshes `b` holds in place of every built-once mesh, each part
 /// slot drawing its run of `ranges` and plants nothing: a tool remaking a
-/// mesh as it is edited (tools/meshedit.zig). The old buffers go once no
-/// frame in flight reads them; with nothing in `b` they stay, drawn by no slot.
-pub fn setParts(r:*Renderer, b:*meshgen.Builder, ranges:[meshlib.SLOTS][2]u32) Error!void {
+/// mesh as it is edited (tools/meshedit.zig). Its first `kept` vertices are
+/// as it last put them, so only those after are copied in while the
+/// buffers have room; else they are made anew with room to spare (the old
+/// go once no frame in flight reads them). With nothing in `b` they stay,
+/// drawn by no slot.
+pub fn setParts(r:*Renderer, b:*meshgen.Builder, ranges:[meshlib.SLOTS][2]u32, kept:usize) Error!void {
   const x = &r.ext;
   x.plant_ranges = @splat(.{0, 0});
   x.plant_morph = @splat(0);
@@ -340,19 +348,30 @@ pub fn setParts(r:*Renderer, b:*meshgen.Builder, ranges:[meshlib.SLOTS][2]u32) E
     x.part_glassy = @splat(false);
     return;
   }
-  _ = try b.skinOf(b.v.items.len);
-  _ = try b.growOf(b.v.items.len);
+  const n = b.v.items.len;
+  _ = try b.skinOf(n);
+  _ = try b.growOf(n);
   x.part_ranges = ranges;
   glassy(b.v.items, &x.part_ranges, &x.part_glassy);
+  const from = @min(kept, x.tool_verts);
+  x.tool_verts = n;
+  const usage:vk.BufferUsageFlags = .{.vertex_buffer = true};
+  if (x.meshes.size >= n * @sizeOf(vertex.Mesh) and from > 0) {
+    try x.meshes.overwrite(&r.ctx, from * @sizeOf(vertex.Mesh), sliceAsBytes(b.v.items[from..]));
+    try x.skins.overwrite(&r.ctx, from * @sizeOf(vertex.Skin), sliceAsBytes(b.skin.items[from..]));
+    try x.grows.overwrite(&r.ctx, from * @sizeOf(vertex.Grow), sliceAsBytes(b.grow.items[from..]));
+    return;
+  }
   try r.retire(x.meshes);
   try r.retire(x.skins);
   try r.retire(x.grows);
   x.meshes = .{};
   x.skins = .{};
   x.grows = .{};
-  x.meshes = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.v.items));
-  x.skins = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.skin.items));
-  x.grows = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.grow.items));
+  const room = n + n / TOOL_ROOM;
+  x.meshes = try Buffer.initRoom(&r.ctx, usage, room * @sizeOf(vertex.Mesh), sliceAsBytes(b.v.items));
+  x.skins = try Buffer.initRoom(&r.ctx, usage, room * @sizeOf(vertex.Skin), sliceAsBytes(b.skin.items));
+  x.grows = try Buffer.initRoom(&r.ctx, usage, room * @sizeOf(vertex.Grow), sliceAsBytes(b.grow.items));
 }
 
 /// forget every chunk mesh: the world was replaced (e.g. a save was loaded).

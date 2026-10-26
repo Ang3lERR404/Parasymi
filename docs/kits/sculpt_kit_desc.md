@@ -40,7 +40,7 @@ neighbouring blocks disagreed). A very wide melt makes sampling slower.
 | `weigh(p) vertex.Skin` | skin weights at `p` (exp falloff over `soft`, only joined bones) |
 | `pack(w)` | per-bone weights → the four heaviest, dropping < 3% of the top, unorm summing to 255 |
 | `packWith(w, slope)` | `pack` plus each kept bone's weight gradient (`gx/gy/gz`), so normals bend by the true Jacobian |
-| `mesh(b, h, t, part)` | mesh with cell size `h`; every vertex `part`, tu (`t`, 0), skin weights written via `b.skinOf` |
+| `mesh(b, h, t, part)` | mesh with cell size `h`; every vertex `part`, tu (`t`, 0), skin weights written via `b.skinOf`; with `io` set, the field and vertices are worked out over the cores (`jobs.each`, the same mesh as serial; tested) |
 
 ## Who uses it
 

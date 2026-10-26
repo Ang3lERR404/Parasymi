@@ -16,6 +16,8 @@ const Allocator = std.mem.Allocator;
 const m = @import("../core/math.zig");
 const color = @import("../core/color.zig");
 const vertex = @import("vertex.zig");
+const jobs = @import("../core/jobs.zig");
+const Io = std.Io;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -123,6 +125,9 @@ fn colV(c:color.Rgba8) V3 { return v3(m.f(c.r), m.f(c.g), m.f(c.b)); }
 /// a point on the surface and its outward normal there
 pub const Hit = struct { p:V3, n:V3 };
 
+/// a build hands the cores blocks of the field this many at least
+const JOB_BLOCKS = 4;
+
 pub const Sculpt = struct {
   gpa:Allocator,
   forms:std.ArrayList(Placed) = .empty,
@@ -138,6 +143,9 @@ pub const Sculpt = struct {
   /// the bones whose forms it keeps (a bit each); the rest are left out,
   /// for a surface cast onto only part of a body
   only:u64 = ~@as(u64, 0),
+  /// where a build's field and vertices are worked out over the cores
+  /// (`jobs.each`; null: here alone, the same mesh either way)
+  io:?Io = null,
 
   pub fn deinit(s:*Sculpt) void {
     s.forms.deinit(s.gpa);
@@ -409,62 +417,88 @@ pub const Sculpt = struct {
       if (!solid) continue;
       const d = s.dist(c, cand.items);
       if (@abs(d) > half * 1.6 + 2 * h) continue;
-      var bl:Block = .{ .at = .{ bx, by, bz }, .vals = undefined, .vid = @splat(NONE), .cand = try gpa.dupe(u32, cand.items) };
-      for (0..S) |z| for (0..S) |y| for (0..S) |x| {
-        const p = lo + v3(m.f(bx * B + x), m.f(by * B + y), m.f(bz * B + z)) * m.splat3(h);
-        bl.vals[(z * S + y) * S + x] = s.dist(p, bl.cand);
-      };
       map[(bz * nb[1] + by) * nb[0] + bx] = @intCast(blocks.items.len);
-      try blocks.append(gpa, bl);
+      try blocks.append(gpa, .{ .at = .{ bx, by, bz }, .vals = undefined, .vid = @splat(NONE), .cand = try gpa.dupe(u32, cand.items) });
     };
 
-    // a vertex in every cell the surface crosses: the mean of where it
-    // crosses the cell's edges, pulled onto the surface
     const Vert = struct { p:V3, n:V3, col:color.Rgba8, skin:vertex.Skin };
-    var verts:std.ArrayList(Vert) = .empty;
-    defer verts.deinit(gpa);
     const corner = [8][3]usize{ .{ 0, 0, 0 }, .{ 1, 0, 0 }, .{ 0, 1, 0 }, .{ 1, 1, 0 }, .{ 0, 0, 1 }, .{ 1, 0, 1 }, .{ 0, 1, 1 }, .{ 1, 1, 1 } };
     const edges = [12][2]u8{ .{ 0, 1 }, .{ 2, 3 }, .{ 4, 5 }, .{ 6, 7 }, .{ 0, 2 }, .{ 1, 3 }, .{ 4, 6 }, .{ 5, 7 }, .{ 0, 4 }, .{ 1, 5 }, .{ 2, 6 }, .{ 3, 7 } };
-    for (blocks.items) |*bl| {
-      for (0..B) |z| for (0..B) |y| for (0..B) |x| {
-        var vals:[8]f32 = undefined;
-        var inside:u8 = 0;
-        for (corner, 0..) |cc, k| {
-          vals[k] = bl.vals[((z + cc[2]) * S + y + cc[1]) * S + x + cc[0]];
-          if (vals[k] < 0) inside += 1;
-        }
-        if (inside == 0 or inside == 8) continue;
-        var acc = v3(0, 0, 0);
-        var n:f32 = 0;
-        for (edges) |e| {
-          const a = vals[e[0]];
-          const c = vals[e[1]];
-          if ((a < 0) == (c < 0)) continue;
-          const f = a / (a - c);
-          const pa = v3(m.f(corner[e[0]][0]), m.f(corner[e[0]][1]), m.f(corner[e[0]][2]));
-          const pc = v3(m.f(corner[e[1]][0]), m.f(corner[e[1]][1]), m.f(corner[e[1]][2]));
-          acc += m.lerpV(pa, pc, f);
-          n += 1;
-        }
-        const cell = v3(m.f(bl.at[0] * B + x), m.f(bl.at[1] * B + y), m.f(bl.at[2] * B + z));
-        var p = lo + (cell + acc / m.splat3(n)) * m.splat3(h);
-        // onto the surface, never leaving the cell's neighbourhood
-        const start = p;
-        for (0..2) |_| {
-          const d = s.dist(p, bl.cand);
-          p -= s.grad(p, bl.cand, h * 0.25) * m.splat3(d);
-        }
-        if (m.len(p - start) > h) p = start;
-        const nrm = s.grad(p, bl.cand, h * 0.35);
-        const cv = s.colourFrom(p, bl.cand);
-        bl.vid[(z * B + y) * B + x] = @intCast(verts.items.len);
-        try verts.append(gpa, .{
-          .p = p, .n = nrm,
-          .col = .{ .r = @intFromFloat(@min(cv[0], 255)), .g = @intFromFloat(@min(cv[1], 255)), .b = @intFromFloat(@min(cv[2], 255)), .a = 255 },
-          .skin = s.weighFrom(p, bl.cand),
-        });
-      };
-    }
+
+    // each block's field, over the cores
+    const Fill = struct {
+      s:*const Sculpt,
+      bs:[]Block,
+      lo:V3,
+      h:f32,
+      fn run(j:@This(), first:usize, end:usize) void {
+        for (j.bs[first..end]) |*bl| for (0..S) |z| for (0..S) |y| for (0..S) |x| {
+          const p = j.lo + v3(m.f(bl.at[0] * B + x), m.f(bl.at[1] * B + y), m.f(bl.at[2] * B + z)) * m.splat3(j.h);
+          bl.vals[(z * S + y) * S + x] = j.s.dist(p, bl.cand);
+        };
+      }
+    };
+    jobs.each(s.io, blocks.items.len, JOB_BLOCKS, Fill, .{ .s = s, .bs = blocks.items, .lo = lo, .h = h }, Fill.run);
+
+    // a vertex in every cell the surface crosses, numbered in order, then
+    // placed over the cores: the mean of where it crosses the cell's
+    // edges, pulled onto the surface
+    var nv:u32 = 0;
+    for (blocks.items) |*bl| for (0..B) |z| for (0..B) |y| for (0..B) |x| {
+      var inside:u8 = 0;
+      for (corner) |cc| inside += @intFromBool(bl.vals[((z + cc[2]) * S + y + cc[1]) * S + x + cc[0]] < 0);
+      if (inside == 0 or inside == 8) continue;
+      bl.vid[(z * B + y) * B + x] = nv;
+      nv += 1;
+    };
+    const verts = try gpa.alloc(Vert, nv);
+    defer gpa.free(verts);
+    const Place = struct {
+      s:*const Sculpt,
+      bs:[]const Block,
+      out:[]Vert,
+      lo:V3,
+      h:f32,
+      fn run(j:@This(), first:usize, end:usize) void {
+        const sc = j.s;
+        const hh = j.h;
+        for (j.bs[first..end]) |*bl| for (0..B) |z| for (0..B) |y| for (0..B) |x| {
+          const vi = bl.vid[(z * B + y) * B + x];
+          if (vi == NONE) continue;
+          var vals:[8]f32 = undefined;
+          for (corner, 0..) |cc, k| vals[k] = bl.vals[((z + cc[2]) * S + y + cc[1]) * S + x + cc[0]];
+          var acc = v3(0, 0, 0);
+          var n:f32 = 0;
+          for (edges) |e| {
+            const a = vals[e[0]];
+            const c = vals[e[1]];
+            if ((a < 0) == (c < 0)) continue;
+            const f = a / (a - c);
+            const pa = v3(m.f(corner[e[0]][0]), m.f(corner[e[0]][1]), m.f(corner[e[0]][2]));
+            const pc = v3(m.f(corner[e[1]][0]), m.f(corner[e[1]][1]), m.f(corner[e[1]][2]));
+            acc += m.lerpV(pa, pc, f);
+            n += 1;
+          }
+          const cell = v3(m.f(bl.at[0] * B + x), m.f(bl.at[1] * B + y), m.f(bl.at[2] * B + z));
+          var p = j.lo + (cell + acc / m.splat3(n)) * m.splat3(hh);
+          // onto the surface, never leaving the cell's neighbourhood
+          const start = p;
+          for (0..2) |_| {
+            const d = sc.dist(p, bl.cand);
+            p -= sc.grad(p, bl.cand, hh * 0.25) * m.splat3(d);
+          }
+          if (m.len(p - start) > hh) p = start;
+          const nrm = sc.grad(p, bl.cand, hh * 0.35);
+          const cv = sc.colourFrom(p, bl.cand);
+          j.out[vi] = .{
+            .p = p, .n = nrm,
+            .col = .{ .r = @intFromFloat(@min(cv[0], 255)), .g = @intFromFloat(@min(cv[1], 255)), .b = @intFromFloat(@min(cv[2], 255)), .a = 255 },
+            .skin = sc.weighFrom(p, bl.cand),
+          };
+        };
+      }
+    };
+    jobs.each(s.io, blocks.items.len, JOB_BLOCKS, Place, .{ .s = s, .bs = blocks.items, .out = verts, .lo = lo, .h = h }, Place.run);
 
     const Look = struct {
       fn cellVert(bs:[]const Block, mp:[]const u32, n:[3]usize, ci:[3]isize) ?u32 {
@@ -509,14 +543,14 @@ pub const Sculpt = struct {
           const sgn:f32 = if (v0 < 0) 1 else -1;
           const dir = switch (axis) { 0 => v3(sgn, 0, 0), 1 => v3(0, sgn, 0), else => v3(0, 0, sgn) };
           var P:[4]V3 = undefined;
-          for (&P, q) |*pp, vi| pp.* = verts.items[vi].p;
+          for (&P, q) |*pp, vi| pp.* = verts[vi].p;
           // split along the shorter diagonal
           const tris:[2][3]usize = if (m.len(P[0] - P[2]) <= m.len(P[1] - P[3])) .{ .{ 0, 1, 2 }, .{ 0, 2, 3 } } else .{ .{ 0, 1, 3 }, .{ 1, 2, 3 } };
           for (tris) |tri| {
             const fnrm = m.cross(P[tri[1]] - P[tri[0]], P[tri[2]] - P[tri[0]]);
             const order = if (m.dot(fnrm, dir) >= 0) [3]usize{ tri[0], tri[1], tri[2] } else [3]usize{ tri[0], tri[2], tri[1] };
             for (order) |k| {
-              const vv = verts.items[q[k]];
+              const vv = verts[q[k]];
               try b.put(vv.p, vv.n, vv.col, t, 0, part);
               try skins.append(gpa, vv.skin);
             }
@@ -527,3 +561,24 @@ pub const Sculpt = struct {
     @memcpy(try b.skinOf(start), skins.items);
   }
 };
+
+test "a sculpt meshes the same over the cores as here alone" {
+  const testing = std.testing;
+  const asBytes = std.mem.sliceAsBytes;
+  const gpa = testing.allocator;
+  const M = @import("meshgen.zig").Mesher(enum(u32) { stem }, .stem);
+  var built:[2]M.Builder = .{ .{ .gpa = gpa }, .{ .gpa = gpa } };
+  defer for (&built) |*b| b.deinit();
+  const col = color.rgb(0.5, 0.4, 0.3).toRgba8(255);
+  for (&built, [_]?Io{ null, testing.io }) |*b, io| {
+    var s:Sculpt = .{ .gpa = gpa, .parents = &.{ null, 0 }, .io = io };
+    defer s.deinit();
+    try s.add(.{ .shape = .{ .ellipsoid = .{ .c = v3(0, 0, 0), .r = v3(0.2, 0.15, 0.1) } }, .bone = 0, .col = col });
+    try s.add(.{ .shape = .{ .cone = .{ .a = v3(0, 0.1, 0), .b = v3(0.1, 0.35, 0), .ra = 0.08, .rb = 0.03 } }, .bone = 1, .col = col });
+    try s.add(.{ .shape = .{ .box = .{ .c = v3(0.15, 0, 0), .half = v3(0.06, 0.06, 0.2), .round = 0.02 } }, .bone = 0, .col = col, .carve = true });
+    try s.mesh(M, b, 0.01, 0.5, .stem);
+  }
+  try testing.expect(built[0].v.items.len > 0);
+  try testing.expectEqualSlices(u8, asBytes(built[0].v.items), asBytes(built[1].v.items));
+  try testing.expectEqualSlices(u8, asBytes(built[0].skin.items), asBytes(built[1].skin.items));
+}

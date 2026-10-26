@@ -72,8 +72,10 @@ const CELL_MIN:f32 = 0.0025;
 const MAX_CELLS:f32 = 256;
 /// the least a form's size may be (m)
 const SIZE_MIN:f32 = 0.005;
-/// while a value is dragged the surface is meshed again at most this often (s)
+/// while a value is dragged the surface is meshed again at most this often
+/// (s), its cells this many times wider (full detail once it is let go)
 const REMESH:f32 = 0.08;
+const DRAG_COARSE:f32 = 2;
 /// a drag changes a length this much per pixel, a turn (degrees) and a
 /// colour these (shift: `FINE` of it)
 const DRAG_LEN:f32 = 0.002;
@@ -207,8 +209,9 @@ const Doc = struct {
   }
 
   /// its surface into `b`, cells `cell` across (wider where the sculpt is
-  /// too big for that many); nothing when no form adds anything
-  fn mesh(d:*const Doc, gpa:Allocator, b:*meshgen.Builder) Allocator.Error!void {
+  /// too big for that many; `DRAG_COARSE` times them while `coarse`);
+  /// nothing when no form adds anything
+  fn mesh(d:*const Doc, gpa:Allocator, io:?Io, coarse:bool, b:*meshgen.Builder) Allocator.Error!void {
     var solid = false;
     var far:f32 = 0;
     for (d.pieces.items) |p| {
@@ -216,10 +219,10 @@ const Doc = struct {
       far = @max(far, p.reach());
     }
     if (!solid) return;
-    var sc:sculpt.Sculpt = .{ .gpa = gpa, .parents = &.{null} };
+    var sc:sculpt.Sculpt = .{ .gpa = gpa, .parents = &.{null}, .io = io };
     defer sc.deinit();
     for (d.pieces.items) |p| try sc.add(p.form());
-    const h = @max(d.cell, 2 * far / MAX_CELLS);
+    const h = @max(d.cell, 2 * far / MAX_CELLS) * (if (coarse) DRAG_COARSE else 1);
     try sc.mesh(meshgen.gen, b, h, 0.5, .stem);
   }
 };
@@ -240,6 +243,8 @@ const Editor = struct {
   /// the surface wants meshing again, and how long since it last was
   stale:bool = true,
   since:f32 = 0,
+  /// what is shown was meshed coarser, while dragging
+  coarse:bool = false,
   note:[96]u8 = undefined,
   note_len:usize = 0,
 
@@ -554,15 +559,19 @@ pub fn main(init:std.process.Init) !void {
 
     // the surface meshed again once it changed (while dragging, not every frame)
     e.since += dt;
+    // (coarser while dragging, at full detail once let go)
+    if (e.drag == .none and e.coarse) e.stale = true;
     if (e.stale and (e.drag == .none or e.since >= REMESH)) {
+      const coarse = e.drag != .none;
       b.v.shrinkRetainingCapacity(wolf_end);
       b.skin.shrinkRetainingCapacity(@min(b.skin.items.len, wolf_end));
       b.grow.shrinkRetainingCapacity(@min(b.grow.items.len, wolf_end));
-      try e.doc.mesh(gpa, &b);
+      try e.doc.mesh(gpa, io, coarse, &b);
       const run:[2]u32 = .{ @intCast(wolf_end), @intCast(b.mark() - wolf_end) };
       for (0..meshgen.LODS) |l| ranges[meshlib.slot(SLOT_ID, @intCast(l))] = run;
-      try renderer.setParts(r, &b, ranges);
+      try renderer.setParts(r, &b, ranges, wolf_end);
       e.stale = false;
+      e.coarse = coarse;
       e.since = 0;
     }
 
@@ -652,10 +661,10 @@ test "carving alone makes no surface, a form makes a closed one" {
   var b:meshgen.Builder = .{ .gpa = gpa };
   defer b.deinit();
   try d.pieces.append(gpa, .{ .carve = true });
-  try d.mesh(gpa, &b);
+  try d.mesh(gpa, null, false, &b);
   try testing.expectEqual(@as(usize, 0), b.v.items.len);
   try d.pieces.append(gpa, .{ .kind = .cone });
-  try d.mesh(gpa, &b);
+  try d.mesh(gpa, null, false, &b);
   try testing.expect(b.v.items.len > 0);
   try testing.expectEqual(@as(usize, 0), b.v.items.len % 3);
 }
