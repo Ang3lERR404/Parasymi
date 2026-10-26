@@ -39,12 +39,13 @@ pub const Seeker = struct {
   cramped:bool = false,
 
   pub fn tick(sk:*Seeker, gpa:Allocator, w:*World, p:*Plants, ss:*st.Structures, g:*prog.Progression) Allocator.Error!void {
-    // lineage structures side by side are witnessed once per sweep
-    if (sk.cursor == 0) ss.meetings(g);
     if (p.topology_dirty) p.rebuildLinks(w);
     const n = p.len();
-    if (n == 0) return;
     if (sk.cursor >= n) sk.cursor = 0;
+    // lineage structures side by side are witnessed once per sweep (after
+    // the wrap: a sweep ends with the cursor at `n`, never at 0)
+    if (sk.cursor == 0) ss.meetings(g);
+    if (n == 0) return;
     // conduit chains are few: follow them all once per sweep
     if (sk.cursor == 0) for (ss.list.items) |*s| {
       if (!s.def().carrier) continue;
@@ -295,4 +296,16 @@ test "lineage structures grown side by side are witnessed, once each" {
   try testing.expectEqual(prog.Status.open, gd.g.status(.woven_stone));
   try testing.expectEqual(prog.Status.locked, gd.g.status(.braided_drift));
   try testing.expect(!gd.g.found.contains(.braid_and_spore));
+}
+test "lineage structures are witnessed in a garden that has plants" {
+  const gpa = testing.allocator;
+  var gd = try Garden.init(gpa, 12);
+  defer gd.deinit(gpa);
+  try gd.mature(gpa, 10, 10, .lumenroot);
+  // sweeps run before the pair stands, as in play
+  try gd.sweep(gpa);
+  try testing.expect(try gd.ss.place(gpa, &gd.w, 1, 1, .loomfern, 0, 0));
+  try testing.expect(try gd.ss.place(gpa, &gd.w, 3, 1, .lithophage, 0, 0));
+  try gd.sweep(gpa);
+  try testing.expect(gd.g.found.contains(.loom_and_stone));
 }
