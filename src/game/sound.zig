@@ -9,8 +9,8 @@
 //!   faster the louder and shorter; no two steps are alike.
 //! - out of the wolf's eyes (first person) its sap is heard settling now and
 //!   then, from inside: a soft slow groan, a low reedy hum through a closing
-//!   throat sagging as it sinks, with a few thick gloops rising through it,
-//!   all muffled. It settles more often while the wolf stands; a full belly
+//!   throat sagging as it sinks, with a few thick gloops rising through it
+//!   (now and then a lighter, smaller one or two among them), all muffled. It settles more often while the wolf stands; a full belly
 //!   groans lower.
 const lib = @import("../lib.zig");
 const std = lib.std;
@@ -163,15 +163,18 @@ const GROAN:f32 = 1.2;
 const SAP_HEAVY:f32 = 0.25;
 /// samples between retunings of the closing throat
 const RETUNE = 32;
-/// the gloops: how many (fewest, most), when (shares of the settling), their
-/// pitch (Hz) rising this share as each fades, its attack and fall (s), level
-const GLOOPS = [2]u32{2, 5};
-const GLOOP_AT = [2]f32{0.1, 0.65};
-const GLOOP_HZ = [2]f32{110, 210};
+/// a kind of gloop: how many (fewest, most), when (shares of the
+/// settling), its pitch (Hz), its fall (s) and level
+const GloopKind = struct { n:[2]u32, at:[2]f32, hz:[2]f32, fall:[2]f32, level:f32 };
+/// the deep ones every settling has, and the lighter, smaller ones that
+/// come with only this share of settlings
+const DEEP:GloopKind = .{.n = .{2, 5}, .at = .{0.1, 0.65}, .hz = .{110, 210}, .fall = .{0.06, 0.12}, .level = 0.6};
+const LIGHT:GloopKind = .{.n = .{1, 2}, .at = .{0.2, 0.75}, .hz = .{300, 460}, .fall = .{0.035, 0.06}, .level = 0.35};
+const LIGHT_CHANCE:f32 = 0.25;
+const GLOOPS = DEEP.n[1] + LIGHT.n[1];
+/// each gloop's pitch rises this share as it fades; its attack (s)
 const GLOOP_RISE:f32 = 0.7;
 const GLOOP_ATTACK:f32 = 0.006;
-const GLOOP_FALL = [2]f32{0.06, 0.12};
-const GLOOP:f32 = 0.6;
 /// heard from inside: what muffles it (Hz), its loudness, and how fast it
 /// fades in and out with the view (s)
 const SAP_SOFT_HZ:f32 = 650;
@@ -189,6 +192,7 @@ const Gloop = struct {
   start:u32,
   attack:u32,
   fall:f32,
+  level:f32,
   amp:f32 = 1,
   age:u32 = 0,
 
@@ -198,7 +202,7 @@ const Gloop = struct {
     if (g.age >= g.attack) g.amp *= g.fall;
     g.age +|= 1;
     g.osc.freq = g.base * (1 + GLOOP_RISE * (1 - g.amp));
-    return g.osc.next() * rise * g.amp;
+    return g.osc.next() * rise * g.amp * g.level;
   }
 };
 
@@ -210,7 +214,7 @@ const Settle = struct {
   noise:dsp.Noise,
   throat:dsp.Biquad,
   soft:dsp.OnePole,
-  gloops:[GLOOPS[1]]Gloop,
+  gloops:[GLOOPS]Gloop,
   /// the hum's pitch before it sags, and the belly's lowering
   base:f32,
   low:f32,
@@ -221,15 +225,10 @@ const Settle = struct {
   fn init(weight:f32, r:*rng.Rng, rate:f32) Settle {
     const low = 1 - SAP_HEAVY * weight;
     const len = samples(r, SETTLE_LEN, rate) + 1;
-    const n = GLOOPS[0] + r.below(GLOOPS[1] - GLOOPS[0] + 1);
-    var gloops:[GLOOPS[1]]Gloop = undefined;
-    for (&gloops, 0..) |*g, i| g.* = .{
-      .osc = .{.rate = rate},
-      .base = r.range(GLOOP_HZ[0], GLOOP_HZ[1]) * low,
-      .start = if (i < n) m.floorTo(u32, r.range(GLOOP_AT[0], GLOOP_AT[1]) * m.f(len)) else m.maxInt(u32),
-      .attack = m.floorTo(u32, GLOOP_ATTACK * rate) + 1,
-      .fall = @exp(-1 / (r.range(GLOOP_FALL[0], GLOOP_FALL[1]) * rate)),
-    };
+    var gloops:[GLOOPS]Gloop = undefined;
+    const light = r.float() < LIGHT_CHANCE;
+    gloopsOf(DEEP, true, gloops[0..DEEP.n[1]], .{.r = r, .rate = rate, .len = len, .low = low});
+    gloopsOf(LIGHT, light, gloops[DEEP.n[1]..], .{.r = r, .rate = rate, .len = len, .low = low});
     const base = vary(r, GROAN_HZ) * low;
     return .{
       .rate = rate,
@@ -246,6 +245,21 @@ const Settle = struct {
     };
   }
 
+  const Within = struct { r:*rng.Rng, rate:f32, len:u32, low:f32 };
+
+  /// `out` filled with gloops of `kind` (silent unless `used`)
+  fn gloopsOf(kind:GloopKind, used:bool, out:[]Gloop, w:Within) void {
+    const n = if (used) kind.n[0] + w.r.below(kind.n[1] - kind.n[0] + 1) else 0;
+    for (out, 0..) |*g, i| g.* = .{
+      .osc = .{.rate = w.rate},
+      .base = w.r.range(kind.hz[0], kind.hz[1]) * w.low,
+      .start = if (i < n) m.floorTo(u32, w.r.range(kind.at[0], kind.at[1]) * m.f(w.len)) else m.maxInt(u32),
+      .attack = m.floorTo(u32, GLOOP_ATTACK * w.rate) + 1,
+      .fall = @exp(-1 / (w.r.range(kind.fall[0], kind.fall[1]) * w.rate)),
+      .level = kind.level,
+    };
+  }
+
   /// mixes the settling into `out`, faded with the view; false once ended
   fn render(st:*Settle, out:[]f32, fade:*dsp.Smooth) bool {
     for (out) |*s| {
@@ -258,7 +272,7 @@ const Settle = struct {
       const groan = st.throat.tick(st.hum.next() + BREATH * st.noise.next()) * GROAN * sw * sw;
       var gl:f32 = 0;
       for (&st.gloops) |*g| gl += g.tick(st.at);
-      s.* += st.soft.low(groan + gl * GLOOP) * st.gain * fade.next();
+      s.* += st.soft.low(groan + gl) * st.gain * fade.next();
       st.at += 1;
     }
     return st.at < st.len;
@@ -415,4 +429,14 @@ test "the sap settles only in the eyes, softly, and fades out with the view" {
   }
   try testing.expect(s.settle == null);
   for (buf) |x| try testing.expectEqual(@as(f32, 0), x);
+}
+
+test "now and then a settling has lighter gloops" {
+  var r:rng.Rng = .init(21);
+  var light:u32 = 0;
+  for (0..200) |_| {
+    const st:Settle = .init(0.5, &r, TEST_RATE);
+    if (st.gloops[DEEP.n[1]].start != m.maxInt(u32)) light += 1;
+  }
+  try testing.expect(light > 20 and light < 90);
 }
