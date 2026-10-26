@@ -1,6 +1,6 @@
 //! audio DSP building blocks, one sample at a time: oscillators, noise,
-//! filters (one-pole, biquad), an ADSR envelope, a parameter smoother and a
-//! delay line, plus level and pitch conversions. Pure maths at a sample
+//! crackle, filters (one-pole, biquad), an ADSR envelope, a parameter
+//! smoother and a delay line, plus level and pitch conversions. Pure maths at a sample
 //! `rate` (Hz) each unit keeps; nothing here touches a device, so a sound is
 //! built by chaining units (`Voice` shows how) and the platform's output
 //! pulls blocks of samples from it.
@@ -93,6 +93,33 @@ pub const Noise = struct {
   r:rng.Rng,
   pub fn init(seed:u64) Noise { return .{.r = .init(seed)}; }
   pub fn next(n:*Noise) f32 { return n.r.float() * 2 - 1; }
+};
+
+/// sparse crackle: tiny bursts of noise ("grains") at random moments, each
+/// of random loudness and fading within a few milliseconds (dry leaves
+/// crushed, twigs, embers, rain on a leaf). `density` may change per sample.
+pub const Crackle = struct {
+  rate:f32,
+  /// grains per second, on average
+  density:f32 = 0,
+  /// how much a grain keeps per sample (from its fade time)
+  fall:f32,
+  r:rng.Rng,
+  level:f32 = 0,
+
+  /// a grain falls ~63% in `grain` seconds
+  pub fn init(seed:u64, grain:f32, rate:f32) Crackle {
+    return .{.rate = rate, .fall = @exp(-1 / @max(grain * rate, 1)), .r = .init(seed)};
+  }
+  pub fn next(c:*Crackle) f32 {
+    if (c.r.float() < c.density / c.rate) {
+      // mostly soft grains, a few loud ones
+      const a = c.r.float();
+      c.level = @max(c.level, a * a);
+    }
+    c.level *= c.fall;
+    return (c.r.float() * 2 - 1) * c.level;
+  }
 };
 
 // ---- filters ----
@@ -355,6 +382,25 @@ test "noise repeats for a seed" {
     try testing.expect(@abs(y) <= 1);
     try testing.expectEqual(y, b.next());
   }
+}
+
+test "crackle is silent without grains, sparse with them, repeats for a seed" {
+  var a:Crackle = .init(3, 0.001, TEST_RATE);
+  for (0..4800) |_| try testing.expectEqual(@as(f32, 0), a.next());
+  a.density = 100;
+  var b = a;
+  // a grain is loud for a few samples, then gone: count where one starts
+  var loud:usize = 0;
+  var quiet:usize = 0;
+  for (0..48000) |_| {
+    const y = a.next();
+    try testing.expectEqual(y, b.next());
+    try testing.expect(@abs(y) <= 1);
+    if (a.level < 1e-3) quiet += 1 else loud += 1;
+  }
+  // a hundred grains of ~1 ms each sound for well under half the second
+  try testing.expect(loud > 100 and loud < 24000);
+  try testing.expect(quiet > 24000);
 }
 
 test "one-pole low passes DC, high blocks it" {

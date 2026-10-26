@@ -124,7 +124,7 @@ gfx       meshgen (plant pieces), meshlib, growth (the garden's Grower), kits,
           instance layouts
 world     chunks (tile SoA + occupancy), generation, the garden's World
 sim       items, species, plants (footprints, floaters), ecology tick
-game      player, actions, structures, research, craft, sky, hud, view, play, save
+game      player, actions, structures, research, craft, sky, sound, hud, view, play, save
 render    the garden's renderer (passes, scene, mesh growing), terrain meshing
 main      wiring, frame loop, save/load/fullscreen requests
 lib       the import hub: std, engine and every game module (`@import("parasymi")` in tools/)

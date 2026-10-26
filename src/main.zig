@@ -44,6 +44,8 @@ const Dir = Io.Dir;
 const sep_str = std.fs.path.sep_str;
 const Options = options.Options;
 const m = lib.engine.core.math;
+const sound = lib.sound;
+const Sounds = engine.platform.audio.Output(sound.Sounds);
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
 const MAX_FRAME_DT:f64 = 0.1;
@@ -174,6 +176,12 @@ pub fn main(init:Init) !void {
   game.world.io = io;
   game.opts = opts;
   game.most_samples = r.maxSamples();
+  // the garden's sound; without a device it plays on in silence
+  const sounds:?*Sounds = Sounds.open(gpa, io, .init(world, sound.RATE), .{.name = txt.s.window.title, .rate = sound.RATE}) catch |e| none: {
+    log.warn("no sound: {t}", .{e});
+    break :none null;
+  };
+  defer if (sounds) |o| o.close(gpa, io);
   // what is in effect; the window opens windowed, so a fullscreen setting
   // is applied on the first frame
   var applied = opts;
@@ -210,6 +218,9 @@ pub fn main(init:Init) !void {
 
     const screen = r.extent();
     try game.update(&input, @floatCast(dt), screen);
+    for (game.player.footfalls()) |ff| if (ff) |f| if (sounds) |o| {
+      o.send(.{.step = f}) catch |e| log.warn("footstep: {t}", .{e});
+    };
     if (game.request) |rq| {
       game.request = null;
       // a lone thing's world is never saved, and no garden replaces it

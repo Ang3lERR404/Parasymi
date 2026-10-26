@@ -358,6 +358,11 @@ const Foot = struct {
   fn planted(f:*const Foot) bool { return f.t >= 1; }
 };
 
+/// a paw coming down, for what hears it (game/sound.zig): how heavy the
+/// wolf is (the belly's stage, 0 light .. 1 full) and how fast it goes
+/// (0 standing .. 1 sprinting)
+pub const Footfall = struct { weight:f32, pace:f32 };
+
 pub const Player = struct {
   /// feet position (y follows the terrain)
   pos:V3,
@@ -384,6 +389,8 @@ pub const Player = struct {
   accel:V3 = v3(0, 0, 0),
   feet:[2]Foot = @splat(.{}),
   placed:bool = false,
+  /// paws come down since `footfalls` last took them
+  fell:[2]?Footfall = @splat(null),
   /// what lags on springs: the lean and bank of the body, each arm's swing
   /// and elbow, the head's turn and nod, the ears
   lean:Swing = .{},
@@ -467,6 +474,12 @@ pub const Player = struct {
     const turn = diff * @min(1, dt * TURN_RESPONSE);
     p.facing += turn;
     p.turn = turn / @max(dt, MIN_DT);
+  }
+
+  /// the paws come down since last asked, once each
+  pub fn footfalls(p:*Player) [2]?Footfall {
+    defer p.fell = @splat(null);
+    return p.fell;
   }
 
   fn groundSpeed(p:*const Player) f32 { return @sqrt(p.vel[0] * p.vel[0] + p.vel[2] * p.vel[2]); }
@@ -589,6 +602,7 @@ pub const Player = struct {
         if (f.planted()) {
           f.at[1] = to[1];
           fell = true;
+          p.fell[s] = .{.weight = p.stage() / 2, .pace = m.clamp01(spd / (SPRINT_SPEED * p.gait().sprint))};
         }
       }
       m.spring(&f.pad, &f.pad_v, if (f.planted()) 1 else 0, PAD_FREQ, dt);

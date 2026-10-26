@@ -43,6 +43,7 @@ pub const save = @import("game/save.zig");
 pub const seeds = @import("game/seeds.zig");
 pub const setups = @import("game/setups.zig");
 pub const sky = @import("game/sky.zig");
+pub const sound = @import("game/sound.zig");
 pub const halo_structure = @import("game/structures/halo.zig");
 pub const monfris_structure = @import("game/structures/monfris.zig");
 pub const sporecaster_structure = @import("game/structures/sporecaster.zig");

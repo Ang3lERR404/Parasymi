@@ -22,7 +22,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## engine/src/core/
 - `color.zig` — colour helpers.
-- `dsp.zig` — audio DSP building blocks, one sample at a time: oscillators, noise, filters (one-pole, biquad), an ADSR envelope, a parameter smoother and…
+- `dsp.zig` — audio DSP building blocks, one sample at a time: oscillators, noise, crackle, filters (one-pole, biquad), an ADSR envelope, a parameter…
 - `jobs.zig` — parallel-for over the game's thread pool (the `Io` main is given): [0, n) split into ranges run on its worker threads and waited for…
 - `math.zig` — the one place for numeric helpers: scalars, angles, tile/world coordinates, SIMD vectors and column-major 4x4 matrices (Vulkan clip space…
 - `noise.zig` — 2D gradient noise + fractal variants.
@@ -161,6 +161,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/game/
 - `setups.zig` — prepared worlds for showcasing and testing (`--demo`, `--stress`).
 - `sky.zig` — day/night cycle and starfall.
+- `sound.zig` — what the garden sounds like: the source the audio device plays (main.zig opens it on `platform.audio.Output`).
 - `specimen.zig` — `--plant=<species>` / `--structure=<kind>`: one plant or structure alone in the world, held in one state or looping one animation…
 - `structures.zig` — grown structures: the first steps from hand work toward automation.
 
