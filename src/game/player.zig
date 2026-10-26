@@ -779,7 +779,7 @@ pub const Player = struct {
       const out:f32 = if (s == 0) REST_ELBOW_OUT else 0;
       const ik = solveArmTurned(m.mulPoint(into, at[s]) - skel.SHOULDER * v3(x, 1, 1), -x * out);
       const a = &q.arms[s];
-      a.root = .{ .x = m.lerp(a.root.x, ik.root.x, r), .y = m.lerp(a.root.y, ik.root.y, r), .z = m.lerp(a.root.z, ik.root.z, r) };
+      a.root = blendTurn(a.root, ik.root, r);
       a.mid = m.lerp(a.mid, ik.mid, r);
       // (on the belly the paw turns palm down and bends onto the sac; on
       // the hip the wrist cocks back)
@@ -800,7 +800,7 @@ pub const Player = struct {
       const at = m.mulPoint(into, p.wrist[s].pos) - skel.SHOULDER * v3(x, 1, 1);
       const ik = solveArm(at);
       const a = &q.arms[s];
-      a.root = .{ .x = m.lerp(a.root.x, ik.root.x, sq), .y = m.lerp(a.root.y, 0, sq), .z = m.lerp(a.root.z, ik.root.z, sq) };
+      a.root = blendTurn(a.root, ik.root, sq);
       a.mid = m.lerp(a.mid, ik.mid, sq);
       const stowing = m.clamp01(p.stow[s] / STOW_TIME * 3);
       a.low = .{ .x = m.lerp(a.low.x, 0.35 * (1 - stowing) + 0.9 * stowing, sq), .y = m.lerp(a.low.y, -x * twist * (1 - stowing), sq), .z = a.low.z };
@@ -965,8 +965,15 @@ pub fn solveArm(d:V3) skel.Limb {
   const dd = d * m.splat3(l / @max(m.len(d), 1e-6));
   const zr = m.asin(m.clamp(dd[0] / -y0, -1, 1));
   const y1 = y0 * @cos(zr);
-  const xr = m.atan2(dd[2], dd[1]) - m.atan2(z0, y1);
+  // (wrapped to the nearest turn: the difference of two angles can come
+  // out a whole turn round, and an arm blended toward it would spin)
+  const xr = m.angleDiff(0, m.atan2(dd[2], dd[1]) - m.atan2(z0, y1));
   return .{ .root = .{ .x = xr, .z = zr }, .mid = mid };
+}
+
+/// `a` turned toward `b` by share `k`, each angle the short way round
+fn blendTurn(a:skel.Turn, b:skel.Turn, k:f32) skel.Turn {
+  return .{ .x = a.x + m.angleDiff(a.x, b.x) * k, .y = a.y + m.angleDiff(a.y, b.y) * k, .z = a.z + m.angleDiff(a.z, b.z) * k };
 }
 
 /// `solveArm` with the shoulder first turned by `y` about the chest's
@@ -1113,4 +1120,32 @@ test "standing still with a heavy belly, one paw rests on it and the other on th
   t = 0;
   while (t < 4) : (t += TEST_DT) q.animate(null, TEST_DT);
   try testing.expect(q.rest_pose.x < 0.01);
+}
+
+test "the arms ease into the gathering and belly-rest poses without swinging round" {
+  // the hands travel there smoothly: never far in a frame, and the
+  // shoulder never turns more than half a turn
+  const Case = struct { full:f32, gather:bool };
+  for ([_]Case{ .{ .full = 0.6, .gather = false }, .{ .full = 0, .gather = true } }) |c| {
+    var p:Player = .{ .pos = v3(0, 0, 0) };
+    var last:?[2]V3 = null;
+    var t:f32 = 0;
+    while (t < 5) : (t += TEST_DT) {
+      if (c.gather and t > 0.5) {
+        p.work = v3(0, 0, GATHER_AT);
+        p.gather = 0;
+      }
+      p.animate(null, TEST_DT);
+      p.fullness = c.full;
+      const q = p.pose();
+      const w = skel.fk(q);
+      var h:[2]V3 = undefined;
+      for (0..2) |s| {
+        h[s] = m.origin(w[@intFromEnum(skel.sides[s].hand)]);
+        try testing.expect(@abs(q.arms[s].root.x) <= m.pi + TEST_EPS);
+        if (last) |l| try testing.expect(m.len(h[s] - l[s]) < 0.03);
+      }
+      last = h;
+    }
+  }
 }
