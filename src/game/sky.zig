@@ -3,6 +3,7 @@
 const lib = @import("../lib.zig");
 const std = lib.std;
 const Allocator = std.mem.Allocator;
+const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const Rng = engine.core.rng.Rng;
@@ -84,7 +85,7 @@ pub const Mote = struct {
 };
 
 /// starfall tuning (tune here, not scattered through update)
-const SPAWN_RATE:f32 = 2.5; // motes per second at full night
+const SPAWN_RATE:f32 = 0.9; // motes per second at full night
 const SPAWN_R_MIN:f32 = 2;
 const SPAWN_R_MAX:f32 = 16;
 const SPAWN_HEIGHT:f32 = 7; // how far above ground they start
@@ -101,18 +102,36 @@ const HOVER_RATE:f32 = 40;
 const DRIFT_RATE:f32 = 20;
 const BURN_BELOW:f32 = 0.4; // night below this, motes start burning away
 const BURN_RATE:f32 = 0.4; // life lost per second while burning
+/// a mote within this (m) of the wolf twinkles now and then: seconds
+/// between twinkles (a gap with none near passes silent)
+const TWINKLE_NEAR:f32 = 6;
+const TWINKLE_GAP = [2]f32{ 2.5, 8 };
+
+/// a mote near the wolf twinkled, for what hears it (game/sound.zig): how
+/// near (0 at `TWINKLE_NEAR` .. 1 touching)
+pub const Twinkle = struct { near:f32 };
 
 pub const Starfall = struct {
   motes:std.ArrayList(Mote) = .empty,
   acc:f32 = 0,
   rng:Rng,
+  /// seconds until a near mote may twinkle, and one since `twinkled` last took it
+  quiet:f32 = 0,
+  twinkle:?Twinkle = null,
 
   pub const MAX = 80;
 
   pub fn deinit(sf:*Starfall, gpa:Allocator) void { sf.motes.deinit(gpa); }
 
+  /// the twinkle since last asked, once
+  pub fn twinkled(sf:*Starfall) ?Twinkle {
+    defer sf.twinkle = null;
+    return sf.twinkle;
+  }
+
   /// motes land only on walkable tiles.
   pub fn update(sf:*Starfall, gpa:Allocator, sky:*const Sky, around:m.V3, ground:*const World, dt:f32) Allocator.Error!void {
+    sf.listen(around, dt);
     const night = 1 - sky.daylight();
     if (night > SPAWN_NIGHT and sf.motes.items.len < MAX) {
       sf.acc += dt * SPAWN_RATE * night;
@@ -140,4 +159,37 @@ pub const Starfall = struct {
       i += 1;
     }
   }
+
+  /// after a quiet gap, the nearest mote within reach twinkles
+  fn listen(sf:*Starfall, around:m.V3, dt:f32) void {
+    sf.quiet -= dt;
+    if (sf.quiet > 0) return;
+    sf.quiet = sf.rng.range(TWINKLE_GAP[0], TWINKLE_GAP[1]);
+    var nearest:f32 = TWINKLE_NEAR;
+    for (sf.motes.items) |mo| nearest = @min(nearest, m.len(mo.pos - around) * mo.life + TWINKLE_NEAR * (1 - mo.life));
+    if (nearest < TWINKLE_NEAR) sf.twinkle = .{ .near = 1 - nearest / TWINKLE_NEAR };
+  }
 };
+
+test "a near mote twinkles now and then, a far one never" {
+  var sf:Starfall = .{ .rng = Rng.init(7) };
+  defer sf.deinit(testing.allocator);
+  try sf.motes.append(testing.allocator, .{ .pos = m.v3(20, 0, 0), .vy = 0, .phase = 0 });
+  const here = m.v3(0, 0, 0);
+  var heard:u32 = 0;
+  // a minute at 60 frames a second
+  for (0..3600) |_| {
+    sf.listen(here, 1.0 / 60.0);
+    if (sf.twinkled() != null) heard += 1;
+  }
+  try testing.expectEqual(@as(u32, 0), heard);
+  sf.motes.items[0].pos = m.v3(2, 0, 0);
+  for (0..3600) |_| {
+    sf.listen(here, 1.0 / 60.0);
+    if (sf.twinkled()) |t| {
+      heard += 1;
+      try testing.expect(t.near > 0.5 and t.near < 0.8);
+    }
+  }
+  try testing.expect(heard >= 6 and heard <= 25);
+}

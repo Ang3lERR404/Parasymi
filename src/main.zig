@@ -223,6 +223,9 @@ pub fn main(init:Init) !void {
     for (game.player.footfalls()) |ff| if (ff) |f| if (sounds) |o| {
       o.send(.{.step = f}) catch |e| log.warn("footstep: {t}", .{e});
     };
+    if (game.stars.twinkled()) |t| if (sounds) |o| {
+      o.send(.{.twinkle = t}) catch |e| log.warn("twinkle: {t}", .{e});
+    };
     // out of the wolf's eyes its sap is heard settling
     if (game.cam.inEyes() != in_eyes) if (sounds) |o| {
       o.send(.{.eyes = !in_eyes}) catch |e| log.warn("eyes: {t}", .{e});

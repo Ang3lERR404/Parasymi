@@ -16,6 +16,10 @@
 //!   swelling and easing in slow gusts, and in the stronger ones a warm,
 //!   breathy whistle (low, soft-edged banded air with a rounder octave
 //!   under it) leaning up a little with the gust.
+//! - a mote of starlight near the wolf twinkles now and then: a few tiny
+//!   glassy pings in quick succession (high bell partials, a little
+//!   out of tune with each other), dying away in a soft shimmer; the
+//!   nearer the mote, the louder.
 const lib = @import("../lib.zig");
 const std = lib.std;
 const testing = std.testing;
@@ -366,10 +370,115 @@ const Wind = struct {
   }
 };
 
+// ---- the starlight twinkling (near a mote) ----
+
+/// pings in one twinkle (fewest, most), seconds between them, and the
+/// first ping's pitch (Hz); each next steps up or down by one of `STEPS`
+const PINGS = [2]u32{2, 4};
+const PING_GAP = [2]f32{0.05, 0.13};
+const PING_HZ = [2]f32{2100, 3400};
+const STEPS = [_]f32{1.122, 1.189, 1.335, 0.891, 0.841};
+/// a ping's glassy partials (shares of its pitch, a little stretched so it
+/// shimmers), their levels, how long each rings (s, ~63%) and the attack (s)
+const PARTIALS = [_]f32{1, 2.32, 4.13};
+const PARTIAL_LEVEL = [_]f32{1, 0.4, 0.15};
+const PARTIAL_FALL = [_]f32{0.32, 0.14, 0.06};
+const PING_ATTACK:f32 = 0.003;
+/// a slow shimmer through it all (Hz, share)
+const SHIMMER_HZ:f32 = 7;
+const SHIMMER:f32 = 0.25;
+/// what softens it (Hz), and its loudness for a far and a touching mote
+const TWINKLE_SOFT_HZ:f32 = 7000;
+const TWINKLE = [2]f32{0.006, 0.03};
+/// twinkles that may sound at once
+const TWINKLES = 2;
+/// a ping this far faded is gone (it is already far quieter than a step)
+const PING_SILENT:f32 = 1e-3;
+
+/// one ping: a tiny bell
+const Ping = struct {
+  osc:[PARTIALS.len]dsp.Osc,
+  amp:[PARTIALS.len]f32 = @splat(1),
+  fall:[PARTIALS.len]f32,
+  start:u32,
+  attack:u32,
+  level:f32,
+  age:u32 = 0,
+
+  fn tick(p:*Ping, at:u32) f32 {
+    if (at < p.start) return 0;
+    const rise = m.clamp01(m.f(p.age) / m.f(p.attack));
+    p.age +|= 1;
+    var y:f32 = 0;
+    inline for (0..PARTIALS.len) |k| {
+      if (p.age > p.attack) p.amp[k] *= p.fall[k];
+      y += p.osc[k].next() * p.amp[k] * PARTIAL_LEVEL[k];
+    }
+    return y * rise * p.level;
+  }
+
+  fn done(p:*const Ping) bool { return p.age > p.attack and p.amp[0] < PING_SILENT; }
+};
+
+/// one twinkle playing out
+const Twinkle = struct {
+  pings:[PINGS[1]]Ping,
+  n:u32,
+  shimmer:dsp.Osc,
+  soft:dsp.OnePole,
+  at:u32 = 0,
+  gain:f32,
+
+  fn init(near:f32, r:*rng.Rng, rate:f32) Twinkle {
+    const n = PINGS[0] + r.below(PINGS[1] - PINGS[0] + 1);
+    var pings:[PINGS[1]]Ping = undefined;
+    var hz = r.range(PING_HZ[0], PING_HZ[1]);
+    var start:u32 = 0;
+    for (&pings, 0..) |*p, i| {
+      var osc:[PARTIALS.len]dsp.Osc = undefined;
+      var fall:[PARTIALS.len]f32 = undefined;
+      inline for (0..PARTIALS.len) |k| {
+        osc[k] = .{.rate = rate, .freq = hz * PARTIALS[k], .phase = r.float()};
+        fall[k] = @exp(-1 / (vary(r, PARTIAL_FALL[k]) * rate));
+      }
+      p.* = .{
+        .osc = osc,
+        .fall = fall,
+        .start = start,
+        .attack = m.floorTo(u32, PING_ATTACK * rate) + 1,
+        // each later ping a little softer
+        .level = if (i < n) vary(r, 1) / m.f(i + 1) else 0,
+      };
+      start += samples(r, PING_GAP, rate);
+      hz *= STEPS[r.below(STEPS.len)];
+    }
+    return .{
+      .pings = pings,
+      .n = n,
+      .shimmer = .{.rate = rate, .freq = vary(r, SHIMMER_HZ)},
+      .soft = .init(TWINKLE_SOFT_HZ, rate),
+      .gain = m.lerp(TWINKLE[0], TWINKLE[1], near),
+    };
+  }
+
+  /// mixes the twinkle into `out`; false once it has ended
+  fn render(t:*Twinkle, out:[]f32) bool {
+    for (out) |*s| {
+      var y:f32 = 0;
+      for (t.pings[0..t.n]) |*p| y += p.tick(t.at);
+      t.at +|= 1;
+      s.* += t.soft.low(y) * (1 - SHIMMER + SHIMMER * t.shimmer.next()) * t.gain;
+    }
+    for (t.pings[0..t.n]) |p| if (!p.done()) return true;
+    return false;
+  }
+};
+
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
 pub const Sounds = struct {
-  /// a paw landed; the view entered or left the wolf's eyes
-  pub const Cmd = union(enum) { step:Footfall, eyes:bool };
+  /// a paw landed; the view entered or left the wolf's eyes; a mote near
+  /// the wolf twinkled
+  pub const Cmd = union(enum) { step:Footfall, eyes:bool, twinkle:lib.sky.Twinkle };
 
   rate:f32,
   r:rng.Rng,
@@ -386,6 +495,9 @@ pub const Sounds = struct {
   /// the belly at the last step
   weight:f32 = 0,
   wind:Wind,
+  /// a new twinkle takes the oldest's place when both are sounding
+  twinkles:[TWINKLES]?Twinkle = @splat(null),
+  next_twinkle:usize = 0,
 
   pub fn init(seed:u64, rate:f32) Sounds {
     var r:rng.Rng = .init(seed);
@@ -405,12 +517,19 @@ pub const Sounds = struct {
         s.eyes = e;
         s.fade.target = if (e) 1 else 0;
       },
+      .twinkle => |t| {
+        s.twinkles[s.next_twinkle] = .init(m.clamp01(t.near), &s.r, s.rate);
+        s.next_twinkle = (s.next_twinkle + 1) % TWINKLES;
+      },
     }
   }
 
   pub fn render(s:*Sounds, out:[]f32) void {
     for (&s.steps) |*v| if (v.*) |*st| {
       if (!st.render(out)) v.* = null;
+    };
+    for (&s.twinkles) |*v| if (v.*) |*t| {
+      if (!t.render(out)) v.* = null;
     };
     s.sap(out);
     s.wind.render(out);
@@ -533,6 +652,28 @@ test "now and then a settling has lighter gloops" {
     if (st.gloops[DEEP.n[1]].start != m.maxInt(u32)) light += 1;
   }
   try testing.expect(light > 20 and light < 90);
+}
+
+test "a twinkle is a few soft high pings, louder the nearer, and ends" {
+  var peaks:[2]f32 = undefined;
+  for ([_]f32{0.1, 1}, &peaks) |near, *peak| {
+    var s:Sounds = .init(11, TEST_RATE);
+    s.wind.level = 0;
+    s.apply(.{.twinkle = .{.near = near}});
+    try testing.expect(s.twinkles[0].?.n >= PINGS[0] and s.twinkles[0].?.n <= PINGS[1]);
+    var buf:[480]f32 = undefined;
+    peak.* = 0;
+    var n:u32 = 0;
+    while (s.twinkles[0] != null and n < 4 * 48000) : (n += buf.len) {
+      @memset(&buf, 0);
+      s.render(&buf);
+      for (buf) |x| peak.* = @max(peak.*, @abs(x));
+    }
+    try testing.expect(s.twinkles[0] == null);
+    const len = m.f(n) / TEST_RATE;
+    try testing.expect(len > 0.5 and len < 3.5);
+  }
+  try testing.expect(peaks[0] > 0.002 and peaks[1] < 0.1 and peaks[1] > 2 * peaks[0]);
 }
 
 test "the wind is gentle, swells in gusts and whistles only in some" {
