@@ -13,11 +13,11 @@ underneath. It never imports the game.
 | core | math, color, rng, noise, registry, jobs, text, png | — |
 | platform | input, display | — |
 | anim | `rig`: `Turn` (Y·X·Z, `blend`), `twoBone` (law-of-cosines IK), `inverses`, `skin` | the wolf's skeleton (`wolf_skeleton`: bones, offsets, `fk`, breath swell) and limb solvers (`player.solveLeg`/`solveArm`, built on `twoBone`) |
-| gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
+| gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights), `growth` (`Grower(M, leaf)`: the growth-spline `Skeleton`, `tag`, `formed`) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
 | world | `chunk` (grid: `SIZE`, `Coord`, `MeshSlot`, `localIndex`), `World(L)` (streaming) | `chunk` (the garden's tiles), `gen`, `world` (`World` over the garden's land) |
 | render | `Renderer(G)`, post, light, camera, `passes/ui` | `renderer` (the garden's `G`), passes, terrain meshing |
 | ui | draw, font | — |
-| shaders | post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl` | everything else; `common.glsl` includes `light.glsl` |
+| shaders | post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`, `growth.glsl` (`growOut`) | everything else; `common.glsl` includes `light.glsl`, `part.vert` `growth.glsl` |
 
 ## How a game plugs in
 - **Renderer**: `engine.render.renderer.Renderer(G)`, where `G` is a
@@ -36,6 +36,10 @@ underneath. It never imports the game.
   surfaces take. Parasymi's is `mg.gen` (`src/gfx/meshgen.zig`), whose
   `Builder` every mesh is built in. A sculpt meshes into it with
   `s.mesh(mg.gen, b, h, t, part)`.
+- **Growth splines**: `engine.gfx.growth.Grower(M, leaf)`, `M` the mesher
+  and `leaf` how the game builds one leaf (`LeafFn`). Parasymi's is
+  `src/gfx/growth.zig`. Its shader carries `vertex.Grow` and calls
+  `growOut` (growth.glsl) with how far its thing has grown.
 - **World**: `engine.world.World(L)`, where `L` declares `Chunk` (holding
   `at`, `height`, `kind`, `occ`, `pins`, `gpu_slot`, `dirty`), `Kind`,
   `Occ` (with `.none`), `blank`, `generate` and `heightAt`. Parasymi's is

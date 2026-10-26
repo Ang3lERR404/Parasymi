@@ -5,7 +5,7 @@
 //!   core      math, colour, rng, noise, registry, jobs, text, png
 //!   platform  input, display (fullscreen)
 //!   anim      joint turns, two-bone IK, skinning matrices
-//!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting
+//!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
 //!   world     the chunk grid and the streamed chunk map
 //!   render    frame orchestration and passes, post (bloom, AA), light, camera
 //!   ui        SDF draw batch, font
@@ -42,6 +42,7 @@ pub const gfx = struct {
   pub const vertex = @import("gfx/vertex.zig");
   pub const meshgen = @import("gfx/meshgen.zig");
   pub const sculpt = @import("gfx/sculpt.zig");
+  pub const growth = @import("gfx/growth.zig");
 };
 
 pub const world = struct {
@@ -78,6 +79,7 @@ test {
   _ = anim.rig;
   _ = gfx.meshgen;
   _ = gfx.sculpt;
+  _ = gfx.growth;
   _ = world.chunk;
   _ = @import("world/world.zig");
   _ = render.camera;

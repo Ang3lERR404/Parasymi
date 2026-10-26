@@ -28,7 +28,7 @@ meshgen ──────────────┬─ structure_kit ── pa
                       │                └─ convergence_kit (+ palette)
                       ├─ radiant_kit ──────────────┘ (uses mineral_kit)
                       └─ sculpt_kit (engine) ── wolf_kit
-growth.zig (Skeleton) is used by structure_kit, parasite_kit, convergence_kit;
+growth.zig (Skeleton; the engine's, for the garden's builder) is used by structure_kit, parasite_kit, convergence_kit;
 never by radiant_kit (enforced by its test).
 ```
 

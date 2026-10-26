@@ -141,6 +141,8 @@ pub fn taperRadii(r0:f32, tip:f32, out:[]f32) void {
 pub fn Mesher(comptime Role:type, comptime stem:Role) type {
   return struct {
     pub const Part = Role;
+    /// the role a plain woody surface takes when none is given
+    pub const default_part = stem;
     const P = Role;
   pub const Builder = struct {
     gpa:Allocator,

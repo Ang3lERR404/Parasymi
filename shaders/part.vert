@@ -2,6 +2,7 @@
 //! places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
+#include "growth.glsl"
 // the solid and glass passes rasterize it at the very same depth (the
 // glass pass tests `less` against what the solid one wrote)
 invariant gl_Position;
@@ -100,9 +101,8 @@ const float ENERGY_QUIVER_FLARE = 0.12;
 // the roles that are a structure's foliage (leaves, an ear): they unfold as
 // it grows and breathe and lift in the wind
 const uint FOLIAGE = PART_BIT(PART_LEAF) | PART_BIT(PART_EAR);
-// grown along a growth spline: how thin it is while its spline is still
-// growing, and how far into its own growth a leaf's tip lags its base
-const float SPROUT_THIN = 0.5;
+// grown along a growth spline (growth.glsl): how far into its own growth a
+// leaf's tip lags its base
 const float LEAF_LAG = 0.6;
 
 // Catmull-Rom through b..c (a, d the neighbours) at f, and its tangent
@@ -126,17 +126,10 @@ void main() {
   }
   vec3 p = pos;
   vec3 nm = nrm;
-  // grown along a growth spline: shrunk into it (or the point it grows
-  // from) until its front comes by, then grown out, thin at first and
-  // thickening as its spline finishes; a leaf unfolds from its base, tips
-  // last. Shrunk about a point, so its normal holds.
-  bool on_spline = gat.y > 0.0;
-  if (on_spline) {
-    float lag = PART_IN(FOLIAGE, part) ? LEAF_LAG * gat.y * tu.y : 0.0;
-    float out_ = smoothstep(gat.x + lag, gat.x + gat.y, iw.w);
-    if (gat.w > gat.z) out_ *= mix(SPROUT_THIN, 1.0, smoothstep(gat.z, gat.w, iw.w));
-    p = gfrom + (p - gfrom) * out_;
-  }
+  // grown along a growth spline (growth.glsl): a leaf unfolds from its
+  // base, tips last
+  float lag = PART_IN(FOLIAGE, part) ? LEAF_LAG * gat.y * tu.y : 0.0;
+  p = growOut(p, gfrom, gat, iw.w, lag);
   // the belly (tu.y 3, its button 4; fill in iq.y): as it fills, creases
   // fold into it down its middle and across it, deepening the fuller it
   // is (in the bind pose, before the gut swells it, so they swell with

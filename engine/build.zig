@@ -2,7 +2,8 @@
 //! windows through zglfw, its shaders compiled to SPIR-V and embedded) and
 //! its tests. A game's build.zig depends on it by path or URL and uses the
 //! helpers below (`@import("engine")`) to find glslc and vk.xml and compile
-//! its own shaders, which may `#include` the engine's (`light.glsl`).
+//! its own shaders, which may `#include` the engine's (`light.glsl`,
+//! `growth.glsl`).
 const std = @import("std");
 const Build = std.Build;
 
@@ -12,7 +13,7 @@ const shaders = [_][]const u8{
   "ui.vert", "ui.frag", "shadow.frag",
 };
 /// files the engine's shaders (and a game's) may include
-pub const includes = [_][]const u8{"post.glsl", "light.glsl"};
+pub const includes = [_][]const u8{"post.glsl", "light.glsl", "growth.glsl"};
 
 /// one shader to compile: `name` it is imported as, the `source` file it is
 /// compiled from (`name` when null) and a `define` to compile it with

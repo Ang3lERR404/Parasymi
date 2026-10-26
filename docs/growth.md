@@ -1,6 +1,7 @@
 # Structures grow along growth splines
 
-`gfx/growth.zig`. Every structure mesh (and any piece of one that grows) is
+Engine `gfx/growth.zig` (`Grower(M, leaf)`), made for the garden in
+`src/gfx/growth.zig` (its leaves `meshgen.leafAt`). Every structure mesh (and any piece of one that grows) is
 built this way, never grown by scaling the whole. That is: sap cache,
 germinator, arsthraxia (and its research vines and offshoots), root-digger
 (and its roots, the digging root to its node grown by how far it reaches),
@@ -47,7 +48,7 @@ not grown (`radiant_kit`, [kits/radiant_kit_desc.md](kits/radiant_kit_desc.md)).
 ## On the GPU
 Each vertex carries `vertex.Grow` (`from`, `at`: start, span, spline start,
 spline done; binding 3, locations 21–22, zero = not on a spline). part.vert
-shrinks it into `from` until the structure's growth (`PartInstance.w.w`,
+(engine growth.glsl `growOut`) shrinks it into `from` until the structure's growth (`PartInstance.w.w`,
 `Look.grown`) reaches it, grows it out, thin (`SPROUT_THIN`) until its
 spline is done; foliage tips lag (`LEAF_LAG`). `b.xform` carries `from`
 along.

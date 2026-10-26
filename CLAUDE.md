@@ -86,14 +86,16 @@ core      math, color, rng, noise, registry, jobs, text, png
 platform  input, display (fullscreen)
 anim      joint turns, two-bone IK, skinning matrices
 gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
-          mesh builder + primitives (Mesher), SDF sculpting
+          mesh builder + primitives (Mesher), SDF sculpting,
+          growth splines (Grower)
 world     chunk grid, World(L) streaming
 render    Renderer(G) frame orchestration, post (bloom, AA), light, camera, ui pass
 ui        SDF draw batch, font
 ```
 `src/` (the game):
 ```
-gfx       meshgen (plant pieces), meshlib, growth, kits, instance layouts
+gfx       meshgen (plant pieces), meshlib, growth (the garden's Grower), kits,
+          instance layouts
 world     chunks (tile SoA + occupancy), generation, the garden's World
 sim       items, species, plants (footprints, floaters), ecology tick
 game      player, actions, structures, research, craft, sky, hud, view, play, save

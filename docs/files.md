@@ -8,6 +8,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `bloom_up.frag` — bloom: one step up the glow's blur chain (3x3 tent, added onto the larger level).
 - `composite.frag` — the world and its glow onto the screen: highlights rolled off above 0.8, faint vignette, luma in alpha for FXAA.
 - `fxaa.frag` — FXAA 3.11 (quality) on the tone-mapped scene, before the UI.
+- `growth.glsl` — growth along growth splines on the GPU (gfx/growth.zig): a vertex shrunk into the point it grows out of until its spline's front comes by…
 - `light.glsl` — the engine's light as a world shader reads it: the frame's `Lighting` record (render/light.zig), the key light's cascaded shadows and the…
 - `post.glsl` — shared by the post-processing passes: the screen triangle's uv in, one colour out, their own push constants.
 - `post.vert` — one triangle covering the screen for the post-processing passes.
@@ -34,6 +35,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## engine/src/gfx/
 - `buffer.zig` — GPU buffers.
 - `ctx.zig` — Vulkan instance + device bring-up.
+- `growth.zig` — growth splines: the hidden skeleton a grown thing is built on and grows along.
 - `meshgen.zig` — procedural mesh construction, the generic half: a `Builder` holding a mesh's vertices (with skin weights and growth records beside them, and
 - `pipeline.zig` — graphics pipeline construction for dynamic rendering.
 - `sculpt.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box) is a signed distance field, the…
@@ -180,7 +182,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 
 ## src/gfx/
-- `growth.zig` — growth splines: the hidden skeleton a grown structure is built on and grows along.
+- `growth.zig` — the garden's growth splines: the engine's (engine gfx/growth.zig: the hidden skeleton a grown structure is built on and grows along) for the
 
 ## src/gfx/meshes/
 - `arsthraxia.zig` — mesh: ARSTHRAXIA.
