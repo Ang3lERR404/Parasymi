@@ -190,7 +190,8 @@ pub const Parts = struct {
   }
 };
 
-fn instance(mat:m.M4, look:Look) PartInstance {
+/// an instance placed by its matrix, looking as `look` says
+pub fn instance(mat:m.M4, look:Look) PartInstance {
   return .{
     .c0 = mat[0], .c1 = mat[1], .c2 = mat[2], .c3 = mat[3],
     .p = .{look.glow, look.flutter, look.phase, look.fade},

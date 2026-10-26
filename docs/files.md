@@ -234,7 +234,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `vertex.zig` — GPU vertex/instance layouts.
 
 ## src/
-- `lib.zig` — the game's modules, for the tools built beside it (tools/animedit.zig): they reach them as `@import("parasymi")`; the game itself starts…
+- `lib.zig` — the game's modules, for the tools built beside it (tools/animedit.zig, tools/meshedit.zig): they reach them as `@import("parasymi")`; the…
 - `main.zig` — Parasymi: a garden of magically infused plants, parasitic and symbiotic, growing toward something beyond comprehension.
 
 ## src/render/passes/

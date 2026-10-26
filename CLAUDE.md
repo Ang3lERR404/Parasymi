@@ -5,7 +5,8 @@ infused plants (symbiotic, parasitic and radiant lineages that converge).
 Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3), Windows only. No asset files:
 every mesh, the font and all UI shapes are procedural; the only data files
 are `src/cfg/parasymi.cfg` (strings), `src/cfg/controls.cfg` (bindings) and
-animation clips in `src/anim/*.anim` (from the editor; not played back yet).
+animation clips in `src/anim/*.anim` and sculpts in `src/mesh/*.mesh` (from
+the tools' editors; the game reads neither yet).
 The generic half (core, platform, Vulkan base, generic renderer and world
 streaming, UI) is its own package in `engine/`, reached as
 `@import("engine")`; see [docs/engine.md](docs/engine.md).
@@ -76,6 +77,9 @@ zig build run -- --tod=0.5 --seed=0x1234 --novsync
 zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --shot]
                                   # animation editor (tools/animedit.zig): keys a clip
                                   # on the real renderer, saves src/anim/<name>.anim
+zig build meshedit -- [--mesh=<name> --shot]
+                                  # mesh editor (tools/meshedit.zig): SDF forms melted
+                                  # into one surface beside the wolf, saves src/mesh/<name>.mesh
 ```
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`

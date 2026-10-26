@@ -116,6 +116,29 @@ pub fn build(b:*Build) !void {
   if (b.args) |args| edit_cmd.addArgs(args);
   b.step("animedit", "run the animation editor.").dependOn(&edit_cmd.step);
 
+  // the mesh editor (tools/meshedit.zig), built the same way
+  const lib = Mods.make(b, "src/lib.zig", t, o, engine, &spvs);
+  const tool_imports:[]const Build.Module.Import = &.{
+    .{.name = "engine", .module = engine},
+    .{.name = "parasymi", .module = lib},
+  };
+  const meshedit = b.addExecutable(.{
+    .name = "meshedit",
+    .root_module = b.createModule(.{
+      .optimize = o,
+      .target = t,
+      .root_source_file = b.path("tools/meshedit.zig"),
+      .imports = tool_imports,
+    }),
+  });
+  const mesh_install = b.addInstallArtifact(meshedit, .{});
+  const mesh_cmd = b.addRunArtifact(meshedit);
+  mesh_cmd.step.dependOn(&mesh_install.step);
+  // (it keeps its meshes under the repo, so it runs from there)
+  mesh_cmd.setCwd(b.path("."));
+  if (b.args) |args| mesh_cmd.addArgs(args);
+  b.step("meshedit", "run the mesh editor.").dependOn(&mesh_cmd.step);
+
   // logic tests (world/sim/game, and the engine's own) need no window or
   // GPU, but share the game's imports so game-level code can be exercised
   // headless.
@@ -126,4 +149,12 @@ pub fn build(b:*Build) !void {
   const test_step = b.step("test", "run unit tests.");
   test_step.dependOn(&b.addRunArtifact(tests).step);
   test_step.dependOn(&b.addRunArtifact(engine_tests).step);
+  // the mesh editor's text and meshing
+  const mesh_tests = b.addTest(.{.root_module = b.createModule(.{
+    .optimize = o,
+    .target = t,
+    .root_source_file = b.path("tools/meshedit.zig"),
+    .imports = tool_imports,
+  })});
+  test_step.dependOn(&b.addRunArtifact(mesh_tests).step);
 }

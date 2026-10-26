@@ -234,12 +234,7 @@ const Growing = struct {
       _ = g.done.fetchAdd(1, .monotonic);
     };
     b.lod = 0;
-    for (&g.part_glassy, g.part_ranges) |*gl, rg| {
-      for (b.v.items[rg[0]..][0..rg[1]]) |v| if (vertex.seeThrough(@enumFromInt(v.part))) {
-        gl.* = true;
-        break;
-      };
-    }
+    glassy(b.v.items, &g.part_ranges, &g.part_glassy);
     _ = try b.skinOf(b.v.items.len);
     _ = try b.growOf(b.v.items.len);
   }
@@ -318,6 +313,45 @@ pub fn meshesReady(r:*Renderer) Error!bool {
   x.skins = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.skin.items));
   x.grows = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.grow.items));
   return true;
+}
+
+/// per part slot: whether any of its run of `verts` can be see-through
+fn glassy(verts:[]const vertex.Mesh, ranges:*const [meshlib.SLOTS][2]u32, out:*[meshlib.SLOTS]bool) void {
+  for (out, ranges) |*gl, rg| {
+    gl.* = false;
+    for (verts[rg[0]..][0..rg[1]]) |v| if (vertex.seeThrough(@enumFromInt(v.part))) {
+      gl.* = true;
+      break;
+    };
+  }
+}
+
+/// put the meshes `b` holds in place of every built-once mesh, each part
+/// slot drawing its run of `ranges` and plants nothing: a tool remaking a
+/// mesh as it is edited (tools/meshedit.zig). The old buffers go once no
+/// frame in flight reads them; with nothing in `b` they stay, drawn by no slot.
+pub fn setParts(r:*Renderer, b:*meshgen.Builder, ranges:[meshlib.SLOTS][2]u32) Error!void {
+  const x = &r.ext;
+  x.plant_ranges = @splat(.{0, 0});
+  x.plant_morph = @splat(0);
+  if (b.v.items.len == 0) {
+    x.part_ranges = @splat(.{0, 0});
+    x.part_glassy = @splat(false);
+    return;
+  }
+  _ = try b.skinOf(b.v.items.len);
+  _ = try b.growOf(b.v.items.len);
+  x.part_ranges = ranges;
+  glassy(b.v.items, &x.part_ranges, &x.part_glassy);
+  try r.retire(x.meshes);
+  try r.retire(x.skins);
+  try r.retire(x.grows);
+  x.meshes = .{};
+  x.skins = .{};
+  x.grows = .{};
+  x.meshes = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.v.items));
+  x.skins = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.skin.items));
+  x.grows = try Buffer.initWith(&r.ctx, .{.vertex_buffer = true}, sliceAsBytes(b.grow.items));
 }
 
 /// forget every chunk mesh: the world was replaced (e.g. a save was loaded).
