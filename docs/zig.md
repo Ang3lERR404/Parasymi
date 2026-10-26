@@ -99,7 +99,8 @@ Read this before writing any code. Where it and CLAUDE.md disagree, CLAUDE.md
 - **Don't use `inline fn`** unless *semantic* inlining is required (e.g., `@compileError`).
 - **Don't use out-parameters** — return values instead.
 - **Don't make functions unnecessarily `pub`** — minimize the public surface.
-- **Don't use `pub` imports** (re-exports) — import directly where needed.
+- **`pub` imports (re-exports) are fine here**: modules are moving to depend
+  on **one** module that gathers every import into a single file.
 - **Avoid `@fieldParentPtr`** when possible.
 - **Avoid self-references** in structs (storing `*Self` inside `Self`).
 - **Functions shouldn't take a large number of parameters** — group into a struct.
@@ -120,3 +121,32 @@ Read this before writing any code. Where it and CLAUDE.md disagree, CLAUDE.md
 - **Don't shadow identifiers** from outer scopes (compile error).
 - **Larger cohesive files are idiomatic** — tests alongside implementation, comptime generics at file scope. Don't split files into tightly coupled pieces.
 - **Run `zig fmt`** — it's not optional.
+
+---
+
+## Zig 0.16 for Games
+
+**Directly beneficial:**
+- **`@floor`, `@ceil`, `@round`, `@trunc`** replacing `@intFromFloat` — the release notes say this is *"part of a larger effort to improve ergonomics for making video games in Zig."* Position/velocity math is cleaner.
+- **Small integers auto-coerce to floats** — a `u8` pixel coordinate can now be used where an `f32` is expected without a cast.
+- **`std.Io` + `Juicy Main`** — asset loading, audio, network, and input all flow through the `Io` interface. The [Aether game engine](https://github.com/AetherEngine/Aether) already uses `io.async`, `io.concurrent`, and `std.Io.Group` for its fixed-step loop (144 Hz update / uncapped render). You pick a threaded or evented backend without rewriting game code.
+- **Faster incremental compilation** — shorter edit-test loop for the game loop itself.
+
+**Breaking / requires migration:**
+- **Vectors forbid runtime indexes** (`my_vec[99]` no longer compiles) — affects SIMD math in `zmath` and any hand-rolled vector code. You must use comptime indices or fall back to regular arrays.
+- **`@cImport` removed** — game dev leans heavily on C interop (Vulkan, OpenGL, SDL, GLFW, Bullet/Jolt physics). You must migrate to `b.addTranslateC` in `build.zig`.
+- **`Io` object passed to everything with side effects** — asset loaders, audio (`zaudio`), input (`zglfw`/`zsdl`), and network all now take `io: Io` as a parameter. The [zig-gamedev](https://github.com/zig-gamedev) org's libraries (zgpu, zaudio, zglfw, zsdl, zphysics, zmath, etc.) are actively being updated (last commits Oct 2026).
+- **`GenericReader`/`AnyReader` deleted** — any custom asset pipeline using those is broken.
+
+**Practical conventions for game code specifically:**
+| Concern | What to do |
+|---------|-----------|
+| Game loop I/O | Pass `io: Io` to your update/render functions; use `io.sleep` for frame pacing, `io.async` for background asset loading |
+| Asset loading | Use `io.async` + `Io.Group` for parallel loads (textures, audio, meshes); don't block the main thread |
+| Audio | `zaudio` (miniaudio bindings) — will need `Io` parameter going forward |
+| Math | `zmath` for SIMD; remember comptime-only vector indexing in 0.16 |
+| C libraries (Vulkan, SDL, physics) | Use `b.addTranslateC` in `build.zig`, not `@cImport` |
+| Frame timing | `io.sleep(.fromMicroseconds(...), .awake)` — the Io interface replaces `std.time.sleep` |
+| ECS / job systems | `zjobs` (job queue) or `Io.Group` for fan-out; `zpool` for object pooling |
+
+**Ecosystem reality:** The community is still small — a few people working on games in Zig at a commercial level. The [zig-gamedev](https://github.com/zig-gamedev) org is the main hub. Most practical game dev in Zig still means "Zig + C bindings" rather than pure-Zig libraries.
