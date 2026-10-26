@@ -364,6 +364,7 @@ const Editor = struct {
       }
     }
     if (!in.down(.{ .button = .left })) e.drag = .none;
+    if (e.pieces().len == 0) e.drag = .none;
     if (e.drag == .value and in.mouse_delta[0] != 0) {
       e.set(Ch.get(&e.pieces()[e.sel].v, e.ch) + in.mouse_delta[0] * e.rate() * (if (shift) FINE else 1));
     }
@@ -587,6 +588,9 @@ pub fn main(init:std.process.Init) !void {
     };
     const inst = [1]ps.vertex.PartInstance{ps.parts.instance(m.translate(origin), .{})};
     scene.parts[meshlib.slot(SLOT_ID, 0)] = &inst;
+    // handles drawn where the forms are now (one may have gone or come)
+    handles.clearRetainingCapacity();
+    for (e.pieces()) |p| try handles.append(gpa, onScreen(game.cam.viewProj(), origin + p.v.pos, screen));
     try e.draw(&ui, screen, handles.items);
     scene.ui = ui.v.items;
     const resized = input.resized;
