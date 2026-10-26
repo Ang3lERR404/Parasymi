@@ -73,7 +73,7 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   _ = st.handOff(ctx, i);
   const self = ctx.ss.get(i);
   const h = &self.state.monfris;
-  h.tethered = @intCast(tethers(ctx.ss, .{self.x, self.y}));
+  h.tethered = @intCast(ctx.ss.childCount(i));
   const r = craft.hand[h.recipe];
   if (!h.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(self.inv.bag(), r)) _ = h.weave.push(self.inv.bag(), h.recipe);
   _ = h.weave.tick(self.inv.bag(), dt * SPEED);
@@ -115,31 +115,19 @@ pub fn choose(s:*st.Structure, g:*prog.Progression, r:u8) void {
 }
 
 /// a Vultrixi waiting to be tethered is tethered here (`ss.pairing`, set by
-/// configuring it), while it has room for one more.
+/// configuring it): it becomes its child (`dependOn`), while it has room
+/// for one more.
 pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
   const p = ss.pairing orelse return;
   const v = ss.floaterAt(p[0], p[1]) orelse return;
   if (ss.get(v).kind() != .vultrixi) return;
   ss.pairing = null;
-  const s = ss.get(id);
-  const here = [2]i32{s.x, s.y};
-  var n:u32 = 0;
-  for (ss.list.items, 0..) |*o, j| if (o.kind() == .vultrixi and j != v.idx()) {
-    if (o.state.vultrixi.dest) |d| if (d[0] == here[0] and d[1] == here[1]) { n += 1; };
-  };
-  if (n >= TETHERS) return g.say(txt.s.msg.tether_full, .{});
-  ss.get(v).state.vultrixi.dest = here;
+  if (!ss.dependOn(v, id)) return g.say(txt.s.msg.tether_full, .{});
   g.say(txt.s.msg.tethered, .{});
 }
 
-/// how many Vultrixi are tethered to the monfris on `at`
-pub fn tethers(ss:*const st.Structures, at:[2]i32) u32 {
-  var n:u32 = 0;
-  for (ss.list.items) |*o| if (o.kind() == .vultrixi) {
-    if (o.state.vultrixi.dest) |d| if (d[0] == at[0] and d[1] == at[1]) { n += 1; };
-  };
-  return n;
-}
+/// its children are the Vultrixi tethered to it, `TETHERS` at most.
+pub fn adopts(_:*const st.Structure, k:st.Kind, have:u32) bool { return k == .vultrixi and have < TETHERS; }
 
 /// what it holds hanging in its sac, and what it weaves forming at its heart.
 pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error!void {

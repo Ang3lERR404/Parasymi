@@ -64,9 +64,9 @@ pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) Allocator.Error!bool {
       }
       // decision: a diamond already floating over the polyp (put there by
       // hand) takes the halo's place; no second one is formed
-      if (try ctx.ss.place(ctx.gpa, ctx.w, x, y, .diamond, 0, seed)) {
+      if (try ctx.ss.spawnChild(ctx.gpa, ctx.w, i, .{ .x = x, .y = y, .kind = .diamond, .seed = seed })) |d| {
         // it is born whole (no growing in), its light still the blooms'
-        ctx.ss.list.items[ctx.ss.list.items.len - 1].state.diamond.light = @splat(1);
+        ctx.ss.get(d).state.diamond.light = @splat(1);
       }
       ctx.g.say(txt.s.msg.diamond_forms, .{});
       ctx.g.discover(.diamond);
@@ -181,6 +181,7 @@ test "four grown blooms on a polyp's points form a halo; the diamond it leaves p
   try testing.expectEqual(st.Kind.polyp, ss.get(w.occAt(px, py).asStructure().?).kind());
   const dia = ss.at(&w, px, py).?;
   try testing.expectEqual(st.Kind.diamond, ss.get(dia).kind());
+  try testing.expectEqual(id, ss.getParent(dia).?);
   for (halo.POINTS) |k| try testing.expect(plants.at(&w, px + k[0] * halo.R, py + k[1] * halo.R) == null);
   try testing.expect(powered.at(&eco, &plants, &w, px - 1, py - 1));
   try testing.expect(powered.at(&eco, &plants, &w, px + 4, py + 4));

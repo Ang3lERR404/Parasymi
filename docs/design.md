@@ -67,6 +67,16 @@ grows a grand garden. 2.5D top-down 3D.
   into the partner; home again if it is gone, hang over it while it is
   full. `Def.far`: its spores are drawn however far it stands.
 
+## Parents and children
+Any structure may depend on another (`Structure.parent`, held by tile and
+floating, so it survives ids shifting): `Structures.spawnChild` puts one
+down already a child (the polyp's diamond), `dependOn` adopts one if the
+parent's `adopts(s, kind, have)` hook takes it (default: none; never a
+loop), `detach` cuts it loose, `getParent`/`getChildren`/`getChild`/
+`childCount` walk them. Uprooting a parent cuts its children loose.
+Pairings between peers (sporecaster, driftbraid) stay `Structures.pairing`
++ their own `dest`.
+
 ## Convergent structures (3rd tier)
 Each pair of lineage structures grown within `structures.MEET` (3) tiles is
 a discovery (`meets` hook + `Structures.meetings`), opening its research.
@@ -87,7 +97,7 @@ convergence essence. The confluence stays the only convergent plant.
   by at most 6 Vultrixi (`monfris.TETHERS`, an advanced weave has at most 6
   kinds), by hand, or by conduits.
 - Vultrixi (gathering crown + ganglion, SHARED NERVES): floating; configure
-  it, then a monfris, to tether it. It takes the ingredient of the weave at
+  it, then a monfris, to tether it (it becomes the monfris's child). It takes the ingredient of the weave at
   its place among the tethered, reaches a tendril into the nearest
   structure within 6 tiles that `gives` it (never a monfris or Vultrixi),
   pulls 1/s and sends it along its tether.

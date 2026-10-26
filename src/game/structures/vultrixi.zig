@@ -1,6 +1,7 @@
 //! VULTRIXI: a gathering crown and a ganglion grown into one floating body
 //! that feeds a monfris. Configured, then the monfris configured, it is
-//! tethered there (at most `monfris.TETHERS` to one). It takes on one
+//! tethered there: the monfris's child (`dependOn`, at most
+//! `monfris.TETHERS` to one). It takes on one
 //! kind of what the monfris's weave needs, by its place among the
 //! Vultrixi tethered there (the first the weave's first ingredient, and so
 //! on), reaches a tendril into the nearest structure within `R` tiles that
@@ -56,8 +57,7 @@ const GLOW:f32 = 0.18;
 pub const Carry = struct { item:items.Item, t:f32 = 0 };
 
 pub const State = struct {
-  /// the monfris it feeds (by tile) and the ground under it
-  dest:?[2]i32 = null,
+  /// the ground under the monfris it feeds (its parent)
   dest_h:f32 = 0,
   /// the kind it brings (from its place among the tethered)
   kind:?items.Item = null,
@@ -72,8 +72,9 @@ pub const State = struct {
   carry:?Carry = null,
 };
 
-fn loomAt(ss:*st.Structures, w:*const World, at:[2]i32) ?st.Id {
-  const j = ss.at(w, at[0], at[1]) orelse return null;
+/// the monfris it is tethered to
+fn loomOf(ss:*st.Structures, i:st.Id) ?st.Id {
+  const j = ss.getParent(i) orelse return null;
   return if (ss.get(j).kind() == .monfris) j else null;
 }
 
@@ -84,7 +85,7 @@ pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
   const here = [2]i32{s.x, s.y};
   if (ss.pairing) |p| if (p[0] == here[0] and p[1] == here[1]) {
     ss.pairing = null;
-    s.state.vultrixi.dest = null;
+    ss.detach(id);
     return g.say(txt.s.msg.tether_cut, .{});
   };
   ss.pairing = here;
@@ -94,15 +95,13 @@ pub fn configure(ss:*st.Structures, id:st.Id, g:*prog.Progression) void {
 /// the kind the Vultrixi `i` brings its monfris `j`: the ingredient of
 /// its weave at its place among those tethered there
 fn assigned(ss:*st.Structures, i:st.Id, j:st.Id) ?items.Item {
-  const loom = ss.get(j);
-  const at = [2]i32{loom.x, loom.y};
   var rank:usize = 0;
-  for (ss.list.items, 0..) |*o, k| {
-    if (k == i.idx()) break;
-    if (o.kind() != .vultrixi) continue;
-    if (o.state.vultrixi.dest) |d| if (d[0] == at[0] and d[1] == at[1]) { rank += 1; };
+  var kin = ss.getChildren(j);
+  while (kin.next()) |o| {
+    if (o == i) break;
+    if (ss.get(o).kind() == .vultrixi) rank += 1;
   }
-  const r = craft.hand[loom.state.monfris.recipe];
+  const r = craft.hand[ss.get(j).state.monfris.recipe];
   return if (rank < r.in.len) r.in[rank].item else null;
 }
 
@@ -137,15 +136,12 @@ fn source(ss:*st.Structures, i:st.Id, kind:items.Item) ?st.Id {
 
 pub fn tick(ctx:st.Ctx, i:st.Id, dt:f32) bool {
   const vs = &ctx.ss.get(i).state.vultrixi;
-  const to = vs.dest orelse {
+  const j = loomOf(ctx.ss, i) orelse {
     vs.kind = null;
     vs.reach = @max(0, vs.reach - dt / REACH);
     return false;
   };
-  const j = loomAt(ctx.ss, ctx.w, to) orelse {
-    vs.dest = null;
-    return false;
-  };
+  const to = ctx.ss.get(i).parent.?.tile();
   vs.dest_h = caster.groundAt(ctx.w, to);
   vs.kind = assigned(ctx.ss, i, j);
   // what runs along the tether goes into the monfris at its end
@@ -203,7 +199,7 @@ fn along(c:[4]V3, t:f32) V3 {
 
 fn tetherCtrl(s:*const st.Structure, base:m.M4) ?[4]V3 {
   const vs = &s.state.vultrixi;
-  const to = vs.dest orelse return null;
+  const to = (s.parent orelse return null).tile();
   const from = m.mulPoint(base, mesh.CROWN);
   const end = m.footprintCentre(to[0], to[1], 2, vs.dest_h) + loom_mesh.SAC_AT;
   const d = end - from;
@@ -240,7 +236,7 @@ pub fn emit(s:*const st.Structure, out:*Parts, ctr:m.V3, tf:f32) Allocator.Error
 
 pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32, y:f32) Allocator.Error!void {
   const vs = &s.state.vultrixi;
-  if (vs.dest == null) {
+  if (s.parent == null) {
     _ = try d.print(x, y, style.text_body, style.dim, txt.s.describe.vult_loose, .{});
   } else if (vs.kind != null and (vs.reach > 0 or vs.carry != null)) {
     _ = try d.print(x, y, style.text_body, style.white, txt.s.describe.vult_pulls, .{txt.item(vs.kind.?).name});
@@ -317,8 +313,8 @@ test "Vultrixi tether to a monfris, six at most, each bringing one kind of its w
   try testing.expect(try ss.place(gpa, &w, 6, 6, .monfris, 0, 0));
   for (0..7) |k| try testing.expect(try ss.place(gpa, &w, @intCast(k + 1), 2, .vultrixi, 0, 0));
   for (0..7) |k| tether(&ss, &w, &g, .{@intCast(k + 1), 2}, .{6, 6});
-  try testing.expectEqual(@as(u32, monfris.TETHERS), monfris.tethers(&ss, .{6, 6}));
-  try testing.expect(ss.get(ss.floaterAt(7, 2).?).state.vultrixi.dest == null);
+  try testing.expectEqual(@as(u32, monfris.TETHERS), ss.childCount(ss.at(&w, 6, 6).?));
+  try testing.expect(ss.get(ss.floaterAt(7, 2).?).parent == null);
   try run(&ss, &w, &plants, &g, 0.1);
   // the diamond's four kinds go to the first four, in order; the rest idle
   const r = craft.hand[ss.get(ss.at(&w, 6, 6).?).state.monfris.recipe];

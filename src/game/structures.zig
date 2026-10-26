@@ -30,6 +30,12 @@
 //!                               sprout or two showing what it does (`icon.zig`)
 //!   meets:Meeting               the other lineage's structure that, grown
 //!                               beside it, is a discovery (`Structures.meetings`)
+//!   adopts(s, kind, have) bool  whether it takes on one more child of `kind`
+//!                               beyond the `have` it has (`dependOn`;
+//!                               default: none). A child depends on its
+//!                               parent: `getParent`, `getChildren`,
+//!                               `getChild`; `spawnChild` puts one down
+//!                               already its child (no `adopts` asked)
 //!   meshes                      the library meshes it draws beyond `mesh` and
 //!                               `preview` (a tuple: `.{ .item_pod, ... }`);
 //!                               `--structure` builds only these (tested)
@@ -166,6 +172,21 @@ const ACTIVITY_EASE:f32 = 3;
 /// how see-through structures' sap is at its thinnest, unless a def says otherwise
 pub const SAP:f32 = 0.78;
 
+/// a structure as another holds on to it: by tile (an `Id` shifts when
+/// another is uprooted) and whether it floats (a floater and what it
+/// floats over share a tile)
+pub const Ref = struct {
+  x:i32,
+  y:i32,
+  floating:bool,
+
+  pub fn eql(a:Ref, b:Ref) bool { return a.x == b.x and a.y == b.y and a.floating == b.floating; }
+  pub fn tile(r:Ref) [2]i32 { return .{r.x, r.y}; }
+};
+
+/// what `spawnChild` puts down
+pub const Spawn = struct { x:i32, y:i32, kind:Kind, dir:m.Dir = 0, seed:f32 = 0 };
+
 pub const Structure = struct {
   x:i32,
   y:i32,
@@ -173,6 +194,8 @@ pub const Structure = struct {
   seed:f32,
   inv:items.Inventory(SLOTS) = .{},
   state:State,
+  /// the structure it depends on (`dependOn`, `spawnChild`), if any
+  parent:?Ref = null,
   /// smoothed 0..1, drives glow and motion
   activity:f32 = 0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
@@ -190,6 +213,7 @@ pub const Structure = struct {
     };
   }
   pub fn def(s:*const Structure) Def { return defs.get(s.kind()); }
+  pub fn ref(s:*const Structure) Ref { return .{ .x = s.x, .y = s.y, .floating = s.def().floating }; }
   /// where its mesh is drawn from, at its centre `ctr`: turned its way,
   /// at the size it has grown to (breathing aside)
   pub fn place(s:*const Structure, ctr:m.V3) m.M4 {
@@ -298,8 +322,95 @@ pub const Structures = struct {
       if (!lstct.floating) w.moveFootprint(l.x, l.y, lstct.size, Occ.structure(id));
     }
     _ = ss.list.swapRemove(idx);
+    // what depended on it is cut loose
+    const gone = s.ref();
+    for (ss.list.items) |*o| if (o.parent) |p| if (p.eql(gone)) { o.parent = null; };
     return s;
   }
+
+  // ---- parents and children: a child depends on its parent ----
+
+  /// the structure `r` names, if one still stands there
+  pub fn find(ss:*const Structures, r:Ref) ?Id {
+    for (ss.list.items, 0..) |*s, i| if (s.ref().eql(r)) return Id.of(i);
+    return null;
+  }
+
+  /// put a structure down already depending on `parent` (its parent
+  /// chooses to: no `adopts` is asked). Returns it, or null if there is
+  /// no room.
+  pub fn spawnChild(ss:*Structures, gpa:Allocator, w:*World, parent:Id, sp:Spawn) Allocator.Error!?Id {
+    const up = ss.get(parent).ref();
+    if (!try ss.place(gpa, w, sp.x, sp.y, sp.kind, sp.dir, sp.seed)) return null;
+    const id = Id.of(ss.list.items.len - 1);
+    ss.get(id).parent = up;
+    return id;
+  }
+
+  /// make `child` depend on `parent`, leaving whatever it depended on
+  /// before, if the parent takes it on (`adopts`) and it is not the
+  /// parent's own ancestor. Returns whether it depends on it now.
+  pub fn dependOn(ss:*Structures, child:Id, parent:Id) bool {
+    if (child == parent) return false;
+    if (ss.getParent(child) == parent) return true;
+    // no loops: the child may not be among the parent's ancestors
+    var up = ss.getParent(parent);
+    while (up) |a| {
+      if (a == child) return false;
+      up = ss.getParent(a);
+    }
+    const p = ss.get(parent);
+    const have = ss.childCount(parent);
+    const k = ss.get(child).kind();
+    const ok = switch (p.kind()) {
+      inline else => |t| if (comptime reg.has(t, "adopts")) reg.module(t).adopts(p, k, have) else false,
+    };
+    if (ok) ss.get(child).parent = p.ref();
+    return ok;
+  }
+
+  /// cut `child` loose from its parent.
+  pub fn detach(ss:*Structures, child:Id) void { ss.get(child).parent = null; }
+
+  pub fn getParent(ss:*const Structures, child:Id) ?Id {
+    const r = ss.list.items[child.idx()].parent orelse return null;
+    return ss.find(r);
+  }
+
+  /// every structure depending on `parent`, in list order.
+  pub fn getChildren(ss:*const Structures, parent:Id) Children {
+    return .{ .ss = ss, .of = ss.list.items[parent.idx()].ref() };
+  }
+
+  /// the `n`th of `parent`'s children (in list order).
+  pub fn getChild(ss:*const Structures, parent:Id, n:usize) ?Id {
+    var it = ss.getChildren(parent);
+    var k:usize = 0;
+    while (it.next()) |c| : (k += 1) if (k == n) return c;
+    return null;
+  }
+
+  pub fn childCount(ss:*const Structures, parent:Id) u32 {
+    var it = ss.getChildren(parent);
+    var n:u32 = 0;
+    while (it.next()) |_| n += 1;
+    return n;
+  }
+
+  pub const Children = struct {
+    ss:*const Structures,
+    of:Ref,
+    i:usize = 0,
+
+    pub fn next(it:*Children) ?Id {
+      while (it.i < it.ss.list.items.len) {
+        const i = it.i;
+        it.i += 1;
+        if (it.ss.list.items[i].parent) |p| if (p.eql(it.of)) return Id.of(i);
+      }
+      return null;
+    }
+  };
 
   // ---- hook dispatch: one comptime switch each, no per-kind code here ----
 
@@ -599,4 +710,45 @@ test "a germinator weaves structure bulbs as well as seeds, and lets go only wha
   try testing.expectEqual(@as(u32, 4), ss.get(id).inv.count(.conduit));
   try testing.expectEqual(@as(u32, 1), ss.get(id).inv.count(.fibre));
   try testing.expect(ss.output(id) == .conduit);
+}
+
+test "parents and children: spawned, adopted, found again after a shift, cut loose when the parent goes" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..8) |x| for (0..8) |y| { const t = y * ck.SIZE + x; c.kind[t] = .soil; c.height[t] = 1; c.res[t] = 0; };
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  try testing.expect(try ss.place(gpa, &w, 0, 0, .sap_cache, 0, 0));
+  try testing.expect(try ss.place(gpa, &w, 4, 4, .monfris, 0, 0));
+  const loom = ss.at(&w, 4, 4).?;
+  // a child put down by its parent, over the parent's own tile
+  const v0 = (try ss.spawnChild(gpa, &w, loom, .{ .x = 4, .y = 4, .kind = .vultrixi })).?;
+  try testing.expectEqual(loom, ss.getParent(v0).?);
+  try testing.expect(try ss.spawnChild(gpa, &w, loom, .{ .x = 4, .y = 4, .kind = .vultrixi }) == null);
+  // adopted: only what the parent takes on (`adopts`), never in a loop
+  try testing.expect(try ss.place(gpa, &w, 1, 1, .vultrixi, 0, 0));
+  const v1 = ss.floaterAt(1, 1).?;
+  const cache = ss.at(&w, 0, 0).?;
+  try testing.expect(!ss.dependOn(v1, cache));
+  try testing.expect(!ss.dependOn(loom, v1));
+  try testing.expect(!ss.dependOn(v1, v1));
+  try testing.expect(ss.dependOn(v1, loom));
+  try testing.expectEqual(@as(u32, 2), ss.childCount(loom));
+  try testing.expectEqual(v0, ss.getChild(loom, 0).?);
+  try testing.expectEqual(v1, ss.getChild(loom, 1).?);
+  try testing.expect(ss.getChild(loom, 2) == null);
+  try testing.expectEqual(@as(u32, 0), ss.childCount(cache));
+  // uprooting the cache shifts the others' ids; they still find each other
+  _ = ss.remove(&w, cache);
+  const loom2 = w.occAt(4, 4).asStructure().?;
+  try testing.expectEqual(@as(u32, 2), ss.childCount(loom2));
+  try testing.expectEqual(loom2, ss.getParent(ss.floaterAt(1, 1).?).?);
+  ss.detach(ss.floaterAt(1, 1).?);
+  try testing.expectEqual(@as(u32, 1), ss.childCount(loom2));
+  // uprooting the parent cuts its children loose
+  _ = ss.remove(&w, loom2);
+  try testing.expect(ss.get(ss.floaterAt(4, 4).?).parent == null);
 }
