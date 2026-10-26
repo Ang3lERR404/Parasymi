@@ -808,7 +808,7 @@ pub const Game = struct {
     if (!ctl.down(in, .use)) g.scrolling = false;
     if (ctl.pressed(in, .use)) if (hit) |h| if (h == .scroll) { g.scrolling = true; };
     if (g.scrolling) if (g.rows.find(.scroll)) |r| {
-      g.garden_top = m.clamp((in.mouse[1] - r[1]) / r[3], 0, 1) * most;
+      g.garden_top = m.clamp(r.local(in.mouse)[1], 0, 1) * most;
     };
     g.garden_top = m.clamp(g.garden_top, 0, most);
     g.garden_at += (g.garden_top - g.garden_at) * @min(1, dt * GARDEN_EASE);
@@ -976,9 +976,9 @@ const click = struct {
   /// press `a` with the mouse over the middle of the first row picking `want`
   fn press(gg:*Game, i:*Input, want:hud.Pick, sc:[2]f32, a:ctl.Action) !void {
     try hud.build(gg, sc);
-    for (gg.rows.rect[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
+    for (gg.rows.box[0..gg.rows.len], gg.rows.pick[0..gg.rows.len]) |q, p| {
       if (!eqlDeep(p, want)) continue;
-      i.mouse = .{q[0] + q[2] / 2, q[1] + q[3] / 2};
+      i.mouse = q.center();
       i.advance();
       ctl.hold(i, a, true);
       try gg.update(i, TICK, sc);

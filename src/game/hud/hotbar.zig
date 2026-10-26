@@ -14,6 +14,7 @@ const st = lib.structures;
 const items = lib.items;
 const icon = lib.icon;
 const belly = lib.hud_belly;
+const Slot = lib.hud_slot.Slot;
 
 const gap = s.slot_gap;
 const pod_r:f32 = 20;
@@ -37,29 +38,26 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const x0 = W / 2 - gap * m.f(n - 1) / 2;
   const hy = H - 86;
   const t = g.uiT();
-  const carrying = g.held != null;
   const vine = belly.rowVine(d, x0 - gap / 2, hy, n, vine_seed);
   try vine.draw(d, t);
 
   for (g.bar, 0..) |slot, i| {
     const x = x0 + gap * m.f(i);
     const sel = i == g.hot;
-    const r = if (sel) pod_r_sel else pod_r;
-    g.rows.add(x - gap / 2, hy - gap / 2, gap, gap, .{.bar = i});
     // lifted onto the cursor, it is shown there instead
     const item = if (g.holds(.{.bar = i})) null else slot;
     const col = if (item) |it| it.info().col else s.gold;
-    if (sel) try d.glow(x, hy, 40, .{col[0], col[1], col[2], glow_alpha});
-    if (g.points(.{.bar = i})) try d.glow(x, hy, 34, if (carrying) s.drop_target else s.slot_hover);
-    const grown = vine.reached(x);
-    if (grown <= 0) continue;
-    try d.husk(x, hy, r * m.smooth(grown), s.pod_empty, if (sel) 1 else 0.25, m.f(i) * 0.37);
-    if (item) |it| {
-      const alpha = if (play.known(g, it)) 255 else unknown_alpha;
-      try icon.draw(d, it, .{x, hy}, r, t, m.f(i) * 0.37, if (sel) 1 else 0.6, alpha);
-      try icon.count(d, .{x, hy}, r, g.player.inv.count(it));
-    }
+    var sl = Slot.around(.{x, hy}, gap, gap, .{.bar = i}, (if (sel) pod_r_sel else pod_r) / gap);
+    sl.grown = vine.reached(x);
+    sl.lit = if (sel) 1 else 0.25;
+    sl.halo = if (sel) .{col[0], col[1], col[2], glow_alpha} else null;
+    sl.phase = m.f(i) * 0.37;
     _ = try d.text(x - 4, hy + 28, s.text_small, s.dim, txt.nth(txt.s.hud.hotbar_keys, i));
+    if (!try sl.draw(g, d)) continue;
+    const it = item orelse continue;
+    const alpha = if (play.known(g, it)) 255 else unknown_alpha;
+    try icon.draw(d, it, sl.center(), sl.radius(), t, sl.phase, if (sel) 1 else 0.6, alpha);
+    try icon.count(d, sl.center(), sl.radius(), g.player.inv.count(it));
   }
 
   const item = g.selected() orelse return;

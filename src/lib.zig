@@ -33,6 +33,7 @@ pub const convergence = @import("game/convergence.zig");
 pub const craft = @import("game/craft.zig");
 pub const hud = @import("game/hud.zig");
 pub const hud_belly = @import("game/hud/belly.zig");
+pub const hud_slot = @import("game/hud/slot.zig");
 pub const icon = @import("game/icon.zig");
 pub const orbit = @import("game/orbit.zig");
 pub const progression = @import("game/progression.zig");

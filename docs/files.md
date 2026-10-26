@@ -59,6 +59,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `renderer.zig` — frame orchestration: acquire, record every pass, submit, present.
 
 ## engine/src/ui/
+- `box.zig` — a box in screen pixels (y down): where a UI component sits, how big it is, and so what the mouse can land on.
 - `draw.zig` — immediate-mode 2D batch in pixel coordinates, rebuilt every frame.
 - `font.zig` — built-in 5x7 bitmap font, defined in code.
 
@@ -102,6 +103,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `options.zig` — the options panel (pause menu, OPTIONS): the world stays frozen behind the veil.
 - `pause.zig` — the pause menu (Esc): the world holds its breath behind a soft veil.
 - `research.zig` — the research tree (T) as a living sapling growing out of the soil.
+- `slot.zig` — a slot, the first of the HUD's components: a husk hanging in its box.
 - `status.zig` — time of day (a sun or moon pod) and how full the wolf's sap belly is.
 - `structure.zig` — a structure's panel (a click on one that keeps items): its slots beside the belly's, lifted and put down between them as in the belly, and…
 - `tooltip.zig` — an item's full name, on a small trellis beside the cursor, while the mouse rests on a belly or hotbar slot holding one.

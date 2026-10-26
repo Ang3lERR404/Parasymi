@@ -17,6 +17,7 @@ const prog = lib.progression;
 const opt = lib.options;
 const Draw = lib.engine.ui.draw.Draw;
 const Color = lib.engine.ui.draw.Color;
+pub const Box = lib.engine.ui.box.Box;
 const m = lib.engine.core.math;
 
 /// what a click on the HUD lands on: a research node, a weave recipe, a
@@ -40,13 +41,13 @@ pub const Sapling = panels.research.Sapling;
 /// hit-tests the mouse against them, one frame behind the draw.
 pub const Rows = struct {
   const MAX = 96;
-  rect:[MAX][4]f32 = undefined,
+  box:[MAX]Box = undefined,
   pick:[MAX]Pick = undefined,
   len:usize = 0,
 
-  pub fn add(r:*Rows, x:f32, y:f32, w:f32, h:f32, p:Pick) void {
+  pub fn add(r:*Rows, b:Box, p:Pick) void {
     if (r.len == MAX) @panic("more clickable HUD rows than Rows.MAX");
-    r.rect[r.len] = .{x, y, w, h};
+    r.box[r.len] = b;
     r.pick[r.len] = p;
     r.len += 1;
   }
@@ -56,18 +57,17 @@ pub const Rows = struct {
     var i = r.len;
     while (i > 0) {
       i -= 1;
-      const q = r.rect[i];
-      if (pos[0] >= q[0] and pos[0] < q[0] + q[2] and pos[1] >= q[1] and pos[1] < q[1] + q[3]) return r.pick[i];
+      if (r.box[i].contains(pos)) return r.pick[i];
     }
     return null;
   }
 
   /// the area last added for `p`, if any.
-  pub fn find(r:*const Rows, p:Pick) ?[4]f32 {
+  pub fn find(r:*const Rows, p:Pick) ?Box {
     var i = r.len;
     while (i > 0) {
       i -= 1;
-      if (eqlDeep(r.pick[i], p)) return r.rect[i];
+      if (eqlDeep(r.pick[i], p)) return r.box[i];
     }
     return null;
   }

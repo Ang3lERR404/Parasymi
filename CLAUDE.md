@@ -113,7 +113,7 @@ gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
           growth splines (Grower)
 world     chunk grid, World(L) streaming
 render    Renderer(G) frame orchestration, post (bloom, AA), light, camera, ui pass
-ui        SDF draw batch, font
+ui        SDF draw batch, font, layout box (x, y, w, h + hit test)
 ```
 `src/` (the game):
 ```

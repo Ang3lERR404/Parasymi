@@ -283,7 +283,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = W - pw - margin;
   const py = (H - ph) / 2;
   try d.trellis(px, py, pw, ph, s.research_panel, 0.77);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   _ = try d.text(px + 56, py + s.title_y, s.text_title, s.gold, txt.s.hud.research_title);
   _ = try d.text(px + 56, py + 58, s.text_small, s.dim, txt.s.hud.research_hint);
 
@@ -353,7 +353,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const id:Id = @enumFromInt(i);
     try node(d, f, &l, g, id, grown[1 + i], rad[0]);
     const hit = @max(0.7 * f.k, min_hit);
-    g.rows.add(c[0] - hit / 2, c[1] - hit / 2, hit, hit, .{.research = id});
+    g.rows.add(.{.x = c[0] - hit / 2, .y = c[1] - hit / 2, .w = hit, .h = hit}, .{.research = id});
   };
 
   try card(g, d, px, py + ph - card_h, hover orelse g.prog.current);

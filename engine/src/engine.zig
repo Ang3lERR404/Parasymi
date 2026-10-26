@@ -8,7 +8,7 @@
 //!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
 //!   world     the chunk grid and the streamed chunk map
 //!   render    frame orchestration and passes, post (bloom, AA), light, camera
-//!   ui        SDF draw batch, font
+//!   ui        SDF draw batch, font, layout boxes
 
 /// the libraries underneath, for the game's own Vulkan and windowing code
 pub const vk = @import("vulkan");
@@ -64,6 +64,7 @@ pub const render = struct {
 pub const ui = struct {
   pub const draw = @import("ui/draw.zig");
   pub const font = @import("ui/font.zig");
+  pub const box = @import("ui/box.zig");
 };
 
 /// the shadow casters' fragment shader (depth alone), for a game's shadow passes
@@ -89,4 +90,5 @@ test {
   _ = render.camera;
   _ = render.light;
   _ = ui.draw;
+  _ = ui.box;
 }

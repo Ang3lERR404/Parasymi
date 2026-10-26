@@ -16,6 +16,7 @@ const m = lib.engine.core.math;
 const icon = lib.icon;
 const items = lib.items;
 const hud = lib.hud;
+const Slot = lib.hud_slot.Slot;
 
 pub const cols = 6;
 const rows = player_mod.SLOTS / cols;
@@ -27,6 +28,7 @@ const pw:f32 = 830;
 const header_h:f32 = 88;
 const weave_row_h:f32 = 52;
 const slot_r:f32 = 24;
+const husk_r:f32 = 21;
 const lifted_alpha:u8 = 50;
 /// a recipe's output, and how faded while it cannot be woven yet
 const recipe_r:f32 = 15;
@@ -48,7 +50,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const py = (H - ph) / 2 - s.panel_lift;
 
   try d.trellis(px, py, pw, ph, s.panel, 0.33);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   _ = try d.text(px + 72, py + s.title_y, s.text_title, s.gold, txt.s.hud.belly_title);
   _ = try d.print(px + pw - 200, py + 38, s.text_sub, s.dim, txt.s.hud.belly_fill, .{g.player.inv.fill() * 100});
   _ = try d.text(px + 72, py + 58, s.text_fine, s.dim, txt.s.hud.belly_hint);
@@ -129,7 +131,6 @@ pub const Vine = struct {
 /// clickStore).
 pub fn grid(g:*play.Game, d:*Draw, comptime side:Side, stacks:[]const ?items.Stack, columns:usize, gx:f32, py:f32) Allocator.Error!void {
   const t = g.uiT();
-  const carrying = g.held != null;
   const n_rows = (stacks.len + columns - 1) / columns;
   for (0..n_rows) |row| {
     const vine = rowVine(d, gx, py + gap * (m.f(row) + 0.5), columns, rowSeed(side, row));
@@ -138,20 +139,16 @@ pub fn grid(g:*play.Game, d:*Draw, comptime side:Side, stacks:[]const ?items.Sta
   for (stacks, 0..) |slot, i| {
     const cx = gx + gap * (m.f(i % columns) + 0.5);
     const cy = py + gap * (m.f(i / columns) + 0.5);
-    const phase = m.f(i) * 0.13;
-    const pick = @unionInit(hud.Pick, @tagName(side), i);
-    g.rows.add(cx - gap / 2, cy - gap / 2, gap, gap, pick);
-    const grown = rowVine(d, gx, cy, columns, rowSeed(side, i / columns)).reached(cx);
-    if (grown <= 0) continue;
-    if (g.points(pick)) try d.glow(cx, cy, 36, if (carrying) s.drop_target else s.slot_hover);
-    try d.husk(cx, cy, 21 * m.smooth(grown), s.pod_empty, 0, phase);
-    if (grown < 1) continue;
+    var sl = Slot.around(.{cx, cy}, gap, gap, @unionInit(hud.Pick, @tagName(side), i), husk_r / gap);
+    sl.grown = rowVine(d, gx, cy, columns, rowSeed(side, i / columns)).reached(cx);
+    sl.phase = m.f(i) * 0.13;
+    if (!try sl.draw(g, d)) continue;
     const it = slot orelse continue;
     // lifted onto the cursor: only a faint trace stays behind
     const lifted = g.holds(@unionInit(play.Held, @tagName(side), i));
     const full = m.ratio(it.n, items.STACK);
-    try icon.draw(d, it.item, .{cx, cy}, slot_r, t, phase, 0.3 + 0.7 * full, if (lifted) lifted_alpha else 255);
-    if (!lifted) try icon.count(d, .{cx, cy}, slot_r, it.n);
+    try icon.draw(d, it.item, sl.center(), slot_r, t, sl.phase, 0.3 + 0.7 * full, if (lifted) lifted_alpha else 255);
+    if (!lifted) try icon.count(d, sl.center(), slot_r, it.n);
   }
 }
 
@@ -181,7 +178,7 @@ fn weaves(g:*play.Game, d:*Draw, px:f32, wy:f32) Allocator.Error!void {
     const r = craft.hand[i];
     const colx = px + 70 + m.f(k % 2) * col_w;
     const y = wy + 42 + weave_row_h * m.f(k / 2);
-    g.rows.add(colx - 10, y - 24, col_w - 20, weave_row_h, .{.weave = i});
+    g.rows.add(.{.x = colx - 10, .y = y - 24, .w = col_w - 20, .h = weave_row_h}, .{.weave = i});
     const open = r.unlocked(&g.prog);
     const ok = open and craft.Crafter.can(g.player.inv.bag(), r);
     if (open) try icon.draw(d, r.out, .{colx + 16, y}, recipe_r, g.uiT(), m.f(i) * 0.5, if (ok) 0.9 else 0.1, if (ok) 255 else unready_alpha)

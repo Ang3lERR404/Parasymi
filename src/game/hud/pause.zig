@@ -34,7 +34,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const px = (W - pw) / 2;
   const py = (H - ph) / 2;
   try d.trellis(px, py, pw, ph, s.pause_panel, 0.55);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   const title = txt.s.hud.paused;
   _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
   for (0..n) |i| {
@@ -45,6 +45,6 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     try hud.bullet(d, px + pod_x, y + 8, 9, s.gold, if (over) 1 else 0.15, m.f(i) * 0.4);
     _ = try d.text(px + key_x, y, s.text_label, s.dim, txt.nth(keys, i));
     _ = try d.text(px + label_x, y, s.text_label, if (over) s.gold else s.white, txt.nth(labels, i));
-    g.rows.add(px + pod_x - row_inset, y - option_h / 2 + 8, pw - 2 * (pod_x - row_inset), option_h, .{.pause = row});
+    g.rows.add(.{.x = px + pod_x - row_inset, .y = y - option_h / 2 + 8, .w = pw - 2 * (pod_x - row_inset), .h = option_h}, .{.pause = row});
   }
 }

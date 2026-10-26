@@ -50,7 +50,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const py = (H - ph) / 2;
   const t = g.uiT();
   try d.trellis(px, py, pw, ph, s.pause_panel, 0.83);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   const title = txt.s.hud.gardens_title;
   _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
 
@@ -67,7 +67,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     if (a > 0.5) {
       const y0 = @max(mid - row_h / 2, top);
       const y1 = @min(mid + row_h / 2, top + list_h);
-      g.rows.add(px + pad_x / 2, y0, pw - pad_x - stem_w, y1 - y0, .{.garden = i});
+      g.rows.add(.{.x = px + pad_x / 2, .y = y0, .w = pw - pad_x - stem_w, .h = y1 - y0}, .{.garden = i});
     }
     try row(g, d, i, px, mid, a, t);
   }
@@ -133,7 +133,7 @@ fn small(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, call:f32) All
   if (over or call > 0) try d.glow(cx, mid, w * 0.7 + 16, faded(s.menu_hover, if (over) 1 else call * 2));
   try hud.bullet(d, cx - w / 2 - 12, mid, pod_r * 0.6, s.bud, if (over) 1 else 0.15, cx * 0.01);
   _ = try d.text(cx - w / 2, mid - 6, s.text_note, if (over or call > 0) s.gold else s.dim, label);
-  g.rows.add(cx - w / 2 - 22, mid - row_h / 2 + 6, w + 30, row_h - 12, p);
+  g.rows.add(.{.x = cx - w / 2 - 22, .y = mid - row_h / 2 + 6, .w = w + 30, .h = row_h - 12}, p);
 }
 
 /// `secs` as shown: just now, minutes, hours or days ago
@@ -155,7 +155,7 @@ fn stem(g:*play.Game, d:*Draw, x:f32, top:f32, t:f32) Allocator.Error!void {
   try d.limb(.{x + sway, top + 4}, .{x - sway, top + list_h - 4}, 3, 2, s.bark_young, 0);
   const y = top + 12 + (list_h - 24) * m.clamp01(g.garden_at / most);
   try d.grain(x, y, 14, 22, if (over) s.gold else s.bud, if (over) 0.4 else 0.1, t * 0.2);
-  g.rows.add(x - stem_w / 2, top, stem_w, list_h, .scroll);
+  g.rows.add(.{.x = x - stem_w / 2, .y = top, .w = stem_w, .h = list_h}, .scroll);
 }
 
 /// a button: a pod and its label centred on (cx, mid); dim when it would
@@ -167,5 +167,5 @@ pub fn button(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, p:Pick, 
   const col = if (!live) s.unknown else if (over or call > 0) s.gold else s.white;
   try hud.bullet(d, cx - w / 2 - 22, mid, pod_r, if (live) s.gold else s.unknown, if (over) 1 else 0.15, cx * 0.01);
   _ = try d.text(cx - w / 2, mid - 8, s.text_label, col, label);
-  g.rows.add(cx - w / 2 - 40, mid - acts_h / 2 + 6, w + 60, acts_h - 12, p);
+  g.rows.add(.{.x = cx - w / 2 - 40, .y = mid - acts_h / 2 + 6, .w = w + 60, .h = acts_h - 12}, p);
 }

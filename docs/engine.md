@@ -16,7 +16,7 @@ Game code reaches it as `@import("engine")` (`engine/src/engine.zig`):
 | gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights), `growth` (`Grower(M, leaf)`: the growth-spline `Skeleton`, `tag`, `formed`) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
 | world | `chunk` (grid: `SIZE`, `Coord`, `MeshSlot`, `localIndex`), `World(L)` (streaming) | `chunk` (the garden's tiles), `gen`, `world` (`World` over the garden's land) |
 | render | `Renderer(G)`, post, light, camera, `passes/ui` | `renderer` (the garden's `G`), passes, terrain meshing |
-| ui | draw, font | — |
+| ui | draw, font, box | — |
 | shaders | post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`, `growth.glsl` (`growOut`) | everything else; `common.glsl` includes `light.glsl`, `part.vert` `growth.glsl` |
 
 ## How a game plugs in

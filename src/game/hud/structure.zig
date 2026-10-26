@@ -15,6 +15,7 @@ const hud = lib.hud;
 const txt = lib.txt;
 const icon = lib.icon;
 const belly = lib.hud_belly;
+const Slot = lib.hud_slot.Slot;
 
 /// its slots, this many across (the belly's grid sits to their right)
 const cols = 4;
@@ -48,7 +49,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const py = (H - ph) / 2 - s.panel_lift;
 
   try d.trellis(px, py, pw, ph, s.panel, 0.41);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   _ = try d.text(px + margin, py + 40, s.text_title, s.gold, txt.structure(sp.kind()));
   try st.describe(sp, d, &g.prog, px + margin, py + 80);
 
@@ -79,18 +80,17 @@ fn recipes(g:*play.Game, d:*Draw, sp:*const st.Structure, choices:[]const u8, x:
   for (choices, 0..) |r, k| {
     const cx = x + recipe_gap * (m.f(k % recipe_cols) + 0.5);
     const cy = row0 + recipe_gap * m.f(k / recipe_cols);
-    const phase = m.f(k) * 0.29;
     const on = chosen == r;
-    g.rows.add(cx - recipe_gap / 2, cy - recipe_gap / 2, recipe_gap, recipe_gap, .{.recipe = r});
-    if (g.points(.{.recipe = r})) {
-      shown = r;
-      try d.glow(cx, cy, 34, s.slot_hover);
-    }
-    if (on) try d.glow(cx, cy, 38, s.research_active);
-    try d.husk(cx, cy, recipe_r + 3, s.pod_empty, if (on) 1 else 0, phase);
+    var sl = Slot.around(.{cx, cy}, recipe_gap, recipe_gap, .{.recipe = r}, (recipe_r + 3) / recipe_gap);
+    sl.lit = if (on) 1 else 0;
+    sl.halo = if (on) s.research_active else null;
+    sl.takes = false;
+    sl.phase = m.f(k) * 0.29;
+    if (g.points(sl.pick)) shown = r;
+    _ = try sl.draw(g, d);
     if (craft.hand[r].unlocked(&g.prog)) {
-      try icon.draw(d, craft.hand[r].out, .{cx, cy}, recipe_r, t, phase, if (on) 1 else 0.3, if (on) 255 else unready_alpha);
-    } else try hud.bullet(d, cx, cy - recipe_r * 0.3, recipe_r * 0.6, s.unknown, 0, phase);
+      try icon.draw(d, craft.hand[r].out, sl.center(), recipe_r, t, sl.phase, if (on) 1 else 0.3, if (on) 255 else unready_alpha);
+    } else try hud.bullet(d, cx, cy - recipe_r * 0.3, recipe_r * 0.6, s.unknown, 0, sl.phase);
   }
 
   const r = craft.hand[shown orelse return];

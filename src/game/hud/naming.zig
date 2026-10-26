@@ -29,7 +29,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const py = (H - ph) / 2;
   const t = g.uiT();
   try d.trellis(px, py, pw, ph, s.pause_panel, 0.61);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   const title = txt.s.hud.naming_title;
   _ = try d.text(W / 2 - Draw.width(title, s.text_title) / 2, py + s.title_y, s.text_title, s.gold, title);
 

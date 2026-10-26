@@ -38,7 +38,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   const py = (H - ph) / 2;
   const t = g.uiT();
   try d.trellis(px, py, pw, ph, s.pause_panel, 0.71);
-  g.rows.add(px, py, pw, ph, .panel);
+  g.rows.add(.{.x = px, .y = py, .w = pw, .h = ph}, .panel);
   const title = txt.s.hud.options_title;
   _ = try d.text(W / 2 - Draw.width(title, s.text_banner) / 2, py + s.title_y, s.text_banner, s.gold, title);
 
@@ -57,7 +57,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const sway = 0.08 * @sin(t * 2 + m.f(i));
     try d.leaf(.{vx - leaf_off, mid}, m.pi + sway, leaf_len, leaf_w, s.leaf, open, m.f(i) * 0.3);
     try d.leaf(.{vx + leaf_off, mid}, -sway, leaf_len, leaf_w, s.leaf, open, m.f(i) * 0.3 + 0.5);
-    g.rows.add(px + pad_x / 2, y - row_h / 2 + 8, pw - pad_x, row_h, .{.option = set});
+    g.rows.add(.{.x = px + pad_x / 2, .y = y - row_h / 2 + 8, .w = pw - pad_x, .h = row_h}, .{.option = set});
   }
 
   const by = py + header_h + row_h * m.f(settings) + 14;
@@ -66,7 +66,7 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
   if (over) try d.glow(W / 2, by + 8, pw * 0.25, s.menu_hover);
   try hud.bullet(d, W / 2 - Draw.width(back, s.text_label) / 2 - 26, by + 8, 9, s.gold, if (over) 1 else 0.15, 0.2);
   _ = try d.text(W / 2 - Draw.width(back, s.text_label) / 2, by, s.text_label, if (over) s.gold else s.white, back);
-  g.rows.add(W / 2 - pw / 4, by - back_h / 2 + 8, pw / 2, back_h, .back);
+  g.rows.add(.{.x = W / 2 - pw / 4, .y = by - back_h / 2 + 8, .w = pw / 2, .h = back_h}, .back);
 
   const hint = txt.s.hud.options_hint;
   _ = try d.text(W / 2 - Draw.width(hint, s.text_fine) / 2, py + ph - hint_h + 4, s.text_fine, s.dim, hint);
