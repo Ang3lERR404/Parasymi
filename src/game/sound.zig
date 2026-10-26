@@ -12,6 +12,10 @@
 //!   throat sagging as it sinks, with a few thick gloops rising through it
 //!   (now and then a lighter, smaller one or two among them), all muffled. It settles more often while the wolf stands; a full belly
 //!   groans lower.
+//! - all the while a gentle wind breathes over the garden: a soft low hush
+//!   swelling and easing in slow gusts, and in the stronger ones a thin
+//!   hollow whistle (narrow-banded air, a fainter fifth above it) rising
+//!   and bending with the gust.
 const lib = @import("../lib.zig");
 const std = lib.std;
 const testing = std.testing;
@@ -279,6 +283,89 @@ const Settle = struct {
   }
 };
 
+// ---- the wind (always) ----
+
+/// gusts: seconds between new strengths, and how fast the wind swells or
+/// eases toward one (s); strengths lean soft by this power
+const GUST_GAP = [2]f32{2.5, 7};
+const GUST_GLIDE:f32 = 1.6;
+const GUST_SOFT:f32 = 1.6;
+/// the hush: noise below this (Hz), a calm and a gusting level
+const HUSH_HZ:f32 = 380;
+const HUSH = [2]f32{0.35, 1};
+/// the whistle: narrow-banded noise (Hz range of its pitch, how narrow,
+/// level), rising this share in a full gust and gliding to a new pitch
+/// in this (s); heard only as the gust passes this strength
+const WHISTLE_HZ = [2]f32{620, 980};
+const WHISTLE_Q:f32 = 45;
+const WHISTLE:f32 = 9;
+const WHISTLE_RISE:f32 = 0.22;
+const WHISTLE_GLIDE:f32 = 2.5;
+const WHISTLE_FROM:f32 = 0.35;
+/// a fainter whistle a fifth above, at this share
+const FIFTH:f32 = 1.5;
+const FIFTH_LEVEL:f32 = 0.35;
+/// what softens it all (Hz) and its loudness
+const WIND_SOFT_HZ:f32 = 2600;
+const WIND:f32 = 0.05;
+
+/// the wind breathing over the garden, never ending
+const Wind = struct {
+  rate:f32,
+  r:rng.Rng,
+  noise:dsp.Noise,
+  hush:dsp.OnePole,
+  whistle:dsp.Biquad,
+  fifth:dsp.Biquad,
+  soft:dsp.OnePole,
+  gust:dsp.Smooth,
+  pitch:dsp.Smooth,
+  /// samples until the next gust's strength, and to the next retune
+  wait:u32 = 0,
+  at:u32 = 0,
+  /// its loudness (tests hush it to hear the rest alone)
+  level:f32 = WIND,
+
+  fn init(r:*rng.Rng, rate:f32) Wind {
+    const hz = r.range(WHISTLE_HZ[0], WHISTLE_HZ[1]);
+    return .{
+      .rate = rate,
+      .r = .init(r.next()),
+      .noise = .init(r.next()),
+      .hush = .init(HUSH_HZ, rate),
+      .whistle = .init(.band, hz, WHISTLE_Q, rate),
+      .fifth = .init(.band, hz * FIFTH, WHISTLE_Q, rate),
+      .soft = .init(WIND_SOFT_HZ, rate),
+      .gust = .init(0.3, GUST_GLIDE, rate),
+      .pitch = .init(hz, WHISTLE_GLIDE, rate),
+    };
+  }
+
+  /// mixes the wind into `out`
+  fn render(w:*Wind, out:[]f32) void {
+    for (out) |*s| {
+      if (w.wait == 0) {
+        w.gust.target = m.pow(f32, w.r.float(), GUST_SOFT);
+        w.pitch.target = w.r.range(WHISTLE_HZ[0], WHISTLE_HZ[1]);
+        w.wait = samples(&w.r, GUST_GAP, w.rate);
+      }
+      w.wait -= 1;
+      const g = w.gust.next();
+      const hz = w.pitch.next() * (1 + WHISTLE_RISE * g);
+      if (w.at % RETUNE == 0) {
+        w.whistle.tune(.band, hz, WHISTLE_Q, w.rate);
+        w.fifth.tune(.band, hz * FIFTH, WHISTLE_Q, w.rate);
+      }
+      w.at +%= 1;
+      const n = w.noise.next();
+      const hush = w.hush.low(n) * m.lerp(HUSH[0], HUSH[1], g);
+      const sing = m.clamp01((g - WHISTLE_FROM) / (1 - WHISTLE_FROM));
+      const whistle = (w.whistle.tick(n) + FIFTH_LEVEL * w.fifth.tick(n)) * WHISTLE * sing * sing;
+      s.* += w.soft.low(hush + whistle) * w.level;
+    }
+  }
+};
+
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
 pub const Sounds = struct {
   /// a paw landed; the view entered or left the wolf's eyes
@@ -298,9 +385,12 @@ pub const Sounds = struct {
   since_step:u32 = m.maxInt(u32),
   /// the belly at the last step
   weight:f32 = 0,
+  wind:Wind,
 
   pub fn init(seed:u64, rate:f32) Sounds {
-    return .{.rate = rate, .r = .init(seed), .fade = .init(0, SAP_FADE, rate)};
+    var r:rng.Rng = .init(seed);
+    const wind:Wind = .init(&r, rate);
+    return .{.rate = rate, .r = r, .fade = .init(0, SAP_FADE, rate), .wind = wind};
   }
 
   pub fn apply(s:*Sounds, cmd:Cmd) void {
@@ -323,6 +413,7 @@ pub const Sounds = struct {
       if (!st.render(out)) v.* = null;
     };
     s.sap(out);
+    s.wind.render(out);
     for (out) |*x| x.* = dsp.softClip(x.*);
   }
 
@@ -356,6 +447,7 @@ const TEST_RATE:f32 = 48000;
 /// sounds (s)
 fn hear(f:Footfall, seed:u64) struct { peak:f32, rms:f32, len:f32 } {
   var s:Sounds = .init(seed, TEST_RATE);
+  s.wind.level = 0;
   s.apply(.{.step = f});
   var buf:[480]f32 = undefined;
   var peak:f32 = 0;
@@ -387,6 +479,7 @@ test "a footstep is short, soft and never clips; a sprint is louder" {
 
 test "steps vary, a busy pool steals the oldest, and it ends silent" {
   var s:Sounds = .init(9, TEST_RATE);
+  s.wind.level = 0;
   for (0..VOICES + 2) |_| s.apply(.{.step = .{.weight = 0.5, .pace = 0.5}});
   for (s.steps) |v| try testing.expect(v != null);
   try testing.expect(s.steps[0].?.gain != s.steps[1].?.gain);
@@ -401,6 +494,7 @@ test "steps vary, a busy pool steals the oldest, and it ends silent" {
 
 test "the sap settles only in the eyes, softly, and fades out with the view" {
   var s:Sounds = .init(3, TEST_RATE);
+  s.wind.level = 0;
   var buf:[480]f32 = undefined;
   // a minute out of the eyes: nothing
   for (0..6000) |_| {
@@ -439,4 +533,30 @@ test "now and then a settling has lighter gloops" {
     if (st.gloops[DEEP.n[1]].start != m.maxInt(u32)) light += 1;
   }
   try testing.expect(light > 20 and light < 90);
+}
+
+test "the wind is gentle, swells in gusts and whistles only in some" {
+  var s:Sounds = .init(5, TEST_RATE);
+  var buf:[4800]f32 = undefined;
+  var peak:f32 = 0;
+  var lo:f32 = 1;
+  var hi:f32 = 0;
+  var whistled:u32 = 0;
+  // a minute, a tenth of a second at a time
+  for (0..600) |_| {
+    @memset(&buf, 0);
+    s.render(&buf);
+    var sum:f32 = 0;
+    for (buf) |x| {
+      peak = @max(peak, @abs(x));
+      sum += x * x;
+    }
+    const rms = @sqrt(sum / m.f(buf.len));
+    lo = @min(lo, rms);
+    hi = @max(hi, rms);
+    if (s.wind.gust.value > WHISTLE_FROM + 0.2) whistled += 1;
+  }
+  try testing.expect(peak > 0.005 and peak < 0.15);
+  try testing.expect(lo > 0.0005 and hi > 2 * lo);
+  try testing.expect(whistled > 10 and whistled < 400);
 }
