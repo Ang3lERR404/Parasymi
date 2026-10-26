@@ -107,7 +107,7 @@ pub fn known(g:*const Game, item:items.Item) bool {
 
 /// what only main can do (it owns the window and the file system)
 pub const Request = union(enum) {
-  /// into the garden being played (under a fresh name if it has none yet)
+  /// into the garden being played (`Game.slot`, which it has)
   save,
   /// back to the garden being played as last saved (else the newest)
   load,
@@ -115,18 +115,21 @@ pub const Request = union(enum) {
   autosave,
   /// the saved gardens menu wants its list (`Game.gardens`)
   list,
-  /// the saved gardens menu: save as the chosen garden (null: a fresh one)
-  save_as:?save.Name,
+  /// the saved gardens menu or the name asked for: save as this garden
+  save_as:save.Name,
   /// the saved gardens menu: replace the running game with the chosen one
   load_from:save.Name,
+  /// the saved gardens menu: let the chosen garden go
+  delete:save.Name,
   /// save and leave
   quit,
 };
 
 /// the pause menu's rows, in `txt.s.hud.pause_labels` order
 pub const PauseRow = enum { @"resume", options, gardens, fullscreen, quit };
-/// the saved gardens menu's buttons under its list
-pub const GardenAct = enum { save, load };
+/// the saved gardens menu's buttons (under its list, and the chosen
+/// garden's delete), and the name prompt's
+pub const GardenAct = enum { save, load, delete, ok, cancel };
 /// saved gardens menu: rows in view at once (it scrolls past them), rows a
 /// wheel notch scrolls, and how fast the list follows (1/s)
 pub const GARDENS_SHOWN = 7;
@@ -151,12 +154,15 @@ pub const Mode = enum {
   /// the world is frozen and the saved gardens are listed (from the pause
   /// menu): save as one, load one
   gardens,
+  /// the world is frozen and a name is asked for the garden being saved
+  /// (saving a fresh one, or the save key before it has a name)
+  naming,
   /// the free camera is flying for inspection (Ctrl+F); the wolf stands idle
   inspect,
 
-  /// the world keeps moving underneath (everything but the pause menu and
-  /// the panels opened from it)
-  pub fn live(md:Mode) bool { return md != .paused and md != .options and md != .gardens; }
+  /// the world keeps moving underneath (everything but the pause menu, the
+  /// panels opened from it and the name prompt)
+  pub fn live(md:Mode) bool { return md != .paused and md != .options and md != .gardens and md != .naming; }
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode) bool { return md == .belly or md == .structure; }
 };
@@ -200,12 +206,16 @@ pub const Game = struct {
   since_save:f64 = 0,
   /// the saved gardens menu: its list (main fills it on `.list`, at
   /// `listed_at` in UI time), the chosen row (0: a fresh garden, else
-  /// `gardens[i - 1]`), whether saving over it was asked once already, and
-  /// the first row in view (wanted, and eased toward)
+  /// `gardens[i - 1]`), whether saving over it (or letting it go) was
+  /// asked once already, and the first row in view (wanted, and eased toward)
   gardens:std.ArrayList(save.Entry) = .empty,
   listed_at:f64 = 0,
   garden:usize = 0,
   overwrite:bool = false,
+  deleting:bool = false,
+  /// the name prompt: the name typed so far, and the mode it returns to
+  typed:save.Name = .{},
+  naming_from:Mode = .roam,
   garden_top:f32 = 0,
   garden_at:f32 = 0,
   /// the list's scroll groove is held (dragged)
@@ -330,13 +340,18 @@ pub const Game = struct {
     g.cam.aspect = screen[0] / @max(screen[1], 1);
 
     // system keys work everywhere; Esc closes a panel first, then pauses
-    if (ctl.pressed(in, .save)) g.request = .save;
-    if (ctl.pressed(in, .load)) g.request = .load;
+    // (not while a name is typed, nor for a garden that has none yet: a
+    // name is asked for first)
+    if (g.mode != .naming) {
+      if (ctl.pressed(in, .save)) if (g.slot != null) { g.request = .save; } else g.startNaming();
+      if (ctl.pressed(in, .load)) g.request = .load;
+    }
     if (ctl.pressed(in, .fullscreen)) g.opts.fullscreen = !g.opts.fullscreen;
     if (ctl.pressed(in, .back)) switch (g.mode) {
       .roam => g.mode = .paused,
       .belly, .structure, .research, .paused => g.mode = .roam,
       .options, .gardens => g.mode = .paused,
+      .naming => g.mode = g.naming_from,
       .inspect => g.inspect(in, false),
     } else if (!g.mode.live()) g.menu(in, dt);
     if (!g.mode.live()) {
@@ -730,6 +745,7 @@ pub const Game = struct {
       if (ctl.pressed(in, .gardens)) g.openGardens();
     }
     if (g.mode == .gardens) g.scroll(in, hit, dt);
+    if (g.mode == .naming) g.typeName(in);
     const dir:i32 = if (ctl.pressed(in, .use)) 1 else if (ctl.pressed(in, .remove)) -1 else 0;
     if (dir == 0) return;
     switch (hit orelse return) {
@@ -739,6 +755,7 @@ pub const Game = struct {
       .garden => |i| if (dir > 0 and i != g.garden) {
         g.garden = i;
         g.overwrite = false;
+        g.deleting = false;
       },
       .garden_act => |a| if (dir > 0) g.gardenAct(a),
       // the world's own rows, not the menus'
@@ -762,6 +779,7 @@ pub const Game = struct {
     g.request = .list;
     g.garden = 0;
     g.overwrite = false;
+    g.deleting = false;
     g.garden_top = 0;
     g.garden_at = 0;
   }
@@ -771,6 +789,7 @@ pub const Game = struct {
   pub fn listed(g:*Game) void {
     g.listed_at = g.ui_time;
     g.overwrite = false;
+    g.deleting = false;
     if (g.slot) |n| for (g.gardens.items, 1..) |e, i| if (e.name.is(n.slice())) { g.garden = i; };
     g.garden = @min(g.garden, g.gardens.items.len);
     const first = @max(m.f(g.garden) - m.f(GARDENS_SHOWN - 1), 0);
@@ -795,19 +814,64 @@ pub const Game = struct {
     g.garden_at += (g.garden_top - g.garden_at) * @min(1, dt * GARDEN_EASE);
   }
 
-  /// SAVE: as a fresh garden at once; over a saved one only when asked
-  /// twice. LOAD: the chosen saved garden.
+  /// SAVE: a fresh garden asks for its name; over a saved one only when
+  /// asked twice. LOAD: the chosen saved garden. DELETE: the chosen one,
+  /// when asked twice. OK and CANCEL: the name prompt's.
   fn gardenAct(g:*Game, a:GardenAct) void {
     const chosen:?save.Name = if (g.garden == 0) null else g.gardens.items[g.garden - 1].name;
     switch (a) {
-      .save => if (chosen == null or g.overwrite) {
-        g.request = .{.save_as = chosen};
-        g.overwrite = false;
-      } else {
-        g.overwrite = true;
-      },
+      .save => if (chosen) |n| {
+        if (g.overwrite) g.request = .{.save_as = n};
+        g.overwrite = !g.overwrite;
+      } else g.startNaming(),
       .load => if (chosen) |n| { g.request = .{.load_from = n}; },
+      .delete => if (chosen) |n| {
+        if (g.deleting) g.request = .{.delete = n};
+        g.deleting = !g.deleting;
+      },
+      .ok => g.nameChosen(),
+      .cancel => g.mode = g.naming_from,
     }
+  }
+
+  /// ask for the name of the garden about to be saved (over the mode it
+  /// returns to); the gardens are listed, to know the names taken
+  fn startNaming(g:*Game) void {
+    g.naming_from = if (g.mode == .naming) g.naming_from else g.mode;
+    g.mode = .naming;
+    g.typed = .{};
+    g.overwrite = false;
+    g.request = .list;
+  }
+
+  /// the name prompt: typing adds to the name, erase takes back, confirm
+  /// is OK
+  fn typeName(g:*Game, in:*const Input) void {
+    const was = g.typed.len;
+    for (in.typed()) |c| g.typed.put(c);
+    if (ctl.pressed(in, .erase)) g.typed.erase();
+    if (g.typed.len != was) g.overwrite = false;
+    if (ctl.pressed(in, .confirm)) g.nameChosen();
+  }
+
+  /// the garden typed is taken
+  pub fn nameTaken(g:*const Game) bool {
+    const n = g.typed.typed() orelse return false;
+    for (g.gardens.items) |e| if (e.name.same(n)) return true;
+    return false;
+  }
+
+  /// OK: save as the name typed (over a garden of that name only when
+  /// asked twice); a name that cannot be one does nothing
+  fn nameChosen(g:*Game) void {
+    const n = g.typed.typed() orelse return;
+    if (g.nameTaken() and !g.overwrite) {
+      g.overwrite = true;
+      return;
+    }
+    g.overwrite = false;
+    g.mode = g.naming_from;
+    g.request = .{.save_as = n};
   }
 
   /// enter or leave the free camera. Leaving gives the cursor back and eases
@@ -980,7 +1044,7 @@ test "the pause menu opens the options; clicks turn them and lead back" {
   try testing.expectEqual(@as(u64, 0), g.ticks);
 }
 
-test "the saved gardens scroll, save over one only when asked twice, and load" {
+test "the saved gardens scroll, save over one or delete it only when asked twice, and load" {
   const gpa = testing.allocator;
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
@@ -1014,24 +1078,87 @@ test "the saved gardens scroll, save over one only when asked twice, and load" {
   for (0..60) |_| try g.update(&in, TICK, screen);
   try testing.expectApproxEqAbs(m.f(4), g.garden_at, 0.01);
 
-  // a fresh garden saves at once
+  // a fresh garden asks its name first
   try click.on(&g, &in, .{.garden_act = .save}, screen);
-  try testing.expect(g.request.?.save_as == null);
+  try testing.expectEqual(Mode.naming, g.mode);
+  try testing.expect(g.request.? == .list);
   g.request = null;
+  try click.on(&g, &in, .{.garden_act = .cancel}, screen);
+  try testing.expectEqual(Mode.gardens, g.mode);
+  try testing.expect(g.request == null);
   // a saved one only on the second click
   try click.on(&g, &in, .{.garden = 9}, screen);
   try testing.expectEqual(@as(usize, 9), g.garden);
   try click.on(&g, &in, .{.garden_act = .save}, screen);
   try testing.expect(g.request == null and g.overwrite);
   try click.on(&g, &in, .{.garden_act = .save}, screen);
-  try testing.expectEqualStrings("garden 8", g.request.?.save_as.?.slice());
+  try testing.expectEqualStrings("garden 8", g.request.?.save_as.slice());
   g.request = null;
   try click.on(&g, &in, .{.garden_act = .load}, screen);
   try testing.expectEqualStrings("garden 8", g.request.?.load_from.slice());
   g.request = null;
+  // the chosen one's delete, only on the second click
+  try click.on(&g, &in, .{.garden_act = .delete}, screen);
+  try testing.expect(g.request == null and g.deleting);
+  try click.on(&g, &in, .{.garden_act = .delete}, screen);
+  try testing.expectEqualStrings("garden 8", g.request.?.delete.slice());
+  g.request = null;
   try click.on(&g, &in, .back, screen);
   try testing.expectEqual(Mode.paused, g.mode);
   try testing.expectEqual(@as(u64, 0), g.ticks);
+}
+
+test "the save key asks a garden without a name for one: typed, taken asks twice, OK saves" {
+  const gpa = testing.allocator;
+  var g = try Game.init(gpa, DEFAULT_SEED);
+  defer g.deinit();
+  const screen = TEST_SCREEN;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  var in:Input = .{.win = undefined};
+  in.mouse = .{-1e4, -1e4};
+
+  in.advance();
+  ctl.hold(&in, .save, true);
+  try g.update(&in, TICK, screen);
+  in.advance();
+  ctl.hold(&in, .save, false);
+  try testing.expectEqual(Mode.naming, g.mode);
+  try testing.expect(g.request.? == .list);
+  g.request = null;
+  try g.gardens.append(gpa, .{.name = save.Name.of("Moss").?, .age = 0});
+  g.listed();
+  // the world stands still while a name is typed; letters bound to
+  // actions only type
+  for ("moss?") |c| in.type1(c);
+  try g.update(&in, TICK, screen);
+  in.typed_len = 0;
+  try testing.expectEqualStrings("moss", g.typed.slice());
+  try testing.expectEqual(@as(u64, 0), g.ticks);
+  try testing.expectEqual(Mode.naming, g.mode);
+  // taken: OK asks first, then saves over it
+  try click.on(&g, &in, .{.garden_act = .ok}, screen);
+  try testing.expect(g.request == null and g.overwrite);
+  try click.on(&g, &in, .{.garden_act = .ok}, screen);
+  try testing.expectEqualStrings("moss", g.request.?.save_as.slice());
+  try testing.expectEqual(Mode.roam, g.mode);
+  g.request = null;
+
+  // named, the save key saves at once; erase takes back, Esc cancels
+  g.startNaming();
+  for ("ab") |c| in.type1(c);
+  try g.update(&in, TICK, screen);
+  in.typed_len = 0;
+  try click.press(&g, &in, .panel, screen, .erase);
+  try testing.expectEqualStrings("a", g.typed.slice());
+  try click.press(&g, &in, .panel, screen, .back);
+  try testing.expectEqual(Mode.roam, g.mode);
+  g.request = null;
+  g.slot = save.Name.of("moss").?;
+  in.advance();
+  ctl.hold(&in, .save, true);
+  try g.update(&in, TICK, screen);
+  try testing.expect(g.request.? == .save);
 }
 
 test "the garden saves itself once the autosave interval is played" {

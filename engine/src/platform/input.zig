@@ -32,6 +32,8 @@ pub const Bind = union(enum) {
 };
 
 const Keys = EnumSet(Key);
+/// most characters typed in one frame that are kept
+pub const MAX_TYPED = 16;
 const Buttons = EnumSet(Button);
 
 pub const Input = struct {
@@ -45,12 +47,18 @@ pub const Input = struct {
   scroll:f32 = 0,
   scroll_acc:f32 = 0,
   resized:bool = false,
+  /// the characters typed this frame (text, not bindings), in order
+  typed_buf:[MAX_TYPED]u21 = undefined,
+  typed_len:u8 = 0,
+  typing_buf:[MAX_TYPED]u21 = undefined,
+  typing_len:u8 = 0,
 
   /// must be called once the Input has its final address.
   pub fn attach(in:*Input) void {
     in.win.setUserPointer(in);
     _ = in.win.setScrollCallback(onScroll);
     _ = in.win.setFramebufferSizeCallback(onResize);
+    _ = in.win.setCharCallback(onChar);
   }
 
   pub fn update(in:*Input) void {
@@ -65,7 +73,15 @@ pub const Input = struct {
     in.mouse = m;
     in.scroll = in.scroll_acc;
     in.scroll_acc = 0;
+    in.typed_buf = in.typing_buf;
+    in.typed_len = in.typing_len;
+    in.typing_len = 0;
   }
+
+  /// the characters typed this frame
+  pub fn typed(in:*const Input) []const u21 { return in.typed_buf[0..in.typed_len]; }
+  /// headless tests: type `c` as of this frame.
+  pub fn type1(in:*Input, c:u21) void { push(&in.typed_buf, &in.typed_len, c); }
 
   /// is `b` held this frame?
   pub fn down(in:*const Input, b:Bind) bool {
@@ -103,6 +119,16 @@ pub const Input = struct {
 
 fn onScroll(w:*glfw.Window, _:f64, y:f64) callconv(.c) void {
   if (w.getUserPointer(Input)) |in| in.scroll_acc += @floatCast(y);
+}
+fn onChar(w:*glfw.Window, c:u32) callconv(.c) void {
+  const in = w.getUserPointer(Input) orelse return;
+  if (c <= 0x10ffff) push(&in.typing_buf, &in.typing_len, @intCast(c));
+}
+/// appends `c` while there is room (more in one frame are dropped)
+fn push(buf:*[MAX_TYPED]u21, len:*u8, c:u21) void {
+  if (len.* == MAX_TYPED) return;
+  buf[len.*] = c;
+  len.* += 1;
 }
 fn onResize(w:*glfw.Window, _:c_int, _:c_int) callconv(.c) void {
   if (w.getUserPointer(Input)) |in| in.resized = true;

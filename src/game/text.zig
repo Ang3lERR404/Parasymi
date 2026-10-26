@@ -62,7 +62,7 @@ pub const Strings = struct {
     braid_choose:S = "", braid_paired:S = "", braid_still:S = "",
     spores_choose:S = "", spores_paired:S = "", spores_still:S = "",
     saved:S = "", autosaved:S = "", save_failed:S = "", remembers:S = "", no_save:S = "", no_gardens:S = "",
-    no_fullscreen:S = "", options_unsaved:S = "",
+    no_fullscreen:S = "", options_unsaved:S = "", deleted:S = "", delete_failed:S = "",
   } = .{},
   hud:struct {
     controls:S = "", ingredient:S = "", unknown:S = "", stock:S = "",
@@ -79,6 +79,8 @@ pub const Strings = struct {
     antialias:S = "", toggle:S = "", autosave:S = "", options_back:S = "",
     gardens_title:S = "", gardens_fresh:S = "", gardens_auto:S = "", gardens_playing:S = "", gardens_age:S = "",
     gardens_save:S = "", gardens_overwrite:S = "", gardens_load:S = "", gardens_hint:S = "",
+    gardens_delete:S = "", gardens_delete_sure:S = "",
+    naming_title:S = "", naming_ok:S = "", naming_cancel:S = "", naming_hint:S = "",
     free_cam:S = "", free_cam_hint:S = "",
     fps:S = "", gpu:S = "", sim:S = "", counts:S = "", draws:S = "", pos:S = "", motes:S = "",
   } = .{},

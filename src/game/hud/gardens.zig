@@ -1,9 +1,10 @@
 //! the saved gardens (pause menu): the world stays frozen behind the veil.
 //! A fresh garden heads the list, then every saved one, the most recent
 //! first; the list scrolls (wheel, or drag its stem) past what fits. A
-//! click chooses one; SAVE writes the garden as it (over a saved one only
-//! when clicked twice), LOAD returns to it. BACK (or Esc) returns to the
-//! pause menu.
+//! click chooses one; SAVE writes the garden as it (a fresh one asks its
+//! name, a saved one is saved over only when clicked twice), LOAD returns
+//! to it, the chosen one's small DELETE lets it go (clicked twice). BACK
+//! (or Esc) returns to the pause menu.
 const lib = @import("../../lib.zig");
 const std = lib.std;
 const Allocator = std.mem.Allocator;
@@ -38,7 +39,7 @@ const seconds_per = [_]i64{ 60, 3600, 86400 };
 pub fn visible(g:*const play.Game) bool { return g.mode == .gardens; }
 
 /// `c` with its alpha scaled by `a`
-fn faded(c:Color, a:f32) Color {
+pub fn faded(c:Color, a:f32) Color {
   return .{ c[0], c[1], c[2], @intFromFloat(m.f(c[3]) * m.clamp01(a)) };
 }
 
@@ -62,12 +63,13 @@ pub fn draw(g:*play.Game, d:*Draw, W:f32, H:f32) Allocator.Error!void {
     const a = 1 - @max(-pos, pos - last, 0) / fade_rows;
     if (a <= 0) continue;
     const mid = top + row_h * (pos + 0.5);
-    try row(g, d, i, px, mid, a, t);
+    // (under the chosen row's DELETE, added as it is drawn)
     if (a > 0.5) {
       const y0 = @max(mid - row_h / 2, top);
       const y1 = @min(mid + row_h / 2, top + list_h);
       g.rows.add(px + pad_x / 2, y0, pw - pad_x - stem_w, y1 - y0, .{.garden = i});
     }
+    try row(g, d, i, px, mid, a, t);
   }
   try stem(g, d, px + pw - stem_x, top, t);
 
@@ -110,11 +112,28 @@ fn row(g:*play.Game, d:*Draw, i:usize, px:f32, mid:f32, a:f32, t:f32) Allocator.
   if (g.slot) |sl| if (sl.is(e.name.slice())) {
     _ = try d.text(end + 14, mid - 6, s.text_note, faded(s.growth, a), txt.s.hud.gardens_playing);
   };
-  // how long ago, right-aligned before the scroll stem
+  // how long ago, right-aligned before the scroll stem (the chosen one's
+  // DELETE before it)
   var age_buf:[64]u8 = undefined;
   const age = ago(&age_buf, e.age + @as(i64, @intFromFloat(g.ui_time - g.listed_at)));
   const ax = px + pw - stem_w - pad_x / 2 - Draw.width(age, s.text_note) - 12;
   _ = try d.text(ax, mid - 6, s.text_note, faded(s.dim, a), age);
+  if (chosen and a > 0.5) {
+    const label = if (g.deleting) txt.s.hud.gardens_delete_sure else txt.s.hud.gardens_delete;
+    try small(g, d, ax - 24 - Draw.width(label, s.text_note) / 2, mid, label, if (g.deleting) 0.5 + 0.5 * @sin(t * 6) else 0);
+  }
+}
+
+/// the chosen garden's DELETE: a small button centred on (cx, mid), its
+/// glow pulsing with `call` (asking)
+fn small(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, call:f32) Allocator.Error!void {
+  const p:Pick = .{.garden_act = .delete};
+  const over = g.points(p);
+  const w = Draw.width(label, s.text_note);
+  if (over or call > 0) try d.glow(cx, mid, w * 0.7 + 16, faded(s.menu_hover, if (over) 1 else call * 2));
+  try hud.bullet(d, cx - w / 2 - 12, mid, pod_r * 0.6, s.bud, if (over) 1 else 0.15, cx * 0.01);
+  _ = try d.text(cx - w / 2, mid - 6, s.text_note, if (over or call > 0) s.gold else s.dim, label);
+  g.rows.add(cx - w / 2 - 22, mid - row_h / 2 + 6, w + 30, row_h - 12, p);
 }
 
 /// `secs` as shown: just now, minutes, hours or days ago
@@ -141,7 +160,7 @@ fn stem(g:*play.Game, d:*Draw, x:f32, top:f32, t:f32) Allocator.Error!void {
 
 /// a button: a pod and its label centred on (cx, mid); dim when it would
 /// do nothing; `call` pulses its glow (asking)
-fn button(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, p:Pick, live:bool, call:f32) Allocator.Error!void {
+pub fn button(g:*play.Game, d:*Draw, cx:f32, mid:f32, label:[]const u8, p:Pick, live:bool, call:f32) Allocator.Error!void {
   const over = live and g.points(p);
   const w = Draw.width(label, s.text_label);
   if (over or call > 0) try d.glow(cx, mid, w * 0.8 + 30, faded(s.menu_hover, if (over) 1 else call * 2));

@@ -55,7 +55,7 @@ shaders change.
 - First person: `--inspect=eyes` looks out of the wolf's eyes, turning
   round where it stands, `--pitch=` degrees down (65 shows its chest and
   belly), e.g. `zig build run -- --demo --inspect=eyes --shots=4 --orbit=8 --pitch=30`.
-- A HUD panel: `--panel=<belly|research|paused|options|gardens>` holds it
+- A HUD panel: `--panel=<belly|research|paused|options|gardens|naming>` holds it
   open and keeps the HUD in `--inspect` shots, e.g.
   `zig build run -- --demo --panel=belly --inspect=player --shots=1 --orbit=2`.
   Panels grow under the loading screen's fade, so shots show them grown.

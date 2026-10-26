@@ -183,9 +183,11 @@ placing or adjusting.
   are copied in once.
 - Save (`game/save.zig`, `saves/<name>.sav`): the world regenerates from
   the seed; only the gardener's changes are stored. Written to a `.tmp`
-  then renamed over. `Game.slot` is the garden being played (F5/quit save
-  into it, a fresh `garden N` if none); `Request` carries
-  saves/loads/listing to main. Autosave (`autosave.sav`) every
+  then renamed over. `Game.slot` is the garden being played (F6 saves into
+  it, else asks its name; quit saves into it, else into the autosave);
+  names are only ever typed by the gardener (`save.Name.typed`), and a
+  save can be deleted from the menu; `Request` carries
+  saves/loads/listing/deletes to main. Autosave (always `autosave.sav`) every
   `Options.autosave` minutes of play (default 5, options panel:
   never..60). Bump `VERSION` when a stored layout changes (the fingerprint
   checks sizes only).

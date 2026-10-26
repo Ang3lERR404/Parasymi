@@ -90,7 +90,7 @@ pub fn main(init:Init) !void {
   var lone:?specimen.Specimen = null;
   var state:specimen.State = .grow;
   var period:?f32 = null;
-  // `--panel=<belly|research|paused|options|gardens>` holds that panel open
+  // `--panel=<belly|research|paused|options|gardens|naming>` holds that panel open
   // (and keeps the HUD in `--inspect` shots)
   var panel:?play.Mode = null;
   for (args[1..]) |a| {
@@ -111,7 +111,7 @@ pub fn main(init:Init) !void {
     if (startsWith(u8, a, "--state=")) state = try specimen.State.parse(a["--state=".len..]);
     if (startsWith(u8, a, "--period=")) period = try parseFloat(f32, a["--period=".len..]);
     if (startsWith(u8, a, "--panel=")) panel = switch (stringToEnum(play.Mode, a["--panel=".len..]) orelse return error.BadPanel) {
-      inline .belly, .research, .paused, .options, .gardens => |p| p,
+      inline .belly, .research, .paused, .options, .gardens, .naming => |p| p,
       else => return error.BadPanel,
     };
   }
@@ -218,9 +218,10 @@ pub fn main(init:Init) !void {
         continue;
       }
       switch (rq) {
-        .save => keep(gpa, io, &game, game.slot),
+        .save => if (game.slot) |n| keep(gpa, io, &game, n),
         .save_as => |n| keep(gpa, io, &game, n),
         .autosave => keep(gpa, io, &game, save.Name.of(save.AUTO).?),
+        .delete => |n| letGo(gpa, io, &game, n),
         .load => {
           // the garden being played as last saved, else the newest
           const n = game.slot orelse newest: {
@@ -240,7 +241,8 @@ pub fn main(init:Init) !void {
         },
         .list => relist(gpa, io, &game),
         .quit => {
-          keep(gpa, io, &game, game.slot);
+          // a garden never named is kept as the autosave
+          keep(gpa, io, &game, game.slot orelse save.Name.of(save.AUTO).?);
           window.setShouldClose(true);
         },
       }
@@ -304,14 +306,10 @@ fn apply(io:Io, game:*Game, r:*Renderer, display:*Display, applied:*Options) !vo
   applied.* = o.*;
 }
 
-/// save the garden as `want` (a fresh name if null); saved by hand (not
-/// the autosave) it becomes the garden being played. A failure is said.
-fn keep(gpa:Allocator, io:Io, game:*Game, want:?save.Name) void {
+/// save the garden as `name`; saved by hand (not the autosave) it becomes
+/// the garden being played. A failure is said.
+fn keep(gpa:Allocator, io:Io, game:*Game, name:save.Name) void {
   game.since_save = 0;
-  const name = want orelse fresh: {
-    relist(gpa, io, game);
-    break :fresh save.fresh(game.gardens.items);
-  };
   save.save(game, gpa, io, name) catch |e| return game.prog.say(txt.s.msg.save_failed, .{e});
   if (name.is(save.AUTO)) {
     game.prog.say(txt.s.msg.autosaved, .{});
@@ -320,6 +318,17 @@ fn keep(gpa:Allocator, io:Io, game:*Game, want:?save.Name) void {
     game.prog.say(txt.s.msg.saved, .{name.slice()});
   }
   if (game.mode == .gardens) relist(gpa, io, game);
+}
+
+/// let the saved garden `name` go; played on, the garden has no name
+/// again. A failure is said.
+fn letGo(gpa:Allocator, io:Io, game:*Game, name:save.Name) void {
+  save.remove(io, name) catch |e| return game.prog.say(txt.s.msg.delete_failed, .{e});
+  if (game.slot) |sl| if (sl.same(name)) {
+    game.slot = null;
+  };
+  game.prog.say(txt.s.msg.deleted, .{name.slice()});
+  relist(gpa, io, game);
 }
 
 /// the saved gardens menu's list, made afresh

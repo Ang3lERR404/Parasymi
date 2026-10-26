@@ -3,8 +3,8 @@
 //! the wolf and its belly, research, the weave queue, every plant and
 //! structure, and resource nodes that were gathered.
 //!
-//! Each garden is a file of its own in `home.SAVES` (`<name>.sav`), chosen
-//! in the saved gardens menu; the timer saves into `AUTO`.
+//! Each garden is a file of its own in `home.SAVES` (`<name>.sav`), named
+//! by the gardener (`Name.typed`); the timer saves into `AUTO`.
 //!
 //! Format: a small header (magic, version, layout fingerprint) followed by
 //! plain-old-data records. The fingerprint changes whenever a stored type's
@@ -15,9 +15,10 @@ const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const asBytes = std.mem.asBytes;
 const eql = std.mem.eql;
-const startsWith = std.mem.startsWith;
+const eqlIgnoreCase = std.ascii.eqlIgnoreCase;
+const isAlphanumeric = std.ascii.isAlphanumeric;
+const indexOfScalar = std.mem.indexOfScalar;
 const endsWith = std.mem.endsWith;
-const parseInt = std.fmt.parseInt;
 const sep_str = std.fs.path.sep_str;
 const ns_per_s = std.time.ns_per_s;
 const testing = std.testing;
@@ -54,10 +55,10 @@ pub const EXT = ".sav";
 const TMP = ".tmp";
 /// the garden the timer saves into
 pub const AUTO = "autosave";
-/// gardens saved fresh are named this and a number
-// decision: file names, not text; the saves menu shows them as they are
-pub const FRESH = "garden ";
-pub const MAX_NAME = 48;
+pub const MAX_NAME = 32;
+/// what a typed name may hold besides letters and digits (nothing a
+/// Windows file name refuses, all in the UI font)
+const NAME_MARKS = " -'()!+,.=[]%";
 const MAX_PATH = home.SAVES.len + 1 + MAX_NAME + EXT.len + TMP.len;
 const MAGIC = "PRSY".*;
 const VERSION:u32 = 21;
@@ -267,6 +268,27 @@ pub const Name = struct {
   }
   pub fn slice(n:*const Name) []const u8 { return n.buf[0..n.len]; }
   pub fn is(n:*const Name, s:[]const u8) bool { return eql(u8, n.slice(), s); }
+  /// names the same file (Windows ignores case)
+  pub fn same(n:*const Name, o:Name) bool { return eqlIgnoreCase(n.slice(), o.slice()); }
+
+  /// `c` typed at the end, if a name may hold it and there is room
+  pub fn put(n:*Name, c:u21) void {
+    if (n.len == MAX_NAME or c > 0x7e) return;
+    const b:u8 = @intCast(c);
+    if (!isAlphanumeric(b) and indexOfScalar(u8, NAME_MARKS, b) == null) return;
+    n.buf[n.len] = b;
+    n.len += 1;
+  }
+  /// the last character taken back
+  pub fn erase(n:*Name) void { n.len -|= 1; }
+  /// what was typed as a garden's name: not blank, never the autosave's,
+  /// and nothing Windows would strip from a file name's ends
+  pub fn typed(n:*const Name) ?Name {
+    const s = n.slice();
+    if (s.len == 0 or s[0] == ' ' or s[s.len - 1] == ' ' or s[s.len - 1] == '.') return null;
+    if (eqlIgnoreCase(s, AUTO)) return null;
+    return n.*;
+  }
 };
 
 /// a garden in `home.SAVES`, as listed: its name and how long ago (s) it
@@ -292,16 +314,6 @@ pub fn list(gpa:Allocator, io:Io, out:*std.ArrayList(Entry)) Error!void {
   }.newer);
 }
 
-/// a name no garden in `have` uses: `FRESH` and the next number up.
-pub fn fresh(have:[]const Entry) Name {
-  var top:u32 = 0;
-  for (have) |e| if (startsWith(u8, e.name.slice(), FRESH)) {
-    top = @max(top, parseInt(u32, e.name.slice()[FRESH.len..], 10) catch continue);
-  };
-  var buf:[MAX_NAME]u8 = undefined;
-  return Name.of(bufPrint(&buf, FRESH ++ "{d}", .{top + 1}) catch unreachable).?;
-}
-
 /// `home.SAVES`/`name``EXT`, plus `extra`
 fn pathOf(buf:*[MAX_PATH]u8, name:Name, extra:[]const u8) []const u8 {
   return bufPrint(buf, "{s}{s}{s}{s}{s}", .{home.SAVES, sep_str, name.slice(), EXT, extra}) catch unreachable;
@@ -319,6 +331,15 @@ pub fn save(g:*Game, gpa:Allocator, io:Io, name:Name) Error!void {
   Io.Dir.rename(home.dir(), tmp, home.dir(), pathOf(&to_buf, name, ""), io) catch return error.SaveUnwritable;
 }
 
+/// lets the garden `name` go (its file is deleted).
+pub fn remove(io:Io, name:Name) Error!void {
+  var buf:[MAX_PATH]u8 = undefined;
+  home.dir().deleteFile(io, pathOf(&buf, name, "")) catch |e| return switch (e) {
+    error.FileNotFound => error.NoSave,
+    else => error.SaveUnwritable,
+  };
+}
+
 pub fn load(gpa:Allocator, io:Io, name:Name) Error!Game {
   var buf:[MAX_PATH]u8 = undefined;
   const bytes = home.dir().readFileAlloc(io, pathOf(&buf, name, ""), gpa, .limited(MAX_SAVE)) catch |e| return switch (e) {
@@ -330,14 +351,21 @@ pub fn load(gpa:Allocator, io:Io, name:Name) Error!Game {
   return decode(gpa, bytes);
 }
 
-test "a fresh garden's name follows the highest numbered one" {
-  var have = [_]Entry{
-    .{ .name = Name.of(FRESH ++ "2").?, .age = 0 },
-    .{ .name = Name.of(AUTO).?, .age = 0 },
-    .{ .name = Name.of(FRESH ++ "x").?, .age = 0 },
-  };
-  try testing.expectEqualStrings(FRESH ++ "3", fresh(&have).slice());
-  try testing.expectEqualStrings(FRESH ++ "1", fresh(have[1..]).slice());
+test "a typed name holds only what a file name may, and never the autosave's" {
+  var n:Name = .{};
+  for ("my: Garden?/2") |c| n.put(c);
+  try testing.expectEqualStrings("my Garden2", n.slice());
+  try testing.expect(n.typed() != null);
+  n.put(' ');
+  try testing.expect(n.typed() == null);
+  n.erase();
+  try testing.expect(n.same(Name.of("MY GARDEN2").?));
+  var a:Name = .{};
+  for ("AutoSave") |c| a.put(c);
+  try testing.expect(a.typed() == null);
+  try testing.expect((Name{}).typed() == null);
+  for (0..MAX_NAME + 4) |_| a.put('x');
+  try testing.expectEqual(@as(u8, MAX_NAME), a.len);
 }
 
 test "a garden survives a save round trip" {

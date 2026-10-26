@@ -41,8 +41,8 @@ Defaults in `src/cfg/controls.cfg` (rebindable in the gardener's copy; see
 - 1–9/0/-/=/Backspace pick hotbar slots only; research nodes and weave
   recipes are clicked in their panels.
 - Tab belly (weave), T research, F3 debug, Esc closes a panel else pauses,
-  F5 save (the garden being played), F9 load (its last save), F11
-  fullscreen.
+  F6 save (the garden being played; one never named asks its name first),
+  F9 load (its last save), F11 fullscreen.
 
 ## Belly and hotbar
 - Hotbar slots start empty. In the belly a click lifts a stack onto the
@@ -69,8 +69,13 @@ germinator's panel also picks what it weaves, any weave
   to the pause menu.
 - Saved gardens panel (pause menu only, `hud/gardens.zig`, `Mode.gardens`):
   A FRESH GARDEN then every save, newest first; wheel or drag its stem to
-  scroll (`GARDENS_SHOWN` rows), LMB chooses, SAVE (twice to save over
-  one), LOAD, BACK/Esc.
+  scroll (`GARDENS_SHOWN` rows), LMB chooses, SAVE (a fresh garden asks
+  its name; twice to save over one), LOAD, the chosen save's small DELETE
+  (twice), BACK/Esc.
+- Name prompt (`hud/naming.zig`, `Mode.naming`, world frozen): type the
+  name (letters, digits, a few marks; `save.Name.put`), Backspace erases,
+  Enter/OK saves (twice over a taken name), Esc/CANCEL returns. Never
+  `autosave` or blank.
 
 ## Free cam
 Click to look, WASD fly (Shift fast), Space/Ctrl+Space rise/sink, Q/E roll,

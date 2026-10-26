@@ -73,7 +73,7 @@ pub const Rows = struct {
   }
 };
 
-const panels = struct {
+pub const panels = struct {
   pub const status = @import("hud/status.zig");
   pub const hotbar = @import("hud/hotbar.zig");
   pub const hover = @import("hud/hover.zig");
@@ -90,6 +90,7 @@ const panels = struct {
   pub const pause = @import("hud/pause.zig");
   pub const options = @import("hud/options.zig");
   pub const gardens = @import("hud/gardens.zig");
+  pub const naming = @import("hud/naming.zig");
 };
 const reg = registry.Registry(panels);
 

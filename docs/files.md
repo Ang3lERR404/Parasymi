@@ -98,6 +98,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `hover.zig` — what is under the cursor, on a trellis beside it: a structure (its name and what it is doing), a plant (its name, how far grown and what it…
 - `inspect.zig` — the free camera's reminder: a small glowing tendril by the top-left with how to get back.
 - `log.zig` — recent messages (newest first, fading) and the control hint line.
+- `naming.zig` — the name prompt: the garden being saved is given a name (saving a fresh one from the saved gardens, or the save key before it has one).
 - `options.zig` — the options panel (pause menu, OPTIONS): the world stays frozen behind the veil.
 - `pause.zig` — the pause menu (Esc): the world holds its breath behind a soft veil.
 - `research.zig` — the research tree (T) as a living sapling growing out of the soil.

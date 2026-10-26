@@ -64,6 +64,8 @@ pub const Action = enum {
   back,
   /// while paused
   quit, options, gardens,
+  /// typing a name: take back the last character, accept it
+  erase, confirm,
   save, load, fullscreen, debug,
 };
 
