@@ -13,9 +13,9 @@
 //!   (now and then a lighter, smaller one or two among them), all muffled. It settles more often while the wolf stands; a full belly
 //!   groans lower.
 //! - all the while a gentle wind breathes over the garden: a soft low hush
-//!   swelling and easing in slow gusts, and in the stronger ones a thin
-//!   hollow whistle (narrow-banded air, a fainter fifth above it) rising
-//!   and bending with the gust.
+//!   swelling and easing in slow gusts, and in the stronger ones a warm,
+//!   breathy whistle (low, soft-edged banded air with a rounder octave
+//!   under it) leaning up a little with the gust.
 const lib = @import("../lib.zig");
 const std = lib.std;
 const testing = std.testing;
@@ -296,17 +296,17 @@ const HUSH = [2]f32{0.35, 1};
 /// the whistle: narrow-banded noise (Hz range of its pitch, how narrow,
 /// level), rising this share in a full gust and gliding to a new pitch
 /// in this (s); heard only as the gust passes this strength
-const WHISTLE_HZ = [2]f32{620, 980};
-const WHISTLE_Q:f32 = 45;
-const WHISTLE:f32 = 9;
-const WHISTLE_RISE:f32 = 0.22;
+const WHISTLE_HZ = [2]f32{340, 520};
+const WHISTLE_Q:f32 = 14;
+const WHISTLE:f32 = 6.5;
+const WHISTLE_RISE:f32 = 0.1;
 const WHISTLE_GLIDE:f32 = 2.5;
 const WHISTLE_FROM:f32 = 0.35;
-/// a fainter whistle a fifth above, at this share
-const FIFTH:f32 = 1.5;
-const FIFTH_LEVEL:f32 = 0.35;
+/// a rounder whistle an octave under, at this share
+const UNDER:f32 = 0.5;
+const UNDER_LEVEL:f32 = 0.6;
 /// what softens it all (Hz) and its loudness
-const WIND_SOFT_HZ:f32 = 2600;
+const WIND_SOFT_HZ:f32 = 1700;
 const WIND:f32 = 0.05;
 
 /// the wind breathing over the garden, never ending
@@ -316,7 +316,7 @@ const Wind = struct {
   noise:dsp.Noise,
   hush:dsp.OnePole,
   whistle:dsp.Biquad,
-  fifth:dsp.Biquad,
+  under:dsp.Biquad,
   soft:dsp.OnePole,
   gust:dsp.Smooth,
   pitch:dsp.Smooth,
@@ -334,7 +334,7 @@ const Wind = struct {
       .noise = .init(r.next()),
       .hush = .init(HUSH_HZ, rate),
       .whistle = .init(.band, hz, WHISTLE_Q, rate),
-      .fifth = .init(.band, hz * FIFTH, WHISTLE_Q, rate),
+      .under = .init(.band, hz * UNDER, WHISTLE_Q, rate),
       .soft = .init(WIND_SOFT_HZ, rate),
       .gust = .init(0.3, GUST_GLIDE, rate),
       .pitch = .init(hz, WHISTLE_GLIDE, rate),
@@ -354,13 +354,13 @@ const Wind = struct {
       const hz = w.pitch.next() * (1 + WHISTLE_RISE * g);
       if (w.at % RETUNE == 0) {
         w.whistle.tune(.band, hz, WHISTLE_Q, w.rate);
-        w.fifth.tune(.band, hz * FIFTH, WHISTLE_Q, w.rate);
+        w.under.tune(.band, hz * UNDER, WHISTLE_Q, w.rate);
       }
       w.at +%= 1;
       const n = w.noise.next();
       const hush = w.hush.low(n) * m.lerp(HUSH[0], HUSH[1], g);
       const sing = m.clamp01((g - WHISTLE_FROM) / (1 - WHISTLE_FROM));
-      const whistle = (w.whistle.tick(n) + FIFTH_LEVEL * w.fifth.tick(n)) * WHISTLE * sing * sing;
+      const whistle = (w.whistle.tick(n) + UNDER_LEVEL * w.under.tick(n)) * WHISTLE * sing * sing;
       s.* += w.soft.low(hush + whistle) * w.level;
     }
   }
