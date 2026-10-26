@@ -105,7 +105,7 @@ build. New shaders go in `build.zig`'s list (the engine's in
 ## Layers (import only downward)
 `engine/src/` (`@import("engine")`, never imports the game):
 ```
-core      math, color, rng, noise, registry, jobs, text, png
+core      math, color, rng, noise, registry, jobs, text, png, dsp
 platform  input, display (fullscreen)
 anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,

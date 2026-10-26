@@ -2,7 +2,7 @@
 //! Vulkan 1.3 can stand on, by layer (import only downward). A game reaches
 //! it as `@import("engine")` and hands the generic parts (`render.renderer`,
 //! `world.World`) a namespace describing itself.
-//!   core      math, colour, rng, noise, registry, jobs, text, png
+//!   core      math, colour, rng, noise, registry, jobs, text, png, dsp
 //!   platform  input, display (fullscreen)
 //!   anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 //!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
@@ -25,6 +25,7 @@ pub const core = struct {
   pub const jobs = @import("core/jobs.zig");
   pub const text = @import("core/text.zig");
   pub const png = @import("core/png.zig");
+  pub const dsp = @import("core/dsp.zig");
 };
 
 pub const platform = struct {
@@ -79,6 +80,7 @@ test {
   _ = core.jobs;
   _ = core.text;
   _ = core.png;
+  _ = core.dsp;
   _ = platform.input;
   _ = anim.rig;
   _ = anim.clip;

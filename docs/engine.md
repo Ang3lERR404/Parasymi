@@ -10,7 +10,7 @@ Game code reaches it as `@import("engine")` (`engine/src/engine.zig`):
 
 | Layer | Engine | Game (`src/`) |
 |---|---|---|
-| core | math, color, rng, noise, registry, jobs, text, png | — |
+| core | math, color, rng, noise, registry, jobs, text, png, `dsp` (audio: `Osc`, `Noise`, `OnePole`, `Biquad`, `Smooth`, `Adsr`, `Delay`, `Voice`; no device) | — |
 | platform | input, display | — |
 | anim | `rig`: `Turn` (Y·X·Z, `blend`), `twoBone` (law-of-cosines IK), `inverses`, `skin`; `clip`: keyed channels eased between, their text form, `Channels(T)` (every f32 of a struct as a named channel) | the wolf's skeleton (`wolf_skeleton`: bones, offsets, `fk`, breath swell) and limb solvers (`player.solveLeg`/`solveArm`, built on `twoBone`) |
 | gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights), `growth` (`Grower(M, leaf)`: the growth-spline `Skeleton`, `tag`, `formed`) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
