@@ -300,8 +300,20 @@ pub const Structures = struct {
   /// a structure waiting to be paired with another (a sporecaster
   /// choosing where it sends): the next one configured
   pairing:?Ref = null,
+  /// every structure by where it stands (`find`, `floaterAt`), kept on
+  /// `place`/`remove`
+  where:std.AutoHashMapUnmanaged(Ref, Id) = .empty,
+  /// beside `list`: each structure's first child and next sibling, in list
+  /// order (`getChildren`); never saved, `relink` rebuilds it
+  kin:std.ArrayList(Kin) = .empty,
 
-  pub fn deinit(ss:*Structures, gpa:Allocator) void { ss.list.deinit(gpa); }
+  pub const Kin = struct { first:?Id = null, next:?Id = null };
+
+  pub fn deinit(ss:*Structures, gpa:Allocator) void {
+    ss.list.deinit(gpa);
+    ss.where.deinit(gpa);
+    ss.kin.deinit(gpa);
+  }
 
   pub fn get(ss:*Structures, id:Id) *Structure { return &ss.list.items[id.idx()]; }
 
@@ -319,9 +331,28 @@ pub const Structures = struct {
   pub fn place(ss:*Structures, gpa:Allocator, w:*World, wx:i32, wy:i32, k:Kind, dir:m.Dir, seed:f32) Allocator.Error!bool {
     if (!ss.canPlace(w, wx, wy, k)) return false;
     const idx = Id.of(ss.list.items.len);
-    try ss.list.append(gpa, .{ .x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k) });
+    try ss.list.ensureUnusedCapacity(gpa, 1);
+    try ss.kin.ensureUnusedCapacity(gpa, 1);
+    try ss.where.ensureUnusedCapacity(gpa, 1);
+    ss.list.appendAssumeCapacity(.{ .x = wx, .y = wy, .dir = dir, .seed = seed, .state = freshState(k) });
+    ss.kin.appendAssumeCapacity(.{});
+    ss.where.putAssumeCapacityNoClobber(ss.get(idx).ref(), idx);
     if (!defs.get(k).floating) w.setFootprint(wx, wy, defs.get(k).size, Occ.structure(idx));
     return true;
+  }
+
+  /// put a saved structure back as it was (inventory, state, whom it
+  /// depends on); once all are back, `relink`. Returns whether it fit.
+  pub fn restore(ss:*Structures, gpa:Allocator, w:*World, s:Structure) Allocator.Error!bool {
+    if (!try ss.place(gpa, w, s.x, s.y, s.kind(), s.dir, s.seed)) return false;
+    ss.list.items[ss.list.items.len - 1] = s;
+    return true;
+  }
+
+  /// rebuild who is whose child from each structure's `parent`
+  pub fn relink(ss:*Structures) void {
+    @memset(ss.kin.items, .{});
+    for (0..ss.list.items.len) |i| if (ss.getParent(Id.of(i))) |p| ss.join(Id.of(i), p);
   }
 
   /// a structure the gardener has just put down starts as a sprout.
@@ -342,10 +373,9 @@ pub const Structures = struct {
     return ss.at(w, wx, wy) orelse ss.floaterAt(wx, wy);
   }
 
-  /// the floating structure over a tile; they are few, so the list is walked
+  /// the floating structure over a tile
   pub fn floaterAt(ss:*const Structures, wx:i32, wy:i32) ?Id {
-    for (ss.list.items, 0..) |*s, i| if (s.def().floating and s.x == wx and s.y == wy) return Id.of(i);
-    return null;
+    return ss.where.get(.{ .x = wx, .y = wy, .floating = true });
   }
 
   /// swap-remove; returns the removed structure so its contents can be refunded.
@@ -355,20 +385,35 @@ pub const Structures = struct {
     // calls should always be at the top;
     const stct = s.def();
     const idx = id.idx();
-    if (!stct.floating) w.setFootprint(s.x, s.y, stct.size, .none);
     const last = ss.list.items.len - 1;
+    const moved = Id.of(last);
+    // it leaves its parent, and what depended on it is cut loose
+    ss.setParent(id, null);
+    var c = ss.kin.items[idx].first;
+    while (c) |k| {
+      c = ss.kin.items[k.idx()].next;
+      ss.kin.items[k.idx()].next = null;
+      ss.get(k).parent = null;
+    }
+    ss.kin.items[idx].first = null;
+    // the last one takes its slot: out of its parent's children till it is there
+    const up = if (idx != last) ss.getParent(moved) else null;
+    if (up) |p| ss.leave(moved, p);
+    if (!stct.floating) w.setFootprint(s.x, s.y, stct.size, .none);
+    _ = ss.where.remove(s.ref());
     if (idx != last) {
       const l = ss.list.items[last];
       const lstct = l.def();
       if (!lstct.floating) w.moveFootprint(l.x, l.y, lstct.size, Occ.structure(id));
+      ss.where.getPtr(l.ref()).?.* = id;
     }
     _ = ss.list.swapRemove(idx);
-    // what depended on it, or was paired with it, is cut loose
+    _ = ss.kin.swapRemove(idx);
+    // its children name it by `Ref`, which did not move
+    if (up) |p| ss.join(id, p);
+    // what was paired with it is cut loose
     const gone = s.ref();
-    for (ss.list.items) |*o| {
-      if (o.parent) |p| if (p.eql(gone)) { o.parent = null; };
-      if (o.partner) |p| if (p.eql(gone)) { o.partner = null; };
-    }
+    for (ss.list.items) |*o| if (o.partner) |p| if (p.eql(gone)) { o.partner = null; };
     if (ss.pairing) |p| if (p.eql(gone)) { ss.pairing = null; };
     return s;
   }
@@ -436,9 +481,40 @@ pub const Structures = struct {
   // ---- parents and children: a child depends on its parent ----
 
   /// the structure `r` names, if one still stands there
-  pub fn find(ss:*const Structures, r:Ref) ?Id {
-    for (ss.list.items, 0..) |*s, i| if (s.ref().eql(r)) return Id.of(i);
-    return null;
+  pub fn find(ss:*const Structures, r:Ref) ?Id { return ss.where.get(r); }
+
+  /// `child` now depends on `parent` (or on nothing), leaving whatever it
+  /// depended on before
+  fn setParent(ss:*Structures, child:Id, parent:?Id) void {
+    if (ss.getParent(child)) |old| ss.leave(child, old);
+    ss.get(child).parent = if (parent) |p| ss.get(p).ref() else null;
+    if (parent) |p| ss.join(child, p);
+  }
+
+  /// put `c` among `p`'s children, in list order
+  fn join(ss:*Structures, c:Id, p:Id) void {
+    const kin = ss.kin.items;
+    var slot:*?Id = &kin[p.idx()].first;
+    while (slot.*) |o| {
+      if (o.idx() > c.idx()) break;
+      slot = &kin[o.idx()].next;
+    }
+    kin[c.idx()].next = slot.*;
+    slot.* = c;
+  }
+
+  /// take `c` out of `p`'s children
+  fn leave(ss:*Structures, c:Id, p:Id) void {
+    const kin = ss.kin.items;
+    var slot:*?Id = &kin[p.idx()].first;
+    while (slot.*) |o| {
+      if (o == c) {
+        slot.* = kin[c.idx()].next;
+        kin[c.idx()].next = null;
+        return;
+      }
+      slot = &kin[o.idx()].next;
+    }
   }
 
   /// put a structure down already depending on `parent` (its parent
@@ -449,6 +525,7 @@ pub const Structures = struct {
     if (!try ss.place(gpa, w, sp.x, sp.y, sp.kind, sp.dir, sp.seed)) return null;
     const id = Id.of(ss.list.items.len - 1);
     ss.get(id).parent = up;
+    ss.join(id, parent);
     return id;
   }
 
@@ -470,12 +547,12 @@ pub const Structures = struct {
     const ok = switch (p.kind()) {
       inline else => |t| if (comptime reg.has(t, "adopts")) reg.module(t).adopts(p, k, have) else false,
     };
-    if (ok) ss.get(child).parent = p.ref();
+    if (ok) ss.setParent(child, parent);
     return ok;
   }
 
   /// cut `child` loose from its parent.
-  pub fn detach(ss:*Structures, child:Id) void { ss.get(child).parent = null; }
+  pub fn detach(ss:*Structures, child:Id) void { ss.setParent(child, null); }
 
   pub fn getParent(ss:*const Structures, child:Id) ?Id {
     const r = ss.list.items[child.idx()].parent orelse return null;
@@ -484,7 +561,7 @@ pub const Structures = struct {
 
   /// every structure depending on `parent`, in list order.
   pub fn getChildren(ss:*const Structures, parent:Id) Children {
-    return .{ .ss = ss, .of = ss.list.items[parent.idx()].ref() };
+    return .{ .ss = ss, .at = ss.kin.items[parent.idx()].first };
   }
 
   /// the `n`th of `parent`'s children (in list order).
@@ -502,7 +579,17 @@ pub const Structures = struct {
     return n;
   }
 
-  pub const Children = Linked("parent");
+  /// walks a structure's children (`kin`)
+  pub const Children = struct {
+    ss:*const Structures,
+    at:?Id,
+
+    pub fn next(it:*Children) ?Id {
+      const c = it.at orelse return null;
+      it.at = it.ss.kin.items[c.idx()].next;
+      return c;
+    }
+  };
   pub const Paired = Linked("partner");
 
   /// walks every structure whose `field` (a `?Ref`) names `of`
@@ -893,6 +980,56 @@ test "handing off reaches further and hands more when asked, the nearest first" 
   try testing.expectEqual(@as(u16, 2), handOffWith(ctx, fern, .{ .range = 2, .amount = 9 }));
   try testing.expectEqual(@as(u32, 2), ss.get(near).inv.count(.fibre));
   try testing.expectEqual(@as(u32, 0), ss.get(fern).inv.count(.fibre));
+}
+
+/// `find` and `getChildren` as walking the whole list answers them
+fn expectIndexed(ss:*const Structures) !void {
+  try testing.expectEqual(ss.list.items.len, ss.where.count());
+  try testing.expectEqual(ss.list.items.len, ss.kin.items.len);
+  for (ss.list.items, 0..) |*s, i| {
+    try testing.expectEqual(Id.of(i), ss.find(s.ref()).?);
+    var it = ss.getChildren(Id.of(i));
+    for (ss.list.items, 0..) |*o, j| if (o.parent) |p| if (p.eql(s.ref())) {
+      try testing.expectEqual(Id.of(j), it.next().?);
+    };
+    try testing.expect(it.next() == null);
+  }
+}
+
+test "the tile index and the children agree with the list through placing, adopting, uprooting and a reload" {
+  const gpa = testing.allocator;
+  var w = World.init(gpa, 5);
+  defer w.deinit();
+  try w.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c = w.chunkOfTile(0, 0).?;
+  for (0..10) |x| for (0..10) |y| { const t = y * ck.SIZE + x; c.kind[t] = .soil; c.height[t] = 1; c.res[t] = 0; };
+  var ss:Structures = .{};
+  defer ss.deinit(gpa);
+  var rng = engine.core.rng.Rng.init(7);
+  const ks = [_]Kind{ .sap_cache, .monfris, .vultrixi, .vultrixi };
+  for (0..400) |_| {
+    const n = ss.list.items.len;
+    switch (rng.below(4)) {
+      0, 1 => _ = try ss.place(gpa, &w, @intCast(rng.below(10)), @intCast(rng.below(10)), ks[rng.below(ks.len)], 0, 0),
+      2 => if (n > 0) { _ = ss.dependOn(Id.of(rng.below(@intCast(n))), Id.of(rng.below(@intCast(n)))); },
+      else => if (n > 0) {
+        if (rng.below(3) == 0) ss.detach(Id.of(rng.below(@intCast(n)))) else _ = ss.remove(&w, Id.of(rng.below(@intCast(n))));
+      },
+    }
+    try expectIndexed(&ss);
+  }
+  // put back as saved, in the same order
+  var again:Structures = .{};
+  defer again.deinit(gpa);
+  var w2 = World.init(gpa, 5);
+  defer w2.deinit();
+  try w2.stream(.{ .x = 0, .y = 0 }, 1, 100);
+  const c2 = w2.chunkOfTile(0, 0).?;
+  for (0..10) |x| for (0..10) |y| { const t = y * ck.SIZE + x; c2.kind[t] = .soil; c2.height[t] = 1; c2.res[t] = 0; };
+  for (ss.list.items) |s| try testing.expect(try again.restore(gpa, &w2, s));
+  again.relink();
+  try expectIndexed(&again);
+  for (0..ss.list.items.len) |i| try testing.expectEqual(ss.childCount(Id.of(i)), again.childCount(Id.of(i)));
 }
 
 test "a structure put down grows before it works" {

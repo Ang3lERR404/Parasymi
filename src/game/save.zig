@@ -231,13 +231,12 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
   for (0..structs) |_| {
     const s = try r.get(st.Structure);
     try ensureFootprint(&g, s.x, s.y, s.def().size);
-    // place allocates and initialises a fresh structure; we then overwrite it
-    // with the saved one so its runtime state (inventory, per-kind data) is
-    // restored exactly. If place fails the save is corrupt (the world is
-    // regenerated from the same seed, so the tile was valid when saved).
-    if (!try g.structs.place(gpa, &g.world, s.x, s.y, s.kind(), s.dir, s.seed)) return error.CorruptSave;
-    g.structs.list.items[g.structs.list.items.len - 1] = s;
+    // restored exactly as saved (inventory, per-kind data). If it does not
+    // fit the save is corrupt (the world is regenerated from the same seed,
+    // so the tile was valid when saved).
+    if (!try g.structs.restore(gpa, &g.world, s)) return error.CorruptSave;
   }
+  g.structs.relink();
   const nodes = try r.get(u32);
   for (0..nodes) |_| {
     const n = try r.get(NodesRec);
