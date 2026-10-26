@@ -120,7 +120,6 @@ Read this before writing any code. Where it and CLAUDE.md disagree, CLAUDE.md
 - **No hidden control flow** — no exceptions, no implicit conversions, no destructors.
 - **Don't shadow identifiers** from outer scopes (compile error).
 - **Larger cohesive files are idiomatic** — tests alongside implementation, comptime generics at file scope. Don't split files into tightly coupled pieces.
-- **Run `zig fmt`** — it's not optional.
 
 ---
 
