@@ -93,6 +93,9 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # `m` picks the shader (part role) a form is drawn with;
                                   # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
+zig build audiocheck              # sound path check (tools/audiocheck.zig): plays a
+                                  # dsp.Voice through platform.audio, records it back by
+                                  # loopback, fails unless heard at its pitch (needs speakers)
 ```
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`

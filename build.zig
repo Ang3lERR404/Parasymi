@@ -139,6 +139,19 @@ pub fn build(b:*Build) !void {
   if (b.args) |args| mesh_cmd.addArgs(args);
   b.step("meshedit", "run the mesh editor.").dependOn(&mesh_cmd.step);
 
+  // the sound check (tools/audiocheck.zig): plays a tone and records it
+  // back, so it needs real speakers and stays out of `test`
+  const audiocheck = b.addExecutable(.{
+    .name = "audiocheck",
+    .root_module = b.createModule(.{
+      .optimize = o,
+      .target = t,
+      .root_source_file = b.path("tools/audiocheck.zig"),
+      .imports = &.{.{.name = "engine", .module = engine}},
+    }),
+  });
+  b.step("audiocheck", "play a tone and check it is heard.").dependOn(&b.addRunArtifact(audiocheck).step);
+
   // logic tests (world/sim/game, and the engine's own) need no window or
   // GPU, but share the game's imports so game-level code can be exercised
   // headless.
