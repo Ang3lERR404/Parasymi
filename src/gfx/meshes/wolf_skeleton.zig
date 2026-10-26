@@ -9,6 +9,7 @@
 const std = @import("std");
 const testing = std.testing;
 const m = @import("engine").core.math;
+const rig = @import("engine").anim.rig;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -124,14 +125,9 @@ pub const EAR_AT = v3(0.05, 0.092, -0.012);
 /// ears lean forward and out by this much at rest
 pub const EAR_TILT:f32 = m.rad(12);
 
-/// a joint's turn: about X (pitch: + tips a limb's -Y backward, a spine's +Y
-/// forward), then Y (twist), then Z (roll), applied as Y * X * Z
-pub const Turn = struct {
-  x:f32 = 0,
-  y:f32 = 0,
-  z:f32 = 0,
-  pub fn m4(t:Turn) M4 { return m.chain(&.{ m.rotY(t.y), m.rotX(t.x), m.rotZ(t.z) }); }
-};
+/// a joint's turn (engine anim/rig.zig): about X (pitch: + tips a limb's
+/// -Y backward, a spine's +Y forward), then Y (twist), then Z (roll)
+pub const Turn = rig.Turn;
 
 pub const Limb = struct {
   /// the arm's shoulder or the leg's hip
@@ -248,11 +244,7 @@ pub fn skin(world:[COUNT]M4, bind_inv:*const [COUNT]M4, breath:f32) [COUNT]M4 {
   return out;
 }
 
-pub fn inverses(mats:[COUNT]M4) [COUNT]M4 {
-  var out:[COUNT]M4 = undefined;
-  for (&out, mats) |*o, mat| o.* = m.inverseRigid(mat);
-  return out;
-}
+pub fn inverses(mats:[COUNT]M4) [COUNT]M4 { return rig.inverses(COUNT, mats); }
 
 test "the bind pose stands on the ground, the arms clear of the body" {
   const w = bind();

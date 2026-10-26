@@ -84,6 +84,7 @@ build. New shaders go in `build.zig`'s list (the engine's in
 ```
 core      math, color, rng, noise, registry, jobs, text, png
 platform  input, display (fullscreen)
+anim      joint turns, two-bone IK, skinning matrices
 gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
           mesh builder + primitives (Mesher), SDF sculpting
 world     chunk grid, World(L) streaming

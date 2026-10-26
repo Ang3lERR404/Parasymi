@@ -15,6 +15,9 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `ui.frag` — organic UI: every shape is an animated signed-distance field.
 - `ui.vert` — UI shapes to the screen; the palette's sRGB colours to linear.
 
+## engine/src/anim/
+- `rig.zig` — skeletal animation, the generic half: a joint's turn, blending turns the short way round, two-bone inverse kinematics, and the matrices a…
+
 ## engine/src/core/
 - `color.zig` — colour helpers.
 - `jobs.zig` — parallel-for over the game's thread pool (the `Io` main is given): [0, n) split into ranges run on its worker threads and waited for…

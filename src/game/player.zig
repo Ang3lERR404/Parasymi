@@ -23,6 +23,7 @@ const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const m = @import("engine").core.math;
 const noise = @import("engine").core.noise;
+const rig = @import("engine").anim.rig;
 const items = @import("../sim/items.zig");
 const World = @import("../world/world.zig").World;
 const skel = @import("../gfx/meshes/wolf_skeleton.zig");
@@ -779,7 +780,7 @@ pub const Player = struct {
       const out:f32 = if (s == 0) REST_ELBOW_OUT else 0;
       const ik = solveArmTurned(m.mulPoint(into, at[s]) - skel.SHOULDER * v3(x, 1, 1), -x * out);
       const a = &q.arms[s];
-      a.root = blendTurn(a.root, ik.root, r);
+      a.root = skel.Turn.blend(a.root, ik.root, r);
       a.mid = m.lerp(a.mid, ik.mid, r);
       // (on the belly the paw turns palm down and bends onto the sac; on
       // the hip the wrist cocks back)
@@ -800,7 +801,7 @@ pub const Player = struct {
       const at = m.mulPoint(into, p.wrist[s].pos) - skel.SHOULDER * v3(x, 1, 1);
       const ik = solveArm(at);
       const a = &q.arms[s];
-      a.root = blendTurn(a.root, ik.root, sq);
+      a.root = skel.Turn.blend(a.root, ik.root, sq);
       a.mid = m.lerp(a.mid, ik.mid, sq);
       const stowing = m.clamp01(p.stow[s] / STOW_TIME * 3);
       a.low = .{ .x = m.lerp(a.low.x, 0.35 * (1 - stowing) + 0.9 * stowing, sq), .y = m.lerp(a.low.y, -x * twist * (1 - stowing), sq), .z = a.low.z };
@@ -931,15 +932,11 @@ pub fn solveLeg(d:V3, fold:f32, pelvis_pitch:f32, hang:f32) skel.Limb {
   const cz = skel.META * @sin(delta);
   const lv = @sqrt(cy * cy + cz * cz);
   const phi = m.atan2(cz, cy);
-  const l2 = skel.SHIN;
-  const reach = @sqrt(dy * dy + dz * dz);
-  const dist = m.clamp(reach, @abs(lv - l2) + 1e-3, lv + l2 - 1e-3);
+  const ik = rig.twoBone(lv, skel.SHIN, @sqrt(dy * dy + dz * dz));
   // the direction toward the ball, as a limb's turn about X
   const beta = m.atan2(-dz, -dy);
-  const g1 = m.acos((lv * lv + dist * dist - l2 * l2) / (2 * lv * dist));
-  const g2 = m.acos((l2 * l2 + dist * dist - lv * lv) / (2 * l2 * dist));
-  const th = beta - g1 - phi;
-  const shin = beta + g2;
+  const th = beta - ik.root - phi;
+  const shin = beta + ik.end;
   const meta = th + delta;
   return .{
     .root = .{ .x = th, .z = ab },
@@ -956,8 +953,9 @@ pub fn solveLeg(d:V3, fold:f32, pelvis_pitch:f32, hang:f32) skel.Limb {
 pub fn solveArm(d:V3) skel.Limb {
   const a = skel.UPPER_ARM;
   const b = skel.FOREARM;
-  const l = m.clamp(m.len(d), @abs(a - b) + 1e-3, a + b - 1e-3);
-  const mid = m.acos(m.clamp((l * l - a * a - b * b) / (2 * a * b), -1, 1));
+  const ik = rig.twoBone(a, b, m.len(d));
+  const l = ik.reach;
+  const mid = ik.bend;
   // the bent arm's wrist in its own frame: down the upper arm, the forearm
   // bent forward from it
   const y0 = -(a + b * @cos(mid));
@@ -969,11 +967,6 @@ pub fn solveArm(d:V3) skel.Limb {
   // out a whole turn round, and an arm blended toward it would spin)
   const xr = m.angleDiff(0, m.atan2(dd[2], dd[1]) - m.atan2(z0, y1));
   return .{ .root = .{ .x = xr, .z = zr }, .mid = mid };
-}
-
-/// `a` turned toward `b` by share `k`, each angle the short way round
-fn blendTurn(a:skel.Turn, b:skel.Turn, k:f32) skel.Turn {
-  return .{ .x = a.x + m.angleDiff(a.x, b.x) * k, .y = a.y + m.angleDiff(a.y, b.y) * k, .z = a.z + m.angleDiff(a.z, b.z) * k };
 }
 
 /// `solveArm` with the shoulder first turned by `y` about the chest's
