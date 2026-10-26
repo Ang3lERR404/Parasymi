@@ -31,7 +31,7 @@ const FALL:f32 = 0.055;
 const FALL_FAST:f32 = 0.6;
 /// the leaves: the band they rustle in (Hz) and its width (q), a full
 /// belly pulling it this share lower; level to match the other layers
-const RUSTLE_HZ:f32 = 2200;
+const RUSTLE_HZ:f32 = 1500;
 const RUSTLE_Q:f32 = 0.8;
 const RUSTLE_HEAVY:f32 = 0.35;
 const RUSTLE:f32 = 4;
@@ -42,9 +42,9 @@ const FLUTTER:f32 = 0.8;
 /// how long each rings (s), heard above this (Hz), level
 const CRUNCH_DENSITY:f32 = 700;
 const CRUNCH_HEAVY:f32 = 0.6;
-const CRUNCH_GRAIN:f32 = 0.0007;
-const CRUNCH_HZ:f32 = 2600;
-const CRUNCH:f32 = 0.9;
+const CRUNCH_GRAIN:f32 = 0.0015;
+const CRUNCH_HZ:f32 = 1800;
+const CRUNCH:f32 = 0.5;
 /// the pad's muffled landing: below this (Hz), falling ~63% in this (s),
 /// level light and full
 const PAD_HZ:f32 = 180;
@@ -52,10 +52,10 @@ const PAD_FALL:f32 = 0.03;
 const PAD_LIGHT:f32 = 1.5;
 const PAD_FULL:f32 = 6;
 /// what softens all of it (Hz)
-const SOFT_HZ:f32 = 7000;
+const SOFT_HZ:f32 = 3800;
 /// loudness of a settling paw and of a sprinting one
-const QUIET:f32 = 0.1;
-const LOUD:f32 = 0.3;
+const QUIET:f32 = 0.05;
+const LOUD:f32 = 0.14;
 /// each step strays from these by up to this share
 const VARY:f32 = 0.2;
 
