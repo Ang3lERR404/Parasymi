@@ -206,7 +206,11 @@ placing or adjusting.
   saves/loads/listing/deletes to main. Autosave (always `autosave.sav`) every
   `Options.autosave` minutes of play (default 5, options panel:
   never..60). Bump `VERSION` when a stored layout changes (the fingerprint
-  checks sizes only).
+  checks sizes only). Structures are stored as `record`s (`game/record.zig`:
+  named, framed fields, enums and kinds by name), so a structure's state may
+  gain, lose or change fields, or hold lists (its `State.deinit` frees
+  them), without a bump: older saves keep what matches and the defaults for
+  the rest, and drop structures of a kind that is gone.
 - Each start grows a fresh world (seed logged, kept in its saves);
   `--seed=` repeats one; test gardens use `play.DEFAULT_SEED`.
 - Options (`game/options.zig`, `hud/options.zig`): AA, vsync, fullscreen,

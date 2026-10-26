@@ -9,6 +9,10 @@
 //! Format: a small header (magic, version, layout fingerprint) followed by
 //! plain-old-data records. The fingerprint changes whenever a stored type's
 //! size changes, so an incompatible save is refused instead of misread.
+//! Structures are the exception: each is its kind's name hash and a
+//! `record` of named fields, so a structure or its state gaining, losing or
+//! changing a field (or holding a list) keeps older saves loading; one of a
+//! kind that is gone is left out.
 const lib = @import("../lib.zig");
 const std = lib.std;
 const Allocator = std.mem.Allocator;
@@ -37,6 +41,7 @@ const items = lib.items;
 const prog = lib.progression;
 const craft = lib.craft;
 const st = lib.structures;
+const record = lib.record;
 const player_mod = lib.player;
 const play = lib.play;
 const txt = lib.txt;
@@ -61,7 +66,7 @@ pub const MAX_NAME = 32;
 const NAME_MARKS = " -'()!+,.=[]%";
 const MAX_PATH = home.SAVES.len + 1 + MAX_NAME + EXT.len + TMP.len;
 const MAGIC = "PRSY".*;
-const VERSION:u32 = 22;
+const VERSION:u32 = 23;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const MAX_SAVE:usize = 64 << 20;
@@ -111,9 +116,9 @@ const Header = extern struct {
 const layout_fingerprint = blk: {
   var h:u64 = 0xA5;
   for ([_]usize{
-    @sizeOf(PlantRec), @sizeOf(NodesRec), @sizeOf(st.Structure),
+    @sizeOf(PlantRec), @sizeOf(NodesRec),
     @sizeOf(prog.Progression), @sizeOf(craft.Crafter), @sizeOf(Belly),
-    @sizeOf(Rng), species.count, st.defs.values.len,
+    @sizeOf(Rng), species.count,
   }) |n| h = h *% 0x100000001B3 ^ n;
   break :blk h;
 };
@@ -168,7 +173,10 @@ pub fn encode(gpa:Allocator, g:*const Game) Allocator.Error![]u8 {
     .dir = s.items(.dir)[i],
   });
   try w.put(u32, @intCast(g.structs.list.items.len));
-  for (g.structs.list.items) |it| try w.put(st.Structure, it);
+  for (g.structs.list.items) |*it| {
+    try w.put(u32, record.nameHash(@tagName(it.kind())));
+    try record.writeFramed(st.Structure, gpa, &w.buf, it);
+  }
 
   // gathered resource nodes (only chunks that differ from generation)
   var touched:std.ArrayList(*const ck.Chunk) = .empty;
@@ -229,11 +237,19 @@ pub fn decode(gpa:Allocator, data:[]const u8) Error!Game {
   }
   const structs = try r.get(u32);
   for (0..structs) |_| {
-    const s = try r.get(st.Structure);
+    const kh = try r.get(u32);
+    var in:record.In = .{ .b = r.data, .pos = r.pos };
+    const body = try in.frame();
+    r.pos = in.pos;
+    // a kind no longer grown is left out
+    const k = st.kindByName(kh) orelse continue;
+    var s = st.blank(k);
+    errdefer s.deinit(gpa);
+    try record.read(st.Structure, gpa, body, &s);
     try ensureFootprint(&g, s.x, s.y, s.def().size);
-    // restored exactly as saved (inventory, per-kind data). If it does not
-    // fit the save is corrupt (the world is regenerated from the same seed,
-    // so the tile was valid when saved).
+    // restored as saved (inventory, per-kind data). If it does not fit the
+    // save is corrupt (the world is regenerated from the same seed, so the
+    // tile was valid when saved).
     if (!try g.structs.restore(gpa, &g.world, s)) return error.CorruptSave;
   }
   g.structs.relink();

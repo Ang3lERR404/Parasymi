@@ -117,6 +117,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `play.zig` — the playable layer: owns world + sim + progression + the player and runs a frame: input -> actions (actions.zig), fixed-tick simulation…
 - `player.zig` — the player: an anthropomorphic wolf woven from vines, leaves and sap.
 - `progression.zig` — research tree, discoveries and world events.
+- `record.zig` — a value as a record of named fields (structures in saves): each field is written with its name's hash and its length, so a record read back…
 
 ## src/game/research/
 - `arsthraxia.zig` — ARSTHRAXIA: study of the bloom that studies.

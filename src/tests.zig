@@ -17,6 +17,7 @@ test {
   _ = lib.orbit;
   _ = lib.specimen;
   _ = lib.player;
+  _ = lib.record;
   _ = lib.save;
   _ = lib.options;
   _ = lib.home;

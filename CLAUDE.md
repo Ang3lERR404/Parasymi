@@ -166,7 +166,9 @@ Code:
 - `WorldPush` ≤ 192 bytes. A new see-through part role goes in
   `vertex.seeThrough`. A structure that emits a library mesh lists it in its
   `meshes` hook.
-- Bump `save.VERSION` when a stored layout changes.
+- Bump `save.VERSION` when a stored layout changes (not for structures:
+  they are `record`s, read by field name; a `State` owning memory has a
+  `deinit`, and `Structures.remove`'s result is the caller's to `deinit`).
 
 Meshes:
 - Every flower has stamens (`meshgen.stamens`); closed buds hide theirs.

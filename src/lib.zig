@@ -38,6 +38,7 @@ pub const icon = @import("game/icon.zig");
 pub const orbit = @import("game/orbit.zig");
 pub const progression = @import("game/progression.zig");
 pub const resources = @import("game/resources.zig");
+pub const record = @import("game/record.zig");
 pub const save = @import("game/save.zig");
 pub const seeds = @import("game/seeds.zig");
 pub const setups = @import("game/setups.zig");

@@ -76,6 +76,7 @@ const Draw = engine.ui.draw.Draw;
 const Color = engine.ui.draw.Color;
 const icon_kit = lib.icon;
 const turn = lib.turn;
+const record = lib.record;
 
 const kinds = struct {
   pub const conduit = @import("structures/conduit.zig");
@@ -273,6 +274,13 @@ pub const Structure = struct {
   turn:turn.Turn = .{},
 
   pub fn kind(s:*const Structure) Kind { return activeTag(s.state); }
+  /// free what its state holds (a `State` with a `deinit`: lists, ...);
+  /// `Structures.remove` hands back one the caller frees
+  pub fn deinit(s:*Structure, gpa:Allocator) void {
+    switch (s.state) {
+      inline else => |*v| if (comptime @typeInfo(@TypeOf(v.*)) == .@"struct" and @hasDecl(@TypeOf(v.*), "deinit")) v.deinit(gpa),
+    }
+  }
   /// how big it is drawn: the size research has grown it to (`size`);
   /// growing in is its growth splines' alone
   pub fn grownScale(s:*const Structure) m.V3 { return m.splat3(s.size()); }
@@ -349,6 +357,16 @@ fn freshState(k:Kind) State {
   };
 }
 
+/// a kind by its name's hash (`record.nameHash`), as saves store it
+pub fn kindByName(h:u32) ?Kind {
+  inline for (reg.ids) |k| if ((comptime record.nameHash(@tagName(k))) == h) return k;
+  return null;
+}
+
+/// a structure of kind `k` at the origin, its state fresh (what a saved
+/// one is read over)
+pub fn blank(k:Kind) Structure { return .{ .x = 0, .y = 0, .seed = 0, .state = freshState(k) }; }
+
 fn anyTile(_:ck.Kind) bool { return true; }
 
 /// empty tiles between two structures' footprints (0: touching)
@@ -384,6 +402,7 @@ pub const Structures = struct {
   pub const Kin = struct { first:?Id = null, next:?Id = null };
 
   pub fn deinit(ss:*Structures, gpa:Allocator) void {
+    for (ss.list.items) |*s| s.deinit(gpa);
     ss.list.deinit(gpa);
     ss.where.deinit(gpa);
     ss.kin.deinit(gpa);
@@ -416,10 +435,13 @@ pub const Structures = struct {
   }
 
   /// put a saved structure back as it was (inventory, state, whom it
-  /// depends on); once all are back, `relink`. Returns whether it fit.
+  /// depends on), owning what its state holds; once all are back,
+  /// `relink`. Returns whether it fit (if not, `s` is still the caller's).
   pub fn restore(ss:*Structures, gpa:Allocator, w:*World, s:Structure) Allocator.Error!bool {
     if (!try ss.place(gpa, w, s.x, s.y, s.kind(), s.dir, s.seed)) return false;
-    ss.list.items[ss.list.items.len - 1] = s;
+    const put = &ss.list.items[ss.list.items.len - 1];
+    put.deinit(gpa);
+    put.* = s;
     return true;
   }
 
@@ -454,7 +476,7 @@ pub const Structures = struct {
 
   /// ordered remove: the others keep the order they were put down in (the
   /// order they tick in), each after it one slot down. Returns the removed
-  /// structure so its contents can be refunded.
+  /// structure so its contents can be refunded; the caller `deinit`s it.
   /// note to CLAUDE, I changed the code, it is bad to do repeated get calls.
   pub fn remove(ss:*Structures, w:*World, id:Id) Structure {
     const s = ss.get(id).*;
@@ -1202,6 +1224,30 @@ test "uprooting keeps the others in the order they were put down, each found on 
   }
   try testing.expect(w.occAt(0, 0).asStructure() == null and w.occAt(3, 0).asStructure() == null);
   try expectIndexed(&ss);
+}
+
+test "every kind's structure is stored as a record and read back the same" {
+  const gpa = testing.allocator;
+  inline for (reg.ids) |k| {
+    var s = blank(k);
+    s.x = 3;
+    s.y = -2;
+    s.grown = 0.5;
+    _ = s.inv.add(.grit, 4);
+    s.partners[0] = .{ .x = 1, .y = 1, .floating = true };
+    var a:std.ArrayList(u8) = .empty;
+    defer a.deinit(gpa);
+    try record.write(Structure, gpa, &a, &s);
+    var back = blank(kindByName(record.nameHash(@tagName(k))).?);
+    defer back.deinit(gpa);
+    try record.read(Structure, gpa, a.items, &back);
+    var b:std.ArrayList(u8) = .empty;
+    defer b.deinit(gpa);
+    try record.write(Structure, gpa, &b, &back);
+    try testing.expectEqualSlices(u8, a.items, b.items);
+    try testing.expectEqual(k, back.kind());
+    try testing.expectEqual(@as(u32, 4), back.inv.count(.grit));
+  }
 }
 
 test "a message is taken by its hook, else by its default" {

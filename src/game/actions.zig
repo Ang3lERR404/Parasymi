@@ -192,6 +192,7 @@ pub fn takeFrom(g:*Game, j:st.Id) void {
 /// anything that doesn't fit is lost.
 pub fn unbuild(g:*Game, j:st.Id) void {
   var s = g.structs.remove(&g.world, j);
+  defer s.deinit(g.gpa);
   var lost:u32 = 0;
   // add returns how many fit; 1 - that = how many were lost
   lost += 1 - g.player.inv.add(s.def().item, 1);

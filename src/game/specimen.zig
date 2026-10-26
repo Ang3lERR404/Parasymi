@@ -257,7 +257,10 @@ pub const Specimen = struct {
         if (gone or s.t >= s.loop()) {
           s.t = 0;
           // what it put down (a polyp's diamond) goes with it
-          while (g.structs.list.items.len > 0) _ = g.structs.remove(&g.world, .of(g.structs.list.items.len - 1));
+          while (g.structs.list.items.len > 0) {
+            var gone_s = g.structs.remove(&g.world, .of(g.structs.list.items.len - 1));
+            gone_s.deinit(g.gpa);
+          }
           try s.put(g);
         }
         s.feed_t -= dt;
