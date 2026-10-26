@@ -12,6 +12,9 @@
 //! joint under the mouse), and its gizmo (tools/gizmo.zig) keys it as it
 //! is dragged: rings for a joint's turns, one ring for a hinge, arrows
 //! (and the centre, across the view) for the hips' place.
+//! The camera orbits as the mesh editor's does (tools/orbit.zig): freely,
+//! over the top and under alike (middle drag; the wheel zooms); `.` eases
+//! it onto the selected joint (else back onto the whole subject).
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
@@ -36,6 +39,7 @@ const Draw = engine.ui.draw.Draw;
 const Color = engine.ui.draw.Color;
 const ps = @import("parasymi");
 const gizmo = @import("gizmo.zig");
+const Orbit = @import("orbit.zig").Orbit;
 const play = ps.play;
 const Game = play.Game;
 const skel = ps.skeleton;
@@ -75,6 +79,8 @@ const CAM_PITCH:f32 = m.rad(18);
 /// a plant or structure is seen from this far plus `CAM_PER` a tile of its size
 const CAM_THING:f32 = 1.6;
 const CAM_PER:f32 = 2.4;
+/// `.` frames a joint as a thing this big (m)
+const JOINT_SIZE:f32 = 0.12;
 /// layout (px): the channel list, the timeline along the bottom
 const PAD:f32 = 16;
 const TEXT:f32 = s.text_small;
@@ -105,7 +111,7 @@ const PANEL:Color = s.panel;
 const HELP = [_][]const u8{
   "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
   "up/down channel   drag value: key it (shift fine)   k key   a key all   x unkey   r rest",
-  "ctrl+s save   middle drag orbit   wheel zoom (over the list: scroll)   wolf: click a joint, drag its gizmo (shift fine)",
+  "ctrl+s save   middle drag orbit   wheel zoom (over the list: scroll)   . focus   wolf: click a joint, drag its gizmo (shift fine)",
 };
 
 /// how a joint of the wolf's pose moves: its place (the hips), its turn
@@ -259,6 +265,8 @@ const Editor = struct {
   part:?gizmo.Part = null,
   hot:?gizmo.Part = null,
   dirty:bool = false,
+  /// the camera is asked onto the selected joint (or the subject)
+  focus:bool = false,
   note:[96]u8 = undefined,
   note_len:usize = 0,
 
@@ -404,6 +412,7 @@ const Editor = struct {
       if (e.clip.track(e.chName(e.sel)) != null) try e.key(e.sel);
     }
     if (ctrl and hit(in, .s)) e.save();
+    if (hit(in, .period)) e.focus = true;
 
     // the mouse: a press on the timeline scrubs, on a row selects it and
     // drags its value
@@ -658,14 +667,15 @@ pub fn main(init:std.process.Init) !void {
     game.specimen = l;
     try game.specimen.?.sow(&game);
   }
-  game.cam.dist = switch (sj) {
+  const home = game.player.pos + m.v3(0, LOOK_UP, 0);
+  const home_dist:f32 = switch (sj) {
     .wolf => CAM_DIST,
     .thing => |t| CAM_THING + CAM_PER * m.f(switch (t) {
       .plant => |sp| ps.species.get(sp).size,
       .structure => |k| ps.structures.defs.get(k).size,
     }),
   };
-  game.cam.pitch = CAM_PITCH;
+  var cam = Orbit.init(home, home_dist, CAM_PITCH);
   while (game.world.unmeshed() > 0) {
     if (!try loadFrame(&screen_l, r, &input, &last, .ground, .{ .done = whole - game.world.unmeshed(), .total = whole })) return;
     try renderer.syncWorld(r, &game.world, m.maxInt(u32), renderer.MESH_MS * 8);
@@ -697,18 +707,20 @@ pub fn main(init:std.process.Init) !void {
       .thing => game.specimen.?.state = .{ .look = e.look },
     }
 
-    // the camera orbits and zooms as in play; nothing else of play runs
+    // the camera orbits the subject freely and zooms; nothing of play runs
     // but the world's tick (which holds a specimen as it is set)
     game.ui_time += dt;
     game.time += dt;
     game.cam.aspect = screen[0] / @max(screen[1], 1);
-    game.cam.tick(dt);
     const over_ui = overList(screen, input.mouse[0], input.mouse[1]) or inTimeline(screen, input.mouse[0], input.mouse[1]);
-    if (ctl.down(&input, .orbit) and !game.cam.inEyes()) game.cam.orbit(input.mouse_delta);
-    if (input.scroll != 0 and !over_ui) game.cam.zoom(input.scroll, game.player.eyes());
+    if (ctl.down(&input, .orbit)) cam.turn(input.mouse_delta);
+    if (input.scroll != 0 and !over_ui) cam.zoom(input.scroll);
+    if (e.focus) {
+      if (e.gizmoAt(&rg)) |at| cam.focus(at.g.at, JOINT_SIZE) else cam.send(home, home_dist);
+    }
+    e.focus = false;
+    cam.step(&game.cam, dt);
     game.player.animate(&game.world, dt);
-    game.cam.see(game.player.eyes());
-    game.cam.target = game.player.pos + m.v3(0, LOOK_UP, 0);
     try game.simulate(dt);
     try renderer.syncWorld(r, &game.world, 6, renderer.MESH_MS);
 

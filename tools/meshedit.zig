@@ -50,9 +50,9 @@ const Input = engine.platform.input.Input;
 const Key = engine.platform.input.Key;
 const Draw = engine.ui.draw.Draw;
 const Color = engine.ui.draw.Color;
-const camera = engine.render.camera;
 const ps = @import("parasymi");
 const gizmo = @import("gizmo.zig");
+const Orbit = @import("orbit.zig").Orbit;
 const play = ps.play;
 const Game = play.Game;
 const renderer = ps.renderer;
@@ -102,18 +102,10 @@ const SIZE = Ch.find("size.x").?;
 /// a new form stands this far from the one it was made from
 const NEW_OFF = v3(0.1, 0, 0);
 /// the camera looks at this height over the sculpt's ground, from this far
-/// and this high (rad) to start; the wheel zooms it this much a notch,
-/// between these (m); it eases half way to where it is sent in this (s)
+/// and this high (rad) to start
 const LOOK_UP:f32 = 0.3;
 const CAM_DIST:f32 = 1.6;
 const CAM_PITCH:f32 = m.rad(20);
-const ZOOM_STEP:f32 = 0.88;
-const DIST_MIN:f32 = 0.08;
-const DIST_MAX:f32 = 40;
-const EASE:f32 = 0.06;
-/// `.` frames a form from this many times its largest size, at least this
-const FOCUS_FIT:f32 = 4;
-const FOCUS_MIN:f32 = 0.15;
 /// the library slot the sculpt is drawn from: nothing else is drawn
 const SLOT_ID:meshlib.Id = meshlib.ids[0];
 /// no wolf: its paws' contact shadows far off any tile
@@ -258,49 +250,6 @@ const Doc = struct {
 };
 
 const Drag = enum { none, value, gizmo };
-
-/// the editor's camera: a free view turning round `target` from `dist`
-/// away, with no limit on its pitch (over the top and under the sculpt
-/// alike); zooms and focusing ease it to `goal` and `goal_dist`
-const Orbit = struct {
-  target:V3,
-  goal:V3,
-  dist:f32 = CAM_DIST,
-  goal_dist:f32 = CAM_DIST,
-  yaw:f32 = 0,
-  pitch:f32 = CAM_PITCH,
-
-  fn init(at:V3) Orbit { return .{ .target = at, .goal = at }; }
-
-  /// drag round by `px` pixels, as the game's camera turns
-  fn turn(o:*Orbit, px:[2]f32) void {
-    o.yaw = @mod(o.yaw - px[0] * camera.ORBIT, m.tau);
-    o.pitch = @mod(o.pitch + px[1] * camera.ORBIT, m.tau);
-  }
-
-  fn zoom(o:*Orbit, steps:f32) void {
-    o.goal_dist = m.clamp(o.goal_dist * m.pow(f32, ZOOM_STEP, steps), DIST_MIN, DIST_MAX);
-  }
-
-  /// look at `at`, near enough that something `size` across fills the view
-  fn focus(o:*Orbit, at:V3, size:f32) void {
-    o.goal = at;
-    o.goal_dist = m.clamp(@max(size * FOCUS_FIT, FOCUS_MIN), DIST_MIN, DIST_MAX);
-  }
-
-  /// ease on by `dt` and place `c` (a free view aimed at the target)
-  fn step(o:*Orbit, c:*camera.Camera, dt:f32) void {
-    const k = 1 - m.pow(f32, 0.5, dt / EASE);
-    o.target = m.lerpV(o.target, o.goal, k);
-    o.dist = m.lerp(o.dist, o.goal_dist, k);
-    c.target = o.target;
-    c.dist = o.dist;
-    c.yaw = o.yaw;
-    const cp = @cos(o.pitch);
-    const out = v3(@sin(o.yaw) * cp, @sin(o.pitch), @cos(o.yaw) * cp);
-    c.view = .{ .free = .{ .pos = o.target + out * m.splat3(o.dist), .yaw = o.yaw, .pitch = -o.pitch } };
-  }
-};
 
 const Editor = struct {
   gpa:Allocator,
@@ -675,7 +624,7 @@ pub fn main(init:std.process.Init) !void {
   }
   // the sculpt stands where the wolf would have woken (dry ground)
   const origin = game.player.pos;
-  var cam = Orbit.init(origin + v3(0, LOOK_UP, 0));
+  var cam = Orbit.init(origin + v3(0, LOOK_UP, 0), CAM_DIST, CAM_PITCH);
 
   var ui:Draw = .{ .gpa = gpa };
   defer ui.deinit();
@@ -782,6 +731,7 @@ fn loadFrame(l:*loading.Loading, r:*Renderer, input:*Input, last:*f64, stage:loa
 
 test {
   _ = gizmo;
+  _ = @import("orbit.zig");
 }
 
 test "a mesh's text reads back as written" {
@@ -833,18 +783,4 @@ test "carving alone makes no surface, a form makes a closed one" {
   try d.mesh(gpa, null, false, &b);
   try testing.expect(b.v.items.len > 0);
   try testing.expectEqual(@as(usize, 0), b.v.items.len % 3);
-}
-
-test "the camera eases onto a focused form and turns past straight up" {
-  var o = Orbit.init(v3(0, 0, 0));
-  var c:camera.Camera = .{};
-  o.focus(v3(1, 2, 3), 0.1);
-  for (0..200) |_| o.step(&c, 0.02);
-  try testing.expect(m.len(o.target - v3(1, 2, 3)) < 1e-3);
-  try testing.expectApproxEqAbs(@max(0.1 * FOCUS_FIT, FOCUS_MIN), o.dist, 1e-3);
-  try testing.expectApproxEqAbs(o.dist, m.len(c.view.free.pos - o.target), 1e-3);
-  // dragged over the top, the view still looks at the target
-  o.pitch = m.rad(120);
-  o.step(&c, 0);
-  try testing.expect(m.len(c.view.free.pos + c.view.free.forward() * m.splat3(o.dist) - o.target) < 1e-3);
 }
