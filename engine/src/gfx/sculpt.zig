@@ -51,6 +51,10 @@ pub const Form = struct {
   /// how softly the skin passes across the joints of its bone (metres;
   /// 0 the sculpt's own): small for a finger, so it bends at its knuckles
   soft:f32 = 0,
+  /// the role (the mesher's `Part`, by its tag) the surface is drawn with
+  /// where this form lies nearest, so the game's shaders shade it so; null
+  /// the role the whole mesh is given
+  part:?u32 = null,
 };
 
 /// a form ready to evaluate: back from the build space to its shape space,
@@ -338,13 +342,19 @@ pub const Sculpt = struct {
     return out;
   }
 
-  /// the field's colour at `p`: the forms' colours meeting softly where
-  /// they meet
-  fn colourFrom(s:*const Sculpt, p:V3, list:[]const u32) V3 {
+  /// the field's colour at `p` (the forms' colours meeting softly where
+  /// they meet) and the role of the solid form nearest it (null: none set)
+  fn colourFrom(s:*const Sculpt, p:V3, list:[]const u32) struct { c:V3, part:?u32 } {
     var best:f32 = 1e9;
+    var part:?u32 = null;
     for (list) |i| {
       const pf = &s.forms.items[i];
-      if (!pf.f.carve and pf.f.ink == 0) best = @min(best, formDist(pf, p));
+      if (pf.f.carve or pf.f.ink > 0) continue;
+      const d = formDist(pf, p);
+      if (d < best) {
+        best = d;
+        part = pf.f.part;
+      }
     }
     var c = v3(0, 0, 0);
     var sum:f32 = 0;
@@ -356,11 +366,12 @@ pub const Sculpt = struct {
       c += colV(pf.f.col) * m.splat3(w);
       sum += w;
     }
-    return c / m.splat3(@max(sum, 1e-9));
+    return .{ .c = c / m.splat3(@max(sum, 1e-9)), .part = part };
   }
 
   /// mesh the surface with cells `h` across into `b`, a builder of the
-  /// mesher `M` (gfx/meshgen.zig `Mesher`), every vertex `part` with tu
+  /// mesher `M` (gfx/meshgen.zig `Mesher`), every vertex the role of the
+  /// form it lies nearest (`part` where that form sets none) with tu
   /// (`t`, 0), weighted to its bones.
   pub fn mesh(s:*const Sculpt, comptime M:type, b:*M.Builder, h:f32, t:f32, part:M.Part) Allocator.Error!void {
     const gpa = s.gpa;
@@ -421,7 +432,7 @@ pub const Sculpt = struct {
       try blocks.append(gpa, .{ .at = .{ bx, by, bz }, .vals = undefined, .vid = @splat(NONE), .cand = try gpa.dupe(u32, cand.items) });
     };
 
-    const Vert = struct { p:V3, n:V3, col:color.Rgba8, skin:vertex.Skin };
+    const Vert = struct { p:V3, n:V3, col:color.Rgba8, skin:vertex.Skin, part:M.Part };
     const corner = [8][3]usize{ .{ 0, 0, 0 }, .{ 1, 0, 0 }, .{ 0, 1, 0 }, .{ 1, 1, 0 }, .{ 0, 0, 1 }, .{ 1, 0, 1 }, .{ 0, 1, 1 }, .{ 1, 1, 1 } };
     const edges = [12][2]u8{ .{ 0, 1 }, .{ 2, 3 }, .{ 4, 5 }, .{ 6, 7 }, .{ 0, 2 }, .{ 1, 3 }, .{ 4, 6 }, .{ 5, 7 }, .{ 0, 4 }, .{ 1, 5 }, .{ 2, 6 }, .{ 3, 7 } };
 
@@ -459,6 +470,7 @@ pub const Sculpt = struct {
       out:[]Vert,
       lo:V3,
       h:f32,
+      part:M.Part,
       fn run(j:@This(), first:usize, end:usize) void {
         const sc = j.s;
         const hh = j.h;
@@ -489,16 +501,18 @@ pub const Sculpt = struct {
           }
           if (m.len(p - start) > hh) p = start;
           const nrm = sc.grad(p, bl.cand, hh * 0.35);
-          const cv = sc.colourFrom(p, bl.cand);
+          const at = sc.colourFrom(p, bl.cand);
+          const cv = at.c;
           j.out[vi] = .{
             .p = p, .n = nrm,
             .col = .{ .r = @intFromFloat(@min(cv[0], 255)), .g = @intFromFloat(@min(cv[1], 255)), .b = @intFromFloat(@min(cv[2], 255)), .a = 255 },
             .skin = sc.weighFrom(p, bl.cand),
+            .part = if (at.part) |r| @enumFromInt(r) else j.part,
           };
         };
       }
     };
-    jobs.each(s.io, blocks.items.len, JOB_BLOCKS, Place, .{ .s = s, .bs = blocks.items, .out = verts, .lo = lo, .h = h }, Place.run);
+    jobs.each(s.io, blocks.items.len, JOB_BLOCKS, Place, .{ .s = s, .bs = blocks.items, .out = verts, .lo = lo, .h = h, .part = part }, Place.run);
 
     const Look = struct {
       fn cellVert(bs:[]const Block, mp:[]const u32, n:[3]usize, ci:[3]isize) ?u32 {
@@ -551,7 +565,7 @@ pub const Sculpt = struct {
             const order = if (m.dot(fnrm, dir) >= 0) [3]usize{ tri[0], tri[1], tri[2] } else [3]usize{ tri[0], tri[2], tri[1] };
             for (order) |k| {
               const vv = verts[q[k]];
-              try b.put(vv.p, vv.n, vv.col, t, 0, part);
+              try b.put(vv.p, vv.n, vv.col, t, 0, vv.part);
               try skins.append(gpa, vv.skin);
             }
           }
@@ -581,4 +595,26 @@ test "a sculpt meshes the same over the cores as here alone" {
   try testing.expect(built[0].v.items.len > 0);
   try testing.expectEqualSlices(u8, asBytes(built[0].v.items), asBytes(built[1].v.items));
   try testing.expectEqualSlices(u8, asBytes(built[0].skin.items), asBytes(built[1].skin.items));
+}
+
+test "each vertex takes the role of the form it lies nearest" {
+  const testing = std.testing;
+  const gpa = testing.allocator;
+  const Role = enum(u32) { stem, leaf, bloom };
+  const M = @import("meshgen.zig").Mesher(Role, .stem);
+  var b:M.Builder = .{ .gpa = gpa };
+  defer b.deinit();
+  const col = color.rgb(0.5, 0.4, 0.3).toRgba8(255);
+  var s:Sculpt = .{ .gpa = gpa, .parents = &.{null} };
+  defer s.deinit();
+  try s.add(.{ .shape = .{ .ellipsoid = .{ .c = v3(-0.1, 0, 0), .r = m.splat3(0.08) } }, .bone = 0, .col = col });
+  try s.add(.{ .shape = .{ .ellipsoid = .{ .c = v3(0.1, 0, 0), .r = m.splat3(0.08) } }, .bone = 0, .col = col, .part = @intFromEnum(Role.bloom) });
+  try s.mesh(M, &b, 0.01, 0.5, .leaf);
+  var seen:[3]usize = @splat(0);
+  for (b.v.items) |v| {
+    seen[v.part] += 1;
+    try testing.expectEqual(v.part == @intFromEnum(Role.bloom), v.pos[0] > 0);
+  }
+  try testing.expectEqual(@as(usize, 0), seen[@intFromEnum(Role.stem)]);
+  try testing.expect(seen[@intFromEnum(Role.leaf)] > 0 and seen[@intFromEnum(Role.bloom)] > 0);
 }

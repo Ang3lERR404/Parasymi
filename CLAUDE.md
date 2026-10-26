@@ -88,6 +88,7 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # mesh editor (tools/meshedit.zig): SDF forms melted
                                   # into one surface on bare ground, saves src/mesh/<name>.mesh;
                                   # the selected form's gizmo (1/2/3) moves, turns, sizes it;
+                                  # `m` picks the shader (part role) a form is drawn with;
                                   # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
 ```

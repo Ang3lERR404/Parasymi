@@ -12,6 +12,10 @@
 //! z) and sized by `size` (radii; a cone's x and z its radii at its foot
 //! and its tip, y half its length; a box's half extents); `round` rounds a
 //! box, `melt` is how far it melts into what is before it, `col` its colour.
+//! Each form also picks the shader its part of the surface is drawn with
+//! (`m`, shift `m` back): one of the game's part roles (vertex.Part:
+//! stem, leaf, bloom, resin, ...), as part.vert/part.frag shade it; where
+//! forms meet, each vertex takes the role of the form it lies nearest.
 //! The selected form carries a gizmo (tools/gizmo.zig): `1` moves it
 //! (arrows along each axis, the centre across the view), `2` turns it
 //! (a ring for each of its turns), `3` sizes it (along its own axes).
@@ -58,6 +62,7 @@ const meshgen = ps.meshgen;
 const meshlib = ps.meshlib;
 const ctl = ps.controls;
 const s = ps.style;
+const Part = ps.vertex.Part;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -121,6 +126,8 @@ const LIST_Y:f32 = 100;
 const LIST_W:f32 = 300;
 const LIST_ROWS = 12;
 const VALUE_X:f32 = 150;
+/// where a form's shader shows in its row
+const SHADE_X:f32 = 190;
 const LINE_H:f32 = 20;
 const GAP:f32 = 14;
 /// a form's handle in view (the selected one shows its gizmo instead): its
@@ -135,7 +142,7 @@ const CARVE:Color = s.growth;
 const PANEL:Color = s.panel;
 
 const HELP = [_][]const u8{
-  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   tab next form",
+  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   m shader (shift back)   tab next form",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
@@ -156,6 +163,8 @@ const Ch = clip.Channels(Vals);
 const Piece = struct {
   kind:Kind = .ellipsoid,
   carve:bool = false,
+  /// the shader (part role) its part of the surface is drawn with
+  shade:Part = .stem,
   v:Vals = .{},
 
   /// as the sculpt takes it
@@ -174,6 +183,7 @@ const Piece = struct {
       .col = color.rgb(v.col[0], v.col[1], v.col[2]).toRgba8(255),
       .k = v.melt,
       .carve = p.carve,
+      .part = @intFromEnum(p.shade),
     };
   }
 
@@ -193,7 +203,7 @@ const Doc = struct {
   fn write(d:*const Doc, w:*Writer) Writer.Error!void {
     try w.print(HEADER ++ "\ncell {d}\n", .{d.cell});
     for (d.pieces.items) |p| {
-      try w.print("form {t}{s}\n", .{ p.kind, if (p.carve) " carve" else "" });
+      try w.print("form {t}{s}\nshade {t}\n", .{ p.kind, if (p.carve) " carve" else "", p.shade });
       for (Ch.names, 0..) |n, i| try w.print("{s} {d}\n", .{ n, Ch.get(&p.v, i) });
     }
   }
@@ -215,6 +225,9 @@ const Doc = struct {
         const kind = stringToEnum(Kind, it.next() orelse return error.BadMesh) orelse return error.BadMesh;
         const carve = if (it.next()) |c| eql(u8, c, "carve") else false;
         try d.pieces.append(gpa, .{ .kind = kind, .carve = carve });
+      } else if (eql(u8, word, "shade")) {
+        if (d.pieces.items.len == 0) return error.BadMesh;
+        d.pieces.items[d.pieces.items.len - 1].shade = stringToEnum(Part, it.next() orelse return error.BadMesh) orelse return error.BadMesh;
       } else {
         const i = Ch.find(word) orelse return error.BadMesh;
         if (d.pieces.items.len == 0) return error.BadMesh;
@@ -442,6 +455,10 @@ const Editor = struct {
         p.carve = !p.carve;
         e.changed();
       }
+      if (hit(in, .m)) {
+        p.shade = nextShade(p.shade, if (shift) .back else .on);
+        e.changed();
+      }
       if (hit(in, .up) and e.ch > 0) e.ch -= 1;
       if (hit(in, .down) and e.ch + 1 < Ch.count) e.ch += 1;
       if (hit(in, .r)) e.set(Ch.get(&Vals{}, e.ch));
@@ -530,6 +547,7 @@ const Editor = struct {
       var lb:[48]u8 = undefined;
       const col = if (i == e.sel) SEL else if (p.carve) CARVE else PLAIN;
       _ = try d.text(PAD + 18, ry, TEXT, col, bufPrint(&lb, "{d}  {t}{s}", .{ i + 1, p.kind, if (p.carve) "  carve" else "" }) catch "?");
+      _ = try d.text(PAD + SHADE_X, ry, TEXT, if (i == e.sel) SEL else BARE, @tagName(p.shade));
     }
     if (e.top > 0) _ = try d.text(PAD + LIST_W - 30, LIST_Y - 20, TEXT, BARE, "...");
     if (e.top + LIST_ROWS < e.pieces().len) _ = try d.text(PAD + LIST_W - 30, LIST_Y + LIST_ROWS * ROW, TEXT, BARE, "...");
@@ -559,6 +577,15 @@ const Editor = struct {
     if (e.gizmoAt(origin)) |g| try g.draw(d, view, e.hot);
   }
 };
+
+const Way = enum { on, back };
+
+/// the shader after `p` (before it, `.back`), round the roles
+fn nextShade(p:Part, way:Way) Part {
+  const n = @typeInfo(Part).@"enum".fields.len;
+  const i:usize = @intFromEnum(p);
+  return @enumFromInt(switch (way) { .on => (i + 1) % n, .back => (i + n - 1) % n });
+}
 
 /// how many form rows show (at least one, at most `LIST_ROWS`)
 fn listRows(n:usize) usize { return m.clamp(n, 1, LIST_ROWS); }
@@ -762,7 +789,7 @@ test "a mesh's text reads back as written" {
   var d:Doc = .{ .cell = 0.02 };
   defer d.deinit(gpa);
   try d.pieces.append(gpa, .{});
-  try d.pieces.append(gpa, .{ .kind = .box, .carve = true, .v = .{ .pos = .{ 0.1, 0.2, -0.3 }, .round = 0.01 } });
+  try d.pieces.append(gpa, .{ .kind = .box, .carve = true, .shade = .resin, .v = .{ .pos = .{ 0.1, 0.2, -0.3 }, .round = 0.01 } });
   var out:Writer.Allocating = .init(gpa);
   defer out.deinit();
   try d.write(&out.writer);
@@ -773,8 +800,24 @@ test "a mesh's text reads back as written" {
   for (d.pieces.items, back.pieces.items) |a, z| {
     try testing.expectEqual(a.kind, z.kind);
     try testing.expectEqual(a.carve, z.carve);
+    try testing.expectEqual(a.shade, z.shade);
     for (0..Ch.count) |i| try testing.expectEqual(Ch.get(&a.v, i), Ch.get(&z.v, i));
   }
+}
+
+test "a form's shader shades its part of the surface, and the list wraps round" {
+  const gpa = testing.allocator;
+  var d:Doc = .{ .cell = 0.02 };
+  defer d.deinit(gpa);
+  var b:meshgen.Builder = .{ .gpa = gpa };
+  defer b.deinit();
+  try d.pieces.append(gpa, .{ .shade = .leaf });
+  try d.mesh(gpa, null, false, &b);
+  try testing.expect(b.v.items.len > 0);
+  for (b.v.items) |v| try testing.expectEqual(@intFromEnum(Part.leaf), v.part);
+  const last:Part = @enumFromInt(@typeInfo(Part).@"enum".fields.len - 1);
+  try testing.expectEqual(Part.stem, nextShade(last, .on));
+  try testing.expectEqual(last, nextShade(.stem, .back));
 }
 
 test "carving alone makes no surface, a form makes a closed one" {

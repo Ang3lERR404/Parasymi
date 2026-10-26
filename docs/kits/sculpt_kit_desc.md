@@ -30,7 +30,7 @@ neighbouring blocks disagreed). A very wide melt makes sampling slower.
 | Item | Purpose |
 |---|---|
 | `Shape = union { ellipsoid{c, r}, cone{a, b, ra, rb}, box{c, half, round} }` | the SDF primitives (round cone rounded at both ends; box half extents include rounding) |
-| `Form{shape, at = identity, stretch = 1, bone, col, k = 0.03, carve = false, ink = 0, soft = 0}` | `at` places shape space; `stretch` scales it first (a wide muzzle from a round cone, distance scaled back); `k` melt (m); `ink` > 0 = colour-only, fading over that many metres; `soft` = per-bone joint softness (small for a finger) |
+| `Form{shape, at = identity, stretch = 1, bone, col, k = 0.03, carve = false, ink = 0, soft = 0, part = null}` | `at` places shape space; `stretch` scales it first (a wide muzzle from a round cone, distance scaled back); `k` melt (m); `ink` > 0 = colour-only, fading over that many metres; `soft` = per-bone joint softness (small for a finger); `part` = the mesher role (tag value) its surface is drawn with where it lies nearest (null: the mesh's own) |
 | `Hit{p, n}` | a surface point and outward normal |
 | `Sculpt{gpa, parents:[]const ?u8, soft = 0.02, blend = 0.012, only = all bones}` | the sculpt; `parents` per bone (weights spread only along joints); `blend` how softly colours meet; `only` bitmask keeps a subset of bones (a surface cast onto part of a body, e.g. ears) |
 | `deinit()` / `add(form)` | add a form (skipped if its bone isn't in `only`); computes inverse (`m.inverseAffine`), bound centre and reach |
@@ -40,7 +40,7 @@ neighbouring blocks disagreed). A very wide melt makes sampling slower.
 | `weigh(p) vertex.Skin` | skin weights at `p` (exp falloff over `soft`, only joined bones) |
 | `pack(w)` | per-bone weights → the four heaviest, dropping < 3% of the top, unorm summing to 255 |
 | `packWith(w, slope)` | `pack` plus each kept bone's weight gradient (`gx/gy/gz`), so normals bend by the true Jacobian |
-| `mesh(b, h, t, part)` | mesh with cell size `h`; every vertex `part`, tu (`t`, 0), skin weights written via `b.skinOf`; with `io` set, the field and vertices are worked out over the cores (`jobs.each`, the same mesh as serial; tested) |
+| `mesh(b, h, t, part)` | mesh with cell size `h`; every vertex the role of the solid form it lies nearest (`part` where that form sets none), tu (`t`, 0), skin weights written via `b.skinOf`; with `io` set, the field and vertices are worked out over the cores (`jobs.each`, the same mesh as serial; tested) |
 
 ## Who uses it
 

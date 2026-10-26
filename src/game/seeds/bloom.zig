@@ -37,7 +37,7 @@ const PETALS = 6;
 const GAP:f32 = 0.2;
 const SQUASH:f32 = 0.75;
 /// radians a second the petals turn
-const TURN:f32 = 0.35;
+const TURN:f32 = 0.45;
 const BOB:f32 = 0.04;
 const BOB_RATE:f32 = 1.3;
 const thread:Color = .{220, 255, 245, 150};
