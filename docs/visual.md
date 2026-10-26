@@ -256,6 +256,11 @@ two-headed calves, neck cords, obliques), melted only a little
   fingers shut on the node and opening to regrip; each unit that comes
   loose sends one paw, in turn, cupped to the front of the belly
   (`STOW_TIME`). The generic work gesture gives way to it.
+- Belly stages (`Player.stage`, `GAITS`): light (< 1/3 full), heavy,
+  full (> 2/3), blended over `STAGE_BLEND`; each fuller stage walks and
+  sprints a little slower (full: 86% / 80%), steps shorter and lower,
+  sways and rolls the pelvis more (full: a waddle), sinks and bobs
+  lower and leans back under the weight.
 - Belly (`wolf_belly`): convex egg sac on the gut; filling scales and drops
   the `gut` bone (lower half) and `gut_top` (upper half: as wide, its top
   kept where it hangs), so the swollen sac never folds (tested); tu.x = gut

@@ -11,7 +11,9 @@
 //! - arms, lean, head and ears follow on springs, so motion carries,
 //!   overshoots a little and settles; the head steadies against the bob;
 //! - a spring-driven tail, breathing that quickens with effort, panting,
-//!   and a sap belly that swells with what it carries;
+//!   and a sap belly that swells with what it carries; the fuller it is the
+//!   heavier the gait, in three stages (light, heavy, full: a waddle), and a
+//!   little slower;
 //! - gathering, it drops into a deep squat over the node, both paws grip it
 //!   (arms by inverse kinematics) and wrench it back once a unit, and each
 //!   unit that comes loose is pressed into the belly by one paw, in turn.
@@ -83,6 +85,22 @@ pub const GATHER_AT:f32 = 0.45;
 /// what the wolf works on or carries sits this high above its feet
 const CHEST_HEIGHT:f32 = 1.0;
 
+/// how the belly's load tells on the gait, in three stages: light (up to a
+/// third full), heavy, full (past two thirds), each blending into the next
+/// over `STAGE_BLEND` of fullness about its threshold. Per stage: top walk
+/// and sprint speed (a share of the light ones: a little slower, never
+/// slow), stride length (a share of the cycle), how high a foot lifts, the
+/// pelvis's sway over the planted foot and roll with the stride (the full
+/// waddle), how low it sinks and bobs, and how far the body leans back to
+/// carry the weight before it.
+const Gait = struct { walk:f32, sprint:f32, stride:f32, lift:f32, sway:f32, roll:f32, sink:f32, bob:f32, lean:f32 };
+const GAITS = [3]Gait{
+  .{ .walk = 1, .sprint = 1, .stride = 1, .lift = 1, .sway = 1, .roll = 1, .sink = 1, .bob = 1.15, .lean = 0 },
+  .{ .walk = 0.93, .sprint = 0.9, .stride = 0.88, .lift = 0.8, .sway = 2.2, .roll = 1.8, .sink = 1.4, .bob = 1.3, .lean = 0.05 },
+  .{ .walk = 0.86, .sprint = 0.8, .stride = 0.76, .lift = 0.6, .sway = 3.6, .roll = 3.2, .sink = 1.8, .bob = 1.5, .lean = 0.11 },
+};
+const STAGE_AT = [2]f32{ 1.0 / 3.0, 2.0 / 3.0 };
+const STAGE_BLEND:f32 = 0.08;
 /// the gait: a full cycle (both feet) covers `CYCLE + CYCLE_PER_SPEED *
 /// speed` metres; a foot is planted for `duty` of it, more of it walking
 /// slowly than running
@@ -369,7 +387,8 @@ pub const Player = struct {
 
   /// tile-aware: no wading, one terrace step at a time.
   pub fn move(p:*Player, wish:[2]f32, sprint:bool, ground:*const World, dt:f32) void {
-    const speed:f32 = if (sprint) SPRINT_SPEED else WALK_SPEED;
+    const g = p.gait();
+    const speed:f32 = if (sprint) SPRINT_SPEED * g.sprint else WALK_SPEED * g.walk;
     const target = v3(wish[0] * speed, 0, wish[1] * speed);
     const k = @min(1, dt * ACCEL_RESPONSE);
     p.vel += (target - p.vel) * m.splat3(k);
@@ -423,11 +442,14 @@ pub const Player = struct {
   pub fn animate(p:*Player, ground:?*const World, dt:f32) void {
     p.t += dt;
     const spd = p.groundSpeed();
-    p.stride += (m.clamp01(spd / WALK_SPEED) - p.stride) * @min(1, dt * STRIDE_RESPONSE);
-    p.cycle = CYCLE + CYCLE_PER_SPEED * spd;
-    p.duty = m.lerp(DUTY_SLOW, DUTY_FAST, m.clamp01((spd - 1) / (SPRINT_SPEED - 1)));
+    const g = p.gait();
+    const walk = WALK_SPEED * g.walk;
+    const sprint = SPRINT_SPEED * g.sprint;
+    p.stride += (m.clamp01(spd / walk) - p.stride) * @min(1, dt * STRIDE_RESPONSE);
+    p.cycle = (CYCLE + CYCLE_PER_SPEED * spd) * g.stride;
+    p.duty = m.lerp(DUTY_SLOW, DUTY_FAST, m.clamp01((spd - 1) / (sprint - 1)));
     p.phase = @mod(p.phase + spd / p.cycle * dt, 1);
-    const effort = m.clamp01(spd / SPRINT_SPEED);
+    const effort = m.clamp01(spd / sprint);
     p.breath += dt * m.lerp(BREATH_RATE, BREATH_RATE_RUN, effort);
 
     p.fullness += (p.bellyFill() - p.fullness) * @min(1, dt * FULLNESS_RESPONSE);
@@ -443,6 +465,26 @@ pub const Player = struct {
     const fell = p.step(ground, spd, dt);
     p.slosh(fell, dt);
     p.springs(dt);
+  }
+
+  /// which of the belly's stages the wolf is in: 0 light .. 1 heavy .. 2
+  /// full, blending over `STAGE_BLEND` about each threshold
+  pub fn stage(p:*const Player) f32 {
+    var out:f32 = 0;
+    for (STAGE_AT) |at| out += m.smooth(m.clamp01((p.fullness - at) / STAGE_BLEND + 0.5));
+    return out;
+  }
+
+  /// the gait for the belly's load (`GAITS` blended by `stage`)
+  fn gait(p:*const Player) Gait {
+    const st = p.stage();
+    const i:usize = if (st >= 1) 1 else 0;
+    const k = st - m.f(i);
+    const a = GAITS[i];
+    const b = GAITS[i + 1];
+    var out:Gait = undefined;
+    inline for (@typeInfo(Gait).@"struct".fields) |fl| @field(out, fl.name) = m.lerp(@field(a, fl.name), @field(b, fl.name), k);
+    return out;
   }
 
   /// how full the belly is to look at (0..1) for what it holds
@@ -482,7 +524,7 @@ pub const Player = struct {
           f.from = f.at;
           f.t = 0;
           f.dur = if (moving) m.clamp((1 - p.duty) * p.cycle / @max(spd, SWING_SPEED_MIN), SWING_MIN, SWING_MAX) else SETTLE_TIME;
-          f.lift = LIFT + LIFT_STRIDE * p.stride;
+          f.lift = (LIFT + LIFT_STRIDE * p.stride) * p.gait().lift;
         }
       }
       f.phase = ph;
@@ -650,11 +692,12 @@ pub const Player = struct {
     // the pelvis: lowest just after each footfall, over the planted foot;
     // gathering, down in a squat, the body leaning in and rocking back
     // with each pull
-    const bob = BOB * st * (0.5 + 0.5 * @cos(2 * ph - p.duty * m.tau));
+    const g = p.gait();
+    const bob = BOB * g.bob * st * (0.5 + 0.5 * @cos(2 * ph - p.duty * m.tau));
     const rock = PRY_ROCK * pryPull(p.gather orelse 0) * sq;
-    const lean = p.lean.x + (SQUAT_LEAN - rock) * sq;
-    q.hip = v3(SWAY * st * @sin(ph), skel.HIP_Y - SINK * st - bob - 0.07 * work - SQUAT_DROP * sq, -0.04 * sq);
-    q.pelvis = .{ .x = 0.25 * lean, .y = HIP_TURN * st * @sin(ph), .z = HIP_ROLL * st * @cos(ph) + p.bank.x };
+    const lean = p.lean.x - g.lean * (1 - sq) + (SQUAT_LEAN - rock) * sq;
+    q.hip = v3(SWAY * g.sway * st * @sin(ph), skel.HIP_Y - SINK * g.sink * st - bob - 0.07 * work - SQUAT_DROP * sq, -0.04 * sq);
+    q.pelvis = .{ .x = 0.25 * lean, .y = HIP_TURN * st * @sin(ph), .z = HIP_ROLL * g.roll * st * @cos(ph) + p.bank.x };
     q.waist = .{ .x = 0.35 * lean, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
     q.chest = .{ .x = 0.4 * lean, .y = -0.5 * COUNTER * q.pelvis.y, .z = -0.4 * q.pelvis.z };
     const breath = @sin(p.breath);
@@ -959,4 +1002,27 @@ test "gathering, the wolf squats, grips the node and each unit sends a paw to th
   t = 0;
   while (t < 2) : (t += TEST_DT) p.animate(null, TEST_DT);
   try testing.expect(p.squat.x < 0.02);
+}
+
+test "the belly's stages: light, heavy, full, each a little slower and never slow" {
+  var p:Player = .{ .pos = v3(0, 0, 0) };
+  const at = [_]f32{ 0.1, 0.5, 0.95 };
+  const want = [_]f32{ 0, 1, 2 };
+  var last:f32 = 2;
+  for (at, want) |f, w| {
+    p.fullness = f;
+    try testing.expectApproxEqAbs(w, p.stage(), 1e-3);
+    const g = p.gait();
+    try testing.expect(g.walk <= last and g.sprint <= last);
+    try testing.expect(g.walk >= 0.8 and g.sprint >= 0.75);
+    last = @min(g.walk, g.sprint);
+  }
+  // blended across a threshold, never jumping
+  var prev:f32 = 0;
+  var f:f32 = 0;
+  while (f <= 1) : (f += 0.005) {
+    p.fullness = f;
+    try testing.expect(@abs(p.stage() - prev) < 0.12);
+    prev = p.stage();
+  }
 }
