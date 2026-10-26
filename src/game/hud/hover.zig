@@ -2,16 +2,17 @@
 //! and what it is doing), a plant (its name, how far grown and what it
 //! gives or draws) or a resource node; bare ground by the top-left, its kind
 //! and ley.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const ck = @import("../../world/chunk.zig");
-const species = @import("../../sim/species.zig");
-const play = @import("../play.zig");
-const st = @import("../structures.zig");
-const resources = @import("../resources.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
+const ck = lib.ck;
+const species = lib.species;
+const play = lib.play;
+const st = lib.structures;
+const resources = lib.resources;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
 
 /// bare ground's panel, by the top-left
 const panel_x = s.edge;

@@ -9,7 +9,8 @@
 //! Format: a small header (magic, version, layout fingerprint) followed by
 //! plain-old-data records. The fingerprint changes whenever a stored type's
 //! size changes, so an incompatible save is refused instead of misread.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const asBytes = std.mem.asBytes;
@@ -24,19 +25,20 @@ const fields = std.meta.fields;
 const assert = std.debug.assert;
 const sort = std.mem.sort;
 const bufPrint = std.fmt.bufPrint;
-const home = @import("home.zig");
-const m = @import("engine").core.math;
-const Rng = @import("engine").core.rng.Rng;
-const ck = @import("../world/chunk.zig");
-const gen = @import("../world/gen.zig");
-const species = @import("../sim/species.zig");
-const items = @import("../sim/items.zig");
-const prog = @import("progression.zig");
-const craft = @import("craft.zig");
-const st = @import("structures.zig");
-const player_mod = @import("player.zig");
-const play = @import("play.zig");
-const txt = @import("text.zig");
+const home = lib.home;
+const engine = lib.engine;
+const m = engine.core.math;
+const Rng = engine.core.rng.Rng;
+const ck = lib.ck;
+const gen = lib.gen;
+const species = lib.species;
+const items = lib.items;
+const prog = lib.progression;
+const craft = lib.craft;
+const st = lib.structures;
+const player_mod = lib.player;
+const play = lib.play;
+const txt = lib.txt;
 
 const Game = play.Game;
 const Belly = @FieldType(player_mod.Player, "inv");
@@ -342,7 +344,7 @@ test "a garden survives a save round trip" {
   const gpa = testing.allocator;
   var g = try Game.init(gpa, play.DEFAULT_SEED);
   defer g.deinit();
-  try @import("setups.zig").demo(&g, 3);
+  try lib.setups.demo(&g, 3);
   // gather from some node so a depleted chunk is stored too
   const c = g.world.chunkOfTile(m.tileOf(g.player.pos[0]), m.tileOf(g.player.pos[2])).?;
   for (&c.res) |*r| if (r.* > 0) { r.* -= 1; break; };

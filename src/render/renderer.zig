@@ -4,25 +4,26 @@
 //! mesh (plant species and part library, grown on a thread while the
 //! loading screen shows) and each streamed chunk's ground. A new pass is
 //! one new file plus one line in `passes`.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const sliceAsBytes = std.mem.sliceAsBytes;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const Thread = std.Thread;
 const Atomic = std.atomic.Value;
-const engine = @import("engine");
+const engine = lib.engine;
 const glfw = engine.glfw;
 const m = engine.core.math;
 const jobs = engine.core.jobs;
 const Buffer = engine.gfx.buffer.Buffer;
 const er = engine.render.renderer;
-const vertex = @import("../gfx/vertex.zig");
-const meshgen = @import("../gfx/meshgen.zig");
-const meshlib = @import("../gfx/meshlib.zig");
-const species = @import("../sim/species.zig");
-const World = @import("../world/world.zig").World;
-const ck = @import("../world/chunk.zig");
-const terrain_mesh = @import("terrain_mesh.zig");
+const vertex = lib.vertex;
+const meshgen = lib.meshgen;
+const meshlib = lib.meshlib;
+const species = lib.species;
+const World = lib.world.World;
+const ck = lib.ck;
+const terrain_mesh = lib.terrain_mesh;
 
 pub const name = "Parasymi";
 pub const Renderer = er.Renderer(@This());
@@ -227,8 +228,8 @@ const Growing = struct {
       };
       _ = g.done.fetchAdd(1, .monotonic);
     };
-    const lib:[]const meshlib.Id = if (g.only) |o| o.parts else meshlib.ids;
-    for (0..meshgen.LODS) |l| for (lib) |id| {
+    const shown:[]const meshlib.Id = if (g.only) |o| o.parts else meshlib.ids;
+    for (0..meshgen.LODS) |l| for (shown) |id| {
       if (g.stop.load(.monotonic)) return;
       try meshlib.buildOne(b, id, @intCast(l), &g.part_ranges);
       _ = g.done.fetchAdd(1, .monotonic);

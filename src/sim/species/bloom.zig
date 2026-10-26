@@ -5,8 +5,10 @@
 //! network that holds a mature one radiates too, so uprooting the bloom
 //! that joins them cuts off everything downstream. Plants that need
 //! radiance (`needs_radiance`) halt and wither outside every field.
-const species = @import("../species.zig");
-const color = @import("engine").core.color;
+const lib = @import("../../lib.zig");
+const species = lib.species;
+const engine = lib.engine;
+const color = engine.core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_bloom, .floating = true,

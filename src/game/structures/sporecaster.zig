@@ -8,26 +8,27 @@
 //! paired on itself, it sends it on again: the loop conduits cannot close.
 //! A spore whose caster is gone turns home and gives back what it carried;
 //! one whose caster is full hangs over it until there is room.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const color = @import("engine").core.color;
-const ck = @import("../../world/chunk.zig");
-const World = @import("../../world/world.zig").World;
-const gen = @import("../../world/gen.zig");
-const items = @import("../../sim/items.zig");
-const Plants = @import("../../sim/plants.zig").Plants;
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Look = @import("../parts.zig").Look;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const mesh = @import("../../gfx/meshes/sporecaster.zig");
+const m = lib.engine.core.math;
+const color = lib.engine.core.color;
+const ck = lib.ck;
+const World = lib.world.World;
+const gen = lib.gen;
+const items = lib.items;
+const Plants = lib.plants.Plants;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Look = lib.parts.Look;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const mesh = lib.sporecaster;
 
 const V3 = m.V3;
 const v3 = m.v3;

@@ -1,7 +1,8 @@
 //! what every key and mouse button does, loaded once at startup from
 //! `PATH` (`controls.cfg`) and never read again. Game code asks about an
 //! `Action`, never a key: `ctl.pressed(in, .harvest)`.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const EnumArray = std.enums.EnumArray;
@@ -10,11 +11,11 @@ const trim = std.mem.trim;
 const splitScalar = std.mem.splitScalar;
 const values = std.enums.values;
 const testing = std.testing;
-const ctext = @import("engine").core.text;
-const input = @import("engine").platform.input;
+const ctext = lib.engine.core.text;
+const input = lib.engine.platform.input;
 const Input = input.Input;
 const Bind = input.Bind;
-const home = @import("home.zig");
+const home = lib.home;
 
 pub const PATH = "controls.cfg";
 /// the bindings as built: what an edited file leaves out falls back to these

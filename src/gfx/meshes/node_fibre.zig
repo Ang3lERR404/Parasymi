@@ -3,13 +3,15 @@
 //! green at the root and drying to straw at their tapering tips, small
 //! leaves along a few of them. It sways like any plant (the instance's
 //! sway). Tile space, centred on the tile.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const kit = @import("structure_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const kit = lib.structure_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

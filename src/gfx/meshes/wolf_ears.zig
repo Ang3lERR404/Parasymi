@@ -6,14 +6,16 @@
 //! (translucent through the instance's fade), cupped, with its outer rim
 //! rolled forward (the helix) and a fold running up inside it; the back is
 //! a dense shell of vine, the two joined by the rolled rim.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const skel = @import("wolf_skeleton.zig");
-const Sculpt = @import("engine").gfx.sculpt.Sculpt;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const skel = lib.skeleton;
+const Sculpt = engine.gfx.sculpt.Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;

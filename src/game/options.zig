@@ -2,7 +2,8 @@
 //! and shown, and how often it saves itself. Kept in `PATH` in `home`: read
 //! once at startup (written with the defaults when missing), written
 //! whenever one changes. An unreadable file means the defaults.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const Writer = Io.Writer;
@@ -12,10 +13,10 @@ const parseInt = std.fmt.parseInt;
 const log = std.log;
 const testing = std.testing;
 const fields = std.meta.fields;
-const ctext = @import("engine").core.text;
-const txt = @import("text.zig");
-const Antialias = @import("../render/renderer.zig").Antialias;
-const home = @import("home.zig");
+const ctext = lib.engine.core.text;
+const txt = lib.txt;
+const Antialias = lib.renderer.Antialias;
+const home = lib.home;
 
 // decision: a file of its own (not the save): settings belong to the
 // player, not to one garden, and loading a save keeps them.

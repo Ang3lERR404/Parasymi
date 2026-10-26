@@ -6,20 +6,21 @@
 //! Its root digs up out of the soil at the edge it is fed from, arches
 //! over its tile and digs back in at its front, so chains join under the
 //! ground however they turn; what it carries runs through its core.
-const m = @import("engine").core.math;
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const m = lib.engine.core.math;
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const items = @import("../../sim/items.zig");
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const color = @import("engine").core.color;
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const meshlib = @import("../../gfx/meshlib.zig");
+const items = lib.items;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const color = lib.engine.core.color;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const meshlib = lib.meshlib;
 
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes = .{ .conduit_left, .conduit_right, .conduit_tap };

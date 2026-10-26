@@ -5,11 +5,12 @@
 //! essence flowers, and fed by conduits it is what automates the garden. Ingredients
 //! leave the inventory when a weave is queued (like Factorio hand crafting)
 //! and the result appears when it finishes.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const copyForwards = std.mem.copyForwards;
 const testing = std.testing;
-const items = @import("../sim/items.zig");
-const prog = @import("progression.zig");
+const items = lib.items;
+const prog = lib.progression;
 
 pub const Recipe = struct {
   out:items.Item,

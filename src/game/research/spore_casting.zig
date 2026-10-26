@@ -1,7 +1,8 @@
 //! SPORE CASTING: the parasites learn to send: sporecasters, which turn
 //! what they are fed into spore carriers that drift, however far, to the
 //! sporecaster they are paired with. The loop conduits cannot close.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

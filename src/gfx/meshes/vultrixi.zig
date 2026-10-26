@@ -9,15 +9,17 @@
 //! It grows on a hidden stalk through it (gfx/growth.zig): the sac swells
 //! first, the nerves trail out with it, the nodules swell ring by ring,
 //! the petals cup it, the stamens last.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const growth = @import("../growth.zig");
-const pk = @import("parasite_kit.zig");
-const kit = @import("convergence_kit.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const growth = lib.growth;
+const pk = lib.parasite_kit;
+const kit = lib.convergence_kit;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

@@ -1,9 +1,10 @@
 //! THE THINNING VEIL: hybrids flourish, and the world itself begins to shift
 //! (the first world event: sky and glow drift toward the celestial).
-const prog = @import("../progression.zig");
-const txt = @import("../text.zig");
-const ecology = @import("../../sim/ecology.zig");
-const species = @import("../../sim/species.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const txt = lib.txt;
+const ecology = lib.ecology;
+const species = lib.species;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

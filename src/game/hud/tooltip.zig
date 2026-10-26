@@ -1,13 +1,14 @@
 //! an item's full name, on a small membrane beside the cursor, while the
 //! mouse rests on a belly or hotbar slot holding one.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const play = @import("../play.zig");
-const items = @import("../../sim/items.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
-const craft = @import("../craft.zig");
+const play = lib.play;
+const items = lib.items;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
+const craft = lib.craft;
 
 /// from the cursor to the card, the card's margin and line height
 const offset = [2]f32{20, 10};

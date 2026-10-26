@@ -14,21 +14,22 @@
 //! What is learned grows on it: Arsthraxia sends vines climbing its stems;
 //! each minor study along it an offshoot out of them (a bough with a
 //! flower and a satellite of its own) and another satellite round its core.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const items = @import("../../sim/items.zig");
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Look = @import("../parts.zig").Look;
-const mesh = @import("../../gfx/meshes/arsthraxia.zig");
-const growth = @import("../../gfx/growth.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
+const m = lib.engine.core.math;
+const items = lib.items;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Look = lib.parts.Look;
+const mesh = lib.arsthraxia;
+const growth = lib.growth;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
 
 const V3 = m.V3;
 const v3 = m.v3;

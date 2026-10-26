@@ -1,28 +1,30 @@
 //! what gets drawn: turns the game state into a render Scene (plant
 //! instances, rigid parts, HUD, sky/fog/light push constants). Read-only with
 //! respect to the simulation.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const pdq = std.sort.pdq;
 const swap = std.mem.swap;
-const m = @import("engine").core.math;
-const rng = @import("engine").core.rng;
-const ck = @import("../world/chunk.zig");
-const species = @import("../sim/species.zig");
-const turn = @import("../sim/turn.zig");
-const renderer = @import("../render/renderer.zig");
-const meshgen = @import("../gfx/meshgen.zig");
-const vertex = @import("../gfx/vertex.zig");
-const st = @import("structures.zig");
-const halo_mod = @import("structures/halo.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const rng = engine.core.rng;
+const ck = lib.ck;
+const species = lib.species;
+const turn = lib.turn;
+const renderer = lib.renderer;
+const meshgen = lib.meshgen;
+const vertex = lib.vertex;
+const st = lib.structures;
+const halo_mod = lib.halo_structure;
 
-const resources = @import("resources.zig");
-const actions = @import("actions.zig");
-const hud = @import("hud.zig");
-const play = @import("play.zig");
+const resources = lib.resources;
+const actions = lib.actions;
+const hud = lib.hud;
+const play = lib.play;
 
 const Game = play.Game;
-const gen = @import("../world/gen.zig");
+const gen = lib.gen;
 
 /// shader time wraps this often (s) so f32 keeps its precision
 const TIME_WRAP:f64 = 3600;

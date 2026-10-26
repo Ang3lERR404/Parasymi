@@ -1,7 +1,8 @@
 //! WOVEN STONE: what a loomfern and a lithophage make between them, grown
 //! side by side: weftstones, floating over the nodes, drawing them up and
 //! ionizing what they draw into ley crystals.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

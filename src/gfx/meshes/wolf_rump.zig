@@ -10,14 +10,16 @@
 //! Built per side around `CENTRE` (the pelvis bone's frame), each vertex
 //! weighted as the hide under it is: the pelvis, and toward its lower edge
 //! the thigh beneath it.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const skel = @import("wolf_skeleton.zig");
-const kit = @import("wolf_kit.zig");
-const body = @import("wolf_body.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const skel = lib.skeleton;
+const kit = lib.wolf_kit;
+const body = lib.wolf_body;
 
 const V3 = m.V3;
 const v3 = m.v3;
@@ -99,7 +101,7 @@ fn facing(b:*const mg.Builder, first:usize) V3 {
 }
 
 test "a resin lobe never folds over itself" {
-  const pec = @import("wolf_pec.zig");
+  const pec = lib.wolf_pec;
   inline for (.{ .{ lobe, RINGS, STEPS }, .{ pec.lobe, pec.RINGS, pec.STEPS } }) |l| {
     for ([_]f32{ -1, 1 }) |side| {
       var b:mg.Builder = .{.gpa = std.testing.allocator};

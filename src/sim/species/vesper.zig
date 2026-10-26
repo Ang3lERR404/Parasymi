@@ -4,8 +4,10 @@
 //! is gathered, never grown, falling in from the sky piece by piece, and
 //! it needs celestial energy: outside a bloom's field it withers, its
 //! pieces loosening and sinking as its light dims.
-const species = @import("../species.zig");
-const color = @import("engine").core.color;
+const lib = @import("../../lib.zig");
+const species = lib.species;
+const engine = lib.engine;
+const color = engine.core.color;
 
 pub const def:species.Species = .{
   .lineage = .convergent, .seed = .seed_vesper,

@@ -3,13 +3,14 @@
 //! any) as instances; detail.vert builds each tile's blades or stones from
 //! its record and the vertex index, and sways the grass in the garden wind.
 //! Shaded by terrain.frag, like the ground they stand on.
-const vk = @import("engine").vk;
-const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("engine").gfx.pipeline;
+const lib = @import("../../lib.zig");
+const vk = lib.engine.vk;
+const vertex = lib.vertex;
+const pipeline = lib.engine.gfx.pipeline;
 const pass = R.pass;
-const R = @import("../renderer.zig");
-const m = @import("engine").core.math;
-const ck = @import("../../world/chunk.zig");
+const R = lib.renderer;
+const m = lib.engine.core.math;
+const ck = lib.ck;
 
 pub const desc:pass.Desc = .{
   .vert = @embedFile("detail.vert"), .frag = @embedFile("terrain.frag"),

@@ -7,19 +7,20 @@
 //! born of a halo, it forms with a flash of light. Blooms sown on the
 //! ring's four points brighten the arcs beside them. (The world event will
 //! start from it.)
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const Field = @import("../../sim/ecology.zig").Field;
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const halo = @import("halo.zig");
+const m = lib.engine.core.math;
+const Field = lib.ecology.Field;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const halo = lib.halo_structure;
 
 // it floats as high as the blooms hang, at the heart of its ring, over
 // whatever is under it

@@ -3,8 +3,10 @@
 //! hanging inside, a crown of five fronds each ending in a small cage of
 //! its own). Drains every non-parasitic neighbour and the ley beneath it;
 //! yields more, at their expense.
-const species = @import("../species.zig");
-const color = @import("engine").core.color;
+const lib = @import("../../lib.zig");
+const species = lib.species;
+const engine = lib.engine;
+const color = engine.core.color;
 
 pub const def:species.Species = .{
   .lineage = .parasitic, .seed = .seed_thornleech,

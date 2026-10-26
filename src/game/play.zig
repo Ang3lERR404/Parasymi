@@ -2,43 +2,45 @@
 //! frame: input -> actions (actions.zig), fixed-tick simulation, and what gets
 //! drawn (view.zig). Nothing is pooled globally: items live in the player and
 //! in structures, essence and seeds live in plants until harvested.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const eqlDeep = std.meta.eql;
 const swap = std.mem.swap;
 const bufPrint = std.fmt.bufPrint;
-const m = @import("engine").core.math;
-const Rng = @import("engine").core.rng.Rng;
-const ck = @import("../world/chunk.zig");
-const gen = @import("../world/gen.zig");
-const World = @import("../world/world.zig").World;
-const species = @import("../sim/species.zig");
-const Plants = @import("../sim/plants.zig").Plants;
-const ecology = @import("../sim/ecology.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const Rng = engine.core.rng.Rng;
+const ck = lib.ck;
+const gen = lib.gen;
+const World = lib.world.World;
+const species = lib.species;
+const Plants = lib.plants.Plants;
+const ecology = lib.ecology;
 const Ecology = ecology.Ecology;
-const items = @import("../sim/items.zig");
-const prog = @import("progression.zig");
-const txt = @import("text.zig");
-const Input = @import("engine").platform.input.Input;
-const ctl = @import("controls.zig");
-const camera = @import("engine").render.camera;
+const items = lib.items;
+const prog = lib.progression;
+const txt = lib.txt;
+const Input = engine.platform.input.Input;
+const ctl = lib.controls;
+const camera = engine.render.camera;
 const Camera = camera.Camera;
-const renderer = @import("../render/renderer.zig");
-const vertex = @import("../gfx/vertex.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const sky_mod = @import("sky.zig");
-const player_mod = @import("player.zig");
+const renderer = lib.renderer;
+const vertex = lib.vertex;
+const Draw = engine.ui.draw.Draw;
+const sky_mod = lib.sky;
+const player_mod = lib.player;
 const Player = player_mod.Player;
-const Parts = @import("parts.zig").Parts;
-const craft = @import("craft.zig");
-const st = @import("structures.zig");
-const actions = @import("actions.zig");
-const convergence = @import("convergence.zig");
-const hud = @import("hud.zig");
-const options = @import("options.zig");
-const save = @import("save.zig");
-const Specimen = @import("specimen.zig").Specimen;
+const Parts = lib.parts.Parts;
+const craft = lib.craft;
+const st = lib.structures;
+const actions = lib.actions;
+const convergence = lib.convergence;
+const hud = lib.hud;
+const options = lib.options;
+const save = lib.save;
+const Specimen = lib.specimen.Specimen;
 
 pub const TICK = 1.0 / 60.0;
 /// the test gardens' world (`--demo`, `--stress`, `--plant`/`--structure`,
@@ -885,7 +887,7 @@ test "the wolf stays put without input" {
   const gpa = testing.allocator;
   var g = try Game.init(gpa, DEFAULT_SEED);
   defer g.deinit();
-  try @import("setups.zig").demo(&g, 5);
+  try lib.setups.demo(&g, 5);
   var in:Input = .{ .win = undefined };
   in.mouse = .{ -1e4, -1e4 };
   const start = g.player.pos;
@@ -1245,7 +1247,7 @@ test "R turns what is under the cursor (Shift back), Q picks its bulb, a click o
   // the next thing put down keeps its own facing
   try testing.expectEqual(@as(m.Dir, 0), g.place_dir);
   // once turned, Shift+R turns it back
-  g.time += @import("../sim/turn.zig").TIME;
+  g.time += lib.turn.TIME;
   ctl.hold(&in, .counter, true);
   try pressAt(&g, &in, at, .rotate);
   ctl.hold(&in, .counter, false);

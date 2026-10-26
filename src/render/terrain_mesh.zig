@@ -7,14 +7,15 @@
 //! tile gets one `DetailTile` record and the GPU grows the detail from it.
 //! Border neighbours come from the generator directly, so a chunk can be
 //! meshed without its neighbours being loaded.
-const std = @import("std");
-const m = @import("engine").core.math;
+const lib = @import("../lib.zig");
+const std = lib.std;
+const m = lib.engine.core.math;
 const Allocator = std.mem.Allocator;
-const ck = @import("../world/chunk.zig");
-const gen = @import("../world/gen.zig");
-const rng = @import("engine").core.rng;
-const color = @import("engine").core.color;
-const vertex = @import("../gfx/vertex.zig");
+const ck = lib.ck;
+const gen = lib.gen;
+const rng = lib.engine.core.rng;
+const color = lib.engine.core.color;
+const vertex = lib.vertex;
 const TV = vertex.Terrain;
 const DetailTile = vertex.DetailTile;
 

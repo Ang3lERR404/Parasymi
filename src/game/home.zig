@@ -7,7 +7,8 @@
 //! a copy the gardener never touched carries a stamp of its own contents
 //! and is replaced when the game's version changes; an edited one is kept,
 //! and whatever it leaves out falls back to the game's.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const Dir = Io.Dir;

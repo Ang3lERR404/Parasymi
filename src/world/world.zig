@@ -1,10 +1,12 @@
 //! the garden's world: the engine's streamed chunk map (engine
 //! world/world.zig) over the garden's tiles (chunk.zig) and generation (gen.zig).
-const std = @import("std");
+const lib = @import("../lib.zig");
+const engine = lib.engine;
+const std = lib.std;
+const world = lib.world;
+const ck = lib.ck;
+const gen = lib.gen;
 const testing = std.testing;
-const engine = @import("engine");
-const ck = @import("chunk.zig");
-const gen = @import("gen.zig");
 
 pub const Chunk = ck.Chunk;
 pub const Coord = ck.Coord;

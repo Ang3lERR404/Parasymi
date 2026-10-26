@@ -5,14 +5,16 @@
 //! rootlets forking off its far half. Bark for the symbiotic lineage
 //! (`build`), pale for the parasites' (`pale`). Out of the ground only
 //! while it turns; at rest the whole of it is in the soil.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const pal = @import("palette.zig");
-const pk = @import("parasite_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const pal = lib.palette;
+const pk = lib.parasite_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

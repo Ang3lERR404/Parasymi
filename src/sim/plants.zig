@@ -3,16 +3,19 @@
 //! floating plants claim none and are tracked by the tile they hover over.
 //! Neighbour links are cached as plain indices and rebuilt only when the
 //! topology changes, so the per-tick ecology loop never touches a hash map.
-const std = @import("std");
-const m = @import("engine").core.math;
+const lib = @import("../lib.zig");
+const std = lib.std;
+const engine = lib.engine;
+const m = engine.core.math;
+const ck = lib.ck;
+const world = lib.world;
+const species = lib.species;
+const World = world.World;
+const Turn = lib.turn.Turn;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const indexOfScalar = std.mem.indexOfScalar;
-const ck = @import("../world/chunk.zig");
-const World = @import("../world/world.zig").World;
-const species = @import("species.zig");
-const jobs = @import("engine").core.jobs;
-const Turn = @import("turn.zig").Turn;
+const jobs = engine.core.jobs;
 
 pub const Id = ck.PlantId;
 const Occ = ck.Occ;

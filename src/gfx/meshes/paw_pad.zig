@@ -1,11 +1,13 @@
 //! mesh: PAW PAD. the central (metacarpal) bean under the foot: a rounded
 //! triangle of three merged lobes, unit size; instances flatten it onto the
 //! sole. Sap, made denser and browner by the instance.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
 
 const v3 = m.v3;
 

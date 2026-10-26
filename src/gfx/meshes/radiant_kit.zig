@@ -18,16 +18,18 @@
 //! by how far its halo (or its own growing in) has come. A new radiant
 //! thing is built from these pieces and gathered the same way, never with
 //! the symbiotes' kits or the growth splines.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const species = @import("../../sim/species.zig");
-const mineral = @import("mineral_kit.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const species = lib.species;
+const mineral = lib.mineral_kit;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

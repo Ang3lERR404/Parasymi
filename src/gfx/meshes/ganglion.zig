@@ -7,12 +7,14 @@
 //! It grows on a hidden stalk (gfx/growth.zig): the foot swells and its
 //! roots spread with it, the stalk rises, the nodules swell out of its
 //! top ring by ring round the bladder, the fronds curl over last.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const growth = @import("../growth.zig");
-const pk = @import("parasite_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const growth = lib.growth;
+const pk = lib.parasite_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

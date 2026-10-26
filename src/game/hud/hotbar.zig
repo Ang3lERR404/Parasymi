@@ -2,16 +2,17 @@
 //! dropped on it from the belly, with the belly's count of it and the
 //! selection's name. Click selects; with the belly open, click lifts and
 //! puts down.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const play = @import("../play.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
-const st = @import("../structures.zig");
-const items = @import("../../sim/items.zig");
-const icon = @import("../icon.zig");
+const m = lib.engine.core.math;
+const play = lib.play;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
+const st = lib.structures;
+const items = lib.items;
+const icon = lib.icon;
 
 const gap = s.slot_gap;
 const pod_r:f32 = 20;

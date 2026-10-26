@@ -1,13 +1,15 @@
 //! shared pieces for the ground's minerals: crystals and faceted stones,
 //! flat-faced (each face its own normal) so they catch the light as cut
 //! planes. Not a mesh itself; the node meshes use it.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

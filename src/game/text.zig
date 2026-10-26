@@ -1,7 +1,8 @@
 //! every player-facing string, loaded once at startup from `PATH`
 //! (`parasymi.cfg`) and never read again. Templates take positional
 //! arguments (`{0}`, `{1:.1}`; see `core/text.zig`); lists are `a | b`.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const EnumArray = std.enums.EnumArray;
@@ -13,15 +14,16 @@ const assert = std.debug.assert;
 const testing = std.testing;
 const indexOf = std.mem.indexOf;
 const fields = std.meta.fields;
-const input = @import("engine").platform.input;
-const ctl = @import("controls.zig");
-const ctext = @import("engine").core.text;
-const ck = @import("../world/chunk.zig");
-const items = @import("../sim/items.zig");
-const species = @import("../sim/species.zig");
-const prog = @import("progression.zig");
-const st = @import("structures.zig");
-const home = @import("home.zig");
+const engine = lib.engine;
+const input = engine.platform.input;
+const ctl = lib.controls;
+const ctext = engine.core.text;
+const ck = lib.ck;
+const items = lib.items;
+const species = lib.species;
+const prog = lib.progression;
+const st = lib.structures;
+const home = lib.home;
 
 pub const PATH = "parasymi.cfg";
 /// the strings as built: what an edited file leaves out falls back to these
@@ -198,8 +200,8 @@ test "the strings file fills every key, shown with the bound keys" {
   try fill(gpa, &.{DEFAULT});
   try testing.expect(indexOf(u8, s.msg.night_hint, s.mouse.get(.middle).?) != null);
   try testing.expectEqual(count(s.hud.pause_keys), count(s.hud.pause_labels));
-  try testing.expectEqual(fields(@import("play.zig").PauseRow).len, count(s.hud.pause_labels));
-  const opt = @import("options.zig");
+  try testing.expectEqual(fields(lib.play.PauseRow).len, count(s.hud.pause_labels));
+  const opt = lib.options;
   try testing.expectEqual(fields(opt.Setting).len, count(s.hud.option_labels));
   try testing.expectEqual(fields(@FieldType(opt.Options, "aa")).len, count(s.hud.antialias));
   try testing.expectEqual(2, count(s.hud.toggle));

@@ -1,14 +1,17 @@
 //! the fixed-tick ecology: mana from the ley field, symbiotic sharing,
 //! parasitic draining, growth, essence and death. Two-phase (accumulate
 //! deltas, then apply) so the result never depends on plant order.
-const std = @import("std");
-const m = @import("engine").core.math;
+const lib = @import("../lib.zig");
+const std = lib.std;
+const engine = lib.engine;
+const species = lib.species;
+const plants_mod = lib.plants;
+const ck = lib.ck;
+const world = lib.world;
+const World = world.World;
+const m = engine.core.math;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const species = @import("species.zig");
-const plants_mod = @import("plants.zig");
-const ck = @import("../world/chunk.zig");
-const World = @import("../world/world.zig").World;
 
 const Plants = plants_mod.Plants;
 const Id = plants_mod.Id;

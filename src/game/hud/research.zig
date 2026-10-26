@@ -15,18 +15,19 @@
 //! dormant bud where its host has grown; beyond that, nothing yet. The trunk
 //! reaches just past the highest open or known node and thickens with all
 //! that is known. Hover a node for its card below; click it to study it.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const indexOfScalar = std.mem.indexOfScalar;
 const testing = std.testing;
-const play = @import("../play.zig");
-const prog = @import("../progression.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
-const m = @import("engine").core.math;
-const color = @import("engine").core.color;
+const play = lib.play;
+const prog = lib.progression;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const s = lib.style;
+const txt = lib.txt;
+const m = lib.engine.core.math;
+const color = lib.engine.core.color;
 
 const Id = prog.Id;
 const V3 = m.V3;

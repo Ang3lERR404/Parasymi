@@ -1,11 +1,12 @@
 //! F3: frame/sim timings and world counts.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const play = @import("../play.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
-const m = @import("engine").core.math;
+const play = lib.play;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
+const m = lib.engine.core.math;
 
 const margin = s.edge;
 const bw:f32 = 364;

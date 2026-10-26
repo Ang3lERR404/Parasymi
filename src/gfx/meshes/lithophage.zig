@@ -12,15 +12,17 @@
 //! It grows on a hidden stalk (gfx/growth.zig): the foot swells and its
 //! roots spread with it, the stalk rises, its sacs swell as it passes, the
 //! crop swells out of its top and the fronds clasp it last, all at once.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const growth = @import("../growth.zig");
-const pk = @import("parasite_kit.zig");
-const mineral = @import("mineral_kit.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const growth = lib.growth;
+const pk = lib.parasite_kit;
+const mineral = lib.mineral_kit;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

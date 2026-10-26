@@ -1,13 +1,14 @@
 //! the pause menu (Esc): the world holds its breath behind a soft veil.
 //! Each row is clicked (or its key pressed) to do what it says.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const fields = std.meta.fields;
-const m = @import("engine").core.math;
-const play = @import("../play.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
+const m = lib.engine.core.math;
+const play = lib.play;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
 
 const pw:f32 = 480;
 const header_h:f32 = 100;

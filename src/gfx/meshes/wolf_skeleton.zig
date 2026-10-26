@@ -6,10 +6,12 @@
 //!
 //! Every limb bone runs down its local -Y from the joint it turns at to the
 //! next; the spine, neck and tail run up +Y.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const rig = @import("engine").anim.rig;
+const engine = lib.engine;
+const m = engine.core.math;
+const rig = engine.anim.rig;
 
 const V3 = m.V3;
 const v3 = m.v3;

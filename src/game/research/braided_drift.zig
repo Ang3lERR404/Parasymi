@@ -1,7 +1,8 @@
 //! BRAIDED DRIFT: what a braided conduit and a sporecaster make between
 //! them, grown side by side: driftbraids, paired, sending what each is fed
 //! to the other by spore and taking in what it sends back.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

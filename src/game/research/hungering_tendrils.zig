@@ -1,6 +1,7 @@
 //! HUNGERING TENDRILS: parasites drain twice as hard.
-const prog = @import("../progression.zig");
-const ecology = @import("../../sim/ecology.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const ecology = lib.ecology;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

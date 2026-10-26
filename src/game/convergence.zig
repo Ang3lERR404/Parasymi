@@ -4,18 +4,19 @@
 //!
 //! The search is spread over ticks (a fixed budget of plants per tick) so a
 //! dense garden never stalls a frame.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const rng = @import("engine").core.rng;
-const ck = @import("../world/chunk.zig");
-const World = @import("../world/world.zig").World;
-const species = @import("../sim/species.zig");
-const plants_mod = @import("../sim/plants.zig");
-const st = @import("structures.zig");
-const prog = @import("progression.zig");
-const txt = @import("text.zig");
+const m = lib.engine.core.math;
+const rng = lib.engine.core.rng;
+const ck = lib.ck;
+const World = lib.world.World;
+const species = lib.species;
+const plants_mod = lib.plants;
+const st = lib.structures;
+const prog = lib.progression;
+const txt = lib.txt;
 
 const Plants = plants_mod.Plants;
 const PlantId = plants_mod.Id;
@@ -228,7 +229,7 @@ test "mature lineages within two tiles grow one confluence" {
   // it grows for 1.5x the slower parent: mature after that, not before
   const span = species.get(.lumenroot).mature_time * SPAN;
   try testing.expectApproxEqAbs(span, gd.p.list.items(.span)[h], 1e-4);
-  var eco:@import("../sim/ecology.zig").Ecology = .{};
+  var eco:lib.ecology.Ecology = .{};
   defer eco.deinit(gpa);
   const dt:f32 = 1.0 / 30.0;
   var t:f32 = 0;

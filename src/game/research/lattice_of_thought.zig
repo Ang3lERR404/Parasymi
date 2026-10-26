@@ -1,7 +1,8 @@
 //! LATTICE OF THOUGHT: a minor study along Arsthraxia. Every arsthraxia grows:
 //! an offshoot out of its stems, another satellite sap round its core.
-const prog = @import("../progression.zig");
-const txt = @import("../text.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const txt = lib.txt;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

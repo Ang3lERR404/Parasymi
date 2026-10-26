@@ -1,8 +1,9 @@
 //! CONVERGENCE THEORY: study of what grows where the lineages meet. The
 //! confluence needs no research to take root; this only teaches what it gives.
-const prog = @import("../progression.zig");
-const txt = @import("../text.zig");
-const species = @import("../../sim/species.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const txt = lib.txt;
+const species = lib.species;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

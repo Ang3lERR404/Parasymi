@@ -2,14 +2,16 @@
 //! and the digits of its hands and feet (forms of planes: superellipsoids,
 //! flat faces, rounded edges, with curved claws). Not a mesh itself; the
 //! wolf's meshes use it.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const Sculpt = @import("engine").gfx.sculpt.Sculpt;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const Sculpt = engine.gfx.sculpt.Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;

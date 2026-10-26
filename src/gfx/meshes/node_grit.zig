@@ -2,13 +2,15 @@
 //! faceted stones half sunk in the soil, grit and pebbles heaped around
 //! them, and pale quartz chips glinting out of the cracks. Tile space,
 //! centred on the tile.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const kit = @import("mineral_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const kit = lib.mineral_kit;
 
 const v3 = m.v3;
 

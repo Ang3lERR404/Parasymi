@@ -1,9 +1,10 @@
 //! the garden's growth splines: the engine's (engine gfx/growth.zig: the
 //! hidden skeleton a grown structure is built on and grows along) for the
 //! garden's builder, its leaves the garden's (`meshgen.leafAt`).
-const engine = @import("engine");
+const lib = @import("../lib.zig");
+const engine = lib.engine;
 const eg = engine.gfx.growth;
-const mg = @import("meshgen.zig");
+const mg = lib.meshgen;
 
 const gr = eg.Grower(mg.gen, mg.leafAt);
 pub const Skeleton = gr.Skeleton;

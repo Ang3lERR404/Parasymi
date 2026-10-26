@@ -12,17 +12,19 @@
 //! It grows along a growth spline (gfx/growth.zig) through its spine: up
 //! out of the soil at its back edge (where the root behind went down),
 //! over, and down in at its front.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const noise = @import("engine").core.noise;
-const vertex = @import("../vertex.zig");
-const Rng = @import("engine").core.rng.Rng;
-const kit = @import("structure_kit.zig");
-const growth = @import("../growth.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const noise = engine.core.noise;
+const vertex = lib.vertex;
+const Rng = engine.core.rng.Rng;
+const kit = lib.structure_kit;
+const growth = lib.growth;
 
 const V3 = m.V3;
 const v3 = m.v3;

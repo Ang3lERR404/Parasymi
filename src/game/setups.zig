@@ -1,16 +1,18 @@
 //! prepared worlds for showcasing and testing (`--demo`, `--stress`).
 //! Not part of play: they place things on the gardener's behalf.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const ck = @import("../world/chunk.zig");
-const species = @import("../sim/species.zig");
-const prog = @import("progression.zig");
-const play = @import("play.zig");
-const m = @import("engine").core.math;
-const halo = @import("structures/halo.zig");
-const craft = @import("craft.zig");
-const st = @import("structures.zig");
-const items = @import("../sim/items.zig");
+const ck = lib.ck;
+const species = lib.species;
+const prog = lib.progression;
+const play = lib.play;
+const engine = lib.engine;
+const m = engine.core.math;
+const halo = lib.halo_structure;
+const craft = lib.craft;
+const st = lib.structures;
+const items = lib.items;
 
 const Game = play.Game;
 

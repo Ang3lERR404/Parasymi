@@ -15,13 +15,14 @@
 //! they meet; past 1, `FORM`s since), goes to the GPU with each instance:
 //! the blooms' spiral, the crystal gathering from its shards and the
 //! projection reaching out all follow it there (common.glsl `haloSpiral`).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const World = @import("../../world/world.zig").World;
-const species = @import("../../sim/species.zig");
-const Plants = @import("../../sim/plants.zig").Plants;
-const Parts = @import("../parts.zig").Parts;
+const m = lib.engine.core.math;
+const World = lib.world.World;
+const species = lib.species;
+const Plants = lib.plants.Plants;
+const Parts = lib.parts.Parts;
 
 /// the ring's radius, tiles: the blooms' points lie this far out along the
 /// axes, on it

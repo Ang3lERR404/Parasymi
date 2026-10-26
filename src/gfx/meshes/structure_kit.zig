@@ -6,15 +6,17 @@
 //! structure meshes use it. Given an `On`, a piece grows on a structure's
 //! growth splines (gfx/growth.zig) instead of with the structure as a
 //! whole; a plant grows by tu.x (plant.vert).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const Rng = @import("engine").core.rng.Rng;
-const growth = @import("../growth.zig");
-const species = @import("../../sim/species.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const Rng = engine.core.rng.Rng;
+const growth = lib.growth;
+const species = lib.species;
 
 const V3 = m.V3;
 const v3 = m.v3;

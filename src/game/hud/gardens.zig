@@ -4,16 +4,17 @@
 //! click chooses one; SAVE writes the garden as it (over a saved one only
 //! when clicked twice), LOAD returns to it. BACK (or Esc) returns to the
 //! pause menu.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const play = @import("../play.zig");
-const Pick = @import("../hud.zig").Pick;
-const save = @import("../save.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
+const m = lib.engine.core.math;
+const play = lib.play;
+const Pick = lib.hud.Pick;
+const save = lib.save;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const s = lib.style;
+const txt = lib.txt;
 
 const pw:f32 = 680;
 const header_h:f32 = 104;

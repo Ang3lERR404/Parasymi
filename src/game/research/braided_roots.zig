@@ -1,6 +1,7 @@
 //! BRAIDED ROOTS: conduits grown dense: braided conduits, four lanes bound
 //! in one weave, each carrying its own kind of item, faster than a conduit.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

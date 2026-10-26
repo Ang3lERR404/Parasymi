@@ -1,11 +1,13 @@
 //! world generation: a pure function of (seed, tile coordinate). Chunks never
 //! depend on neighbours being loaded, so meshing and streaming stay order-free.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
+const engine = lib.engine;
+const ck = lib.ck;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const noise = @import("engine").core.noise;
-const ck = @import("chunk.zig");
-const rng = @import("engine").core.rng;
+const m = engine.core.math;
+const noise = engine.core.noise;
+const rng = engine.core.rng;
 
 pub const TERRACE = 0.35;
 /// terrace levels per unit of elevation noise; below `LOW` the ground lies

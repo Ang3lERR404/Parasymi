@@ -35,25 +35,27 @@
 //!                               `--structure` builds only these (tested)
 //! Missing hooks fall back to doing nothing. A new structure is one new file
 //! plus one line in `kinds`.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const activeTag = std.meta.activeTag;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const registry = @import("engine").core.registry;
-const ck = @import("../world/chunk.zig");
-const World = @import("../world/world.zig").World;
-const items = @import("../sim/items.zig");
-const species = @import("../sim/species.zig");
-const Plants = @import("../sim/plants.zig").Plants;
-const Field = @import("../sim/ecology.zig").Field;
-const meshlib = @import("../gfx/meshlib.zig");
-const prog = @import("progression.zig");
-const Parts = @import("parts.zig").Parts;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const icon_kit = @import("icon.zig");
-const turn = @import("../sim/turn.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const registry = engine.core.registry;
+const ck = lib.ck;
+const World = lib.world.World;
+const items = lib.items;
+const species = lib.species;
+const Plants = lib.plants.Plants;
+const Field = lib.ecology.Field;
+const meshlib = lib.meshlib;
+const prog = lib.progression;
+const Parts = lib.parts.Parts;
+const Draw = engine.ui.draw.Draw;
+const Color = engine.ui.draw.Color;
+const icon_kit = lib.icon;
+const turn = lib.turn;
 
 const kinds = struct {
   pub const conduit = @import("structures/conduit.zig");
@@ -580,7 +582,7 @@ test "a germinator weaves structure bulbs as well as seeds, and lets go only wha
   var g:prog.Progression = .{};
   try testing.expect(try ss.place(gpa, &w, 0, 0, .germinator, 0, 0));
   const id = ss.at(&w, 0, 0).?;
-  const craft = @import("craft.zig");
+  const craft = lib.craft;
   // every weave is on offer, the bulbs too, but the advanced tier, which
   // only a monfris weaves
   try testing.expectEqual(craft.hand.len - craft.advanced.len, recipes(.germinator).len);

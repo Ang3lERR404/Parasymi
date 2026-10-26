@@ -10,14 +10,16 @@
 //! It grows on a hidden stalk (gfx/growth.zig): the bulb swells first,
 //! the frondlets clasp it, the weave rises and the fronds arch out of its
 //! top, their leaflets opening as each front passes.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const growth = @import("../growth.zig");
-const pk = @import("parasite_kit.zig");
-const kit = @import("convergence_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const growth = lib.growth;
+const pk = lib.parasite_kit;
+const kit = lib.convergence_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

@@ -22,18 +22,20 @@
 //! A cage's strands carry how far they have parted in tu.y, as the
 //! parasites' do. The confluence is grown through keys (sizes passed in,
 //! never counts, so every key keeps one vertex layout).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const species = @import("../../sim/species.zig");
-const growth = @import("../growth.zig");
-const Rng = @import("engine").core.rng.Rng;
-const pal = @import("palette.zig");
-const pk = @import("parasite_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const species = lib.species;
+const growth = lib.growth;
+const Rng = engine.core.rng.Rng;
+const pal = lib.palette;
+const pk = lib.parasite_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

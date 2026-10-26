@@ -14,17 +14,19 @@
 //!   reveals:[_]species.Id         species whose yield it makes visible
 //!   study(*Study)                 what it teaches the labs (arsthraxias)
 //! A new technology is one new file plus one line in `techs`.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const EnumArray = std.enums.EnumArray;
 const copyBackwards = std.mem.copyBackwards;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const registry = @import("engine").core.registry;
-const species = @import("../sim/species.zig");
-const ecology = @import("../sim/ecology.zig");
-const items = @import("../sim/items.zig");
-const txt = @import("text.zig");
-const ctext = @import("engine").core.text;
+const engine = lib.engine;
+const m = engine.core.math;
+const registry = engine.core.registry;
+const species = lib.species;
+const ecology = lib.ecology;
+const items = lib.items;
+const txt = lib.txt;
+const ctext = engine.core.text;
 
 const techs = struct {
   pub const ley_sight = @import("research/ley_sight.zig");

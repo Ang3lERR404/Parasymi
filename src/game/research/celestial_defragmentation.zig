@@ -2,7 +2,8 @@
 //! lattice that gathered four blooms' light into one and fragments it into
 //! a ring. Dormant until a diamond has formed; known, diamonds can be woven
 //! and put down by hand.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 // decision: its cost is set here (the brief sets none): the lineages'
 // condensed essence and the sky's light, as the diamond is made of

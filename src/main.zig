@@ -3,7 +3,8 @@
 //!
 //! layers (each only imports the ones above it):
 //!   core -> platform -> gfx -> world -> sim -> game/render/ui -> main
-const std = @import("std");
+const lib = @import("lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const parseFloat = std.fmt.parseFloat;
@@ -14,34 +15,35 @@ const startsWith = std.mem.startsWith;
 const asBytes = std.mem.asBytes;
 const Init = std.process.Init;
 const log = std.log;
-const glfw = @import("engine").glfw;
-const Input = @import("engine").platform.input.Input;
-const Display = @import("engine").platform.display.Display;
-const renderer = @import("render/renderer.zig");
+const engine = lib.engine;
+const glfw = engine.glfw;
+const Input = engine.platform.input.Input;
+const Display = engine.platform.display.Display;
+const renderer = lib.renderer;
 const Renderer = renderer.Renderer;
-const play = @import("game/play.zig");
+const play = lib.play;
 const Game = play.Game;
-const view = @import("game/view.zig");
-const setups = @import("game/setups.zig");
-const save = @import("game/save.zig");
-const txt = @import("game/text.zig");
-const controls = @import("game/controls.zig");
-const options = @import("game/options.zig");
-const home = @import("game/home.zig");
-const orbit = @import("game/orbit.zig");
-const loading = @import("game/loading.zig");
-const specimen = @import("game/specimen.zig");
-const species = @import("sim/species.zig");
-const st = @import("game/structures.zig");
+const view = lib.view;
+const setups = lib.setups;
+const save = lib.save;
+const txt = lib.txt;
+const controls = lib.controls;
+const options = lib.options;
+const home = lib.home;
+const orbit = lib.orbit;
+const loading = lib.loading;
+const specimen = lib.specimen;
+const species = lib.species;
+const st = lib.structures;
 const stringToEnum = std.meta.stringToEnum;
 const Loading = loading.Loading;
-const World = @import("world/world.zig").World;
-const png = @import("engine").core.png;
+const World = lib.world.World;
+const png = lib.engine.core.png;
 const bufPrint = std.fmt.bufPrint;
 const Dir = Io.Dir;
 const sep_str = std.fs.path.sep_str;
 const Options = options.Options;
-const m = @import("engine").core.math;
+const m = lib.engine.core.math;
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
 const MAX_FRAME_DT:f64 = 0.1;

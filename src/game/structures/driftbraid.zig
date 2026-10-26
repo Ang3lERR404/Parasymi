@@ -11,27 +11,28 @@
 // (`kept`), not slots of its own: items leave a structure through its
 // inventory alone. A count it has lost track of (the gardener lifting it
 // out by hand, a conduit pulling) is trimmed to what is there each tick.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const EnumArray = std.enums.EnumArray;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const color = @import("engine").core.color;
-const ck = @import("../../world/chunk.zig");
-const World = @import("../../world/world.zig").World;
-const items = @import("../../sim/items.zig");
-const Plants = @import("../../sim/plants.zig").Plants;
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Look = @import("../parts.zig").Look;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const mesh = @import("../../gfx/meshes/driftbraid.zig");
-const caster = @import("sporecaster.zig");
+const m = lib.engine.core.math;
+const color = lib.engine.core.color;
+const ck = lib.ck;
+const World = lib.world.World;
+const items = lib.items;
+const Plants = lib.plants.Plants;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Look = lib.parts.Look;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const mesh = lib.driftbraid;
+const caster = lib.sporecaster_structure;
 
 const V3 = m.V3;
 const v3 = m.v3;

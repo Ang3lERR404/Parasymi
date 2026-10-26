@@ -114,8 +114,12 @@ sim       items, species, plants (footprints, floaters), ecology tick
 game      player, actions, structures, research, craft, sky, hud, view, play, save
 render    the garden's renderer (passes, scene, mesh growing), terrain meshing
 main      wiring, frame loop, save/load/fullscreen requests
-lib       the game's modules for tools/ (`@import("parasymi")`)
+lib       the import hub: std, engine and every game module (`@import("parasymi")` in tools/)
 ```
+Game files import only `lib.zig` (`const lib = @import("../lib.zig"); const
+std = lib.std;`), never another file by path; a new module gets one line
+there. Registry part lists still `@import` their own members. The layer
+order above still holds for what a module may use.
 
 ## Registries
 One module per thing; enum via `std.meta.DeclEnum`, dispatch via

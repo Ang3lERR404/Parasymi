@@ -1,10 +1,11 @@
 //! looking out of the wolf's eyes: a small lit seed at the middle of the
 //! screen, in a soft glow, marking what a click lands on.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const play = @import("../play.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
+const play = lib.play;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
 
 const seed_r:f32 = 4;
 const glow_r:f32 = 14;

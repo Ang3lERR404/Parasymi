@@ -4,9 +4,11 @@
 //! one only turns where it hangs. Its facing changes at once; how it gets
 //! there is timed from when it began (`Turn.at`, game seconds), so nothing
 //! ticks it.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const testing = std.testing;
-const m = @import("engine").core.math;
+const engine = lib.engine;
+const m = engine.core.math;
 
 /// how long one turn takes (s), rooted and floating
 pub const TIME:f32 = 1.5;

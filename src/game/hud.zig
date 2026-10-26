@@ -6,13 +6,14 @@
 //!   visible(g) bool              (optional; always drawn when absent)
 //! Panels draw in declaration order, so later ones sit on top. A new panel is
 //! one new file plus one line in `panels`.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const eqlDeep = std.meta.eql;
-const registry = @import("engine").core.registry;
-const play = @import("play.zig");
-const prog = @import("progression.zig");
-const opt = @import("options.zig");
+const registry = lib.engine.core.registry;
+const play = lib.play;
+const prog = lib.progression;
+const opt = lib.options;
 
 /// what a click on the HUD lands on: a research node, a weave recipe, a
 /// belly slot, a hotbar slot, a slot of the open structure, a recipe it may

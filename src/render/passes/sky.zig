@@ -1,8 +1,9 @@
 //! sky: the dome behind everything, drawn first as one full-screen triangle
 //! without depth (the world draws over it). No vertex data.
-const vk = @import("engine").vk;
+const lib = @import("../../lib.zig");
+const vk = lib.engine.vk;
 const pass = R.pass;
-const R = @import("../renderer.zig");
+const R = lib.renderer;
 
 pub const desc:pass.Desc = .{
   .vert = @embedFile("sky.vert"), .frag = @embedFile("sky.frag"),

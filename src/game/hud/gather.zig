@@ -1,11 +1,12 @@
 //! gathering progress grows a tendril above the wolf's focus.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const play = @import("../play.zig");
-const actions = @import("../actions.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const m = @import("engine").core.math;
+const play = lib.play;
+const actions = lib.actions;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const m = lib.engine.core.math;
 
 const tendril_w:f32 = 120;
 const tendril_h = s.bar_h_bold;

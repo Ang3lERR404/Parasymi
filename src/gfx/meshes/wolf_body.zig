@@ -14,16 +14,18 @@
 //!
 //! The pectorals, the rear, the ears and the belly are their own skinned
 //! meshes (translucent sap and resin, sprung by the rig).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const kit = @import("wolf_kit.zig");
-const sculpt = @import("engine").gfx.sculpt;
-const skel = @import("wolf_skeleton.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const kit = lib.wolf_kit;
+const sculpt = engine.gfx.sculpt;
+const skel = lib.skeleton;
 
 const V3 = m.V3;
 const v3 = m.v3;

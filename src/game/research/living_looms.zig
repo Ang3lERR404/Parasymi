@@ -1,7 +1,8 @@
 //! LIVING LOOMS: the symbiotes lend their weaving to the garden: loomferns,
 //! which weave fibre by themselves, and gathering crowns, which root out to
 //! every plant round them and gather what is ripe.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

@@ -5,7 +5,8 @@
 //! round it, a structure keeps the world's resource nodes, which it may
 //! work), and the renderer builds only the meshes it draws (`only`). Not
 //! part of play: it sets the thing's state itself.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const stringToEnum = std.meta.stringToEnum;
 const parseFloat = std.fmt.parseFloat;
@@ -14,20 +15,21 @@ const eql = std.mem.eql;
 const values = std.enums.values;
 const indexOfScalar = std.mem.indexOfScalar;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const ck = @import("../world/chunk.zig");
-const species = @import("../sim/species.zig");
-const items = @import("../sim/items.zig");
-const meshlib = @import("../gfx/meshlib.zig");
-const meshgen = @import("../gfx/meshgen.zig");
-const renderer = @import("../render/renderer.zig");
-const st = @import("structures.zig");
-const prog = @import("progression.zig");
-const resources = @import("resources.zig");
-const Parts = @import("parts.zig").Parts;
-const play = @import("play.zig");
-const actions = @import("actions.zig");
-const turn = @import("../sim/turn.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const ck = lib.ck;
+const species = lib.species;
+const items = lib.items;
+const meshlib = lib.meshlib;
+const meshgen = lib.meshgen;
+const renderer = lib.renderer;
+const st = lib.structures;
+const prog = lib.progression;
+const resources = lib.resources;
+const Parts = lib.parts.Parts;
+const play = lib.play;
+const actions = lib.actions;
+const turn = lib.turn;
 const Game = play.Game;
 
 /// a loop's animation runs `period` seconds, then holds its end this long

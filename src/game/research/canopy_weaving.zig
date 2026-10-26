@@ -1,6 +1,7 @@
 //! CANOPY WEAVING: Hollowhearts, the first plants larger than a tile.
-const prog = @import("../progression.zig");
-const species = @import("../../sim/species.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const species = lib.species;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

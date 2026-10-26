@@ -6,11 +6,13 @@
 //! faint haze, soft streaks swelling from sender to receiver and tiny
 //! drifting motes, the rainbow running from one end to the other. Part
 //! `.thread`. Listed last: it blends over everything.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
 
 const v3 = m.v3;
 

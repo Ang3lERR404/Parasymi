@@ -3,12 +3,14 @@
 //! four long, needle-thin rays crossing through it like the glint of a star.
 //! All of it glows (the instance's glow); the view turns it slowly and lets
 //! it twinkle.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const kit = @import("mineral_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const kit = lib.mineral_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

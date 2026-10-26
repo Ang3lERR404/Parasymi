@@ -2,12 +2,13 @@
 //! thread of light: a gold core in a star of five dusk-violet rays, two
 //! dusky leaves floating free beneath it, and starlight falling to it from
 //! the star that feeds it (it needs radiance).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const items = @import("../../sim/items.zig");
-const icon_kit = @import("../icon.zig");
-const Color = @import("engine").ui.draw.Color;
+const m = lib.engine.core.math;
+const items = lib.items;
+const icon_kit = lib.icon;
+const Color = lib.engine.ui.draw.Color;
 
 pub const item:items.Item = .seed_vesper;
 

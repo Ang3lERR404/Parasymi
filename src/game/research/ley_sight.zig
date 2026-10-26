@@ -1,5 +1,6 @@
 //! LEY SIGHT: the ley currents beneath the ground become visible.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

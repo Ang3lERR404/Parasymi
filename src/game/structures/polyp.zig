@@ -9,20 +9,21 @@
 //! the polyp, with a flash of light. The polyp is left as it was. While the
 //! halo forms, its ring is already a field of celestial energy (see
 //! `halo.zig`).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const species = @import("../../sim/species.zig");
-const Field = @import("../../sim/ecology.zig").Field;
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const halo = @import("halo.zig");
+const m = lib.engine.core.math;
+const species = lib.species;
+const Field = lib.ecology.Field;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const halo = lib.halo_structure;
 
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes = .{ .halo_diamond, .halo_flash, .halo_projection, .halo_ring };
@@ -112,10 +113,10 @@ pub fn describe(s:*const st.Structure, d:*Draw, _:*const prog.Progression, x:f32
 test "four grown blooms on a polyp's points form a halo; the diamond it leaves powers further and can be studied" {
   const testing = std.testing;
   const gpa = testing.allocator;
-  const ck = @import("../../world/chunk.zig");
-  const World = @import("../../world/world.zig").World;
-  const Plants = @import("../../sim/plants.zig").Plants;
-  const Ecology = @import("../../sim/ecology.zig").Ecology;
+  const ck = lib.ck;
+  const World = lib.world.World;
+  const Plants = lib.plants.Plants;
+  const Ecology = lib.ecology.Ecology;
   var w = World.init(gpa, 5);
   defer w.deinit();
   try w.stream(.{ .x = 0, .y = 0 }, 1, 100);

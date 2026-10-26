@@ -1,10 +1,11 @@
 //! terrain: one draw per resident chunk mesh (built by renderer.syncWorld).
-const vk = @import("engine").vk;
-const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("engine").gfx.pipeline;
+const lib = @import("../../lib.zig");
+const vk = lib.engine.vk;
+const vertex = lib.vertex;
+const pipeline = lib.engine.gfx.pipeline;
 const pass = R.pass;
-const R = @import("../renderer.zig");
-const m = @import("engine").core.math;
+const R = lib.renderer;
+const m = lib.engine.core.math;
 
 pub const desc:pass.Desc = .{
   .vert = @embedFile("terrain.vert"), .frag = @embedFile("terrain.frag"),

@@ -13,16 +13,18 @@
 //! the soil, pale roots. On a structure every piece grows on its growth
 //! splines (gfx/growth.zig); a plant grows by tu.x and its cage parts as
 //! it matures (plant.vert: tu.y how far each strand has parted).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
-const growth = @import("../growth.zig");
-const vertex = @import("../vertex.zig");
-const species = @import("../../sim/species.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
+const growth = lib.growth;
+const vertex = lib.vertex;
+const species = lib.species;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

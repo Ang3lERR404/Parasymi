@@ -1,18 +1,19 @@
 //! the sap belly (Tab): the wolf's inventory, and the weave list below it.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
-const play = @import("../play.zig");
-const player_mod = @import("../player.zig");
-const prog = @import("../progression.zig");
-const craft = @import("../craft.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
-const m = @import("engine").core.math;
-const icon = @import("../icon.zig");
-const items = @import("../../sim/items.zig");
-const hud = @import("../hud.zig");
+const play = lib.play;
+const player_mod = lib.player;
+const prog = lib.progression;
+const craft = lib.craft;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
+const m = lib.engine.core.math;
+const icon = lib.icon;
+const items = lib.items;
+const hud = lib.hud;
 
 pub const cols = 6;
 const rows = player_mod.SLOTS / cols;

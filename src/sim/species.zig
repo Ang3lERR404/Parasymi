@@ -4,10 +4,12 @@
 //! which parents it was spliced from.
 //!
 //! A new species is one new file plus one line in `parts`.
-const items = @import("items.zig");
-const color = @import("engine").core.color;
-const m = @import("engine").core.math;
-const registry = @import("engine").core.registry;
+const lib = @import("../lib.zig");
+const items = lib.items;
+const engine = lib.engine;
+const color = engine.core.color;
+const m = engine.core.math;
+const registry = engine.core.registry;
 
 const parts = struct {
   pub const lumenroot = @import("species/lumenroot.zig");

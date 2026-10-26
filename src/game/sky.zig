@@ -1,11 +1,13 @@
 //! day/night cycle and starfall. At night starlight motes drift down near the
 //! player and hover over the ground until dawn burns them away.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const Rng = @import("engine").core.rng.Rng;
-const World = @import("../world/world.zig").World;
-const txt = @import("text.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const Rng = engine.core.rng.Rng;
+const World = lib.world.World;
+const txt = lib.txt;
 
 /// seconds per full day/night cycle
 pub const DAY_LEN:f32 = 300;

@@ -1,7 +1,8 @@
 //! SEED SPLICING: germinators weave Vesper seeds, spliced from both lineages.
 //! Needs both lineages studied, and their convergence witnessed.
-const prog = @import("../progression.zig");
-const species = @import("../../sim/species.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const species = lib.species;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

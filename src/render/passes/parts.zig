@@ -1,18 +1,19 @@
 //! parts: library meshes (the wolf, nodes, motes, structures), one
 //! instanced draw per mesh with a per-instance transform (or, for beams,
 //! motes and the skinned wolf, the parameters part.vert places them by).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const sliceAsBytes = std.mem.sliceAsBytes;
-const vk = @import("engine").vk;
-const m = @import("engine").core.math;
-const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("engine").gfx.pipeline;
-const meshlib = @import("../../gfx/meshlib.zig");
-const ctx = @import("engine").gfx.ctx;
+const vk = lib.engine.vk;
+const m = lib.engine.core.math;
+const vertex = lib.vertex;
+const pipeline = lib.engine.gfx.pipeline;
+const meshlib = lib.meshlib;
+const ctx = lib.engine.gfx.ctx;
 const Ctx = ctx.Ctx;
-const Buffer = @import("engine").gfx.buffer.Buffer;
+const Buffer = lib.engine.gfx.buffer.Buffer;
 const pass = R.pass;
-const R = @import("../renderer.zig");
+const R = lib.renderer;
 
 pub const MAX = 1 << 15;
 /// skinned parts' bones a frame can hold
@@ -98,7 +99,7 @@ pub const glass = struct {
 /// under SHADOW)
 pub const shadow = struct {
   pub const desc:pass.Desc = .{
-    .vert = @embedFile("part_shadow.vert"), .frag = @import("engine").shadow_frag,
+    .vert = @embedFile("part_shadow.vert"), .frag = lib.engine.shadow_frag,
     .bindings = bindings, .attrs = attrs, .target = .shadow,
   };
   pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, _:*const R.Scene, stats:*R.Stats) void {

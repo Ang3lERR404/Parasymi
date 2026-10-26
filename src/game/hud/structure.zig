@@ -1,18 +1,19 @@
 //! a structure's panel (a click on one that keeps items): its slots beside
 //! the belly's, lifted and put down between them as in the belly, and the
 //! weaves it may be set to (a germinator's `recipes`).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const assert = std.debug.assert;
-const m = @import("engine").core.math;
-const play = @import("../play.zig");
-const st = @import("../structures.zig");
-const craft = @import("../craft.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
-const icon = @import("../icon.zig");
-const belly = @import("belly.zig");
+const m = lib.engine.core.math;
+const play = lib.play;
+const st = lib.structures;
+const craft = lib.craft;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
+const icon = lib.icon;
+const belly = lib.hud_belly;
 
 /// its slots, this many across (the belly's grid sits to their right)
 const cols = 4;

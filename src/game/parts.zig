@@ -1,10 +1,11 @@
 //! per-frame collector of rigid part instances, grouped by library mesh.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const meshlib = @import("../gfx/meshlib.zig");
-const mg = @import("../gfx/meshgen.zig");
-const vertex = @import("../gfx/vertex.zig");
+const m = lib.engine.core.math;
+const meshlib = lib.meshlib;
+const mg = lib.meshgen;
+const vertex = lib.vertex;
 const PartInstance = vertex.PartInstance;
 
 /// how part.vert places an instance (`PartInstance.e.x`): by its matrix,

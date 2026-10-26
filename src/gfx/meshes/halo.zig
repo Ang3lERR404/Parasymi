@@ -3,13 +3,15 @@
 //! shards (radiant_kit: never grown), and the light it throws, its ring,
 //! the projection that makes it and the flash it forms with. The light is
 //! the halo's own and forms on the GPU as it does.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const radiant = @import("radiant_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const radiant = lib.radiant_kit;
 
 const v3 = m.v3;
 

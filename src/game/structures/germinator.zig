@@ -7,24 +7,25 @@
 //! from into its core of sap, which spins them into a whirl round its
 //! spindle (centrifuging them) and winds a seed of them on it (spindling),
 //! all of it following how far the weave has come.
-const std = @import("std");
-const m = @import("engine").core.math;
+const lib = @import("../../lib.zig");
+const std = lib.std;
+const m = lib.engine.core.math;
 const indexOfScalar = std.mem.indexOfScalar;
 const Allocator = std.mem.Allocator;
-const items = @import("../../sim/items.zig");
-const color = @import("engine").core.color;
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const craft = @import("../craft.zig");
-const style = @import("../style.zig");
-const Parts = @import("../parts.zig").Parts;
-const Look = @import("../parts.zig").Look;
-const mesh = @import("../../gfx/meshes/germinator.zig");
-const growth = @import("../../gfx/growth.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
+const items = lib.items;
+const color = lib.engine.core.color;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const craft = lib.craft;
+const style = lib.style;
+const Parts = lib.parts.Parts;
+const Look = lib.parts.Look;
+const mesh = lib.germinator;
+const growth = lib.growth;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
 
 const V3 = m.V3;
 const v3 = m.v3;

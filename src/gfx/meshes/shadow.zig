@@ -1,11 +1,13 @@
 //! mesh: SHADOW. a flat unit disc on the ground (y = 0), part `.shadow`,
 //! tu.x its radial fraction so the shader can soften its edge. Laid under
 //! things that float, so they read as hanging in the air.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const color = @import("engine").core.color;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const color = engine.core.color;
 
 const RINGS = 4;
 const STEPS = 16;

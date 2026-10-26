@@ -15,7 +15,7 @@
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
 //! still follows the game's binding).
-const std = @import("std");
+const std = ps.std;
 const Allocator = std.mem.Allocator;
 const Io = std.Io;
 const Dir = Io.Dir;
@@ -30,7 +30,7 @@ const parseFloat = std.fmt.parseFloat;
 const bufPrint = std.fmt.bufPrint;
 const log = std.log;
 const testing = std.testing;
-const engine = @import("engine");
+const engine = ps.engine;
 const glfw = engine.glfw;
 const m = engine.core.math;
 const color = engine.core.color;

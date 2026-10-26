@@ -1,12 +1,13 @@
 //! THORNLEECH seed: a pale twisted stalk with a bulb and fronds curling
 //! round it, a bead of red sap drawn into it from a green leaf beside it
 //! (it drains its neighbours).
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const items = @import("../../sim/items.zig");
-const icon_kit = @import("../icon.zig");
-const Color = @import("engine").ui.draw.Color;
+const m = lib.engine.core.math;
+const items = lib.items;
+const icon_kit = lib.icon;
+const Color = lib.engine.ui.draw.Color;
 
 pub const item:items.Item = .seed_thornleech;
 

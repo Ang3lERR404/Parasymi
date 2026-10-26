@@ -1,11 +1,12 @@
 //! the free camera's reminder: a small glowing tendril by the top-left with
 //! how to get back.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const play = @import("../play.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
+const play = lib.play;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
 
 const ox:f32 = 344;
 const oy:f32 = 46;

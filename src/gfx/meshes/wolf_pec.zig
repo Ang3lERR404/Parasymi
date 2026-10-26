@@ -15,14 +15,16 @@
 //! and breathes with it. Built once per side (`left` /
 //! `right`), mirrored, not flipped by an instance, so normals and facing
 //! stay true.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const skel = @import("wolf_skeleton.zig");
-const kit = @import("wolf_kit.zig");
-const body = @import("wolf_body.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const skel = lib.skeleton;
+const kit = lib.wolf_kit;
+const body = lib.wolf_body;
 
 const V3 = m.V3;
 const v3 = m.v3;

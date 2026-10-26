@@ -9,17 +9,19 @@
 //! the clutch roots climb out of the soil round it with the stem, closing
 //! over the gourd, the soil heaving where they break it and their leaves
 //! unfolding as they pass, the tuft last.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const kit = @import("structure_kit.zig");
-const conduit = @import("conduit.zig");
-const growth = @import("../growth.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const kit = lib.structure_kit;
+const conduit = lib.conduit;
+const growth = lib.growth;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

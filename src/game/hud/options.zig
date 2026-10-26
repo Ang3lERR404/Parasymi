@@ -2,15 +2,16 @@
 //! the veil. Each setting is a row, its value held between two leaves; a
 //! click turns it on, the other button turns it back. BACK (or Esc) returns
 //! to the pause menu.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const fields = std.meta.fields;
-const m = @import("engine").core.math;
-const play = @import("../play.zig");
-const opt = @import("../options.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
+const m = lib.engine.core.math;
+const play = lib.play;
+const opt = lib.options;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
 
 const pw:f32 = 620;
 const header_h:f32 = 104;

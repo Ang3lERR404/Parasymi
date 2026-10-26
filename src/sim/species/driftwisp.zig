@@ -1,8 +1,10 @@
 //! DRIFTWISP: a floater that occupies no tile: a sap float holding up a
 //! catcher dish, filaments trailing beneath. Drinks the night sky instead
 //! of the ley and condenses it into starlight.
-const species = @import("../species.zig");
-const color = @import("engine").core.color;
+const lib = @import("../../lib.zig");
+const species = lib.species;
+const engine = lib.engine;
+const color = engine.core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_driftwisp, .floating = true, .yields = .starlight,

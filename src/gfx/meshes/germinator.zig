@@ -11,15 +11,17 @@
 //! roots spreading, the foot leaves unfolding as it passes, then the
 //! boughs, calyx and spindle off its crown, the twigs off the boughs, and
 //! last (`FORM`) the cups and core, which carry that window themselves.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const kit = @import("structure_kit.zig");
-const color = @import("engine").core.color;
-const Rng = @import("engine").core.rng.Rng;
-const growth = @import("../growth.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const kit = lib.structure_kit;
+const color = engine.core.color;
+const Rng = engine.core.rng.Rng;
+const growth = lib.growth;
 
 const V3 = m.V3;
 const v3 = m.v3;

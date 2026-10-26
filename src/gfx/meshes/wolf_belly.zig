@@ -14,17 +14,19 @@
 //! at the belly button, `crossing`). The belly button is sap like the sac,
 //! a knot with a puckered ring round it, its vertices tu.y = NAVEL: the
 //! shader raises it from inside the sap to the surface, and on out.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const kit = @import("wolf_kit.zig");
-const color = @import("engine").core.color;
-const vertex = @import("../vertex.zig");
-const skel = @import("wolf_skeleton.zig");
-const Sculpt = @import("engine").gfx.sculpt.Sculpt;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const kit = lib.wolf_kit;
+const color = engine.core.color;
+const vertex = lib.vertex;
+const skel = lib.skeleton;
+const Sculpt = engine.gfx.sculpt.Sculpt;
 
 const V3 = m.V3;
 const v3 = m.v3;

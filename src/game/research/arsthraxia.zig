@@ -2,7 +2,8 @@
 //! every arsthraxia condenses faster, fed or not, and vines climb its
 //! stems. The minor studies along it each grow the arsthraxias (an
 //! offshoot, another satellite sap).
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

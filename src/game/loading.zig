@@ -3,17 +3,18 @@
 //! as it passes them, under it what is being made and how much is made and
 //! left. Shown while the meshes grow (on their own thread), the world wakes
 //! and its ground is meshed; then it fades off the first frames of play.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const renderer = @import("../render/renderer.zig");
-const Camera = @import("engine").render.camera.Camera;
-const draw_mod = @import("engine").ui.draw;
+const m = lib.engine.core.math;
+const renderer = lib.renderer;
+const Camera = lib.engine.render.camera.Camera;
+const draw_mod = lib.engine.ui.draw;
 const Draw = draw_mod.Draw;
 const Color = draw_mod.Color;
-const Sky = @import("sky.zig").Sky;
-const s = @import("style.zig");
-const txt = @import("text.zig");
+const Sky = lib.sky.Sky;
+const s = lib.style;
+const txt = lib.txt;
 
 /// what is being made, in order (`txt.s.loading.stages` names each)
 pub const Stage = enum { forms, world, ground };

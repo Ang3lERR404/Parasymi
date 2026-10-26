@@ -1,9 +1,11 @@
 //! shared look for library meshes: the vine-wolf palette (woody cores, living
 //! vines, leaves, amber sap) and a per-mesh deterministic random stream.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Wyhash = std.hash.Wyhash;
-const Rng = @import("engine").core.rng.Rng;
-const color = @import("engine").core.color;
+const engine = lib.engine;
+const Rng = engine.core.rng.Rng;
+const color = engine.core.color;
 
 pub const core = color.rgb(0.20, 0.26, 0.13).toRgba8(255);
 pub const vine = color.rgb(0.36, 0.58, 0.24).toRgba8(255);

@@ -4,17 +4,18 @@
 //! shot is taken the game closes. For looking at visual work unattended.
 //! `eyes` looks out of the wolf's own eyes instead, turning round where it
 //! stands, `--pitch` down.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const stringToEnum = std.meta.stringToEnum;
 const parseInt = std.fmt.parseInt;
 const indexOfScalar = std.mem.indexOfScalar;
 const bufPrint = std.fmt.bufPrint;
 const eql = std.mem.eql;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const species = @import("../sim/species.zig");
-const st = @import("structures.zig");
-const play = @import("play.zig");
+const m = lib.engine.core.math;
+const species = lib.species;
+const st = lib.structures;
+const play = lib.play;
 const Game = play.Game;
 
 /// the point looked at sits this far above a thing's ground (the wolf's

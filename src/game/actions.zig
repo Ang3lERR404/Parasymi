@@ -2,19 +2,20 @@
 //! take from structures, interact with them, harvest, uproot, turn what
 //! stands, pick up the seed of what stands, catch starlight. Each action works
 //! on the Game and reports through the progression log.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const indexOfScalar = std.mem.indexOfScalar;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const ck = @import("../world/chunk.zig");
-const species = @import("../sim/species.zig");
-const items = @import("../sim/items.zig");
-const craft = @import("craft.zig");
-const st = @import("structures.zig");
-const resources = @import("resources.zig");
-const play = @import("play.zig");
-const txt = @import("text.zig");
+const m = lib.engine.core.math;
+const ck = lib.ck;
+const species = lib.species;
+const items = lib.items;
+const craft = lib.craft;
+const st = lib.structures;
+const resources = lib.resources;
+const play = lib.play;
+const txt = lib.txt;
 
 const Game = play.Game;
 

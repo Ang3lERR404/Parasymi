@@ -14,15 +14,17 @@
 //! the stem climbs through it while the basket's vines wind up round it,
 //! the collar binds at the neck and the vines sprout from it; last (`FORM`)
 //! the lid closes over the mouth.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const kit = @import("structure_kit.zig");
-const growth = @import("../growth.zig");
-const Rng = @import("engine").core.rng.Rng;
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const kit = lib.structure_kit;
+const growth = lib.growth;
+const Rng = engine.core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

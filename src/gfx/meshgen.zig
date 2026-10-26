@@ -1,21 +1,22 @@
 //! the garden's meshes: every plant grown from its species genome out of the
 //! engine's primitives (engine gfx/meshgen.zig: tubes, lofts, vines, braids)
 //! and the garden's own (blades, laminae, petals, stamens, flowers).
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const engine = @import("engine");
+const engine = lib.engine;
 const m = engine.core.math;
-const Rng = @import("engine").core.rng.Rng;
-const vertex = @import("vertex.zig");
-const species = @import("../sim/species.zig");
-const color = @import("engine").core.color;
-const noise = @import("engine").core.noise;
-const parasite_kit = @import("meshes/parasite_kit.zig");
-const convergence_kit = @import("meshes/convergence_kit.zig");
-const radiant_kit = @import("meshes/radiant_kit.zig");
-const structure_kit = @import("meshes/structure_kit.zig");
+const Rng = engine.core.rng.Rng;
+const vertex = lib.vertex;
+const species = lib.species;
+const color = engine.core.color;
+const noise = engine.core.noise;
+const parasite_kit = lib.parasite_kit;
+const convergence_kit = lib.convergence_kit;
+const radiant_kit = lib.radiant_kit;
+const structure_kit = lib.structure_kit;
 
 const V3 = m.V3;
 const PV = vertex.Mesh;

@@ -9,12 +9,14 @@
 //! roots spread with it, the stalk rises, its sacs swell as it passes,
 //! the sac swells out of its top, the pore purses and the fronds flare
 //! last, all at once, their pods after them.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const growth = @import("../growth.zig");
-const pk = @import("parasite_kit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const growth = lib.growth;
+const pk = lib.parasite_kit;
 
 const V3 = m.V3;
 const v3 = m.v3;

@@ -1,7 +1,8 @@
 //! GPU vertex/instance layouts. Pipelines derive their attribute descriptions
 //! from these (gfx/pipeline.zig), and the GLSL `layout(location=..)` must match
 //! field order.
-const engine = @import("engine");
+const lib = @import("../lib.zig");
+const engine = lib.engine;
 const color = engine.core.color;
 const ev = engine.gfx.vertex;
 

@@ -1,7 +1,9 @@
 //! the garden's chunk: a 32x32 block of tiles (engine world/chunk.zig),
 //! stored as struct-of-arrays so hot loops stay linear.
-const m = @import("engine").core.math;
-const grid = @import("engine").world.chunk;
+const lib = @import("../lib.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const grid = engine.world.chunk;
 
 pub const SIZE = grid.SIZE;
 pub const N = grid.N;

@@ -2,7 +2,8 @@
 //! draw the mineral nodes all round them into a crystal and sap it away as
 //! grit, and ganglia, which hand what they are fed on to whatever round
 //! them wants it.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

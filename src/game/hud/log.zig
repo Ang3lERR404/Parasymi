@@ -1,11 +1,12 @@
 //! recent messages (newest first, fading) and the control hint line.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const play = @import("../play.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const s = @import("../style.zig");
-const txt = @import("../text.zig");
+const m = lib.engine.core.math;
+const play = lib.play;
+const Draw = lib.engine.ui.draw.Draw;
+const s = lib.style;
+const txt = lib.txt;
 
 const line_h:f32 = 22;
 const start_y:f32 = 160;

@@ -7,14 +7,16 @@
 //! (the test fails on a seed without one).
 // decision: the icons live here, not in sim/species, since sim may not
 // import the HUD's icon kit (layers import only downward)
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const registry = @import("engine").core.registry;
-const items = @import("../sim/items.zig");
-const species = @import("../sim/species.zig");
-const Color = @import("engine").ui.draw.Color;
-const icon_kit = @import("icon.zig");
+const engine = lib.engine;
+const registry = engine.core.registry;
+const items = lib.items;
+const species = lib.species;
+const Color = engine.ui.draw.Color;
+const icon_kit = lib.icon;
 
 const kinds = struct {
   pub const lumenroot = @import("seeds/lumenroot.zig");

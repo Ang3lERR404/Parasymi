@@ -1,10 +1,11 @@
 //! what each kind of ground offers: the item gathered from its resource
 //! nodes and how those nodes look. One table, keyed by tile kind.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const EnumArray = std.enums.EnumArray;
-const ck = @import("../world/chunk.zig");
-const items = @import("../sim/items.zig");
-const meshlib = @import("../gfx/meshlib.zig");
+const ck = lib.ck;
+const items = lib.items;
+const meshlib = lib.meshlib;
 
 pub const Node = struct {
   item:items.Item,

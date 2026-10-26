@@ -1,7 +1,8 @@
 //! SHARED NERVES: what a gathering crown and a ganglion make between them,
 //! grown side by side: Vultrixi, floaters tethered to a monfris that
 //! reach into the structures round them and pull out what it needs.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

@@ -3,16 +3,17 @@
 //! sprout or two showing what it will grow into (the structure's `icon`
 //! hook, or its module in `seeds.zig`, drawn with the kit below); anything
 //! else is its colour, for now.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const items = @import("../sim/items.zig");
-const st = @import("structures.zig");
-const seeds = @import("seeds.zig");
-const s = @import("style.zig");
-const txt = @import("text.zig");
+const m = lib.engine.core.math;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const items = lib.items;
+const st = lib.structures;
+const seeds = lib.seeds;
+const s = lib.style;
+const txt = lib.txt;
 
 /// a point in icon units: x right, y up, origin at the slot's centre, 1 = its radius.
 pub const P = [2]f32;

@@ -1,12 +1,13 @@
 //! plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
-const vk = @import("engine").vk;
-const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("engine").gfx.pipeline;
-const ctx = @import("engine").gfx.ctx;
+const lib = @import("../../lib.zig");
+const vk = lib.engine.vk;
+const vertex = lib.vertex;
+const pipeline = lib.engine.gfx.pipeline;
+const ctx = lib.engine.gfx.ctx;
 const Ctx = ctx.Ctx;
-const Buffer = @import("engine").gfx.buffer.Buffer;
+const Buffer = lib.engine.gfx.buffer.Buffer;
 const pass = R.pass;
-const R = @import("../renderer.zig");
+const R = lib.renderer;
 
 pub const MAX = 1 << 16;
 
@@ -77,7 +78,7 @@ pub const glass = struct {
 /// is light itself or clear sap casts none; plant.vert under SHADOW)
 pub const shadow = struct {
   pub const desc:pass.Desc = .{
-    .vert = @embedFile("plant_shadow.vert"), .frag = @import("engine").shadow_frag,
+    .vert = @embedFile("plant_shadow.vert"), .frag = lib.engine.shadow_frag,
     .bindings = bindings, .attrs = attrs, .target = .shadow,
   };
   pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {

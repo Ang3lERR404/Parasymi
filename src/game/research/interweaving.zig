@@ -1,7 +1,8 @@
 //! INTERWEAVING: what a weftstone and a driftbraid make between them,
 //! grown side by side: monfris, 2x2 trees of both lineages that weave
 //! the advanced tier, fed by the Vultrixi tethered to them.
-const prog = @import("../progression.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

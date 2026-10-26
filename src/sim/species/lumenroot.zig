@@ -3,8 +3,10 @@
 //! lineage's (gfx/meshes/structure_kit.zig `plant`): a braided stem on a
 //! mat of braided roots, a leaf rosette, a vine twining up it, its cyan
 //! bloom opening out of a bead of resin sap.
-const species = @import("../species.zig");
-const color = @import("engine").core.color;
+const lib = @import("../../lib.zig");
+const species = lib.species;
+const engine = lib.engine;
+const color = engine.core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_lumenroot,

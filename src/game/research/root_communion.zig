@@ -1,6 +1,7 @@
 //! ROOT COMMUNION: symbiotic links reach a second ring of neighbours.
-const prog = @import("../progression.zig");
-const ecology = @import("../../sim/ecology.zig");
+const lib = @import("../../lib.zig");
+const prog = lib.progression;
+const ecology = lib.ecology;
 
 pub const def:prog.Research = .{
   .per_unit = &.{

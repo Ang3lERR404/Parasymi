@@ -18,19 +18,21 @@
 //! - gathering, it drops into a deep squat over the node, both paws grip it
 //!   (arms by inverse kinematics) and wrench it back once a unit, and each
 //!   unit that comes loose is pressed into the belly by one paw, in turn.
-const std = @import("std");
+const lib = @import("../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("engine").core.math;
-const noise = @import("engine").core.noise;
-const rig = @import("engine").anim.rig;
-const items = @import("../sim/items.zig");
-const World = @import("../world/world.zig").World;
-const skel = @import("../gfx/meshes/wolf_skeleton.zig");
-const body_mesh = @import("../gfx/meshes/wolf_body.zig");
-const belly_mesh = @import("../gfx/meshes/wolf_belly.zig");
-const meshlib = @import("../gfx/meshlib.zig");
-const parts = @import("parts.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const noise = engine.core.noise;
+const rig = engine.anim.rig;
+const items = lib.items;
+const World = lib.world.World;
+const skel = lib.skeleton;
+const body_mesh = lib.wolf_body;
+const belly_mesh = lib.wolf_belly;
+const meshlib = lib.meshlib;
+const parts = lib.parts;
 const Parts = parts.Parts;
 
 pub const SLOTS = 24;

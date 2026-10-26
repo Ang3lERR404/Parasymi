@@ -10,15 +10,17 @@
 //! of a straight one, its preview.
 //! Every piece grows along one growth spline per arch, the same in each
 //! (gfx/growth.zig): the cores and weave dig on together.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const m = @import("engine").core.math;
-const mg = @import("../meshgen.zig");
-const pal = @import("palette.zig");
-const color = @import("engine").core.color;
-const noise = @import("engine").core.noise;
-const growth = @import("../growth.zig");
-const conduit = @import("conduit.zig");
+const engine = lib.engine;
+const m = engine.core.math;
+const mg = lib.meshgen;
+const pal = lib.palette;
+const color = engine.core.color;
+const noise = engine.core.noise;
+const growth = lib.growth;
+const conduit = lib.conduit;
 
 const V3 = m.V3;
 

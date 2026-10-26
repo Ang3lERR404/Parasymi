@@ -1,22 +1,23 @@
 //! SAP CACHE: plain storage. Takes anything, gives anything. What goes in
 //! drops in through the lid at its mouth, which opens for it, and hangs in
 //! the resin; what comes out rises out the same way.
-const std = @import("std");
+const lib = @import("../../lib.zig");
+const std = lib.std;
 const Allocator = std.mem.Allocator;
-const items = @import("../../sim/items.zig");
-const st = @import("../structures.zig");
-const icon_kit = @import("../icon.zig");
-const txt = @import("../text.zig");
-const prog = @import("../progression.zig");
-const style = @import("../style.zig");
-const Draw = @import("engine").ui.draw.Draw;
-const Color = @import("engine").ui.draw.Color;
-const m = @import("engine").core.math;
-const color = @import("engine").core.color;
-const Parts = @import("../parts.zig").Parts;
-const Look = @import("../parts.zig").Look;
-const growth = @import("../../gfx/growth.zig");
-const pod = @import("../../gfx/meshes/sap_cache.zig");
+const items = lib.items;
+const st = lib.structures;
+const icon_kit = lib.icon;
+const txt = lib.txt;
+const prog = lib.progression;
+const style = lib.style;
+const Draw = lib.engine.ui.draw.Draw;
+const Color = lib.engine.ui.draw.Color;
+const m = lib.engine.core.math;
+const color = lib.engine.core.color;
+const Parts = lib.parts.Parts;
+const Look = lib.parts.Look;
+const growth = lib.growth;
+const pod = lib.sap_cache;
 
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes = .{ .belly_lump, .item_pod, .sap_cache_lid };

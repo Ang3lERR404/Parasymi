@@ -1,6 +1,15 @@
-//! the game's modules, for the tools built beside it (tools/animedit.zig, tools/meshedit.zig):
-//! they reach them as `@import("parasymi")`; the game itself starts from
-//! main.zig.
+//! the import hub: every game file reaches std, the engine and every other
+//! game module through here (`const lib = @import("../lib.zig")`), never by
+//! path; only registry part lists import their own members. The tools reach
+//! it as `@import("parasymi")`; the game itself starts from main.zig.
+pub const std = @import("std");
+pub const engine = @import("engine");
+pub const items = @import("sim/items.zig");
+pub const plants = @import("sim/plants.zig");
+pub const turn = @import("sim/turn.zig");
+pub const ck = @import("world/chunk.zig");
+pub const gen = @import("world/gen.zig");
+pub const world = @import("world/world.zig");
 pub const play = @import("game/play.zig");
 pub const view = @import("game/view.zig");
 pub const player = @import("game/player.zig");
@@ -19,3 +28,48 @@ pub const parts = @import("game/parts.zig");
 pub const meshgen = @import("gfx/meshgen.zig");
 pub const meshlib = @import("gfx/meshlib.zig");
 pub const vertex = @import("gfx/vertex.zig");
+pub const actions = @import("game/actions.zig");
+pub const convergence = @import("game/convergence.zig");
+pub const craft = @import("game/craft.zig");
+pub const hud = @import("game/hud.zig");
+pub const hud_belly = @import("game/hud/belly.zig");
+pub const icon = @import("game/icon.zig");
+pub const orbit = @import("game/orbit.zig");
+pub const progression = @import("game/progression.zig");
+pub const resources = @import("game/resources.zig");
+pub const save = @import("game/save.zig");
+pub const seeds = @import("game/seeds.zig");
+pub const setups = @import("game/setups.zig");
+pub const sky = @import("game/sky.zig");
+pub const halo_structure = @import("game/structures/halo.zig");
+pub const monfris_structure = @import("game/structures/monfris.zig");
+pub const sporecaster_structure = @import("game/structures/sporecaster.zig");
+pub const growth = @import("gfx/growth.zig");
+pub const arsthraxia = @import("gfx/meshes/arsthraxia.zig");
+pub const braided_conduit = @import("gfx/meshes/braided_conduit.zig");
+pub const conduit = @import("gfx/meshes/conduit.zig");
+pub const convergence_kit = @import("gfx/meshes/convergence_kit.zig");
+pub const driftbraid = @import("gfx/meshes/driftbraid.zig");
+pub const ganglion = @import("gfx/meshes/ganglion.zig");
+pub const gathering_crown = @import("gfx/meshes/gathering_crown.zig");
+pub const germinator = @import("gfx/meshes/germinator.zig");
+pub const lithophage = @import("gfx/meshes/lithophage.zig");
+pub const loomfern = @import("gfx/meshes/loomfern.zig");
+pub const mineral_kit = @import("gfx/meshes/mineral_kit.zig");
+pub const monfris = @import("gfx/meshes/monfris.zig");
+pub const palette = @import("gfx/meshes/palette.zig");
+pub const parasite_kit = @import("gfx/meshes/parasite_kit.zig");
+pub const radiant_kit = @import("gfx/meshes/radiant_kit.zig");
+pub const root_digger = @import("gfx/meshes/root_digger.zig");
+pub const sap_cache = @import("gfx/meshes/sap_cache.zig");
+pub const sporecaster = @import("gfx/meshes/sporecaster.zig");
+pub const structure_kit = @import("gfx/meshes/structure_kit.zig");
+pub const vultrixi = @import("gfx/meshes/vultrixi.zig");
+pub const weftstone = @import("gfx/meshes/weftstone.zig");
+pub const wolf_belly = @import("gfx/meshes/wolf_belly.zig");
+pub const wolf_body = @import("gfx/meshes/wolf_body.zig");
+pub const wolf_kit = @import("gfx/meshes/wolf_kit.zig");
+pub const wolf_pec = @import("gfx/meshes/wolf_pec.zig");
+pub const wolf_rump = @import("gfx/meshes/wolf_rump.zig");
+pub const terrain_mesh = @import("render/terrain_mesh.zig");
+pub const ecology = @import("sim/ecology.zig");
