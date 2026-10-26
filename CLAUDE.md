@@ -80,12 +80,15 @@ zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --
 zig build run -- --panel=<belly|research|paused|options|gardens>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
-zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --shot]
+zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --channel=<name> --shot]
                                   # animation editor (tools/animedit.zig): keys a clip
-                                  # on the real renderer, saves src/anim/<name>.anim
-zig build meshedit -- [--mesh=<name> --shot]
+                                  # on the real renderer, saves src/anim/<name>.anim;
+                                  # wolf joints are clickable, their gizmo keys them
+zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # mesh editor (tools/meshedit.zig): SDF forms melted
-                                  # into one surface beside the wolf, saves src/mesh/<name>.mesh
+                                  # into one surface beside the wolf, saves src/mesh/<name>.mesh;
+                                  # the selected form's gizmo (1/2/3) moves, turns, sizes it
+                                  # (gizmos: tools/gizmo.zig)
 ```
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`

@@ -5,12 +5,15 @@
 //! keeps it as text in `src/mesh/<name>.mesh`. The game does not read
 //! these yet. From the repo root:
 //!   zig build meshedit -- [--mesh=<name>]
-//! (`--shot` saves one frame to `shots/meshedit.png` and closes, for
-//! checking it headless.)
+//! (`--gizmo=move|turn|size` starts the gizmo so; `--shot` saves one frame
+//! to `shots/meshedit.png` and closes, for checking it headless.)
 //! Each form is placed by `pos`, turned by `rot` (degrees, y then x then
 //! z) and sized by `size` (radii; a cone's x and z its radii at its foot
 //! and its tip, y half its length; a box's half extents); `round` rounds a
 //! box, `melt` is how far it melts into what is before it, `col` its colour.
+//! The selected form carries a gizmo (tools/gizmo.zig): `1` moves it
+//! (arrows along each axis, the centre across the view), `2` turns it
+//! (a ring for each of its turns), `3` sizes it (along its own axes).
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
@@ -41,6 +44,7 @@ const Key = engine.platform.input.Key;
 const Draw = engine.ui.draw.Draw;
 const Color = engine.ui.draw.Color;
 const ps = @import("parasymi");
+const gizmo = @import("gizmo.zig");
 const play = ps.play;
 const Game = play.Game;
 const renderer = ps.renderer;
@@ -82,6 +86,10 @@ const DRAG_LEN:f32 = 0.002;
 const DRAG_DEG:f32 = 0.5;
 const DRAG_COL:f32 = 0.004;
 const FINE:f32 = 0.2;
+/// where the gizmo's values start among a form's channels
+const POS = Ch.find("pos.x").?;
+const ROT = Ch.find("rot.x").?;
+const SIZE = Ch.find("size.x").?;
 /// a new form stands this far from the one it was made from
 const NEW_OFF = v3(0.1, 0, 0);
 /// the sculpt stands this far to the wolf's side; the camera looks at this
@@ -105,10 +113,9 @@ const LIST_ROWS = 12;
 const VALUE_X:f32 = 150;
 const LINE_H:f32 = 20;
 const GAP:f32 = 14;
-/// a form's handle in view: its radius, the selected one's, and how near
-/// a click picks it (px)
+/// a form's handle in view (the selected one shows its gizmo instead): its
+/// radius, and how near a click picks it (px)
 const HANDLE_R:f32 = 4;
-const SEL_HANDLE_R:f32 = 7;
 const PICK:f32 = 14;
 /// colours: selected, set, dim, carving, panels
 const SEL:Color = s.gold;
@@ -120,7 +127,7 @@ const PANEL:Color = s.panel;
 const HELP = [_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   tab next form",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save",
-  "middle drag orbit   wheel zoom",
+  "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom",
 };
 
 const Kind = enum { ellipsoid, cone, box };
@@ -227,7 +234,7 @@ const Doc = struct {
   }
 };
 
-const Drag = enum { none, value };
+const Drag = enum { none, value, gizmo };
 
 const Editor = struct {
   gpa:Allocator,
@@ -239,6 +246,10 @@ const Editor = struct {
   ch:usize = 0,
   top:usize = 0,
   drag:Drag = .none,
+  /// what the gizmo does, the handle held, and the one under the mouse
+  mode:gizmo.Mode = .move,
+  part:?gizmo.Part = null,
+  hot:?gizmo.Part = null,
   dirty:bool = false,
   /// the surface wants meshing again, and how long since it last was
   stale:bool = true,
@@ -271,12 +282,56 @@ const Editor = struct {
   }
 
   /// the selected value set to `v`, kept where it makes sense
-  fn set(e:*Editor, v:f32) void {
+  fn set(e:*Editor, v:f32) void { e.setCh(e.ch, v); }
+
+  /// the selected form's value `ch` set to `v`, kept where it makes sense
+  fn setCh(e:*Editor, ch:usize, v:f32) void {
     const p = &e.pieces()[e.sel];
-    const name = Ch.names[e.ch];
+    const name = Ch.names[ch];
     const kept = if (startsWith(u8, name, "size")) @max(SIZE_MIN, v) else if (startsWith(u8, name, "col")) m.clamp01(v) else if (eql(u8, name, "melt") or eql(u8, name, "round")) @max(0, v) else v;
-    Ch.set(&p.v, e.ch, kept);
+    Ch.set(&p.v, ch, kept);
     e.changed();
+  }
+
+  /// the selected form's value `ch` changed by `by`
+  fn nudge(e:*Editor, ch:usize, by:f32) void { e.setCh(ch, Ch.get(&e.pieces()[e.sel].v, ch) + by); }
+
+  /// the selected form's gizmo where it stands (`origin` the sculpt's
+  /// place), none without forms
+  fn gizmoAt(e:*Editor, origin:V3) ?gizmo.Gizmo {
+    if (e.pieces().len == 0) return null;
+    const v = e.pieces()[e.sel].v;
+    const ry = m.rotY(m.rad(v.rot[1]));
+    const rx = m.mul(ry, m.rotX(m.rad(v.rot[0])));
+    const full = m.mul(rx, m.rotZ(m.rad(v.rot[2])));
+    const X = v3(1, 0, 0);
+    const Y = v3(0, 1, 0);
+    const Z = v3(0, 0, 1);
+    return .{ .at = origin + v.pos, .mode = e.mode, .axes = switch (e.mode) {
+      .move => .{ X, Y, Z },
+      // each turn about the axis it turns round: y the world's, x after
+      // y, z after both
+      .turn => .{ m.mulDir(ry, X), Y, m.mulDir(rx, Z) },
+      .size => .{ m.mulDir(full, X), m.mulDir(full, Y), m.mulDir(full, Z) },
+    } };
+  }
+
+  /// a drag of the gizmo's held handle from `from` to `to` (px), `k` of it
+  fn dragGizmo(e:*Editor, g:gizmo.Gizmo, view:gizmo.View, from:[2]f32, to:[2]f32, k:f32) void {
+    const part = e.part orelse return;
+    switch (part) {
+      .free => {
+        const by:[3]f32 = g.across(view, from, to) * m.splat3(k);
+        for (0..3) |i| e.nudge(POS + i, by[i]);
+        e.ch = POS;
+      },
+      .x, .y, .z => {
+        const i = @intFromEnum(part);
+        const by = g.along(view, i, from, to) * k;
+        e.ch = i + switch (e.mode) { .move => POS, .turn => ROT, .size => SIZE };
+        e.nudge(e.ch, if (e.mode == .turn) by / m.rad(1) else by);
+      },
+    }
   }
 
   fn rate(e:*const Editor) f32 {
@@ -285,8 +340,9 @@ const Editor = struct {
   }
 
   /// one frame's keys and mouse; `handles` where each form's handle is on
-  /// screen (null behind the eye)
-  fn handle(e:*Editor, in:*const Input, handles:[]const ?[2]f32) Allocator.Error!void {
+  /// screen (null behind the eye), the gizmo seen through `view` with the
+  /// sculpt at `origin`
+  fn handle(e:*Editor, in:*const Input, handles:[]const ?[2]f32, view:gizmo.View, origin:V3) Allocator.Error!void {
     const shift = in.down(.{ .key = .left_shift }) or in.down(.{ .key = .right_shift });
     const ctrl = in.down(.{ .key = .left_control }) or in.down(.{ .key = .right_control });
     const hit = struct {
@@ -335,6 +391,9 @@ const Editor = struct {
       if (hit(in, .down) and e.ch + 1 < Ch.count) e.ch += 1;
       if (hit(in, .r)) e.set(Ch.get(&Vals{}, e.ch));
     }
+    if (hit(in, .one)) e.mode = .move;
+    if (hit(in, .two)) e.mode = .turn;
+    if (hit(in, .three)) e.mode = .size;
     if (hit(in, .left_bracket)) {
       e.doc.cell = @max(CELL_MIN, e.doc.cell - CELL_STEP);
       e.changed();
@@ -346,10 +405,14 @@ const Editor = struct {
     if (ctrl and hit(in, .s)) e.save();
 
     // the mouse: a press on a form row selects it, on a value row selects
-    // it and drags it, on a handle in view selects its form
+    // it and drags it, on the gizmo drags its handle, on a handle in view
+    // selects its form
     const mx = in.mouse[0];
     const my = in.mouse[1];
     const vy = valuesY(listRows(e.pieces().len));
+    const g = e.gizmoAt(origin);
+    const ui = overUi(listRows(e.pieces().len), mx, my);
+    e.hot = if (e.drag == .gizmo) e.part else if (g != null and !ui) g.?.pick(view, in.mouse) else null;
     if (in.pressed(.{ .button = .left })) {
       if (mx < PAD + LIST_W and my >= LIST_Y and my < vy) {
         const r:usize = @intFromFloat(@floor((my - LIST_Y) / ROW));
@@ -357,6 +420,9 @@ const Editor = struct {
       } else if (mx < PAD + LIST_W and my >= vy and my < vy + m.f(Ch.count) * ROW and e.pieces().len > 0) {
         e.ch = @intFromFloat(@floor((my - vy) / ROW));
         e.drag = .value;
+      } else if (e.hot) |part| {
+        e.part = part;
+        e.drag = .gizmo;
       } else {
         var best:f32 = PICK;
         for (handles, 0..) |h, i| if (h) |at| {
@@ -373,12 +439,17 @@ const Editor = struct {
     if (e.drag == .value and in.mouse_delta[0] != 0) {
       e.set(Ch.get(&e.pieces()[e.sel].v, e.ch) + in.mouse_delta[0] * e.rate() * (if (shift) FINE else 1));
     }
+    if (e.drag == .gizmo and (in.mouse_delta[0] != 0 or in.mouse_delta[1] != 0)) if (g) |gz| {
+      const from = [2]f32{ mx - in.mouse_delta[0], my - in.mouse_delta[1] };
+      e.dragGizmo(gz, view, from, in.mouse, if (shift) FINE else 1);
+    };
+    if (e.drag != .gizmo) e.part = null;
     // the selection kept in view
     if (e.sel < e.top) e.top = e.sel;
     if (e.sel >= e.top + LIST_ROWS) e.top = e.sel + 1 - LIST_ROWS;
   }
 
-  fn draw(e:*Editor, d:*Draw, screen:[2]f32, handles:[]const ?[2]f32) Allocator.Error!void {
+  fn draw(e:*Editor, d:*Draw, screen:[2]f32, handles:[]const ?[2]f32, view:gizmo.View, origin:V3) Allocator.Error!void {
     const W = screen[0];
     var y:f32 = PAD;
     for (HELP) |h| {
@@ -388,7 +459,7 @@ const Editor = struct {
     var pb:[160]u8 = undefined;
     _ = try d.text(W - PAD - 420, PAD, s.text_label, SEL, bufPrint(&pb, "{s}{s}", .{ e.path, if (e.dirty) " *" else "" }) catch e.path);
     var cb:[64]u8 = undefined;
-    _ = try d.text(W - PAD - 420, PAD + LINE_H + 4, TEXT, PLAIN, bufPrint(&cb, "cells {d:.4} m   {d} forms", .{ e.doc.cell, e.pieces().len }) catch "?");
+    _ = try d.text(W - PAD - 420, PAD + LINE_H + 4, TEXT, PLAIN, bufPrint(&cb, "cells {d:.4} m   {d} forms   gizmo {t}", .{ e.doc.cell, e.pieces().len, e.mode }) catch "?");
     if (e.note_len > 0) _ = try d.text(W - PAD - 420, PAD + 2 * (LINE_H + 4), TEXT, PLAIN, e.note[0..e.note_len]);
 
     // the forms
@@ -426,8 +497,10 @@ const Editor = struct {
     for (handles, 0..) |h, i| if (h) |at| {
       const p = e.pieces()[i];
       const col = if (i == e.sel) SEL else if (p.carve) CARVE else PLAIN;
-      try d.pod(at[0], at[1], if (i == e.sel) SEL_HANDLE_R else HANDLE_R, col, 1, 0);
+      if (i != e.sel) try d.pod(at[0], at[1], HANDLE_R, col, 1, 0);
     };
+    // the selected form's gizmo over everything in view
+    if (e.gizmoAt(origin)) |g| try g.draw(d, view, e.hot);
   }
 };
 
@@ -440,13 +513,6 @@ fn overUi(rows:usize, x:f32, y:f32) bool {
   return x < PAD + LIST_W and y >= LIST_Y - 6 and y < valuesY(rows) + m.f(Ch.count) * ROW + 6;
 }
 
-/// `p` (world) on screen, or null behind the eye
-fn onScreen(vp:m.M4, p:V3, screen:[2]f32) ?[2]f32 {
-  const c = m.mulV(vp, .{ p[0], p[1], p[2], 1 });
-  if (c[3] <= 1e-4) return null;
-  return .{ (c[0] / c[3] * 0.5 + 0.5) * screen[0], (c[1] / c[3] * 0.5 + 0.5) * screen[1] };
-}
-
 pub fn main(init:std.process.Init) !void {
   const gpa = init.gpa;
   const io = init.io;
@@ -455,8 +521,10 @@ pub fn main(init:std.process.Init) !void {
 
   var name:[]const u8 = "sculpt";
   var shot = false;
+  var mode:gizmo.Mode = .move;
   for (args[1..]) |a| {
     if (startsWith(u8, a, "--mesh=")) name = a["--mesh=".len..];
+    if (startsWith(u8, a, "--gizmo=")) mode = stringToEnum(gizmo.Mode, a["--gizmo=".len..]) orelse return error.BadGizmo;
     if (eql(u8, a, "--shot")) shot = true;
   }
   const path = try std.fmt.allocPrint(arena, DIR ++ "/{s}" ++ EXT, .{name});
@@ -474,7 +542,7 @@ pub fn main(init:std.process.Init) !void {
     defer gpa.free(text);
     break :load try Doc.parse(gpa, text);
   };
-  var e:Editor = .{ .gpa = gpa, .io = io, .path = path, .doc = doc };
+  var e:Editor = .{ .gpa = gpa, .io = io, .path = path, .doc = doc, .mode = mode };
   defer e.doc.deinit(gpa);
 
   // the game's files (controls, strings), as the game reads them
@@ -549,11 +617,11 @@ pub fn main(init:std.process.Init) !void {
     last = now;
     const screen = r.extent();
 
-    // handles as last frame's camera saw them
-    const vp = game.cam.viewProj();
+    // handles and the gizmo as last frame's camera saw them
+    const seen:gizmo.View = .{ .vp = game.cam.viewProj(), .eye = game.cam.viewEye(), .screen = screen };
     handles.clearRetainingCapacity();
-    for (e.pieces()) |p| try handles.append(gpa, onScreen(vp, origin + p.v.pos, screen));
-    try e.handle(&input, handles.items);
+    for (e.pieces()) |p| try handles.append(gpa, seen.project(origin + p.v.pos));
+    try e.handle(&input, handles.items, seen, origin);
     e.sel = @min(e.sel, e.pieces().len -| 1);
 
     // the surface meshed again once it changed (while dragging, not every frame)
@@ -597,10 +665,11 @@ pub fn main(init:std.process.Init) !void {
     const inst = [1]ps.vertex.PartInstance{ps.parts.instance(m.translate(origin), .{})};
     scene.parts[meshlib.slot(SLOT_ID, 0)] = &inst;
     // handles drawn where the forms are now (one may have gone or come)
+    const view:gizmo.View = .{ .vp = game.cam.viewProj(), .eye = game.cam.viewEye(), .screen = screen };
     handles.clearRetainingCapacity();
-    for (e.pieces()) |p| try handles.append(gpa, onScreen(game.cam.viewProj(), origin + p.v.pos, screen));
+    for (e.pieces()) |p| try handles.append(gpa, view.project(origin + p.v.pos));
     ui.clear(@floatCast(game.ui_time));
-    try e.draw(&ui, screen, handles.items);
+    try e.draw(&ui, screen, handles.items, view, origin);
     scene.ui = ui.v.items;
     const resized = input.resized;
     input.resized = false;
@@ -632,6 +701,10 @@ fn loadFrame(l:*loading.Loading, r:*Renderer, input:*Input, last:*f64, stage:loa
   input.resized = false;
   try r.draw(&scene, resized);
   return true;
+}
+
+test {
+  _ = gizmo;
 }
 
 test "a mesh's text reads back as written" {

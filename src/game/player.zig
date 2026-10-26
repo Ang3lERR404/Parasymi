@@ -470,7 +470,8 @@ pub const Player = struct {
   }
 
   fn groundSpeed(p:*const Player) f32 { return @sqrt(p.vel[0] * p.vel[0] + p.vel[2] * p.vel[2]); }
-  fn heading(p:*const Player) M4 { return m.chain(&.{ T(p.pos), m.rotY(p.facing) }); }
+  /// wolf space to the world: where it stands, turned the way it faces
+  pub fn heading(p:*const Player) M4 { return m.chain(&.{ T(p.pos), m.rotY(p.facing) }); }
 
   /// where a foot rests under the standing wolf, in the world
   fn rest(p:*const Player, ground:?*const World, s:usize) V3 {

@@ -3,10 +3,15 @@
 //! the game's own renderer, and keeps it as text in `src/anim/<name>.anim`.
 //! The game does not play clips back yet. From the repo root:
 //!   zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name>]
-//! (`--at=<s>` starts the playhead there; `--shot` saves one frame to
-//! `shots/animedit.png` and closes, for checking it headless.)
+//! (`--at=<s>` starts the playhead there, `--channel=<name>` on that
+//! channel; `--shot` saves one frame to `shots/animedit.png` and closes,
+//! for checking it headless.)
 //! Every f32 of the wolf's `Pose` (or a specimen's `Look`) is a channel;
-//! dragging a channel's value keys it at the playhead.
+//! dragging a channel's value keys it at the playhead. On the wolf each
+//! joint is a dot on its skeleton: a click selects it (again, the next
+//! joint under the mouse), and its gizmo (tools/gizmo.zig) keys it as it
+//! is dragged: rings for a joint's turns, one ring for a hinge, arrows
+//! (and the centre, across the view) for the hips' place.
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
@@ -30,6 +35,7 @@ const Key = engine.platform.input.Key;
 const Draw = engine.ui.draw.Draw;
 const Color = engine.ui.draw.Color;
 const ps = @import("parasymi");
+const gizmo = @import("gizmo.zig");
 const play = ps.play;
 const Game = play.Game;
 const skel = ps.skeleton;
@@ -81,19 +87,127 @@ const TL_H:f32 = 44;
 const TL_BOTTOM:f32 = 40;
 const KEY_R:f32 = 5;
 const SEL_KEY_R:f32 = 8;
+/// a joint's dot, the selected one's, and how near a click picks one (px)
+const JOINT_R:f32 = 3.5;
+const SEL_JOINT_R:f32 = 5.5;
+const JOINT_PICK:f32 = 10;
+/// how lit a joint's dot is
+const JOINT_LIT:f32 = 0.25;
 /// colours: selected, keyed, unkeyed, the playhead, keys, panels
 const SEL:Color = s.gold;
 const KEYED:Color = s.white;
 const BARE:Color = s.dim;
 const HEAD:Color = s.growth;
 const KEY_DIM:Color = .{190, 210, 190, 220};
+const JOINT:Color = .{190, 210, 190, 200};
 const PANEL:Color = s.panel;
 
 const HELP = [_][]const u8{
   "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
   "up/down channel   drag value: key it (shift fine)   k key   a key all   x unkey   r rest",
-  "ctrl+s save   middle drag orbit   wheel zoom (over the list: scroll)",
+  "ctrl+s save   middle drag orbit   wheel zoom (over the list: scroll)   wolf: click a joint, drag its gizmo (shift fine)",
 };
+
+/// how a joint of the wolf's pose moves: its place (the hips), its turn
+/// about three axes, or a hinge's about one
+const Move = enum { place, turn, hinge };
+
+/// a joint of the wolf's pose: its channels (x, y, z; a hinge's alone),
+/// the bone it stands at, and a hinge's axis in that bone's frame
+const Joint = struct {
+  bone:skel.Bone,
+  move:Move,
+  chans:[3]?usize,
+  axis:m.V3 = m.v3(1, 0, 0),
+};
+
+fn joint(comptime name:[]const u8, bone:skel.Bone, move:Move, axis:m.V3) Joint {
+  @setEvalBranchQuota(1_000_000);
+  return .{ .bone = bone, .move = move, .axis = axis, .chans = switch (move) {
+    .place, .turn => .{ PoseCh.find(name ++ ".x").?, PoseCh.find(name ++ ".y").?, PoseCh.find(name ++ ".z").? },
+    .hinge => .{ PoseCh.find(name).?, null, null },
+  } };
+}
+
+/// every joint a gizmo turns (the fingers are keyed in the list); a
+/// hinge's axis as its bone turns about it (the elbow folds about -x)
+const joints = blk: {
+  const X = m.v3(1, 0, 0);
+  const NX = m.v3(-1, 0, 0);
+  break :blk [_]Joint{
+    joint("hip", .pelvis, .place, X),
+    joint("pelvis", .pelvis, .turn, X),
+    joint("waist", .waist, .turn, X),
+    joint("chest", .chest, .turn, X),
+    joint("neck", .neck, .turn, X),
+    joint("head", .head, .turn, X),
+    joint("jaw", .jaw, .hinge, X),
+    joint("tail.0", .tail0, .turn, X),
+    joint("tail.1", .tail1, .turn, X),
+    joint("tail.2", .tail2, .turn, X),
+    joint("tail.3", .tail3, .turn, X),
+  } ++ side(0, X, NX) ++ side(1, X, NX);
+};
+
+/// a side's joints (0 left, 1 right)
+fn side(comptime i:usize, X:m.V3, NX:m.V3) [8]Joint {
+  const sd = skel.sides[i];
+  const n = std.fmt.comptimePrint("{d}", .{i});
+  return .{
+    joint("ears." ++ n, sd.ear, .turn, X),
+    joint("arms." ++ n ++ ".root", sd.arm, .turn, X),
+    joint("arms." ++ n ++ ".mid", sd.forearm, .hinge, NX),
+    joint("arms." ++ n ++ ".low", sd.hand, .turn, X),
+    joint("legs." ++ n ++ ".root", sd.thigh, .turn, X),
+    joint("legs." ++ n ++ ".mid", sd.shin, .hinge, X),
+    joint("legs." ++ n ++ ".low", sd.meta, .turn, X),
+    joint("legs." ++ n ++ ".foot", sd.foot, .hinge, X),
+  };
+}
+
+/// the joint channel `ch` of the pose belongs to
+fn jointOf(ch:usize) ?usize {
+  for (joints, 0..) |j, i| for (j.chans) |c| if (c == ch) return i;
+  return null;
+}
+
+/// the wolf's bones in the world this frame, for `pose`
+const Bones = [skel.COUNT]m.M4;
+fn bonesOf(pose:skel.Pose, heading:m.M4) Bones {
+  var w = skel.fk(pose);
+  for (&w) |*b| b.* = m.mul(heading, b.*);
+  return w;
+}
+
+/// joint `j`'s gizmo (`heading` wolf space to the world), its axes those
+/// its channels turn or move it along
+fn gizmoOf(j:Joint, pose:*const skel.Pose, bones:*const Bones, heading:m.M4) gizmo.Gizmo {
+  const w = bones[@intFromEnum(j.bone)];
+  const X = m.v3(1, 0, 0);
+  const Y = m.v3(0, 1, 0);
+  const Z = m.v3(0, 0, 1);
+  const at = m.origin(w);
+  return switch (j.move) {
+    .place => .{ .at = at, .mode = .move, .axes = .{ m.norm(m.mulDir(heading, X)), m.norm(m.mulDir(heading, Y)), m.norm(m.mulDir(heading, Z)) } },
+    .hinge => .{ .at = at, .mode = .turn, .axes = .{ m.norm(m.mulDir(w, j.axis)), null, null } },
+    .turn => turn: {
+      // a turn is y, then x, then z, last in its bone's frame: z about the
+      // bone's own z, x before z was turned, y before both
+      const x = PoseCh.get(pose, j.chans[0].?);
+      const z = PoseCh.get(pose, j.chans[2].?);
+      const unz = m.mul(w, m.rotZ(-z));
+      break :turn .{ .at = at, .mode = .turn, .axes = .{
+        m.norm(m.mulDir(unz, X)),
+        m.norm(m.mulDir(m.mul(unz, m.rotX(-x)), Y)),
+        m.norm(m.mulDir(w, Z)),
+      } };
+    },
+  };
+}
+
+/// what the gizmo needs of the wolf this frame
+const Rig = struct { view:gizmo.View, bones:Bones, heading:m.M4 };
+
 
 const Subject = union(enum) {
   wolf,
@@ -121,7 +235,7 @@ const Subject = union(enum) {
   }
 };
 
-const Drag = enum { none, timeline, value };
+const Drag = enum { none, timeline, value, gizmo };
 
 const Editor = struct {
   gpa:Allocator,
@@ -141,9 +255,74 @@ const Editor = struct {
   sel:usize = 0,
   top:usize = 0,
   drag:Drag = .none,
+  /// the gizmo's handle held, and the one under the mouse
+  part:?gizmo.Part = null,
+  hot:?gizmo.Part = null,
   dirty:bool = false,
   note:[96]u8 = undefined,
   note_len:usize = 0,
+
+  /// the selected channel's joint and its gizmo (the wolf's alone)
+  fn gizmoAt(e:*const Editor, rg:*const Rig) ?struct { j:Joint, g:gizmo.Gizmo } {
+    if (!e.wolf()) return null;
+    const j = joints[jointOf(e.shown[e.sel]) orelse return null];
+    return .{ .j = j, .g = gizmoOf(j, &e.pose, &rg.bones, rg.heading) };
+  }
+
+  /// channel `ch` of the pose changed by `by` and keyed (the wolf shows
+  /// every channel, so `ch` is its row too)
+  fn nudge(e:*Editor, ch:usize, by:f32) Allocator.Error!void {
+    e.setValue(ch, e.value(ch) + by);
+    try e.key(ch);
+  }
+
+  /// a drag of the held handle from `from` to `to` (px), `k` of it
+  fn dragGizmo(e:*Editor, j:Joint, g:gizmo.Gizmo, rg:*const Rig, from:[2]f32, to:[2]f32, k:f32) Allocator.Error!void {
+    const part = e.part orelse return;
+    switch (part) {
+      // the hips moved across the view: back into wolf space
+      .free => {
+        const by = g.across(rg.view, from, to) * m.splat3(k);
+        for (j.chans, g.axes) |c, a| try e.nudge(c.?, m.dot(by, a.?));
+      },
+      .x, .y, .z => {
+        const i = @intFromEnum(part);
+        const c = j.chans[i] orelse return;
+        try e.nudge(c, g.along(rg.view, i, from, to) * k);
+        e.sel = c;
+      },
+    }
+  }
+
+  /// the joint whose dot is under `mouse`; again on the selected one, the
+  /// next under it
+  fn pickJoint(e:*const Editor, rg:*const Rig, mouse:[2]f32) ?usize {
+    const cur = jointOf(e.shown[e.sel]);
+    var best:?usize = null;
+    var near:f32 = JOINT_PICK;
+    var after:?usize = null;
+    var cur_under = false;
+    for (joints, 0..) |j, i| {
+      const at = rg.view.project(m.origin(rg.bones[@intFromEnum(j.bone)])) orelse continue;
+      const d = m.len(m.v3(at[0] - mouse[0], at[1] - mouse[1], 0));
+      if (d >= JOINT_PICK) continue;
+      if (cur != null and i == cur.?) cur_under = true;
+      if (cur != null and i > cur.? and after == null) after = i;
+      if (d < near) {
+        near = d;
+        best = i;
+      }
+    }
+    if (cur_under) {
+      if (after) |a| return a;
+      // round to the first under the mouse
+      for (joints, 0..) |j, i| {
+        const at = rg.view.project(m.origin(rg.bones[@intFromEnum(j.bone)])) orelse continue;
+        if (m.len(m.v3(at[0] - mouse[0], at[1] - mouse[1], 0)) < JOINT_PICK) return i;
+      }
+    }
+    return best;
+  }
 
   fn wolf(e:*const Editor) bool { return e.subject == .wolf; }
 
@@ -188,8 +367,9 @@ const Editor = struct {
 
   fn snap(t:f32) f32 { return @round(t * FPS) / FPS; }
 
-  /// one frame's keys and mouse (`over` the list or the timeline)
-  fn handle(e:*Editor, in:*const Input, screen:[2]f32, dt:f32) Allocator.Error!void {
+  /// one frame's keys and mouse (`over` the list or the timeline), the
+  /// wolf's joints as `rg` sees them
+  fn handle(e:*Editor, in:*const Input, screen:[2]f32, dt:f32, rg:*const Rig) Allocator.Error!void {
     const shift = in.down(.{ .key = .left_shift }) or in.down(.{ .key = .right_shift });
     const ctrl = in.down(.{ .key = .left_control }) or in.down(.{ .key = .right_control });
     const hit = struct {
@@ -230,6 +410,9 @@ const Editor = struct {
     const rows = e.fits(screen);
     const mx = in.mouse[0];
     const my = in.mouse[1];
+    const gz = e.gizmoAt(rg);
+    const ui = overList(screen, mx, my) or inTimeline(screen, mx, my);
+    e.hot = if (e.drag == .gizmo) e.part else if (gz != null and !ui) gz.?.g.pick(rg.view, in.mouse) else null;
     if (in.pressed(.{ .button = .left })) {
       if (inTimeline(screen, mx, my)) {
         e.drag = .timeline;
@@ -240,6 +423,12 @@ const Editor = struct {
           e.sel = e.top + r;
           e.drag = .value;
         }
+      } else if (e.hot) |part| {
+        e.part = part;
+        e.drag = .gizmo;
+        e.playing = false;
+      } else if (e.wolf()) {
+        if (e.pickJoint(rg, in.mouse)) |j| e.sel = joints[j].chans[0].?;
       }
     }
     if (!in.down(.{ .button = .left })) e.drag = .none;
@@ -251,7 +440,12 @@ const Editor = struct {
         e.setValue(e.sel, e.value(e.sel) + in.mouse_delta[0] * rate);
         try e.key(e.sel);
       },
+      .gizmo => if (gz) |z| if (in.mouse_delta[0] != 0 or in.mouse_delta[1] != 0) {
+        const from = [2]f32{ mx - in.mouse_delta[0], my - in.mouse_delta[1] };
+        try e.dragGizmo(z.j, z.g, rg, from, in.mouse, if (shift) FINE else 1);
+      },
     }
+    if (e.drag != .gizmo) e.part = null;
     if (overList(screen, mx, my) and in.scroll != 0) {
       const most = e.shown.len -| rows;
       const step:i32 = @intFromFloat(-in.scroll * 3);
@@ -268,9 +462,20 @@ const Editor = struct {
     return @intFromFloat(@max(1, @floor(h / ROW)));
   }
 
-  fn draw(e:*const Editor, d:*Draw, screen:[2]f32) Allocator.Error!void {
+  fn draw(e:*const Editor, d:*Draw, screen:[2]f32, rg:*const Rig) Allocator.Error!void {
     const W = screen[0];
     const H = screen[1];
+    // the wolf's joints, the selected one's gizmo over them
+    if (e.wolf()) {
+      const cur = jointOf(e.shown[e.sel]);
+      for (joints, 0..) |j, i| if (cur == null or i != cur.?) {
+        if (rg.view.project(m.origin(rg.bones[@intFromEnum(j.bone)]))) |at| try d.pod(at[0], at[1], JOINT_R, JOINT, JOINT_LIT, m.f(i));
+      };
+      if (e.gizmoAt(rg)) |z| {
+        if (rg.view.project(z.g.at)) |at| try d.glow(at[0], at[1], SEL_JOINT_R * 2, s.menu_hover);
+        try z.g.draw(d, rg.view, e.hot);
+      }
+    }
     var y:f32 = PAD;
     for (HELP) |h| {
       _ = try d.text(PAD, y, TEXT, BARE, h);
@@ -357,6 +562,7 @@ pub fn main(init:std.process.Init) !void {
   var subject:?Subject = null;
   var name:?[]const u8 = null;
   var start:f32 = 0;
+  var channel:?[]const u8 = null;
   var shot = false;
   for (args[1..]) |a| {
     if (eql(u8, a, "--wolf")) subject = .wolf;
@@ -364,6 +570,7 @@ pub fn main(init:std.process.Init) !void {
     if (startsWith(u8, a, "--structure=")) subject = .{ .thing = .{ .structure = stringToEnum(ps.structures.Kind, a["--structure=".len..]) orelse return error.BadStructure } };
     if (startsWith(u8, a, "--clip=")) name = a["--clip=".len..];
     if (startsWith(u8, a, "--at=")) start = try std.fmt.parseFloat(f32, a["--at=".len..]);
+    if (startsWith(u8, a, "--channel=")) channel = a["--channel=".len..];
     if (eql(u8, a, "--shot")) shot = true;
   }
   const sj = subject orelse {
@@ -400,6 +607,9 @@ pub fn main(init:std.process.Init) !void {
   };
   defer e.clip.deinit();
   e.t = m.clamp(start, 0, e.clip.length);
+  if (channel) |want| e.sel = for (0..e.shown.len) |i| {
+    if (eql(u8, e.chName(i), want)) break i;
+  } else return error.BadChannel;
   if (!eql(u8, e.clip.subject, word)) {
     log.err("{s} animates {s}, not {s}", .{ path, e.clip.subject, word });
     return error.WrongSubject;
@@ -474,7 +684,13 @@ pub fn main(init:std.process.Init) !void {
     last = now;
     const screen = r.extent();
 
-    try e.handle(&input, screen, dt);
+    // the joints as last frame's camera saw them
+    var rg:Rig = .{
+      .view = .{ .vp = game.cam.viewProj(), .eye = game.cam.viewEye(), .screen = screen },
+      .bones = bonesOf(e.pose, game.player.heading()),
+      .heading = game.player.heading(),
+    };
+    try e.handle(&input, screen, dt, &rg);
     e.sample();
     switch (sj) {
       .wolf => game.player.posed = e.pose,
@@ -497,8 +713,13 @@ pub fn main(init:std.process.Init) !void {
     try renderer.syncWorld(r, &game.world, 6, renderer.MESH_MS);
 
     var scene = try ps.view.scene(&game, screen);
+    rg = .{
+      .view = .{ .vp = game.cam.viewProj(), .eye = game.cam.viewEye(), .screen = screen },
+      .bones = bonesOf(e.pose, game.player.heading()),
+      .heading = game.player.heading(),
+    };
     ui.clear(@floatCast(game.ui_time));
-    try e.draw(&ui, screen);
+    try e.draw(&ui, screen, &rg);
     scene.ui = ui.v.items;
     const resized = input.resized;
     input.resized = false;
