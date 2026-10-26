@@ -21,12 +21,12 @@ const indexOfScalar = std.mem.indexOfScalar;
 const testing = std.testing;
 const play = @import("../play.zig");
 const prog = @import("../progression.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
-const m = @import("../../core/math.zig");
-const color = @import("../../core/color.zig");
+const m = @import("engine").core.math;
+const color = @import("engine").core.color;
 
 const Id = prog.Id;
 const V3 = m.V3;

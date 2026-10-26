@@ -2,7 +2,7 @@
 //! catcher dish, filaments trailing beneath. Drinks the night sky instead
 //! of the ley and condenses it into starlight.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_driftwisp, .floating = true, .yields = .starlight,

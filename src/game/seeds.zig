@@ -10,10 +10,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const registry = @import("../core/registry.zig");
+const registry = @import("engine").core.registry;
 const items = @import("../sim/items.zig");
 const species = @import("../sim/species.zig");
-const Color = @import("../ui/draw.zig").Color;
+const Color = @import("engine").ui.draw.Color;
 const icon_kit = @import("icon.zig");
 
 const kinds = struct {

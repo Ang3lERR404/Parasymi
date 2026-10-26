@@ -78,8 +78,12 @@ in `hud.Pick`. Strings under `[hud]`.
 ## A render pass
 `render/passes/<name>.zig` with `desc` (`.target`), `prepare`, `record`
 (+ `Frame`, `initFrame`/`deinitFrame`), one line in `passes` in
-`render/renderer.zig` (record order). New shaders: the file in `shaders/`
+`render/renderer.zig` (record order); its `desc` embeds its SPIR-V
+(`.vert = @embedFile("x.vert")`). New shaders: the file in `shaders/`
 with a `//!` header after `#version`, its name in `shaders` in `build.zig`.
+A pass any game could use goes in the engine instead
+(`engine/src/render/passes/`, shaders in `engine/shaders/` and
+`engine/build.zig`; [engine.md](engine.md)).
 
 ## An input
 An `ctl.Action` tag in `game/controls.zig` + a `[bind]` line in

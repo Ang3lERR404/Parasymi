@@ -3,16 +3,16 @@
 //! any) as instances; detail.vert builds each tile's blades or stones from
 //! its record and the vertex index, and sways the grass in the garden wind.
 //! Shaded by terrain.frag, like the ground they stand on.
-const vk = @import("vulkan");
+const vk = @import("engine").vk;
 const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("../../gfx/pipeline.zig");
+const pipeline = @import("engine").gfx.pipeline;
 const pass = R.pass;
 const R = @import("../renderer.zig");
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const ck = @import("../../world/chunk.zig");
 
 pub const desc:pass.Desc = .{
-  .vert = "detail.vert", .frag = "terrain.frag",
+  .vert = @embedFile("detail.vert"), .frag = @embedFile("terrain.frag"),
   .bindings = &.{pipeline.binding(vertex.DetailTile, 0, .instance)},
   .attrs = &pipeline.attrs(vertex.DetailTile, 0, 0),
 };
@@ -32,7 +32,7 @@ pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.
   const zero = [_]vk.DeviceSize{0};
   const focus = [2]f32{scene.push.view[0], scene.push.view[1]};
   const view = m.Frustum.of(scene.push.vp);
-  for (r.slots.items) |s| {
+  for (r.ext.slots.items) |s| {
     if (!s.live or s.tiles == 0) continue;
     if (!view.sphere(m.v3(s.centre[0], R.CHUNK_MID_Y, s.centre[1]), R.CHUNK_RADIUS)) continue;
     const dx = @max(@abs(s.centre[0] - focus[0]) - HALF, 0);

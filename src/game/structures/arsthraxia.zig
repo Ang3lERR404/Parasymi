@@ -16,7 +16,7 @@
 //! flower and a satellite of its own) and another satellite round its core.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const items = @import("../../sim/items.zig");
 const st = @import("../structures.zig");
 const icon_kit = @import("../icon.zig");
@@ -27,8 +27,8 @@ const Parts = @import("../parts.zig").Parts;
 const Look = @import("../parts.zig").Look;
 const mesh = @import("../../gfx/meshes/arsthraxia.zig");
 const growth = @import("../../gfx/growth.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 
 const V3 = m.V3;
 const v3 = m.v3;

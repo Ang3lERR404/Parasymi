@@ -1,23 +1,22 @@
 //! plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
-const vk = @import("vulkan");
+const vk = @import("engine").vk;
 const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("../../gfx/pipeline.zig");
-const ctx = @import("../../gfx/ctx.zig");
+const pipeline = @import("engine").gfx.pipeline;
+const ctx = @import("engine").gfx.ctx;
 const Ctx = ctx.Ctx;
-const Buffer = @import("../../gfx/buffer.zig").Buffer;
+const Buffer = @import("engine").gfx.buffer.Buffer;
 const pass = R.pass;
 const R = @import("../renderer.zig");
-const light = @import("../light.zig");
 
 pub const MAX = 1 << 16;
 
 // binding 2: the same mesh buffer, offset to the next growth key, so a
-// confluence blends toward it (see Renderer.plant_morph)
+// confluence blends toward it (see the renderer's `Ext.plant_morph`)
 const bindings = &[_]vk.VertexInputBindingDescription{pipeline.binding(vertex.Mesh, 0, .vertex), pipeline.binding(vertex.PlantInstance, 1, .instance), pipeline.binding(vertex.Mesh, 2, .vertex)};
 const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PlantInstance, 1, 5) ++ pipeline.attrs(vertex.MeshPose, 2, 10));
 
 pub const desc:pass.Desc = .{
-  .vert = "plant.vert", .frag = "plant.frag",
+  .vert = @embedFile("plant.vert"), .frag = @embedFile("plant.frag"),
   .bindings = bindings, .attrs = attrs, .per_sample = true,
 };
 
@@ -49,12 +48,12 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, scene:*const R
   if (stats.instances == 0) return;
   cmd.bindPipeline(.graphics, r.pipe(p));
   cmd.pushConstants(r.layout(.world), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
-  cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf}, &.{0, 0});
+  cmd.bindVertexBuffers(0, &.{r.ext.meshes.buf, f.inst.buf}, &.{0, 0});
   for (0..R.PLANT_MESHES) |i| {
     if (f.counts[i] == 0) continue;
-    const mesh = if (p == .plants_shadow) light.caster(i) else i;
-    cmd.bindVertexBuffers(2, &.{r.meshes.buf}, &.{r.plant_morph[mesh]});
-    cmd.draw(r.plant_ranges[mesh][1], f.counts[i], r.plant_ranges[mesh][0], f.first[i]);
+    const mesh = if (p == .plants_shadow) R.caster(i) else i;
+    cmd.bindVertexBuffers(2, &.{r.ext.meshes.buf}, &.{r.ext.plant_morph[mesh]});
+    cmd.draw(r.ext.plant_ranges[mesh][1], f.counts[i], r.ext.plant_ranges[mesh][0], f.first[i]);
     stats.draws += 1;
   }
 }
@@ -64,7 +63,7 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, scene:*const R
 /// instances, blended over what is there, writing no depth.
 pub const glass = struct {
   pub const desc:pass.Desc = .{
-    .vert = "plant.vert", .frag = "plant_glass.frag",
+    .vert = @embedFile("plant.vert"), .frag = @embedFile("plant_glass.frag"),
     .bindings = bindings, .attrs = attrs,
     .blend = true, .depth_write = false, .nearer = true, .per_sample = true,
   };
@@ -78,7 +77,7 @@ pub const glass = struct {
 /// is light itself or clear sap casts none; plant.vert under SHADOW)
 pub const shadow = struct {
   pub const desc:pass.Desc = .{
-    .vert = "plant_shadow.vert", .frag = "shadow.frag",
+    .vert = @embedFile("plant_shadow.vert"), .frag = @import("engine").shadow_frag,
     .bindings = bindings, .attrs = attrs, .target = .shadow,
   };
   pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {

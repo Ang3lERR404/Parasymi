@@ -5,6 +5,9 @@ infused plants (symbiotic, parasitic and radiant lineages that converge).
 Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3), Windows only. No asset files:
 every mesh, the font and all UI shapes are procedural; the only data files
 are `src/cfg/parasymi.cfg` (strings) and `src/cfg/controls.cfg` (bindings).
+The generic half (core, platform, Vulkan base, generic renderer and world
+streaming, UI) is its own package in `engine/`, reached as
+`@import("engine")`; see [docs/engine.md](docs/engine.md).
 2.5D top-down 3D camera orbiting the wolf (MMB drag: yaw free, pitch
 8°–89°; free cam for inspection).
 
@@ -12,6 +15,7 @@ are `src/cfg/parasymi.cfg` (strings) and `src/cfg/controls.cfg` (bindings).
 | Working on | Read first |
 |---|---|
 | finding a file | [docs/files.md](docs/files.md) (one line per source file and shader) |
+| the engine package, what is generic, how the game plugs in | [docs/engine.md](docs/engine.md) |
 | adding a structure, species, research, item, mesh, panel, pass, input, string | [docs/recipes.md](docs/recipes.md) (every place to wire it) |
 | gameplay, structures' behaviour, research, saves | [docs/design.md](docs/design.md) |
 | how anything looks or moves | [docs/visual.md](docs/visual.md) |
@@ -72,18 +76,26 @@ Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
 `--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`
 (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`, zglfw
 `f04fdbf` (upstream heads need 0.17). A stray `CPATH` breaks GLFW's C
-build. New shaders go in `build.zig`'s list.
+build. New shaders go in `build.zig`'s list (the engine's in
+`engine/build.zig`'s); `zig build test` also runs the engine's tests.
 
 ## Layers (import only downward)
+`engine/src/` (`@import("engine")`, never imports the game):
 ```
-core      math, color, rng, noise, registry, jobs, text
+core      math, color, rng, noise, registry, jobs, text, png
 platform  input, display (fullscreen)
-gfx       Vulkan ctx, swapchain, buffers, pipelines, meshgen, meshlib, growth
-world     chunks (tile SoA + occupancy), generation, streaming
+gfx       Vulkan ctx, swapchain, buffers, pipelines, UI/light vertex layouts
+world     chunk grid, World(L) streaming
+render    Renderer(G) frame orchestration, post (bloom, AA), light, camera, ui pass
+ui        SDF draw batch, font
+```
+`src/` (the game):
+```
+gfx       meshgen, meshlib, growth, kits, game vertex layouts
+world     chunks (tile SoA + occupancy), generation, the garden's World
 sim       items, species, plants (footprints, floaters), ecology tick
 game      player, actions, structures, research, craft, sky, hud, view, play, save
-render    renderer + passes, post (bloom, AA), light, terrain meshing, camera
-ui        SDF draw batch, font
+render    the garden's renderer (passes, scene, mesh growing), terrain meshing
 main      wiring, frame loop, save/load/fullscreen requests
 ```
 
@@ -101,7 +113,7 @@ registry kinds outside the registry file; add a hook.
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order) |
-| render passes | `render/renderer.zig` | `desc` (`.target`: shadow/world/screen), `Frame`, `initFrame`/`deinitFrame`, `prepare`, `record` |
+| render passes | `render/renderer.zig` (`passes`; engine `Renderer(G)`) | `desc` (`.target`: shadow/world/screen), `Frame`, `initFrame`/`deinitFrame`, `prepare`, `record` |
 
 Items (`sim/items.zig`, ids stored by value: new items go last) and weave
 recipes (`game/craft.zig`) are plain data tables.
@@ -112,7 +124,7 @@ Code:
   shown via `txt.s.*`; never name a key in text, write `{@action}`.
 - No hard-coded inputs: an `ctl.Action` tag + a `controls.cfg` line; never
   `glfw.Key`/`Button` in game code.
-- All math via `core/math.zig` (`m`), colours via `core/color.zig`; never
+- All math via engine `core/math.zig` (`m`), colours via `core/color.zig`; never
   `std.math`, hand-rolled casts or hand-rolled linear algebra. A singular
   matrix is a bug.
 - Threads only via `jobs.each` on `w.io`, results identical to serial,

@@ -2,8 +2,8 @@
 //! vines, leaves, amber sap) and a per-mesh deterministic random stream.
 const std = @import("std");
 const Wyhash = std.hash.Wyhash;
-const Rng = @import("../../core/rng.zig").Rng;
-const color = @import("../../core/color.zig");
+const Rng = @import("engine").core.rng.Rng;
+const color = @import("engine").core.color;
 
 pub const core = color.rgb(0.20, 0.26, 0.13).toRgba8(255);
 pub const vine = color.rgb(0.36, 0.58, 0.24).toRgba8(255);

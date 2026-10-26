@@ -14,9 +14,9 @@ const startsWith = std.mem.startsWith;
 const asBytes = std.mem.asBytes;
 const Init = std.process.Init;
 const log = std.log;
-const glfw = @import("zglfw");
-const Input = @import("platform/input.zig").Input;
-const Display = @import("platform/display.zig").Display;
+const glfw = @import("engine").glfw;
+const Input = @import("engine").platform.input.Input;
+const Display = @import("engine").platform.display.Display;
 const renderer = @import("render/renderer.zig");
 const Renderer = renderer.Renderer;
 const play = @import("game/play.zig");
@@ -36,12 +36,12 @@ const st = @import("game/structures.zig");
 const stringToEnum = std.meta.stringToEnum;
 const Loading = loading.Loading;
 const World = @import("world/world.zig").World;
-const png = @import("core/png.zig");
+const png = @import("engine").core.png;
 const bufPrint = std.fmt.bufPrint;
 const Dir = Io.Dir;
 const sep_str = std.fs.path.sep_str;
 const Options = options.Options;
-const m = @import("core/math.zig");
+const m = @import("engine").core.math;
 
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
 const MAX_FRAME_DT:f64 = 0.1;
@@ -131,7 +131,7 @@ pub fn main(init:Init) !void {
   input.attach();
   var display:Display = .{.win = window};
 
-  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa, if (lone) |*l| try l.only(init.arena.allocator()) else null);
+  const r = try Renderer.init(gpa, window, opts.vsync, opts.aa, .{.only = if (lone) |*l| try l.only(init.arena.allocator()) else null});
   defer r.deinit();
   opts.aa = r.antialiasing();
 
@@ -141,10 +141,10 @@ pub fn main(init:Init) !void {
   var load_screen = Loading.init(gpa);
   defer load_screen.deinit();
   var last = glfw.getTime();
-  const forms = r.meshProgress()[1];
+  const forms = renderer.meshProgress(r)[1];
   const whole = forms + 1 + play.STREAM_CHUNKS;
-  while (!try r.meshesReady()) {
-    if (!try loadFrame(&load_screen, r, &input, &last, .forms, .{.done = r.meshProgress()[0], .total = whole})) return;
+  while (!try renderer.meshesReady(r)) {
+    if (!try loadFrame(&load_screen, r, &input, &last, .forms, .{.done = renderer.meshProgress(r)[0], .total = whole})) return;
   }
   if (!try loadFrame(&load_screen, r, &input, &last, .world, .{.done = forms, .total = whole})) return;
 
@@ -242,7 +242,7 @@ pub fn main(init:Init) !void {
     const t0 = glfw.getTime();
     try game.simulate(dt);
     game.sim_ms += (@as(f32, @floatCast((glfw.getTime() - t0) * m.MS_PER_S)) - game.sim_ms) * play.TIMING_EASE;
-    try r.syncWorld(&game.world, MESH_BUDGET, renderer.MESH_MS);
+    try renderer.syncWorld(r, &game.world, MESH_BUDGET, renderer.MESH_MS);
     game.render_stats = r.stats;
 
     var scene = try view.scene(&game, screen);
@@ -329,7 +329,7 @@ fn restore(gpa:Allocator, io:Io, game:*Game, r:*Renderer, name:save.Name) !bool 
   // becomes a garden of its own)
   loaded.slot = if (name.is(save.AUTO)) null else name;
   // the old world's meshes belong to chunks that are about to disappear
-  try r.dropWorld();
+  try renderer.dropWorld(r);
   // the settings belong to the gardener, not the garden
   loaded.opts = game.opts;
   loaded.most_samples = game.most_samples;
@@ -366,7 +366,7 @@ fn ground(l:*Loading, r:*Renderer, input:*Input, last:*f64, w:*World, before:u32
     const left = w.unmeshed();
     if (!try loadFrame(l, r, input, last, .ground, .{.done = total - left, .total = total})) return false;
     if (left == 0) return true;
-    try r.syncWorld(w, m.maxInt(u32), LOAD_MESH_MS);
+    try renderer.syncWorld(r, w, m.maxInt(u32), LOAD_MESH_MS);
   }
 }
 

@@ -9,7 +9,7 @@
 //! top ring by ring round the bladder, the fronds curl over last.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const growth = @import("../growth.zig");
 const pk = @import("parasite_kit.zig");

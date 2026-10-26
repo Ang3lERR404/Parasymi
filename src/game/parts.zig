@@ -1,7 +1,7 @@
 //! per-frame collector of rigid part instances, grouped by library mesh.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const meshlib = @import("../gfx/meshlib.zig");
 const mg = @import("../gfx/meshgen.zig");
 const vertex = @import("../gfx/vertex.zig");

@@ -6,7 +6,7 @@
 //! that joins them cuts off everything downstream. Plants that need
 //! radiance (`needs_radiance`) halt and wither outside every field.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_bloom, .floating = true,

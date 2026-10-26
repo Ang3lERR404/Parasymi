@@ -2,7 +2,7 @@
 //! parasitic draining, growth, essence and death. Two-phase (accumulate
 //! deltas, then apply) so the result never depends on plant order.
 const std = @import("std");
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const species = @import("species.zig");

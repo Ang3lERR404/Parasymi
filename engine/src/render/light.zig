@@ -9,11 +9,11 @@
 //! per mesh, not one per cascade. A slice's sphere depends only on the
 //! camera's shape, never where it is, and its centre is snapped to whole
 //! texels, so shadow edges hold still as the view pans. The world shaders
-//! read it with hardware depth compares (common.glsl `keyShadow`).
+//! read it with hardware depth compares (light.glsl `keyShadow`).
 //!
 //! Points of light are sent each frame in the same record as the cascades
 //! (`Lighting`, reached by its address like the bones), and every lit
-//! surface sums them on the GPU (common.glsl `pointLight`).
+//! surface sums them on the GPU (light.glsl `pointLight`).
 const std = @import("std");
 const vk = @import("vulkan");
 const m = @import("../core/math.zig");
@@ -21,25 +21,18 @@ const ctx = @import("../gfx/ctx.zig");
 const Ctx = ctx.Ctx;
 const sw = @import("../gfx/swapchain.zig");
 const vertex = @import("../gfx/vertex.zig");
-const meshgen = @import("../gfx/meshgen.zig");
 
-/// slices of the view, each its own layer (common.glsl CASCADES)
+/// slices of the view, each its own layer (light.glsl CASCADES)
 pub const CASCADES = 3;
 /// texels along each side of a cascade's layer
 pub const RES = 1536;
-/// points of light a frame can hold (common.glsl MAX_LIGHTS)
+/// points of light a frame can hold (light.glsl MAX_LIGHTS)
 pub const MAX_LIGHTS = 32;
 /// the views the casters draw: one per cascade
 pub const VIEWS:u32 = (1 << CASCADES) - 1;
 /// casters pushed away from the light by a constant and with their slope
 pub const BIAS = [2]f32{1.25, 1.75};
 pub const FORMAT = sw.depth_format;
-
-/// the mesh a caster drawn from `slot` (a plant's or a part's) casts with:
-/// the same mesh at its coarsest level of detail (a slot table lays each
-/// mesh's levels side by side). A shadow needs no fine detail, and every
-/// caster is drawn into every cascade.
-pub fn caster(slot:usize) usize { return slot - slot % meshgen.LODS + meshgen.LODS - 1; }
 
 /// how far toward the light beyond a slice's sphere casters are caught
 /// (taller than anything the garden grows or floats)
@@ -57,7 +50,7 @@ const RADIUS_STEP:f32 = 1.0 / 32.0;
 /// and never in steps finer than this (world units)
 const STEP_MIN:f32 = 0.25;
 
-/// what the world shaders read about light each frame (common.glsl
+/// what the world shaders read about light each frame (light.glsl
 /// `Lighting`)
 pub const Lighting = extern struct {
   /// world to each cascade's clip space
@@ -69,9 +62,9 @@ pub const Lighting = extern struct {
   lights:[MAX_LIGHTS]vertex.Light,
 };
 comptime {
-  // std430 as common.glsl reads it: the texel sizes pack into one vec4
+  // std430 as light.glsl reads it: the texel sizes pack into one vec4
   if (CASCADES > 4 or @offsetOf(Lighting, "info") != CASCADES * 64 + 16 or @offsetOf(Lighting, "lights") != CASCADES * 64 + 32)
-    @compileError("Lighting must match common.glsl's layout");
+    @compileError("Lighting must match light.glsl's layout");
 }
 
 /// the cascades for a view: each world to its clip space, the world size

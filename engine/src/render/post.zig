@@ -188,15 +188,15 @@ pub const Post = struct {
       .set_layout_count = 1, .p_set_layouts = @ptrCast(&p.set_layout),
       .push_constant_range_count = push.len, .p_push_constant_ranges = &push,
     }, null);
-    p.pipe_down = try p.pipe(c, "bloom_down.frag", HDR_FORMAT, false);
-    p.pipe_up = try p.pipe(c, "bloom_up.frag", HDR_FORMAT, true);
-    p.pipe_composite = try p.pipe(c, "composite.frag", p.screen, false);
-    p.pipe_fxaa = try p.pipe(c, "fxaa.frag", p.screen, false);
+    p.pipe_down = try p.pipe(c, @embedFile("bloom_down.frag"), HDR_FORMAT, false);
+    p.pipe_up = try p.pipe(c, @embedFile("bloom_up.frag"), HDR_FORMAT, true);
+    p.pipe_composite = try p.pipe(c, @embedFile("composite.frag"), p.screen, false);
+    p.pipe_fxaa = try p.pipe(c, @embedFile("fxaa.frag"), p.screen, false);
     try p.images(c, w, h);
   }
 
   fn pipe(p:*const Post, c:*const Ctx, comptime frag:[]const u8, fmt:vk.Format, additive:bool) !vk.Pipeline {
-    const vs = try c.shader("post.vert");
+    const vs = try c.shader(@embedFile("post.vert"));
     defer c.device.destroyShaderModule(vs, null);
     const fs = try c.shader(frag);
     defer c.device.destroyShaderModule(fs, null);

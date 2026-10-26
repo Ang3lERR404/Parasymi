@@ -17,7 +17,7 @@
 //! projection reaching out all follow it there (common.glsl `haloSpiral`).
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const World = @import("../../world/world.zig").World;
 const species = @import("../../sim/species.zig");
 const Plants = @import("../../sim/plants.zig").Plants;

@@ -10,7 +10,7 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const mg = @import("meshgen.zig");
-const registry = @import("../core/registry.zig");
+const registry = @import("engine").core.registry;
 
 const parts = struct {
   // drawn first: a flat soft patch on the ground under floaters

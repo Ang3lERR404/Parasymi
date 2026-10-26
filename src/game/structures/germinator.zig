@@ -8,11 +8,11 @@
 //! spindle (centrifuging them) and winds a seed of them on it (spindling),
 //! all of it following how far the weave has come.
 const std = @import("std");
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const indexOfScalar = std.mem.indexOfScalar;
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const st = @import("../structures.zig");
 const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
@@ -23,8 +23,8 @@ const Parts = @import("../parts.zig").Parts;
 const Look = @import("../parts.zig").Look;
 const mesh = @import("../../gfx/meshes/germinator.zig");
 const growth = @import("../../gfx/growth.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 
 const V3 = m.V3;
 const v3 = m.v3;

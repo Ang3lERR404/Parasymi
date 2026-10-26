@@ -14,13 +14,13 @@
 //! crop swells out of its top and the fronds clasp it last, all at once.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const growth = @import("../growth.zig");
 const pk = @import("parasite_kit.zig");
 const mineral = @import("mineral_kit.zig");
-const Rng = @import("../../core/rng.zig").Rng;
+const Rng = @import("engine").core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

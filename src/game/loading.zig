@@ -5,10 +5,10 @@
 //! and its ground is meshed; then it fades off the first frames of play.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const renderer = @import("../render/renderer.zig");
-const Camera = @import("../render/camera.zig").Camera;
-const draw_mod = @import("../ui/draw.zig");
+const Camera = @import("engine").render.camera.Camera;
+const draw_mod = @import("engine").ui.draw;
 const Draw = draw_mod.Draw;
 const Color = draw_mod.Color;
 const Sky = @import("sky.zig").Sky;

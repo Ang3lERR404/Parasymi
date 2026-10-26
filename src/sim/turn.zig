@@ -6,7 +6,7 @@
 //! ticks it.
 const std = @import("std");
 const testing = std.testing;
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 
 /// how long one turn takes (s), rooted and floating
 pub const TIME:f32 = 1.5;

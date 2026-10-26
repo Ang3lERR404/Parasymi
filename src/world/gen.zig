@@ -2,10 +2,10 @@
 //! depend on neighbours being loaded, so meshing and streaming stay order-free.
 const std = @import("std");
 const testing = std.testing;
-const m = @import("../core/math.zig");
-const noise = @import("../core/noise.zig");
+const m = @import("engine").core.math;
+const noise = @import("engine").core.noise;
 const ck = @import("chunk.zig");
-const rng = @import("../core/rng.zig");
+const rng = @import("engine").core.rng;
 
 pub const TERRACE = 0.35;
 /// terrace levels per unit of elevation noise; below `LOW` the ground lies

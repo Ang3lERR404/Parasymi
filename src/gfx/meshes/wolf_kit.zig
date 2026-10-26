@@ -5,9 +5,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const vertex = @import("../vertex.zig");
 const Sculpt = @import("sculpt_kit.zig").Sculpt;
 

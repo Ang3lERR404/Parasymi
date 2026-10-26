@@ -9,7 +9,7 @@ items, plants, research, structures, tiles, the window title) lives in
 (`txt.load` in main) and never again.
 - Add a field to `txt.Strings` and a line to the cfg; show it via
   `txt.s.*`/`txt.item(i)`.
-- Templates are runtime: `{0}`, `{1:.1}` (`core/text.zig`), passed to
+- Templates are runtime: `{0}`, `{1:.1}` (engine `core/text.zig`), passed to
   `Progression.say` / `Draw.print`; lists are `a | b` (`txt.nth`).
 - The test build embeds the cfg and fails on a missing or unknown key.
 - Not text: file paths/magic, shader names, CLI flags, log/panic messages,
@@ -21,7 +21,7 @@ No key or mouse button is named in code. Every binding lives in
 `mouse_left`…), read once at startup by `game/controls.zig`
 (`controls.load` in main).
 - Game code asks about an `ctl.Action` (`ctl.down`/`ctl.pressed(in,
-  .harvest)`), never `glfw.Key`/`Button`; `platform/input.zig` only polls
+  .harvest)`), never `glfw.Key`/`Button`; engine `platform/input.zig` only polls
   and answers for a `Bind`.
 - New input = an `Action` tag + a cfg line (the test fails on an unbound
   action); modifiers are actions too (`alt`, `take`, `run`).
@@ -32,7 +32,7 @@ No key or mouse button is named in code. Every binding lives in
   with the bound key's `[key]`/`[mouse]` name (else its binding name in
   capitals), so labels follow rebinding.
 
-## Parallel loops (`core/jobs.zig`)
+## Parallel loops (engine `core/jobs.zig`)
 `jobs.each(io, n, min, Ctx, ctx, Ctx.run)` runs `run(ctx, lo, hi)` over
 [0, n) in ranges of at least `min` items (first range on the calling
 thread, the rest on main's `Io` pool) and returns once all are done. Never
@@ -57,11 +57,11 @@ spawn threads or keep a pool of your own.
   (`testing.io` vs `null`, as in plants/world).
 
 ## Math
-All math via `core/math.zig` (`m`): scalars, `unorm8`, tiles (`footprint`
+All math via engine `core/math.zig` (`m`): scalars, `unorm8`, tiles (`footprint`
 and `ring` iterators, `Chunk.tileOf` back from a local index),
 `dirs`/`dirVec`/`dirYaw`, vectors/matrices, `spring`, `springDamper`,
 `catmullRom`/`splineResample`, `alignY`, `Frustum`. Colours via
-`core/color.zig`. Inverses: `m.inverseRigid`, `m.inverseAffine`, `m.inverse`
+engine `core/color.zig`. Inverses: `m.inverseRigid`, `m.inverseAffine`, `m.inverse`
 only as fallback; add missing methods with a test. A singular matrix is a
 bug (`@panic` in debug).
 

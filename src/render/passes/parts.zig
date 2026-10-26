@@ -3,17 +3,16 @@
 //! motes and the skinned wolf, the parameters part.vert places them by).
 const std = @import("std");
 const sliceAsBytes = std.mem.sliceAsBytes;
-const vk = @import("vulkan");
-const m = @import("../../core/math.zig");
+const vk = @import("engine").vk;
+const m = @import("engine").core.math;
 const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("../../gfx/pipeline.zig");
+const pipeline = @import("engine").gfx.pipeline;
 const meshlib = @import("../../gfx/meshlib.zig");
-const ctx = @import("../../gfx/ctx.zig");
+const ctx = @import("engine").gfx.ctx;
 const Ctx = ctx.Ctx;
-const Buffer = @import("../../gfx/buffer.zig").Buffer;
+const Buffer = @import("engine").gfx.buffer.Buffer;
 const pass = R.pass;
 const R = @import("../renderer.zig");
-const light = @import("../light.zig");
 
 pub const MAX = 1 << 15;
 /// skinned parts' bones a frame can hold
@@ -26,7 +25,7 @@ const bindings = &[_]vk.VertexInputBindingDescription{
 const attrs = &(pipeline.attrs(vertex.Mesh, 0, 0) ++ pipeline.attrs(vertex.PartInstance, 1, 5) ++ pipeline.attrs(vertex.Skin, 2, 16) ++ pipeline.attrs(vertex.Grow, 3, 21));
 
 pub const desc:pass.Desc = .{
-  .vert = "part.vert", .frag = "part.frag",
+  .vert = @embedFile("part.vert"), .frag = @embedFile("part.frag"),
   .bindings = bindings, .attrs = attrs, .per_sample = true,
 };
 
@@ -70,11 +69,11 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, stats:*R.Stats
   if (stats.parts == 0) return;
   cmd.bindPipeline(.graphics, r.pipe(p));
   cmd.pushConstants(r.layout(.world), pass.stages, 0, @sizeOf(R.WorldPush), &f.push);
-  cmd.bindVertexBuffers(0, &.{r.meshes.buf, f.inst.buf, r.skins.buf, r.grows.buf}, &.{0, 0, 0, 0});
+  cmd.bindVertexBuffers(0, &.{r.ext.meshes.buf, f.inst.buf, r.ext.skins.buf, r.ext.grows.buf}, &.{0, 0, 0, 0});
   for (0..meshlib.SLOTS) |i| {
-    if (f.counts[i] == 0 or (p == .parts_glass and !r.part_glassy[i])) continue;
-    const mesh = if (p == .parts_shadow) light.caster(i) else i;
-    cmd.draw(r.part_ranges[mesh][1], f.counts[i], r.part_ranges[mesh][0], f.first[i]);
+    if (f.counts[i] == 0 or (p == .parts_glass and !r.ext.part_glassy[i])) continue;
+    const mesh = if (p == .parts_shadow) R.caster(i) else i;
+    cmd.draw(r.ext.part_ranges[mesh][1], f.counts[i], r.ext.part_ranges[mesh][0], f.first[i]);
     stats.draws += 1;
   }
 }
@@ -84,7 +83,7 @@ fn draw(r:*R.Renderer, f:*const Frame, cmd:vk.CommandBufferProxy, stats:*R.Stats
 /// blended over what is there, writing no depth.
 pub const glass = struct {
   pub const desc:pass.Desc = .{
-    .vert = "part.vert", .frag = "part_glass.frag",
+    .vert = @embedFile("part.vert"), .frag = @embedFile("part_glass.frag"),
     .bindings = bindings, .attrs = attrs,
     .blend = true, .depth_write = false, .nearer = true, .per_sample = true,
   };
@@ -99,7 +98,7 @@ pub const glass = struct {
 /// under SHADOW)
 pub const shadow = struct {
   pub const desc:pass.Desc = .{
-    .vert = "part_shadow.vert", .frag = "shadow.frag",
+    .vert = @embedFile("part_shadow.vert"), .frag = @import("engine").shadow_frag,
     .bindings = bindings, .attrs = attrs, .target = .shadow,
   };
   pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, _:*const R.Scene, stats:*R.Stats) void {

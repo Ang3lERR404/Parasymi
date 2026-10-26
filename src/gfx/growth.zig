@@ -20,11 +20,11 @@ const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("meshgen.zig");
 const vertex = @import("vertex.zig");
-const color = @import("../core/color.zig");
-const Rng = @import("../core/rng.zig").Rng;
+const color = @import("engine").core.color;
+const Rng = @import("engine").core.rng.Rng;
 
 const V3 = m.V3;
 

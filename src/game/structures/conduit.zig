@@ -6,7 +6,7 @@
 //! Its root digs up out of the soil at the edge it is fed from, arches
 //! over its tile and digs back in at its front, so chains join under the
 //! ground however they turn; what it carries runs through its core.
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const items = @import("../../sim/items.zig");
@@ -14,11 +14,11 @@ const st = @import("../structures.zig");
 const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 const meshlib = @import("../../gfx/meshlib.zig");
 
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)

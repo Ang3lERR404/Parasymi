@@ -5,7 +5,7 @@
 //! it needs celestial energy: outside a bloom's field it withers, its
 //! pieces loosening and sinking as its light dims.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .convergent, .seed = .seed_vesper,

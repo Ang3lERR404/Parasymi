@@ -9,7 +9,7 @@ const species = @import("../../sim/species.zig");
 const play = @import("../play.zig");
 const st = @import("../structures.zig");
 const resources = @import("../resources.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
+const Draw = @import("engine").ui.draw.Draw;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
 

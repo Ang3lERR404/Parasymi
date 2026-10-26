@@ -53,13 +53,14 @@ pub const Ctx = struct {
   /// whether pipelines may shade every sample (MSAA edges a shader decides)
   sample_shading:bool,
 
-  pub fn init(gpa:Allocator, window:*glfw.Window) Error!Ctx {
+  /// `app`: the game's name, as the driver is told it
+  pub fn init(gpa:Allocator, window:*glfw.Window, app:[*:0]const u8) Error!Ctx {
     var c:Ctx = undefined;
-    c.bringUp(gpa, window) catch |e| return fold(e);
+    c.bringUp(gpa, window, app) catch |e| return fold(e);
     return c;
   }
 
-  fn bringUp(c:*Ctx, gpa:Allocator, window:*glfw.Window) !void {
+  fn bringUp(c:*Ctx, gpa:Allocator, window:*glfw.Window, name:[*:0]const u8) !void {
     c.messenger = .null_handle;
     c.vkb = vk.BaseWrapper.load(glfwGetInstanceProcAddress);
 
@@ -77,9 +78,9 @@ pub const Ctx = struct {
     }
 
     const app:vk.ApplicationInfo = .{
-      .p_application_name = "Parasymi",
+      .p_application_name = name,
       .application_version = 0,
-      .p_engine_name = "Parasymi",
+      .p_engine_name = "engine",
       .engine_version = 0,
       .api_version = @bitCast(vk.API_VERSION_1_3),
     };
@@ -194,10 +195,10 @@ pub const Ctx = struct {
     return mem;
   }
 
-  /// `name` is a build-time compiled shader (see build.zig `shaders`).
-  pub fn shader(c:*const Ctx, comptime name:[]const u8) Error!vk.ShaderModule {
+  /// `spv`: a build-time compiled shader's SPIR-V, embedded by the module
+  /// that compiled it (`@embedFile("post.vert")`; see build.zig).
+  pub fn shader(c:*const Ctx, comptime spv:[]const u8) Error!vk.ShaderModule {
     const words = comptime blk: {
-      const spv = @embedFile(name);
       var w:[spv.len / 4]u32 = undefined;
       @memcpy(sliceAsBytes(&w), spv);
       break :blk w;

@@ -1,4 +1,6 @@
-//! ui: the HUD batch, drawn last, blended, without depth.
+//! ui: the HUD batch, drawn last, blended, without depth. A game lists it
+//! in its passes as `ui`; its scene carries `ui:[]const vertex.Ui` and
+//! `ui_time:f32`.
 const std = @import("std");
 const sliceAsBytes = std.mem.sliceAsBytes;
 const vk = @import("vulkan");
@@ -7,13 +9,12 @@ const pipeline = @import("../../gfx/pipeline.zig");
 const ctx = @import("../../gfx/ctx.zig");
 const Ctx = ctx.Ctx;
 const Buffer = @import("../../gfx/buffer.zig").Buffer;
-const pass = R.pass;
-const R = @import("../renderer.zig");
+const pass = @import("../renderer.zig").pass;
 
 pub const MAX = 1 << 17;
 
 pub const desc:pass.Desc = .{
-  .vert = "ui.vert", .frag = "ui.frag",
+  .vert = @embedFile("ui.vert"), .frag = @embedFile("ui.frag"),
   .bindings = &.{pipeline.binding(vertex.Ui, 0, .vertex)},
   .attrs = &pipeline.attrs(vertex.Ui, 0, 0),
   .layout = .ui, .depth = false, .blend = true, .target = .screen,
@@ -29,7 +30,10 @@ pub fn initFrame(c:*const Ctx) ctx.Error!Frame {
 }
 pub fn deinitFrame(f:*Frame, c:*const Ctx) void { f.verts.deinit(c); }
 
-pub fn record(r:*R.Renderer, f:*Frame, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
+// decision: `r`, `scene` and `stats` are whatever renderer the game made
+// (render/renderer.zig `Renderer(G)`), which this pass is one of, so it
+// cannot name their types
+pub fn record(r:anytype, f:*Frame, cmd:vk.CommandBufferProxy, scene:anytype, stats:anytype) void {
   const n:u32 = @intCast(@min(scene.ui.len, MAX));
   if (n == 0) return;
   f.verts.write(0, sliceAsBytes(scene.ui[0..n]));

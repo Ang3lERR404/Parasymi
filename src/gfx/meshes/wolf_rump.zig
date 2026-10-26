@@ -12,7 +12,7 @@
 //! the thigh beneath it.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const skel = @import("wolf_skeleton.zig");

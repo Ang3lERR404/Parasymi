@@ -12,11 +12,11 @@
 //! (gfx/growth.zig): the cores and weave dig on together.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
-const color = @import("../../core/color.zig");
-const noise = @import("../../core/noise.zig");
+const color = @import("engine").core.color;
+const noise = @import("engine").core.noise;
 const growth = @import("../growth.zig");
 const conduit = @import("conduit.zig");
 

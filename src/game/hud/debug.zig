@@ -2,10 +2,10 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
+const Draw = @import("engine").ui.draw.Draw;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 
 const margin = s.edge;
 const bw:f32 = 364;

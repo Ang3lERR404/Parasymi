@@ -14,13 +14,13 @@
 //! over, and down in at its front.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
-const color = @import("../../core/color.zig");
-const noise = @import("../../core/noise.zig");
+const color = @import("engine").core.color;
+const noise = @import("engine").core.noise;
 const vertex = @import("../vertex.zig");
-const Rng = @import("../../core/rng.zig").Rng;
+const Rng = @import("engine").core.rng.Rng;
 const kit = @import("structure_kit.zig");
 const growth = @import("../growth.zig");
 

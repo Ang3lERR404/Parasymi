@@ -13,12 +13,12 @@
 //! last (`FORM`) the cups and core, which carry that window themselves.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
 const kit = @import("structure_kit.zig");
-const color = @import("../../core/color.zig");
-const Rng = @import("../../core/rng.zig").Rng;
+const color = @import("engine").core.color;
+const Rng = @import("engine").core.rng.Rng;
 const growth = @import("../growth.zig");
 
 const V3 = m.V3;

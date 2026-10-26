@@ -6,12 +6,12 @@
 //! pause menu.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const play = @import("../play.zig");
 const Pick = @import("../hud.zig").Pick;
 const save = @import("../save.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
 

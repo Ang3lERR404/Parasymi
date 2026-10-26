@@ -173,19 +173,20 @@ Gradient dome, sun/moon, stars; star motes (faceted core, ring, needle
 rays) turn, twinkle, hover and trail echoes while falling. Low pitch widens
 the view toward the horizon.
 
-## Lighting (`render/light.zig`)
+## Lighting (engine `render/light.zig`)
 The key light (sun/moon) casts shadows through a cascaded shadow map (3
 cascades, 1536², `fit` snaps them to texels so they hold still), drawn in
 one multiview pass per caster (`gl_ViewIndex`, `project()`), casters at
-their coarsest LOD (`light.caster`); shader variants with SHADOW leave out
+their coarsest LOD (`renderer.caster`); shader variants with SHADOW leave out
 what is light itself (blooms, motes, beams, halo, ghosts, lanterns).
 Terrain receives but does not cast. Points of light (`Parts.light`: blooms,
 motes, ley shards, diamond and flash; at most `MAX_LIGHTS` 32, ranked in
 view.zig) and the cascades travel in `Lighting`, reached by address
-(`WorldPush.light`); common.glsl `keyShadow`, `pointLight`, `shadeLit`.
+(`WorldPush.light`); engine light.glsl `keyShadow`, `pointLight`;
+common.glsl `shadeLit`.
 Culling keeps what may cast into view (`Parts.sees`).
 
-## Post-processing (`render/post.zig`)
+## Post-processing (engine `render/post.zig`)
 World passes draw into an HDR image; brighter-than-white light blooms
 (5-level 13-tap down chain with soft-knee threshold and anti-firefly
 weighting, tent filter back up); composite adds the glow (0.7), rolls
@@ -204,12 +205,12 @@ swapchain).
 A living night (`Draw.night`, ui.frag) with the name, a tendril growing as
 far as what is made (leaves opening as it passes), the stage, percent,
 made/left. Stages: every mesh grown on a thread of its own
-(`Renderer.meshProgress` / `meshesReady` uploads once through), the world
+(`renderer.meshProgress` / `meshesReady` uploads once through), the world
 woken, its ground meshed in 25 ms slices (`World.unmeshed`); also after a
 load in play. It fades off play's first frames (0.6 s).
 
 ## UI
-Organic, animated, no boxes; SDFs in `shaders/ui.frag`. Wobbling membranes,
+Organic, animated, no boxes; SDFs in `engine/shaders/ui.frag`. Wobbling membranes,
 seed-pod slots, tendril bars, soft glow, stems (`Draw.limb`) and
 leaves/buds (`Draw.leaf`), seeds (`Draw.grain`) and gems (`Draw.gem`);
 150 ms anim.

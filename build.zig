@@ -2,17 +2,17 @@ const std = @import("std");
 const zon = @import("build.zig.zon");
 const Build = std.Build;
 const OptimizeMode = std.builtin.OptimizeMode;
+/// the engine's build: glslc, vk.xml and shader compiling
+const eb = @import("engine");
 
 /// every shader in `shaders/` is compiled to SPIR-V at build time and exposed
-/// as an anonymous import named after its file (`@embedFile("terrain.vert")`).
+/// as an anonymous import named after its file (`@embedFile("terrain.vert")`);
+/// they may include the engine's (`light.glsl`).
 const shaders = [_][]const u8{
   "terrain.vert", "terrain.frag", "detail.vert",
   "plant.vert", "plant.frag",
   "part.vert", "part.frag",
-  "ui.vert", "ui.frag",
   "sky.vert", "sky.frag",
-  "post.vert", "bloom_down.frag", "bloom_up.frag", "composite.frag", "fxaa.frag",
-  "shadow.frag",
 };
 /// shaders compiled a second time from the same source with a define,
 /// imported under their own name: (name, source, define). The glass
@@ -30,6 +30,8 @@ const names = shaders ++ blk: {
   for (variants, &n) |v, *o| o.* = v[0];
   break :blk n;
 };
+/// what the game's shaders include
+const includes = [_][]const u8{"common.glsl", "surface.glsl"};
 
 pub fn build(b:*Build) !void {
   const name = @tagName(zon.name);
@@ -39,51 +41,35 @@ pub fn build(b:*Build) !void {
     .preferred_optimize_mode = .ReleaseFast
   });
 
-  const sdk = b.graph.environ_map.get("VULKAN_SDK");
-  const registry:Build.LazyPath = if (b.option([]const u8, "vk-registry", "path to vk.xml")) |p|
-    .{.cwd_relative = p}
-  else if (sdk) |s|
-    .{.cwd_relative = b.pathJoin(&.{s, "share", "vulkan", "registry", "vk.xml"})}
-  else
-    @panic("set VULKAN_SDK or pass -Dvk-registry=<path to vk.xml>");
-  const glslc = b.option([]const u8, "glslc", "path to glslc") orelse
-    if (sdk) |s| b.pathJoin(&.{s, "Bin", "glslc"}) else "glslc";
-
-  const vulkan = b.dependency("vulkan", .{.registry = registry}).module("vulkan-zig");
-  const zglfw = b.dependency("zglfw", .{
+  const glslc = eb.glslc(b);
+  const eng = b.dependency("engine", .{
     .target = t,
     .optimize = o,
-    .import_vulkan = true,
+    .glslc = glslc,
+    .@"vk-registry" = eb.registry(b),
   });
-  const glfw_mod = zglfw.module("root");
-  glfw_mod.addImport("vulkan", vulkan);
+  const engine = eng.module("engine");
 
   // compile every shader once; both the game and the tests can import them
+  const dir = b.path("shaders");
+  const engine_dir = eng.path("shaders");
+  var inputs:[includes.len + eb.includes.len]Build.LazyPath = undefined;
+  for (includes, inputs[0..includes.len]) |i, *in| in.* = dir.path(b, i);
+  for (eb.includes, inputs[includes.len..]) |i, *in| in.* = engine_dir.path(b, i);
   var spvs:[names.len]Build.LazyPath = undefined;
   for (names, &spvs, 0..) |s, *spv, i| {
     const v:?[3][]const u8 = if (i < shaders.len) null else variants[i - shaders.len];
-    const cmd = b.addSystemCommand(&.{glslc, "--target-env=vulkan1.3", "-O"});
-    cmd.addPrefixedDirectoryArg("-I", b.path("shaders"));
-    for ([_][]const u8{"common.glsl", "surface.glsl", "post.glsl"}) |inc| cmd.addFileInput(b.path(b.fmt("shaders/{s}", .{inc})));
-    if (v) |vv| cmd.addArg(b.fmt("-D{s}", .{vv[2]}));
-    // glslc reads the stage from the source's extension
-    cmd.addFileArg(b.path(b.fmt("shaders/{s}", .{if (v) |vv| vv[1] else s})));
-    cmd.addArg("-o");
-    spv.* = cmd.addOutputFileArg(b.fmt("{s}.spv", .{s}));
+    spv.* = eb.compile(b, glslc, dir, &.{dir, engine_dir}, &inputs, if (v) |vv| .{.name = s, .source = vv[1], .define = vv[2]} else .{.name = s});
   }
 
   const Mods = struct {
-    fn make(bb:*Build, root:[]const u8, tt:Build.ResolvedTarget, oo:OptimizeMode, vk:*Build.Module, gm:*Build.Module, glfw:*Build.Step.Compile, sp:[]const Build.LazyPath) *Build.Module {
+    fn make(bb:*Build, root:[]const u8, tt:Build.ResolvedTarget, oo:OptimizeMode, en:*Build.Module, sp:[]const Build.LazyPath) *Build.Module {
       const md = bb.createModule(.{
         .optimize = oo,
         .target = tt,
         .root_source_file = bb.path(root),
-        .imports = &.{
-          .{.name = "vulkan", .module = vk},
-          .{.name = "zglfw", .module = gm},
-        },
+        .imports = &.{.{.name = "engine", .module = en}},
       });
-      md.linkLibrary(glfw);
       for (names, sp) |s, spv| md.addAnonymousImport(s, .{.root_source_file = spv});
       // the game ships its strings and controls (stock copies in `src/cfg/`),
       // writing them out to the gardener's folder (%LOCALAPPDATA%\Parasymi)
@@ -92,7 +78,7 @@ pub fn build(b:*Build) !void {
       return md;
     }
   };
-  const mod = Mods.make(b, "src/main.zig", t, o, vulkan, glfw_mod, zglfw.artifact("glfw"), &spvs);
+  const mod = Mods.make(b, "src/main.zig", t, o, engine, &spvs);
 
   const exe = b.addExecutable(.{
     .name = name,
@@ -108,11 +94,14 @@ pub fn build(b:*Build) !void {
   run.step.dependOn(&run.cmd.step);
   if (b.args) |args| run.cmd.addArgs(args);
 
-  // logic tests (core/world/sim/game) need no window or GPU, but share the
-  // game's imports so game-level code can be exercised headless.
+  // logic tests (world/sim/game, and the engine's own) need no window or
+  // GPU, but share the game's imports so game-level code can be exercised
+  // headless.
   const tests = b.addTest(.{
-    .root_module = Mods.make(b, "src/tests.zig", t, o, vulkan, glfw_mod, zglfw.artifact("glfw"), &spvs),
+    .root_module = Mods.make(b, "src/tests.zig", t, o, engine, &spvs),
   });
+  const engine_tests = b.addTest(.{.root_module = engine});
   const test_step = b.step("test", "run unit tests.");
   test_step.dependOn(&b.addRunArtifact(tests).step);
+  test_step.dependOn(&b.addRunArtifact(engine_tests).step);
 }

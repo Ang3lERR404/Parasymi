@@ -5,9 +5,9 @@
 //! else is its colour, for now.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../core/math.zig");
-const Draw = @import("../ui/draw.zig").Draw;
-const Color = @import("../ui/draw.zig").Color;
+const m = @import("engine").core.math;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 const items = @import("../sim/items.zig");
 const st = @import("structures.zig");
 const seeds = @import("seeds.zig");

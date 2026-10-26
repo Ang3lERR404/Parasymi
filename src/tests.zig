@@ -1,15 +1,7 @@
-//! pure-logic test root: no window, no GPU.
+//! pure-logic test root: no window, no GPU (the engine's own tests run beside these).
 test {
-  _ = @import("core/math.zig");
-  _ = @import("core/registry.zig");
-  _ = @import("core/text.zig");
   _ = @import("game/text.zig");
   _ = @import("game/controls.zig");
-  _ = @import("platform/input.zig");
-  _ = @import("core/rng.zig");
-  _ = @import("core/noise.zig");
-  _ = @import("core/png.zig");
-  _ = @import("core/jobs.zig");
   _ = @import("world/gen.zig");
   _ = @import("world/world.zig");
   _ = @import("sim/ecology.zig");
@@ -33,6 +25,4 @@ test {
   _ = @import("gfx/meshes/wolf_belly.zig");
   _ = @import("gfx/meshes/wolf_rump.zig");
   _ = @import("gfx/meshes/radiant_kit.zig");
-  _ = @import("render/camera.zig");
-  _ = @import("render/light.zig");
 }

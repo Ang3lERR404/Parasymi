@@ -1,7 +1,7 @@
 //! HOLLOWHEART: a 2x2 heart-tree. A deep mana reservoir that feeds
 //! everything around its footprint.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_hollowheart, .size = 2,

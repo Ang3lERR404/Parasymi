@@ -5,9 +5,9 @@
 //!
 //! A new species is one new file plus one line in `parts`.
 const items = @import("items.zig");
-const color = @import("../core/color.zig");
-const m = @import("../core/math.zig");
-const registry = @import("../core/registry.zig");
+const color = @import("engine").core.color;
+const m = @import("engine").core.math;
+const registry = @import("engine").core.registry;
 
 const parts = struct {
   pub const lumenroot = @import("species/lumenroot.zig");

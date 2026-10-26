@@ -29,7 +29,7 @@
   the GPU (frames in flight), so profile before threading anything else.
 - Culling: chunks (`CHUNK_RADIUS`), plants and parts are culled to the view
   frustum (`m.Frustum`; `Parts.look` sets the frame's eye and view).
-- Shadows (`render/light.zig`): cost ~+3 ms on this machine's 35 ms demo
+- Shadows (engine `render/light.zig`): cost ~+3 ms on this machine's 35 ms demo
   frame.
 - Post: bloom ~0.1 ms. AA release (demo): off 4.1, fxaa 3.9, msaa4 4.35,
   msaa8 4.9 ms.

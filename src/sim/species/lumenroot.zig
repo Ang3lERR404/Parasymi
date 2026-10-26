@@ -4,7 +4,7 @@
 //! mat of braided roots, a leaf rosette, a vine twining up it, its cyan
 //! bloom opening out of a bead of resin sap.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .symbiotic, .seed = .seed_lumenroot,

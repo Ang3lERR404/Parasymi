@@ -3,9 +3,9 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const play = @import("../play.zig");
 const actions = @import("../actions.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
+const Draw = @import("engine").ui.draw.Draw;
 const s = @import("../style.zig");
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 
 const tendril_w:f32 = 120;
 const tendril_h = s.bar_h_bold;

@@ -2,8 +2,8 @@
 //! player and hover over the ground until dawn burns them away.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../core/math.zig");
-const Rng = @import("../core/rng.zig").Rng;
+const m = @import("engine").core.math;
+const Rng = @import("engine").core.rng.Rng;
 const World = @import("../world/world.zig").World;
 const txt = @import("text.zig");
 

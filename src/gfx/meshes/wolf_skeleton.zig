@@ -8,7 +8,7 @@
 //! next; the spine, neck and tail run up +Y.
 const std = @import("std");
 const testing = std.testing;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 
 const V3 = m.V3;
 const v3 = m.v3;

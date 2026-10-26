@@ -8,7 +8,7 @@ const Dir = Io.Dir;
 const Allocator = std.mem.Allocator;
 
 const OUT = "docs/files.md";
-const ROOTS = [_][]const u8{ "src", "shaders" };
+const ROOTS = [_][]const u8{ "src", "shaders", "engine/src", "engine/shaders" };
 const MAX_FILE = 4 << 20;
 const MAX_SUMMARY = 140;
 
@@ -51,7 +51,7 @@ fn collect(io:Io, arena:Allocator, root:[]const u8, rows:*std.ArrayList(Row)) !v
   while (try walk.next(io)) |e| {
     if (e.kind != .file) continue;
     const zig = std.mem.endsWith(u8, e.basename, ".zig");
-    if (!zig and std.mem.eql(u8, root, "src")) continue;
+    if (!zig and std.mem.endsWith(u8, root, "src")) continue;
     const path = try std.fmt.allocPrint(arena, "{s}/{s}", .{ root, e.path });
     std.mem.replaceScalar(u8, path, '\\', '/');
     const text = try e.dir.readFileAlloc(io, e.basename, arena, .limited(MAX_FILE));

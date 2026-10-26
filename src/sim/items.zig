@@ -1,7 +1,7 @@
 //! physical items and inventories. There is no global stockpile: every item
 //! lives in some inventory (the player, later structures) or in the world.
 const std = @import("std");
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const EnumArray = std.enums.EnumArray;
 const testing = std.testing;
 const species = @import("species.zig");

@@ -9,7 +9,7 @@
 //! start from it.)
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const Field = @import("../../sim/ecology.zig").Field;
 const st = @import("../structures.zig");
 const icon_kit = @import("../icon.zig");
@@ -17,8 +17,8 @@ const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 const halo = @import("halo.zig");
 
 // it floats as high as the blooms hang, at the heart of its ring, over

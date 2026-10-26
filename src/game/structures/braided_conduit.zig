@@ -11,7 +11,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const ck = @import("../../world/chunk.zig");
 const World = @import("../../world/world.zig").World;
 const items = @import("../../sim/items.zig");
@@ -20,11 +20,11 @@ const st = @import("../structures.zig");
 const icon_kit = @import("../icon.zig");
 const txt = @import("../text.zig");
 const prog = @import("../progression.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const style = @import("../style.zig");
 const Parts = @import("../parts.zig").Parts;
-const Draw = @import("../../ui/draw.zig").Draw;
-const Color = @import("../../ui/draw.zig").Color;
+const Draw = @import("engine").ui.draw.Draw;
+const Color = @import("engine").ui.draw.Color;
 const meshlib = @import("../../gfx/meshlib.zig");
 const mesh = @import("../../gfx/meshes/braided_conduit.zig");
 

@@ -2,10 +2,10 @@
 //! glowing in its hollow and pulsing (a deep reservoir that feeds around it).
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const items = @import("../../sim/items.zig");
 const icon_kit = @import("../icon.zig");
-const Color = @import("../../ui/draw.zig").Color;
+const Color = @import("engine").ui.draw.Color;
 
 pub const item:items.Item = .seed_hollowheart;
 

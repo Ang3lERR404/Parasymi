@@ -1,8 +1,13 @@
-//! a 32x32 block of tiles, stored as struct-of-arrays so hot loops stay linear.
-const m = @import("../core/math.zig");
+//! the garden's chunk: a 32x32 block of tiles (engine world/chunk.zig),
+//! stored as struct-of-arrays so hot loops stay linear.
+const m = @import("engine").core.math;
+const grid = @import("engine").world.chunk;
 
-pub const SIZE = 32;
-pub const N = SIZE * SIZE;
+pub const SIZE = grid.SIZE;
+pub const N = grid.N;
+pub const Coord = grid.Coord;
+pub const MeshSlot = grid.MeshSlot;
+pub const localIndex = grid.localIndex;
 /// how much a resource node holds (thousands, so a node lasts)
 pub const Res = u16;
 const NONE:u32 = m.maxInt(u32);
@@ -12,13 +17,6 @@ pub const Kind = enum(u8) {
 
   /// tiles a seed can take root in.
   pub fn fertile(k:Kind) bool { return k == .soil or k == .moss or k == .ley; }
-};
-
-pub const Coord = struct {
-  x:i32, y:i32,
-  pub fn ofTile(wx:i32, wy:i32) Coord {
-    return .{.x = @divFloor(wx, SIZE), .y = @divFloor(wy, SIZE)};
-  }
 };
 
 /// a plant's slot in `sim/plants.zig`. Distinct from `StructId` so the two
@@ -36,9 +34,6 @@ pub const StructId = enum(u32) {
   pub fn of(i:usize) StructId { return @enumFromInt(i); }
   pub fn idx(s:StructId) usize { return @intFromEnum(s); }
 };
-
-/// a renderer-owned mesh slot (the world only keeps it for the renderer).
-pub const MeshSlot = enum(u32) { _ };
 
 /// what sits on a tile: a rooted plant, a structure, or nothing, packed into
 /// one word (the top bit tells structures apart). Floating plants occupy no tile.
@@ -64,12 +59,6 @@ pub const Occ = enum(u32) {
     return switch (o.get()) { .structure => |s| s, .empty, .plant => null };
   }
 };
-
-pub inline fn localIndex(wx:i32, wy:i32) usize {
-  const lx:usize = @intCast(@mod(wx, SIZE));
-  const ly:usize = @intCast(@mod(wy, SIZE));
-  return ly * SIZE + lx;
-}
 
 pub fn blank(at:Coord) Chunk {
   return .{.at = at, .height = undefined, .kind = undefined, .ley = undefined, .ley_cap = undefined,
@@ -97,7 +86,5 @@ pub const Chunk = struct {
   pub fn originX(c:*const Chunk) i32 { return c.at.x * SIZE; }
   pub fn originY(c:*const Chunk) i32 { return c.at.y * SIZE; }
   /// world tile (x, y) of local tile index `t` (inverse of `localIndex`).
-  pub fn tileOf(c:*const Chunk, t:usize) [2]i32 {
-    return .{c.originX() + @as(i32, @intCast(t % SIZE)), c.originY() + @as(i32, @intCast(t / SIZE))};
-  }
+  pub fn tileOf(c:*const Chunk, t:usize) [2]i32 { return grid.tileOf(c.at, t); }
 };

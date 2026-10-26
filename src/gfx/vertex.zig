@@ -1,7 +1,13 @@
 //! GPU vertex/instance layouts. Pipelines derive their attribute descriptions
 //! from these (gfx/pipeline.zig), and the GLSL `layout(location=..)` must match
 //! field order.
-const color = @import("../core/color.zig");
+const engine = @import("engine");
+const color = engine.core.color;
+const ev = engine.gfx.vertex;
+
+/// the engine's own layouts (points of light, UI quads)
+pub const Light = ev.Light;
+pub const Ui = ev.Ui;
 
 pub const Terrain = extern struct {
   pos:[3]f32,
@@ -147,31 +153,6 @@ pub const PartInstance = extern struct {
 /// `PartInstance.flags`: a placement preview (casts no shadow); part.vert
 /// reads it as `PART_GHOST`
 pub const PART_GHOST:u32 = 1;
-
-/// a point of light (a bloom's core, a star mote, a halo's flash) as the
-/// shaders read it from the frame's lighting record: it lights what lies
-/// within its reach, brightest beside it, gone at the edge
-pub const Light = extern struct {
-  /// xyz where it is, w how far it reaches (world units)
-  pos:[4]f32,
-  /// linear rgb times its strength; w unused
-  col:[4]f32,
-};
-
-pub const Ui = extern struct {
-  pos:[2]f32,
-  /// local coordinates inside the quad: glyph cells (0..6, 0..8) for text,
-  /// pixels (0..size) for shapes
-  uv:[2]f32,
-  /// quad size in pixels (shapes need it for aspect-correct distance fields)
-  size:[2]f32,
-  col:[4]u8,
-  /// glyph: 5x7 bitmap packed row-major (bit 0 = top-left).
-  /// shape: x = 0xffffffff, y = shape kind (see ui/draw.zig `Shape`)
-  bits:[2]u32,
-  /// shape parameters: x value/selection 0..1, y phase/seed
-  param:[2]f32,
-};
 
 /// a halo forming around a polyp (game/structures/polyp.zig), as an
 /// instance carries it to the shaders: xyz its centre (where the diamond

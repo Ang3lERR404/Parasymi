@@ -3,9 +3,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const fields = std.meta.fields;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const play = @import("../play.zig");
-const Draw = @import("../../ui/draw.zig").Draw;
+const Draw = @import("engine").ui.draw.Draw;
 const s = @import("../style.zig");
 const txt = @import("../text.zig");
 

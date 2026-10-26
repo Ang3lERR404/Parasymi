@@ -1,13 +1,13 @@
 //! terrain: one draw per resident chunk mesh (built by renderer.syncWorld).
-const vk = @import("vulkan");
+const vk = @import("engine").vk;
 const vertex = @import("../../gfx/vertex.zig");
-const pipeline = @import("../../gfx/pipeline.zig");
+const pipeline = @import("engine").gfx.pipeline;
 const pass = R.pass;
 const R = @import("../renderer.zig");
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 
 pub const desc:pass.Desc = .{
-  .vert = "terrain.vert", .frag = "terrain.frag",
+  .vert = @embedFile("terrain.vert"), .frag = @embedFile("terrain.frag"),
   .bindings = &.{pipeline.binding(vertex.Terrain, 0, .vertex)},
   .attrs = &pipeline.attrs(vertex.Terrain, 0, 0),
 };
@@ -18,7 +18,7 @@ pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.
   const zero = [_]vk.DeviceSize{0};
   // only chunks the camera can see
   const view = m.Frustum.of(scene.push.vp);
-  for (r.slots.items) |s| {
+  for (r.ext.slots.items) |s| {
     if (!s.live or s.count == 0) continue;
     if (!view.sphere(m.v3(s.centre[0], R.CHUNK_MID_Y, s.centre[1]), R.CHUNK_RADIUS)) continue;
     cmd.bindVertexBuffers(0, &.{s.buf.buf}, &zero);

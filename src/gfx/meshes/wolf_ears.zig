@@ -8,10 +8,10 @@
 //! a dense shell of vine, the two joined by the rolled rim.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const skel = @import("wolf_skeleton.zig");
 const Sculpt = @import("sculpt_kit.zig").Sculpt;
 

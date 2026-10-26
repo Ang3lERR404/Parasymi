@@ -6,7 +6,7 @@
 //! convergence_kit.zig `confluence`): a trunk of each lineage winding up
 //! round the other and fusing into one weave of both, crowned by flowers.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .convergent, .seed = null, .size = 2, .yields = .convergence_essence,

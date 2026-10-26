@@ -4,14 +4,14 @@
 //! Neighbour links are cached as plain indices and rebuilt only when the
 //! topology changes, so the per-tick ecology loop never touches a hash map.
 const std = @import("std");
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const Allocator = std.mem.Allocator;
 const testing = std.testing;
 const indexOfScalar = std.mem.indexOfScalar;
 const ck = @import("../world/chunk.zig");
 const World = @import("../world/world.zig").World;
 const species = @import("species.zig");
-const jobs = @import("../core/jobs.zig");
+const jobs = @import("engine").core.jobs;
 const Turn = @import("turn.zig").Turn;
 
 pub const Id = ck.PlantId;

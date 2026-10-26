@@ -18,13 +18,13 @@ const std = @import("std");
 const EnumArray = std.enums.EnumArray;
 const copyBackwards = std.mem.copyBackwards;
 const testing = std.testing;
-const m = @import("../core/math.zig");
-const registry = @import("../core/registry.zig");
+const m = @import("engine").core.math;
+const registry = @import("engine").core.registry;
 const species = @import("../sim/species.zig");
 const ecology = @import("../sim/ecology.zig");
 const items = @import("../sim/items.zig");
 const txt = @import("text.zig");
-const ctext = @import("../core/text.zig");
+const ctext = @import("engine").core.text;
 
 const techs = struct {
   pub const ley_sight = @import("research/ley_sight.zig");

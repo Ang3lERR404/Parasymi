@@ -11,15 +11,15 @@
 //! unfolding as they pass, the tuft last.
 const std = @import("std");
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
 const pal = @import("palette.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const vertex = @import("../vertex.zig");
 const kit = @import("structure_kit.zig");
 const conduit = @import("conduit.zig");
 const growth = @import("../growth.zig");
-const Rng = @import("../../core/rng.zig").Rng;
+const Rng = @import("engine").core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

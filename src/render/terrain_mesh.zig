@@ -8,12 +8,12 @@
 //! Border neighbours come from the generator directly, so a chunk can be
 //! meshed without its neighbours being loaded.
 const std = @import("std");
-const m = @import("../core/math.zig");
+const m = @import("engine").core.math;
 const Allocator = std.mem.Allocator;
 const ck = @import("../world/chunk.zig");
 const gen = @import("../world/gen.zig");
-const rng = @import("../core/rng.zig");
-const color = @import("../core/color.zig");
+const rng = @import("engine").core.rng;
+const color = @import("engine").core.color;
 const vertex = @import("../gfx/vertex.zig");
 const TV = vertex.Terrain;
 const DetailTile = vertex.DetailTile;

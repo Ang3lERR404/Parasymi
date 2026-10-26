@@ -21,13 +21,13 @@
 const std = @import("std");
 const assert = std.debug.assert;
 const Allocator = std.mem.Allocator;
-const m = @import("../../core/math.zig");
+const m = @import("engine").core.math;
 const mg = @import("../meshgen.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 const vertex = @import("../vertex.zig");
 const species = @import("../../sim/species.zig");
 const mineral = @import("mineral_kit.zig");
-const Rng = @import("../../core/rng.zig").Rng;
+const Rng = @import("engine").core.rng.Rng;
 
 const V3 = m.V3;
 const v3 = m.v3;

@@ -4,7 +4,7 @@
 //! its own). Drains every non-parasitic neighbour and the ley beneath it;
 //! yields more, at their expense.
 const species = @import("../species.zig");
-const color = @import("../../core/color.zig");
+const color = @import("engine").core.color;
 
 pub const def:species.Species = .{
   .lineage = .parasitic, .seed = .seed_thornleech,
