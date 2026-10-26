@@ -82,6 +82,10 @@ pub const Mote = struct {
   phase:f32,
   /// still falling (it trails light) rather than resting over the ground
   falling:bool = true,
+  /// ground height it lands on (kept while its tile is not walkable), and
+  /// how far its sway has it off the point it fell toward
+  ground:f32 = 0,
+  sway:f32 = 0,
 };
 
 /// starfall tuning (tune here, not scattered through update)
@@ -89,11 +93,14 @@ const SPAWN_RATE:f32 = 0.9; // motes per second at full night
 const SPAWN_R_MIN:f32 = 2;
 const SPAWN_R_MAX:f32 = 16;
 const SPAWN_HEIGHT:f32 = 7; // how far above ground they start
-const FALL_MIN:f32 = 0.8;
-const FALL_MAX:f32 = 1.6;
+/// speed it sets off at (m/s) and how hard it is pulled down (m/s²)
+const FALL_MIN:f32 = 1.5;
+const FALL_MAX:f32 = 2.5;
+const GRAVITY:f32 = 4;
 const REST_HOVER:f32 = 0.35; // how far above ground they rest
 const HOVER_AMP:f32 = 0.08;  // vertical bob amplitude while resting
-const DRIFT:f32 = 0.3; // horizontal sway speed while falling
+/// horizontal sway (m) at spawn height, gone by the time it lands
+const DRIFT:f32 = 0.25;
 const LAND_EASE:f32 = 3; // how quickly they settle onto the rest height
 const SPAWN_NIGHT:f32 = 0.6; // night deeper than this, stars fall
 const FALLING_ABOVE:f32 = 0.05; // above rest by this much, a mote still trails
@@ -141,19 +148,27 @@ pub const Starfall = struct {
         const x = around[0] + @cos(a) * r;
         const z = around[2] + @sin(a) * r;
         const h = ground.walkable(m.tileOf(x), m.tileOf(z)) orelse continue;
-        try sf.motes.append(gpa, .{ .pos = m.v3(x, h + SPAWN_HEIGHT, z), .vy = -sf.rng.range(FALL_MIN, FALL_MAX), .phase = sf.rng.float() });
+        try sf.motes.append(gpa, .{ .pos = m.v3(x, h + SPAWN_HEIGHT, z), .vy = -sf.rng.range(FALL_MIN, FALL_MAX), .phase = sf.rng.float(), .ground = h });
       }
     }
     var i:usize = 0;
     while (i < sf.motes.items.len) {
       const mo = &sf.motes.items[i];
-      const h = ground.walkable(m.tileOf(mo.pos[0]), m.tileOf(mo.pos[2])) orelse mo.pos[1];
-      const rest = h + REST_HOVER + HOVER_AMP * @sin(mo.phase * HOVER_RATE + mo.pos[0]);
+      if (ground.walkable(m.tileOf(mo.pos[0]), m.tileOf(mo.pos[2]))) |h| mo.ground = h;
+      const rest = mo.ground + REST_HOVER + HOVER_AMP * @sin(mo.phase * HOVER_RATE);
       mo.falling = mo.pos[1] > rest + FALLING_ABOVE;
       if (mo.pos[1] > rest) {
+        mo.vy -= GRAVITY * dt;
         mo.pos[1] = @max(rest, mo.pos[1] + mo.vy * dt);
-        mo.pos[0] += @sin(mo.phase * DRIFT_RATE + mo.pos[1]) * DRIFT * dt;
-      } else mo.pos[1] += (rest - mo.pos[1]) * @min(1, dt * LAND_EASE);
+      } else {
+        mo.vy = -FALL_MIN;
+        mo.pos[1] += (rest - mo.pos[1]) * @min(1, dt * LAND_EASE);
+      }
+      // the sway is an offset that dies away as it nears the ground, so it
+      // lands where it was falling toward
+      const sway = @sin(mo.phase * DRIFT_RATE + mo.pos[1]) * DRIFT * m.clamp01((mo.pos[1] - rest) / SPAWN_HEIGHT);
+      mo.pos[0] += sway - mo.sway;
+      mo.sway = sway;
       if (night < BURN_BELOW) mo.life -= dt * BURN_RATE;
       if (mo.life <= 0) { _ = sf.motes.swapRemove(i); continue; }
       i += 1;
