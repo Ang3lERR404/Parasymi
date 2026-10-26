@@ -296,6 +296,16 @@ pub const Voice = struct {
   }
   pub fn stop(v:*Voice) void { v.env.off(); }
 
+  /// what a game sends a playing voice (`platform.audio.Output`)
+  pub const Cmd = union(enum) { play:f32, stop, gain:f32 };
+  pub fn apply(v:*Voice, cmd:Cmd) void {
+    switch (cmd) {
+      .play => |hz| v.play(hz),
+      .stop => v.stop(),
+      .gain => |g| v.gain.target = g,
+    }
+  }
+
   /// fills `out` (mono), mixing into what is there so voices sum
   pub fn render(v:*Voice, out:[]f32) void {
     if (v.env.stage == .idle) return;

@@ -45,6 +45,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `vertex.zig` — the GPU layouts the engine itself defines: built meshes (with skin and growth records beside them), UI quads and points of light.
 
 ## engine/src/platform/
+- `audio.zig` — sound out: the default WASAPI device pulling blocks from a `dsp` source.
 - `display.zig` — fullscreen toggling: borderless on the primary monitor at its native mode, returning to the exact windowed position and size it left.
 - `input.zig` — per-frame input snapshot with edge detection, fed by GLFW.
 

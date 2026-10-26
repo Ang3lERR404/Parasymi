@@ -3,7 +3,7 @@
 //! it as `@import("engine")` and hands the generic parts (`render.renderer`,
 //! `world.World`) a namespace describing itself.
 //!   core      math, colour, rng, noise, registry, jobs, text, png, dsp
-//!   platform  input, display (fullscreen)
+//!   platform  input, display (fullscreen), audio (WASAPI output)
 //!   anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 //!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
 //!   world     the chunk grid and the streamed chunk map
@@ -31,6 +31,7 @@ pub const core = struct {
 pub const platform = struct {
   pub const input = @import("platform/input.zig");
   pub const display = @import("platform/display.zig");
+  pub const audio = @import("platform/audio.zig");
 };
 
 pub const anim = struct {
@@ -82,6 +83,7 @@ test {
   _ = core.png;
   _ = core.dsp;
   _ = platform.input;
+  _ = platform.audio;
   _ = anim.rig;
   _ = anim.clip;
   _ = gfx.meshgen;

@@ -106,7 +106,7 @@ build. New shaders go in `build.zig`'s list (the engine's in
 `engine/src/` (`@import("engine")`, never imports the game):
 ```
 core      math, color, rng, noise, registry, jobs, text, png, dsp
-platform  input, display (fullscreen)
+platform  input, display (fullscreen), audio (WASAPI output)
 anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
           mesh builder + primitives (Mesher), SDF sculpting,
@@ -160,7 +160,8 @@ Code:
   `std.math`, hand-rolled casts or hand-rolled linear algebra. A singular
   matrix is a bug.
 - Threads only via `jobs.each` on `w.io`, results identical to serial,
-  with a test proving it. Never spawn threads or keep a pool.
+  with a test proving it. Never spawn threads or keep a pool (the audio
+  device's render thread is zig-wsapi's own, fed through `audio.Output`).
 - Dense per-element visual work runs on the GPU, never per frame/chunk on
   the CPU.
 - `WorldPush` ≤ 192 bytes. A new see-through part role goes in
