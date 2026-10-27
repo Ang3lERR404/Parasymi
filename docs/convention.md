@@ -24,7 +24,9 @@ ___
 # ***Y E S***
 ___
 # #1 enemy: **SNAKE_CASE**.
-it's just bad. It's pointless, it makes variables or constants stupidly long to type, and overall a huge waste of time.
+### it's just bad. It's pointless, it makes variables or constants stupidly long to type, and overall a huge waste of time.
+# #2 enemy: **stupidly long ID's.**
+### if a declaration ever gets uncomprehensibly long, it's better to type it like `const tNTLong;` which stands for `thingNotTooLong`
 
 ## General Rules:
 ### 1. Don't be a space hog.
@@ -34,6 +36,15 @@ it's just bad. It's pointless, it makes variables or constants stupidly long to 
 > `if` newline `(...)` newline `{...}` newline `else` newline `{...}`
 > `const reallylongandpointlesslyhugenamethatisjuststupid = "something extra short";`
 > `const really_Long_and_Pointlessly_huge_name_that_is_just_idiotic = "extra short thing";`
+
+#### excessive reuse of keywords especially if the compiler/runtime is smart enough to figure it out:
+- `inline`
+
+### 1.1 How not to be a space hog.
+> `if (...) return EXPRESSION/whatever else;`
+> `const sNames = "good";`
+> `fn sName(1 -> 4 parameters) ... {}`
+> Compile time blocks
 ### 2. If struct data can be represented in one single file, do that instead.
 ### 3. Don't be a fixed point in space, be a dynamic moving object that is never constrained.
 ### 4. Data is mutable/dynamic and should never be fixed. The only time that data should be fixed, is when it is genuinely helpful, otherwise, it's harmful and should be discarded immediately.
