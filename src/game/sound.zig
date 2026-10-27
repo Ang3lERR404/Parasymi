@@ -39,7 +39,7 @@ const Footfall = lib.player.Footfall;
 /// play at it leaves the garden silent)
 pub const RATE:u32 = 48000;
 /// steps that may sound at once (a sprint overlaps two or three)
-const VOICES = 6;
+const VOICES = 64;
 /// a step quieter than this has ended and frees its voice
 const SILENT:f32 = 1e-4;
 
@@ -584,7 +584,7 @@ const MUSIC_FROM:f32 = 0.05;
 const MUSIC:f32 = 1;
 
 /// a MIDI note of the scale, `i` steps above the key
-fn scaleNote(i:u8) u8 { return KEY + 12 * (i / PENTA.len) + PENTA[i % PENTA.len]; }
+fn scaleNote(i:u8) u8 { return @intCast(KEY + 12 * (i / PENTA.len) + PENTA[i % PENTA.len]); }
 
 /// the note nearest `note` (within a whole tone) that is in `c`
 fn chordTone(note:u8, c:Chord) u8 {
@@ -1000,6 +1000,15 @@ pub const Sounds = struct {
     return s.steal;
   }
 };
+
+// pub const Choir = struct{
+//   const This = @This();
+//   singers:comptime_int,
+//   spread:f32 = 14,
+//   vibratoHZ:[]f32 = &.{4.2,5.8},
+//   vibrato:f32 = 12,
+//   formants:[]f32
+// };
 
 const TEST_RATE:f32 = 48000;
 

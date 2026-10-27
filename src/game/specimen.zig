@@ -31,6 +31,7 @@ const play = lib.play;
 const actions = lib.actions;
 const turn = lib.turn;
 const Game = play.Game;
+const diag = lib.diagnostics;
 
 /// a loop's animation runs `period` seconds, then holds its end this long
 /// before it starts again
@@ -165,6 +166,26 @@ pub const Specimen = struct {
       }
       if (found or s.what == .plant) break;
     }
+    if (!found) switch(s.what) {
+      .structure => |k| {
+        s.at = .{cz, cx};
+        const sdef = st.defs.get(k);
+        const size = sdef.size;
+        const fallback = st.firstGround(k);
+        const c0 = g.world.chunkOfTile(cx, cz) orelse return;
+        const h0 = c0.height[ck.localIndex(cx, cz)];
+        for(0..size,0..size) |dx,dz| {
+          const lx = cx + @as(i32, @intCast(dx));
+          const lz = cz + @as(i32, @intCast(dz));
+          if (g.world.chunkOfTile(lx, lz)) |c| {
+            const t = ck.localIndex(lx, lz);
+            c.kind[t] = fallback;
+            c.height[t] = h0;
+          }
+        }
+      },
+      else => {}
+    };
     try s.put(g);
     const size:u8, const up:f32 = switch (s.what) {
       .plant => |sp| .{if (species.get(sp).floating) 1 else species.get(sp).size, 0},
@@ -189,7 +210,8 @@ pub const Specimen = struct {
         .growth = if (s.state == .live) 0 else l.growth, .span = if (s.state == .live) 0 else NEVER,
       }),
       .structure => |k| {
-        _ = try g.structs.place(g.gpa, &g.world, s.at[0], s.at[1], k, 0, SEED);
+        const ok = try g.structs.place(g.gpa, &g.world, s.at[0], s.at[1], k, 0, SEED);
+        if (!ok) diag.whyNot(&g.structs, &g.world, s.at[0], s.at[1], k);
         if (g.structs.list.items.len > 0) g.structs.list.items[0].grown = l.growth;
       },
     }
@@ -229,6 +251,7 @@ pub const Specimen = struct {
         if (g.structs.list.items.len == 0) try s.put(g);
         // it notices its neighbours (a conduit its arches) but never works
         lib.structures.Structures.linkWith(g.structCtx(.{}));
+        if (g.structs.list.items.len == 0) return false;
         const one = &g.structs.list.items[0];
         one.grown = l.growth;
         one.activity = 0;

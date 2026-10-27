@@ -140,7 +140,9 @@ pub fn World(comptime L:type) type {
       while (it.next()) |p| {
         const c = w.chunkOfTile(p[0], p[1]) orelse return false;
         const t = ck.localIndex(p[0], p[1]);
-        if (c.occ[t] != .none or !ok(c.kind[t]) or c.height[t] != h0) return false;
+        if (c.occ[t] != .none or !ok(c.kind[t]) or @abs(c.height[t] - h0) > 0.05) return false;
+        // erroneous, causes buggy behavior.
+        // if (c.occ[t] != .none or !ok(c.kind[t]) or c.height[t] != h0) return false;
       }
       return true;
     }

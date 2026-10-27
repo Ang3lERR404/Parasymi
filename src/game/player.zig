@@ -36,7 +36,7 @@ const parts = lib.parts;
 const Parts = parts.Parts;
 
 pub const SLOTS = 24;
-pub const REACH:f32 = 2.4;
+pub const REACH:f32 = 3.5;
 const STEP_UP:f32 = 0.45;
 const WALK_SPEED:f32 = 4.0;
 const SPRINT_SPEED:f32 = 6.5;

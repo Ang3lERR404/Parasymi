@@ -889,6 +889,18 @@ pub const HandOff = struct {
   amount:u16 = 1,
 };
 
+pub fn firstGround(k:Kind) ck.Kind {
+  return switch (k) {
+    inline else => |t| {
+      const gf = if (comptime reg.has(t, "ground")) reg.module(t).ground else anyTile;
+      return blk:{
+        for (std.enums.values(ck.Kind)) |c| if (gf(c)) break :blk c;
+        break :blk .soil;
+      };
+    }
+  };
+}
+
 /// hand one of what structure `i` lets go (`outputs`) to a neighbour beside
 /// it that wants it; returns whether one went.
 pub fn handOff(ctx:Ctx, i:Id) bool { return handOffWith(ctx, i, .{}) > 0; }

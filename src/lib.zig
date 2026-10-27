@@ -76,3 +76,4 @@ pub const wolf_pec = @import("gfx/meshes/wolf_pec.zig");
 pub const wolf_rump = @import("gfx/meshes/wolf_rump.zig");
 pub const terrain_mesh = @import("render/terrain_mesh.zig");
 pub const ecology = @import("sim/ecology.zig");
+pub const diagnostics = @import("diagnostics.zig");

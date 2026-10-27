@@ -1,6 +1,5 @@
 # Both past and future things that are yet to be implemented/going to be implemented.
 
-
 ## Past.
   - [ ] Alt mode:
     - [ ] pressing `alt` toggles icon overview of what is being crafted/held
