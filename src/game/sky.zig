@@ -86,6 +86,7 @@ pub const Mote = struct {
   /// how far its sway has it off the point it fell toward
   ground:f32 = 0,
   sway:f32 = 0,
+  pulled:bool = false
 };
 
 /// starfall tuning (tune here, not scattered through update)
@@ -154,6 +155,7 @@ pub const Starfall = struct {
     var i:usize = 0;
     while (i < sf.motes.items.len) {
       const mo = &sf.motes.items[i];
+      if (mo.pulled) {i+=1; continue;}
       if (ground.walkable(m.tileOf(mo.pos[0]), m.tileOf(mo.pos[2]))) |h| mo.ground = h;
       const rest = mo.ground + REST_HOVER + HOVER_AMP * @sin(mo.phase * HOVER_RATE);
       mo.falling = mo.pos[1] > rest + FALLING_ABOVE;

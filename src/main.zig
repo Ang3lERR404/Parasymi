@@ -235,6 +235,14 @@ pub fn main(init:Init) !void {
       o.send(.{.daylight = game.sky.daylight()}) catch |e| log.warn("daylight: {t}", .{e});
       told_day = game.sky.daylight();
     };
+    // the asthraxia's research hums and chimes
+    if (game.arsthraxiaState()) |cmd| {
+      if (sounds) |o| {
+        o.send(cmd) catch |e| log.warn("arsthraxia:{t}",.{e});
+      } else if (sounds) |o| {
+        o.send(.{.arsthraxia=.{.progress=0,.fed=0,.complete=false}}) catch |e| log.warn("arsthraxia:{t}",.{e});
+      }
+    }
     // out of the wolf's eyes its sap is heard settling
     if (game.cam.inEyes() != in_eyes) if (sounds) |o| {
       o.send(.{.eyes = !in_eyes}) catch |e| log.warn("eyes: {t}", .{e});

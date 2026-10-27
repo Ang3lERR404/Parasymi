@@ -551,7 +551,15 @@ pub const Game = struct {
     try g.world.far(g.focus(), STREAM_RADIUS, &g.far);
     for (g.far.items) |c| try g.world.unload(c);
   }
-
+  pub fn arsthraxiaState(g:*const Game) ?lib.sound.Sounds.Cmd {
+    for (g.structs.list.items) |*s| {
+      if (s.kind() != .arsthraxia) continue;
+      const a = &s.state.arsthraxia;
+      if (!a.lab.active and a.flare <= 0) return null;
+      return .{.arsthraxia = .{.progress = a.lab.t, .fed = a.fed, .complete = a.flare > 0.9}};
+    }
+    return null;
+  }
   /// the view is in the wolf's eyes: its head is not drawn (its shadow is)
   pub fn headless(g:*const Game) bool {
     return switch (g.cam.view) {

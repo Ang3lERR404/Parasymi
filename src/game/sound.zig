@@ -915,7 +915,13 @@ const Music = struct {
 pub const Sounds = struct {
   /// a paw landed; the view entered or left the wolf's eyes; a mote near
   /// the wolf twinkled; the daylight changed (0 night .. 1 day)
-  pub const Cmd = union(enum) { step:Footfall, eyes:bool, twinkle:lib.sky.Twinkle, daylight:f32 };
+  pub const Cmd = union(enum) {
+    step:Footfall,
+    eyes:bool,
+    twinkle:lib.sky.Twinkle,
+    daylight:f32,
+    arsthraxia:struct{progress:f32,fed:f32,complete:bool}
+  };
 
   rate:f32,
   r:rng.Rng,
@@ -936,6 +942,10 @@ pub const Sounds = struct {
   twinkles:[TWINKLES]?Twinkle = @splat(null),
   next_twinkle:usize = 0,
   music:Music,
+  research:?Research = null,
+  boom:?Boom = null,
+  resProgress:f32 = 0,
+  resFed:f32 = 0,
 
   pub fn init(seed:u64, rate:f32) Sounds {
     var r:rng.Rng = .init(seed);
@@ -961,6 +971,16 @@ pub const Sounds = struct {
         s.next_twinkle = (s.next_twinkle + 1) % TWINKLES;
       },
       .daylight => |d| s.music.daylight(d),
+      .arsthraxia => |a| {
+        s.resProgress = a.progress;
+        s.resFed = a.fed;
+        if (a.complete and s.boom == null) s.boom = .init(&s.r, s.rate);
+        if (a.progress > 0 and a.progress < 1) {
+          if (s.research == null) s.research = .init(&s.r, s.rate);
+        } else if (a.progress == 0) {
+          s.research = null;
+        }
+      }
     }
   }
 
@@ -972,6 +992,10 @@ pub const Sounds = struct {
       if (!t.render(out)) v.* = null;
     };
     s.sap(out);
+    if (s.research) |*rs| rs.render(out, s.resProgress, s.resFed);
+    if (s.boom) |*bm| {
+      if (!bm.render(out)) s.boom = null;
+    }
     s.wind.render(out);
     s.music.render(out);
     for (out) |*x| x.* = dsp.softClip(x.*);
@@ -1009,6 +1033,272 @@ pub const Sounds = struct {
 //   vibrato:f32 = 12,
 //   formants:[]f32
 // };
+// ---- the arsthraxia: whorl → choir crescendo → boom → shimmer ----
+
+// the whorl: two detuned saws whose beat IS the vortex spin; a fast FM
+// (depth increasing with progress) creates the "spinning" sensation; a
+// band-pass focuses them and tightens as the energy concentrates
+const WHORL_BASE = [2]f32{55, 55.5};
+const WHORL_FM_HZ = [2]f32{6, 18};
+const WHORL_FM_DEPTH = [2]f32{0.02, 0.12};
+const WHORL_FILTER = [2]f32{200, 800};
+const WHORL_Q = [2]f32{1.5, 6};
+const WHORL:f32 = 1.8;
+const RUMBLE_HZ:f32 = 35;
+const RUMBLE:f32 = 0.4;
+const EXPAND_AT:f32 = 0.72;
+const RES_SOFT_HZ:f32 = 3500;
+const RES:f32 = 0.10;
+const RES_FED:f32 = 0.3;
+
+// the choir: a vowel sung by a few voices, swelling with progress
+const SINGERS = 4;
+const CHOIR_BASE = [2]f32{165, 262};
+const CHOIR_SPREAD:f32 = 14;
+const VIBRATO_HZ = [2]f32{4.5, 6.0};
+const VIBRATO_CENTS:f32 = 15;
+const BODY_HZ:f32 = 350;
+const BODY:f32 = 0.8;
+const F1:f32 = 500;
+const F2:f32 = 1200;
+const F3:f32 = 2800;
+const F1_Q:f32 = 6;
+const F2_Q:f32 = 8;
+const F3_Q:f32 = 10;
+const F1_L:f32 = 1.0;
+const F2_L:f32 = 0.5;
+const F3_L:f32 = 0.2;
+const CHOIR_FROM:f32 = 0.3;
+const CHOIR_FULL:f32 = 0.85;
+const CHOIR_ATTACK:f32 = 1.5;
+const CHOIR:f32 = 0.18;
+
+// the boom: a sharp pop into a deep, long thud
+const BOOM_CORE = [2]f32{55, 30};
+const BOOM_DROP:f32 = 0.2;
+const BOOM_CORE_FALL:f32 = 1.8;
+const BOOM_THUD:f32 = 2.0;
+const BOOM_SUB_HZ:f32 = 28;
+const BOOM_SUB_FALL:f32 = 2.5;
+const BOOM_SUB:f32 = 0.6;
+const BOOM_POP_HZ:f32 = 2500;
+const BOOM_POP_FALL:f32 = 0.008;
+const BOOM_POP:f32 = 0.8;
+const BOOM_THUMP_HZ:f32 = 100;
+const BOOM_THUMP_FALL:f32 = 0.15;
+const BOOM_THUMP:f32 = 1.2;
+const BOOM:f32 = 0.15;
+
+// the shimmer: a cascade of inharmonic partials (a crystalline structure
+// fracturing), each starting slightly after the last, some wobbling as
+// they ring out
+const BOOM_SHIMMER_N = 10;
+const BOOM_SHIMMER_BASE:f32 = 660;
+const BOOM_SHIMMER_INHARM:f32 = 0.004;
+const BOOM_SHIMMER_STAGGER:f32 = 0.012;
+const BOOM_SHIMMER_SOFT_HZ:f32 = 6000;
+const BOOM_SHIMMER:f32 = 0.08;
+const BOOM_SHIMMER_WOBBLE = [BOOM_SHIMMER_N]bool{
+  false, true, false, true, false, true, false, true, false, true,
+};
+const BOOM_SHIMMER_WOBBLE_HZ = [2]f32{2.0, 3.5};
+const BOOM_SHIMMER_WOBBLE_DEPTH:f32 = 0.25;
+
+/// one singer: a detuned saw with its own vibrato
+const Singer = struct {
+  osc:dsp.Osc,
+  vibrato:dsp.Osc,
+  base:f32,
+
+  fn init(i:usize, base:f32, r:*rng.Rng, rate:f32) Singer {
+    const cents = m.f(@as(i32, @intCast(i)) - (SINGERS - 1) / 2) * CHOIR_SPREAD;
+    const hz = base * m.pow(f32, 2, cents / 1200);
+    return .{
+      .osc = .{.rate = rate, .shape = .saw, .freq = hz},
+      .vibrato = .{.rate = rate, .freq = r.range(VIBRATO_HZ[0], VIBRATO_HZ[1])},
+      .base = hz,
+    };
+  }
+
+  fn tick(sg:*Singer, u:f32) f32 {
+    const rise = m.lerp(1, CHOIR_BASE[1] / CHOIR_BASE[0], m.smooth(u));
+    sg.osc.freq = sg.base * rise * (1 + VIBRATO_CENTS / 100 * 0.01 * sg.vibrato.next());
+    return sg.osc.next();
+  }
+};
+
+/// the sustained voice: whorl + rumble + choir crescendo, driven by progress
+const Research = struct {
+  rate:f32,
+  r:rng.Rng,
+  oscA:dsp.Osc,
+  oscB:dsp.Osc,
+  fm:dsp.Osc,
+  band:dsp.Biquad,
+  rumble:dsp.Osc,
+  singers:[SINGERS]Singer,
+  body:dsp.OnePole,
+  f1:dsp.Biquad,
+  f2:dsp.Biquad,
+  f3:dsp.Biquad,
+  choir_fade:dsp.Smooth,
+  soft:dsp.OnePole,
+  at:u32 = 0,
+  gain:f32,
+
+  fn init(r:*rng.Rng, rate:f32) Research {
+    var singers:[SINGERS]Singer = undefined;
+    for (&singers, 0..) |*sg, i| sg.* = .init(i, CHOIR_BASE[0], r, rate);
+    return .{
+      .rate = rate,
+      .r = .init(r.next()),
+      .oscA = .{.rate = rate, .shape = .saw, .freq = WHORL_BASE[0]},
+      .oscB = .{.rate = rate, .shape = .saw, .freq = WHORL_BASE[1]},
+      .fm = .{.rate = rate, .shape = .sine, .freq = WHORL_FM_HZ[0]},
+      .band = .init(.band, WHORL_FILTER[0], WHORL_Q[0], rate),
+      .rumble = .{.rate = rate, .shape = .sine, .freq = RUMBLE_HZ},
+      .singers = singers,
+      .body = .init(BODY_HZ, rate),
+      .f1 = .init(.band, F1, F1_Q, rate),
+      .f2 = .init(.band, F2, F2_Q, rate),
+      .f3 = .init(.band, F3, F3_Q, rate),
+      .choir_fade = .init(0, CHOIR_ATTACK, rate),
+      .soft = .init(RES_SOFT_HZ, rate),
+      .gain = vary(r, RES),
+    };
+  }
+
+  fn render(rs:*Research, out:[]f32, progress:f32, fed:f32) void {
+    const u = m.smooth(m.clamp01(progress / EXPAND_AT));
+    const fm_hz = m.lerp(WHORL_FM_HZ[0], WHORL_FM_HZ[1], u);
+    const fm_depth = m.lerp(WHORL_FM_DEPTH[0], WHORL_FM_DEPTH[1], u);
+    const filt_hz = m.lerp(WHORL_FILTER[0], WHORL_FILTER[1], u);
+    const q = m.lerp(WHORL_Q[0], WHORL_Q[1], u);
+    const ex = m.clamp01((progress - EXPAND_AT) / (1 - EXPAND_AT));
+    const q_open = m.lerp(q, 1.0, ex);
+    const choir_u = m.clamp01((progress - CHOIR_FROM) / (CHOIR_FULL - CHOIR_FROM));
+    rs.choir_fade.target = m.smooth(choir_u);
+
+    for (out) |*s| {
+      if (rs.at % RETUNE == 0) rs.band.tune(.band, filt_hz, q_open, rs.rate);
+      rs.at +%= 1;
+      rs.fm.freq = fm_hz;
+
+      const mod = rs.fm.next() * fm_depth;
+      rs.oscA.freq = WHORL_BASE[0] * (1 + mod);
+      rs.oscB.freq = WHORL_BASE[1] * (1 - mod);
+      const raw = rs.oscA.next() + rs.oscB.next();
+      const swirl = rs.band.tick(raw);
+      const low = rs.rumble.next();
+
+      var cr:f32 = 0;
+      for (rs.singers[0..]) |*sg| cr += sg.tick(progress);
+      const bod = rs.body.low(cr) * BODY;
+      const formant = rs.f1.tick(cr) * F1_L + rs.f2.tick(cr) * F2_L + rs.f3.tick(cr) * F3_L;
+      const voice = (bod + formant) * rs.choir_fade.next();
+
+      const vol = u * u * (1 + 0.5 * ex);
+      const y = swirl * WHORL + low * RUMBLE + voice * CHOIR;
+      s.* += rs.soft.low(y) * rs.gain * vol * (1 + RES_FED * fed);
+    }
+  }
+};
+
+/// the boom and its shimmer
+const Boom = struct {
+  core:dsp.Osc,
+  noise:dsp.Noise,
+  thump:dsp.Biquad,
+  pop:dsp.Biquad,
+  sub:dsp.Sine,
+  shimmer:[BOOM_SHIMMER_N]dsp.Sine,
+  shimmer_amp:[BOOM_SHIMMER_N]f32 = @splat(1),
+  shimmer_fall:[BOOM_SHIMMER_N]f32,
+  shimmer_start:[BOOM_SHIMMER_N]u32,
+  shimmer_wobble:[BOOM_SHIMMER_N]dsp.Osc,
+  shimmer_wobble_on:[BOOM_SHIMMER_N]bool,
+  shimmer_soft:dsp.OnePole,
+  drop:f32 = 1,
+  core_amp:f32 = 1,
+  thump_amp:f32 = 1,
+  pop_amp:f32 = 1,
+  sub_amp:f32 = 1,
+  drop_fall:f32,
+  core_fall:f32,
+  thump_fall:f32,
+  pop_fall:f32,
+  sub_fall:f32,
+  at:u32 = 0,
+  gain:f32,
+
+  fn init(r:*rng.Rng, rate:f32) Boom {
+    var sp:[BOOM_SHIMMER_N]dsp.Sine = undefined;
+    var sf:[BOOM_SHIMMER_N]f32 = undefined;
+    var ss:[BOOM_SHIMMER_N]u32 = undefined;
+    var sw:[BOOM_SHIMMER_N]dsp.Osc = undefined;
+    var swn:[BOOM_SHIMMER_N]bool = undefined;
+    const base = vary(r, BOOM_SHIMMER_BASE);
+    inline for (0..BOOM_SHIMMER_N) |k| {
+      const n = m.f(k + 1);
+      const hz = base * n * (1 + BOOM_SHIMMER_INHARM * n * n);
+      sp[k] = .init(hz, rate);
+      const fall_s = (2.2 - m.f(k) * 0.18) * r.range(0.8, 1.3);
+      sf[k] = @exp(-1 / (fall_s * rate));
+      ss[k] = m.floorTo(u32, m.f(k) * BOOM_SHIMMER_STAGGER * rate);
+      swn[k] = BOOM_SHIMMER_WOBBLE[k];
+      sw[k] = .{.rate = rate, .freq = r.range(BOOM_SHIMMER_WOBBLE_HZ[0], BOOM_SHIMMER_WOBBLE_HZ[1])};
+    }
+    return .{
+      .core = .{.rate = rate, .shape = .saw, .freq = BOOM_CORE[0]},
+      .noise = .init(r.next()),
+      .thump = .init(.low, BOOM_THUMP_HZ, 0.707, rate),
+      .pop = .init(.high, BOOM_POP_HZ, 0.707, rate),
+      .sub = .init(BOOM_SUB_HZ, rate),
+      .shimmer = sp,
+      .shimmer_fall = sf,
+      .shimmer_start = ss,
+      .shimmer_wobble = sw,
+      .shimmer_wobble_on = swn,
+      .shimmer_soft = .init(BOOM_SHIMMER_SOFT_HZ, rate),
+      .drop_fall = @exp(-1 / (BOOM_DROP * rate)),
+      .core_fall = @exp(-1 / (BOOM_CORE_FALL * rate)),
+      .thump_fall = @exp(-1 / (BOOM_THUMP_FALL * rate)),
+      .pop_fall = @exp(-1 / (BOOM_POP_FALL * rate)),
+      .sub_fall = @exp(-1 / (BOOM_SUB_FALL * rate)),
+      .gain = vary(r, BOOM),
+    };
+  }
+
+  fn render(b:*Boom, out:[]f32) bool {
+    for (out) |*s| {
+      b.core.freq = m.lerp(BOOM_CORE[1], BOOM_CORE[0], b.drop);
+      b.drop *= b.drop_fall;
+      b.core_amp *= b.core_fall;
+      b.thump_amp *= b.thump_fall;
+      b.pop_amp *= b.pop_fall;
+      b.sub_amp *= b.sub_fall;
+      const n = b.noise.next();
+      const impact = b.core.next() * BOOM_THUD * b.core_amp + b.thump.tick(n) * BOOM_THUMP * b.thump_amp + b.pop.tick(n) * BOOM_POP * b.pop_amp + b.sub.next() * BOOM_SUB * b.sub_amp;
+      var sh:f32 = 0;
+      var alive = false;
+      for (0..BOOM_SHIMMER_N) |k| {
+        if (b.at < b.shimmer_start[k]) continue;
+        if (b.shimmer_amp[k] < SILENT) continue;
+        alive = true;
+        b.shimmer_amp[k] *= b.shimmer_fall[k];
+        var amp = b.shimmer_amp[k];
+        if (b.shimmer_wobble_on[k]) {
+          amp *= 1 - BOOM_SHIMMER_WOBBLE_DEPTH + BOOM_SHIMMER_WOBBLE_DEPTH * (1 + b.shimmer_wobble[k].next()) * 0.5;
+        }
+        sh += b.shimmer[k].next() * amp * (1 - m.f(k) * 0.07);
+      }
+      s.* += impact * b.gain + b.shimmer_soft.low(sh) * BOOM_SHIMMER;
+      b.at +|= 1;
+      if (!alive and b.core_amp < SILENT and b.sub_amp < SILENT) return false;
+    }
+    return true;
+  }
+};
 
 const TEST_RATE:f32 = 48000;
 

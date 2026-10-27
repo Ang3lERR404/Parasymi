@@ -35,7 +35,7 @@ const WARN_COOLDOWN:f32 = 1.5;
 const ATTRACT:f32 = 2.4;
 const PULL:f32 = 5;
 const PULL_FALLOFF:f32 = 1.5;
-const ABSORB:f32 = 0.45;
+const ABSORB:f32 = 0.65;
 
 /// returns whether the wolf keeps working this tile.
 pub fn gather(g:*Game, c:*ck.Chunk, t:usize, dt:f32) bool {
@@ -247,7 +247,12 @@ pub fn catchStarlight(g:*Game, dt:f32) void {
     const mo = &g.stars.motes.items[i];
     const d = chest - mo.pos;
     const dist = m.len(d);
-    if (dist < ATTRACT) mo.pos += d * m.splat3(@min(1, dt * (PULL - dist * PULL_FALLOFF)));
+    if (dist < ATTRACT) {
+      mo.pulled = true;
+      mo.pos += d * m.splat3(@min(1, dt * (PULL - dist * PULL_FALLOFF)));
+    } else if (mo.pulled) {
+      mo.pulled = false;
+    }
     if (dist < ABSORB and g.player.inv.add(.starlight, 1) == 1) {
       _ = g.stars.motes.swapRemove(i);
       continue;
