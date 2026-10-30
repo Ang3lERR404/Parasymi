@@ -170,9 +170,11 @@ void surface() {
   bool green = aff > 0.5 && part == PART_LEAF;
   if (green) body = v_col;
   body = mix(DEAD_BROWN, body, health);
-  // leaves and petals are matte living tissue: sap shows through them, but
-  // nothing wet sits on them (no glisten, no beads, no glinting bubbles)
-  bool matte = PART_IN(SHEETS, part);
+  // symbiotes and parasites are matte living tissue, stems, vines, leaves
+  // and petals alike: sap shows through them, but nothing wet or glossy sits
+  // on them (no glisten, no beads, no glinting bubbles, no fibre sheen);
+  // only a convergent plant's young growth stays wet
+  bool matte = abs(aff) > 0.5 || PART_IN(SHEETS, part);
   // how strongly it glistens (below): only thin, living growth does, so the
   // points of light are mirrored only there
   float glisten = matte ? 0.0 : thin * (0.35 + 0.65 * fill) * health * SKIN_GLISTEN;
@@ -181,7 +183,7 @@ void surface() {
 
   // fibres: a Kajiya-Kay sheen across the stem's length, as on the wolf's vines
   float tl = length(tgrad);
-  if (tl > 0.0 && !PART_IN(SHEETS, part)) c += fibreLight(body, lit, tgrad, tl, n, V, 0.22, sh);
+  if (tl > 0.0 && !matte) c += fibreLight(body, lit, tgrad, tl, n, V, 0.22, sh);
 
   // sap, seen through the skin: light from behind and at grazing angles,
   // more where the growth is thin and the plant is full
