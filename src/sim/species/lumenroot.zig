@@ -14,6 +14,8 @@ const color=engine.core.color;
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedLumenroot,
   .matureTime=12,.manaCap=10,.leyDraw=0.6,.share=0.8,.drain=0,.yield=0.12,
+  // plucked from its bloom, a bead of resin sap at the top of its stem
+  .pluck=0.66,
   .genome=.{
     .stemH=0.75,.stemR=0.045,.segments=7,.curl=0,.wobble=0.1,
     .leaves=6,.leafLen=0.28,.leafW=0.1,.leafDroop=0.35,

@@ -38,6 +38,8 @@ const haloMod=lib.haloStructure;
 const resources=lib.resources;
 /// the gardener's actions, for whether a preview fits
 const actions=lib.actions;
+/// plucking: a drawn plant's size, the plucked plant's bend
+const pluck=lib.pluck;
 /// the HUD, built into the scene each frame
 const hud=lib.hud;
 /// the playable layer: draw limit, what is known
@@ -60,6 +62,9 @@ const fogNear:f32=0.7;
 const plantBound:f32=1.2;
 /// the share of the way up a plant its bounding sphere is centred
 const plantBoundUp:f32=0.6;
+/// how far out from a broad plant's centre (metres a tile past the first)
+/// the paws find its yield, on the side facing the wolf
+const pluckOut:f32=0.45;
 /// floaters: how far they bob (metres), a slow rise and a quicker one
 const bobAmount=[2]f32{0.07,0.025};
 /// floaters: how fast each bob runs (radians a second)
@@ -191,7 +196,8 @@ pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
   // nodes or structures (their meshes were never built)
   const alone=g.specimen!=null;
   // where the wolf's paws are, for their contact shadows (none when alone)
-  const feet=if(alone)noFeet else try g.player.rig(&g.parts,g.headless());
+  // (but for one the wolf plucks)
+  const feet=if(alone and !g.specimen.?.wolf())noFeet else try g.player.rig(&g.parts,g.headless());
   if(!alone or g.specimen.?.what==.structure){
     try nodes(g,@intFromFloat(reach));
     try structures(g,reach,tf);
@@ -250,6 +256,7 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
       .growth=s.items(.growth)[i],.mana=s.items(.mana)[i],.seed=s.items(.seed)[i],
       .flow=s.items(.flow)[i],.health=s.items(.health)[i],
       .dir=s.items(.dir)[i],.turn=s.items(.turn)[i],
+      .tug=g.tug.of(ck.PlantId.of(i),s.items(.at)[i]),
       // (worked out each tick: a plant sown since has none yet)
       .radiating=i<radiating.len and radiating[i],
     },tf);
@@ -294,6 +301,27 @@ fn floatAt(def:*const species.Species,c:m.V3,ground:f32,seed:f32,tf:f32)m.V3{
   // how far it has risen with its two bobs
   const lift=bobAmount[0]*@sin(tf*bobRate[0]+seed*10)+bobAmount[1]*@sin(tf*bobRate[1]+seed*4);
   return m.v3(c[0]+drift*@sin(tf*driftRate[0]+seed*7),@max(ground,0)+def.hover+lift,c[2]+drift*@cos(tf*driftRate[1]+seed*5));
+}
+/// where the paws pluck plant `i`'s ripe yield this frame, the wolf at
+/// `from`: its kind's pluck height over its foot (a floater's, over where
+/// it hangs this moment), at the size it is drawn; a broad plant's from
+/// the side of its footprint facing the wolf
+pub fn pluckPoint(g:*const Game,i:usize,from:m.V3)m.V3{
+  // the plants' columns, its kind, its seed, the ground under it, the time drawn
+  const s=g.plants.list.slice();
+  const def=species.get(s.items(.sp)[i]);
+  const seed=s.items(.seed)[i];
+  const ground=s.items(.chunk)[i].height[s.items(.tile)[i]];
+  const tf:f32=@floatCast(@mod(g.time,timeWrap));
+  // its foot, or where it hangs
+  const c=s.items(.at)[i];
+  const at=if(def.floating)floatAt(def,c,ground,seed,tf)else m.v3(c[0],ground,c[2]);
+  // the way to the wolf across the ground, and how far out toward it the
+  // paws find a broad one's yield
+  const d=m.v3(from[0]-at[0],0,from[2]-at[2]);
+  const out=@min(pluckOut*m.f(def.size-1),m.len(d));
+  const toward=if(out>0)m.norm(d)*m.splat3(out)else m.v3(0,0,0);
+  return at+toward+m.v3(0,def.pluck*pluck.size(seed),0);
 }
 /// the forming halo drawing in the bloom at a tile, as the shaders take it
 /// (`vertex.noHalo` for none): they spiral it in (common.glsl `haloSpiral`).
@@ -386,6 +414,8 @@ const Drawn=struct{
   dir:m.Dir=0,
   /// how it is turning to that facing (R)
   turn:turn.Turn=.{},
+  /// its bend after the paws plucking it (`pluck.Tug.of`)
+  tug:[4]f32=@splat(0),
 };
 /// draws one plant (or its placement preview): culled to the view, posed
 /// as it turns, floated over its shadow if it floats, its instance added to
@@ -436,6 +466,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     .b=.{d.flow,d.health,def.sway,m.f(@intFromEnum(def.genome.form))},
     .c=.{key.f,if(d.ghost)1 else 0,if(d.fits)1 else 0,m.dirYaw(d.dir)+pose.spin},
     .h=halo,
+    .tug=d.tug,
   });
   // a celestial bloom is the garden's light: its core sheds it round
   // about, pearl tinted by its film, pulsing slowly, brighter as it

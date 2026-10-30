@@ -119,8 +119,20 @@ const sinkAmount=lib.player.tuning.sinkAmount;
 const squatDrop=lib.player.tuning.squatDrop;
 /// how far the body leans in over the node (radians)
 const squatLean=lib.player.tuning.squatLean;
-/// how long a paw takes to press a unit into the belly (s)
-const stowTime=lib.player.tuning.stowTime;
+/// how far it leans back, stretched up to work over its head (radians)
+const riseLean=lib.player.tuning.riseLean;
+/// how far its hips lift, stretched up (m)
+const riseUp=lib.player.tuning.riseUp;
+/// how far down the hand from the wrist a plucked bead is held (m)
+const beadOut=lib.player.tuning.beadOut;
+/// a plucked bead's radius (m)
+const beadR=lib.player.tuning.beadR;
+/// the item pod's own radius (gfx/meshes/item_pod.zig), sized to a bead
+const podR:f32=0.09;
+/// how brightly a plucked bead glows
+const beadGlow=lib.player.tuning.beadGlow;
+/// colour types, for a plucked bead's tint
+const color=engine.core.color;
 /// how far the pelvis sways over the planted foot (m)
 const swayAmount=lib.player.tuning.swayAmount;
 /// how much more the metatarsal folds mid-swing (radians)
@@ -167,9 +179,13 @@ pub fn pose(p:*const Player)skel.Pose{
   // the gait, the bob, the pull's rock, and the body's lean
   const g=p.gait();
   const bob=bobAmount*g.bob*st*(0.5+0.5*@cos(2*ph-p.duty*m.tau));
+  // (only as deep as the work is low; reaching up to it, stretched tall
+  // and leaning back)
   const rock=pryRock*pryPull(p.gather orelse 0)*sq;
-  const lean=p.lean.x-g.lean*(1-sq)+(squatLean-rock)*sq;
-  q.hip=v3(swayAmount*g.sway*st*@sin(ph),skel.hipY-sinkAmount*g.sink*st-bob-0.07*work-squatDrop*sq,-0.04*sq);
+  const low=p.low.x;
+  const rise=p.rise.x;
+  const lean=p.lean.x-g.lean*(1-sq)+(squatLean*low-riseLean*rise-rock)*sq;
+  q.hip=v3(swayAmount*g.sway*st*@sin(ph),skel.hipY-sinkAmount*g.sink*st-bob-0.07*work-(squatDrop*low-riseUp*rise)*sq,-0.04*sq*low);
   q.pelvis=.{.x=0.25*lean,.y=hipTurn*st*@sin(ph),.z=hipRoll*g.roll*st*@cos(ph)+p.bank.x};
   q.waist=.{.x=0.35*lean,.y=-0.5*counter*q.pelvis.y,.z=-0.4*q.pelvis.z};
   q.chest=.{.x=0.4*lean,.y=-0.5*counter*q.pelvis.y,.z=-0.4*q.pelvis.z};
@@ -200,7 +216,7 @@ pub fn pose(p:*const Player)skel.Pose{
   // the tail lifts with the stride and droops at rest, each joint bending
   // a little further
   // (crouching, it lifts to balance the lean)
-  for(&q.tail,p.tail,0..)|*j,sp,i|j.*=.{.x=(if(i==0)-tailLift*@max(st,sq)else tailDroop*(1-0.6*st)),.z=sp.x};
+  for(&q.tail,p.tail,0..)|*j,sp,i|j.*=.{.x=(if(i==0)-tailLift*@max(st,sq*low)else tailDroop*(1-0.6*st)),.z=sp.x};
   q.legs=p.legs(q);
   if(sq>0)p.armsToWrists(&q,sq);
   // how far into the belly-rest idle
@@ -257,7 +273,7 @@ pub fn armsToWrists(p:*const Player,q:*skel.Pose,sq:f32)void{
     a.root=skel.Turn.blend(a.root,ik.root,sq);
     a.mid=m.lerp(a.mid,ik.mid,sq);
     // how far into stowing this paw is (0..1)
-    const stowing=m.clamp01(p.stow[s]/stowTime*3);
+    const stowing=m.clamp01(p.stowLeft(s)*3);
     a.low=.{.x=m.lerp(a.low.x,0.35*(1-stowing)+0.9*stowing,sq),.y=m.lerp(a.low.y,-x*twist*(1-stowing),sq),.z=a.low.z};
   }
 }
@@ -325,6 +341,14 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
   for(p.lump[0..@min(held,lumps.len)])|l|{
     try out.emit(.bellyLump,m.chain(&.{gut,translate(l.pos),scale(m.splat3(lumpR))}),.{.glow=lumpGlow,.phase=0.3});
   }
+  // a plucked bead, its yield's colour, cupped in each paw that carries
+  // one in from the plant, until the paw presses it into the belly
+  if(p.bead)|it|for(0..2)|s|if(p.stowLeft(s)>0.5){
+    // the paw's wrist, the bead held down the hand at its knuckles, where
+    // the fingers close round it
+    const hand=at(&w,skel.sides[s].hand);
+    try out.emit(.itemPod,m.chain(&.{hand,translate(v3(0,-beadOut,0)),scale(m.splat3(beadR/podR))}),.{.glow=beadGlow,.phase=0.3,.tint=color.Rgba8.of(it.info().col).toF4()});
+  };
   // (the shader creases it as it fills, the folds crossing at its button)
   // where the belly's folds cross
   const cross=bellyMesh.crossing();

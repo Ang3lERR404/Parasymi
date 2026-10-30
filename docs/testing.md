@@ -49,6 +49,7 @@ their end 1.5 s, then start again.
 | `dark` | plant | grown, a bloom's network dark |
 | `live` | plant | real ecology from seed; resown 4 s after grown or dead |
 | `turn` | both | grown, turned a quarter (R) every `turn.time` + 1 s: a rooted one pulls its roots out, steps round, digs back in; a floater turns in the air |
+| `pluck` | plant | grown and ripe, plucked by the wolf (drawn, for once) as harvest does it in play: it steps up, each pluck bends the plant after its paws, the plant springs back, a bead goes to the belly; ripened afresh 1.5 s after each harvest |
 | `active` | structure | grown and working its real `tick`: every 0.4 s handed one of the next thing it `wants` (a carrier: into it from behind, let go 2 s later), what it made (an `output` it does not want) taken away; put down afresh each loop. Emitted pieces (cups, pours, roots to nodes, lids, crystals) as in play |
 
 ### Held states

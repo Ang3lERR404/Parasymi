@@ -111,6 +111,15 @@ const Foot=struct{
 /// (0 standing .. 1 sprinting)
 /// (fields: `weight` 0 light .. 1 full, `pace` 0 standing .. 1 sprinting)
 pub const Footfall=struct{weight:f32,pace:f32};
+/// what the paws gather from: a resource node, wrenched out of the ground
+/// a unit at a time (each sent to the belly as the next is gripped), or a
+/// plant's ripe yield, drawn off it by paw (each sent as it comes loose)
+pub const Hold=enum{
+  /// a resource node, pried
+  node,
+  /// a plant's ripe yield, plucked
+  plant,
+};
 /// the wolf: where it stands and moves, what it carries in its belly, and
 /// every spring and stage of its procedural motion
 pub const Player=struct{
@@ -187,8 +196,19 @@ pub const Player=struct{
   /// gathering from the node at `work`: how far through the unit being
   /// pried loose (0..1); null otherwise
   gather:?f32=null,
+  /// what the paws work at `work` while gathering: a node pried out of the
+  /// ground, or a plant's ripe yield plucked
+  hold:Hold=.node,
+  /// a plucked yield's kind, shown as a bead in each paw that stows one;
+  /// null when nothing plucked is carried in
+  bead:?items.Item=null,
   /// 0..1 blend into the gathering squat
   squat:Swing=.{},
+  /// how deep that squat goes, 1 down in full (work on the ground) .. 0
+  /// standing to work at the chest, eased after the work's height
+  low:Swing=.{.x=1},
+  /// how far it stretches up to work over its head, 0..1, eased the same
+  rise:Swing=.{},
   /// where each wrist is wanted while gathering (wolf space), on a spring
   wrist:[2]Spring3=@splat(.{}),
   /// seconds left of each paw pressing a unit into the belly, which paw
@@ -268,7 +288,7 @@ pub const Player=struct{
   /// where a foot rests under the standing wolf, in the world
   pub fn rest(p:*const Player,ground:?*const World,s:usize)V3{
     // the foot's rest out to the side: wider for a full belly or a squat
-    const x=restFoot[s][0]+skel.sign(s)*(bellyStance*p.fullness+squatStance*p.squat.x);
+    const x=restFoot[s][0]+skel.sign(s)*(bellyStance*p.fullness+squatStance*p.squat.x*p.low.x);
     // that rest in the world
     const r=m.mulV(p.heading(),.{x,0,restFoot[s][2],1});
     return p.onGround(ground,v3(r[0],0,r[2]));
@@ -304,6 +324,14 @@ pub const Player=struct{
   pub const pry=lib.player.motion.pry;
   /// where a gathering wrist is wanted (motion.zig)
   pub const wristWant=lib.player.motion.wristWant;
+  /// how long a paw takes to carry a unit to the belly (motion.zig)
+  pub const stowSpan=lib.player.motion.stowSpan;
+  /// how much of a paw's carry to the belly is still to come (motion.zig)
+  pub const stowLeft=lib.player.motion.stowLeft;
+  /// a plucked unit come loose sent to the belly (motion.zig)
+  pub const stowUnit=lib.player.motion.stowUnit;
+  /// how deep the squat goes and how far it stretches up (motion.zig)
+  pub const height=lib.player.motion.height;
   /// the node worked on, in its own frame (motion.zig)
   pub const workLocal=lib.player.motion.workLocal;
   /// every spring settled after the frame's motion (springs.zig)

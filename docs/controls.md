@@ -30,7 +30,8 @@ names below are the defaults.
   cursor sweeps.
 - Where it does not fit, a click on a structure interacts; on a plant, it
   harvests.
-- **E** always interacts (on a plant: harvests).
+- **E** always interacts (on a plant: harvests). A harvest is plucked by
+  paw over a few seconds; moving lets it go.
 - **What interacting does:**
   - a structure that keeps items opens its panel;
   - a paired one (`configure` hook) is configured;

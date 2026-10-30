@@ -373,6 +373,9 @@ pub fn main(init:Init)!void{
     try r.draw(&scene,resized);
     if(r.shot())|sh|{
       snap(gpa,io,sh,&turn);
+      // decision: the time spent writing the shot is not the world's, so
+      // the next frame does not jump (springs would spike, timings slip)
+      last=glfw.getTime();
       if(turn.done())window.setShouldClose(true);
     }
   }

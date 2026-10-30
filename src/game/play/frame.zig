@@ -18,6 +18,14 @@ const playerMod=lib.player;
 const st=lib.structures;
 /// the gardener's actions: put, harvest, gather, remove, turn
 const actions=lib.actions;
+/// what gets drawn: where the paws pluck a plant's yield
+const view=lib.view;
+/// plucking: a drawn plant's size, how far a plucked one bends
+const pluck=lib.pluck;
+/// every plant kind's definition
+const species=lib.species;
+/// how far through its pull a unit's pry (or pluck) is (0..1)
+const pryPull=lib.player.ik.pryPull;
 /// the HUD: clicks and rows
 const hud=lib.hud;
 /// how eagerly the wolf walks up to a node it gathers from
@@ -225,22 +233,39 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
     }
     if(working or g.linger>0)work=m.tileCentre(h[0],h[1],c.height[t]);
   };
+  // plucking: the pluck under way goes on, the paws at the plant's yield
+  // (moving off, or gathering from a node, lets it go)
+  if(gathering or wish[0]!=0 or wish[1]!=0)g.pluck=null;
+  const plucked=actions.pluckOn(g,dt);
+  if(plucked!=null)if(g.pluck)|p|{
+    work=view.pluckPoint(g,p.id.idx(),g.player.pos);
+  };
+  tugOn(g,plucked,dt);
   // weaving: hands work at the chest while the queue runs
   if(g.weave.tick(g.player.inv.bag(),dt))|made|g.prog.say(txt.s.msg.wove,.{txt.item(made).name});
-  if(g.weave.busy()and!working)work=g.player.pos+m.v3(@sin(g.player.facing),0,@cos(g.player.facing));
+  if(g.weave.busy()and!working and plucked==null)work=g.player.pos+m.v3(@sin(g.player.facing),0,@cos(g.player.facing));
   // a one-off gesture keeps facing where it happened
   if(work==null and g.linger>0)work=g.player.work;
   g.player.work=work;
-  g.player.gather=if(gathering)m.clamp01(g.gatherT/actions.gatherTime)else null;
+  g.player.gather=if(gathering)m.clamp01(g.gatherT/actions.gatherTime)else plucked;
+  // what the paws work: a node pried, or a plant's yield plucked (a
+  // node's units carry no bead)
+  if(gathering){
+    g.player.hold=.node;
+    g.player.bead=null;
+  }else if(plucked!=null)g.player.hold=.plant;
   // decision: gathering with no move held, the wolf steps up to the node
-  // until its paws can grip it (it crouches and pries it by hand)
-  if(gathering and wish[0]==0 and wish[1]==0)if(work)|at|{
+  // until its paws can grip it (it crouches and pries it by hand); so too
+  // to a plant it plucks
+  if(gathering or plucked!=null)if(wish[0]==0 and wish[1]==0)if(work)|at|{
     // how far the node is, across and along, and its distance
     const dx=at[0]-g.player.pos[0];
     const dz=at[2]-g.player.pos[2];
     const d=@sqrt(dx*dx+dz*dz);
     // how eagerly to step, slowing as the paws reach it
-    const go=m.clamp01((d-playerMod.gatherAt)*approach);
+    // (a plant from a little further off, clear of its leaves)
+    const stand=if(gathering)playerMod.gatherAt else playerMod.tuning.pluckAt;
+    const go=m.clamp01((d-stand)*approach);
     if(d>1e-3)wish=.{dx/d*go,dz/d*go};
   };
   // out of its eyes, the wolf turns to face where they look
@@ -261,4 +286,25 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   try g.world.stream(g.focus(),streamRadius,streamFrame);
   try g.world.far(g.focus(),streamRadius,&g.far);
   for(g.far.items)|c|try g.world.unload(c);
+}
+/// the plucked plant bends after the paws as they draw its yield back
+/// toward the wolf (`plucked` how far through the pluck), and springs back
+/// past upright once the yield comes loose or the pluck is let go
+fn tugOn(g:*Game,plucked:?f32,dt:f32)void{
+  // the bend wanted: none, unless a yield is being drawn back
+  var want:f32=0;
+  if(g.pluck)|p|if(plucked)|k|{
+    // the plants' columns, the plucked one's slot and kind
+    const s=g.plants.list.slice();
+    const i=p.id.idx();
+    const def=species.get(s.items(.sp)[i]);
+    // the way from the plant to the wolf across the ground, and how far
+    const d=m.v3(g.player.pos[0]-p.at[0],0,g.player.pos[2]-p.at[2]);
+    const l=m.len(d);
+    if(l>1e-3)g.tug.dir=.{d[0]/l,d[2]/l};
+    g.tug.id=p.id;
+    g.tug.at=p.at;
+    if(!p.freed)want=pluck.bend(def,pluck.size(s.items(.seed)[i]))*pryPull(k);
+  };
+  g.tug.to(want,dt);
 }

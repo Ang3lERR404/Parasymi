@@ -16,6 +16,8 @@ const color=engine.core.color;
 pub const def:species.Species=.{
   .lineage=.convergent,.seed=.seedVesper,
   .matureTime=16,.manaCap=24,.leyDraw=0.8,.share=0.6,.drain=0.8,.yield=0.4,
+  // plucked from its core, hanging on light over its tile
+  .pluck=0.6,
   // decision: the first plant that needs radiance (the brief names none)
   .needsRadiance=true,
   // it hangs over its tile on light; it does not bend from a root

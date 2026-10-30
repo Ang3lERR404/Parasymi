@@ -11,6 +11,8 @@ const color=engine.core.color;
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedHollowheart,.size=2,
   .matureTime=45,.manaCap=60,.leyDraw=2.4,.share=0.9,.drain=0,.yield=0.5,
+  // plucked from under its canopy, as high as the wolf reaches up
+  .pluck=1.4,
   // a heavy tree: it leans, it does not wave
   .sway=0.6,
   .genome=.{

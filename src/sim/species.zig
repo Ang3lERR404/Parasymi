@@ -174,6 +174,9 @@ pub const Species=struct{
   sway:f32=1,
   /// a floater's height above the ground
   hover:f32=1.15,
+  /// where its ripe yield is plucked by paw: how high over its foot (a
+  /// floater's: over its own floating point), in metres at full size
+  pluck:f32=0.5,
   /// celestial energy: the radius (tiles) of the field this plant holds
   /// once it radiates (0: none) (see ecology `Radiance`)
   radiance:f32=0,

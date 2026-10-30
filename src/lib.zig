@@ -56,6 +56,8 @@ pub const meshlib=@import("gfx/meshlib.zig");
 pub const vertex=@import("gfx/vertex.zig");
 /// what the wolf does to the world: gather, sow, weave, feed, harvest
 pub const actions=@import("game/actions.zig");
+/// plucking: a ripe plant's yield taken by paw, the plant bending after it
+pub const pluck=@import("game/pluck.zig");
 /// convergence: where a symbiote and a parasite meet, a confluence takes root
 pub const convergence=@import("game/convergence.zig");
 /// the weave recipes: what a germinator turns what into

@@ -20,6 +20,8 @@ pub const def:species.Species=.{
   // (1.5x the slower first pair); a spawned one carries its own span.
   .matureTime=18,.manaCap=40,.leyDraw=1.6,.share=0.5,.drain=0,.yield=0.12,
   .contain=3,.sway=1.5,
+  // plucked where its trunks fuse, as high as the wolf reaches up
+  .pluck=1.45,
   .stages=4,
   .genome=.{
     .form=.confluence,

@@ -433,6 +433,21 @@ bone) tucked up under it; ears (`wolfEars`, skinned to ear bones).
   to the front of the belly (`stowTime`).
 - The generic work gesture gives way to it.
 
+### Plucking (`game/pluck.zig`, `Player.hold` `.plant`)
+Harvest on a ripe plant is taken by paw, never all at once:
+- **Steps up** to `pluckAt` from the yield, clear of the leaves.
+- **As high as the yield** (`Species.pluck`, per kind): the squat goes
+  only as deep as it is low (`Player.low`); one over the chest is
+  reached up to, the wolf stretching and leaning back (`Player.rise`).
+- **Up to three plucks** (`pluck.most`), each `pluck.time`: both paws
+  close either side of the yield and draw it back toward the wolf; the
+  plant **bends after them** (`PlantInstance.tug`, bent on the GPU from
+  the root, tip most; a radiant one is drawn along instead).
+- **Comes loose** at the wrench's end: the plant springs back past
+  upright and settles (`pluck.Tug`, an underdamped spring), and one
+  paw, in turn, carries a **bead** of the yield's colour (`itemPod`)
+  cupped at its knuckles to the belly (`pluckStow`, slower than a node's).
+
 ### Belly stages (`Player.stage`, `gaits`)
 - Stages: light (< 1/3 full), heavy, full (> 2/3), blended over
   `stageBlend`.

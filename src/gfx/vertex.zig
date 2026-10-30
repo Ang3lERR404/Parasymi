@@ -97,6 +97,9 @@ pub const PlantInstance=extern struct{
   c:[4]f32=.{0,0,0,0},
   /// a forming halo drawing it in (see `noHalo`)
   h:[4]f32=noHalo,
+  /// its bend after the gardener's paws plucking it: xy the way it bends
+  /// on the ground (unit length), z how far (radians at its tip), w unused
+  tug:[4]f32=.{0,0,0,0},
 };
 /// one tile's worth of ground detail, read per instance by detail.vert,
 /// which grows the tile's grass blades (or its clods and stones on soil)

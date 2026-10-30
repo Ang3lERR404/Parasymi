@@ -12,6 +12,8 @@ const color=engine.core.color;
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedDriftwisp,.floating=true,.yields=.starlight,
   .matureTime=20,.manaCap=8,.leyDraw=0.5,.share=0.4,.drain=0,.yield=0.06,
+  // plucked from its catcher dish, just over the float
+  .pluck=0.08,
   // light and hanging in the air: the wind carries it furthest
   .sway=1.8,
   .genome=.{

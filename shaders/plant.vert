@@ -19,8 +19,9 @@ layout(location = 7) in vec4 ib;    // flow, health, sway amplitude, form (speci
 layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (0/1), ghost fits (0/1), the way it faces (yaw)
 // the same vertex in the next growth key (equals pos/nrm for keyless plants)
 layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre, how far along (< 0 none)
-layout(location = 10) in vec3 pos_next;
-layout(location = 11) in vec3 nrm_next;
+layout(location = 10) in vec4 it;   // its bend after the gardener's paws plucking it: the way on the ground (xy), how far (z, radians at its tip)
+layout(location = 11) in vec3 pos_next;
+layout(location = 12) in vec3 nrm_next;
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -62,6 +63,9 @@ const float FALL_TURN = 2.4;
 const float LOOSE_SINK = 0.14;
 const float LOOSE_AWAY = 0.22;
 const float LOOSE_HANG = 0.7;
+// plucked, a plant that never bends from a root (its pieces held by light)
+// is drawn after the paws instead: this far (m) per radian of the bend
+const float TUG_SLIDE = 0.3;
 // a wilting plant sinks to this share of its height
 const float WILT = 0.55;
 // a sown plant's size: seedling share, and the spread between instances
@@ -180,6 +184,8 @@ void main() {
       p.xz = orbit * p.xz;
       n.xz = orbit * n.xz;
     }
+    // plucked, it is drawn after the paws, springing back once let go
+    p.xz += it.xy * it.z * TUG_SLIDE;
     vec3 wp = base + p;
     v_pos = wp;
     v_nrm = n;
@@ -278,6 +284,11 @@ void main() {
   ang *= smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
   p = bendIn(p, wdir, ang);
   n = bendIn(n, wdir, ang);
+  // plucked, it bends after the paws drawing its yield back, the same way
+  // (tip most), and springs back past upright once the yield comes loose
+  float tug = it.z * h * h;
+  p = bendIn(p, it.xy, tug);
+  n = bendIn(n, it.xy, tug);
   // a confluence's growth keys already carry its size
   float s = (keyed ? 1.0 : mix(SEEDLING, 1.0, g)) * (SIZE_MIN + SIZE_SPREAD * fract(seed * 7.13));
   vec3 wp = base + p * s;

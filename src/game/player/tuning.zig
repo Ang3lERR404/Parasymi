@@ -77,6 +77,38 @@ pub const handDamp:f32=0.75;
 pub const pryGrip:f32=1.2;
 /// how far a stowing paw cups round its unit
 pub const stowCup:f32=0.6;
+/// plucking a plant: the paws close either side of its ripe yield and
+/// draw it back toward the wolf, bending the plant after them, until it
+/// comes loose. The squat goes only as deep as the yield is low: its full
+/// depth for one at `lowFrom` over the feet or under, none `lowSpan`
+/// higher; past `riseFrom` the wolf stretches up, leaning back by up to
+/// `riseLean`. (This one: how far either side of the yield each paw closes, m)
+pub const pluckSide:f32=0.06;
+/// the wolf steps up to a plant it plucks until its yield is this far
+/// ahead of its feet (clear of the leaves, the paws still reaching it)
+pub const pluckAt:f32=0.62;
+/// how long a paw takes to carry a plucked unit to the belly (s)
+pub const pluckStow:f32=0.7;
+/// how far the pull draws a plucked yield back toward the wolf (m)
+pub const pluckBack:f32=0.16;
+/// the squat is at its full depth for work this high over the feet (m)
+pub const lowFrom:f32=0.15;
+/// and gone this much higher (m)
+pub const lowSpan:f32=0.75;
+/// past this height over the feet the wolf stretches up to its work (m)
+pub const riseFrom:f32=1.0;
+/// and is stretched in full this much higher (m)
+pub const riseSpan:f32=0.45;
+/// how far it leans back, stretched up in full (radians)
+pub const riseLean:f32=0.22;
+/// how far its hips lift, stretched up in full (m)
+pub const riseUp:f32=0.05;
+/// how far down the hand from the wrist a plucked bead is held (m)
+pub const beadOut:f32=0.085;
+/// a plucked bead's radius (m)
+pub const beadR:f32=0.045;
+/// how brightly a plucked bead glows
+pub const beadGlow:f32=0.7;
 /// the wolf steps up to a node it gathers from, until it is this far ahead
 /// of its feet (and the paws can reach it)
 pub const gatherAt:f32=0.45;

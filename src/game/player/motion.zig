@@ -105,6 +105,20 @@ const trailMax=lib.player.tuning.trailMax;
 const walkSpeed=lib.player.tuning.walkSpeed;
 /// how far through its pull and wrench a unit's pry is (0..1)
 const pryPull=lib.player.ik.pryPull;
+/// how long a paw takes to carry a plucked unit to the belly (s)
+const pluckStow=lib.player.tuning.pluckStow;
+/// how far either side of a plucked yield each paw closes (m)
+const pluckSide=lib.player.tuning.pluckSide;
+/// how far the pull draws a plucked yield back toward the wolf (m)
+const pluckBack=lib.player.tuning.pluckBack;
+/// the squat is at its full depth for work this high over the feet (m)
+const lowFrom=lib.player.tuning.lowFrom;
+/// and gone this much higher (m)
+const lowSpan=lib.player.tuning.lowSpan;
+/// past this height over the feet the wolf stretches up to its work (m)
+const riseFrom=lib.player.tuning.riseFrom;
+/// and is stretched in full this much higher (m)
+const riseSpan=lib.player.tuning.riseSpan;
 /// one frame of motion: the gait's stride, cycle and phase follow the
 /// speed, breath quickens with effort, the belly's look follows its fill,
 /// the work, pry and rest poses ease, then the feet step, what hangs
@@ -233,16 +247,23 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
 /// pry wants them
 pub fn pry(p:*Player,dt:f32)void{
   p.squat.to(if(p.gather!=null)1 else 0,squatFreq,1,dt);
+  // the squat's depth and the stretch follow the work's height (held as
+  // they were once the work is done, while the squat eases out)
+  if(p.work!=null){
+    // how low and how high the work is
+    const h=p.height();
+    p.low.to(h.low,squatFreq,1,dt);
+    p.rise.to(h.rise,squatFreq,1,dt);
+  }
   for(&p.stow)|*t|t.*=@max(t.*-dt,0);
   // the unit's share of the pry, or nothing if not gathering
   const k=p.gather orelse {
     p.lastPry=0;
     return;
   };
-  if(k<p.lastPry and p.squat.x>0.5){
-    p.stow[p.nextStow]=stowTime;
-    p.nextStow+%=1;
-  }
+  // (a node's unit is sent once the next is gripped; a plucked one as it
+  // comes loose, by `stowUnit`)
+  if(p.hold==.node and k<p.lastPry and p.squat.x>0.5)p.stowUnit();
   p.lastPry=k;
   // the skeleton's pose, which the wrists' wants are taken from
   const q=p.pose();
@@ -254,17 +275,51 @@ pub fn pry(p:*Player,dt:f32)void{
     m.springDamper(&w.pos,&w.vel,want,handFreq*handFreq,2*handDamp*handFreq,1,v3(0,0,0),dt);
   }
 }
+/// how long a paw takes to carry a unit to the belly: a plucked one slower,
+/// so it is seen leaving the plant
+pub fn stowSpan(p:*const Player)f32{
+  return switch(p.hold){
+    .node=>stowTime,
+    .plant=>pluckStow,
+  };
+}
+/// how much of paw `s`'s carry to the belly is still to come (1 setting
+/// off .. 0 done)
+pub fn stowLeft(p:*const Player,s:usize)f32{return p.stow[s]/p.stowSpan();}
+/// a unit come loose sent to the belly: the next paw, in turn, presses it in
+pub fn stowUnit(p:*Player)void{
+  p.stow[p.nextStow]=p.stowSpan();
+  p.nextStow+%=1;
+}
+/// how high the work is, as the body answers it: `low` 1 down in the full
+/// squat (a node, or a yield near the ground) .. 0 standing to it, and
+/// `rise` 0 .. 1 stretched up to one over its head
+pub fn height(p:*const Player)struct{low:f32,rise:f32}{
+  // how high the work is over the feet
+  const y=p.workLocal()[1];
+  return.{.low=1-m.smooth(m.clamp01((y-lowFrom)/lowSpan)),.rise=m.smooth(m.clamp01((y-riseFrom)/riseSpan))};
+}
 /// where wrist `s` is wanted (wolf space) at unit share `k`: on the node,
-/// pulled back and up through the pry, or at the belly while stowing
+/// pulled back and up through the pry (or either side of a plucked yield,
+/// drawn back toward the wolf), or at the belly while stowing
 pub fn wristWant(p:*const Player,q:skel.Pose,s:usize,k:f32)V3{
   // the node, which side this wrist is on, and how far the pull has drawn
   const node=p.workLocal();
   const x=skel.sign(s);
   const pull=pryPull(k);
-  // the grip on the node, drawn back and up by the pull
-  const grip=node+v3(x*gripSide,gripUp+pryUp*pull,-pryBack*pull);
+  // the grip on the node, drawn back and up by the pull (a plucked
+  // yield's, toward the wolf)
+  const grip=switch(p.hold){
+    .node=>node+v3(x*gripSide,gripUp+pryUp*pull,-pryBack*pull),
+    .plant=>node+v3(x*pluckSide,0,-pluckBack*pull),
+  };
   // how far toward the belly a stowing paw is: up, then back again
-  const stow=m.smooth(m.clamp01(@sin(p.stow[s]/stowTime*m.pi)*1.6));
+  // (a plucked one carried in steadily, a pried one pressed in at once)
+  const press:f32=switch(p.hold){
+    .node=>1.6,
+    .plant=>1.1,
+  };
+  const stow=m.smooth(m.clamp01(@sin(p.stowLeft(s)*m.pi)*press));
   if(stow<=0)return grip;
   // the bones in the wolf's space, and the belly's front where the paw presses
   const w=skel.fk(q);

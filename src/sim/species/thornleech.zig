@@ -14,6 +14,8 @@ const color=engine.core.color;
 pub const def:species.Species=.{
   .lineage=.parasitic,.seed=.seedThornleech,
   .matureTime=8,.manaCap=14,.leyDraw=1.0,.share=0,.drain=1.2,.yield=0.22,
+  // plucked from the sacs hanging in its cage
+  .pluck=0.36,
   .genome=.{
     .form=.coil,
     // a coil: its stalk's height and girth, the sacs in its cage (`thorns`)

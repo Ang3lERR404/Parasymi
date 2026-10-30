@@ -27,6 +27,8 @@ const craft=lib.craft;
 const st=lib.structures;
 /// what each kind of ground's nodes give
 const resources=lib.resources;
+/// plucking a ripe plant by paw: how long, how many plucks
+const pluck=lib.pluck;
 /// the game's state and its helpers (`known`, the default seed)
 const play=lib.play;
 /// every player-facing string
@@ -36,12 +38,10 @@ const Game=play.Game;
 /// how long the wolf works a node for one item (s)
 pub const gatherTime:f32=0.45;
 /// how long a one-off gesture keeps the hands busy (s): putting something
-/// down or uprooting it, feeding or emptying a structure, harvesting
+/// down or uprooting it, feeding or emptying a structure
 pub const lingerPut:f32=0.35;
 /// how long feeding or emptying a structure keeps the hands busy (s)
 const lingerTrade:f32=0.4;
-/// how long a harvest keeps the hands busy (s)
-const lingerHarvest:f32=0.5;
 /// wait before the next put (s): after one, and after warning of none left
 const putCooldown:f32=0.25;
 /// remove, held and swept: the wait before the next tile's thing goes (s)
@@ -241,7 +241,8 @@ pub fn unbuild(g:*Game,j:st.Id)void{
   };
   if(lost>0)g.prog.say(txt.s.msg.spilled,.{lost});
 }
-/// take a mature plant's yield. Plants never set seed (a germinator weaves them).
+/// start plucking a mature plant's yield by paw (`pluckOn` carries it on).
+/// Plants never set seed (a germinator weaves them).
 pub fn harvest(g:*Game,h:[2]i32)void{
   // the plant standing there, its row, the plant list's columns, its species
   const id=g.plantAt(h) orelse return;
@@ -258,14 +259,58 @@ pub fn harvest(g:*Game,h:[2]i32)void{
     g.prog.say(txt.s.msg.notRipe,.{});
     return;
   }
-  // what it yields, and how many of those the belly took
-  const yields=species.get(sp).yields;
-  const gotEs=g.player.inv.add(yields,es);
-  s.items(.essence)[i]-=m.f(gotEs);
-  // what an unstudied plant gives is learned only by taking it
-  if(gotEs>0 and !g.prog.yieldKnown(sp))g.prog.say(txt.s.msg.givesUp,.{gotEs,txt.item(yields).name});
-  g.linger=lingerHarvest;
-  if(gotEs<es)g.prog.say(txt.s.msg.bellyFull,.{});
+  // (pressed again on the plant being plucked, the pluck goes on)
+  if(g.pluck)|p|if(p.id==id)return;
+  g.pluck=.{.id=id,.at=s.items(.at)[i],.left=@min(es,pluck.most)};
+}
+/// one frame of plucking: the pluck under way goes on, the yield that
+/// comes loose shared out of what the plant has ripened into the belly (a
+/// paw carrying it in). Returns how far through the pluck (0..1), or null
+/// when there is none (its plant gone, the belly full, or all taken).
+pub fn pluckOn(g:*Game,dt:f32)?f32{
+  // the pluck under way
+  const p=if(g.pluck)|*p|p else return null;
+  // the plant plucked: gone, or another moved into its slot, and it ends
+  const i=p.id.idx();
+  const s=g.plants.list.slice();
+  if(i>=s.len or m.len(s.items(.at)[i]-p.at)>1e-4){
+    g.pluck=null;
+    return null;
+  }
+  p.t+=dt;
+  if(!p.freed and p.t>=pluck.loose*pluck.time){
+    p.freed=true;
+    // what it has ripened whole, its share for this pluck (rounded up),
+    // what it yields, and how many the belly took
+    const es=m.floorTo(u16,s.items(.essence)[i]);
+    const n=(es+p.left-1)/p.left;
+    const yields=species.get(s.items(.sp)[i]).yields;
+    const got=g.player.inv.add(yields,n);
+    s.items(.essence)[i]-=m.f(got);
+    p.got+=got;
+    if(got>0){
+      g.player.bead=yields;
+      g.player.stowUnit();
+    }
+    // the belly full, this pluck is the last
+    if(got<n){
+      g.prog.say(txt.s.msg.bellyFull,.{});
+      p.left=1;
+    }
+    if(es==got)p.left=1;
+  }
+  if(p.t<pluck.time)return p.share();
+  p.left-=1;
+  if(p.left==0){
+    // what an unstudied plant gives is learned only by taking it
+    const sp=s.items(.sp)[i];
+    if(p.got>0 and !g.prog.yieldKnown(sp))g.prog.say(txt.s.msg.givesUp,.{p.got,txt.item(species.get(sp).yields).name});
+    g.pluck=null;
+    return null;
+  }
+  p.t-=pluck.time;
+  p.freed=false;
+  return p.share();
 }
 /// pull a plant up: a sown plant always comes back as its seed, ready to be
 /// sown again, so it stays in the ground while the belly has no room for it.
@@ -318,11 +363,50 @@ test"plants never set seed; an uprooted plant comes back as its seed"{
     .seed=0.5,.growth=1,.essence=2.5,
   }));
   harvest(&g,.{x+2,z});
+  // plucked by paw over the next frames, until all it ripened is taken
+  while(pluckOn(&g,1.0/60.0)!=null){}
   try testing.expectEqual(@as(u32,2),g.player.inv.count(.essence));
   try testing.expectEqual(@as(u32,0),g.player.inv.count(.seedLumenroot));
   uproot(&g,.{x+2,z});
   try testing.expect(g.plants.at(&g.world,x+2,z)==null);
   try testing.expectEqual(@as(u32,1),g.player.inv.count(.seedLumenroot));
+}
+test"a harvest is plucked by paw: a few plucks, each yield carried in as a bead"{
+  // the test allocator, a fresh game, and the tile two right of the wolf
+  const gpa=testing.allocator;
+  var g=try Game.init(gpa,play.defaultSeed);
+  defer g.deinit();
+  // the wolf's tile, the chunk two tiles right of it and that tile within it
+  const x,const z=m.tileAt(g.player.pos);
+  const cc=g.world.chunkOfTile(x+2,z).?;
+  const t=ck.localIndex(x+2,z);
+  cc.kind[t]=.soil;
+  cc.res[t]=0;
+  try testing.expect(try g.plants.placeEx(gpa,&g.world,x+2,z,.{
+    .x=x+2,.y=z,.chunk=undefined,.tile=undefined,.sp=.lumenroot,
+    .seed=0.5,.growth=1,.essence=7.5,
+  }));
+  harvest(&g,.{x+2,z});
+  // nothing is taken at the press: it comes loose pluck by pluck
+  try testing.expectEqual(@as(u32,0),g.player.inv.count(.essence));
+  // how many times the belly took some, and what it held last
+  var plucks:u32=0;
+  var had:u32=0;
+  while(pluckOn(&g,1.0/60.0)!=null){
+    // what the belly holds now
+    const now=g.player.inv.count(.essence);
+    if(now>had)plucks+=1;
+    had=now;
+  }
+  try testing.expectEqual(@as(u32,pluck.most),plucks);
+  try testing.expectEqual(@as(u32,7),g.player.inv.count(.essence));
+  try testing.expect(g.player.bead==.essence);
+  // moving off (the pluck let go) takes nothing more
+  g.plants.list.items(.essence)[g.plantAt(.{x+2,z}).?.idx()]=3;
+  harvest(&g,.{x+2,z});
+  g.pluck=null;
+  try testing.expect(pluckOn(&g,1)==null);
+  try testing.expectEqual(@as(u32,7),g.player.inv.count(.essence));
 }
 test"seeds are woven only by a germinator, which is woven from gathered matter"{
   for(craft.byHand)|i|try testing.expect(!craft.germinatorOnly(i));
@@ -350,6 +434,8 @@ test"a confluence gives only convergence essence"{
     .seed=0.5,.growth=1,.essence=3.5,
   }));
   harvest(&g,.{x+3,z+1});
+  // plucked by paw over the next frames, until all it ripened is taken
+  while(pluckOn(&g,1.0/60.0)!=null){}
   try testing.expectEqual(@as(u32,3),g.player.inv.count(.convergenceEssence));
   try testing.expectEqual(@as(u32,0),g.player.inv.count(.seedLumenroot));
   try testing.expectEqual(@as(u32,0),g.player.inv.count(.seedThornleech));

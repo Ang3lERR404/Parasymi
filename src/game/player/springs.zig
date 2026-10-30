@@ -141,8 +141,6 @@ const spreadShut=lib.player.tuningLook.spreadShut;
 const stepKick=lib.player.tuningLook.stepKick;
 /// how far a stowing paw cups round its unit
 const stowCup=lib.player.tuning.stowCup;
-/// how long a paw takes to press a unit into the belly (s)
-const stowTime=lib.player.tuning.stowTime;
 /// how damped the tail's springs are
 const tailDamp=lib.player.tuningLook.tailDamp;
 /// how stiff the tail root's spring is (spring frequency)
@@ -208,7 +206,7 @@ pub fn springs(p:*Player,dt:f32)void{
       const k=p.gather orelse 0;
       const regrip=1-m.smooth(m.clamp01((k-wrenchEnd)/(1-wrenchEnd)*2))*m.smooth(m.clamp01((1-k)*8));
       const hold=m.lerp(gripOpen,pryGrip,regrip);
-      const cup=m.clamp01(p.stow[s]/stowTime*4);
+      const cup=m.clamp01(p.stowLeft(s)*4);
       target=m.lerp(target,m.lerp(hold,stowCup,cup),p.squat.x);
       // resting: the paw on the belly lies flat, the one on the hip curls
       target=m.lerp(target,if(s==1)restFlat else restFist,p.restPose.x*(1-p.squat.x));

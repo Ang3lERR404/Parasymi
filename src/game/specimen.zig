@@ -80,6 +80,10 @@ const feedRate:f32=0.4;
 /// a carrier lets go of what it carries this long after taking it (s),
 /// since nothing stands ahead to take it
 const carry:f32=2;
+/// plucked, the wolf starts this far (m) from its footprint's edge
+const standBack:f32=1.2;
+/// the plucking state's plucks, what the plant is ripened to each loop
+const ripe:f32=m.f(lib.pluck.most)+0.5;
 /// the specimen's seed (its variant, its phase)
 const seed:f32=0.37;
 /// what stands alone
@@ -114,13 +118,16 @@ pub const State=union(enum){
   /// grown, turned a quarter (R) each loop: a rooted one uproots itself on
   /// its roots, turns and digs back in; a floater only turns
   turn,
+  /// a plant grown and ripe, plucked by the wolf (drawn beside it) as
+  /// harvest does it in play, ripened afresh each loop
+  pluck,
   /// shown as set from outside (the animation editor, tools/animedit.zig)
   look:Look,
   /// a name, a share of growth (`0.4`) or a span (`0.2..0.8`)
   pub fn parse(s:[]const u8)error{BadState}!State{
     if(eql(u8,s,"mature") or eql(u8,s,"idle"))return.{.held=1};
-    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn},s))|k|return switch(k){
-      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,
+    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck},s))|k|return switch(k){
+      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,
     };
     if(indexOf(u8,s,".."))|dots|{
       // where the dots are, and the shares either side of them
@@ -131,11 +138,11 @@ pub const State=union(enum){
     return.{.held=m.clamp01(parseFloat(f32,s) catch return error.BadState)};
   }
   /// whether a subject can show it (growth states suit both; plants
-  /// wither, flow, drain, darken and live; structures work)
+  /// wither, flow, drain, darken, live and are plucked; structures work)
   pub fn suits(s:State,what:Subject)bool{
     return switch(s){
       .grow,.span,.held,.turn,.look=>true,
-      .wither,.flow,.drain,.dark,.live=>what==.plant,
+      .wither,.flow,.drain,.dark,.live,.pluck=>what==.plant,
       .active=>what==.structure,
     };
   }
@@ -170,11 +177,13 @@ pub const Specimen=struct{
   carryT:f32=0,
   /// the tile it stands on (found by `sow`)
   at:[2]i32=.{0,0},
-  /// the meshes to build: the species' (and a floater's shadow), or what
-  /// the structure draws and the resource nodes round it
+  /// whether the wolf is drawn beside it (plucking it)
+  pub fn wolf(s:*const Specimen)bool{return s.state==.pluck;}
+  /// the meshes to build: the species' (and a floater's shadow; the wolf's
+  /// plucking it), or what the structure draws and the resource nodes round it
   pub fn only(s:*const Specimen,arena:Allocator)Allocator.Error!renderer.Only{
     switch(s.what){
-      .plant=>|sp|return.{.species=sp,.parts=&.{.shadow,.turnRoot,.turnRootPale}},
+      .plant=>|sp|return.{.species=sp,.parts=if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.bellyLump,.itemPod,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale}},
       .structure=>|k|{
         // the meshes, gathered
         var list:std.ArrayList(meshlib.Id)=.empty;
@@ -244,6 +253,8 @@ pub const Specimen=struct{
     };
     g.player.pos=m.footprintCentre(s.at[0],s.at[1],size,g.heightAt(s.at[0],s.at[1]));
     g.cam.target=g.player.pos+m.v3(0,up,0);
+    // plucking, the wolf stands back from it and steps up to it
+    if(s.wolf())g.player.pos[2]-=standBack+m.f(size)*0.5;
   }
   /// whether it may stand at (x, z)
   fn fits(s:*const Specimen,g:*const Game,x:i32,z:i32)bool{
@@ -297,6 +308,17 @@ pub const Specimen=struct{
         p.items(.flow)[0]=l.flow;
         p.items(.health)[0]=l.health;
         p.items(.span)[0]=never;
+        // plucked: once the last pluck is done and its end held, ripened
+        // afresh and harvested again
+        if(s.state==.pluck){
+          if(g.pluck!=null)s.feedT=holdTime;
+          s.feedT-=dt;
+          if(s.feedT<=0){
+            p.items(.essence)[0]=ripe;
+            actions.harvest(g,s.at);
+            s.feedT=holdTime;
+          }
+        }
         // the plants lit by radiance; it alone, lit as its look says
         const rad=&g.eco.radiance.radiating;
         try rad.resize(g.gpa,g.plants.len());
@@ -409,7 +431,7 @@ pub const Specimen=struct{
       .dark=>.{.radiating=false},
       .live=>.{.growth=0},
       .look=>|l|l,
-      .active,.turn=>.{},
+      .active,.turn,.pluck=>.{},
     };
   }
 };

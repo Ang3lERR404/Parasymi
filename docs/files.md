@@ -144,6 +144,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `tuning_look.zig` — how the wolf looks as it moves: eyes, ears, fingers, glow, sap, belly and tail.
 
 ## src/game/
+- `pluck.zig` — plucking: the gardener taking a ripe plant's yield by paw.
 - `progression.zig` — research tree, discoveries and world events.
 - `record.zig` — a value as a record of named fields (structures in saves): each field is written with its name's hash and its length, so a record read back…
 

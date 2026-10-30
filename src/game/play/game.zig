@@ -203,6 +203,10 @@ pub const Game=struct{
   hoverFloat:?PlantId=null,
   /// how far the current gather has come (s)
   gatherT:f32=0,
+  /// a ripe plant being plucked by paw, if any (game/pluck.zig)
+  pluck:?lib.pluck.Pluck=null,
+  /// the plucked plant's bend after the paws, springing back once let go
+  tug:lib.pluck.Tug=.{},
   /// a short linger (s) for one-off gestures: the wolf keeps facing where it happened
   linger:f32=0,
   /// the wait (s) before the next thing is put down as the cursor sweeps
