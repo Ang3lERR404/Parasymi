@@ -71,7 +71,8 @@ shaded 0.55). From the ground up:
 | `sap_cache.zig` | `rootMat`, `footLeaves`, `leafyVine`, `resinPod` |
 | `arsthraxia.zig` | `rootMat`, `footLeaves`, `resinPod` |
 | `gathering_crown.zig` | `rootMat`, `footLeaves`, `resinPod`, `rootlet` |
-| `polyp.zig` | `rootMat`, `resinPod` |
+| `polyp_hydra.zig` (the polyp) | `rootMat`, `resinPod` |
+| `polyp.zig` (its colony look) | `rootMat`, `resinPod` |
 | `root_digger.zig` | `rootMat`, `resinPod`, `rootlet` |
 | `loomfern.zig` | `rootMat` |
 | `conduit.zig` | `rootlet` (the arch's rootlets; the arch itself is `conduit.arch`) |

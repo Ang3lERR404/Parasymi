@@ -1,4 +1,5 @@
-//! mesh: POLYP. the heart of a halo: a colony of soft polyps budding from
+//! mesh: POLYP COLONY. an earlier look for the polyp, laid beside it to
+//! compare (`--samples=polypColony,polyp`): a colony of soft polyps budding from
 //! one fleshy mound on a root mat. Each is a smooth column flaring into an
 //! oral disc, its mouth a dark slit on a raised mound at the heart, ringed
 //! by eight feathery tentacles that arch out and curl down at their tips;

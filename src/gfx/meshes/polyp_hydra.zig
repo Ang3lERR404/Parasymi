@@ -1,12 +1,15 @@
-//! mesh: POLYP, HYDRA. hydra looks for the polyp, laid side by side to
-//! compare (`--samples=polypHydraFeathered,polypHydraBoth,polypHydraPlumed`):
-//! one tall, slender, stretchy body gripping the soil with a foot disc,
-//! swelling a little at its gut, opening at its head into the polyp's
-//! mouth disc, crowned with its feathery tentacles, with long thin
-//! tentacles beaded with stinging knots and plumed at their tips, or with
-//! both; a young hydra buds from its side with a small crown of its own.
-//! Also a colony of cone-headed hydras on the polyp's mound
-//! (`polypHydras`). They grow along growth splines.
+//! mesh: POLYP. the heart of a halo: one tall, slender, stretchy hydra
+//! gripping the soil with a foot disc, swelling a little at its gut,
+//! opening at its head into a mouth disc (a dark slit on a raised mound,
+//! a bead of resin in it), ringed by feathery tentacles, with long thin
+//! tentacles beaded with stinging knots hanging from under them, plumed
+//! at their tips. Offshoots bud up its stem, each its own size and
+//! bearing, crowned alike. The diamond forms high over it as the halo
+//! completes. Also looks to compare (`--samples=`): the hydra crowned with
+//! feathers alone (`polypHydraFeathered`) or plumes alone
+//! (`polypHydraPlumed`), with a single young bud, and a colony of
+//! cone-headed hydras on a fleshy mound (`polypHydras`). They grow along
+//! growth splines.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -65,6 +68,10 @@ pub const Body=struct{
   base:color.Rgb,
   /// how its head is made
   head:Head=.cone,
+  /// how many feathery tentacles crown an open head
+  feathers:u32=8,
+  /// whether its mouth holds a bead of resin
+  bead:bool=false,
 };
 /// how wide an open head's disc flares, as a share of its body's radius
 const openFlare:f32=2.6;
@@ -87,12 +94,37 @@ pub const Head=enum{
   /// from under them
   both,
 };
-/// the merged look (`--samples=polypHydraFeathered,polypHydraBoth,polypHydraPlumed`):
-/// the single hydra opening into the polyp's mouth disc, its feathery
-/// crown round the rim and its long plumed tentacles hanging from under it
-pub const both=struct{
-  /// builds the hydra, crowned with both
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.both);}
+/// builds the polyp: the single hydra opening into the mouth disc, its
+/// feathery crown round the rim and its long plumed tentacles hanging from
+/// under it, offshoots of its own budding up its stem, each crowned alike
+pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.both);}
+/// one offshoot budding from the stem: where along it, which way, how far
+/// out and up it reaches, and how big its crown is
+const Offshoot=struct{
+  /// how far up the stem it buds (0 foot .. 1 head)
+  u:f32,
+  /// its bearing round the stem (radians)
+  a:f32,
+  /// how far out it reaches
+  out:f32,
+  /// how far up it rises
+  rise:f32,
+  /// its body's radius
+  r:f32,
+  /// how long its plumed tentacles hang
+  reach:f32,
+  /// how many feathery tentacles crown it
+  feathers:u32,
+  /// how many plumed tentacles hang from it
+  arms:u32,
+};
+/// the offshoots up the stem, each its own size and bearing, low and large
+/// to high and small (`single` with an open head)
+const offshoots=[_]Offshoot{
+  .{.u=0.26,.a=0.4,.out=0.13,.rise=0.16,.r=0.015,.reach=0.24,.feathers=6,.arms=3},
+  .{.u=0.42,.a=2.6,.out=0.17,.rise=0.22,.r=0.018,.reach=0.3,.feathers=6,.arms=3},
+  .{.u=0.57,.a=4.3,.out=0.13,.rise=0.15,.r=0.014,.reach=0.22,.feathers=6,.arms=3},
+  .{.u=0.71,.a=5.6,.out=0.09,.rise=0.11,.r=0.011,.reach=0.16,.feathers=5,.arms=3},
 };
 /// a mixed look (`--samples=polyp,polypHydraFeathered`): the single hydra
 /// opening into the polyp's mouth disc, crowned with its feathery tentacles
@@ -122,7 +154,20 @@ fn single(b:*mg.Builder,head:Head)Allocator.Error!void{
     try mg.ellipsoid(b,.{.center=v3(0,0.005,0),.radii=v3(0.065,0.018,0.065),.col=foot.toRgba8(255),.part=.tendril,.rings=6,.segs=14});
     try k.along(b,s,trunk);
   }
-  try body(b,&k,trunk,.{.r=0.03,.arms=6,.reach=1,.base=foot,.head=head},&rng);
+  try body(b,&k,trunk,.{.r=0.03,.arms=6,.reach=1,.base=foot,.head=head,.bead=true},&rng);
+  if(head!=.cone){
+    for(offshoots,0..)|o,i|{
+      // where it buds, the flat way out it reaches, and a little drift aside
+      const side=k.point(trunk,o.u);
+      const out=v3(@cos(o.a),0,@sin(o.a));
+      const aside=m.cross(v3(0,1,0),out)*m.splat3(rng.range(-0.03,0.03));
+      // out of the stem, then turning upward
+      const id=k.branch(trunk,o.u,&.{side,side+out*m.splat3(o.out*0.45)+v3(0,o.rise*0.05,0),side+out*m.splat3(o.out*0.85)+v3(0,o.rise*0.35,0)+aside,side+out*m.splat3(o.out)+v3(0,o.rise,0)+aside},.{.pace=bodyPace,.delay=0.1+0.05*m.f(i)});
+      try body(b,&k,id,.{.r=o.r,.arms=o.arms,.reach=o.reach,.base=gut,.head=head,.feathers=o.feathers},&rng);
+    }
+    k.finish(b);
+    return;
+  }
   // the young one, budding from its side and turning upward
   const side=k.point(trunk,0.42);
   const bud=k.branch(trunk,0.42,&.{side,side+v3(0.07,0.02,0.04),side+v3(0.13,0.08,0.07),side+v3(0.15,0.17,0.08)},.{.pace=bodyPace,.delay=0.2});
@@ -220,9 +265,15 @@ pub fn body(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,o:Body,rng:*Rng)Alloca
   const hr=rs[bodyRings-1];
   if(o.head!=.cone){
     try lib.polypMesh.mouthOn(b,k,id,top,up,hr,rng);
-    if(o.head!=.plumed)for(0..feathers)|j|{
+    if(o.bead){
+      // where its vertices begin
+      const s=b.mark();
+      try kit.resinPod(b,top+up*m.splat3(hr*0.3),v3(hr*0.3,hr*0.24,hr*0.3),6,10);
+      try k.on(b,s,id,1,.{.from=top,.delay=0.05});
+    }
+    if(o.head!=.plumed)for(0..o.feathers)|j|{
       // this feathery tentacle's bearing
-      const a=(m.f(j)+rng.range(-0.15,0.15))/feathers*m.tau;
+      const a=(m.f(j)+rng.range(-0.15,0.15))/m.f(o.feathers)*m.tau;
       try lib.polypMesh.tentacle(b,k,id,.{.top=top,.up=up,.e1=e1,.e2=e2,.dr=hr,.r=hr/lib.polypMesh.flare},a,rng);
     };
     if(o.head!=.feathered)for(0..o.arms)|j|{
@@ -284,8 +335,6 @@ pub const Tip=enum{
   /// in a feathery plume of the polyp's soft pinnules
   plume,
 };
-/// feathery tentacles round an open head, `Head.feathered`
-const feathers=8;
 /// where along a plumed tentacle its plume begins (0 root .. 1 tip)
 const plumeFrom:f32=0.62;
 /// pinnule pairs in a plume

@@ -117,7 +117,7 @@ pub const Samples=struct{
   }
 };
 /// how a sample sways and how full of sap it shows: as the structure whose
-/// mesh its name begins with (`polypHydraBoth` as the polyp)
+/// mesh its name begins with (`polypColony` as the polyp)
 const Like=struct{
   /// how far it bends in the garden's wind
   sway:f32=0.4,

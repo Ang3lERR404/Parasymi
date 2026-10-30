@@ -204,16 +204,16 @@ const parts=struct{
   /// the weftstone: a loomfern and a lithophage grown into one, floating
   pub const weftstone=@import("meshes/weftstone.zig");
   // the halo: its polyp and the diamond it forms
-  /// the polyp: the heart of a halo, a colony of feathery polyps on one fleshy mound
-  pub const polyp=@import("meshes/polyp.zig");
+  /// the polyp: the heart of a halo, a slender hydra crowned with feathers and plumed tentacles, offshoots budding up its stem
+  pub const polyp=@import("meshes/polyp_hydra.zig");
+  /// an earlier look for the polyp, to compare: a colony of feathery polyps on one fleshy mound
+  pub const polypColony=@import("meshes/polyp.zig");
   /// a mixed look for the polyp: the colony crowned with the hydra's hanging tentacles
   pub const polypHanging=@import("meshes/polyp.zig").hanging;
   /// a mixed look for the polyp: a colony of slender hydras on the fleshy mound
   pub const polypHydras=@import("meshes/polyp_hydra.zig").colony;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, crowned with its feathery tentacles
   pub const polypHydraFeathered=@import("meshes/polyp_hydra.zig").feathered;
-  /// a mixed look for the polyp: the hydra opening into its mouth disc, crowned with feathers and plumed tentacles both
-  pub const polypHydraBoth=@import("meshes/polyp_hydra.zig").both;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, its long tentacles plumed at their tips
   pub const polypHydraPlumed=@import("meshes/polyp_hydra.zig").plumed;
   /// the diamond a halo leaves, gathered in from its shards

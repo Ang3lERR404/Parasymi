@@ -275,8 +275,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `parasite_kit.zig` — the parasitic lineage's body, shared by its plants (`plant`, the `coil` form) and its structures: alien, not hostile, and plainly a…
 - `paw_pad.zig` — mesh: PAW PAD.
 - `pluck_burst.zig` — mesh: PLUCK BURST.
-- `polyp.zig` — mesh: POLYP.
-- `polyp_hydra.zig` — mesh: POLYP, HYDRA.
+- `polyp.zig` — mesh: POLYP COLONY.
+- `polyp_hydra.zig` — mesh: POLYP.
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
 - `sap_cache.zig` — mesh: SAP CACHE.
