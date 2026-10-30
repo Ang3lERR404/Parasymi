@@ -164,7 +164,10 @@ Code:
   matrix is a bug.
 - Threads only via `jobs.each` on `w.io`, results identical to serial,
   with a test proving it. Never spawn threads or keep a pool (the audio
-  device's render thread is zig-wsapi's own, fed through `audio.Output`).
+  device's render thread is zig-wsapi's own, fed through `audio.Output`;
+  work beside the frames that touches no game state, the renderer's mesh
+  growing and `--inspect` shot writing, runs as an `io.concurrent` task,
+  awaited before what it holds is freed).
 - Dense per-element visual work runs on the GPU, never per frame/chunk on
   the CPU.
 - `WorldPush` ≤ 192 bytes. A new see-through part role goes in

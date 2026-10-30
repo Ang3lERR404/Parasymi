@@ -48,6 +48,9 @@ none, the binding name in capitals). So labels follow rebinding.
 ## Parallel loops (engine `core/jobs.zig`)
 `jobs.each` splits a loop over the CPU cores, like handing out pages of a
 book to several readers. Never spawn threads or keep a pool of your own.
+Work beside the frames that touches no game state (growing the meshes,
+writing `--inspect` shots) is an `io.concurrent` task on the I/O, with
+its own copy of what it needs, awaited before that is freed.
 
 ```zig
 jobs.each(io, n, min, Ctx, ctx, Ctx.run);

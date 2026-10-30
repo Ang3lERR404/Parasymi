@@ -261,6 +261,13 @@ pub fn main(init:Init)!void{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});
   }
+  // the shots still being written apart from the frames, each waited for
+  // before the game closes
+  var writing:std.ArrayList(Io.Future(void))=.empty;
+  defer{
+    for(writing.items)|*w|w.await(io);
+    writing.deinit(gpa);
+  }
   if(!try ground(&loadScreen,r,&input,&last,&game.world,forms+1))return;
   // play's clock runs on from the screen's, so it fades off without a jump
   game.uiTime=loadScreen.time;
@@ -372,27 +379,59 @@ pub fn main(init:Init)!void{
     r.capture=shoot;
     try r.draw(&scene,resized);
     if(r.shot())|sh|{
-      snap(gpa,io,sh,&turn);
-      // decision: the time spent writing the shot is not the world's, so
-      // the next frame does not jump (springs would spike, timings slip)
+      try snap(gpa,io,sh,&turn,&writing);
+      // (what time taking it still costs is not the world's, so the next
+      // frame does not jump: springs would spike, timings slip)
       last=glfw.getTime();
       if(turn.done())window.setShouldClose(true);
     }
   }
 }
-/// write a captured frame as `shots/<focus>_<n>.png` (failures are logged)
-fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,turn:*orbit.Orbit)void{
+/// a captured frame on its way to `shots/<focus>_<n>.png`: its own copy
+/// of the pixels and of the path, freed once written
+const ShotFile=struct{
+  /// the frame's width, in pixels
+  w:u32,
+  /// its height, in pixels
+  h:u32,
+  /// its pixels, copied out of the renderer's
+  px:[]u8,
+  /// whether each pixel comes blue first
+  bgra:bool,
+  /// where it is written
+  path:[]u8,
+  /// encode it as a PNG and write it (failures are logged), then free it
+  fn write(f:ShotFile,gpa:Allocator,io:Io)void{
+    defer gpa.free(f.px);
+    defer gpa.free(f.path);
+    // the frame encoded as a PNG
+    const bytes=png.encode(gpa,f.w,f.h,f.px,if(f.bgra).bgra else.rgba)catch|e|return log.err("{s}: {t}",.{f.path,e});
+    defer gpa.free(bytes);
+    Dir.cwd().writeFile(io,.{.sub_path=f.path,.data=bytes})catch|e|return log.err("{s}: {t}",.{f.path,e});
+    log.info("shot {s}",.{f.path});
+  }
+};
+/// send a captured frame off to be written as `shots/<focus>_<n>.png`:
+/// copied, then encoded and written on a task of its own beside the frames
+/// (the I/O's, never a thread of ours), so the frame loop never waits on
+/// it; written here if no task can be had
+fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,turn:*orbit.Orbit,writing:*std.ArrayList(Io.Future(void)))Allocator.Error!void{
   defer turn.took();
   // buffers for the focus's name and the shot's path
   var nb:[32]u8=undefined;
   var pb:[96]u8=undefined;
   // the shot's path, `shots/<focus>_<n>.png`
   const path=bufPrint(&pb,shots++sepStr++"{s}_{d}.png",.{turn.focus.name(&nb),turn.taken}) catch unreachable;
-  // the frame encoded as a PNG
-  const bytes=png.encode(gpa,sh.w,sh.h,sh.px,if(sh.bgra).bgra else.rgba)catch|e|return log.err("{s}: {t}",.{path,e});
-  defer gpa.free(bytes);
-  Dir.cwd().writeFile(io,.{.sub_path=path,.data=bytes})catch|e|return log.err("{s}: {t}",.{path,e});
-  log.info("shot {s}",.{path});
+  // room to keep its task, and the frame with its own copies of the pixels and the path
+  try writing.ensureUnusedCapacity(gpa,1);
+  const px=try gpa.dupe(u8,sh.px);
+  errdefer gpa.free(px);
+  const f=ShotFile{.w=sh.w,.h=sh.h,.px=px,.bgra=sh.bgra,.path=try gpa.dupe(u8,path)};
+  const future=io.concurrent(ShotFile.write,.{f,gpa,io})catch|e|{
+    log.warn("shot written without a task of its own: {t}",.{e});
+    return f.write(gpa,io);
+  };
+  writing.appendAssumeCapacity(future);
 }
 /// put the gardener's changed settings into effect (as far as the GPU and
 /// monitor allow, which the settings then show) and keep them.
