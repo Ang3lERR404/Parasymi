@@ -3,13 +3,13 @@
 ## Past.
   - [ ] Alt mode:
     - [ ] pressing `alt` toggles icon overview of what is being crafted/held
-  - [ ] Modularize the GUI:
-    - [ ] Each component only needs to worry about a few things given it's type:
-      - [ ] text inputs:
+  - [x] Modularize the GUI:
+    - [x] Each component only needs to worry about a few things given it's type:
+      - [x] text inputs:
         - hook onto the main text input handling process.
         - render a text-cursor/caret at either: `left-hand`/`centre` or `right-hand` sides.
         - when pressing `enter` should trigger the input to process the given text.
-      - [ ] buttons:
+      - [x] buttons:
         - with it's given position and size coordinates:
           - (`x` position,
           - `y` position,
@@ -19,7 +19,7 @@
           - `hovering`: when the mouse is over it's coordinates at any position.
           - `pressed`: when mouse1 (`left click`) is pressed
           - `held`: when mouse1 is held down
----
+___
 
 ## Future.
   - [ ] Music for both day and night:

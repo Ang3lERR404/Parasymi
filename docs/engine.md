@@ -68,8 +68,11 @@ adds on top.
 - Game: `renderer` (the garden's `G`), passes, terrain meshing.
 
 ### ui
-- Engine: draw, font, box.
-- Game: nothing.
+- Engine: draw, font, box, and the components' behaviour: `button`
+  (a box and the pointer give one of idle, hovering, pressed, held) and
+  `textInput` (typing, erase, enter; text and caret kept to the left-hand
+  side, the centre or the right-hand side of its box).
+- Game: how they look (`hud/button.zig`, `hud/field.zig`, `hud/slot.zig`).
 
 ### shaders
 - Engine: post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`

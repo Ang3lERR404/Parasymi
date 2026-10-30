@@ -102,9 +102,11 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/hud/
 - `belly.zig` — the sap belly (Tab): the wolf's inventory, slots hanging in rows from vines on a trellis whose main stem fills with sap as the belly does…
+- `button.zig` — a button, the second of the HUD's components: a bud and its label in a box the mouse lands on.
 - `carry.zig` — what the cursor carries: the lifted stack (or hotbar item) hangs just off the pointer, glowing, until a click puts it down.
 - `debug.zig` — F3: frame/sim timings and world counts.
 - `eyes.zig` — looking out of the wolf's eyes: a small lit seed at the middle of the screen, in a soft glow, marking what a click lands on.
+- `field.zig` — a text field, the third of the HUD's components: what is typed into a text input (ui/text_input.zig) grows along a young stem across its…
 - `gardens.zig` — the saved gardens (pause menu): the world stays frozen behind the veil.
 - `gather.zig` — gathering progress grows a tendril above the wolf's focus.
 - `hotbar.zig` — the hotbar: a row of husks hanging from a vine, each empty or holding an item the gardener dropped on it from the belly, with the belly's…

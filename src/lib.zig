@@ -70,6 +70,10 @@ pub const hud=@import("game/hud.zig");
 pub const hudBelly=@import("game/hud/belly.zig");
 /// a HUD slot: a husk hanging in its box
 pub const hudSlot=@import("game/hud/slot.zig");
+/// a HUD button: a bud and its label, idle, hovered, pressed or held
+pub const hudButton=@import("game/hud/button.zig");
+/// a HUD text field: typed text on a stem, its caret a blinking bud
+pub const hudField=@import("game/hud/field.zig");
 /// item icons: a seed broken open, a pod, a mote
 pub const icon=@import("game/icon.zig");
 /// `--inspect`: the camera turning round one thing, taking shots

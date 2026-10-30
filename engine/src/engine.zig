@@ -8,7 +8,7 @@
 //!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
 //!   world     the chunk grid and the streamed chunk map
 //!   render    frame orchestration and passes, post (bloom, AA), light, camera
-//!   ui        SDF draw batch, font, layout boxes
+//!   ui        SDF draw batch, font, layout boxes, buttons, text inputs
 /// Vulkan bindings (vulkan-zig), for the game's own Vulkan code
 pub const vk=@import("vulkan");
 /// GLFW windows and input (zglfw), for the game's own windowing code
@@ -99,6 +99,10 @@ pub const ui=struct{
   pub const font=@import("ui/font.zig");
   /// layout boxes and their hit tests
   pub const box=@import("ui/box.zig");
+  /// a button's state under the mouse: idle, hovering, pressed, held
+  pub const button=@import("ui/button.zig");
+  /// a text input: typing, erasing, enter, its caret's side
+  pub const textInput=@import("ui/text_input.zig");
 };
 /// the shadow casters' fragment shader (depth alone), for a game's shadow passes
 pub const shadowFrag=@embedFile("shadow.frag");
@@ -126,4 +130,6 @@ test{
   _=render.volume;
   _=ui.draw;
   _=ui.box;
+  _=ui.button;
+  _=ui.textInput;
 }

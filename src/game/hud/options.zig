@@ -25,6 +25,10 @@ const hud=lib.hud;
 const txt=lib.txt;
 /// the keys and buttons down this frame
 const Input=lib.engine.platform.input.Input;
+/// the HUD's button component
+const Button=lib.hudButton.Button;
+/// a button's state, for each setting's row
+const buttonState=lib.hudButton.stateOf;
 /// the panel's width (pixels)
 const pw:f32=620;
 /// the height (pixels) of its title band, above the first setting
@@ -88,8 +92,10 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
     const set:opt.Setting=@enumFromInt(i);
     const y=py+headerH+rowH*m.f(i);
     const mid=y+8;
-    // whether the mouse is over this row
-    const over=g.points(hud.row(.options,.{.setting=set}));
+    // this row's box, its state, and whether the mouse is over it
+    const box:hud.Box=.{.x=px+padX/2,.y=y-rowH/2+8,.w=pw-padX,.h=rowH};
+    const st=buttonState(g,hud.row(.options,.{.setting=set}),box);
+    const over=st.over();
     if(over)try d.glow(px+pw/2,mid,pw*0.45,s.menuHover);
     _=try d.text(px+padX,y,s.textLabel,if(over)s.gold else s.white,txt.nth(labels,i));
     // the setting's value as shown, and where its centre sits
@@ -98,20 +104,15 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
     _=try d.text(vx-Draw.width(val,s.textLabel)/2,y,s.textLabel,s.gold,val);
     // leaves pointing either way, swaying a little, opening under the mouse
     // how open the leaves are, and how far they sway now
-    const open:f32=if(over)1 else 0.6;
+    const open:f32=switch(st){.idle=>0.6,.hovering=>1,.pressed,.held=>0.8};
     const sway=0.08*@sin(t*2+m.f(i));
     try d.leaf(.{vx-leafOff,mid},m.pi+sway,leafLen,leafW,s.leaf,open,m.f(i)*0.3);
     try d.leaf(.{vx+leafOff,mid},-sway,leafLen,leafW,s.leaf,open,m.f(i)*0.3+0.5);
-    g.rows.add(.{.x=px+padX/2,.y=y-rowH/2+8,.w=pw-padX,.h=rowH},hud.row(.options,.{.setting=set}));
+    g.rows.add(box,hud.row(.options,.{.setting=set}));
   }
-  // BACK's line, its label, and whether the mouse is over it
+  // BACK's line
   const by=py+headerH+rowH*m.f(settings)+14;
-  const back=txt.s.hud.optionsBack;
-  const over=g.points(hud.row(.options,.back));
-  if(over)try d.glow(w/2,by+8,pw*0.25,s.menuHover);
-  try hud.bullet(d,w/2-Draw.width(back,s.textLabel)/2-26,by+8,9,s.gold,if(over)1 else 0.15,0.2);
-  _=try d.text(w/2-Draw.width(back,s.textLabel)/2,by,s.textLabel,if(over)s.gold else s.white,back);
-  g.rows.add(.{.x=w/2-pw/4,.y=by-backH/2+8,.w=pw/2,.h=backH},hud.row(.options,.back));
+  try(Button{.center=.{w/2,by+8},.label=txt.s.hud.optionsBack,.pick=hud.row(.options,.back),.h=backH,.wide=pw/2,.reach=pw*0.25}).draw(g,d);
   // the hint, centred along the bottom
   const hint=txt.s.hud.optionsHint;
   _=try d.text(w/2-Draw.width(hint,s.textFine)/2,py+ph-hintH+4,s.textFine,s.dim,hint);

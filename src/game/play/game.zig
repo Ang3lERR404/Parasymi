@@ -154,8 +154,8 @@ pub const Game=struct{
   overwrite:bool=false,
   /// letting the chosen garden go was asked once already (the next DELETE does it)
   deleting:bool=false,
-  /// the name prompt: the name typed so far
-  typed:save.Name=.{},
+  /// the name prompt: the name typed so far, its caret kept to the centre
+  typed:save.Typed=.{},
   /// the mode the name prompt returns to
   namingFrom:Mode=.roam,
   /// the first garden row in view, as wanted (scrolled by wheel or stem)
@@ -178,6 +178,9 @@ pub const Game=struct{
   /// the cursor, in screen pixels (tooltips and what is carried follow it);
   /// looking out of the wolf's eyes, the middle of the screen
   mouse:[2]f32=.{0,0},
+  /// the cursor and the use button (mouse1) this frame, for the HUD's
+  /// buttons to say whether they are hovered, pressed or held
+  pointer:lib.engine.ui.button.Pointer=.{},
   /// the window holds the cursor for looking out of the wolf's eyes; the
   /// frame it is taken its jump is not a look
   looking:bool=false,

@@ -107,7 +107,14 @@ Tests catch: a sown species without a seed icon; cfg keys.
    husk. A `Slot` is a box, a pick, and the husk's share of the box. It
    registers its box, draws the husk and glows, and its look scales with
    the box.
-5. **Strings** under `[hud]`.
+5. **Buttons** use `hud/button.zig` (`Button`: its middle, label, pick
+   and box height); the engine's `ui/button.zig` says whether it is idle,
+   hovering, pressed or held, the component only how each looks. A row
+   that is a button in its own layout asks `stateOf(g, pick, box)`.
+6. **Text inputs** are an engine `TextInput(cap, accept)` fed each frame
+   (`feed`: typed, erase, enter) and drawn by `hud/field.zig`, the text
+   and its caret kept to the input's `alignment` (left, centre, right).
+7. **Strings** under `[hud]`.
 
 ## A render pass
 1. **Its module**: `render/passes/<name>.zig` with `desc` (`.target`),

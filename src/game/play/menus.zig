@@ -37,6 +37,7 @@ const PauseRow=lib.play.PauseRow;
 /// rows.
 pub fn menu(g:*Game,in:*const Input,dt:f32)void{
   g.mouse=in.mouse;
+  g.pointer=.{.at=in.mouse,.down=ctl.down(in,.use),.went=ctl.pressed(in,.use)};
   // the HUD row under the mouse, if any
   const hit=g.rows.at(in.mouse);
   g.pointed=hit;
@@ -127,24 +128,23 @@ pub fn gardenAct(g:*Game,a:GardenAct)void{
 pub fn startNaming(g:*Game)void{
   g.namingFrom=if(g.mode==.naming)g.namingFrom else g.mode;
   g.mode=.naming;
-  g.typed=.{};
+  g.typed.clear();
   g.overwrite=false;
   g.request=.list;
 }
 /// the name prompt: typing adds to the name, erase takes back, confirm
 /// is OK
 pub fn typeName(g:*Game,in:*const Input)void{
-  // how long the name was before this frame's typing
-  const was=g.typed.len;
-  for(in.typed())|c|g.typed.put(c);
-  if(ctl.pressed(in,.erase))g.typed.erase();
-  if(g.typed.len!=was)g.overwrite=false;
-  if(ctl.pressed(in,.confirm))g.nameChosen();
+  switch(g.typed.feed(.{.typed=in.typed(),.erase=ctl.pressed(in,.erase),.confirm=ctl.pressed(in,.confirm)})){
+    .same=>{},
+    .changed=>g.overwrite=false,
+    .submitted=>g.nameChosen(),
+  }
 }
 /// the garden typed is taken
 pub fn nameTaken(g:*const Game)bool{
   // the name typed, if it can be one
-  const n=g.typed.typed() orelse return false;
+  const n=save.named(&g.typed) orelse return false;
   for(g.gardens.items)|e|if(e.name.same(n))return true;
   return false;
 }
@@ -152,7 +152,7 @@ pub fn nameTaken(g:*const Game)bool{
 /// asked twice); a name that cannot be one does nothing
 pub fn nameChosen(g:*Game)void{
   // the name typed, if it can be one
-  const n=g.typed.typed() orelse return;
+  const n=save.named(&g.typed) orelse return;
   if(g.nameTaken()and!g.overwrite){
     g.overwrite=true;
     return;

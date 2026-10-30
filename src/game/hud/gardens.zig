@@ -28,6 +28,8 @@ const hud=lib.hud;
 const txt=lib.txt;
 /// the keys and buttons down this frame
 const Input=lib.engine.platform.input.Input;
+/// the HUD's button component
+const Button=lib.hudButton.Button;
 /// the panel's width (pixels)
 const pw:f32=680;
 /// the height (pixels) of its title band, above the list
@@ -187,14 +189,7 @@ fn row(g:*play.Game,d:*Draw,i:usize,px:f32,mid:f32,a:f32,t:f32)Allocator.Error!v
 /// the chosen garden's DELETE: a small button centred on (cx, mid), its
 /// glow pulsing with `call` (asking)
 fn small(g:*play.Game,d:*Draw,cx:f32,mid:f32,label:[]const u8,call:f32)Allocator.Error!void{
-  // what the button picks, whether the mouse is over it, and its label's width
-  const p:hud.Pick=hud.row(.gardens,.{.act=.delete});
-  const over=g.points(p);
-  const w=Draw.width(label,s.textNote);
-  if(over or call>0)try d.glow(cx,mid,w*0.7+16,faded(s.menuHover,if(over)1 else call*2));
-  try hud.bullet(d,cx-w/2-12,mid,podR*0.6,s.bud,if(over)1 else 0.15,cx*0.01);
-  _=try d.text(cx-w/2,mid-6,s.textNote,if(over or call>0)s.gold else s.dim,label);
-  g.rows.add(.{.x=cx-w/2-22,.y=mid-rowH/2+6,.w=w+30,.h=rowH-12},p);
+  try(Button{.center=.{cx,mid},.label=label,.pick=hud.row(.gardens,.{.act=.delete}),.h=rowH-12,.size=.note,.call=call}).draw(g,d);
 }
 /// `secs` as shown: just now, minutes, hours or days ago
 fn ago(buf:[]u8,secs:i64)[]const u8{
@@ -225,13 +220,5 @@ fn stem(g:*play.Game,d:*Draw,x:f32,top:f32,t:f32)Allocator.Error!void{
 /// a button: a pod and its label centred on (cx, mid); dim when it would
 /// do nothing; `call` pulses its glow (asking)
 pub fn button(g:*play.Game,d:*Draw,cx:f32,mid:f32,label:[]const u8,p:hud.Pick,live:bool,call:f32)Allocator.Error!void{
-  // whether it is live under the mouse, and its label's width
-  const over=live and g.points(p);
-  const w=Draw.width(label,s.textLabel);
-  if(over or call>0)try d.glow(cx,mid,w*0.8+30,faded(s.menuHover,if(over)1 else call*2));
-  // its label's colour: dim when it would do nothing
-  const col=if(!live)s.unknown else if(over or call>0)s.gold else s.white;
-  try hud.bullet(d,cx-w/2-22,mid,podR,if(live)s.gold else s.unknown,if(over)1 else 0.15,cx*0.01);
-  _=try d.text(cx-w/2,mid-8,s.textLabel,col,label);
-  g.rows.add(.{.x=cx-w/2-40,.y=mid-actsH/2+6,.w=w+60,.h=actsH-12},p);
+  try(Button{.center=.{cx,mid},.label=label,.pick=p,.h=actsH-12,.live=live,.call=call}).draw(g,d);
 }

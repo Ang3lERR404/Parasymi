@@ -8,8 +8,6 @@ const lib=@import("../../lib.zig");
 const std=lib.std;
 /// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
-/// all the maths: easing, angles
-const m=lib.engine.core.math;
 /// the game itself: its mode and the name being typed
 const play=lib.play;
 /// the UI's draw batch, and text widths
@@ -22,6 +20,10 @@ const txt=lib.txt;
 const hud=lib.hud;
 /// the saved gardens panel, whose buttons and picks the prompt shares
 const gardens=hud.panels.gardens;
+/// saving: what a typed name may be
+const save=lib.save;
+/// the HUD's text field component, the name grows along
+const field=lib.hudField;
 /// the panel's width (pixels)
 const pw:f32=560;
 /// the panel's height (pixels)
@@ -32,8 +34,6 @@ const fieldY:f32=112;
 const fieldPad:f32=56;
 /// where OK and CANCEL sit, from the panel's top (pixels)
 const actsY:f32=190;
-/// the bud where the next letter goes blinks this often (1/s)
-const blink:f32=2.2;
 /// shown while a garden is being named.
 pub fn visible(g:*const play.Game)bool{return g.mode==.naming;}
 /// draws the veil and the panel: the title, the typed name on its swaying
@@ -51,24 +51,11 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   const title=txt.s.hud.namingTitle;
   _=try d.text(w/2-Draw.width(title,s.textTitle)/2,py+s.titleY,s.textTitle,s.gold,title);
   // the name on its stem, the bud after its last letter
-  // the name typed so far, and the stem's height and two ends
-  const name=g.typed.slice();
-  const fy=py+fieldY;
-  const x0=px+fieldPad;
-  const x1=px+pw-fieldPad;
-  // how far the stem sways now (pixels)
-  const sway=1.5*@sin(t*1.3);
-  try d.limb(.{x0,fy+14+sway},.{x1,fy+14-sway},2.5,1.5,s.barkYoung,0);
-  // where the name starts, centred, and where it ends
-  const nx=w/2-Draw.width(name,s.textHeading)/2;
-  const end=try d.text(nx,fy-8,s.textHeading,s.white,name);
-  // how far the bud is open now, blinking 0..1
-  const open=0.5+0.5*@sin(t*blink*m.tau);
-  try d.leaf(.{end+6,fy+12},-m.halfPi,18,8,s.leaf,open,0.2);
+  try field.draw(save.Typed,&g.typed,d,.{.x=px+fieldPad,.y=py+fieldY-8,.w=pw-2*fieldPad,.h=36},t);
   // OK only for a name that can be one; asking first over a taken one
   // the buttons' row, whether the name can be one, and OK's label
   const by=py+actsY;
-  const ok=g.typed.typed()!=null;
+  const ok=save.named(&g.typed)!=null;
   const okLabel=if(g.overwrite)txt.s.hud.gardensOverwrite else txt.s.hud.namingOk;
   try gardens.button(g,d,px+pw*0.32,by,okLabel,hud.row(.gardens,.{.act=.ok}),ok,if(g.overwrite)0.5+0.5*@sin(t*6)else 0);
   try gardens.button(g,d,px+pw*0.7,by,txt.s.hud.namingCancel,hud.row(.gardens,.{.act=.cancel}),true,0);

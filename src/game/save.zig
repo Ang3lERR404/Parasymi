@@ -99,6 +99,22 @@ pub const maxName=32;
 /// what a typed name may hold besides letters and digits (nothing a
 /// Windows file name refuses, all in the UI font)
 const nameMarks=" -'()!+,.=[]%";
+/// the byte `c` stands for in a name, if a name may hold it: a letter, a
+/// digit or one of `nameMarks`
+pub fn nameChar(c:u21)?u8{
+  if(c>0x7e)return null;
+  // the character, as a byte
+  const b:u8=@intCast(c);
+  return if(isAlphanumeric(b) or indexOfScalar(u8,nameMarks,b)!=null)b else null;
+}
+/// the name prompt's text input: what a name may hold, as long as one may be
+pub const Typed=lib.engine.ui.textInput.TextInput(maxName,nameChar);
+/// what was typed into `t` as a garden's name, if it can be one (`Name.typed`)
+pub fn named(t:*const Typed)?Name{
+  // the text, as a name
+  const n=Name.of(t.slice()) orelse return null;
+  return n.typed();
+}
 /// the longest path a save's file can have, scratch extension and all
 const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
@@ -377,11 +393,8 @@ pub const Name=struct{
   pub fn same(n:*const Name,o:Name)bool{return eqlIgnoreCase(n.slice(),o.slice());}
   /// `c` typed at the end, if a name may hold it and there is room
   pub fn put(n:*Name,c:u21)void{
-    if(n.len==maxName or c>0x7e)return;
-    // the character, as a byte
-    const b:u8=@intCast(c);
-    if(!isAlphanumeric(b) and indexOfScalar(u8,nameMarks,b)==null)return;
-    n.buf[n.len]=b;
+    if(n.len==maxName)return;
+    n.buf[n.len]=nameChar(c) orelse return;
     n.len+=1;
   }
   /// the last character taken back

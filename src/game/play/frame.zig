@@ -114,6 +114,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   // choose research, weave a recipe, lift or put down an item; a panel's
   // backdrop just absorbs it
   g.mouse=cursor;
+  g.pointer=.{.at=cursor,.down=ctl.down(in,.use),.went=ctl.pressed(in,.use)};
   // a structure's panel closes once it is gone or out of reach
   if(g.mode==.structure and g.opened()==null)g.mode=.roam;
   if(!g.mode.sorting())g.held=null;

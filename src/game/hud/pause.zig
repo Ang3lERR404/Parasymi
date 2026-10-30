@@ -21,6 +21,8 @@ const hud=lib.hud;
 const txt=lib.txt;
 /// the keys and buttons down this frame
 const Input=lib.engine.platform.input.Input;
+/// a button's state, for each row
+const buttonState=lib.hudButton.stateOf;
 /// the panel's width (pixels)
 const pw:f32=480;
 /// the height (pixels) of its title band, above the first row
@@ -69,14 +71,17 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   const title=txt.s.hud.paused;
   _=try d.text(w/2-Draw.width(title,s.textBanner)/2,py+s.titleY,s.textBanner,s.gold,title);
   for(0..n)|i|{
-    // this row's line top, which row it is, and whether the mouse is over it
+    // this row's line top, which row it is, its box, its state and
+    // whether the mouse is over it
     const y=py+headerH+optionH*m.f(i);
     const row:play.PauseRow=@enumFromInt(i);
-    const over=g.points(hud.row(.pause,.{.row=row}));
-    if(over)try d.glow(px+pw/2,y+8,pw*0.42,s.menuHover);
-    try hud.bullet(d,px+podX,y+8,9,s.gold,if(over)1 else 0.15,m.f(i)*0.4);
+    const box:hud.Box=.{.x=px+podX-rowInset,.y=y-optionH/2+8,.w=pw-2*(podX-rowInset),.h=optionH};
+    const st=buttonState(g,hud.row(.pause,.{.row=row}),box);
+    const over=st.over();
+    if(over)try d.glow(px+pw/2,y+8,pw*@as(f32,if(st.down())0.36 else 0.42),s.menuHover);
+    try hud.bullet(d,px+podX,y+8,9,s.gold,switch(st){.idle=>0.15,.hovering=>1,.pressed,.held=>0.7},m.f(i)*0.4);
     _=try d.text(px+keyX,y,s.textLabel,s.dim,txt.nth(keys,i));
     _=try d.text(px+labelX,y,s.textLabel,if(over)s.gold else s.white,txt.nth(labels,i));
-    g.rows.add(.{.x=px+podX-rowInset,.y=y-optionH/2+8,.w=pw-2*(podX-rowInset),.h=optionH},hud.row(.pause,.{.row=row}));
+    g.rows.add(box,hud.row(.pause,.{.row=row}));
   }
 }
