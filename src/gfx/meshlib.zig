@@ -17,6 +17,8 @@ const Allocator=std.mem.Allocator;
 const engine=lib.engine;
 /// the garden's mesh builder and its levels of detail
 const mg=lib.meshgen;
+/// all the maths: the points a sample's glows sit at
+const m=engine.core.math;
 /// the engine's registry: one module per thing, an enum over them
 const registry=engine.core.registry;
 /// every library mesh, one member each, in draw order: translucent ones
@@ -146,6 +148,14 @@ const parts=struct{
   pub const arsthraxiaShoot=@import("meshes/arsthraxia.zig").shoot;
   /// a small sap of resin held in two vine bands, spun round the core
   pub const arsthraxiaSatellite=@import("meshes/arsthraxia.zig").satellite;
+  /// the warm heart glowing in a thought-bud
+  pub const arsthraxiaBudHeart=@import("meshes/arsthraxia.zig").budHeart;
+  /// a sample: a thought-bud of four broad petals, closed, half open, open
+  pub const arsthraxiaBudFour=@import("meshes/arsthraxia.zig").budFour;
+  /// a sample: a thought-bud of five petals, closed, half open, open
+  pub const arsthraxiaBudFive=@import("meshes/arsthraxia.zig").budFive;
+  /// a sample: a thought-bud of five furled petals, closed, half open, open
+  pub const arsthraxiaBudSpiral=@import("meshes/arsthraxia.zig").budSpiral;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;
@@ -250,6 +260,29 @@ const parts=struct{
 const reg=registry.Registry(parts);
 /// which library mesh: one tag per member of `parts`
 pub const Id=reg.Id;
+/// something glowing a sample is drawn with (`--samples=`): a library mesh
+/// lit from within, and the light it throws into the air. A sample mesh
+/// lists its own as `glows`.
+pub const Glow=struct{
+  /// the glowing library mesh, by name
+  mesh:[]const u8,
+  /// where it sits, in the sample's own space
+  at:m.V3,
+  /// how big it is drawn
+  scale:f32,
+  /// how bright it glows
+  glow:f32,
+  /// the colour and strength of the light it throws
+  light:m.V3,
+  /// how far that light reaches
+  reach:f32,
+};
+/// what glows with sample `id` (its `glows`; none: nothing)
+pub fn glows(id:Id)[]const Glow{
+  return switch(id){
+    inline else=>|k|if(@hasDecl(reg.module(k),"glows"))reg.module(k).glows else &.{},
+  };
+}
 /// how many library meshes there are
 pub const count=reg.count;
 /// every library mesh id, in draw order

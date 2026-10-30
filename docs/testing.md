@@ -82,6 +82,9 @@ spawn, so looks can be compared at once.
   structure's mesh (`polypColony` beside `polyp`); it sways as that
   structure does.
 - States: `grow`, a share or span of growth, `mature`.
+- A sample mesh may list `glows` (`meshlib.Glow`): meshes lit from within
+  drawn with it, each throwing its light into the air, as the structure
+  would emit them (the arsthraxia's thought-bud hearts).
 - Shoot it with `--inspect=player`: the orbit circles the line's middle.
 
 ```

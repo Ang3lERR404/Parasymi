@@ -364,6 +364,127 @@ pub const satellite=struct{
     try mg.bands(b,v3(0,0,0),v3(radius,radius,radius),&arcs,1,0.008,0.12,0x0B5,pal.vine);
   }
 };
+/// how a thought-bud's petals lie: how many, and whether they furl round
+/// one another
+pub const BudStyle=struct{
+  /// how many petals close over its heart
+  n:usize,
+  /// how far each petal's claw sits off the heart, sideways round it (0:
+  /// all from the middle; more: furled, each overlapping the next)
+  furl:f32=0,
+  /// how wide a petal is against its length
+  width:f32=0.55,
+};
+/// how long a thought-bud's petals are
+const budLen:f32=0.11;
+/// a thought-bud (a satellite to come) round the origin, its petals
+/// `open` (0 closed .. 1 open): a small green calyx under it, the violet
+/// petals closed round where its heart glows (`budHeart`, emitted), its stamens arching out
+/// only as it opens (closed, it hides them)
+pub fn thoughtBud(b:*mg.Builder,st:BudStyle,open:f32)Allocator.Error!void{
+  // where the petals root, just over the calyx
+  const heart=v3(0,0.012,0);
+  // the calyx: a small green bulb closing its underside
+  try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(0.026,0.022,0.026),.col=pal.leafDark,.part=.leaf,.rings=6,.segs=8,.t=1});
+  for(0..3)|i|{
+    // this sepal's bearing round the bulb (radians)
+    const a=(m.f(i)+0.5)/3*m.tau;
+    try mg.petal(b,.{
+      .base=v3(0,-0.004,0),.out=v3(@cos(a),0,@sin(a)),.len=0.05,.width=0.022,
+      .rise=m.lerp(0.9,0.2,open),.flare=0.5,.cup=0.5,
+      .col=pal.leafDark,.tip=pal.leafLite,.t=1,.part=.leaf,
+    });
+  }
+  for(0..st.n)|i|{
+    // this petal's bearing round the heart (radians)
+    const a=m.ratio(i,st.n)*m.tau;
+    // the way out along it, flat, and the way round, for a furled claw
+    const out=v3(@cos(a),0,@sin(a));
+    const round=v3(-@sin(a),0,@cos(a));
+    // a furled petal faces part way round, overlapping the next
+    const face=m.norm(out+round*m.splat3(st.furl*3));
+    try mg.petal(b,.{
+      .base=heart+round*m.splat3(st.furl*budLen)+out*m.splat3(0.006),.out=face,
+      .len=budLen,.width=budLen*st.width,
+      // closed: past upright by the tip, over the heart; open: wide
+      .rise=m.lerp(1.3,0.6,open),.flare=m.lerp(-0.55,0.75,open),.cup=m.lerp(0.7,0.4,open),
+      .col=petalHeart.toRgba8(255),.tip=petalRim.toRgba8(255),.t=1,.part=.leaf,
+    });
+  }
+  // its stamens, only once it has opened enough to show them
+  if(open<0.35)return;
+  try mg.stamens(b,.{
+    .heart=heart,.axis=v3(0,1,0),.n=5,.len=0.07*open,.r=0.003,.anther=0.016,
+    .lean=0.35,.arch=0.5,.col=stamen.toRgba8(255),.t=1,.seed=0x7B0D,
+  });
+}
+/// where a thought-bud's heart glows, over its calyx
+pub const budHeartAt=v3(0,0.034,0);
+/// the warm light a thought-bud's heart throws into the air round it
+pub const budLight=v3(1.0,0.62,0.3);
+/// mesh: ARSTHRAXIA BUD HEART. the warm heart of thought a bud closes
+/// round: a small amber bead, a unit across, lit from within (its glow)
+pub const budHeart=struct{
+  /// builds the heart: a bead of warm amber, radius 1, a little tall
+  pub fn build(b:*mg.Builder)Allocator.Error!void{
+    try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(1,1.35,1),.col=color.rgb(1.0,0.66,0.32).toRgba8(255),.part=.leaf,.rings=8,.segs=10,.t=1});
+  }
+};
+/// how big a thought-bud's heart is (its radius)
+pub const budHeartR:f32=0.019;
+/// how much bigger than in the structure a sample bud is drawn, to be seen
+const show:f32=3;
+/// how far apart a sample's three buds stand
+const sampleStep:f32=0.75;
+/// how high a sample's buds float
+const sampleLift:f32=0.7;
+/// a thought-bud style shown three times along x, closed, half open and
+/// open, raised off the ground and drawn `show` times its size: a sample
+/// to compare (`--samples=`)
+fn budSample(b:*mg.Builder,st:BudStyle)Allocator.Error!void{
+  for([_]f32{0,0.5,1},0..)|o,i|{
+    // where this one's vertices begin, so only it is moved and sized
+    const s=b.mark();
+    try thoughtBud(b,st,o);
+    b.xform(s,m.chain(&.{m.translate(v3((m.f(i)-1)*sampleStep,sampleLift,0)),m.scale3(m.splat3(show))}));
+  }
+}
+/// the hearts glowing in a sample's three buds: dim closed, bright open
+const sampleGlows=blk:{
+  // the hearts, one per bud
+  var gs:[3]lib.meshlib.Glow=undefined;
+  for(&gs,0..)|*g,i|{
+    // how open this bud is
+    const o=m.f(i)*0.5;
+    g.*=.{
+      .mesh="arsthraxiaBudHeart",.at=v3((m.f(i)-1)*sampleStep,sampleLift,0)+budHeartAt*m.splat3(show),
+      .scale=budHeartR*show,.glow=0.6+0.6*o,.light=budLight*m.splat3(0.8+1.4*o),.reach=3,
+    };
+  }
+  break:blk gs;
+};
+/// mesh: ARSTHRAXIA BUD FOUR. a sample: a thought-bud of four broad petals
+pub const budFour=struct{
+  /// builds the sample: closed, half open, open
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,.{.n=4,.width=0.7});}
+  /// its hearts, glowing
+  pub const glows:[]const lib.meshlib.Glow=&sampleGlows;
+};
+/// mesh: ARSTHRAXIA BUD FIVE. a sample: a thought-bud of five petals
+pub const budFive=struct{
+  /// builds the sample: closed, half open, open
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,.{.n=5});}
+  /// its hearts, glowing
+  pub const glows:[]const lib.meshlib.Glow=&sampleGlows;
+};
+/// mesh: ARSTHRAXIA BUD SPIRAL. a sample: a thought-bud of five petals
+/// furled round one another, opening as a pinwheel
+pub const budSpiral=struct{
+  /// builds the sample: closed, half open, open
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,.{.n=5,.furl=0.1,.width=0.5});}
+  /// its hearts, glowing
+  pub const glows:[]const lib.meshlib.Glow=&sampleGlows;
+};
 /// mesh: ARSTHRAXIA CORE. the research energy condensing where the old sap
 /// core stood: a ball of light a unit across (tu.x < 0 marks it from a
 /// wisp); the structure sizes it by how far the unit has condensed.

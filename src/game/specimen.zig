@@ -244,7 +244,13 @@ pub const Specimen=struct{
         for(values(ck.Kind))|t|if(resources.of(t))|n|try list.append(arena,n.mesh);
         return.{.parts=list.items};
       },
-      .samples=>|sm|return.{.parts=try arena.dupe(meshlib.Id,sm.list())},
+      .samples=>|sm|{
+        // the samples, and what glows with each
+        var list:std.ArrayList(meshlib.Id)=.empty;
+        try list.appendSlice(arena,sm.list());
+        for(sm.list())|id|for(meshlib.glows(id))|gl|try list.append(arena,stringToEnum(meshlib.Id,gl.mesh).?);
+        return.{.parts=list.items};
+      },
     }
   }
   /// put it down on the free tile nearest the wolf (a structure beside a
@@ -419,6 +425,13 @@ pub const Specimen=struct{
       // how it sways
       const like=likeOf(id);
       try g.parts.emit(id,m.translate(at),.{.phase=seed,.fade=like.sap,.sway=like.sway,.tall=like.tall,.grown=l.growth});
+      // what glows with it, lit from within, throwing its light
+      for(meshlib.glows(id))|gl|{
+        // the glowing mesh (a name the library lacks: a bug in the sample)
+        const mesh=stringToEnum(meshlib.Id,gl.mesh).?;
+        try g.parts.emit(mesh,m.chain(&.{m.translate(at+gl.at),m.scale3(m.splat3(gl.scale))}),.{.phase=seed,.glow=gl.glow,.sway=like.sway,.tall=like.tall,.grown=l.growth});
+        try g.parts.light(at+gl.at,gl.light,gl.reach);
+      }
     }
   }
   /// after the world's tick. A live plant, once grown (or gone) and left a
