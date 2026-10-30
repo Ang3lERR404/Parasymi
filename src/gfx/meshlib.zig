@@ -204,7 +204,7 @@ const parts=struct{
   /// the weftstone: a loomfern and a lithophage grown into one, floating
   pub const weftstone=@import("meshes/weftstone.zig");
   // the halo: its polyp and the diamond it forms
-  /// the polyp: the heart of a halo, a short woven stalk on a root mat
+  /// the polyp: the heart of a halo, a colony of feathery polyps on one fleshy mound
   pub const polyp=@import("meshes/polyp.zig");
   /// the diamond a halo leaves, gathered in from its shards
   pub const haloDiamond=@import("meshes/halo.zig").diamond;

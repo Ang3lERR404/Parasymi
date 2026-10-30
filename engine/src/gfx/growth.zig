@@ -40,7 +40,7 @@ const Rng=@import("../core/rng.zig").Rng;
 /// a point or direction in three dimensions
 const V3=m.V3;
 /// splines a skeleton may hold
-pub const max=48;
+pub const max=64;
 /// points each spline is resampled into, evenly by arc length
 pub const res=33;
 /// how long a spline's growth front is (it tapers to a point over it), as
