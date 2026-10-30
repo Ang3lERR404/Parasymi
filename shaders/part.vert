@@ -98,6 +98,44 @@ const float BURST_FALL = 1.6;
 // glowing sap part's
 const float PULSE_RATE = 3.0;
 const float DIM_GLOW = 0.06;
+// the constellate web (meshes/constellate.zig; PLEXUS_POINTS must match its
+// `count`): how many points float in a cluster, which one is its heart (in
+// the middle of the spindle), how far each drifts from where it rests and
+// how fast (rad/s, slowest and quickest), how big a point is, how wide a
+// line, how far a pane's faces sit apart, where a line begins to fade as
+// its points part (a share of its reach)
+const int PLEXUS_POINTS = 30;
+const int PLEXUS_HEART = 15;
+const float PLEXUS_DRIFT = 0.13;
+const float PLEXUS_SLOW = 0.12;
+const float PLEXUS_QUICK = 0.32;
+const float PLEXUS_POINT_R = 0.015;
+const float PLEXUS_LINE_W = 0.007;
+const float PLEXUS_PANE = 0.005;
+const float PLEXUS_SOFT = 0.8;
+
+// where constellate point `id` rests: an upright spindle of them, widest in
+// the middle, from knee height to over the wolf's head
+vec3 plexusRest(float id) {
+  vec3 h = hash33(vec3(id, 3.1, 7.7));
+  float up = id / float(PLEXUS_POINTS - 1);
+  float wide = 0.2 + 0.4 * sin(0.5 * TAU * up);
+  float a = h.x * TAU;
+  float r = wide * mix(0.35, 1.0, h.y);
+  return vec3(cos(a) * r, 0.5 + 1.2 * up + (h.z - 0.5) * 0.12, sin(a) * r);
+}
+// where it is at time `t`: drifting round its rest, each axis on two slow
+// waves of its own
+vec3 plexusAt(float id, float t) {
+  vec3 f = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 11.3, 2.9)));
+  vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 5.7, 19.1)));
+  vec3 ph = hash33(vec3(id, 23.9, 1.3)) * TAU;
+  vec3 d = 0.6 * sin(t * f + ph) + 0.4 * sin(t * g * 1.7 + ph.yzx * 2.0);
+  return plexusRest(id) + PLEXUS_DRIFT * d * vec3(1.0, 0.6, 1.0);
+}
+// how much a line between `a` and `b` shows: whole within its reach's
+// soft edge, gone beyond its reach
+float plexusLink(vec3 a, vec3 b, float reach) { return 1.0 - smoothstep(reach * PLEXUS_SOFT, reach, length(b - a)); }
 // a conduit's amber pulses: how fast they run (rad/s)
 const float CORE_RUN_RATE = 2.6;
 // thought climbing an arsthraxia's nerves: its colour (linear violet), how
@@ -238,7 +276,55 @@ void main() {
   vec4 w;
   vec3 wn;
   float twinkle = 1.0;
-  if (mode == PLACE_CURVE) {
+  // the constellate web: how far its beat runs to reach here (from its
+  // heart, straight across), how much of it shows, what it is
+  float plexBeat = 0.0;
+  float plexFade = 1.0;
+  float plexKind = 0.0;
+  if (part == PART_PLEXUS) {
+    // its points (colour r, g, b their ids), what it is (alpha), the
+    // cluster's reach (pos.x); every point drifting, the heart among them
+    vec3 ids = floor(col.rgb * 255.0 + 0.5);
+    plexKind = floor(col.a * 255.0 + 0.5);
+    float reach = pos.x;
+    vec3 A = plexusAt(ids.x, t);
+    vec3 B = plexusAt(ids.y, t);
+    vec3 C = plexusAt(ids.z, t);
+    vec3 H = plexusAt(float(PLEXUS_HEART), t);
+    vec3 lp;
+    if (plexKind < 0.5) {
+      // a point: a ball of light round where it has drifted to
+      lp = A + nrm * PLEXUS_POINT_R;
+      w = M * vec4(lp, 1.0);
+      wn = mat3(M) * nrm;
+    } else if (plexKind < 1.5) {
+      // a line (tu.x along it, tu.y which side): a ribbon turned to the
+      // eye, pointed at both ends, thinning to nothing as its points part
+      plexFade = plexusLink(A, B, reach);
+      lp = mix(A, B, tu.x);
+      vec3 wc = (M * vec4(lp, 1.0)).xyz;
+      vec3 T = mat3(M) * (B - A);
+      vec3 toEye = normalize(pc.eye_time.xyz - wc);
+      vec3 across = cross(T, toEye);
+      vec3 right = across / max(length(across), 1e-6);
+      float pinch = sqrt(max(sin(0.5 * TAU * tu.x), 0.0));
+      w = vec4(wc + right * tu.y * PLEXUS_LINE_W * pinch * plexFade, 1.0);
+      wn = toEye;
+    } else {
+      // a pane (tu its corner's weights, pos.y its face): it shows while
+      // all three of its lines do, drawn in toward its middle as any of
+      // them breaks
+      plexFade = min(min(plexusLink(A, B, reach), plexusLink(A, C, reach)), plexusLink(B, C, reach));
+      vec3 mid = (A + B + C) / 3.0;
+      vec3 corner = A * tu.x + B * tu.y + C * (1.0 - tu.x - tu.y);
+      vec3 cr = cross(B - A, C - A);
+      vec3 n = cr / max(length(cr), 1e-6) * pos.y;
+      lp = mid + (corner - mid) * 0.85 * plexFade + n * PLEXUS_PANE;
+      w = M * vec4(lp, 1.0);
+      wn = mat3(M) * n;
+    }
+    plexBeat = length(lp - H);
+  } else if (mode == PLACE_CURVE) {
     // a curve (the tail): the mesh runs straight up +Y over 0..1; each point
     // goes to that fraction along the Catmull-Rom curve through c0..c3 (the
     // ends extended in line), its x laid toward the side (tint.xyz) and its
@@ -406,6 +492,13 @@ void main() {
   if (part == PART_HALO || part == PART_PROJECTION) v_fade = length(c0.xyz);
   if (drawn && part == PART_SHADOW) v_fade *= 1.0 - haloFold(ih.w);
   v_u = tu.y;
+  // the constellate web carries how far its beat runs to reach here, what
+  // it is, and how much of it shows (as its glow)
+  if (part == PART_PLEXUS) {
+    v_t = plexBeat;
+    v_u = plexKind;
+    v_glow = plexFade;
+  }
   v_obj = p;
   v_phase = ip.z;
   v_aux = ip.y;

@@ -1,12 +1,22 @@
 //! a rough sketch of the constellate lineage (tier 4), for the gardener to
-//! check we see the same thing (`--samples=`): solid points of light
-//! floating free, a thin line of light joining any two near enough (the
-//! plexus web), and a pane filling every three that are all joined. Each
-//! web has a heart, the point most joined; it beats, and every beat runs
-//! out through the web as a wave, lightening the blue of each point, line
-//! and pane it passes (part.frag `PART_PLEXUS`, on the GPU). One cluster
-//! shown at three moments, the lines reaching further each time: loose,
-//! forming, crystalline. The points hold still for now.
+//! check we see the same thing (`--samples=`): small solid points of light
+//! drifting free, a thin line of light joining any two near enough (the
+//! plexus web), and a pane filling every three that are all joined. As the
+//! points drift, lines and panes form between those coming together and
+//! break between those parting. The web's heart beats, and every beat runs
+//! out through it as a wave, lightening the blue it passes. One cluster
+//! shown at three reaches, the lines reaching further each time: loose,
+//! forming, crystalline.
+//!
+//! All of it is the GPU's (part.vert, part.frag `PART_PLEXUS`): where each
+//! point rests and how it drifts, which lines and panes show, the beat. So
+//! every vertex here carries only what it belongs to: colour r, g, b the
+//! ids of its points (one for a point, two for a line, three for a pane),
+//! alpha what it is (`Kind`); pos.x the cluster's reach; and for a point
+//! its direction out from its middle (the normal), for a line how far along
+//! it and which side (tu), for a pane its corner's weights (tu) and which
+//! face (pos.y). Every line and pane that could ever form is built,
+//! collapsed to nothing while its points are apart.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -14,33 +24,22 @@ const std=lib.std;
 const Allocator=std.mem.Allocator;
 /// the generic engine package
 const engine=lib.engine;
-/// all the maths: vectors, distances, normals
+/// all the maths: vectors, ratios
 const m=engine.core.math;
-/// the mesh builder, its tubes and balls
+/// the mesh builder and its balls
 const mg=lib.meshgen;
-/// colours of the points, lines and panes
+/// the vertex colours the ids ride in
 const color=engine.core.color;
-/// the mineral kit: flat facets, for the panes
-const mineral=lib.mineralKit;
-/// the engine's deterministic random stream, for where points float
-const Rng=engine.core.rng.Rng;
 /// a point or direction in space
 const V3=m.V3;
 /// makes a vector from three numbers
 const v3=m.v3;
-/// how many points float in the cluster
+/// how many points float in the cluster (part.vert `PLEXUS_POINTS`)
 const count=30;
-/// the seed the cluster is scattered from, the same at every moment
-const seed:u64=0xC0457E11A7E;
-/// the blue everything is drawn in (part.frag lightens it as a beat passes)
-const blue=color.rgb(0.25,0.55,1.0).toRgba8(255);
-/// how big a point of light is
-const pointR:f32=0.015;
-/// how thick a pane is
-const paneThick:f32=0.01;
-/// how thick a line is at its middle
-const lineR:f32=0.007;
-/// what a piece of the web is (tu.y): part.frag draws each its own way
+/// how many pieces a line is cut into along its length
+const lineSteps=8;
+/// what a piece of the web is (colour alpha): part.vert places each its
+/// own way, part.frag draws each its own way
 const Kind=enum(u8){
   /// a solid point of light
   point,
@@ -49,154 +48,63 @@ const Kind=enum(u8){
   /// a pane across three
   pane,
 };
-/// a point the beat reaches, and how far it has run through the web to
-/// get there (from its heart, along the lines)
-const Reached=struct{
-  /// where the point floats
+/// one vertex of the web: what it belongs to and where on it
+const Vert=struct{
+  /// the ids of its points (repeated where it has fewer than three)
+  ids:[3]u8,
+  /// what it is
+  kind:Kind,
+  /// the cluster's reach, and for a pane which face (pos)
   at:V3,
-  /// how far the beat runs to reach it
-  dist:f32,
+  /// a point's direction out from its middle (else unused)
+  out:V3=v3(0,1,0),
+  /// along a line and across it, or a pane corner's weights
+  tu:[2]f32=.{0,0},
 };
-/// where each point floats: an upright spindle of them, widest in the
-/// middle, from knee height to over the wolf's head
-fn points()[count]V3{
-  // the cluster's own random stream, and where each point floats
-  var rng=Rng.init(seed);
-  var ps:[count]V3=undefined;
-  for(&ps,0..)|*p,i|{
-    // how far up the spindle, and how wide it is there
-    const h=m.ratio(i,count-1);
-    const w=0.2+0.4*@sin(m.pi*h);
-    // its bearing round the spindle, and how far out
-    const a=rng.range(0,m.tau);
-    const r=w*rng.range(0.35,1.0);
-    p.*=v3(@cos(a)*r,0.5+1.2*h+rng.range(-0.06,0.06),@sin(a)*r);
-  }
-  return ps;
+/// put one vertex of the web, as `Vert` describes it
+fn put(b:*mg.Builder,v:Vert)Allocator.Error!void{
+  try b.v.append(b.gpa,.{.pos=v.at,.nrm=v.out,.col=color.Rgba8.of(.{v.ids[0],v.ids[1],v.ids[2],@intFromEnum(v.kind)}),.tu=v.tu,.part=@intFromEnum(lib.vertex.Part.plexus)});
 }
-/// whether points `i` and `j` are joined by a line
-fn joined(ps:[count]V3,i:usize,j:usize,reach:f32)bool{return i!=j and m.len(ps[j]-ps[i])<=reach;}
-/// how far the beat runs to reach each point: each web's heart is its most
-/// joined point (the first, if even), and the beat runs out from it along
-/// the lines, the shortest way (Dijkstra)
-fn distances(ps:[count]V3,reach:f32)[count]f32{
-  // how far to each point, and which are settled
-  var d=[_]f32{m.inf(f32)}**count;
-  var done=[_]bool{false}**count;
-  // each point's lines
-  var links=[_]u32{0}**count;
-  for(0..count)|i|for(0..count)|j|{
-    if(joined(ps,i,j,reach))links[i]+=1;
-  };
-  while(true){
-    // the next web's heart: the most joined point not yet reached
-    var heart:?usize=null;
-    for(0..count)|i|{
-      if(done[i] or d[i]<m.inf(f32))continue;
-      if(heart==null or links[i]>links[heart.?])heart=i;
-    }
-    const h=heart orelse break;
-    d[h]=0;
-    while(true){
-      // the nearest unsettled point reached so far
-      var near:?usize=null;
-      for(0..count)|i|{
-        if(done[i] or d[i]==m.inf(f32))continue;
-        if(near==null or d[i]<d[near.?])near=i;
-      }
-      const n=near orelse break;
-      done[n]=true;
-      for(0..count)|j|{
-        if(!joined(ps,n,j,reach))continue;
-        d[j]=@min(d[j],d[n]+m.len(ps[j]-ps[n]));
-      }
-    }
-  }
-  return d;
-}
-/// tag every vertex since `start` as `kind`, with how far the beat runs to
-/// reach it: from the nearest of `from`, straight across to it
-fn tag(b:*mg.Builder,start:usize,from:[]const Reached,kind:Kind)void{
-  for(b.v.items[start..])|*v|{
-    // the soonest the beat reaches this vertex
-    var t:f32=m.inf(f32);
-    for(from)|f|t=@min(t,f.dist+m.len(v.pos-f.at));
-    v.tu=.{t,m.f(@intFromEnum(kind))};
-  }
-}
-/// one cluster: every point, a line between each two within `reach`, a
-/// pane across each three all within `reach` of one another
+/// one cluster: every point, every line that could join two, every pane
+/// that could fill three; a line shows within `reach`
 fn cluster(b:*mg.Builder,reach:f32)Allocator.Error!void{
-  // where the points float, and how far the beat runs to each
-  const ps=points();
-  const ds=distances(ps,reach);
-  // each point: a ball of light
-  for(ps,ds)|p,d|{
-    // where its vertices begin
+  // the reach every vertex carries
+  const at=v3(reach,0,0);
+  // each point: a ball, its vertices keeping only their direction out
+  for(0..count)|i|{
+    // where its vertices begin, and its id
     const s=b.mark();
-    try mg.ellipsoid(b,.{.center=p,.radii=m.splat3(pointR),.col=blue,.part=.plexus,.rings=6,.segs=8});
-    tag(b,s,&.{.{.at=p,.dist=d}},.point);
+    const id:u8=@intCast(i);
+    try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(1,1,1),.col=color.Rgba8.of(.{0,0,0,0}),.part=.plexus,.rings=6,.segs=8});
+    for(b.v.items[s..])|*v|{
+      v.nrm=m.norm(v.pos);
+      v.pos=at;
+      v.col=color.Rgba8.of(.{id,id,id,@intFromEnum(Kind.point)});
+      v.tu=.{0,0};
+    }
   }
-  // the lines, each a tube pointed at both ends
+  // each line: a ribbon cut along its length, turned to the eye on the GPU
   for(0..count)|i|for(i+1..count)|j|{
-    if(!joined(ps,i,j,reach))continue;
-    // where its vertices begin
-    const s=b.mark();
-    try line(b,ps[i],ps[j]);
-    tag(b,s,&.{.{.at=ps[i],.dist=ds[i]},.{.at=ps[j],.dist=ds[j]}},.line);
+    // its two points
+    const ids=[3]u8{@intCast(i),@intCast(j),@intCast(j)};
+    for(0..lineSteps)|k|{
+      // where this piece begins and ends along it
+      const s0=m.ratio(k,lineSteps);
+      const s1=m.ratio(k+1,lineSteps);
+      for([_][2]f32{.{s0,-1},.{s1,-1},.{s1,1},.{s0,-1},.{s1,1},.{s0,1}})|c|try put(b,.{.ids=ids,.kind=.line,.at=at,.tu=c});
+    }
   };
-  // the panes, across each three all joined
+  // each pane: two faces, wound opposite ways so one faces either side
   for(0..count)|i|for(i+1..count)|j|for(j+1..count)|k|{
-    if(!(joined(ps,i,j,reach) and joined(ps,i,k,reach) and joined(ps,j,k,reach)))continue;
-    // where its vertices begin
-    const s=b.mark();
-    try pane(b,.{ps[i],ps[j],ps[k]});
-    tag(b,s,&.{.{.at=ps[i],.dist=ds[i]},.{.at=ps[j],.dist=ds[j]},.{.at=ps[k],.dist=ds[k]}},.pane);
+    // its three points
+    const ids=[3]u8{@intCast(i),@intCast(j),@intCast(k)};
+    // its corners' weights: all of the first, all of the second, all of the third
+    const a=[2]f32{1,0};
+    const bb=[2]f32{0,1};
+    const c=[2]f32{0,0};
+    for([_][2]f32{a,bb,c})|w|try put(b,.{.ids=ids,.kind=.pane,.at=v3(reach,1,0),.tu=w});
+    for([_][2]f32{a,c,bb})|w|try put(b,.{.ids=ids,.kind=.pane,.at=v3(reach,-1,0),.tu=w});
   };
-}
-/// a thin line of light from `a` to `z`, pointed at both ends
-fn line(b:*mg.Builder,a:V3,z:V3)Allocator.Error!void{
-  // how many rings run along it
-  const steps=8;
-  // its path, its flow and its radius, ring by ring
-  var path:[steps]V3=undefined;
-  var ts:[steps]f32=undefined;
-  var rs:[steps]f32=undefined;
-  for(&path,&ts,&rs,0..)|*p,*t,*r,i|{
-    // how far along the line this ring is (0..1)
-    const k=m.ratio(i,steps-1);
-    p.*=a+(z-a)*m.splat3(k);
-    t.*=k;
-    r.*=@max(lineR*@sqrt(@max(0,@sin(m.pi*k))),2e-4);
-  }
-  try b.tubeR(&path,&ts,&rs,blue,.plexus,4);
-}
-/// a pane across three points: a thin closed slab, two faces and three
-/// edges, drawn a little inside the points so it hangs between them
-fn pane(b:*mg.Builder,c:[3]V3)Allocator.Error!void{
-  // its face's normal and middle, and the half thickness either side
-  const n=m.norm(m.cross(c[1]-c[0],c[2]-c[0]));
-  const mid=m.centroid(c[0],c[1],c[2]);
-  const o=n*m.splat3(paneThick*0.5);
-  // its corners on either face
-  var top:[3]V3=undefined;
-  var bot:[3]V3=undefined;
-  for(c,&top,&bot)|p,*t,*u|{
-    // this corner, drawn in toward the middle
-    const q=mid+(p-mid)*m.splat3(0.85);
-    t.*=q+o;
-    u.*=q-o;
-  }
-  // every corner in the same blue
-  const cs=[3]color.Rgba8{blue,blue,blue};
-  try mineral.facet(b,top,mid,cs,0,.plexus);
-  try mineral.facet(b,bot,mid,cs,0,.plexus);
-  for(0..3)|i|{
-    // the next corner round
-    const j=(i+1)%3;
-    try mineral.facet(b,.{top[i],top[j],bot[j]},mid,cs,0,.plexus);
-    try mineral.facet(b,.{top[i],bot[j],bot[i]},mid,cs,0,.plexus);
-  }
 }
 /// mesh: CONSTELLATE, LOOSE. the points drifting, few of them joined
 pub const loose=struct{

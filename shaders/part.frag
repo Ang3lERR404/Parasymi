@@ -148,7 +148,8 @@ void surface() {
   }
   if (part == PART_PLEXUS) {
     // the constellate web (v_u: 0 a point, 1 a line, 2 a pane; v_t how far
-    // a beat runs through it to reach here). Its heart beats lub-dub, and
+    // a beat runs through it to reach here; v_glow how much of a line or
+    // pane shows as its points part). Its heart beats lub-dub, and
     // each beat runs out through the web, reaching here v_t / SPEED late,
     // fading as it goes: it lightens the blue toward pale as it passes. A
     // point is a solid light; a line glows thin; a pane is a sheet of blue
@@ -166,12 +167,12 @@ void surface() {
       c = mix(col, PLEXUS_PALE, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
       a = 1.0;
     } else if (kind == 1) {
-      c = col * (0.7 + 3.0 * beat);
-      a = clamp(0.5 + 0.5 * beat, 0.0, 1.0);
+      c = col * (0.7 + 3.0 * beat) * v_glow;
+      a = clamp(0.5 + 0.5 * beat, 0.0, 1.0) * v_glow;
     } else {
       float rim = pow(1.0 - ndv, 3.0);
-      c = col * (0.25 + 0.6 * rim + 1.8 * beat);
-      a = clamp(0.22 + 0.4 * rim + 0.45 * beat, 0.0, 1.0);
+      c = col * (0.25 + 0.6 * rim + 1.8 * beat) * v_glow;
+      a = clamp(0.22 + 0.4 * rim + 0.45 * beat, 0.0, 1.0) * v_glow;
     }
     o = vec4(applyFog(c, v_pos), a);
     return;
