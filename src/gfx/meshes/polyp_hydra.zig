@@ -1,10 +1,12 @@
-//! mesh: POLYP, HYDRA. a look for the polyp, laid beside it to compare
-//! (`--samples=polyp,polypHydra`): one tall, slender, stretchy body
-//! gripping the soil with a foot disc, swelling a little at its gut, its
-//! head a pointed cone with the mouth at its tip. Six very long thin
-//! tentacles leave from under the cone, arch up and out and hang far down,
-//! beaded with stinging knots; a young hydra buds from its side with a
-//! small crown of its own. It grows along growth splines.
+//! mesh: POLYP, HYDRA. hydra looks for the polyp, laid side by side to
+//! compare (`--samples=polypHydraFeathered,polypHydraBoth,polypHydraPlumed`):
+//! one tall, slender, stretchy body gripping the soil with a foot disc,
+//! swelling a little at its gut, opening at its head into the polyp's
+//! mouth disc, crowned with its feathery tentacles, with long thin
+//! tentacles beaded with stinging knots and plumed at their tips, or with
+//! both; a young hydra buds from its side with a small crown of its own.
+//! Also a colony of cone-headed hydras on the polyp's mound
+//! (`polypHydras`). They grow along growth splines.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -69,7 +71,6 @@ const openFlare:f32=2.6;
 /// builds the hydra. It grows on a hidden stalk (gfx/growth.zig): the roots
 /// and foot disc spread, the body rises, its head cone closes, the long
 /// tentacles reach out of it and down, and last the young one buds from its side.
-pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.cone);}
 /// how a hydra's head is made
 pub const Head=enum{
   /// a pointed cone, the mouth at its tip, the long knotted tentacles
@@ -81,6 +82,17 @@ pub const Head=enum{
   /// opening into the polyp's oral disc and slit mouth, its long knotted
   /// tentacles ending in feathery plumes
   plumed,
+  /// opening into the polyp's oral disc and slit mouth, crowned with both:
+  /// the feathery tentacles round the rim, the long plumed ones hanging
+  /// from under them
+  both,
+};
+/// the merged look (`--samples=polypHydraFeathered,polypHydraBoth,polypHydraPlumed`):
+/// the single hydra opening into the polyp's mouth disc, its feathery
+/// crown round the rim and its long plumed tentacles hanging from under it
+pub const both=struct{
+  /// builds the hydra, crowned with both
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.both);}
 };
 /// a mixed look (`--samples=polyp,polypHydraFeathered`): the single hydra
 /// opening into the polyp's mouth disc, crowned with its feathery tentacles
@@ -208,16 +220,20 @@ pub fn body(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,o:Body,rng:*Rng)Alloca
   const hr=rs[bodyRings-1];
   if(o.head!=.cone){
     try lib.polypMesh.mouthOn(b,k,id,top,up,hr,rng);
-    for(0..if(o.head==.feathered)feathers else o.arms)|j|{
-      // this tentacle's bearing, and the flat way out along it
-      const a=(m.f(j)+rng.range(-0.15,0.15))/m.f(if(o.head==.feathered)feathers else o.arms)*m.tau;
+    if(o.head!=.plumed)for(0..feathers)|j|{
+      // this feathery tentacle's bearing
+      const a=(m.f(j)+rng.range(-0.15,0.15))/feathers*m.tau;
+      try lib.polypMesh.tentacle(b,k,id,.{.top=top,.up=up,.e1=e1,.e2=e2,.dr=hr,.r=hr/lib.polypMesh.flare},a,rng);
+    };
+    if(o.head!=.feathered)for(0..o.arms)|j|{
+      // this long tentacle's bearing (between the feathery ones, crowned
+      // with both), and the flat way out along it
+      const a=(m.f(j)+@as(f32,if(o.head==.both)0.5 else 0)+rng.range(-0.15,0.15))/m.f(o.arms)*m.tau;
       const out=e1*m.splat3(@cos(a))+e2*m.splat3(@sin(a));
-      switch(o.head){
-        .feathered=>try lib.polypMesh.tentacle(b,k,id,.{.top=top,.up=up,.e1=e1,.e2=e2,.dr=hr,.r=hr/lib.polypMesh.flare},a,rng),
-        .plumed=>try hanging(b,k,id,.{.root=top+out*m.splat3(hr*0.86)+up*m.splat3(hr*0.04),.out=out,.up=up,.len=o.reach*rng.range(0.85,1.15),.r0=o.r*0.3,.tip=.plume},rng),
-        .cone=>{},
-      }
-    }
+      // where it leaves: the rim, or from under the feathery crown
+      const root=if(o.head==.both)top+out*m.splat3(hr*0.8)-up*m.splat3(hr*0.18)else top+out*m.splat3(hr*0.86)+up*m.splat3(hr*0.04);
+      try hanging(b,k,id,.{.root=root,.out=out,.up=up,.len=o.reach*rng.range(0.85,1.15),.r0=o.r*0.3,.tip=.plume},rng);
+    };
     return;
   }
   {

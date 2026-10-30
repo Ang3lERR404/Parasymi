@@ -78,13 +78,13 @@ Anything that needs a partner or neighbours; use `--demo` for those:
 spawn, so looks can be compared at once.
 
 - A look for a structure is its own library mesh, named after the
-  structure's mesh (`polypHydra` beside `polyp`); it sways as that
+  structure's mesh (`polypHydraBoth` beside `polyp`); it sways as that
   structure does.
 - States: `grow`, a share or span of growth, `mature`.
 - Shoot it with `--inspect=player`: the orbit circles the line's middle.
 
 ```
-zig build run -- --samples=polyp,polypHydra --state=mature --inspect=player --shots=3 --orbit=9 --dist=3.2 --pitch=18 --tod=0.5
+zig build run -- --samples=polypHydraFeathered,polypHydraBoth,polypHydraPlumed --state=mature --inspect=player --shots=3 --orbit=9 --dist=3.2 --pitch=18 --tod=0.5
 ```
 
 ## Screenshots, unattended
