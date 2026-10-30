@@ -213,7 +213,7 @@ pub const Specimen=struct{
     }
     if(!found)switch(s.what){
       .structure=>|k|{
-        s.at=.{cz,cx};
+        s.at=.{cx,cz};
         // the structure's def, its size, and the ground it may first stand on
         const sdef=st.defs.get(k);
         const size=sdef.size;
@@ -221,7 +221,8 @@ pub const Specimen=struct{
         // the wolf's chunk, and the ground height under the wolf
         const c0=g.world.chunkOfTile(cx,cz) orelse return;
         const h0=c0.height[ck.localIndex(cx,cz)];
-        for(0..size,0..size)|dx,dz|{
+        // every tile of the footprint, row by row (not just its diagonal)
+        for(0..size)|dx|for(0..size)|dz|{
           // the tile in the footprint, flattened to that ground
           const lx=cx+@as(i32,@intCast(dx));
           const lz=cz+@as(i32,@intCast(dz));
@@ -231,7 +232,7 @@ pub const Specimen=struct{
             c.kind[t]=fallback;
             c.height[t]=h0;
           }
-        }
+        };
       },
       else=>{}
     };

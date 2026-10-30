@@ -161,7 +161,7 @@ pub fn main(init:std.process.Init)!void{
   var input:Input=.{.win=window};
   input.attach();
   // the renderer grows next to nothing (the editor puts its own meshes in)
-  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=.{.parts=&.{slotId}}});
+  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=.{.parts=&.{slotId}},.io=io});
   defer r.deinit();
   // the meshes grow, then the world wakes and its ground is meshed,
   // behind the game's loading screen

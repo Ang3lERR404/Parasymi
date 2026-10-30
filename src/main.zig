@@ -197,7 +197,7 @@ pub fn main(init:Init)!void{
   // the display mode, windowed at first
   var display:Display=.{.win=window};
   // the renderer, built for the settings (and, for one thing alone, only its meshes)
-  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(init.arena.allocator())else null});
+  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(init.arena.allocator())else null,.io=io});
   defer r.deinit();
   opts.aa=r.antialiasing();
   // the loading screen shows while every mesh grows (on a thread of its
@@ -268,6 +268,8 @@ pub fn main(init:Init)!void{
   var inEyes=false;
   // and of the daylight (none yet, so the first frame tells it)
   var toldDay:f32=-1;
+  // and whether the arsthraxia was last heard humming, so its silence is told once
+  var arsHumming=false;
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
@@ -291,11 +293,14 @@ pub fn main(init:Init)!void{
       toldDay=game.sky.daylight();
     };
     // the asthraxia's research hums and chimes
-    if(game.arsthraxiaState())|cmd|{
-      if(sounds)|o|{
+    if(sounds)|o|{
+      if(game.arsthraxiaState())|cmd|{
         o.send(cmd)catch|e|log.warn("arsthraxia:{t}",.{e});
-      }else if(sounds)|o|{
+        arsHumming=true;
+      }else if(arsHumming){
+        // its research done or gone: hushed, once
         o.send(.{.arsthraxia=.{.progress=0,.fed=0,.complete=false}})catch|e|log.warn("arsthraxia:{t}",.{e});
+        arsHumming=false;
       }
     }
     // out of the wolf's eyes its sap is heard settling

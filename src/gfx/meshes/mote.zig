@@ -66,7 +66,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     for([_]V3{w,w2})|side|{
       // the ray's far point
       const a=r.d*m.splat3(r.len);
-      try kit.facet(b,.{a,side,-side},side*m.splat3(0.0)+m.cross(side,r.d),.{pale,core,core},1,.bloom);
+      try kit.facet(b,.{a,side,-side},m.cross(side,r.d),.{pale,core,core},1,.bloom);
       try kit.facet(b,.{-a,-side,side},m.cross(side,r.d),.{pale,core,core},1,.bloom);
     }
   }

@@ -215,7 +215,7 @@ pub fn main(init:std.process.Init)!void{
     .thing=>|t|.{.what=t,.state=.{.look=.{}}},
   };
   // the renderer, building only the meshes the subject needs
-  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(arena)else null});
+  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(arena)else null,.io=io});
   defer r.deinit();
   // every mesh grows, then the world wakes and its ground is meshed,
   // behind the game's loading screen

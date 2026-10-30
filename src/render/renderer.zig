@@ -1,7 +1,7 @@
 //! the garden's renderer: the engine's frame orchestration (engine
 //! render/renderer.zig) given the garden's passes (under `passes/`), push
 //! constants and scene, and the state it keeps beside them: every grown
-//! mesh (plant species and part library, grown on a thread while the
+//! mesh (plant species and part library, grown as a task of their own while the
 //! loading screen shows) and each streamed chunk's ground. A new pass is
 //! one new file plus one line in `passes`.
 const lib=@import("../lib.zig");
@@ -13,9 +13,9 @@ const Allocator=std.mem.Allocator;
 const sliceAsBytes=std.mem.sliceAsBytes;
 /// the arena the growing meshes' scratch lives in, freed in one go
 const ArenaAllocator=std.heap.ArenaAllocator;
-/// the thread the meshes grow on while the loading screen shows
-const Thread=std.Thread;
-/// a value both threads read and write safely: progress and flags
+/// the I/O the meshes grow on, apart, while the loading screen shows
+const Io=std.Io;
+/// a value the frames and the growing task both read and write safely: progress and flags
 const Atomic=std.atomic.Value;
 /// the engine package
 const engine=lib.engine;
@@ -213,6 +213,9 @@ pub const Only=struct{
 pub const Ext=struct{
   /// with `only`, those meshes alone are built (`--plant`, `--structure`)
   only:?Only=null,
+  /// the I/O the meshes grow on, beside the loading screen (null: grown
+  /// here, before the first frame)
+  io:?Io=null,
   /// terrain chunk meshes (see syncWorld)
   slots:std.ArrayList(Slot)=.empty,
   /// slots freed by evicted chunks, ready for the next one
@@ -242,20 +245,20 @@ pub const Ext=struct{
   /// how many vertices of `meshes` a tool last put in (`setParts`; 0: none)
   toolVerts:usize=0,
 };
-/// every built-once mesh (plant species + part library), grown on a thread
+/// every built-once mesh (plant species + part library), grown as a task of their own
 /// of its own while the loading screen shows, one mesh at one level of
 /// detail at a time (`done` of `units`); `meshesReady` takes them in once
 /// it is through.
 const Growing=struct{
   /// the builder's vertices are scratch: one arena, freed in one go once uploaded
   arena:ArenaAllocator,
-  /// the builder the thread pours every mesh into
+  /// the builder the growing task pours every mesh into
   b:meshgen.Builder=undefined,
-  /// the thread itself, or null when growing ran here
-  thread:?Thread=null,
+  /// the growing running apart on the I/O, and that I/O, or null when growing ran here
+  apart:?struct{io:Io,future:Io.Future(void)}=null,
   /// how many units are grown so far
   done:Atomic(u32)=.init(0),
-  /// set once the thread is through
+  /// set once the growing is through
   finished:Atomic(bool)=.init(false),
   /// set when the renderer goes before the meshes are through: stop early
   stop:Atomic(bool)=.init(false),
@@ -279,7 +282,7 @@ const Growing=struct{
     const n=if(g.only)|o|@as(usize,if(o.species!=null)1 else 0)+o.parts.len else species.ids.len+meshlib.count;
     return@intCast(n*meshgen.lods);
   }
-  /// the thread's body: grows everything, then marks it finished (or failed)
+  /// the growing task.s body: grows everything, then marks it finished (or failed)
   fn run(g:*Growing)void{
     g.failed=std.meta.isError(g.all());
     g.finished.store(true,.release);
@@ -325,27 +328,30 @@ const Growing=struct{
     _=try b.skinOf(b.v.items.len);
     _=try b.growOf(b.v.items.len);
   }
-  /// wait for the thread (asked to stop early) and free what it built
+  /// wait for the growing task (asked to stop early) and free what it built
   fn end(g:*Growing,gpa:Allocator)void{
     g.stop.store(true,.monotonic);
-    if(g.thread)|t|t.join();
+    if(g.apart)|*a|a.future.await(a.io);
     g.arena.deinit();
     gpa.destroy(g);
   }
 };
-/// start growing every species' mesh and every library part on a thread
-/// of their own (here, if no thread can be had)
+/// start growing every species' mesh and every library part as a task
+/// of their own on the I/O (here, if none can be had)
 pub fn start(r:*Renderer)Error!void{
-  // the growing state, made on the heap so the thread can hold it
+  // the growing state, made on the heap so the growing task can hold it
   const g=try r.gpa.create(Growing);
   g.*=.{.arena=ArenaAllocator.init(r.gpa),.only=r.ext.only};
   g.b=.{.gpa=g.arena.allocator()};
   r.ext.growing=g;
-  g.thread=Thread.spawn(.{},Growing.run,.{g})catch|e|blk:{
-    std.log.warn("meshes grown without a thread: {t}",.{e});
-    g.run();
-    break:blk null;
+  // no I/O to grow on: grown here, before the first frame
+  const io=r.ext.io orelse return g.run();
+  // a task of its own beside the frames (the I/O's, never a thread of ours)
+  const future=io.concurrent(Growing.run,.{g})catch|e|{
+    std.log.warn("meshes grown without a task of their own: {t}",.{e});
+    return g.run();
   };
+  g.apart=.{.io=io,.future=future};
 }
 /// free what the garden keeps on the renderer (null handles are skipped)
 pub fn release(r:*Renderer)void{
@@ -382,8 +388,8 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   const x=&r.ext;
   const g=x.growing orelse return true;
   if(!g.finished.load(.acquire))return false;
-  if(g.thread)|t|t.join();
-  g.thread=null;
+  if(g.apart)|*a|a.future.await(a.io);
+  g.apart=null;
   defer{
     g.end(r.gpa);
     x.growing=null;
