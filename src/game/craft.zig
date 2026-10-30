@@ -6,15 +6,25 @@
 //! leave the inventory when a weave is queued (like Factorio hand crafting)
 //! and the result appears when it finishes.
 const lib=@import("../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// shifts the weave queue forward a place when the first weave is done
 const copyForwards=std.mem.copyForwards;
+/// the test harness
 const testing=std.testing;
+/// what can be held: items, ingredients, bags
 const items=lib.items;
+/// the research tree, which gates some weaves
 const prog=lib.progression;
+/// one weave: what comes out, how many, what goes in and how long it takes
 pub const Recipe=struct{
+  /// the item woven
   out:items.Item,
+  /// how many come out of one weave
   n:u16=1,
+  /// what it eats, taken when it is queued
   in:[]const items.Ingredient,
+  /// seconds the weave takes
   time:f32,
   /// research that must be known before this can be woven
   needs:?prog.Id=null,
@@ -24,6 +34,7 @@ pub const Recipe=struct{
   /// the advanced tier: only a monfris weaves it, never a germinator or
   /// the hands
   advanced:bool=false,
+  /// whether the research it needs (if any) is known
   pub fn unlocked(r:Recipe,g:*const prog.Progression)bool{
     return if(r.needs)|id|g.done.contains(id)else true;
   }
@@ -69,10 +80,12 @@ pub const hand=[_]Recipe{
   .{.out=.monfris,.in=&.{.{.item=.weftstone,.n=1},.{.item=.driftbraid,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.interweaving,.germinator=true},
   .{.out=.vultrixi,.in=&.{.{.item=.gatheringCrown,.n=1},.{.item=.ganglion,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.sharedNerves,.germinator=true},
 };
+/// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}
 /// whether the hands cannot weave it: a seed, one marked for a germinator,
 /// or the advanced tier
 pub fn germinatorOnly(idx:usize)bool{return isSeedRecipe(idx) or hand[idx].germinator or hand[idx].advanced;}
+/// whether the weave at `idx` in `hand` is the advanced tier
 pub fn isAdvanced(idx:usize)bool{return hand[idx].advanced;}
 /// the recipes the wolf weaves by hand (indices into `hand`): all but what
 /// only a germinator weaves.
@@ -89,14 +102,19 @@ pub fn woven(item:items.Item)bool{
   for(hand)|r|if(r.out==item)return true;
   return false;
 }
+/// how many weaves the predicate answers `want` for (comptime)
 fn countWhere(comptime pred:fn(usize)bool,comptime want:bool)usize{
   @setEvalBranchQuota(10_000);
+  // the count so far
   var n:usize=0;
   for(0..hand.len)|i|if(pred(i)==want){n+=1;};
   return n;
 }
+/// the indices into `hand` of every weave the predicate answers `want`
+/// for, in table order (comptime)
 fn recipesWhere(comptime pred:fn(usize)bool,comptime want:bool)[countWhere(pred,want)]u8{
   @setEvalBranchQuota(10_000);
+  // the gathered indices, and how many are in so far
   var out:[countWhere(pred,want)]u8=undefined;
   var k:usize=0;
   for(0..hand.len)|i|if(pred(i)==want){out[k]=i;k+=1;};
@@ -104,16 +122,22 @@ fn recipesWhere(comptime pred:fn(usize)bool,comptime want:bool)[countWhere(pred,
 }
 /// max weaves queued at once (the wolf's hands can only do so much)
 const queueMax=8;
+/// the wolf's weaving hands: a queue of weaves, the first one in progress
 pub const Crafter=struct{
+  /// the queued weaves, indices into `hand`; only the first `len` are real
   queue:[queueMax]u8=undefined,
+  /// how many weaves are queued
   len:usize=0,
+  /// seconds the first weave has been worked
   t:f32=0,
+  /// whether `inv` holds everything the recipe eats
   pub fn can(inv:items.Bag,r:Recipe)bool{
     for(r.in)|ing|if(inv.count(ing.item)<ing.n)return false;
     return true;
   }
   /// takes the ingredients now; false if missing or the queue is full.
   pub fn push(c:*Crafter,inv:items.Bag,idx:usize)bool{
+    // the recipe asked for
     const r=hand[idx];
     if(c.len==queueMax or !can(inv,r))return false;
     for(r.in)|ing|_=inv.take(ing.item,ing.n);
@@ -121,12 +145,15 @@ pub const Crafter=struct{
     c.len+=1;
     return true;
   }
+  /// whether a weave is underway
   pub fn busy(c:*const Crafter)bool{return c.len>0;}
+  /// how far the first weave is, 0..1 (0 when idle)
   pub fn progress(c:*const Crafter)f32{return if(c.len==0)0 else c.t/hand[c.queue[0]].time;}
   /// returns the item finished this step, if any. A result that does not fit
   /// waits in the weave until there is room.
   pub fn tick(c:*Crafter,inv:items.Bag,dt:f32)?items.Item{
     if(c.len==0)return null;
+    // the weave at the front of the queue
     const r=hand[c.queue[0]];
     c.t=@min(c.t+dt,r.time);
     if(c.t<r.time)return null;
@@ -138,6 +165,7 @@ pub const Crafter=struct{
   }
 };
 test"weaving takes ingredients up front and yields after its time"{
+  // a bag of eight slots and idle hands
   var inv:items.Inventory(8)=.{};
   var c:Crafter=.{};
   try testing.expect(!c.push(inv.bag(),0));

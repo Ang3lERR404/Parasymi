@@ -1,90 +1,170 @@
 //! the wolf posed: the skeleton from its state, and its parts for the renderer.
+/// the hub every game module is reached through
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type emitting parts may fail with
 const Allocator=std.mem.Allocator;
+/// the generic engine package
 const engine=lib.engine;
+/// all the maths: vectors, matrices, turns, easing
 const m=engine.core.math;
+/// the wolf's skeleton: bones, pose, forward kinematics and skinning
 const skel=lib.skeleton;
+/// the wolf's body mesh: where its nose, pads and beans sit
 const bodyMesh=lib.wolfBody;
+/// the belly's mesh: its radii, its top, where its folds cross
 const bellyMesh=lib.wolfBelly;
+/// the library meshes: the pectorals' and rear's ids
 const meshlib=lib.meshlib;
+/// the scene's moving parts and how each looks
 const parts=lib.parts;
+/// the scene's list of moving parts the wolf adds to each frame
 const Parts=parts.Parts;
+/// a point or direction in 3D
 const V3=m.V3;
+/// builds a 3D vector from its three parts
 const v3=m.v3;
+/// a 4x4 transform
 const M4=m.M4;
+/// a transform that moves by a vector
 const translate=m.translate;
+/// a transform that scales by a vector
 const scale=m.scale3;
+/// one bone of the wolf's skeleton
 const Bone=skel.Bone;
+/// how far the arms hang out from the body (radians)
 const armOut=lib.player.tuning.armOut;
+/// the paw beans' glow
 const beanGlow=lib.player.tuningLook.beanGlow;
+/// how dense the beans' and nose's sap is (0..1)
 const beanOpacity=lib.player.tuningLook.beanOpacity;
+/// the paw beans' colour
 const beanTint=lib.player.tuningLook.beanTint;
+/// how far a full belly pushes the arms out (radians)
 const bellyArms=lib.player.tuning.bellyArms;
+/// the belly sap's glow when empty
 const bellyGlow=lib.player.tuningLook.bellyGlow;
+/// how much more the belly sap glows once full
 const bellyGlowFull=lib.player.tuningLook.bellyGlowFull;
+/// how far the pelvis bobs down at each footfall (m)
 const bobAmount=lib.player.tuning.bobAmount;
+/// how much its fur leaves stir
 const bodyFlutter=lib.player.tuningLook.bodyFlutter;
+/// the body's glow
 const bodyGlow=lib.player.tuningLook.bodyGlow;
+/// how high its middle sits, for culling and detail (m)
 const bodyMid=lib.player.tuningLook.bodyMid;
+/// how far the chest swells with each breath at rest
 const breathAmount=lib.player.tuning.breathAmount;
+/// how far it swells at a run
 const breathRun=lib.player.tuning.breathRun;
+/// how far the chest turns against the hips (a share)
 const counter=lib.player.tuning.counter;
+/// the inner ears' glow
 const earGlow=lib.player.tuningLook.earGlow;
+/// the inner ears' sap opacity
 const earOpacity=lib.player.tuningLook.earOpacity;
+/// where the eyes sit in the head's frame
 const eyesAt=lib.player.tuningLook.eyesAt;
+/// the head's bones, hidden from its own eyes
 const headBones=lib.player.tuningLook.headBones;
+/// how far the pelvis rolls with the stride (radians)
 const hipRoll=lib.player.tuning.hipRoll;
+/// how far the pelvis turns with the stride (radians)
 const hipTurn=lib.player.tuning.hipTurn;
+/// the belly lumps' glow
 const lumpGlow=lib.player.tuningLook.lumpGlow;
+/// how large each belly lump is (m)
 const lumpR=lib.player.tuningLook.lumpR;
+/// the nose's glow
 const noseGlow=lib.player.tuningLook.noseGlow;
+/// the nose's colour
 const noseTint=lib.player.tuningLook.noseTint;
+/// how far a planted foot's central pad flattens (a share)
 const padFlatten=lib.player.tuningLook.padFlatten;
+/// how far the jaw drops open, panting at a run (radians)
 const pant=lib.player.tuning.pant;
+/// the pectorals' opacity
 const pecOpacity=lib.player.tuningLook.pecOpacity;
+/// how far the body rocks back with the pull (radians)
 const pryRock=lib.player.tuning.pryRock;
+/// how far the wrists twist in the wrench (radians)
 const pryTwist=lib.player.tuning.pryTwist;
+/// where in a unit's pry the pull ends (0..1)
 const pullEnd=lib.player.tuning.pullEnd;
+/// the wolf being posed
 const Player=lib.player.player.Player;
+/// how far the resting paw bends over the belly's curve (radians)
 const restDrape=lib.player.tuning.restDrape;
+/// how far the hip-leaning elbow swings out (radians)
 const restElbowOut=lib.player.tuning.restElbowOut;
+/// where the left paw leans on the hip (pelvis frame)
 const restHip=lib.player.tuning.restHip;
+/// how far the resting wrist sits off the sac (m)
 const restLift=lib.player.tuning.restLift;
+/// where the right paw rests on the belly (shares of the sac)
 const restOn=lib.player.tuning.restOn;
+/// how far the resting paw turns palm down (radians)
 const restPronate=lib.player.tuning.restPronate;
+/// the rear's opacity
 const rumpOpacity=lib.player.tuningLook.rumpOpacity;
+/// the belly sap's opacity at its centre
 const sapOpacity=lib.player.tuningLook.sapOpacity;
+/// how much more a full, stretched sac lets show through
 const sapStretch=lib.player.tuning.sapStretch;
+/// how far the pelvis sinks at full stride (m)
 const sinkAmount=lib.player.tuning.sinkAmount;
+/// how far the hips drop in the gathering squat (m)
 const squatDrop=lib.player.tuning.squatDrop;
+/// how far the body leans in over the node (radians)
 const squatLean=lib.player.tuning.squatLean;
+/// how long a paw takes to press a unit into the belly (s)
 const stowTime=lib.player.tuning.stowTime;
+/// how far the pelvis sways over the planted foot (m)
 const swayAmount=lib.player.tuning.swayAmount;
+/// how much more the metatarsal folds mid-swing (radians)
 const swingFold=lib.player.tuning.swingFold;
+/// how far each tail joint past the root droops at rest (radians)
 const tailDroop=lib.player.tuningLook.tailDroop;
+/// how far the tail's root lifts at full stride (radians)
 const tailLift=lib.player.tuningLook.tailLift;
+/// how far a finger's tip joint is bent at rest (radians)
 const tipRest=lib.player.tuningLook.tipRest;
+/// how much of the knuckle's curl the tip joint follows
 const tipShare=lib.player.tuningLook.tipShare;
+/// how far the toes hang as a foot swings (radians)
 const toeHang=lib.player.tuning.toeHang;
+/// where in a unit's pry the wrench ends (0..1)
 const wrenchEnd=lib.player.tuning.wrenchEnd;
+/// the bind pose, inverted, the skin matrices start from
 const bindInv=lib.player.ik.bindInv;
+/// the belly's lumps
 const lumps=lib.player.tuningLook.lumps;
+/// how far through its pull and wrench a unit's pry is (0..1)
 const pryPull=lib.player.ik.pryPull;
+/// an arm reaching its wrist (inverse kinematics)
 const solveArm=lib.player.ik.solveArm;
+/// an arm reaching its wrist, the elbow swung round
 const solveArmTurned=lib.player.ik.solveArmTurned;
+/// a leg reaching its foot (inverse kinematics)
 const solveLeg=lib.player.ik.solveLeg;
-/// the skeleton's pose this frame, in wolf space (see wolf_skeleton)
+/// the skeleton's pose this frame, in wolf space (see wolf_skeleton);
+/// a pose set from outside (`posed`) wins
 pub fn pose(p:*const Player)skel.Pose{
   if(p.posed)|q|return q;
+  // how far into stride, how far into the work gesture, how deep the squat
   const st=p.stride;
   const work=p.reach.x*(1-p.squat.x);
   const sq=p.squat.x;
+  // the gait's phase as an angle
   const ph=p.phase*m.tau;
+  // the pose, built up below
   var q:skel.Pose=.{};
   // the pelvis: lowest just after each footfall, over the planted foot;
   // gathering, down in a squat, the body leaning in and rocking back
   // with each pull
+  // the gait, the bob, the pull's rock, and the body's lean
   const g=p.gait();
   const bob=bobAmount*g.bob*st*(0.5+0.5*@cos(2*ph-p.duty*m.tau));
   const rock=pryRock*pryPull(p.gather orelse 0)*sq;
@@ -93,6 +173,7 @@ pub fn pose(p:*const Player)skel.Pose{
   q.pelvis=.{.x=0.25*lean,.y=hipTurn*st*@sin(ph),.z=hipRoll*g.roll*st*@cos(ph)+p.bank.x};
   q.waist=.{.x=0.35*lean,.y=-0.5*counter*q.pelvis.y,.z=-0.4*q.pelvis.z};
   q.chest=.{.x=0.4*lean,.y=-0.5*counter*q.pelvis.y,.z=-0.4*q.pelvis.z};
+  // where in its breath the wolf is, -1..1
   const breath=@sin(p.breath);
   q.breath=1+m.lerp(breathAmount,breathRun,st)*breath;
   // the head holds its gaze: it takes back the body's lean and bob
@@ -102,6 +183,7 @@ pub fn pose(p:*const Player)skel.Pose{
   q.jaw=pant*st*(0.6+0.4*breath);
   q.gut=p.fullness;
   for(0..2)|s|{
+    // which side this is: -1 left, 1 right
     const x=skel.sign(s);
     q.arms[s]=.{
       .root=.{.x=p.arm[s].x,.z=x*(armOut+bellyArms*p.fullness+0.02*breath+0.1*work),.y=-x*0.15*work},
@@ -121,6 +203,7 @@ pub fn pose(p:*const Player)skel.Pose{
   for(&q.tail,p.tail,0..)|*j,sp,i|j.*=.{.x=(if(i==0)-tailLift*@max(st,sq)else tailDroop*(1-0.6*st)),.z=sp.x};
   q.legs=p.legs(q);
   if(sq>0)p.armsToWrists(&q,sq);
+  // how far into the belly-rest idle
   const resting=p.restPose.x*(1-sq);
   if(resting>0)restArms(&q,resting);
   return q;
@@ -129,22 +212,28 @@ pub fn pose(p:*const Player)skel.Pose{
 /// of the belly, the palm laid on it; the left on the hip, the wrist
 /// bent back and the elbow turned out
 pub fn restArms(q:*skel.Pose,r:f32)void{
+  // the bones in the wolf's space, and the way into the chest's frame
   const w=skel.fk(q.*);
   const into=m.inverseRigid(w[@intFromEnum(Bone.chest)]);
+  // where the right paw rests on the sac, in its upper half's frame
   const on=restOn*v3(bellyMesh.rx,bellyMesh.upAxis,bellyMesh.rz);
+  // where each wrist is wanted: the left on the hip, the right on the belly
   const at=[2]V3{
     m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1)),
     m.mulPoint(w[@intFromEnum(Bone.gutTop)],on)+v3(0,restLift,0),
   };
   for(0..2)|s|{
+    // which side, how far the elbow swings out, and the arm reaching there
     const x=skel.sign(s);
     const out:f32=if(s==0)restElbowOut else 0;
     const ik=solveArmTurned(m.mulPoint(into,at[s])-skel.shoulder*v3(x,1,1),-x*out);
+    // the arm being posed
     const a=&q.arms[s];
     a.root=skel.Turn.blend(a.root,ik.root,r);
     a.mid=m.lerp(a.mid,ik.mid,r);
     // (on the belly the paw turns palm down and bends onto the sac; on
     // the hip the wrist cocks back)
+    // the wrist's turn wanted
     const low:skel.Turn=if(s==0).{.x=-0.5,.z=x*0.3}else.{.y=-x*restPronate,.z=-x*restDrape};
     a.low=.{.x=m.lerp(a.low.x,low.x,r),.y=m.lerp(a.low.y,low.y,r),.z=m.lerp(a.low.z,low.z,r)};
   }
@@ -152,32 +241,42 @@ pub fn restArms(q:*skel.Pose,r:f32)void{
 /// gathering: each arm blended (by `sq`) toward reaching its wrist's
 /// target by inverse kinematics, the wrist twisting with the wrench
 pub fn armsToWrists(p:*const Player,q:*skel.Pose,sq:f32)void{
+  // the bones in the wolf's space, and the way into the chest's frame
   const w=skel.fk(q.*);
   const into=m.inverseRigid(w[@intFromEnum(Bone.chest)]);
+  // the pry's unit share, and how far the wrists twist with the wrench
   const k=p.gather orelse 0;
   const twist=pryTwist*m.smooth(m.clamp01((k-pullEnd)/(wrenchEnd-pullEnd)))*(1-m.smooth(m.clamp01((k-wrenchEnd)/(1-wrenchEnd))));
   for(0..2)|s|{
+    // which side, where the wrist is wanted from the shoulder, and the reach
     const x=skel.sign(s);
     const at=m.mulPoint(into,p.wrist[s].pos)-skel.shoulder*v3(x,1,1);
     const ik=solveArm(at);
+    // the arm being posed
     const a=&q.arms[s];
     a.root=skel.Turn.blend(a.root,ik.root,sq);
     a.mid=m.lerp(a.mid,ik.mid,sq);
+    // how far into stowing this paw is (0..1)
     const stowing=m.clamp01(p.stow[s]/stowTime*3);
     a.low=.{.x=m.lerp(a.low.x,0.35*(1-stowing)+0.9*stowing,sq),.y=m.lerp(a.low.y,-x*twist*(1-stowing),sq),.z=a.low.z};
   }
 }
 /// each leg reaching its foot, by inverse kinematics in the pelvis's frame
 pub fn legs(p:*const Player,q:skel.Pose)[2]skel.Limb{
+  // the two legs' turns, filled in below
   var out:[2]skel.Limb=undefined;
+  // the way from the world into wolf space, and into the pelvis's frame
   const toWolf=m.inverseRigid(p.heading());
   const pelvis=m.chain(&.{translate(q.hip),q.pelvis.m4()});
   const into=m.inverseRigid(pelvis);
+  // how far the pelvis is pitched, which the feet stay level against
   const pelvisPitch=q.pelvis.x;
   for(&out,0..)|*l,s|{
+    // the foot, in wolf space, then in the pelvis's frame
     const f=p.feet[s];
     const fw=m.mulV(toWolf,.{f.at[0],f.at[1],f.at[2],1});
     const fp=m.mulV(into,fw);
+    // how far through its swing the foot is lifted (0 planted)
     const swing=if(f.planted())@as(f32,0)else@sin(f.t*m.pi);
     l.*=solveLeg(v3(fp[0],fp[1],fp[2])-v3(skel.sign(s)*skel.hipX,0,0),swingFold*swing,pelvisPitch,toeHang*swing);
   }
@@ -185,6 +284,7 @@ pub fn legs(p:*const Player,q:skel.Pose)[2]skel.Limb{
 }
 /// where its eyes are in the world this frame
 pub fn eyes(p:*const Player)V3{
+  // the bones in the wolf's space
   const w=skel.fk(p.pose());
   return m.mulPoint(m.mul(p.heading(),w[@intFromEnum(Bone.head)]),eyesAt);
 }
@@ -192,24 +292,32 @@ pub fn eyes(p:*const Player)V3{
 /// Seen from its own eyes (`headless`) its head is not drawn, though it
 /// still casts its shadow.
 pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
+  // the pose, the wolf's place in the world, and the bones there
   const q=p.pose();
   const root=p.heading();
   var w=skel.fk(q);
   for(&w)|*b|b.*=m.mul(root,b.*);
+  // the skin matrices, and where they go in the scene
   const skin=skel.skin(w,&bindInv(),q.breath);
   const base=try out.pose(&skin);
+  // the body's middle, where it is culled and detailed about
   const mid=p.pos+v3(0,bodyMid,0);
+  // a bone's transform, by name
   const at=struct{
+    /// bone `b`'s transform out of the bones `ws`
     fn f(ws:*const[skel.count]M4,b:Bone)M4{return ws[@intFromEnum(b)];}
   }.f;
+  // the bones hidden from its own eyes
   const hide:u64=if(headless)headBones else 0;
   try out.emitSkinned(.wolfBody,base,mid,.{.glow=bodyGlow,.flutter=bodyFlutter,.phase=0.1,.hide=hide});
   try out.emitSkinned(.wolfEars,base,mid,.{.glow=earGlow,.phase=0.5,.fade=earOpacity,.hide=hide});
   if(!headless)try out.emit(.pawBean,m.chain(&.{at(&w,.head),translate(bodyMesh.nose),m.rotX(-bodyMesh.noseTilt),scale(v3(0.015,0.0105,0.011))}),.{.glow=noseGlow,.fade=beanOpacity,.tint=noseTint});
   // the belly: a sap sac that inflates with the inventory, drops and sags
   // as it fills, with the heavier things inside showing through as shadows
+  // how full the belly is, and the gut bone it hangs from
   const b=p.fullness;
   const gut=at(&w,.gut);
+  // how many stacks it holds: one lump shows for each, up to five
   var held:usize=0;
   for(p.inv.slot)|slot|if(slot!=null){
     held+=1;
@@ -218,6 +326,7 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
     try out.emit(.bellyLump,m.chain(&.{gut,translate(l.pos),scale(m.splat3(lumpR))}),.{.glow=lumpGlow,.phase=0.3});
   }
   // (the shader creases it as it fills, the folds crossing at its button)
+  // where the belly's folds cross
   const cross=bellyMesh.crossing();
   try out.emitSkinned(.wolfBelly,base,mid,.{
     .glow=bellyGlow+bellyGlowFull*b,.phase=0.3,.fade=sapOpacity-sapStretch*b,.give=.{b,cross[1],cross[2]},
@@ -225,24 +334,30 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
   // the pectorals and the rear: resin, its surface given by its spring
   // (and, on the chest, a slow idle) while its base holds
   for([_]meshlib.Id{.wolfPecL,.wolfPecR},[_]f32{-1,1},0..)|id,side,i|{
+    // this pectoral's give: its spring and a slow idle breath
     const give=p.pec[i].pos+v3(0,0.003*@sin(p.t*m.tau/3+side*1.3),0);
     try out.emitSkinned(id,base,mid,.{.phase=0.6,.fade=pecOpacity,.give=.{give[0],give[1],give[2]}});
   }
   for([_]meshlib.Id{.wolfRumpL,.wolfRumpR},0..)|id,i|{
+    // this cheek of the rear's give
     const give=p.rump[i].pos;
     try out.emitSkinned(id,base,mid,.{.phase=0.15,.fade=rumpOpacity,.give=.{give[0],give[1],give[2]}});
   }
+  // where each paw touches down, filled in below
   var feet:[2]V3=undefined;
   for(skel.sides,0..)|sd,s|{
+    // which side: -1 left, 1 right
     const x=skel.sign(s);
     // the beans: a palm pad and one under each fingertip; one
     // central pad on each foot that flattens while planted, four toe pads
     const bean:parts.Look=.{.glow=beanGlow,.fade=beanOpacity,.tint=beanTint};
+    // the hand bone
     const hand=at(&w,sd.hand);
     try out.emit(.pawPad,m.chain(&.{hand,translate(bodyMesh.palmAt*v3(x,1,1)),m.rotZ(x*m.pi/2.0),scale(v3(0.018,0.005,0.016))}),bean);
     for(sd.tips)|tb|{
       try out.emit(.pawBean,m.chain(&.{at(&w,tb),translate(bodyMesh.tipPad*v3(x,1,1)),scale(v3(0.0042,0.0085,0.0075))}),bean);
     }
+    // the foot bone
     const foot=at(&w,sd.foot);
     try out.emit(.pawPad,m.chain(&.{foot,translate(bodyMesh.padAt),scale(v3(0.021,0.006*(1-padFlatten*p.feet[s].pad),0.02))}),bean);
     for(bodyMesh.toes)|tp|{

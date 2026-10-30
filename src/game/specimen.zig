@@ -6,38 +6,65 @@
 //! work), and the renderer builds only the meshes it draws (`only`). Not
 //! part of play: it sets the thing's state itself.
 const lib=@import("../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator the specimen's plant, structure and mesh list need
 const Allocator=std.mem.Allocator;
+/// reads a species, structure kind or state from its name
 const stringToEnum=std.meta.stringToEnum;
+/// reads a share of growth
 const parseFloat=std.fmt.parseFloat;
+/// finds the `..` in a span
 const indexOf=std.mem.indexOf;
+/// are two strings equal?
 const eql=std.mem.eql;
+/// every tag of an enum: tile kinds, items, studies
 const values=std.enums.values;
+/// finds a mesh among those a structure declares
 const indexOfScalar=std.mem.indexOfScalar;
+/// the test harness
 const testing=std.testing;
+/// the engine package
 const engine=lib.engine;
+/// all the maths: tiles, rings, easing
 const m=engine.core.math;
+/// the chunk grid: tiles, kinds and heights
 const ck=lib.ck;
+/// the species registry: sizes, floating, mana, radiance
 const species=lib.species;
+/// what can be held: every item, to feed a structure
 const items=lib.items;
+/// the mesh library: ids for the meshes to build
 const meshlib=lib.meshlib;
+/// the plant mesh builder, for its levels of detail
 const meshgen=lib.meshgen;
+/// the garden's renderer, told which meshes to build
 const renderer=lib.renderer;
+/// the structures registry: placing, feeding, meshes, emitting
 const st=lib.structures;
+/// the research tree, for an arsthraxia's study
 const prog=lib.progression;
+/// what each kind of ground's nodes give and look like
 const resources=lib.resources;
+/// the scene's list of moving parts (the mesh test)
 const Parts=lib.parts.Parts;
+/// the game's state and its tick
 const play=lib.play;
+/// the wolf's actions, for turning a thing as R does
 const actions=lib.actions;
+/// how a turn is timed
 const turn=lib.turn;
+/// the whole running game the specimen stands in
 const Game=play.Game;
+/// tells why a structure could not be put down
 const diag=lib.diagnostics;
 /// a loop's animation runs `period` seconds, then holds its end this long
 /// before it starts again
 const holdTime:f32=1.5;
-/// seconds a loop runs unless `--period` says: an active structure's runs
+/// seconds a loop runs unless `--period` says
 /// long enough for a weave or a study unit
 const period:f32=8;
+/// an active structure's loop: long enough for a weave or a study unit
 const activePeriod:f32=30;
 /// turning, it turns a quarter this often (s) unless `--period` says
 const turnPeriod:f32=turn.time+1;
@@ -48,17 +75,21 @@ const never:f32=1e9;
 /// a tile to sow on: searched this far round the wolf
 const search:i32=8;
 /// active, a structure is handed one of what it wants this often (s), and
-/// what it made is taken from it; a carrier lets go of what it carries
-/// this long after taking it (nothing stands ahead to take it)
+/// what it made is taken from it
 const feedRate:f32=0.4;
+/// a carrier lets go of what it carries this long after taking it (s),
+/// since nothing stands ahead to take it
 const carry:f32=2;
 /// the specimen's seed (its variant, its phase)
 const seed:f32=0.37;
 /// what stands alone
 pub const Subject=union(enum){
+  /// a plant of a species
   plant:species.Id,
+  /// a structure of a kind
   structure:st.Kind,
 };
+/// how the specimen is shown: grown in a loop, held still, worn out, or left live
 pub const State=union(enum){
   /// grows from nothing to grown, again and again
   grow,
@@ -92,6 +123,7 @@ pub const State=union(enum){
       .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,
     };
     if(indexOf(u8,s,".."))|dots|{
+      // where the dots are, and the shares either side of them
       const a=parseFloat(f32,s[0..dots]) catch return error.BadState;
       const b=parseFloat(f32,s[dots+2..]) catch return error.BadState;
       return.{.span=.{m.clamp01(a),m.clamp01(b)}};
@@ -109,15 +141,32 @@ pub const State=union(enum){
   }
 };
 /// what it shows this moment (a structure: `growth` only)
-pub const Look=struct{growth:f32=1,mana:f32=1,flow:f32=0,health:f32=1,radiating:bool=true};
+pub const Look=struct{
+  /// how grown, 0..1
+  growth:f32=1,
+  /// how full of mana, 0..1 of its cap
+  mana:f32=1,
+  /// how much sap rises through it, 0..1
+  flow:f32=0,
+  /// how healthy, 0..1
+  health:f32=1,
+  /// whether its radiance network is lit
+  radiating:bool=true
+};
+/// one plant or structure alone: what it is, how it is shown, its clock
+/// and the tile it stands on
 pub const Specimen=struct{
+  /// what stands alone
   what:Subject,
+  /// how it is shown
   state:State=.grow,
-  /// seconds one loop's animation runs (unset: `PERIOD`, `ACTIVE_PERIOD`)
+  /// seconds one loop's animation runs (unset: `period`, `activePeriod`)
   period:?f32=null,
+  /// seconds into the loop
   t:f32=0,
-  /// active: seconds to the next feeding, and since its carried item came
+  /// active: seconds to the next feeding
   feedT:f32=0,
+  /// active: seconds since its carried item came
   carryT:f32=0,
   /// the tile it stands on (found by `sow`)
   at:[2]i32=.{0,0},
@@ -127,6 +176,7 @@ pub const Specimen=struct{
     switch(s.what){
       .plant=>|sp|return.{.species=sp,.parts=&.{.shadow,.turnRoot,.turnRootPale}},
       .structure=>|k|{
+        // the meshes, gathered
         var list:std.ArrayList(meshlib.Id)=.empty;
         try list.appendSlice(arena,st.meshes(k));
         try list.appendSlice(arena,&.{.turnRoot,.turnRootPale});
@@ -140,13 +190,17 @@ pub const Specimen=struct{
   /// (and the camera) over it
   pub fn sow(s:*Specimen,g:*Game)Allocator.Error!void{
     if(s.state==.active)study(g);
+    // the wolf's tile, and whether a tile has been found
     const cx,const cz=m.tileAt(g.player.pos);
     var found=false;
     for([_]bool{true,false})|byNode|{
+      // the ring being searched, outward from the wolf
       var r:i32=0;
       find:while(r<search):(r+=1){
+        // the walk round that ring
         var it=m.ring(r);
         while(it.next())|o|{
+          // the tile tried
           const x=cx+o[0];
           const z=cz+o[1];
           if(!s.fits(g,x,z)or(byNode and !nodeNear(g,x,z)))continue;
@@ -160,15 +214,19 @@ pub const Specimen=struct{
     if(!found)switch(s.what){
       .structure=>|k|{
         s.at=.{cz,cx};
+        // the structure's def, its size, and the ground it may first stand on
         const sdef=st.defs.get(k);
         const size=sdef.size;
         const fallback=st.firstGround(k);
+        // the wolf's chunk, and the ground height under the wolf
         const c0=g.world.chunkOfTile(cx,cz) orelse return;
         const h0=c0.height[ck.localIndex(cx,cz)];
         for(0..size,0..size)|dx,dz|{
+          // the tile in the footprint, flattened to that ground
           const lx=cx+@as(i32,@intCast(dx));
           const lz=cz+@as(i32,@intCast(dz));
           if(g.world.chunkOfTile(lx,lz))|c|{
+            // the tile within its chunk
             const t=ck.localIndex(lx,lz);
             c.kind[t]=fallback;
             c.height[t]=h0;
@@ -178,6 +236,7 @@ pub const Specimen=struct{
       else=>{}
     };
     try s.put(g);
+    // its footprint's size, and how far it hovers
     const size:u8,const up:f32=switch(s.what){
       .plant=>|sp|.{if(species.get(sp).floating)1 else species.get(sp).size,0},
       .structure=>|k|.{st.defs.get(k).size,st.defs.get(k).hover},
@@ -185,13 +244,16 @@ pub const Specimen=struct{
     g.player.pos=m.footprintCentre(s.at[0],s.at[1],size,g.heightAt(s.at[0],s.at[1]));
     g.cam.target=g.player.pos+m.v3(0,up,0);
   }
+  /// whether it may stand at (x, z)
   fn fits(s:*const Specimen,g:*const Game,x:i32,z:i32)bool{
     return switch(s.what){
       .plant=>|sp|g.plants.canPlace(&g.world,x,z,sp),
       .structure=>|k|g.structs.canPlace(&g.world,x,z,k),
     };
   }
+  /// puts it down at its tile, as its state shows it now
   fn put(s:*Specimen,g:*Game)Allocator.Error!void{
+    // what it shows now
     const l=s.look();
     switch(s.what){
       .plant=>|sp|_=try g.plants.placeEx(g.gpa,&g.world,s.at[0],s.at[1],.{
@@ -199,6 +261,7 @@ pub const Specimen=struct{
         .growth=if(s.state==.live)0 else l.growth,.span=if(s.state==.live)0 else never,
       }),
       .structure=>|k|{
+        // whether it took root
         const ok=try g.structs.place(g.gpa,&g.world,s.at[0],s.at[1],k,0,seed);
         if(!ok)diag.whyNot(&g.structs,&g.world,s.at[0],s.at[1],k);
         if(g.structs.list.items.len>0)g.structs.list.items[0].grown=l.growth;
@@ -211,6 +274,7 @@ pub const Specimen=struct{
   pub fn hold(s:*Specimen,g:*Game,dt:f32)Allocator.Error!bool{
     if(s.state==.live or s.state==.active)return false;
     s.t+=dt;
+    // what it shows this moment
     const l=s.look();
     // turning: a quarter each loop, as R does it in play
     if(s.state==.turn){
@@ -224,6 +288,7 @@ pub const Specimen=struct{
       .plant=>|sp|{
         // uprooted: back it comes
         if(g.plants.len()==0)try s.put(g);
+        // its species, and the plant list's columns
         const def=species.get(sp);
         const p=g.plants.list.slice();
         p.items(.growth)[0]=l.growth;
@@ -231,6 +296,7 @@ pub const Specimen=struct{
         p.items(.flow)[0]=l.flow;
         p.items(.health)[0]=l.health;
         p.items(.span)[0]=never;
+        // the plants lit by radiance; it alone, lit as its look says
         const rad=&g.eco.radiance.radiating;
         try rad.resize(g.gpa,g.plants.len());
         rad.items[0]=def.radiance>0 and l.radiating;
@@ -240,6 +306,7 @@ pub const Specimen=struct{
         // it notices its neighbours (a conduit its arches) but never works
         lib.structures.Structures.linkWith(g.structCtx(.{}));
         if(g.structs.list.items.len==0)return false;
+        // the one structure
         const one=&g.structs.list.items[0];
         one.grown=l.growth;
         one.activity=0;
@@ -253,6 +320,7 @@ pub const Specimen=struct{
   pub fn after(s:*Specimen,g:*Game,dt:f32)Allocator.Error!void{
     switch(s.state){
       .live=>{
+        // whether the plant is gone (uprooted, withered)
         const gone=g.plants.len()==0;
         if(!gone and g.plants.list.items(.growth)[0]<1)return;
         s.t+=dt;
@@ -263,11 +331,13 @@ pub const Specimen=struct{
       },
       .active=>{
         s.t+=dt;
+        // whether the structure is gone
         const gone=g.structs.list.items.len==0;
         if(gone or s.t>=s.loop()){
           s.t=0;
           // what it put down (a polyp's diamond) goes with it
           while(g.structs.list.items.len>0){
+            // the last structure, lifted out and freed
             var goneS=g.structs.remove(&g.world,.of(g.structs.list.items.len-1));
             goneS.deinit(g.gpa);
           }
@@ -286,6 +356,7 @@ pub const Specimen=struct{
   /// behind), what it made taken away; a carrier lets go of what it has
   /// carried a while
   fn feed(s:*Specimen,g:*Game)void{
+    // the structure: the only one
     const id:st.Id=.of(0);
     const one=g.structs.get(id);
     if(one.def().carrier){
@@ -293,10 +364,13 @@ pub const Specimen=struct{
     }else if(g.structs.output(id))|made|{
       if(g.structs.wants(&g.prog,id,made)==0)_=one.inv.take(made,1);
     }
+    // every kind of item
     const all=values(items.Item);
     // a different kind each time, round all it takes
+    // where in the list this feeding starts
     const from:usize=@intFromFloat(@mod(g.time*7+m.f(g.ticks),m.f(all.len)));
     for(0..all.len)|i|{
+      // the item offered
       const item=all[(from+i)%all.len];
       if(!one.def().carrier and g.structs.wants(&g.prog,id,item)==0)continue;
       if(g.structs.handIn(&g.prog,id,item,2)){
@@ -316,10 +390,13 @@ pub const Specimen=struct{
   }
   /// how far through this loop's animation (0..1; 1 through the hold)
   fn share(s:*const Specimen)f32{
+    // the loop's length
     const p=s.loop();
     return m.clamp01(@mod(s.t,p+holdTime)/p);
   }
+  /// what it shows this moment, from its state and how far through the loop it is
   fn look(s:*const Specimen)Look{
+    // how far through the loop
     const k=s.share();
     return switch(s.state){
       .grow=>.{.growth=k},
@@ -348,7 +425,9 @@ fn study(g:*Game)void{
 /// one of the eight tiles a lithophage drains)
 fn nodeNear(g:*const Game,x:i32,z:i32)bool{
   for(m.dirs)|d|{
+    // the way being looked
     const v=m.dirVec(d);
+    // the chunk holding that tile (none: not streamed in), and the tile in it
     const c=g.world.chunkOfTile(x+v.x,z+v.z) orelse continue;
     const t=ck.localIndex(x+v.x,z+v.z);
     if(c.res[t]>0 and resources.of(c.kind[t])!=null)return true;
@@ -365,6 +444,7 @@ test"a state is a name, a share of growth or a span"{
   try testing.expect(!(try State.parse("wither")).suits(.{.structure=.germinator}));
 }
 test"a loop runs its period, holds its end, then starts again"{
+  // a plant looping every four seconds
   var s:Specimen=.{.what=.{.plant=.lumenroot},.period=4};
   s.t=2;
   try testing.expectApproxEqAbs(@as(f32,0.5),s.look().growth,1e-5);
@@ -374,6 +454,7 @@ test"a loop runs its period, holds its end, then starts again"{
   try testing.expectApproxEqAbs(@as(f32,0.25),s.look().growth,1e-5);
 }
 test"held, the plant shows its state and nothing else grows it"{
+  // the test allocator, and a fresh game
   const gpa=testing.allocator;
   var g=try Game.init(gpa,play.defaultSeed);
   defer g.deinit();
@@ -387,26 +468,32 @@ test"held, the plant shows its state and nothing else grows it"{
   try testing.expectEqual(@as(f32,1),g.plants.list.items(.health)[0]);
 }
 test"a structure alone draws only the meshes it declares"{
+  // the test allocator
   const gpa=testing.allocator;
   for(values(st.Kind))|k|for([_]State{.grow,.active})|state|{
+    // a fresh game
     var g=try Game.init(gpa,play.defaultSeed);
     defer g.deinit();
     g.specimen=.{.what=.{.structure=k},.state=state,.period=20};
     try g.specimen.?.sow(&g);
     try testing.expectEqual(@as(usize,1),g.structs.list.items.len);
+    // the meshes the structure says it draws, and the parts collector
     const declared=st.meshes(k);
     var parts=Parts.init(gpa);
     defer parts.deinit();
     // a loop and a half, its pieces looked at four times a second
+    // seconds looked at so far
     var t:f32=0;
     while(t<30):(t+=0.25){
       for(0..@intFromFloat(0.25/play.tickTime))|_|try g.step();
       parts.clear();
       for(g.structs.list.items)|*s|{
+        // its centre on the ground
         const ctr=m.footprintCentre(s.x,s.y,s.def().size,g.heightAt(s.x,s.y));
         try st.emit(s,&parts,ctr,t);
       }
       for(parts.lists,0..)|l,slot|if(l.items.len>0){
+        // the mesh this slot's instances belong to
         const id:meshlib.Id=@enumFromInt(slot/meshgen.lods);
         if(indexOfScalar(meshlib.Id,declared,id)==null){
           std.debug.print("{t} emits {t}, not in its `meshes`\n",.{k,id});

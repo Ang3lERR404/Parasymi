@@ -1,26 +1,38 @@
 //! shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes. Muted greens/browns base,
 //! amber accents.
+/// a UI colour: red, green, blue and alpha bytes
 const C=[4]u8;
-/// type scale (text size multipliers), largest first
+/// the type scale (text size multipliers), largest first: a banner across the screen
 pub const textBanner:f32=3.5;
+/// a panel's title
 pub const textTitle:f32=2.5;
+/// a section heading
 pub const textHeading:f32=2;
+/// a slot's or button's label
 pub const textLabel:f32=1.75;
+/// a row in a list
 pub const textRow:f32=1.6;
+/// a subtitle under a heading
 pub const textSub:f32=1.5;
 /// a structure's or plant's description line
 pub const textBody:f32=1.4;
+/// a note under a description
 pub const textNote:f32=1.25;
+/// small print
 pub const textSmall:f32=1.2;
+/// finer print
 pub const textFine:f32=1.15;
+/// the tiniest print
 pub const textTiny:f32=1.1;
-/// tendril (progress bar) thickness, slim and bold
+/// a slim tendril (progress bar), in pixels thick
 pub const barH:f32=12;
+/// a bold tendril, in pixels thick
 pub const barHBold:f32=14;
 /// left-edge panels sit this far in from the screen's edge
 pub const edge:f32=16;
-/// a structure's description bar: offset from the text and width
+/// a structure's description bar: how far it sits right of the text (px)
 pub const descBarX:f32=250;
+/// how wide a structure's description bar is (px)
 pub const descBarW:f32=110;
 /// spacing of item slots (belly, hotbar, a structure's store)
 pub const slotGap:f32=64;
@@ -30,9 +42,13 @@ pub const titleY:f32=30;
 pub const panelLift:f32=30;
 /// a menu's backdrop veil reaches this share of the screen's longer side
 pub const veilReach:f32=0.75;
+/// bright text: pale leaf-white
 pub const white:C=.{235,240,225,255};
+/// dim text: muted sage
 pub const dim:C=.{150,170,150,255};
+/// the amber accent: gold
 pub const gold:C=.{255,215,130,255};
+/// near-black, for outlines and shadows
 pub const dark:C=.{20,20,20,255};
 /// a large panel's bed under its trellis (belly, a structure's): dark leaf litter
 pub const panel:C=.{24,30,18,242};
@@ -40,8 +56,9 @@ pub const panel:C=.{24,30,18,242};
 pub const card:C=.{24,36,22,232};
 /// empty inventory slot
 pub const podEmpty:C=.{40,55,45,160};
-/// a slot under the mouse; one that will take what the cursor carries
+/// a slot under the mouse: a pale wash
 pub const slotHover:C=.{220,235,210,70};
+/// a slot that will take what the cursor carries: a gold wash
 pub const dropTarget:C=.{255,215,130,120};
 /// a slot's count drawn over its icon, and the shadow under it
 pub const countShadow:C=.{10,12,10,220};
@@ -54,8 +71,8 @@ pub const freecam:C=.{150,230,190,255};
 /// free cam glow (same hue, low alpha)
 pub const freecamGlow:C=.{150,230,190,90};
 /// the middle of the screen, looking out of the wolf's eyes: a lit seed
-/// and its glow
 pub const aim:C=.{225,245,210,230};
+/// the lit seed's soft halo
 pub const aimGlow:C=.{150,230,190,70};
 /// pause menu veil (near-black, soft)
 pub const veil:C=.{4,6,10,200};
@@ -75,12 +92,15 @@ pub const researchActive:C=.{255,210,130,120};
 pub const researchHover:C=.{220,235,210,90};
 /// research bud that can be chosen: a faint gold call
 pub const researchInvite:C=.{255,215,130,45};
-/// research sapling bark: young green twig, old brown wood
+/// research sapling bark: young green twig
 pub const barkYoung:C=.{100,140,80,255};
+/// research sapling bark: old brown wood, toward the trunk
 pub const barkOld:C=.{105,80,58,255};
-/// research sapling: a known leaf, a bud that can be chosen, a dormant bud
+/// research sapling: a known leaf
 pub const leaf:C=.{105,185,105,235};
+/// a bud that can be chosen
 pub const bud:C=.{235,195,115,245};
+/// a dormant bud, still waiting
 pub const budDormant:C=.{95,95,105,200};
 /// the soil the sapling stands in
 pub const soil:C=.{70,48,32,150};

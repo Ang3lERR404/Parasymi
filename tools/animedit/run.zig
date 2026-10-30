@@ -1,62 +1,122 @@
 //! the animation editor's window and frame loop on the game's renderer.
+/// the standard library, reached through the game's hub
 const std=ps.std;
+/// the I/O interface: files, the clock
 const Io=std.Io;
+/// a directory, for reading clips and writing the shot
 const Dir=Io.Dir;
+/// whether two byte strings are the same
 const eql=std.mem.eql;
+/// whether an argument begins with a flag's name
 const startsWith=std.mem.startsWith;
+/// where in a name any of a set of bytes first falls
 const indexOfAny=std.mem.indexOfAny;
+/// a name turned into its enum tag, or null if none matches
 const stringToEnum=std.meta.stringToEnum;
+/// the log, for usage, warnings and notes
 const log=std.log;
+/// the engine package, as the game's hub hands it on
 const engine=ps.engine;
+/// the window library: the window, its events and the clock
 const glfw=engine.glfw;
+/// all the maths: vectors, clamps, casts
 const m=engine.core.math;
+/// keyframed clips: channels, keys, parsing
 const clip=engine.anim.clip;
+/// the keys and buttons held this frame
 const Input=engine.platform.input.Input;
+/// the UI's draw batch, which the panel goes into
 const Draw=engine.ui.draw.Draw;
+/// the game, reached through its import hub
 const ps=@import("parasymi");
+/// the tools' free camera, turning round its target
 const Orbit=@import("../orbit.zig").Orbit;
+/// play: the running game
 const play=ps.play;
+/// the running game, here holding only the world, the wolf or a specimen
 const Game=play.Game;
+/// the wolf's skeleton and its `Pose`
 const skel=ps.skeleton;
+/// one plant or structure standing alone, and its `Look`
 const specimen=ps.specimen;
+/// the garden's renderer module: syncing, meshes ready
 const renderer=ps.renderer;
+/// the renderer itself
 const Renderer=renderer.Renderer;
+/// the loading screen, shown while the meshes grow
 const loading=ps.loading;
+/// the key and button bindings (the orbit follows the game's)
 const ctl=ps.controls;
+/// every f32 of the wolf's `Pose`, each a channel a clip can key
 const PoseCh=clip.Channels(skel.Pose);
+/// every f32 of a specimen's `Look`, each a channel a clip can key
 const LookCh=clip.Channels(specimen.Look);
+/// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
+/// how far (m) the camera starts from the wolf
 const camDist=animedit.settings.camDist;
+/// how much farther (m) it starts per tile of a thing's size
 const camPer=animedit.settings.camPer;
+/// how high over its subject the camera starts (rad)
 const camPitch=animedit.settings.camPitch;
+/// how far (m) the camera starts from a thing, before its size
 const camThing=animedit.settings.camThing;
+/// where clips are kept
 const dir=animedit.settings.dir;
+/// the file ending every kept clip carries
 const ext=animedit.settings.ext;
+/// the editor's state
 const Editor=animedit.editor.Editor;
+/// how big (m) a joint is framed as when focused
 const jointSize=animedit.settings.jointSize;
+/// how long (s) a new clip runs
 const length=animedit.settings.length;
+/// how high (m) over the wolf's feet the camera looks
 const lookUp=animedit.settings.lookUp;
+/// the longest a stalled frame counts as (s)
 const maxDt=animedit.settings.maxDt;
+/// the bytes a clip's name may not hold
 const notInName=animedit.settings.notInName;
+/// what the gizmo needs of the wolf this frame
 const Rig=animedit.rigging.Rig;
+/// where `--shot` writes its frame
 const shotPath=animedit.settings.shotPath;
+/// how many frames `--shot` waits first
 const shotFrames=animedit.settings.shotFrames;
+/// who the clip moves
 const Subject=animedit.rigging.Subject;
+/// every look channel's index: a plant shows them all
 const allLook=animedit.editor.allLook;
+/// every pose channel's index: the wolf shows them all
 const allPose=animedit.editor.allPose;
+/// the wolf's bones in the world this frame
 const bonesOf=animedit.rigging.bonesOf;
+/// a structure shows only its growth
 const growthOnly=animedit.editor.growthOnly;
+/// whether a point is on the timeline
 const inTimeline=animedit.editor.inTimeline;
+/// whether a point is over the channel list
 const overList=animedit.editor.overList;
+/// the animation editor's start: reads the subject and clip from the
+/// flags, loads or makes the clip, opens the game's window and renderer on
+/// a quiet world with the wolf or the one thing alone, then runs frames,
+/// keying as the gardener edits, until the window closes (or `--shot` is taken)
 pub fn main(init:std.process.Init)!void{
+  // the general allocator, the I/O, and the run's arena
   const gpa=init.gpa;
   const io=init.io;
   const arena=init.arena.allocator();
+  // the command line, kept in the arena
   const args=try init.minimal.args.toSlice(arena);
+  // `--wolf`/`--plant=`/`--structure=`: who the clip moves
   var subject:?Subject=null;
+  // `--clip=`: the clip's name, else the subject's own
   var name:?[]const u8=null;
+  // `--at=`: where the playhead starts (s)
   var start:f32=0;
+  // `--channel=`: the channel selected at the start
   var channel:?[]const u8=null;
+  // `--shot`: save one frame and close
   var shot=false;
   for(args[1..])|a|{
     if(eql(u8,a,"--wolf"))subject=.wolf;
@@ -67,24 +127,31 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--channel="))channel=a["--channel=".len..];
     if(eql(u8,a,"--shot"))shot=true;
   }
+  // who the clip moves, which the flags must say
   const sj=subject orelse {
     log.err("usage: zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name>]",.{});
     return error.NoSubject;
   };
+  // the clip's name, checked to be a plain file name
   const named=name orelse sj.name();
   if(named.len==0 or indexOfAny(u8,named,notInName)!=null){
     log.err("--clip={s}: a plain file name, kept as "++dir++"/<name>"++ext,.{named});
     return error.BadName;
   }
+  // where it is kept
   const path=try std.fmt.allocPrint(arena,dir++"/{s}"++ext,.{named});
   // the clip: as kept, else a fresh one, written at once so a new name is
   // a file from the start
   var wb:[64]u8=undefined;
+  // the subject's word, which a kept clip must carry
   const word=sj.word(&wb);
+  // whether the clip is new, and so to be written at once
   var made=false;
   const c=load:{
+    // the clip's text, if it is kept
     const text=Dir.cwd().readFileAlloc(io,path,gpa,.limited(1<<22))catch|er|switch(er){
       error.FileNotFound=>{
+        // a fresh clip for the subject, as long as a new clip runs
         var fresh=try clip.Clip.init(gpa,word);
         fresh.length=length;
         made=true;
@@ -95,6 +162,7 @@ pub fn main(init:std.process.Init)!void{
     defer gpa.free(text);
     break:load try clip.Clip.parse(gpa,text);
   };
+  // the editor, showing every channel of the wolf or a plant, or a structure's growth
   var e:Editor=.{
     .gpa=gpa,
     .io=io,
@@ -125,6 +193,7 @@ pub fn main(init:std.process.Init)!void{
   // the game's files (controls, strings), as the game reads them
   try ps.home.open(io,init.environ_map);
   defer ps.home.close(io);
+  // the gardener's settings: vsync and antialiasing
   const opts=try ps.options.load(gpa,io);
   try ctl.load(gpa,io);
   defer ctl.unload();
@@ -134,26 +203,33 @@ pub fn main(init:std.process.Init)!void{
   defer glfw.terminate();
   if(!glfw.isVulkanSupported())return error.VulkanUnsupported;
   glfw.windowHint(.client_api,.no_api);
+  // the editor's window, as big as the game's
   const window=try glfw.createWindow(play.windowSize[0],play.windowSize[1],"Parasymi animation editor",null,null);
   defer window.destroy();
+  // the input, reading keys and buttons from the window
   var input:Input=.{.win=window};
   input.attach();
+  // the one thing alone in a fresh world, or none for the wolf
   var lone:?specimen.Specimen=switch(sj){
     .wolf=>null,
     .thing=>|t|.{.what=t,.state=.{.look=.{}}},
   };
+  // the renderer, building only the meshes the subject needs
   const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(arena)else null});
   defer r.deinit();
   // every mesh grows, then the world wakes and its ground is meshed,
   // behind the game's loading screen
   var screenL=loading.Loading.init(gpa);
   defer screenL.deinit();
+  // the clock at the last frame (s)
   var last=glfw.getTime();
+  // how many forms are grown, and the whole loading count: forms, the world, its chunks
   const forms=renderer.meshProgress(r)[1];
   const whole=forms+1+play.streamChunks;
   while(!try renderer.meshesReady(r)){
     if(!try loadFrame(&screenL,r,&input,&last,.forms,.{.done=renderer.meshProgress(r)[0],.total=whole}))return;
   }
+  // the quiet world the subject stands in
   var game=try Game.init(gpa,play.defaultSeed);
   defer game.deinit();
   game.world.io=io;
@@ -162,6 +238,7 @@ pub fn main(init:std.process.Init)!void{
     game.specimen=l;
     try game.specimen.?.sow(&game);
   }
+  // where the camera looks to start, and from how far
   const home=game.player.pos+m.v3(0,lookUp,0);
   const homeDist:f32=switch(sj){
     .wolf=>camDist,
@@ -170,23 +247,29 @@ pub fn main(init:std.process.Init)!void{
       .structure=>|k|ps.structures.defs.get(k).size,
     }),
   };
+  // the camera, turning round the subject
   var cam=Orbit.init(home,homeDist,camPitch);
   while(game.world.unmeshed()>0){
     if(!try loadFrame(&screenL,r,&input,&last,.ground,.{.done=whole-game.world.unmeshed(),.total=whole}))return;
     try renderer.syncWorld(r,&game.world,m.maxInt(u32),renderer.meshMs*8);
   }
+  // the panel's draw batch
   var ui:Draw=.{.gpa=gpa};
   defer ui.deinit();
+  // how many frames have run (for `--shot`)
   var frames:u32=0;
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
     frames+=1;
+    // the clock now, and the time since the last frame, capped (s)
     const now=glfw.getTime();
     const dt:f32=@floatCast(@min(now-last,maxDt));
     last=now;
+    // the swapchain's size this frame (px)
     const screen=r.extent();
     // the joints as last frame's camera saw them
+    // the wolf's joints as the camera sees them
     var rg:Rig=.{
       .view=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen},
       .bones=bonesOf(e.pose,game.player.heading()),
@@ -203,6 +286,7 @@ pub fn main(init:std.process.Init)!void{
     game.uiTime+=dt;
     game.time+=dt;
     game.cam.aspect=screen[0]/@max(screen[1],1);
+    // whether the mouse is over the panel, where the wheel scrolls the list
     const overUi=overList(screen,input.mouse[0],input.mouse[1]) or inTimeline(screen,input.mouse[0],input.mouse[1]);
     if(ctl.down(&input,.orbit))cam.turn(input.mouseDelta);
     if(input.scroll!=0 and !overUi)cam.zoom(input.scroll);
@@ -214,6 +298,7 @@ pub fn main(init:std.process.Init)!void{
     game.player.animate(&game.world,dt);
     try game.simulate(dt);
     try renderer.syncWorld(r,&game.world,6,renderer.meshMs);
+    // what the renderer draws this frame
     var scene=try ps.view.scene(&game,screen);
     rg=.{
       .view=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen},
@@ -223,11 +308,13 @@ pub fn main(init:std.process.Init)!void{
     ui.clear(@floatCast(game.uiTime));
     try e.draw(&ui,screen,&rg);
     scene.ui=ui.v.items;
+    // whether the window was resized since the last frame
     const resized=input.resized;
     input.resized=false;
     r.capture=shot and frames==shotFrames;
     try r.draw(&scene,resized);
     if(r.shot())|sh|{
+      // the frame encoded as a PNG
       const bytes=try engine.core.png.encode(gpa,sh.w,sh.h,sh.px,if(sh.bgra).bgra else.rgba);
       defer gpa.free(bytes);
       try Dir.cwd().createDirPath(io,"shots");
@@ -243,11 +330,14 @@ fn loadFrame(l:*loading.Loading,r:*Renderer,input:*Input,last:*f64,stage:loading
   glfw.pollEvents();
   input.update();
   if(r.window.shouldClose())return false;
+  // the clock now, and the time since the last frame, capped (s)
   const now=glfw.getTime();
   const dt=@min(now-last.*,maxDt);
   last.*=now;
   l.step(stage,at,@floatCast(dt));
+  // what the loading screen draws
   var scene=try l.scene(r.extent());
+  // whether the window was resized since the last frame
   const resized=input.resized;
   input.resized=false;
   try r.draw(&scene,resized);

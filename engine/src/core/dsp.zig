@@ -4,19 +4,26 @@
 //! `rate` (Hz) each unit keeps; nothing here touches a device, so a sound is
 //! built by chaining units (`Voice` shows how) and the platform's output
 //! pulls blocks of samples from it.
+/// the standard library
 const std=@import("std");
+/// the engine's maths: clamp, pow, tau, lerp
 const m=@import("math.zig");
+/// the seeded random numbers noise and crackle draw from
 const rng=@import("rng.zig");
+/// the test helpers
 const testing=std.testing;
+/// the allocator type a `Delay` takes
 const Allocator=std.mem.Allocator;
 /// the highest cutoff a filter takes, as a fraction of the sample rate (just
 /// under Nyquist, where the biquad's maths breaks down)
 const maxCutoff:f32=0.49;
 /// 0 dB is a gain of 1; every 20 dB is a factor of 10
 const dbPerDecade:f32=20;
-/// MIDI note 69 is A4, 440 Hz; 12 notes to the octave
+/// MIDI note 69 is A4: the note the tuning hangs from
 const a4Note:f32=69;
+/// A4's pitch, 440 Hz
 const a4Hz:f32=440;
+/// semitones to the octave, 12
 const notesPerOctave:f32=12;
 /// `softClip` reaches ±1 at ±3 and holds there
 const clipKnee:f32=3;
@@ -30,29 +37,49 @@ pub fn noteToHz(note:f32)f32{return a4Hz*m.pow(f32,2,(note-a4Note)/notesPerOctav
 /// a smooth saturator close to tanh: linear near 0, ±1 past ±3, so a loud
 /// mix bends instead of clipping hard
 pub fn softClip(x:f32)f32{
+  // the input held within the knee, where the curve meets ±1
   const c=m.clamp(x,-clipKnee,clipKnee);
   return c*(27+c*c)/(27+9*c*c);
 }
 /// `x` placed in stereo at `p` (-1 left, 0 centre, 1 right), equal power so
 /// it stays as loud wherever it sits: .{left, right}
 pub fn pan(x:f32,p:f32)[2]f32{
+  // the pan as an angle, 0 (all left) to a quarter turn (all right)
   const a=(m.clamp(p,-1,1)+1)*(m.pi/4.0);
   return.{x*@cos(a),x*@sin(a)};
 }
 /// the fractional part of a phase (wraps 0..1)
 inline fn wrap(t:f32)f32{return t-@floor(t);}
 // ---- sources ----
-pub const Shape=enum{sine,saw,square,triangle};
+/// the four waveforms an oscillator can sing
+pub const Shape=enum{
+  /// pure and round: a single tone
+  sine,
+  /// bright and buzzy: every harmonic, ramping up then dropping
+  saw,
+  /// hollow and reedy: odd harmonics, high half then low half
+  square,
+  /// soft and flute-like: odd harmonics, fading fast
+  triangle
+};
 /// a periodic waveform. `phase` runs 0..1 per cycle; saw and square are
 /// band-limited (polyBLEP) so high notes don't alias into whine.
 pub const Osc=struct{
+  /// samples a second (Hz)
   rate:f32,
+  /// which waveform it sings
   shape:Shape=.sine,
+  /// its pitch (Hz)
   freq:f32=a4Hz,
+  /// where in the cycle it stands, 0..1
   phase:f32=0,
+  /// the next sample, -1..1 (a touch past for the band-limited edges), and
+  /// the phase stepped on by one sample
   pub fn next(o:*Osc)f32{
+    // how far one sample moves the phase, and where it stands now
     const dt=o.freq/o.rate;
     const t=o.phase;
+    // the sample, shaped by the waveform
     const y=switch(o.shape){
       .sine=>@sin(m.tau*t),
       .saw=>2*t-1-blep(t,dt),
@@ -68,14 +95,21 @@ pub const Osc=struct{
 /// multiplies a sample instead of a `@sin`, for the many partials of a
 /// struck string or bell. Starts at phase 0, rising.
 pub const Sine=struct{
+  /// the recurrence's multiplier, 2cos(w)
   c:f32,
+  /// the last sample
   y1:f32=0,
+  /// the sample before it
   y2:f32,
+  /// a sine of `freq` Hz at `rate` samples a second (held under Nyquist)
   pub fn init(freq:f32,rate:f32)Sine{
+    // the angle one sample turns (radians)
     const w=m.tau*m.clamp(freq,0,maxCutoff*rate)/rate;
     return.{.c=2*@cos(w),.y2=-@sin(w)};
   }
+  /// the next sample, -1..1
   pub fn next(s:*Sine)f32{
+    // the new sample from the last two
     const y=s.c*s.y1-s.y2;
     s.y2=s.y1;
     s.y1=y;
@@ -86,10 +120,12 @@ pub const Sine=struct{
 /// sample each side, `dt` being one sample's phase step
 fn blep(t:f32,dt:f32)f32{
   if(t<dt){
+    // how far past the jump, in samples (0..1)
     const x=t/dt;
     return x+x-x*x-1;
   }
   if(t>1-dt){
+    // how far before the jump, in samples (-1..0)
     const x=(t-1)/dt;
     return x*x+x+x+1;
   }
@@ -98,28 +134,37 @@ fn blep(t:f32,dt:f32)f32{
 /// white noise in -1..1, the same stream for the same seed (wind, rustle,
 /// the attack of a pluck)
 pub const Noise=struct{
+  /// the generator the noise is drawn from
   r:rng.Rng,
+  /// a noise stream for `seed`
   pub fn init(seed:u64)Noise{return.{.r=.init(seed)};}
+  /// the next sample, -1..1
   pub fn next(n:*Noise)f32{return n.r.float()*2-1;}
 };
 /// sparse crackle: tiny bursts of noise ("grains") at random moments, each
 /// of random loudness and fading within a few milliseconds (dry leaves
 /// crushed, twigs, embers, rain on a leaf). `density` may change per sample.
 pub const Crackle=struct{
+  /// samples a second (Hz)
   rate:f32,
   /// grains per second, on average
   density:f32=0,
   /// how much a grain keeps per sample (from its fade time)
   fall:f32,
+  /// the generator grains and their loudness are drawn from
   r:rng.Rng,
+  /// how loud the current grain still is, 0..1
   level:f32=0,
   /// a grain falls ~63% in `grain` seconds
   pub fn init(seed:u64,grain:f32,rate:f32)Crackle{
     return.{.rate=rate,.fall=@exp(-1/@max(grain*rate,1)),.r=.init(seed)};
   }
+  /// the next sample: maybe a new grain begins, then the grain fades on;
+  /// noise scaled by its loudness, -1..1
   pub fn next(c:*Crackle)f32{
     if(c.r.float()<c.density/c.rate){
       // mostly soft grains, a few loud ones
+      // the new grain's loudness, squared below
       const a=c.r.float();
       c.level=@max(c.level,a*a);
     }
@@ -133,51 +178,85 @@ pub const Crackle=struct{
 pub const OnePole=struct{
   /// how far the state moves toward the input each sample (0..1; lower is darker)
   a:f32,
+  /// the filtered signal so far
   z:f32=0,
+  /// a filter whose -3 dB point sits at `cutoff` Hz
   pub fn init(cutoff:f32,rate:f32)OnePole{return.{.a=coeff(cutoff,rate)};}
   /// the coefficient whose -3 dB point sits at `cutoff` Hz
   pub fn coeff(cutoff:f32,rate:f32)f32{
     return 1-@exp(-m.tau*m.clamp(cutoff,0,maxCutoff*rate)/rate);
   }
+  /// the low-passed sample: the state drawn `a` of the way toward `x`
   pub fn low(p:*OnePole,x:f32)f32{
     p.z+=p.a*(x-p.z);
     return p.z;
   }
+  /// the high-passed sample: what the low pass leaves out
   pub fn high(p:*OnePole,x:f32)f32{return x-p.low(x);}
 };
 /// a value that glides to its `target` instead of jumping, so a gain or
 /// cutoff changed between blocks doesn't click ("zipper noise")
 pub const Smooth=struct{
+  /// where the value stands now
   value:f32,
+  /// where it is gliding to
   target:f32,
+  /// how far it moves toward the target each sample, 0..1
   a:f32,
   /// starts at `value`; `time` seconds to get ~63% of the way to a new target
   pub fn init(value:f32,time:f32,rate:f32)Smooth{
     return.{.value=value,.target=value,.a=1-@exp(-1/@max(time*rate,1))};
   }
+  /// the next value, one sample further along its glide
   pub fn next(s:*Smooth)f32{
     s.value+=s.a*(s.target-s.value);
     return s.value;
   }
 };
-pub const BiquadKind=enum{low,high,band,notch};
+/// what a biquad lets through
+pub const BiquadKind=enum{
+  /// what lies under the cutoff: darkens
+  low,
+  /// what lies over the cutoff: thins
+  high,
+  /// a band round the cutoff, as wide as `q` lets it
+  band,
+  /// all but a narrow band round the cutoff
+  notch
+};
 /// the workhorse two-pole filter, 12 dB/octave (RBJ cookbook, transposed
 /// direct form II). `q` is the resonance: 0.707 is flat, higher rings at
 /// the cutoff.
 pub const Biquad=struct{
-  b0:f32,b1:f32,b2:f32,a1:f32,a2:f32,
+  /// how much of this sample's input passes
+  b0:f32,
+  /// how much of the input one sample ago passes
+  b1:f32,
+  /// how much of the input two samples ago passes
+  b2:f32,
+  /// how much of the output one sample ago feeds back (subtracted)
+  a1:f32,
+  /// how much of the output two samples ago feeds back (subtracted)
+  a2:f32,
+  /// the filter's first carried state
   z1:f32=0,
+  /// its second carried state
   z2:f32=0,
+  /// a filter of `kind` at `cutoff` Hz with resonance `q`
   pub fn init(kind:BiquadKind,cutoff:f32,q:f32,rate:f32)Biquad{
+    // a filter passing everything, about to be tuned
     var f:Biquad=.{.b0=1,.b1=0,.b2=0,.a1=0,.a2=0};
     f.tune(kind,cutoff,q,rate);
     return f;
   }
   /// new coefficients, keeping the state so a sweep doesn't click
   pub fn tune(f:*Biquad,kind:BiquadKind,cutoff:f32,q:f32,rate:f32)void{
+    // the cutoff as an angle per sample (radians), and its cosine
     const w=m.tau*m.clamp(cutoff,1,maxCutoff*rate)/rate;
     const c=@cos(w);
+    // how wide the response is, from the resonance
     const alpha=@sin(w)/(2*@max(q,0.01));
+    // the input weights for this kind, not yet normalised
     const b:[3]f32=switch(kind){
       .low=>.{(1-c)/2,1-c,(1-c)/2},
       .high=>.{(1+c)/2,-(1+c),(1+c)/2},
@@ -185,6 +264,7 @@ pub const Biquad=struct{
       .band=>.{alpha,0,-alpha},
       .notch=>.{1,-2*c,1},
     };
+    // the output weight everything is divided by
     const a0=1+alpha;
     f.b0=b[0]/a0;
     f.b1=b[1]/a0;
@@ -192,7 +272,9 @@ pub const Biquad=struct{
     f.a1=-2*c/a0;
     f.a2=(1-alpha)/a0;
   }
+  /// the filtered sample for input `x`, the state carried on
   pub fn tick(f:*Biquad,x:f32)f32{
+    // the output, from this input and the carried state
     const y=f.b0*x+f.z1;
     f.z1=f.b1*x-f.a1*y+f.z2;
     f.z2=f.b2*x-f.a2*y;
@@ -203,21 +285,40 @@ pub const Biquad=struct{
 /// attack, decay, sustain, release: the loudness shape of one note, 0..1.
 /// `on` starts it, `off` lets it fade; it is `.idle` once silent.
 pub const Adsr=struct{
-  pub const Stage=enum{idle,attack,decay,sustain,release};
+  /// where a note's envelope stands
+  pub const Stage=enum{
+    /// silent, waiting for `on`
+    idle,
+    /// rising to full
+    attack,
+    /// falling to the sustain level
+    decay,
+    /// holding while the note is down
+    sustain,
+    /// fading to silence after `off`
+    release
+  };
+  /// samples a second (Hz)
   rate:f32,
-  /// seconds
+  /// seconds from silence to full level
   attack:f32=0.01,
+  /// seconds from full level down to the sustain level
   decay:f32=0.1,
   /// level held while the note is down, 0..1
   sustain:f32=0.7,
   /// seconds from full level to silence
   release:f32=0.3,
+  /// the loudness now, 0..1
   level:f32=0,
+  /// which part of its shape the envelope is in
   stage:Stage=.idle,
+  /// a note begins: rise from wherever it stands
   pub fn on(e:*Adsr)void{e.stage=.attack;}
+  /// the note is let go: fade from wherever it stands (an idle one stays idle)
   pub fn off(e:*Adsr)void{
     if(e.stage!=.idle)e.stage=.release;
   }
+  /// the next loudness, 0..1, moving the envelope on through its stages
   pub fn next(e:*Adsr)f32{
     switch(e.stage){
       .idle=>e.level=0,
@@ -253,31 +354,39 @@ pub const Adsr=struct{
 /// a ring of past samples: echoes, chorus, the start of a reverb. Owns its
 /// buffer (`deinit`).
 pub const Delay=struct{
+  /// the past samples, a ring
   buf:[]f32,
+  /// where the next sample is written
   at:usize=0,
   /// room for `max` samples of delay
   pub fn init(gpa:Allocator,max:usize)Allocator.Error!Delay{
+    // the ring, one longer than the longest delay, silent
     const buf=try gpa.alloc(f32,max+1);
     @memset(buf,0);
     return.{.buf=buf};
   }
+  /// frees the ring
   pub fn deinit(d:*Delay,gpa:Allocator)void{gpa.free(d.buf);}
   /// the sample written `delay` samples ago (fractional, interpolated;
   /// clamped to 1..max)
   pub fn read(d:Delay,delay:f32)f32{
+    // the ring's length, and the delay held within it
     const n=d.buf.len;
     const dl=m.clamp(delay,1,m.f(n-1));
+    // the whole samples back, and the two samples either side of the delay
     const whole=m.floorTo(usize,dl);
     const s0=d.buf[(d.at+n-whole)%n];
     const s1=d.buf[(d.at+n-whole-1)%n];
     return m.lerp(s0,s1,dl-m.f(whole));
   }
+  /// stores `x` as the newest sample, the ring turning on by one
   pub fn write(d:*Delay,x:f32)void{
     d.buf[d.at]=x;
     d.at=(d.at+1)%d.buf.len;
   }
   /// `read` then `write`: a plain delay of `delay` samples
   pub fn tick(d:*Delay,x:f32,delay:f32)f32{
+    // the delayed sample, read before this one overwrites the oldest
     const y=d.read(delay);
     d.write(x);
     return y;
@@ -287,10 +396,15 @@ pub const Delay=struct{
 /// one playable note, showing how the units chain: oscillator → low-pass →
 /// envelope → gain. A game's sounds are built the same way.
 pub const Voice=struct{
+  /// the sound's source
   osc:Osc,
+  /// the low pass that softens it
   filter:Biquad,
+  /// the loudness shape of the note
   env:Adsr,
+  /// the overall loudness, gliding to new settings
   gain:Smooth,
+  /// a silent voice of `shape` at `rate` samples a second
   pub fn init(rate:f32,shape:Shape)Voice{
     return.{
       .osc=.{.rate=rate,.shape=shape},
@@ -299,13 +413,23 @@ pub const Voice=struct{
       .gain=.init(0.2,0.01,rate),
     };
   }
+  /// starts a note at `freq` Hz
   pub fn play(v:*Voice,freq:f32)void{
     v.osc.freq=freq;
     v.env.on();
   }
+  /// lets the note go, to fade by its release
   pub fn stop(v:*Voice)void{v.env.off();}
   /// what a game sends a playing voice (`platform.audio.Output`)
-  pub const Cmd=union(enum){play:f32,stop,gain:f32};
+  pub const Cmd=union(enum){
+    /// start a note at this pitch (Hz)
+    play:f32,
+    /// let the note go
+    stop,
+    /// glide to this loudness
+    gain:f32
+  };
+  /// does what `cmd` says: play, stop, or change the loudness
   pub fn apply(v:*Voice,cmd:Cmd)void{
     switch(cmd){
       .play=>|hz|v.play(hz),
@@ -320,6 +444,7 @@ pub const Voice=struct{
   }
 };
 // ---- tests ----
+/// the sample rate the tests run at (Hz)
 const testRate:f32=48000;
 test"conversions"{
   try testing.expectApproxEqAbs(@as(f32,0.501),dbToGain(-6),0.001);
@@ -328,26 +453,34 @@ test"conversions"{
   try testing.expectApproxEqAbs(@as(f32,880),noteToHz(81),0.01);
   try testing.expectEqual(@as(f32,1),softClip(10));
   try testing.expectApproxEqAbs(@as(f32,0.1),softClip(0.1),0.001);
+  // a sound panned to the centre
   const c=pan(1,0);
   try testing.expectApproxEqAbs(@as(f32,1),c[0]*c[0]+c[1]*c[1],0.001);
 }
 test"sine at a quarter of the rate walks 0, 1, 0, -1"{
+  // a sine at a quarter of the rate: four samples a cycle
   var o:Osc=.{.rate=testRate,.freq=testRate/4};
   for([_]f32{0,1,0,-1})|want|try testing.expectApproxEqAbs(want,o.next(),0.001);
 }
 test"a recurrence sine follows @sin for seconds"{
+  // a recurrence sine
   var s:Sine=.init(1234,testRate);
   for(0..2*48000)|i|{
+    // what @sin gives for this sample
     const want=@sin(m.tau*1234*m.f(i+1)/testRate);
     try testing.expectApproxEqAbs(want,s.next(),0.01);
   }
 }
 test"band-limited saw and square stay bounded and centred"{
   for([_]Shape{.saw,.square,.triangle})|shape|{
+    // an oscillator of this shape, high enough to alias without its blep
     var o:Osc=.{.rate=testRate,.shape=shape,.freq=3001};
+    // the samples summed, to find their centre
     var sum:f32=0;
+    // a second's worth of samples
     const n=48000;
     for(0..n)|_|{
+      // this sample
       const y=o.next();
       try testing.expect(@abs(y)<=1.2);
       sum+=y;
@@ -356,23 +489,29 @@ test"band-limited saw and square stay bounded and centred"{
   }
 }
 test"noise repeats for a seed"{
+  // two noise streams from the same seed
   var a:Noise=.init(7);
   var b:Noise=.init(7);
   for(0..64)|_|{
+    // this sample
     const y=a.next();
     try testing.expect(@abs(y)<=1);
     try testing.expectEqual(y,b.next());
   }
 }
 test"crackle is silent without grains, sparse with them, repeats for a seed"{
+  // a crackle with grains a millisecond long, no grains yet
   var a:Crackle=.init(3,0.001,testRate);
   for(0..4800)|_|try testing.expectEqual(@as(f32,0),a.next());
   a.density=100;
+  // a copy, which must crackle the same
   var b=a;
-  // a grain is loud for a few samples, then gone: count where one starts
+  // a grain is loud for a few samples, then gone: count where one starts,
+  // and how many samples are quiet
   var loud:usize=0;
   var quiet:usize=0;
   for(0..48000)|_|{
+    // this sample
     const y=a.next();
     try testing.expectEqual(y,b.next());
     try testing.expect(@abs(y)<=1);
@@ -383,8 +522,10 @@ test"crackle is silent without grains, sparse with them, repeats for a seed"{
   try testing.expect(quiet>24000);
 }
 test"one-pole low passes DC, high blocks it"{
+  // a low pass and a high pass at 100 Hz
   var lo:OnePole=.init(100,testRate);
   var hi:OnePole=.init(100,testRate);
+  // their last outputs on a steady input
   var l:f32=0;
   var h:f32=1;
   for(0..testRate)|_|{
@@ -395,8 +536,10 @@ test"one-pole low passes DC, high blocks it"{
   try testing.expectApproxEqAbs(@as(f32,0),h,0.001);
 }
 test"biquad low passes DC and stops Nyquist; high the reverse"{
+  // a low pass and a high pass at 1 kHz
   var lo:Biquad=.init(.low,1000,0.707,testRate);
   var hi:Biquad=.init(.high,1000,0.707,testRate);
+  // their last outputs on a steady input
   var lDc:f32=0;
   var hDc:f32=1;
   for(0..4800)|_|{
@@ -407,9 +550,11 @@ test"biquad low passes DC and stops Nyquist; high the reverse"{
   try testing.expectApproxEqAbs(@as(f32,0),hDc,0.001);
   lo=.init(.low,1000,0.707,testRate);
   hi=.init(.high,1000,0.707,testRate);
+  // their loudest outputs on the fastest wave there is
   var lNy:f32=0;
   var hNy:f32=0;
   for(0..4800)|i|{
+    // a sample of that wave, flipping every sample
     const x:f32=if(i%2==0)1 else-1;
     lNy=@max(lNy*0.99,@abs(lo.tick(x)));
     hNy=@abs(hi.tick(x));
@@ -418,6 +563,7 @@ test"biquad low passes DC and stops Nyquist; high the reverse"{
   try testing.expectApproxEqAbs(@as(f32,1),hNy,0.01);
 }
 test"adsr rises, holds, fades to idle"{
+  // a quick envelope at 1000 samples a second
   var e:Adsr=.{.rate=1000,.attack=0.01,.decay=0.01,.sustain=0.5,.release=0.01};
   e.on();
   for(0..10)|_|_=e.next();
@@ -431,10 +577,13 @@ test"adsr rises, holds, fades to idle"{
   try testing.expectEqual(@as(f32,0),e.level);
 }
 test"delay returns an impulse after its length"{
+  // a delay of up to 16 samples
   var d:Delay=try.init(testing.allocator,16);
   defer d.deinit(testing.allocator);
+  // when the impulse came back
   var got:?usize=null;
   for(0..20)|i|{
+    // this sample out, five samples behind
     const y=d.tick(if(i==0)1 else 0,5);
     if(y==1)got=i;
   }
@@ -445,12 +594,15 @@ test"delay returns an impulse after its length"{
   try testing.expectApproxEqAbs(@as(f32,0.5),d.read(1.5),0.001);
 }
 test"a voice sounds while held and falls silent after release"{
+  // a saw voice
   var v:Voice=.init(testRate,.saw);
+  // a block of samples, silent to start
   var buf:[480]f32=@splat(0);
   v.render(&buf);
   try testing.expectEqual(@as(f32,0),buf[100]);
   v.play(220);
   v.render(&buf);
+  // the loudest sample in the block
   var peak:f32=0;
   for(buf)|s|peak=@max(peak,@abs(s));
   try testing.expect(peak>0.05);

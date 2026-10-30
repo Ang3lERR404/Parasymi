@@ -5,9 +5,14 @@
 //! it needs celestial energy: outside a bloom's field it withers, its
 //! pieces loosening and sinking as its light dims.
 const lib=@import("../../lib.zig");
+/// the species registry: what a species is
 const species=lib.species;
+/// the engine package, reached through the hub
 const engine=lib.engine;
+/// colour types, for its genome's dusk violet and evening gold
 const color=engine.core.color;
+/// the vesper bloom: a convergent star of lumenroot and thornleech that
+/// shares and drains, and withers outside a bloom's field
 pub const def:species.Species=.{
   .lineage=.convergent,.seed=.seedVesper,
   .matureTime=16,.manaCap=24,.leyDraw=0.8,.share=0.6,.drain=0.8,.yield=0.4,
@@ -17,7 +22,7 @@ pub const def:species.Species=.{
   .sway=0.5,
   .genome=.{
     .form=.star,
-    // stem_h: how high its core hangs over its tile (it has no stem)
+    // stemH: how high its core hangs over its tile (it has no stem)
     .stemH=0.62,.stemR=0.03,.segments=4,.curl=0.05,.wobble=0.1,
     // its leaves float free beneath it, one of each lineage's in turn
     .leaves=5,.leafLen=0.28,.leafW=0.07,.leafDroop=0.5,

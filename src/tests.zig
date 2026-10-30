@@ -1,4 +1,5 @@
 //! pure-logic test root: no window, no GPU (the engine's own tests run beside these).
+/// the import hub, through which every module's tests are reached
 const lib=@import("lib.zig");
 test{
   _=lib.txt;

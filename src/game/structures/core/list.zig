@@ -1,21 +1,39 @@
 //! every structure in the garden: the list, its tile index, placing and uprooting.
 const lib=@import("../../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type placing a structure may fail with
 const Allocator=std.mem.Allocator;
+/// the engine package
 const engine=lib.engine;
+/// all the maths: here, the way a structure faces
 const m=engine.core.math;
+/// the garden's world of chunks, whose tiles a footprint marks
 const World=lib.world.World;
+/// a placed structure's slot in the list
 const Id=lib.structures.Id;
+/// which kind of structure
 const Kind=lib.structures.Kind;
+/// what fills a tile, as a footprint marks it
 const Occ=lib.structures.Occ;
+/// a structure as another holds on to it: by tile
 const Ref=lib.structures.Ref;
+/// one placed structure
 const Structure=lib.structures.structure.Structure;
+/// the default `ground`: any tile will do
 const anyTile=lib.structures.structure.anyTile;
+/// every kind's `def`
 const defs=lib.structures.defs;
+/// a kind's state, fresh
 const freshState=lib.structures.structure.freshState;
+/// the structures registry: which kinds have which hooks
 const reg=lib.structures.reg;
+/// an id once a slot before it is taken out
 const slotDown=lib.structures.structure.slotDown;
+/// every structure standing in the garden, in the order put down (the
+/// order they tick in), with the indexes kept beside it
 pub const Structures=struct{
+  /// the structures themselves; an `Id` is a place in this list
   list:std.ArrayList(Structure)=.empty,
   /// a structure waiting to be paired with another (a sporecaster
   /// choosing where it sends): the next one configured
@@ -26,14 +44,21 @@ pub const Structures=struct{
   /// beside `list`: each structure's first child and next sibling, in list
   /// order (`getChildren`); never saved, `relink` rebuilds it
   kin:std.ArrayList(Kin)=.empty,
+  /// one structure's place among kin: its `first` child and the `next`
+  /// sibling after it (null: none)
   pub const Kin=struct{first:?Id=null,next:?Id=null};
+  /// frees every structure's state and the lists and index themselves
   pub fn deinit(ss:*Structures,gpa:Allocator)void{
     for(ss.list.items)|*s|s.deinit(gpa);
     ss.list.deinit(gpa);
     ss.where.deinit(gpa);
     ss.kin.deinit(gpa);
   }
+  /// the structure at slot `id`, to read or change in place
   pub fn get(ss:*Structures,id:Id)*Structure{return&ss.list.items[id.idx()];}
+  /// whether a structure of kind `k` may go down at tile `wx`,`wy`: a
+  /// floater over any streamed tile without another floater, anything
+  /// else on a footprint free and of ground it may stand on
   pub fn canPlace(ss:*const Structures,w:*const World,wx:i32,wy:i32,k:Kind)bool{
     if(defs.get(k).floating){
       // over any tile, whatever stands on it, but not over another
@@ -44,8 +69,12 @@ pub const Structures=struct{
       inline else=>|t|w.footprintFree(wx,wy,defs.get(t).size,if(comptime reg.has(t,"ground"))reg.module(t).ground else anyTile),
     };
   }
+  /// put a fresh structure of kind `k` down at `wx`,`wy`, facing `dir`,
+  /// marking its footprint (unless it floats) and indexing it. Returns
+  /// false, changing nothing, if it may not go there.
   pub fn place(ss:*Structures,gpa:Allocator,w:*World,wx:i32,wy:i32,k:Kind,dir:m.Dir,seed:f32)Allocator.Error!bool{
     if(!ss.canPlace(w,wx,wy,k))return false;
+    // the slot it will take: the end of the list
     const idx=Id.of(ss.list.items.len);
     try ss.list.ensureUnusedCapacity(gpa,1);
     try ss.kin.ensureUnusedCapacity(gpa,1);
@@ -61,6 +90,7 @@ pub const Structures=struct{
   /// `relink`. Returns whether it fit (if not, `s` is still the caller's).
   pub fn restore(ss:*Structures,gpa:Allocator,w:*World,s:Structure)Allocator.Error!bool{
     if(!try ss.place(gpa,w,s.x,s.y,s.kind(),s.dir,s.seed))return false;
+    // the fresh one just put down, overwritten by the saved one
     const put=&ss.list.items[ss.list.items.len-1];
     put.deinit(gpa);
     put.*=s;
@@ -73,6 +103,7 @@ pub const Structures=struct{
   }
   /// a structure the gardener has just put down starts as a sprout.
   pub fn sprout(ss:*Structures,id:Id)void{
+    // the one just put down
     const s=ss.get(id);
     if(s.def().grow>0)s.grown=0;
   }
@@ -95,12 +126,15 @@ pub const Structures=struct{
   /// structure so its contents can be refunded; the caller `deinit`s it.
   /// note to CLAUDE, I changed the code, it is bad to do repeated get calls.
   pub fn remove(ss:*Structures,w:*World,id:Id)Structure{
+    // a copy of the one uprooted, handed back at the end
     const s=ss.get(id).*;
     // calls should always be at the top;
+    // its kind's def (footprint, floating), and its slot in the list
     const stct=s.def();
     const idx=id.idx();
     // it leaves its parent, and what depended on it is cut loose
     ss.setParent(id,null);
+    // the child being cut loose, walked along the sibling links
     var c=ss.kin.items[idx].first;
     while(c)|k|{
       c=ss.kin.items[k.idx()].next;
@@ -115,6 +149,7 @@ pub const Structures=struct{
     // each after it is one slot down: its tiles, where it is found, and the
     // child lists naming it (still in list order, as all move alike)
     for(ss.list.items[idx..],idx..)|*l,k|{
+      // the def of the one moving down
       const lstct=l.def();
       if(!lstct.floating)w.moveFootprint(l.x,l.y,lstct.size,Occ.structure(Id.of(k)));
       ss.where.getPtr(l.ref()).?.*=Id.of(k);
@@ -129,38 +164,72 @@ pub const Structures=struct{
     if(ss.pairing)|p|if(p.eql(gone)){ss.pairing=null;};
     return s;
   }
+  /// pair one structure with another as its kind pairs
   pub const pairWith=lib.structures.partners.pairWith;
+  /// cut the structure at a tile from one partner
   pub const letGo=lib.structures.partners.letGo;
+  /// cut a structure from all its partners
   pub const unpair=lib.structures.partners.unpair;
+  /// the configure handshake of a structure that pairs
   pub const pairStep=lib.structures.partners.pairStep;
+  /// the first a structure was paired with
   pub const getPartner=lib.structures.partners.getPartner;
+  /// every structure one is paired with, oldest first
   pub const getPartners=lib.structures.partners.getPartners;
+  /// every structure paired with one
   pub const pairedTo=lib.structures.partners.pairedTo;
+  /// the walk over a structure's partners
   pub const Partners=lib.structures.partners.Partners;
+  /// the walk over those paired with a structure
   pub const Paired=lib.structures.partners.Paired;
+  /// the structure a `Ref` names, if it still stands
   pub const find=lib.structures.kin.find;
+  /// make one structure depend on another, or on nothing
   pub const setParent=lib.structures.kin.setParent;
+  /// thread a child into its parent's children
   pub const join=lib.structures.kin.join;
+  /// take a child out of its parent's children
   pub const leave=lib.structures.kin.leave;
+  /// put a structure down already a child
   pub const spawnChild=lib.structures.kin.spawnChild;
+  /// make one depend on another, if the parent adopts it
   pub const dependOn=lib.structures.kin.dependOn;
+  /// cut a child loose from its parent
   pub const detach=lib.structures.kin.detach;
+  /// the structure one depends on
   pub const getParent=lib.structures.kin.getParent;
+  /// every structure depending on one
   pub const getChildren=lib.structures.kin.getChildren;
+  /// the `n`th child of one
   pub const getChild=lib.structures.kin.getChild;
+  /// how many depend on one
   pub const childCount=lib.structures.kin.childCount;
+  /// the walk over a structure's children
   pub const Children=lib.structures.kin.Children;
+  /// how many of an item a structure will still take
   pub const wants=lib.structures.dispatch.wants;
+  /// what may leave a structure first
   pub const output=lib.structures.dispatch.output;
+  /// hand one item into a structure at an edge
   pub const handIn=lib.structures.dispatch.handIn;
+  /// tell a structure something
   pub const send=lib.structures.dispatch.send;
+  /// everything that may leave a structure
   pub const outputs=lib.structures.dispatch.outputs;
+  /// the walk over what may leave a structure
   pub const Outputs=lib.structures.dispatch.Outputs;
+  /// whether an item may leave a structure
   pub const gives=lib.structures.dispatch.gives;
+  /// put items into a structure, as many as it wants
   pub const insert=lib.structures.dispatch.insert;
+  /// witness the lineages' meetings
   pub const meetings=lib.structures.dispatch.meetings;
+  /// every structure notices its neighbours
   pub const link=lib.structures.dispatch.link;
+  /// `link` with the game's whole context
   pub const linkWith=lib.structures.dispatch.linkWith;
+  /// a tick with only the garden
   pub const tick=lib.structures.dispatch.tick;
+  /// a tick with the game's whole context
   pub const tickWith=lib.structures.dispatch.tickWith;
 };

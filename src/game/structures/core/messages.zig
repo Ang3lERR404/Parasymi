@@ -1,7 +1,10 @@
 //! what structures tell each other (`Msg`, `Reply`) and how a kind pairs.
 const lib=@import("../../../lib.zig");
+/// what can be held: item kinds and stacks of them
 const items=lib.items;
+/// which kind of structure
 const Kind=lib.structures.Kind;
+/// the structures registry, for asking a kind's `pairs`
 const reg=lib.structures.reg;
 /// what one structure tells another (`Structures.send`): taken at once by
 /// the other's `message` hook, nothing left pending (so nothing is saved).
@@ -20,6 +23,7 @@ pub const Msg=union(enum){
 pub const Reply=union(enum){
   /// nothing: it does not take that message
   ignored,
+  /// heard and acted on, with nothing to hand back
   done,
   /// how many of what `arrived` it took in
   took:u16,
@@ -31,10 +35,19 @@ pub const Reply=union(enum){
 pub const Pairs=struct{way:Way=.oneWay,with:?Kind=null,most:u8=1};
 /// the most partners any structure keeps
 pub const partnerSlots=4;
-pub const Way=enum{oneWay,bothWays};
+/// which way a pairing runs
+pub const Way=enum{
+  /// one sends, its partner receives
+  oneWay,
+  /// each is the other's partner
+  bothWays
+};
+/// how kind `k` pairs, or null if it never does; checked at compile time
+/// that its `most` lies in 1..`partnerSlots`
 pub fn pairsOf(k:Kind)?Pairs{
   return switch(k){
     inline else=>|t|if(comptime reg.has(t,"pairs"))blk:{
+      // the kind's pairing, as it declares it
       const p:Pairs=reg.module(t).pairs;
       if(comptime p.most<1 or p.most>partnerSlots)@compileError(@tagName(t)++": pairs.most must be 1..PARTNERS");
       break:blk p;

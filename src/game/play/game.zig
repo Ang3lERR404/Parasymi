@@ -1,71 +1,134 @@
 //! the game: what it owns, starting and ending it, and the fixed-tick step.
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type the game is built with
 const Allocator=std.mem.Allocator;
+/// the engine package
 const engine=lib.engine;
+/// all the maths: vectors, tiles, facings
 const m=engine.core.math;
+/// the seeded random stream
 const Rng=engine.core.rng.Rng;
+/// the chunk layer: coordinates, tiles, chunks
 const ck=lib.ck;
+/// world generation: a tile's kind and height before it is streamed
 const gen=lib.gen;
+/// the garden's streamed world of chunks
 const World=lib.world.World;
+/// every plant growing in the garden
 const Plants=lib.plants.Plants;
+/// the ecology: the tick that grows, spreads and drains
 const ecology=lib.ecology;
+/// the ecology's own state, kept between ticks
 const Ecology=ecology.Ecology;
+/// what can be held: item kinds
 const items=lib.items;
+/// what the gardener has understood
 const prog=lib.progression;
+/// every player-facing string
 const txt=lib.txt;
+/// the engine's camera module
 const camera=engine.render.camera;
+/// the camera orbiting the wolf
 const Camera=camera.Camera;
+/// the garden's renderer: its plant meshes and stats
 const renderer=lib.renderer;
+/// the vertex layouts, for a plant's instance
 const vertex=lib.vertex;
+/// the UI's draw batch, which the HUD fills
 const Draw=engine.ui.draw.Draw;
+/// the sky: day and night, and the starfall
 const skyMod=lib.sky;
+/// the player module
 const playerMod=lib.player;
+/// the vine-wolf the gardener plays
 const Player=playerMod.Player;
+/// the scene's list of moving parts
 const Parts=lib.parts.Parts;
+/// weaving: the queue of recipes woven by hand
 const craft=lib.craft;
+/// the structures registry: every structure standing
 const st=lib.structures;
+/// convergence: lineages meeting into something new
 const convergence=lib.convergence;
+/// the HUD: rows, picks, the sapling
 const hud=lib.hud;
+/// the settings
 const options=lib.options;
+/// saving: gardens' names and entries
 const save=lib.save;
+/// one thing alone, its state set by hand (`--plant`/`--structure`)
 const Specimen=lib.specimen.Specimen;
+/// how many hotbar slots there are
 const barSlots=lib.play.barSlots;
+/// what a frame or a build may fail with: running out of memory
 const Error=lib.play.Error;
+/// what the cursor may carry
 const Held=lib.play.Held;
+/// the most catch-up ticks a frame may run
 const maxCatchup=lib.play.maxCatchup;
+/// what has the wolf's attention
 const Mode=lib.play.Mode;
+/// ground picking: how far the ray reaches, as times the camera's distance
 const pickRangeMult=lib.play.pickRangeMult;
+/// ground picking: the ray's step (metres)
 const pickStep=lib.play.pickStep;
+/// what only main can do
 const Request=lib.play.Request;
+/// the spawn search's radius (tiles)
 const spawnSearch=lib.play.spawnSearch;
+/// the spawn search's step (tiles)
 const spawnStep=lib.play.spawnStep;
+/// how many chunks stream in the first call
 const streamInit=lib.play.streamInit;
+/// how many rings of chunks are streamed round the gardener
 const streamRadius=lib.play.streamRadius;
+/// one simulation tick (s)
 const tickTime=lib.play.tickTime;
+/// the whole playable game: the garden and all that lives in it, the wolf,
+/// progression, the camera and sky, the HUD and what it points at, and the
+/// clocks that run them.
 pub const Game=struct{
+  /// the allocator everything the game owns is made with
   gpa:Allocator,
+  /// the streamed world of chunks: tiles, heights, occupancy
   world:World,
+  /// every plant growing in the garden
   plants:Plants=.{},
+  /// every structure standing in the garden
   structs:st.Structures=.{},
+  /// the ecology's state between ticks
   eco:Ecology=.{},
   /// the standing fields of celestial energy (halos), gathered each tick
   fields:std.ArrayList(ecology.Field)=.empty,
+  /// convergence's search for lineages meeting
   converge:convergence.Seeker=.{},
+  /// what the gardener has understood, and the message log
   prog:prog.Progression=.{},
+  /// the camera: following, in the wolf's eyes, or flying free
   cam:Camera=.{},
+  /// the sky: the hour, day and night
   sky:skyMod.Sky=.{},
+  /// the starlight falling at night, as motes
   stars:skyMod.Starfall,
+  /// the vine-wolf: where it stands, its belly, its pose
   player:Player,
+  /// the game's own random stream, seeded from the world's seed
   rng:Rng,
+  /// the scene's moving parts, refilled each frame
   parts:Parts,
+  /// the HUD's draw batch, rebuilt each frame
   ui:Draw,
   /// what a click on the HUD would land on, as drawn last frame
   rows:hud.Rows=.{},
   /// the HUD area under the mouse this frame (panels show what it points at)
   pointed:?hud.Pick=null,
+  /// the research sapling's growth, kept between frames
   sapling:hud.Sapling=.{},
+  /// the queue of recipes woven by hand
   weave:craft.Crafter=.{},
+  /// what has the wolf's attention now
   mode:Mode=.roam,
   /// something only main can do (it owns the window and the file system).
   request:?Request=null,
@@ -77,27 +140,33 @@ pub const Game=struct{
   slot:?save.Name=null,
   /// seconds played since the garden was last saved (autosave counts these)
   sinceSave:f64=0,
-  /// the saved gardens menu: its list (main fills it on `.list`, at
-  /// `listed_at` in UI time), the chosen row (0: a fresh garden, else
-  /// `gardens[i - 1]`), whether saving over it (or letting it go) was
-  /// asked once already, and the first row in view (wanted, and eased toward)
+  /// the saved gardens menu: its list (main fills it on `.list`)
   gardens:std.ArrayList(save.Entry)=.empty,
+  /// when the list was filled, in UI time (s), so ages keep counting up
   listedAt:f64=0,
+  /// the chosen row: 0 a fresh garden, else `gardens[i - 1]`
   garden:usize=0,
+  /// saving over the chosen garden was asked once already (the next SAVE does it)
   overwrite:bool=false,
+  /// letting the chosen garden go was asked once already (the next DELETE does it)
   deleting:bool=false,
-  /// the name prompt: the name typed so far, and the mode it returns to
+  /// the name prompt: the name typed so far
   typed:save.Name=.{},
+  /// the mode the name prompt returns to
   namingFrom:Mode=.roam,
+  /// the first garden row in view, as wanted (scrolled by wheel or stem)
   gardenTop:f32=0,
+  /// the first garden row in view, eased toward `gardenTop`
   gardenAt:f32=0,
   /// the list's scroll groove is held (dragged)
   scrolling:bool=false,
   /// keeps running while paused, so the UI still breathes.
   uiTime:f64=0,
-  /// the hotbar's items and the selected slot
+  /// the hotbar's items
   bar:[barSlots]?items.Item=@splat(null),
+  /// the selected hotbar slot
   hot:usize=0,
+  /// what the cursor carries, if anything
   held:?Held=null,
   /// the tile of the structure whose panel is open (mode `.structure`); a
   /// tile, not an id, since ids move when a structure is removed
@@ -115,28 +184,46 @@ pub const Game=struct{
   /// the cursor; picking a seed takes the picked thing's)
   placeDir:m.Dir=0,
   /// remove, held: the tile last removed from (it is not removed from
-  /// again until the cursor leaves it) and the wait before the next
+  /// again until the cursor leaves it)
   removed:?[2]i32=null,
+  /// the wait (s) before remove, held, removes the next tile
   removeCd:f32=0,
+  /// the debug card is shown
   debug:bool=false,
+  /// the tile under the cursor, if any
   hover:?[2]i32=null,
-  /// progress of the current gather, and a short linger for one-off gestures
+  /// how far the current gather has come (s)
   gatherT:f32=0,
+  /// a short linger (s) for one-off gestures: the wolf keeps facing where it happened
   linger:f32=0,
+  /// the wait (s) before the next thing is put down as the cursor sweeps
   plantCd:f32=0,
+  /// the belly-full warning has been said for this press of remove
   fullWarned:bool=false,
+  /// seconds of the world moving (not while frozen), for structures' turns
   time:f64=0,
+  /// unspent time (s) carried to the next fixed tick
   acc:f64=0,
+  /// how long the simulation took this frame (ms), eased
   simMs:f32=0,
+  /// how long a frame takes (ms), eased
   frameMs:f32=16,
+  /// how many fixed ticks have run
   ticks:u64=0,
+  /// the plant instances to draw this frame, one list per plant mesh
   inst:[renderer.plantMeshes]std.ArrayList(vertex.PlantInstance)=@splat(.empty),
+  /// the chunks streamed far enough away to let go, gathered each frame
   far:std.ArrayList(*ck.Chunk)=.empty,
+  /// the renderer's numbers from last frame
   renderStats:renderer.Stats=.{},
   /// `--plant`/`--structure`: one thing alone, its state set by hand (see
   /// specimen.zig); nothing else falls, grows or is drawn
   specimen:?Specimen=null,
+  /// a fresh game on world `seed`: the wolf set down on the first fertile
+  /// tile found spiralling out from the origin, the chunks round it streamed,
+  /// and the waking messages said.
   pub fn init(gpa:Allocator,seed:u64)Error!Game{
+    // the game being built
     var g:Game=.{
       .gpa=gpa,
       .world=World.init(gpa,seed),
@@ -148,10 +235,13 @@ pub const Game=struct{
     };
     errdefer g.deinit();
     // start on dry land: spiral out from the origin until a fertile tile shows up.
+    // the ring being searched (tiles from the origin)
     var r:i32=0;
     find:while(r<spawnSearch):(r+=spawnStep){
+      // the step along the ring
       var a:i32=-r;
       while(a<=r):(a+=spawnStep){
+        // the tile's row, and what generation makes of it
         const z=r-@divFloor(r,2);
         const s=gen.sample(seed,a,z);
         if(s.kind.fertile()){
@@ -166,6 +256,7 @@ pub const Game=struct{
     g.prog.say(txt.s.msg.nightHint,.{});
     return g;
   }
+  /// frees everything the game owns.
   pub fn deinit(g:*Game)void{
     g.gardens.deinit(g.gpa);
     for(&g.inst)|*l|l.deinit(g.gpa);
@@ -179,20 +270,26 @@ pub const Game=struct{
     g.structs.deinit(g.gpa);
     g.world.deinit();
   }
+  /// the chunk the wolf stands in
   pub fn focus(g:*const Game)ck.Coord{
+    // the tile the wolf stands on
     const t=m.tileAt(g.player.pos);
     return ck.Coord.ofTile(t[0],t[1]);
   }
+  /// the ground's height at tile (`wx`, `wy`): the streamed chunk's, else generation's
   pub fn heightAt(g:*const Game,wx:i32,wy:i32)f32{
     if(g.world.chunkOfTile(wx,wy))|c|return c.height[ck.localIndex(wx,wy)];
     return gen.heightAt(g.world.seed,wx,wy);
   }
   /// march the ray through the cursor until it dips below the terraced ground.
   pub fn pick(g:*const Game,cursor:[2]f32,screen:[2]f32)?[2]i32{
+    // the ray through the cursor, and how far along it the march has come
     const ray=g.cam.ray(cursor[0],cursor[1],screen[0],screen[1]);
     var t:f32=0;
+    // how far the march goes at most
     const maxT=g.cam.dist*pickRangeMult;
     while(t<maxT):(t+=pickStep){
+      // the point reached, and the tile under it
       const p=ray.o+ray.d*m.splat3(t);
       const tile=m.tileAt(p);
       if(p[1]<=g.heightAt(tile[0],tile[1]))return tile;
@@ -204,7 +301,7 @@ pub const Game=struct{
   pub fn structCtx(g:*Game,ev:lib.ecology.Events)st.Ctx{
     return.{.gpa=g.gpa,.w=&g.world,.plants=&g.plants,.g=&g.prog,.ss=&g.structs,.player=&g.player,.sky=&g.sky,.events=ev};
   }
-  /// fixed-step simulation; never more than `MAX_CATCHUP` ticks per frame.
+  /// fixed-step simulation; never more than `maxCatchup` ticks per frame.
   pub fn simulate(g:*Game,frameDt:f64)Error!void{
     if(!g.mode.live())return;
     g.acc=@min(g.acc+frameDt,tickTime*maxCatchup);
@@ -218,10 +315,12 @@ pub const Game=struct{
       g.ticks+=1;
       return;
     };
+    // the modifiers this tick: progression's, the night, the standing fields
     var mods=g.prog.mods();
     mods.night=1-g.sky.daylight();
     try st.fields(&g.structs,g.gpa,&g.fields);
     mods.fields=g.fields.items;
+    // what befell the garden this tick
     const ev=try g.eco.tick(g.gpa,&g.plants,&g.world,mods,tickTime);
     try g.converge.tick(g.gpa,&g.world,&g.plants,&g.structs,&g.prog);
     g.prog.absorb(ev,tickTime);
@@ -229,35 +328,66 @@ pub const Game=struct{
     if(g.specimen)|*sp|try sp.after(g,tickTime);
     g.ticks+=1;
   }
+  /// one frame of play (`frame.update`)
   pub const update=lib.play.frame.update;
+  /// what the arsthraxia's sound plays now (`belly.arsthraxiaState`)
   pub const arsthraxiaState=lib.play.belly.arsthraxiaState;
+  /// the view is in the wolf's eyes, its head hidden (`belly.headless`)
   pub const headless=lib.play.belly.headless;
+  /// whether the cursor carries a given thing (`belly.holds`)
   pub const holds=lib.play.belly.holds;
+  /// whether the mouse is over a given HUD row (`belly.points`)
   pub const points=lib.play.belly.points;
+  /// UI seconds, wrapped small for sway (`belly.uiT`)
   pub const uiT=lib.play.belly.uiT;
+  /// the selected hotbar item (`belly.selected`)
   pub const selected=lib.play.belly.selected;
+  /// what the cursor carries (`belly.carried`)
   pub const carried=lib.play.belly.carried;
+  /// the item a carried slot holds (`belly.itemOf`)
   pub const itemOf=lib.play.belly.itemOf;
+  /// the structure whose panel is open (`belly.opened`)
   pub const opened=lib.play.belly.opened;
+  /// a slot of the open structure (`belly.storeSlot`)
   pub const storeSlot=lib.play.belly.storeSlot;
+  /// a click on a belly slot (`belly.clickSlot`)
   pub const clickSlot=lib.play.belly.clickSlot;
+  /// a click on a slot of the open structure (`belly.clickStore`)
   pub const clickStore=lib.play.belly.clickStore;
+  /// a click on a hotbar slot (`belly.clickBar`)
   pub const clickBar=lib.play.belly.clickBar;
+  /// put down what is carried anywhere but a slot (`belly.drop`)
   pub const drop=lib.play.belly.drop;
+  /// throw away a belly stack (`belly.discard`)
   pub const discard=lib.play.belly.discard;
+  /// move a stack straight across (`belly.moveAcross`)
   pub const moveAcross=lib.play.belly.moveAcross;
+  /// put a carried stack down on a slot (`belly.putDown`)
   pub const putDown=lib.play.belly.putDown;
+  /// the frozen world's menus, each frame (`menus.menu`)
   pub const menu=lib.play.menus.menu;
+  /// does what a pause row says (`menus.choose`)
   pub const choose=lib.play.menus.choose;
+  /// opens the saved gardens (`menus.openGardens`)
   pub const openGardens=lib.play.menus.openGardens;
+  /// main has listed the gardens (`menus.listed`)
   pub const listed=lib.play.menus.listed;
+  /// how far the gardens list scrolls (`menus.gardenScroll`)
   pub const gardenScroll=lib.play.menus.gardenScroll;
+  /// scrolls the gardens list (`menus.scroll`)
   pub const scroll=lib.play.menus.scroll;
+  /// a saved gardens button (`menus.gardenAct`)
   pub const gardenAct=lib.play.menus.gardenAct;
+  /// asks for the name of the garden to save (`menus.startNaming`)
   pub const startNaming=lib.play.menus.startNaming;
+  /// the name prompt's typing (`menus.typeName`)
   pub const typeName=lib.play.menus.typeName;
+  /// whether the typed name is taken (`menus.nameTaken`)
   pub const nameTaken=lib.play.menus.nameTaken;
+  /// OK on the name prompt (`menus.nameChosen`)
   pub const nameChosen=lib.play.menus.nameChosen;
+  /// enter or leave the free camera (`menus.inspect`)
   pub const inspect=lib.play.menus.inspect;
+  /// the free camera's flying (`menus.fly`)
   pub const fly=lib.play.menus.fly;
 };

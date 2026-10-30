@@ -9,79 +9,125 @@
 //! A spore whose caster is gone turns home and gives back what it carried;
 //! one whose caster is full hangs over it until there is room.
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
+/// the test harness: allocator and expectations
 const testing=std.testing;
+/// all the maths: vectors, matrices, easing
 const m=lib.engine.core.math;
+/// colour conversions, for tinting a spore by what it carries
 const color=lib.engine.core.color;
+/// chunk layout: tiles and their heights
 const ck=lib.ck;
+/// the garden's tile world
 const World=lib.world.World;
+/// world generation, for the ground's height where no chunk is loaded
 const gen=lib.gen;
+/// what can be held: item kinds and stacks of them
 const items=lib.items;
+/// the garden's plants (the tests' bench needs a list of them)
 const Plants=lib.plants.Plants;
+/// the structures registry: `Def`, `Structure`, the hooks' context
 const st=lib.structures;
+/// the shared structure test bench: ground, running ticks
 const bench=st.bench;
+/// the tools a bulb icon is drawn with
 const iconKit=lib.icon;
+/// every player-facing string
 const txt=lib.txt;
+/// what the gardener has understood
 const prog=lib.progression;
+/// the HUD's shared sizes and colours
 const style=lib.style;
+/// the scene's list of moving parts this caster adds to each frame
 const Parts=lib.parts.Parts;
+/// the UI's draw batch, which the panel text goes into
 const Draw=lib.engine.ui.draw.Draw;
+/// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
+/// the sporecaster's mesh: where its pore and sac are
 const mesh=lib.sporecaster;
+/// a three-float vector
 const V3=m.V3;
+/// builds a three-float vector
 const v3=m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.bellyLump,.sporeCarrier};
 /// paired one way: its partner is the caster it sends to
 pub const pairs:st.Pairs=.{};
+/// what a sporecaster is: grown from its seed, one tile across, a pale
+/// store that swaps sap and is drawn from afar
 pub const def:st.Def=.{.item=.sporecaster,.size=1,.mesh=.sporecaster,.store=true,.grow=5,.sway=0.45,.tall=0.65,.sap=0.3,.far=true,.pale=true};
-/// most it holds, how many of one kind a spore carries, and seconds
-/// between one spore and the next
+/// the most it holds
 pub const holdTime=40;
+/// how many of one kind a spore carries
 pub const load=5;
+/// seconds between one spore and the next
 pub const launch:f32=0.25;
 /// spores in the air at once from one caster
 pub const airHeight=24;
-/// tiles a second a spore drifts, and how high it rises over a crossing
-/// (a share of how far it goes, at least `RISE_MIN`)
+/// tiles a second a spore drifts
 pub const speed:f32=2.5;
+/// how high it rises over a crossing, as a share of how far it goes
 const riseHeight:f32=0.22;
+/// the least it rises, however short the crossing
 const riseMin:f32=1.2;
 /// it wanders off its line by this much, back and forth as it goes
 const wanderAmount:f32=0.25;
+/// how see-through a spore is
 const sporeFade:f32=0.35;
+/// how brightly a spore glows
 const sporeGlow:f32=0.6;
+/// a spore's size, of its mesh
 const sporeSize:f32=1.7;
 /// a spore waiting over a full caster hangs this high over its pore, bobbing
 const hangDepth:f32=0.35;
-/// what it holds hangs in its sac, in a ring, bobbing
+/// what it holds hangs in its sac in a ring this far out, as a share of
+/// the sac's radius
 const ringRadius:f32=0.45;
+/// the size of a held shape holding a single thing
 const lumpR:f32=0.022;
+/// how much larger a held shape grows as the sac fills
 const lumpGrow:f32=0.02;
+/// how far each held shape bobs up and down
 const bobAmount:f32=0.01;
+/// how fast the ring of held shapes turns (radians a second)
 const turnRate:f32=0.25;
+/// how brightly the held shapes glow
 const glow:f32=0.2;
+/// one spore in the air: what it carries and where it is bound
 pub const Spore=struct{
+  /// the kind it carries
   item:items.Item,
+  /// how many of it
   n:u8,
   /// how far along it is (0 at the pore it left .. 1 at the one it seeks)
   t:f32=0,
-  /// the caster it seeks (its tile and ground height), and whether it has
-  /// turned home, carrying back what it could not deliver
+  /// the tile of the caster it seeks
   to:[2]i32,
+  /// the ground height under that caster
   toH:f32,
+  /// whether it has turned home, carrying back what it could not deliver
   home:bool=false,
 };
+/// what a sporecaster remembers: its spores in the air, and the time since
+/// it sent the last
 pub const State=struct{
+  /// each spore in the air, or null for a free place
   spores:[airHeight]?Spore=@splat(null),
+  /// seconds since it sent its last spore
   t:f32=0,
 };
 /// the sporecaster on tile `at`, if one stands there.
 fn casterAt(ss:*st.Structures,w:*const World,at:[2]i32)?st.Id{
+  // whatever structure stands there
   const j=ss.at(w,at[0],at[1]) orelse return null;
   return if(ss.get(j).kind()==.sporecaster)j else null;
 }
+/// the ground's height at tile `at`: from its chunk if loaded, else as the
+/// world would generate it
 pub fn groundAt(w:*const World,at:[2]i32)f32{
   if(w.chunkOfTile(at[0],at[1]))|c|return c.height[ck.localIndex(at[0],at[1])];
   return gen.heightAt(w.seed,at[0],at[1]);
@@ -95,15 +141,22 @@ pub fn configure(ss:*st.Structures,id:st.Id,g:*prog.Progression)void{
     .paired=>g.say(txt.s.msg.sporesPaired,.{}),
   }
 }
+/// drifts each spore on (home, or toward its caster, landing what fits
+/// there), and while paired and holding anything sends a load of what it
+/// holds most of every `launch` seconds. Returns true while busy.
 pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
+  // the caster itself, and its remembered state
   const self=ctx.ss.get(i);
   const sc=&self.state.sporecaster;
   // a caster that sends hands nothing to its neighbours: it sends it all
   if(self.partner()==null)_=st.handOff(ctx,i);
+  // whether any spore is in the air
   var busy=false;
   for(&sc.spores)|*slot|{
+    // the spore in this place
     const sp=&(slot.* orelse continue);
     busy=true;
+    // how far its crossing is, tiles (at least one)
     const far=@max(m.len(m.v3(m.f(sp.to[0]-self.x),0,m.f(sp.to[1]-self.y))),1);
     if(sp.home){
       sp.t-=dt*speed/far;
@@ -121,6 +174,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
       sp.home=true;
       continue;
     };
+    // how many the caster below took in
     const took=switch(ctx.ss.send(ctx,j,.{.arrived=.{.item=sp.item,.n=sp.n}})){
       .took=>|k|k,
       .ignored,.done=>0,
@@ -129,6 +183,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
     if(sp.n==0)slot.*=null;
   }
   if(ctx.ss.getPartner(i)==null)return busy;
+  // the tile of the caster it sends to
   const to=self.partner().?.tile();
   if(self.inv.total()==0)return busy;
   sc.t+=dt;
@@ -140,6 +195,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
     for(self.inv.slot)|s|if(s)|it|if(best==null or it.n>best.?.n){
       best=it;
     };
+    // that stack, and how many of it this spore carries
     const it=best orelse break;
     const n:u8=@intCast(@min(it.n,load));
     _=self.inv.take(it.item,n);
@@ -157,7 +213,7 @@ pub fn release(s:*st.Structure)?items.Item{
   };
   return null;
 }
-/// anything, while it has room.
+/// anything, while it has room (up to `holdTime` in all).
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdTime-|s.inv.total();}
 /// the oldest thing it holds (what a caster that sends nowhere lets go).
 pub fn output(s:*const st.Structure)?items.Item{
@@ -165,21 +221,26 @@ pub fn output(s:*const st.Structure)?items.Item{
   for(s.inv.slot)|slot|if(slot)|it|return it.item;
   return null;
 }
+/// it gives anything it holds, but only while it sends nowhere.
 pub fn gives(s:*const st.Structure,item:items.Item)bool{return s.partner()==null and s.inv.count(item)>0;}
 /// the spores it sent, drifting over to the caster they seek (or home),
 /// each its tip leading and a bead of what it carries inside; and what it
 /// holds hanging in its sac.
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
+  // its remembered state, its frame in the world, and its pore there
   const sc=&s.state.sporecaster;
   const base=s.place(ctr);
   const pore=m.mulPoint(base,mesh.poreAt);
   for(sc.spores,0..)|slot,k|{
+    // the spore in this place
     const sp=slot orelse continue;
+    // the pore it seeks, where it is now, and a little further along its way
     const dest=m.footprintCentre(sp.to[0],sp.to[1],1,sp.toH)+mesh.poreAt;
     const at=flight(pore,dest,sp.t,s.seed+m.f(k)*0.37,tf);
     const ahead=flight(pore,dest,if(sp.home)sp.t-0.02 else sp.t+0.02,s.seed+m.f(k)*0.37,tf);
     // a spore waiting over a full caster hangs there, bobbing
     const hang=if(!sp.home and sp.t>=1)v3(0,hangDepth+0.05*@sin(tf*2+m.f(k)),0)else v3(0,0,0);
+    // the way its tip leads, and the colour of what it carries
     const dir=if(m.len(ahead-at)>m.eps)m.norm(ahead-at)else v3(0,1,0);
     const col=color.Rgba8.of(sp.item.info().col).toF4();
     try out.emit(.sporeCarrier,m.chain(&.{m.translate(at+hang),m.alignY(dir),m.scale3(m.splat3(sporeSize))}),.{
@@ -187,13 +248,17 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     });
   }
   if(s.grown<1)return;
+  // how many stacks it holds, and which of them is being drawn
   const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
+    // the stack in this slot
     const it=slot orelse continue;
+    // the stack's place on the ring: its angle, the ring's reach, where it hangs
     const a=m.ratio(j,n)*m.tau+tf*turnRate+s.seed*6;
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
+    // its size: larger the fuller the sac
     const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
     try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
@@ -203,22 +268,31 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
 /// pore, a long rise and fall over the ground, straight down into the
 /// pore it seeks, wandering a little off its line as it goes
 pub fn flight(from:V3,to:V3,t:f32,ph:f32,tf:f32)V3{
+  // how far along (0..1), and the way from start to end
   const k=m.clamp01(t);
   const d=to-from;
+  // that way laid level, and how far it runs
   const flat=v3(d[0],0,d[2]);
   const far=m.len(flat);
+  // the level sideways it wanders along, and how high it rises
   const side=if(far>m.eps)m.norm(m.cross(flat,v3(0,1,0)))else v3(1,0,0);
   const rise=@max(riseMin,riseHeight*far);
   // eased along, so it leaves and arrives slowly
   const e=m.smooth(k);
+  // how far off its line it has wandered now (none at either end)
   const wander=wanderAmount*@sin(m.pi*k)*@sin(k*9+ph*7+tf*0.7);
   return from+flat*m.splat3(e)+v3(0,d[1]*e+rise*@sin(m.pi*k),0)+side*m.splat3(wander);
 }
+/// its line in the panel: where it sends (as an offset), spores in the air
+/// and how full it is; or, dim, that it is unpaired.
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
+  // its remembered state
   const sc=&s.state.sporecaster;
+  // how many spores are in the air
   var air:u32=0;
   for(sc.spores)|sp|{if(sp!=null)air+=1;}
   if(s.partner())|p|{
+    // the tile it sends to
     const to=p.tile();
     _=try d.print(x,y,style.textBody,style.white,txt.s.describe.sends,.{to[0]-s.x,to[1]-s.y,air,s.inv.total(),holdTime});
   }else{
@@ -232,30 +306,41 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
   try ic.glow(.{-0.1,0.72},0.25,iconSacGlow);
   try ic.bud(.{-0.1,0.72},0.18,iconSac,0.3);
   for([_]f32{-1,1})|sx|try ic.stem(.{.{-0.1,0.86},.{-0.1+0.18*sx,0.98},.{-0.1+0.3*sx,0.9},.{-0.1+0.28*sx,0.78}},0.04,iconFrond);
+  // the arc the spores drift along
   const arc=[4]iconKit.P{.{-0.1,0.9},.{0.2,1.1},.{0.6,0.9},.{0.75,0.3}};
   for(0..3)|k|{
+    // how far along the arc this spore has drifted (0..1)
     const t=@mod(ic.t*0.5+ic.phase+m.f(k)/3,1);
     try ic.bud(iconKit.curve(arc,t),0.06,iconSpore,@sin(t*m.pi));
   }
   try ic.coat(col);
 }
+/// the pale lilac of its stalk in its bulb
 const iconSkin:Color=.{190,182,205,255};
+/// the violet of the fronds round its pore
 const iconFrond:Color=.{175,160,210,255};
+/// the translucent blue of its sac
 const iconSac:Color=.{120,160,220,200};
+/// the soft blue glow behind that sac
 const iconSacGlow:Color=.{120,160,220,70};
+/// the near-white of the drifting spores
 const iconSpore:Color=.{235,225,255,255};
 // ---- tests ----
+/// the bench's tick length, seconds
 const testDt=bench.testDt;
 test"sporecasters pair by configuring one, then the one it sends to"{
+  // the allocator, the world and its ground
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   _=try bench.ground(&w,.{.width=30,.depth=2});
+  // the structures, and what the gardener understands
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,0,0,.sporecaster,0,0));
   try testing.expect(try ss.place(gpa,&w,25,1,.sporecaster,0,0));
+  // the two casters: the sender and the one it sends to
   const a=ss.at(&w,0,0).?;
   const b=ss.at(&w,25,1).?;
   st.configure(&ss,a,&g);
@@ -263,6 +348,7 @@ test"sporecasters pair by configuring one, then the one it sends to"{
   st.configure(&ss,b,&g);
   try testing.expectEqual(b,ss.getPartner(a).?);
   try testing.expect(ss.get(b).partner()==null and ss.pairing==null);
+  // the casters paired to b
   var toB=ss.pairedTo(b);
   try testing.expectEqual(a,toB.next().?);
   try testing.expect(toB.next()==null);
@@ -272,10 +358,12 @@ test"sporecasters pair by configuring one, then the one it sends to"{
   try testing.expect(ss.get(a).partner()==null);
 }
 test"spores carry what a caster is fed to the one it is paired with, however far"{
+  // the allocator, the world and its ground
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   _=try bench.ground(&w,.{.width=30,.depth=2});
+  // no plants, the structures, and what the gardener understands
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -283,6 +371,7 @@ test"spores carry what a caster is fed to the one it is paired with, however far
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,0,0,.sporecaster,0,0));
   try testing.expect(try ss.place(gpa,&w,28,0,.sporecaster,0,0));
+  // the sender
   const a=ss.at(&w,0,0).?;
   try testing.expect(ss.pairWith(a,ss.at(&w,28,0).?));
   try testing.expectEqual(@as(u16,12),ss.insert(&g,a,.essence,12));
@@ -290,6 +379,7 @@ test"spores carry what a caster is fed to the one it is paired with, however far
   // a caster that sends lets nothing go to conduits
   try testing.expect(ss.output(a)==null);
   try bench.run(&ss,&w,&plants,&g,24);
+  // the caster it sent to
   const b=ss.get(ss.at(&w,28,0).?);
   try testing.expectEqual(@as(u32,12),b.inv.count(.essence));
   try testing.expectEqual(@as(u32,7),b.inv.count(.grit));
@@ -298,10 +388,12 @@ test"spores carry what a caster is fed to the one it is paired with, however far
   try testing.expect(ss.output(ss.at(&w,28,0).?)!=null);
 }
 test"spores whose caster is uprooted turn home with what they carry"{
+  // the allocator, the world and its ground
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   _=try bench.ground(&w,.{.width=30,.depth=2});
+  // no plants, the structures, and what the gardener understands
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -309,6 +401,7 @@ test"spores whose caster is uprooted turn home with what they carry"{
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,0,0,.sporecaster,0,0));
   try testing.expect(try ss.place(gpa,&w,28,0,.sporecaster,0,0));
+  // the sender
   const a=ss.at(&w,0,0).?;
   try testing.expect(ss.pairWith(a,ss.at(&w,28,0).?));
   _=ss.insert(&g,a,.fibre,10);
@@ -317,6 +410,7 @@ test"spores whose caster is uprooted turn home with what they carry"{
   // uprooting it cut the pairing
   try testing.expect(ss.get(ss.at(&w,0,0).?).partner()==null);
   try bench.run(&ss,&w,&plants,&g,24);
+  // the sender, its spores home again
   const back=ss.get(ss.at(&w,0,0).?);
   try testing.expectEqual(@as(u32,10),back.inv.count(.fibre));
   for(back.state.sporecaster.spores)|sp|try testing.expect(sp==null);

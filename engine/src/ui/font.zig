@@ -1,12 +1,20 @@
 //! built-in 5x7 bitmap font, defined in code. Each glyph is 7 rows of 5 bits
 //! (MSB = leftmost column). Uppercase, digits and basic punctuation.
+/// the standard library
 const std=@import("std");
+/// a letter in upper case
 const toUpper=std.ascii.toUpper;
+/// a glyph's width in pixels
 pub const glyphW=5;
+/// a glyph's height in pixels
 pub const glyphH=7;
+/// a glyph: seven rows of five bits, the leftmost column in bit 4
 const Glyph=[7]u8;
+/// a glyph from its rows, as written in the table below
 fn g(rows:[7]u8)Glyph{return rows;}
+/// every glyph, indexed by its ASCII code (blank where none is drawn)
 const table=blk:{
+  // the glyphs, all blank until drawn
   var t:[128]Glyph=@splat(.{0}**7);
   t['A']=g(.{0b01110,0b10001,0b10001,0b11111,0b10001,0b10001,0b10001});
   t['B']=g(.{0b11110,0b10001,0b10001,0b11110,0b10001,0b10001,0b11110});
@@ -66,12 +74,15 @@ const table=blk:{
 };
 /// packed bits for the shader: bit (row*5 + col), col 0 = leftmost.
 pub fn bits(ch:u8)[2]u32{
+  // the letter, upper-cased, and its glyph ('?' past ASCII)
   const c=toUpper(ch);
   const glyph=table[if(c<128)c else'?'];
+  // the bits packed so far
   var v:u64=0;
   for(glyph,0..)|row,r|for(0..glyphW)|col|{
     if(row>>@intCast(glyphW-1-col)&1!=0)v|=@as(u64,1)<<@intCast(r*glyphW+col);
   };
   return.{@truncate(v),@truncate(v>>32)};
 }
+/// every bit set: the shader draws a solid block, not a glyph
 pub const solid:[2]u32=.{0xffff_ffff,0xffff_ffff};

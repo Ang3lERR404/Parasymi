@@ -2,31 +2,46 @@
 //! round it, a bead of red sap drawn into it from a green leaf beside it
 //! (it drains its neighbours).
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
+/// all the maths: vectors, easing, angles
 const m=lib.engine.core.math;
+/// what can be held: item kinds
 const items=lib.items;
+/// the tools a seed icon is drawn with
 const iconKit=lib.icon;
+/// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
+/// the seed this module draws
 pub const item:items.Item=.seedThornleech;
+/// draws three pale strands wound into a stalk with a bulb, fronds curling
+/// round it, a green leaf beside it drooping as beads of red sap are drawn
+/// out of it into the stalk, and the coat in `col` beneath.
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
+  // where the bulb sits atop the stalk
   const bulb:iconKit.P=.{0.02,0.62};
   // the victim and what is drawn out of it
   const prey:iconKit.P=.{-0.7,-0.2};
   try ic.stem(.{.{prey[0],prey[1]-0.2},.{prey[0],prey[1]-0.1},.{prey[0]-0.02,prey[1]},prey},0.06,preyStem);
+  // how far the bead of sap has come, 0..1
   const k=@mod(ic.t*runAmount+ic.phase,1);
   // the leaf droops as each bead leaves it
   try ic.leaf(prey,m.pi-0.9-0.3*@sin(k*m.pi),0.22,0.13,preyLeaf,0.9);
+  // the arc the bead is drawn along, from the leaf into the stalk
   const path=[4]iconKit.P{prey,.{-0.5,0.25},.{-0.2,0.2},.{0,0.3}};
   try ic.bud(iconKit.curve(path,k),0.065,sap,@sin(k*m.pi));
   // three strands wound round each other
   for(0..3)|i|{
+    // this strand's bearing round the stalk, and how far out it winds
     const a=m.tau*m.ratio(i,3);
     const w:f32=0.07;
     try ic.stem(.{.{0,iconKit.topAt},.{w*@cos(a),0.25},.{w*@cos(a+2.4),0.42},bulb},0.07,stalk[i]);
   }
   // fronds curling down round the bulb
   for([_]f32{-1,1,-0.5},0..)|sx,i|{
+    // where this frond's tip curls down to
     const tip:iconKit.P=.{0.34*sx,0.48+0.08*m.f(i)};
     try ic.stem(.{bulb,.{0.3*sx,0.92},.{0.5*sx,0.7},tip},0.06,frond);
   }
@@ -35,12 +50,19 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
   try ic.bud(bulb,0.12,pearl,0.7);
   try ic.coat(col);
 }
-/// beads drawn in a second
+/// how many beads of sap are drawn in a second
 const runAmount:f32=0.5;
+/// the three strands' colours: pale lilac greys
 const stalk=[3]Color{.{150,145,168,255},.{170,165,190,255},.{135,130,155,255}};
+/// the fronds: a pale lilac
 const frond:Color=.{185,185,210,255};
+/// the little bladders along the stalk
 const bladder:Color=.{200,200,230,255};
+/// the bulb: a pale pearl
 const pearl:Color=.{215,205,240,255};
+/// the red sap being drawn in
 const sap:Color=.{240,90,120,255};
+/// the victim's stem: a living green
 const preyStem:Color=.{90,130,80,255};
+/// the victim's leaf: a living green
 const preyLeaf:Color=.{110,170,95,255};

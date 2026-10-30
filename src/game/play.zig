@@ -3,38 +3,56 @@
 //! drawn (view.zig). Nothing is pooled globally: items live in the player and
 //! in structures, essence and seeds live in plants until harvested.
 const lib=@import("../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type a frame may fail with
 const Allocator=std.mem.Allocator;
+/// the chunk layer, for how many tiles a chunk spans
 const ck=lib.ck;
+/// what can be held: item kinds
 const items=lib.items;
+/// the bindings, for the hotbar's slot keys
 const ctl=lib.controls;
+/// the settings, kept in the game
 const options=lib.options;
+/// saving, for a garden's name
 const save=lib.save;
+/// the game itself: its state and how it is built and torn down
 pub const game=@import("play/game.zig");
+/// a frame: input, actions, ticks, camera, and what is drawn
 pub const frame=@import("play/frame.zig");
+/// what the wolf carries: hotbar, belly, an opened structure's slots
 pub const belly=@import("play/belly.zig");
+/// the menus: pause, options, saved gardens, the name prompt
 pub const menus=@import("play/menus.zig");
+/// the menus' tests
 pub const testsMenu=@import("play/tests_menu.zig");
+/// the belly's and carrying's tests
 pub const testsBelly=@import("play/tests_belly.zig");
+/// placing's tests
 pub const testsPlace=@import("play/tests_place.zig");
+/// the playable game: world, sim, progression, the wolf and its HUD
 pub const Game=game.Game;
+/// one simulation tick (s): sixty a second
 pub const tickTime=1.0/60.0;
 /// the test gardens' world (`--demo`, `--stress`, `--plant`/`--structure`,
 /// tests); a played game grows from a fresh seed each start
 pub const defaultSeed:u64=0x5EED_0F_11FE;
 /// the window's size when it opens
 pub const windowSize=[2]u16{1600,900};
+/// how many rings of chunks are streamed round the gardener
 pub const streamRadius=4;
 /// the chunks resident round the gardener once streamed (a square of rings)
 pub const streamChunks=(2*streamRadius+1)*(2*streamRadius+1);
 /// nothing is drawn further than this from the camera target (inside the
 /// streamed radius, so a low camera never runs off the generated world)
 pub const drawLimit:f32=(streamRadius-0.5)*ck.sizeTiles;
-/// max chunks to stream in a single call (initial load is generous,
-/// per-frame is tight to avoid hitches)
+/// at most this many chunks are streamed in the first call (generous: the
+/// whole first view)
 pub const streamInit=1<<10;
+/// at most this many chunks stream in each frame after (tight, to avoid hitches)
 pub const streamFrame=4;
-/// camera feel parameters (tune here, not scattered through update)
+/// camera feel: how quickly the camera follows the wolf (share a second)
 pub const followLerp:f32=6;
 /// the camera follows a point this far above the wolf's feet
 pub const followHeight:f32=0.6;
@@ -43,19 +61,22 @@ pub const followHeight:f32=0.6;
 pub const approach:f32=2;
 /// how quickly the shown frame and sim timings follow the measured ones
 pub const timingEase:f32=0.05;
-/// free camera: Shift multiplies the fly speed; the wheel dollies this much a notch
+/// free camera: Shift multiplies the fly speed by this much
 pub const flyFastSpeed:f32=3;
+/// free camera: the wheel dollies this far a notch (share of the distance)
 pub const dollyPerNotch:f32=0.4;
 /// first person: the wolf's head is hidden once the view comes this close
 /// to its eyes (easing in, it is seen until then)
 pub const headClear:f32=0.3;
 /// the simulation never runs more than this many catch-up ticks a frame
 pub const maxCatchup=8;
-/// the spawn search spirals out to this radius in steps of this many tiles
+/// the spawn search spirals out to this radius (tiles)
 pub const spawnSearch=400;
+/// the spawn search steps out this many tiles at a time
 pub const spawnStep=3;
-/// ray-march parameters for ground picking
+/// ground picking: the ray marches in steps this long (metres)
 pub const pickStep:f32=0.1;
+/// ground picking: the ray reaches this many times the camera's distance
 pub const pickRangeMult:f32=4;
 /// hotbar slots, in `ctl.slots` order. Each is empty or holds an item the
 /// gardener dropped on it from the belly; it shows how many the belly holds.
@@ -66,7 +87,14 @@ pub const uiWrap:f64=1000;
 /// slot's stack, a hotbar slot's item, or a stack from a slot of the
 /// structure whose panel is open. It stays where it was until put down, so
 /// closing the panel or saving loses nothing.
-pub const Held=union(enum){slot:usize,bar:usize,store:usize};
+pub const Held=union(enum){
+  /// a belly slot's stack, by the slot's index
+  slot:usize,
+  /// a hotbar slot's item, by the slot's index
+  bar:usize,
+  /// a stack from the open structure's slot, by its index
+  store:usize
+};
 /// a stack put down within one inventory goes as far as it fits
 pub const stackAny:u32=1<<16;
 /// can the gardener place this hotbar item yet (seed understood / always for bulbs)?
@@ -79,7 +107,7 @@ pub const Request=union(enum){
   save,
   /// back to the garden being played as last saved (else the newest)
   load,
-  /// the autosave timer ran out: into `save.AUTO`
+  /// the autosave timer ran out: into `save.auto`
   autosave,
   /// the saved gardens menu wants its list (`Game.gardens`)
   list,
@@ -92,15 +120,38 @@ pub const Request=union(enum){
   /// save and leave
   quit,
 };
-/// the pause menu's rows, in `txt.s.hud.pause_labels` order
-pub const PauseRow=enum{@"resume",options,gardens,fullscreen,quit};
+/// the pause menu's rows, in `txt.s.hud.pauseLabels` order
+pub const PauseRow=enum{
+  /// back to the garden, the world moving again
+  @"resume",
+  /// the options panel
+  options,
+  /// the saved gardens
+  gardens,
+  /// fullscreen on or off
+  fullscreen,
+  /// save and leave
+  quit
+};
 /// the saved gardens menu's buttons (under its list, and the chosen
 /// garden's delete), and the name prompt's
-pub const GardenAct=enum{save,load,delete,ok,cancel};
-/// saved gardens menu: rows in view at once (it scrolls past them), rows a
-/// wheel notch scrolls, and how fast the list follows (1/s)
+pub const GardenAct=enum{
+  /// SAVE: write the garden as the chosen one (a fresh one asks its name)
+  save,
+  /// LOAD: return to the chosen garden
+  load,
+  /// the chosen garden's small DELETE: let it go
+  delete,
+  /// the name prompt's OK: save under the typed name
+  ok,
+  /// the name prompt's CANCEL: back to where it was asked
+  cancel
+};
+/// saved gardens menu: rows in view at once (it scrolls past them)
 pub const gardensShown=7;
+/// saved gardens menu: how many rows a wheel notch scrolls
 pub const gardenNotch:f32=1;
+/// saved gardens menu: how fast the list follows (share a second)
 pub const gardenEase:f32=14;
 /// what has the wolf's attention; only one at a time.
 pub const Mode=enum{
@@ -131,6 +182,7 @@ pub const Mode=enum{
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode)bool{return md==.belly or md==.structure;}
 };
+/// what a frame or a game's building may fail with: running out of memory
 pub const Error=Allocator.Error;
 test{
   _=game;

@@ -1,69 +1,122 @@
 //! Parasymi: a garden of magically infused plants, parasitic and symbiotic,
-//! growing toward something beyond comprehension.
+//! growing toward something beyond comprehension. This is the game's start:
+//! it reads the command line, opens the window, renderer and sound, grows
+//! the meshes behind the loading screen, then runs the frame loop and
+//! answers the garden's save, load and fullscreen requests.
 //!
 //! layers (each only imports the ones above it):
-//!   core -> platform -> gfx -> world -> sim -> game/render/ui -> main
+//!   engine (core, platform, anim, gfx, world, render, ui) -> gfx -> world
+//!   -> sim -> game -> render -> main, all reached through lib.zig
+/// the import hub every game module is reached through
 const lib=@import("lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type, passed to whatever keeps memory
 const Allocator=std.mem.Allocator;
+/// the I/O interface: files, the clock, randomness, the thread pool
 const Io=std.Io;
+/// reads a decimal number from an argument (`--tod=0.5`)
 const parseFloat=std.fmt.parseFloat;
+/// reads a whole number from an argument (`--seed=0x1234`)
 const parseInt=std.fmt.parseInt;
+/// whether two byte strings are the same
 const eql=std.mem.eql;
+/// whether two values are the same field by field (the settings)
 const eqlDeep=std.meta.eql;
+/// whether an argument begins with a flag's name
 const startsWith=std.mem.startsWith;
+/// a value seen as its raw bytes (a fresh seed is filled through it)
 const asBytes=std.mem.asBytes;
+/// what the process is handed at start: allocators, I/O, args, environment
 const Init=std.process.Init;
+/// the log, for warnings and the world's seed
 const log=std.log;
+/// the engine package
 const engine=lib.engine;
+/// the window library: the window, its events and the clock
 const glfw=engine.glfw;
+/// the keys and buttons held this frame
 const Input=engine.platform.input.Input;
+/// windowed or fullscreen, and the switch between them
 const Display=engine.platform.display.Display;
+/// the garden's renderer module: syncing, meshes ready, screenshots
 const renderer=lib.renderer;
+/// the renderer itself: the GPU and every pass
 const Renderer=renderer.Renderer;
+/// play: the running game and its modes
 const play=lib.play;
+/// the running game: world, player, sky, HUD, everything played
 const Game=play.Game;
+/// turns the game into a scene for the renderer to draw
 const view=lib.view;
+/// the test gardens: `--demo` and `--stress`
 const setups=lib.setups;
+/// saving, loading, listing and deleting gardens
 const save=lib.save;
+/// every player-facing string
 const txt=lib.txt;
+/// the key and button bindings, read from controls.cfg
 const controls=lib.controls;
+/// the gardener's settings module: load and save
 const options=lib.options;
+/// the gardener's folder (%LOCALAPPDATA%\Parasymi), where every file lives
 const home=lib.home;
+/// the `--inspect` camera turn: what it circles and how
 const orbit=lib.orbit;
+/// the loading screen module: its stages and progress
 const loading=lib.loading;
+/// one thing standing alone (`--plant=` / `--structure=`)
 const specimen=lib.specimen;
+/// the plant species, named by `--plant=`
 const species=lib.species;
+/// the structures registry, named by `--structure=`
 const st=lib.structures;
+/// a name turned into its enum tag, or null if none matches
 const stringToEnum=std.meta.stringToEnum;
+/// the loading screen itself
 const Loading=loading.Loading;
+/// the streamed world of chunks
 const World=lib.world.World;
+/// writes a captured frame as a PNG
 const png=lib.engine.core.png;
+/// formats text into a fixed buffer (a shot's path)
 const bufPrint=std.fmt.bufPrint;
+/// a directory, for writing the shots
 const Dir=Io.Dir;
+/// the path separator, as a string
 const sepStr=std.fs.path.sep_str;
+/// the gardener's settings: vsync, antialiasing, fullscreen and the rest
 const Options=options.Options;
+/// all the maths: vectors, matrices, easing
 const m=lib.engine.core.math;
+/// the garden's sound: footsteps, twinkles, music, hums
 const sound=lib.sound;
+/// the audio device, fed the garden's sound commands from the frame loop
 const Sounds=engine.platform.audio.Output(sound.Sounds);
 /// a stalled frame (window drag, hitch) counts as at most this long (s)
 const maxFrameDt:f64=0.1;
 /// the sound hears of the daylight once it has changed this much
 const dayTold:f32=0.01;
-/// `--demo` fast-forwards its garden this many seconds; `--stress` sows a
+/// `--demo` fast-forwards its garden this many seconds
 /// field this many tiles on a side
 const demoForward=25;
+/// `--stress` sows a field this many tiles on a side
 const stressSide=120;
-/// most streamed chunks meshed in one frame (`MESH_MS` also caps it)
+/// most streamed chunks meshed in one frame (`renderer.meshMs` also caps it)
 const meshBudget=6;
 /// behind the loading screen a frame meshes the ground for this long (ms)
 const loadMeshMs:f64=25;
 /// `--inspect` writes its screenshots here, under the working directory
 /// (kept out of git)
 const shots="shots";
+/// the game's start: reads the flags, opens the window, renderer and sound,
+/// grows the world (fresh, loaded, a test garden or one thing alone), then
+/// runs frames until the window closes, answering the garden's requests
 pub fn main(init:Init)!void{
+  // the general allocator, and the I/O everything is done through
   const gpa=init.gpa;
   const io=init.io;
+  // the command line, kept in the start's arena
   const args=try init.minimal.args.toSlice(init.arena.allocator());
   // every file of the gardener's lives in their folder, made on first start
   // (with the settings, strings and controls in it); files kept beside the
@@ -74,9 +127,11 @@ pub fn main(init:Init)!void{
   home.adopt(io,save.legacy,home.saves++sepStr++save.legacy);
   // the gardener's settings; `--novsync` overrides theirs for this run
   var opts=try options.load(gpa,io);
+  // `--demo`, `--stress` and `--load`: which garden to start in
   var demo=false;
   var stress=false;
   var load=false;
+  // `--tod=`: the time of day to start at (0..1), else the sky's own
   var tod:?f32=null;
   // the world's seed: `--seed=`, else one of its own (see below)
   var seed:?u64=null;
@@ -133,11 +188,15 @@ pub fn main(init:Init)!void{
   defer glfw.terminate();
   if(!glfw.isVulkanSupported())return error.VulkanUnsupported;
   glfw.windowHint(.client_api,.no_api);
+  // the window, sized as play asks and titled from the strings
   const window=try glfw.createWindow(play.windowSize[0],play.windowSize[1],try init.arena.allocator().dupeZ(u8,txt.s.window.title),null,null);
   defer window.destroy();
+  // the input, reading keys and buttons from the window
   var input:Input=.{.win=window};
   input.attach();
+  // the display mode, windowed at first
   var display:Display=.{.win=window};
+  // the renderer, built for the settings (and, for one thing alone, only its meshes)
   const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(init.arena.allocator())else null});
   defer r.deinit();
   opts.aa=r.antialiasing();
@@ -146,7 +205,9 @@ pub fn main(init:Init)!void{
   // woken its chunks are counted as many as stream in round the gardener.
   var loadScreen=Loading.init(gpa);
   defer loadScreen.deinit();
+  // the clock at the last frame (s)
   var last=glfw.getTime();
+  // how many forms are grown, and the whole loading count: forms, the world, its chunks
   const forms=renderer.meshProgress(r)[1];
   const whole=forms+1+play.streamChunks;
   while(!try renderer.meshesReady(r)){
@@ -157,12 +218,15 @@ pub fn main(init:Init)!void{
   // one; the test gardens (`--demo`, `--stress`, one thing alone) keep the
   // stock world, so they and their screenshots stay alike run to run. A
   // loaded garden brings its own seed.
+  // the world's seed: named, the stock one, or fresh from the I/O's randomness
   const world=seed orelse if(demo or stress or lone!=null)play.defaultSeed else fresh:{
+    // the fresh seed being filled
     var s:u64=undefined;
     io.random(asBytes(&s));
     break:fresh s;
   };
   log.info("world seed 0x{x}",.{world});
+  // the running game, grown from that seed
   var game=try Game.init(gpa,world);
   defer game.deinit();
   // the world's heavy work (chunks generated and meshed, plants relinked)
@@ -207,10 +271,12 @@ pub fn main(init:Init)!void{
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
+    // the clock this frame (s)
     const now=glfw.getTime();
     // a stalled frame must not fling animation or movement
     const dt=@min(now-last,maxFrameDt);
     last=now;
+    // the swapchain's size this frame (px)
     const screen=r.extent();
     try game.update(&input,@floatCast(dt),screen);
     for(game.player.footfalls())|ff|if(ff)|f|if(sounds)|o|{
@@ -277,12 +343,14 @@ pub fn main(init:Init)!void{
     if(!eqlDeep(game.opts,applied))try apply(io,&game,r,&display,&applied);
     // inspecting, the camera turns round the focus and the HUD is hidden
     const shoot=if(inspect!=null)turn.step(&game,@floatCast(dt))else false;
+    // the clock before the simulation, to time it
     const t0=glfw.getTime();
     try game.simulate(dt);
     game.simMs+=(@as(f32,@floatCast((glfw.getTime()-t0)*m.msPerS))-game.simMs)*play.timingEase;
     try renderer.syncWorld(r,&game.world,meshBudget,renderer.meshMs);
     game.renderStats=r.stats;
     if(panel)|p|game.mode=p;
+    // what the renderer draws this frame
     var scene=try view.scene(&game,screen);
     if(inspect!=null and panel==null){
       scene.ui=&.{};
@@ -293,6 +361,7 @@ pub fn main(init:Init)!void{
       try loadScreen.draw(&game.ui,screen[0],screen[1]);
       scene.ui=game.ui.v.items;
     }
+    // whether the window was resized since the last frame
     const resized=input.resized;
     input.resized=false;
     r.capture=shoot;
@@ -306,9 +375,12 @@ pub fn main(init:Init)!void{
 /// write a captured frame as `shots/<focus>_<n>.png` (failures are logged)
 fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,turn:*orbit.Orbit)void{
   defer turn.took();
+  // buffers for the focus's name and the shot's path
   var nb:[32]u8=undefined;
   var pb:[96]u8=undefined;
+  // the shot's path, `shots/<focus>_<n>.png`
   const path=bufPrint(&pb,shots++sepStr++"{s}_{d}.png",.{turn.focus.name(&nb),turn.taken}) catch unreachable;
+  // the frame encoded as a PNG
   const bytes=png.encode(gpa,sh.w,sh.h,sh.px,if(sh.bgra).bgra else.rgba)catch|e|return log.err("{s}: {t}",.{path,e});
   defer gpa.free(bytes);
   Dir.cwd().writeFile(io,.{.sub_path=path,.data=bytes})catch|e|return log.err("{s}: {t}",.{path,e});
@@ -317,10 +389,12 @@ fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,turn:*orbit.Orbit)void{
 /// put the gardener's changed settings into effect (as far as the GPU and
 /// monitor allow, which the settings then show) and keep them.
 fn apply(io:Io,game:*Game,r:*Renderer,display:*Display,applied:*Options)!void{
+  // the settings asked for
   const o=&game.opts;
   try r.antialias(o.aa);
   o.aa=r.antialiasing();
   try r.setVsync(o.vsync);
+  // whether the window is fullscreen now
   const full=display.mode==.fullscreen;
   if(o.fullscreen!=full)display.toggle()catch|e|{
     game.prog.say(txt.s.msg.noFullscreen,.{e});
@@ -360,6 +434,7 @@ fn relist(gpa:Allocator,io:Io,game:*Game)void{
 /// replace the running game with the saved garden `name` (keeping it on
 /// failure); whether it was.
 fn restore(gpa:Allocator,io:Io,game:*Game,r:*Renderer,name:save.Name)!bool{
+  // the garden read from disk
   var loaded=save.load(gpa,io,name)catch|e|{
     game.prog.say(txt.s.msg.noSave,.{e});
     return false;
@@ -384,11 +459,14 @@ fn loadFrame(l:*Loading,r:*Renderer,input:*Input,last:*f64,stage:loading.Stage,a
   glfw.pollEvents();
   input.update();
   if(r.window.shouldClose())return false;
+  // the clock now, and the time since the last frame, capped as play's is
   const now=glfw.getTime();
   const dt=@min(now-last.*,maxFrameDt);
   last.*=now;
   l.step(stage,at,@floatCast(dt));
+  // what the loading screen draws
   var scene=try l.scene(r.extent());
+  // whether the window was resized since the last frame
   const resized=input.resized;
   input.resized=false;
   try r.draw(&scene,resized);
@@ -397,9 +475,11 @@ fn loadFrame(l:*Loading,r:*Renderer,input:*Input,last:*f64,stage:loading.Stage,a
 /// mesh the world's ground behind the loading screen, `before` units of the
 /// whole already made; false once the window is closed
 fn ground(l:*Loading,r:*Renderer,input:*Input,last:*f64,w:*World,before:u32)!bool{
+  // how many chunks are still to be meshed, and the whole count with what came before
   const chunks=w.unmeshed();
   const total=before+chunks;
   while(true){
+    // the chunks still unmeshed this time round
     const left=w.unmeshed();
     if(!try loadFrame(l,r,input,last,.ground,.{.done=total-left,.total=total}))return false;
     if(left==0)return true;

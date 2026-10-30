@@ -5,23 +5,41 @@
 //! order listed, by target: the shadow casters into the key light's shadow
 //! map, then the world into the HDR image, then the screen. A new pass is
 //! one new file plus one line in the game's list.
+/// the standard library
 const std=@import("std");
+/// the allocator the renderer and its lists are made with
 const Allocator=std.mem.Allocator;
+/// a slice seen as its bytes, for uploading instance runs
 const sliceAsBytes=std.mem.sliceAsBytes;
+/// one value seen as its bytes, for uploading the lighting record
 const asBytes=std.mem.asBytes;
+/// the Vulkan bindings: command buffers, semaphores, fences, queries
 const vk=@import("vulkan");
+/// the window library: the framebuffer size, and waiting while minimised
 const glfw=@import("zglfw");
+/// all the maths: vectors and the small conversions
 const m=@import("../core/math.zig");
+/// the registry the game's pass list is read through
 const registry=@import("../core/registry.zig");
+/// the Vulkan context and its error fold
 const ctx=@import("../gfx/ctx.zig");
+/// the device context everything is made on and drawn with
 const Ctx=ctx.Ctx;
+/// the swapchain module: the swapchain, ranges and image barriers
 const sw=@import("../gfx/swapchain.zig");
+/// a GPU buffer: per-frame lighting, retired buffers, the capture
 const Buffer=@import("../gfx/buffer.zig").Buffer;
+/// pipeline construction, for each pass and the push layouts
 const pipeline=@import("../gfx/pipeline.zig");
+/// the post chain module: HDR image, glow, antialiasing
 const postMod=@import("post.zig");
+/// light that moves: shadow cascades and points of light
 const light=@import("light.zig");
+/// the post chain: the world's HDR image, its glow and the smoothing
 const Post=postMod.Post;
+/// the HDR image's format, which world passes draw into
 const hdrFormat=postMod.hdrFormat;
+/// how edges are smoothed: off, FXAA or MSAA at 2, 4 or 8 samples
 pub const Antialias=postMod.Antialias;
 /// the UI pass every game can list (as `ui`): the HUD batch, drawn last
 pub const ui=@import("passes/ui.zig");
@@ -37,18 +55,37 @@ pub const ui=@import("passes/ui.zig");
 pub const pass=struct{
   /// which push-constant block the pass uses: the game's world block, or
   /// the UI's (`ui.Push`)
-  pub const Layout=enum{world,ui};
+  pub const Layout=enum{
+    /// the game's world block (`G.Push`), with the shadow map's set
+    world,
+    /// the UI's block (`ui.Push`)
+    ui
+  };
   /// what a pass draws into: the key light's shadow map (depth alone, every
   /// cascade at once), the world's HDR image, or the screen after the world
   /// (and its glow): the UI
-  pub const Target=enum{shadow,world,screen};
+  pub const Target=enum{
+    /// the key light's shadow map: depth alone, every cascade in one draw
+    shadow,
+    /// the world's HDR image
+    world,
+    /// the screen, after the world and its glow are composed
+    screen
+  };
+  /// how a pass is drawn: its shaders, vertex layout, push block, depth and
+  /// blend choices, and what it draws into
   pub const Desc=struct{
     /// SPIR-V, embedded by the module that compiled it (`@embedFile("x.vert")`)
     vert:[]const u8,
+    /// (the fragment shader's SPIR-V, the same way)
     frag:[]const u8,
+    /// the vertex buffers it reads and how each steps
     bindings:[]const vk.VertexInputBindingDescription,
+    /// the fields it reads from them, by location
     attrs:[]const vk.VertexInputAttributeDescription,
+    /// which push block it uses
     layout:Layout=.world,
+    /// whether it tests depth
     depth:bool=true,
     /// with `depth`: whether it writes depth (a glass pass only tests it)
     depthWrite:bool=true,
@@ -58,20 +95,25 @@ pub const pass=struct{
     /// it before they are shaded, the see-through ones (which wrote no
     /// depth there) pass.
     nearer:bool=false,
+    /// whether it blends over what is there by its alpha
     blend:bool=false,
+    /// what it draws into
     target:Target=.world,
     /// with MSAA, shade every sample: its fragments choose for themselves
     /// whether they are solid or see-through, so the edge between the two
     /// (and the silhouette it makes) lies inside the pixel, not on geometry
     perSample:bool=false,
   };
+  /// the shader stages every push constant block is seen by
   pub const stages:vk.ShaderStageFlags=.{.vertex=true,.fragment=true};
   /// write each mesh's run of instances into `buf` back to back (at most
   /// `max` in all), noting where each run starts and how long it is;
   /// returns how many were written.
   pub fn upload(comptime I:type,buf:*Buffer,lists:[]const[]const I,first:[]u32,counts:[]u32,max:u32)u32{
+    // how many instances are written so far
     var n:u32=0;
     for(lists,0..)|list,i|{
+      // how many of this run fit
       const k:u32=@intCast(@min(list.len,max-n));
       first[i]=n;
       counts[i]=k;
@@ -81,9 +123,13 @@ pub const pass=struct{
     return n;
   }
   /// `samples`: per pixel of the world's attachments (the screen has one)
+  /// a pipeline for pass `d` with push `layout`, drawing into the shadow map,
+  /// the HDR image or the `screen`-format swapchain as `d.target` says
   pub fn create(c:*const Ctx,comptime d:Desc,layout:vk.PipelineLayout,screen:vk.Format,samples:u32)ctx.Error!vk.Pipeline{
+    // the pass's vertex shader
     const vs=try c.shader(d.vert);
     defer c.device.destroyShaderModule(vs,null);
+    // the pass's fragment shader
     const fs=try c.shader(d.frag);
     defer c.device.destroyShaderModule(fs,null);
     return pipeline.create(c,.{
@@ -98,13 +144,23 @@ pub const pass=struct{
     });
   }
 };
+/// frames in flight: the CPU records one while the GPU draws the other
 pub const frames=2;
 /// points of light a frame can hold (the rest of a scene's `lights` is dropped)
 pub const maxLights=light.maxLights;
 /// the renderer fails the way the graphics layer does.
 pub const Error=ctx.Error;
 /// a captured frame: 4 bytes a pixel, row by row from the top
-pub const Shot=struct{w:u32,h:u32,px:[]const u8,bgra:bool};
+pub const Shot=struct{
+  /// its width, in pixels
+  w:u32,
+  /// its height, in pixels
+  h:u32,
+  /// the pixels, `w`×`h`×4 bytes
+  px:[]const u8,
+  /// whether each pixel is blue, green, red, alpha (else red first)
+  bgra:bool
+};
 /// how fast the GPU times follow the frames (share of the way a frame)
 const gpuEase:f32=0.05;
 /// the renderer for a game `G`, which declares
@@ -112,13 +168,13 @@ const gpuEase:f32=0.05;
 ///   passes                  a namespace of pass modules, one line each, in
 ///                           record order (list `ui` from this file to get the HUD)
 ///   Push                    the world passes' push constants, holding at
-///                           least `vp:m.M4`, `eye_time`, `view`, `sun:[4]f32`
+///                           least `vp:m.M4`, `eyeTime`, `view`, `sun:[4]f32`
 ///                           and `light:[2]u32` (light.glsl reads them)
 ///   Scene                   what one frame draws: at least `push:Push`,
 ///                           `clear:[3]f32` and `lights:[]const vertex.Light`
-///                           (and `ui`, `ui_time` when it lists `ui`)
+///                           (and `ui`, `uiTime` when it lists `ui`)
 ///   Stats                   a frame's counts: at least `draws`, `lights:u32`
-///                           and `gpu_ms:f32`, every field defaulted
+///                           and `gpuMs:f32`, every field defaulted
 ///   Ext                     state of its own the renderer keeps (`r.ext`),
 ///                           handed to `init`
 ///   start(r) Error!void     (optional) once every pipeline is made
@@ -128,24 +184,37 @@ const gpuEase:f32=0.05;
 ///   carry(prev:Stats) Stats (optional) what a frame's counts start from
 pub fn Renderer(comptime G:type)type{
   return struct{
+    /// (the renderer's own type)
     const R=@This();
+    /// the game's passes, as a registry
     const reg=registry.Registry(G.passes);
+    /// which pass: one per module in the game's list
     pub const Pass=reg.Id;
+    /// the world passes' push constants
     pub const Push=G.Push;
+    /// what one frame draws
     pub const Scene=G.Scene;
+    /// a frame's counts
     pub const Stats=G.Stats;
     /// what the GPU's time is told apart by: each pass (`Pass` order), then
-    /// the glow and the composite (`GLOW`, `COMPOSE`)
+    /// the glow and the composite (`glow`, `compose`)
     pub const stageCount=reg.count+2;
+    /// (the glow's stage)
     pub const glow=reg.count;
+    /// (the composite's stage)
     pub const compose=reg.count+1;
     /// time stamps a frame writes: one before it, one after each stage
     const stamps=stageCount+1;
+    /// what one frame in flight holds: its command buffer, sync, pass
+    /// resources, lighting record, time stamps and garbage
     const Frame=struct{
+      /// the pool its command buffer comes from
       pool:vk.CommandPool=.null_handle,
       /// freed with its pool
       cmd:vk.CommandBuffer=undefined,
+      /// signalled when the GPU is through this frame
       fence:vk.Fence=.null_handle,
+      /// signalled when its swapchain image is acquired
       acquired:vk.Semaphore=.null_handle,
       /// each pass's per-frame resources, side by side
       pass:reg.Struct("Frame")=undefined,
@@ -154,41 +223,56 @@ pub fn Renderer(comptime G:type)type{
       /// its GPU time stamps (null where the GPU keeps none), how many it
       /// wrote and the stage each one ends (the first: none)
       queries:vk.QueryPool=.null_handle,
+      /// (how many time stamps it wrote)
       stamped:u32=0,
+      /// (the stage each time stamp ends)
       stage:[stamps]u32=undefined,
       /// buffers retired while this frame was in flight; freed when it comes round again.
       garbage:std.ArrayList(Buffer)=.empty,
     };
+    /// the allocator the renderer and its lists are made with
     gpa:Allocator,
+    /// the window it draws into
     window:*glfw.Window,
+    /// the Vulkan context
     ctx:Ctx,
+    /// the swapchain the screen is presented through
     sc:sw.Swapchain,
     /// the HDR image the world is drawn into, and the glow taken from it
     post:Post=.{},
     /// the key light's shadow map
     shadow:light.Shadow=.{},
+    /// whether presenting waits for the display's refresh
     vsync:bool,
+    /// each frame in flight's resources
     frames:[frames]Frame=@splat(.{}),
+    /// which frame in flight is being recorded
     fi:usize=0,
+    /// the push layouts: the world block (with the shadow map's set) and the UI's
     layouts:[2]vk.PipelineLayout=@splat(.null_handle),
+    /// each pass's pipeline, by `Pass`
     pipes:[reg.count]vk.Pipeline=@splat(.null_handle),
     /// buffers retired since the last frame began; any frame still in flight
     /// may use them, so they join the next frame's garbage (freed only once
     /// that frame, and every frame before it, has finished on the GPU).
     pending:std.ArrayList(Buffer)=.empty,
+    /// the last frame's counts, which the next starts from
     stats:Stats=.{},
     /// set before `draw`: copy that frame (UI and all) out for `shot`
     capture:bool=false,
     /// where a captured frame lands, and whether it holds one
     shotBuf:Buffer=.{},
+    /// (whether `shotBuf` holds a frame not yet taken)
     shotReady:bool=false,
-    /// the GPU's time for each stage of a frame (ms, eased; see `STAGES`)
+    /// the GPU's time for each stage of a frame (ms, eased; `stageCount` of them)
     gpuMs:[stageCount]f32=@splat(0),
+    /// the GPU's time for the whole frame (ms, eased)
     gpuTotal:f32=0,
     /// the game's own state (see `G.Ext`)
     ext:G.Ext,
     /// `aa` falls back to the most samples the GPU offers (see `antialias`)
     pub fn init(gpa:Allocator,window:*glfw.Window,vsync:bool,aa:Antialias,ext:G.Ext)Error!*R{
+      // the renderer, made on the heap so passes may point at it
       const r=try gpa.create(R);
       errdefer gpa.destroy(r);
       r.*=.{.gpa=gpa,.window=window,.vsync=vsync,.ctx=undefined,.sc=.{},.ext=ext};
@@ -204,8 +288,12 @@ pub fn Renderer(comptime G:type)type{
       if(@hasDecl(G,"start"))try G.start(r);
       return r;
     }
+    /// the steps of `init`: swapchain, post chain, shadow map, each frame's
+    /// resources, push layouts and every pipeline
     fn build(r:*R)!void{
+      // the context, short
       const c=&r.ctx;
+      // the window's size in pixels
       const fb=r.window.getFramebufferSize();
       r.sc=try sw.Swapchain.init(c,r.gpa,@intCast(fb[0]),@intCast(fb[1]),r.vsync,.null_handle);
       r.post=try Post.init(c,r.sc.format.format,r.sc.extent.width,r.sc.extent.height,r.fit(r.post.aa));
@@ -227,11 +315,13 @@ pub fn Renderer(comptime G:type)type{
       r.layouts[@intFromEnum(pass.Layout.ui)]=try pipeline.layout(c,@sizeOf(ui.Push),&.{});
       try r.makePipes(false);
     }
-    /// every pass's pipeline (or with `world_only`, those drawing into the
+    /// every pass's pipeline (or with `worldOnly`, those drawing into the
     /// world, after its sample count changed: the old ones must be destroyed)
     fn makePipes(r:*R,worldOnly:bool)Error!void{
+      // the world's samples per pixel
       const n=r.post.aa.samples();
       inline for(reg.ids)|id|{
+        // this pass's description
         const d=reg.module(id).desc;
         if(!worldOnly or d.target==.world){
           r.pipes[@intFromEnum(id)]=try pass.create(&r.ctx,d,r.layout(d.layout),r.sc.format.format,n);
@@ -240,15 +330,20 @@ pub fn Renderer(comptime G:type)type{
     }
     /// the most samples per pixel both the world's colour and depth can take
     pub fn maxSamples(r:*const R)u32{
+      // the GPU's limits
       const l=r.ctx.props.limits;
+      // the sample counts both colour and depth allow, as bits
       const both:u32=@as(u32,@bitCast(l.framebuffer_color_sample_counts))&@as(u32,@bitCast(l.framebuffer_depth_sample_counts));
+      // the most samples tried first, halved until both allow it
       var n:u32=8;
       while(n>1 and both&n==0)n/=2;
       return n;
     }
     /// `aa`, or MSAA with as many samples as the GPU can take
     fn fit(r:*const R,aa:Antialias)Antialias{
+      // the most samples the GPU allows
       const most=r.maxSamples();
+      // the mode being stepped down to fit
       var a=aa;
       while(a.samples()>most)a=@enumFromInt(@intFromEnum(a)-1);
       return a;
@@ -258,10 +353,13 @@ pub fn Renderer(comptime G:type)type{
     /// smooth edges another way (what the GPU can take of `aa`); waits for
     /// the GPU and remakes the world's images and pipelines
     pub fn antialias(r:*R,aa:Antialias)Error!void{
+      // what the GPU can take of `aa`
       const a=r.fit(aa);
       if(a==r.post.aa)return;
+      // the context, short
       const c=&r.ctx;
       c.device.deviceWaitIdle()catch|e|return ctx.fold(e);
+      // whether the sample count changes, so the world's pipelines must be remade
       const remake=a.samples()!=r.post.aa.samples();
       try r.post.antialias(c,a);
       if(!remake)return;
@@ -279,8 +377,11 @@ pub fn Renderer(comptime G:type)type{
       r.vsync=on;
       try r.recreate();
     }
+    /// the pipeline of pass `p`
     pub fn pipe(r:*const R,p:Pass)vk.Pipeline{return r.pipes[@intFromEnum(p)];}
+    /// the push layout `l`
     pub fn layout(r:*const R,l:pass.Layout)vk.PipelineLayout{return r.layouts[@intFromEnum(l)];}
+    /// wait for the GPU, free everything and the renderer itself
     pub fn deinit(r:*R)void{
       // nothing to recover: teardown proceeds even if the device was lost
       r.ctx.device.deviceWaitIdle()catch{};
@@ -290,6 +391,7 @@ pub fn Renderer(comptime G:type)type{
     }
     /// free every GPU object the renderer made (null handles are skipped).
     fn release(r:*R)void{
+      // the context, short
       const c=&r.ctx;
       if(@hasDecl(G,"release"))G.release(r);
       for(&r.frames)|*f|{
@@ -320,8 +422,12 @@ pub fn Renderer(comptime G:type)type{
       if(b.buf==.null_handle)return;
       try r.pending.append(r.gpa,b);
     }
+    /// remake the swapchain (and the post images) for the window's size,
+    /// waiting while the window is minimised
     fn recreate(r:*R)Error!void{
+      // the context, short
       const c=&r.ctx;
+      // the window's size in pixels
       var fb=r.window.getFramebufferSize();
       while(fb[0]==0 or fb[1]==0){
         glfw.waitEvents();
@@ -329,15 +435,20 @@ pub fn Renderer(comptime G:type)type{
         if(r.window.shouldClose())return;
       }
       c.device.deviceWaitIdle()catch|e|return ctx.fold(e);
+      // the old swapchain, handed over and then freed
       const old=r.sc;
       r.sc=try sw.Swapchain.init(c,r.gpa,@intCast(fb[0]),@intCast(fb[1]),r.vsync,old.handle);
+      // (a copy that can be freed)
       var o=old;
       o.deinit(c,r.gpa,false);
       try r.post.resize(c,r.sc.extent.width,r.sc.extent.height);
     }
+    /// the screen's size, in pixels
     pub fn extent(r:*const R)[2]f32{
       return.{m.f(r.sc.extent.width),m.f(r.sc.extent.height)};
     }
+    /// draw one frame of `scene` (remaking the swapchain instead when
+    /// `resized`); a frame with `capture` set is kept for `shot`
     pub fn draw(r:*R,scene:*const Scene,resized:bool)Error!void{
       defer r.capture=false;
       r.frame(scene,resized)catch|e|return ctx.fold(e);
@@ -347,16 +458,22 @@ pub fn Renderer(comptime G:type)type{
     pub fn shot(r:*R)?Shot{
       if(!r.shotReady)return null;
       r.shotReady=false;
+      // the frame's size
       const w=r.sc.extent.width;
       const h=r.sc.extent.height;
+      // whether the pixels come blue first
       const bgra=switch(r.sc.format.format){
         .b8g8r8a8_srgb,.b8g8r8a8_unorm=>true,
         else=>false,
       };
       return.{.w=w,.h=h,.px=r.shotBuf.map[0..@as(usize,w)*h*4],.bgra=bgra};
     }
+    /// one frame: wait for its slot, free its garbage, acquire, record every
+    /// pass, submit and present
     fn frame(r:*R,scene:*const Scene,resized:bool)!void{
+      // the context, short
       const c=&r.ctx;
+      // this frame in flight
       const f=&r.frames[r.fi];
       _=try c.device.waitForFences(&.{f.fence},.true,m.maxInt(u64));
       for(f.garbage.items)|*b|b.deinit(c);
@@ -365,21 +482,26 @@ pub fn Renderer(comptime G:type)type{
       r.pending.clearRetainingCapacity();
       r.readTimes(f);
       if(resized){try r.recreate();return;}
+      // the acquired swapchain image
       const acq=c.device.acquireNextImageKHR(r.sc.handle,m.maxInt(u64),f.acquired,.null_handle)catch|e|switch(e){
         error.OutOfDateKHR=>{try r.recreate();return;},
         else=>return e,
       };
+      // which swapchain image it is
       const img=acq.image_index;
       try c.device.resetFences(&.{f.fence});
       // a capture copies the finished screen into a buffer the CPU reads
+      // whether this frame is captured
       const cap=r.capture and r.sc.readable;
       if(cap){
+        // how many bytes a capture needs
         const size=@as(u64,r.sc.extent.width)*r.sc.extent.height*4;
         if(r.shotBuf.size<size){
           try r.retire(r.shotBuf);
           r.shotBuf=try Buffer.init(c,size,.{.transfer_dst=true});
         }
       }
+      // the frame's command buffer, with its calls attached
       const cmd=vk.CommandBufferProxy.init(f.cmd,c.vkd);
       try cmd.resetCommandBuffer(.{});
       try cmd.beginCommandBuffer(&.{.flags=.{.one_time_submit=true}});
@@ -389,8 +511,10 @@ pub fn Renderer(comptime G:type)type{
       // every pass's data up, then the shadow casters into the shadow map,
       // the world into the HDR image, its glow, then the screen: the world
       // and its glow composed (and with FXAA filtered), the UI over it
+      // the frame's counts, started from the last if the game asks
       var stats:Stats=if(@hasDecl(G,"carry"))G.carry(r.stats)else.{};
       stats.gpuMs=r.gpuTotal;
+      // a copy of the scene, its push constants pointed at the lighting
       var sc=scene.*;
       stats.lights=r.lightUp(f,&sc);
       inline for(reg.ids)|id|{
@@ -412,6 +536,7 @@ pub fn Renderer(comptime G:type)type{
       r.end(cmd,img,cap);
       try cmd.endCommandBuffer();
       try r.submit(f,img);
+      // how presenting went (out of date is handled below)
       const pres=c.device.queuePresentKHR(c.queue,&.{
         .wait_semaphore_count=1,
         .p_wait_semaphores=@ptrCast(&r.sc.done[img]),
@@ -452,14 +577,19 @@ pub fn Renderer(comptime G:type)type{
     /// each stage's time and the whole frame's
     fn readTimes(r:*R,f:*Frame)void{
       if(f.stamped<2)return;
+      // the time stamps read back
       var t:[stamps]u64=undefined;
+      // whether they could all be read
       const res=r.ctx.device.getQueryPoolResults(f.queries,0,f.stamped,f.stamped*@sizeOf(u64),&t,@sizeOf(u64),.{.@"64"=true}) catch return;
       if(res!=.success)return;
+      // how many milliseconds one GPU tick is
       const msPerTick=r.ctx.props.limits.timestamp_period/m.nsPerMs;
       for(1..f.stamped)|i|{
+        // the time this stage took
         const ms=m.f(t[i]-%t[i-1])*msPerTick;
         r.gpuMs[f.stage[i]]+=(ms-r.gpuMs[f.stage[i]])*gpuEase;
       }
+      // the whole frame's time
       const whole=m.f(t[f.stamped-1]-%t[0])*msPerTick;
       r.gpuTotal+=(whole-r.gpuTotal)*gpuEase;
     }
@@ -467,13 +597,18 @@ pub fn Renderer(comptime G:type)type{
     /// points of light) and point the scene's push constants at it; how many
     /// points it holds
     fn lightUp(r:*R,f:*Frame,scene:*Scene)u32{
+      // the push constants, which carry the eye, view and sun
       const p=&scene.push;
+      // the eye, and the point looked at on the ground
       const eye=m.v3(p.eyeTime[0],p.eyeTime[1],p.eyeTime[2]);
       const target=m.v3(p.view[0],0,p.view[1]);
       // shadows reach the drawn world's far edge as the eye sees it
       const reach=m.len(eye-target)+p.view[3];
+      // the shadow cascades fitted to the view and the sun
       const cas=light.fit(p.vp,eye,target,reach,m.v3(p.sun[0],p.sun[1],p.sun[2]));
+      // how many points of light it holds
       const n:u32=@intCast(@min(scene.lights.len,light.maxLights));
+      // the lighting record
       var l:light.Lighting=.{
         .cascades=cas.mats,.texel=undefined,
         .info=.{m.f(n),cas.reach,0,0},
@@ -482,6 +617,7 @@ pub fn Renderer(comptime G:type)type{
       @memcpy(l.texel[0..light.cascades],&cas.texel);
       @memcpy(l.lights[0..n],scene.lights[0..n]);
       f.lighting.write(0,asBytes(&l));
+      // where the record sits on the GPU, split into two words for the push
       const at=f.lighting.address(&r.ctx);
       p.light=.{@truncate(at),@truncate(at>>32)};
       return n;
@@ -490,11 +626,14 @@ pub fn Renderer(comptime G:type)type{
     /// (with MSAA, multisampled ones resolved into the HDR image).
     fn beginWorld(r:*R,cmd:vk.CommandBufferProxy,clear:[3]f32)void{
       r.post.beginWorld(cmd);
+      // whether the world draws multisampled
       const ms=r.post.multisampled();
       sw.barrier(cmd,if(ms)r.post.msDepth.image else r.sc.depth,sw.depthRange(),.undefined,.depth_attachment_optimal,
         .{.early_fragment_tests=true,.late_fragment_tests=true},.{.depth_stencil_attachment_write=true},
         .{.early_fragment_tests=true,.late_fragment_tests=true},.{.depth_stencil_attachment_write=true,.depth_stencil_attachment_read=true});
+      // the world's colour attachment
       const color=[_]vk.RenderingAttachmentInfo{r.post.worldColor(clear)};
+      // the depth attachment: the multisampled one, or the swapchain's
       const depth:vk.RenderingAttachmentInfo=.{
         .image_view=if(ms)r.post.msDepth.views[0]else r.sc.depthView,
         .image_layout=.depth_attachment_optimal,
@@ -511,6 +650,7 @@ pub fn Renderer(comptime G:type)type{
       sw.barrier(cmd,r.sc.images[img],sw.colorRange(),.undefined,.color_attachment_optimal,
         .{.color_attachment_output=true},.{},
         .{.color_attachment_output=true},.{.color_attachment_write=true});
+      // the swapchain image, not cleared (the composite covers it)
       const color=[_]vk.RenderingAttachmentInfo{.{
         .image_view=r.sc.views[img],
         .image_layout=.color_attachment_optimal,
@@ -522,7 +662,10 @@ pub fn Renderer(comptime G:type)type{
       }};
       r.scope(cmd,&color,null);
     }
+    /// begin a rendering scope over the whole screen with `color` and `depth`,
+    /// setting the viewport and scissor to match
     fn scope(r:*R,cmd:vk.CommandBufferProxy,color:[]const vk.RenderingAttachmentInfo,depth:?*const vk.RenderingAttachmentInfo)void{
+      // the whole screen
       const area:vk.Rect2D=.{.offset=.{.x=0,.y=0},.extent=r.sc.extent};
       cmd.beginRendering(&.{
         .render_area=area,
@@ -541,7 +684,7 @@ pub fn Renderer(comptime G:type)type{
       cmd.setScissor(0,&.{area});
     }
     /// close the rendering scope and hand the image to presentation (with
-    /// `cap`, copied into `shot_buf` on the way).
+    /// `cap`, copied into `shotBuf` on the way).
     fn end(r:*R,cmd:vk.CommandBufferProxy,img:u32,cap:bool)void{
       cmd.endRendering();
       if(cap)r.copyOut(cmd,img);
@@ -549,7 +692,7 @@ pub fn Renderer(comptime G:type)type{
         if(cap).{.copy=true}else.{.color_attachment_output=true},if(cap).{}else.{.color_attachment_write=true},
         .{},.{});
     }
-    /// the screen image into `shot_buf`, left as a transfer's source
+    /// the screen image into `shotBuf`, left as a transfer's source
     fn copyOut(r:*R,cmd:vk.CommandBufferProxy,img:u32)void{
       sw.barrier(cmd,r.sc.images[img],sw.colorRange(),.color_attachment_optimal,.transfer_src_optimal,
         .{.color_attachment_output=true},.{.color_attachment_write=true},
@@ -563,6 +706,7 @@ pub fn Renderer(comptime G:type)type{
         .image_extent=.{.width=r.sc.extent.width,.height=r.sc.extent.height,.depth=1},
       }});
       // the host reads it once the frame's fence is signalled
+      // the barrier that makes the copy visible to the host
       const done=[_]vk.MemoryBarrier2{.{
         .src_stage_mask=.{.copy=true},
         .src_access_mask=.{.transfer_write=true},
@@ -571,10 +715,16 @@ pub fn Renderer(comptime G:type)type{
       }};
       cmd.pipelineBarrier2(&.{.memory_barrier_count=done.len,.p_memory_barriers=&done});
     }
+    /// submit the frame's commands: wait on its acquired image, signal its
+    /// image's done semaphore and the frame's fence
     fn submit(r:*R,f:*Frame,img:u32)!void{
+      // the context, short
       const c=&r.ctx;
+      // what it waits on: the image being acquired, before drawing colour
       const wait=[_]vk.SemaphoreSubmitInfo{.{.semaphore=f.acquired,.value=0,.stage_mask=.{.color_attachment_output=true},.device_index=0}};
+      // what it signals: the image's done semaphore, for presenting
       const signal=[_]vk.SemaphoreSubmitInfo{.{.semaphore=r.sc.done[img],.value=0,.stage_mask=.{.all_commands=true},.device_index=0}};
+      // the command buffer submitted
       const cbi=[_]vk.CommandBufferSubmitInfo{.{.command_buffer=f.cmd,.device_mask=0}};
       try c.device.queueSubmit2(c.queue,&.{.{
         .wait_semaphore_info_count=wait.len,

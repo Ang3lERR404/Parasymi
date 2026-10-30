@@ -2,7 +2,10 @@
 //! grown side by side: monfris, 2x2 trees of both lineages that weave
 //! the advanced tier, fed by the Vultrixi tethered to them.
 const lib=@import("../../lib.zig");
+/// the research tree: what a study costs and what it teaches
 const prog=lib.progression;
+/// what it costs: essence, a ley crystal and convergence essence, thirty
+/// units of eight seconds; opens once a weftstone has met a driftbraid
 pub const def:prog.Research=.{
   .perUnit=&.{
     .{.item=.essence,.n=3},

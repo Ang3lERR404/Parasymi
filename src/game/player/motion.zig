@@ -1,98 +1,165 @@
 //! the wolf's motion each frame: gait stages, footsteps and the gathering pry.
+/// the hub every game module is reached through
 const lib=@import("../../lib.zig");
+/// the generic engine package
 const engine=lib.engine;
+/// all the maths: vectors, springs, easing
 const m=engine.core.math;
+/// the garden's world, whose ground the feet are planted on
 const World=lib.world.World;
+/// the wolf's skeleton: its bones, pose and forward kinematics
 const skel=lib.skeleton;
+/// the belly's mesh: its radii and depth, where a stowing paw presses
 const bellyMesh=lib.wolfBelly;
+/// a point or direction in 3D
 const V3=m.V3;
+/// builds a 3D vector from its three parts
 const v3=m.v3;
+/// one bone of the wolf's skeleton
 const Bone=skel.Bone;
+/// how many items carried bring the belly most of the way to full
 const bellyItems=lib.player.tuning.bellyItems;
+/// the breath's tempo at rest (radians a second)
 const breathRate=lib.player.tuning.breathRate;
+/// the breath's tempo at a full sprint (radians a second)
 const breathRateRun=lib.player.tuning.breathRateRun;
+/// the gait cycle's length standing still (m)
 const cycle=lib.player.tuning.cycle;
+/// how much longer the cycle grows per m/s of speed (m)
 const cyclePerSpeed=lib.player.tuning.cyclePerSpeed;
+/// the share of the cycle a foot is planted, at a sprint
 const dutyFast=lib.player.tuning.dutyFast;
+/// the share of the cycle a foot is planted, walking slowly
 const dutySlow=lib.player.tuning.dutySlow;
+/// how quickly the belly's look follows its fill (per second)
 const fullnessResponse=lib.player.tuning.fullnessResponse;
+/// the light, heavy and full gaits
 const gaits=lib.player.tuning.gaits;
+/// how far ahead of its feet the wolf gathers from a node (m)
 const gatherAt=lib.player.tuning.gatherAt;
+/// how far either side of the node each paw grips (m)
 const gripSide=lib.player.tuning.gripSide;
+/// how high above the node's ground the paws grip (m)
 const gripUp=lib.player.tuning.gripUp;
+/// one stage's gait: speeds, stride, lift, sway, roll, sink, bob, lean
 const Gait=lib.player.tuning.Gait;
+/// how damped the gripping wrists' spring is
 const handDamp=lib.player.tuning.handDamp;
+/// how stiffly the gripping wrists chase their want (spring frequency)
 const handFreq=lib.player.tuning.handFreq;
+/// how high a swinging foot lifts standing (m)
 const liftAmount=lib.player.tuning.liftAmount;
+/// the lift's arc over the swing (sin to this power)
 const liftArc=lib.player.tuning.liftArc;
+/// how much higher a foot lifts at full stride (m)
 const liftStride=lib.player.tuning.liftStride;
+/// a foot this far from the body is put straight back (m)
 const lost=lib.player.tuning.lost;
+/// the shortest frame time a rate is divided by (s)
 const minDt=lib.player.tuning.minDt;
+/// how stiffly a foot's pad squashes and springs back (spring frequency)
 const padFreq=lib.player.tuningLook.padFreq;
+/// how far back the pull draws the paws (m)
 const pryBack=lib.player.tuning.pryBack;
+/// how far up the pull lifts the paws (m)
 const pryUp=lib.player.tuning.pryUp;
+/// the wolf whose motion this is
 const Player=lib.player.player.Player;
+/// how stiffly the paws move into and out of the work gesture
 const reachFreq=lib.player.tuning.reachFreq;
+/// how long it stands still before the belly rest begins (s)
 const restAfter=lib.player.tuning.restAfter;
+/// how stiffly the rest pose eases in (spring frequency)
 const restFreq=lib.player.tuning.restFreq;
+/// how full the belly must be before the rest begins (0..1)
 const restFull=lib.player.tuning.restFull;
+/// how full it is when the rest is fully in (0..1)
 const restFullIn=lib.player.tuning.restFullIn;
+/// a standing foot further than this from rest steps back under (m)
 const settle=lib.player.tuning.settle;
+/// how long that settling step takes (s)
 const settleTime=lib.player.tuning.settleTime;
+/// its top sprinting speed (m/s)
 const sprintSpeed=lib.player.tuning.sprintSpeed;
+/// how stiffly the squat eases in and out (spring frequency)
 const squatFreq=lib.player.tuning.squatFreq;
+/// where the heavy and full stages begin (shares of fullness)
 const stageAt=lib.player.tuning.stageAt;
+/// how much fullness each stage blends over
 const stageBlend=lib.player.tuning.stageBlend;
+/// below this stride the wolf counts as standing
 const standing=lib.player.tuning.standing;
+/// how long a paw takes to press a loose unit into the belly (s)
 const stowTime=lib.player.tuning.stowTime;
+/// how quickly the stride eases in and out (per second)
 const strideResponse=lib.player.tuning.strideResponse;
+/// the longest a striding swing lasts (s)
 const swingMax=lib.player.tuning.swingMax;
+/// the shortest a striding swing lasts (s)
 const swingMin=lib.player.tuning.swingMin;
+/// the slowest speed a swing is timed for (m/s)
 const swingSpeedMin=lib.player.tuning.swingSpeedMin;
+/// a planted foot never trails the hip further than this (m)
 const trailMax=lib.player.tuning.trailMax;
+/// its top walking speed (m/s)
 const walkSpeed=lib.player.tuning.walkSpeed;
+/// how far through its pull and wrench a unit's pry is (0..1)
 const pryPull=lib.player.ik.pryPull;
+/// one frame of motion: the gait's stride, cycle and phase follow the
+/// speed, breath quickens with effort, the belly's look follows its fill,
+/// the work, pry and rest poses ease, then the feet step, what hangs
+/// sloshes, and every spring settles
 pub fn animate(p:*Player,ground:?*const World,dt:f32)void{
   p.t+=dt;
+  // how fast it moves over the ground, and the gait its belly allows
   const spd=p.groundSpeed();
   const g=p.gait();
+  // the top walk and sprint speeds for that gait
   const walk=walkSpeed*g.walk;
   const sprint=sprintSpeed*g.sprint;
   p.stride+=(m.clamp01(spd/walk)-p.stride)*@min(1,dt*strideResponse);
   p.cycle=(cycle+cyclePerSpeed*spd)*g.stride;
   p.duty=m.lerp(dutySlow,dutyFast,m.clamp01((spd-1)/(sprint-1)));
   p.phase=@mod(p.phase+spd/p.cycle*dt,1);
+  // how hard it is working: 0 at rest .. 1 at a full sprint
   const effort=m.clamp01(spd/sprint);
   p.breath+=dt*m.lerp(breathRate,breathRateRun,effort);
   p.fullness+=(p.bellyFill()-p.fullness)*@min(1,dt*fullnessResponse);
   p.reach.to(if(p.work!=null)1 else 0,reachFreq,1,dt);
   p.pry(dt);
   p.still=if(p.stride<standing and p.work==null and p.gather==null)p.still+dt else 0;
+  // how heavy the belly is for the rest pose: 0 .. 1 once full enough
   const heavy=m.smooth(m.clamp01((p.fullness-restFull)/(restFullIn-restFull)));
   p.restPose.to(if(p.still>restAfter)heavy else 0,restFreq,1,dt);
   // what the body feels: its acceleration, turned into its own frame
   const a=(p.vel-p.lastVel)/m.splat3(@max(dt,minDt));
   p.lastVel=p.vel;
+  // that acceleration turned into the wolf's own frame
   const al=m.mulV(m.rotY(-p.facing),.{a[0],a[1],a[2],0});
   p.accel=v3(al[0],al[1],al[2]);
+  // whether a foot came down this frame
   const fell=p.step(ground,spd,dt);
   p.slosh(fell,dt);
   p.springs(dt);
 }
 /// which of the belly's stages the wolf is in: 0 light .. 1 heavy .. 2
-/// full, blending over `STAGE_BLEND` about each threshold
+/// full, blending over `stageBlend` about each threshold
 pub fn stage(p:*const Player)f32{
+  // the stages passed so far, each blended in about its threshold
   var out:f32=0;
   for(stageAt)|at|out+=m.smooth(m.clamp01((p.fullness-at)/stageBlend+0.5));
   return out;
 }
-/// the gait for the belly's load (`GAITS` blended by `stage`)
+/// the gait for the belly's load (`gaits` blended by `stage`)
 pub fn gait(p:*const Player)Gait{
+  // the stage, the pair of gaits it lies between, and how far along
   const st=p.stage();
   const i:usize=if(st>=1)1 else 0;
   const k=st-m.f(i);
+  // the two gaits blended between
   const a=gaits[i];
   const b=gaits[i+1];
+  // the gait blended field by field
   var out:Gait=undefined;
   inline for(@typeInfo(Gait).@"struct".fields)|fl|@field(out,fl.name)=m.lerp(@field(a,fl.name),@field(b,fl.name),k);
   return out;
@@ -106,19 +173,24 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
     for(&p.feet,0..)|*f,s|f.at=p.rest(ground,s);
     p.placed=true;
   }
+  // whether it is striding, or only standing
   const moving=p.stride>standing;
   // how far ahead of the hip a foot lands, so it passes under the hip
   // mid-stance
   const ahead=if(spd>0.1)p.vel/m.splat3(spd)*m.splat3(p.duty*p.cycle*0.5*m.clamp01(spd/1.5))else v3(0,0,0);
+  // whether any foot came down this frame
   var fell=false;
   for(&p.feet,0..)|*f,s|{
+    // the other foot
     const other=&p.feet[1-s];
     if(m.len(f.at-p.rest(ground,s))>lost){
       f.*=.{.at=p.rest(ground,s),.phase=f.phase};
       continue;
     }
+    // where this foot is in the gait's cycle (the two half a cycle apart)
     const ph=@mod(p.phase+0.5*m.f(s),1);
     if(f.planted()){
+      // how far it is from where it rests
       const off=m.len(f.at-p.rest(ground,s));
       // a foot trailing too far always lifts (the other one is down by then)
       var lift=off>trailMax and other.planted();
@@ -139,6 +211,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
     f.phase=ph;
     if(!f.planted()){
       f.t=@min(1,f.t+dt/f.dur);
+      // the swing's time left, where it will land, and how far along it is
       const left=(1-f.t)*f.dur;
       const to=p.onGround(ground,p.rest(ground,s)+p.vel*m.splat3(left)+ahead);
       const k=m.smooth(f.t);
@@ -150,6 +223,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
         p.fell[s]=.{.weight=p.stage()/2,.pace=m.clamp01(spd/(sprintSpeed*p.gait().sprint))};
       }
     }
+    // its pad squashes as it plants, springing back as it lifts
     m.spring(&f.pad,&f.padV,if(f.planted())1 else 0,padFreq,dt);
   }
   return fell;
@@ -160,6 +234,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
 pub fn pry(p:*Player,dt:f32)void{
   p.squat.to(if(p.gather!=null)1 else 0,squatFreq,1,dt);
   for(&p.stow)|*t|t.*=@max(t.*-dt,0);
+  // the unit's share of the pry, or nothing if not gathering
   const k=p.gather orelse {
     p.lastPry=0;
     return;
@@ -169,8 +244,10 @@ pub fn pry(p:*Player,dt:f32)void{
     p.nextStow+%=1;
   }
   p.lastPry=k;
+  // the skeleton's pose, which the wrists' wants are taken from
   const q=p.pose();
   for(&p.wrist,0..)|*w,s|{
+    // where this wrist is wanted
     const want=p.wristWant(q,s,k);
     // just crouching, the wrists start where they are wanted
     if(p.squat.x<0.02)w.*=.{.pos=want};
@@ -180,19 +257,25 @@ pub fn pry(p:*Player,dt:f32)void{
 /// where wrist `s` is wanted (wolf space) at unit share `k`: on the node,
 /// pulled back and up through the pry, or at the belly while stowing
 pub fn wristWant(p:*const Player,q:skel.Pose,s:usize,k:f32)V3{
+  // the node, which side this wrist is on, and how far the pull has drawn
   const node=p.workLocal();
   const x=skel.sign(s);
   const pull=pryPull(k);
+  // the grip on the node, drawn back and up by the pull
   const grip=node+v3(x*gripSide,gripUp+pryUp*pull,-pryBack*pull);
+  // how far toward the belly a stowing paw is: up, then back again
   const stow=m.smooth(m.clamp01(@sin(p.stow[s]/stowTime*m.pi)*1.6));
   if(stow<=0)return grip;
+  // the bones in the wolf's space, and the belly's front where the paw presses
   const w=skel.fk(q);
   const belly=m.mulPoint(w[@intFromEnum(Bone.gut)],v3(x*bellyMesh.rx*0.3,bellyMesh.down*0.15,bellyMesh.rz*1.15));
   return m.lerpV(grip,belly,stow);
 }
 /// the node worked on, in the wolf's own frame (a little ahead without one)
 pub fn workLocal(p:*const Player)V3{
+  // the node in the world, or a spot just ahead when there is none
   const at=p.work orelse return v3(0,0,gatherAt);
+  // the node in the wolf's own frame
   const l=m.mulV(m.inverseRigid(p.heading()),.{at[0],at[1],at[2],1});
   return v3(l[0],l[1],l[2]);
 }

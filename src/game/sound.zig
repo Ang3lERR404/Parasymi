@@ -10,7 +10,8 @@
 //! - out of the wolf's eyes (first person) its sap is heard settling now and
 //!   then, from inside: a soft slow groan, a low reedy hum through a closing
 //!   throat sagging as it sinks, with a few thick gloops rising through it
-//!   (now and then a lighter, smaller one or two among them), all muffled. It settles more often while the wolf stands; a full belly
+//!   (now and then a lighter, smaller one or two among them), all muffled.
+//!   It settles more often while the wolf stands; a full belly
 //!   groans lower.
 //! - all the while a gentle wind breathes over the garden: a soft low hush
 //!   swelling and easing in slow gusts, and in the stronger ones a warm,
@@ -26,25 +27,41 @@
 //!   variation over a slow chord progression, a soft low drum on some bars,
 //!   all with a dark echo three steps behind; it rises with the morning and
 //!   fades out at dusk.
+//! - while the arsthraxia works, a spinning whorl hums under a choir that
+//!   swells with its progress; when it completes, a pop drops into a deep
+//!   thud and a fracturing shimmer rings out.
+/// the hub every game module is reached through
 const lib=@import("../lib.zig");
+/// the footstep: a soft crunchy rustle under a paw
 pub const footstep=@import("sound/footstep.zig");
+/// the sap settling, heard from inside the wolf
 pub const sap=@import("sound/sap.zig");
+/// the gentle wind over the garden
 pub const wind=@import("sound/wind.zig");
+/// a mote of starlight's glassy twinkle
 pub const twinkle=@import("sound/twinkle.zig");
+/// the daytime music's score: its chords, motif and phrasing
 pub const score=@import("sound/score.zig");
+/// the piano's voices: felt-hammered strings and the soft drum
 pub const voices=@import("sound/voices.zig");
+/// the daytime music played out, rising and fading with the light
 pub const music=@import("sound/music.zig");
+/// every sound's voices mixed into one stream for the device
 pub const mixer=@import("sound/mixer.zig");
+/// the arsthraxia's working: whorl and swelling choir
 pub const arsthraxia=@import("sound/arsthraxia.zig");
+/// the arsthraxia's completion: pop, thud and shimmer
 pub const boom=@import("sound/boom.zig");
+/// the sounds' headless tests
 pub const tests=@import("sound/tests.zig");
+/// the source the audio device pulls from
 pub const Sounds=mixer.Sounds;
 /// samples per second the sounds are built for (a device that will not
 /// play at it leaves the garden silent)
 pub const rate:u32=48000;
-/// steps that may sound at once (a sprint overlaps two or three)
+/// footsteps that may sound at once (a sprint overlaps two or three)
 pub const voiceCount=64;
-/// a step quieter than this has ended and frees its voice
+/// a sound quieter than this has ended and frees its voice
 pub const silent:f32=1e-4;
 test{
   _=footstep;

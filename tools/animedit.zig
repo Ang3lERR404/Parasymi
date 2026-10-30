@@ -20,19 +20,33 @@
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
 //! still follows the game's binding).
+/// the engine package, as the game's hub hands it on
 const engine=ps.engine;
+/// keyframed clips: channels, keys and sampling
 const clip=engine.anim.clip;
+/// the game, reached through its import hub
 const ps=@import("parasymi");
+/// the wolf's skeleton and its `Pose`
 const skel=ps.skeleton;
+/// one plant or structure standing alone, and its `Look`
 const specimen=ps.specimen;
+/// every f32 of the wolf's `Pose`, each a channel a clip can key
 const PoseCh=clip.Channels(skel.Pose);
+/// every f32 of a specimen's `Look`, each a channel a clip can key
 const LookCh=clip.Channels(specimen.Look);
+/// the editor's sizes, colours, words and keys
 pub const settings=@import("animedit/settings.zig");
+/// the wolf's joints as the editor sees them: dots, picking and gizmos
 pub const rigging=@import("animedit/rigging.zig");
+/// the editor's state: the clip, the subject, the playhead, the selection
 pub const editor=@import("animedit/editor.zig");
+/// what the gardener's hands do to the clip: keying, dragging, saving
 pub const editing=@import("animedit/editing.zig");
+/// the side panel: the channels, their values and the timeline
 pub const panel=@import("animedit/panel.zig");
+/// the window, the renderer and the frame loop
 pub const run=@import("animedit/run.zig");
+/// the editor's start: opens the window and runs until it closes
 pub const main=run.main;
 test{
   _=settings;

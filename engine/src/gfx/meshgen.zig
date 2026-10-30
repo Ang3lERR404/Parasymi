@@ -6,18 +6,31 @@
 //! ellipsoids, grid patches, grown vines (Catmull-Rom, tapering) and woven
 //! braids. A vertex's role is the game's own enum (`Mesher(Part, stem)`):
 //! its shaders key motion and shading off it.
+/// the standard library
 const std=@import("std");
+/// checks that hold in debug builds: spines and loops within their limits
 const assert=std.debug.assert;
+/// the allocator a builder's lists grow with
 const Allocator=std.mem.Allocator;
+/// the test helpers
 const testing=std.testing;
+/// all the maths: vectors, matrices, splines, easing
 const m=@import("../core/math.zig");
+/// the seeded random stream a vine's wobble is drawn from
 const Rng=@import("../core/rng.zig").Rng;
+/// colour types: the eight-bit rgba every vertex carries
 const color=@import("../core/color.zig");
+/// smooth noise, for a braid strand's wander
 const noise=@import("../core/noise.zig");
+/// the GPU layouts: mesh vertices, skin weights, growth records
 const vertex=@import("vertex.zig");
+/// a point or direction in three dimensions
 const V3=m.V3;
+/// most points a tube's spine may have (the maths' spline limit)
 const maxSpine=m.maxSpline;
+/// most sides round a tube's ring
 const maxSides=16;
+/// most points round a loft's cross-section, or along it
 const maxLoft=24;
 /// most rows or columns a patch may have
 const maxPatch=128;
@@ -29,14 +42,21 @@ pub const lods=3;
 pub const lodDistances=[lods-1]f32{36,70};
 /// braids: the core's and each strand's share of the radius, how far out
 /// the strands run (share of the radius), and the seed step between strands
+/// (the core's share of the radius)
 pub const braidCore:f32=0.72;
+/// (each strand's share of the radius)
 pub const braidStrand:f32=0.26;
+/// (how far out the strands run, a share of the radius)
 pub const braidOff:f32=0.8;
+/// (the seed step from one strand to the next)
 pub const strandSalt=7919;
 /// a strand's wander: noise frequency along it, and how far its turn and
 /// its distance out stray (per unit of wobble)
+/// (how often the noise turns along the strand)
 const strandFreq:f32=3;
+/// (how far its turn round the core strays)
 const strandTurnRate:f32=4;
+/// (how far its distance out strays)
 const strandSwellRate:f32=3;
 /// how far a braid strand (seeded `sd`) strays round the core at `u` along it.
 pub fn strandTurn(sd:u64,u:f32,wobble:f32)f32{return wobble*strandTurnRate*noise.grad(sd,u*strandFreq,0.5);}
@@ -44,6 +64,7 @@ pub fn strandTurn(sd:u64,u:f32,wobble:f32)f32{return wobble*strandTurnRate*noise
 pub fn strandSwell(sd:u64,u:f32,wobble:f32)f32{return 1+wobble*strandSwellRate*noise.grad(sd,u*strandFreq,7.5);}
 /// the level of detail for something `dist` from the eye.
 pub fn lodAt(dist:f32)u32{
+  // the level reached so far: one more for each distance passed
   var l:u32=0;
   for(lodDistances)|d|{
     if(dist>d)l+=1;
@@ -53,6 +74,7 @@ pub fn lodAt(dist:f32)u32{
 /// indices 0, s, 2s, .. and always the last, for keeping every s-th of `n`
 /// points along a surface (s = 1 keeps them all). Returns how many.
 pub fn stride(n:usize,s:usize,out:[]usize)usize{
+  // how many indices are written, and the next point index
   var k:usize=0;
   var i:usize=0;
   while(i<n-1):(i+=s){
@@ -66,8 +88,11 @@ pub fn stride(n:usize,s:usize,out:[]usize)usize{
 /// point a normal and binormal perpendicular to the local tangent, twisting
 /// as little as possible, so rings built from it never shear or flip.
 pub fn transport(spine:[]const V3,nrms:[]V3,bis:[]V3)void{
+  // how many points the curve has
   const n=spine.len;
+  // the first segment's direction, which the first normal is crossed off
   const t0=m.norm(spine[1]-spine[0]);
+  // the normal being carried along, starting square to that direction
   var nrm=m.norm(m.cross(t0,if(@abs(t0[1])>0.9)m.v3(1,0,0)else m.v3(0,1,0)));
   for(0..n)|i|{
     // tangent: average of the neighbouring segments, so joints bisect the bend
@@ -80,9 +105,11 @@ pub fn transport(spine:[]const V3,nrms:[]V3,bis:[]V3)void{
 }
 /// how a vine grows: mostly along one direction, never quite straight.
 pub const Growth=struct{
+  /// where the vine's root sits; it never moves
   start:V3,
   /// dominant growth direction (unit)
   direction:V3,
+  /// how long the vine runs from root to tip
   length:f32,
   /// how much noise perturbs the path, relative to the control-point spacing
   wobble:f32=0.15,
@@ -90,23 +117,32 @@ pub const Growth=struct{
   curl:f32=0,
   /// tip radius relative to the base
   taper:f32=0.3,
+  /// the seed its wobble is drawn from
   seed:u64=0,
 };
 /// perturb a control polyline the way a vine grows: wobble perpendicular to
 /// `g.direction` and a curl around it, both easing off toward the tip. The
 /// first point is the root and never moves. Deterministic in `g.seed`.
 pub fn grow(pts:[]V3,g:Growth)void{
+  // how many points there are
   const n=pts.len;
+  // the direction it grows along
   const axis=g.direction;
+  // two directions square to it and to each other, the wobble's plane
   const up=m.norm(m.cross(axis,if(@abs(axis[1])<m.nearParallel)m.v3(0,1,0)else m.v3(1,0,0)));
   const side=m.norm(m.cross(axis,up));
+  // the random stream the wobble is drawn from
   var rng=Rng.init(g.seed);
+  // how far apart the points sit along the axis
   const step=g.length/m.f(n-1);
   for(pts[1..],1..)|*p,i|{
+    // how far toward the tip this point is (0..1)
     const t=m.ratio(i,n-1);
+    // how far it may wobble, easing off toward the tip
     const w=g.wobble*step*(1-0.5*t);
     p.*+=side*m.splat3((rng.float()-0.5)*w)+up*m.splat3((rng.float()-0.5)*w);
     if(g.curl>0){
+      // how far round the spiral this point has turned
       const a=t*g.curl*4*m.tau;
       // the spiral widens out of the root and closes toward the tip
       const r=g.curl*0.25*g.length*m.smooth(@min(1,t*4))*(1-t);
@@ -125,15 +161,21 @@ pub fn taperRadii(r0:f32,tip:f32,out:[]f32)void{
 }
 /// the builder and the primitives that write a role: `Part` is the game's
 /// enum(u32) of vertex roles, `stem` the role a plain woody surface takes
-/// (braids, bands, an ellipsoid left unset)
+/// (braids, bands, an ellipsoid left unset); returns the mesher type
 pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   return struct{
+    /// the game's enum of vertex roles
     pub const Part=Role;
     /// the role a plain woody surface takes when none is given
     pub const defaultPart=stem;
+    /// (the same enum, short)
     const P=Role;
+  /// a mesh being built: its vertices, the skin weights and growth records
+  /// beside them, and the level of detail it is built at
   pub const Builder=struct{
+    /// the allocator its lists grow with
     gpa:Allocator,
+    /// the vertices built so far, three to a triangle
     v:std.ArrayList(vertex.Mesh)=.empty,
     /// skin weights beside `v`, as far as the last skinned vertex (see `skinOf`)
     skin:std.ArrayList(vertex.Skin)=.empty,
@@ -148,6 +190,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     pub fn step(b:*const Builder)usize{return@as(usize,1)<<@intCast(b.lod);}
     /// how many sides a ring keeps at this level (never fewer than `min`)
     pub fn around(b:*const Builder,sides:u32,min:u32)u32{return@max(@min(sides,min),sides>>@intCast(b.lod));}
+    /// free its lists
     pub fn deinit(b:*Builder)void{
       b.v.deinit(b.gpa);
       b.skin.deinit(b.gpa);
@@ -165,12 +208,15 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       try b.grow.appendNTimes(b.gpa,.{},b.v.items.len-|b.grow.items.len);
       return b.grow.items[start..b.v.items.len];
     }
+    /// add one vertex: at `p` facing `n` (normalised here), coloured `col`,
+    /// tu `t` up the thing and `u` across, with role `part`
     pub fn put(b:*Builder,p:V3,n:V3,col:color.Rgba8,t:f32,u:f32,part:Part)Allocator.Error!void{
       try b.v.append(b.gpa,.{.pos=p,.nrm=m.norm(n),.col=col,.tu=.{t,u},.part=@intFromEnum(part)});
     }
     /// apply a transform to every vertex added since `start` (build in a unit
     /// space, then place/scale into the final part space).
     pub fn xform(b:*Builder,start:usize,mat:m.M4)void{
+      // (the inverse here, read as its transpose by `mulCovector`)
       const nm=m.inverse(mat); // normals use the inverse-transpose
       for(b.v.items[start..])|*v|{
         v.pos=m.mulPoint(mat,v.pos);
@@ -183,16 +229,21 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       // a weight's gradient is a covector too: it goes as the normals do
       if(start>=b.skin.items.len)return;
       for(b.skin.items[start..])|*k|for(0..4)|i|{
+        // the gradient, turned with the normals
         const g=m.mulCovector(nm,.{k.gx[i],k.gy[i],k.gz[i]});
         k.gx[i]=g[0];
         k.gy[i]=g[1];
         k.gz[i]=g[2];
       };
     }
+    /// how many vertices it holds now: where the next piece begins, for
+    /// `xform`, `skinOf`, `growOf` and the growth tags
     pub fn mark(b:*const Builder)usize{return b.v.items.len;}
     /// tube along a spine, `sides` facets, radius tapering from r0 to r1.
     pub fn tube(b:*Builder,spine:[]const V3,ts:[]const f32,r0:f32,r1:f32,col:color.Rgba8,part:Part,sides:u32)Allocator.Error!void{
+      // a radius per spine point, lerped from `r0` to `r1`
       var radii:[maxSpine]f32=undefined;
+      // the last point's index, as a float
       const last=m.f(spine.len-1);
       for(0..spine.len)|i|radii[i]=m.lerp(r0,r1,m.f(i)/last);
       try b.tubeR(spine,ts,radii[0..spine.len],col,part,sides);
@@ -201,6 +252,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     /// smoothly along the curve (parallel transport) so consecutive segments
     /// share their rings exactly, with both ends capped.
     pub fn tubeR(b:*Builder,spine:[]const V3,ts:[]const f32,radii:[]const f32,col:color.Rgba8,part:Part,sides:u32)Allocator.Error!void{
+      // the one colour, once per ring
       var cols:[maxSpine]color.Rgba8=undefined;
       @memset(cols[0..spine.len],col);
       try b.tubeC(spine,ts,radii,cols[0..spine.len],null,part,sides);
@@ -208,17 +260,24 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     /// `tubeR` with a colour per ring (a gradient along the tube, shared rings
     /// so it never steps), and optionally `us[i]` written to tu.y.
     pub fn tubeC(b:*Builder,spine:[]const V3,ts:[]const f32,radii:[]const f32,cols:[]const color.Rgba8,us:?[]const f32,part:Part,fullSides:u32)Allocator.Error!void{
+      // (the most sides at full detail, before `around` thins them)
       assert(spine.len>=2 and spine.len<=maxSpine and fullSides<=maxSides and cols.len==spine.len);
+      // the sides it keeps at this level, never under three
       const sides=b.around(fullSides,3);
+      // each ring's points and outward directions
       var rings:[maxSpine][maxSides]V3=undefined;
       var norms:[maxSpine][maxSides]V3=undefined;
+      // how many spine points
       const n=spine.len;
+      // the carried frame's normal and binormal at each point
       var frameNormal:[maxSpine]V3=undefined;
       var fb:[maxSpine]V3=undefined;
       transport(spine,frameNormal[0..n],fb[0..n]);
       for(0..n)|i|{
         for(0..sides)|k|{
+          // how far round the ring this side is (radians)
           const a=m.ratio(k,sides)*m.tau;
+          // which way out from the spine that is
           const dir=frameNormal[i]*m.splat3(@cos(a))+fb[i]*m.splat3(@sin(a));
           norms[i][k]=dir;
           rings[i][k]=spine[i]+dir*m.splat3(radii[i]);
@@ -226,9 +285,12 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       }
       // rings kept at this level of detail (the frames came from all of them)
       var keep:[maxSpine]usize=undefined;
+      // how many rings are kept
       const kn=stride(n,b.step(),&keep);
       for(0..kn-1)|j|for(0..sides)|k|{
+        // the next side round, wrapping
         const k1=(k+1)%sides;
+        // the quad's side indices and ring indices, corner by corner
         const q=[4]usize{k,k1,k1,k};
         const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
         for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],cols[r[c]],ts[r[c]],uOf(us,r[c]),part);
@@ -236,8 +298,10 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       // caps (skipped where the tube tapers to a point anyway)
       for([_]usize{0,n-1})|i|{
         if(radii[i]<1e-4)continue;
+        // which way the cap faces: out of the tube's end
         const out=if(i==0)m.norm(spine[0]-spine[1])else m.norm(spine[n-1]-spine[n-2]);
         for(0..sides)|k|{
+          // the next side round, wrapping
           const k1=(k+1)%sides;
           try b.put(spine[i],out,cols[i],ts[i],uOf(us,i),part);
           try b.put(rings[i][k],out,cols[i],ts[i],uOf(us,i),part);
@@ -245,15 +309,24 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
         }
       }
     }
+    /// the tu.y of ring `i`: from `us` if given, else zero
     fn uOf(us:?[]const f32,i:usize)f32{return if(us)|s|s[i]else 0;}
+    /// a closed cone from `base` along `dir`, `len` long and `r` wide at its
+    /// base, its point at the tip
     pub fn cone(b:*Builder,base:V3,dir:V3,len:f32,r:f32,col:color.Rgba8,t:f32,part:Part)Allocator.Error!void{
+      // two directions square to `dir`, the base ring's plane
       const side=m.norm(m.cross(dir,if(@abs(dir[1])>0.9)m.v3(1,0,0)else m.v3(0,1,0)));
+      // the third direction of the base ring's plane
       const up=m.cross(side,dir);
+      // the cone's point
       const tip=base+dir*m.splat3(len);
+      // how many sides round it has (always four: a cone is small)
       const sides=4;
       for(0..sides)|i|{
+        // where this side begins and ends round the base (radians)
         const a0=m.f(i)/sides*m.tau;
         const a1=m.f(i+1)/sides*m.tau;
+        // which way out the side's two base corners face
         const n0=side*m.splat3(@cos(a0))+up*m.splat3(@sin(a0));
         const n1=side*m.splat3(@cos(a1))+up*m.splat3(@sin(a1));
         try b.put(base+n0*m.splat3(r),n0,col,t,0,part);
@@ -266,15 +339,19 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       }
     }
   };
-  /// a grown vine: `ctrl_n` control points from `g`, smoothed by Catmull-Rom
+  /// a grown vine: `ctrlN` control points from `g`, smoothed by Catmull-Rom
   /// into `res` evenly spaced rings, tapering by `g.taper`, `t` from t0 to t1.
   pub fn vine(b:*Builder,g:Growth,ctrlN:usize,res:usize,r0:f32,col:color.Rgba8,part:Part,sides:u32,t0:f32,t1:f32)Allocator.Error!void{
+    // the control points, laid out by `growthPath`
     var ctrl:[maxSpine]V3=undefined;
     growthPath(g,ctrl[0..ctrlN]);
+    // the spline through them, resampled evenly into `res` points
     var path:[maxSpine]V3=undefined;
     m.splineResample(ctrl[0..ctrlN],path[0..res]);
+    // the radius at each point, tapering by `g.taper`
     var radii:[maxSpine]f32=undefined;
     taperRadii(r0,g.taper,radii[0..res]);
+    // the tu.x at each point, from `t0` to `t1`
     var ts:[maxSpine]f32=undefined;
     for(ts[0..res],0..)|*t,i|t.*=m.lerp(t0,t1,m.ratio(i,res-1));
     try b.tubeR(path[0..res],ts[0..res],radii[0..res],col,part,sides);
@@ -283,6 +360,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   /// vines, `radii[i]` the bundle's radius at each point. `wobble` roughs the
   /// strands' winding with smooth noise (0 = a perfect lathe-like helix).
   pub fn braid(b:*Builder,spine:[]const V3,ts:[]const f32,radii:[]const f32,strands:u32,twist:f32,wobble:f32,seed:u64,core:color.Rgba8,strand:color.Rgba8)Allocator.Error!void{
+    // how far round the core the strands have wound at each point
     var turn:[maxSpine]f32=undefined;
     for(turn[0..spine.len],0..)|*a,i|a.*=m.ratio(i,spine.len-1)*twist;
     try braidTurned(b,spine,ts,radii,turn[0..spine.len],strands,wobble,seed,core,strand);
@@ -293,25 +371,33 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   pub fn braidTurned(b:*Builder,spine:[]const V3,ts:[]const f32,radii:[]const f32,turn:[]const f32,strands:u32,wobble:f32,seed:u64,core:color.Rgba8,strand:color.Rgba8)Allocator.Error!void{
     try braidAround(b,spine,ts,radii,turn,strands,wobble,seed,core,strand,stem);
   }
-  /// `braidTurned` round a core of role `core_part` (an arsthraxia's nerve
+  /// `braidTurned` round a core of role `corePart` (an arsthraxia's nerve
   /// showing between its strands)
   pub fn braidAround(b:*Builder,spine:[]const V3,ts:[]const f32,radii:[]const f32,turn:[]const f32,strands:u32,wobble:f32,seed:u64,core:color.Rgba8,strand:color.Rgba8,corePart:Part)Allocator.Error!void{
+    // how many spine points
     const n=spine.len;
+    // the carried frame's normal and binormal at each point
     var frameNormal:[maxSpine]V3=undefined;
     var fb:[maxSpine]V3=undefined;
     transport(spine,frameNormal[0..n],fb[0..n]);
+    // the radius at each point: the core's first, then each strand's
     var r:[maxSpine]f32=undefined;
     for(0..n)|i|r[i]=radii[i]*braidCore;
     try b.tubeR(spine,ts,r[0..n],core,corePart,8);
     for(0..n)|i|r[i]=radii[i]*braidStrand;
     for(0..strands)|si|{
+      // where this strand starts round the core (radians)
       const a0=m.ratio(si,strands)*m.tau;
+      // this strand's own seed for its wander
       const sd=seed+%si*strandSalt;
+      // the strand's path, wound round the spine
       var path:[maxSpine]V3=undefined;
       for(0..n)|i|{
+        // how far along the spine this point is (0..1)
         const u=m.ratio(i,n-1);
         // strands stay embedded in the core: the offset never leaves 0.8 +- 10%
         const a=a0+turn[i]+strandTurn(sd,u,wobble);
+        // how far out from the spine the strand runs here
         const off=radii[i]*braidOff*strandSwell(sd,u,wobble);
         path[i]=spine[i]+(frameNormal[i]*m.splat3(@cos(a))+fb[i]*m.splat3(@sin(a)))*m.splat3(off);
       }
@@ -324,19 +410,29 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   /// shared and both ends capped, so it is watertight like `tubeR`.
   pub fn loft(b:*Builder,spine:[]const V3,ts:[]const f32,widths:[]const f32,heights:[]const f32,up:V3,comptime shape:fn(f32)[2]f32,col:color.Rgba8,part:Part,fullSides:u32)Allocator.Error!void{
     assert(spine.len>=2 and spine.len<=maxSpine and fullSides<=maxLoft);
+    // the sides it keeps at this level, never under six
     const sides=b.around(fullSides,6);
+    // how many spine points
     const n=spine.len;
+    // each ring's points and outward normals
     var rings:[maxSpine][maxLoft]V3=undefined;
     var norms:[maxSpine][maxLoft]V3=undefined;
     for(0..n)|i|{
+      // the spine's direction here, the average of its neighbours
       const tan=m.norm(spine[@min(i+1,n-1)]-spine[if(i==0)0 else i-1]);
+      // the section's sideways and upright directions
       const side=m.norm(m.cross(up,tan));
+      // (the section's upright, square to the spine and the side)
       const u=m.cross(tan,side);
       for(0..sides)|k|{
+        // how far round the section this side is (radians)
         const a=m.ratio(k,sides)*m.tau;
+        // the section curve's point there, at unit size
         const p=shape(a);
         // outward normal of the (scaled) section curve
+        // the small step either side the curve's slope is measured over
         const e:f32=0.01;
+        // the curve's points either side, and the scaled slope between them
         const p0=shape(a-e);
         const p1=shape(a+e);
         const dx=(p1[0]-p0[0])*widths[i];
@@ -345,17 +441,23 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
         rings[i][k]=spine[i]+side*m.splat3(p[0]*widths[i])+u*m.splat3(p[1]*heights[i]);
       }
     }
+    // the rings kept at this level of detail
     var keep:[maxSpine]usize=undefined;
+    // how many rings are kept
     const kn=stride(n,b.step(),&keep);
     for(0..kn-1)|j|for(0..sides)|k|{
+      // the next side round, wrapping
       const k1=(k+1)%sides;
+      // the quad's side indices and ring indices, corner by corner
       const q=[4]usize{k,k1,k1,k};
       const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
       for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],col,ts[r[c]],0,part);
     };
     for([_]usize{0,n-1})|i|{
+      // which way the cap faces: out of the loft's end
       const out=if(i==0)m.norm(spine[0]-spine[1])else m.norm(spine[n-1]-spine[n-2]);
       for(0..sides)|k|{
+        // the next side round, wrapping
         const k1=(k+1)%sides;
         try b.put(spine[i],out,col,ts[i],0,part);
         try b.put(rings[i][k],out,col,ts[i],0,part);
@@ -370,13 +472,16 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     // rows and columns kept at this level of detail
     var kr:[maxPatch]usize=undefined;
     var kc:[maxPatch]usize=undefined;
+    // how many rows and columns are kept
     const nr=stride(rows,b.step(),&kr);
     const nc=stride(cols,b.step(),&kc);
     for(0..nr-1)|ri|for(0..nc-1)|ci|{
+      // the quad's two kept rows and two kept columns
       const r0=kr[ri];
       const r1=kr[ri+1];
       const c0=kc[ci];
       const c1=kc[ci+1];
+      // the quad's four point indices, round its corners
       const q=[4]usize{r0*cols+c0,r0*cols+c1,r1*cols+c1,r1*cols+c0};
       for([_]usize{0,1,2,0,2,3})|v|try b.put(pts[q[v]],nrms[q[v]],colsRgba[q[v]],t,us[q[v]],part);
     };
@@ -386,9 +491,12 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   /// `side` mirrors it in x, so left and right forms are built, not mirrored.
   pub fn bands(b:*Builder,at:V3,radii:V3,arcs:[]const[4]f32,side:f32,r:f32,wobble:f32,seed:u64,col:color.Rgba8)Allocator.Error!void{
     for(arcs,0..)|arc,i|{
+      // the band's six control points, laid over the surface
       var ctrl:[6]V3=undefined;
       for(&ctrl,0..)|*c,j|{
+        // how far along the band this point is (0..1)
         const k=m.ratio(j,ctrl.len-1);
+        // its polar and azimuth angles, lerped across the band
         const th=m.lerp(arc[0],arc[2],k);
         const ph=m.lerp(arc[1],arc[3],k);
         c.*=at+m.v3(@sin(th)*@cos(ph)*side,@cos(th),@sin(th)*@sin(ph))*radii*m.splat3(1.03);
@@ -397,8 +505,10 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
         .start=ctrl[0],.direction=m.norm(ctrl[ctrl.len-1]-ctrl[0]),.length=m.len(ctrl[ctrl.len-1]-ctrl[0]),
         .wobble=wobble,.curl=0,.seed=seed+%i*17,
       });
+      // the band's path, smoothed and resampled
       var path:[16]V3=undefined;
       m.splineResample(&ctrl,&path);
+      // the tu.x and radius at each point of it
       var ts:[16]f32=undefined;
       var rs:[16]f32=undefined;
       for(&ts,&rs,0..)|*t,*rr,j|{
@@ -409,26 +519,39 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       try b.tubeR(&path,&ts,&rs,col,stem,5);
     }
   }
+  /// a closed ellipsoid of quads, `rings` from pole to pole and `segs` round
   pub const Ellipsoid=struct{
+    /// its centre
     center:V3,
+    /// its half-widths along x, y and z
     radii:V3,
+    /// its colour
     col:color.Rgba8,
+    /// the part role it is drawn with
     part:Part=stem,
+    /// how many rings of quads from pole to pole (thinned at coarser detail)
     rings:u32=8,
+    /// how many quads round each ring (thinned at coarser detail)
     segs:u32=10,
     /// value written to tu.x (e.g. height along a body part)
     t:f32=0,
   };
+  /// an ellipsoid as `e` describes, its normals true to its stretched surface
   pub fn ellipsoid(b:*Builder,e:Ellipsoid)Allocator.Error!void{
+    // how many rings and segments are kept at this level
     const ringCount=b.around(e.rings,3);
     const segCount=b.around(e.segs,4);
     for(0..ringCount)|ri|for(0..segCount)|si|{
+      // the quad's four corners and their normals
       var q:[4]V3=undefined;
       var n:[4]V3=undefined;
+      // which ring and segment step each corner takes
       const corners=[4][2]u32{.{0,0},.{1,0},.{1,1},.{0,1}};
       for(corners,0..)|cn,k|{
+        // the corner's polar and azimuth angles
         const th=m.ratio(ri+cn[0],ringCount)*m.pi;
         const ph=m.ratio(si+cn[1],segCount)*m.tau;
+        // the corner's point on the unit sphere
         const u=m.v3(@sin(th)*@cos(ph),@cos(th),@sin(th)*@sin(ph));
         q[k]=e.center+u*e.radii;
         n[k]=u/e.radii;
@@ -439,11 +562,14 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   /// a woven bundle of vines along +Y from 0 to 1 (see `braid`).
   /// `profile(k)` gives the bundle radius at height k.
   pub fn bundle(b:*Builder,comptime profile:fn(f32)f32,strands:u32,twist:f32,wobble:f32,seed:u64,core:color.Rgba8,strand:color.Rgba8)Allocator.Error!void{
+    // how many points along the bundle's spine, less one
     const strandSides=18;
+    // the spine straight up, tu.x and the radius at each point
     var spine:[strandSides+1]V3=undefined;
     var ts:[strandSides+1]f32=undefined;
     var radii:[strandSides+1]f32=undefined;
     for(0..strandSides+1)|i|{
+      // how far up the bundle this point is (0..1)
       const k=m.f(i)/strandSides;
       spine[i]=m.v3(0,k,0);
       ts[i]=k;
@@ -454,7 +580,9 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   };
 }
 test"grown vines keep their root and regrow identically"{
+  // a curling, wobbling vine one unit long
   const g:Growth=.{.start=m.v3(1,0,2),.direction=m.v3(0,1,0),.length=1,.wobble=0.2,.curl=0.4,.seed=9};
+  // its control points, grown twice from the same growth
   var a:[8]V3=undefined;
   var b:[8]V3=undefined;
   growthPath(g,&a);
@@ -465,17 +593,25 @@ test"grown vines keep their root and regrow identically"{
   try testing.expect(@abs(a[7][1]-1)<0.1);
 }
 test"a tube keeps fewer rings and sides at a coarser level of detail, its caps closed"{
+  // the test's two roles
   const Role=enum(u32){stem,leaf};
+  // a mesher over them
   const M=Mesher(Role,.stem);
+  // a gently bending five-point spine
   const spine=[_]V3{m.v3(0,0,0),m.v3(0,0.3,0),m.v3(0.1,0.6,0),m.v3(0.1,0.9,0.1),m.v3(0,1.2,0.1)};
+  // tu.x along it
   const ts=[_]f32{0,0.25,0.5,0.75,1};
+  // the vertex count at full detail and at the next level
   var counts:[2]usize=undefined;
   for(&counts,0..)|*c,l|{
+    // a builder at this level of detail
     var b:M.Builder=.{.gpa=testing.allocator,.lod=@intCast(l)};
     defer b.deinit();
     try b.tube(&spine,&ts,0.1,0.05,color.rgb(0.4,0.3,0.2).toRgba8(255),.stem,8);
     // two triangles a side between kept rings, a fan a side at each cap
+    // the sides kept at this level
     const sides:usize=b.around(8,3);
+    // the rings kept at this level, and how many there are
     var keep:[8]usize=undefined;
     const rings=stride(spine.len,b.step(),&keep);
     try testing.expectEqual((rings-1)*sides*6+2*sides*3,b.v.items.len);

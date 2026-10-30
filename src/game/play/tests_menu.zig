@@ -1,32 +1,54 @@
 //! play tested: standing still, clicking the HUD, the menus and saving.
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the test helpers
 const testing=std.testing;
+/// deep equality, to find the row picking what is wanted
 const eqlDeep=std.meta.eql;
+/// writing into a fixed buffer, for gardens' names
 const bufPrint=std.fmt.bufPrint;
+/// the engine package
 const engine=lib.engine;
+/// all the maths: conversions, minutes
 const m=engine.core.math;
+/// the keys and buttons, set by hand here
 const Input=engine.platform.input.Input;
+/// the bindings: actions held and loaded
 const ctl=lib.controls;
+/// the renderer, for its antialiasing choices
 const renderer=lib.renderer;
+/// the weave recipes, some woven by hand
 const craft=lib.craft;
+/// the HUD: building it, its rows to click
 const hud=lib.hud;
+/// saving: gardens' names
 const save=lib.save;
+/// the test gardens' world seed
 const defaultSeed=lib.play.defaultSeed;
+/// how many gardens' rows are in view at once
 const gardensShown=lib.play.gardensShown;
+/// the game under test
 const Game=lib.play.game.Game;
+/// what has the wolf's attention
 const Mode=lib.play.Mode;
+/// one simulation tick (s), each frame's step here
 const tickTime=lib.play.tickTime;
+/// the window's size when it opens
 const windowSize=lib.play.windowSize;
 /// tests draw to a window of the default size
 pub const testScreen=[2]f32{m.f(windowSize[0]),m.f(windowSize[1])};
 test"the wolf stays put without input"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
   try lib.setups.demo(&g,5);
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   in.mouse=.{-1e4,-1e4};
+  // where the wolf stood at the start
   const start=g.player.pos;
   for(0..300)|_|{
     try g.update(&in,tickTime,testScreen);
@@ -56,12 +78,16 @@ pub const click=struct{
   }
 };
 test"clicking a research node or weave recipe picks it; number keys only pick the hotbar"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   g.mode=.research;
   try click.on(&g,&in,hud.row(.research,.{.node=.leySight}),screen);
@@ -81,12 +107,16 @@ test"clicking a research node or weave recipe picks it; number keys only pick th
   try testing.expectEqual(@as(usize,1),g.weave.len);
 }
 test"the pause menu opens the options; clicks turn them and lead back"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   g.opts=.{.aa=.off};
   g.mode=.paused;
@@ -104,12 +134,16 @@ test"the pause menu opens the options; clicks turn them and lead back"{
   try testing.expectEqual(@as(u64,0),g.ticks);
 }
 test"the saved gardens scroll, save over one or delete it only when asked twice, and load"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   g.mode=.paused;
   try click.on(&g,&in,hud.row(.pause,.{.row=.gardens}),screen);
@@ -118,6 +152,7 @@ test"the saved gardens scroll, save over one or delete it only when asked twice,
   g.request=null;
   // main lists them: more than fit, so the list scrolls
   for(0..gardensShown+3)|i|{
+    // room to write this garden's name in
     var buf:[16]u8=undefined;
     try g.gardens.append(gpa,.{.name=save.Name.of(bufPrint(&buf,"garden {d}",.{i}) catch unreachable).?,.age=@intCast(i*90)});
   }
@@ -165,12 +200,16 @@ test"the saved gardens scroll, save over one or delete it only when asked twice,
   try testing.expectEqual(@as(u64,0),g.ticks);
 }
 test"the save key asks a garden without a name for one: typed, taken asks twice, OK saves"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   in.mouse=.{-1e4,-1e4};
   in.advance();
@@ -215,14 +254,18 @@ test"the save key asks a garden without a name for one: typed, taken asks twice,
   try testing.expect(g.request.?==.save);
 }
 test"the garden saves itself once the autosave interval is played"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   in.mouse=.{-1e4,-1e4};
   g.opts.autosave=1;
+  // each frame's step (s), and how many frames ran before it asked
   const stepS:f32=0.5;
   var frames:usize=0;
   while(g.request==null):(frames+=1)try g.update(&in,stepS,testScreen);

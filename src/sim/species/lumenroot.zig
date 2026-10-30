@@ -4,9 +4,13 @@
 //! mat of braided roots, a leaf rosette, a vine twining up it, its cyan
 //! bloom opening out of a bead of resin sap.
 const lib=@import("../../lib.zig");
+/// the species registry: what a species is
 const species=lib.species;
+/// the engine package, reached through the hub
 const engine=lib.engine;
+/// colour types, for its genome's greens and cyan bloom
 const color=engine.core.color;
+/// the lumenroot: the first symbiote, quick to grow, sharing most of its mana
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedLumenroot,
   .matureTime=12,.manaCap=10,.leyDraw=0.6,.share=0.8,.drain=0,.yield=0.12,

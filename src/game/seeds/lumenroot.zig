@@ -1,23 +1,35 @@
 //! LUMENROOT seed: a leafy sprout opening a cyan flower, motes of mana
 //! running from it to the little sprouts beside it (it shares with kin).
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
+/// all the maths: vectors, easing, angles
 const m=lib.engine.core.math;
+/// what can be held: item kinds
 const items=lib.items;
+/// the tools a seed icon is drawn with
 const iconKit=lib.icon;
+/// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
+/// the seed this module draws
 pub const item:items.Item=.seedLumenroot;
+/// draws a leafy sprout opening a cyan flower, two little kin sprouts beside
+/// it with motes of mana running out to them, and the coat in `col` beneath.
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
+  // where the flower opens, atop the stem
   const top:iconKit.P=.{0,0.66};
   try ic.stem(.{.{0,iconKit.topAt},.{-0.06,0.3},.{0.06,0.48},top},0.1,stem);
   try ic.leaf(.{0,0.3},0.5,0.32,0.16,iconKit.sprout,0.9);
   try ic.leaf(.{0,0.38},m.pi-0.5,0.3,0.15,iconKit.sprout,0.9);
   // the neighbours it feeds, and the mana running out to them
   for([_]f32{-1,1},0..)|sx,i|{
+    // where this neighbour sprout stands, left or right
     const kin:iconKit.P=.{0.72*sx,-0.32};
     try ic.stem(.{.{kin[0],kin[1]-0.18},.{kin[0],kin[1]-0.08},.{kin[0]+0.02*sx,kin[1]},kin},0.06,stem);
     try ic.leaf(kin,if(sx<0)m.pi-0.7 else 0.7,0.18,0.11,iconKit.sprout,0.9);
+    // the arc the mana runs along, and how far along it this mote is, 0..1
     const run=[4]iconKit.P{top,.{0.3*sx,0.85},.{0.7*sx,0.3},kin};
     const k=@mod(ic.t*runAmount+ic.phase+m.f(i)*0.5,1);
     try ic.bud(iconKit.curve(run,k),0.06,mote,@sin(k*m.pi));
@@ -30,12 +42,19 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
   try ic.bud(top,0.06,core,1);
   try ic.coat(col);
 }
+/// how many petals the flower opens
 const petals=6;
-/// motes out to the neighbours a second
+/// how many motes run out to each neighbour a second
 const runAmount:f32=0.4;
+/// the stems: a soft green
 const stem:Color=.{70,140,95,255};
+/// the petals: bright cyan
 const petal:Color=.{140,240,255,255};
+/// the flower's core: near white
 const core:Color=.{230,255,250,255};
+/// the stamens: a pale mint
 const filament:Color=.{220,250,245,255};
+/// the motes of mana running out to the kin
 const mote:Color=.{160,250,240,255};
+/// the flower's halo, soft cyan
 const glow:Color=.{140,240,255,80};

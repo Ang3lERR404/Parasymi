@@ -1,33 +1,57 @@
 //! play tested: a germinator's panel, carrying and discarding stacks.
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the test helpers
 const testing=std.testing;
+/// the engine package
 const engine=lib.engine;
+/// all the maths: tiles, footprints, vectors
 const m=engine.core.math;
+/// the chunk layer: tile indices
 const ck=lib.ck;
+/// what can be held: item kinds and stacks
 const items=lib.items;
+/// the keys and buttons, set by hand here
 const Input=engine.platform.input.Input;
+/// the bindings: actions held and loaded
 const ctl=lib.controls;
+/// the weave recipes: seeds a germinator weaves
 const craft=lib.craft;
+/// the structures registry: placing, what is chosen
 const st=lib.structures;
+/// the HUD: rows to click
 const hud=lib.hud;
+/// the test gardens' world seed
 const defaultSeed=lib.play.defaultSeed;
+/// the game under test
 const Game=lib.play.game.Game;
+/// what has the wolf's attention
 const Mode=lib.play.Mode;
+/// the screen size the tests draw for
 const testScreen=lib.play.testsMenu.testScreen;
+/// one simulation tick (s), each frame's step here
 const tickTime=lib.play.tickTime;
+/// clicking a HUD row headlessly, from the menu tests
 const click=lib.play.testsMenu.click;
 test"a germinator's panel: choose its seed, put in only what it weaves from, move stacks across"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
+  // the tile the wolf stands on
   const x,const z=m.tileAt(g.player.pos);
+  // the germinator's footprint beside the wolf, cleared to bare soil
   var fp=m.footprint(x+1,z,2);
   while(fp.next())|p|{
+    // this footprint tile's chunk and index
     const c=g.world.chunkOfTile(p[0],p[1]).?;
     const t=ck.localIndex(p[0],p[1]);
     c.kind[t]=.soil;
@@ -35,6 +59,7 @@ test"a germinator's panel: choose its seed, put in only what it weaves from, mov
     c.occ[t]=.none;
   }
   try testing.expect(try g.structs.place(gpa,&g.world,x+1,z,.germinator,0,0));
+  // the germinator just placed
   const id=g.structs.at(&g.world,x+1,z).?;
   g.player.inv=.{};
   g.player.inv.slot[0]=.{.item=.fibre,.n=30};
@@ -42,7 +67,7 @@ test"a germinator's panel: choose its seed, put in only what it weaves from, mov
   g.mode=.structure;
   g.open=.{x+1,z};
   try testing.expect(g.opened()!=null);
-  // set to thornleech, it takes no fibre: the stack stays in hand
+  // set to thornleech, it takes no fibre: the stack stays in hand (its recipe)
   const thorn=for(craft.seeds)|r|{
     if(craft.hand[r].out==.seedThornleech)break r;
   }else unreachable;
@@ -58,7 +83,7 @@ test"a germinator's panel: choose its seed, put in only what it weaves from, mov
   try click.on(&g,&in,hud.row(.belly,.{.store=2}),screen);
   try testing.expectEqual(@as(u32,5),g.structs.get(id).inv.count(.grit));
   try testing.expect(g.held==null and g.player.inv.slot[1]==null);
-  // a locked seed is not chosen
+  // a locked seed is not chosen (vesper's recipe)
   const vesper=for(craft.seeds)|r|{
     if(craft.hand[r].out==.seedVesper)break r;
   }else unreachable;
@@ -83,12 +108,16 @@ test"a germinator's panel: choose its seed, put in only what it weaves from, mov
   try testing.expectEqual(Mode.roam,g.mode);
 }
 test"a click lifts a stack, the next puts it down; dropped on the hotbar it assigns"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   for(g.bar)|b|try testing.expect(b==null);
   g.mode=.belly;
@@ -132,12 +161,16 @@ test"a click lifts a stack, the next puts it down; dropped on the hotbar it assi
   try testing.expect(g.bar[0]==null and g.selected()==null);
 }
 test"discard throws away a belly stack, hovered or carried, never a structure's"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
+  // the screen the clicks land on
   const screen=testScreen;
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
   g.mode=.belly;
   g.player.inv=.{};

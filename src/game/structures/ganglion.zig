@@ -8,68 +8,108 @@
 //! each neighbour it feeds, and a pulse of what it hands on runs out along
 //! it.
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
+/// the test harness: allocator and expectations
 const testing=std.testing;
+/// all the maths: vectors, directions, easing
 const m=lib.engine.core.math;
+/// colour conversions, for tinting a pulse by its item's colour
 const color=lib.engine.core.color;
+/// chunk sizes, for laying moss under the tests' loomferns
 const ck=lib.ck;
+/// the garden's tile world the tests grow on
 const World=lib.world.World;
+/// what can be held: item kinds and stacks of them
 const items=lib.items;
+/// the garden's plants (the tests' bench needs a list of them)
 const Plants=lib.plants.Plants;
+/// the structures registry: `Def`, `Structure`, the hooks' context
 const st=lib.structures;
+/// the shared structure test bench: ground, running ticks
 const bench=st.bench;
+/// the tools a bulb icon is drawn with
 const iconKit=lib.icon;
+/// every player-facing string
 const txt=lib.txt;
+/// what the gardener has understood
 const prog=lib.progression;
+/// the HUD's shared sizes and colours
 const style=lib.style;
+/// the scene's list of moving parts this ganglion adds to each frame
 const Parts=lib.parts.Parts;
+/// the UI's draw batch, which the panel text goes into
 const Draw=lib.engine.ui.draw.Draw;
+/// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
+/// the ganglion's mesh: where its bladder's heart is and how wide
 const mesh=lib.ganglion;
+/// builds a three-float vector
 const v3=m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.bellyLump,.ganglionNerve};
+/// what a ganglion is: grown from its seed, one tile across, a pale low
+/// knot that stores and swaps sap, swaying a little
 pub const def:st.Def=.{.item=.ganglion,.size=1,.mesh=.ganglion,.store=true,.grow=4,.sway=0.4,.tall=0.45,.sap=0.3,.pale=true};
-/// most it holds at once, and seconds between one hand-off and the next
+/// the most things its bladder holds at once
 pub const holdTime=8;
+/// seconds between one hand-off and the next
 pub const pass:f32=0.35;
-/// how fast a nerve grows out to a neighbour it may feed, and withers
+/// how fast a nerve grows out to a neighbour it may feed (lengths a second)
 const nerveGrow:f32=0.8;
+/// how fast a nerve withers once that neighbour is gone (lengths a second)
 const nerveWither:f32=1.2;
 /// a pulse runs out along a nerve this fast (its length a second)
 const pulseRate:f32=3;
-/// what it holds hangs in its bladder: in a ring this far out, bobbing
+/// what it holds hangs in its bladder in a ring this far out, as a share
+/// of the bladder's radius
 const ringRadius:f32=0.45;
+/// the size of a held shape holding a single thing
 const lumpR:f32=0.022;
+/// how much larger a held shape grows as the bladder fills
 const lumpGrow:f32=0.02;
+/// how far each held shape bobs up and down
 const bobAmount:f32=0.01;
+/// how fast the ring of held shapes turns (radians a second)
 const turnRate:f32=0.3;
+/// how brightly the nerves and held shapes glow
 const glow:f32=0.2;
+/// what a ganglion remembers between ticks: whose turn it is, its nerves
+/// and the pulses running along them
 pub const State=struct{
   /// the side it hands on to next (round them in turn)
   turn:u8=0,
+  /// seconds since its last hand-off
   t:f32=0,
   /// how far its nerve toward each side has grown (0..1), by world direction
   reach:[4]f32=@splat(0),
   /// a pulse running out along each nerve (0 just sent .. 1 arrived, or
   /// none) and the item it carries
   pulse:[4]?f32=@splat(null),
+  /// the item each nerve's last pulse carried, for its colour
   sent:[4]items.Item=@splat(.essence),
 };
-/// whether the neighbour on side `d` may be fed (by a carrier: only one
-/// not facing into it)
+/// the neighbour on side `d` it may feed, or null: none there, or a carrier
+/// facing into it (it never hands back up a line)
 fn feeds(ctx:st.Ctx,self:*const st.Structure,d:m.Dir)?st.Id{
+  // the step toward that side, the neighbour there, and that neighbour
   const v=m.dirVec(d);
   const j=ctx.ss.at(ctx.w,self.x+v.x,self.y+v.z) orelse return null;
   const t=ctx.ss.get(j);
   if(t.def().carrier and t.dir==d+%2)return null;
   return j;
 }
+/// grows each nerve toward a neighbour it may feed (withering the rest),
+/// runs the pulses along them, and every `pass` seconds hands one thing on
+/// to the next side round that takes it. Returns true while it holds anything.
 pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
+  // the ganglion itself, and its remembered state
   const self=ctx.ss.get(i);
   const gs=&self.state.ganglion;
   for(m.dirs)|d|{
+    // this side's nerve reach
     const r=&gs.reach[d];
     r.*=if(feeds(ctx,self,d)!=null)@min(1,r.*+dt*nerveGrow)else@max(0,r.*-dt*nerveWither);
     if(gs.pulse[d])|*p|{
@@ -82,11 +122,14 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(gs.t<pass)return true;
   // round the sides in turn, each offered what it holds
   for(0..4)|k|{
+    // the side offered now, starting from whose turn it is
     const d:m.Dir=@intCast((gs.turn+k)%4);
     if(gs.reach[d]<1)continue;
+    // the neighbour fed on that side, and that neighbour
     const j=feeds(ctx,self,d) orelse continue;
     const t=ctx.ss.get(j);
     for(self.inv.slot)|slot|{
+      // what this slot holds, offered whole to the neighbour
       const it=(slot orelse continue).item;
       if(!ctx.ss.handIn(ctx.g,j,it,(d+%2)-%t.dir))continue;
       _=self.inv.take(it,1);
@@ -100,14 +143,16 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // nobody took anything: try again next tick
   return true;
 }
-/// anything, while it has room.
+/// it wants anything, while its bladder has room (up to `holdTime` in all).
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdTime-|s.inv.total();}
 /// its nerves out to the neighbours it feeds, a pulse of what it hands on
 /// running out along each, and what it holds hanging in its bladder.
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
+  // its remembered state
   const gs=&s.state.ganglion;
   for(gs.reach,0..)|r,d|{
     if(r<=0)continue;
+    // how far the pulse has run (-1: none), and the colour it carries
     const carry=gs.pulse[d]orelse-1;
     const col=color.Rgba8.of(gs.sent[d].info().col).toF4();
     try out.emit(.ganglionNerve,m.chain(&.{m.translate(ctr),m.rotY(m.dirYaw(@intCast(d)))}),.{
@@ -115,22 +160,31 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     });
   }
   if(s.grown<1)return;
+  // how many stacks it holds, and which of them is being drawn
   const n=s.inv.used();
   var k:usize=0;
+  // its frame in the world
   const base=s.place(ctr);
   for(s.inv.slot)|slot|{
+    // the stack in this slot
     const it=slot orelse continue;
+    // the stack's place on the ring: its angle, the ring's reach, where it hangs
     const a=m.ratio(k,n)*m.tau+tf*turnRate+s.seed*6;
     const ring=if(n==1)0 else mesh.heartR[0]*ringRadius;
     const at=mesh.heartAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.1+m.f(k)*2),@sin(a)*ring);
+    // its size: larger the fuller the stack
     const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
     try s.emitLump(out,base,at,r,it.item,glow);
     k+=1;
   }
 }
+/// its line in the panel: how many neighbours it shares with, and how full
+/// it is (dim while it feeds nobody).
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
+  // how many nerves have reached a neighbour
   var n:u32=0;
   for(s.state.ganglion.reach)|r|{if(r>=1)n+=1;}
+  // the line's colour: dim when it feeds nobody
   const col=if(n==0)style.dim else style.white;
   _=try d.print(x,y,style.textBody,col,txt.s.describe.shares,.{n,s.inv.total(),holdTime});
 }
@@ -138,8 +192,10 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
 /// out either side with beads running along them (it shares things out).
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
   for([_]f32{-1,1})|sx|{
+    // this side's nerve curve
     const nerve=[4]iconKit.P{.{0.05*sx,0.55},.{0.35*sx,0.62},.{0.6*sx,0.5},.{0.78*sx,0.2}};
     try ic.stem(nerve,0.06,iconNerve);
+    // how far along the nerve its bead has run (0..1), the sides half a run apart
     const k=@mod(ic.t*0.8+ic.phase+(if(sx<0)@as(f32,0.5)else 0),1);
     try ic.bud(iconKit.curve(nerve,k),0.07,iconBead,@sin(k*m.pi));
   }
@@ -147,23 +203,32 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
   try ic.glow(.{0,0.62},0.26,iconSacGlow);
   try ic.bud(.{0,0.62},0.2,iconSac,0.3);
   for(0..5)|k|{
+    // this knob's angle round the knot
     const a=m.ratio(k,5)*m.tau;
     try ic.bud(.{@cos(a)*0.2,0.6+@sin(a)*0.16},0.075,iconSkin,0.1);
   }
   try ic.coat(col);
 }
+/// the pale lilac of its knot and stalk in its bulb
 const iconSkin:Color=.{190,182,205,255};
+/// the violet of the nerves in its bulb
 const iconNerve:Color=.{175,160,210,255};
+/// the translucent blue of the bladder in its bulb
 const iconSac:Color=.{120,160,220,200};
+/// the soft blue glow behind that bladder
 const iconSacGlow:Color=.{120,160,220,70};
+/// the gold of the beads running along the nerves
 const iconBead:Color=.{255,215,120,255};
 // ---- tests ----
+/// the bench's tick length, seconds
 const testDt=bench.testDt;
 test"a ganglion splits a conduit line, never back into it"{
+  // the allocator, the world and its ground
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   _=try bench.ground(&w,.{.width=6,.depth=5});
+  // no plants, the structures, and what the gardener understands
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -183,16 +248,19 @@ test"a ganglion splits a conduit line, never back into it"{
   _=ss.insert(&g,ss.at(&w,0,2).?,.fibre,30);
   try bench.run(&ss,&w,&plants,&g,40);
   for([_][2]i32{.{4,2},.{2,0},.{2,4}})|o|{
+    // how much fibre reached this cache
     const n=ss.get(ss.at(&w,o[0],o[1]).?).inv.count(.fibre);
     try testing.expect(n>=8 and n<=12);
   }
   try testing.expectEqual(@as(u32,0),ss.get(ss.at(&w,0,2).?).inv.count(.fibre));
 }
 test"a ganglion feeds each neighbour only what it wants"{
+  // the allocator, the world and its ground
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   _=try bench.ground(&w,.{.width=6,.depth=5});
+  // no plants, the structures, and what the gardener understands
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -204,6 +272,7 @@ test"a ganglion feeds each neighbour only what it wants"{
   try testing.expect(try ss.place(gpa,&w,2,2,.ganglion,0,0));
   try testing.expect(try ss.place(gpa,&w,1,2,.loomfern,0,0));
   try testing.expect(try ss.place(gpa,&w,3,2,.loomfern,0,0));
+  // the ganglion
   const id=ss.at(&w,2,2).?;
   try testing.expectEqual(@as(u16,4),ss.insert(&g,id,.essence,4));
   try testing.expectEqual(@as(u16,4),ss.insert(&g,id,.grit,4));

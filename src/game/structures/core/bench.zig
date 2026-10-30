@@ -1,7 +1,9 @@
 //! the test bench: a little patch of ground every structure's tests grow on,
 //! and the clock that runs them. One shared copy instead of one per kind.
 const lib=@import("../../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the test allocator the bench's ticks run on
 const testing=std.testing;
 /// the chunk's tile layout and ground kinds
 const ck=lib.ck;

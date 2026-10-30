@@ -1,20 +1,36 @@
 //! runtime text: templates (`{0}`, `{1:.2}`) filled at runtime, and the
 //! `key = value` cfg format they are loaded from (see `game/text.zig`).
+/// the standard library
 const std=@import("std");
+/// the allocator type `expand` takes
 const Allocator=std.mem.Allocator;
+/// the stream writer templates are rendered into
 const Writer=std.Io.Writer;
+/// where one run of bytes first appears in another
 const indexOf=std.mem.indexOf;
+/// a table indexed by an enum, one value per tag
 const EnumArray=std.enums.EnumArray;
+/// strips the given bytes from both ends
 const trim=std.mem.trim;
+/// whether two runs of bytes are the same
 const eql=std.mem.eql;
+/// walks the pieces between each separator byte
 const splitScalar=std.mem.splitScalar;
+/// where one byte first appears
 const indexOfScalar=std.mem.indexOfScalar;
+/// where one byte first appears, from a given position on
 const indexOfScalarPos=std.mem.indexOfScalarPos;
+/// reads a whole number from its digits
 const parseUnsigned=std.fmt.parseUnsigned;
+/// the enum tag a name spells, if any
 const stringToEnum=std.meta.stringToEnum;
+/// the test helpers
 const testing=std.testing;
+/// how often one run of bytes appears in another
 const countOf=std.mem.count;
+/// formats into a fixed buffer
 const bufPrint=std.fmt.bufPrint;
+/// an allocator freed all at once (the tests')
 const ArenaAllocator=std.heap.ArenaAllocator;
 /// separates the entries of a list value (`a | b | c`).
 pub const listSep='|';
@@ -24,31 +40,42 @@ const maxKey=128;
 /// integers in decimal, floats with `{N:.P}` decimals (0 without), errors
 /// by name. `{{` is a literal brace; an unknown index writes nothing.
 pub fn render(w:*Writer,tpl:[]const u8,args:anytype)Writer.Error!void{
+  // the arguments' fields, walked at compile time to pick the one asked for
   const fields=@typeInfo(@TypeOf(args)).@"struct".fields;
+  // where in the template the walk stands
   var i:usize=0;
   while(i<tpl.len){
     if(tpl[i]!='{'){try w.writeByte(tpl[i]);i+=1;continue;}
     if(i+1<tpl.len and tpl[i+1]=='{'){try w.writeByte('{');i+=2;continue;}
+    // the closing brace, and what lies between the braces
     const end=indexOfScalarPos(u8,tpl,i,'}') orelse return w.writeAll(tpl[i..]);
     const spec=tpl[i+1..end];
     i=end+1;
+    // where the precision starts, if one is given
     const colon=indexOfScalar(u8,spec,':');
+    // which argument is asked for (anything else is skipped)
     const idx=parseUnsigned(usize,spec[0..colon orelse spec.len],10) catch continue;
+    // how many decimals a float gets
     const prec:usize=if(colon)|k|precision(spec[k+1..])else 0;
     inline for(fields,0..)|f,n|if(n==idx)try arg(w,@field(args,f.name),prec);
   }
 }
 /// `render` into `buf`, truncated to fit.
 pub fn bufRender(buf:[]u8,tpl:[]const u8,args:anytype)[]const u8{
+  // a writer over the buffer, which stops when it is full
   var w:Writer=.fixed(buf);
   render(&w,tpl,args)catch{};
   return w.buffered();
 }
+/// the decimals asked for by a `.P` spec, 0 when none or unreadable
 fn precision(s:[]const u8)usize{
   if(s.len<2 or s[0]!='.')return 0;
   return parseUnsigned(usize,s[1..],10) catch 0;
 }
+/// writes one argument: an integer in decimal, a float to `prec` decimals,
+/// an error by name, a string as it is
 fn arg(w:*Writer,a:anytype,prec:usize)Writer.Error!void{
+  // the argument's type, which picks how it is written
   const T=@TypeOf(a);
   switch(@typeInfo(T)){
     .int,.comptime_int=>try w.print("{d}",.{a}),
@@ -60,6 +87,7 @@ fn arg(w:*Writer,a:anytype,prec:usize)Writer.Error!void{
 }
 /// entry `i` of a list value, trimmed ("" past the end).
 pub fn nth(list:[]const u8,i:usize)[]const u8{
+  // the entries, and which one the walk is on
   var it=splitScalar(u8,list,listSep);
   var k:usize=0;
   while(it.next())|e|:(k+=1)if(k==i)return trim(u8,e," \t");
@@ -70,7 +98,15 @@ pub fn count(list:[]const u8)usize{
   if(list.len==0)return 0;
   return countOf(u8,list,&.{listSep})+1;
 }
-pub const ParseError=error{BadLine,UnknownKey,MissingKey};
+/// what reading a cfg can fail with
+pub const ParseError=error{
+  /// a line that is neither `key = value`, a comment nor a `[section]`
+  BadLine,
+  /// a key naming nothing in the target
+  UnknownKey,
+  /// a required string left empty after the whole file
+  MissingKey
+};
 /// fills `out` from cfg source `src`: one `key = value` per line, `#`
 /// comment lines, `[a.b]` prefixes the keys below it. Keys are dotted
 /// paths through `T`: struct fields, `EnumArray` tags, ending at a
@@ -78,46 +114,60 @@ pub const ParseError=error{BadLine,UnknownKey,MissingKey};
 /// (optional). Values are slices of `src`, which must outlive `out`.
 /// On error the offending line or key is written to `bad`.
 pub fn parse(comptime T:type,out:*T,src:[]const u8,bad:*Writer)ParseError!void{
+  // the dotted key, prefix and all, built here
   var keyBuf:[maxKey]u8=undefined;
+  // the current `[section]`'s prefix, and the room it is copied into
   var prefix:[]const u8="";
   var prefixBuf:[maxKey]u8=undefined;
+  // the source, line by line
   var lines=splitScalar(u8,src,'\n');
   while(lines.next())|raw|{
+    // this line, trimmed of spaces and its CR
     const line=trim(u8,raw," \t\r");
     if(line.len==0 or line[0]=='#')continue;
     if(line[0]=='['){
       if(line[line.len-1]!=']' or line.len-2>maxKey)return fail(bad,line,error.BadLine);
+      // the section's name, trimmed
       const p=trim(u8,line[1..line.len-1]," \t");
       @memcpy(prefixBuf[0..p.len],p);
       prefix=prefixBuf[0..p.len];
       continue;
     }
+    // where the key ends and the value begins
     const eq=indexOfScalar(u8,line,'=') orelse return fail(bad,line,error.BadLine);
+    // the key as written, and with its section's prefix
     const name=trim(u8,line[0..eq]," \t");
     const key=if(prefix.len==0)name else bufPrint(&keyBuf,"{s}.{s}",.{prefix,name}) catch return fail(bad,line,error.BadLine);
     if(!set(T,out,key,trim(u8,line[eq+1..]," \t")))return fail(bad,key,error.UnknownKey);
   }
+  // where a missing key's dotted path is built
   var pathBuf:[maxKey]u8=undefined;
   var path:Writer=.fixed(&pathBuf);
   if(missing(T,out,&path))return fail(bad,path.buffered(),error.MissingKey);
 }
+/// writes what went wrong (`what`) to `bad`, then returns `e`
 fn fail(bad:*Writer,what:[]const u8,e:ParseError)ParseError{
   bad.writeAll(what)catch{};
   return e;
 }
+/// whether `T` is an `EnumArray`, whose tags are keys like fields
 fn isEnumArray(comptime T:type)bool{
   return@typeInfo(T)==.@"struct"and@hasDecl(T,"Key")and@hasDecl(T,"Value") and T==EnumArray(T.Key,T.Value);
 }
+/// sets the leaf at dotted `path` inside `p` to `val`, walking fields and
+/// enum tags one dot at a time. Returns false when the path names nothing.
 fn set(comptime T:type,p:*T,path:[]const u8,val:[]const u8)bool{
   if(T==[]const u8 or T==?[]const u8){
     if(path.len!=0)return false;
     p.*=val;
     return true;
   }
+  // where the first dot is, the name before it and the path after it
   const dot=indexOfScalar(u8,path,'.');
   const head=path[0..dot orelse path.len];
   const rest=if(dot)|k|path[k+1..]else"";
   if(comptime isEnumArray(T)){
+    // the tag this name spells
     const k=stringToEnum(T.Key,head) orelse return false;
     return set(T.Value,p.getPtr(k),rest,val);
   }
@@ -128,9 +178,11 @@ fn set(comptime T:type,p:*T,path:[]const u8,val:[]const u8)bool{
 fn missing(comptime T:type,p:*const T,path:*Writer)bool{
   if(T==?[]const u8)return false;
   if(T==[]const u8)return p.len==0;
+  // where the path built so far ends, to go back to for each branch
   const at=path.end;
   if(comptime isEnumArray(T)){
     inline for(0..T.len)|i|{
+      // this tag
       const k=T.Indexer.keyForIndex(i);
       path.end=at;
       path.print("{s}{s}",.{if(at==0)""else".",@tagName(k)})catch{};
@@ -150,7 +202,13 @@ fn missing(comptime T:type,p:*const T,path:*Writer)bool{
 pub const token="{@";
 /// writes what token `name` stands for; false for no such name.
 pub const Lookup=*const fn(w:*Writer,name:[]const u8)Writer.Error!bool;
-pub const ExpandError=error{UnknownToken,BadLine}||Allocator.Error;
+/// what expanding tokens can fail with, besides running out of memory
+pub const ExpandError=error{
+  /// a `{@name}` naming nothing the lookup knows
+  UnknownToken,
+  /// a `{@` with no closing brace
+  BadLine
+}||Allocator.Error;
 /// replaces every `{@name}` in the string leaves of `p` with what `lookup`
 /// writes for `name`; changed strings are allocated from `gpa` (an arena:
 /// nothing is freed here). On an unknown name it is written to `bad`.
@@ -161,10 +219,13 @@ pub fn expand(comptime T:type,p:*T,gpa:Allocator,lookup:Lookup,bad:*Writer)Expan
   }
   if(T==[]const u8){
     if(indexOf(u8,p.*,token)==null)return;
+    // the string being rebuilt, and the writer into it
     var out:Writer.Allocating=.init(gpa);
     const w=&out.writer;
+    // what is left of the string to copy
     var rest=p.*;
     while(indexOf(u8,rest,token))|at|{
+      // the token's closing brace, and the name inside
       const end=indexOfScalarPos(u8,rest,at,'}') orelse return failExpand(bad,rest[at..],error.BadLine);
       const name=rest[at+token.len..end];
       w.writeAll(rest[0..at]) catch return error.OutOfMemory;
@@ -181,33 +242,42 @@ pub fn expand(comptime T:type,p:*T,gpa:Allocator,lookup:Lookup,bad:*Writer)Expan
   }
   inline for(@typeInfo(T).@"struct".fields)|f|try expand(f.type,&@field(p,f.name),gpa,lookup,bad);
 }
+/// writes what went wrong (`what`) to `bad`, then returns `e`
 fn failExpand(bad:*Writer,what:[]const u8,e:ExpandError)ExpandError{
   bad.writeAll(what)catch{};
   return e;
 }
 test"expand replaces load-time tokens"{
+  // three strings, one optional
   const T=struct{a:[]const u8="",b:?[]const u8=null,c:[]const u8=""};
+  // where the expanded strings are kept
   var arena:ArenaAllocator=.init(testing.allocator);
   defer arena.deinit();
+  // a lookup that knows only `k`, which stands for KEY
   const look=struct{
+    /// writes KEY for `k`; false for any other name
     fn f(w:*Writer,name:[]const u8)Writer.Error!bool{
       if(!eql(u8,name,"k"))return false;
       try w.writeAll("KEY");
       return true;
     }
   }.f;
+  // where an unknown token's name is written
   var badBuf:[maxKey]u8=undefined;
   var bad:Writer=.fixed(&badBuf);
+  // strings with tokens, repeated ones, a placeholder left alone and none
   var t:T=.{.a="PRESS {@k} OR {@k} {0}",.b="{@k}",.c="PLAIN"};
   try expand(T,&t,arena.allocator(),look,&bad);
   try testing.expectEqualStrings("PRESS KEY OR KEY {0}",t.a);
   try testing.expectEqualStrings("KEY",t.b.?);
   try testing.expectEqualStrings("PLAIN",t.c);
+  // a string with a token nobody knows
   var u:T=.{.a="{@nope}"};
   try testing.expectError(error.UnknownToken,expand(T,&u,arena.allocator(),look,&bad));
   try testing.expectEqualStrings("nope",bad.buffered());
 }
 test"render fills positional templates"{
+  // the buffer templates are rendered into
   var buf:[64]u8=undefined;
   try testing.expectEqualStrings("A 3 B 1.50 x",bufRender(&buf,"{1} {0} {2} {3:.2} x",.{@as(u32,3),"A","B",@as(f32,1.5)}));
   try testing.expectEqualStrings("{x} 2%",bufRender(&buf,"{{x} {0}%",.{@as(f32,2.4)}));
@@ -220,13 +290,20 @@ test"lists"{
   try testing.expectEqual(3,count("a|b|c"));
 }
 test"parse fills, rejects unknown and missing keys"{
+  // the tags of a table
   const E=enum{a,b};
+  // a top-level key, a section of two, and a table of names
   const T=struct{
+    /// a required key at the top
     top:[]const u8="",
+    /// a section: one required key, one optional
     sec:struct{x:[]const u8="",y:?[]const u8=null}=.{},
+    /// a table with one required name per tag
     tab:EnumArray(E,struct{name:[]const u8=""})=.initFill(.{}),
   };
+  // the strings to fill
   var t:T=.{};
+  // where a bad key is written
   var badBuf:[maxKey]u8=undefined;
   var bad:Writer=.fixed(&badBuf);
   try parse(T,&t,"# c\ntop = HI {0}\n[sec]\nx = X = 1\n[tab]\na.name = A\nb.name=B\n",&bad);
@@ -234,6 +311,7 @@ test"parse fills, rejects unknown and missing keys"{
   try testing.expectEqualStrings("X = 1",t.sec.x);
   try testing.expectEqual(null,t.sec.y);
   try testing.expectEqualStrings("B",t.tab.get(.b).name);
+  // a second set to fill, for the failures
   var u:T=.{};
   try testing.expectError(error.UnknownKey,parse(T,&u,"nope = 1",&bad));
   try testing.expectEqualStrings("nope",bad.buffered());

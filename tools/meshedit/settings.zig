@@ -1,108 +1,164 @@
 //! the mesh editor's settings: files, steps, the camera, the panel's layout and a form's values.
+/// the engine package, as the game's hub hands it on
 const engine=ps.engine;
+/// all the maths: vectors, angles, clamps
 const m=engine.core.math;
+/// clip channels, borrowed to name every value of a form
 const clip=engine.anim.clip;
+/// a UI colour: four bytes, red, green, blue and alpha
 const Color=engine.ui.draw.Color;
+/// the game, reached through its import hub
 const ps=@import("parasymi");
+/// the mesh library, whose first slot the sculpt is drawn into
 const meshlib=ps.meshlib;
+/// the HUD's shared colours and type sizes, borrowed for the panel
 const s=ps.style;
+/// a part role: the shader a part of the surface is drawn with
 const Part=ps.vertex.Part;
+/// a point or size in the sculpt (m)
 const V3=m.V3;
+/// makes a `V3` from its three parts
 const v3=m.v3;
 /// meshes are kept here (from the repo root)
 pub const dir="src/mesh";
+/// the file ending every kept mesh carries
 pub const ext=".mesh";
 /// a mesh's name is a plain file name: none of these
 pub const notInName="/\\:.*?\"<>|";
 /// the first line of a mesh's text
 pub const header="# mesh";
-/// `--shot` writes here, this many frames in (the world settled)
+/// `--shot` writes its one frame here
 pub const shotPath="shots/meshedit.png";
+/// how many frames `--shot` waits first, so the world has settled
 pub const shotFrames=30;
 /// a stalled frame counts as at most this long (s)
 pub const maxDt:f64=0.1;
-/// the surface's cells (m): to start, the step `[`/`]` take, the least,
-/// and the most cells across the whole sculpt (past that they widen)
+/// the surface's cell size to start (m)
 pub const cell:f32=0.01;
+/// how much `[`/`]` widen or narrow the cells (m)
 pub const cellStep:f32=0.0025;
+/// the finest the cells may be (m)
 pub const cellMin:f32=0.0025;
+/// the most cells across the whole sculpt (past that they widen)
 pub const maxCells:f32=256;
 /// the least a form's size may be (m)
 pub const sizeMin:f32=0.005;
-/// while a value is dragged the surface is meshed again at most this often
-/// (s), its cells this many times wider (full detail once it is let go)
+/// while a value is dragged the surface is meshed again at most this often (s)
 pub const remesh:f32=0.08;
+/// and its cells this many times wider then (full detail once let go)
 pub const dragCoarse:f32=2;
-/// a drag changes a length this much per pixel, a turn (degrees) and a
-/// colour these (shift: `FINE` of it)
+/// a drag changes a length this much per pixel (m)
 pub const dragLen:f32=0.002;
+/// a turn this much per pixel (degrees)
 pub const dragDeg:f32=0.5;
+/// a colour channel this much per pixel
 pub const dragCol:f32=0.004;
+/// and held with shift, this share of any of them, for fine work
 pub const fine:f32=0.2;
-/// where the gizmo's values start among a form's channels
+/// where the gizmo's values start among a form's channels: its place
 pub const pos=Ch.find("pos.x").?;
+/// its turn
 pub const rot=Ch.find("rot.x").?;
+/// its size
 pub const sizeTiles=Ch.find("size.x").?;
 /// a new form stands this far from the one it was made from
 pub const newOff=v3(0.1,0,0);
-/// the camera looks at this height over the sculpt's ground, from this far
-/// and this high (rad) to start
+/// the camera looks at this height (m) over the sculpt's ground to start
 pub const lookUp:f32=0.3;
+/// from this far away (m)
 pub const camDist:f32=1.6;
+/// and this high over it (rad)
 pub const camPitch:f32=m.rad(20);
 /// the library slot the sculpt is drawn from: nothing else is drawn
 pub const slotId:meshlib.Id=meshlib.ids[0];
 /// no wolf: its paws' contact shadows far off any tile
 pub const noFeet:f32=1e9;
-/// layout (px): the form list, the selected form's values under it
+/// layout (px): the gap round the panel's edges
 pub const pad:f32=16;
+/// the size of the panel's text
 pub const text:f32=s.textSmall;
+/// the height of one row of the list or the values
 pub const row:f32=18;
+/// how far down the window the form list starts
 pub const listY:f32=100;
+/// how wide the form list is
 pub const listW:f32=300;
+/// the most form rows shown at once
 pub const listRowCount=12;
+/// how far in from the list's left a value is written
 pub const valueX:f32=150;
 /// where a form's shader shows in its row
 pub const shadeX:f32=190;
+/// the height of one line of the help along the top
 pub const lineH:f32=20;
+/// the gap between the form list and the values under it
 const gap:f32=14;
-/// a form's handle in view (the selected one shows its gizmo instead): its
-/// radius, and how near a click picks it (px)
+/// a form's handle in view (the selected one shows its gizmo instead): its radius (px)
 pub const handleR:f32=4;
+/// how near (px) a click must land to pick a form's handle
 pub const pickRadius:f32=14;
-/// colours: selected, set, dim, carving, panels
+/// colours: the selected form and value
 pub const sel:Color=s.gold;
+/// a value that is set, and a form that adds
 pub const plain:Color=s.white;
+/// a dim note, and the help
 pub const bare:Color=s.dim;
+/// a form that carves
 pub const carve:Color=s.growth;
+/// the panels behind the list and the values
 pub const panel:Color=s.panel;
+/// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   m shader (shift back)   tab next form",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
-pub const Kind=enum{ellipsoid,cone,box};
+/// the shape a form takes
+pub const Kind=enum{
+  /// a round body with three radii
+  ellipsoid,
+  /// a rounded cone from a foot to a tip
+  cone,
+  /// a box with rounded edges
+  box,
+};
 /// a form's numbers, every one a value the editor shows and keeps
 pub const Vals=struct{
+  /// where it stands (m)
   pos:V3=.{0,0.3,0},
+  /// how it is turned (degrees: y, then x, then z)
   rot:V3=.{0,0,0},
+  /// its radii (an ellipsoid's), foot and tip radii and half length (a
+  /// cone's x, z and y), or half extents (a box's) (m)
   size:V3=.{0.15,0.15,0.15},
+  /// how much a box's edges are rounded (m)
   round:f32=0.02,
+  /// how far it melts into the forms before it (m)
   melt:f32=0.03,
+  /// its colour, red, green and blue (0..1)
   col:V3=.{0.45,0.42,0.3},
 };
+/// every value of a form, each a channel the panel shows and the text keeps
 pub const Ch=clip.Channels(Vals);
-const Way=enum{on,back};
+/// which way the shader is stepped through the roles
+const Way=enum{
+  /// to the next role
+  on,
+  /// to the one before
+  back,
+};
 /// the shader after `p` (before it, `.back`), round the roles
 pub fn nextShade(p:Part,way:Way)Part{
+  // how many roles there are, and the one now
   const n=@typeInfo(Part).@"enum".fields.len;
   const i:usize=@intFromEnum(p);
   return@enumFromInt(switch(way){.on=>(i+1)%n,.back=>(i+n-1)%n});
 }
-/// how many form rows show (at least one, at most `LIST_ROWS`)
+/// how many form rows show (at least one, at most `listRowCount`)
 pub fn listRows(n:usize)usize{return m.clamp(n,1,listRowCount);}
 /// where the values start, under `rows` form rows
 pub fn valuesY(rows:usize)f32{return listY+m.f(rows)*row+12+gap;}
+/// whether (`x`,`y`) (px) is over the form list or the values under it
 pub fn overUi(rows:usize,x:f32,y:f32)bool{
   return x<pad+listW and y>=listY-6 and y<valuesY(rows)+m.f(Ch.count)*row+6;
 }

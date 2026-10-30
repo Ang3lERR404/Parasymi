@@ -4,11 +4,16 @@
 //! within `link` tiles into one network: a growing bloom joined to a
 //! network that holds a mature one radiates too, so uprooting the bloom
 //! that joins them cuts off everything downstream. Plants that need
-//! radiance (`needs_radiance`) halt and wither outside every field.
+//! radiance (`needsRadiance`) halt and wither outside every field.
 const lib=@import("../../lib.zig");
+/// the species registry: what a species is
 const species=lib.species;
+/// the engine package, reached through the hub
 const engine=lib.engine;
+/// colour types, for its genome's pearl colours
 const color=engine.core.color;
+/// the celestial bloom: a floating radiant symbiote, holding a field of
+/// light 3.5 tiles round and linking with blooms within 10
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedBloom,.floating=true,
   // no item, no output: it radiates instead (the sky feeds it, as it does

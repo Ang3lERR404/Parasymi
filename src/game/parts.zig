@@ -1,25 +1,37 @@
 //! per-frame collector of rigid part instances, grouped by library mesh.
 const lib=@import("../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator the per-mesh lists grow with
 const Allocator=std.mem.Allocator;
+/// all the maths: vectors, matrices, frustums
 const m=lib.engine.core.math;
+/// the mesh library: ids and the slot each level of detail lives in
 const meshlib=lib.meshlib;
+/// the plant mesh builder, for the level of detail a distance calls for
 const mg=lib.meshgen;
+/// the vertex and instance layouts the GPU reads
 const vertex=lib.vertex;
+/// one part as the GPU reads it: matrix, look, curve and placement
 const PartInstance=vertex.PartInstance;
-/// how part.vert places an instance (`PartInstance.e.x`): by its matrix,
-/// bent along a curve, or as a star mote
+/// how part.vert places an instance (`PartInstance.e.x`; 0: by its matrix):
+/// bent along a curve
 const placeCurve:f32=1;
+/// how part.vert places a star mote
 const placeMote:f32=2;
+/// how part.vert places a skinned mesh, moved by its bones
 const placeSkin:f32=3;
-/// culling spheres: a mesh reaches `BOUND` times its scale plus
-/// `BOUND_PAD` from its origin; a mote `MOTE_BOUND`
+/// culling spheres: a mesh reaches `bound` times its scale plus
+/// `boundPad` from its origin
 const bound:f32=2.5;
+/// what a mesh's culling sphere reaches beyond its scaled size
 const boundPad:f32=0.5;
+/// how far a star mote's culling sphere reaches
 const moteBound:f32=0.6;
 /// what may cast a shadow into view is kept too: a thing this high over
-/// the ground, at most this far along the key light's rays
+/// the ground is assumed to cast
 const castAbove:f32=2;
+/// how far along the key light's rays a shadow is followed, at most
 const castReach:f32=24;
 /// the least rise of the key light the casting reach is worked out for
 const castLow:f32=0.15;
@@ -27,31 +39,39 @@ const castLow:f32=0.15;
 const hideWord=24;
 /// a curve is always drawn at least this far along
 const minReach:f32=1e-3;
+/// how one part looks: its glow, tint, sway, growth and what it carries
 pub const Look=struct{
+  /// how brightly it glows, 0..1
   glow:f32=0,
+  /// how much its leaves flutter
   flutter:f32=0,
+  /// its own phase, so neighbours move apart
   phase:f32=0,
+  /// how opaque it is, 0..1
   fade:f32=1,
   /// rgb tint + weight (weight 0 = no tint, 1 = full tint)
   tint:[4]f32=.{1,1,1,0},
   /// how far a resin part's surface is pushed off its rest (mesh space);
   /// its base on the body stays put (see vertex.Part.resin)
   give:[3]f32=.{0,0,0},
-  /// how far it bends in the garden's wind, as the plants do (0 rigid),
+  /// how far it bends in the garden's wind, as the plants do (0 rigid)
   /// over what height, rooted how far below its origin
   sway:f32=0,
+  /// the height the wind bends it over
   tall:f32=1,
+  /// how far below its origin it is rooted
   drop:f32=0,
   /// how far a grown structure has come along (0 sprout .. 1 grown): its
   /// leaves and petals unfold from the bottom up
   grown:f32=1,
-  /// a forming halo it rides with (see `vertex.NO_HALO`), and for a curve,
+  /// a forming halo it rides with (see `vertex.noHalo`)
   /// which of its ends that halo draws in (1 first, 2 last, 3 both)
   halo:[4]f32=vertex.noHalo,
+  /// for a curve, which of its ends that halo draws in (1 first, 2 last, 3 both)
   ends:f32=0,
-  /// essence carried through a conduit's core: how far along it (0..1,
-  /// < 0 none) and its colour (sRGB 0..1)
+  /// essence carried through a conduit's core: how far along it (0..1, < 0 none)
   carry:f32=-1,
+  /// the carried essence's colour (sRGB 0..1)
   carryCol:[3]f32=.{0,0,0},
   /// a placement preview: drawn, but casts no shadow
   ghost:bool=false,
@@ -60,14 +80,20 @@ pub const Look=struct{
   /// its eyes)
   hide:u64=0,
 };
+/// the scene's moving parts for one frame: instances gathered per library
+/// mesh and level of detail, the bones and lights they bring, and the eye
+/// they are culled for
 pub const Parts=struct{
+  /// the allocator the lists grow with
   gpa:Allocator,
+  /// every mesh slot's instances this frame
   lists:[meshlib.slots]std.ArrayList(PartInstance)=@splat(.empty),
   /// this frame's bones for skinned meshes (see `pose`)
   bones:std.ArrayList(m.M4)=.empty,
-  /// where the eye is this frame and what it sees: parts are drawn at the
-  /// level of detail their distance calls for, and not at all out of view
+  /// where the eye is this frame: parts are drawn at the level of detail
+  /// their distance calls for
   eye:m.V3=.{0,0,0},
+  /// what the eye sees (null: everything is kept)
   view:?m.Frustum=null,
   /// toward the key light (sun or moon): what stands out of view may still
   /// cast its shadow into it
@@ -77,12 +103,15 @@ pub const Parts=struct{
   /// while set, everything emitted (and every light) is carried by it: a
   /// structure turning (R) takes all it draws along with its body
   around:?m.M4=null,
+  /// an empty collector, growing with `gpa`
   pub fn init(gpa:Allocator)Parts{return.{.gpa=gpa};}
+  /// frees every list
   pub fn deinit(p:*Parts)void{
     for(&p.lists)|*l|l.deinit(p.gpa);
     p.bones.deinit(p.gpa);
     p.lights.deinit(p.gpa);
   }
+  /// empties every list for the next frame, keeping their room
   pub fn clear(p:*Parts)void{
     for(&p.lists)|*l|l.clearRetainingCapacity();
     p.bones.clearRetainingCapacity();
@@ -98,13 +127,16 @@ pub const Parts=struct{
   /// whether a thing within `r` of `at` is worth drawing: it can be seen,
   /// or its shadow can (it reaches down the key light's rays to the ground)
   pub fn sees(p:*const Parts,at:m.V3,r:f32)bool{
+    // the view; none set, and everything is kept
     const v=p.view orelse return true;
+    // how far down the key light's rays its shadow may fall
     const reach=@min((@max(at[1],0)+r+castAbove)/@max(p.toward[1],castLow),castReach);
     return v.capsule(at,at-p.toward*m.splat3(reach),r);
   }
   /// a point of light at `at` (linear `col` times its strength) lighting
   /// what lies within `reach` of it: kept if any of that can be seen
   pub fn light(p:*Parts,where:m.V3,col:m.V3,reach:f32)Allocator.Error!void{
+    // where it is, carried by the turning structure if one is set
     const at=if(p.around)|a|m.mulPoint(a,where)else where;
     if(p.view)|v|if(!v.sphere(at,reach))return;
     try p.lights.append(p.gpa,.{.pos=.{at[0],at[1],at[2],reach},.col=.{col[0],col[1],col[2],0}});
@@ -112,13 +144,18 @@ pub const Parts=struct{
   /// a mesh placed by its matrix: skipped when out of view (a sphere a few
   /// times its scale), at the level of detail for its distance.
   pub fn emit(p:*Parts,id:meshlib.Id,matIn:m.M4,lookIn:Look)Allocator.Error!void{
+    // the matrix, carried by the turning structure if one is set
     const mat=if(p.around)|a|m.mul(a,matIn)else matIn;
+    // where it stands, and its largest axis scale
     const at=m.v3(mat[3][0],mat[3][1],mat[3][2]);
     const scale=@max(m.len(m.v3(mat[0][0],mat[0][1],mat[0][2])),@max(m.len(m.v3(mat[1][0],mat[1][1],mat[1][2])),m.len(m.v3(mat[2][0],mat[2][1],mat[2][2]))));
     if(!p.sees(at,bound*scale+boundPad))return;
     try p.add(id,at,instance(mat,lookIn));
   }
+  /// files an instance under its mesh's slot for the level of detail its
+  /// distance from the eye calls for
   fn add(p:*Parts,id:meshlib.Id,at:m.V3,inst:PartInstance)Allocator.Error!void{
+    // the level of detail its distance calls for
     const lod=mg.lodAt(m.len(at-p.eye));
     try p.lists[meshlib.slot(id,lod)].append(p.gpa,inst);
   }
@@ -127,12 +164,14 @@ pub const Parts=struct{
   /// the length the mesh was built at, `reach` how far along it is drawn
   /// (0..1; what lies beyond gathers at its end).
   pub fn emitCurve(p:*Parts,id:meshlib.Id,ctrlIn:[4]m.V3,sideIn:m.V3,len:f32,reach:f32,lookIn:Look)Allocator.Error!void{
+    // the control points and side, carried by the turning structure if one is set
     var ctrl=ctrlIn;
     var side=sideIn;
     if(p.around)|a|{
       for(&ctrl)|*c|c.*=m.mulPoint(a,c.*);
       side=m.mulDir(a,side);
     }
+    // the instance, its matrix unused: the curve places it
     var inst=instance(m.identity,lookIn);
     inst.c0=.{ctrl[0][0],ctrl[0][1],ctrl[0][2],1};
     inst.c1=.{ctrl[1][0],ctrl[1][1],ctrl[1][2],1};
@@ -147,6 +186,7 @@ pub const Parts=struct{
   /// a skeleton's bones this frame (each carrying a vertex from where its
   /// mesh was built to where it is now); what `emitSkinned` takes
   pub fn pose(p:*Parts,bones:[]const m.M4)Allocator.Error!u32{
+    // where its bones start in this frame's list
     const base:u32=@intCast(p.bones.items.len);
     try p.bones.appendSlice(p.gpa,bones);
     return base;
@@ -155,6 +195,7 @@ pub const Parts=struct{
   /// about where it is (to cull it and pick its level of detail)
   pub fn emitSkinned(p:*Parts,id:meshlib.Id,base:u32,at:m.V3,lookIn:Look)Allocator.Error!void{
     if(!p.sees(at,bound+boundPad))return;
+    // the instance, at about where it stands
     var inst=instance(m.translate(at),lookIn);
     // (the mask 24 bones to a float, as part.vert reads it)
     std.debug.assert(lookIn.hide<1<<2*hideWord);
@@ -164,12 +205,15 @@ pub const Parts=struct{
   /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
   /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
   pub fn emitMote(p:*Parts,at:m.V3,phase:f32,life:f32,echo:f32,glow:f32)Allocator.Error!void{
+    // the mote's instance
     var inst=instance(m.translate(at),.{.glow=glow,.phase=phase});
     inst.e=.{placeMote,phase,life,echo};
     if(p.view)|v|if(!v.sphere(at,moteBound))return;
     try p.add(.mote,at,inst);
   }
+  /// every slot's instances this frame, as slices for the renderer
   pub fn slices(p:*const Parts)[meshlib.slots][]const PartInstance{
+    // the slices being filled
     var out:[meshlib.slots][]const PartInstance=undefined;
     for(&out,p.lists)|*o,l|o.*=l.items;
     return out;

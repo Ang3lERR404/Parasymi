@@ -4,9 +4,13 @@
 //! its own). Drains every non-parasitic neighbour and the ley beneath it;
 //! yields more, at their expense.
 const lib=@import("../../lib.zig");
+/// the species registry: what a species is
 const species=lib.species;
+/// the engine package, reached through the hub
 const engine=lib.engine;
+/// colour types, for its genome's grey skin, lilac fronds and blue sap
 const color=engine.core.color;
+/// the thornleech: the first parasite, quickest to mature, draining its neighbours
 pub const def:species.Species=.{
   .lineage=.parasitic,.seed=.seedThornleech,
   .matureTime=8,.manaCap=14,.leyDraw=1.0,.share=0,.drain=1.2,.yield=0.22,

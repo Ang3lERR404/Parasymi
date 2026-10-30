@@ -15,76 +15,111 @@
 //! The pectorals, the rear, the ears and the belly are their own skinned
 //! meshes (translucent sap and resin, sprung by the rig).
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator error every building call may fail with
 const Allocator=std.mem.Allocator;
+/// the generic engine package
 const engine=lib.engine;
+/// all the maths: vectors, matrices, easing
 const m=engine.core.math;
+/// the mesh builder the hide and all on it is laid into
 const mg=lib.meshgen;
+/// the garden's shared colours (the wolf's core, vine, leaves, claws, sap)
 const pal=lib.palette;
+/// colour mixing, for the hide's tones
 const color=engine.core.color;
+/// part roles (reached for nothing here at present)
 const vertex=lib.vertex;
+/// the wolf's kit: fur leaves, claws and toes
 const kit=lib.wolfKit;
+/// the sculpt kit: forms melted into one surface, cast onto and weighted
 const sculpt=engine.gfx.sculpt;
+/// the wolf's bones, their sizes and the bind pose
 const skel=lib.skeleton;
+/// a point or direction in 3D
 const V3=m.V3;
+/// makes a `V3` from three numbers
 const v3=m.v3;
+/// a 4x4 transform: one bone's frame
 const M4=m.M4;
+/// one of the wolf's bones
 const Bone=skel.Bone;
+/// one sculpted form (named here, though the forms are added by literal)
 const Form=sculpt.Form;
 /// the hide's cells at full detail (each level of detail doubles them)
 pub const cell:f32=0.005;
-/// the hide: a muted olive-brown, the vine's tone on the muscles, the
-/// core's darker brown on the hands and feet, a paler muzzle
+/// the hide: a muted olive-brown, halfway between the wolf's core and its vine
 const hide=color.mix(pal.wolfCore,pal.wolfVine,0.45);
+/// the muscles' tone: nearer the vine
 const muscle=color.mix(pal.wolfCore,pal.wolfVine,0.7);
+/// the hands' and feet's darker brown
 const dark=color.mix(pal.wolfCore,color.rgb(0.1,0.08,0.05).toRgba8(255),0.35);
+/// the muzzle's paler tone
 const muzzle=color.mix(pal.wolfCore,pal.wolfVine,0.55);
+/// near-black, for the lip line and the sockets' rims
 const lip=color.rgb(0.08,0.06,0.05).toRgba8(255);
-/// the eyes: centre and radius in the head's frame (x for the right one)
+/// each eye's centre in the head's frame (x for the right one)
 pub const eye=v3(0.034,0.03,0.071);
+/// each eye's radius
 const eyeR:f32=0.0125;
-/// the nose pad, at the upturned end of the muzzle (head frame), and the
-/// way its face looks (up and forward)
+/// the nose pad, at the upturned end of the muzzle (head frame)
 pub const nose=v3(0,0.038,0.174);
+/// how far the nose pad's face tips up from facing forward (radians)
 pub const noseTilt:f32=0.45;
 /// where each paw's beans sit (hand, fingertip and foot frames, x for the
-/// right side): the palm's pad, one under each fingertip, the sole's
+/// right side). The palm's pad, in the hand's frame
 pub const palmAt=v3(-0.025,-0.05,0.0);
+/// each fingertip's bean, in its tip's frame
 pub const tipPad=v3(-0.0088,-0.016,0);
+/// how far under the foot's frame the sole lies
 pub const soleY:f32=-0.006;
+/// the sole's big pad, in the foot's frame
 pub const padAt=v3(0,soleY+0.002,0.035);
+/// where each of the four toes sits on the foot (x across, z forward)
 pub const toes=[4][2]f32{.{-0.027,0.098},.{-0.009,0.108},.{0.009,0.108},.{0.027,0.098}};
-/// the fingers: their radii at the knuckle, the middle joint and the tip,
-/// how softly they melt into each other (barely: they stay apart), and
-/// how tightly the skin passes across their joints
+/// the fingers' radii at the knuckle, the middle joint and the tip
 const fingerR=[3]f32{0.0118,0.0105,0.0086};
+/// how softly the fingers melt into each other: barely
 const fingerK:f32=0.004;
+/// how tightly the skin passes across the fingers' joints
 const fingerSoft:f32=0.006;
-/// the dewclaw thumb: from high on the paw's leading edge, out and down
-/// (hand frame, x for the right side)
+/// the dewclaw thumb's root, high on the paw's leading edge (hand frame,
+/// x for the right side)
 const dewRoot=v3(0,-0.026,0.044);
+/// where the dewclaw thumb ends, out and down
 const dewTip=v3(-0.006,-0.046,0.062);
 /// how far the ribcage stands over the waist: the waist's half-width and
-/// depth, the ribcage's lower edge lifted (its height kept at the top),
-/// how softly the two melt, and the lats' depth and melt
+/// depth (the ribcage's lower edge is lifted after, its height kept at the top)
 const ribWaist=[2]f32{0.12,0.093};
+/// how far the ribcage's lower edge is lifted, its height kept at the top
 const ribLift:f32=0.012;
+/// how softly the ribcage melts into the waist
 const ribMelt:f32=0.1;
+/// how deep the lats stand off the back
 const latDepth:f32=0.032;
+/// how softly the lats melt into the waist
 const latMelt:f32=0.07;
 /// the lats end higher, their lower ends lifted off the waist
 const latLift:f32=0.02;
 /// how softly the limbs' muscles melt into each other and the bone under
 /// them: small, so each reads as its own mass with a groove between
 const meatMelt:f32=0.014;
+/// bone `b`'s index, its slot in the frames and the skin
 fn bi(b:Bone)u8{return@intFromEnum(b);}
+/// an ellipsoid shape centred at `c` with radii `r`
 fn ell(c:V3,r:V3)sculpt.Shape{return.{.ellipsoid=.{.c=c,.r=r}};}
+/// a rounded cone from `a` (radius `ra`) to `b` (radius `rb`)
 fn cone(a:V3,b:V3,ra:f32,rb:f32)sculpt.Shape{return.{.cone=.{.a=a,.b=b,.ra=ra,.rb=rb}};}
 /// the forms, built into `s` around the bind pose `w`
 fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
+  // a helper that adds forms placed in a bone's frame of the bind pose
   const Add=struct{
+    /// the sculpt the forms go into
     s:*sculpt.Sculpt,
+    /// the bind pose's frames
     w:*const[skel.count]M4,
+    /// adds `shape` in `bone`'s frame, coloured `col`, melting into its neighbours over `k`
     fn f(a:@This(),bone:Bone,shape:sculpt.Shape,col:color.Rgba8,k:f32)Allocator.Error!void{
       try a.s.add(.{.shape=shape,.at=a.w[bi(bone)],.bone=bi(bone),.col=col,.k=k});
     }
@@ -93,6 +128,7 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
       try a.s.add(.{.shape=shape,.at=m.mul(a.w[bi(bone)],at),.bone=bi(bone),.col=col,.k=k});
     }
   };
+  // the helper, bound to this sculpt and pose
   const a:Add=.{.s=s,.w=w};
   // hips: the pelvis's mass (the resin rear sits on its back)
   try a.f(.pelvis,ell(v3(0,0.045,-0.008),v3(0.14,0.1,0.105)),hide,0.04);
@@ -149,6 +185,7 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   // bicep before and the tricep behind; the forearm swelling below the
   // elbow and tapering to the wrist; the back of the hand
   for(skel.sides,0..)|sd,si|{
+    // which way out this side is: -1 left, 1 right
     const x=skel.sign(si);
     // the deltoid in three heads (front, side, rear) capping the shoulder
     try a.f(sd.arm,ell(v3(0,-0.035,0),v3(0.082,0.092,0.082)),muscle,meatMelt*1.6);
@@ -193,7 +230,9 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   // the tail, growing out of the rear and tapering to its tip
   const radii=[_]f32{0.056,0.048,0.04,0.03,0.011};
   for([_]Bone{.tail0,.tail1,.tail2,.tail3},0..)|tb,i|{
+    // where this tail segment's cone starts: the first sunk a little into the rear
     const from:f32=if(i==0)-0.03 else 0;
+    // how long it runs: the last a touch short, so the tip stays a point
     const len=if(i==3)skel.tailSeg*0.92 else skel.tailSeg;
     try a.f(tb,cone(v3(0,from,0),v3(0,len,0),radii[i],radii[i+1]),hide,if(i==0)0.045 else 0.03);
   }
@@ -205,6 +244,7 @@ pub fn sculpted(gpa:Allocator,w:*const[skel.count]M4)Allocator.Error!sculpt.Scul
 /// only the forms of the bones in `only` (all when null): the part of the
 /// body a mesh lies on, without what stands near it (the tail by the rear)
 pub fn sculptedOf(gpa:Allocator,w:*const[skel.count]M4,only:?[]const Bone)Allocator.Error!sculpt.Sculpt{
+  // the sculpt, knowing which bone hangs from which
   var s:sculpt.Sculpt=.{.gpa=gpa,.parents=&parents};
   if(only)|bones|{
     s.only=0;
@@ -214,13 +254,19 @@ pub fn sculptedOf(gpa:Allocator,w:*const[skel.count]M4,only:?[]const Bone)Alloca
   try sculptBody(&s,w);
   return s;
 }
+/// each bone's parent's index (null for the pelvis), as the sculpt wants it
 const parents=blk:{
+  // each bone's parent index, filled in turn
   var out:[skel.count]?u8=undefined;
   for(&out,0..)|*o,i|o.*=if(skel.parent(@enumFromInt(i)))|p|@intFromEnum(p)else null;
   break:blk out;
 };
+/// lays the whole body: the hide meshed from the sculpt at this level of detail
+/// (cells doubling each level), then the eyes, vines, fur and digits over it
 pub fn build(b:*mg.Builder)Allocator.Error!void{
+  // the bind pose's frames
   const w=skel.bind();
+  // the sculpted body, freed once the hide is laid
   var s=try sculpted(b.gpa,&w);
   defer s.deinit();
   try s.mesh(mg.gen,b,cell*m.f(@as(u32,1)<<@intCast(b.lod)),0.5,.stem);
@@ -229,6 +275,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   try fur(b,&s,&w);
   try digits(b,&w);
 }
+/// the way `d` points once turned by `mat`, unit length
 fn dir(mat:M4,d:V3)V3{return m.norm(m.mulDir(mat,d));}
 /// every vertex since `start` moves with `bone` alone
 fn rigid(b:*mg.Builder,start:usize,bone:Bone)Allocator.Error!void{
@@ -237,6 +284,7 @@ fn rigid(b:*mg.Builder,start:usize,bone:Bone)Allocator.Error!void{
 /// the eyes: amber sap set back in the sockets, glowing
 fn eyes(b:*mg.Builder,w:*const[skel.count]M4)Allocator.Error!void{
   for([_]f32{-1,1})|x|{
+    // where this eye's vertices begin
     const start=b.mark();
     try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(eyeR*0.95,eyeR*0.8,eyeR),.col=pal.sap,.part=.bloom,.rings=8,.segs=12,.t=1});
     b.xform(start,m.chain(&.{w[bi(.head)],m.translate(eye*v3(x,1,1)+v3(0,0,-0.004)),m.rotY(x*0.55)}));
@@ -247,17 +295,22 @@ fn eyes(b:*mg.Builder,w:*const[skel.count]M4)Allocator.Error!void{
 /// on a bone's axis (`axis`) along `out`, so it always lies on that part's
 /// own hide, never jumping across to another
 const vine=22;
+/// a vine's lay: for each of its points, where on the bone's axis the cast starts and the way it goes
 const Lay=struct{axis:[vine]V3,out:[vine]V3};
 /// a grown vine lying along the hide through the points `lay` casts to,
 /// half sunk in it, tapering to a point at both ends and weighted to the
 /// bones under it
 fn vineOver(b:*mg.Builder,s:*const sculpt.Sculpt,lay:*const Lay,r:f32,col:color.Rgba8)Allocator.Error!void{
+  // the vine's points on the hide, their places along it (0..1) and their radii
   var path:[vine]V3=undefined;
   var ts:[vine]f32=undefined;
   var rs:[vine]f32=undefined;
+  // how many casts found the hide so far
   var n:usize=0;
   for(lay.axis,lay.out,0..)|a,o,i|{
+    // where the cast leaves the hide (a cast that misses is skipped)
     const hit=(try s.cast(a,o,0.4)) orelse continue;
+    // how far along the vine this point is, 0..1
     const k=m.ratio(i,vine-1);
     rs[n]=@max(r*@sqrt(@sin(m.pi*k)),0.0006);
     path[n]=hit.p+hit.n*m.splat3(rs[n]*0.45);
@@ -267,6 +320,7 @@ fn vineOver(b:*mg.Builder,s:*const sculpt.Sculpt,lay:*const Lay,r:f32,col:color.
   if(n<4)return;
   rs[0]=0.0006;
   rs[n-1]=0.0006;
+  // where the vine's vertices begin
   const start=b.mark();
   try b.tubeR(path[0..n],ts[0..n],rs[0..n],col,.stem,5);
   for(b.v.items[start..],try b.skinOf(start))|vx,*k|k.*=try s.weigh(v3(vx.pos[0],vx.pos[1],vx.pos[2]));
@@ -276,15 +330,20 @@ const Seg=struct{bone:Bone,y0:f32,y1:f32};
 /// a vine winding around the axis of `segs` in turn, starting at angle `a0`
 /// (about each bone's y, 0 toward its +z) and turning `turn` radians along
 fn wind(w:*const[skel.count]M4,segs:[]const Seg,a0:f32,turn:f32)Lay{
+  // the lay being filled
   var lay:Lay=undefined;
+  // the whole length of the stretches, summed
   var total:f32=0;
   for(segs)|sg|total+=@abs(sg.y1-sg.y0);
   for(0..vine)|i|{
+    // how far along the vine this point is, 0..1, and how far that is along the stretches
     const k=m.ratio(i,vine-1);
     var along=k*total;
+    // the stretch this point falls in, and how far along it (0..1)
     var at=segs[segs.len-1];
     var f:f32=1;
     for(segs)|sg|{
+      // this stretch's length
       const l=@abs(sg.y1-sg.y0);
       if(along<=l){
         at=sg;
@@ -293,6 +352,7 @@ fn wind(w:*const[skel.count]M4,segs:[]const Seg,a0:f32,turn:f32)Lay{
       }
       along-=l;
     }
+    // that stretch's bone frame, and the angle round it here
     const mat=w[bi(at.bone)];
     const a=a0+k*turn;
     lay.axis[i]=m.mulPoint(mat,v3(0,m.lerp(at.y0,at.y1,f),0));
@@ -303,21 +363,27 @@ fn wind(w:*const[skel.count]M4,segs:[]const Seg,a0:f32,turn:f32)Lay{
 /// a vine along a line inside one bone (`from` to `to`, local), cast out
 /// along `out` (local)
 fn line(w:*const[skel.count]M4,bone:Bone,from:V3,to:V3,out:V3)Lay{
+  // the lay being filled, and the bone's frame
   var lay:Lay=undefined;
   const mat=w[bi(bone)];
   for(0..vine)|i|{
+    // how far along the line this point is, 0..1
     const k=m.ratio(i,vine-1);
     lay.axis[i]=m.mulPoint(mat,m.lerpV(from,to,k));
     lay.out[i]=dir(mat,out);
   }
   return lay;
 }
+/// lays the vines grown over the hide: winding down the limbs, tendons on the
+/// hocks and forearms, woven round the torso, spiralling up the neck, braided down the tail
 fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   // limbs: vines winding down each segment and across the joints, so the
   // limb reads as grown and bound, never jointed
   for(skel.sides,0..)|sd,si|{
+    // which way out this side is: -1 left, 1 right
     const x=skel.sign(si);
     for(0..2)|vi|{
+      // where round the limb this vine starts: the two opposite
       const a0=m.f(vi)*m.pi+x*0.6;
       try vineOver(b,s,&wind(w,&.{.{.bone=sd.arm,.y0=-0.06,.y1=-skel.upperArm},.{.bone=sd.forearm,.y0=0,.y1=-0.2}},a0,2.4),0.0085,pal.wolfVine);
       try vineOver(b,s,&wind(w,&.{.{.bone=sd.thigh,.y0=-0.03,.y1=-skel.thighLength},.{.bone=sd.shin,.y0=0,.y1=-0.22}},a0,2.8),0.01,pal.wolfVine);
@@ -332,6 +398,7 @@ fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.E
   // where the sap shows
   const torso=[_]Seg{.{.bone=.pelvis,.y0=-0.02,.y1=skel.waistAt[1]},.{.bone=.waist,.y0=0,.y1=skel.chestAt[1]},.{.bone=.chest,.y0=0,.y1=0.17}};
   for([_]f32{1.2,2.3,3.5,4.6},0..)|a0,vi|{
+    // which way this strand winds: alternate ones crossing
     const turn:f32=if(vi%2==0)1.5 else-1.5;
     try vineOver(b,s,&wind(w,&torso,a0,turn),0.011,pal.wolfVine);
   }
@@ -349,19 +416,27 @@ fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.E
 /// a fur leaf lying on the surface near `guess`, along `along` (pulled
 /// into the surface's plane), moving rigidly with the bones at its base
 fn furLeaf(b:*mg.Builder,s:*const sculpt.Sculpt,guess:V3,along:V3,len:f32,width:f32,lift:f32,curl:f32)Allocator.Error!void{
+  // the hide nearest the guess, and its facing
   const on=try s.project(guess);
+  // the way it lies, flattened onto the hide
   const al=m.norm(along-on.n*m.splat3(m.dot(along,on.n)));
+  // where the leaf's vertices begin
   const start=b.mark();
   try kit.leaf(b,.{
     .base=on.p-on.n*m.splat3(0.002),.along=al,.out=on.n,
     .len=len,.width=width,.lift=lift,.curl=curl,.cup=0.3,
     .col=pal.wolfLeafDark,.tip=pal.wolfLeafLite,.t=0.9,
   });
+  // the skin of the hide at its base, which the whole leaf takes
   const k=try s.weigh(on.p);
   for(try b.skinOf(start))|*q|q.*=k;
 }
+/// lays the fur leaves: hair over the head, a forelock, the mane down the neck,
+/// cheek tufts, a tuft on each shoulder, rings down the tail and the tuft at its tip
 fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
+  // the fur's own random stream, so each leaf is its own yet the same every build
   var rng=pal.rngFor("wolf_fur");
+  // the skull's frame
   const head=w[bi(.head)];
   // hair: staggered rows of leaves over the head. Each row: how far along
   // the head it roots (`z`, metres in the head's frame: + toward the nose,
@@ -371,7 +446,9 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
   // head's frame: +z forward, -z back, -y down). Rows behind the brow lie
   // back and lengthen toward the nape into a ruff; the fringe at the front
   // falls forward over the brow, and side locks forward past the temples.
+  // the way the crown's rows lie: back toward the nape and a little down
   const backLie=v3(0,-0.45,-1);
+  // the rows themselves (each also says how far its leaves lift, 0.4 unless told)
   const rows=[_]struct{z:f32,a0:f32,a1:f32,n:u32,len:f32,lie:V3,lift:f32=0.4}{
     // the fringe, falling forward and down over the brow
     .{.z=0.05,.a0=1.2,.a1=1.94,.n=4,.len=0.07,.lie=v3(0,-0.4,1),.lift=0.8},
@@ -390,8 +467,11 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
   };
   for(rows,0..)|row,ri|{
     for(0..row.n)|i|{
+      // how far each row's leaves are shifted, so neighbouring rows interleave
       const stagger:f32=if(ri%2==0)0.5 else 0.25;
+      // this leaf's angle round the skull, nudged a little
       const a=m.lerp(row.a0,row.a1,(m.f(i)+stagger)/m.f(row.n))+rng.range(-0.05,0.05);
+      // a point near where it roots, cast onto the hide
       const guess=m.mulPoint(head,v3(@cos(a)*0.1,0.04+@sin(a)*0.1,row.z));
       try furLeaf(b,s,guess,dir(head,row.lie),row.len*rng.range(0.85,1.1),0.017*rng.range(0.9,1.1),row.lift,0.5);
     }
@@ -402,10 +482,13 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
     try furLeaf(b,s,m.mulPoint(head,v3(x,0.12,0.03-0.008*m.f(i%2))),dir(head,v3(x*4,0.6,-1)),0.07*rng.range(0.9,1.1),0.02,0.75,0.6);
   }
   // the mane running on down the back of the neck, longest at its root
+  // the neck's frame
   const neck=w[bi(.neck)];
   for([_]f32{0.07,0.035,0.0,-0.035},0..)|y,ri|{
+    // how many leaves in this row of the mane: more further down
     const n:u32=5+@as(u32,@intCast(ri));
     for(0..n)|i|{
+      // this leaf's angle round the back of the neck, nudged a little
       const a=m.lerp(m.pi*0.62,m.pi*1.38,(m.f(i)+0.5)/m.f(n))+rng.range(-0.06,0.06);
       try furLeaf(b,s,m.mulPoint(neck,v3(@sin(a)*0.1,y,@cos(a)*0.1)),dir(neck,v3(@sin(a)*0.3,-1,-0.5)),(0.075+0.006*m.f(ri))*rng.range(0.85,1.1),0.019,0.38,0.5);
     }
@@ -418,26 +501,35 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
   }
   // a tuft over each shoulder
   for(skel.sides)|sd|{
+    // the upper arm's frame
     const arm=w[bi(sd.arm)];
     for(0..6)|i|{
+      // this leaf's angle round the shoulder
       const a=m.ratio(i,6)*m.tau;
       try furLeaf(b,s,m.mulPoint(arm,v3(@sin(a)*0.05,0.06,@cos(a)*0.05)),dir(arm,v3(@sin(a),-0.6,@cos(a))),0.085*rng.range(0.85,1.1),0.026,0.45,0.45);
     }
   }
   // rings of fur down the tail, longer toward the tip, and the tuft there
   for(0..6)|ring|{
+    // how far down the tail this ring sits, in segments
     const along=1.2+0.45*m.f(ring);
+    // the segment it sits on, and that segment's frame
     const seg=@min(@as(usize,@intFromFloat(along)),3);
     const tb=w[bi(.tail0)+seg];
     for(0..3)|j|{
+      // this leaf's angle round the tail, each ring turned from the last
       const a=m.f(j)/3*m.tau+m.f(ring)*1.05;
       try furLeaf(b,s,m.mulPoint(tb,v3(@sin(a)*0.08,(along-m.f(seg))*skel.tailSeg,@cos(a)*0.08)),dir(tb,v3(0,1,0)),0.06+0.012*m.f(ring),0.02,0.45,0.4);
     }
   }
+  // the tail tip's frame
   const tip=m.chain(&.{w[bi(.tail3)],m.translate(v3(0,skel.tailSeg*0.85,0))});
+  // where the tip's tuft begins
   const start=b.mark();
   for(0..9)|i|{
+    // whether this leaf is one of the three short inner ones
     const inner=i>=6;
+    // its angle round the tip, and the way out there
     const a=if(inner)(m.f(i-6)+0.5)/3*m.tau else m.f(i)/6*m.tau+rng.range(-0.15,0.15);
     const out=v3(@cos(a),0.0,@sin(a));
     try kit.leaf(b,.{
@@ -454,17 +546,21 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
 /// the feet's toes: knuckled forms of planes arching to curved claws
 fn digits(b:*mg.Builder,w:*const[skel.count]M4)Allocator.Error!void{
   for(skel.sides,0..)|sd,si|{
+    // which way out this side is: -1 left, 1 right
     const x=skel.sign(si);
     // the palm faces the body; each claw leaves the top of its fingertip
     // and hooks down toward the palm
     const palm=v3(-x,0,0);
     for(sd.tips,0..)|tb,i|{
+      // where this claw's vertices begin
       const start=b.mark();
       try kit.claw(b,v3(x*0.003,-skel.distal[i]+0.002,0),v3(0,-1,0),palm,0.026,0.0058,pal.wolfClaw);
       b.xform(start,w[bi(tb)]);
       try rigid(b,start,tb);
     }
+    // where the dewclaw's vertices begin (then the toes')
     var start=b.mark();
+    // the dewclaw thumb's end on this side
     const tip=dewTip*v3(x,1,1);
     try kit.claw(b,tip-m.norm(tip-dewRoot)*m.splat3(0.004),m.norm(tip-dewRoot),palm,0.016,0.0046,pal.wolfClaw);
     b.xform(start,w[bi(sd.hand)]);

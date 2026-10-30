@@ -2,23 +2,38 @@
 //! of its `//!` header (a shader's right after `#version`). Run from the
 //! repo root after adding, removing or re-describing a file:
 //!   zig run tools/filemap.zig
+/// the standard library
 const std=@import("std");
+/// the I/O interface: files and directories
 const Io=std.Io;
+/// a directory, walked for source files
 const Dir=Io.Dir;
+/// the allocator type, here always the run's arena
 const Allocator=std.mem.Allocator;
+/// where the map is written, from the repo root
 const outPath="docs/files.md";
+/// the trees walked: the game's and engine's sources and shaders
 const roots=[_][]const u8{"src","shaders","engine/src","engine/shaders"};
+/// the largest file read for its header (bytes)
 const maxFile=4<<20;
+/// the longest summary kept before it is cut at a word (characters)
 const maxSummary=140;
+/// one line of the map: a file's path and what its header says it is
 const Row=struct{path:[]const u8,what:[]const u8};
+/// walks every root, sorts what it found by path and writes docs/files.md,
+/// one heading per directory and one line per file
 pub fn main(init:std.process.Init)!void{
+  // the I/O, and the arena everything is kept in until the run ends
   const io=init.io;
   const arena=init.arena.allocator();
+  // every file found, with its summary
   var rows:std.ArrayList(Row)=.empty;
   for(roots)|root|try collect(io,arena,root,&rows);
   std.mem.sort(Row,rows.items,{},struct{
+    /// whether `a`'s path sorts before `b`'s
     fn lt(_:void,a:Row,b:Row)bool{return std.mem.lessThan(u8,a.path,b.path);}
   }.lt);
+  // the markdown being written
   var out:std.ArrayList(u8)=.empty;
   try out.appendSlice(arena,
     \\# Source files
@@ -27,8 +42,10 @@ pub fn main(init:std.process.Init)!void{
     \\edit by hand (fix the file's `//!` header and regenerate).
     \\
   );
+  // the directory whose heading was written last
   var dirNow:[]const u8="";
   for(rows.items)|r|{
+    // this file's directory
     const d=std.fs.path.dirnamePosix(r.path)orelse"";
     if(!std.mem.eql(u8,d,dirNow)){
       dirNow=d;
@@ -38,17 +55,24 @@ pub fn main(init:std.process.Init)!void{
   }
   try Dir.cwd().writeFile(io,.{.sub_path=outPath,.data=out.items});
 }
+/// adds a row for every file under `root`: every `.zig` in a source tree,
+/// every file in a shader tree, each with its header's summary
 fn collect(io:Io,arena:Allocator,root:[]const u8,rows:*std.ArrayList(Row))!void{
+  // the root, opened for walking
   var d=try Dir.cwd().openDir(io,root,.{.iterate=true});
   defer d.close(io);
+  // the walk through every file under it
   var walk=try d.walk(arena);
   defer walk.deinit();
   while(try walk.next(io))|e|{
     if(e.kind!=.file)continue;
+    // whether this is a Zig file (a source tree keeps only those)
     const zig=std.mem.endsWith(u8,e.basename,".zig");
     if(!zig and std.mem.endsWith(u8,root,"src"))continue;
+    // the file's path from the repo root, with forward slashes
     const path=try std.fmt.allocPrint(arena,"{s}/{s}",.{root,e.path});
     std.mem.replaceScalar(u8,path,'\\','/');
+    // the whole file, read for its header
     const text=try e.dir.readFileAlloc(io,e.basename,arena,.limited(maxFile));
     try rows.append(arena,.{.path=path,.what=try summary(arena,text)});
   }
@@ -56,21 +80,28 @@ fn collect(io:Io,arena:Allocator,root:[]const u8,rows:*std.ArrayList(Row))!void{
 /// The leading `//!` lines joined (a shader's after its `#version`), cut at
 /// the first sentence end.
 fn summary(arena:Allocator,text:[]const u8)![]const u8{
+  // the header's marker
   const mark="//!";
+  // the header's lines joined into one
   var joined:std.ArrayList(u8)=.empty;
+  // the file's lines, one at a time
   var lines=std.mem.splitScalar(u8,text,'\n');
   while(lines.next())|raw|{
+    // this line without its margins
     const line=std.mem.trim(u8,raw," \t\r");
     if(joined.items.len==0 and std.mem.startsWith(u8,line,"#version"))continue;
     if(!std.mem.startsWith(u8,line,mark))break;
+    // the header line's words, without the marker
     const body=std.mem.trim(u8,line[mark.len..]," \t");
     if(body.len==0)break;
     if(joined.items.len>0)try joined.append(arena,' ');
     try joined.appendSlice(arena,body);
     if(joined.items.len>=maxSummary)break;
   }
+  // the joined header
   const s=joined.items;
   if(s.len==0)return"(no header)";
+  // where the summary ends: its first sentence, cut at a word if too long
   var end:usize=s.len;
   if(std.mem.indexOf(u8,s,". "))|i|end=i+1;
   if(end>maxSummary){

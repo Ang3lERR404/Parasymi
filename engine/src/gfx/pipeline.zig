@@ -1,13 +1,22 @@
 //! graphics pipeline construction for dynamic rendering. Vertex layouts are
 //! derived at comptime from plain extern structs, so a vertex type is the
 //! single source of truth for its GPU layout.
+/// the standard library
 const std=@import("std");
+/// an all-zero value, for the stencil states nobody uses
 const zeroes=std.mem.zeroes;
+/// the Vulkan bindings: pipeline records, formats and flags
 const vk=@import("vulkan");
+/// the Vulkan context and its error fold
 const ctx=@import("ctx.zig");
+/// colour types, so an eight-bit rgba field gets its format
 const color=@import("../core/color.zig");
+/// the device context pipelines are made with
 const Ctx=ctx.Ctx;
+/// the swapchain, for the one depth format every pass shares
 const swapchain=@import("swapchain.zig");
+/// the Vulkan format a vertex field of type `T` is read as; a type with
+/// none is a compile error
 fn formatOf(comptime T:type)vk.Format{
   return switch(T){
     f32=>.r32_sfloat,
@@ -20,9 +29,12 @@ fn formatOf(comptime T:type)vk.Format{
     else=>@compileError("no vertex format for "++@typeName(T)),
   };
 }
-/// one attribute per field of `T`, locations starting at `first`.
+/// one attribute per field of `T`, read from binding `bind`, locations
+/// counting up from `first` in field order (the shader's `location`s)
 pub fn attrs(comptime T:type,comptime bind:u32,comptime first:u32)[@typeInfo(T).@"struct".fields.len]vk.VertexInputAttributeDescription{
+  // the vertex struct's fields, in order
   const fields=@typeInfo(T).@"struct".fields;
+  // one attribute description per field
   var out:[fields.len]vk.VertexInputAttributeDescription=undefined;
   inline for(fields,0..)|f,i|out[i]=.{
     .location=first+i,
@@ -32,17 +44,27 @@ pub fn attrs(comptime T:type,comptime bind:u32,comptime first:u32)[@typeInfo(T).
   };
   return out;
 }
+/// how one vertex buffer binding of `T` steps: binding `b`, a `T` per
+/// vertex or per instance (`rate`)
 pub fn binding(comptime T:type,comptime b:u32,rate:vk.VertexInputRate)vk.VertexInputBindingDescription{
   return.{.binding=b,.stride=@sizeOf(T),.input_rate=rate};
 }
+/// what a pipeline is made of: its two shaders, vertex layout, push layout
+/// and the depth, blend, cull and sample choices it draws with
 pub const Desc=struct{
+  /// the vertex shader
   vert:vk.ShaderModule,
+  /// the fragment shader
   frag:vk.ShaderModule,
+  /// the vertex buffers it reads and how each steps
   bindings:[]const vk.VertexInputBindingDescription,
+  /// the fields it reads from them, by location
   attrs:[]const vk.VertexInputAttributeDescription,
+  /// the push constant and descriptor layout it is drawn with
   layout:vk.PipelineLayout,
   /// `.undefined`: no colour attachment (depth only, a shadow map)
   colorFormat:vk.Format,
+  /// whether it tests depth at all
   depth:bool=true,
   /// with `depth`: whether it writes depth too (see-through surfaces only test it)
   depthWrite:bool=true,
@@ -51,9 +73,11 @@ pub const Desc=struct{
   depthCompare:vk.CompareOp=.less_or_equal,
   /// whether the rendering scope it draws in has a depth attachment
   depthAttachment:bool=true,
+  /// whether it blends over what is there by its alpha (see-through things)
   blend:bool=false,
   /// with `blend`: add onto what is there instead of blending over it
   additive:bool=false,
+  /// whether back faces are culled
   cull:bool=true,
   /// samples per pixel of the attachments it draws into (MSAA)
   samples:vk.SampleCountFlags=.{.@"1"=true},
@@ -67,9 +91,12 @@ pub const Desc=struct{
   depthBias:?[2]f32=null,
 };
 /// `sets`: descriptor set layouts the pipelines also bind (0..)
+/// a pipeline layout with one push constant range of `pushSize` bytes, seen
+/// by both stages; `NoSuitableGpu` when the GPU cannot push that much
 pub fn layout(c:*const Ctx,pushSize:u32,sets:[]const vk.DescriptorSetLayout)ctx.Error!vk.PipelineLayout{
   // 128 bytes is all Vulkan guarantees; desktop GPUs offer 256
   if(pushSize>c.props.limits.max_push_constants_size)return error.NoSuitableGpu;
+  // the one push constant range, shared by vertex and fragment
   const range=[_]vk.PushConstantRange{.{
     .stage_flags=.{.vertex=true,.fragment=true},
     .offset=0,
@@ -80,19 +107,26 @@ pub fn layout(c:*const Ctx,pushSize:u32,sets:[]const vk.DescriptorSetLayout)ctx.
     .push_constant_range_count=1,.p_push_constant_ranges=&range,
   },null)catch|e|ctx.fold(e);
 }
+/// a graphics pipeline for dynamic rendering from `d`: triangle lists,
+/// viewport and scissor set at draw time
 pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
+  // the two shader stages, both entered at `main`
   const stages=[_]vk.PipelineShaderStageCreateInfo{
     .{.stage=.{.vertex=true},.module=d.vert,.p_name="main"},
     .{.stage=.{.fragment=true},.module=d.frag,.p_name="main"},
   };
+  // the vertex layout: bindings and attributes (none for a full-screen pass)
   const vin:vk.PipelineVertexInputStateCreateInfo=.{
     .vertex_binding_description_count=@intCast(d.bindings.len),
     .p_vertex_binding_descriptions=if(d.bindings.len>0)d.bindings.ptr else null,
     .vertex_attribute_description_count=@intCast(d.attrs.len),
     .p_vertex_attribute_descriptions=if(d.attrs.len>0)d.attrs.ptr else null,
   };
+  // plain triangle lists
   const ia:vk.PipelineInputAssemblyStateCreateInfo=.{.topology=.triangle_list,.primitive_restart_enable=.false};
+  // one viewport and scissor, both set while drawing
   const vp:vk.PipelineViewportStateCreateInfo=.{.viewport_count=1,.scissor_count=1};
+  // filled, counter-clockwise front faces, back faces culled if asked, depth bias for casters
   const rs:vk.PipelineRasterizationStateCreateInfo=.{
     .depth_clamp_enable=.false,
     .rasterizer_discard_enable=.false,
@@ -105,6 +139,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .depth_bias_slope_factor=if(d.depthBias)|b|b[1]else 0,
     .line_width=1,
   };
+  // the samples per pixel, and whether each one is shaded
   const ms:vk.PipelineMultisampleStateCreateInfo=.{
     .rasterization_samples=d.samples,
     .sample_shading_enable=if(d.perSample and c.sampleShading and !d.samples.@"1").true else.false,
@@ -112,6 +147,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .alpha_to_coverage_enable=.false,
     .alpha_to_one_enable=.false,
   };
+  // the depth test and write; no stencil
   const ds:vk.PipelineDepthStencilStateCreateInfo=.{
     .depth_test_enable=if(d.depth).true else.false,
     .depth_write_enable=if(d.depth and d.depthWrite).true else.false,
@@ -123,6 +159,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .min_depth_bounds=0,
     .max_depth_bounds=1,
   };
+  // how the one colour attachment blends: alpha over, or added on
   const att=[_]vk.PipelineColorBlendAttachmentState{.{
     .blend_enable=if(d.blend).true else.false,
     .src_color_blend_factor=if(d.additive).one else.src_alpha,
@@ -133,7 +170,9 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .alpha_blend_op=.add,
     .color_write_mask=.{.r=true,.g=true,.b=true,.a=true},
   }};
+  // whether it draws colour at all (a depth-only pass does not)
   const colour=d.colorFormat!=.undefined;
+  // the blend state over that attachment
   const cb:vk.PipelineColorBlendStateCreateInfo=.{
     .logic_op_enable=.false,
     .logic_op=.copy,
@@ -141,9 +180,13 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .p_attachments=&att,
     .blend_constants=.{0,0,0,0},
   };
+  // the states set while drawing: viewport and scissor
   const dyn=[_]vk.DynamicState{.viewport,.scissor};
+  // that list, as the pipeline record wants it
   const dy:vk.PipelineDynamicStateCreateInfo=.{.dynamic_state_count=dyn.len,.p_dynamic_states=&dyn};
+  // the colour attachment's format
   const fmts=[_]vk.Format{d.colorFormat};
+  // what it renders into: views, colour format, the shared depth format
   const rendering:vk.PipelineRenderingCreateInfo=.{
     .view_mask=d.viewMask,
     .color_attachment_count=if(colour)1 else 0,
@@ -151,6 +194,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .depth_attachment_format=if(d.depthAttachment)swapchain.depthFormat else.undefined,
     .stencil_attachment_format=.undefined,
   };
+  // the made pipeline
   var p:vk.Pipeline=undefined;
   _=c.device.createGraphicsPipelines(.null_handle,&.{.{
     .p_next=&rendering,

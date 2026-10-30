@@ -1,41 +1,67 @@
 //! structures tested: messages, partners, outputs, growing, parents and children.
 const lib=@import("../../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the test allocator and expectations
 const testing=std.testing;
+/// the chunks: tile layout and ground kinds
 const ck=lib.ck;
+/// the garden's world of chunks
 const World=lib.world.World;
+/// every plant in the garden
 const Plants=lib.plants.Plants;
+/// what the gardener has understood
 const prog=lib.progression;
+/// saved records, written and read by field name
 const record=lib.record;
+/// everything a structure's behaviour may touch
 const Ctx=lib.structures.structure.Ctx;
+/// a structure as another holds on to it: by tile
 const Ref=lib.structures.Ref;
+/// what a structure makes of a message
 const Reply=lib.structures.messages.Reply;
+/// one placed structure
 const Structure=lib.structures.structure.Structure;
+/// the garden's list of structures
 const Structures=lib.structures.list.Structures;
+/// a fresh structure of one kind at the origin
 const blank=lib.structures.structure.blank;
+/// set the recipe a structure weaves
 const choose=lib.structures.hooks.choose;
+/// every kind's `def`
 const defs=lib.structures.defs;
+/// a kind's state, fresh
 const freshState=lib.structures.structure.freshState;
+/// hand one thing on to a neighbour
 const handOff=lib.structures.handoff.handOff;
+/// a kind found by its name's hash
 const kindByName=lib.structures.structure.kindByName;
+/// every kind's module, to find each one's file
 const kinds=lib.structures.kinds;
+/// what a kind's panel offers to weave
 const recipes=lib.structures.hooks.recipes;
+/// the structures registry: every kind's id
 const reg=lib.structures.reg;
 test"every kind's structure is stored as a record and read back the same"{
+  // the test allocator
   const gpa=testing.allocator;
   inline for(reg.ids)|k|{
+    // a blank of this kind, given a little of everything to store
     var s=blank(k);
     s.x=3;
     s.y=-2;
     s.grown=0.5;
     _=s.inv.add(.grit,4);
     s.partners[0]=.{.x=1,.y=1,.floating=true};
+    // the bytes it is written to
     var a:std.ArrayList(u8)=.empty;
     defer a.deinit(gpa);
     try record.write(Structure,gpa,&a,&s);
+    // a blank found by the stored name, read over from those bytes
     var back=blank(kindByName(record.nameHash(@tagName(k))).?);
     defer back.deinit(gpa);
     try record.read(Structure,gpa,a.items,&back);
+    // the bytes the read-back one writes, which must match
     var b:std.ArrayList(u8)=.empty;
     defer b.deinit(gpa);
     try record.write(Structure,gpa,&b,&back);
@@ -45,21 +71,26 @@ test"every kind's structure is stored as a record and read back the same"{
   }
 }
 test"a message is taken by its hook, else by its default"{
+  // the test allocator, and the world it grows on
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, its first row laid as soil
   const c=w.chunkOfTile(0,0).?;
   for(0..4)|x|{c.kind[x]=.soil;c.height[x]=1;c.res[x]=0;}
+  // the plants, the structures and what is understood
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
+  // the context messages are sent in
   const ctx:Ctx=.{.gpa=gpa,.w=&w,.plants=&plants,.g=&g,.ss=&ss};
   try testing.expect(try ss.place(gpa,&w,0,0,.sapCache,0,0));
   try testing.expect(try ss.place(gpa,&w,1,0,.diamond,0,0));
   try testing.expect(try ss.place(gpa,&w,2,0,.loomfern,0,0));
+  // a cache, a diamond and a loomfern side by side
   const cache=ss.at(&w,0,0).?;
   const dia=ss.at(&w,1,0).?;
   const fern=ss.at(&w,2,0).?;
@@ -73,6 +104,7 @@ test"a message is taken by its hook, else by its default"{
 }
 /// a kind's file name: its camelCase name with each capital turned to `_` and lower case
 fn snakeOf(comptime name:[]const u8)[]const u8{
+  // the file name, built up a letter at a time
   comptime var out:[]const u8="";
   inline for(name)|c|{
     out=out++if(std.ascii.isUpper(c))"_"++[_]u8{std.ascii.toLower(c)} else [_]u8{c};
@@ -82,6 +114,7 @@ fn snakeOf(comptime name:[]const u8)[]const u8{
 test"no kind reads or writes another kind's state outside its tests"{
   @setEvalBranchQuota(2_000_000);
   inline for(comptime std.meta.declarations(kinds))|d|{
+    // the kind's source, and the part of it before its first test
     const src=@embedFile("../"++comptime snakeOf(d.name)++".zig");
     const body=comptime src[0..std.mem.indexOf(u8,src,"\ntest\"") orelse src.len];
     inline for(comptime std.meta.declarations(kinds))|o|{
@@ -93,6 +126,7 @@ test"no kind reads or writes another kind's state outside its tests"{
   }
 }
 test"several partners: each once, oldest first, the oldest let go past `most`"{
+  // a lone driftbraid, and three tiles it may pair with
   var s:Structure=.{.x=0,.y=0,.seed=0,.state=freshState(.driftbraid)};
   const r=[_]Ref{.{.x=1,.y=0,.floating=false},.{.x=2,.y=0,.floating=false},.{.x=3,.y=0,.floating=false}};
   try testing.expect(s.addPartner(r[0],2)==null);
@@ -105,20 +139,25 @@ test"several partners: each once, oldest first, the oldest let go past `most`"{
   try testing.expect(s.partner().?.eql(r[2]) and s.partnerCount()==1);
 }
 test"several outputs: what a neighbour wants goes, even when it is not the first"{
+  // the test allocator, and the world it grows on
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, its first row laid as soil
   const c=w.chunkOfTile(0,0).?;
   for(0..4)|x|{c.kind[x]=.soil;c.height[x]=1;c.res[x]=0;}
+  // the plants, the structures and what is understood
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
+  // the context the hand-off runs in
   const ctx:Ctx=.{.gpa=gpa,.w=&w,.plants=&plants,.g=&g,.ss=&ss};
   try testing.expect(try ss.place(gpa,&w,0,0,.sapCache,0,0));
   try testing.expect(try ss.place(gpa,&w,1,0,.loomfern,0,0));
+  // the cache that gives
   const cache=ss.at(&w,0,0).?;
   _=ss.get(cache).inv.add(.essence,2);
   _=ss.get(cache).inv.add(.fibre,3);
@@ -131,21 +170,26 @@ test"several outputs: what a neighbour wants goes, even when it is not the first
   try testing.expectEqual(@as(u32,3),ss.get(cache).inv.count(.fibre));
 }
 test"a structure put down grows before it works"{
+  // the test allocator, and the world it grows on
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, a 2×2 patch laid as soil
   const c=w.chunkOfTile(0,0).?;
   for(0..2)|x|for(0..2)|y|{const t=y*ck.sizeTiles+x;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
+  // the plants, the structures and what is understood
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,0,0,.germinator,0,0));
+  // the germinator, put down as a sprout
   const id=ss.at(&w,0,0).?;
   ss.sprout(id);
   try testing.expectEqual(@as(f32,0),ss.get(id).grown);
+  // how long it takes to grow, and the time passed so far
   const secs=defs.get(.germinator).grow;
   var t:f32=0;
   while(t<secs*0.5):(t+=0.05)try ss.tick(gpa,&w,&plants,&g,0.05);
@@ -155,24 +199,29 @@ test"a structure put down grows before it works"{
   try testing.expectEqual(@as(f32,1),ss.get(id).grown);
 }
 test"a germinator weaves structure bulbs as well as seeds, and lets go only what it wove"{
+  // the test allocator, and the world it grows on
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, a 2×2 patch laid as soil
   const c=w.chunkOfTile(0,0).?;
   for(0..2)|x|for(0..2)|y|{const t=y*ck.sizeTiles+x;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
+  // the plants, the structures and what is understood
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,0,0,.germinator,0,0));
+  // the germinator, and the weave tables
   const id=ss.at(&w,0,0).?;
   const craft=lib.craft;
   // every weave is on offer, the bulbs too, but the advanced tier, which
   // only a monfris weaves
   try testing.expectEqual(craft.hand.len-craft.advanced.len,recipes(.germinator).len);
   for(recipes(.monfris))|r|try testing.expect(craft.hand[r].advanced);
+  // the recipe that weaves a conduit bulb
   const conduit=for(recipes(.germinator))|r|{
     if(craft.hand[r].out==.conduit)break r;
   }else unreachable;
@@ -187,16 +236,20 @@ test"a germinator weaves structure bulbs as well as seeds, and lets go only what
   try testing.expect(ss.output(id)==.conduit);
 }
 test"parents and children: spawned, adopted, found again after a shift, cut loose when the parent goes"{
+  // the test allocator, and the world it grows on
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, an 8×8 patch laid as soil
   const c=w.chunkOfTile(0,0).?;
   for(0..8)|x|for(0..8)|y|{const t=y*ck.sizeTiles+x;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
+  // the structures
   var ss:Structures=.{};
   defer ss.deinit(gpa);
   try testing.expect(try ss.place(gpa,&w,0,0,.sapCache,0,0));
   try testing.expect(try ss.place(gpa,&w,4,4,.monfris,0,0));
+  // the monfris, the parent in this test
   const loom=ss.at(&w,4,4).?;
   // a child put down by its parent, over the parent's own tile
   const v0=(try ss.spawnChild(gpa,&w,loom,.{.x=4,.y=4,.kind=.vultrixi})).?;
@@ -204,6 +257,7 @@ test"parents and children: spawned, adopted, found again after a shift, cut loos
   try testing.expect(try ss.spawnChild(gpa,&w,loom,.{.x=4,.y=4,.kind=.vultrixi})==null);
   // adopted: only what the parent takes on (`adopts`), never in a loop
   try testing.expect(try ss.place(gpa,&w,1,1,.vultrixi,0,0));
+  // a second vultrixi, put down alone, and the cache that adopts nothing
   const v1=ss.floaterAt(1,1).?;
   const cache=ss.at(&w,0,0).?;
   try testing.expect(!ss.dependOn(v1,cache));
@@ -217,6 +271,7 @@ test"parents and children: spawned, adopted, found again after a shift, cut loos
   try testing.expectEqual(@as(u32,0),ss.childCount(cache));
   // uprooting the cache shifts the others' ids; they still find each other
   _=ss.remove(&w,cache);
+  // the monfris under its new id
   const loom2=w.occAt(4,4).asStructure().?;
   try testing.expectEqual(@as(u32,2),ss.childCount(loom2));
   try testing.expectEqual(loom2,ss.getParent(ss.floaterAt(1,1).?).?);
@@ -227,17 +282,21 @@ test"parents and children: spawned, adopted, found again after a shift, cut loos
   try testing.expect(ss.get(ss.floaterAt(4,4).?).parent==null);
 }
 test"partners: one way or both ways, re-pairing leaves the old one, uprooting cuts it"{
+  // the test allocator, and the world it grows on
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, its first row laid as soil
   const c=w.chunkOfTile(0,0).?;
   for(0..8)|x|{c.kind[x]=.soil;c.height[x]=1;c.res[x]=0;}
+  // the structures
   var ss:Structures=.{};
   defer ss.deinit(gpa);
   for(0..3)|x|try testing.expect(try ss.place(gpa,&w,@intCast(x),0,.driftbraid,0,0));
   try testing.expect(try ss.place(gpa,&w,4,0,.sporecaster,0,0));
   try testing.expect(try ss.place(gpa,&w,5,0,.sapCache,0,0));
+  // the three driftbraids, west to east
   const a=ss.at(&w,0,0).?;
   const b=ss.at(&w,1,0).?;
   const d=ss.at(&w,2,0).?;

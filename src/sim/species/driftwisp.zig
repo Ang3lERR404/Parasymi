@@ -2,9 +2,13 @@
 //! catcher dish, filaments trailing beneath. Drinks the night sky instead
 //! of the ley and condenses it into starlight.
 const lib=@import("../../lib.zig");
+/// the species registry: what a species is
 const species=lib.species;
+/// the engine package, reached through the hub
 const engine=lib.engine;
+/// colour types, for its genome's pale blues
 const color=engine.core.color;
+/// the driftwisp: a floating symbiote that condenses starlight, swaying most of all
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedDriftwisp,.floating=true,.yields=.starlight,
   .matureTime=20,.manaCap=8,.leyDraw=0.5,.share=0.4,.drain=0,.yield=0.06,

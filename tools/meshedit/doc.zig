@@ -1,40 +1,73 @@
 //! a mesh as the editor keeps it: its forms, read from and written to text.
+/// the standard library, reached through the game's hub
 const std=ps.std;
+/// the allocator type the forms are kept with
 const Allocator=std.mem.Allocator;
+/// the I/O interface, handed to the sculpt for its thread pool
 const Io=std.Io;
+/// a text writer, which a mesh is written into
 const Writer=Io.Writer;
+/// whether two byte strings are the same
 const eql=std.mem.eql;
+/// a name turned into its enum tag, or null if none matches
 const stringToEnum=std.meta.stringToEnum;
+/// splits text at each newline
 const splitScalar=std.mem.splitScalar;
+/// splits a line into its words
 const tokenizeScalar=std.mem.tokenizeScalar;
+/// a line without its margins
 const trim=std.mem.trim;
+/// reads a decimal number
 const parseFloat=std.fmt.parseFloat;
+/// the engine package, as the game's hub hands it on
 const engine=ps.engine;
+/// all the maths: vectors, matrices, angles
 const m=engine.core.math;
+/// colour conversions: a form's colour into bytes
 const color=engine.core.color;
+/// SDF sculpting: forms melted into one surface and meshed
 const sculpt=engine.gfx.sculpt;
+/// the game, reached through its import hub
 const ps=@import("parasymi");
+/// the move, turn and size handles on the selected form
 const gizmo=@import("../gizmo.zig");
+/// the game's mesh builder, which the surface is meshed into
 const meshgen=ps.meshgen;
+/// a part role: the shader a part of the surface is drawn with
 const Part=ps.vertex.Part;
+/// makes a vector from its three parts
 const v3=m.v3;
+/// the editor's root, through which its other files are reached
 const meshedit=@import("../meshedit.zig");
+/// the surface's cell size to start (m)
 const cell=meshedit.settings.cell;
+/// the finest the cells may be (m)
 const cellMin=meshedit.settings.cellMin;
+/// every value of a form, each a named channel
 const Ch=meshedit.settings.Ch;
+/// how many times wider the cells are while a value is dragged
 const dragCoarse=meshedit.settings.dragCoarse;
+/// the first line of a mesh's text
 const header=meshedit.settings.header;
+/// the shape a form takes
 const Kind=meshedit.settings.Kind;
+/// the most cells across the whole sculpt
 const maxCells=meshedit.settings.maxCells;
+/// a form's numbers
 const Vals=meshedit.settings.Vals;
+/// one form of the sculpt: its shape, whether it carves, its shader and values
 pub const Piece=struct{
+  /// an ellipsoid, a rounded cone or a rounded box
   kind:Kind=.ellipsoid,
+  /// whether it is carved out of what is before it (else melted in)
   carve:bool=false,
   /// the shader (part role) its part of the surface is drawn with
   shade:Part=.stem,
+  /// where it stands, how it is turned and sized, and its colour
   v:Vals=.{},
   /// as the sculpt takes it
   pub fn form(p:Piece)sculpt.Form{
+    // its values, its place and turn as one matrix, and the origin in its frame
     const v=p.v;
     const at=m.chain(&.{m.translate(v.pos),m.rotY(m.rad(v.rot[1])),m.rotX(m.rad(v.rot[0])),m.rotZ(m.rad(v.rot[2]))});
     const z=v3(0,0,0);
@@ -59,9 +92,14 @@ pub const Piece=struct{
 };
 /// what a mesh's text holds: its cells and its forms, in order
 pub const Doc=struct{
+  /// how fine the surface is meshed: the cell size (m)
   cell:f32=cell,
+  /// its forms, in the order they melt into one another
   pieces:std.ArrayList(Piece)=.empty,
+  /// lets the forms go
   pub fn deinit(d:*Doc,gpa:Allocator)void{d.pieces.deinit(gpa);}
+  /// writes the mesh as text: the header, the cell size, then each form's
+  /// kind, shader and every value, one to a line
   pub fn write(d:*const Doc,w:*Writer)Writer.Error!void{
     try w.print(header++"\ncell {d}\n",.{d.cell});
     for(d.pieces.items)|p|{
@@ -69,19 +107,27 @@ pub const Doc=struct{
       for(Ch.names,0..)|n,i|try w.print("{s} {d}\n",.{n,Ch.get(&p.v,i)});
     }
   }
+  /// what a mesh's text can fail to read with
   pub const ParseError=error{BadMesh,OutOfMemory};
+  /// reads a mesh from its text, skipping blanks and `#` lines; a line it
+  /// does not understand, or a value before any form, is `BadMesh`
   pub fn parse(gpa:Allocator,text:[]const u8)ParseError!Doc{
+    // the mesh being read
     var d:Doc=.{};
     errdefer d.deinit(gpa);
+    // the text's lines, one at a time
     var lines=splitScalar(u8,text,'\n');
     while(lines.next())|raw|{
+      // this line without its margins
       const line=trim(u8,raw," \t\r");
       if(line.len==0 or line[0]=='#')continue;
+      // the line's words, and its first
       var it=tokenizeScalar(u8,line,' ');
       const word=it.next() orelse continue;
       if(eql(u8,word,"cell")){
         d.cell=@max(cellMin,parseFloat(f32,it.next() orelse return error.BadMesh) catch return error.BadMesh);
       }else if(eql(u8,word,"form")){
+        // the new form's shape, and whether it carves
         const kind=stringToEnum(Kind,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
         const carve=if(it.next())|c|eql(u8,c,"carve")else false;
         try d.pieces.append(gpa,.{.kind=kind,.carve=carve});
@@ -89,8 +135,10 @@ pub const Doc=struct{
         if(d.pieces.items.len==0)return error.BadMesh;
         d.pieces.items[d.pieces.items.len-1].shade=stringToEnum(Part,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
       }else{
+        // the value's channel
         const i=Ch.find(word) orelse return error.BadMesh;
         if(d.pieces.items.len==0)return error.BadMesh;
+        // the value
         const v=parseFloat(f32,it.next() orelse return error.BadMesh) catch return error.BadMesh;
         Ch.set(&d.pieces.items[d.pieces.items.len-1].v,i,v);
       }
@@ -98,9 +146,10 @@ pub const Doc=struct{
     return d;
   }
   /// its surface into `b`, cells `cell` across (wider where the sculpt is
-  /// too big for that many; `DRAG_COARSE` times them while `coarse`);
+  /// too big for that many; `dragCoarse` times them while `coarse`);
   /// nothing when no form adds anything
   pub fn mesh(d:*const Doc,gpa:Allocator,io:?Io,coarse:bool,b:*meshgen.Builder)Allocator.Error!void{
+    // whether any form adds (else there is nothing to mesh), and the farthest reach
     var solid=false;
     var far:f32=0;
     for(d.pieces.items)|p|{
@@ -108,11 +157,21 @@ pub const Doc=struct{
       far=@max(far,p.reach());
     }
     if(!solid)return;
+    // the sculpt the forms are melted into
     var sc:sculpt.Sculpt=.{.gpa=gpa,.parents=&.{null},.io=io};
     defer sc.deinit();
     for(d.pieces.items)|p|try sc.add(p.form());
+    // the cell size this time (m)
     const h=@max(d.cell,2*far/maxCells)*(if(coarse)dragCoarse else 1);
     try sc.mesh(meshgen.gen,b,h,0.5,.stem);
   }
 };
-pub const Drag=enum{none,value,gizmo};
+/// what is being dragged: nothing, a value, or the gizmo
+pub const Drag=enum{
+  /// nothing held
+  none,
+  /// the selected value, changing as the mouse moves
+  value,
+  /// one of the selected form's gizmo handles
+  gizmo,
+};

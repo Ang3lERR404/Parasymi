@@ -1,29 +1,48 @@
 //! a mote of starlight twinkling: a few glassy pings dying in a shimmer.
+/// the hub every game module is reached through
 const lib=@import("../../lib.zig");
+/// the generic engine package
 const engine=lib.engine;
+/// all the maths: lerps, clamps, rounding
 const m=engine.core.math;
+/// the engine's sound pieces: oscillators, the soft low-pass
 const dsp=engine.core.dsp;
+/// the seeded random numbers each twinkle draws from
 const rng=engine.core.rng;
+/// a span of seconds drawn as samples
 const samples=lib.sound.sap.samples;
+/// a value nudged a little either way, so no two twinkles are alike
 const vary=lib.sound.footstep.vary;
 // ---- the starlight twinkling (near a mote) ----
 /// pings in one twinkle (fewest, most), seconds between them, and the
-/// first ping's pitch (Hz); each next steps up or down by one of `STEPS`
+/// first ping's pitch (Hz); each next steps up or down by one of `stepCount`
+/// (this one: how many pings)
 pub const pingRange=[2]u32{2,4};
+/// seconds between pings
 const pingGap=[2]f32{0.05,0.13};
+/// the first ping's pitch (Hz)
 const pingHz=[2]f32{2100,3400};
+/// the ratios a ping's pitch may step by to the next: up or down a little
 const stepCount=[_]f32{1.122,1.189,1.335,0.891,0.841};
 /// a ping's glassy partials (shares of its pitch, a little stretched so it
 /// shimmers), their levels, how long each rings (s, ~63%) and the attack (s)
+/// (this one: the partials' pitches, as shares of the ping's)
 const partials=[_]f32{1,2.32,4.13};
+/// each partial's level
 const partialLevel=[_]f32{1,0.4,0.15};
+/// how long each partial rings (s, ~63%)
 const partialFall=[_]f32{0.32,0.14,0.06};
+/// a ping's attack (s)
 const pingAttack:f32=0.003;
 /// a slow shimmer through it all (Hz, share)
+/// (this one: how fast it shimmers, Hz)
 const shimmerHz:f32=7;
+/// how deep it shimmers (a share)
 const shimmer:f32=0.25;
 /// what softens it (Hz), and its loudness for a far and a touching mote
+/// (this one: the low-pass that softens it, Hz)
 const twinkleSoftHz:f32=7000;
+/// its loudness for a far mote and for a touching one
 const twinkle=[2]f32{0.006,0.03};
 /// twinkles that may sound at once
 pub const twinkles=2;
@@ -31,17 +50,28 @@ pub const twinkles=2;
 const pingSilent:f32=1e-3;
 /// one ping: a tiny bell
 const Ping=struct{
+  /// each partial's sine
   osc:[partials.len]dsp.Osc,
+  /// each partial's level now, 1 falling away
   amp:[partials.len]f32=@splat(1),
+  /// how much of its level each partial keeps a sample
   fall:[partials.len]f32,
+  /// the twinkle's sample it starts on
   start:u32,
+  /// how many samples its attack takes
   attack:u32,
+  /// how loud it is (0: a ping not used)
   level:f32,
+  /// samples since it started
   age:u32=0,
+  /// its next sample at the twinkle's sample `at`: silent before its
+  /// start, rising through its attack, its partials ringing away
   fn tick(p:*Ping,at:u32)f32{
     if(at<p.start)return 0;
+    // how far through its attack it is, 0..1
     const rise=m.clamp01(m.f(p.age)/m.f(p.attack));
     p.age+|=1;
+    // the partials summed
     var y:f32=0;
     inline for(0..partials.len)|k|{
       if(p.age>p.attack)p.amp[k]*=p.fall[k];
@@ -49,22 +79,35 @@ const Ping=struct{
     }
     return y*rise*p.level;
   }
+  /// whether it has rung out
   fn done(p:*const Ping)bool{return p.age>p.attack and p.amp[0]<pingSilent;}
 };
 /// one twinkle playing out
 pub const Twinkle=struct{
+  /// its pings (only the first `n` sound)
   pings:[pingRange[1]]Ping,
+  /// how many pings sound
   n:u32,
+  /// the slow shimmer's wave
   shimmer:dsp.Osc,
+  /// the low-pass softening it
   soft:dsp.OnePole,
+  /// samples played so far
   at:u32=0,
+  /// its loudness, for how near the mote is
   gain:f32,
+  /// a fresh twinkle for a mote `near` (0 far .. 1 touching): its pings'
+  /// count, pitches and spacing drawn from `r`
   pub fn init(near:f32,r:*rng.Rng,rate:f32)Twinkle{
+    // how many pings sound
     const n=pingRange[0]+r.below(pingRange[1]-pingRange[0]+1);
+    // the pings, filled in below
     var pings:[pingRange[1]]Ping=undefined;
+    // the next ping's pitch, and the sample it starts on
     var hz=r.range(pingHz[0],pingHz[1]);
     var start:u32=0;
     for(&pings,0..)|*p,i|{
+      // this ping's partials' sines and falls, filled in below
       var osc:[partials.len]dsp.Osc=undefined;
       var fall:[partials.len]f32=undefined;
       inline for(0..partials.len)|k|{
@@ -93,6 +136,7 @@ pub const Twinkle=struct{
   /// mixes the twinkle into `out`; false once it has ended
   pub fn render(t:*Twinkle,out:[]f32)bool{
     for(out)|*s|{
+      // the pings summed this sample
       var y:f32=0;
       for(t.pings[0..t.n])|*p|y+=p.tick(t.at);
       t.at+|=1;

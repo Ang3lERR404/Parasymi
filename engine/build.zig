@@ -5,6 +5,7 @@
 //! its own shaders, which may `#include` the engine's (`light.glsl`,
 //! `growth.glsl`).
 const std=@import("std");
+/// the build graph's types: steps, modules, lazy paths
 const Build=std.Build;
 /// the engine's own shaders, embedded in its module
 const shaders=[_][]const u8{
@@ -16,22 +17,28 @@ pub const includes=[_][]const u8{"post.glsl","light.glsl","growth.glsl"};
 /// one shader to compile: `name` it is imported as, the `source` file it is
 /// compiled from (`name` when null) and a `define` to compile it with
 pub const Shader=struct{name:[]const u8,source:?[]const u8=null,define:?[]const u8=null};
-/// glslc: the `glslc` option, else the Vulkan SDK's, else whichever is on PATH
+/// glslc: the `glslc` option, else the Vulkan SDK's, else whichever is on
+/// PATH. Returns the path (or bare name) the shader steps run.
 pub fn glslc(b:*Build)[]const u8{
+  // where the Vulkan SDK lies, if the environment says
   const sdk=b.graph.environ_map.get("VULKAN_SDK");
   return b.option([]const u8,"glslc","path to glslc") orelse
     if(sdk)|s|b.pathJoin(&.{s,"Bin","glslc"})else"glslc";
 }
-/// vk.xml: the `vk-registry` option, else the Vulkan SDK's
+/// vk.xml: the `vk-registry` option, else the Vulkan SDK's. Panics when
+/// neither is given, since nothing Vulkan can be generated without it.
 pub fn registry(b:*Build)[]const u8{
   if(b.option([]const u8,"vk-registry","path to vk.xml"))|p|return p;
+  // the Vulkan SDK's folder, which must be set when no option is
   const s=b.graph.environ_map.get("VULKAN_SDK") orelse
     @panic("set VULKAN_SDK or pass -Dvk-registry=<path to vk.xml>");
   return b.pathJoin(&.{s,"share","vulkan","registry","vk.xml"});
 }
 /// `s` from `dir` compiled to SPIR-V for Vulkan 1.3, its includes found in
-/// `include_dirs` (`inputs`: the included files, so a change rebuilds it)
+/// `includeDirs` (`inputs`: the included files, so a change rebuilds it).
+/// Returns the `.spv` the compile step leaves behind.
 pub fn compile(b:*Build,glslcPath:[]const u8,dir:Build.LazyPath,includeDirs:[]const Build.LazyPath,inputs:[]const Build.LazyPath,s:Shader)Build.LazyPath{
+  // the glslc run, optimising for size and speed
   const cmd=b.addSystemCommand(&.{glslcPath,"--target-env=vulkan1.3","-O"});
   for(includeDirs)|d|cmd.addPrefixedDirectoryArg("-I",d);
   for(inputs)|f|cmd.addFileInput(f);
@@ -41,19 +48,28 @@ pub fn compile(b:*Build,glslcPath:[]const u8,dir:Build.LazyPath,includeDirs:[]co
   cmd.addArg("-o");
   return cmd.addOutputFileArg(b.fmt("{s}.spv",.{s.name}));
 }
+/// the engine's own build: its module (with Vulkan, GLFW and WASAPI wired
+/// in, and its shaders embedded) and the `test` step that runs its tests
 pub fn build(b:*Build)void{
+  // the target and optimisation the caller chose
   const t=b.standardTargetOptions(.{});
   const o=b.standardOptimizeOption(.{});
+  // where glslc lives, found once
   const glslcPath=glslc(b);
+  // the Vulkan bindings, generated from vk.xml
   const vulkan=b.dependency("vulkan",.{.registry=@as(Build.LazyPath,.{.cwd_relative=registry(b)})}).module("vulkan-zig");
+  // GLFW for windows and input, with Vulkan surfaces enabled
   const zglfw=b.dependency("zglfw",.{
     .target=t,
     .optimize=o,
     .import_vulkan=true,
   });
+  // GLFW's Zig module, told where the Vulkan bindings are
   const glfwMod=zglfw.module("root");
   glfwMod.addImport("vulkan",vulkan);
+  // the Windows audio bindings
   const wasapi=b.dependency("wasapi",.{.target=t,.optimize=o}).module("wasapi");
+  // the engine itself, as the module a game imports
   const mod=b.addModule("engine",.{
     .target=t,
     .optimize=o,
@@ -65,7 +81,9 @@ pub fn build(b:*Build)void{
     },
   });
   mod.linkLibrary(zglfw.artifact("glfw"));
+  // the shader folder
   const dir=b.path("shaders");
+  // every include file, so editing one recompiles the shaders that use it
   var inputs:[includes.len]Build.LazyPath=undefined;
   for(includes,&inputs)|i,*in|in.*=dir.path(b,i);
   for(shaders)|s|{
@@ -73,6 +91,7 @@ pub fn build(b:*Build)void{
   }
   // the engine's logic tests need no window or GPU
   const tests=b.addTest(.{.root_module=mod});
+  // the `test` step a caller (or `zig build test`) runs
   const testStep=b.step("test","run the engine's unit tests.");
   testStep.dependOn(&b.addRunArtifact(tests).step);
 }

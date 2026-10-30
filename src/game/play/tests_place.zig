@@ -1,20 +1,34 @@
 //! play tested: turning, picking, opening, removing and putting down.
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the test helpers
 const testing=std.testing;
+/// the engine package
 const engine=lib.engine;
+/// all the maths: tiles, facings, projection
 const m=engine.core.math;
+/// the chunk layer: tile indices
 const ck=lib.ck;
+/// what can be held: item kinds
 const items=lib.items;
+/// the keys and buttons, set by hand here
 const Input=engine.platform.input.Input;
+/// the bindings: actions held and loaded
 const ctl=lib.controls;
+/// the test gardens' world seed
 const defaultSeed=lib.play.defaultSeed;
+/// the game under test
 const Game=lib.play.game.Game;
+/// what has the wolf's attention
 const Mode=lib.play.Mode;
+/// the screen size the tests draw for
 const testScreen=lib.play.testsMenu.testScreen;
+/// one simulation tick (s), each frame's step here
 const tickTime=lib.play.tickTime;
 /// headless: the mouse over the middle of tile `t`, as the camera sees it now
 fn aim(g:*const Game,in:*Input,t:[2]i32,sc:[2]f32)void{
+  // the tile's middle, projected to the screen (clip space)
   const q=m.mulV(g.cam.viewProj(),.{m.f(t[0])+0.5,g.heightAt(t[0],t[1]),m.f(t[1])+0.5,1});
   in.mouse=.{(q[0]/q[3]+1)/2*sc[0],(q[1]/q[3]+1)/2*sc[1]};
 }
@@ -29,14 +43,19 @@ fn pressAt(g:*Game,in:*Input,t:[2]i32,a:ctl.Action)!void{
   try g.update(in,tickTime,testScreen);
 }
 test"R turns what is under the cursor (Shift back), Q picks its bulb, a click opens it, remove takes it up, held use puts one down"{
+  // the test allocator, which catches leaks
   const gpa=testing.allocator;
+  // a fresh game on the test seed
   var g=try Game.init(gpa,defaultSeed);
   defer g.deinit();
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
+  // the input, driven by hand (no window)
   var in:Input=.{.win=undefined};
+  // the tile the wolf stands on
   const x,const z=m.tileAt(g.player.pos);
   for(0..4)|dx|{
+    // the tile this many east of the wolf, its chunk and index
     const tx=x+1+@as(i32,@intCast(dx));
     const c=g.world.chunkOfTile(tx,z).?;
     const t=ck.localIndex(tx,z);
@@ -44,11 +63,13 @@ test"R turns what is under the cursor (Shift back), Q picks its bulb, a click op
     c.res[t]=0;
     c.occ[t]=.none;
   }
+  // the tile the sap cache stands on
   const at=[2]i32{x+2,z};
   try testing.expect(try g.structs.place(gpa,&g.world,at[0],at[1],.sapCache,0,0));
   g.player.inv=.{};
   // R: a quarter clockwise, rooted, and not again until it has turned
   try pressAt(&g,&in,at,.rotate);
+  // the cache just placed
   const id=g.structs.at(&g.world,at[0],at[1]).?;
   try testing.expectEqual(@as(m.Dir,1),g.structs.get(id).dir);
   try testing.expect(g.structs.get(id).turn.busy(g.time,true));
@@ -89,6 +110,7 @@ test"R turns what is under the cursor (Shift back), Q picks its bulb, a click op
   ctl.hold(&in,.use,true);
   for(0..3)|_|try g.update(&in,tickTime,testScreen);
   ctl.hold(&in,.use,false);
+  // the cache put back down
   const put=g.structs.at(&g.world,at[0],at[1]) orelse return error.TestUnexpectedResult;
   try testing.expectEqual(@as(m.Dir,3),g.structs.get(put).dir);
   try testing.expectEqual(@as(u32,1),g.player.inv.count(.sapCache));

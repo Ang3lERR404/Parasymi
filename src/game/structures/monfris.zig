@@ -1,38 +1,63 @@
 //! MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that
 //! weaves the advanced tier (`craft.advanced`), which nothing else can:
 //! its panel picks the weave, as a germinator's does. It is fed by the
-//! Vultrixi tethered to it, at most `TETHERS`, each bringing it one kind of
+//! Vultrixi tethered to it, at most `tethers`, each bringing it one kind of
 //! what that weave needs (so an advanced weave has at most six kinds), or
 //! by hand from its panel; what it weaves it hands to the structures
 //! beside it, or keeps for the gardener.
 // decision: what it is fed by conduits it takes too (a conduit hands in
 // through `wants` like anything else); only Vultrixi reach out for it
 const lib=@import("../../lib.zig");
+/// the standard library, reached through the hub
 const std=lib.std;
+/// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
+/// finds a value in a slice, for checking a weave is of the advanced tier
 const indexOfScalar=std.mem.indexOfScalar;
+/// the test harness: allocator and expectations
 const testing=std.testing;
+/// all the maths: vectors, matrices, easing
 const m=lib.engine.core.math;
+/// colour conversions, for tinting the forming weave by its item's colour
 const color=lib.engine.core.color;
+/// chunk sizes and tile layout
 const ck=lib.ck;
+/// the garden's tile world
 const World=lib.world.World;
+/// what can be held: item kinds and stacks of them
 const items=lib.items;
+/// the garden's plants
 const Plants=lib.plants.Plants;
+/// the structures registry: `Def`, `Structure`, the hooks' context
 const st=lib.structures;
+/// the tools a bulb icon is drawn with
 const iconKit=lib.icon;
+/// every player-facing string
 const txt=lib.txt;
+/// what the gardener has understood
 const prog=lib.progression;
+/// the weave recipes and the crafter that works through them
 const craft=lib.craft;
+/// the HUD's shared sizes and colours
 const style=lib.style;
+/// the scene's list of moving parts this tree adds to each frame
 const Parts=lib.parts.Parts;
+/// how one part looks: its glow, tint, sway and growth
 const Look=lib.parts.Look;
+/// the UI's draw batch, which the panel text goes into
 const Draw=lib.engine.ui.draw.Draw;
+/// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
+/// the monfris's mesh: where its sac hangs and how wide
 const mesh=lib.monfris;
+/// a three-float vector
 const V3=m.V3;
+/// builds a three-float vector
 const v3=m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.bellyLump,.itemPod};
+/// what a monfris is: grown from its seed over ten seconds, two tiles
+/// across, a store, a tall tree swaying only a little
 pub const def:st.Def=.{.item=.monfris,.size=2,.mesh=.monfris,.store=true,.grow=10,.sway=0.2,.tall=1.7,.sap=0.3};
 /// most Vultrixi tethered to one monfris (an advanced weave needs at
 /// most this many kinds)
@@ -41,38 +66,52 @@ pub const tethers=6;
 const stock=2;
 /// it weaves this much faster than a germinator weaves its own
 const speed:f32=1;
-/// what it holds hangs in its sac, in a ring, bobbing; what it weaves forms
-/// at the sac's heart
+/// what it holds hangs in its sac in a ring this far out, as a share of
+/// the sac's radius
 const ringRadius:f32=0.5;
+/// the size of a held shape holding a single thing
 const lumpR:f32=0.026;
+/// how much larger a held shape grows as its stack fills
 const lumpGrow:f32=0.02;
+/// how far each held shape bobs up and down
 const bobAmount:f32=0.012;
+/// how fast the ring of held shapes turns (radians a second)
 const turnRate:f32=0.2;
+/// how brightly the held shapes glow
 const glow:f32=0.2;
+/// the size of what it weaves, forming at the sac's heart, once nearly done
 const formingSize:f32=0.55;
+/// how brightly that forming weave glows
 const formingGlow:f32=0.8;
 comptime{
   // every advanced weave fits the tethers it may have
   for(craft.advanced)|r|std.debug.assert(craft.hand[r].in.len<=tethers);
 }
+/// what a monfris remembers: the weave it is set to, its crafter, and how
+/// many Vultrixi feed it
 pub const State=struct{
   /// which advanced weave (index into craft.hand) it weaves
   recipe:u8=craft.advanced[0],
+  /// the crafter working through its weaves
   weave:craft.Crafter=.{},
   /// how many Vultrixi are tethered to it (counted each tick)
   tethered:u8=0,
 };
+/// hands on what it has woven, counts its tethers, starts its chosen weave
+/// when it has all it needs and works it on. Returns true while weaving.
 pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   _=st.handOff(ctx,i);
+  // the tree itself, and its remembered state
   const self=ctx.ss.get(i);
   const h=&self.state.monfris;
   h.tethered=@intCast(ctx.ss.childCount(i));
+  // the weave it is set to
   const r=craft.hand[h.recipe];
   if(!h.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(self.inv.bag(),r))_=h.weave.push(self.inv.bag(),h.recipe);
   _=h.weave.tick(self.inv.bag(),dt*speed);
   return h.weave.busy();
 }
-/// what its weave needs, `STOCK` weaves' worth.
+/// what its weave needs, `stock` weaves' worth, less what it already holds.
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32{
   for(craft.hand[s.state.monfris.recipe].in)|ing|{
     if(ing.item==item)return@as(u32,ing.n)*stock-|s.inv.count(item);
@@ -84,14 +123,18 @@ fn made(item:items.Item)bool{
   for(craft.advanced)|r|if(craft.hand[r].out==item)return true;
   return false;
 }
+/// what it gives first: the first woven thing it holds.
 pub fn output(s:*const st.Structure)?items.Item{return s.firstHeld(made);}
+/// it gives only what it has woven, while it holds some.
 pub fn gives(s:*const st.Structure,item:items.Item)bool{return made(item) and s.inv.count(item)>0;}
 /// its panel offers the advanced tier.
 pub fn recipes()[]const u8{return&craft.advanced;}
+/// the weave it is set to, for its panel to mark.
 pub fn chosen(s:*const st.Structure)?u8{return s.state.monfris.recipe;}
 /// set what it weaves, if the gardener understands it (a weave under way
 /// finishes first).
 pub fn choose(s:*st.Structure,g:*prog.Progression,r:u8)void{
+  // the name of what that weave makes
   const out=txt.item(craft.hand[r].out).name;
   if(!craft.hand[r].unlocked(g))return g.say(txt.s.msg.notUnderstood,.{out});
   if(indexOfScalar(u8,&craft.advanced,r)==null or s.state.monfris.recipe==r)return;
@@ -102,6 +145,7 @@ pub fn choose(s:*st.Structure,g:*prog.Progression,r:u8)void{
 /// configuring it): it becomes its child (`dependOn`), while it has room
 /// for one more.
 pub fn configure(ss:*st.Structures,id:st.Id,g:*prog.Progression)void{
+  // the Vultrixi waiting, and where it is in the list
   const p=ss.pairing orelse return;
   const v=ss.find(p) orelse return;
   if(ss.get(v).kind()!=.vultrixi)return;
@@ -109,25 +153,31 @@ pub fn configure(ss:*st.Structures,id:st.Id,g:*prog.Progression)void{
   if(!ss.dependOn(v,id))return g.say(txt.s.msg.tetherFull,.{});
   g.say(txt.s.msg.tethered,.{});
 }
-/// its children are the Vultrixi tethered to it, `TETHERS` at most.
+/// its children are the Vultrixi tethered to it, `tethers` at most.
 pub fn adopts(_:*const st.Structure,k:st.Kind,have:u32)bool{return k==.vultrixi and have<tethers;}
 /// what it holds hanging in its sac, and what it weaves forming at its heart.
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
   if(s.grown<1)return;
+  // its frame in the world, and its remembered state
   const base=s.place(ctr);
   const h=&s.state.monfris;
+  // how many stacks it holds, and which of them is being drawn
   const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
+    // the stack in this slot
     const it=slot orelse continue;
+    // the stack's place on the ring: its angle, the ring's reach, where it hangs
     const a=m.ratio(j,n)*m.tau+tf*turnRate+s.seed*6;
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,-mesh.sacR[1]*0.3+bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
+    // its size: larger the fuller the stack
     const r=lumpR+lumpGrow*m.ratio(it.n,items.stack);
     try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
   if(h.weave.busy()){
+    // the weave under way, and where it forms, a little over the sac's heart
     const r=craft.hand[h.weave.queue[0]];
     const at=mesh.sacAt+v3(0,mesh.sacR[1]*0.15,0);
     try out.emit(.itemPod,m.mul(base,m.chain(&.{m.translate(at),m.rotY(tf),m.scale3(m.splat3(formingSize*(0.3+0.7*h.weave.progress())))})),Look{
@@ -136,7 +186,10 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     });
   }
 }
+/// its line in the panel: what it weaves and how many tethers feed it, with
+/// a tendril of progress while it weaves (dim while it waits).
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
+  // its remembered state, and the name of what it is set to weave
   const h=&s.state.monfris;
   const name=txt.item(craft.hand[h.recipe].out).name;
   if(h.weave.busy()){
@@ -150,15 +203,19 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
 /// sac, a woven seed forming in it, tethers running in to it from either
 /// side with motes along them (it is fed from round it).
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
+  // where the sac sits in the bulb
   const sac:iconKit.P=.{0,0.7};
   for(0..4)|i|{
+    // where this strand leaves the seed, left to right
     const sx=m.lerp(-0.3,0.3,m.ratio(i,3));
     try ic.stem(.{.{sx,iconKit.topAt},.{sx*0.6,0.28},.{-sx*0.3,0.42},.{0,0.55}},0.06,if(i%2==0)iconGreen else iconPale);
   }
   for([_]f32{-1,1},0..)|sx,i|{
+    // this side's tether curve, from its Vultrixi in to the sac
     const run=[4]iconKit.P{.{0.85*sx,0.95},.{0.6*sx,1.0},.{0.3*sx,0.85},sac};
     try ic.stem(run,0.02,iconTether);
     try ic.bud(.{0.85*sx,0.95},0.06,iconVult,0.6);
+    // how far along the tether its mote has run (0..1)
     const k=@mod(ic.t*0.6+ic.phase+m.f(i)*0.5,1);
     try ic.bud(iconKit.curve(run,k),0.04,iconMote,@sin(k*m.pi));
   }
@@ -167,11 +224,19 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
   try ic.kernel(sac,0.13,iconSeed);
   try ic.coat(col);
 }
+/// the green of the weftstone strands in its bulb
 const iconGreen:Color=.{80,150,95,255};
+/// the pale lilac of the driftbraid strands
 const iconPale:Color=.{185,180,205,255};
+/// the pale thread of the tethers
 const iconTether:Color=.{200,195,220,255};
+/// the soft pink of the Vultrixi at the tethers' ends
 const iconVult:Color=.{225,205,230,255};
+/// the warm gold of the motes along the tethers
 const iconMote:Color=.{245,210,150,255};
+/// the rosy, half-clear sac
 const iconSac:Color=.{215,150,125,210};
+/// the faint violet glow behind the sac
 const iconSacGlow:Color=.{170,140,230,70};
+/// the violet of the woven seed forming in the sac
 const iconSeed:Color=.{200,160,255,255};

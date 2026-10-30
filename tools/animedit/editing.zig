@@ -1,38 +1,69 @@
 //! the animation editor's input: the timeline, the channel list and joint drags.
+/// the standard library, reached through the game's hub
 const std=ps.std;
+/// the allocator type keying may fail with
 const Allocator=std.mem.Allocator;
+/// the engine package, as the game's hub hands it on
 const engine=ps.engine;
+/// all the maths: clamps, rounding
 const m=engine.core.math;
+/// keyframed clips: channels, keys and sampling
 const clip=engine.anim.clip;
+/// the keys and buttons held this frame
 const Input=engine.platform.input.Input;
+/// a keyboard key, named as the window library names it
 const Key=engine.platform.input.Key;
+/// the game, reached through its import hub
 const ps=@import("parasymi");
+/// the wolf's skeleton and its `Pose`
 const skel=ps.skeleton;
+/// one plant or structure standing alone, and its `Look`
 const specimen=ps.specimen;
+/// every f32 of the wolf's `Pose`, each a channel a clip can key
 const PoseCh=clip.Channels(skel.Pose);
+/// every f32 of a specimen's `Look`, each a channel a clip can key
 const LookCh=clip.Channels(specimen.Look);
+/// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
+/// how much a drag changes a value per pixel
 const dragRate=animedit.settings.dragRate;
+/// the editor's state
 const Editor=animedit.editor.Editor;
+/// a time snapped to the nearest frame
 const snap=Editor.snap;
+/// the share of a drag shift keeps, for fine work
 const fine=animedit.settings.fine;
+/// the frame rate the playhead steps by
 const fps=animedit.settings.fps;
+/// the shortest a clip may be (s)
 const lengthMin=animedit.settings.lengthMin;
+/// how much `pgup`/`pgdn` lengthen or shorten a clip (s)
 const lengthStep=animedit.settings.lengthStep;
+/// how wide the channel list is (px)
 const listW=animedit.settings.listW;
+/// how far down the window the channel list starts (px)
 const listY=animedit.settings.listY;
+/// the gap round the panel's edges (px)
 const pad=animedit.settings.pad;
+/// the height of one channel's row (px)
 const row=animedit.settings.row;
+/// what the gizmo needs of the wolf this frame
 const Rig=animedit.rigging.Rig;
+/// whether a point is on the timeline
 const inTimeline=animedit.editor.inTimeline;
+/// every joint a gizmo turns
 const joints=animedit.rigging.joints;
+/// whether a point is over the channel list
 const overList=animedit.editor.overList;
 /// one frame's keys and mouse (`over` the list or the timeline), the
 /// wolf's joints as `rg` sees them
 pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Allocator.Error!void{
+  // whether shift is held (fine drags, key to key), and whether ctrl is
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
   const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
+  // whether key `k` went down this frame
   const hit=struct{
+    /// whether key `k` went down this frame
     fn f(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
   }.f;
   if(hit(in,.space))e.playing=!e.playing;
@@ -66,10 +97,14 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
   if(hit(in,.period))e.focus=true;
   // the mouse: a press on the timeline scrubs, on a row selects it and
   // drags its value
+  // how many rows of the list fit the window
   const rows=e.fits(screen);
+  // the mouse (px)
   const mx=in.mouse[0];
   const my=in.mouse[1];
+  // the selected joint and its gizmo, if the wolf's
   const gz=e.gizmoAt(rg);
+  // whether the mouse is over the panel, where gizmos don't answer
   const ui=overList(screen,mx,my) or inTimeline(screen,mx,my);
   e.hot=if(e.drag==.gizmo)e.part else if(gz!=null and !ui)gz.?.g.pick(rg.view,in.mouse)else null;
   if(in.pressed(.{.button=.left})){
@@ -77,6 +112,7 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
       e.drag=.timeline;
       e.playing=false;
     }else if(mx<pad+listW and my>=listY){
+      // the row pressed on, counted from the first in view
       const r:usize=@intFromFloat(@floor((my-listY)/row));
       if(r<rows and e.top+r<e.shown.len){
         e.sel=e.top+r;
@@ -95,17 +131,20 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
     .none=>{},
     .timeline=>e.t=snap(m.clamp01((mx-pad)/(screen[0]-2*pad))*e.clip.length),
     .value=>if(in.mouseDelta[0]!=0){
+      // how far a pixel of drag moves the value
       const rate=dragRate*(if(shift)fine else 1);
       e.setValue(e.sel,e.value(e.sel)+in.mouseDelta[0]*rate);
       try e.key(e.sel);
     },
     .gizmo=>if(gz)|z|if(in.mouseDelta[0]!=0 or in.mouseDelta[1]!=0){
+      // where the mouse was last frame (px)
       const from=[2]f32{mx-in.mouseDelta[0],my-in.mouseDelta[1]};
       try e.dragGizmo(z.j,z.g,rg,from,in.mouse,if(shift)fine else 1);
     },
   }
   if(e.drag!=.gizmo)e.part=null;
   if(overList(screen,mx,my) and in.scroll!=0){
+    // the farthest the list may scroll, and this frame's scroll in rows
     const most=e.shown.len-|rows;
     const step:i32=@intFromFloat(-in.scroll*3);
     e.top=@intCast(m.clamp(@as(i32,@intCast(e.top))+step,0,@as(i32,@intCast(most))));

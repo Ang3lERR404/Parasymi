@@ -1,53 +1,104 @@
 //! the mesh editor's window and frame loop on the game's renderer.
+/// the standard library, reached through the game's hub
 const std=ps.std;
+/// the I/O interface: files, the clock
 const Io=std.Io;
+/// a directory, for reading meshes and writing the shot
 const Dir=Io.Dir;
+/// whether two byte strings are the same
 const eql=std.mem.eql;
+/// whether an argument begins with a flag's name
 const startsWith=std.mem.startsWith;
+/// where in a name any of a set of bytes first falls
 const indexOfAny=std.mem.indexOfAny;
+/// a name turned into its enum tag, or null if none matches
 const stringToEnum=std.meta.stringToEnum;
+/// the log, for usage, warnings and notes
 const log=std.log;
+/// the engine package, as the game's hub hands it on
 const engine=ps.engine;
+/// the window library: the window, its events and the clock
 const glfw=engine.glfw;
+/// all the maths: vectors, matrices, casts
 const m=engine.core.math;
+/// the keys and buttons held this frame
 const Input=engine.platform.input.Input;
+/// the UI's draw batch, which the panel goes into
 const Draw=engine.ui.draw.Draw;
+/// the game, reached through its import hub
 const ps=@import("parasymi");
+/// the move, turn and size handles on the selected form
 const gizmo=@import("../gizmo.zig");
+/// the tools' free camera, turning round its target
 const Orbit=@import("../orbit.zig").Orbit;
+/// play: the running game
 const play=ps.play;
+/// the running game, here holding only the world and its clocks
 const Game=play.Game;
+/// the garden's renderer module: syncing, parts, meshes ready
 const renderer=ps.renderer;
+/// the renderer itself
 const Renderer=renderer.Renderer;
+/// the loading screen, shown while the ground is meshed
 const loading=ps.loading;
+/// the game's mesh builder, which the sculpt is meshed into
 const meshgen=ps.meshgen;
+/// the mesh library: its slots and levels of detail
 const meshlib=ps.meshlib;
+/// the key and button bindings (the orbit follows the game's)
 const ctl=ps.controls;
+/// makes a vector from its three parts
 const v3=m.v3;
+/// the editor's root, through which its other files are reached
 const meshedit=@import("../meshedit.zig");
+/// how far (m) the camera starts from the sculpt
 const camDist=meshedit.settings.camDist;
+/// how high over the sculpt the camera starts (rad)
 const camPitch=meshedit.settings.camPitch;
+/// where meshes are kept
 const dir=meshedit.settings.dir;
+/// the mesh as kept: its cells and its forms
 const Doc=meshedit.doc.Doc;
+/// the file ending every kept mesh carries
 const ext=meshedit.settings.ext;
+/// the editor's state
 const Editor=meshedit.editor.Editor;
+/// how high (m) over the ground the camera looks
 const lookUp=meshedit.settings.lookUp;
+/// the longest a stalled frame counts as (s)
 const maxDt=meshedit.settings.maxDt;
+/// the bytes a mesh's name may not hold
 const notInName=meshedit.settings.notInName;
+/// where the wolf's paws are said to be, far off any tile
 const noFeet=meshedit.settings.noFeet;
+/// how often (s) the surface is meshed again while dragging
 const remesh=meshedit.settings.remesh;
+/// where `--shot` writes its frame
 const shotPath=meshedit.settings.shotPath;
+/// how many frames `--shot` waits first
 const shotFrames=meshedit.settings.shotFrames;
+/// the library slot the sculpt is drawn from
 const slotId=meshedit.settings.slotId;
+/// how many form rows show
 const listRows=meshedit.settings.listRows;
+/// whether a point is over the panel
 const overUi=meshedit.settings.overUi;
+/// the mesh editor's start: reads the mesh's name and gizmo from the flags,
+/// loads or makes the mesh, opens the game's window and renderer on a quiet
+/// world, then runs frames, meshing the sculpt again as it is edited,
+/// until the window closes (or `--shot` is taken)
 pub fn main(init:std.process.Init)!void{
+  // the general allocator, the I/O, and the run's arena
   const gpa=init.gpa;
   const io=init.io;
   const arena=init.arena.allocator();
+  // the command line, kept in the arena
   const args=try init.minimal.args.toSlice(arena);
+  // `--mesh=`: the mesh's name
   var name:[]const u8="sculpt";
+  // `--shot`: save one frame and close
   var shot=false;
+  // `--gizmo=`: what the gizmo does to start
   var mode:gizmo.Mode=.move;
   for(args[1..])|a|{
     if(startsWith(u8,a,"--mesh="))name=a["--mesh=".len..];
@@ -58,13 +109,18 @@ pub fn main(init:std.process.Init)!void{
     log.err("--mesh={s}: a plain file name, kept as "++dir++"/<name>"++ext,.{name});
     return error.BadName;
   }
+  // where the mesh is kept
   const path=try std.fmt.allocPrint(arena,dir++"/{s}"++ext,.{name});
   // the mesh: as kept, else one form to start from, written at once so a
   // new name is a file from the start
+  // whether the mesh is new, and so to be written at once
   var made=false;
+  // the mesh: read from its text, else a fresh one with a single form
   const doc=load:{
+    // the mesh's text, if it is kept
     const text=Dir.cwd().readFileAlloc(io,path,gpa,.limited(1<<22))catch|er|switch(er){
       error.FileNotFound=>{
+        // a fresh mesh, one form at rest
         var fresh:Doc=.{};
         try fresh.pieces.append(gpa,.{});
         made=true;
@@ -75,6 +131,7 @@ pub fn main(init:std.process.Init)!void{
     defer gpa.free(text);
     break:load try Doc.parse(gpa,text);
   };
+  // the editor, sculpting that mesh
   var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode};
   defer e.doc.deinit(gpa);
   if(made){
@@ -87,6 +144,7 @@ pub fn main(init:std.process.Init)!void{
   // the game's files (controls, strings), as the game reads them
   try ps.home.open(io,init.environ_map);
   defer ps.home.close(io);
+  // the gardener's settings: vsync and antialiasing
   const opts=try ps.options.load(gpa,io);
   try ctl.load(gpa,io);
   defer ctl.unload();
@@ -96,8 +154,10 @@ pub fn main(init:std.process.Init)!void{
   defer glfw.terminate();
   if(!glfw.isVulkanSupported())return error.VulkanUnsupported;
   glfw.windowHint(.client_api,.no_api);
+  // the editor's window, as big as the game's
   const window=try glfw.createWindow(play.windowSize[0],play.windowSize[1],"Parasymi mesh editor",null,null);
   defer window.destroy();
+  // the input, reading keys and buttons from the window
   var input:Input=.{.win=window};
   input.attach();
   // the renderer grows next to nothing (the editor puts its own meshes in)
@@ -107,7 +167,9 @@ pub fn main(init:std.process.Init)!void{
   // behind the game's loading screen
   var screenL=loading.Loading.init(gpa);
   defer screenL.deinit();
+  // the clock at the last frame (s)
   var last=glfw.getTime();
+  // the whole loading count: the forms, the sculpt, the world's chunks
   const whole=2+play.streamChunks;
   while(!try renderer.meshesReady(r)){
     if(!try loadFrame(&screenL,r,&input,&last,.forms,.{.done=0,.total=whole}))return;
@@ -115,8 +177,10 @@ pub fn main(init:std.process.Init)!void{
   // the sculpt alone, meshed again as it changes
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
+  // where in the builder each library slot's level of detail lies
   var ranges:[meshlib.slots][2]u32=@splat(.{0,0});
   _=try loadFrame(&screenL,r,&input,&last,.forms,.{.done=1,.total=whole});
+  // the quiet world the sculpt stands on
   var game=try Game.init(gpa,play.defaultSeed);
   defer game.deinit();
   game.world.io=io;
@@ -127,19 +191,25 @@ pub fn main(init:std.process.Init)!void{
   }
   // the sculpt stands where the wolf would have woken (dry ground)
   const origin=game.player.pos;
+  // the camera, turning round the sculpt
   var cam=Orbit.init(origin+v3(0,lookUp,0),camDist,camPitch);
+  // the panel's draw batch
   var ui:Draw=.{.gpa=gpa};
   defer ui.deinit();
+  // each form's handle on screen, or null behind the eye
   var handles:std.ArrayList(?[2]f32)=.empty;
   defer handles.deinit(gpa);
+  // how many frames have run (for `--shot`)
   var frames:u32=0;
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
     frames+=1;
+    // the clock now, and the time since the last frame, capped (s)
     const now=glfw.getTime();
     const dt:f32=@floatCast(@min(now-last,maxDt));
     last=now;
+    // the swapchain's size this frame (px)
     const screen=r.extent();
     // handles and the gizmo as last frame's camera saw them
     const seen:gizmo.View=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen};
@@ -152,11 +222,13 @@ pub fn main(init:std.process.Init)!void{
     // (coarser while dragging, at full detail once let go)
     if(e.drag==.none and e.coarse)e.stale=true;
     if(e.stale and (e.drag==.none or e.since>=remesh)){
+      // whether this meshing is coarse, for a drag still going on
       const coarse=e.drag!=.none;
       b.v.clearRetainingCapacity();
       b.skin.clearRetainingCapacity();
       b.grow.clearRetainingCapacity();
       try e.doc.mesh(gpa,io,coarse,&b);
+      // the whole surface, as every level of detail of the slot
       const run:[2]u32=.{0,@intCast(b.mark())};
       for(0..meshgen.lods)|l|ranges[meshlib.slot(slotId,@intCast(l))]=run;
       try renderer.setParts(r,&b,ranges,0);
@@ -169,10 +241,12 @@ pub fn main(init:std.process.Init)!void{
     game.uiTime+=dt;
     game.time+=dt;
     game.cam.aspect=screen[0]/@max(screen[1],1);
+    // whether the mouse is over the panel, where the wheel doesn't zoom
     const pointerOverUi=overUi(listRows(e.pieces().len),input.mouse[0],input.mouse[1]);
     if(ctl.down(&input,.orbit))cam.turn(input.mouseDelta);
     if(input.scroll!=0 and !pointerOverUi)cam.zoom(input.scroll);
     if(e.focus and e.pieces().len>0){
+      // the selected form's values
       const v=e.pieces()[e.sel].v;
       cam.focus(origin+v.pos,@reduce(.Max,v.size));
     }
@@ -185,6 +259,7 @@ pub fn main(init:std.process.Init)!void{
     for(&scene.instances)|*p|p.*=&.{};
     scene.lights=&.{};
     for(&scene.push.feet)|*f|f.*=.{noFeet,noFeet,noFeet,0};
+    // the sculpt, drawn once where it stands
     const inst=[1]ps.vertex.PartInstance{ps.parts.instance(m.translate(origin),.{})};
     scene.parts[meshlib.slot(slotId,0)]=&inst;
     // handles drawn where the forms are now (one may have gone or come)
@@ -194,11 +269,13 @@ pub fn main(init:std.process.Init)!void{
     ui.clear(@floatCast(game.uiTime));
     try e.draw(&ui,screen,handles.items,view,origin);
     scene.ui=ui.v.items;
+    // whether the window was resized since the last frame
     const resized=input.resized;
     input.resized=false;
     r.capture=shot and frames==shotFrames;
     try r.draw(&scene,resized);
     if(r.shot())|sh|{
+      // the frame encoded as a PNG
       const bytes=try engine.core.png.encode(gpa,sh.w,sh.h,sh.px,if(sh.bgra).bgra else.rgba);
       defer gpa.free(bytes);
       try Dir.cwd().createDirPath(io,"shots");
@@ -214,11 +291,14 @@ fn loadFrame(l:*loading.Loading,r:*Renderer,input:*Input,last:*f64,stage:loading
   glfw.pollEvents();
   input.update();
   if(r.window.shouldClose())return false;
+  // the clock now, and the time since the last frame, capped (s)
   const now=glfw.getTime();
   const dt=@min(now-last.*,maxDt);
   last.*=now;
   l.step(stage,at,@floatCast(dt));
+  // what the loading screen draws
   var scene=try l.scene(r.extent());
+  // whether the window was resized since the last frame
   const resized=input.resized;
   input.resized=false;
   try r.draw(&scene,resized);

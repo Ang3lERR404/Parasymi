@@ -6,12 +6,17 @@
 //! convergence_kit.zig `confluence`): a trunk of each lineage winding up
 //! round the other and fusing into one weave of both, crowned by flowers.
 const lib=@import("../../lib.zig");
+/// the species registry: what a species is
 const species=lib.species;
+/// the engine package, reached through the hub
 const engine=lib.engine;
+/// colour types, for its genome's trunks and flowers
 const color=engine.core.color;
+/// the confluence: a 2x2 convergent hybrid of lumenroot and thornleech,
+/// never sown, containing parasites within 3 tiles once mature
 pub const def:species.Species=.{
   .lineage=.convergent,.seed=null,.size=2,.yields=.convergenceEssence,
-  // decision: mature_time is the fallback for a confluence without parents
+  // decision: matureTime is the fallback for a confluence without parents
   // (1.5x the slower first pair); a spawned one carries its own span.
   .matureTime=18,.manaCap=40,.leyDraw=1.6,.share=0.5,.drain=0,.yield=0.12,
   .contain=3,.sway=1.5,

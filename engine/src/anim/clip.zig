@@ -3,54 +3,86 @@
 //! it is kept in. `Channels(T)` reads and writes every f32 of a plain
 //! struct (nested structs, arrays, vectors) as a channel of its own, named
 //! by its path (`arms.0.root.x`), so a whole pose or look can be keyed.
+/// the standard library
 const std=@import("std");
+/// the allocator type clips own their names and keys through
 const Allocator=std.mem.Allocator;
+/// the stream writer a clip's text is written into
 const Writer=std.Io.Writer;
+/// walks the words of a line, skipping repeated spaces
 const tokenizeScalar=std.mem.tokenizeScalar;
+/// walks the pieces between each separator byte
 const splitScalar=std.mem.splitScalar;
+/// strips the given bytes from both ends
 const trim=std.mem.trim;
+/// whether two runs of bytes are the same
 const eql=std.mem.eql;
+/// reads a float from its digits
 const parseFloat=std.fmt.parseFloat;
+/// the test helpers
 const testing=std.testing;
+/// the engine's maths: lerp, smoothstep
 const m=@import("../core/math.zig");
 /// keys this close in time are the same key
 pub const same:f32=1e-4;
 /// the first line of a clip's text
 pub const header="# clip";
-pub const Key=struct{t:f32,v:f32};
+/// one key: a value pinned at a time
+pub const Key=struct{
+  /// when the key sits (seconds into the clip)
+  t:f32,
+  /// the value it holds there
+  v:f32
+};
 /// one channel's keys, in time order
 pub const Track=struct{
+  /// the channel's name, its path (`arms.0.root.x`); owned by the clip
   name:[]const u8,
+  /// its keys, sorted by time
   keys:std.ArrayList(Key)=.empty,
   /// its value at `t`: held before the first key and after the last,
   /// eased in and out between two (null without keys)
   pub fn sample(tr:*const Track,t:f32)?f32{
+    // the keys
     const k=tr.keys.items;
     if(k.len==0)return null;
     if(t<=k[0].t)return k[0].v;
     for(k[1..],1..)|b,i|if(t<b.t){
+      // the key before `t`
       const a=k[i-1];
       return m.lerp(a.v,b.v,m.smooth((t-a.t)/(b.t-a.t)));
     };
     return k[k.len-1].v;
   }
-  /// the key at `at` (within `SAME`), if there is one
+  /// the key at `t` (within `same` seconds), if there is one: its index
   pub fn at(tr:*const Track,t:f32)?usize{
     for(tr.keys.items,0..)|k,i|if(@abs(k.t-t)<same)return i;
     return null;
   }
 };
-pub const ParseError=error{BadClip,OutOfMemory};
+/// what reading a clip's text can fail with
+pub const ParseError=error{
+  /// a line that is not a header, comment, `subject`, `length` or `key`,
+  /// or one missing its words or numbers
+  BadClip,
+  /// no room for the clip's names and keys
+  OutOfMemory
+};
+/// a named set of tracks: one movement, kept as text in `src/anim/`
 pub const Clip=struct{
+  /// the allocator its subject, names and keys are owned through
   gpa:Allocator,
   /// what it animates (the game's word for it)
   subject:[]const u8,
   /// seconds it runs
   length:f32=2,
+  /// its tracks, one per channel keyed, in the order they were first keyed
   tracks:std.ArrayList(Track)=.empty,
+  /// an empty clip of `subject`, which is copied
   pub fn init(gpa:Allocator,subject:[]const u8)Allocator.Error!Clip{
     return.{.gpa=gpa,.subject=try gpa.dupe(u8,subject)};
   }
+  /// frees the subject, every track's name and keys, and the tracks
   pub fn deinit(c:*Clip)void{
     for(c.tracks.items)|*tr|{
       c.gpa.free(tr.name);
@@ -59,13 +91,16 @@ pub const Clip=struct{
     c.tracks.deinit(c.gpa);
     c.gpa.free(c.subject);
   }
+  /// the track named `name`, or null when none is keyed yet
   pub fn track(c:*const Clip,name:[]const u8)?*Track{
     for(c.tracks.items)|*tr|if(eql(u8,tr.name,name))return tr;
     return null;
   }
   /// `name` keyed to `v` at `t` (an existing key there takes the value)
   pub fn put(c:*Clip,name:[]const u8,t:f32,v:f32)Allocator.Error!void{
+    // the channel's track, made (with its name copied) when it is new
     const tr=c.track(name) orelse add:{
+      // the name, owned by the clip
       const owned=try c.gpa.dupe(u8,name);
       errdefer c.gpa.free(owned);
       try c.tracks.append(c.gpa,.{.name=owned});
@@ -75,24 +110,29 @@ pub const Clip=struct{
       tr.keys.items[i].v=v;
       return;
     }
+    // where the new key goes, keeping the keys in time order
     var i:usize=0;
     while(i<tr.keys.items.len and tr.keys.items[i].t<t)i+=1;
     try tr.keys.insert(c.gpa,i,.{.t=t,.v=v});
   }
   /// `name`'s key at `t` taken out; whether there was one
   pub fn remove(c:*Clip,name:[]const u8,t:f32)bool{
+    // the channel's track, and the key at `t`
     const tr=c.track(name) orelse return false;
     const i=tr.at(t) orelse return false;
     _=tr.keys.orderedRemove(i);
     return true;
   }
+  /// `name`'s value at `t` (see `Track.sample`), or null when it has no track
   pub fn sample(c:*const Clip,name:[]const u8,t:f32)?f32{
     return if(c.track(name))|tr|tr.sample(t)else null;
   }
   /// the nearest key time after (`dir` 1) or before (-1) `t` on any track
   pub fn nextKey(c:*const Clip,t:f32,dir:f32)?f32{
+    // the nearest key time so far
     var best:?f32=null;
     for(c.tracks.items)|tr|for(tr.keys.items)|k|{
+      // how far ahead (along `dir`) this key lies
       const d=(k.t-t)*dir;
       if(d>same and (best==null or d<(best.?-t)*dir))best=k.t;
     };
@@ -106,15 +146,20 @@ pub const Clip=struct{
   }
   /// a clip from its text (`#` starts a comment)
   pub fn parse(gpa:Allocator,text:[]const u8)ParseError!Clip{
+    // the clip, empty until its lines fill it
     var c=try Clip.init(gpa,"");
     errdefer c.deinit();
+    // the text, line by line
     var lines=splitScalar(u8,text,'\n');
     while(lines.next())|raw|{
+      // this line, trimmed of spaces and its CR
       const line=trim(u8,raw," \t\r");
       if(line.len==0 or line[0]=='#')continue;
+      // the line's words, and the first, which says what the line is
       var it=tokenizeScalar(u8,line,' ');
       const word=it.next() orelse continue;
       if(eql(u8,word,"subject")){
+        // the subject's word
         const s=it.next() orelse return error.BadClip;
         gpa.free(c.subject);
         c.subject="";
@@ -122,6 +167,7 @@ pub const Clip=struct{
       }else if(eql(u8,word,"length")){
         c.length=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
       }else if(eql(u8,word,"key")){
+        // the key's channel, time and value
         const name=it.next() orelse return error.BadClip;
         const t=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
         const v=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
@@ -135,12 +181,17 @@ pub const Clip=struct{
 /// write it. Other fields (bools, ints) are left out.
 pub fn Channels(comptime T:type)type{
   return struct{
+    /// how many channels `T` has
     pub const count=countOf(T);
+    /// each channel's name, its dotted path, in channel order
     pub const names:[count][]const u8=namesOf(T,"");
+    /// channel `i`'s value in `x`
     pub fn get(x:*const T,i:usize)f32{
+      // a copy, since `walk` takes something it may write
       var copy=x.*;
       return walk(T,&copy,i,null);
     }
+    /// sets channel `i` in `x` to `v`
     pub fn set(x:*T,i:usize,v:f32)void{_=walk(T,x,i,v);}
     /// the channel named `name`
     pub fn find(name:[]const u8)?usize{
@@ -149,10 +200,13 @@ pub fn Channels(comptime T:type)type{
     }
   };
 }
+/// how many f32 channels a `U` holds: a float one, a struct its fields',
+/// an array its items', a vector its lanes (other types none)
 fn countOf(comptime U:type)usize{
   return switch(@typeInfo(U)){
     .float=>if(U==f32)1 else 0,
     .@"struct"=>|s|blk:{
+      // the fields' channels, summed
       var n:usize=0;
       for(s.fields)|fl|n+=countOf(fl.type);
       break:blk n;
@@ -162,26 +216,35 @@ fn countOf(comptime U:type)usize{
     else=>0,
   };
 }
+/// how a vector's lanes are named, by index
 const axes=[_][]const u8{"x","y","z","w"};
+/// each channel's name in a `U`, dotted from `prefix`: field names, array
+/// indices and vector axes, in channel order
 fn namesOf(comptime U:type,comptime prefix:[]const u8)[countOf(U)][]const u8{
   @setEvalBranchQuota(100_000);
+  // the names, filled as the type is walked
   var out:[countOf(U)][]const u8=undefined;
+  // the prefix with its dot, or nothing at the top
   const dot=if(prefix.len==0)""else prefix++".";
   switch(@typeInfo(U)){
     .float=>if(U==f32){
       out[0]=prefix;
     },
     .@"struct"=>|s|{
+      // where the next field's names go
       var n:usize=0;
       for(s.fields)|fl|{
+        // the field's names
         const sub=namesOf(fl.type,dot++fl.name);
         for(sub,0..)|nm,i|out[n+i]=nm;
         n+=sub.len;
       }
     },
     .array=>|a|{
+      // how many channels one item holds
       const per=countOf(a.child);
       for(0..a.len)|j|{
+        // the item's names
         const sub=namesOf(a.child,dot++std.fmt.comptimePrint("{d}",.{j}));
         for(sub,0..)|nm,i|out[j*per+i]=nm;
       }
@@ -201,20 +264,24 @@ fn walk(comptime U:type,x:*U,i:usize,v:?f32)f32{
       return x.*;
     },
     .@"struct"=>|s|{
+      // where this field's channels start
       comptime var base:usize=0;
       inline for(s.fields)|fl|{
+        // how many channels this field holds
         const n=comptime countOf(fl.type);
         if(n>0 and i>=base and i<base+n)return walk(fl.type,&@field(x,fl.name),i-base,v);
         base+=n;
       }
     },
     .array=>|a|{
+      // how many channels one item holds
       const per=comptime countOf(a.child);
       if(per>0)inline for(0..a.len)|j|{
         if(i>=j*per and i<(j+1)*per)return walk(a.child,&x[j],i-j*per,v);
       };
     },
     .vector=>|vec|if(vec.child==f32){
+      // the vector as an array, so one lane can be set
       var arr:[vec.len]f32=x.*;
       if(v)|nv|arr[i]=nv;
       x.*=arr;
@@ -225,11 +292,13 @@ fn walk(comptime U:type,x:*U,i:usize,v:?f32)f32{
   unreachable;
 }
 test"a track eases between its keys and holds past its ends"{
+  // a clip with one channel keyed twice, at 0 and at 1
   var c=try Clip.init(testing.allocator,"thing");
   defer c.deinit();
   try c.put("a",1,2);
   try c.put("a",0,0);
   try c.put("a",1,4);
+  // the channel's track
   const tr=c.track("a").?;
   try testing.expectEqual(@as(usize,2),tr.keys.items.len);
   try testing.expectEqual(@as(f32,0),c.sample("a",-1).?);
@@ -242,16 +311,20 @@ test"a track eases between its keys and holds past its ends"{
   try testing.expect(!c.remove("a",1));
 }
 test"a clip comes back from its text"{
+  // the allocator, which finds leaks
   const gpa=testing.allocator;
+  // a clip with a length and three keys on two channels
   var c=try Clip.init(gpa,"wolf");
   defer c.deinit();
   c.length=1.5;
   try c.put("head.x",0,0.25);
   try c.put("head.x",0.75,-0.5);
   try c.put("jaw",0.5,0.1);
+  // the clip's text, written into memory
   var out:Writer.Allocating=.init(gpa);
   defer out.deinit();
   try c.write(&out.writer);
+  // the clip read back from that text
   var back=try Clip.parse(gpa,out.written());
   defer back.deinit();
   try testing.expectEqualStrings("wolf",back.subject);
@@ -261,16 +334,23 @@ test"a clip comes back from its text"{
   try testing.expectError(error.BadClip,Clip.parse(gpa,"key head.x zero 1"));
 }
 test"every f32 of a struct is a channel, named by its path"{
+  // a float, a bool (no channel), a vector and an array of structs
   const S=struct{
+    /// one channel, `a`
     a:f32=1,
+    /// no channel: not a float
     on:bool=true,
+    /// three channels, `p.x` to `p.z`
     p:m.V3=.{2,3,4},
+    /// two legs of three channels each, `legs.0.b` to `legs.1.c.1`
     legs:[2]struct{b:f32=5,c:[2]f32=.{6,7}}=@splat(.{}),
   };
+  // the struct's channels
   const C=Channels(S);
   try testing.expectEqual(@as(usize,1+3+2*3),C.count);
   try testing.expectEqualStrings("p.y",C.names[2]);
   try testing.expectEqualStrings("legs.1.c.0",C.names[8]);
+  // a struct to read and write
   var s:S=.{};
   try testing.expectEqual(@as(f32,3),C.get(&s,2));
   C.set(&s,8,-1);
