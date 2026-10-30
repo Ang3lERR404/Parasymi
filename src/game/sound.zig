@@ -23,8 +23,9 @@
 //!   nearer the mote, the louder.
 //! - by day, music: light piano plunks (felt-hammered strings, a little
 //!   stretched and beating) on a steady eighth-note pulse, a wandering
-//!   pentatonic line over a soft left hand, phrased as a motif and its
-//!   variation over a slow chord progression, a soft low drum on some bars,
+//!   Lydian line (its raised fourth the sound of wonder) over a soft left
+//!   hand, phrased as a motif and its variation over open chords (major
+//!   sevenths, the Lydian II, ninths left ringing), a soft low drum on some bars,
 //!   all with a dark echo three steps behind; it rises with the morning and
 //!   fades out at dusk.
 //! - while the arsthraxia works, a spinning whorl hums under a choir that

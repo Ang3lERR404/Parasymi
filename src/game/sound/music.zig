@@ -1,4 +1,4 @@
-//! the day's music playing: phrases of plunks over a slow pulse, fading with the light.
+//! the day's music playing: Lydian phrases of plunks over open chords and a slow pulse, fading with the light.
 /// the hub every game module is reached through
 const lib=@import("../../lib.zig");
 /// the generic engine package
@@ -29,6 +29,8 @@ const echo=lib.sound.score.echo;
 const Echo=lib.sound.voices.Echo;
 /// how often the left hand's fifth sounds on the third beat
 const fifthChance=lib.sound.score.fifthChance;
+/// how often the left hand's ninth rings there instead
+const ninthChance=lib.sound.score.ninthChance;
 /// the left hand's low root (MIDI)
 const lowLevel=lib.sound.score.lowLevel;
 /// roots above this many semitones drop an octave
@@ -208,7 +210,12 @@ pub const Music=struct{
     // the left hand's root, dropped an octave if high
     const low=lowLevel+c.root-(if(c.root>lowFold)@as(u8,12)else 0);
     if(s==0)mu.plunk(low,vary(&mu.r,lowVel));
-    if(s==barSlots/2 and mu.r.float()<fifthChance)mu.plunk(low+7,vary(&mu.r,lowVel*0.8));
+    if(s==barSlots/2){
+      // the left hand's second note: the ninth, left open, or the fifth
+      const second=mu.r.float();
+      if(second<ninthChance)mu.plunk(low+14,vary(&mu.r,lowVel*0.7))
+      else if(second<ninthChance+fifthChance*(1-ninthChance))mu.plunk(low+7,vary(&mu.r,lowVel*0.8));
+    }
     if(s==0 and mu.r.float()<drumChance)mu.drum(1);
     if(s==barSlots/2 and mu.r.float()<tapChance)mu.drum(tapVel);
     mu.step=(mu.step+1)%phraseSteps;

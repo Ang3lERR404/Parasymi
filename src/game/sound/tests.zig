@@ -252,4 +252,6 @@ test"a phrase's second half varies its first, and melody stays in range"{
   // a bar's first note sits in its chord
   try testing.expectEqual(@as(u8,62),chordTone(63,.{.root=0}));
   try testing.expectEqual(@as(u8,71),chordTone(72,.{.root=9,.minor=true}));
+  // an open chord holds its seventh too (C sharp over Dmaj7)
+  try testing.expectEqual(@as(u8,73),chordTone(73,.{.root=0,.seventh=11}));
 }

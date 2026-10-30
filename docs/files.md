@@ -65,8 +65,10 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## engine/src/ui/
 - `box.zig` — a box in screen pixels (y down): where a UI component sits, how big it is, and so what the mouse can land on.
+- `button.zig` — a button, as far as the mouse goes: its box and the pointer decide which of four states it is in (idle, hovering, pressed, held), so each…
 - `draw.zig` — immediate-mode 2D batch in pixel coordinates, rebuilt every frame.
 - `font.zig` — built-in 5x7 bitmap font, defined in code.
+- `text_input.zig` — a text input: the characters typed into it each frame (the window's one stream of typing, `platform.input`), the last one taken back on…
 
 ## engine/src/world/
 - `chunk.zig` — the grid every world is cut into: square chunks of tiles, addressed by chunk coordinate, each tile by its index inside its chunk.
@@ -201,9 +203,9 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `boom.zig` — the arsthraxia's completion: a pop into a deep thud and a fracturing shimmer.
 - `footstep.zig` — a footstep: leaf litter rustled and crushed under a paw over a muffled pad.
 - `mixer.zig` — the source the device pulls from: every sound's voices mixed into one stream.
-- `music.zig` — the day's music playing: phrases of plunks over a slow pulse, fading with the light.
+- `music.zig` — the day's music playing: Lydian phrases of plunks over open chords and a slow pulse, fading with the light.
 - `sap.zig` — the sap settling, heard from inside the wolf (first person): a groan with gloops.
-- `score.zig` — the day's music on paper: pulse, scale, chords and how its voices are tuned.
+- `score.zig` — the day's music on paper: pulse, a Lydian scale, open chords and how its voices are tuned.
 - `tests.zig` — the garden's sounds rendered offline and measured.
 - `twinkle.zig` — a mote of starlight twinkling: a few glassy pings dying in a shimmer.
 - `voices.zig` — the music's instruments: the piano plunk, the soft drum and the dark echo.

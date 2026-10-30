@@ -1,4 +1,4 @@
-//! the day's music on paper: pulse, scale, chords and how its voices are tuned.
+//! the day's music on paper: pulse, a Lydian scale, open chords and how its voices are tuned.
 /// the hub every game module is reached through
 const lib=@import("../../lib.zig");
 /// the generic engine package
@@ -22,16 +22,20 @@ pub const bars=4;
 pub const phraseSteps=barSlots*bars;
 /// a motif is two bars; the phrase plays it, then a variation of it
 pub const motif=2*barSlots;
-/// the key (MIDI note of D4) and its pentatonic scale (semitones)
+/// the key (MIDI note of D4) and its Lydian scale (semitones)
 /// (this one: the key, MIDI D4)
 const key:u8=62;
-/// the pentatonic scale's notes, semitones above the key
-const penta=[_]u8{0,2,4,7,9};
+// decision: Lydian, not the major pentatonic: its raised fourth (G sharp
+// over D) is the sound of wonder, where the pentatonic read as plain and
+// cheerful
+/// the Lydian scale's notes, semitones above the key: a major scale with
+/// its fourth raised
+const scale=[_]u8{0,2,4,6,7,9,11};
 /// the melody's range, in steps of the scale above the key (B4..E6)
 /// (this one: its lowest step)
-pub const melLo:u8=4;
+pub const melLo:u8=5;
 /// its highest step
-pub const melHi:u8=11;
+pub const melHi:u8=15;
 /// how likely a note is on a bar's first step, on a beat, off the beat
 pub const noteChance=[3]f32{0.9,0.6,0.3};
 /// how loud a note is there (before it strays by `vary`)
@@ -46,14 +50,28 @@ pub const newChords:f32=0.4;
 pub const mutate:f32=0.25;
 /// the phrase breathes out: its last two steps rest this often
 pub const breathe:f32=0.7;
-/// a chord: its root (semitones above the key) and whether it is minor
-/// (fields: `root`, `minor`)
-pub const Chord=struct{root:u8,minor:bool=false};
-/// I vi IV V, IV I ii V, I V vi IV
+/// a chord: its root (semitones above the key), whether it is minor, and
+/// its seventh (semitones above its root; 0 for none)
+/// (fields: `root`, `minor`, `seventh`)
+pub const Chord=struct{root:u8,minor:bool=false,seventh:u8=0};
+/// the open chords of D Lydian, rising and never quite resolving: Imaj7 II
+/// (the raised fourth's own chord), iii7, vi7, V
+/// (this one: Imaj7)
+const one:Chord=.{.root=0,.seventh=11};
+/// II, major: the chord that makes Lydian Lydian
+const two:Chord=.{.root=2};
+/// iii7
+const three:Chord=.{.root=4,.minor=true,.seventh=10};
+/// vi7
+const six:Chord=.{.root=9,.minor=true,.seventh=10};
+/// V
+const five:Chord=.{.root=7};
+/// Imaj7 II Imaj7 II, vi7 II Imaj7 Imaj7, iii7 II Imaj7 V, Imaj7 vi7 II II
 pub const progressions=[_][bars]Chord{
-  .{.{.root=0},.{.root=9,.minor=true},.{.root=5},.{.root=7}},
-  .{.{.root=5},.{.root=0},.{.root=2,.minor=true},.{.root=7}},
-  .{.{.root=0},.{.root=7},.{.root=9,.minor=true},.{.root=5}},
+  .{one,two,one,two},
+  .{six,two,one,one},
+  .{three,two,one,five},
+  .{one,six,two,two},
 };
 /// the left hand: each bar's root low (D3, roots above this many semitones
 /// an octave lower), its fifth on the third beat this often, and how loud
@@ -63,6 +81,8 @@ pub const lowLevel:u8=50;
 pub const lowFold:u8=4;
 /// how often the fifth sounds on the third beat
 pub const fifthChance:f32=0.6;
+/// how often the ninth rings over it instead, left open
+pub const ninthChance:f32=0.35;
 /// how loud the left hand plays
 pub const lowVel:f32=0.55;
 /// the plunk: a struck string's partials (harmonics a little stretched,
@@ -159,7 +179,7 @@ pub const musicFrom:f32=0.05;
 /// the music's loudness (tests hush it to hear the rest alone)
 pub const music:f32=1;
 /// a MIDI note of the scale, `i` steps above the key
-pub fn scaleNote(i:u8)u8{return@intCast(key+12*(i/penta.len)+penta[i%penta.len]);}
+pub fn scaleNote(i:u8)u8{return@intCast(key+12*(i/scale.len)+scale[i%scale.len]);}
 /// the note nearest `note` (within a whole tone) that is in `c`
 pub fn chordTone(note:u8,c:Chord)u8{
   // the chord's third: minor or major
@@ -170,7 +190,7 @@ pub fn chordTone(note:u8,c:Chord)u8{
   for([_]u8{0,1,2})|d|for([_]u8{note-|d,note+d})|n|{
     // where `n` lies in the chord's scale, semitones above its root
     const in=(n+12-key%12+12-c.root)%12;
-    if((in==0 or in==third or in==7) and d<dist){
+    if((in==0 or in==third or in==7 or (c.seventh!=0 and in==c.seventh)) and d<dist){
       best=n;
       dist=d;
     }
