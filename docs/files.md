@@ -204,7 +204,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `wind.zig` — the wind over the garden: a hush in slow gusts, whistling in the strong ones.
 
 ## src/game/
-- `specimen.zig` — `--plant=<species>` / `--structure=<kind>`: one plant or structure alone in the world, held in one state or looping one animation…
+- `specimen.zig` — `--plant=<species>` / `--structure=<kind>`: one plant or structure alone (or `--samples=<mesh>,...`: library meshes side by side along the x
 - `structures.zig` — grown structures: the first steps from hand work toward automation.
 
 ## src/game/structures/
@@ -276,6 +276,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `paw_pad.zig` — mesh: PAW PAD.
 - `pluck_burst.zig` — mesh: PLUCK BURST.
 - `polyp.zig` — mesh: POLYP.
+- `polyp_hydra.zig` — mesh: POLYP, HYDRA.
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
 - `sap_cache.zig` — mesh: SAP CACHE.

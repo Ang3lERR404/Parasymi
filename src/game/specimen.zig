@@ -1,4 +1,6 @@
 //! `--plant=<species>` / `--structure=<kind>`: one plant or structure alone
+//! (or `--samples=<mesh>,...`: library meshes side by side along the x
+//! axis, to compare looks)
 //! in the world, held in one state or looping one animation (`--state=`,
 //! `--period=`), for testing how it grows, looks and works. Nothing else is
 //! put down or drawn (no wolf or motes; a plant has no nodes or structures
@@ -20,6 +22,10 @@ const indexOf=std.mem.indexOf;
 const eql=std.mem.eql;
 /// every tag of an enum: tile kinds, items, studies
 const values=std.enums.values;
+/// reads the names in a list of samples
+const tokenizeScalar=std.mem.tokenizeScalar;
+/// tells a sample's structure by the start of its name
+const startsWith=std.mem.startsWith;
 /// finds a mesh among those a structure declares
 const indexOfScalar=std.mem.indexOfScalar;
 /// the test harness
@@ -84,12 +90,50 @@ const carry:f32=2;
 const standBack:f32=1.2;
 /// the specimen's seed (its variant, its phase)
 const seed:f32=0.37;
+/// samples laid out this many tiles apart along the x axis
+const sampleGap:i32=3;
+/// the most samples laid out at once
+pub const maxSamples=8;
+/// library meshes to compare, laid out in a line along the x axis
+pub const Samples=struct{
+  /// the meshes, the first `n` in use
+  ids:[maxSamples]meshlib.Id=undefined,
+  /// how many are in use
+  n:usize=0,
+  /// the meshes in use, in the order they stand along x
+  pub fn list(s:*const Samples)[]const meshlib.Id{return s.ids[0..s.n];}
+  /// reads `a,b,c`: library mesh names, at least one, at most `maxSamples`
+  pub fn parse(text:[]const u8)error{BadSample}!Samples{
+    // the samples read so far, and the walk over the names
+    var s=Samples{};
+    var it=tokenizeScalar(u8,text,',');
+    while(it.next())|name|{
+      if(s.n==maxSamples)return error.BadSample;
+      s.ids[s.n]=stringToEnum(meshlib.Id,name) orelse return error.BadSample;
+      s.n+=1;
+    }
+    if(s.n==0)return error.BadSample;
+    return s;
+  }
+};
+/// how a sample sways and how full of sap it shows: as the structure whose
+/// mesh its name begins with (`polypHydra` as the polyp)
+const Like=struct{
+  /// how far it bends in the garden's wind
+  sway:f32=0.4,
+  /// the height it bends over
+  tall:f32=1,
+  /// how full of sap it shows
+  sap:f32=1,
+};
 /// what stands alone
 pub const Subject=union(enum){
   /// a plant of a species
   plant:species.Id,
   /// a structure of a kind
   structure:st.Kind,
+  /// library meshes side by side along the x axis
+  samples:Samples,
 };
 /// how the specimen is shown: grown in a loop, held still, worn out, or left live
 pub const State=union(enum){
@@ -142,7 +186,8 @@ pub const State=union(enum){
   /// wither, flow, drain, darken, live and are plucked; structures work)
   pub fn suits(s:State,what:Subject)bool{
     return switch(s){
-      .grow,.span,.held,.turn,.look=>true,
+      .grow,.span,.held=>true,
+      .turn,.look=>what!=.samples,
       .wither,.flow,.drain,.dark,.live,.pluck,.ripen=>what==.plant,
       .active=>what==.structure,
     };
@@ -195,6 +240,7 @@ pub const Specimen=struct{
         for(values(ck.Kind))|t|if(resources.of(t))|n|try list.append(arena,n.mesh);
         return.{.parts=list.items};
       },
+      .samples=>|sm|return.{.parts=try arena.dupe(meshlib.Id,sm.list())},
     }
   }
   /// put it down on the free tile nearest the wolf (a structure beside a
@@ -206,6 +252,8 @@ pub const Specimen=struct{
     const cx,const cz=m.tileAt(g.player.pos);
     var found=false;
     for([_]bool{true,false})|byNode|{
+      // (samples stand anywhere)
+      if(byNode and s.what==.samples)continue;
       // the ring being searched, outward from the wolf
       var r:i32=0;
       find:while(r<search):(r+=1){
@@ -253,6 +301,7 @@ pub const Specimen=struct{
     const size:u8,const up:f32=switch(s.what){
       .plant=>|sp|.{if(species.get(sp).floating)1 else species.get(sp).size,0},
       .structure=>|k|.{st.defs.get(k).size,st.defs.get(k).hover},
+      .samples=>.{1,0},
     };
     g.player.pos=m.footprintCentre(s.at[0],s.at[1],size,g.heightAt(s.at[0],s.at[1]));
     g.cam.target=g.player.pos+m.v3(0,up,0);
@@ -264,6 +313,7 @@ pub const Specimen=struct{
     return switch(s.what){
       .plant=>|sp|g.plants.canPlace(&g.world,x,z,sp),
       .structure=>|k|g.structs.canPlace(&g.world,x,z,k),
+      .samples=>true,
     };
   }
   /// puts it down at its tile, as its state shows it now
@@ -281,6 +331,8 @@ pub const Specimen=struct{
         if(!ok)diag.whyNot(&g.structs,&g.world,s.at[0],s.at[1],k);
         if(g.structs.list.items.len>0)g.structs.list.items[0].grown=l.growth;
       },
+      // (samples are drawn, never put down: `drawSamples`)
+      .samples=>{},
     }
   }
   /// one tick before the world's: held, it is set as its state says and
@@ -339,8 +391,29 @@ pub const Specimen=struct{
         one.grown=l.growth;
         one.activity=0;
       },
+      .samples=>{},
     }
     return true;
+  }
+  /// samples: each mesh drawn on its own tile along the x axis, the line
+  /// centred on its tile, grown as its state shows and swaying as its
+  /// structure does
+  pub fn drawSamples(s:*const Specimen,g:*Game)Allocator.Error!void{
+    // the samples (none: nothing to draw)
+    const sm=switch(s.what){
+      .samples=>|x|x,
+      .plant,.structure=>return,
+    };
+    // what they show this moment
+    const l=s.look();
+    for(sm.list(),0..)|id,i|{
+      // its tile along the line, and the middle of it on the ground
+      const x=s.at[0]+@divFloor((@as(i32,@intCast(i))*2-@as(i32,@intCast(sm.n-1)))*sampleGap,2);
+      const at=m.footprintCentre(x,s.at[1],1,g.heightAt(x,s.at[1]));
+      // how it sways
+      const like=likeOf(id);
+      try g.parts.emit(id,m.translate(at),.{.phase=seed,.fade=like.sap,.sway=like.sway,.tall=like.tall,.grown=l.growth});
+    }
   }
   /// after the world's tick. A live plant, once grown (or gone) and left a
   /// while, is sown afresh; an active structure is fed, emptied of what it
@@ -441,6 +514,24 @@ pub const Specimen=struct{
     };
   }
 };
+/// how sample `id` sways: as the structure whose mesh name its own begins
+/// with, the longest such (none: `Like`'s defaults)
+fn likeOf(id:meshlib.Id)Like{
+  // the best match yet, and its name's length
+  var best:?st.Kind=null;
+  var len:usize=0;
+  for(values(st.Kind))|k|{
+    // the name of that structure's mesh
+    const name=@tagName(st.defs.get(k).mesh);
+    if(startsWith(u8,@tagName(id),name) and name.len>len){
+      best=k;
+      len=name.len;
+    }
+  }
+  // the structure it is a look for
+  const k=best orelse return.{};
+  return.{.sway=st.defs.get(k).sway,.tall=st.defs.get(k).tall,.sap=st.defs.get(k).sap};
+}
 /// an arsthraxia studies what is chosen: the first open study that takes
 /// ingredients
 fn study(g:*Game)void{
@@ -471,6 +562,15 @@ test"a state is a name, a share of growth or a span"{
   try testing.expectError(error.BadState,State.parse("sideways"));
   try testing.expect((try State.parse("active")).suits(.{.structure=.germinator}));
   try testing.expect(!(try State.parse("wither")).suits(.{.structure=.germinator}));
+}
+test"samples are library mesh names, one to `maxSamples`, and sway as their structure"{
+  // two meshes, read in order
+  const s=try Samples.parse("polyp,shadow");
+  try testing.expectEqualSlices(meshlib.Id,&.{.polyp,.shadow},s.list());
+  try testing.expectError(error.BadSample,Samples.parse(""));
+  try testing.expectError(error.BadSample,Samples.parse("polyp,nothing"));
+  try testing.expect(!@as(State,.turn).suits(.{.samples=s}));
+  try testing.expectEqual(st.defs.get(.polyp).sway,likeOf(.polyp).sway);
 }
 test"a loop runs its period, holds its end, then starts again"{
   // a plant looping every four seconds

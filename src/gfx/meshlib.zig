@@ -206,6 +206,8 @@ const parts=struct{
   // the halo: its polyp and the diamond it forms
   /// the polyp: the heart of a halo, a colony of feathery polyps on one fleshy mound
   pub const polyp=@import("meshes/polyp.zig");
+  /// a look for the polyp, to compare beside it: one slender hydra, its long tentacles hanging
+  pub const polypHydra=@import("meshes/polyp_hydra.zig");
   /// the diamond a halo leaves, gathered in from its shards
   pub const haloDiamond=@import("meshes/halo.zig").diamond;
   // translucent, over everything

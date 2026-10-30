@@ -75,6 +75,7 @@ zig build run -- --stress         # 120×120 plant field
 zig build run -- --load           # newest saved garden
 zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
+zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
 zig build run -- --panel=<belly|research|paused|options|gardens|naming>

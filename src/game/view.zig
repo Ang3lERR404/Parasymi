@@ -212,6 +212,7 @@ pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
     try nodes(g,@intFromFloat(reach));
     try structures(g,reach,tf);
   }
+  if(alone)try g.specimen.?.drawSamples(g);
   if(!alone){
     try ghost(g,tf);
     try motes(g);

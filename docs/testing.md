@@ -72,6 +72,21 @@ Anything that needs a partner or neighbours; use `--demo` for those:
 - a polyp's halo from blooms;
 - conduit side roots, and crown roots to plants.
 
+## Samples side by side
+`--samples=<mesh>,<mesh>,...` lays library meshes (`meshlib` names, up to
+8) along the x axis, 3 tiles apart, centred on the free tile nearest
+spawn, so looks can be compared at once.
+
+- A look for a structure is its own library mesh, named after the
+  structure's mesh (`polypHydra` beside `polyp`); it sways as that
+  structure does.
+- States: `grow`, a share or span of growth, `mature`.
+- Shoot it with `--inspect=player`: the orbit circles the line's middle.
+
+```
+zig build run -- --samples=polyp,polypHydra --state=mature --inspect=player --shots=3 --orbit=9 --dist=3.2 --pitch=18 --tod=0.5
+```
+
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.
 
