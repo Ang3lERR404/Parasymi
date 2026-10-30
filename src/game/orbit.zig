@@ -146,11 +146,11 @@ pub const Orbit=struct{
         // the nearest so far, and how far it is
         var best:?m.V3=null;
         var near:f32=m.inf(f32);
-        for(s.items(.sp),s.items(.x),s.items(.y))|sp,x,y|if(sp==id){
+        for(s.items(.sp),s.items(.x),s.items(.y),s.items(.at))|sp,x,y,at|if(sp==id){
           // the plant's species
           const def=species.get(sp);
           // its centre, lifted by the follow height and any hover
-          const c=m.footprintCentre(x,y,if(def.floating)1 else def.size,g.heightAt(x,y)+focusUp+if(def.floating)def.hover else 0);
+          const c=at+m.v3(0,g.heightAt(x,y)+focusUp+if(def.floating)def.hover else 0,0);
           // how far it is from the wolf
           const d=m.len(c-wolf);
           if(d<near){near=d;best=c;}

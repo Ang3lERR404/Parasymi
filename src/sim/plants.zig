@@ -1,6 +1,7 @@
 //! plant storage: one struct-of-arrays for every living plant in the world.
 //! Rooted plants claim a size x size footprint of tiles (see world occupancy);
-//! floating plants claim none and are tracked by the tile they hover over.
+//! floating plants claim none: they hang at any free point, off the grid,
+//! kept only from crowding another floater, and draw from the tile under them.
 //! Neighbour links are cached as plain indices and rebuilt only when the
 //! topology changes, so the per-tick ecology loop never touches a hash map.
 const lib=@import("../lib.zig");
@@ -24,7 +25,7 @@ const Turn=lib.turn.Turn;
 const Allocator=std.mem.Allocator;
 /// the test allocator and expectations
 const testing=std.testing;
-/// finds an id in a ring, for the tests
+/// finds an id in a ring or the floater list
 const indexOfScalar=std.mem.indexOfScalar;
 /// spreads relinking over the pool (`jobs.each`)
 const jobs=engine.core.jobs;
@@ -38,6 +39,10 @@ const Error=Allocator.Error;
 pub const r1=12;
 /// how many neighbours lie one tile further (ring 2)
 pub const r2=20;
+/// how close two floaters may hang, centre to centre (m)
+pub const floatGap=0.8;
+/// how near a cursor ray must pass a floater's float to touch it (m)
+pub const floatTouch=0.6;
 /// fewer plants than this a thread are relinked in one go
 const linksMin=512;
 /// a square of tiles: a footprint.
@@ -60,10 +65,13 @@ pub const Rect=struct{
 /// one living plant: where it stands, what it is, how far grown and how
 /// full of mana, and its neighbours
 pub const Plant=struct{
-  /// anchor tile (top-left of the footprint, or the tile hovered over): its world x
+  /// anchor tile (top-left of the footprint, or the tile under a floater): its world x
   x:i32,
   /// and its world y
   y:i32,
+  /// where it stands across the ground (y 0): a floater's own free point,
+  /// a rooted plant's footprint centre
+  at:m.V3=@splat(0),
   /// the chunk its anchor tile lies in
   chunk:*ck.Chunk,
   /// its anchor tile's index within that chunk
@@ -93,13 +101,13 @@ pub const Plant=struct{
   /// the plants one tile further out (ring 2), packed likewise
   n2:[r2]Id=@splat(.none),
 };
-/// every living plant, struct-of-arrays, with the floaters by tile and
+/// every living plant, struct-of-arrays, with the floaters listed and
 /// whether the neighbour links need rebuilding
 pub const Plants=struct{
   /// every plant, one column per field
   list:std.MultiArrayList(Plant)=.empty,
-  /// each floating plant by the tile it hovers over
-  floaters:std.AutoHashMapUnmanaged([2]i32,Id)=.empty,
+  /// every floating plant, in no order
+  floaters:std.ArrayList(Id)=.empty,
   /// whether a plant was placed or removed since links were last rebuilt
   topologyDirty:bool=false,
   /// frees the plant lists
@@ -110,44 +118,123 @@ pub const Plants=struct{
   /// how many plants are living
   pub fn len(p:*const Plants)usize{return p.list.len;}
   /// whether a plant of species `sp` may stand at world tile (wx, wy): a
-  /// floater over any loaded tile no other floater holds, a rooted one on a
-  /// free, fertile footprint
+  /// floater at the tile's centre, a rooted one on a free, fertile footprint
   pub fn canPlace(p:*const Plants,w:*const World,wx:i32,wy:i32,sp:species.Id)bool{
     // the species' definition
     const def=species.get(sp);
-    if(def.floating)return w.chunkOfTile(wx,wy)!=null and !p.floaters.contains(.{wx,wy});
+    if(def.floating)return p.canFloat(w,m.tileCentre(wx,wy,0));
     return w.footprintFree(wx,wy,def.size,ck.Kind.fertile);
+  }
+  /// whether a plant of species `sp` may stand at ground point `pt`: a
+  /// floater right there, a rooted one on the footprint centred nearest it
+  pub fn canPlaceNear(p:*const Plants,w:*const World,pt:m.V3,sp:species.Id)bool{
+    if(species.get(sp).floating)return p.canFloat(w,pt);
+    // the footprint's top-left tile
+    const t=anchor(pt,sp);
+    return p.canPlace(w,t[0],t[1],sp);
+  }
+  /// where a plant of species `sp` stands when put down from the cursor,
+  /// over tile `t` at ground point `pt`: a floater right at `pt`, off the
+  /// grid; a rooted one on the footprint whose top-left is `t`
+  pub fn spot(sp:species.Id,t:[2]i32,pt:m.V3)m.V3{
+    // the species' definition
+    const def=species.get(sp);
+    return if(def.floating)m.v3(pt[0],0,pt[2])else m.footprintCentre(t[0],t[1],def.size,0);
+  }
+  /// the anchor tile a plant of species `sp` takes for ground point `pt`:
+  /// the tile under a floater, the top-left of the footprint centred
+  /// nearest it for a rooted one
+  fn anchor(pt:m.V3,sp:species.Id)[2]i32{
+    // the species' definition, and how far its footprint's centre is from its top-left tile's
+    const def=species.get(sp);
+    const half=if(def.floating)0 else m.f(def.size-1)*0.5;
+    return m.tileAt(pt-m.v3(half,0,half));
+  }
+  /// whether a floater may hang at ground point `pt`: over loaded ground,
+  /// no nearer another floater than `floatGap` (it may hang over anything else)
+  fn canFloat(p:*const Plants,w:*const World,pt:m.V3)bool{
+    // the tile under the point
+    const t=m.tileAt(pt);
+    if(w.chunkOfTile(t[0],t[1])==null)return false;
+    // every plant's point
+    const ats=p.list.items(.at);
+    for(p.floaters.items)|f|{
+      // the way to that floater, flat on the ground
+      const d=(ats[f.idx()]-pt)*m.v3(1,0,1);
+      if(m.dot(d,d)<floatGap*floatGap)return false;
+    }
+    return true;
   }
   /// places a fresh plant of species `sp` at (wx, wy); returns whether it took root
   pub fn place(p:*Plants,gpa:Allocator,w:*World,wx:i32,wy:i32,sp:species.Id,seed:f32)Error!bool{
     return p.placeEx(gpa,w,wx,wy,.{.sp=sp,.seed=seed,.x=wx,.y=wy,.chunk=undefined,.tile=undefined});
   }
-  /// place a fully specified plant (x/y/chunk/tile are filled in here).
+  /// place a fully specified plant at tile (wx, wy), a floater at its
+  /// centre (x/y/at/chunk/tile are filled in here).
   pub fn placeEx(p:*Plants,gpa:Allocator,w:*World,wx:i32,wy:i32,proto:Plant)Error!bool{
-    if(!p.canPlace(w,wx,wy,proto.sp))return false;
-    // the species' definition, the chunk it lands in, and its new id
+    // the species' definition
     const def=species.get(proto.sp);
-    const c=w.chunkOfTile(wx,wy).?;
+    return p.placeNear(gpa,w,m.footprintCentre(wx,wy,if(def.floating)1 else def.size,0),proto);
+  }
+  /// place a fully specified plant at ground point `pt`: a floater hangs
+  /// right there, a rooted one takes the footprint centred nearest it
+  /// (x/y/at/chunk/tile are filled in here).
+  pub fn placeNear(p:*Plants,gpa:Allocator,w:*World,pt:m.V3,proto:Plant)Error!bool{
+    if(!p.canPlaceNear(w,pt,proto.sp))return false;
+    // the species' definition, its anchor tile, the chunk it lands in, and its new id
+    const def=species.get(proto.sp);
+    const t=anchor(pt,proto.sp);
+    const c=w.chunkOfTile(t[0],t[1]).?;
     const idx=Id.of(p.list.len);
-    // the plant as placed, its anchor and chunk filled in
+    // the plant as placed, its anchor, point and chunk filled in
     var pl=proto;
-    pl.x=wx;
-    pl.y=wy;
+    pl.x=t[0];
+    pl.y=t[1];
+    pl.at=if(def.floating)m.v3(pt[0],0,pt[2])else m.footprintCentre(t[0],t[1],def.size,0);
     pl.chunk=c;
-    pl.tile=@intCast(ck.localIndex(wx,wy));
+    pl.tile=@intCast(ck.localIndex(t[0],t[1]));
     try p.list.append(gpa,pl);
     if(def.floating){
-      try p.floaters.put(gpa,.{wx,wy},idx);
+      try p.floaters.append(gpa,idx);
       c.pins+=1;
-    }else w.setFootprint(wx,wy,def.size,Occ.plant(idx));
+    }else w.setFootprint(t[0],t[1],def.size,Occ.plant(idx));
     p.topologyDirty=true;
     return true;
   }
   /// the plant at a tile: a rooted one first, else one floating over it.
   pub fn at(p:*const Plants,w:*const World,wx:i32,wy:i32)?Id{
     if(w.occAt(wx,wy).asPlant())|i|return i;
-    return p.floaters.get(.{wx,wy});
+    // every plant's anchor tile
+    const xs=p.list.items(.x);
+    const ys=p.list.items(.y);
+    for(p.floaters.items)|f|if(xs[f.idx()]==wx and ys[f.idx()]==wy)return f;
+    return null;
   }
+  /// the floater a ray from `o` along unit `d` passes nearest its start,
+  /// within `floatTouch` of where it hangs (`hang.at(id)`), and how far along
+  /// the ray that is
+  pub fn floaterOnRay(p:*const Plants,o:m.V3,d:m.V3,comptime Hang:type,hang:Hang)?Touch{
+    // the nearest so far
+    var best:?Touch=null;
+    for(p.floaters.items)|f|{
+      // where it hangs, how far along the ray it lies, and how far off it
+      const c=hang.at(f);
+      const t=m.dot(c-o,d);
+      if(t<=0)continue;
+      if(best)|b|if(t>=b.t)continue;
+      const off=c-(o+d*m.splat3(t));
+      if(m.dot(off,off)>floatTouch*floatTouch)continue;
+      best=.{.id=f,.t=t};
+    }
+    return best;
+  }
+  /// a floater a ray touches, and how far along it
+  pub const Touch=struct{
+    /// the floater
+    id:Id,
+    /// how far along the ray (m)
+    t:f32,
+  };
   /// uproots whatever plant is at (wx, wy); returns whether there was one
   pub fn removeAt(p:*Plants,w:*World,wx:i32,wy:i32)bool{
     // the plant there
@@ -162,7 +249,7 @@ pub const Plants=struct{
     const s=p.list.slice();
     const def=species.get(s.items(.sp)[i]);
     if(def.floating){
-      _=p.floaters.remove(.{s.items(.x)[i],s.items(.y)[i]});
+      _=p.floaters.swapRemove(indexOfScalar(Id,p.floaters.items,id).?);
       s.items(.chunk)[i].pins-=1;
     }else w.setFootprint(s.items(.x)[i],s.items(.y)[i],def.size,.none);
     // the last slot, whose plant moves into the gap
@@ -172,7 +259,7 @@ pub const Plants=struct{
       const ld=species.get(s.items(.sp)[last]);
       const lx=s.items(.x)[last];
       const ly=s.items(.y)[last];
-      if(ld.floating)p.floaters.getPtr(.{lx,ly}).?.*=id
+      if(ld.floating)p.floaters.items[indexOfScalar(Id,p.floaters.items,Id.of(last)).?]=id
       else w.moveFootprint(lx,ly,ld.size,Occ.plant(id));
     }
     p.list.swapRemove(i);
@@ -206,11 +293,10 @@ pub const Plants=struct{
     const def=species.get(s.items(.sp)[i]);
     return.{.x=s.items(.x)[i],.y=s.items(.y)[i],.size=if(def.floating)1 else def.size};
   }
-  /// world-space centre of a plant's footprint (x, z).
+  /// world-space centre of a plant: its footprint's, or where it floats (x, z).
   pub fn centre(p:*const Plants,i:usize)[2]f32{
-    // the plant columns, and its footprint's centre in world space
-    const s=p.list.slice();
-    const c=m.footprintCentre(s.items(.x)[i],s.items(.y)[i],species.get(s.items(.sp)[i]).size,0);
+    // where it stands
+    const c=p.list.items(.at)[i];
     return.{c[0],c[2]};
   }
   /// remakes every plant's neighbour rings from occupancy, over the pool
@@ -237,8 +323,6 @@ pub const Plants=struct{
       const sps=s.items(.sp);
       const n1=s.items(.n1);
       const n2=s.items(.n2);
-      // whether any plant floats, so the floater map is read only then
-      const anyFloaters=p.floaters.count()>0;
       for(lo..hi)|i|{
         n1[i]=@splat(.none);
         n2[i]=@splat(.none);
@@ -260,8 +344,15 @@ pub const Plants=struct{
             const wx=xs[i]+dx;
             const wy=ys[i]+dy;
             if(w.occAt(wx,wy).asPlant())|j|link(n1,n2,i,j,ring);
-            if(anyFloaters)if(p.floaters.get(.{wx,wy}))|f|link(n1,n2,i,f,ring);
           }
+        }
+        // floaters, by the tile each hangs over (one under the footprint touches it)
+        // this plant's tiles
+        const me=Rect{.x=xs[i],.y=ys[i],.size=@intCast(size)};
+        for(p.floaters.items)|f|{
+          // how far the floater's tile is from this plant's
+          const gap=me.gap(.{.x=xs[f.idx()],.y=ys[f.idx()],.size=1});
+          if(gap<=2)link(n1,n2,i,f,@max(gap,1));
         }
       }
     }
@@ -312,6 +403,14 @@ test"footprints, floaters and links"{
   // a floater may hover over the heart itself, but not over another floater
   try testing.expect(try p.place(gpa,&w,2,2,.driftwisp,0.5));
   try testing.expect(!try p.place(gpa,&w,2,2,.driftwisp,0.5));
+  // floaters hang off the grid: anywhere not crowding another
+  const proto=Plant{.x=0,.y=0,.chunk=undefined,.tile=undefined,.sp=.driftwisp,.seed=0.5};
+  try testing.expect(!try p.placeNear(gpa,&w,m.v3(2.5+floatGap*0.9,0,2.5),proto));
+  try testing.expect(try p.placeNear(gpa,&w,m.v3(2.5+floatGap*1.1,0,2.4),proto));
+  try testing.expectEqual(@as(i32,3),p.list.items(.x)[p.len()-1]);
+  try testing.expectEqual(@as(f32,2.4),p.list.items(.at)[p.len()-1][2]);
+  try testing.expect(p.at(&w,3,2)!=null);
+  p.remove(&w,.of(p.len()-1));
   p.rebuildLinks(&w);
   // how many neighbours the heart has
   var links:usize=0;

@@ -18,6 +18,10 @@ const gen=lib.gen;
 const World=lib.world.World;
 /// every plant growing in the garden
 const Plants=lib.plants.Plants;
+/// a plant's slot
+const PlantId=lib.plants.Id;
+/// the species registry: how high a floater hangs
+const species=lib.species;
 /// the ecology: the tick that grows, spreads and drains
 const ecology=lib.ecology;
 /// the ecology's own state, kept between ticks
@@ -190,8 +194,13 @@ pub const Game=struct{
   removeCd:f32=0,
   /// the debug card is shown
   debug:bool=false,
-  /// the tile under the cursor, if any
+  /// the tile under the cursor, if any (under a floater the cursor touches, its tile)
   hover:?[2]i32=null,
+  /// the ground point under the cursor (y 0), or where a touched floater stands:
+  /// a floater is put down right here, off the grid
+  hoverAt:m.V3=@splat(0),
+  /// the floating plant the cursor touches, if any: it is reached before the ground
+  hoverFloat:?PlantId=null,
   /// how far the current gather has come (s)
   gatherT:f32=0,
   /// a short linger (s) for one-off gestures: the wolf keeps facing where it happened
@@ -281,20 +290,53 @@ pub const Game=struct{
     if(g.world.chunkOfTile(wx,wy))|c|return c.height[ck.localIndex(wx,wy)];
     return gen.heightAt(g.world.seed,wx,wy);
   }
-  /// march the ray through the cursor until it dips below the terraced ground.
-  pub fn pick(g:*const Game,cursor:[2]f32,screen:[2]f32)?[2]i32{
-    // the ray through the cursor, and how far along it the march has come
+  /// what the cursor points at: `hover`, `hoverAt` and `hoverFloat` (none
+  /// while `off`, as when inspecting)
+  pub fn aim(g:*Game,cursor:[2]f32,screen:[2]f32,off:bool)void{
+    g.hover=null;
+    g.hoverFloat=null;
+    if(off)return;
+    // the ray through the cursor, the floater it touches first, and how far along it the march has come
     const ray=g.cam.ray(cursor[0],cursor[1],screen[0],screen[1]);
+    const touched=g.plants.floaterOnRay(ray.o,ray.d,Hang,.{.g=g});
     var t:f32=0;
     // how far the march goes at most
     const maxT=g.cam.dist*pickRangeMult;
     while(t<maxT):(t+=pickStep){
+      if(touched)|f|if(f.t<=t){
+        // a floater before the ground: its tile and where it stands
+        g.hover=.{g.plants.list.items(.x)[f.id.idx()],g.plants.list.items(.y)[f.id.idx()]};
+        g.hoverAt=g.plants.list.items(.at)[f.id.idx()];
+        g.hoverFloat=f.id;
+        return;
+      };
       // the point reached, and the tile under it
       const p=ray.o+ray.d*m.splat3(t);
       const tile=m.tileAt(p);
-      if(p[1]<=g.heightAt(tile[0],tile[1]))return tile;
+      if(p[1]<=g.heightAt(tile[0],tile[1])){
+        g.hover=tile;
+        g.hoverAt=m.v3(p[0],0,p[2]);
+        return;
+      }
     }
-    return null;
+  }
+  /// where each floating plant hangs, still, for the cursor to touch
+  const Hang=struct{
+    /// the garden they hang in
+    g:*const Game,
+    /// where floater `id` hangs: over its point, its species' height above the ground (never the water)
+    pub fn at(h:Hang,id:PlantId)m.V3{
+      // the plant columns, and where it stands
+      const s=h.g.plants.list.slice();
+      const c=s.items(.at)[id.idx()];
+      return m.v3(c[0],@max(h.g.heightAt(s.items(.x)[id.idx()],s.items(.y)[id.idx()]),0)+species.get(s.items(.sp)[id.idx()]).hover,c[2]);
+    }
+  };
+  /// the plant at tile `h`: the floater the cursor touches when `h` is the
+  /// hovered tile, else whatever stands or floats there
+  pub fn plantAt(g:*const Game,h:[2]i32)?PlantId{
+    if(g.hoverFloat)|f|if(g.hover)|hv|if(hv[0]==h[0] and hv[1]==h[1])return f;
+    return g.plants.at(&g.world,h[0],h[1]);
   }
   /// what structures' behaviour may touch, the wolf and the sky with the
   /// garden, and what befell it this tick (`ev`)

@@ -104,7 +104,7 @@ const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the stored layout's version: bumped whenever one changes
-const version:u32=24;
+const version:u32=25;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -130,6 +130,10 @@ const PlantRec=extern struct{
   x:i32,
   /// its tile row
   y:i32,
+  /// where it stands across (a floater's own free point, m)
+  ax:f32,
+  /// and along
+  az:f32,
   /// its species id
   sp:u32,
   /// how grown it is, 0..1
@@ -233,7 +237,7 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
   const s=g.plants.list.slice();
   try w.put(u32,@intCast(g.plants.len()));
   for(0..g.plants.len())|i|try w.put(PlantRec,.{
-    .x=s.items(.x)[i],.y=s.items(.y)[i],.sp=@intFromEnum(s.items(.sp)[i]),
+    .x=s.items(.x)[i],.y=s.items(.y)[i],.ax=s.items(.at)[i][0],.az=s.items(.at)[i][2],.sp=@intFromEnum(s.items(.sp)[i]),
     .growth=s.items(.growth)[i],.span=s.items(.span)[i],.mana=s.items(.mana)[i],.health=s.items(.health)[i],
     .seed=s.items(.seed)[i],.flow=s.items(.flow)[i],.essence=s.items(.essence)[i],
     .dir=s.items(.dir)[i],
@@ -300,7 +304,7 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
     // its species
     const sp:species.Id=@enumFromInt(p.sp);
     try ensureFootprint(&g,p.x,p.y,species.get(sp).size);
-    _=try g.plants.placeEx(gpa,&g.world,p.x,p.y,.{
+    _=try g.plants.placeNear(gpa,&g.world,m.v3(p.ax,0,p.az),.{
       .x=p.x,.y=p.y,.chunk=undefined,.tile=undefined,.sp=sp,
       .growth=p.growth,.span=p.span,.mana=p.mana,.health=p.health,.seed=p.seed,
       .flow=p.flow,.essence=p.essence,.dir=@intCast(p.dir),

@@ -17,6 +17,8 @@ const m=lib.engine.core.math;
 const ck=lib.ck;
 /// the species registry: what a plant yields, whether it floats, its seed
 const species=lib.species;
+/// the garden's plants: where one put down from the cursor stands
+const Plants=lib.plants.Plants;
 /// what can be held: items and the belly's bags
 const items=lib.items;
 /// the weaving recipes
@@ -87,7 +89,7 @@ pub fn put(g:*Game,h:[2]i32)Allocator.Error!void{
   // a plant faces the way the next thing put down does, as a structure
   // whether it took root: a seed sown as a plant, a bulb grown as a structure
   const ok=if(item.plants())|sp |
-    try g.plants.placeEx(g.gpa,&g.world,h[0],h[1],.{
+    try g.plants.placeNear(g.gpa,&g.world,Plants.spot(sp,h,g.hoverAt),.{
       .x=h[0],.y=h[1],.chunk=undefined,.tile=undefined,.sp=sp,.seed=g.rng.float(),.dir=g.placeDir,
     })
   else if(st.kindOf(item))|k |
@@ -105,7 +107,7 @@ pub fn put(g:*Game,h:[2]i32)Allocator.Error!void{
 pub fn canPut(g:*const Game,h:[2]i32)bool{
   // the hotbar's chosen item; none, and nothing can be put
   const item=g.selected() orelse return false;
-  if(item.plants())|sp|return g.plants.canPlace(&g.world,h[0],h[1],sp);
+  if(item.plants())|sp|return g.plants.canPlaceNear(&g.world,Plants.spot(sp,h,g.hoverAt),sp);
   if(st.kindOf(item))|k|return g.structs.canPlace(&g.world,h[0],h[1],k);
   return false;
 }
@@ -164,7 +166,7 @@ pub fn turnAt(g:*Game,h:[2]i32,back:bool)bool{
     return true;
   }
   // the plant standing there; none, and nothing is turned
-  const id=g.plants.at(&g.world,h[0],h[1]) orelse return false;
+  const id=g.plantAt(h) orelse return false;
   // the plant list's columns, the plant's row, and whether it roots
   const p=g.plants.list.slice();
   const i=id.idx();
@@ -187,7 +189,7 @@ pub fn pick(g:*Game,h:[2]i32)bool{
     // (what forms by itself, a diamond, has no bulb to pick)
     if(st.kindOf(s.def().item)!=s.kind())return true;
     break:blk.{s.def().item,s.dir};
-  }else if(g.plants.at(&g.world,h[0],h[1]))|id|blk:{
+  }else if(g.plantAt(h))|id|blk:{
     // the plant list's columns, and the plant's seed (none: nothing to pick)
     const p=g.plants.list.slice();
     const seed=species.get(p.items(.sp)[id.idx()]).seed orelse return true;
@@ -242,7 +244,7 @@ pub fn unbuild(g:*Game,j:st.Id)void{
 /// take a mature plant's yield. Plants never set seed (a germinator weaves them).
 pub fn harvest(g:*Game,h:[2]i32)void{
   // the plant standing there, its row, the plant list's columns, its species
-  const id=g.plants.at(&g.world,h[0],h[1]) orelse return;
+  const id=g.plantAt(h) orelse return;
   const i=id.idx();
   const s=g.plants.list.slice();
   const sp=s.items(.sp)[i];
@@ -270,11 +272,11 @@ pub fn harvest(g:*Game,h:[2]i32)void{
 /// One that was never sown (a confluence) gives nothing back.
 pub fn uproot(g:*Game,h:[2]i32)void{
   // the plant standing there; none, and nothing is uprooted
-  const id=g.plants.at(&g.world,h[0],h[1]) orelse return;
+  const id=g.plantAt(h) orelse return;
   if(species.get(g.plants.list.items(.sp)[id.idx()]).seed)|seed|{
     if(g.player.inv.add(seed,1)==0)return g.prog.say(txt.s.msg.bellyFull,.{});
   }
-  _=g.plants.removeAt(&g.world,h[0],h[1]);
+  g.plants.remove(&g.world,id);
 }
 /// starlight drifts toward the wolf's chest and is absorbed on touch.
 pub fn catchStarlight(g:*Game,dt:f32)void{

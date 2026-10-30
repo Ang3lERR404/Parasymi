@@ -163,9 +163,13 @@ pub const Radiance=struct{
       var it=m.footprint(fl.x-reach,fl.y-reach,@intCast(2*reach+1));
       while(it.next())|t|{
         if(!fl.holds(t[0],t[1]))continue;
-        // the plant on this tile, if any
-        const j=p.at(w,t[0],t[1]) orelse continue;
+        // the plant rooted on this tile, if any
+        const j=w.occAt(t[0],t[1]).asPlant() orelse continue;
         r.powered.items[j.idx()]=true;
+      }
+      // and every floater over a tile it holds (they may share one)
+      for(p.floaters.items)|f|{
+        if(fl.holds(s.items(.x)[f.idx()],s.items(.y)[f.idx()]))r.powered.items[f.idx()]=true;
       }
     }
     for(s.items(.sp),0..)|sp,i|{

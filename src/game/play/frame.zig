@@ -155,7 +155,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
     if(in.scroll!=0)g.cam.zoom(in.scroll,g.player.eyes());
   }
   // interaction with the hovered tile (none while inspecting)
-  g.hover=if(inspecting)null else g.pick(cursor,screen);
+  g.aim(cursor,screen,inspecting);
   // whether the wolf is working or gathering, and where its hands work
   var working=false;
   var gathering=false;
@@ -185,7 +185,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
     const t=ck.localIndex(h[0],h[1]);
     // what floats over a tile is reached first (it is drawn over what is under it)
     const onStruct=g.structs.at(&g.world,h[0],h[1]);
-    const onPlant=if(onStruct==null)g.plants.at(&g.world,h[0],h[1])else null;
+    const onPlant=if(onStruct==null)g.plantAt(h)else null;
     // whether a click here acts on the garden: not on the HUD, not spent
     const using=uiHit==null and !g.useSpent;
     // held, use puts what is in hand down wherever it fits as the cursor

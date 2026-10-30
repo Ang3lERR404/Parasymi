@@ -20,6 +20,8 @@ const rng=engine.core.rng;
 const ck=lib.ck;
 /// every plant kind's definition
 const species=lib.species;
+/// the garden's plants: where a preview put down from the cursor stands
+const Plants=lib.plants.Plants;
 /// turning (R): how a turning thing is posed
 const turn=lib.turn;
 /// the garden's renderer: its scene, lights and limits
@@ -62,7 +64,7 @@ const plantBoundUp:f32=0.6;
 const bobAmount=[2]f32{0.07,0.025};
 /// floaters: how fast each bob runs (radians a second)
 const bobRate=[2]f32{0.5,1.13};
-/// floaters: how far they drift about their tile (metres)
+/// floaters: how far they drift about their point (metres)
 const drift:f32=0.05;
 /// floaters: how fast they drift, across and along (radians a second)
 const driftRate=[2]f32{0.31,0.27};
@@ -244,7 +246,7 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
     const ctr=g.plants.centre(i);
     if(@abs(ctr[0]-g.cam.target[0])>reach or @abs(ctr[1]-g.cam.target[2])>reach)continue;
     try plant(g,.{
-      .sp=s.items(.sp)[i],.x=s.items(.x)[i],.y=s.items(.y)[i],.ground=s.items(.chunk)[i].height[s.items(.tile)[i]],
+      .sp=s.items(.sp)[i],.x=s.items(.x)[i],.y=s.items(.y)[i],.at=s.items(.at)[i],.ground=s.items(.chunk)[i].height[s.items(.tile)[i]],
       .growth=s.items(.growth)[i],.mana=s.items(.mana)[i],.seed=s.items(.seed)[i],
       .flow=s.items(.flow)[i],.health=s.items(.health)[i],
       .dir=s.items(.dir)[i],.turn=s.items(.turn)[i],
@@ -287,10 +289,9 @@ fn rankLights(g:*Game)void{
   g.parts.lights.shrinkRetainingCapacity(renderer.maxLights);
 }
 /// where a floater hangs this frame: its hover height with a slow rise and
-/// fall, and a lazy drift about its tile.
-fn floatAt(def:*const species.Species,x:i32,y:i32,ground:f32,seed:f32,tf:f32)m.V3{
-  // the footprint's centre, and how far it has risen with its two bobs
-  const c=m.footprintCentre(x,y,def.size,0);
+/// fall, and a lazy drift about its own point `c` (off the grid).
+fn floatAt(def:*const species.Species,c:m.V3,ground:f32,seed:f32,tf:f32)m.V3{
+  // how far it has risen with its two bobs
   const lift=bobAmount[0]*@sin(tf*bobRate[0]+seed*10)+bobAmount[1]*@sin(tf*bobRate[1]+seed*4);
   return m.v3(c[0]+drift*@sin(tf*driftRate[0]+seed*7),@max(ground,0)+def.hover+lift,c[2]+drift*@cos(tf*driftRate[1]+seed*5));
 }
@@ -351,7 +352,7 @@ fn end(g:*Game,i:usize,tf:f32)m.V3{
   // the plants' columns, and the bloom's kind
   const s=g.plants.list.slice();
   const def=species.get(s.items(.sp)[i]);
-  return floatAt(def,s.items(.x)[i],s.items(.y)[i],s.items(.chunk)[i].height[s.items(.tile)[i]],s.items(.seed)[i],tf);
+  return floatAt(def,s.items(.at)[i],s.items(.chunk)[i].height[s.items(.tile)[i]],s.items(.seed)[i],tf);
 }
 /// what drawing one plant needs to know about it.
 const Drawn=struct{
@@ -361,6 +362,8 @@ const Drawn=struct{
   x:i32,
   /// its tile, along
   y:i32,
+  /// where it stands across the ground (y 0): a floater's own point, a rooted one's footprint centre
+  at:m.V3,
   /// the ground's height under it (metres)
   ground:f32,
   /// how far grown it is, 0..1
@@ -390,13 +393,13 @@ const Drawn=struct{
 fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   // its kind, its foot, and its bounding sphere's reach
   const def=species.get(d.sp);
-  const foot=m.footprintCentre(d.x,d.y,def.size,d.ground);
+  const foot=m.v3(d.at[0],d.ground,d.at[2]);
   const reach=plantBound+m.f(def.size);
   if(!g.parts.sees(foot+m.v3(0,reach*plantBoundUp,0),reach))return;
   // the level of detail its distance from the eye calls for
   const lod=meshgen.lodAt(m.len(foot-g.parts.eye));
   // where it stands, across and up
-  var at=m.footprintCentre(d.x,d.y,def.size,0);
+  var at=d.at;
   var y=d.ground;
   // the forming halo drawing it in, if any
   const halo=if(d.ghost)vertex.noHalo else haloOf(g,def,d.x,d.y);
@@ -415,7 +418,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // follows one a halo draws in, fading as it folds)
     // the ground under it (never below the water)
     const ground=@max(y,0);
-    at=floatAt(def,d.x,d.y,d.ground,d.seed,tf);
+    at=floatAt(def,d.at,d.ground,d.seed,tf);
     y=at[1];
     // its shadow's radius, shrinking as it rises
     const r=shadowR-shadowShrink*(at[1]-ground-def.hover);
@@ -541,7 +544,7 @@ fn ghost(g:*Game,tf:f32)Allocator.Error!void{
   const ok=actions.canPut(g,h) and g.player.inReach(h[0],h[1]) and g.player.inv.count(item)>0;
   if(item.plants())|sp|{
     // a fixed seed so the preview does not spin about as the cursor moves
-    return plant(g,.{.sp=sp,.x=h[0],.y=h[1],.ground=g.heightAt(h[0],h[1]),.growth=1,.seed=ghostSeed,.ghost=true,.fits=ok,.dir=g.placeDir},tf);
+    return plant(g,.{.sp=sp,.x=h[0],.y=h[1],.at=Plants.spot(sp,h,g.hoverAt),.ground=g.heightAt(h[0],h[1]),.growth=1,.seed=ghostSeed,.ghost=true,.fits=ok,.dir=g.placeDir},tf);
   }
   // the structure kind it grows, and its definition
   const k=st.kindOf(item) orelse return;

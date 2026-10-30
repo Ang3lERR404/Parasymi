@@ -59,7 +59,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   const c=g.world.chunkOfTile(h[0],h[1]) orelse return;
   const near=g.player.inReach(h[0],h[1]);
   if(g.structs.at(&g.world,h[0],h[1]))|j|return structure(g,d,screenW,screenH,g.structs.get(j),near);
-  if(g.plants.at(&g.world,h[0],h[1]))|i|return plant(g,d,screenW,screenH,i,near);
+  if(g.plantAt(h))|i|return plant(g,d,screenW,screenH,i,near);
   // the tile's index within its chunk
   const t=ck.localIndex(h[0],h[1]);
   if(c.res[t]>0 and c.occ[t]==.none){

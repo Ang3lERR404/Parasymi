@@ -31,6 +31,10 @@ a grand garden. The view is 2.5D: a 3D world seen from above.
   full, the plant stays put. A confluence gives nothing.
 - **Plants and structures share the ground** (occupancy: one thing per
   tile). Footprints are 1×1, 2×2 or floating.
+- **Floating plants are off the grid.** A driftwisp or bloom hangs right
+  where the cursor puts it, at any point, kept only from crowding another
+  floater (0.8 m). Pointing at one reaches it before the ground; it draws
+  from the tile under it.
 - **Floaters** hang in the air. You reach one (panel, feed, configure,
   unbuild) where nothing stands under it. Nothing is ever sown or put
   under one.
