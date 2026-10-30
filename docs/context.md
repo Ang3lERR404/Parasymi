@@ -1,19 +1,19 @@
 # Game Project — Context File
 
 ## The core idea
-**Parasymi**, a game all focused around plants intermingled with magic that have only gained sentience through eons of evolutions where humans and animals have gone extinct, they yearn for the stars and more, and to get there, rely heavily on the first iteration of the player's character, who only came to life after a long development period, he does not know why the factory **must grow**, but it claws at him, it's his instinct, the very core of his being. The player's character is an anthropomorphic, plant + mushroom based hyena, his design is heavily intertwined with vines, flowers, leaves, branches, sap and more.
+**Parasymi**, a game all focused around plants (and mushrooms) intermingled with magic that have only gained sentience and sapience through eons of evolutions where humans and animals have all gone extinct, they yearn for the stars and more, and to get there, rely heavily on the first iteration of the player's character, who only came to life after a long development period, he does not know why the factory **must grow**, but it claws at him, it's his instinct, the very core of his being. The player's character is an anthropomorphic, plant + mushroom based hyena, his design is heavily intertwined with vines, flowers, leaves, branches, sap and more.
 
 ## The core concept
-Parasitic vs Symbiotic, where these two eventually converge, stay within that convergant state and evolve into celestial, beyond comprehension, beings that're no longer bound to the earth and soil
+Parasitic vs Symbiotic, where these two eventually converge, stay within that convergant state and evolve into the celestial
 
 ## The divergent Designs (current design kits in mind):
-- **Symbiotic**: Contributory, lush greenery with beautiful flowers and elegant designs, beautifully unsymetrical
+- **Symbiotic**: Contributory, lush greenery with beautiful flowers and elegant designs
 - **Neutral**: Purely for the sake of merging the two, design is TBD.
 - **Parasitic**: Self-explanatory, uncanny symmetry, cage like designs, writhing, alien (not hostile)
 
 ## Who I Am
 - I am Ang3l404ERR, I have been an artist since 2011.
-- (personal) I am kinky and I do not shy away from sexual expression. I **embrace** it, the way I see it: Humans are animals, we should be able to express ourselves in a way that is never harmful towards anyone else, no harm? no fowl, why hide or punish something that is innate to our nature?.
+- (personal) I am kinky and I do not shy away from sexual expression. I **embrace** it, the way I see it: Humans ***are*** animals, we should be able to express ourselves in any way that is never harmful towards anyone else, no harm? no fowl, why hide or punish something that is innate to our nature?.
 - I have been programming since 2016 and I am 26 years old.
 - I have ADHD, math is not intuitive for me. I learn best with ELI5-style explanations.
 - I need to see the "why" before the "what." No "trust me, the formula is X."
