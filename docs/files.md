@@ -228,6 +228,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/structures/
 - `diamond.zig` — DIAMOND: where a halo's four blooms became one, floating high at the heart of their cross (four grown blooms `halo.reachTiles` out east…
+- `drift_flower.zig` — DRIFT FLOWER: a flower of both lineages with no stem, pulled from the air beside a polyp and put down by the wolf as a floating light.
 - `driftbraid.zig` — DRIFTBRAID: a braided conduit and a sporecaster grown into one, that trades both ways.
 - `ganglion.zig` — GANGLION: a parasite's nerve knot that shares out what it is fed.
 - `gathering_crown.zig` — GATHERING CROWN: a symbiote that gathers for the garden.

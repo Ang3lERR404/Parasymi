@@ -187,6 +187,8 @@ pub const kinds=struct{
   pub const vultrixi=@import("structures/vultrixi.zig");
   /// the seed the unforming let fall, lying where it landed
   pub const strangeSeed=@import("structures/strange_seed.zig");
+  /// a polyp's stemless flower put down as a floating light
+  pub const driftFlower=@import("structures/drift_flower.zig");
 };
 /// the registry built from `kinds`: ids, tables, hook dispatch
 pub const reg=registry.Registry(kinds);

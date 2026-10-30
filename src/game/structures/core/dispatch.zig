@@ -78,7 +78,7 @@ pub fn send(ss:*Structures,ctx:Ctx,to:Id,msg:Msg)Reply{
   };
   if(r!=.ignored)return r;
   return switch(msg){
-    .lit,.unform=>.ignored,
+    .lit,.unform,.graft=>.ignored,
     .arrived=>|a|.{.took=ss.insert(ctx.g,to,a.item,a.n)},
   };
 }
@@ -205,5 +205,15 @@ pub fn tickWith(ctx:Ctx,dt:f32)Allocator.Error!void{
     // fetched again: its own tick may have put another down and moved the list
     const s=ss.get(id);
     s.activity+=((if(active)@as(f32,1)else 0)-s.activity)*@min(1,dt*activityEase);
+  }
+  // what is gone (fully faded: a drift flower taken into an arsthraxia),
+  // lifted out, walking down the list so removing one never skips another
+  var k=ss.list.items.len;
+  while(k>0){
+    k-=1;
+    if(ss.list.items[k].fade<1)continue;
+    // the structure, lifted out and freed
+    var gone=ss.remove(ctx.w,.of(k));
+    gone.deinit(ctx.gpa);
   }
 }

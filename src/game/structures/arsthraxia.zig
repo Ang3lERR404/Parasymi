@@ -52,7 +52,7 @@ const v3=m.v3;
 // decision: drawn by its own `emit` (`bare`), so its look carries what it
 // is doing (its nerves' light, a unit's surge) instead of the shared breath
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaSatellite,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
+pub const meshes=.{.driftFlower,.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaSatellite,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
 /// what the lab is: 2×2, keeping what it is fed, swaying from its root two
 /// tiles tall, growing in over 8 s; shown whole (`preview`) before it is put down
 pub const def:st.Def=.{.item=.arsthraxia,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true};
@@ -160,13 +160,35 @@ pub const State=struct{
   /// evolved by the unforming from the symbiotic lineage into the
   /// convergent one: drawn woven of both (meshes/arsthraxia_convergent.zig)
   evolved:bool=false,
+  /// drift flowers taken in as stemless branches, once evolved: each
+  /// quickens its study by `branchBoost`
+  branches:u16=0,
+  /// how far the newest branch has grown in (0..1)
+  graft:f32=1,
 };
+/// how much faster an evolved arsthraxia studies for each stemless branch
+/// it bears (linear: 0.6% each)
+pub const branchBoost:f32=0.006;
+/// how far off its axis its branches are held
+const branchR:f32=0.22;
+/// seconds a new branch takes to grow in
+const graftGrow:f32=3;
+/// the most branches drawn on it (more still count)
+const branchesDrawn=48;
 /// `unform`: the unforming takes the symbiotic lineage, but an arsthraxia
 /// evolves instead
 pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
   switch(msg){
     .unform=>{
       ctx.ss.get(i).state.arsthraxia.evolved=true;
+      return.done;
+    },
+    .graft=>{
+      // the arsthraxia's state: only an evolved one bears branches
+      const a=&ctx.ss.get(i).state.arsthraxia;
+      if(!a.evolved)return.ignored;
+      a.branches+|=1;
+      a.graft=0;
       return.done;
     },
     .lit,.arrived=>return.ignored,
@@ -179,7 +201,10 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // the lab, its remembered state, and what is understood along its lineage
   const self=ctx.ss.get(i);
   const a=&self.state.arsthraxia;
-  const study=ctx.g.study();
+  var study=ctx.g.study();
+  // its stemless branches quicken it, a little each
+  study.speed*=1+branchBoost*m.f(a.branches);
+  a.graft=@min(1,a.graft+dt/graftGrow);
   if(ctx.g.labTick(&a.lab,self.inv.bag(),study,dt))a.flare=1;
   a.flare=@max(0,a.flare-dt*flareFade);
   a.fed+=((if(a.lab.fed)@as(f32,1)else 0)-a.fed)*@min(1,dt*fedEase);
@@ -266,6 +291,19 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const open=v3(1+whorlWide*busy,1-whorlOpen*busy,1+whorlWide*busy);
   try out.emit(if(woven).arsthraxiaWovenWhorl else .arsthraxiaWhorl,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[0]),m.scale3(open)})),flower);
   try out.emit(if(woven).arsthraxiaWovenCup else .arsthraxiaCup,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[1])})),flower);
+  // its stemless branches: drift flowers held up its stems in a spiral,
+  // the newest growing in
+  for(0..@min(a.branches,branchesDrawn))|k|{
+    // how high up it sits, its bearing round the stems, and its size
+    const y=0.3+1.05*@mod(m.f(k)*0.618,1);
+    const ang=m.f(k)*golden+s.seed*m.tau;
+    const size=0.6*(if(k+1==a.branches)m.smooth(a.graft)else 1);
+    // where it sits, held just off the stems
+    const at=v3(@cos(ang)*branchR,y,@sin(ang)*branchR);
+    var look=sway;
+    look.glow=0.4;
+    try out.emit(.driftFlower,m.mul(base,m.chain(&.{m.translate(at),m.rotY(ang),m.rotZ(0.6),m.scale3(m.splat3(size))})),look);
+  }
   // the vines Arsthraxia sends climbing its stems, by how far they have grown
   if(a.vines>0){
     // the vines' look: grown as far as they have climbed

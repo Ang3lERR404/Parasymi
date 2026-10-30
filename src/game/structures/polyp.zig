@@ -41,6 +41,10 @@ pub const def:st.Def=.{.item=.polyp,.size=1,.mesh=.polyp,.sway=0.4,.tall=1,.grow
 pub const feedReach:i32=4;
 /// seconds of one bloom's light it takes to grow a flower
 const feedTime:f32=20;
+// decision: with every bloom gone after the unforming, a polyp feeds on
+// what light is left on its own, a flower taking this long
+/// seconds a flower takes to grow once the unforming has passed (no blooms left)
+const lateFeedTime:f32=90;
 /// the most flowers it lets drift at once (the exact fives of both lineages)
 pub const most:u32=5;
 /// seconds a new flower takes to rise out of its crown to where it drifts
@@ -85,10 +89,15 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   const p=&self.state.polyp;
   p.since+=dt;
   if(self.inv.count(.driftFlower)>=most)return false;
-  // how many blooms it feeds on
-  const n=blooms(ctx,self.x,self.y);
-  if(n==0)return false;
-  p.feed+=dt*m.f(n)/feedTime;
+  if(ctx.g.done.contains(.unforming)){
+    // the unforming passed: it grows them on its own, slowly
+    p.feed+=dt/lateFeedTime;
+  }else{
+    // how many blooms it feeds on
+    const n=blooms(ctx,self.x,self.y);
+    if(n==0)return false;
+    p.feed+=dt*m.f(n)/feedTime;
+  }
   if(p.feed>=1 and self.inv.add(.driftFlower,1)==1){
     p.feed=0;
     p.since=0;

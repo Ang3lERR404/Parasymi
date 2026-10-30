@@ -17,6 +17,8 @@ pub const Msg=union(enum){
   lit,
   /// the unforming has begun (an arsthraxia evolves)
   unform,
+  /// a drift flower taken in as a stemless branch (an evolved arsthraxia)
+  graft,
   /// `n` of `item` came in from afar (spores landing); by default it is
   /// taken in as `insert` does
   arrived:struct{item:items.Item,n:u16},

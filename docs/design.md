@@ -239,7 +239,13 @@ Radiance is a field of light that some plants need to live.
   grows a DRIFT FLOWER (the confluence's flower, no stem). It rises off
   the crown and drifts round it, never far and never fading, up to 5.
 - **Pulled from the air:** a click hands one to the belly (`handOver`
-  hook). What drift flowers are for is still open (the gardener's call).
+  hook).
+- **Drift flowers** (`structures/drift_flower.zig`) are put down anywhere
+  as floating lights, drifting in place. After the unforming, one put
+  within 2 tiles of an evolved arsthraxia is taken into it as a stemless
+  branch (`Msg.graft`): each makes it study 0.6% faster (linear,
+  `arsthraxia.branchBoost`). With the blooms gone, a polyp then grows a
+  flower on its own every 90 s.
 - **Its first flower** discovers `.driftFlower`, opening THE UNFORMING.
 
 ## The unforming (`game/unforming.zig`): the first world event
