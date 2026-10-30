@@ -68,7 +68,7 @@ const nippleR:f32=0.01;
 const nippleRise:f32=0.0075;
 /// how far the lobe rolls, its lower edge turned toward the sternum
 /// (radians)
-const rollSpeed:f32=0.18;
+const rollAngle:f32=0.18;
 /// how far its face tilts down (radians)
 const tiltDown:f32=0.2;
 /// how far it yaws out to follow the chest's curve (radians)
@@ -138,7 +138,7 @@ pub fn lobe(b:*mg.Builder,side:f32)Allocator.Error!void{
   const at=m.chain(&.{
     w[@intFromEnum(skel.Bone.chest)],m.translate(centre*v3(side,1,1)),
     m.scale3(v3(side,1,1)),
-    m.rotY(yawOut),m.rotX(tiltDown),m.rotZ(rollSpeed),
+    m.rotY(yawOut),m.rotX(tiltDown),m.rotZ(rollAngle),
   });
   try kit.resinLobe(b,&s,at,Shape,rings,stepCount,pal.sap,0.6);
 }

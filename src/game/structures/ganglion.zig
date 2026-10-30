@@ -54,7 +54,7 @@ pub const meshes=.{.bellyLump,.ganglionNerve};
 /// knot that stores and swaps sap, swaying a little
 pub const def:st.Def=.{.item=.ganglion,.size=1,.mesh=.ganglion,.store=true,.grow=4,.sway=0.4,.tall=0.45,.sap=0.3,.pale=true};
 /// the most things its bladder holds at once
-pub const holdTime=8;
+pub const holdMost=8;
 /// seconds between one hand-off and the next
 pub const pass:f32=0.35;
 /// how fast a nerve grows out to a neighbour it may feed (lengths a second)
@@ -143,8 +143,8 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // nobody took anything: try again next tick
   return true;
 }
-/// it wants anything, while its bladder has room (up to `holdTime` in all).
-pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdTime-|s.inv.total();}
+/// it wants anything, while its bladder has room (up to `holdMost` in all).
+pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdMost-|s.inv.total();}
 /// its nerves out to the neighbours it feeds, a pulse of what it hands on
 /// running out along each, and what it holds hanging in its bladder.
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
@@ -173,7 +173,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.heartR[0]*ringRadius;
     const at=mesh.heartAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.1+m.f(k)*2),@sin(a)*ring);
     // its size: larger the fuller the stack
-    const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
+    const r=lumpR+lumpGrow*m.ratio(it.n,holdMost);
     try s.emitLump(out,base,at,r,it.item,glow);
     k+=1;
   }
@@ -186,7 +186,7 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   for(s.state.ganglion.reach)|r|{if(r>=1)n+=1;}
   // the line's colour: dim when it feeds nobody
   const col=if(n==0)style.dim else style.white;
-  _=try d.print(x,y,style.textBody,col,txt.s.describe.shares,.{n,s.inv.total(),holdTime});
+  _=try d.print(x,y,style.textBody,col,txt.s.describe.shares,.{n,s.inv.total(),holdMost});
 }
 /// its bulb: a pale knot on a short stalk out of the seed, nerves reaching
 /// out either side with beads running along them (it shares things out).
@@ -220,8 +220,6 @@ const iconSacGlow:Color=.{120,160,220,70};
 /// the gold of the beads running along the nerves
 const iconBead:Color=.{255,215,120,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 test"a ganglion splits a conduit line, never back into it"{
   // the allocator, the world and its ground
   const gpa=testing.allocator;

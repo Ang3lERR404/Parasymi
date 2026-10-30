@@ -56,7 +56,7 @@ pub const flash=struct{
 /// facet by facet from its foot up, the radiant way.
 pub const diamond=struct{
   /// how much larger it is built than the rows below give it
-  const sizeTiles:f32=1.6;
+  const enlarge:f32=1.6;
   /// the crystal's cut: its rows of facets and the two colours of its film
   const cut:radiant.Cut=.{
     // rows from the bottom point to the top one: height, radius, twist (in
@@ -74,7 +74,7 @@ pub const diamond=struct{
     .lite=color.rgb(1.0,0.97,0.92).toRgba8(255),
   };
   /// builds the diamond: cuts the crystal, grows three shards at its foot, then
-  /// scales the whole gathered form up by `sizeTiles`
+  /// scales the whole gathered form up by `enlarge`
   pub fn build(b:*mg.Builder)Allocator.Error!void{
     // where the diamond's vertices begin, so only they are scaled
     const start=b.mark();
@@ -82,7 +82,7 @@ pub const diamond=struct{
     var rng=pal.rngFor("halo_diamond");
     try radiant.cut(b,cut,&rng);
     try radiant.shards(b,3,-0.12,cut,&rng);
-    b.xform(start,m.scale3(m.splat3(sizeTiles)));
+    b.xform(start,m.scale3(m.splat3(enlarge)));
   }
 };
 /// mesh: HALO RING. the ring of fragmented light a diamond projects: a flat

@@ -60,7 +60,7 @@ pub const pos=Ch.find("pos.x").?;
 /// its turn
 pub const rot=Ch.find("rot.x").?;
 /// its size
-pub const sizeTiles=Ch.find("size.x").?;
+pub const sizeX=Ch.find("size.x").?;
 /// a new form stands this far from the one it was made from
 pub const newOff=v3(0.1,0,0);
 /// the camera looks at this height (m) over the sculpt's ground to start

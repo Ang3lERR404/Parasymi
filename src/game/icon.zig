@@ -159,14 +159,14 @@ pub const Icon=struct{
   /// free tip and a wave running down it; it tapers from `w` to nothing.
   pub fn thread(ic:Icon,from:P,len:f32,waves:f32,amp:f32,w:f32,ph:f32,c:Color)Allocator.Error!void{
     // how many segments the thread is drawn in
-    const stamenCount=14;
+    const segments=14;
     // the segment's start, and the arc length drawn so far
     var prev=ic.px(from);
     var arc:f32=0;
-    for(1..stamenCount+1)|i|{
+    for(1..segments+1)|i|{
       // how far down the thread the segment starts and ends, 0..1
-      const k0=m.ratio(i-1,stamenCount);
-      const k=m.ratio(i,stamenCount);
+      const k0=m.ratio(i-1,segments);
+      const k=m.ratio(i,segments);
       // how far it swings out here: wider toward the tip, a wave running down
       const swing=amp*k*@sin(k*waves*m.tau-ic.t*2.2+ph);
       // the segment's end, in pixels

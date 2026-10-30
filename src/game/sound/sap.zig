@@ -45,7 +45,7 @@ const throatQ:f32=3.5;
 /// how much breath is in it (a share of noise)
 const breathAmount:f32=0.35;
 /// the groan's level
-const groanRate:f32=1.2;
+const groanLevel:f32=1.2;
 /// how much lower a full belly pulls it all (a share)
 const sapHeavy:f32=0.25;
 /// samples between retunings of the closing throat
@@ -189,7 +189,7 @@ pub const Settle=struct{
       // swells early, sinks away slowly
       const sw=@sin(m.pi*m.pow(f32,u,0.6));
       // the groan: the hum and breath through the throat, swelling and sinking
-      const groan=st.throat.tick(st.hum.next()+breathAmount*st.noise.next())*groanRate*sw*sw;
+      const groan=st.throat.tick(st.hum.next()+breathAmount*st.noise.next())*groanLevel*sw*sw;
       // the gloops summed
       var gl:f32=0;
       for(&st.gloops)|*g|gl+=g.tick(st.at);

@@ -340,8 +340,6 @@ const iconSac:Color=.{180,140,230,220};
 /// the pearly lilac of the beads round it
 const iconPearl:Color=.{220,212,238,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 /// tethers the Vultrixi floating at `v` to the monfris at `loom`, as the
 /// gardener would: configuring one, then the other
 fn tether(ss:*st.Structures,w:*World,g:*prog.Progression,v:[2]i32,loom:[2]i32)void{

@@ -15,7 +15,7 @@ const samples=lib.sound.sap.samples;
 const vary=lib.sound.footstep.vary;
 // ---- the starlight twinkling (near a mote) ----
 /// pings in one twinkle (fewest, most), seconds between them, and the
-/// first ping's pitch (Hz); each next steps up or down by one of `stepCount`
+/// first ping's pitch (Hz); each next steps up or down by one of `stepRatios`
 /// (this one: how many pings)
 pub const pingRange=[2]u32{2,4};
 /// seconds between pings
@@ -23,7 +23,7 @@ const pingGap=[2]f32{0.05,0.13};
 /// the first ping's pitch (Hz)
 const pingHz=[2]f32{2100,3400};
 /// the ratios a ping's pitch may step by to the next: up or down a little
-const stepCount=[_]f32{1.122,1.189,1.335,0.891,0.841};
+const stepRatios=[_]f32{1.122,1.189,1.335,0.891,0.841};
 /// a ping's glassy partials (shares of its pitch, a little stretched so it
 /// shimmers), their levels, how long each rings (s, ~63%) and the attack (s)
 /// (this one: the partials' pitches, as shares of the ping's)
@@ -123,7 +123,7 @@ pub const Twinkle=struct{
         .level=if(i<n)vary(r,1)/m.f(i+1)else 0,
       };
       start+=samples(r,pingGap,rate);
-      hz*=stepCount[r.below(stepCount.len)];
+      hz*=stepRatios[r.below(stepRatios.len)];
     }
     return.{
       .pings=pings,

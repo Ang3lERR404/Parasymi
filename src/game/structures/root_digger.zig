@@ -261,8 +261,6 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   try d.tendril(x+barX,y+2,barW,style.barH,style.digger,dg.t/rate,0.4);
 }
 // ---- tests ----
-/// tests tick structures at 20 Hz
-const testDt=bench.testDt;
 /// a strip of soil at y = 0 (x = 0..5) with a moss node of `res` fibre at
 /// (2, 0); the digger goes at (1, 0).
 fn fixture(w:*World,res:ck.Res)!void{

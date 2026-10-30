@@ -39,7 +39,7 @@ const v3=m.v3;
 /// where the corner weaves come up, out from the centre of its 2x2 ground
 const cornerAt:f32=0.62;
 /// where the corner weaves meet over the middle
-const meetCount=v3(0,0.75,0);
+const meetAt=v3(0,0.75,0);
 /// the top of the one weave they become
 const topAt=v3(0,1.45,0);
 /// how far round (radians) the corner weaves turn as they climb
@@ -61,8 +61,8 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   // the skeleton every part is timed along
   var k=growth.Skeleton.begin(b);
   // the hidden trunk: up from under the middle of its ground to its top
-  const trunk=k.trunk(&.{v3(0,-0.3,0),v3(0,0.25,0),meetCount,v3(0.015,1.1,-0.01),topAt},.{.pace=1.4});
-  // the corner weaves: each digs up at its corner and winds in to `meetCount`
+  const trunk=k.trunk(&.{v3(0,-0.3,0),v3(0,0.25,0),meetAt,v3(0.015,1.1,-0.01),topAt},.{.pace=1.4});
+  // the corner weaves: each digs up at its corner and winds in to `meetAt`
   for(0..4)|i|try corner(b,&k,trunk,i);
   // the one weave, from where they meet to its top
   {
@@ -71,7 +71,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     var ts:[growth.res]f32=undefined;
     var sec:[growth.res]pk.Section=undefined;
     // how far along the trunk it starts, just under where they meet
-    const from=k.nearest(trunk,meetCount-v3(0,0.08,0));
+    const from=k.nearest(trunk,meetAt-v3(0,0.08,0));
     k.path(trunk,from,1,&sp);
     for(&ts,0..)|*t,j|t.*=m.lerp(0.45,0.8,m.ratio(j,growth.res-1));
     kit.sections(trunkStalk,&sec);
@@ -130,7 +130,7 @@ fn corner(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,i:usize)Allocator.Err
     const f=m.ratio(j,6);
     const a=a0+turnRate*f;
     const r=cornerAt*(1-m.smooth(f));
-    q.*=v3(@cos(a)*r,-0.02+meetCount[1]*f,@sin(a)*r);
+    q.*=v3(@cos(a)*r,-0.02+meetAt[1]*f,@sin(a)*r);
   }
   // its branch on the skeleton, growing with the trunk
   const id=k.branch(trunk,0,&c,.{.after=.with});

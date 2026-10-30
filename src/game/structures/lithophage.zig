@@ -327,8 +327,6 @@ const iconGem:Color=.{200,170,255,255};
 /// the stony grey of the grit bead running from its lip
 const iconEss:Color=.{150,140,130,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 /// soil round (2, 2), a grit node at (3, 2) holding `res`
 fn fixture(w:*World,res:ck.Res)!void{
   // the bare ground's chunk

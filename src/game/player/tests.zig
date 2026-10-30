@@ -193,7 +193,7 @@ test"standing still with a heavy belly, one paw rests on it and the other on the
   try testing.expect(p.restPose.x>0.95);
   // the posed bones, and where the right paw and left paw should rest
   const w=skel.fk(p.pose());
-  const belly=m.mulPoint(w[@intFromEnum(Bone.gutTop)],restOn*v3(bellyMesh.rx,bellyMesh.upAxis,bellyMesh.rz))+v3(0,restLift,0);
+  const belly=m.mulPoint(w[@intFromEnum(Bone.gutTop)],restOn*v3(bellyMesh.rx,bellyMesh.upReach,bellyMesh.rz))+v3(0,restLift,0);
   const hip=m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1));
   try testing.expect(m.len(m.origin(w[@intFromEnum(skel.sides[1].hand)])-belly)<0.03);
   try testing.expect(m.len(m.origin(w[@intFromEnum(skel.sides[0].hand)])-hip)<0.03);

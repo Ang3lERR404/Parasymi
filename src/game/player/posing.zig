@@ -216,7 +216,7 @@ pub fn restArms(q:*skel.Pose,r:f32)void{
   const w=skel.fk(q.*);
   const into=m.inverseRigid(w[@intFromEnum(Bone.chest)]);
   // where the right paw rests on the sac, in its upper half's frame
-  const on=restOn*v3(bellyMesh.rx,bellyMesh.upAxis,bellyMesh.rz);
+  const on=restOn*v3(bellyMesh.rx,bellyMesh.upReach,bellyMesh.rz);
   // where each wrist is wanted: the left on the hip, the right on the belly
   const at=[2]V3{
     m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1)),

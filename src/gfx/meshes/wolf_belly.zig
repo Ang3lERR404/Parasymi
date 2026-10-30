@@ -12,7 +12,7 @@
 //! carry tu.y = `belly`: as it fills the shader folds creases into it, one
 //! down its middle and one across it, deepening the fuller it is (crossing
 //! at the belly button, `crossing`). The belly button is sap like the sac,
-//! a knot with a puckered ring round it, its vertices tu.y = `navelDepth`: the
+//! a knot with a puckered ring round it, its vertices tu.y = `navelMark`: the
 //! shader raises it from inside the sap to the surface, and on out.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
@@ -52,7 +52,7 @@ pub const rx:f32=skel.gutR[0];
 pub const down:f32=skel.gutR[1];
 /// the sac's reach up toward the ribs (it reaches up under the pectorals,
 /// so the two meet with no bare hide between them)
-pub const upAxis:f32=skel.gutUp;
+pub const upReach:f32=skel.gutUp;
 /// the sac's radius forward
 pub const rz:f32=skel.gutR[2];
 /// how far the sac narrows toward its top (share of its width)
@@ -60,7 +60,7 @@ const taper:f32=0.12;
 /// the tu.y that marks the sac, which the shader creases as it fills
 pub const belly:f32=3;
 /// the tu.y that marks the belly button (a marker, not a depth)
-pub const navelDepth:f32=4;
+pub const navelMark:f32=4;
 /// how far round from the bottom the belly button sits (radians)
 const navelTh:f32=m.pi*0.47;
 /// how far out the knot sits, as a share of the sac's radius there (under 1: sunk in the sap)
@@ -84,7 +84,7 @@ fn surface(th:f32,ph:f32,lift:f32)V3{
   // how far up the top half it is, and how much the sac narrows there
   const up=@max(y,0);
   const narrow=1-taper*up*up;
-  return centre+v3(@cos(ph)*r*rx*narrow,y*(if(y>0)upAxis else down),@sin(ph)*r*rz*narrow)*m.splat3(lift);
+  return centre+v3(@cos(ph)*r*rx*narrow,y*(if(y>0)upReach else down),@sin(ph)*r*rz*narrow)*m.splat3(lift);
 }
 /// the sac's outward facing (unit) at `th` and `ph`, found from small steps
 /// either way (held off the poles, where the steps would vanish)
@@ -103,7 +103,7 @@ fn normal(th:f32,ph:f32)V3{
   return if(m.dot(n,out)<0)-n else n;
 }
 /// how much of the gut a point at `th` is (`share`)
-fn gut(th:f32)f32{return share(-@cos(th)*(if(@cos(th)<0)upAxis else down))[0];}
+fn gut(th:f32)f32{return share(-@cos(th)*(if(@cos(th)<0)upReach else down))[0];}
 /// `scale` times a smooth step of x over `from`..`from + span`, and its
 /// slope in x
 fn ramp(x:f32,from:f32,span:f32,scale:f32)[2]f32{
@@ -112,7 +112,7 @@ fn ramp(x:f32,from:f32,span:f32,scale:f32)[2]f32{
   if(u<=0 or u>=1)return.{scale*m.smooth(m.clamp01(u)),0};
   return.{scale*m.smooth(u),scale*6*u*(1-u)/span};
 }
-/// how far up the sac (share of `upAxis`) it starts being held to the body
+/// how far up the sac (share of `upReach`) it starts being held to the body
 const pin:f32=0.55;
 /// how much of the gut a point `yr` above the gut's centre is, and how fast
 /// that changes going up: all of it up past the middle (so the whole sac
@@ -122,8 +122,8 @@ const pin:f32=0.55;
 /// folds the swollen sac over itself.
 fn share(yr:f32)[2]f32{
   // how far the hold toward the top has come in, and its slope
-  const r=ramp(yr/upAxis,pin,1-pin,1);
-  return.{1-r[0],-r[1]/upAxis};
+  const r=ramp(yr/upReach,pin,1-pin,1);
+  return.{1-r[0],-r[1]/upReach};
 }
 /// the gut's two bones part across its middle, where both take a point
 /// alike: below, `gut` (the sac drops and rounds out full), above,
@@ -234,7 +234,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     t.*=1;
   }
   try b.tube(&ring,&rts,0.003,0.003,knot,.bloom,8);
-  for(b.v.items[navel..])|*vx|vx.tu[1]=navelDepth;
+  for(b.v.items[navel..])|*vx|vx.tu[1]=navelMark;
   // into the waist's place in the bind pose: the gut with the gut bones,
   // the rest with the spine, the hips below it and the ribs above. The
   // weights change with height alone, and the gut swells the sac to three
@@ -246,7 +246,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     const y=vx.pos[1];
     const g=vx.tu[0];
     // how fast that gut share changes going up (none for the belly button)
-    const dg=if(vx.tu[1]==navelDepth)0 else share(y-centre[1])[1];
+    const dg=if(vx.tu[1]==navelMark)0 else share(y-centre[1])[1];
     // how much of the gut is its lower bone, and its slope
     const lo=lower(y-centre[1]);
     // each bone's weight for this vertex, and how fast it changes going up
@@ -290,7 +290,7 @@ test"the gut's shares change up the sac as their slopes say"{
   var k:usize=1;
   while(k<200):(k+=1){
     // that height above the gut's centre
-    const yr=m.lerp(-down,upAxis,m.ratio(k,200));
+    const yr=m.lerp(-down,upReach,m.ratio(k,200));
     // the gut share's slope, measured
     const fd=(share(yr+e)[0]-share(yr-e)[0])/(2*e);
     try testing.expectApproxEqAbs(fd,share(yr)[1],0.05+0.02*@abs(fd));
@@ -307,7 +307,7 @@ test"the swelling sac never folds over itself, however full"{
     var k:usize=0;
     while(k<=400):(k+=1){
       // that height above the gut's centre
-      const yr=m.lerp(-down,upAxis,m.ratio(k,400));
+      const yr=m.lerp(-down,upReach,m.ratio(k,400));
       // how much of it is the gut, how much of that the lower bone, and how far each bone lifts it
       const g=share(yr)[0];
       const lo=lower(yr)[0];
@@ -318,6 +318,6 @@ test"the swelling sac never folds over itself, however full"{
       last=h;
     }
     // and its top stays where it hangs from the ribs
-    try testing.expectApproxEqAbs(upAxis,last,1e-4);
+    try testing.expectApproxEqAbs(upReach,last,1e-4);
   }
 }

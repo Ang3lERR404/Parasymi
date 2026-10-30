@@ -268,8 +268,6 @@ const iconGlow:Color=.{255,190,90,80};
 /// the warm gold of the crown's petals
 const iconPetal:Color=.{245,190,100,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 /// plants a full-grown lumenroot at (x, y) holding `essence` ripe units
 fn ripe(gpa:Allocator,w:*World,plants:*Plants,x:i32,y:i32,essence:f32)!void{
   try testing.expect(try plants.placeEx(gpa,w,x,y,.{.x=x,.y=y,.chunk=undefined,.tile=undefined,.sp=.lumenroot,.seed=0,.growth=1,.essence=essence}));

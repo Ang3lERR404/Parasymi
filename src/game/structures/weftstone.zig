@@ -417,8 +417,6 @@ const iconGrit:Color=.{150,140,130,255};
 /// the lilac of the ley node and the crystal
 const iconLey:Color=.{200,160,255,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 /// turns tile (x, y) of the first chunk into a node of `item` holding `n`
 /// (whichever ground kind yields it)
 fn putNode(w:*World,x:usize,y:usize,item:items.Item,n:ck.Res)void{

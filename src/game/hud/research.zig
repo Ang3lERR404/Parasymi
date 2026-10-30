@@ -74,7 +74,7 @@ const minHit:f32=26;
 /// how many even steps a stem's centreline is drawn in
 const seg=10;
 /// straight up, the way the trunk grows (radians)
-const upAxis:f32=m.halfPi;
+const upAngle:f32=m.halfPi;
 /// how far off the host's heading a branch leaves the trunk (radians)
 const branchAngle=m.rad(60);
 /// how far off its host's heading a branch leaves a branch (radians)
@@ -239,7 +239,7 @@ const Stem=struct{
     for(1..seg+1)|j|{
       // how far along it this step is, 0..1
       const u=m.ratio(j,seg);
-      st.ang[j]=a0+(upAxis-a0)*bend*u+curl*u*u;
+      st.ang[j]=a0+(upAngle-a0)*bend*u+curl*u*u;
       st.pts[j]=st.pts[j-1]+heading((st.ang[j-1]+st.ang[j])/2)*m.splat3(len/seg);
     }
     return st;
@@ -267,7 +267,7 @@ const Layout=struct{
 fn layout(t:f32,amp:f32)Layout{
   // the layout being filled
   var l:Layout=undefined;
-  l.stems[0]=.build(m.splat3(0),upAxis,stemLen(0),bendAmount,amp*sway(0,t)*trunkSway);
+  l.stems[0]=.build(m.splat3(0),upAngle,stemLen(0),bendAmount,amp*sway(0,t)*trunkSway);
   place(&l,null,t,amp);
   for(plan.order[0..plan.branches])|b|{
     // the branch's index
@@ -411,7 +411,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   try d.glow(foot[0],foot[1],@max(0.9*f.k,24),s.soil);
   for([_]f32{-1,0,1})|side|{
     // this root, curling outward
-    const root:Stem=.build(m.splat3(0),-upAxis+side*rootSpread,rootLen,0,-side*0.5);
+    const root:Stem=.build(m.splat3(0),-upAngle+side*rootSpread,rootLen,0,-side*0.5);
     try stem(d,f,&root,rootLen,rad[0]*0.8);
   }
   try stem(d,f,&l.stems[0],grown[0],rad[0]);

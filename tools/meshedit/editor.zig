@@ -50,7 +50,7 @@ const Piece=meshedit.doc.Piece;
 /// the first of a form's turn channels
 const rot=meshedit.settings.rot;
 /// the first of a form's size channels
-const sizeTiles=meshedit.settings.sizeTiles;
+const sizeX=meshedit.settings.sizeX;
 /// the least a form's size may be (m)
 const sizeMin=meshedit.settings.sizeMin;
 /// the editor: the mesh being sculpted, the selection, the gizmo, and
@@ -164,7 +164,7 @@ pub const Editor=struct{
         // the handle's axis, and how far the drag carried along or about it
         const i=@intFromEnum(part);
         const by=g.along(view,i,from,to)*k;
-        e.ch=i+switch(e.mode){.move=>pos,.turn=>rot,.size=>sizeTiles};
+        e.ch=i+switch(e.mode){.move=>pos,.turn=>rot,.size=>sizeX};
         e.nudge(e.ch,if(e.mode==.turn)by/m.rad(1)else by);
       },
     }

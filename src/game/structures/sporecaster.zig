@@ -61,13 +61,13 @@ pub const pairs:st.Pairs=.{};
 /// store that swaps sap and is drawn from afar
 pub const def:st.Def=.{.item=.sporecaster,.size=1,.mesh=.sporecaster,.store=true,.grow=5,.sway=0.45,.tall=0.65,.sap=0.3,.far=true,.pale=true};
 /// the most it holds
-pub const holdTime=40;
+pub const holdMost=40;
 /// how many of one kind a spore carries
 pub const load=5;
 /// seconds between one spore and the next
 pub const launch:f32=0.25;
 /// spores in the air at once from one caster
-pub const airHeight=24;
+pub const airMost=24;
 /// tiles a second a spore drifts
 pub const speed:f32=2.5;
 /// how high it rises over a crossing, as a share of how far it goes
@@ -116,7 +116,7 @@ pub const Spore=struct{
 /// it sent the last
 pub const State=struct{
   /// each spore in the air, or null for a free place
-  spores:[airHeight]?Spore=@splat(null),
+  spores:[airMost]?Spore=@splat(null),
   /// seconds since it sent its last spore
   t:f32=0,
 };
@@ -213,8 +213,8 @@ pub fn release(s:*st.Structure)?items.Item{
   };
   return null;
 }
-/// anything, while it has room (up to `holdTime` in all).
-pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdTime-|s.inv.total();}
+/// anything, while it has room (up to `holdMost` in all).
+pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdMost-|s.inv.total();}
 /// the oldest thing it holds (what a caster that sends nowhere lets go).
 pub fn output(s:*const st.Structure)?items.Item{
   if(s.partner()!=null)return null;
@@ -259,7 +259,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
     // its size: larger the fuller the sac
-    const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
+    const r=lumpR+lumpGrow*m.ratio(it.n,holdMost);
     try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
@@ -294,9 +294,9 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   if(s.partner())|p|{
     // the tile it sends to
     const to=p.tile();
-    _=try d.print(x,y,style.textBody,style.white,txt.s.describe.sends,.{to[0]-s.x,to[1]-s.y,air,s.inv.total(),holdTime});
+    _=try d.print(x,y,style.textBody,style.white,txt.s.describe.sends,.{to[0]-s.x,to[1]-s.y,air,s.inv.total(),holdMost});
   }else{
-    _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.unpaired,.{s.inv.total(),holdTime});
+    _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.unpaired,.{s.inv.total(),holdMost});
   }
 }
 /// its bulb: a tall pale stalk out of the seed holding a sac, spores rising
@@ -326,8 +326,6 @@ const iconSacGlow:Color=.{120,160,220,70};
 /// the near-white of the drifting spores
 const iconSpore:Color=.{235,225,255,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 test"sporecasters pair by configuring one, then the one it sends to"{
   // the allocator, the world and its ground
   const gpa=testing.allocator;

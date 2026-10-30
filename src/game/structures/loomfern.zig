@@ -255,8 +255,6 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
 /// the moss green of the fibre sheaf in its bulb
 const iconFibre:Color=.{120,170,90,255};
 // ---- tests ----
-/// the bench's tick length, seconds
-const testDt=bench.testDt;
 test"a loomfern weaves fibre slowly unfed, and fast from essence"{
   // the allocator, the world and its mossy ground
   const gpa=testing.allocator;

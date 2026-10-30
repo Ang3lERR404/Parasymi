@@ -67,13 +67,13 @@ pub const pairs:st.Pairs=.{.way=.bothWays};
 /// they drift (`far`)
 pub const def:st.Def=.{.item=.driftbraid,.size=1,.mesh=.driftbraid,.store=true,.grow=7,.sway=0.4,.tall=0.9,.sap=0.3,.far=true};
 /// the most it holds, fed and received together
-pub const holdTime=40;
+pub const holdMost=40;
 /// how many of one kind a spore carries, as a sporecaster's
 const load=caster.load;
 /// seconds between one spore and the next
 const launch=caster.launch;
 /// how many of its spores may be in the air at once
-const airHeight=caster.airHeight;
+const airMost=caster.airMost;
 /// tiles a second a spore drifts
 const speed=caster.speed;
 /// how see-through a spore is
@@ -89,7 +89,7 @@ const hangDepth:f32=0.35;
 const ringRadius:f32=0.45;
 /// the size of a lump holding a single thing
 const lumpR:f32=0.02;
-/// how much larger a lump grows as its stack fills toward `holdTime`
+/// how much larger a lump grows as its stack fills toward `holdMost`
 const lumpGrow:f32=0.02;
 /// how far each lump bobs up and down
 const bobAmount:f32=0.01;
@@ -101,7 +101,7 @@ const glow:f32=0.2;
 /// how much of what it holds came by spore
 pub const State=struct{
   /// its spores in the air, each slot empty or one in flight
-  spores:[airHeight]?caster.Spore=@splat(null),
+  spores:[airMost]?caster.Spore=@splat(null),
   /// seconds since its last spore left
   t:f32=0,
   /// how many of each kind it holds came by spore
@@ -232,7 +232,7 @@ pub fn release(s:*st.Structure)?items.Item{
   return null;
 }
 /// anything, while it has room.
-pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdTime-|s.inv.total();}
+pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdMost-|s.inv.total();}
 /// `arrived`: what came by spore is taken in and kept apart (`kept`), to be
 /// let go rather than sent back
 pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
@@ -289,7 +289,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
     // its size: larger the fuller it is
-    const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
+    const r=lumpR+lumpGrow*m.ratio(it.n,holdMost);
     try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
@@ -308,9 +308,9 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   if(s.partner())|p|{
     // the tile of the one it trades with
     const to=p.tile();
-    _=try d.print(x,y,style.textBody,style.white,txt.s.describe.trades,.{to[0]-s.x,to[1]-s.y,air,s.inv.total()-|got,got,holdTime});
+    _=try d.print(x,y,style.textBody,style.white,txt.s.describe.trades,.{to[0]-s.x,to[1]-s.y,air,s.inv.total()-|got,got,holdMost});
   }else{
-    _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.untraded,.{s.inv.total(),holdTime});
+    _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.untraded,.{s.inv.total(),holdMost});
   }
 }
 /// its bulb: a twined stalk out of the seed holding a sac, spores drifting
@@ -348,8 +348,6 @@ const iconSpore:Color=.{235,225,255,255};
 /// the warm spores drifting back
 const iconSporeBack:Color=.{245,200,140,255};
 // ---- tests ----
-/// one beat of the bench's clock
-const testDt=bench.testDt;
 test"driftbraids pair both ways and trade what each is fed, never sending it back"{
   // the test allocator, and the world it grows on
   const gpa=testing.allocator;
