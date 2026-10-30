@@ -255,6 +255,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/gfx/meshes/
 - `arsthraxia.zig` — mesh: ARSTHRAXIA.
+- `arsthraxia_convergent.zig` — mesh: ARSTHRAXIA, CONVERGENT.
 - `belly_lump.zig` — mesh: BELLY LUMP.
 - `bloom_thread.zig` — mesh: BLOOM THREAD.
 - `braided_conduit.zig` — mesh: BRAIDED CONDUIT.

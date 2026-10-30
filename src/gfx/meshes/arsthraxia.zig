@@ -42,15 +42,15 @@ pub const height:f32=1.55;
 /// the flower's heart, where its whorls turn
 pub const heartAt=v3(0,height-0.02,0);
 /// how many braided stems rise and twine
-const stemCount=3;
+pub const stemCount=3;
 /// the petals' deep violet heart
 const petalHeart=color.rgb(0.30,0.22,0.46);
 /// the paler lilac their rims turn to
 const petalRim=color.rgb(0.62,0.5,0.86);
 /// the pale lilac of its stamens
-const stamen=color.rgb(0.8,0.74,0.9);
+pub const stamen=color.rgb(0.8,0.74,0.9);
 /// a nerve at rest: dark wood with a violet cast
-const nerve=color.rgb(0.2,0.15,0.24).toRgba8(255);
+pub const nerve=color.rgb(0.2,0.15,0.24).toRgba8(255);
 /// research energy is light: white under the shading's own colours
 const energyWhite=color.rgb(1,1,1).toRgba8(255);
 /// the last share of its growth, its stems grown, over which its whorls
@@ -67,29 +67,29 @@ const whorlStagger:f32=0.005;
 /// likewise an offshoot's satellite, over the last of the offshoot's growth
 pub const shootForm:f32=0.3;
 /// the stems grow this slowly per unit of their length
-const stalkPace:f32=1.2;
+pub const stalkPace:f32=1.2;
 /// how much later each sepal or petal opens than the one before (a share
 /// of the skeleton's time)
-const petalStagger:f32=0.025;
+pub const petalStagger:f32=0.025;
 /// a stem's course, from the root mat's heart: (height, out from the axis,
 /// how far it has wound round it) at each control point. It flares out of
 /// the roots, twines tight with the others, parts into the cage and
 /// gathers again under the flower.
-const stemAt=[_][3]f32{
+pub const stemAt=[_][3]f32{
   .{0.0,0.0,0.0},.{0.12,0.13,0.15},.{0.35,0.085,0.95},.{0.6,0.075,1.95},
   .{0.84,0.09,2.9},.{1.02,0.21,3.45},.{1.17,0.26,3.75},.{1.32,0.2,4.0},
   .{1.44,0.08,4.15},.{height-0.04,0.02,4.2},
 };
 /// where the cage is widest: the resin pod's height
-const cageY:f32=1.17;
+pub const cageY:f32=1.17;
 /// the pod's half-sizes along x, y and z
 const podR=v3(0.1,0.13,0.1);
 /// where up the stems the foot leaves unfold (0..1)
 const footAt:f32=0.06;
 /// stem `k`'s starting heading round the axis (radians), evenly spread
-fn stemAngle(k:usize)f32{return m.ratio(k,stemCount)*m.tau;}
+pub fn stemAngle(k:usize)f32{return m.ratio(k,stemCount)*m.tau;}
 /// its nerve's tu.x at a height: 0 at its roots .. 1 at its flower
-fn nerveAt(y:f32)f32{return m.clamp01(y/height);}
+pub fn nerveAt(y:f32)f32{return m.clamp01(y/height);}
 /// builds it alone, as the structure grows it: its whorls and core are emitted
 pub fn build(b:*mg.Builder)Allocator.Error!void{try stand(b);}
 /// lays the whole stand on one growth skeleton: three stems, the root mat
@@ -215,7 +215,7 @@ fn calyx(b:*mg.Builder,sk:*growth.Skeleton,trunk:growth.Id)Allocator.Error!void{
 }
 /// a whorl of `n` petals round the heart (the origin), opening one after
 /// another from `first` on over the structure's last `form` of growth
-fn petals(b:*mg.Builder,n:usize,turn:f32,first:usize,p:mg.Petal)Allocator.Error!void{
+pub fn petals(b:*mg.Builder,n:usize,turn:f32,first:usize,p:mg.Petal)Allocator.Error!void{
   for(0..n)|i|{
     // this petal's angle round the heart (radians)
     const a=(m.f(i)+turn)/m.f(n)*m.tau;
