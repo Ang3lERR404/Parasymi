@@ -183,6 +183,11 @@ plant.
   - It reaches a tendril into the nearest structure within 6 tiles that
     `gives` it (never a monfris or Vultrixi).
   - It pulls 1/s and sends it along its tether.
+  - **Untethered, it relays** (its second job): it links to every other
+    untethered Vultrixi within 6 tiles. One pulls from a structure in its
+    reach whatever something along the links wants; the item hops link
+    to link (nearest first) to the Vultrixi nearest a structure that
+    wants it, which hands it over. Never back to where it came from.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined
@@ -247,14 +252,16 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
   into a STRANGE SEED, which falls (2.2 s) and lies on the ground, never
   planting itself: a structure the wolf may pick up. Its lineage is still
   to be designed (the gardener's call).
-- **The lineages die:** symbiotic and parasitic plants wither, and the
-  lineage structures (`Def.unforms`: loomfern, gathering crown, braided
-  conduit, lithophage, ganglion, sporecaster) grow back down to nothing
-  and are gone (`Structure.fade`), over 8 s, each in 6 s. Convergent
-  plants and structures, the polyp, the diamond and the common structures
-  (conduit, sap cache, germinator, root-digger) stay.
-- **The arsthraxia evolves** instead (`Msg.unform`: `evolved`); its
-  convergent look is still to be chosen.
+- **Everything else dies:** symbiotic and parasitic plants wither, and
+  every structure that is not convergent (`Def.unforms`: the base ones,
+  conduit, sap cache, germinator, root-digger; the lineage ones; and the
+  diamond, its shards coming loose) grows back down to nothing and is
+  gone (`Structure.fade`), over 8 s, each in 6 s. Only the convergent
+  plants and structures (the confluence, the polyp, weftstone,
+  driftbraid, monfris, Vultrixi) and the strange seed remain.
+- **The arsthraxia evolves** instead (`Msg.unform`: `evolved`): drawn
+  woven of both lineages (`arsthraxia_convergent.zig`, the gardener's
+  pick), its whorls in the kit's living colours.
 
 ## Research panel (T, `hud/research.zig`)
 The research tree is drawn as a sapling growing in soil. It is laid out

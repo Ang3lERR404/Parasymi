@@ -38,7 +38,7 @@ const pod=lib.sapCache;
 pub const meshes=.{.bellyLump,.itemPod,.sapCacheLid};
 /// what a cache is: grown from its seed, one tile across, a store that
 /// swaps sap, swaying gently and standing a little under a tile tall
-pub const def:st.Def=.{.item=.sapCache,.size=1,.mesh=.sapCache,.store=true,.sap=0.3,.sway=0.5,.tall=0.9,.grow=4};
+pub const def:st.Def=.{.item=.sapCache,.size=1,.mesh=.sapCache,.store=true,.sap=0.3,.sway=0.5,.tall=0.9,.grow=4,.unforms=true};
 /// how much it will take of anything: effectively without end, so conduits
 /// and diggers can always hand off to a cache
 const wantsMax:u32=1<<16;

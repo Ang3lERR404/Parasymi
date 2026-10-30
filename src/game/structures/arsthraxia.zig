@@ -52,7 +52,7 @@ const v3=m.v3;
 // decision: drawn by its own `emit` (`bare`), so its look carries what it
 // is doing (its nerves' light, a unit's surge) instead of the shared breath
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaSatellite,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp};
+pub const meshes=.{.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaSatellite,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
 /// what the lab is: 2×2, keeping what it is fed, swaying from its root two
 /// tiles tall, growing in over 8 s; shown whole (`preview`) before it is put down
 pub const def:st.Def=.{.item=.arsthraxia,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true};
@@ -158,7 +158,7 @@ pub const State=struct{
   /// how far its flower's outer whorl and inner cup have turned
   turn:[2]f32=@splat(0),
   /// evolved by the unforming from the symbiotic lineage into the
-  /// convergent one (its convergent look is still to be chosen)
+  /// convergent one: drawn woven of both (meshes/arsthraxia_convergent.zig)
   evolved:bool=false,
 };
 /// `unform`: the unforming takes the symbiotic lineage, but an arsthraxia
@@ -256,14 +256,16 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   body.flutter=a.flare;
   body.fade=def.sap;
   body.grown=s.grown;
-  try out.emit(.arsthraxia,base,body);
+  // evolved by the unforming, it is drawn woven of both lineages
+  const woven=a.evolved;
+  try out.emit(if(woven).arsthraxiaWoven else .arsthraxia,base,body);
   // its flower: the whorls open and turn against each other while it studies
   // the flower's look, and how far its whorl opens
   var flower=body;
   flower.drop=mesh.heartAt[1];
   const open=v3(1+whorlWide*busy,1-whorlOpen*busy,1+whorlWide*busy);
-  try out.emit(.arsthraxiaWhorl,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[0]),m.scale3(open)})),flower);
-  try out.emit(.arsthraxiaCup,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[1])})),flower);
+  try out.emit(if(woven).arsthraxiaWovenWhorl else .arsthraxiaWhorl,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[0]),m.scale3(open)})),flower);
+  try out.emit(if(woven).arsthraxiaWovenCup else .arsthraxiaCup,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[1])})),flower);
   // the vines Arsthraxia sends climbing its stems, by how far they have grown
   if(a.vines>0){
     // the vines' look: grown as far as they have climbed

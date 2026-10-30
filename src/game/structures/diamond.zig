@@ -43,7 +43,7 @@ pub const meshes=.{.haloFlash,.haloProjection,.haloRing};
 /// what a diamond is: one tile, floating as high as the blooms hang, at
 /// the heart of its ring, over whatever is under it; it draws itself
 /// (`bare`, forming on the GPU) and takes 8 s to gather when put down
-pub const def:st.Def=.{.item=.diamond,.size=1,.mesh=.haloDiamond,.floating=true,.hover=halo.hover,.bare=true,.grow=8};
+pub const def:st.Def=.{.item=.diamond,.size=1,.mesh=.haloDiamond,.floating=true,.hover=halo.hover,.bare=true,.grow=8,.unforms=true};
 /// how a diamond came to be
 pub const Born=enum(u8){
   /// woven and put down by hand: it gathers as it grows in
@@ -130,6 +130,8 @@ pub fn field(s:*const st.Structure)?Field{
 fn along(s:*const st.Structure)f32{
   // its remembered state
   const d=&s.state.diamond;
+  // unforming, its shards come loose again, back the way they gathered
+  if(s.fade>0)return 1-s.fade;
   if(d.born==.halo)return d.t/halo.form;
   return if(s.grown<1)s.grown else 1+d.t/halo.form;
 }

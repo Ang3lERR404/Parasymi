@@ -54,7 +54,7 @@ pub const meshes=.{.germinatorCore,.germinatorCup,.germinatorPool,.germinatorSee
 /// a swaying tree that stands still on its spot
 pub const def:st.Def=.{
   .item=.germinator,.size=2,.mesh=.germinator,.preview=.germinatorWhole,.store=true,
-  .sway=0.55,.tall=mesh.tall,.grow=6,.still=true,
+  .sway=0.55,.tall=mesh.tall,.grow=6,.still=true,.unforms=true,
 };
 /// weave speed multiplier relative to hand-weaving
 const speed:f32=0.6;

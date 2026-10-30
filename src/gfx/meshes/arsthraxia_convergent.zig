@@ -1,16 +1,15 @@
-//! mesh: ARSTHRAXIA, CONVERGENT. two looks for the arsthraxia the
-//! unforming evolves into the convergent lineage, laid beside it to
-//! compare (`--samples=arsthraxiaWhole,arsthraxiaWoven,arsthraxiaBloomed`).
-//! Both keep its stand: three stems rising out of its foot, twining,
-//! parting into a cage round a sac and gathering under its flower, its
-//! nerve rising up the cage's middle. But each stem is the convergence
-//! kit's weave of green and pale strands, the resin pod a marbled sac of
-//! both saps, the root mat and foot leaves the kit's foot (a pale bulb, five
-//! pale roots, five green braided ones), and each tendril a lilac frond
-//! rolling into a crozier. WOVEN keeps its own two whorls, coloured as the
-//! kit's living petals (warm at the heart to violet at the rim); BLOOMED
-//! opens the kit's flower of both instead, a great one, pale frondlets
-//! round living petals and pearl stamens. They grow along growth splines.
+//! mesh: ARSTHRAXIA, WOVEN. the arsthraxia the unforming evolves into the
+//! convergent lineage. Its stand is the arsthraxia's own: three stems
+//! rising out of its foot, twining, parting into a cage round a sac and
+//! gathering under its flower, its nerve rising up the cage's middle. But
+//! each stem is the convergence kit's weave of green and pale strands, the
+//! resin pod a marbled sac of both saps, the root mat and foot leaves the
+//! kit's foot (a pale bulb, five pale roots, five green braided ones), each
+//! tendril a lilac frond rolling into a crozier, the calyx pale frondlets;
+//! its two whorls are coloured as the kit's living petals (warm at the
+//! heart to violet at the rim), its stamens pearl. The structure emits the
+//! whorls as it does the arsthraxia's (`whorl`, `cup`); `whole` is its
+//! preview. It grows along growth splines.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -35,41 +34,62 @@ const v3=m.v3;
 /// a stem's weave: a plain braid of both, opening a little where the
 /// stems part round the cage
 const stemStalk:pk.Stalk=.{.girth=0.055,.part=1.2,.from=0.55,.to=0.85};
-/// the look with its own whorls in the kit's living colours
-pub const woven=struct{
-  /// builds it at rest, its whorls set on its heart
+/// mesh: ARSTHRAXIA WOVEN. the evolved arsthraxia's stand alone, as the
+/// structure grows it: its whorls and core are emitted
+pub const stand=struct{
+  /// builds the woven stand
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try standOf(b);}
+};
+/// mesh: ARSTHRAXIA WOVEN WHORL. its broad outer whorl in the kit's living
+/// colours, warm at the heart to violet at the rim, opening round its heart
+/// (the origin); it turns slowly while it studies
+pub const whorl=struct{
+  /// builds the outer whorl: nine broad petals opening wide
   pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try stand(b);
-    // where the whorls' vertices begin, so only they are moved up to the heart
-    const s=b.mark();
     try ax.petals(b,9,0,0,.{
       .base=v3(0,0,0),.out=undefined,.len=0.62,.width=0.3,.rise=0.55,.flare=0.7,.cup=0.4,
       .col=kit.petalBase,.tip=kit.petalTip,.t=1,.part=.leaf,
     });
+  }
+};
+/// mesh: ARSTHRAXIA WOVEN CUP. its inner whorl in the kit's living colours,
+/// pearl stamens arching out of its heart (the origin)
+pub const cup=struct{
+  /// builds the cup: five upright petals, then nine pearl stamens opening after them
+  pub fn build(b:*mg.Builder)Allocator.Error!void{
     try ax.petals(b,5,0.5,9,.{
       .base=v3(0,0,0),.out=undefined,.len=0.42,.width=0.22,.rise=1.15,.flare=0.4,.cup=0.4,
       .col=kit.petalBase,.tip=kit.petalTip,.t=1,.part=.leaf,
     });
+    // where the stamens' vertices begin, so they open last
+    const s=b.mark();
     try mg.stamens(b,.{
       .heart=v3(0,0,0),.axis=v3(0,1,0),.n=9,.len=0.32,.r=0.009,.anther=0.055,
       .lean=0.4,.arch=0.6,.col=kit.pearl,.t=1,.seed=0x7C05,
     });
+    try growth.tag(b,s,v3(0,0,0),.{1-ax.form+ax.whorlStagger*14,ax.petalOpen});
+  }
+};
+/// mesh: ARSTHRAXIA WOVEN WHOLE. it at rest with its flower: the evolved
+/// arsthraxia's preview
+pub const whole=struct{
+  /// builds it at rest, its whorls set on its heart
+  pub fn build(b:*mg.Builder)Allocator.Error!void{
+    try standOf(b);
+    // where the whorls' vertices begin, so only they are moved up to the heart
+    const s=b.mark();
+    try whorl.build(b);
+    try cup.build(b);
     b.xform(s,m.translate(ax.heartAt));
   }
 };
-/// the look crowned with the kit's flower of both
-pub const bloomed=struct{
-  /// builds it at rest, a great flower of both on its heart
-  pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try stand(b);
-    try kit.bloom(b,.{.heart=ax.heartAt,.len=0.55,.petals=9,.seed=0x7C06});
-  }
-};
 /// the convergent stand: three woven stems on the kit's foot, a frond off
-/// each, the cage's nerve and its sac, and the calyx
-fn stand(b:*mg.Builder)Allocator.Error!void{
+/// each, the cage's nerve and its sac, and the calyx, leaving the last
+/// `form` of the growth for the emitted whorls
+fn standOf(b:*mg.Builder)Allocator.Error!void{
   // the growth skeleton the whole stand is hung on
   var sk=growth.Skeleton.begin(b);
+  sk.tail=ax.form;
   // the three stems' splines, the first the trunk the rest hang on
   var stems:[ax.stemCount]growth.Id=undefined;
   for(&stems,0..)|*id,k|id.*=try stem(b,&sk,if(k==0)null else stems[0],k);

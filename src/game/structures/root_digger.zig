@@ -55,7 +55,7 @@ const mesh=lib.rootDigger;
 pub const meshes=.{.bellyLump,.diggerClod,.diggerRoot};
 /// what a digger is: grown from its seed, one tile across, a low store
 /// swaying gently
-pub const def:st.Def=.{.item=.rootDigger,.size=1,.mesh=.rootDigger,.store=true,.grow=4,.sway=0.5,.tall=0.6};
+pub const def:st.Def=.{.item=.rootDigger,.size=1,.mesh=.rootDigger,.store=true,.grow=4,.sway=0.5,.tall=0.6,.unforms=true};
 /// seconds per item drawn from the node
 pub const rate:f32=4;
 /// items it holds before it stops digging

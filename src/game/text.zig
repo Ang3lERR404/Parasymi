@@ -437,6 +437,8 @@ pub const Strings=struct{
     vultIdle:S="",
     /// a vultrixi tethered to none: how to tether it
     vultLoose:S="",
+    /// an untethered Vultrixi relaying an item along its kin
+    vultRelays:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",
     /// a weftstone ionizing a ley crystal

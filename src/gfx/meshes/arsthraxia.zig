@@ -61,9 +61,9 @@ pub const form:f32=0.3;
 pub const coreForm:f32=0.12;
 /// how long a petal of the whorls takes to open (a share of the whole
 /// growth)
-const petalOpen:f32=0.1;
+pub const petalOpen:f32=0.1;
 /// how much later each petal of the whorls opens than the one before
-const whorlStagger:f32=0.005;
+pub const whorlStagger:f32=0.005;
 /// likewise an offshoot's satellite, over the last of the offshoot's growth
 pub const shootForm:f32=0.3;
 /// the stems grow this slowly per unit of their length

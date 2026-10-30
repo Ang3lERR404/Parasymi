@@ -128,10 +128,14 @@ const parts=struct{
   pub const arsthraxia=@import("meshes/arsthraxia.zig");
   /// the arsthraxia whole, at rest with its flower: what is placed
   pub const arsthraxiaWhole=@import("meshes/arsthraxia.zig").whole;
-  /// a look for the arsthraxia the unforming evolves: woven of both lineages, its own whorls in living colours
-  pub const arsthraxiaWoven=@import("meshes/arsthraxia_convergent.zig").woven;
-  /// a look for the arsthraxia the unforming evolves: woven of both lineages, a great flower of both on it
-  pub const arsthraxiaBloomed=@import("meshes/arsthraxia_convergent.zig").bloomed;
+  /// the arsthraxia the unforming evolves: its stand woven of both lineages
+  pub const arsthraxiaWoven=@import("meshes/arsthraxia_convergent.zig").stand;
+  /// its outer whorl, in the convergence kit's living colours
+  pub const arsthraxiaWovenWhorl=@import("meshes/arsthraxia_convergent.zig").whorl;
+  /// its inner cup and stamens, in the convergence kit's living colours
+  pub const arsthraxiaWovenCup=@import("meshes/arsthraxia_convergent.zig").cup;
+  /// it whole, at rest with its flower
+  pub const arsthraxiaWovenWhole=@import("meshes/arsthraxia_convergent.zig").whole;
   /// its flower's broad outer whorl, turning slowly as it studies
   pub const arsthraxiaWhorl=@import("meshes/arsthraxia.zig").whorl;
   /// its inner cup, turning against the outer whorl

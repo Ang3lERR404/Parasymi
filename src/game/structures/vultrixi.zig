@@ -7,6 +7,10 @@
 //! on), reaches a tendril into the nearest structure within `reachTiles`
 //! tiles that would let that kind go, pulls it out a unit at a time and
 //! sends each along its tether into the monfris, while the monfris wants it.
+//! Untethered, it relays instead (its second job): it links to every other
+//! untethered Vultrixi within `linkTiles`, and together they carry what
+//! one pulls from a structure in its reach, hop by hop along their links,
+//! to the one nearest a structure that wants it, which hands it over.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -105,6 +109,8 @@ pub const State=struct{
   pull:f32=0,
   /// what runs along its tether now
   carry:?Carry=null,
+  /// what it relays along its links now (untethered), if anything
+  relay:?Relay=null,
 };
 /// the monfris it is tethered to
 fn loomOf(ss:*st.Structures,i:st.Id)?st.Id{
@@ -181,8 +187,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // the monfris it feeds
   const j=loomOf(ctx.ss,i)orelse{
     vs.kind=null;
-    vs.reach=@max(0,vs.reach-dt/reachDistance);
-    return false;
+    return relayTick(ctx,i,dt);
   };
   // the monfris's tile
   const to=ctx.ss.get(i).parent.?.tile();
@@ -230,11 +235,189 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(s.inv.take(kind,1))vs.carry=.{.item=kind};
   return true;
 }
+/// how far (tiles) an untethered Vultrixi links to another
+pub const linkTiles:f32=6;
+/// the most Vultrixi a relay's search walks through
+const maxKin=64;
+/// one item relayed along the Vultrixi's links: what it is, how far along
+/// the hop it has run (0..1), and where it is going: the next Vultrixi's
+/// tile (null: it is handed over here) and the structure that wants it
+pub const Relay=struct{
+  /// what is relayed
+  item:items.Item,
+  /// how far along this hop (0..1)
+  t:f32=0,
+  /// the next Vultrixi's tile, or null to hand it over here
+  next:?[2]i32=null,
+  /// the tile of the structure it is bound for
+  dest:[2]i32,
+  /// the tile of the structure it was pulled from (never handed back there)
+  from:[2]i32,
+};
+/// whether `o` is an untethered, grown Vultrixi within `linkTiles` of `s`
+fn linked(s:*const st.Structure,o:*const st.Structure)bool{
+  if(o.kind()!=.vultrixi or o==s or o.grown<1 or o.fade>0 or o.parent!=null)return false;
+  // the way between them, level
+  const d=o.at-s.at;
+  return d[0]*d[0]+d[2]*d[2]<=linkTiles*linkTiles;
+}
+/// the nearest structure in `i`'s reach (no Vultrixi, monfris or the one
+/// it came from) that wants `item`
+fn wanting(ctx:st.Ctx,i:st.Id,item:items.Item,except:?st.Id)?st.Id{
+  // the Vultrixi, its tile, and the nearest found so far
+  const self=ctx.ss.get(i);
+  const here=[2]i32{self.x,self.y};
+  var best:?st.Id=null;
+  var near:i32=reachTiles+1;
+  for(ctx.ss.list.items,0..)|*o,k|{
+    // its id, and how far off it is
+    const id=st.Id.of(k);
+    if(k==i.idx() or (except!=null and except.?==id) or o.grown<1 or o.fade>0)continue;
+    if(o.kind()==.vultrixi or o.kind()==.monfris)continue;
+    const d=gap(here,o);
+    if(d>=near or ctx.ss.wants(ctx.g,id,item)==0)continue;
+    best=id;
+    near=d;
+  }
+  return best;
+}
+/// a way to hand `item` on from Vultrixi `from`: the first hop (itself if
+/// it hands it over there) and the structure that wants it, found by a
+/// walk outward along the links, nearest first
+const Way=struct{first:st.Id,dest:st.Id};
+/// (`Way` found as above, or null if no Vultrixi in reach of `from` along
+/// its links has a structure wanting it)
+fn route(ctx:st.Ctx,from:st.Id,item:items.Item,except:?st.Id)?Way{
+  // the walk's queue, each one's first hop, and how many are in it
+  var queue:[maxKin]st.Id=undefined;
+  var first:[maxKin]st.Id=undefined;
+  var n:usize=1;
+  queue[0]=from;
+  first[0]=from;
+  // how far through the queue the walk has come
+  var at:usize=0;
+  while(at<n):(at+=1){
+    // the Vultrixi this step reaches
+    const v=queue[at];
+    if(wanting(ctx,v,item,except))|dest|return.{.first=first[at],.dest=dest};
+    for(ctx.ss.list.items,0..)|*o,k|{
+      if(n==maxKin)break;
+      if(!linked(ctx.ss.get(v),o))continue;
+      // its id, unless the walk has been there already
+      const id=st.Id.of(k);
+      var seen=false;
+      for(queue[0..n])|q|seen=seen or q==id;
+      if(seen)continue;
+      queue[n]=id;
+      first[n]=if(at==0)id else first[at];
+      n+=1;
+    }
+  }
+  return null;
+}
+/// untethered: relays along its links. Carrying, the item runs along the
+/// hop to the next Vultrixi, which takes it on (once it carries nothing)
+/// or, bound here, hands it to the structure that wants it; carrying
+/// nothing, it pulls a unit from a structure in its reach that something
+/// along its links wants. Returns whether it is busy.
+fn relayTick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
+  // the Vultrixi and its remembered state
+  const self=ctx.ss.get(i);
+  const vs=&self.state.vultrixi;
+  if(vs.relay)|*r|{
+    vs.reach=@max(0,vs.reach-dt/reachDistance);
+    const next=r.next orelse {
+      // bound here: handed over, if the structure is still there and wants it
+      const dest=ctx.ss.at(ctx.w,r.dest[0],r.dest[1])orelse{
+        vs.relay=null;
+        return false;
+      };
+      if(ctx.ss.insert(ctx.g,dest,r.item,1)==1)vs.relay=null;
+      return true;
+    };
+    // how far this hop runs (tiles, at least one)
+    const far=@max(m.len(v3(m.f(next[0]-self.x),0,m.f(next[1]-self.y))),1);
+    r.t=@min(1,r.t+dt*runAmount/far);
+    if(r.t<1)return true;
+    // arrived: the next Vultrixi takes it on, if it carries nothing
+    const nid=ctx.ss.floaterAt(next[0],next[1])orelse{
+      vs.relay=null;
+      return false;
+    };
+    // (it may be gone, or no longer a Vultrixi)
+    if(ctx.ss.get(nid).kind()!=.vultrixi){
+      vs.relay=null;
+      return false;
+    }
+    const ns=&ctx.ss.get(nid).state.vultrixi;
+    if(ns.relay!=null)return true;
+    // its way on from there, never back where it came from
+    const way=route(ctx,nid,r.item,ctx.ss.at(ctx.w,r.from[0],r.from[1])) orelse return true;
+    // the Vultrixi it hops to after that, if any
+    const after=if(way.first==nid)null else [2]i32{ctx.ss.get(way.first).x,ctx.ss.get(way.first).y};
+    // the structure's tile
+    const dt2=ctx.ss.get(way.dest);
+    ns.relay=.{.item=r.item,.next=after,.dest=.{dt2.x,dt2.y},.from=r.from};
+    vs.relay=null;
+    return true;
+  }
+  // carrying nothing: the nearest structure in reach with something
+  // wanted along its links
+  const here=[2]i32{self.x,self.y};
+  // the best source so far, how near, and the way its item goes
+  var best:?st.Id=null;
+  var near:i32=reachTiles+1;
+  var way:?Way=null;
+  var item:items.Item=.grit;
+  for(ctx.ss.list.items,0..)|*o,k|{
+    if(k==i.idx() or o.def().carrier or o.grown<1 or o.fade>0)continue;
+    if(o.kind()==.monfris or o.kind()==.vultrixi)continue;
+    // how far off it is, its id, and what it lets go first
+    const d=gap(here,o);
+    if(d>=near)continue;
+    const id=st.Id.of(k);
+    const it=ctx.ss.output(id) orelse continue;
+    const w=route(ctx,i,it,id) orelse continue;
+    best=id;
+    near=d;
+    way=w;
+    item=it;
+  }
+  const src=best orelse {
+    vs.reach=@max(0,vs.reach-dt/reachDistance);
+    return false;
+  };
+  // the source
+  const s=ctx.ss.get(src);
+  if(vs.src==null or vs.src.?[0]!=s.x or vs.src.?[1]!=s.y){
+    vs.src=.{s.x,s.y};
+    vs.srcSize=s.def().size;
+    vs.srcH=caster.groundAt(ctx.w,.{s.x,s.y});
+    vs.reach=0;
+    vs.pull=0;
+  }
+  if(vs.reach<1){
+    vs.reach=@min(1,vs.reach+dt/reachDistance);
+    return true;
+  }
+  vs.pull+=dt/pull;
+  if(vs.pull<1)return true;
+  vs.pull=0;
+  if(!s.inv.take(item,1))return true;
+  // where it goes: the first hop's tile (none: handed over here), and the structure's
+  const w=way.?;
+  const after=if(w.first==i)null else [2]i32{ctx.ss.get(w.first).x,ctx.ss.get(w.first).y};
+  const d=ctx.ss.get(w.dest);
+  vs.relay=.{.item=item,.next=after,.dest=.{d.x,d.y},.from=.{s.x,s.y}};
+  return true;
+}
 /// cut loose when uprooted: what runs along its tether is lost back to it.
 pub fn release(s:*st.Structure)?items.Item{
   // its remembered state
   const vs=&s.state.vultrixi;
   defer vs.carry=null;
+  defer vs.relay=null;
+  if(vs.relay)|r|return r.item;
   return if(vs.carry)|c|c.item else null;
 }
 /// a point `t` along the curve through `c` (as the GPU bends it, closely enough)
@@ -263,10 +446,10 @@ fn sideOf(c:[4]V3)V3{
   const flat=v3(c[3][0]-c[0][0],0,c[3][2]-c[0][2]);
   return if(m.len(flat)>m.eps)m.norm(m.cross(flat,v3(0,1,0)))else v3(1,0,0);
 }
-/// its tether to its monfris, what runs along it, and its tendril into
+/// its tether to its monfris (or, untethered, the hop it relays along),
+/// what runs along it, and its tendril into
 /// the structure it pulls from.
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
-  _=tf;
   // its remembered state, and its frame in the world
   const vs=&s.state.vultrixi;
   const base=s.place(ctr);
@@ -278,6 +461,9 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
       try out.emit(.itemPod,m.chain(&.{m.translate(along(c,m.smooth(cr.t))),m.scale3(m.splat3(moteSize))}),look);
     }
   }
+  // untethered: a thread to every Vultrixi it links to (each pair drawn
+  // once, by the one further west), the item it relays running along one
+  if(s.parent==null)try links(s,out,base,tf);
   if(vs.reach>0)if(vs.src)|src|{
     // the point under it, the top of the source, and the way between
     const under=m.mulPoint(base,mesh.underAt);
@@ -289,11 +475,34 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   };
 }
 /// its line in the panel: loose (untethered), pulling a kind, or idle.
+/// the threads from an untethered Vultrixi `s` to those it links to (from
+/// the one further west, so each is drawn once), and the item it relays
+/// running along the hop it takes
+fn links(s:*const st.Structure,out:*Parts,base:m.M4,_:f32)Allocator.Error!void{
+  // its remembered state, and its crown
+  const vs=&s.state.vultrixi;
+  const from=m.mulPoint(base,mesh.crown);
+  if(vs.relay)|r|{
+    // the hop it relays along, or the structure it hands to
+    const to:V3=if(r.next)|n|m.v3(m.f(n[0])+0.5,from[1],m.f(n[1])+0.5)else m.v3(m.f(r.dest[0])+0.5,from[1]-0.6,m.f(r.dest[1])+0.5);
+    // the way between, sagging
+    const d=to-from;
+    const sag=v3(0,-tetherSag*@min(m.len(d),4)*0.25,0);
+    const c=[4]V3{from,from+d*m.splat3(1.0/3.0)+sag,from+d*m.splat3(2.0/3.0)+sag,to};
+    try out.emitCurve(.monfrisTether,c,sideOf(c),1,s.grown,.{.flutter=tendrilFlutter,.phase=s.seed,.glow=glow});
+    // the mote's look: glowing, its item's colour
+    const look:Look=.{.glow=moteGlow,.phase=s.seed,.tint=color.Rgba8.of(r.item.info().col).toF4()};
+    try out.emit(.itemPod,m.chain(&.{m.translate(along(c,m.smooth(r.t))),m.scale3(m.splat3(moteSize))}),look);
+  }
+}
+
+
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
   // its remembered state
   const vs=&s.state.vultrixi;
   if(s.parent==null){
-    _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.vultLoose,.{});
+    if(vs.relay)|r|_=try d.print(x,y,style.textBody,style.white,txt.s.describe.vultRelays,.{txt.item(r.item).name})
+    else _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.vultLoose,.{});
   }else if(vs.kind!=null and (vs.reach>0 or vs.carry!=null)){
     _=try d.print(x,y,style.textBody,style.white,txt.s.describe.vultPulls,.{txt.item(vs.kind.?).name});
   }else{
@@ -405,4 +614,36 @@ test"a Vultrixi pulls what a structure lets go into its monfris, which weaves it
   try bench.run(&ss,&w,&plants,&g,40);
   try testing.expect(ss.get(loom).inv.count(.diamond)>=1);
   try testing.expectEqual(@as(u32,6),ss.get(ss.at(&w,13,1).?).inv.count(.fibre));
+}
+test"untethered Vultrixi relay what one pulls along their links to a structure that wants it"{
+  // the allocator, the world and its ground
+  const gpa=testing.allocator;
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  _=try bench.ground(&w,.{.width=16,.depth=16});
+  // no plants, the structures, and what the gardener understands
+  var plants:Plants=.{};
+  defer plants.deinit(gpa);
+  var ss:st.Structures=.{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression=.{};
+  // three Vultrixi in a line, each within reach of the next, a cache of
+  // grit by the first and an empty one by the last, beyond the first's reach
+  for([_]i32{1,6,11})|x|try testing.expect(try ss.place(gpa,&w,x,1,.vultrixi,0,0));
+  try testing.expect(try ss.place(gpa,&w,1,3,.sapCache,0,0));
+  try testing.expect(try ss.place(gpa,&w,14,3,.sapCache,0,0));
+  // the full cache and the empty one
+  const from=ss.at(&w,1,3).?;
+  const to=ss.at(&w,14,3).?;
+  _=ss.get(from).inv.add(.grit,5);
+  try bench.run(&ss,&w,&plants,&g,40);
+  try testing.expect(ss.get(to).inv.count(.grit)>0);
+  try testing.expectEqual(@as(u32,5),ss.get(from).inv.count(.grit)+ss.get(to).inv.count(.grit)+inFlight(&ss));
+}
+/// how many items the Vultrixi have in flight between them (a test's count)
+fn inFlight(ss:*st.Structures)u32{
+  // the count so far
+  var n:u32=0;
+  for(ss.list.items)|*s|if(s.kind()==.vultrixi and s.state.vultrixi.relay!=null){n+=1;};
+  return n;
 }
