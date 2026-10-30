@@ -67,12 +67,15 @@ pub const cup=struct{
   }
 };
 /// the kit's bloom `f`, opening as the arsthraxia's flower does, `after`
-/// petals' staggers late
+/// petals' staggers late, through the rest of the flower's time (closing
+/// as the growth does, never past it)
 fn bloomAt(b:*mg.Builder,f:kit.Bloom,after:usize)Allocator.Error!void{
   // where its vertices begin, so it opens in its turn
   const s=b.mark();
   try kit.bloom(b,f);
-  try growth.tag(b,s,f.heart,.{1-ax.form+ax.whorlStagger*m.f(after),ax.petalOpen*3});
+  // how late it begins, after the stand is done
+  const wait=ax.whorlStagger*m.f(after);
+  try growth.tag(b,s,f.heart,.{1-ax.form+wait,ax.form-wait});
 }
 /// mesh: ARSTHRAXIA WOVEN WHOLE. it at rest with its flower: the evolved
 /// arsthraxia's preview
