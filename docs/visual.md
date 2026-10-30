@@ -98,8 +98,11 @@ proportion only.
 - Sway ×1.5.
 
 ### Vesper (`star`, `radiantKit.star`)
-An evening star come down. It hangs `stemH` (0.62) over its tile, with
-nothing under it.
+An evening star come down. It hangs `stemH` (0.62) over its tile, held to
+it by a root of light: a taproot and 5 thin gold strands fanning down from
+the core's underside into the soil, a small violet crystal shard standing
+where each digs in. The root strikes down out of the heart just after it
+lands, and never turns.
 
 - **Parts:** a dusk-violet core (gold nucleus, 5 stamens); an upright cup
   of 5 pale-gold petals; a star of 5 long narrow violet rays lying open;

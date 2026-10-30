@@ -43,13 +43,18 @@ layout(location = 12) flat out vec4 v_yield;  // the colour of what it yields (l
 const float HALO_BUD = 0.12;
 // a radiant plant's turning: each ring's pace (rad/s, alternating ways),
 // by its radiant_kit.Ring: core, inner, middle, outer whorl, motes, halo,
-// leaves (a ring past the table turns as the last)
-// leaves, the beads of its yield (with the core; a ring past the table
-// turns as the last)
-const float SPIN[8] = float[8](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02, 0.03);
+// leaves, the beads of its yield (with the core), a grounded one's root
+// (dug in: it never turns; a ring past the table turns as the last)
+const float SPIN[9] = float[9](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02, 0.03, 0.0);
 // the light each ring carries (v_glow): the core and its threads fullest,
-// a vesper's floating leaves living tissue that carries little
-const float GLOW[8] = float[8](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 1.0);
+// a vesper's floating leaves living tissue that carries little, its root
+// a little dimmer than its heart
+const float GLOW[9] = float[9](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 1.0, 0.8);
+// a grounded radiant plant's root strikes down out of its heart as it
+// gathers: its soil end starts ROOT_STRIKE up, under the heart (the
+// vesper's heart height less its core's underside), its heart end held
+// decision: a constant, as the vesper is the one grounded radiant plant
+const float ROOT_STRIKE = 0.55;
 const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
 // how it gathers (common.glsl gatherAway, gatherIn): fragments settle
 // ARRIVE_PACE of growth apart by order, each over ARRIVE_SPAN, coming in
@@ -158,6 +163,7 @@ void main() {
     Fragment f = fragmentOf(tu, col.a);
     float order = f.order, bearing = f.bearing, ring = f.ring, held = f.held;
     bool leaves = abs(ring - 6.0) < 0.5;
+    bool rooted = abs(ring - 8.0) < 0.5;
     // a bead of its yield (ring 7) swells from a nub about its own centre
     // (ir.z its radius) as it ripens, breathing once ripe; just taken, it
     // quivers
@@ -175,7 +181,7 @@ void main() {
     float loose = 1.0 - clamp(health, 0.0, 1.0);
     float away = gatherAway(order, ARRIVE_PACE, ARRIVE_SPAN, growth);
     float settle = 1.0 - away;
-    if (ring > 0.5) away = max(away, loose * LOOSE_AWAY);
+    if (ring > 0.5 && !rooted) away = max(away, loose * LOOSE_AWAY);
     vec2 dir = vec2(cos(bearing), sin(bearing));
     float ph = bearing * 3.0 + ring * 1.7 + seed * 9.0;
     if (petals) {
@@ -193,7 +199,7 @@ void main() {
       p.xz += dir * drift * held;
       p.y += 0.025 * sin(t * 0.55 + ph * 1.3) * held;
     }
-    if (ring > 0.5) p.y -= loose * LOOSE_SINK * held;
+    if (ring > 0.5 && !rooted) p.y -= loose * LOOSE_SINK * held;
     // each mote spirals in from beyond the outer whorl to the core and
     // fades as it is taken up, then begins again (c 0..1 of the way)
     float c = fract(t * MOTE_RATE + order + seed);
@@ -210,10 +216,15 @@ void main() {
     vec3 from = vec3(dir.x * ARRIVE_REACH, rise, dir.y * ARRIVE_REACH) * held;
     if (falling && ring < 0.5) from = vec3(0.0, FALL_FROM, 0.0);
     float turns = falling ? FALL_TURN : ARRIVE_TURN;
+    // its root strikes straight down out of the heart into the soil
+    if (rooted) {
+      from = vec3(-p.x, ROOT_STRIKE, -p.z) * held;
+      turns = 0.0;
+    }
     p = gatherIn(p, from, away, 0.0, turns);
     n = gatherTurn(n, away, turns);
     // each ring turns at its own slow pace, alternating ways
-    int ri = clamp(int(ring), 0, 7);
+    int ri = clamp(int(ring), 0, 8);
     float spin = SPIN[ri];
     mat2 turn = rot(t * spin + seed * TAU);
     p.xz = turn * p.xz;
@@ -230,7 +241,8 @@ void main() {
       n.xz = orbit * n.xz;
     }
     // plucked, it is drawn after the paws, springing back once let go
-    p.xz += it.xy * it.z * TUG_SLIDE;
+    // (its root's soil end stays dug in)
+    p.xz += it.xy * it.z * TUG_SLIDE * (rooted ? 1.0 - held : 1.0);
     vec3 wp = base + p;
     v_pos = wp;
     v_nrm = n;

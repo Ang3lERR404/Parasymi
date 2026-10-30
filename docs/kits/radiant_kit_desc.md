@@ -12,8 +12,10 @@ The **radiant (celestial) lineage's body**. It is shared by:
   (the vesper, form `star`);
 - its structures: the diamond (`cut` + `shards`).
 
-**A radiant thing is never grown, only gathered.** No root, no stem, no
-growth spline, nothing that swells or scales up.
+**A radiant thing is never grown, only gathered.** No stem, no growth
+spline, nothing that swells or scales up. A grounded one (the vesper) is
+held to its tile by a `root` of light, struck down out of its heart, never
+grown up from the soil.
 
 It is made of rigid fragments joined to nothing: petals, threads, motes,
 facets. Think of iron filings flying to a magnet:
@@ -36,8 +38,9 @@ Each fragment tells the shader three things:
 | tu.y | `Ring` as a number; a thread adds `(1 - along) * threadAmount` (0.9), so its heart end stays put |
 | colour alpha | bearing round the heart (`bearing / τ * 255`: the angle scaled into 0..255), the way it comes in from |
 
-`Ring = enum(u8) { core, inner, middle, outer, motes, halo, leaves }`.
-Each ring moves its own way (plant.vert `spinTimes[7]` turn rates).
+`Ring = enum(u8) { core, inner, middle, outer, motes, halo, leaves, yield, root }`.
+Each ring moves its own way (plant.vert `SPIN[9]` turn rates; `.root`
+never turns).
 
 A radiant structure's body is `.core`. `threadAmount` = common.glsl
 `RADIANT_THREAD`.
@@ -51,6 +54,7 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
 | `Core{r, body, lite, stamens = 7, seed}` / `core(b, c, rng)` | the heart, order 0: luminous seed-shaped core + nucleus + crown of stamens (threads tipped with beads) |
 | `Whorl{n, ring, at, y, len, w, rise, flare, cup, order:[2], offset, col, tip}` / `whorl(b, R, wh, lite, seed, rng)` | petals (`mg.petal`, part `.leaf`) floating free a gap off the heart, each its own fragment (order spread over `order[0..1]`), each held by a private `tether` thread from the core's flank to its claw; `offset` turns it half a petal on |
 | `Leaves{n, at, y, len, w, droop, order, col, tip}` / `leaves(...)` | leaves floating free under the heart, threaded up to its underside; ring `.leaves` — **the only fragments that cast shadows** |
+| `Root{n, depth, spread, sink, order:[2], col, shard, tip}` / `root(b, R, r, seed, rng)` | a grounded one's root of light: a taproot from the core's underside and `n` strands fanning down into the soil (threads, heart end held), a small `mineral.crystal` shard where each digs in; ring `.root` |
 | `motes(b, R, n, col, rng)` | motes of light, each its own fragment on its bearing, spiralling in and fading, over and over |
 | `halo(b, r, thick, tilt, order, col)` | a thin tilted ring of light, ring `.halo`, the last to close |
 | `cutSides` = 8, `Cut{rows:[][3]f32 (height, radius, twist in half sides), deepRows, deep, lite, part = .prism}` | a cut crystal's profile; a row of radius 0 is a point |
@@ -74,7 +78,8 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
 - A star of long narrow rays (len 2.3+, offset).
 - `leaves` floating beneath (`leafCol`), and 7 motes.
 - **No halo.**
-- All of it lifted `stemH` over its tile.
+- All of it lifted `stemH` over its tile, held to it by a `root` (5
+  strands, order 0.03–0.09: just after the heart lands).
 
 ## Who uses it
 
@@ -99,6 +104,9 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
   folded as a bud, and opens it.
 - **Grown**: whorls turn slowly, alternating (`spinTimes`), and drift
   apart and back; the whole bobs.
+- **Rooting**: a `.root` fragment strikes straight down out of the heart
+  (its soil end starts `ROOT_STRIKE` 0.55 up, under the heart); once in it
+  never turns, never comes loose, and its soil end stays put when plucked.
 - **Falling**, `FORMS_FALLING` (= star): falls in from the sky. The heart
   comes first, straight down, then each piece spirals down its thread
   (`FALL_FROM` 1.8, `FALL_TURN` 2.4).
@@ -124,7 +132,7 @@ Shadow variants leave out light itself; only `.leaves` fragments cast.
 checks:
 - every vertex has an order in 0..1, a valid ring, and no NaN;
 - **nothing is on a growth spline** (`b.grow` untouched);
-- the vesper never reaches the ground (y > 0.05);
+- only the vesper's root reaches the ground, and it digs in (below 0);
 - a cut's facets gather foot up.
 
 ## Rules

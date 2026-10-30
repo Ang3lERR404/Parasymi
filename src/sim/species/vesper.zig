@@ -20,7 +20,7 @@ pub const def:species.Species=.{
   .pluck=0.6,
   // decision: the first plant that needs radiance (the brief names none)
   .needsRadiance=true,
-  // it hangs over its tile on light; it does not bend from a root
+  // it hangs over its tile on light, rooted by light; it does not bend from its root
   .sway=0.5,
   .genome=.{
     .form=.star,

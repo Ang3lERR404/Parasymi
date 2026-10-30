@@ -74,7 +74,7 @@ pub const Form=enum(u8){
   /// grows, and drifts rather than bends
   radiant,
   /// an evening star's flower: the radiant body brought down to hang over
-  /// its tile (`stemH` up, nothing under it), a star of `petals` rays
+  /// its tile (`stemH` up, held by a root of light), a star of `petals` rays
   /// round its core (`bloomR`) and `leaves` floating free beneath, all
   /// gathered, falling in from the sky (radiant_kit `star`)
   star,

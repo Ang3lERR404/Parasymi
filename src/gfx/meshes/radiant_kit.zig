@@ -1,8 +1,9 @@
 //! the radiant (celestial) lineage's body, shared by its plants (`plant`,
 //! the celestial bloom, the `radiant` form; `star`, the vesper, the `star`
 //! form) and its structures (the diamond, `cut` + `shards`). A radiant thing is never grown: it is
-//! gathered. It has no root, no stem, no growth spline and nothing that
-//! swells or scales up; it is made of rigid fragments joined to nothing
+//! gathered. It has no stem, no growth spline and nothing that swells or
+//! scales up (a grounded one is held to its tile by a `root` of light,
+//! struck down from its heart, never grown up from the soil); it is made of rigid fragments joined to nothing
 //! (petals, threads, motes, facets), and each comes in from afar on its own
 //! way, turning round the heart as it comes, and settles in its place in
 //! its turn, the heart first, the last to close last. Once gathered it
@@ -68,6 +69,9 @@ pub const Ring=enum(u8){
   /// beads of its yield held round the heart (part `.pod`, their bearing
   /// their place among its pods), swelling as it ripens
   yield,
+  /// a grounded one's root of light, struck down from the heart into the
+  /// soil: it never turns, and its soil end stays where it dug in
+  root,
 };
 /// tu.y a thread adds at its heart end (0 at what it holds; common.glsl
 /// `RADIANT_THREAD`)
@@ -263,6 +267,56 @@ pub fn leaves(b:*mg.Builder,radius:f32,l:Leaves,lite:Rgba8,seed:u64,rng:*Rng)All
     try tether(b,out*m.splat3(radius*0.12)+v3(0,-radius*0.4,0),base-out*m.splat3(radius*0.05),radius*0.018,lite,seed+%i*11,f);
   }
 }
+/// how a grounded radiant plant's root of light is laid out under its heart
+pub const Root=struct{
+  /// how many strands fan out round the taproot
+  n:u32,
+  /// how far below the heart the soil lies (its `stemH`)
+  depth:f32,
+  /// how far out the strands dig in (a share of the radius)
+  spread:f32,
+  /// how deep under the soil they reach
+  sink:f32,
+  /// the assembly orders its first and last strand settle at
+  order:[2]f32,
+  /// the strands' light
+  col:Rgba8,
+  /// the shards where they dig in: at their foot, and paling to their point
+  shard:Rgba8,
+  /// toward the shards' points
+  tip:Rgba8,
+};
+/// a root of light holding a grounded radiant plant to its tile: a taproot
+/// straight down from the heart's underside into the soil and a fan of
+/// strands round it, each a thread of light tapering to points, its heart
+/// end staying with the core; where a strand digs in, a small shard of
+/// crystal stands out of the soil, leaning away. Each strand (and its
+/// shard) is its own fragment on ring `.root`: it strikes down out of the
+/// heart as it gathers (plant.vert) and never turns once in
+pub fn root(b:*mg.Builder,radius:f32,r:Root,seed:u64,rng:*Rng)Allocator.Error!void{
+  // the heart's underside, where every strand leaves it
+  const from=v3(0,-radius*0.4,0);
+  for(0..r.n+1)|i|{
+    // the taproot first (straight down), then the strands on their bearings
+    const tap=i==0;
+    const a=if(tap)0 else m.ratio(i-1,r.n)*m.tau+rng.range(-0.2,0.2);
+    const out=v3(@cos(a),0,@sin(a));
+    // where it digs in at the soil, and where it ends under it
+    const at=if(tap)m.splat3(0)else out*m.splat3(radius*r.spread*rng.range(0.8,1.15));
+    const to=at+out*m.splat3(if(tap)0 else radius*0.25)+v3(0,-r.depth-r.sink*(if(tap)1.4 else rng.range(0.8,1.1)),0);
+    // the fragment it is: its turn striking down, its bearing
+    const f:Fragment=.{.order=m.lerp(r.order[0],r.order[1],m.ratio(i,r.n)),.ring=.root,.bearing=a};
+    try tether(b,from,to,radius*(if(tap)0.05 else rng.range(0.028,0.038)),r.col,seed+%i*19,f);
+    if(tap)continue;
+    // a shard of crystal where it digs in, leaning out
+    const s=b.mark();
+    try mineral.crystal(b,.{
+      .base=at+v3(0,-r.depth,0),.dir=m.norm(out*m.splat3(0.7)+v3(0,1,0)),
+      .len=radius*rng.range(0.28,0.4),.r=radius*rng.range(0.06,0.08),.sides=5,.col=r.shard,.tip=r.tip,
+    },rng);
+    fragment(b,s,f);
+  }
+}
 /// motes of light, each its own fragment on its own bearing, waiting to
 /// spiral in to the heart (the shaders carry them in and fade them as they
 /// are taken up, over and over)
@@ -407,7 +461,8 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error
   try halo(b,radius*1.55,radius*0.025,0.35,0.95,lite);
 }
 /// the vesper (the `star` form): an evening star's flower, the radiant body
-/// brought down to hang `stemH` over its tile with nothing under it. Its
+/// brought down to hang `stemH` over its tile, held to it by a `root` of
+/// light struck down into the soil. Its
 /// `core` (dusk violet, gold light, five stamens) holds a small upright cup
 /// of petals and, turned half a petal on, a star of long narrow rays lying
 /// open round it; beneath, `leaves` float free (it was spliced from both
@@ -439,6 +494,11 @@ pub fn star(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
     .order=.{0.6,0.85},.col=lc,.tip=color.mix(lc,body,0.5),
   },lite,seed+%0x1EAF,&rng);
   try motes(b,radius,7,lite,&rng);
+  // its root of light, struck down into its tile just after the heart lands
+  try root(b,radius,.{
+    .n=5,.depth=g.stemH,.spread=0.9,.sink=0.08,.order=.{0.03,0.09},
+    .col=lite,.shard=body,.tip=pale,
+  },seed+%0x5007,&rng);
   // its yield: beads of light held round its core, the last to settle
   for(0..g.pods)|k|{
     // this bead's bearing (its place among the pods, which the shaders
@@ -460,7 +520,7 @@ fn expectGathered(b:*const mg.Builder,start:usize)!void{
     for(0..3)|i|try std.testing.expect(v.pos[i]==v.pos[i] and v.nrm[i]==v.nrm[i]);
     // the ring it belongs to, with any thread's share dropped
     const ring=@floor(v.tu[1]+0.01);
-    try std.testing.expect(ring>=0 and ring<=@intFromEnum(Ring.yield));
+    try std.testing.expect(ring>=0 and ring<=@intFromEnum(Ring.root));
   }
   // nothing of it is on a growth spline
   try std.testing.expect(b.grow.items.len<=start);
@@ -471,11 +531,17 @@ test"a celestial bloom, a vesper and a cut crystal are wholly gathered fragments
   defer b.deinit();
   try plant(&b,species.get(.bloom).genome,7,0);
   try expectGathered(&b,0);
-  // the vesper too, hanging over its tile: nothing of it reaches the ground
+  // the vesper too, hanging over its tile: only its root reaches the
+  // ground, and it does dig in
   const v=b.mark();
   try star(&b,species.get(.vesper).genome,7,1);
   try expectGathered(&b,v);
-  for(b.v.items[v..])|x|try std.testing.expect(x.pos[1]>0.05);
+  // the lowest any of its root reaches
+  var deepest:f32=1;
+  for(b.v.items[v..])|x|{
+    if(@floor(x.tu[1]+0.01)==@intFromEnum(Ring.root))deepest=@min(deepest,x.pos[1])else try std.testing.expect(x.pos[1]>0.05);
+  }
+  try std.testing.expect(deepest<0);
   // where the cut begins, and its random stream
   const s=b.mark();
   var rng=Rng.init(3);
