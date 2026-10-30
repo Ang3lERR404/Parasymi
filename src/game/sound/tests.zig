@@ -307,3 +307,67 @@ test"the night's music is silent by day and plays softly by night: the choir and
   // (only the hall's last whisper is left)
   for(buf)|x|try testing.expect(@abs(x)<1e-6);
 }
+/// the arsthraxia heard alone for `secs` seconds at `progress` and `fed`:
+/// its peak and loudness (rms)
+fn study(progress:f32,fed:f32,secs:f32)struct{peak:f32,rms:f32}{
+  // the sounds, with the wind and both musics hushed so it is heard alone
+  var s:Sounds=.init(5,testRate);
+  s.wind.level=0;
+  s.apply(.{.daylight=0.5});
+  s.apply(.{.arsthraxia=.{.progress=progress,.fed=fed,.complete=false}});
+  // a block of samples, the peak, the sum of squares, and samples heard
+  var buf:[480]f32=undefined;
+  var peak:f32=0;
+  var sum:f32=0;
+  var n:u32=0;
+  // the first second it hums in, unheard
+  while(m.f(n)<testRate){
+    @memset(&buf,0);
+    s.render(&buf);
+    n+=buf.len;
+  }
+  n=0;
+  while(m.f(n)<secs*testRate){
+    @memset(&buf,0);
+    if(s.research)|*rs|_=rs.render(&buf,progress,fed);
+    for(buf)|x|{
+      peak=@max(peak,@abs(x));
+      sum+=x*x;
+    }
+    n+=buf.len;
+  }
+  return.{.peak=peak,.rms=@sqrt(sum/m.f(n))};
+}
+test"the arsthraxia hums softly, its core swells with the unit and it is louder fed"{
+  // just begun unfed, nearly condensed unfed, and nearly condensed fed
+  const early=study(0.05,0,3);
+  const late=study(0.95,0,3);
+  const fed=study(0.95,1,3);
+  for([_]@TypeOf(early){early,late,fed})|h|{
+    try testing.expect(h.peak>0.005 and h.peak<0.3);
+  }
+  try testing.expect(late.rms>early.rms);
+  try testing.expect(fed.rms>late.rms);
+}
+test"the arsthraxia fades away when its work stops, and a unit done blooms and rings out"{
+  // the sounds, with the wind hushed
+  var s:Sounds=.init(9,testRate);
+  s.wind.level=0;
+  s.apply(.{.arsthraxia=.{.progress=0.5,.fed=0,.complete=false}});
+  var buf:[480]f32=undefined;
+  for(0..100)|_|s.render(&buf);
+  try testing.expect(s.research!=null);
+  // a unit done: the bloom rings while the voice hums on
+  s.apply(.{.arsthraxia=.{.progress=0.99,.fed=0,.complete=true}});
+  try testing.expect(s.blooms[0]!=null);
+  // the work stops: within twenty seconds both are gone
+  s.apply(.{.arsthraxia=.{.progress=0,.fed=0,.complete=false}});
+  // how many blocks it took
+  var blocks:u32=0;
+  while(blocks<2000 and !(s.research==null and s.blooms[0]==null)){
+    @memset(&buf,0);
+    s.render(&buf);
+    blocks+=1;
+  }
+  try testing.expect(s.research==null and s.blooms[0]==null);
+}

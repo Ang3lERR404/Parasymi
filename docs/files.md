@@ -202,8 +202,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sound.zig` — what the garden sounds like: the source the audio device plays (main.zig opens it on `platform.audio.Output`).
 
 ## src/game/sound/
-- `arsthraxia.zig` — the arsthraxia's working: a spinning whorl under a swelling choir.
-- `boom.zig` — the arsthraxia's completion: a pop into a deep thud and a fracturing shimmer.
+- `arsthraxia.zig` — the arsthraxia's working: a flower thinking, glass sung by its turning whorls over a thrum of thought.
+- `bloom.zig` — the arsthraxia's unit done: a soft bell chord blooming upward and a breath rushing up its stems.
 - `choir.zig` — the night's choir: sopranos, altos, tenors and basses, eight voices each, singing "ahh" through slow chords.
 - `drums.zig` — the day's drums, played big: taiko struck with heavy sticks, tuned timpani rolled into the phrase, a cymbal swelling to a crash.
 - `footstep.zig` — a footstep: leaf litter rustled and crushed under a paw over a muffled pad.

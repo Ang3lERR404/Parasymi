@@ -35,9 +35,14 @@
 //!   phrase, strings bowing the chords under it; it rises with the dusk and
 //!   fades out at dawn.
 //! - both musics ring in a great stone hall.
-//! - while the arsthraxia works, a spinning whorl hums under a choir that
-//!   swells with its progress; when it completes, a pop drops into a deep
-//!   thud and a fracturing shimmer rings out.
+//! - while the arsthraxia works, its flower thinks aloud: its two whorls
+//!   sing like wet fingers round glass rims, each two tones a hair apart
+//!   swelling against each other as the whorls turn; a low thrum rises
+//!   through each pulse of thought climbing its nerves; airy wisps are
+//!   breathed in to its core, and a soft low hum swells as the unit
+//!   condenses. Fed, it is brighter, quicker and a little louder. When a
+//!   unit is done a soft bell chord in the music's key blooms upward over a
+//!   warm low note, and a breath rushes up its stems with the surge of light.
 /// the hub every game module is reached through
 const lib=@import("../lib.zig");
 /// the footstep: a soft crunchy rustle under a paw
@@ -64,10 +69,10 @@ pub const drums=@import("sound/drums.zig");
 pub const night=@import("sound/night.zig");
 /// every sound's voices mixed into one stream for the device
 pub const mixer=@import("sound/mixer.zig");
-/// the arsthraxia's working: whorl and swelling choir
+/// the arsthraxia's working: glass whorls, thrum, wisps and core
 pub const arsthraxia=@import("sound/arsthraxia.zig");
-/// the arsthraxia's completion: pop, thud and shimmer
-pub const boom=@import("sound/boom.zig");
+/// the arsthraxia's unit done: a bell chord blooming and a breath rushing up
+pub const bloom=@import("sound/bloom.zig");
 /// the sounds' headless tests
 pub const tests=@import("sound/tests.zig");
 /// the source the audio device pulls from
@@ -93,6 +98,6 @@ test{
   _=night;
   _=mixer;
   _=arsthraxia;
-  _=boom;
+  _=bloom;
   _=tests;
 }

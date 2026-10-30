@@ -11,8 +11,8 @@ const dsp=engine.core.dsp;
 const rng=engine.core.rng;
 /// a paw coming down: how heavy, how fast
 const Footfall=lib.player.Footfall;
-/// the arsthraxia's completing boom
-const Boom=lib.sound.boom.Boom;
+/// the arsthraxia's bloom as a unit is done
+const Bloom=lib.sound.bloom.Bloom;
 /// how soon the first settling comes after the view enters the eyes (s)
 const gapFirst=lib.sound.sap.gapFirst;
 /// seconds between settlings while the wolf stands
@@ -23,7 +23,7 @@ const gapWalk=lib.sound.sap.gapWalk;
 const Music=lib.sound.music.Music;
 /// the night's strings, chimes and choir
 const Night=lib.sound.night.Night;
-/// the arsthraxia's working voice: whorl and choir
+/// the arsthraxia's working voice: glass, thrum, wisps and core
 const Research=lib.sound.arsthraxia.Research;
 /// how fast the settling fades in and out with the view (s)
 const sapFade=lib.sound.sap.sapFade;
@@ -104,14 +104,18 @@ pub const Sounds=struct{
   night:Night,
   /// the great hall both musics ring in
   hall:dsp.Hall,
-  /// the arsthraxia's working voice, while it works
+  /// the arsthraxia's working voice, while it works or fades away
   research:?Research=null,
-  /// the boom, while it rings out
-  boom:?Boom=null,
+  /// the blooms ringing out: a unit may be done before the last has rung away
+  blooms:[2]?Bloom=@splat(null),
+  /// the bloom slot the next one takes
+  nextBloom:usize=0,
   /// how far along the arsthraxia's work is (0..1)
   resProgress:f32=0,
   /// how well the arsthraxia is fed (0..1)
   resFed:f32=0,
+  /// whether its last word was a unit done, so one unit blooms once
+  resDone:bool=false,
   /// every sound ready to play, seeded from `seed`, at `rate` samples a second
   pub fn init(seed:u64,rate:f32)Sounds{
     // the random numbers, and the wind and music drawn from them
@@ -124,7 +128,7 @@ pub const Sounds=struct{
   /// what happened, heard: a step takes a voice, the eyes fade the
   /// settling in or out, a twinkle takes a slot, daylight sets the day's
   /// and the night's music,
-  /// and the arsthraxia's work starts, follows or ends its voice and boom
+  /// and the arsthraxia's work starts, follows or fades its voice and rings its bloom
   pub fn apply(s:*Sounds,cmd:Cmd)void{
     switch(cmd){
       .step=>|f|{
@@ -148,11 +152,15 @@ pub const Sounds=struct{
       .arsthraxia=>|a|{
         s.resProgress=a.progress;
         s.resFed=a.fed;
-        if(a.complete and s.boom==null)s.boom=.init(&s.r,s.rate);
+        if(a.complete and !s.resDone){
+          s.blooms[s.nextBloom]=.init(&s.r,s.rate);
+          s.nextBloom=(s.nextBloom+1)%s.blooms.len;
+        }
+        s.resDone=a.complete;
         if(a.progress>0 and a.progress<1){
-          if(s.research==null)s.research=.init(&s.r,s.rate);
-        }else if(a.progress==0){
-          s.research=null;
+          if(s.research)|*rs|rs.go()else s.research=.init(&s.r,s.rate);
+        }else if(a.progress==0 and !a.complete){
+          if(s.research)|*rs|rs.stop();
         }
       }
     }
@@ -167,10 +175,12 @@ pub const Sounds=struct{
       if(!t.render(out))v.*=null;
     };
     s.sap(out);
-    if(s.research)|*rs|rs.render(out,s.resProgress,s.resFed);
-    if(s.boom)|*bm|{
-      if(!bm.render(out))s.boom=null;
+    if(s.research)|*rs|{
+      if(!rs.render(out,s.resProgress,s.resFed))s.research=null;
     }
+    for(&s.blooms)|*v|if(v.*)|*bl|{
+      if(!bl.render(out))v.*=null;
+    };
     s.wind.render(out);
     s.musics(out);
     for(out)|*x|x.*=dsp.softClip(x.*);
