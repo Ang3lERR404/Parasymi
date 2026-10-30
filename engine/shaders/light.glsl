@@ -97,6 +97,23 @@ float keyShadow(vec3 wpos, vec3 n) {
   return mix(lit, 1.0, smoothstep(far * SHADOW_FADE, far, dist));
 }
 
+// how much of the key light reaches a point in the air `dist` from the eye
+// (nothing to push off, so one hardware-filtered tap of the nearest cascade
+// holding it, a hair toward the light), fading to lit toward the shadows'
+// reach
+const float AIR_BIAS = 0.0004;
+float airLit(Lighting L, vec3 wpos, float dist) {
+  float far = L.info.y;
+  if (dist >= far) return 1.0;
+  for (int i = 0; i < CASCADES; i++) {
+    vec4 q = L.cascade[i] * vec4(wpos, 1.0);
+    if (max(abs(q.x), abs(q.y)) >= CASCADE_BLEND_TO || q.z >= 1.0) continue;
+    float s = texture(shadow_map, vec4(q.xy * 0.5 + 0.5, float(i), q.z - AIR_BIAS));
+    return mix(s, 1.0, smoothstep(far * SHADOW_FADE, far, dist));
+  }
+  return 1.0;
+}
+
 // the light the points of light (a game's blooms, motes, flashes) shed on a
 // surface at `wpos` facing `n`: each brightest beside it, gone at its
 // reach. `wrap` > 0 lets light reach round thin tissue (0 a plain surface).

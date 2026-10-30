@@ -31,7 +31,27 @@ lowland).
   line, `terrain_mesh.lineDepth`, info.w), bare soil behind a bright
   violet seam; their nodes' shards drift off and blink out.
 - `info.z = 255` marks the top surface.
-- Fog closes in before the edge of the world. Paws leave contact shadows.
+- The world closes into the horizon's colour before its edge. Paws leave
+  contact shadows.
+
+## Fog (`passes/fog.zig`, `fog.frag`)
+The garden stands in real air, marched on the GPU after the world at half
+the screen's size and laid over it edge-aware (engine `render/volume.zig`).
+
+- **Haze:** everywhere, thinning with height; thinner as the camera draws
+  back (the old distance fog's density), so far views never drown. Far
+  away it melts into the sky's colour.
+- **Low air:** thin air among the plants, thickest on the ground.
+- **Mist:** lies low on the ground and pools in the hollows (below the
+  second terrace), torn into flat wisps drifting along the wind; denser by
+  night.
+- **Light shafts:** the key light is looked up in its shadow map at every
+  step, so what shades the ground shades the air: light falls through the
+  gaps between plants and structures, and glows toward the sun (forward
+  scattering, gone once the sky has shifted).
+- **Glow:** the points of light (blooms, motes) light the air round them;
+  the ley lines' glow rises off the ground into the mist, pulsing with
+  them (read from the overhead map, the ground drawn from above).
 
 ## Plants
 ### All plants

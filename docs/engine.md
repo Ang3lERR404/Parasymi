@@ -62,7 +62,9 @@ adds on top.
   garden's land).
 
 ### render
-- Engine: `Renderer(G)`, post, light, camera, `passes/ui`.
+- Engine: `Renderer(G)`, post, light, camera, `volume` (the air: the
+  overhead map, a half-size volume after the world, its edge-aware
+  composite), `passes/ui`.
 - Game: `renderer` (the garden's `G`), passes, terrain meshing.
 
 ### ui
@@ -70,8 +72,10 @@ adds on top.
 - Game: nothing.
 
 ### shaders
-- Engine: post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`,
-  `growth.glsl` (`growOut`).
+- Engine: post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`
+  (`airLit`: the key light at a point in the air), `growth.glsl`
+  (`growOut`), `volume.glsl` (what a volume pass reads),
+  `volume_compose.frag`.
 - Game: everything else. `common.glsl` includes `light.glsl`; `part.vert`
   includes `growth.glsl`.
 
@@ -99,6 +103,19 @@ Its comment block lists the full contract.
 
 Pass descriptors carry SPIR-V bytes (`.vert = @embedFile("plant.vert")`),
 so each module embeds its own shaders.
+
+A pass's `.target` is where it draws, in this order each frame:
+- `shadow`: the key light's cascades;
+- `overhead`: the overhead map, seen from straight above. It is fixed to
+  the world and wraps (a texel a unit, `volume.overheadSize` across) and
+  is kept from frame to frame, so a pass redraws only a few pieces a frame,
+  each pushed `volume.overheadOf` as its `vp`;
+- `world`: the HDR image;
+- `volume`: the air, at half size, reading the world's depth and the
+  overhead map (set 1, `volume.glsl`); rgb what the air sends to the eye, a
+  how much shows through. The engine lays it over the HDR image before the
+  glow;
+- `screen`: the HUD.
 
 ### Meshes
 `engine.gfx.meshgen.Mesher(Part, stem)`:

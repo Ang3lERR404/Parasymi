@@ -18,17 +18,20 @@ const shaders=[_][]const u8{
   "plant.vert","plant.frag",
   "part.vert","part.frag",
   "sky.vert","sky.frag",
+  "fog.vert","fog.frag",
 };
 /// shaders compiled a second time from the same source with a define,
 /// imported under their own name: (name, source, define). The glass
 /// variants draw only the see-through fragments the plain ones skip; the
 /// shadow variants place what casts into each cascade of the key light's
-/// shadow map.
+/// shadow map; the overhead ones draw the ground from above for the fog.
 const variants=[_][3][]const u8{
   .{"plant_glass.frag","plant.frag","GLASS"},
   .{"part_glass.frag","part.frag","GLASS"},
   .{"plant_shadow.vert","plant.vert","SHADOW"},
   .{"part_shadow.vert","part.vert","SHADOW"},
+  .{"terrain_overhead.vert","terrain.vert","OVERHEAD"},
+  .{"terrain_overhead.frag","terrain.frag","OVERHEAD"},
 };
 /// every shader name the game imports: the plain ones, then each variant's own
 const names=shaders++blk:{

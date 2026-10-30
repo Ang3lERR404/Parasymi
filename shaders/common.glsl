@@ -104,6 +104,9 @@ float hash12(vec2 p) {
   return fract((q.x + q.y) * q.z);
 }
 
+// how the ley lines pulse at `p` (0..1): a slow wave rolling across them
+float leyPulse(vec3 p, float t) { return 0.5 + 0.5 * sin(t * 2.0 + p.x * 0.45 + p.z * 0.3); }
+
 float segDist(vec2 p, vec2 a, vec2 b) {
   vec2 ab = b - a;
   float h = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
@@ -463,13 +466,12 @@ vec3 sapGlisten(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear, flo
 }
 
 
+// the drawn world ends a little before the streamed one: close it into the
+// horizon so a low camera never sees an edge. (The air itself, haze and
+// mist, is the fog pass's: fog.frag.)
 vec3 applyFog(vec3 c, vec3 wpos) {
-  float d = length(wpos - pc.eye_time.xyz);
-  float f = 1.0 - exp(-pow(d * pc.fog.w, 2.0));
-  // the drawn world ends a little before the streamed one: close it into the
-  // horizon so a low camera never sees an edge
-  f = max(f, smoothstep(pc.view.z, pc.view.w, length(wpos.xz - pc.view.xy)));
-  return mix(c, pc.fog.rgb, clamp(f, 0.0, 1.0));
+  float f = smoothstep(pc.view.z, pc.view.w, length(wpos.xz - pc.view.xy));
+  return mix(c, pc.fog.rgb, f);
 }
 
 // a halo forming (game/structures/polyp.zig): over k 0..1 its blooms spiral

@@ -3,8 +3,9 @@
 //! passes (shape in `pass` below), push constants, scene and stats, and
 //! the state of its own it keeps on the renderer. Passes record in the
 //! order listed, by target: the shadow casters into the key light's shadow
-//! map, then the world into the HDR image, then the screen. A new pass is
-//! one new file plus one line in the game's list.
+//! map, what is seen from above into the overhead map, then the world into
+//! the HDR image, the air over it (volume.zig), then the screen. A new pass
+//! is one new file plus one line in the game's list.
 /// the standard library
 const std=@import("std");
 /// the allocator the renderer and its lists are made with
@@ -35,6 +36,8 @@ const pipeline=@import("../gfx/pipeline.zig");
 const postMod=@import("post.zig");
 /// light that moves: shadow cascades and points of light
 const light=@import("light.zig");
+/// the air: the overhead map, the volume and its composite
+const Volume=@import("volume.zig").Volume;
 /// the post chain: the world's HDR image, its glow and the smoothing
 const Post=postMod.Post;
 /// the HDR image's format, which world passes draw into
@@ -56,19 +59,27 @@ pub const pass=struct{
   /// which push-constant block the pass uses: the game's world block, or
   /// the UI's (`ui.Push`)
   pub const Layout=enum{
-    /// the game's world block (`G.Push`), with the shadow map's set
+    /// the game's world block (`G.Push`), with the shadow map's set (and
+    /// the air's: the world's depth and the overhead map)
     world,
     /// the UI's block (`ui.Push`)
     ui
   };
   /// what a pass draws into: the key light's shadow map (depth alone, every
-  /// cascade at once), the world's HDR image, or the screen after the world
-  /// (and its glow): the UI
+  /// cascade at once), the overhead map, the world's HDR image, the air's
+  /// volume after it, or the screen after the world (and its glow): the UI
   pub const Target=enum{
     /// the key light's shadow map: depth alone, every cascade in one draw
     shadow,
+    /// the overhead map: colour alone, seen from straight above (each draw
+    /// pushes its own `vp`, `volume.overheadOf`), before the world; kept
+    /// from frame to frame, so a pass redraws only what changed
+    overhead,
     /// the world's HDR image
     world,
+    /// the air's volume, half the screen's size, after the world: colour
+    /// alone, reading the world's depth (volume.glsl)
+    volume,
     /// the screen, after the world and its glow are composed
     screen
   };
@@ -136,8 +147,8 @@ pub const pass=struct{
       .vert=vs,.frag=fs,
       .bindings=d.bindings,.attrs=d.attrs,
       .layout=layout,
-      .colorFormat=switch(d.target){.shadow=>.undefined,.world=>hdrFormat,.screen=>screen},
-      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target!=.screen,.blend=d.blend,.cull=false,
+      .colorFormat=switch(d.target){.shadow=>.undefined,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
+      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.world,.blend=d.blend,.cull=false,
       .samples=postMod.sampleFlags(if(d.target==.world)samples else 1),.perSample=d.perSample,
       .viewMask=if(d.target==.shadow)light.views else 0,
       .depthBias=if(d.target==.shadow)light.bias else null,
@@ -242,6 +253,8 @@ pub fn Renderer(comptime G:type)type{
     post:Post=.{},
     /// the key light's shadow map
     shadow:light.Shadow=.{},
+    /// the air: the overhead map, the volume and its composite
+    volume:Volume=.{},
     /// whether presenting waits for the display's refresh
     vsync:bool,
     /// each frame in flight's resources
@@ -298,6 +311,7 @@ pub fn Renderer(comptime G:type)type{
       r.sc=try sw.Swapchain.init(c,r.gpa,@intCast(fb[0]),@intCast(fb[1]),r.vsync,.null_handle);
       r.post=try Post.init(c,r.sc.format.format,r.sc.extent.width,r.sc.extent.height,r.fit(r.post.aa));
       r.shadow=try light.Shadow.init(c);
+      r.volume=try Volume.init(c,r.sc.extent.width,r.sc.extent.height,r.sc.depthView);
       for(&r.frames)|*f|{
         f.lighting=try Buffer.init(c,@sizeOf(light.Lighting),.{.storage_buffer=true,.shader_device_address=true});
         f.pool=try c.device.createCommandPool(&.{.flags=.{.reset_command_buffer=true},.queue_family_index=c.family},null);
@@ -311,7 +325,7 @@ pub fn Renderer(comptime G:type)type{
         }
         try c.device.allocateCommandBuffers(&.{.command_pool=f.pool,.level=.primary,.command_buffer_count=1},@ptrCast(&f.cmd));
       }
-      r.layouts[@intFromEnum(pass.Layout.world)]=try pipeline.layout(c,@sizeOf(Push),&.{r.shadow.setLayout});
+      r.layouts[@intFromEnum(pass.Layout.world)]=try pipeline.layout(c,@sizeOf(Push),&.{r.shadow.setLayout,r.volume.setLayout});
       r.layouts[@intFromEnum(pass.Layout.ui)]=try pipeline.layout(c,@sizeOf(ui.Push),&.{});
       try r.makePipes(false);
     }
@@ -384,7 +398,7 @@ pub fn Renderer(comptime G:type)type{
     /// wait for the GPU, free everything and the renderer itself
     pub fn deinit(r:*R)void{
       // nothing to recover: teardown proceeds even if the device was lost
-      r.ctx.device.deviceWaitIdle()catch{};
+      r.ctx.device.deviceWaitIdle()catch{};std.log.info("gpu {any} total {d}",.{r.gpuMs,r.gpuTotal});
       r.release();
       r.ctx.deinit(r.gpa);
       r.gpa.destroy(r);
@@ -414,6 +428,7 @@ pub fn Renderer(comptime G:type)type{
       for(r.pipes)|p|c.device.destroyPipeline(p,null);
       for(r.layouts)|l|c.device.destroyPipelineLayout(l,null);
       r.post.deinit(c);
+      r.volume.deinit(c);
       r.shadow.deinit(c);
       r.sc.deinit(c,r.gpa,false);
     }
@@ -442,6 +457,7 @@ pub fn Renderer(comptime G:type)type{
       var o=old;
       o.deinit(c,r.gpa,false);
       try r.post.resize(c,r.sc.extent.width,r.sc.extent.height);
+      try r.volume.resize(c,r.sc.extent.width,r.sc.extent.height,r.sc.depthView);
     }
     /// the screen's size, in pixels
     pub fn extent(r:*const R)[2]f32{
@@ -523,10 +539,17 @@ pub fn Renderer(comptime G:type)type{
       r.shadow.begin(cmd);
       r.record(f,cmd,.shadow,&sc,&stats);
       r.shadow.end(cmd);
-      r.beginWorld(cmd,scene.clear);
+      r.volume.beginOverhead(cmd);
       cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set},null);
+      r.record(f,cmd,.overhead,&sc,&stats);
+      r.volume.endOverhead(cmd);
+      r.beginWorld(cmd,scene.clear);
       r.record(f,cmd,.world,&sc,&stats);
       cmd.endRendering();
+      r.volume.beginVolume(cmd,r.sc.depth);
+      cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set,r.volume.set},null);
+      r.record(f,cmd,.volume,&sc,&stats);
+      r.volume.compose(cmd,r.post.hdr);
       r.post.glow(cmd);
       stamp(cmd,f,glow);
       r.beginScreen(cmd,img);
@@ -623,24 +646,31 @@ pub fn Renderer(comptime G:type)type{
       return n;
     }
     /// open the world's rendering scope: the HDR image and the depth buffer
-    /// (with MSAA, multisampled ones resolved into the HDR image).
+    /// (with MSAA, multisampled ones resolved into the HDR image and the
+    /// swapchain's depth, its first sample), the depth kept for the air.
     fn beginWorld(r:*R,cmd:vk.CommandBufferProxy,clear:[3]f32)void{
       r.post.beginWorld(cmd);
       // whether the world draws multisampled
       const ms=r.post.multisampled();
-      sw.barrier(cmd,if(ms)r.post.msDepth.image else r.sc.depth,sw.depthRange(),.undefined,.depth_attachment_optimal,
+      // (what the air read of the depth last frame is done first)
+      sw.barrier(cmd,r.sc.depth,sw.depthRange(),.undefined,.depth_attachment_optimal,
+        .{.early_fragment_tests=true,.late_fragment_tests=true,.color_attachment_output=true,.fragment_shader=true},.{.depth_stencil_attachment_write=true,.color_attachment_write=true},
+        .{.early_fragment_tests=true,.late_fragment_tests=true,.color_attachment_output=true},.{.depth_stencil_attachment_write=true,.depth_stencil_attachment_read=true,.color_attachment_write=true});
+      if(ms)sw.barrier(cmd,r.post.msDepth.image,sw.depthRange(),.undefined,.depth_attachment_optimal,
         .{.early_fragment_tests=true,.late_fragment_tests=true},.{.depth_stencil_attachment_write=true},
         .{.early_fragment_tests=true,.late_fragment_tests=true},.{.depth_stencil_attachment_write=true,.depth_stencil_attachment_read=true});
       // the world's colour attachment
       const color=[_]vk.RenderingAttachmentInfo{r.post.worldColor(clear)};
-      // the depth attachment: the multisampled one, or the swapchain's
+      // the depth attachment: the multisampled one (its first sample
+      // resolved into the swapchain's), or the swapchain's, kept
       const depth:vk.RenderingAttachmentInfo=.{
         .image_view=if(ms)r.post.msDepth.views[0]else r.sc.depthView,
         .image_layout=.depth_attachment_optimal,
-        .resolve_mode=.{},
-        .resolve_image_layout=.undefined,
+        .resolve_mode=if(ms).{.sample_zero=true}else.{},
+        .resolve_image_view=if(ms)r.sc.depthView else.null_handle,
+        .resolve_image_layout=if(ms).depth_attachment_optimal else.undefined,
         .load_op=.clear,
-        .store_op=.dont_care,
+        .store_op=if(ms).dont_care else.store,
         .clear_value=.{.depth_stencil=.{.depth=1,.stencil=0}},
       };
       r.scope(cmd,&color,&depth);

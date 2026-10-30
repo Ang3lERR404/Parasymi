@@ -76,6 +76,8 @@ pub const passes=struct{
   pub const plantsShadow=@import("passes/plants.zig").shadow;
   /// parts cast into the key light's shadow map
   pub const partsShadow=@import("passes/parts.zig").shadow;
+  /// the ground seen from above into the overhead map, for the fog
+  pub const terrainOverhead=@import("passes/terrain.zig").overhead;
   /// the sky dome behind everything
   pub const sky=@import("passes/sky.zig");
   /// the baked ground of every streamed chunk
@@ -91,6 +93,8 @@ pub const passes=struct{
   pub const plantsGlass=@import("passes/plants.zig").glass;
   /// the parts' see-through fragments, blended over the solids
   pub const partsGlass=@import("passes/parts.zig").glass;
+  /// the air over everything, marched after the world into its volume
+  pub const fog=@import("passes/fog.zig");
   /// the HUD, over the finished picture
   pub const ui=er.ui;
 };
@@ -202,6 +206,8 @@ pub const Slot=struct{
   centre:[2]f32=.{0,0},
   /// whether this slot holds a chunk now (false once evicted)
   live:bool=false,
+  /// whether its ground is drawn into the overhead map as it is now
+  overhead:bool=false,
 };
 /// the meshes built when one thing stands alone (`--plant`, `--structure`):
 /// one species' (or none) and these library meshes
@@ -222,6 +228,8 @@ pub const Ext=struct{
   slots:std.ArrayList(Slot)=.empty,
   /// slots freed by evicted chunks, ready for the next one
   freeSlots:std.ArrayList(ck.MeshSlot)=.empty,
+  /// the slot the overhead map's refresh goes on from (passes/terrain.zig)
+  overheadTurn:usize=0,
   /// every built-once mesh (plant species + part library) in one buffer.
   meshes:Buffer=.{},
   /// each vertex of `meshes`' skin weights (zero where a mesh is not skinned)

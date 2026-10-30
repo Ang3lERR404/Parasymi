@@ -15,6 +15,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `shadow.frag` — shadow casters write depth alone.
 - `ui.frag` — organic UI, all of it grown: every shape is an animated signed-distance field.
 - `ui.vert` — UI shapes to the screen; the palette's sRGB colours to linear.
+- `volume.glsl` — the air as a volume pass reads it (render/volume.zig): the world's depth under each volume texel, the overhead map (fixed to the world…
+- `volume_compose.frag` — the air laid over the world: each pixel takes the 4x4 half-size volume texels round it, softly weighted and by how near their depth lies to…
 
 ## engine/src/anim/
 - `clip.zig` — keyframed animation, the generic half: a clip is a set of named channels, each a run of keys (time, value) eased between, and the text it…
@@ -59,6 +61,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## engine/src/render/
 - `post.zig` — post-processing: light that bleeds, and smooth edges.
 - `renderer.zig` — frame orchestration: acquire, record every pass, submit, present.
+- `volume.zig` — the air between the eye and what it sees: volumes a game raymarches on the GPU from the world's depth (mist, haze, light falling through…
 
 ## engine/src/ui/
 - `box.zig` — a box in screen pixels (y down): where a UI component sits, how big it is, and so what the mouse can land on.
@@ -72,6 +75,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## shaders/
 - `common.glsl` — shared by every world pass: push constants, the sky's shift, garden wind, growth, gathering, halo spiral, the plexus and shading (shadows…
 - `detail.vert` — ground detail grown per tile from one DetailTile: grass blades, and clods and stones on soil.
+- `fog.frag` — the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the…
+- `fog.vert` — one full-screen triangle for the fog, handing on the inverse view-projection (worked out once a vertex, not once a texel).
 - `part.frag` — material of library parts (structures, the wolf, nodes, beams, motes): fibre, sap, resin, essence, light.
 - `part.vert` — places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 - `plant.frag` — plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
@@ -326,6 +331,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/render/passes/
 - `detail.zig` — detail: the ground's grass, clods and stones, grown on the GPU.
+- `fog.zig` — fog: the air the garden stands in, marched on the GPU after the world at half the screen's size (fog.frag): a haze over everything, mist…
 - `parts.zig` — parts: library meshes (the wolf, nodes, motes, structures), one instanced draw per mesh with a per-instance transform (or, for beams, motes…
 - `plants.zig` — plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
 - `sky.zig` — sky: the dome behind everything, drawn first as one full-screen triangle without depth (the world draws over it).

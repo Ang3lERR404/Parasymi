@@ -73,7 +73,7 @@ pub const Push=extern struct{
   intensity:f32=0.7,
 };
 /// what kind of image to make: format, mip levels, samples, depth or colour
-const Spec=struct{
+pub const Spec=struct{
   /// its pixel format
   format:vk.Format=hdrFormat,
   /// how many mip levels (the blur chain's levels)
@@ -86,7 +86,7 @@ const Spec=struct{
   transient:bool=false,
 };
 /// one image of the post chain, with a view per level and its size
-const Image=struct{
+pub const Image=struct{
   /// the Vulkan image
   image:vk.Image=.null_handle,
   /// the memory under it
@@ -99,7 +99,7 @@ const Image=struct{
   levels:u32=1,
   /// an image of `w`×`h` as `sp` describes, with its memory and views;
   /// freed again on failure
-  fn init(c:*const Ctx,w:u32,h:u32,sp:Spec)!Image{
+  pub fn init(c:*const Ctx,w:u32,h:u32,sp:Spec)!Image{
     // the image being made
     var im:Image=.{.extent=.{.width=w,.height=h},.levels=sp.levels};
     errdefer im.deinit(c);
@@ -131,7 +131,7 @@ const Image=struct{
     return im;
   }
   /// free its views, image and memory and leave it empty (safe when empty)
-  fn deinit(im:*Image,c:*const Ctx)void{
+  pub fn deinit(im:*Image,c:*const Ctx)void{
     for(im.views)|v|c.device.destroyImageView(v,null);
     c.device.destroyImage(im.image,null);
     c.device.freeMemory(im.mem,null);
@@ -143,7 +143,7 @@ const Image=struct{
   }
 };
 /// one colour level of an image
-fn range(level:u32)vk.ImageSubresourceRange{
+pub fn range(level:u32)vk.ImageSubresourceRange{
   return.{.aspect_mask=.{.color=true},.base_mip_level=level,.level_count=1,.base_array_layer=0,.layer_count=1};
 }
 /// the post chain: the world's HDR image, MSAA and FXAA images, the blur

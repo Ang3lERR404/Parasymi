@@ -114,7 +114,7 @@ pub const Swapchain=struct{
       .array_layers=1,
       .samples=.{.@"1"=true},
       .tiling=.optimal,
-      .usage=.{.depth_stencil_attachment=true},
+      .usage=.{.depth_stencil_attachment=true,.sampled=true},
       .sharing_mode=.exclusive,
       .initial_layout=.undefined,
     },null);

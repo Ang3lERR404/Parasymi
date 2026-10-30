@@ -86,6 +86,8 @@ pub const render=struct{
   pub const post=@import("render/post.zig");
   /// the sun's light and its shadow cascades
   pub const light=@import("render/light.zig");
+  /// the air: the overhead map, the volume and its composite
+  pub const volume=@import("render/volume.zig");
   /// the camera: orbit, first person and free
   pub const camera=@import("render/camera.zig");
 };
@@ -121,6 +123,7 @@ test{
   _=@import("world/world.zig");
   _=render.camera;
   _=render.light;
+  _=render.volume;
   _=ui.draw;
   _=ui.box;
 }

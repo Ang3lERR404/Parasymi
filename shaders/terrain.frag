@@ -1,6 +1,7 @@
 #version 450
 //! terrain shading: tile colour, ley sight and its plexus, the ley lines
-//! sealing (the unforming), shadows, fog.
+//! sealing (the unforming), shadows, fog. With OVERHEAD, the ground seen
+//! from above for the fog: the glow it sends into the air, and its height.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 
@@ -26,6 +27,9 @@ const float HOVER_PULSE = 6.0;
 // darkness there
 const vec2 PAW_SHADOW = vec2(0.12, 0.18);
 const float PAW_SHADOW_DARK = 0.7;
+// seen from above, a ley line's plexus as the air takes it: its threads too
+// fine to tell apart, an even glow this strong over the line
+const float PLEXUS_AIR = 0.35;
 
 void main() {
   vec3 n = normalize(v_nrm);
@@ -41,23 +45,38 @@ void main() {
   float front = mix(0.0, 1.0 + SEAM_WIDTH, seal);
   float closed = seal <= 0.0 ? 0.0 : ground ? line * smoothstep(depth - SEAM_WIDTH * 0.5, depth + SEAM_WIDTH * 0.5, front) : line * seal;
   float seam = ground && seal > 0.0 && seal < 1.0 ? line * (1.0 - smoothstep(0.0, SEAM_WIDTH, abs(depth - front))) : 0.0;
-  // how much of the key light reaches here: what stands between it and the
-  // sun or moon (a plant, a structure, the wolf, a hill) shades it
-  float sh = keyShadow(v_pos, n);
-  vec3 c = shadeLit(mix(v_col, srgb2lin(SEALED_SOIL), closed), n, v_pos, sh);
-
+  // the light the ground gives off itself
+  vec3 glow = vec3(0.0);
   if (ground || v_info.w > 0.0) {
     // ley currents: everywhere with ley sight, on the ground and its grass,
     // fading smoothly across tile borders (ley is shared at tile edges)
-    float pulse = 0.5 + 0.5 * sin(t * 2.0 + v_pos.x * 0.45 + v_pos.z * 0.3);
+#ifdef OVERHEAD
+    // (the map is kept for many frames: the fog pulses it itself)
+    float pulse = 0.5;
+#else
+    float pulse = leyPulse(v_pos, t);
+#endif
     vec3 leyc = mix(LEY, LEY_VEILED, VEIL);
-    c += leyc * pc.misc.y * ley * ley * 0.45 * pulse * (1.0 - closed);
-    c += SEAM * seam * (0.6 + 0.4 * pulse);
+    glow += leyc * pc.misc.y * ley * ley * 0.45 * pulse * (1.0 - closed);
+    glow += SEAM * seam * (0.6 + 0.4 * pulse);
     // a faint plexus drifting over the ley lines themselves
     // (only evaluated where it shows: it is the costliest thing on the ground)
     float on = smoothstep(0.5, 0.85, ley) * (1.0 - closed);
-    if (ground && on > 0.0) c += mix(leyc, PLEXUS_PALE, 0.4) * plexus(v_pos.xz, t) * on * mix(0.32, 0.16, DAYLIGHT);
+#ifdef OVERHEAD
+    float web = PLEXUS_AIR;
+#else
+    float web = on > 0.0 ? plexus(v_pos.xz, t) : 0.0;
+#endif
+    if (ground && on > 0.0) glow += mix(leyc, PLEXUS_PALE, 0.4) * web * on * mix(0.32, 0.16, DAYLIGHT);
   }
+#ifdef OVERHEAD
+  o = vec4(glow, v_pos.y);
+  return;
+#endif
+  // how much of the key light reaches here: what stands between it and the
+  // sun or moon (a plant, a structure, the wolf, a hill) shades it
+  float sh = keyShadow(v_pos, n);
+  vec3 c = shadeLit(mix(v_col, srgb2lin(SEALED_SOIL), closed), n, v_pos, sh) + glow;
   // hovered tile
   if (ground && all(equal(floor(v_pos.xz), pc.misc.zw))) c += HOVER * (0.7 + 0.3 * sin(t * HOVER_PULSE));
   // contact shadows: a soft ellipse under each paw, long along the facing,

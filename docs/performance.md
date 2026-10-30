@@ -33,6 +33,17 @@ Shaders make it with instancing, vertex/fragment fields or compute.
 The CPU keeps the state and the sim, and sends small records: a tile's
 corners, a mote's state, four control points.
 
+## Fog
+The fog (`fog.frag`) marches at half the screen's size, 28 steps through
+the low slab the garden stands in, the haze above it summed in closed form,
+each point of light summed in closed form too. Measured release on a 4060
+Ti at 1600×900, `--demo`: the march about 0.9 ms, its composite about
+0.1 ms, the overhead map about 0.2 ms.
+
+The overhead map draws only 4 chunks a frame (new ones first, then the
+rest in turn): the chunks' ground buffers are host-visible, so reading all
+of them every frame cost 2.6 ms.
+
 ## Level of detail
 Every plant and library mesh is built at `meshgen.lods` (3) levels of
 detail, so far-away things use fewer triangles.

@@ -77,6 +77,9 @@ pub const Desc=struct{
   blend:bool=false,
   /// with `blend`: add onto what is there instead of blending over it
   additive:bool=false,
+  /// with `blend`: what it draws is already weighted by its alpha (colour
+  /// added on, what is there kept by one minus its alpha: a veil over it)
+  premultiplied:bool=false,
   /// whether back faces are culled
   cull:bool=true,
   /// samples per pixel of the attachments it draws into (MSAA)
@@ -162,7 +165,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
   // how the one colour attachment blends: alpha over, or added on
   const att=[_]vk.PipelineColorBlendAttachmentState{.{
     .blend_enable=if(d.blend).true else.false,
-    .src_color_blend_factor=if(d.additive).one else.src_alpha,
+    .src_color_blend_factor=if(d.additive or d.premultiplied).one else.src_alpha,
     .dst_color_blend_factor=if(d.additive).one else.one_minus_src_alpha,
     .color_blend_op=.add,
     .src_alpha_blend_factor=.one,
