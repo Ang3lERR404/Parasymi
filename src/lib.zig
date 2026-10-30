@@ -126,6 +126,10 @@ pub const palette=@import("gfx/meshes/palette.zig");
 pub const parasiteKit=@import("gfx/meshes/parasite_kit.zig");
 /// the radiant kit: gathered light fragments, never grown
 pub const radiantKit=@import("gfx/meshes/radiant_kit.zig");
+/// the polyp's colony mesh: its shared mound and buds, for the mixed looks
+pub const polypMesh=@import("gfx/meshes/polyp.zig");
+/// the hydra look for the polyp: its hanging tentacles and bodies, for the mixed looks
+pub const polypHydra=@import("gfx/meshes/polyp_hydra.zig");
 /// mesh: the root digger, which draws from the ground's nodes
 pub const rootDigger=@import("gfx/meshes/root_digger.zig");
 /// mesh: the sap cache, a gourd of resin that stores anything

@@ -67,6 +67,10 @@ const tipCol=color.rgb(0.9,0.86,0.94);
 const mouth=color.rgb(0.22,0.15,0.28);
 /// tentacles round each disc
 const tentacles=8;
+/// long hanging tentacles round each disc, crowned `hanging`
+const hangers=6;
+/// how long a hanging tentacle runs, as a share of its column's radius
+const hangReach:f32=8;
 /// feathery side branches (pinnules) each side of a tentacle
 const pinnules=7;
 /// how wide an oral disc flares, as a share of its column's radius
@@ -99,22 +103,51 @@ fn columnColour(k:f32)color.Rgba8{
 /// spread with the mound, then each polyp's column rises out of it, its
 /// disc and mouth open, and its tentacles reach out of the rim, their
 /// pinnules unfurling as each front passes; the buds swell as they rise.
-pub fn build(b:*mg.Builder)Allocator.Error!void{
+pub fn build(b:*mg.Builder)Allocator.Error!void{try colonyOf(b,.feathery);}
+/// how a polyp's disc is crowned
+pub const Crown=enum{
+  /// eight feathery tentacles arching out and curling down
+  feathery,
+  /// six long thin tentacles hanging far down, beaded with stinging knots
+  /// (the hydra's, `polypHydra.hanging`)
+  hanging,
+};
+/// a mixed look, to compare beside it (`--samples=polyp,polypHanging`):
+/// the colony's columns and discs, crowned with the hydra's long hanging
+/// tentacles
+pub const hanging=struct{
+  /// builds the colony crowned with hanging tentacles
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try colonyOf(b,.hanging);}
+};
+/// the colony, every disc crowned as `crown` says
+fn colonyOf(b:*mg.Builder,crown:Crown)Allocator.Error!void{
   // the colony's own random stream, the same every build
   var rng=pal.rngFor("polyp");
   // the skeleton every part is timed along
   var k=growth.Skeleton.begin(b);
+  // the mound's hidden heart, which every polyp grows off
+  const heart=try base(b,&k);
+  for(colony,0..)|p,i|try polyp(b,&k,heart,p,i,crown,&rng);
+  try budsOn(b,&k,heart);
+  k.finish(b);
+}
+/// the root mat and the fleshy mound a colony shares, grown off a hidden
+/// heart rising out of the soil (returned, for the colony to grow off)
+pub fn base(b:*mg.Builder,k:*growth.Skeleton)Allocator.Error!growth.Id{
   // the mound's hidden heart, rising out of the soil
   const heart=k.trunk(&.{v3(0,-0.02,0),v3(0,0.03,0),v3(0,0.08,0)},.{.pace=columnPace*2});
   // decision: no foot leaves; the colony reads as soft flesh, not foliage
-  try kit.rootMat(b,5,0.5,0.045,0x9071,.{.k=&k,.id=heart});
+  try kit.rootMat(b,5,0.5,0.045,0x9071,.{.k=k,.id=heart});
   {
     // where the mound's vertices begin
     const s=b.mark();
     try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=mound,.col=flesh.toRgba8(255),.part=.tendril,.rings=10,.segs=18});
     try k.along(b,s,heart);
   }
-  for(colony,0..)|p,i|try polyp(b,&k,heart,p,i,&rng);
+  return heart;
+}
+/// the closed buds of young polyps low on the mound, swelling off its `heart`
+pub fn budsOn(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id)Allocator.Error!void{
   for(buds,0..)|at,i|{
     // where this bud's vertices begin
     const s=b.mark();
@@ -122,11 +155,10 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     try mg.ellipsoid(b,.{.center=at+v3(0,0.038,0),.radii=v3(0.01,0.008,0.01),.col=mouth.toRgba8(255),.part=.tendril,.rings=4,.segs=6,.t=0.9});
     try k.on(b,s,heart,1,.{.from=at-v3(0,0.03,0),.delay=0.4+0.05*m.f(i)});
   }
-  k.finish(b);
 }
 /// one polyp `p` (the `i`th of the colony) off the mound's `heart`: its
-/// column, disc, mouth and tentacles
-fn polyp(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id,p:Polyp,i:usize,rng:*Rng)Allocator.Error!void{
+/// column, disc, mouth and tentacles, crowned as `crown` says
+fn polyp(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id,p:Polyp,i:usize,crown:Crown,rng:*Rng)Allocator.Error!void{
   // its column's control points (the first left for the skeleton to root),
   // rising nearly upright from its foot and leaning out toward its disc
   const d=p.top-p.foot;
@@ -179,6 +211,15 @@ fn polyp(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id,p:Polyp,i:usize,rng:*R
   // the tentacles' bearings are offset on every other polyp, so no two
   // crowns line up
   const turn:f32=if(i%2==0)0 else 0.5;
+  if(crown==.hanging){
+    for(0..hangers)|j|{
+      // this tentacle's bearing, and the flat way out along it
+      const a=(m.f(j)+turn+rng.range(-0.2,0.2))/hangers*m.tau;
+      const out=e1*m.splat3(@cos(a))+e2*m.splat3(@sin(a));
+      try lib.polypHydra.hanging(b,k,column,.{.root=top+out*m.splat3(dr*0.86)+up*m.splat3(dr*0.04),.out=out,.up=up,.len=p.r*hangReach*rng.range(0.85,1.15),.r0=p.r*0.3},rng);
+    }
+    return;
+  }
   for(0..tentacles)|j|try tentacle(b,k,column,.{.top=top,.up=up,.e1=e1,.e2=e2,.dr=dr,.r=p.r},(m.f(j)+turn+rng.range(-0.15,0.15))/tentacles*m.tau,rng);
 }
 /// an oral disc a crown of tentacles grows round

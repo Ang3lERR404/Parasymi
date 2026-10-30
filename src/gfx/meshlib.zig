@@ -208,6 +208,10 @@ const parts=struct{
   pub const polyp=@import("meshes/polyp.zig");
   /// a look for the polyp, to compare beside it: one slender hydra, its long tentacles hanging
   pub const polypHydra=@import("meshes/polyp_hydra.zig");
+  /// a mixed look for the polyp: the colony crowned with the hydra's hanging tentacles
+  pub const polypHanging=@import("meshes/polyp.zig").hanging;
+  /// a mixed look for the polyp: a colony of slender hydras on the fleshy mound
+  pub const polypHydras=@import("meshes/polyp_hydra.zig").colony;
   /// the diamond a halo leaves, gathered in from its shards
   pub const haloDiamond=@import("meshes/halo.zig").diamond;
   // translucent, over everything
