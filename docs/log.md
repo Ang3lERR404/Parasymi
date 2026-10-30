@@ -22,8 +22,8 @@
 ___
 
 ## Future.
-  - [ ] Music for both day and night:
-    - [ ] Day: light piano plunks and the occassional hit of a drum with a nice, steady, rhythm.
+  - [x] Music for both day and night:
+    - [x] Day: light piano plunks and the occassional hit of a drum with a nice, steady, rhythm.
       - Mood: is supposed to convey the magical presence of the game that these plants have.
-    - [ ] Night: light symphonies and chimes.
+    - [x] Night: light symphonies and chimes.
       - Mood: is supposed to be a proper night indicator that brings the feel of "glistening magic" with "sweet otherworldly voices"

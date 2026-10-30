@@ -207,6 +207,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `footstep.zig` — a footstep: leaf litter rustled and crushed under a paw over a muffled pad.
 - `mixer.zig` — the source the device pulls from: every sound's voices mixed into one stream.
 - `music.zig` — the day's music playing: Lydian phrases of plunks over open chords and a slow pulse, fading with the light.
+- `night.zig` — the night's music: strings swelling through slow open chords, glass chimes glistening high over them, a far choir singing "oo".
+- `night_voices.zig` — the night's instruments: a glass chime struck high, bowed strings swelling under it, and a far choir singing "oo".
 - `sap.zig` — the sap settling, heard from inside the wolf (first person): a groan with gloops.
 - `score.zig` — the day's music on paper: pulse, a Lydian scale, open chords and how its voices are tuned.
 - `tests.zig` — the garden's sounds rendered offline and measured.

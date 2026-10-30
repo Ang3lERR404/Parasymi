@@ -21,6 +21,8 @@ const gapStill=lib.sound.sap.gapStill;
 const gapWalk=lib.sound.sap.gapWalk;
 /// the daytime piano
 const Music=lib.sound.music.Music;
+/// the night's strings, chimes and choir
+const Night=lib.sound.night.Night;
 /// the arsthraxia's working voice: whorl and choir
 const Research=lib.sound.arsthraxia.Research;
 /// how fast the settling fades in and out with the view (s)
@@ -88,6 +90,8 @@ pub const Sounds=struct{
   nextTwinkle:usize=0,
   /// the daytime piano, always running (silent by night)
   music:Music,
+  /// the night's music, always running (silent by day)
+  night:Night,
   /// the arsthraxia's working voice, while it works
   research:?Research=null,
   /// the boom, while it rings out
@@ -102,10 +106,12 @@ pub const Sounds=struct{
     var r:rng.Rng=.init(seed);
     const wind:Wind=.init(&r,rate);
     const music:Music=.init(&r,rate);
-    return.{.rate=rate,.r=r,.fade=.init(0,sapFade,rate),.wind=wind,.music=music};
+    const night:Night=.init(&r,rate);
+    return.{.rate=rate,.r=r,.fade=.init(0,sapFade,rate),.wind=wind,.music=music,.night=night};
   }
   /// what happened, heard: a step takes a voice, the eyes fade the
-  /// settling in or out, a twinkle takes a slot, daylight sets the music,
+  /// settling in or out, a twinkle takes a slot, daylight sets the day's
+  /// and the night's music,
   /// and the arsthraxia's work starts, follows or ends its voice and boom
   pub fn apply(s:*Sounds,cmd:Cmd)void{
     switch(cmd){
@@ -123,7 +129,10 @@ pub const Sounds=struct{
         s.twinkles[s.nextTwinkle]=.init(m.clamp01(t.near),&s.r,s.rate);
         s.nextTwinkle=(s.nextTwinkle+1)%twinkles;
       },
-      .daylight=>|d|s.music.daylight(d),
+      .daylight=>|d|{
+        s.music.daylight(d);
+        s.night.daylight(d);
+      },
       .arsthraxia=>|a|{
         s.resProgress=a.progress;
         s.resFed=a.fed;
@@ -152,6 +161,7 @@ pub const Sounds=struct{
     }
     s.wind.render(out);
     s.music.render(out);
+    s.night.render(out);
     for(out)|*x|x.*=dsp.softClip(x.*);
   }
   /// the sap settling now and then while in the eyes: counts the samples

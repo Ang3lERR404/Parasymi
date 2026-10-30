@@ -195,9 +195,10 @@ test"the wind is gentle, swells in gusts and whistles only in some"{
   try testing.expect(whistled>10 and whistled<400);
 }
 test"the music is silent at night and plays softly by day, on a steady pulse"{
-  // the sounds, with the wind hushed
+  // the sounds, with the wind and the night's music hushed
   var s:Sounds=.init(17,testRate);
   s.wind.level=0;
+  s.night.level=0;
   // a block of samples
   var buf:[480]f32=undefined;
   // ten seconds of night: nothing
@@ -254,4 +255,51 @@ test"a phrase's second half varies its first, and melody stays in range"{
   try testing.expectEqual(@as(u8,71),chordTone(72,.{.root=9,.minor=true}));
   // an open chord holds its seventh too (C sharp over Dmaj7)
   try testing.expectEqual(@as(u8,73),chordTone(73,.{.root=0,.seventh=11}));
+}
+test"the night's music is silent by day and plays softly by night: chords, chimes and the choir"{
+  // the sounds, with the wind and the day's music hushed
+  var s:Sounds=.init(23,testRate);
+  s.wind.level=0;
+  s.music.level=0;
+  // a block of samples
+  var buf:[480]f32=undefined;
+  // ten seconds of day: nothing
+  s.apply(.{.daylight=1});
+  for(0..1000)|_|{
+    @memset(&buf,0);
+    s.render(&buf);
+    for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+  }
+  try testing.expectEqual(@as(u32,0),s.night.bowed);
+  s.apply(.{.daylight=0});
+  // the loudest sample heard by night, and the sum of squares
+  var peak:f32=0;
+  var sum:f64=0;
+  // two minutes of night
+  const secs=120;
+  for(0..secs*100)|_|{
+    @memset(&buf,0);
+    s.render(&buf);
+    for(buf)|x|{
+      try testing.expect(x==x and @abs(x)<10);
+      peak=@max(peak,@abs(x));
+      sum+=x*x;
+    }
+  }
+  // how loud it is on the whole
+  const rms:f32=@floatCast(@sqrt(sum/(secs*testRate)));
+  try testing.expect(peak>0.02 and peak<0.35);
+  try testing.expect(rms>0.004 and rms<0.08);
+  // a chord a bar (4.8 s), chimes on many steps, the choir most other bars
+  try testing.expect(s.night.bowed>=24 and s.night.bowed<=26);
+  try testing.expect(s.night.struck>40);
+  try testing.expect(s.night.sang>=6);
+  // dawn: it fades out and rests
+  s.apply(.{.daylight=1});
+  for(0..4000)|_|{
+    @memset(&buf,0);
+    s.render(&buf);
+  }
+  try testing.expect(s.night.resting);
+  for(buf)|x|try testing.expectEqual(@as(f32,0),x);
 }

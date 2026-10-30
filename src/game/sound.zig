@@ -28,6 +28,11 @@
 //!   sevenths, the Lydian II, ninths left ringing), a soft low drum on some bars,
 //!   all with a dark echo three steps behind; it rises with the morning and
 //!   fades out at dusk.
+//! - by night, music: open chords swelling slowly on soft bowed strings,
+//!   glass chimes glistening two and three octaves over them (now and then
+//!   a glint of them run quickly down), a far choir singing "oo", scooping
+//!   up into a chord tone held two bars; it rises with the dusk and fades
+//!   out at dawn.
 //! - while the arsthraxia works, a spinning whorl hums under a choir that
 //!   swells with its progress; when it completes, a pop drops into a deep
 //!   thud and a fracturing shimmer rings out.
@@ -47,6 +52,10 @@ pub const score=@import("sound/score.zig");
 pub const voices=@import("sound/voices.zig");
 /// the daytime music played out, rising and fading with the light
 pub const music=@import("sound/music.zig");
+/// the night's instruments: glass chimes, bowed strings, a far choir
+pub const nightVoices=@import("sound/night_voices.zig");
+/// the night's music played out, rising with the dusk
+pub const night=@import("sound/night.zig");
 /// every sound's voices mixed into one stream for the device
 pub const mixer=@import("sound/mixer.zig");
 /// the arsthraxia's working: whorl and swelling choir
@@ -72,6 +81,8 @@ test{
   _=score;
   _=voices;
   _=music;
+  _=nightVoices;
+  _=night;
   _=mixer;
   _=arsthraxia;
   _=boom;
