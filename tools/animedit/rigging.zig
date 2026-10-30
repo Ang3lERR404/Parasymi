@@ -142,12 +142,27 @@ pub const Rig=struct{
   /// the wolf's facing: wolf space to the world
   heading:m.M4,
 };
+/// one thing a clip moves alone: a plant or a structure (never samples,
+/// which no clip keys)
+pub const Thing=union(enum){
+  /// a plant of a species
+  plant:@FieldType(specimen.Subject,"plant"),
+  /// a structure of a kind
+  structure:@FieldType(specimen.Subject,"structure"),
+  /// it as the game's lone subject
+  pub fn subject(t:Thing)specimen.Subject{
+    return switch(t){
+      .plant=>|sp|.{.plant=sp},
+      .structure=>|k|.{.structure=k},
+    };
+  }
+};
 /// who the clip moves: the wolf, or one plant or structure alone
 pub const Subject=union(enum){
   /// the vine-wolf, keyed through its joints and pose channels
   wolf,
   /// a plant or structure alone, keyed through its `Look`
-  thing:specimen.Subject,
+  thing:Thing,
   /// its word in the clip (`wolf`, `plant:<species>`, `structure:<kind>`)
   pub fn word(sj:Subject,buf:[]u8)[]const u8{
     return switch(sj){

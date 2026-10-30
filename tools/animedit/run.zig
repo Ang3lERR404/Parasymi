@@ -212,7 +212,7 @@ pub fn main(init:std.process.Init)!void{
   // the one thing alone in a fresh world, or none for the wolf
   var lone:?specimen.Specimen=switch(sj){
     .wolf=>null,
-    .thing=>|t|.{.what=t,.state=.{.look=.{}}},
+    .thing=>|t|.{.what=t.subject(),.state=.{.look=.{}}},
   };
   // the renderer, building only the meshes the subject needs
   const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(arena)else null,.io=io});
