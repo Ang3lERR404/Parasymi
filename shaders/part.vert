@@ -110,6 +110,15 @@ const float PLEXUS_DRIFT = 0.13;
 const float PLEXUS_SLOW = 0.12;
 const float PLEXUS_QUICK = 0.32;
 const float PLEXUS_POINT_R = 0.015;
+// each point is a pair of lights circling each other: how far apart they
+// are, how much of that the first (the larger) keeps to the middle's far
+// side (the smaller swings wider), how big the companion is beside it, how
+// fast they circle (rad/s, slowest and quickest)
+const float PLEXUS_PAIR = 0.04;
+const float PLEXUS_PAIR_LEAN = 0.4;
+const float PLEXUS_COMPANION = 0.7;
+const float PLEXUS_PAIR_SLOW = 0.6;
+const float PLEXUS_PAIR_QUICK = 1.4;
 const float PLEXUS_LINE_W = 0.007;
 const float PLEXUS_PANE = 0.005;
 const float PLEXUS_SOFT = 0.8;
@@ -293,8 +302,16 @@ void main() {
     vec3 H = plexusAt(float(PLEXUS_HEART), t);
     vec3 lp;
     if (plexKind < 0.5) {
-      // a point: a ball of light round where it has drifted to
-      lp = A + nrm * PLEXUS_POINT_R;
+      // a point: a pair of lights (pos.y 1 the first, -1 its companion,
+      // the smaller) circling each other round where it has drifted to,
+      // each pair about an axis and at a pace of its own
+      vec3 h = hash33(vec3(ids.x, 41.7, 13.3));
+      vec3 axis = normalize(h - 0.5 + vec3(0.0, 0.6, 0.0));
+      vec3 side = normalize(cross(axis, abs(axis.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+      float spin = t * mix(PLEXUS_PAIR_SLOW, PLEXUS_PAIR_QUICK, h.z) + h.x * TAU;
+      vec3 orbit = side * cos(spin) + cross(axis, side) * sin(spin);
+      float first = step(0.0, pos.y);
+      lp = A + orbit * PLEXUS_PAIR * pos.y * mix(1.0 - PLEXUS_PAIR_LEAN, PLEXUS_PAIR_LEAN, first) + nrm * PLEXUS_POINT_R * mix(PLEXUS_COMPANION, 1.0, first);
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * nrm;
     } else if (plexKind < 1.5) {

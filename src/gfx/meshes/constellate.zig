@@ -13,6 +13,7 @@
 //! every vertex here carries only what it belongs to: colour r, g, b the
 //! ids of its points (one for a point, two for a line, three for a pane),
 //! alpha what it is (`Kind`); pos.x the cluster's reach; and for a point
+//! which of its pair of lights (pos.y) and
 //! its direction out from its middle (the normal), for a line how far along
 //! it and which side (tu), for a pane its corner's weights (tu) and which
 //! face (pos.y). Every line and pane that could ever form is built,
@@ -70,19 +71,21 @@ fn put(b:*mg.Builder,v:Vert)Allocator.Error!void{
 fn cluster(b:*mg.Builder,reach:f32)Allocator.Error!void{
   // the reach every vertex carries
   const at=v3(reach,0,0);
-  // each point: a ball, its vertices keeping only their direction out
-  for(0..count)|i|{
+  // each point: a pair of lights circling each other, two balls, their
+  // vertices keeping only their direction out and which of the pair
+  // (pos.y: 1 the first, -1 its companion)
+  for(0..count)|i|for([_]f32{1,-1})|twin|{
     // where its vertices begin, and its id
     const s=b.mark();
     const id:u8=@intCast(i);
     try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(1,1,1),.col=color.Rgba8.of(.{0,0,0,0}),.part=.plexus,.rings=6,.segs=8});
     for(b.v.items[s..])|*v|{
       v.nrm=m.norm(v.pos);
-      v.pos=at;
+      v.pos=v3(reach,twin,0);
       v.col=color.Rgba8.of(.{id,id,id,@intFromEnum(Kind.point)});
       v.tu=.{0,0};
     }
-  }
+  };
   // each line: a ribbon cut along its length, turned to the eye on the GPU
   for(0..count)|i|for(i+1..count)|j|{
     // its two points
