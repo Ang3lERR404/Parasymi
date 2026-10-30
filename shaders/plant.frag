@@ -170,9 +170,12 @@ void surface() {
   bool green = aff > 0.5 && part == PART_LEAF;
   if (green) body = v_col;
   body = mix(DEAD_BROWN, body, health);
+  // leaves and petals are matte living tissue: sap shows through them, but
+  // nothing wet sits on them (no glisten, no beads, no glinting bubbles)
+  bool matte = PART_IN(SHEETS, part);
   // how strongly it glistens (below): only thin, living growth does, so the
   // points of light are mirrored only there
-  float glisten = thin * (0.35 + 0.65 * fill) * health * SKIN_GLISTEN;
+  float glisten = matte ? 0.0 : thin * (0.35 + 0.65 * fill) * health * SKIN_GLISTEN;
   PointLit pl = pointLights(v_pos, n, reflect(-V, n), glisten > 0.0);
   vec3 c = shadeLitWith(body, n, sh, pl.plain);
 
@@ -197,9 +200,11 @@ void surface() {
   c += sap * lit * moving * 0.3 * show;
   // sap is alive: bubbles drifting up inside thin growth, beads of it
   // sliding down the skin of a full plant
-  c += mix(sap, vec3(1.0), 0.3) * sapBubbles(v_obj, V, pc.eye_time.w) * show * lit * 0.4;
-  vec2 drop = sapDroplets(v_obj * 0.8, n, SUN, V, pc.eye_time.w) * (0.25 + 0.75 * fill) * health;
-  c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + keyLight() * drop.y * sh * 0.8;
+  if (!matte) {
+    c += mix(sap, vec3(1.0), 0.3) * sapBubbles(v_obj, V, pc.eye_time.w) * show * lit * 0.4;
+    vec2 drop = sapDroplets(v_obj * 0.8, n, SUN, V, pc.eye_time.w) * (0.25 + 0.75 * fill) * health;
+    c = mix(c, c * 0.85 + sap * 0.3 * lit, drop.x * 0.6) + keyLight() * drop.y * sh * 0.8;
+  }
   // thin sap-filled growth is wet: it glistens, as bare sap does, a little
   // less under its skin
   if (glisten > 0.0) c += sapGlistenWith(n, V, v_pos, v_obj, sap, thin * show, sh, pl.mirrored) * glisten;

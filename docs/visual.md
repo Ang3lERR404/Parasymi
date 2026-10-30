@@ -251,7 +251,9 @@ This is what plays while a polyp's halo forms
 
 ## Sap
 Sap everywhere is alive. Bubbles rise inside; beads slide down its surface
-(`sapBubbles`/`sapDroplets`, in mesh space).
+(`sapBubbles`/`sapDroplets`, in mesh space). A plant's leaves and petals
+are matte: sap lights them from inside, but no bubbles, beads or glisten
+sit on them (plant.frag).
 
 Sap glistens; it never glows softly (`sapGlisten`, common.glsl, on every
 sap material):
