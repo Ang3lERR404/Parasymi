@@ -35,7 +35,7 @@ const seed:u64=0xC0457E11A7E;
 /// the blue everything is drawn in (part.frag lightens it as a beat passes)
 const blue=color.rgb(0.25,0.55,1.0).toRgba8(255);
 /// how big a point of light is
-const pointR:f32=0.03;
+const pointR:f32=0.015;
 /// how thick a pane is
 const paneThick:f32=0.01;
 /// how thick a line is at its middle
