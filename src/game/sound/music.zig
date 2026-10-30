@@ -1,4 +1,4 @@
-//! the day's music playing: Lydian phrases of plunks over open chords and a slow pulse, fading with the light.
+//! the day's music playing: Lydian phrases of a full piano over open chords, driven by taiko, timpani rolls and cymbal swells, fading with the light.
 /// the hub every game module is reached through
 const lib=@import("../../lib.zig");
 /// the generic engine package
@@ -17,16 +17,6 @@ const bars=lib.sound.score.bars;
 const breathe=lib.sound.score.breathe;
 /// a chord: its root and whether it is minor
 const Chord=lib.sound.score.Chord;
-/// how many drums may sound at once
-const drums=lib.sound.score.drums;
-/// how often the drum falls on a bar's first step
-const drumChance=lib.sound.score.drumChance;
-/// one soft low drum hit
-const Drum=lib.sound.voices.Drum;
-/// the echo's level
-const echo=lib.sound.score.echo;
-/// the dark echo three steps behind
-const Echo=lib.sound.voices.Echo;
 /// how often the left hand's fifth sounds on the third beat
 const fifthChance=lib.sound.score.fifthChance;
 /// how often the left hand's ninth rings there instead
@@ -67,14 +57,18 @@ const plunks=lib.sound.score.plunks;
 const progressions=lib.sound.score.progressions;
 /// one struck piano note
 const Plunk=lib.sound.voices.Plunk;
+/// a taiko struck
+const Taiko=lib.sound.drums.Taiko;
+/// a timpani stroke
+const Timpani=lib.sound.drums.Timpani;
+/// a cymbal, swelling or crashing
+const Cymbal=lib.sound.drums.Cymbal;
+/// the day's score: the drums' pattern and voices
+const score=lib.sound.score;
 /// quieter than this, the music has faded out
 const silent=lib.sound.silent;
 /// how long one step lasts (s)
 const stepS=lib.sound.score.stepS;
-/// how often a light tap falls on the third beat
-const tapChance=lib.sound.score.tapChance;
-/// how loud that tap is
-const tapVel=lib.sound.score.tapVel;
 /// the note nearest a given one that is in a chord
 const chordTone=lib.sound.score.chordTone;
 /// a MIDI note of the scale, steps above the key
@@ -83,8 +77,10 @@ const scaleNote=lib.sound.score.scaleNote;
 const vary=lib.sound.footstep.vary;
 /// samples the music renders at a time between its steps
 const chunkFrames=256;
-/// the day's music: light piano plunks over a slow steady pulse, a soft
-/// drum now and then, fading in with the morning and out at dusk
+/// the day's music: a full piano over open chords, driven by great taiko
+/// on a steady pulse, timpani rolled up into each phrase and a cymbal
+/// swelling to crash on its first step; fading in with the morning and
+/// out at dusk
 pub const Music=struct{
   /// samples per second
   rate:f32,
@@ -92,14 +88,22 @@ pub const Music=struct{
   r:rng.Rng,
   /// the plunks ringing; null is free
   plunks:[plunks]?Plunk=@splat(null),
-  /// the drums sounding; null is free
-  drums:[drums]?Drum=@splat(null),
+  /// the taiko sounding; null is free
+  taikos:[score.taikos]?Taiko=@splat(null),
+  /// the timpani strokes sounding; null is free
+  timps:[score.timps]?Timpani=@splat(null),
+  /// the cymbals sounding; null is free
+  cymbals:[score.cymbals]?Cymbal=@splat(null),
   /// the plunk taken when none is free (round the pool: the oldest)
   nextPlunk:usize=0,
-  /// the drum slot the next hit takes
-  nextDrum:usize=0,
-  /// the echo every note feeds
-  echo:Echo,
+  /// the taiko slot the next hit takes
+  nextTaiko:usize=0,
+  /// the timpani slot the next stroke takes
+  nextTimp:usize=0,
+  /// the cymbal slot the next takes
+  nextCymbal:usize=0,
+  /// this phrase is calm: the deep taiko and one stroke a bar only
+  calm:bool=false,
   /// the music's level, gliding after the daylight
   fade:dsp.Smooth,
   /// the step about to play, and samples until it does
@@ -120,8 +124,12 @@ pub const Music=struct{
   resting:bool=true,
   /// notes and drums struck (tests count them)
   struck:u32=0,
-  /// drums struck so far
+  /// taiko struck so far
   drummed:u32=0,
+  /// timpani strokes so far
+  rolled:u32=0,
+  /// cymbals crashed so far
+  crashed:u32=0,
   /// the music's loudness (tests hush it)
   level:f32=music,
   /// fresh music, silent until day, drawing its own random numbers from `r`
@@ -129,7 +137,6 @@ pub const Music=struct{
     return.{
       .rate=rate,
       .r=.init(r.next()),
-      .echo=.init(rate),
       .fade=.init(0,musicGlide,rate),
       .stepLen=m.floorTo(u32,stepS*rate),
     };
@@ -156,12 +163,13 @@ pub const Music=struct{
       off+=n;
     }
   }
-  /// the night's rest: every voice and the echo cleared, the next day
-  /// starting a phrase from its first step
+  /// the night's rest: every voice cleared, the next day starting a
+  /// phrase from its first step
   pub fn rest(mu:*Music)void{
     mu.plunks=@splat(null);
-    mu.drums=@splat(null);
-    mu.echo=.init(mu.rate);
+    mu.taikos=@splat(null);
+    mu.timps=@splat(null);
+    mu.cymbals=@splat(null);
     mu.step=0;
     mu.left=0;
     mu.resting=true;
@@ -181,17 +189,23 @@ pub const Music=struct{
       for(&mu.plunks)|*v|if(v.*)|*p|{
         if(!p.render(part))v.*=null;
       };
-      for(&mu.drums)|*v|if(v.*)|*d|{
+      for(&mu.taikos)|*v|if(v.*)|*d|{
+        if(!d.render(part))v.*=null;
+      };
+      for(&mu.timps)|*v|if(v.*)|*d|{
+        if(!d.render(part))v.*=null;
+      };
+      for(&mu.cymbals)|*v|if(v.*)|*d|{
         if(!d.render(part))v.*=null;
       };
       mu.left-=n;
       i+=n;
     }
-    for(buf)|*s|s.*=(s.*+echo*mu.echo.tick(s.*))*mu.level*mu.fade.next();
+    for(buf)|*s|s.*=mu.level*mu.fade.next()*s.*;
   }
   /// strikes the step about to play: the melody's note (on a bar's first
-  /// step, the nearest chord tone), the left hand's root and fifth, and
-  /// now and then a drum; a phrase's first step writes a new phrase
+  /// step, the nearest chord tone), the left hand's root, its octave and
+  /// fifth, and the drums; a phrase's first step writes a new phrase
   pub fn strikeStep(mu:*Music)void{
     if(mu.step==0)mu.phrase();
     // which bar this is, the step within it, and the bar's chord
@@ -209,19 +223,22 @@ pub const Music=struct{
     }
     // the left hand's root, dropped an octave if high
     const low=lowLevel+c.root-(if(c.root>lowFold)@as(u8,12)else 0);
-    if(s==0)mu.plunk(low,vary(&mu.r,lowVel));
+    if(s==0){
+      mu.plunk(low,vary(&mu.r,lowVel));
+      mu.plunk(low+12,vary(&mu.r,lowVel*0.6));
+    }
     if(s==barSlots/2){
       // the left hand's second note: the ninth, left open, or the fifth
       const second=mu.r.float();
       if(second<ninthChance)mu.plunk(low+14,vary(&mu.r,lowVel*0.7))
       else if(second<ninthChance+fifthChance*(1-ninthChance))mu.plunk(low+7,vary(&mu.r,lowVel*0.8));
     }
-    if(s==0 and mu.r.float()<drumChance)mu.drum(1);
-    if(s==barSlots/2 and mu.r.float()<tapChance)mu.drum(tapVel);
+    mu.drumStep(s);
     mu.step=(mu.step+1)%phraseSteps;
   }
   /// a new phrase: maybe new chords, a new motif or a variation of the last
   pub fn phrase(mu:*Music)void{
+    mu.calm=mu.r.float()<score.calmChance;
     if(mu.r.float()<newChords)mu.chords=progressions[mu.r.below(progressions.len)];
     if(mu.fresh or mu.r.float()<newMotifChance){
       mu.motif=mu.newMotif();
@@ -276,11 +293,48 @@ pub const Music=struct{
     mu.plunks[mu.freePlunk()]=.init(note,vel,&mu.r,mu.rate);
     mu.struck+=1;
   }
-  /// strikes the drum at velocity `vel`, taking the next drum slot
-  pub fn drum(mu:*Music,vel:f32)void{
-    mu.drums[mu.nextDrum]=.init(vel,&mu.r,mu.rate);
-    mu.nextDrum=(mu.nextDrum+1)%drums;
+  /// the drums on step `s` of its bar: the deep taiko on a bar's first,
+  /// the taiko on their beats, the small ones now and then (only the deep
+  /// one and the seventh step's stroke in a calm phrase); at a phrase's
+  /// end the cymbal swells (crashing on the next one's first step) and the
+  /// timpani roll up into it, landing on the low kettle
+  pub fn drumStep(mu:*Music,s:u32)void{
+    if(s==0)mu.taiko(score.boomHz,score.boomRing,1);
+    // how hard the taiko and the small taiko strike here (0: not at all)
+    const big=score.taikoBeat[s];
+    const small=score.smallBeat[s];
+    if(big>0 and (!mu.calm or s==6))mu.taiko(score.taikoHz,score.taikoRing,vary(&mu.r,big));
+    if(small>0 and !mu.calm and mu.r.float()<score.smallChance)mu.taiko(score.smallHz,score.smallRing,vary(&mu.r,small));
+    if(mu.step==0 and mu.rolled>0)mu.timp(score.kettles[0],1,0);
+    if(mu.step==phraseSteps-score.swellSteps)mu.crash(m.floorTo(u32,m.f(score.swellSteps)*m.f(mu.stepLen)));
+    if(mu.step>=score.rollFrom){
+      // how far through the roll this step is, 0..1, and its kettle
+      const into=m.f(mu.step-score.rollFrom)/m.f(phraseSteps-score.rollFrom);
+      const kettle=score.kettles[if(mu.step%2==0)0 else 1];
+      for(0..score.rollPerStep)|k|{
+        // this stroke's place in the roll, and how loud it is
+        const at=into+m.f(k)/m.f(score.rollPerStep*(phraseSteps-score.rollFrom));
+        mu.timp(kettle,m.lerp(score.rollVel[0],score.rollVel[1],at*at),@intCast(k*mu.stepLen/score.rollPerStep));
+      }
+    }
+  }
+  /// strikes a taiko pitched at `hz`, ringing `ring` seconds, at velocity `vel`
+  pub fn taiko(mu:*Music,hz:f32,ring:f32,vel:f32)void{
+    mu.taikos[mu.nextTaiko]=.init(hz,ring,vel,&mu.r,mu.rate);
+    mu.nextTaiko=(mu.nextTaiko+1)%score.taikos;
     mu.drummed+=1;
+  }
+  /// strikes a timpani kettle (MIDI `note`) at velocity `vel` after `wait` samples
+  pub fn timp(mu:*Music,note:u8,vel:f32,wait:u32)void{
+    mu.timps[mu.nextTimp]=.init(note,vel,wait,&mu.r,mu.rate);
+    mu.nextTimp=(mu.nextTimp+1)%score.timps;
+    mu.rolled+=1;
+  }
+  /// a cymbal swelling for `swell` samples to its crash (0: a crash now)
+  pub fn crash(mu:*Music,swell:u32)void{
+    mu.cymbals[mu.nextCymbal]=.init(score.crashVel,swell,&mu.r,mu.rate);
+    mu.nextCymbal=(mu.nextCymbal+1)%score.cymbals;
+    mu.crashed+=1;
   }
   /// a plunk to play on: the first free one, or else the next in turn
   /// round the pool (the oldest)

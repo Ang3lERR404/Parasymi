@@ -21,18 +21,20 @@
 //!   glassy pings in quick succession (high bell partials, a little
 //!   out of tune with each other), dying away in a soft shimmer; the
 //!   nearer the mote, the louder.
-//! - by day, music: light piano plunks (felt-hammered strings, a little
-//!   stretched and beating) on a steady eighth-note pulse, a wandering
+//! - by day, music: a full piano (felt-hammered strings, a little
+//!   stretched and beating, low and long-ringing) on a steady eighth-note
+//!   pulse driven by great taiko, timpani rolled up into each phrase and a
+//!   cymbal swelling to crash on its first step; a wandering
 //!   Lydian line (its raised fourth the sound of wonder) over a soft left
 //!   hand, phrased as a motif and its variation over open chords (major
-//!   sevenths, the Lydian II, ninths left ringing), a soft low drum on some bars,
-//!   all with a dark echo three steps behind; it rises with the morning and
-//!   fades out at dusk.
-//! - by night, music: open chords swelling slowly on soft bowed strings,
-//!   glass chimes glistening two and three octaves over them (now and then
-//!   a glint of them run quickly down), a far choir singing "oo", scooping
-//!   up into a chord tone held two bars; it rises with the dusk and fades
-//!   out at dawn.
+//!   sevenths, the Lydian II, ninths left ringing); it rises with the
+//!   morning and fades out at dusk.
+//! - by night, music: a choir of sopranos, altos, tenors and basses, eight
+//!   voices each, singing "ahh" through slow open chords, each section
+//!   gliding to its nearest note of the next and swelling through each
+//!   phrase, strings bowing the chords under it; it rises with the dusk and
+//!   fades out at dawn.
+//! - both musics ring in a great stone hall.
 //! - while the arsthraxia works, a spinning whorl hums under a choir that
 //!   swells with its progress; when it completes, a pop drops into a deep
 //!   thud and a fracturing shimmer rings out.
@@ -52,8 +54,12 @@ pub const score=@import("sound/score.zig");
 pub const voices=@import("sound/voices.zig");
 /// the daytime music played out, rising and fading with the light
 pub const music=@import("sound/music.zig");
-/// the night's instruments: glass chimes, bowed strings, a far choir
+/// the night's strings: a soft ensemble bowing each note
 pub const nightVoices=@import("sound/night_voices.zig");
+/// the night's choir: four sections singing "ahh"
+pub const choir=@import("sound/choir.zig");
+/// the day's drums: taiko, timpani, cymbal
+pub const drums=@import("sound/drums.zig");
 /// the night's music played out, rising with the dusk
 pub const night=@import("sound/night.zig");
 /// every sound's voices mixed into one stream for the device
@@ -82,6 +88,8 @@ test{
   _=voices;
   _=music;
   _=nightVoices;
+  _=choir;
+  _=drums;
   _=night;
   _=mixer;
   _=arsthraxia;

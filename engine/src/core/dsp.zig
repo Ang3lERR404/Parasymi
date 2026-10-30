@@ -1,6 +1,6 @@
 //! audio DSP building blocks, one sample at a time: oscillators, noise,
 //! crackle, filters (one-pole, biquad), an ADSR envelope, a parameter
-//! smoother and a delay line, plus level and pitch conversions. Pure maths at a sample
+//! smoother, a delay line and a hall reverb, plus level and pitch conversions. Pure maths at a sample
 //! `rate` (Hz) each unit keeps; nothing here touches a device, so a sound is
 //! built by chaining units (`Voice` shows how) and the platform's output
 //! pulls blocks of samples from it.
@@ -392,6 +392,109 @@ pub const Delay=struct{
     return y;
   }
 };
+// ---- a hall ----
+/// the hall's lines (samples at 48 kHz, scaled to the rate): spread apart
+/// and sharing no factor, so their echoes never pile up into one ringing
+/// pitch (this one: the eight feedback lines)
+const hallLines=[8]usize{1931,2213,2591,2953,3361,3797,4159,4733};
+/// the four diffusers smearing what comes in before the lines hear it
+const hallDiffusers=[4]usize{142,107,379,277};
+/// how much each diffuser feeds round itself
+const hallDiffuse:f32=0.62;
+/// the longest pre-delay a hall holds (samples at 48 kHz)
+const hallPreMax=4800;
+/// the rate the line lengths are written for
+const hallRef:f32=48000;
+/// the most a rate may stretch the lines (their rings are sized for it)
+const hallStretch=2;
+/// a large stone hall: what goes in comes back as a long, dense, darkening
+/// tail (an eight-line feedback delay network, its lines mixed through a
+/// Hadamard matrix every sample, each line darkened as it feeds back, after
+/// a pre-delay and four diffusing all-passes). Its rings are fixed arrays:
+/// no allocation, about 270 KB.
+pub const Hall=struct{
+  /// the eight lines' rings
+  lines:[8][hallLines[7]*hallStretch+1]f32=@splat(@splat(0)),
+  /// each line's length (samples)
+  len:[8]usize,
+  /// where each line writes next
+  at:[8]usize=@splat(0),
+  /// how much of each line's sound is kept round one trip (its decay)
+  keep:[8]f32,
+  /// each line's darkening as it feeds back
+  damp:[8]OnePole,
+  /// the diffusers' rings
+  diff:[4][hallDiffusers[2]*hallStretch+1]f32=@splat(@splat(0)),
+  /// each diffuser's length (samples)
+  dlen:[4]usize,
+  /// where each diffuser writes next
+  dat:[4]usize=@splat(0),
+  /// the pre-delay's ring
+  pre:[hallPreMax*hallStretch+1]f32=@splat(0),
+  /// the pre-delay's length (samples)
+  preLen:usize,
+  /// where the pre-delay writes next
+  preAt:usize=0,
+  /// a hall ringing about `rt60` seconds (to -60 dB), after `preS` seconds
+  /// of pre-delay, its tail darkened above `dampHz`, at `rate` samples a
+  /// second (at most twice 48 kHz)
+  pub fn init(rt60:f32,preS:f32,dampHz:f32,rate:f32)Hall{
+    // how much the rate stretches the lengths
+    const k=m.clamp(rate/hallRef,0.25,hallStretch);
+    // the hall, its lengths and decays filled in below
+    var h:Hall=.{.len=undefined,.keep=undefined,.damp=undefined,.dlen=undefined,.preLen=m.clamp(m.floorTo(usize,preS*rate),1,hallPreMax*hallStretch)};
+    for(0..8)|i|{
+      h.len[i]=@max(m.floorTo(usize,m.f(hallLines[i])*k),1);
+      // -60 dB over rt60 seconds, taken a trip of this line at a time
+      h.keep[i]=m.pow(f32,10,-3*m.f(h.len[i])/(@max(rt60,0.1)*rate));
+      h.damp[i]=.init(dampHz,rate);
+    }
+    for(0..4)|i|h.dlen[i]=@max(m.floorTo(usize,m.f(hallDiffusers[i])*k),1);
+    return h;
+  }
+  /// what the hall sends back for `x` this sample (the wet sound alone)
+  pub fn tick(h:*Hall,x:f32)f32{
+    // the pre-delayed input
+    const back=(h.preAt+h.pre.len-h.preLen)%h.pre.len;
+    var y=h.pre[back];
+    h.pre[h.preAt]=x;
+    h.preAt=(h.preAt+1)%h.pre.len;
+    // smeared through the diffusers (Schroeder all-passes)
+    inline for(0..4)|i|{
+      // what the diffuser heard its length ago
+      const d=h.diff[i][(h.dat[i]+h.diff[i].len-h.dlen[i])%h.diff[i].len];
+      const v=y+hallDiffuse*d;
+      h.diff[i][h.dat[i]]=v;
+      h.dat[i]=(h.dat[i]+1)%h.diff[i].len;
+      y=d-hallDiffuse*v;
+    }
+    // each line's output, read its length ago
+    var o:[8]f32=undefined;
+    inline for(0..8)|i|o[i]=h.lines[i][(h.at[i]+h.lines[i].len-h.len[i])%h.lines[i].len];
+    // the lines mixed through an 8x8 Hadamard (fast Walsh-Hadamard, kept
+    // to unit gain), so each feeds every other
+    var w=o;
+    inline for(.{1,2,4})|span|{
+      inline for(0..8)|i|if(i&span==0){
+        // the pair this butterfly mixes
+        const a=w[i];
+        const b=w[i+span];
+        w[i]=a+b;
+        w[i+span]=a-b;
+      };
+    }
+    // the Hadamard's scale: one over the square root of eight
+    const norm:f32=0.35355339;
+    // what is heard: the lines summed, alternately signed
+    var out:f32=0;
+    inline for(0..8)|i|{
+      out+=if(i%2==0)o[i]else-o[i];
+      h.lines[i][h.at[i]]=h.damp[i].low(w[i]*norm*h.keep[i])+y*0.5;
+      h.at[i]=(h.at[i]+1)%h.lines[i].len;
+    }
+    return out*0.35;
+  }
+};
 // ---- a voice ----
 /// one playable note, showing how the units chain: oscillator → low-pass →
 /// envelope → gain. A game's sounds are built the same way.
@@ -612,4 +715,25 @@ test"a voice sounds while held and falls silent after release"{
     v.render(&buf);
   }
   try testing.expectEqual(Adsr.Stage.idle,v.env.stage);
+}
+test"a hall answers an impulse late, keeps ringing for seconds, darkens and dies away"{
+  // a hall ringing three seconds after 20 ms
+  var h=Hall.init(3,0.02,5000,48000);
+  // its answer to one click, block by block of a tenth of a second
+  var first:?usize=null;
+  var energy:[60]f32=@splat(0);
+  for(0..48000*6)|i|{
+    // the hall's answer this sample
+    const y=h.tick(if(i==0)1 else 0);
+    try testing.expect(y==y and @abs(y)<4);
+    if(first==null and @abs(y)>1e-6)first=i;
+    energy[i/4800]+=y*y;
+  }
+  // nothing before the pre-delay
+  try testing.expect(first.?>=960);
+  // still heard a second and a half on, about 30 dB down by three seconds,
+  // and gone by six
+  try testing.expect(energy[15]>1e-7);
+  try testing.expect(energy[30]<energy[2]*0.01);
+  try testing.expect(energy[59]<energy[2]*1e-4);
 }

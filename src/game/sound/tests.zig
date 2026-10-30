@@ -224,9 +224,12 @@ test"the music is silent at night and plays softly by day, on a steady pulse"{
   // how many steps of the pulse passed
   const steps=m.f(secs)/stepS;
   try testing.expect(m.f(s.music.struck)>0.5*steps and m.f(s.music.struck)<1.5*steps);
-  // how many bars passed
+  // how many bars passed: the deep taiko on each, more besides in most,
+  // a roll and a cymbal every phrase after the first
   const bars=steps/barSlots;
-  try testing.expect(m.f(s.music.drummed)>0.25*bars and m.f(s.music.drummed)<0.8*bars);
+  try testing.expect(m.f(s.music.drummed)>1.5*bars and m.f(s.music.drummed)<5*bars);
+  try testing.expect(m.f(s.music.crashed)>0.2*bars and m.f(s.music.crashed)<0.3*bars);
+  try testing.expect(s.music.rolled>s.music.crashed*12);
   // dusk: it fades out and rests
   s.apply(.{.daylight=0});
   for(0..3000)|_|{
@@ -234,7 +237,8 @@ test"the music is silent at night and plays softly by day, on a steady pulse"{
     s.render(&buf);
   }
   try testing.expect(s.music.resting);
-  for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+  // (only the hall's last whisper is left)
+  for(buf)|x|try testing.expect(@abs(x)<1e-6);
 }
 test"a phrase's second half varies its first, and melody stays in range"{
   // the random numbers, and the music under test
@@ -256,7 +260,7 @@ test"a phrase's second half varies its first, and melody stays in range"{
   // an open chord holds its seventh too (C sharp over Dmaj7)
   try testing.expectEqual(@as(u8,73),chordTone(73,.{.root=0,.seventh=11}));
 }
-test"the night's music is silent by day and plays softly by night: chords, chimes and the choir"{
+test"the night's music is silent by day and plays softly by night: the choir and the strings"{
   // the sounds, with the wind and the day's music hushed
   var s:Sounds=.init(23,testRate);
   s.wind.level=0;
@@ -290,10 +294,9 @@ test"the night's music is silent by day and plays softly by night: chords, chime
   const rms:f32=@floatCast(@sqrt(sum/(secs*testRate)));
   try testing.expect(peak>0.02 and peak<0.35);
   try testing.expect(rms>0.004 and rms<0.08);
-  // a chord a bar (4.8 s), chimes on many steps, the choir most other bars
-  try testing.expect(s.night.bowed>=24 and s.night.bowed<=26);
-  try testing.expect(s.night.struck>40);
-  try testing.expect(s.night.sang>=6);
+  // a chord a bar (5.2 s), the choir singing most of them
+  try testing.expect(s.night.bowed>=23 and s.night.bowed<=24);
+  try testing.expect(s.night.sang>=12);
   // dawn: it fades out and rests
   s.apply(.{.daylight=1});
   for(0..4000)|_|{
@@ -301,5 +304,6 @@ test"the night's music is silent by day and plays softly by night: chords, chime
     s.render(&buf);
   }
   try testing.expect(s.night.resting);
-  for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+  // (only the hall's last whisper is left)
+  for(buf)|x|try testing.expect(@abs(x)<1e-6);
 }

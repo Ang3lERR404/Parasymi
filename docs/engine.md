@@ -21,7 +21,8 @@ adds on top.
 ### core
 - Engine: math, color, rng, noise, registry, jobs, text, png, and `dsp`
   (audio building blocks, no device): `Osc`, `Noise`, `Crackle`,
-  `OnePole`, `Biquad`, `Smooth`, `Adsr`, `Delay`, `Voice`.
+  `OnePole`, `Biquad`, `Smooth`, `Adsr`, `Delay`, `Hall` (a large stone
+  hall reverb, fixed rings, no allocation), `Voice`.
 - Game: nothing.
 
 ### platform

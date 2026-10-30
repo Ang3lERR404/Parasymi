@@ -204,16 +204,18 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/game/sound/
 - `arsthraxia.zig` — the arsthraxia's working: a spinning whorl under a swelling choir.
 - `boom.zig` — the arsthraxia's completion: a pop into a deep thud and a fracturing shimmer.
+- `choir.zig` — the night's choir: sopranos, altos, tenors and basses, eight voices each, singing "ahh" through slow chords.
+- `drums.zig` — the day's drums, played big: taiko struck with heavy sticks, tuned timpani rolled into the phrase, a cymbal swelling to a crash.
 - `footstep.zig` — a footstep: leaf litter rustled and crushed under a paw over a muffled pad.
 - `mixer.zig` — the source the device pulls from: every sound's voices mixed into one stream.
-- `music.zig` — the day's music playing: Lydian phrases of plunks over open chords and a slow pulse, fading with the light.
-- `night.zig` — the night's music: strings swelling through slow open chords, glass chimes glistening high over them, a far choir singing "oo".
-- `night_voices.zig` — the night's instruments: a glass chime struck high, bowed strings swelling under it, and a far choir singing "oo".
+- `music.zig` — the day's music playing: Lydian phrases of a full piano over open chords, driven by taiko, timpani rolls and cymbal swells, fading with the…
+- `night.zig` — the night's music: a choir of four sections singing "ahh" through slow open chords, strings swelling under it.
+- `night_voices.zig` — the night's strings: a soft ensemble bowing each note of a chord, swelling in and dying away.
 - `sap.zig` — the sap settling, heard from inside the wolf (first person): a groan with gloops.
-- `score.zig` — the day's music on paper: pulse, a Lydian scale, open chords and how its voices are tuned.
+- `score.zig` — the day's music on paper: pulse, a Lydian scale, open chords, the drums' pattern and how its voices are tuned.
 - `tests.zig` — the garden's sounds rendered offline and measured.
 - `twinkle.zig` — a mote of starlight twinkling: a few glassy pings dying in a shimmer.
-- `voices.zig` — the music's instruments: the piano plunk, the soft drum and the dark echo.
+- `voices.zig` — the day's piano: a felt-hammered string struck and ringing.
 - `wind.zig` — the wind over the garden: a hush in slow gusts, whistling in the strong ones.
 
 ## src/game/

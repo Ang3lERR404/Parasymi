@@ -43,6 +43,16 @@ const Twinkle=lib.sound.twinkle.Twinkle;
 const voiceCount=lib.sound.voiceCount;
 /// the wind over the garden
 const Wind=lib.sound.wind.Wind;
+/// how long the hall rings (s, to -60 dB)
+const hallRt60:f32=4.2;
+/// how long before it answers (s): a large space
+const hallPre:f32=0.035;
+/// what darkens its tail (Hz): stone, not glass
+const hallDamp:f32=4500;
+/// how much of the hall is heard against the music itself
+const hallWet:f32=0.6;
+/// samples the music is rendered at a time before the hall
+const hallBlock=256;
 /// a span of seconds drawn as samples
 const samples=lib.sound.sap.samples;
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
@@ -92,6 +102,8 @@ pub const Sounds=struct{
   music:Music,
   /// the night's music, always running (silent by day)
   night:Night,
+  /// the great hall both musics ring in
+  hall:dsp.Hall,
   /// the arsthraxia's working voice, while it works
   research:?Research=null,
   /// the boom, while it rings out
@@ -107,7 +119,7 @@ pub const Sounds=struct{
     const wind:Wind=.init(&r,rate);
     const music:Music=.init(&r,rate);
     const night:Night=.init(&r,rate);
-    return.{.rate=rate,.r=r,.fade=.init(0,sapFade,rate),.wind=wind,.music=music,.night=night};
+    return.{.rate=rate,.r=r,.fade=.init(0,sapFade,rate),.wind=wind,.music=music,.night=night,.hall=.init(hallRt60,hallPre,hallDamp,rate)};
   }
   /// what happened, heard: a step takes a voice, the eyes fade the
   /// settling in or out, a twinkle takes a slot, daylight sets the day's
@@ -160,8 +172,7 @@ pub const Sounds=struct{
       if(!bm.render(out))s.boom=null;
     }
     s.wind.render(out);
-    s.music.render(out);
-    s.night.render(out);
+    s.musics(out);
     for(out)|*x|x.*=dsp.softClip(x.*);
   }
   /// the sap settling now and then while in the eyes: counts the samples
@@ -182,6 +193,21 @@ pub const Sounds=struct{
     }
     if(s.settle)|*st|{
       if(!st.render(out,&s.fade)or(!s.eyes and s.fade.value<silent))s.settle=null;
+    }
+  }
+  /// the day's and the night's music, mixed into `out` with the hall they
+  /// ring in, a block at a time
+  pub fn musics(s:*Sounds,out:[]f32)void{
+    // how far into `out` the blocks have reached
+    var off:usize=0;
+    while(off<out.len){
+      // this block's length, and the music alone in it
+      const k=@min(hallBlock,out.len-off);
+      var buf:[hallBlock]f32=@splat(0);
+      s.music.render(buf[0..k]);
+      s.night.render(buf[0..k]);
+      for(out[off..][0..k],buf[0..k])|*o,x|o.*+=x+hallWet*s.hall.tick(x);
+      off+=k;
     }
   }
   /// a footstep voice to play on: the first free one, or else the next in
