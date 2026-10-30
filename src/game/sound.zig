@@ -26,38 +26,36 @@
 //!   variation over a slow chord progression, a soft low drum on some bars,
 //!   all with a dark echo three steps behind; it rises with the morning and
 //!   fades out at dusk.
-const lib = @import("../lib.zig");
-pub const footstep = @import("sound/footstep.zig");
-pub const sap = @import("sound/sap.zig");
-pub const wind = @import("sound/wind.zig");
-pub const twinkle = @import("sound/twinkle.zig");
-pub const score = @import("sound/score.zig");
-pub const voices = @import("sound/voices.zig");
-pub const music = @import("sound/music.zig");
-pub const mixer = @import("sound/mixer.zig");
-pub const arsthraxia = @import("sound/arsthraxia.zig");
-pub const boom = @import("sound/boom.zig");
-pub const tests = @import("sound/tests.zig");
-pub const Sounds = mixer.Sounds;
-
+const lib=@import("../lib.zig");
+pub const footstep=@import("sound/footstep.zig");
+pub const sap=@import("sound/sap.zig");
+pub const wind=@import("sound/wind.zig");
+pub const twinkle=@import("sound/twinkle.zig");
+pub const score=@import("sound/score.zig");
+pub const voices=@import("sound/voices.zig");
+pub const music=@import("sound/music.zig");
+pub const mixer=@import("sound/mixer.zig");
+pub const arsthraxia=@import("sound/arsthraxia.zig");
+pub const boom=@import("sound/boom.zig");
+pub const tests=@import("sound/tests.zig");
+pub const Sounds=mixer.Sounds;
 /// samples per second the sounds are built for (a device that will not
 /// play at it leaves the garden silent)
-pub const RATE:u32 = 48000;
+pub const rate:u32=48000;
 /// steps that may sound at once (a sprint overlaps two or three)
-pub const VOICES = 64;
+pub const voiceCount=64;
 /// a step quieter than this has ended and frees its voice
-pub const SILENT:f32 = 1e-4;
-
-test {
-  _ = footstep;
-  _ = sap;
-  _ = wind;
-  _ = twinkle;
-  _ = score;
-  _ = voices;
-  _ = music;
-  _ = mixer;
-  _ = arsthraxia;
-  _ = boom;
-  _ = tests;
+pub const silent:f32=1e-4;
+test{
+  _=footstep;
+  _=sap;
+  _=wind;
+  _=twinkle;
+  _=score;
+  _=voices;
+  _=music;
+  _=mixer;
+  _=arsthraxia;
+  _=boom;
+  _=tests;
 }

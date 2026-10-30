@@ -33,9 +33,9 @@ Every piece works two ways:
 | `rootMat(b, n, reach, girth, seed, on)` | `n` braided roots radiating from the centre to `reach`, hugging the ground, sinking in at their ends (3-strand `mg.braid`, girth tapering to 0.35) | each root is `k.branch(id, u, ctrl, .{.after = .with})` + `k.braid` (grows with its parent) |
 | `leafyVine(b, from, to, r0, curl, leaves, t0, t1, seed, on)` | a grown, tapering vine from `from` toward `to` (wobble 0.18, `curl`), `leaves` small leaves along it | `k.vine(id, u, growth, 7, .{})` + `k.tube` + `k.leaves`: grown once the parent is done, leaves open as the front passes |
 | `resinPod(b, center, radii, rings, segs)` | an ellipsoid of part `.resin`, colour `pal.sap`; tu.y 0 at its dense base → 1 at its thin crown (the resin shader reads it) | not tagged: tag it yourself (`sk.on` / `growth.tag`) |
-| `footLeaves(b, n, r, len, width, seed, on)` | `n` broad blades in a ring at the foot on one envelope | each blade `k.on(b, mark, id, u, .{.from = base, .delay = FOOT_STAGGER * i})`: they unfold from their bases one after another (`FOOT_STAGGER` 0.025 of the growth) |
+| `footLeaves(b, n, r, len, width, seed, on)` | `n` broad blades in a ring at the foot on one envelope | each blade `k.on(b, mark, id, u, .{.from = base, .delay = footStagger * i})`: they unfold from their bases one after another (`footStagger` 0.025 of the growth) |
 | `rootlet(b, from, dir, len, r0, seed)` | a root heading down into the soil, tapering to a hair (tip 0.12), two forks off its far half; `pal.root_bark`, tu.x 0..0.3 | plain only (the caller tags it) |
-| `plant(b, g, seed, variant, rooted)` | a symbiote from its genome: braided stem (4 strands, 6 past `THICK` 0.1, turn `PITCH` 0.46 × length / radius) flaring into 5 braided roots (`ROOTS`) hugging the ground, genome `rosette` foot leaves, `vines` leafy vines twining up it (pointed at both ends), the leaf envelope, thorns, braided prop roots (`tendrils`), braided offshoots (`mg.shootPath`, folded by `mg.shootFoldNearest`) ending in buds or blooms, and its bloom on a resin bead (`mg.flower`, `.{.resin = pal.sap}`). Colours from the genome (core = stem shaded 0.55) | plants grow by tu.x in plant.vert (whole-plant scale, leaves and petals unfolding), not on a skeleton |
+| `plant(b, g, seed, variant, rooted)` | a symbiote from its genome: braided stem (4 strands, 6 past `thick` 0.1, turn `pitch` 0.46 × length / radius) flaring into 5 braided roots (`roots`) hugging the ground, genome `rosette` foot leaves, `vines` leafy vines twining up it (pointed at both ends), the leaf envelope, thorns, braided prop roots (`tendrils`), braided offshoots (`mg.shootPath`, folded by `mg.shootFoldNearest`) ending in buds or blooms, and its bloom on a resin bead (`mg.flower`, `.{.resin = pal.sap}`). Colours from the genome (core = stem shaded 0.55) | plants grow by tu.x in plant.vert (whole-plant scale, leaves and petals unfolding), not on a skeleton |
 
 ## Who uses it
 
@@ -74,7 +74,7 @@ sk.finish(b);                                                           // requi
 
 Timing is the skeleton's alone (`Branch.pace`, `Branch.front`, `After.done/
 passing/with`, `.delay`); never hand-set times. Emitted pieces (cups, lids) go in
-the tail kept free by `sk.tail = FORM`.
+the tail kept free by `sk.tail = form`.
 
 ## GPU side
 

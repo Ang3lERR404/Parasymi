@@ -18,75 +18,67 @@
 //! NOTE: every `pub const` in the namespace is treated as a module.
 //! Don't put helper constants or types in the namespace; put them in
 //! the modules themselves.
-const std = @import("std");
-const EnumArray = std.enums.EnumArray;
-const values = std.enums.values;
-const DeclEnum = std.meta.DeclEnum;
-const activeTag = std.meta.activeTag;
-const declarations = std.meta.declarations;
-const testing = std.testing;
-
-pub fn Registry(comptime ns:type) type {
-  return struct {
-    pub const Id = DeclEnum(ns);
-    pub const count = declarations(ns).len;
-    pub const ids = values(Id);
-
-    pub fn module(comptime id:Id) type { return @field(ns, @tagName(id)); }
-
+const std=@import("std");
+const EnumArray=std.enums.EnumArray;
+const values=std.enums.values;
+const DeclEnum=std.meta.DeclEnum;
+const activeTag=std.meta.activeTag;
+const declarations=std.meta.declarations;
+const testing=std.testing;
+pub fn Registry(comptime ns:type)type{
+  return struct{
+    pub const Id=DeclEnum(ns);
+    pub const count=declarations(ns).len;
+    pub const ids=values(Id);
+    pub fn module(comptime id:Id)type{return@field(ns,@tagName(id));}
     /// gather declaration `decl` (e.g. "def") from every module into an Id-indexed table.
-    pub fn table(comptime T:type, comptime decl:[]const u8) EnumArray(Id, T) {
-      return comptime blk: {
-        var t:EnumArray(Id, T) = undefined;
-        for (ids) |id| t.set(id, @field(module(id), decl));
-        break :blk t;
+    pub fn table(comptime T:type,comptime decl:[]const u8)EnumArray(Id,T){
+      return comptime blk:{
+        var t:EnumArray(Id,T)=undefined;
+        for(ids)|id|t.set(id,@field(module(id),decl));
+        break:blk t;
       };
     }
-
     /// each module's name and its `decl` type (void when it declares none).
-    fn fields(comptime decl:[]const u8) struct { names:[count][]const u8, types:[count]type } {
-      var names:[count][]const u8 = undefined;
-      var types:[count]type = undefined;
-      for (ids, 0..) |id, i| {
-        names[i] = @tagName(id);
-        types[i] = if (@hasDecl(module(id), decl)) @field(module(id), decl) else void;
+    fn fields(comptime decl:[]const u8)struct{names:[count][]const u8,types:[count]type}{
+      var names:[count][]const u8=undefined;
+      var types:[count]type=undefined;
+      for(ids,0..)|id,i|{
+        names[i]=@tagName(id);
+        types[i]=if(@hasDecl(module(id),decl))@field(module(id),decl)else void;
       }
-      return .{.names = names, .types = types};
+      return.{.names=names,.types=types};
     }
-
     /// a tagged union over Id whose payloads are each module's `decl` type
     /// (void when a module does not declare one).
-    pub fn Union(comptime decl:[]const u8) type {
-      const f = comptime fields(decl);
-      return @Union(.auto, Id, &f.names, &f.types, &@splat(.{}));
+    pub fn Union(comptime decl:[]const u8)type{
+      const f=comptime fields(decl);
+      return@Union(.auto,Id,&f.names,&f.types,&@splat(.{}));
     }
-
     /// a struct with one field per module, typed by that module's `decl`
     /// (void when absent): e.g. per-pass resources living side by side.
-    pub fn Struct(comptime decl:[]const u8) type {
-      const f = comptime fields(decl);
-      return @Struct(.auto, null, &f.names, &f.types, &@splat(.{}));
+    pub fn Struct(comptime decl:[]const u8)type{
+      const f=comptime fields(decl);
+      return@Struct(.auto,null,&f.names,&f.types,&@splat(.{}));
     }
-
     /// does a module implement an optional hook?
-    pub fn has(comptime id:Id, comptime decl:[]const u8) bool { return @hasDecl(module(id), decl); }
+    pub fn has(comptime id:Id,comptime decl:[]const u8)bool{return@hasDecl(module(id),decl);}
   };
 }
-
-test "registry derives enum, tables and unions" {
-  const ns = struct {
-    pub const alpha = struct { pub const def:u32 = 1; pub const State = struct { n:u8 = 0 }; };
-    pub const beta = struct { pub const def:u32 = 2; };
+test"registry derives enum, tables and unions"{
+  const ns=struct{
+    pub const alpha=struct{pub const def:u32=1;pub const State=struct{n:u8=0};};
+    pub const beta=struct{pub const def:u32=2;};
   };
-  const R = Registry(ns);
-  try testing.expectEqual(@as(usize, 2), R.count);
-  const t = R.table(u32, "def");
-  try testing.expectEqual(@as(u32, 2), t.get(.beta));
-  const U = R.Union("State");
-  const u:U = .{.alpha = .{.n = 3}};
-  try testing.expectEqual(R.Id.alpha, activeTag(u));
-  try testing.expect(R.has(.alpha, "State") and !R.has(.beta, "State"));
-  const S = R.Struct("State");
-  const s:S = .{ .alpha = .{ .n = 5 }, .beta = {} };
-  try testing.expectEqual(@as(u8, 5), s.alpha.n);
+  const R=Registry(ns);
+  try testing.expectEqual(@as(usize,2),R.count);
+  const t=R.table(u32,"def");
+  try testing.expectEqual(@as(u32,2),t.get(.beta));
+  const U=R.Union("State");
+  const u:U=.{.alpha=.{.n=3}};
+  try testing.expectEqual(R.Id.alpha,activeTag(u));
+  try testing.expect(R.has(.alpha,"State")and!R.has(.beta,"State"));
+  const S=R.Struct("State");
+  const s:S=.{.alpha=.{.n=5},.beta={}};
+  try testing.expectEqual(@as(u8,5),s.alpha.n);
 }

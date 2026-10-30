@@ -18,7 +18,7 @@ faces, rounded edges, curved claws). Not a mesh itself. The skin they sit on is
 | `Form{center, radii, ns = 0.7, ew = 0.7, col, part = .stem, t = 0.5, rings = 10, segs = 14}` / `form(b, f)` | a superellipsoid closed at its poles: `ns` squareness down its height, `ew` around it (1 round → 0 flat faces, sharp edges); rings/segs reduced per LOD (`b.around`) |
 | `Leaf{base, along, out, len, width, lift = 0.35, curl = 0.25, cup = 0.25, col, tip, t = 1}` / `leaf(b, l)` | a fur leaf: base flush with the surface, lifting off (`lift`), curling back at the tip (`curl`), cupped toward the body; lanceolate (narrow claw, broadest a third along, long point); a `mg.lamina` with a vein in the cup; tu.y base→tip (the shader moves tips, never the base); part `.leaf` |
 | `resinLobe(b, s:*const Sculpt, at, Shape, rings, steps, col, t)` | a lobe of resin laid over the hide: every outline point cast from one point deep behind the lobe (always inside) to where its ray last leaves the body (`s.castOut`); a hit far from where the previous ring predicts it (> 12 mm: out through the thigh) is replaced by `s.project` of the prediction. A smooth sheet draped over the hide (60 smoothing passes, never sinking in), settling onto the hide from 0.55 of the radius; raised by `Shape.height` along the sheet's facing, turning to the hide's own only from 0.85 out (offset along the hide's normal over a crease tighter than the lobe's height folds it). The face stands 1.5 mm clear of the hide (the hide's facets lie outside its true surface in creases) and dives under it over the outer 8% to meet the base (4 mm under); one watertight sheet. Every vertex part `.resin`, tu.y 0 on the body → 1 at the crown, **skinned to the hide where it lies** (`s.weigh`) |
-| — `Shape` (comptime) must provide | `outline(a) [2]f32` (x, y at unit radius for angle `a`), `height(k, a, x, y)` (k 0 crown .. 1 rim, falling to 0 with no slope at the rim), `CROWN` |
+| — `Shape` (comptime) must provide | `outline(a) [2]f32` (x, y at unit radius for angle `a`), `height(k, a, x, y)` (k 0 crown .. 1 rim, falling to 0 with no slope at the rim), `crown` |
 | `claw(b, base, dir, down, len, r, col)` | a curved tapering hook bending toward `down`, closed to a point; part `.thorn` |
 | `Digit{base, dir, down = -y, len, r, col, claw}` / `digit(b, d)` | a knuckle and two segments (`form`s, each lower and narrower) arching from `base` along `dir` to the ground, then its `claw` |
 
@@ -40,8 +40,8 @@ faces, rounded edges, curved claws). Not a mesh itself. The skin they sit on is
 
 ## Palette
 
-The wolf's colours live in `palette.zig`: `wolf_core`, `wolf_vine`,
-`wolf_leaf_dark`, `wolf_leaf_lite`, `wolf_claw` (muted greens/browns; amber only
+The wolf's colours live in `palette.zig`: `wolfCore`, `wolfVine`,
+`wolfLeafDark`, `wolfLeafLite`, `wolfClaw` (muted greens/browns; amber only
 on belly, eyes, inner ears, beans, pectorals, rear).
 
 ## Test

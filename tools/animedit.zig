@@ -20,27 +20,25 @@
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
 //! still follows the game's binding).
-const engine = ps.engine;
-const clip = engine.anim.clip;
-const ps = @import("parasymi");
-const skel = ps.skeleton;
-const specimen = ps.specimen;
-
-const PoseCh = clip.Channels(skel.Pose);
-const LookCh = clip.Channels(specimen.Look);
-pub const settings = @import("animedit/settings.zig");
-pub const rigging = @import("animedit/rigging.zig");
-pub const editor = @import("animedit/editor.zig");
-pub const editing = @import("animedit/editing.zig");
-pub const panel = @import("animedit/panel.zig");
-pub const run = @import("animedit/run.zig");
-pub const main = run.main;
-
-test {
-  _ = settings;
-  _ = rigging;
-  _ = editor;
-  _ = editing;
-  _ = panel;
-  _ = run;
+const engine=ps.engine;
+const clip=engine.anim.clip;
+const ps=@import("parasymi");
+const skel=ps.skeleton;
+const specimen=ps.specimen;
+const PoseCh=clip.Channels(skel.Pose);
+const LookCh=clip.Channels(specimen.Look);
+pub const settings=@import("animedit/settings.zig");
+pub const rigging=@import("animedit/rigging.zig");
+pub const editor=@import("animedit/editor.zig");
+pub const editing=@import("animedit/editing.zig");
+pub const panel=@import("animedit/panel.zig");
+pub const run=@import("animedit/run.zig");
+pub const main=run.main;
+test{
+  _=settings;
+  _=rigging;
+  _=editor;
+  _=editing;
+  _=panel;
+  _=run;
 }

@@ -82,6 +82,9 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `terrain.frag` — terrain shading: tile colour, ley sight and its plexus, shadows, fog.
 - `terrain.vert` — terrain tiles (the smooth fans of render/terrain_mesh.zig) to clip space.
 
+## src/
+- `diagnostics.zig` — This module is built for the sole purpose of finding any bugs in the code or silent errors that are hard to pin down.
+
 ## src/game/
 - `actions.zig` — what the wolf does to the world: gather, put (sow/grow), weave, feed and take from structures, interact with them, harvest, uproot, turn…
 - `controls.zig` — what every key and mouse button does, loaded once at startup from `PATH` (`controls.cfg`) and never read again.
@@ -117,7 +120,30 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `orbit.zig` — `--inspect`: the camera fixed on one thing (the wolf, the nearest plant of a species or structure of a kind, or a tile), turning slowly…
 - `parts.zig` — per-frame collector of rigid part instances, grouped by library mesh.
 - `play.zig` — the playable layer: owns world + sim + progression + the player and runs a frame: input -> actions (actions.zig), fixed-tick simulation…
+
+## src/game/play/
+- `belly.zig` — what the wolf carries: the hotbar, the belly and an opened structure's slots.
+- `frame.zig` — one frame of play: input read into actions, the camera, the HUD's picks.
+- `game.zig` — the game: what it owns, starting and ending it, and the fixed-tick step.
+- `menus.zig` — the pause menu, the saved gardens, naming a garden, inspecting and flying.
+- `tests_belly.zig` — play tested: a germinator's panel, carrying and discarding stacks.
+- `tests_menu.zig` — play tested: standing still, clicking the HUD, the menus and saving.
+- `tests_place.zig` — play tested: turning, picking, opening, removing and putting down.
+
+## src/game/
 - `player.zig` — the player: an anthropomorphic wolf woven from vines, leaves and sap.
+
+## src/game/player/
+- `ik.zig` — the wolf's limbs by inverse kinematics: legs to feet, arms to wrists.
+- `motion.zig` — the wolf's motion each frame: gait stages, footsteps and the gathering pry.
+- `player.zig` — the wolf: what it carries and where it is, moving over the tiles.
+- `posing.zig` — the wolf posed: the skeleton from its state, and its parts for the renderer.
+- `springs.zig` — the wolf's springs: arms, lean, head, ears, tail and the sloshing belly.
+- `tests.zig` — the wolf tested: belly lag, legs, eyes, feet, arms, gathering and the belly's stages.
+- `tuning.zig` — how the wolf moves: speeds, gaits, stride, lean, arms, breath and head.
+- `tuning_look.zig` — how the wolf looks as it moves: eyes, ears, fingers, glow, sap, belly and tail.
+
+## src/game/
 - `progression.zig` — research tree, discoveries and world events.
 - `record.zig` — a value as a record of named fields (structures in saves): each field is written with its name's hash and its length, so a record read back…
 
@@ -162,6 +188,21 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `setups.zig` — prepared worlds for showcasing and testing (`--demo`, `--stress`).
 - `sky.zig` — day/night cycle and starfall.
 - `sound.zig` — what the garden sounds like: the source the audio device plays (main.zig opens it on `platform.audio.Output`).
+
+## src/game/sound/
+- `arsthraxia.zig` — the arsthraxia's working: a spinning whorl under a swelling choir.
+- `boom.zig` — the arsthraxia's completion: a pop into a deep thud and a fracturing shimmer.
+- `footstep.zig` — a footstep: leaf litter rustled and crushed under a paw over a muffled pad.
+- `mixer.zig` — the source the device pulls from: every sound's voices mixed into one stream.
+- `music.zig` — the day's music playing: phrases of plunks over a slow pulse, fading with the light.
+- `sap.zig` — the sap settling, heard from inside the wolf (first person): a groan with gloops.
+- `score.zig` — the day's music on paper: pulse, scale, chords and how its voices are tuned.
+- `tests.zig` — the garden's sounds rendered offline and measured.
+- `twinkle.zig` — a mote of starlight twinkling: a few glassy pings dying in a shimmer.
+- `voices.zig` — the music's instruments: the piano plunk, the soft drum and the dark echo.
+- `wind.zig` — the wind over the garden: a hush in slow gusts, whistling in the strong ones.
+
+## src/game/
 - `specimen.zig` — `--plant=<species>` / `--structure=<kind>`: one plant or structure alone in the world, held in one state or looping one animation…
 - `structures.zig` — grown structures: the first steps from hand work toward automation.
 
@@ -169,6 +210,20 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `arsthraxia.zig` — ARSTHRAXIA: the lab, a bloom that studies.
 - `braided_conduit.zig` — BRAIDED CONDUIT: a root conduit grown dense, four cores bound in one weave, each core a lane of its own.
 - `conduit.zig` — ROOT CONDUIT: the first logistics.
+
+## src/game/structures/core/
+- `dispatch.zig` — the hook dispatch over every structure: one comptime switch each, no per-kind code.
+- `handoff.zig` — handing items on from a structure to its neighbours.
+- `hooks.zig` — per-structure hooks the HUD, the renderer and the garden ask through.
+- `kin.zig` — parents and children: a child depends on its parent.
+- `list.zig` — every structure in the garden: the list, its tile index, placing and uprooting.
+- `messages.zig` — what structures tell each other (`Msg`, `Reply`) and how a kind pairs.
+- `partners.zig` — partners: structures paired one way or both ways (`pairs`).
+- `structure.zig` — one structure as stored, and the context its hooks run in.
+- `tests_flow.zig` — structures tested: harvesting, handing off, the tile index, records.
+- `tests_kin.zig` — structures tested: messages, partners, outputs, growing, parents and children.
+
+## src/game/structures/
 - `diamond.zig` — DIAMOND: where a halo's four blooms became one, floating high over the polyp at its ring's heart; or, once Celestial Defragmentation is…
 - `driftbraid.zig` — DRIFTBRAID: a braided conduit and a sporecaster grown into one, that trades both ways.
 - `ganglion.zig` — GANGLION: a parasite's nerve knot that shares out what it is fed.
@@ -237,6 +292,17 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/gfx/
 - `meshgen.zig` — the garden's meshes: every plant grown from its species genome out of the engine's primitives (engine gfx/meshgen.zig: tubes, lofts, vines…
+
+## src/gfx/meshgen/
+- `blades.zig` — blades: a bent strip with a body, its vein on the cupped face.
+- `drifts.zig` — the drifting plants: tendrils and lanterns.
+- `flowers.zig` — flowers, buds and leaves set along a path.
+- `laminae.zig` — laminae: leaves with a body, folding to a midrib.
+- `petals.zig` — petals and stamens: a flower's pieces.
+- `shoots.zig` — a plant from its genome, and the shoots branching off its spine.
+- `tests.zig` — the garden's meshes tested: blades and growth keys.
+
+## src/gfx/
 - `meshlib.zig` — catalogue of rigid procedural part meshes, one module (or a companion struct inside its owner's module) each under `meshes/` exposing…
 - `vertex.zig` — GPU vertex/instance layouts.
 

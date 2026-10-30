@@ -6,142 +6,137 @@
 //! procedural animation is just transform math.
 //!
 //! A new mesh is one new file (or struct) plus one line in `parts`.
-const lib = @import("../lib.zig");
-const std = lib.std;
-const assert = std.debug.assert;
-const Allocator = std.mem.Allocator;
-const engine = lib.engine;
-const mg = lib.meshgen;
-const registry = engine.core.registry;
-
-const parts = struct {
+const lib=@import("../lib.zig");
+const std=lib.std;
+const assert=std.debug.assert;
+const Allocator=std.mem.Allocator;
+const engine=lib.engine;
+const mg=lib.meshgen;
+const registry=engine.core.registry;
+const parts=struct{
   // drawn first: a flat soft patch on the ground under floaters
-  pub const shadow = @import("meshes/shadow.zig");
+  pub const shadow=@import("meshes/shadow.zig");
   // the vine-wolf: one skinned body, then what is see-through over it
-  pub const wolf_body = @import("meshes/wolf_body.zig");
-  pub const wolf_ears = @import("meshes/wolf_ears.zig");
+  pub const wolfBody=@import("meshes/wolf_body.zig");
+  pub const wolfEars=@import("meshes/wolf_ears.zig");
   // drawn before the belly so the translucent sac blends over them
-  pub const belly_lump = @import("meshes/belly_lump.zig");
-  pub const wolf_belly = @import("meshes/wolf_belly.zig");
-  pub const wolf_pec_l = @import("meshes/wolf_pec.zig").left;
-  pub const wolf_pec_r = @import("meshes/wolf_pec.zig").right;
-  pub const wolf_rump_l = @import("meshes/wolf_rump.zig").left;
-  pub const wolf_rump_r = @import("meshes/wolf_rump.zig").right;
-  pub const paw_pad = @import("meshes/paw_pad.zig");
-  pub const paw_bean = @import("meshes/paw_pad.zig").bean;
+  pub const bellyLump=@import("meshes/belly_lump.zig");
+  pub const wolfBelly=@import("meshes/wolf_belly.zig");
+  pub const wolfPecL=@import("meshes/wolf_pec.zig").left;
+  pub const wolfPecR=@import("meshes/wolf_pec.zig").right;
+  pub const wolfRumpL=@import("meshes/wolf_rump.zig").left;
+  pub const wolfRumpR=@import("meshes/wolf_rump.zig").right;
+  pub const pawPad=@import("meshes/paw_pad.zig");
+  pub const pawBean=@import("meshes/paw_pad.zig").bean;
   // the world
-  pub const node_grit = @import("meshes/node_grit.zig");
-  pub const node_fibre = @import("meshes/node_fibre.zig");
-  pub const node_ley = @import("meshes/node_ley.zig");
-  pub const mote = @import("meshes/mote.zig");
+  pub const nodeGrit=@import("meshes/node_grit.zig");
+  pub const nodeFibre=@import("meshes/node_fibre.zig");
+  pub const nodeLey=@import("meshes/node_ley.zig");
+  pub const mote=@import("meshes/mote.zig");
   // structures
-  pub const conduit = @import("meshes/conduit.zig");
-  pub const conduit_left = @import("meshes/conduit.zig").left;
-  pub const conduit_right = @import("meshes/conduit.zig").right;
-  pub const conduit_tap = @import("meshes/conduit.zig").tap;
-  pub const braided_conduit = @import("meshes/braided_conduit.zig");
-  pub const braid_wrap = @import("meshes/braided_conduit.zig").wrap;
-  pub const braid_wrap_left = @import("meshes/braided_conduit.zig").wrap_left;
-  pub const braid_wrap_right = @import("meshes/braided_conduit.zig").wrap_right;
-  pub const braid_lane0 = @import("meshes/braided_conduit.zig").Lane(0, 0);
-  pub const braid_lane1 = @import("meshes/braided_conduit.zig").Lane(0, 1);
-  pub const braid_lane2 = @import("meshes/braided_conduit.zig").Lane(0, 2);
-  pub const braid_lane3 = @import("meshes/braided_conduit.zig").Lane(0, 3);
-  pub const braid_lane0_left = @import("meshes/braided_conduit.zig").Lane(1, 0);
-  pub const braid_lane1_left = @import("meshes/braided_conduit.zig").Lane(1, 1);
-  pub const braid_lane2_left = @import("meshes/braided_conduit.zig").Lane(1, 2);
-  pub const braid_lane3_left = @import("meshes/braided_conduit.zig").Lane(1, 3);
-  pub const braid_lane0_right = @import("meshes/braided_conduit.zig").Lane(-1, 0);
-  pub const braid_lane1_right = @import("meshes/braided_conduit.zig").Lane(-1, 1);
-  pub const braid_lane2_right = @import("meshes/braided_conduit.zig").Lane(-1, 2);
-  pub const braid_lane3_right = @import("meshes/braided_conduit.zig").Lane(-1, 3);
-  pub const sap_cache_lid = @import("meshes/sap_cache.zig").lid;
-  pub const sap_cache = @import("meshes/sap_cache.zig");
-  pub const germinator = @import("meshes/germinator.zig");
-  pub const germinator_whole = @import("meshes/germinator.zig").whole;
-  pub const germinator_cup = @import("meshes/germinator.zig").cup;
-  pub const germinator_pool = @import("meshes/germinator.zig").pool;
-  pub const germinator_pour = @import("meshes/germinator.zig").pour;
-  pub const germinator_vortex = @import("meshes/germinator.zig").vortex;
-  pub const germinator_thread = @import("meshes/germinator.zig").thread;
-  pub const germinator_seed = @import("meshes/germinator.zig").seed;
-  pub const germinator_winding = @import("meshes/germinator.zig").winding;
+  pub const conduit=@import("meshes/conduit.zig");
+  pub const conduitLeft=@import("meshes/conduit.zig").left;
+  pub const conduitRight=@import("meshes/conduit.zig").right;
+  pub const conduitTap=@import("meshes/conduit.zig").tap;
+  pub const braidedConduit=@import("meshes/braided_conduit.zig");
+  pub const braidWrap=@import("meshes/braided_conduit.zig").wrap;
+  pub const braidWrapLeft=@import("meshes/braided_conduit.zig").wrapLeft;
+  pub const braidWrapRight=@import("meshes/braided_conduit.zig").wrapRight;
+  pub const braidLane0=@import("meshes/braided_conduit.zig").Lane(0,0);
+  pub const braidLane1=@import("meshes/braided_conduit.zig").Lane(0,1);
+  pub const braidLane2=@import("meshes/braided_conduit.zig").Lane(0,2);
+  pub const braidLane3=@import("meshes/braided_conduit.zig").Lane(0,3);
+  pub const braidLane0Left=@import("meshes/braided_conduit.zig").Lane(1,0);
+  pub const braidLane1Left=@import("meshes/braided_conduit.zig").Lane(1,1);
+  pub const braidLane2Left=@import("meshes/braided_conduit.zig").Lane(1,2);
+  pub const braidLane3Left=@import("meshes/braided_conduit.zig").Lane(1,3);
+  pub const braidLane0Right=@import("meshes/braided_conduit.zig").Lane(-1,0);
+  pub const braidLane1Right=@import("meshes/braided_conduit.zig").Lane(-1,1);
+  pub const braidLane2Right=@import("meshes/braided_conduit.zig").Lane(-1,2);
+  pub const braidLane3Right=@import("meshes/braided_conduit.zig").Lane(-1,3);
+  pub const sapCacheLid=@import("meshes/sap_cache.zig").lid;
+  pub const sapCache=@import("meshes/sap_cache.zig");
+  pub const germinator=@import("meshes/germinator.zig");
+  pub const germinatorWhole=@import("meshes/germinator.zig").whole;
+  pub const germinatorCup=@import("meshes/germinator.zig").cup;
+  pub const germinatorPool=@import("meshes/germinator.zig").pool;
+  pub const germinatorPour=@import("meshes/germinator.zig").pour;
+  pub const germinatorVortex=@import("meshes/germinator.zig").vortex;
+  pub const germinatorThread=@import("meshes/germinator.zig").thread;
+  pub const germinatorSeed=@import("meshes/germinator.zig").seed;
+  pub const germinatorWinding=@import("meshes/germinator.zig").winding;
   // (see-through: blends over what spins inside it)
-  pub const germinator_core = @import("meshes/germinator.zig").core;
-  pub const arsthraxia = @import("meshes/arsthraxia.zig");
-  pub const arsthraxia_whole = @import("meshes/arsthraxia.zig").whole;
-  pub const arsthraxia_whorl = @import("meshes/arsthraxia.zig").whorl;
-  pub const arsthraxia_cup = @import("meshes/arsthraxia.zig").cup;
-  pub const arsthraxia_vines = @import("meshes/arsthraxia.zig").vines;
-  pub const arsthraxia_shoot = @import("meshes/arsthraxia.zig").shoot;
-  pub const arsthraxia_satellite = @import("meshes/arsthraxia.zig").satellite;
+  pub const germinatorCore=@import("meshes/germinator.zig").core;
+  pub const arsthraxia=@import("meshes/arsthraxia.zig");
+  pub const arsthraxiaWhole=@import("meshes/arsthraxia.zig").whole;
+  pub const arsthraxiaWhorl=@import("meshes/arsthraxia.zig").whorl;
+  pub const arsthraxiaCup=@import("meshes/arsthraxia.zig").cup;
+  pub const arsthraxiaVines=@import("meshes/arsthraxia.zig").vines;
+  pub const arsthraxiaShoot=@import("meshes/arsthraxia.zig").shoot;
+  pub const arsthraxiaSatellite=@import("meshes/arsthraxia.zig").satellite;
   // (light: blends over the satellites spinning round it)
-  pub const arsthraxia_core = @import("meshes/arsthraxia.zig").core;
-  pub const arsthraxia_wisp = @import("meshes/arsthraxia.zig").wisp;
-  pub const item_pod = @import("meshes/item_pod.zig");
-  pub const root_digger = @import("meshes/root_digger.zig");
-  pub const digger_root = @import("meshes/root_digger.zig").root;
-  pub const digger_clod = @import("meshes/root_digger.zig").clod;
-  pub const loomfern = @import("meshes/loomfern.zig");
-  pub const loomfern_sheaf = @import("meshes/loomfern.zig").sheaf;
-  pub const loomfern_thread = @import("meshes/loomfern.zig").thread;
-  pub const crown_root1 = @import("meshes/gathering_crown.zig").Root(0);
-  pub const crown_root2 = @import("meshes/gathering_crown.zig").Root(1);
-  pub const crown_root3 = @import("meshes/gathering_crown.zig").Root(2);
-  pub const crown_root4 = @import("meshes/gathering_crown.zig").Root(3);
-  pub const crown_root5 = @import("meshes/gathering_crown.zig").Root(4);
-  pub const gathering_crown = @import("meshes/gathering_crown.zig");
-  pub const lithophage = @import("meshes/lithophage.zig");
-  pub const lithophage_crystal = @import("meshes/lithophage.zig").crystal;
-  pub const lithophage_root = @import("meshes/lithophage.zig").root;
-  pub const lithophage_root_far = @import("meshes/lithophage.zig").root_far;
+  pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;
+  pub const arsthraxiaWisp=@import("meshes/arsthraxia.zig").wisp;
+  pub const itemPod=@import("meshes/item_pod.zig");
+  pub const rootDigger=@import("meshes/root_digger.zig");
+  pub const diggerRoot=@import("meshes/root_digger.zig").root;
+  pub const diggerClod=@import("meshes/root_digger.zig").clod;
+  pub const loomfern=@import("meshes/loomfern.zig");
+  pub const loomfernSheaf=@import("meshes/loomfern.zig").sheaf;
+  pub const loomfernThread=@import("meshes/loomfern.zig").thread;
+  pub const crownRoot1=@import("meshes/gathering_crown.zig").Root(0);
+  pub const crownRoot2=@import("meshes/gathering_crown.zig").Root(1);
+  pub const crownRoot3=@import("meshes/gathering_crown.zig").Root(2);
+  pub const crownRoot4=@import("meshes/gathering_crown.zig").Root(3);
+  pub const crownRoot5=@import("meshes/gathering_crown.zig").Root(4);
+  pub const gatheringCrown=@import("meshes/gathering_crown.zig");
+  pub const lithophage=@import("meshes/lithophage.zig");
+  pub const lithophageCrystal=@import("meshes/lithophage.zig").crystal;
+  pub const lithophageRoot=@import("meshes/lithophage.zig").root;
+  pub const lithophageRootFar=@import("meshes/lithophage.zig").rootFar;
   // what a rooted thing walks on while it turns (R)
-  pub const turn_root = @import("meshes/turn_root.zig");
-  pub const turn_root_pale = @import("meshes/turn_root.zig").pale;
-  pub const ganglion_nerve = @import("meshes/ganglion.zig").nerve;
+  pub const turnRoot=@import("meshes/turn_root.zig");
+  pub const turnRootPale=@import("meshes/turn_root.zig").pale;
+  pub const ganglionNerve=@import("meshes/ganglion.zig").nerve;
   // (see-through: blends over what hangs inside it)
-  pub const ganglion = @import("meshes/ganglion.zig");
+  pub const ganglion=@import("meshes/ganglion.zig");
   // (see-through: blends over what hangs inside it)
-  pub const sporecaster = @import("meshes/sporecaster.zig");
-  pub const spore_carrier = @import("meshes/sporecaster.zig").carrier;
+  pub const sporecaster=@import("meshes/sporecaster.zig");
+  pub const sporeCarrier=@import("meshes/sporecaster.zig").carrier;
   // the convergent structures (see-through: blend over what hangs inside)
-  pub const weftstone_tendril = @import("meshes/weftstone.zig").tendril;
-  pub const monfris_tether = @import("meshes/monfris.zig").tether;
-  pub const driftbraid = @import("meshes/driftbraid.zig");
-  pub const monfris = @import("meshes/monfris.zig");
-  pub const vultrixi = @import("meshes/vultrixi.zig");
-  pub const weftstone = @import("meshes/weftstone.zig");
+  pub const weftstoneTendril=@import("meshes/weftstone.zig").tendril;
+  pub const monfrisTether=@import("meshes/monfris.zig").tether;
+  pub const driftbraid=@import("meshes/driftbraid.zig");
+  pub const monfris=@import("meshes/monfris.zig");
+  pub const vultrixi=@import("meshes/vultrixi.zig");
+  pub const weftstone=@import("meshes/weftstone.zig");
   // the halo: its polyp and the diamond it forms
-  pub const polyp = @import("meshes/polyp.zig");
-  pub const halo_diamond = @import("meshes/halo.zig").diamond;
+  pub const polyp=@import("meshes/polyp.zig");
+  pub const haloDiamond=@import("meshes/halo.zig").diamond;
   // translucent, over everything
-  pub const halo_projection = @import("meshes/halo.zig").projection;
-  pub const halo_ring = @import("meshes/halo.zig").ring;
-  pub const halo_flash = @import("meshes/halo.zig").flash;
-  pub const bloom_thread = @import("meshes/bloom_thread.zig");
+  pub const haloProjection=@import("meshes/halo.zig").projection;
+  pub const haloRing=@import("meshes/halo.zig").ring;
+  pub const haloFlash=@import("meshes/halo.zig").flash;
+  pub const bloomThread=@import("meshes/bloom_thread.zig");
 };
-const reg = registry.Registry(parts);
-
-pub const Id = reg.Id;
-pub const count = reg.count;
-pub const ids = reg.ids;
-
+const reg=registry.Registry(parts);
+pub const Id=reg.Id;
+pub const count=reg.count;
+pub const ids=reg.ids;
 /// every library mesh at each level of detail (one slot per mesh and level,
 /// see `slot`).
-pub const SLOTS = count * mg.LODS;
-
+pub const slots=count*mg.lods;
 /// where a mesh at a level of detail sits in per-slot tables.
-pub fn slot(id:Id, lod:u32) usize { return @as(usize, @intFromEnum(id)) * mg.LODS + lod; }
-
+pub fn slot(id:Id,lod:u32)usize{return@as(usize,@intFromEnum(id))*mg.lods+lod;}
 /// build one mesh at one level of detail into `b` (leaving `b.lod` there),
 /// recording its (first vertex, count).
-pub fn buildOne(b:*mg.Builder, id:Id, lod:u32, ranges:*[SLOTS][2]u32) Allocator.Error!void {
-  b.lod = lod;
-  const first = b.mark();
-  switch (id) {
-    inline else => |k| try reg.module(k).build(b),
+pub fn buildOne(b:*mg.Builder,id:Id,lod:u32,ranges:*[slots][2]u32)Allocator.Error!void{
+  b.lod=lod;
+  const first=b.mark();
+  switch(id){
+    inline else=>|k|try reg.module(k).build(b),
   }
   // a skeleton left unfinished leaves its times past one (never grown)
-  if (b.grow.items.len > first) for (b.grow.items[first..]) |g| assert(g.at[0] + g.at[1] <= 1 + 1e-4);
-  ranges[slot(id, lod)] = .{@intCast(first), @intCast(b.mark() - first)};
+  if(b.grow.items.len>first)for(b.grow.items[first..])|g|assert(g.at[0]+g.at[1]<=1+1e-4);
+  ranges[slot(id,lod)]=.{@intCast(first),@intCast(b.mark()-first)};
 }

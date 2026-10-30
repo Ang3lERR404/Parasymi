@@ -39,7 +39,7 @@ planes. Not grown, not on splines. Not a mesh itself.
 
 - Keep it flat-faced; no smoothed normals here.
 - No growth: a node's minerals are just there; a structure that makes a crystal
-  scales it by `growth.formed(FORM, grown)` or its own progress in the mesh that
+  scales it by `growth.formed(form, grown)` or its own progress in the mesh that
   emits it.
 - Check: `--structure=lithophage --state=active` (crystal in its crop); nodes
   appear around any `--structure` specimen.

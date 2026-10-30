@@ -4,8 +4,8 @@
 
 The way to check a species' or structure's growth, look and work: no demo
 garden, no scratch edits. Use it whenever a species, its genome, a plant
-kit (`structure_kit` plant, `parasite_kit`, `convergence_kit`,
-`radiant_kit`, meshgen drift), a structure, its mesh/growth skeleton/`emit`, or plant/part
+kit (`structureKit` plant, `parasiteKit`, `convergenceKit`,
+`radiantKit`, meshgen drift), a structure, its mesh/growth skeleton/`emit`, or plant/part
 shaders change.
 
 - `--plant=<species>` (a `species.Id` tag) / `--structure=<kind>` (a
@@ -47,7 +47,7 @@ shaders change.
 - Unattended, with screenshots: add `--inspect=<same species/kind>` and
   shape the orbit, e.g.
   `zig build run -- --plant=vesper --state=grow --period=5 --inspect=vesper --shots=6 --orbit=9 --dist=3.5 --pitch=25 --tod=0.5`
-  `zig build run -- --structure=root_digger --state=active --period=20 --inspect=root_digger --shots=3 --orbit=12 --dist=3 --pitch=30 --tod=0.5`
+  `zig build run -- --structure=rootDigger --state=active --period=20 --inspect=rootDigger --shots=3 --orbit=12 --dist=3 --pitch=30 --tod=0.5`
   (shots land in `shots/<name>_<n>.png` after a 3 s settle; the loop runs
   from the start, so shot k of n over a turn of `--orbit` seconds shows
   growth about `((3 + k·orbit/n) mod (period+1.5)) / period`). Read the

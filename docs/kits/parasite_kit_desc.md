@@ -2,7 +2,7 @@
 
 `src/gfx/meshes/parasite_kit.zig` (471 lines). Imports: `meshgen` (`mg`),
 `growth`, `vertex`, `sim/species` (Genome), `core/math`, `core/color`,
-`core/rng`. Imported by `convergence_kit` as `pk`.
+`core/rng`. Imported by `convergenceKit` as `pk`.
 
 ## What it is
 
@@ -15,7 +15,7 @@ symbiotes:
   from the core into an open lattice cage** (`lattice`), pearl beads where they
   cross, the core thinned to a filament inside, **sacs of thin-film sap hanging
   on it in plain view** (`organs`), and gather to it again.
-- It is **too exact**: everything in fives (`FOLD`), turned evenly, grown alike
+- It is **too exact**: everything in fives (`fold`), turned evenly, grown alike
   (one seed for every frond of a crown), never a golden angle.
 - It **repeats itself**: each frond ends in a small cage of its own (`pod`),
   crowned in turn by five frondlets.
@@ -35,9 +35,9 @@ parted).
 | `pearl` | rgb(0.78, 0.74, 0.84) | youngest growth, beads, roots |
 | `lilac` | rgb(0.68, 0.62, 0.82) | fronds |
 | `sac` | rgb(0.46, 0.62, 0.86) | thin pale-blue sap |
-| `FOLD` | 5 | how many of everything |
-| `TWIST` | 1.6π | turn of the strands along a stalk, each way |
-| `WOBBLE` | 0.05 | a plain weave (nerve) is tighter than a symbiote's |
+| `fold` | 5 | how many of everything |
+| `twist` | 1.6π | turn of the strands along a stalk, each way |
+| `wobble` | 0.05 | a plain weave (nerve) is tighter than a symbiote's |
 
 ## API
 
@@ -47,7 +47,7 @@ parted).
 |---|---|
 | `Section{core, tight, open, strand}` | cross-section at one point: core radius, radius strands lie at woven tight, radius they've parted to (≥ tight), strand radius |
 | `parting(s) f32` | how far a section has parted: `1 - tight/open` (0 woven .. →1) |
-| `Lattice{n = FOLD, twist = TWIST, sides = 4, node = 1.9, node_from = 0.3, part = .stem, core, strand, bead}` | lattice options; `node` = bead size × strand radius (0 none), only where parted ≥ `node_from` |
+| `Lattice{n = fold, twist = twist, sides = 4, node = 1.9, nodeFrom = 0.3, part = .stem, core, strand, bead}` | lattice options; `node` = bead size × strand radius (0 none), only where parted ≥ `nodeFrom` |
 | `lattice(b, spine, ts, sec, l)` | core tube + `n` strands each way at exactly even turns (parallel-transported frames), lifting into a cage where parted and paling toward pearl; beads where strands cross (every π/(n·twist) along it). Strand tu.y = `parting`. **Beads dropped at the coarsest LOD.** |
 | `Stalk{girth, part = 2.6, from = 0.15, to = 0.85, foot = 0.9, twist, sides = 4, node = 1.9}` | a stalk's shape: woven at its foot, a cage over `from..to`, gathering above; `part` = how far strands part at widest (× woven radius); `foot` = swell into the foot |
 | `parted(s, u)` | cage opening at `u` (0..1), `1 - cos⁴`, eased both ways so strands leave and rejoin with no kink |
@@ -70,20 +70,20 @@ parted).
 |---|---|
 | `frondPath(from, out, len, rise, curl, seed, pts)` | control points: heading starts at `rise`, turns ever faster (`curl` at tip; negative turns up), steps shrinking; one seed for a crown → fronds alike |
 | `Frond{out, len, r, rise = 1.25, curl = 5.2, tip = 0.12, t0 = 0.6, seed, grow}` / `frond(b, k, parent, u, f)` | a lilac `.tendril` tube on its own branch; returns its spline id |
-| `Crown{spin, len, r, rise = 0.4, curl = -1.1, t0, seed, grow, pod = 0}` / `crown(b, k, parent, u, c)` | `FOLD` fronds alike, turned evenly from `spin`, all at once; with `pod > 0` each ends in a `pod` (frond tip sized to `podFoot`) |
+| `Crown{spin, len, r, rise = 0.4, curl = -1.1, t0, seed, grow, pod = 0}` / `crown(b, k, parent, u, c)` | `fold` fronds alike, turned evenly from `spin`, all at once; with `pod > 0` each ends in a `pod` (frond tip sized to `podFoot`) |
 | `Pod{len, girth, t, part = .tendril, skin, core, pearl, frond, sac, seed}` | a pod's look |
 | `podGirth(len)` = len·0.085, `podFoot(girth)` | a pod's girth for its length; its width at the foot (where its frond meets it) |
-| `podAt(b, at, axis, p)` | the body again, small: a 3-sided lattice parting round a sac, gathering into a pearl bead, `FOLD` frondlets springing from it. **Frondlets only at LOD 0.** No skeleton (used by plants directly) |
+| `podAt(b, at, axis, p)` | the body again, small: a 3-sided lattice parting round a sac, gathering into a pearl bead, `fold` frondlets springing from it. **Frondlets only at LOD 0.** No skeleton (used by plants directly) |
 | `pod(b, k, id, p)` | `podAt` at the tip of frond `id`, on its own branch grown once the frond is done; returns that id |
 
 ### The plant
 
 `plant(b, genome, seed)` — the `coil` form, upright and exactly symmetric,
-variants differ in proportion only. From the genome: `stem_col` (skin; dark =
-shade 0.7, light = mixed toward white), `leaf_col` (fronds), `bloom_col` (sap),
-`stem_h`, `stem_r`, `thorns` (number of sacs), `tendrils` (number of crown
-fronds), `bloom_r` (neck bulb). Builds: a 25-point dead-upright lattice stalk
-(cage from 0.12 to ~0.78), a bulbous foot, `FOLD` pale roots, sacs on the core,
+variants differ in proportion only. From the genome: `stemCol` (skin; dark =
+shade 0.7, light = mixed toward white), `leafCol` (fronds), `bloomCol` (sap),
+`stemH`, `stemR`, `thorns` (number of sacs), `tendrils` (number of crown
+fronds), `bloomR` (neck bulb). Builds: a 25-point dead-upright lattice stalk
+(cage from 0.12 to ~0.78), a bulbous foot, `fold` pale roots, sacs on the core,
 a sap bulb at the neck, and a candelabrum of fronds each ending in `podAt`. tu.x
 is height (crown 0.85..1).
 
@@ -92,10 +92,10 @@ is height (crown 0.85..1).
 | User | Uses |
 |---|---|
 | `meshgen.zig` (plant form `.coil`) | `plant` — species `thornleech` |
-| `lithophage.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, palette, `FOLD` |
-| `ganglion.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `nodule`, `WOBBLE`, palette |
+| `lithophage.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, palette, `fold` |
+| `ganglion.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `nodule`, `wobble`, palette |
 | `sporecaster.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `frondPath`, `pod`, `podGirth`, `podFoot`, palette |
-| `convergence_kit.zig` | `Section`, `Stalk`, `section`, `parting`, `lattice`, `frondPath`, `nodule`, `FOLD`, `TWIST`, palette |
+| `convergence_kit.zig` | `Section`, `Stalk`, `section`, `parting`, `lattice`, `frondPath`, `nodule`, `fold`, `twist`, palette |
 | `driftbraid`, `monfris`, `weftstone`, `vultrixi` | `Stalk`/`Section`, `nodule`, `frondPath`, `core` (via convergent meshes) |
 
 ## GPU side
@@ -113,9 +113,9 @@ is height (crown 0.85..1).
 
 ## Rules
 
-- Counts are `FOLD`, turned evenly; one seed per crown. No golden angles, no
+- Counts are `fold`, turned evenly; one seed per crown. No golden angles, no
   per-frond randomness (that's the symbiotes').
 - Plants are exactly symmetric and dead upright.
-- Don't mix with `structure_kit` pieces for a convergent look; use
-  `convergence_kit`.
+- Don't mix with `structureKit` pieces for a convergent look; use
+  `convergenceKit`.
 - Check: `zig build run -- --plant=thornleech --state=grow`, `--structure=lithophage|ganglion|sporecaster --state=grow|active`.

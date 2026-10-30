@@ -6,24 +6,22 @@
 //! faint haze, soft streaks swelling from sender to receiver and tiny
 //! drifting motes, the rainbow running from one end to the other. Part
 //! `.thread`. Listed last: it blends over everything.
-const lib = @import("../../lib.zig");
-const std = lib.std;
-const Allocator = std.mem.Allocator;
-const engine = lib.engine;
-const m = engine.core.math;
-const mg = lib.meshgen;
-const color = engine.core.color;
-
-const v3 = m.v3;
-
-pub fn build(b:*mg.Builder) Allocator.Error!void {
-  const warm = color.rgb(1.0, 0.9, 0.7).toRgba8(255);
-  const N = 48;
-  const across = [_]f32{-1, 0, 1};
-  for (0..N - 1) |i| for (0..across.len - 1) |j| {
-    const k0 = m.ratio(i, N - 1);
-    const k1 = m.ratio(i + 1, N - 1);
-    const q = [4][2]f32{.{k0, across[j]}, .{k0, across[j + 1]}, .{k1, across[j + 1]}, .{k1, across[j]}};
-    for ([_]usize{0, 1, 2, 0, 2, 3}) |c| try b.put(v3(q[c][1], q[c][0], 0), v3(0, 0, 1), warm, q[c][0], q[c][1], .thread);
+const lib=@import("../../lib.zig");
+const std=lib.std;
+const Allocator=std.mem.Allocator;
+const engine=lib.engine;
+const m=engine.core.math;
+const mg=lib.meshgen;
+const color=engine.core.color;
+const v3=m.v3;
+pub fn build(b:*mg.Builder)Allocator.Error!void{
+  const warm=color.rgb(1.0,0.9,0.7).toRgba8(255);
+  const n=48;
+  const across=[_]f32{-1,0,1};
+  for(0..n-1)|i|for(0..across.len-1)|j|{
+    const k0=m.ratio(i,n-1);
+    const k1=m.ratio(i+1,n-1);
+    const q=[4][2]f32{.{k0,across[j]},.{k0,across[j+1]},.{k1,across[j+1]},.{k1,across[j]}};
+    for([_]usize{0,1,2,0,2,3})|c|try b.put(v3(q[c][1],q[c][0],0),v3(0,0,1),warm,q[c][0],q[c][1],.thread);
   };
 }

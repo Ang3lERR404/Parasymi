@@ -46,7 +46,7 @@ neighbouring blocks disagreed). A very wide melt makes sampling slower.
 
 | User | Uses |
 |---|---|
-| `wolf_body.zig` | `Sculpt`, `Form`, `Shape`: `sculptBody` adds forms per bone of `wolf_skeleton`'s bind pose; `mesh(b, CELL << lod, 0.5, .stem)` (`CELL` 5 mm, doubled per LOD); `cast` to lay vines onto the hide; `project` + `weigh` for fur leaves |
+| `wolf_body.zig` | `Sculpt`, `Form`, `Shape`: `sculptBody` adds forms per bone of `wolf_skeleton`'s bind pose; `mesh(b, cell << lod, 0.5, .stem)` (`cell` 5 mm, doubled per LOD); `cast` to lay vines onto the hide; `project` + `weigh` for fur leaves |
 | `wolf_ears.zig` | `Sculpt.pack` (ear skins) |
 | `wolf_belly.zig` | `Sculpt.packWith` (belly weights + slopes for the swelling sac) |
 | `wolf_kit.zig` | `Sculpt` (`resinLobe` casts out onto it with `castOut`, `project`s strays, weighs) |

@@ -34,16 +34,16 @@ never by radiant_kit (enforced by its test).
 
 ## Which kit to reach for
 
-- A new **symbiotic structure**: `structure_kit` + the conduit's `arch`
+- A new **symbiotic structure**: `structureKit` + the conduit's `arch`
   (`conduit.arch`, `spineCtrl`). Build on a `growth.Skeleton`.
-- A new **symbiotic plant**: a `herb` genome (`structure_kit.plant`).
-- A new **parasitic plant or structure**: `parasite_kit`.
-- A new **convergent structure** (3rd tier): `convergence_kit` (it already
-  mixes the two lineages; never layer `structure_kit` over `parasite_kit`).
-- A new **radiant thing**: `radiant_kit` only. No skeleton, no splines,
-  no other kits except `mineral_kit` for crystals.
-- **Rocks, crystals, facets**: `mineral_kit`.
-- **Wolf**: sculpt in `sculpt_kit`, dress with `wolf_kit`; everything skinned.
+- A new **symbiotic plant**: a `herb` genome (`structureKit.plant`).
+- A new **parasitic plant or structure**: `parasiteKit`.
+- A new **convergent structure** (3rd tier): `convergenceKit` (it already
+  mixes the two lineages; never layer `structureKit` over `parasiteKit`).
+- A new **radiant thing**: `radiantKit` only. No skeleton, no splines,
+  no other kits except `mineralKit` for crystals.
+- **Rocks, crystals, facets**: `mineralKit`.
+- **Wolf**: sculpt in `sculpt_kit`, dress with `wolfKit`; everything skinned.
 
 Rules that apply to every kit (from CLAUDE.md): Catmull-Rom grown vines tapering
 at both ends, watertight geometry (shared rings, capped tubes), leaves/petals

@@ -1,19 +1,17 @@
 //! sky: the dome behind everything, drawn first as one full-screen triangle
 //! without depth (the world draws over it). No vertex data.
-const lib = @import("../../lib.zig");
-const vk = lib.engine.vk;
-const pass = R.pass;
-const R = lib.renderer;
-
-pub const desc:pass.Desc = .{
-  .vert = @embedFile("sky.vert"), .frag = @embedFile("sky.frag"),
-  .bindings = &.{}, .attrs = &.{},
-  .depth = false,
+const lib=@import("../../lib.zig");
+const vk=lib.engine.vk;
+const pass=renderer.pass;
+const renderer=lib.renderer;
+pub const desc:pass.Desc=.{
+  .vert=@embedFile("sky.vert"),.frag=@embedFile("sky.frag"),
+  .bindings=&.{},.attrs=&.{},
+  .depth=false,
 };
-
-pub fn record(r:*R.Renderer, _:*void, cmd:vk.CommandBufferProxy, scene:*const R.Scene, stats:*R.Stats) void {
-  cmd.bindPipeline(.graphics, r.pipe(.sky));
-  cmd.pushConstants(r.layout(desc.layout), pass.stages, 0, @sizeOf(R.WorldPush), &scene.push);
-  cmd.draw(3, 1, 0, 0);
-  stats.draws += 1;
+pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+  cmd.bindPipeline(.graphics,r.pipe(.sky));
+  cmd.pushConstants(r.layout(desc.layout),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
+  cmd.draw(3,1,0,0);
+  stats.draws+=1;
 }

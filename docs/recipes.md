@@ -71,7 +71,7 @@ Tests: a sown species without a seed icon; cfg keys.
 3. If a structure emits it, add it to that structure's `meshes`.
 
 ## A HUD panel
-`game/hud/<name>.zig` with `draw(g, d, W, H)` (+ `visible(g)`), one line in
+`game/hud/<name>.zig` with `draw(g, d, W, h)` (+ `visible(g)`), one line in
 `panels` in `game/hud.zig` (later draws on top). Clickable things: the
 panel's own `pub const Pick` union, made into a HUD pick with
 `hud.row(.<panel>, ...)`, their area a `hud.Box` (x, y, w, h) passed to

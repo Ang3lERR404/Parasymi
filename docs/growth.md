@@ -10,7 +10,7 @@ reach), loomfern, lithophage (and its roots), braided conduit (weave and
 each lane its own mesh on the same spline), ganglion (and its nerves),
 gathering crown (and its roots, `Root(n)` per distance), sporecaster, and
 the convergent structures. The diamond is the radiant lineage's: gathered,
-not grown (`radiant_kit`, [kits/radiant_kit_desc.md](kits/radiant_kit_desc.md)).
+not grown (`radiantKit`, [kits/radiant_kit_desc.md](kits/radiant_kit_desc.md)).
 
 ## Building
 - A mesh's `build` lays out a hidden `Skeleton`: `var sk =
@@ -37,7 +37,7 @@ not grown (`radiant_kit`, [kits/radiant_kit_desc.md](kits/radiant_kit_desc.md)).
 - `grownScale` is a structure's research size only; nothing shoots up or
   fills out (the old whole-structure scale is gone).
 - Pieces a structure emits on its own (cups, cores, satellites) form in a
-  last share kept free by `sk.tail = FORM` (a `pub const` in the mesh
+  last share kept free by `sk.tail = form` (a `pub const` in the mesh
   file): a mesh of its own carries that window (`growth.tag(b, mark, from,
   growth.tailWindow(FORM))`, emitted with `.grown = s.grown`); one the game
   places and sizes itself scales by `growth.formed(mesh.FORM, s.grown)`,

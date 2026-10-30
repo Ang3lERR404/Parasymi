@@ -18,31 +18,29 @@
 //! - gathering, it drops into a deep squat over the node, both paws grip it
 //!   (arms by inverse kinematics) and wrench it back once a unit, and each
 //!   unit that comes loose is pressed into the belly by one paw, in turn.
-const lib = @import("../lib.zig");
-
-pub const SLOTS = 24;
-pub const tuning = @import("player/tuning.zig");
-pub const tuning_look = @import("player/tuning_look.zig");
-pub const player = @import("player/player.zig");
-pub const motion = @import("player/motion.zig");
-pub const springs = @import("player/springs.zig");
-pub const posing = @import("player/posing.zig");
-pub const ik = @import("player/ik.zig");
-pub const tests = @import("player/tests.zig");
-pub const Player = player.Player;
-pub const Footfall = player.Footfall;
-pub const GATHER_AT = tuning.GATHER_AT;
-pub const solveLeg = ik.solveLeg;
-pub const solveArm = ik.solveArm;
-pub const solveArmTurned = ik.solveArmTurned;
-
-test {
-  _ = tuning;
-  _ = tuning_look;
-  _ = player;
-  _ = motion;
-  _ = springs;
-  _ = posing;
-  _ = ik;
-  _ = tests;
+const lib=@import("../lib.zig");
+pub const slots=24;
+pub const tuning=@import("player/tuning.zig");
+pub const tuningLook=@import("player/tuning_look.zig");
+pub const player=@import("player/player.zig");
+pub const motion=@import("player/motion.zig");
+pub const springs=@import("player/springs.zig");
+pub const posing=@import("player/posing.zig");
+pub const ik=@import("player/ik.zig");
+pub const tests=@import("player/tests.zig");
+pub const Player=player.Player;
+pub const Footfall=player.Footfall;
+pub const gatherAt=tuning.gatherAt;
+pub const solveLeg=ik.solveLeg;
+pub const solveArm=ik.solveArm;
+pub const solveArmTurned=ik.solveArmTurned;
+test{
+  _=tuning;
+  _=tuningLook;
+  _=player;
+  _=motion;
+  _=springs;
+  _=posing;
+  _=ik;
+  _=tests;
 }

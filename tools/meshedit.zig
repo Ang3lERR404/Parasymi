@@ -26,27 +26,25 @@
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
 //! still follows the game's binding).
-const gizmo = @import("gizmo.zig");
-
-pub const settings = @import("meshedit/settings.zig");
-pub const doc = @import("meshedit/doc.zig");
-pub const editor = @import("meshedit/editor.zig");
-pub const editing = @import("meshedit/editing.zig");
-pub const panel = @import("meshedit/panel.zig");
-pub const run = @import("meshedit/run.zig");
-pub const tests = @import("meshedit/tests.zig");
-pub const main = run.main;
-test {
-  _ = gizmo;
-  _ = @import("orbit.zig");
+const gizmo=@import("gizmo.zig");
+pub const settings=@import("meshedit/settings.zig");
+pub const doc=@import("meshedit/doc.zig");
+pub const editor=@import("meshedit/editor.zig");
+pub const editing=@import("meshedit/editing.zig");
+pub const panel=@import("meshedit/panel.zig");
+pub const run=@import("meshedit/run.zig");
+pub const tests=@import("meshedit/tests.zig");
+pub const main=run.main;
+test{
+  _=gizmo;
+  _=@import("orbit.zig");
 }
-
-test {
-  _ = settings;
-  _ = doc;
-  _ = editor;
-  _ = editing;
-  _ = panel;
-  _ = run;
-  _ = tests;
+test{
+  _=settings;
+  _=doc;
+  _=editor;
+  _=editing;
+  _=panel;
+  _=run;
+  _=tests;
 }

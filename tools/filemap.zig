@@ -2,28 +2,24 @@
 //! of its `//!` header (a shader's right after `#version`). Run from the
 //! repo root after adding, removing or re-describing a file:
 //!   zig run tools/filemap.zig
-const std = @import("std");
-const Io = std.Io;
-const Dir = Io.Dir;
-const Allocator = std.mem.Allocator;
-
-const OUT = "docs/files.md";
-const ROOTS = [_][]const u8{ "src", "shaders", "engine/src", "engine/shaders" };
-const MAX_FILE = 4 << 20;
-const MAX_SUMMARY = 140;
-
-const Row = struct { path:[]const u8, what:[]const u8 };
-
-pub fn main(init:std.process.Init) !void {
-  const io = init.io;
-  const arena = init.arena.allocator();
-  var rows:std.ArrayList(Row) = .empty;
-  for (ROOTS) |root| try collect(io, arena, root, &rows);
-  std.mem.sort(Row, rows.items, {}, struct {
-    fn lt(_:void, a:Row, b:Row) bool { return std.mem.lessThan(u8, a.path, b.path); }
+const std=@import("std");
+const Io=std.Io;
+const Dir=Io.Dir;
+const Allocator=std.mem.Allocator;
+const outPath="docs/files.md";
+const roots=[_][]const u8{"src","shaders","engine/src","engine/shaders"};
+const maxFile=4<<20;
+const maxSummary=140;
+const Row=struct{path:[]const u8,what:[]const u8};
+pub fn main(init:std.process.Init)!void{
+  const io=init.io;
+  const arena=init.arena.allocator();
+  var rows:std.ArrayList(Row)=.empty;
+  for(roots)|root|try collect(io,arena,root,&rows);
+  std.mem.sort(Row,rows.items,{},struct{
+    fn lt(_:void,a:Row,b:Row)bool{return std.mem.lessThan(u8,a.path,b.path);}
   }.lt);
-
-  var out:std.ArrayList(u8) = .empty;
+  var out:std.ArrayList(u8)=.empty;
   try out.appendSlice(arena,
     \\# Source files
     \\
@@ -31,58 +27,56 @@ pub fn main(init:std.process.Init) !void {
     \\edit by hand (fix the file's `//!` header and regenerate).
     \\
   );
-  var dir_now:[]const u8 = "";
-  for (rows.items) |r| {
-    const d = std.fs.path.dirnamePosix(r.path) orelse "";
-    if (!std.mem.eql(u8, d, dir_now)) {
-      dir_now = d;
-      try out.print(arena, "\n## {s}/\n", .{d});
+  var dirNow:[]const u8="";
+  for(rows.items)|r|{
+    const d=std.fs.path.dirnamePosix(r.path)orelse"";
+    if(!std.mem.eql(u8,d,dirNow)){
+      dirNow=d;
+      try out.print(arena,"\n## {s}/\n",.{d});
     }
-    try out.print(arena, "- `{s}` — {s}\n", .{ std.fs.path.basenamePosix(r.path), r.what });
+    try out.print(arena,"- `{s}` — {s}\n",.{std.fs.path.basenamePosix(r.path),r.what});
   }
-  try Dir.cwd().writeFile(io, .{ .sub_path = OUT, .data = out.items });
+  try Dir.cwd().writeFile(io,.{.sub_path=outPath,.data=out.items});
 }
-
-fn collect(io:Io, arena:Allocator, root:[]const u8, rows:*std.ArrayList(Row)) !void {
-  var d = try Dir.cwd().openDir(io, root, .{ .iterate = true });
+fn collect(io:Io,arena:Allocator,root:[]const u8,rows:*std.ArrayList(Row))!void{
+  var d=try Dir.cwd().openDir(io,root,.{.iterate=true});
   defer d.close(io);
-  var walk = try d.walk(arena);
+  var walk=try d.walk(arena);
   defer walk.deinit();
-  while (try walk.next(io)) |e| {
-    if (e.kind != .file) continue;
-    const zig = std.mem.endsWith(u8, e.basename, ".zig");
-    if (!zig and std.mem.endsWith(u8, root, "src")) continue;
-    const path = try std.fmt.allocPrint(arena, "{s}/{s}", .{ root, e.path });
-    std.mem.replaceScalar(u8, path, '\\', '/');
-    const text = try e.dir.readFileAlloc(io, e.basename, arena, .limited(MAX_FILE));
-    try rows.append(arena, .{ .path = path, .what = try summary(arena, text) });
+  while(try walk.next(io))|e|{
+    if(e.kind!=.file)continue;
+    const zig=std.mem.endsWith(u8,e.basename,".zig");
+    if(!zig and std.mem.endsWith(u8,root,"src"))continue;
+    const path=try std.fmt.allocPrint(arena,"{s}/{s}",.{root,e.path});
+    std.mem.replaceScalar(u8,path,'\\','/');
+    const text=try e.dir.readFileAlloc(io,e.basename,arena,.limited(maxFile));
+    try rows.append(arena,.{.path=path,.what=try summary(arena,text)});
   }
 }
-
 /// The leading `//!` lines joined (a shader's after its `#version`), cut at
 /// the first sentence end.
-fn summary(arena:Allocator, text:[]const u8) ![]const u8 {
-  const mark = "//!";
-  var joined:std.ArrayList(u8) = .empty;
-  var lines = std.mem.splitScalar(u8, text, '\n');
-  while (lines.next()) |raw| {
-    const line = std.mem.trim(u8, raw, " \t\r");
-    if (joined.items.len == 0 and std.mem.startsWith(u8, line, "#version")) continue;
-    if (!std.mem.startsWith(u8, line, mark)) break;
-    const body = std.mem.trim(u8, line[mark.len..], " \t");
-    if (body.len == 0) break;
-    if (joined.items.len > 0) try joined.append(arena, ' ');
-    try joined.appendSlice(arena, body);
-    if (joined.items.len >= MAX_SUMMARY) break;
+fn summary(arena:Allocator,text:[]const u8)![]const u8{
+  const mark="//!";
+  var joined:std.ArrayList(u8)=.empty;
+  var lines=std.mem.splitScalar(u8,text,'\n');
+  while(lines.next())|raw|{
+    const line=std.mem.trim(u8,raw," \t\r");
+    if(joined.items.len==0 and std.mem.startsWith(u8,line,"#version"))continue;
+    if(!std.mem.startsWith(u8,line,mark))break;
+    const body=std.mem.trim(u8,line[mark.len..]," \t");
+    if(body.len==0)break;
+    if(joined.items.len>0)try joined.append(arena,' ');
+    try joined.appendSlice(arena,body);
+    if(joined.items.len>=maxSummary)break;
   }
-  const s = joined.items;
-  if (s.len == 0) return "(no header)";
-  var end:usize = s.len;
-  if (std.mem.indexOf(u8, s, ". ")) |i| end = i + 1;
-  if (end > MAX_SUMMARY) {
-    end = MAX_SUMMARY;
-    while (end > 0 and s[end - 1] != ' ') end -= 1;
-    return std.fmt.allocPrint(arena, "{s}…", .{std.mem.trimEnd(u8, s[0..end], " ,;:")});
+  const s=joined.items;
+  if(s.len==0)return"(no header)";
+  var end:usize=s.len;
+  if(std.mem.indexOf(u8,s,". "))|i|end=i+1;
+  if(end>maxSummary){
+    end=maxSummary;
+    while(end>0 and s[end-1]!=' ')end-=1;
+    return std.fmt.allocPrint(arena,"{s}…",.{std.mem.trimEnd(u8,s[0..end]," ,;:")});
   }
   return s[0..end];
 }

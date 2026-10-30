@@ -1,7 +1,7 @@
 # convergence_kit
 
 `src/gfx/meshes/convergence_kit.zig` (629 lines). Imports: `meshgen` (`mg`),
-`parasite_kit` (`pk`), `palette` (`pal`), `growth`, `vertex`, `sim/species`,
+`parasiteKit` (`pk`), `palette` (`pal`), `growth`, `vertex`, `sim/species`,
 `core/math`, `core/color`, `core/rng`.
 
 ## What it is
@@ -18,7 +18,7 @@ so neither is ever seen alone:
   violet knot**, neither one's colour. The shared core is banded with both saps.
 - **Sap** (`sac`): amber and pale blue swirling round each other in arms, violet
   where they mingle; never stirred smooth.
-- **Counts**: the parasites' exact fives (`FOLD`), turned evenly and grown
+- **Counts**: the parasites' exact fives (`fold`), turned evenly and grown
   alike, but what each of the five carries is a symbiote's, each a little
   different: a lilac **frond** bearing green leaflets ending in a fern crozier;
   a **bloom** of a pale frondlet calyx holding warm living petals with stamens.
@@ -32,13 +32,13 @@ driftbraid's look is the approved reference for this kit.
 
 | Name | Source | Use |
 |---|---|---|
-| `green`, `leaf_dark`, `leaf_lite`, `amber` | `pal.vine`, `pal.leaf_*`, `pal.sap` | the symbiotes' half |
+| `green`, `leafDark`, `leafLite`, `amber` | `pal.vine`, `pal.leaf_*`, `pal.sap` | the symbiotes' half |
 | `pale`, `pearl`, `lilac`, `blue` | `pk.skin`, `pk.pearl`, `pk.lilac`, `pk.sac` | the parasites' half |
 | `violet` | rgb(0.58, 0.36, 0.9) | where they meet |
 | `knot` | rgb(0.8, 0.68, 0.98) | fused crossings |
-| `petal_base` → `petal_tip` | warm orange → violet | living petals |
-| (private) `core_sym` / `core_par` | `pal.sapwood_dark` / `pk.core` | banded core |
-| `FOLD` | `pk.FOLD` (5) | counts |
+| `petalBase` → `petalTip` | warm orange → violet | living petals |
+| (private) `coreSym` / `corePar` | `pal.sapwood_dark` / `pk.core` | banded core |
+| `fold` | `pk.FOLD` (5) | counts |
 
 ## API
 
@@ -46,8 +46,8 @@ driftbraid's look is the approved reference for this kit.
 
 | Item | Purpose |
 |---|---|
-| `Weave{n = FOLD, twist = pk.TWIST, sides = 4, wobble = 0.08, knot = 1.55, knot_from = 0.3, bands = 5, seed, part = .stem}` | options: green strands wander by `wobble` (`mg.strandTurn`/`strandSwell`), pale never; `knot` size × strand radius where parted ≥ `knot_from`; `bands` of sap up the core |
-| `weave(b, spine, ts, sec, w)` | core (banded `core_sym`↔`core_par`) + `n` green strands one way, `n` pale the other, paling where parted (green→`leaf_lite`, pale→`pearl`); strand tu.y = `pk.parting`; knots where pale strand j meets green j−k. **Knots dropped at coarsest LOD.** |
+| `Weave{n = fold, twist = pk.TWIST, sides = 4, wobble = 0.08, knot = 1.55, knotFrom = 0.3, bands = 5, seed, part = .stem}` | options: green strands wander by `wobble` (`mg.strandTurn`/`strandSwell`), pale never; `knot` size × strand radius where parted ≥ `knotFrom`; `bands` of sap up the core |
+| `weave(b, spine, ts, sec, w)` | core (banded `coreSym`↔`corePar`) + `n` green strands one way, `n` pale the other, paling where parted (green→`leafLite`, pale→`pearl`); strand tu.y = `pk.parting`; knots where pale strand j meets green j−k. **Knots dropped at coarsest LOD.** |
 | `sections(stalk, out)` | fill `out` with `pk.section` along it |
 | `weaveOn(b, k, id, stalk, w, t0, t1, sp, sec)` | a weave along spline `id`, `k.along`-tagged; writes back the path and sections so callers can place what rides inside (sacs) |
 
@@ -62,7 +62,7 @@ driftbraid's look is the approved reference for this kit.
 
 | Item | Purpose |
 |---|---|
-| `Frond{from, out, len, r, rise = 1.1, curl = 3.0, pairs, leaf_len, leaf_w, coil = 1.2, t0, t1, seed, leaf_seed}` | `seed` shared by a crown (exact); `leaf_seed` per frond (symbiotic leaflets) |
+| `Frond{from, out, len, r, rise = 1.1, curl = 3.0, pairs, leafLen, leafW, coil = 1.2, t0, t1, seed, leafSeed}` | `seed` shared by a crown (exact); `leafSeed` per frond (symbiotic leaflets) |
 | `frond(b, f)` | plain: lilac `.tendril` stem (`pk.frondPath` arc, 8 pts) rolling into a crozier (6 pts, `coil` turns), greening toward the tip; leaflet pairs longest near the foot; furled nubs on the coil (**nubs at LOD 0 only**) |
 | `frondOn(b, k, parent, u, f, branch)` | the same on its own spline; stem `k.along`, each leaflet pair and nub `k.on` at its nearest point, unfolding as the front passes; returns its id |
 
@@ -70,15 +70,15 @@ driftbraid's look is the approved reference for this kit.
 
 | Item | Purpose |
 |---|---|
-| `Bloom{heart, len, t = 1, open = 1, spin = 0, petals = FOLD, base, tip, seed}` | `open` 0 bud .. 1 open |
-| `bloom(b, f)` | a sac bead of both saps, a calyx of `FOLD` lilac frondlets tipped with pearls (exact), `petals` living `mg.petal`s each its own size and lean, and `mg.stamens` (pearl filaments, gold pollen). **Every size follows `open`, counts never do** — one vertex layout for every key. |
+| `Bloom{heart, len, t = 1, open = 1, spin = 0, petals = fold, base, tip, seed}` | `open` 0 bud .. 1 open |
+| `bloom(b, f)` | a sac bead of both saps, a calyx of `fold` lilac frondlets tipped with pearls (exact), `petals` living `mg.petal`s each its own size and lean, and `mg.stamens` (pearl filaments, gold pollen). **Every size follows `open`, counts never do** — one vertex layout for every key. |
 
 ### Rooting and helpers
 
 | Item | Purpose |
 |---|---|
-| `Foot{at, r, reach, root_r, t = 0, seed}` | bulb radius, root reach, root radius |
-| `foot(b, f)` | plain: `pk.nodule` bulb, `FOLD` pale exact roots + `FOLD` green braided roots between (each its own) |
+| `Foot{at, r, reach, rootR, t = 0, seed}` | bulb radius, root reach, root radius |
+| `foot(b, f)` | plain: `pk.nodule` bulb, `fold` pale exact roots + `fold` green braided roots between (each its own) |
 | `footOn(b, k, id, f)` | the same on spline `id`: bulb swells out of its start (30% of its time), every root a branch `.after = .with` |
 | `rootPath(at, a, from, reach, wobble, seed, c)` | a root from the bulb toward bearing `a`, low over the ground then down |
 | `taper(b, p, r, tip, t0, t1, col, part, sides)` | a tapering tube along `p`, never thinner than 2e-4 (keeps caps) |
@@ -86,11 +86,11 @@ driftbraid's look is the approved reference for this kit.
 ### The confluence
 
 `confluence(b, genome, seed, growth)` — the `confluence` plant form at
-`growth` 0..1 (meshgen builds `KEYS` = 8 keys, `variant/(KEYS-1)`). Tells the
+`growth` 0..1 (meshgen builds `keys` = 8 keys, `variant/(keys-1)`). Tells the
 meeting from the ground up: out of opposite corners rise a symbiote's braided
 leafy trunk on green roots and a parasite's lattice stalk with sacs on a pale
 bulb; they wind round each other (1.15π), close in, and **fuse** at
-`FUSE_T` (0.42) into one `weave` that gives onto the canopy at `CANOPY_T`
+`fuseT` (0.42) into one `weave` that gives onto the canopy at `canopyT`
 (0.78): a great `sac`, five lilac boughs with leaves each ending in a `bloom`,
 and a crowning `bloom` lifting clear as it opens. Stages via `Grown.at`: `rise`
 (trunks), `reach` (boughs), `bloom` (flowers). **Nothing appears or vanishes
@@ -102,10 +102,10 @@ layout — required by plant.vert's key blending.
 | User | Uses |
 |---|---|
 | `meshgen.zig` (form `.confluence`) | `confluence` — species `confluence` |
-| `weftstone.zig` | `weaveOn`, `frondOn`, `sac`, `taper`, palette, `FOLD` |
-| `driftbraid.zig` (approved reference look) | `weaveOn`, `footOn`, `bloom`, `sac`, palette, `FOLD` |
+| `weftstone.zig` | `weaveOn`, `frondOn`, `sac`, `taper`, palette, `fold` |
+| `driftbraid.zig` (approved reference look) | `weaveOn`, `footOn`, `bloom`, `sac`, palette, `fold` |
 | `monfris.zig` | `weave`, `weaveOn`, `sections`, `bloom`, `sac`, `rootPath`, palette |
-| `vultrixi.zig` | `sac`, palette (`petal_base/tip`, `pale`, `pearl`), `FOLD` |
+| `vultrixi.zig` | `sac`, palette (`petal_base/tip`, `pale`, `pearl`), `fold` |
 
 ## GPU side
 

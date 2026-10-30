@@ -1,18 +1,17 @@
 //! BRAIDED DRIFT: what a braided conduit and a sporecaster make between
 //! them, grown side by side: driftbraids, paired, sending what each is fed
 //! to the other by spore and taking in what it sends back.
-const lib = @import("../../lib.zig");
-const prog = lib.progression;
-
-pub const def:prog.Research = .{
-  .per_unit = &.{
-    .{ .item = .essence, .n = 3 },
-    .{ .item = .ley_shard, .n = 1 },
-    .{ .item = .convergence_essence, .n = 1 },
+const lib=@import("../../lib.zig");
+const prog=lib.progression;
+pub const def:prog.Research=.{
+  .perUnit=&.{
+    .{.item=.essence,.n=3},
+    .{.item=.leyShard,.n=1},
+    .{.item=.convergenceEssence,.n=1},
   },
-  .units = 25,
-  .unit_time = 8,
-  .prereq = &.{ .spore_casting, .braided_roots },
-  .needs = .braid_and_spore,
-  .branch = true,
+  .units=25,
+  .unitTime=8,
+  .prereq=&.{.sporeCasting,.braidedRoots},
+  .needs=.braidAndSpore,
+  .branch=true,
 };

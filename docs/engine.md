@@ -14,7 +14,7 @@ Game code reaches it as `@import("engine")` (`engine/src/engine.zig`):
 | platform | input, display, `audio` (`Output(S)`: the default WASAPI device pulling mono blocks from a source declaring `Cmd`, `apply`, `render`, on zig-wsapi's render thread; the game `send`s commands through a lock-free `Mailbox`) | — |
 | anim | `rig`: `Turn` (Y·X·Z, `blend`), `twoBone` (law-of-cosines IK), `inverses`, `skin`; `clip`: keyed channels eased between, their text form, `Channels(T)` (every f32 of a struct as a named channel) | the wolf's skeleton (`wolf_skeleton`: bones, offsets, `fk`, breath swell) and limb solvers (`player.solveLeg`/`solveArm`, built on `twoBone`) |
 | gfx | ctx, swapchain, buffer, pipeline, `vertex` (`Mesh`, `Skin`, `Grow`, `MeshPose`, `Ui`, `Light`), `meshgen` (`Mesher(Part, stem)`: `Builder`, tubes, cone, loft, patch, ellipsoid, vines, braids, bands; LOD scheme; Growth/transport), `sculpt` (SDF forms, surface nets, bone weights), `growth` (`Grower(M, leaf)`: the growth-spline `Skeleton`, `tag`, `formed`) | meshgen (blades, laminae, petals, stamens, flowers, plants; re-exports the engine's), meshlib, growth, kits, `vertex` (instances; re-exports the rest) |
-| world | `chunk` (grid: `SIZE`, `Coord`, `MeshSlot`, `localIndex`), `World(L)` (streaming) | `chunk` (the garden's tiles), `gen`, `world` (`World` over the garden's land) |
+| world | `chunk` (grid: `sizeTiles`, `Coord`, `MeshSlot`, `localIndex`), `World(L)` (streaming) | `chunk` (the garden's tiles), `gen`, `world` (`World` over the garden's land) |
 | render | `Renderer(G)`, post, light, camera, `passes/ui` | `renderer` (the garden's `G`), passes, terrain meshing |
 | ui | draw, font, box | — |
 | shaders | post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`, `growth.glsl` (`growOut`) | everything else; `common.glsl` includes `light.glsl`, `part.vert` `growth.glsl` |
@@ -23,10 +23,10 @@ Game code reaches it as `@import("engine")` (`engine/src/engine.zig`):
 - **Renderer**: `engine.render.renderer.Renderer(G)`, where `G` is a
   namespace (Parasymi's is `src/render/renderer.zig`, using `@This()`)
   declaring `name`, `passes` (the pass registry, record order; list
-  `er.ui` as `ui` for the HUD), `Push` (holding `vp`, `eye_time`, `view`,
+  `er.ui` as `ui` for the HUD), `Push` (holding `vp`, `eyeTime`, `view`,
   `sun`, `light`), `Scene` (holding `push`, `clear`, `lights`, plus `ui`
-  and `ui_time` for the UI pass), `Stats` (holding `draws`, `lights`,
-  `gpu_ms`) and `Ext` (the game's own state, `r.ext`). It may also declare
+  and `uiTime` for the UI pass), `Stats` (holding `draws`, `lights`,
+  `gpuMs`) and `Ext` (the game's own state, `r.ext`). It may also declare
   the hooks `start(r)`, `release(r)` and `carry(prev)`. Its comment block
   lists the full contract. Pass descriptors carry SPIR-V bytes
   (`.vert = @embedFile("plant.vert")`), so each module embeds its own
@@ -41,7 +41,7 @@ Game code reaches it as `@import("engine")` (`engine/src/engine.zig`):
   `src/gfx/growth.zig`. Its shader carries `vertex.Grow` and calls
   `growOut` (growth.glsl) with how far its thing has grown.
 - **World**: `engine.world.World(L)`, where `L` declares `Chunk` (holding
-  `at`, `height`, `kind`, `occ`, `pins`, `gpu_slot`, `dirty`), `Kind`,
+  `at`, `height`, `kind`, `occ`, `pins`, `gpuSlot`, `dirty`), `Kind`,
   `Occ` (with `.none`), `blank`, `generate` and `heightAt`. Parasymi's is
   `Land` in `src/world/world.zig`.
 - **Shaders**: a world shader declares its push block `pc` and `SUN`, then

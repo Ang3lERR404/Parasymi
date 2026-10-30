@@ -57,7 +57,7 @@ grows a grand garden. 2.5D top-down 3D.
 - Braided conduit ("Braided Roots", woven from 4 conduits): 4 lanes, one
   kind each, 3.5 tiles/s; joins and turns with conduits.
 
-### Parasitic (pale, alien, `parasite_kit`)
+### Parasitic (pale, alien, `parasiteKit`)
 - Lithophage ("Lithophagy"): drains grit/ley nodes on the 8 tiles round it
   (one per 3 s) into a crystal in its crop (6 grit, ley shard = 3), sapped
   back out as 6 grit into its cup; fed ley shards only, so the grit it
@@ -79,7 +79,7 @@ parent's `adopts(s, kind, have)` hook takes it (default: none; never a
 loop), `detach` cuts it loose, `getParent`/`getChildren`/`getChild`/
 `childCount` walk them. Uprooting a parent cuts its children loose.
 
-Partners are peers (`Structure.partners`, up to `PARTNERS`, oldest first,
+Partners are peers (`Structure.partners`, up to `partnerSlots`, oldest first,
 held the same way): a kind that declares `pairs:Pairs` pairs with its own
 kind (or `.with`), one way (it sends there: the sporecaster) or both ways
 (each is the other's: the driftbraid), with up to `.most` (default 1) at
@@ -105,8 +105,8 @@ a discovery (`meets` hook + `Structures.meetings`), opening its research.
 Woven by a germinator only (`Recipe.germinator`) from the pair's bulbs + 2
 convergence essence. The confluence stays the only convergent plant.
 - Weftstone (loomfern + lithophage, WOVEN STONE): floating (its mesh
-  carries `HOVER`, `Def.hover` 0), latches tendrils (emitted curves,
-  `weftstone_tendril`) onto the nearest 6 grit/ley nodes within 2 tiles,
+  carries `hover`, `Def.hover` 0), latches tendrils (emitted curves,
+  `weftstoneTendril`) onto the nearest 6 grit/ley nodes within 2 tiles,
   draws one unit/2 s in turn into its bulb (12 grit, 4 ley), ionizes 4 grit
   + 1 ley into a ley crystal in 6 s, holds 8, hands them on.
 - Driftbraid (braided conduit + sporecaster, BRAIDED DRIFT): paired both
@@ -137,7 +137,7 @@ convergence essence; mature, halves parasite drain within 3 tiles.
 - Blooms within 10 tiles link into networks; a network radiates when it
   holds a mature bloom (then all its blooms do), so uprooting a linking
   bloom cuts off those beyond it.
-- Plants with `needs_radiance` (vesper, for now) halt and wither
+- Plants with `needsRadiance` (vesper, for now) halt and wither
   (0.06 HP/s) outside every field.
 - Worked out per tick from blooms only (pairwise links, then each radiating
   bloom's tiles). Hover panel shows RADIATING/DARK + links, DRAWING
@@ -170,14 +170,14 @@ placing or adjusting.
 - Along a host, children sit one slot apart by depth (longest prereq chain;
   a `needs` discovery counts 1), then declaration order; leaves and
   branches each alternate sides. Stems are one slot longer than their
-  children (branches ≥ `BRANCH_MIN`) and bend toward the light.
+  children (branches ≥ `branchMin`) and bend toward the light.
 - The fully grown, still tree is fitted to the panel (`fit`, slot ≤
-  `max_slot` px), so nothing moves: the sapling starts small at the soil
+  `maxSlot` px), so nothing moves: the sapling starts small at the soil
   and fills the panel as research is done.
 - Known: grown leaf / branch with a violet bloom at its tip. Open: gold bud
   (glows; while studied a leaf unfurls and a branch shoot extends with
   progress). Locked: dim dormant bud where its host has grown, else
-  hidden. The trunk reaches `TRUNK_LEAD` past its highest open/known node
+  hidden. The trunk reaches `trunkLead` past its highest open/known node
   (eased, `play.Game.sapling`) and thickens with √(known).
 - Wind sways stems from the base (children follow), leaves flutter.
   Hovering a node (`Game.pointed`) shows its card (cost, progress, or what
@@ -205,7 +205,7 @@ placing or adjusting.
   save can be deleted from the menu; `Request` carries
   saves/loads/listing/deletes to main. Autosave (always `autosave.sav`) every
   `Options.autosave` minutes of play (default 5, options panel:
-  never..60). Bump `VERSION` when a stored layout changes (the fingerprint
+  never..60). Bump `version` when a stored layout changes (the fingerprint
   checks sizes only). Structures are stored as `record`s (`game/record.zig`:
   named, framed fields, enums and kinds by name), so a structure's state may
   gain, lose or change fields, or hold lists (its `State.deinit` frees

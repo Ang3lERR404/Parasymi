@@ -14,7 +14,7 @@ Defaults in `src/cfg/controls.cfg` (rebindable in the gardener's copy; see
   seed at the screen's middle is on. A panel or the pause menu gives the
   cursor back. The head (head, jaw and ear bones) is clipped away on the
   GPU (`parts.Look.hide`, part.vert `gl_ClipDistance`) once the view is
-  within `HEAD_CLEAR` of the eyes; its shadow still falls.
+  within `headClear` of the eyes; its shadow still falls.
 - LMB held plants the selected seed/bulb wherever it fits as the cursor
   sweeps; where it does not, a click on a structure interacts, on a plant
   harvests. E always interacts (harvests a plant). Interact: a structure
@@ -22,8 +22,8 @@ Defaults in `src/cfg/controls.cfg` (rebindable in the gardener's copy; see
   configured, any other is fed from the belly.
 - RMB pressed or held is the universal remove: uproots a plant, takes up
   a structure (one tile at a time as the cursor sweeps,
-  `REMOVE_COOLDOWN`), gathers from a resource node while held (with no
-  move held, the wolf steps up to the node, `GATHER_AT`, and pries it by
+  `removeCooldown`), gathers from a resource node while held (with no
+  move held, the wolf steps up to the node, `gatherAt`, and pries it by
   hand).
 - Q picks the seed/bulb of what is under the cursor: selects its hotbar
   slot, else puts it from the belly on the selected slot (if empty, else
@@ -69,7 +69,7 @@ germinator's panel also picks what it weaves, any weave
   to the pause menu.
 - Saved gardens panel (pause menu only, `hud/gardens.zig`, `Mode.gardens`):
   A FRESH GARDEN then every save, newest first; wheel or drag its stem to
-  scroll (`GARDENS_SHOWN` rows), LMB chooses, SAVE (a fresh garden asks
+  scroll (`gardensShown` rows), LMB chooses, SAVE (a fresh garden asks
   its name; twice to save over one), LOAD, the chosen save's small DELETE
   (twice), BACK/Esc.
 - Name prompt (`hud/naming.zig`, `Mode.naming`, world frozen): type the

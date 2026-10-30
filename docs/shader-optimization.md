@@ -16,7 +16,7 @@ fragment shader and with a trivial vertex shader, and scaled with bytes
 per vertex. Before touching shader math, knock things out one at a time
 (trivial frag, trivial vert, AA off) and see which one moves the time.
 
-- The CPU frame hides behind the GPU (frames in flight), so `frame_ms` says
+- The CPU frame hides behind the GPU (frames in flight), so `frameMs` says
   little about a shader change. Read GPU time per pass: Vulkan timestamp
   queries written around every pass (`vkCmdWriteTimestamp2`, a query pool
   per frame in flight, read back after its fence; ticks x

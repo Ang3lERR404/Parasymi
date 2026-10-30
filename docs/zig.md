@@ -58,7 +58,8 @@ Read this before writing any code. Where it and CLAUDE.md disagree, CLAUDE.md
 - **Juicy Main** eliminates the "read globals in main" boilerplate.
 - **Faster iteration:** incremental compilation, 20s self-hosted build (was 75s), 5 MiB compiler binary.
 - **Better errors:** the type-resolution redesign produces messages that tell you *what you actually did wrong*.
-- **`zig fmt`** is canonical and mandatory — run it always.
+- **Never run `zig fmt`** here: the project's own style (CLAUDE.md, Style) is
+  tighter than it, and `zig fmt` would undo it.
 
 ---
 

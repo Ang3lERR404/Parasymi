@@ -28,7 +28,7 @@ No key or mouse button is named in code. Every binding lives in
 - Headless tests `ctl.fill` the embedded cfg and `ctl.hold` actions. The
   mouse wheel/cursor are axes, not bindings.
 - Text never names a key either: write `{@action}` in `parasymi.cfg`
-  (`FEED ({@harvest})`); `txt.load` (after `controls.load`) replaces it once
+  (`feedRate ({@harvest})`); `txt.load` (after `controls.load`) replaces it once
   with the bound key's `[key]`/`[mouse]` name (else its binding name in
   capitals), so labels follow rebinding.
 
@@ -52,7 +52,7 @@ spawn threads or keep a pool of your own.
   Allocate with the gpa (thread-safe); no Vulkan, GLFW, txt or controls
   calls inside `run`.
 - `min`: enough work a range to pay for a hand-off (~0.1 ms; e.g.
-  `LINKS_MIN` 512 plants, 1 chunk).
+  `linksMin` 512 plants, 1 chunk).
 - Every new use gets a test that it matches the serial result
   (`testing.io` vs `null`, as in plants/world).
 
@@ -70,14 +70,14 @@ bug (`@panic` in debug).
   `bundle`, `loft`, `patch`, `lamina`, `blade`/`bladeAlong`, `petal`,
   `stamens`, `leavesAlong`, `bands`, `ellipsoid`, `cone`.
 - Shared kits: [kits/README.md](kits/README.md) (one file per kit; update
-  it with the kit). Symbiotic structures use `structure_kit` and the
+  it with the kit). Symbiotic structures use `structureKit` and the
   conduit's `arch` (its weave, spine and side roots: `conduit.arch`,
   `spineCtrl`, `core = null` for a bare weave).
 - Structures: [growth.md](growth.md).
 - Stamens (`meshgen.stamens`): grown filaments, two-lobed pollen anthers,
   `.leaf` so they fold and open with the petals; icons `Icon.stamens`.
   Closed buds hide theirs.
-- Leaves and petals (`meshgen.lamina`): a thin closed shell (`LAMINA_THICK`
+- Leaves and petals (`meshgen.lamina`): a thin closed shell (`laminaThick`
   of the broadest half-width) rounded over at the edges, a small bevel;
   leaves (blades, fur leaves) fold toward a pale midrib vein raised in the
   fold, fading to the tip. Petals have no vein.
@@ -86,7 +86,7 @@ bug (`@panic` in debug).
 - Translucent sap: part `.bloom` with instance `fade < 1` (fresnel, hue from
   vertex colour, `tint` shifts it); `.ear` inner face and `.resin` likewise.
 - See-through is two passes: `plants`/`parts` keep only fragments with
-  alpha ≥ 0.996 (writing depth); `plants_glass`/`parts_glass` (the same
+  alpha ≥ 0.996 (writing depth); `plantsGlass`/`partsGlass` (the same
   instances, shaders built with `-DGLASS`, build.zig `variants`) blend the
   rest over every solid surface, testing depth but writing none. A new
   see-through part role goes in `vertex.seeThrough`.
