@@ -6,39 +6,49 @@
 
 ## What it is
 
-The **lineages mixed**: what grows where symbiote and parasite have become one
-body. Shared by the confluence (a plant, grown through keys) and the convergent
-structures (on growth splines, the `*On` pieces). Not one laid over the other
-(a braid below, a cage above) but **woven through each other at every scale**,
-so neither is ever seen alone:
+The **lineages mixed**: what grows where symbiote and parasite have become
+one body. Not a mesh itself.
 
-- **Stalk** (`weave`): the parasites' lattice with every other strand a
-  symbiote's: green strands one way, each wandering a little; pale strands the
-  other way, exact. Where it parts into a cage they cross and **fuse into a
-  violet knot**, neither one's colour. The shared core is banded with both saps.
-- **Sap** (`sac`): amber and pale blue swirling round each other in arms, violet
-  where they mingle; never stirred smooth.
+It is shared by:
+- the confluence (a plant, grown through keys);
+- the convergent structures (on growth splines, the `*On` pieces).
+
+It is not one laid over the other (a braid below, a cage above). The two
+are **woven through each other at every scale**, so neither is ever seen
+alone:
+
+- **Stalk** (`weave`): the parasites' lattice, with every other strand a
+  symbiote's. Green strands run one way, each wandering a little; pale
+  strands run the other way, exact. Where it parts into a cage they cross
+  and **fuse into a violet knot**, neither one's colour. The shared core
+  is banded with both saps.
+- **Sap** (`sac`): amber and pale blue swirling round each other in arms,
+  violet where they mingle; never stirred smooth.
 - **Counts**: the parasites' exact fives (`fold`), turned evenly and grown
-  alike, but what each of the five carries is a symbiote's, each a little
-  different: a lilac **frond** bearing green leaflets ending in a fern crozier;
-  a **bloom** of a pale frondlet calyx holding warm living petals with stamens.
-- **Foot**: rooted both ways: a pale bulb with five exact pale roots, a green
-  braided symbiote root between each two.
+  alike. But what each of the five carries is a symbiote's, each a little
+  different:
+  - a lilac **frond** bearing green leaflets, ending in a fern crozier (a
+    tightly rolled tip);
+  - a **bloom** of a pale frondlet calyx holding warm living petals with
+    stamens.
+- **Foot**: rooted both ways. A pale bulb with five exact pale roots, and
+  a green braided symbiote root between each two.
 
-Cage strands carry how far they've parted in tu.y, as the parasites' do. The
-driftbraid's look is the approved reference for this kit.
+Cage strands carry how far they've parted in tu.y, as the parasites' do.
+
+The driftbraid's look is the approved reference for this kit.
 
 ## Colours
 
 | Name | Source | Use |
 |---|---|---|
-| `green`, `leafDark`, `leafLite`, `amber` | `pal.vine`, `pal.leaf_*`, `pal.sap` | the symbiotes' half |
+| `green`, `leafDark`, `leafLite`, `amber` | `pal.vine`, `pal.leafDark`/`pal.leafLite`, `pal.sap` | the symbiotes' half |
 | `pale`, `pearl`, `lilac`, `blue` | `pk.skin`, `pk.pearl`, `pk.lilac`, `pk.sac` | the parasites' half |
 | `violet` | rgb(0.58, 0.36, 0.9) | where they meet |
 | `knot` | rgb(0.8, 0.68, 0.98) | fused crossings |
 | `petalBase` → `petalTip` | warm orange → violet | living petals |
-| (private) `coreSym` / `corePar` | `pal.sapwood_dark` / `pk.core` | banded core |
-| `fold` | `pk.FOLD` (5) | counts |
+| (private) `coreSym` / `corePar` | `pal.sapwoodDark` / `pk.core` | banded core |
+| `fold` | `pk.fold` (5) | counts |
 
 ## API
 
@@ -46,7 +56,7 @@ driftbraid's look is the approved reference for this kit.
 
 | Item | Purpose |
 |---|---|
-| `Weave{n = fold, twist = pk.TWIST, sides = 4, wobble = 0.08, knot = 1.55, knotFrom = 0.3, bands = 5, seed, part = .stem}` | options: green strands wander by `wobble` (`mg.strandTurn`/`strandSwell`), pale never; `knot` size × strand radius where parted ≥ `knotFrom`; `bands` of sap up the core |
+| `Weave{n = fold, twist = pk.twist, sides = 4, wobble = 0.08, knot = 1.55, knotFrom = 0.3, bands = 5, seed, part = .stem}` | options: green strands wander by `wobble` (`mg.strandTurn`/`strandSwell`), pale never; `knot` size × strand radius where parted ≥ `knotFrom`; `bands` of sap up the core |
 | `weave(b, spine, ts, sec, w)` | core (banded `coreSym`↔`corePar`) + `n` green strands one way, `n` pale the other, paling where parted (green→`leafLite`, pale→`pearl`); strand tu.y = `pk.parting`; knots where pale strand j meets green j−k. **Knots dropped at coarsest LOD.** |
 | `sections(stalk, out)` | fill `out` with `pk.section` along it |
 | `weaveOn(b, k, id, stalk, w, t0, t1, sp, sec)` | a weave along spline `id`, `k.along`-tagged; writes back the path and sections so callers can place what rides inside (sacs) |
@@ -85,17 +95,24 @@ driftbraid's look is the approved reference for this kit.
 
 ### The confluence
 
-`confluence(b, genome, seed, growth)` — the `confluence` plant form at
-`growth` 0..1 (meshgen builds `keys` = 8 keys, `variant/(keys-1)`). Tells the
-meeting from the ground up: out of opposite corners rise a symbiote's braided
-leafy trunk on green roots and a parasite's lattice stalk with sacs on a pale
-bulb; they wind round each other (1.15π), close in, and **fuse** at
-`fuseT` (0.42) into one `weave` that gives onto the canopy at `canopyT`
-(0.78): a great `sac`, five lilac boughs with leaves each ending in a `bloom`,
-and a crowning `bloom` lifting clear as it opens. Stages via `Grown.at`: `rise`
-(trunks), `reach` (boughs), `bloom` (flowers). **Nothing appears or vanishes
-with growth** (what isn't grown yet is small), so every key keeps one vertex
-layout — required by plant.vert's key blending.
+`confluence(b, genome, seed, growth)` builds the `confluence` plant form
+at `growth` 0..1. Meshgen builds `keys` = 8 keys, at `variant/(keys-1)`.
+
+It tells the meeting from the ground up:
+1. Out of opposite corners rise a symbiote's braided leafy trunk on green
+   roots, and a parasite's lattice stalk with sacs on a pale bulb.
+2. They wind round each other (1.15π) and close in.
+3. They **fuse** at `fuseT` (0.42) into one `weave`.
+4. The weave gives onto the canopy at `canopyT` (0.78): a great `sac`,
+   five lilac boughs with leaves each ending in a `bloom`, and a crowning
+   `bloom` lifting clear as it opens.
+
+Stages via `Grown.at`: `rise` (trunks), `reach` (boughs), `bloom`
+(flowers).
+
+**Nothing appears or vanishes with growth**: what isn't grown yet is just
+small. So every key keeps one vertex layout, which plant.vert's key
+blending requires.
 
 ## Who uses it
 
@@ -105,20 +122,25 @@ layout — required by plant.vert's key blending.
 | `weftstone.zig` | `weaveOn`, `frondOn`, `sac`, `taper`, palette, `fold` |
 | `driftbraid.zig` (approved reference look) | `weaveOn`, `footOn`, `bloom`, `sac`, palette, `fold` |
 | `monfris.zig` | `weave`, `weaveOn`, `sections`, `bloom`, `sac`, `rootPath`, palette |
-| `vultrixi.zig` | `sac`, palette (`petal_base/tip`, `pale`, `pearl`), `fold` |
+| `vultrixi.zig` | `sac`, palette (`petalBase`/`petalTip`, `pale`, `pearl`), `fold` |
 
 ## GPU side
 
-- **Confluence**: 8 growth keys of one vertex layout blended in plant.vert
+- **Confluence**: 8 growth keys of one vertex layout, blended in plant.vert
   (binding 2, `FORMS_KEYED`); sway ×1.5; translucent violet petals.
-- Cage strands: tu.y = parting (as the parasites').
-- Sacs part `.bloom`, `fade < 1`: see-through in the glass pass; `sapGlisten`.
-- Structure pieces: `vertex.Grow` from `k.along`/`k.on`, grown in part.vert.
+- **Cage strands**: tu.y = parting (as the parasites').
+- **Sacs**: part `.bloom`, `fade < 1`: see-through in the glass pass;
+  `sapGlisten`.
+- **Structure pieces**: `vertex.Grow` from `k.along`/`k.on`, grown in
+  part.vert.
 
 ## Rules
 
 - Mix at every scale; never a symbiotic piece stacked on a parasitic one.
-- Exact fives for counts and layout; symbiotic variation only in what each of the
-  five carries (leaflets, petal sizes, green strand wander, green root lengths).
+- Exact fives for counts and layout. Symbiotic variation only in what each
+  of the five carries (leaflets, petal sizes, green strand wander, green
+  root lengths).
 - For the confluence: pass sizes, never counts, through `open`/`Grown`.
-- Check: `--plant=confluence --state=grow`, `--structure=weftstone|driftbraid|monfris|vultrixi --state=grow` (pairs and tethers need `--demo`).
+- Check: `--plant=confluence --state=grow`,
+  `--structure=weftstone|driftbraid|monfris|vultrixi --state=grow` (pairs
+  and tethers need `--demo`).

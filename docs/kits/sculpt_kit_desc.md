@@ -1,29 +1,42 @@
 # sculpt_kit
 
 `engine/src/gfx/sculpt.zig` (the engine's, `engine.gfx.sculpt`; kept as a
-kit by name). Imports: engine `vertex`, `core/math`, `core/color`. It meshes
-into any `meshgen.Mesher`'s builder: `s.mesh(mg.gen, b, h, t, part)`.
+kit by name). Imports: engine `vertex`, `core/math`, `core/color`.
+
+It meshes into any `meshgen.Mesher`'s builder:
+`s.mesh(mg.gen, b, h, t, part)`.
 
 ## What it is
 
-Sculpts **one seamless surface out of many forms** (the wolf's skin):
+It sculpts **one seamless surface out of many forms**: the wolf's skin.
+Think of clay lumps pressed together and smoothed into one body.
 
-1. Each form (ellipsoid, rounded cone, rounded box) is a **signed distance
-   field**, owned by a bone.
-2. Forms melt together by **smooth union** (`smin`, per-form melt `k`) or are
-   carved by smooth subtraction (`carve`); `ink` forms only colour.
-3. The whole is meshed once at startup with **surface nets**: one vertex per
-   surface cell, pulled onto the surface, normal = field gradient.
-4. Each vertex is **weighted to the bones** of the forms it lies nearest
-   (smoothly, only across joints that are actually joined: the nearest bone,
-   its parent, its children), so the mesh bends as one skin (`vertex.Skin`,
-   part.vert skinned mode 3).
+1. **Forms.** Each form (ellipsoid, rounded cone, rounded box) is a
+   **signed distance field** (SDF): a rule that tells, for any point, how
+   far it is from the form's surface, negative inside. Each form is owned
+   by a bone.
+2. **Melting.** Forms melt together by **smooth union** (`smin`, with a
+   per-form melt `k`: how wide the soft seam between them is). Or they are
+   carved away by smooth subtraction (`carve`). `ink` forms only colour.
+3. **Meshing.** The whole is meshed once at startup with **surface nets**:
+   one vertex per surface cell, pulled onto the surface. Its normal is the
+   field's gradient (the direction the distance grows fastest).
+4. **Skinning.** Each vertex is **weighted to the bones** of the forms it
+   lies nearest, so the mesh bends as one skin (`vertex.Skin`, part.vert
+   skinned mode 3). The weights blend smoothly, but only across joints
+   that are actually joined: the nearest bone, its parent, its children.
 
-Sampling is sparse: only 8³-cell blocks the surface can pass through are
-evaluated, each with only the forms whose bounding sphere reaches it, padded
-by the widest melt `k` of any form (a far form still melts into a nearer one
-by the nearer one's `k`; padding by its own alone cracked the skin where
-neighbouring blocks disagreed). A very wide melt makes sampling slower.
+### Sparse sampling
+Sampling is sparse, so it skips empty space:
+- Only the 8³-cell blocks the surface can pass through are evaluated.
+- Each block is tested only with the forms whose bounding sphere reaches
+  it, padded by the widest melt `k` of any form.
+
+Why the widest: a far form still melts into a nearer one by the nearer
+one's `k`. Padding by each form's own `k` alone cracked the skin where
+neighbouring blocks disagreed.
+
+A very wide melt makes sampling slower.
 
 ## API
 
@@ -53,15 +66,17 @@ neighbouring blocks disagreed). A very wide melt makes sampling slower.
 
 ## GPU side
 
-- `vertex.Skin` (binding 2) beside the mesh buffer; bones per frame via
-  `Parts.pose`/`emitSkinned`, buffer device address in `WorldPush.bones`;
-  part.vert placement mode 3 (`e.y` first bone), normals bent by slopes.
+- `vertex.Skin` (binding 2) sits beside the mesh buffer.
+- Bones are sent per frame via `Parts.pose`/`emitSkinned`; their buffer
+  device address is in `WorldPush.bones`.
+- part.vert placement mode 3 (`e.y` first bone); normals bent by slopes.
 
 ## Rules
 
-- New wolf meshes are built **in bind space and skinned**; never rigid parts.
+- New wolf meshes are built **in bind space and skinned**; never rigid
+  parts.
 - Weights only cross joined bones, so a surface never jumps across a gap.
-- Linear algebra only through `m` (`m.inverseAffine`); a singular form matrix is
-  a bug.
-- Sculpting is startup cost (once per LOD); keep forms bounded (`reach`) so the
-  sparse sampling stays sparse.
+- Linear algebra only through `m` (`m.inverseAffine`); a singular form
+  matrix is a bug.
+- Sculpting is startup cost (once per LOD). Keep forms bounded (`reach`)
+  so the sparse sampling stays sparse.

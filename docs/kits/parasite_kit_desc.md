@@ -6,25 +6,32 @@
 
 ## What it is
 
-The **parasitic lineage's body**, shared by its plants (`plant`, the `coil`
-form) and its structures. Alien, not hostile, plainly a deviation from the
-symbiotes:
+The **parasitic lineage's body**, shared by its plants (`plant`, the
+`coil` form) and its structures. Not a mesh itself.
 
-- A symbiote winds its strands tight round its core, each a little different. A
-  parasite's strands come up woven the same way (both ways at once), then **part
-  from the core into an open lattice cage** (`lattice`), pearl beads where they
-  cross, the core thinned to a filament inside, **sacs of thin-film sap hanging
-  on it in plain view** (`organs`), and gather to it again.
-- It is **too exact**: everything in fives (`fold`), turned evenly, grown alike
-  (one seed for every frond of a crown), never a golden angle.
-- It **repeats itself**: each frond ends in a small cage of its own (`pod`),
-  crowned in turn by five frondlets.
-- Pale pearl skin, lilac fronds, a bulbous foot half sunk in the soil, pale
-  exact roots.
+It is alien, not hostile: plainly a deviation from the symbiotes.
 
-On a structure every piece grows on growth splines; a plant grows by tu.x and
-its cage parts as it matures (plant.vert reads tu.y = how far each strand has
-parted).
+**It opens up.** A symbiote winds its strands tight round its core, each a
+little different. A parasite's strands come up woven the same way (both
+ways at once), and then:
+- **part from the core into an open lattice cage** (`lattice`), with
+  pearl beads where they cross;
+- the core thins to a filament inside;
+- **sacs of thin-film sap hang on it in plain view** (`organs`);
+- then the strands gather to the core again.
+
+**It is too exact.** Everything comes in fives (`fold`), turned evenly,
+grown alike (one seed for every frond of a crown), never a golden angle.
+
+**It repeats itself.** Each frond ends in a small cage of its own (`pod`),
+crowned in turn by five frondlets.
+
+**Its look**: pale pearl skin, lilac fronds, a bulbous foot half sunk in
+the soil, pale exact roots.
+
+On a structure, every piece grows on growth splines. A plant grows by
+tu.x, and its cage parts as it matures (plant.vert reads tu.y = how far
+each strand has parted).
 
 ## Constants
 
@@ -46,12 +53,12 @@ parted).
 | Item | Purpose |
 |---|---|
 | `Section{core, tight, open, strand}` | cross-section at one point: core radius, radius strands lie at woven tight, radius they've parted to (≥ tight), strand radius |
-| `parting(s) f32` | how far a section has parted: `1 - tight/open` (0 woven .. →1) |
+| `parting(s) f32` | how far a section has parted, from 0 (woven) toward 1: `1 - tight/open` |
 | `Lattice{n = fold, twist = twist, sides = 4, node = 1.9, nodeFrom = 0.3, part = .stem, core, strand, bead}` | lattice options; `node` = bead size × strand radius (0 none), only where parted ≥ `nodeFrom` |
 | `lattice(b, spine, ts, sec, l)` | core tube + `n` strands each way at exactly even turns (parallel-transported frames), lifting into a cage where parted and paling toward pearl; beads where strands cross (every π/(n·twist) along it). Strand tu.y = `parting`. **Beads dropped at the coarsest LOD.** |
 | `Stalk{girth, part = 2.6, from = 0.15, to = 0.85, foot = 0.9, twist, sides = 4, node = 1.9}` | a stalk's shape: woven at its foot, a cage over `from..to`, gathering above; `part` = how far strands part at widest (× woven radius); `foot` = swell into the foot |
-| `parted(s, u)` | cage opening at `u` (0..1), `1 - cos⁴`, eased both ways so strands leave and rejoin with no kink |
-| `section(s, u)` | the `Section` at `u`: braid-proportioned (`mg.BRAID_CORE/OFF/STRAND`), core thinning 65% where open |
+| `parted(s, u)` | cage opening at `u` (0..1), shaped `1 - cos⁴`: eased both ways so strands leave and rejoin with no kink |
+| `section(s, u)` | the `Section` at `u`: braid-proportioned (`mg.braidCore`/`braidOff`/`braidStrand`), core thinning 65% where open |
 | `stalk(b, k, id, s)` | the stalk along spline `id`, `k.along`-tagged (tu.x 0..0.85) |
 
 ### Organs, foot, roots
@@ -78,14 +85,22 @@ parted).
 
 ### The plant
 
-`plant(b, genome, seed)` — the `coil` form, upright and exactly symmetric,
-variants differ in proportion only. From the genome: `stemCol` (skin; dark =
-shade 0.7, light = mixed toward white), `leafCol` (fronds), `bloomCol` (sap),
-`stemH`, `stemR`, `thorns` (number of sacs), `tendrils` (number of crown
-fronds), `bloomR` (neck bulb). Builds: a 25-point dead-upright lattice stalk
-(cage from 0.12 to ~0.78), a bulbous foot, `fold` pale roots, sacs on the core,
-a sap bulb at the neck, and a candelabrum of fronds each ending in `podAt`. tu.x
-is height (crown 0.85..1).
+`plant(b, genome, seed)` builds the `coil` form: upright and exactly
+symmetric. Variants differ in proportion only.
+
+What it reads from the genome:
+- colours: `stemCol` (skin; dark = shade 0.7, light = mixed toward white),
+  `leafCol` (fronds), `bloomCol` (sap);
+- sizes: `stemH`, `stemR`, `bloomR` (neck bulb);
+- counts: `thorns` (number of sacs), `tendrils` (number of crown fronds).
+
+What it builds:
+- a 25-point, dead-upright lattice stalk (cage from 0.12 to ~0.78);
+- a bulbous foot and `fold` pale roots;
+- sacs on the core, and a sap bulb at the neck;
+- a candelabrum of fronds, each ending in `podAt`.
+
+tu.x is height (the crown is 0.85..1).
 
 ## Who uses it
 
@@ -100,22 +115,25 @@ is height (crown 0.85..1).
 
 ## GPU side
 
-- **plant.vert**, `FORMS_PARTING` (= coil): parts the cage from the foot up using
-  strand tu.y (how far that strand has parted at full growth) as it matures.
-- **plant.vert**, `FORMS_CROWNED` (= coil): the crown starts closed and opens with
-  growth.
-- Parasites are the only things that **writhe** in the wind (everything else
-  bends from its root).
-- Sacs/bladders are part `.bloom` with instance `fade < 1`: fresnel see-through,
-  hue from vertex colour, drawn in the glass pass.
+- **plant.vert**, `FORMS_PARTING` (= coil): parts the cage from the foot
+  up as the plant matures, using strand tu.y (how far that strand has
+  parted at full growth).
+- **plant.vert**, `FORMS_CROWNED` (= coil): the crown starts closed and
+  opens with growth.
+- Parasites are the only things that **writhe** in the wind. Everything
+  else bends from its root.
+- Sacs/bladders are part `.bloom` with instance `fade < 1`: fresnel
+  see-through (brighter at grazing edges), hue from vertex colour, drawn
+  in the glass pass.
 - Structure pieces carry `vertex.Grow` from `k.along` / `k.on` (see
   structure_kit's GPU notes).
 
 ## Rules
 
-- Counts are `fold`, turned evenly; one seed per crown. No golden angles, no
-  per-frond randomness (that's the symbiotes').
+- Counts are `fold`, turned evenly; one seed per crown. No golden angles,
+  no per-frond randomness (that's the symbiotes').
 - Plants are exactly symmetric and dead upright.
 - Don't mix with `structureKit` pieces for a convergent look; use
   `convergenceKit`.
-- Check: `zig build run -- --plant=thornleech --state=grow`, `--structure=lithophage|ganglion|sporecaster --state=grow|active`.
+- Check: `zig build run -- --plant=thornleech --state=grow`,
+  `--structure=lithophage|ganglion|sporecaster --state=grow|active`.

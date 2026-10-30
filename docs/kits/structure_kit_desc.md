@@ -6,24 +6,35 @@
 
 ## What it is
 
-The **symbiotic lineage's body**: shared pieces for its structures, in the
-plants' language (a woven root mat they rise from, grown vines with leaves
-along them, broad foot leaves, forking rootlets, and pods of the wolf's resin
-sap: dense at the base, see-through at the crown, no light of its own), and its
-plants (`plant`, the `herb` form), built of the same. Not a mesh itself.
+The **symbiotic lineage's body**. Not a mesh itself.
+
+It holds shared pieces for the lineage's structures, in the plants'
+language:
+- a woven root mat they rise from;
+- grown vines with leaves along them;
+- broad foot leaves;
+- forking rootlets;
+- pods of the wolf's resin sap: dense at the base, see-through at the
+  crown, no light of its own.
+
+It also builds the lineage's plants (`plant`, the `herb` form) out of the
+same pieces.
 
 Every piece works two ways:
-- **Plain** (`on = null`): built with fixed tu.x (old style, still used by the
-  fibre node and rootlets).
-- **On a growth spline** (`on = On{k, id, u}`): the piece becomes a branch of the
-  structure's `growth.Skeleton` and grows with it. This is the required way for
-  any structure mesh ([../growth.md](../growth.md)).
+- **Plain** (`on = null`): built with a fixed tu.x. This is the old style,
+  still used by the fibre node and rootlets.
+- **On a growth spline** (`on = On{k, id, u}`): the piece becomes a branch
+  of the structure's `growth.Skeleton` and grows with it. This is the
+  required way for any structure mesh ([../growth.md](../growth.md)).
 
 ## Colours (from `palette.zig`)
 
-`pal.core` (braid core), `pal.vine` (strands, vines), `pal.leaf_dark` /
-`pal.leaf_lite` (leaves base→tip), `pal.sap` (resin), `pal.root_bark`
-(rootlets), `pal.STRAND_WOBBLE` (0.03, how much a braided strand wanders).
+- `pal.core`: the braid core.
+- `pal.vine`: strands, vines.
+- `pal.leafDark` / `pal.leafLite`: leaves, base→tip.
+- `pal.sap`: resin.
+- `pal.rootBark`: rootlets.
+- `pal.strandWobble` (0.03): how much a braided strand wanders.
 
 ## API
 
@@ -34,8 +45,22 @@ Every piece works two ways:
 | `leafyVine(b, from, to, r0, curl, leaves, t0, t1, seed, on)` | a grown, tapering vine from `from` toward `to` (wobble 0.18, `curl`), `leaves` small leaves along it | `k.vine(id, u, growth, 7, .{})` + `k.tube` + `k.leaves`: grown once the parent is done, leaves open as the front passes |
 | `resinPod(b, center, radii, rings, segs)` | an ellipsoid of part `.resin`, colour `pal.sap`; tu.y 0 at its dense base → 1 at its thin crown (the resin shader reads it) | not tagged: tag it yourself (`sk.on` / `growth.tag`) |
 | `footLeaves(b, n, r, len, width, seed, on)` | `n` broad blades in a ring at the foot on one envelope | each blade `k.on(b, mark, id, u, .{.from = base, .delay = footStagger * i})`: they unfold from their bases one after another (`footStagger` 0.025 of the growth) |
-| `rootlet(b, from, dir, len, r0, seed)` | a root heading down into the soil, tapering to a hair (tip 0.12), two forks off its far half; `pal.root_bark`, tu.x 0..0.3 | plain only (the caller tags it) |
-| `plant(b, g, seed, variant, rooted)` | a symbiote from its genome: braided stem (4 strands, 6 past `thick` 0.1, turn `pitch` 0.46 × length / radius) flaring into 5 braided roots (`roots`) hugging the ground, genome `rosette` foot leaves, `vines` leafy vines twining up it (pointed at both ends), the leaf envelope, thorns, braided prop roots (`tendrils`), braided offshoots (`mg.shootPath`, folded by `mg.shootFoldNearest`) ending in buds or blooms, and its bloom on a resin bead (`mg.flower`, `.{.resin = pal.sap}`). Colours from the genome (core = stem shaded 0.55) | plants grow by tu.x in plant.vert (whole-plant scale, leaves and petals unfolding), not on a skeleton |
+| `rootlet(b, from, dir, len, r0, seed)` | a root heading down into the soil, tapering to a hair (tip 0.12), two forks off its far half; `pal.rootBark`, tu.x 0..0.3 | plain only (the caller tags it) |
+| `plant(b, g, seed, variant, rooted)` | a symbiote from its genome (see below) | plants grow by tu.x in plant.vert (whole-plant scale, leaves and petals unfolding), not on a skeleton |
+
+### What `plant` builds
+A symbiote from its genome. Colours come from the genome (core = stem
+shaded 0.55). From the ground up:
+- **Stem**: braided, 4 strands (6 past `thick` 0.1). Its turn is `pitch`
+  0.46 × length / radius.
+- **Roots**: the stem flares into 5 braided roots (`roots`) hugging the
+  ground, plus braided prop roots (`tendrils`).
+- **Foot leaves**: genome `rosette` of them.
+- **Vines**: `vines` leafy vines twining up it, pointed at both ends.
+- **Leaves and thorns**: the leaf envelope, thorns.
+- **Offshoots**: braided (`mg.shootPath`, folded by
+  `mg.shootFoldNearest`), ending in buds or blooms.
+- **Bloom**: on a resin bead (`mg.flower`, `.{.resin = pal.sap}`).
 
 ## Who uses it
 
@@ -52,10 +77,11 @@ Every piece works two ways:
 | `conduit.zig` | `rootlet` (the arch's rootlets; the arch itself is `conduit.arch`) |
 | `node_fibre.zig` | `rootMat` (plain) |
 
-Companion pieces not in this kit but part of the same vocabulary:
-`conduit.arch` / `spineCtrl` (a woven arch with a sapwood `.core`, side roots;
-`core = null` for a bare weave), `mg.braid`, `mg.braidAround` (nerves),
-`mg.leavesAlong`, `mg.petal`, `mg.stamens`.
+Companion pieces not in this kit, but part of the same vocabulary:
+- `conduit.arch` / `spineCtrl`: a woven arch with a sapwood `.core` and
+  side roots (`core = null` for a bare weave);
+- `mg.braid`, `mg.braidAround` (nerves);
+- `mg.leavesAlong`, `mg.petal`, `mg.stamens`.
 
 ## Process: building a symbiotic structure mesh with it
 
@@ -72,24 +98,27 @@ try kit.leafyVine(b, from, to, 0.012, 0.4, 4, 0.5, 1, seed, .{.k = &sk, .id = tr
 sk.finish(b);                                                           // required (debug assert in meshlib.build)
 ```
 
-Timing is the skeleton's alone (`Branch.pace`, `Branch.front`, `After.done/
-passing/with`, `.delay`); never hand-set times. Emitted pieces (cups, lids) go in
-the tail kept free by `sk.tail = form`.
+Timing is the skeleton's alone (`Branch.pace`, `Branch.front`,
+`After.done/passing/with`, `.delay`); never hand-set times.
+
+Emitted pieces (cups, lids) go in the tail kept free by `sk.tail = form`.
 
 ## GPU side
 
-- Vertices on a spline carry `vertex.Grow` (`from`, `at`; binding 3, locations
-  21–22). `part.vert` shrinks each into `from` until the structure's growth
-  (`PartInstance.w.w`, `Look.grown`) reaches it, then grows it out, thin
-  (`SPROUT_THIN`) until its spline is done; foliage tips lag (`LEAF_LAG`).
-- `.resin` (pods): translucent sap, tu.y base→crown, `sapGlisten`,
-  `sapBubbles`/`sapDroplets` (common.glsl); drawn in the glass pass
-  (`vertex.seeThrough(.resin)`).
-- `.resin` beads on a plant's blooms: plant.frag shades them as the
-  structures' resin (surface.glsl `resinSurface`, shared with part.frag),
-  tu.y (passed as `v_young`) base→crown, dimmed by health.
-- `.leaf` blades fold toward a pale midrib (`meshgen.lamina`), breathe and sway
-  with `gardenWind`.
+- **Growing**: vertices on a spline carry `vertex.Grow` (`from`, `at`;
+  binding 3, locations 21–22). `part.vert` shrinks each into `from` until
+  the structure's growth (`PartInstance.w.w`, `Look.grown`) reaches it,
+  then grows it out. It stays thin (`SPROUT_THIN`) until its spline is
+  done. Foliage tips lag behind (`LEAF_LAG`).
+- **Resin pods** (`.resin`): translucent sap, tu.y base→crown,
+  `sapGlisten`, `sapBubbles`/`sapDroplets` (common.glsl). Drawn in the
+  glass pass (`vertex.seeThrough(.resin)`).
+- **Resin beads on a plant's blooms** (`.resin`): plant.frag shades them
+  as the structures' resin (surface.glsl `resinSurface`, shared with
+  part.frag). tu.y (passed as `v_young`) runs base→crown, dimmed by
+  health.
+- **Leaves** (`.leaf` blades) fold toward a pale midrib
+  (`meshgen.lamina`), and breathe and sway with `gardenWind`.
 
 ## Rules
 

@@ -98,7 +98,7 @@ zig build audiocheck              # sound path check (tools/audiocheck.zig): pla
                                   # loopback, fails unless heard at its pitch (needs speakers)
 ```
 Each start grows a fresh world; `--seed=` repeats one; `--demo`/`--stress`/
-`--plant`/`--structure` use `play.DEFAULT_SEED`. Needs `VULKAN_SDK`
+`--plant`/`--structure` use `play.defaultSeed`. Needs `VULKAN_SDK`
 (`vk.xml` + `glslc`). Pinned: vulkan-zig `zig-0.16-compat`, zglfw
 `f04fdbf` (upstream heads need 0.17), zig-wsapi `4f64035` (its `zig-0.16`
 branch; the engine's `wasapi`, Windows audio). A stray `CPATH` breaks GLFW's C
@@ -170,7 +170,7 @@ Code:
 - `WorldPush` ≤ 192 bytes. A new see-through part role goes in
   `vertex.seeThrough`. A structure that emits a library mesh lists it in its
   `meshes` hook.
-- Bump `save.VERSION` when a stored layout changes (not for structures:
+- Bump `version` in `save.zig` when a stored layout changes (not for structures:
   they are `record`s, read by field name; a `State` owning memory has a
   `deinit`, and `Structures.remove`'s result is the caller's to `deinit`).
 

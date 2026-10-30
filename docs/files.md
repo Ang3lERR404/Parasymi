@@ -87,7 +87,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `actions.zig` — what the wolf does to the world: gather, put (sow/grow), weave, feed and take from structures, interact with them, harvest, uproot, turn…
-- `controls.zig` — what every key and mouse button does, loaded once at startup from `PATH` (`controls.cfg`) and never read again.
+- `controls.zig` — what every key and mouse button does, loaded once at startup from `filePath` (`controls.cfg`) and never read again.
 - `convergence.zig` — convergence: where a mature symbiote and a mature parasite meet, within two tiles of each other or joined by a chain of conduits, a…
 - `craft.zig` — weaving: turning gathered matter into seeds and structure bulbs.
 - `home.zig` — where the gardener's files live: `%LOCALAPPDATA%\Parasymi` (the strings, the controls, the options and `saves/`), made on first start.
@@ -243,7 +243,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `style.zig` — shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes.
-- `text.zig` — every player-facing string, loaded once at startup from `PATH` (`parasymi.cfg`) and never read again.
+- `text.zig` — every player-facing string, loaded once at startup from `filePath` (`parasymi.cfg`) and never read again.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 
 ## src/gfx/
@@ -287,7 +287,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `wolf_body.zig` — mesh: WOLF BODY.
 - `wolf_ears.zig` — mesh: WOLF EARS.
 - `wolf_kit.zig` — shared pieces for the wolf's body: the leaves that lie over it like fur and the digits of its hands and feet (forms of planes…
-- `wolf_pec.zig` — WOLF PECTORAL: one lobe of solidified sap on the chest, laid over it around its centre (`CENTRE`, in the chest bone's frame) and grown out…
+- `wolf_pec.zig` — WOLF PECTORAL: one lobe of solidified sap on the chest, laid over it around its centre (`centre`, in the chest bone's frame) and grown out…
 - `wolf_rump.zig` — WOLF REAR: one lobe per side of solidified sap, like the pectorals: a full resin dome laid over the hips' base and grown out of the hide…
 - `wolf_skeleton.zig` — the vine-wolf's skeleton: its bones, how they hang together and the pose they take.
 

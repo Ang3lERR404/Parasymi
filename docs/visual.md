@@ -1,299 +1,471 @@
 # Visual (current)
 
-How everything looks and moves now. The user's art direction is final (see
-CLAUDE.md, Rules); each overhaul sets the bar for everything of its kind.
-Kit-level detail: [kits/README.md](kits/README.md).
+How everything looks and moves now. The user's art direction is final
+(see CLAUDE.md, Rules). Each overhaul sets the bar for everything of its
+kind. Kit-level detail: [kits/README.md](kits/README.md).
 
 ## Motion and wind
-One garden-wide wind (`gardenWind`/`bendIn`, common.glsl), slow gusts
-rolling across as a wave. Everything grown bends from its root in it (h²,
-tips lagging), per-thing `sway`; leaves breathe and lift a little; only
-parasites writhe.
+There is one wind for the whole garden (`gardenWind`/`bendIn`,
+common.glsl): slow gusts rolling across it as a wave.
+
+- Everything grown bends from its root in it. The bend grows with the
+  square of the height (h²), so tips swing most and lag behind.
+- Each thing has its own `sway`.
+- Leaves breathe and lift a little.
+- Only parasites writhe.
 
 ## Terrain (`render/terrain_mesh.zig`)
-Smooth, no walls; each tile a fan of four triangles, centre at the tile's
-height, corners shared (height, colour, ley averaged), smooth normals; no
-water (basins are level lowland). Detail grown on the GPU (detail pass,
-`detail.vert`) from one `DetailTile` per tile: grass blades on all but soil
-(tile-coloured, wind-swayed), clods and stones on soil; within `detailR`
-(28 tiles). Ley lines carry a faint drifting plexus; ley sight glows
-smoothly across tiles. info.z = 255 marks the top surface. Fog closes in
-before the edge; paw contact shadows.
+The ground is smooth, with no walls and no water (basins are level
+lowland).
+
+- **Shape:** each tile is a fan of four triangles, its centre at the
+  tile's height. Corners are shared (height, colour and ley averaged), with
+  smooth normals.
+- **Detail, grown on the GPU** (detail pass, `detail.vert`) from one
+  `DetailTile` per tile, within `detailR` (28 tiles):
+  - grass blades on everything but soil (tile-coloured, wind-swayed);
+  - clods and stones on soil.
+- **Ley:** ley lines carry a faint drifting plexus (a web of thin lines);
+  ley sight glows smoothly across tiles.
+- `info.z = 255` marks the top surface.
+- Fog closes in before the edge of the world. Paws leave contact shadows.
 
 ## Plants
-- 4 variants per species (by tile). Material (plant.frag) is the wolf's
-  vocabulary: muted skin, fibre sheen, old growth densifying to root brown,
-  colour carried by sap through thin/young tissue (`v_young`), no self-glow
-  (rim at night), see-through petals. Plants scale up as they grow;
-  parasites open their closed crowns. Holding a seed shows a ghost of the
-  grown plant (green fits, red not).
-- Forms (`species.Form`: herb 0, coil 1, drift 2, confluence 3, radiant 4,
-  star 5; common.glsl `FORMS_FREE` = the radiant ones).
-- Symbiotes (`herb`, `structureKit.plant`): the symbiotic structures'
-  body. A braided stem (4 strands round a darker core, 6 on a trunk
-  thicker than `thick`, wound at one `pitch` per radius so thin and thick
-  wind alike) flaring into a mat of 5 braided roots that arch down to hug
-  the ground and sink in; a rosette of broad leaves round the foot
-  (genome `rosette`), leafy vines twining up the stem, tapering at both
-  ends (`vines`), one vase leaf envelope up it (`leafFrom` for tree
-  crowns), braided offshoots (`meshgen.shootPath`, genome `shoots` =
-  per-variant count range) ending in a closed bud or a small bloom (looks
-  only; colour alpha = 1 - how far out along one, plant.vert folds them
-  in against the stem until growth passes them). Each bloom opens out of
-  a bead of the lineage's amber resin (`meshgen.Calyx.resin`, part
-  `.resin`) held in a cup of five sepals: two whorls of real petals and
-  stamens on its crown. The bead shades as the structures' resin
-  (surface.glsl `resinSurface`, tu.y dense base → thin crown), dimmed by
-  health. Their leaves and sepals are not muted: plant.frag shades them
-  in their own green (`green`, light through them `GREEN_THROUGH` of it),
-  as the structures' leaves. Lumenroot: the palette's leaf green, a vine
-  green richer than the palette's (the stem is still muted), cyan bloom.
-- Parasites (`coil`, `parasiteKit.plant`): alien not hostile, exactly
-  symmetric and dead upright (variants differ in proportion only): a
-  lattice cage stalk on a bulbous foot, sacs hanging on its core inside, a
-  bulb at its neck, a candelabrum of 5 fronds each ending in a pod crowned
-  by 5 frondlets; plant.vert parts the cage from the foot up (tu.y) and
-  opens the crown.
-- Floaters (`drift`): a comb-jelly lantern (`meshgen.lantern`: clear sap, 8
-  twisting comb rows in split-light colours, a golden spore inside;
-  plant.frag shades it apart by tu.x 0.5, bright iridescent film, approved
-  as is), catcher dish, hair-thin filaments waving in two lengths (a wave
-  runs down them in plant.vert), slow bob over a ground shadow.
-- Confluence: 8 growth keys of one vertex layout blended in plant.vert
-  (binding 2), braid strands running on into red vines, translucent violet
-  petals, sway ×1.5.
-- Vesper (`star`, `radiantKit.star`): an evening star come down, hanging
-  `stemH` (0.62) over its tile, nothing under it: a dusk-violet core (gold
-  nucleus, 5 stamens), an upright cup of 5 pale-gold petals, a star of 5
-  long narrow violet rays lying open, 5 dusky leaves floating beneath
-  (`glow` 0.3: living tissue, little light, they cast shadows), motes; no
-  halo. It gathers as the bloom does but falls in from the sky (plant.vert
-  `FORMS_FALLING`, `FALL_*`): the heart first, straight down, then each
-  piece spiralling down on its thread. Keeps more of its own hue under the
-  film (plant.frag `FORMS_OWN_HUE`). Withering out of radiance any radiant
-  plant comes loose (`LOOSE_*`: pieces sink, drift out, hang open) and its
-  light dims with health.
-- Celestial bloom (`radiant`): a flower whose petals float free, gathered
-  by its core: a luminous core with a crown of stamens, three whorls of
+### All plants
+- 4 variants per species, picked by tile.
+- **Material** (plant.frag) speaks the wolf's vocabulary:
+  - muted skin, a sheen like fibre;
+  - old growth densifies to root brown;
+  - colour carried by sap through thin, young tissue (`v_young`);
+  - no glow of its own (a rim light at night); see-through petals.
+- Plants scale up as they grow. Parasites open their closed crowns.
+- Holding a seed shows a ghost of the grown plant: green where it fits,
+  red where it does not.
+- **Forms** (`species.Form`): herb 0, coil 1, drift 2, confluence 3,
+  radiant 4, star 5. In common.glsl, `FORMS_FREE` = the radiant ones.
+
+### Symbiotes (`herb`, `structureKit.plant`)
+These are the symbiotic structures' body.
+
+- **Stem:** braided, 4 strands round a darker core (6 on a trunk thicker
+  than `thick`). Strands wind at one `pitch` per radius, so thin and thick
+  stems wind alike.
+- **Roots:** the stem flares into a mat of 5 braided roots that arch down,
+  hug the ground and sink in.
+- **Leaves:** a rosette of broad leaves round the foot (genome `rosette`).
+  Leafy vines twine up the stem, tapering at both ends (`vines`). One vase
+  leaf envelope rises up it (`leafFrom`, for tree crowns).
+- **Offshoots:** braided (`meshgen.shootPath`; genome `shoots` = the
+  per-variant count range), each ending in a closed bud or a small bloom.
+  They are looks only. Colour alpha = 1 - how far out along one it is;
+  plant.vert folds them in against the stem until growth passes them.
+- **Blooms:** each opens out of a bead of the lineage's amber resin
+  (`meshgen.Calyx.resin`, part `.resin`), held in a cup of five sepals:
+  two whorls of real petals, with stamens on its crown.
+  - The bead shades like the structures' resin (surface.glsl
+    `resinSurface`; tu.y runs from dense base to thin crown), dimmed by
+    health.
+- **Greens:** their leaves and sepals are not muted. plant.frag shades
+  them in their own green (`green`; light comes through them at
+  `GREEN_THROUGH` of it), like the structures' leaves.
+- **Lumenroot:** the palette's leaf green; a vine green richer than the
+  palette's (the stem stays muted); a cyan bloom.
+
+### Parasites (`coil`, `parasiteKit.plant`)
+Alien, not hostile. Exactly symmetric and dead upright; variants differ in
+proportion only.
+
+- A lattice cage stalk on a bulbous foot, with sacs hanging on its core
+  inside and a bulb at its neck.
+- A candelabrum of 5 fronds, each ending in a pod crowned by 5 frondlets.
+- plant.vert parts the cage from the foot up (tu.y) and opens the crown.
+
+### Floaters (`drift`)
+- **Lantern:** a comb-jelly lantern (`meshgen.lantern`): clear sap, 8
+  twisting comb rows in split-light colours, a golden spore inside.
+  plant.frag shades it apart by tu.x 0.5, with a bright iridescent film.
+  Approved as is.
+- A catcher dish.
+- Hair-thin filaments waving in two lengths (plant.vert runs a wave down
+  them).
+- A slow bob over a ground shadow.
+
+### Confluence
+- 8 growth keys of one vertex layout, blended in plant.vert (binding 2).
+  (A growth key is a snapshot of the shape at one stage; the shader blends
+  between them.)
+- Braid strands running on into red vines; translucent violet petals.
+- Sway ×1.5.
+
+### Vesper (`star`, `radiantKit.star`)
+An evening star come down. It hangs `stemH` (0.62) over its tile, with
+nothing under it.
+
+- **Parts:** a dusk-violet core (gold nucleus, 5 stamens); an upright cup
+  of 5 pale-gold petals; a star of 5 long narrow violet rays lying open;
+  5 dusky leaves floating beneath (`glow` 0.3: living tissue, little
+  light, they cast shadows); motes. No halo.
+- **Gathering:** it gathers as the bloom does, but falls in from the sky
+  (plant.vert `FORMS_FALLING`, `FALL_*`). The heart comes first, straight
+  down; then each piece spirals down on its thread.
+- **Colour:** it keeps more of its own hue under the film (plant.frag
+  `FORMS_OWN_HUE`).
+- **Withering:** out of radiance, any radiant plant comes loose (`LOOSE_*`:
+  pieces sink, drift out, hang open) and its light dims with health.
+
+### Celestial bloom (`radiant`)
+A flower whose petals float free, gathered by its core.
+
+- **Parts:** a luminous core with a crown of stamens; three whorls of
   narrow cupped petals (inner upright .. outer open) floating apart from
-  it, each held by a thread of light, motes spiralling in, tilted halo.
-  Pearl with an iridescent film (plant.frag `filmHue` by view angle).
-  Fragments carry assembly order (tu.x), `radiantKit.Ring` (tu.y; a thread
-  adds its distance from its petal) and bearing (colour alpha): plant.vert
-  spirals each in folded as a bud and opens it as growth passes it; grown,
-  whorls turn slowly, alternating, and drift apart and back; it bobs and
-  never bends. With the vesper, the garden's only true glow.
-- Beams between linked blooms (`bloomThread`, part `.thread`): soft rays,
-  a camera-facing spindle bent in part.vert curve mode; no core, a faint
-  haze with five soft streaks swelling from sender to receiver, iridescent
-  (rainbow end to end, rolling along), tiny motes drifting inside shifting
-  hue (seeded by the instance phase); dim when the network is dark; sent
-  from the more grown bloom as it finishes.
+  it, each held by a thread of light; motes spiralling in; a tilted halo.
+- **Surface:** pearl with an iridescent film (plant.frag `filmHue`, by
+  view angle).
+- **What each fragment carries:** assembly order (tu.x), `radiantKit.Ring`
+  (tu.y; a thread adds its distance from its petal) and bearing (colour
+  alpha).
+- **Growing:** plant.vert spirals each piece in, folded as a bud, and
+  opens it as growth passes it.
+- **Grown:** whorls turn slowly, alternating, and drift apart and back. It
+  bobs and never bends.
+- With the vesper, it is the garden's only true glow.
+
+### Beams between linked blooms (`bloomThread`, part `.thread`)
+- Soft rays: a camera-facing spindle bent in part.vert's curve mode.
+- No core: a faint haze with five soft streaks swelling from sender to
+  receiver.
+- Iridescent: rainbow end to end, rolling along. Tiny motes drift inside,
+  shifting hue (seeded by the instance phase).
+- Dim when the network is dark.
+- Sent from the more grown bloom as it finishes.
 
 ## Structures
 `structureKit` structures speak the plants' language: woven root mats,
-leafy vines, real petals, pods of resin sap (`Def.sap`, no own light).
-Standing structures sway (`Def.sway`; conduits don't, so chains stay
-joined; hung parts follow via `Look.drop`), breathe at a fixed tempo, and
-grow in along their growth splines (trunk first, branches after, leaves
-unfolding as the front passes, emitted pieces last; [growth.md](growth.md)).
-- Germinator (`Def.still`: no breath, so its emitted pieces stay on it;
-  `Def.preview` whole): a small tree, woven trunk on a root mat, five
-  braided boughs rising round a core of thin resin sap held in a calyx and
-  arching over it to hold flower cups (stamens) above it; a sapwood spindle
-  runs up through the core. A weave is seen through by its progress alone:
-  the cups hold what it stocks (pools of `.essence`, kept level), tip and
-  pour it (curve-placed streams, colour in `q.yzw`); the core spins it into
-  a whirl round the spindle (one arm per essence, turned by the area under
-  the spin stage, whole turns per weave) and threads wind a seed of them on
-  the spindle (kernel in the output's colour, a winding per essence).
-- Arsthraxia (`Def.bare`, its own `emit`; never breathes or bobs): three
-  braided stems twine up from a root mat, part into a cage round a resin
-  pod threaded on a nerve and gather in a calyx under a violet flower (two
-  whorls, emitted, opening and counter-turning while it studies). Each
-  stem's core is a nerve (part `.nerve`, `mg.braidAround`): studying,
-  violet thought climbs it (part.vert), a unit done sends a surge up
-  (`flutter` = flare). Research grows on it: vines climbing the stems
-  (Arsthraxia, `Study.vines`), a braided offshoot bough with a vine round
-  it and its own flower per minor study.
-- Sap cache: a resin gourd cupped by a calyx on a woven bole, a wicker
-  basket over it (green vines one way, pale roots the other, over and
-  under), a collar at its neck and a bud of sepals closing its mouth
-  (`sapCacheLid`, emitted): it opens as an item drops in (sinking to its
-  stack, which swells) or rises out; contents hang inside.
-- Root-digger: four braided roots break the ground (soil heaved round them)
-  and twine up to grip a small resin gourd, a leaf tuft on top; its digging
-  root (`diggerRoot`, a conduit arch whose `.core` runs home, tu.x 0 in
-  the node) reaches to the node it works and withers from one gone; each
-  item is prised loose (`diggerClod`s flung up about the claw), then
-  swells up the core in its colour to the gourd.
-- Conduit (`Def.bare`, its own `emit`): per tile a root digs up out of the
-  soil at each edge it is fed from (`link` hook: `feeds`;
-  `conduit`/`conduitLeft`/`conduitRight`), arches (rising long, diving
-  short) and digs back in at its front, so chains join underground in any
-  turn; a sapwood core (part `.core`) in an over-under weave of strands,
-  branchlets, leaves in twos/threes swept forward, soil heaped (a ridge
-  pushed ahead where it dives) with rootlets. Carried essence swells and
-  tints the core as it passes (part.vert, `Look.carry`/`carryCol`), amber
-  pulses run the way it carries; side roots (`conduitTap`) are smaller
-  woven arches.
-- Loomfern: a fern: fronds, croziers, a sheaf winding on its spindle from
-  threads off the fronds.
-- Weftstone: crystal + sparks in its bulb as it ionizes.
-- Driftbraid: its look is the approved reference for convergent structures.
-- Monfris: four corner weaves twining into one crowned trunk.
+leafy vines, real petals, pods of resin sap (`Def.sap`, no light of their
+own).
+
+- **Sway:** standing structures sway (`Def.sway`). Conduits don't, so
+  chains stay joined. Hung parts follow via `Look.drop`.
+- **Breath:** they breathe at a fixed tempo.
+- **Growing:** they grow in along their growth splines: trunk first,
+  branches after, leaves unfolding as the front passes, emitted pieces
+  last ([growth.md](growth.md)).
+
+### Germinator
+(`Def.still`: no breath, so its emitted pieces stay on it; `Def.preview`
+whole.)
+
+- **Shape:** a small tree. A woven trunk on a root mat; five braided boughs
+  rise round a core of thin resin sap held in a calyx, and arch over it to
+  hold flower cups (with stamens) above it. A sapwood spindle runs up
+  through the core.
+- **Weaving is shown by its progress alone:**
+  - The cups hold what it stocks (pools of `.essence`, kept level).
+  - They tip and pour it (curve-placed streams, colour in `q.yzw`).
+  - The core spins it into a whirl round the spindle: one arm per essence,
+    turned by the area under the spin stage, whole turns per weave.
+  - Threads wind a seed of them on the spindle: a kernel in the output's
+    colour, one winding per essence.
+
+### Arsthraxia
+(`Def.bare`, its own `emit`; never breathes or bobs.)
+
+- **Shape:** three braided stems twine up from a root mat. They part into
+  a cage round a resin pod threaded on a nerve, and gather in a calyx
+  under a violet flower. The flower has two whorls, emitted, opening and
+  counter-turning while it studies.
+- **Nerves:** each stem's core is a nerve (part `.nerve`,
+  `mg.braidAround`). While studying, violet thought climbs it (part.vert);
+  each unit done sends a surge up (`flutter` = flare).
+- **Research grows on it:** vines climb the stems (Arsthraxia,
+  `Study.vines`), and each minor study adds a braided offshoot bough with
+  a vine round it and its own flower.
+
+### Sap cache
+- A resin gourd cupped by a calyx on a woven bole.
+- A wicker basket over it: green vines one way, pale roots the other, over
+  and under.
+- A collar at its neck, and a bud of sepals closing its mouth
+  (`sapCacheLid`, emitted). The bud opens as an item drops in (sinking to
+  its stack, which swells) or rises out.
+- Contents hang inside.
+
+### Root-digger
+- Four braided roots break the ground (soil heaved round them) and twine
+  up to grip a small resin gourd, with a leaf tuft on top.
+- **Digging root** (`diggerRoot`): a conduit arch whose `.core` runs home
+  (tu.x 0 is in the node). It reaches to the node it works, and withers
+  from one that is gone.
+- **Each item** is prised loose (`diggerClod`s flung up about the claw),
+  then swells up the core in its colour to the gourd.
+
+### Conduit
+(`Def.bare`, its own `emit`.)
+
+- **Path, per tile:** a root digs up out of the soil at each edge it is
+  fed from (`link` hook: `feeds`; `conduit`/`conduitLeft`/`conduitRight`).
+  It arches (rising long, diving short) and digs back in at its front. So
+  chains join underground in any turn.
+- **Body:** a sapwood core (part `.core`) in an over-under weave of
+  strands; branchlets; leaves in twos and threes swept forward; soil
+  heaped (a ridge pushed ahead where it dives) with rootlets.
+- **Carrying:** carried essence swells and tints the core as it passes
+  (part.vert, `Look.carry`/`carryCol`). Amber pulses run the way it
+  carries.
+- **Side roots** (`conduitTap`) are smaller woven arches.
+
+### Others
+- **Loomfern:** a fern: fronds, croziers (the curled-up fern tips), and a
+  sheaf winding on its spindle from threads off the fronds.
+- **Weftstone:** crystal + sparks in its bulb as it ionizes.
+- **Driftbraid:** its look is the approved reference for convergent
+  structures.
+- **Monfris:** four corner weaves twining into one crowned trunk.
 
 ## Halo
-While a polyp's halo forms ([design.md](design.md#halo-and-diamond-structurespolypzig-halozig-diamondzig)):
-the blooms spiral in to the ring's heart at bloom hover (share ∝ e^(4k),
-1.25 turns) and fold to buds, all on the GPU (common.glsl `haloSpiral`; the
-CPU sends only `[centre, k]`, instance `h` / `vertex.NO_HALO`, beams their
-held ends in `e.z`), while the diamond (1.6× its mesh) gathers there from
-its shards and projects the halo: needle rays of split light
-(`haloProjection`, part 12) running level out to a ring through the points
-(`haloRing`, part 11: spectrum across its width, red inner edge as an ice
-halo, beam-like swells and motes running round). As they meet a flash
-spreads (`haloFlash`, part 9).
+This is what plays while a polyp's halo forms
+([design.md](design.md#halo-and-diamond-structurespolypzig-halozig-diamondzig)).
+
+### The blooms come in
+- The blooms spiral in to the ring's heart at bloom hover height, over
+  1.25 turns, and fold to buds.
+- How far along each one is follows `share ∝ e^(4k)`: an exponential
+  curve, so the pull quickens toward the end.
+- All of it runs on the GPU (common.glsl `haloSpiral`). The CPU sends only
+  `[centre, k]` (instance `h` / `vertex.noHalo`; beams keep their held
+  ends in `e.z`).
+
+### The diamond projects the halo
+- The diamond (1.6× its mesh) gathers at the heart from its shards.
+- It projects needle rays of split light (`haloProjection`, part 12),
+  running level out to a ring through the points.
+- The ring (`haloRing`, part 11): a spectrum across its width with a red
+  inner edge, like an ice halo, and beam-like swells and motes running
+  round.
+- As they meet, a flash spreads (`haloFlash`, part 9).
 
 ## Resource nodes (`mineralKit`, flat facets)
-Ley shards a violet crystal cluster; grit faceted stones with quartz chips;
-fibre a swaying clump of arching stalks.
+- **Ley shards:** a violet crystal cluster.
+- **Grit:** faceted stones with quartz chips.
+- **Fibre:** a swaying clump of arching stalks.
 
 ## Sap
-Sap everywhere is alive: bubbles rise inside, beads slide down its surface
-(`sapBubbles`/`sapDroplets`, mesh space). Sap glistens, never glows softly
-(`sapGlisten`, common.glsl, on every sap material): hard-edged mirrored
-lights (`hardSpot`: key light with a white-hot core, points of light, a sky
-window), winking skin facets, a sharp caustic through clear sap, a thin
-hard edge line; its colour gathers to a narrow edge band (`SAP_EDGE_POW`).
-The bloom post makes the glow round the glints.
+Sap everywhere is alive. Bubbles rise inside; beads slide down its surface
+(`sapBubbles`/`sapDroplets`, in mesh space).
+
+Sap glistens; it never glows softly (`sapGlisten`, common.glsl, on every
+sap material):
+
+- hard-edged mirrored lights (`hardSpot`: the key light with a white-hot
+  core, points of light, a sky window);
+- winking skin facets;
+- a sharp caustic (focused light) through clear sap;
+- a thin hard edge line;
+- its colour gathers to a narrow band at the edge (`SAP_EDGE_POW`).
+
+The bloom post-process makes the glow round the glints.
 
 ## Sky
-Gradient dome, sun/moon, stars; star motes (faceted core, ring, needle
-rays) turn, twinkle, hover and trail echoes while falling. Low pitch widens
-the view toward the horizon.
+- A gradient dome, sun and moon, stars.
+- Star motes (faceted core, ring, needle rays) turn, twinkle, hover and
+  trail echoes while falling.
+- A low camera pitch widens the view toward the horizon.
 
 ## Lighting (engine `render/light.zig`)
-The key light (sun/moon) casts shadows through a cascaded shadow map (3
-cascades, 1536², `fit` snaps them to texels so they hold still), drawn in
-one multiview pass per caster (`gl_ViewIndex`, `project()`), casters at
-their coarsest LOD (`renderer.caster`); shader variants with SHADOW leave out
-what is light itself (blooms, motes, beams, halo, ghosts, lanterns).
-Terrain receives but does not cast. Points of light (`Parts.light`: blooms,
-motes, ley shards, diamond and flash; at most `maxLights` 32, ranked in
-view.zig) and the cascades travel in `Lighting`, reached by address
-(`WorldPush.light`); engine light.glsl `keyShadow`, `pointLight`;
-common.glsl `shadeLit`.
-Culling keeps what may cast into view (`Parts.sees`).
+### Shadows
+- The key light (sun or moon) casts shadows through a cascaded shadow map:
+  3 cascades, shadow pictures each covering a wider area out from the
+  camera (1536² each). `fit` snaps them to texels so they hold still.
+- They are drawn in one multiview pass per caster (all 3 at once:
+  `gl_ViewIndex`, `project()`), with casters at their coarsest LOD
+  (`renderer.caster`).
+- Shader variants with SHADOW leave out what is light itself: blooms,
+  motes, beams, halo, ghosts, lanterns.
+- Terrain receives shadows but does not cast them.
+
+### Points of light
+- `Parts.light`: blooms, motes, ley shards, diamond and flash. At most
+  `maxLights` (32), ranked in view.zig.
+- They and the cascades travel in `Lighting`, reached by address
+  (`WorldPush.light`).
+- Shader side: engine light.glsl `keyShadow`, `pointLight`; common.glsl
+  `shadeLit`.
+- Culling keeps whatever may cast a shadow into view (`Parts.sees`).
 
 ## Post-processing (engine `render/post.zig`)
-World passes draw into an HDR image; brighter-than-white light blooms
-(5-level 13-tap down chain with soft-knee threshold and anti-firefly
-weighting, tent filter back up); composite adds the glow (0.7), rolls
-highlights off above 0.8 and a faint vignette; `Desc.screen` passes (UI)
-draw on top.
+- World passes draw into an HDR image (one that can hold light brighter
+  than white).
+- **Bloom:** brighter-than-white light glows out. A 5-level 13-tap chain
+  shrinks the image, with a soft-knee threshold (a gentle start rather
+  than a hard cutoff) and anti-firefly weighting (so single bright pixels
+  don't flicker); a tent filter scales it back up.
+- **Composite:** adds the glow (0.7), rolls highlights off above 0.8, and
+  adds a faint vignette.
+- `Desc.screen` passes (the UI) draw on top.
 
 ## Anti-aliasing (`post.Antialias`: off, fxaa, msaa2/4/8; default msaa4)
-MSAA draws the world into multisampled colour + depth resolved (average)
-into the HDR image; plant/part passes (`Desc.per_sample`) shade per sample,
-since their solid/glass split is per fragment. FXAA (`fxaa.frag`, FXAA 3.11
-quality) filters the composite (luma in alpha) before the UI.
-`Renderer.antialias`/`setVsync` switch at runtime (remake pipelines /
-swapchain).
+Anti-aliasing smooths jagged edges.
+
+- **MSAA** (several samples per pixel): draws the world into multisampled
+  colour + depth, resolved (averaged) into the HDR image. Plant/part
+  passes (`Desc.perSample`) shade per sample, since their solid/glass
+  split is per fragment.
+- **FXAA** (a blur along edges after drawing): `fxaa.frag`, FXAA 3.11
+  quality, filters the composite (luma in alpha) before the UI.
+- `Renderer.antialias`/`setVsync` switch at runtime (remaking pipelines /
+  swapchain).
 
 ## Loading screen (`game/loading.zig`, wired in main)
-A living night (`Draw.night`, ui.frag) with the name, a tendril growing as
-far as what is made (leaves opening as it passes), the stage, percent,
-made/left. Stages: every mesh grown on a thread of its own
-(`renderer.meshProgress` / `meshesReady` uploads once through), the world
-woken, its ground meshed in 25 ms slices (`World.unmeshed`); also after a
-load in play. It fades off play's first frames (0.6 s).
+A living night (`Draw.night`, ui.frag) with the name; a tendril growing as
+far as what is made (leaves opening as it passes); the stage, percent,
+made/left.
+
+The stages:
+
+1. Every mesh, grown on a thread of its own (`renderer.meshProgress`;
+   `meshesReady` uploads once they are through).
+2. The world woken.
+3. Its ground meshed in 25 ms slices (`World.unmeshed`).
+
+It shows after a load in play too. It fades off over play's first frames
+(0.6 s).
 
 ## UI
-Every interface is grown, never boxed; SDFs in `engine/shaders/ui.frag`.
-- Panels (`Draw.trellis`): a dark bed of leaf litter behind a faint
-  diagonal lattice of woven withies (over-under, `LATTICE_SHOW` kept low
-  for the text), framed by two vines braided round the rim. They root at
-  the lower left corner and grow both ways round in `trellisGrow` s from
-  the frame the panel is first drawn (`Draw.grown`, keyed by its seed; a
-  frame's break regrows it), tips tapering; leaves unfurl off the nodes
-  behind the tips, some nodes bear an amber sap bud or a curling tendril;
-  leaves sway, sap pulses climb out from the root.
-- Slots (`Draw.husk`): ribbed husks fuller below, a calyx of sepals, each
-  hanging by its stalk from its row's vine (`hudBelly.Vine`: belly,
-  hotbar, a structure's store), which grows across with leaf pairs between
-  the husks; a husk swells as the vine reaches it, swings a little, sap
-  light fills it when lit.
-- Bars (`Draw.tendril`, any angle `Draw.stem`): a stem grows to the value,
-  alternating leaves unfurling behind a bud at its tip, a faint twine
-  ahead. The belly's main stem rises up its left side filling with sap.
-- Bullets: buds (`hud.bullet`) that open under the mouse; ingredients and
-  saved gardens: seeds (`Draw.grain`); also stems (`Draw.limb`),
-  leaves/buds (`Draw.leaf`), gems (`Draw.gem`), soft glow.
+Every interface is grown, never boxed. The shapes are SDFs (shapes drawn
+from a distance-to-edge function, so they stay crisp at any size) in
+`engine/shaders/ui.frag`.
+
+### Panels (`Draw.trellis`)
+- A dark bed of leaf litter behind a faint diagonal lattice of woven
+  withies (over-under; `LATTICE_SHOW` kept low for the text).
+- Framed by two vines braided round the rim.
+- **Growing:** they root at the lower left corner and grow both ways round
+  in `trellisGrow` s from the frame the panel is first drawn (`Draw.grown`,
+  keyed by its seed; a frame's break regrows it). Tips taper.
+- Leaves unfurl off the nodes behind the tips. Some nodes bear an amber
+  sap bud or a curling tendril.
+- Leaves sway; sap pulses climb out from the root.
+
+### Slots (`Draw.husk`)
+- Ribbed husks, fuller below, with a calyx of sepals.
+- Each hangs by its stalk from its row's vine (`hudBelly.Vine`: belly,
+  hotbar, a structure's store). The vine grows across, with leaf pairs
+  between the husks.
+- A husk swells as the vine reaches it and swings a little. Sap light
+  fills it when lit.
+
+### Bars (`Draw.tendril`; any angle: `Draw.stem`)
+- A stem grows to the value, with alternating leaves unfurling behind a
+  bud at its tip and a faint twine ahead.
+- The belly's main stem rises up its left side, filling with sap.
+
+### Small pieces
+- Bullets: buds (`hud.bullet`) that open under the mouse.
+- Ingredients and saved gardens: seeds (`Draw.grain`).
+- Also: stems (`Draw.limb`), leaves/buds (`Draw.leaf`), gems (`Draw.gem`),
+  soft glow.
 
 ## Item icons (`game/icon.zig`)
-A structure's bulb is a split seed with a sprout or two showing what it
-does (its `icon` hook, drawn with the `Icon` kit: `coat`, `stem` along a
-Bézier, `leaf`, `bud`, `glow`, `gem`, `kernel`; sprouts sway). A plant's
-seed likewise, from its module in `game/seeds.zig` (`seeds/<species>.zig`:
-`item` + `icon`; the test fails on a sown species without one). Any other
-item is its colour fill with its short name, for now.
+- **A structure's bulb** is a split seed with a sprout or two showing what
+  it does. It comes from its `icon` hook, drawn with the `Icon` kit:
+  `coat`, `stem` along a Bézier curve, `leaf`, `bud`, `glow`, `gem`,
+  `kernel`. Sprouts sway.
+- **A plant's seed** likewise, from its module in `game/seeds.zig`
+  (`seeds/<species>.zig`: `item` + `icon`). The test fails on a sown
+  species without one.
+- **Any other item** is its colour fill with its short name, for now.
 
 ## Wolf (`game/player.zig` rig)
-Muted greens/browns, amber only on belly, eyes, inner ears, beans,
-pectorals and rear. The ribcage is broad but melts into a waist only a
-little narrower (`RIB_*`, `LAT_*` in `wolfBody`): no barrel rim over the
-waist, front or back. The limbs carry heavy, distinct muscle (three-headed
-deltoids, bicep/tricep, brachioradialis, quadriceps with an inner teardrop,
-two-headed calves, neck cords, obliques), melted only a little
-(`meatMelt`) so a groove reads between each mass.
-- One skin: `wolfBody` is sculpted (engine `gfx/sculpt.zig`: SDF ellipsoids, round
-  cones, round boxes per bone, smooth union/carve, `ink` paints colour
-  only) around the bind pose of `wolf_skeleton` (27 bones, `fk(Pose)`),
-  meshed once with surface nets (`cell` 5 mm, doubled per LOD), each vertex
-  weighted to the bones of the forms nearest it (only across joints that
-  are joined). GPU skinning: `vertex.Skin` beside the mesh buffer (binding
-  2), bones per frame via `Parts.pose`/`emitSkinned` (part.vert mode 3,
-  buffer device address in `WorldPush.bones`). New wolf meshes are built in
-  bind space and skinned; never rigid parts.
-- Over the hide: vines cast onto it from bone axes (`wind`/`line`, so they
-  never jump across), fur leaves (`wolfKit.leaf`) as hair over the crown
-  with a forelock and nape mane, along the cheekbones, shoulder tufts, tail
-  rings and tip; digits/claws (`wolfKit.digit`); eyes set in carved
-  sockets under the brow.
-- Head: short muzzle rising to an upturned nose (bean), lower jaw (own
-  bone) tucked up under it, ears (`wolfEars`, skinned to ear bones).
-- Resin sap (`.resin`, sprung `give`): pectorals (`wolfPec`) on the chest,
-  the rear (`wolfRump`) on the pelvis, its lower edge partly following the
-  thighs.
-- Gathering (`Player.pry`, `armsToWrists`, `solveArm`): a deep squat
-  (`SQUAT_*`: hips drop, body leans in, feet step out, tail lifts), both
-  paws on the node by arm IK, a pry each unit (`pryPull`: pull back and
-  up, wrench with a wrist twist, back to the grip; the body rocks back),
-  fingers shut on the node and opening to regrip; each unit that comes
-  loose sends one paw, in turn, cupped to the front of the belly
-  (`stowTime`). The generic work gesture gives way to it.
-- Belly stages (`Player.stage`, `gaits`): light (< 1/3 full), heavy,
-  full (> 2/3), blended over `stageBlend`; each fuller stage walks and
-  sprints a little slower (full: 86% / 80%), steps shorter and lower,
-  sways and rolls the pelvis more (full: a waddle), sinks and bobs
-  lower and leans back under the weight.
-- Belly-rest idle (`restArms`, `REST_*`): standing still `restAfter` s
-  with the belly past a third full (fully by `restFullIn`), the right
-  paw lies palm down over the top of the sac and the left fist sits on
-  the hip, elbow out (`solveArmTurned` swings the elbow round the
-  shoulder-wrist line); eased in on a slow spring, gone once he moves,
-  works or gathers.
-- Belly (`wolfBelly`): convex egg sac on the gut; filling scales and drops
-  the `gut` bone (lower half) and `gutTop` (upper half: as wide, its top
-  kept where it hangs), so the swollen sac never folds (tested); tu.x = gut
-  share of each vertex; the belly button pops out; up to 5 lumps inside (in
-  the gut bone's frame). `vertex.Skin` carries each weight's slope
-  (`gx/gy/gz`): part.vert bends skinned normals by the true Jacobian, not
-  the blended bones alone.
-- Motion: feet planted in the world, swung on arcs when the gait's phase
-  (or, standing, a foot left behind) says; digitigrade leg IK (`solveLeg`:
-  thigh+metatarsal as one link); pelvis bobs at footfalls, sways, turns and
-  rolls, chest counter-turns; lean, bank, arms, head, ears and tail on
-  springs (`Swing`); head steadied against the bob, idle look-around, ear
-  flicks; breath and panting quicken with effort.
+### Colour and build
+- Muted greens and browns. Amber only on belly, eyes, inner ears, beans,
+  pectorals and rear.
+- **Torso:** the ribcage is broad but melts into a waist only a little
+  narrower (`rib*`, `lat*` in `wolfBody`). No barrel rim over the waist,
+  front or back.
+- **Muscle:** the limbs carry heavy, distinct muscle: three-headed
+  deltoids, bicep/tricep, brachioradialis, quadriceps with an inner
+  teardrop, two-headed calves, neck cords, obliques. They are melted only
+  a little (`meatMelt`), so a groove reads between each mass.
+
+### One skin
+- **Sculpted:** `wolfBody` is sculpted with engine `gfx/sculpt.zig`. SDF
+  forms (ellipsoids, round cones, round boxes) per bone, joined with
+  smooth union or carved away, like clay; `ink` paints colour only.
+- It is sculpted around the bind pose (the rest pose the mesh is built
+  in) of `wolf_skeleton` (27 bones, `fk(Pose)`).
+- **Meshed once** with surface nets (a way of turning the sculpt into
+  triangles on a grid; `cell` 5 mm, doubled per LOD).
+- **Weights:** each vertex is weighted to the bones of the forms nearest
+  it (only across joints that are joined).
+- **GPU skinning:** `vertex.Skin` sits beside the mesh buffer (binding 2).
+  Bones come per frame via `Parts.pose`/`emitSkinned` (part.vert mode 3,
+  buffer device address in `WorldPush.bones`).
+- New wolf meshes are built in bind space and skinned; never rigid parts.
+
+### Over the hide
+- Vines cast onto it from bone axes (`wind`/`line`, so they never jump
+  across).
+- Fur leaves (`wolfKit.leaf`) as hair: over the crown with a forelock and
+  nape mane, along the cheekbones, shoulder tufts, tail rings and tip.
+- Digits and claws (`wolfKit.digit`).
+- Eyes set in carved sockets under the brow.
+
+### Head
+A short muzzle rising to an upturned nose (bean); the lower jaw (its own
+bone) tucked up under it; ears (`wolfEars`, skinned to ear bones).
+
+### Resin sap
+(`.resin`, sprung `give`.) Pectorals (`wolfPec`) on the chest; the rear
+(`wolfRump`) on the pelvis, its lower edge partly following the thighs.
+
+### Gathering (`Player.pry`, `armsToWrists`, `solveArm`)
+- **A deep squat** (`squat*`): hips drop, body leans in, feet step out,
+  tail lifts.
+- **Both paws on the node** by arm IK (inverse kinematics: place the paw,
+  and the elbow and shoulder work out how to bend).
+- **A pry each unit** (`pryPull`): pull back and up, wrench with a wrist
+  twist, back to the grip; the body rocks back. Fingers shut on the node
+  and open to regrip.
+- **Stowing:** each unit that comes loose sends one paw, in turn, cupped
+  to the front of the belly (`stowTime`).
+- The generic work gesture gives way to it.
+
+### Belly stages (`Player.stage`, `gaits`)
+- Stages: light (< 1/3 full), heavy, full (> 2/3), blended over
+  `stageBlend`.
+- Each fuller stage:
+  - walks and sprints a little slower (full: 86% / 80%);
+  - steps shorter and lower;
+  - sways and rolls the pelvis more (full: a waddle);
+  - sinks and bobs lower, and leans back under the weight.
+
+### Belly-rest idle (`restArms`, `rest*`)
+- **When:** standing still `restAfter` s with the belly past a third full
+  (fully in the pose by `restFullIn`).
+- **Pose:** the right paw lies palm down over the top of the sac; the left
+  fist sits on the hip, elbow out (`solveArmTurned` swings the elbow round
+  the shoulder-wrist line).
+- Eased in on a slow spring; gone once he moves, works or gathers.
+
+### Belly (`wolfBelly`)
+- A convex egg sac on the gut.
+- **Filling** scales and drops two bones: `gut` (lower half) and `gutTop`
+  (upper half: as wide, its top kept where it hangs). So the swollen sac
+  never folds (tested).
+- tu.x = the gut's share of each vertex.
+- The belly button pops out.
+- Up to 5 lumps inside (in the gut bone's frame).
+- **Normals:** `vertex.Skin` carries each weight's slope (`gx/gy/gz`).
+  part.vert bends skinned normals by the true Jacobian (how the surface
+  actually stretches and turns there), not by the blended bones alone.
+
+### Motion
+- **Feet** are planted in the world and swung on arcs when the gait's
+  phase says so (or, standing, when a foot is left behind).
+- **Legs:** digitigrade (walking on the toes, as dogs do) leg IK
+  (`solveLeg`: thigh + metatarsal solved as one link).
+- **Body:** the pelvis bobs at footfalls, sways, turns and rolls; the
+  chest counter-turns.
+- **Springs** (`Swing`): lean, bank, arms, head, ears and tail.
+- **Head:** steadied against the bob; an idle look-around; ear flicks.
+- Breath and panting quicken with effort.
