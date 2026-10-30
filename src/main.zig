@@ -149,8 +149,12 @@ pub fn main(init:Init)!void{
   var state:specimen.State=.grow;
   var period:?f32=null;
   // `--panel=<belly|research|paused|options|gardens|naming>` holds that panel open
-  // (and keeps the HUD in `--inspect` shots)
+  // (and keeps the HUD in `--inspect` shots); `--panel=overview` holds alt
+  // mode on while roaming
   var panel:?play.Mode=null;
+  // decision: alt mode is a flag beside the mode, not a mode, so
+  // `--panel=overview` roams with it held on
+  var overview=false;
   for(args[1..])|a|{
     if(eql(u8,a,"--inspect"))inspect=.player;
     if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
@@ -169,7 +173,10 @@ pub fn main(init:Init)!void{
     if(startsWith(u8,a,"--samples="))lone=.{.what=.{.samples=try specimen.Samples.parse(a["--samples=".len..])}};
     if(startsWith(u8,a,"--state="))state=try specimen.State.parse(a["--state=".len..]);
     if(startsWith(u8,a,"--period="))period=try parseFloat(f32,a["--period=".len..]);
-    if(startsWith(u8,a,"--panel="))panel=switch(stringToEnum(play.Mode,a["--panel=".len..]) orelse return error.BadPanel){
+    if(eql(u8,a,"--panel=overview")){
+      panel=.roam;
+      overview=true;
+    }else if(startsWith(u8,a,"--panel="))panel=switch(stringToEnum(play.Mode,a["--panel=".len..]) orelse return error.BadPanel){
       inline.belly,.research,.paused,.options,.gardens,.naming=>|p|p,
       else=>return error.BadPanel,
     };
@@ -364,6 +371,7 @@ pub fn main(init:Init)!void{
     try renderer.syncWorld(r,&game.world,meshBudget,renderer.meshMs);
     game.renderStats=r.stats;
     if(panel)|p|game.mode=p;
+    if(overview)game.overview=true;
     // what the renderer draws this frame
     var scene=try view.scene(&game,screen);
     if(inspect!=null and panel==null){

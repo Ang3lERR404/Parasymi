@@ -115,6 +115,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `log.zig` — recent messages (newest first, fading) and the control hint line.
 - `naming.zig` — the name prompt: the garden being saved is given a name (saving a fresh one from the saved gardens, or the save key before it has one).
 - `options.zig` — the options panel (pause menu, OPTIONS): the world stays frozen behind the veil.
+- `overview.zig` — alt mode ({@overview} toggles it): over every structure in view, what it weaves (the chosen weave's seed, haloed, its husk lit as it works)…
 - `pause.zig` — the pause menu (Esc): the world holds its breath behind a soft veil.
 - `research.zig` — the research tree (T) as a living sapling growing out of the soil.
 - `slot.zig` — a slot, the first of the HUD's components: a husk hanging in its box.

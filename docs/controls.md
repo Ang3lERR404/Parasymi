@@ -69,6 +69,9 @@ the top left.
 - **1–9 / 0 / - / = / Backspace** pick hotbar slots only. Research nodes
   and weave recipes are clicked in their panels.
 - **Tab** belly (weave), **T** research, **F3** debug.
+- **Left Alt** alt mode: over every structure, what it weaves (its seed,
+  haloed) or holds (its most plentiful items, with counts); over the wolf,
+  what its hands weave.
 - **Esc** closes a panel, else pauses.
 - **F6** saves (into the garden being played; one never named asks its
   name first). **F9** loads (its last save). **F11** fullscreen.

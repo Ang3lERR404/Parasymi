@@ -154,6 +154,8 @@ pub const Game=struct{
   overwrite:bool=false,
   /// letting the chosen garden go was asked once already (the next DELETE does it)
   deleting:bool=false,
+  /// alt mode: an icon over every structure of what it weaves or holds
+  overview:bool=false,
   /// the name prompt: the name typed so far, its caret kept to the centre
   typed:save.Typed=.{},
   /// the mode the name prompt returns to

@@ -130,6 +130,8 @@ pub const Rows=struct{
 };
 /// every panel of the HUD, one module each, drawn in this order (later on top)
 pub const panels=struct{
+  /// alt mode: what each structure weaves or holds, over it in the garden
+  pub const overview=@import("hud/overview.zig");
   /// the time of day and the sap belly's fill, top left
   pub const status=@import("hud/status.zig");
   /// the hotbar of seeds and tools along the bottom

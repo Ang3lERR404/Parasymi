@@ -106,6 +106,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
     if(ctl.pressed(in,.research))g.mode=if(g.mode==.research).roam else.research;
   }
   if(ctl.pressed(in,.debug))g.debug=!g.debug;
+  if(ctl.pressed(in,.overview))g.overview=!g.overview;
   // slot keys pick the hotbar slot, whichever panel is open
   if(!inspecting)for(ctl.slots,0..)|a,i|{
     if(ctl.pressed(in,a))g.hot=i;

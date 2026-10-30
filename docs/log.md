@@ -1,8 +1,8 @@
 # Both past and future things that are yet to be implemented/going to be implemented.
 
 ## Past.
-  - [ ] Alt mode:
-    - [ ] pressing `alt` toggles icon overview of what is being crafted/held
+  - [x] Alt mode:
+    - [x] pressing `alt` toggles icon overview of what is being crafted/held
   - [x] Modularize the GUI:
     - [x] Each component only needs to worry about a few things given it's type:
       - [x] text inputs:

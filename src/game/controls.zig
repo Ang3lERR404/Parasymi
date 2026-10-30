@@ -81,6 +81,9 @@ pub const Action=enum{
   belly,
   /// open or close the research sapling
   research,
+  /// alt mode: show or hide, over every structure, an icon of what it
+  /// weaves or holds
+  overview,
   /// hotbar slot 1, the leftmost (all of them in order: `slots`)
   slot1,
   /// hotbar slot 2

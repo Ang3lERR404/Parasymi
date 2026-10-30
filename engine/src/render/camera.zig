@@ -327,6 +327,14 @@ pub const Camera=struct{
       .free,.returning=>{},
     }
   }
+  /// where the world point `p` lands on a screen `w` by `h` pixels, or
+  /// null behind the eye (the inverse of `ray`)
+  pub fn screenOf(c:*const Camera,p:m.V3,w:f32,h:f32)?[2]f32{
+    // the point in clip space, before the divide
+    const q=m.mulV(c.viewProj(),.{p[0],p[1],p[2],1});
+    if(q[3]<=1e-4)return null;
+    return.{(q[0]/q[3]+1)/2*w,(q[1]/q[3]+1)/2*h};
+  }
   /// world-space ray through a pixel.
   pub fn ray(c:*const Camera,px:f32,py:f32,w:f32,h:f32)struct{o:m.V3,d:m.V3}{
     // back from clip space to the world
@@ -411,4 +419,14 @@ test"orbiting turns freely and tilts only within its limits"{
     const r=c.ray(800,450,1600,900);
     try testing.expect(m.len(r.d)>0.99);
   }
+}
+test"a point along a pixel's ray lands back on that pixel, and one behind the eye on none"{
+  // a camera following a point off the origin
+  const c:Camera=.{.target=m.v3(3,1,-2)};
+  // a ray through a pixel, and a point some way along it
+  const r=c.ray(400,300,1600,900);
+  const p=r.o+r.d*m.splat3(7);
+  const q=c.screenOf(p,1600,900).?;
+  try testing.expect(@abs(q[0]-400)<0.05 and @abs(q[1]-300)<0.05);
+  try testing.expectEqual(null,c.screenOf(c.eye()-r.d*m.splat3(3),1600,900));
 }
