@@ -158,6 +158,12 @@ const parts=struct{
   pub const arsthraxiaBudHeart=@import("meshes/arsthraxia.zig").budHeart;
   /// a sample: the satellites' thought-bud, closed, half open, open
   pub const arsthraxiaBudSpiral=@import("meshes/arsthraxia.zig").budSpiral;
+  /// a sketch: the constellate lineage's fragments, few of them joined
+  pub const constellateLoose=@import("meshes/constellate.zig").loose;
+  /// a sketch: more joined, the first panes filling in
+  pub const constellateForming=@import("meshes/constellate.zig").forming;
+  /// a sketch: joined through, panes across most of it
+  pub const constellateCrystalline=@import("meshes/constellate.zig").crystalline;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;
