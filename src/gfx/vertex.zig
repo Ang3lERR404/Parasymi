@@ -110,7 +110,12 @@ pub const PlantInstance=extern struct{
   ripe:[4]f32=.{0,0,0,noPluck},
   /// the colour of what it yields (sRGB 0..1), w unused
   yield:[4]f32=.{1,1,1,0},
+  /// its unforming (game/unforming.zig): x how far it has shattered, 0
+  /// its first glitch .. 1 gone (< 0 none); yzw unused
+  glitch:[4]f32=noGlitch,
 };
+/// `PlantInstance.glitch` for a plant the unforming has not touched
+pub const noGlitch=[4]f32{-1,0,0,0};
 /// `PlantInstance.ripe.w` for a plant never plucked (long since)
 pub const noPluck:f32=1e4;
 /// one tile's worth of ground detail, read per instance by detail.vert,

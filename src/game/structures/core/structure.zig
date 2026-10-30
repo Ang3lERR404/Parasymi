@@ -82,6 +82,9 @@ pub const Structure=struct{
   activity:f32=0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
   grown:f32=1,
+  /// how far the unforming has taken it, 0 untouched .. 1 gone: it grows
+  /// back down as it comes and works no more (game/unforming.zig)
+  fade:f32=0,
   /// how it got to face `dir` (R turns it)
   turn:turn.Turn=.{},
   /// what kind it is: the live tag of its state

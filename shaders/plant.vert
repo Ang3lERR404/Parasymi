@@ -22,8 +22,9 @@ layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre,
 layout(location = 10) in vec4 it;   // its bend after the gardener's paws plucking it: the way on the ground (xy), how far (z, radians at its tip)
 layout(location = 11) in vec4 ir;   // its yield ripening: how ripe 0..1, its pods, a radiant pod's radius, seconds since its yield last came loose
 layout(location = 12) in vec4 iy;   // the colour of what it yields (sRGB)
-layout(location = 13) in vec3 pos_next;
-layout(location = 14) in vec3 nrm_next;
+layout(location = 13) in vec4 ig;   // its unforming: how far it has shattered 0..1 (< 0 none)
+layout(location = 14) in vec3 pos_next;
+layout(location = 15) in vec3 nrm_next;
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -38,6 +39,7 @@ layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubb
 layout(location = 10) out float v_glow;       // how much light a radiant fragment carries (1 elsewhere)
 layout(location = 11) out vec2 v_pod;         // a pod: how far it has swelled 0..1 (< 0 not a pod), how freshly its yield was taken 1..0
 layout(location = 12) flat out vec4 v_yield;  // the colour of what it yields (linear), how ripe the plant is 0..1
+layout(location = 13) flat out float v_glitch; // how far the unforming has shattered it 0..1 (< 0 none)
 
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
@@ -127,8 +129,33 @@ float shiverLeft(float since) { return since >= 0.0 ? exp(-since * SHIVER_FADE) 
 // a quiver at time `t`, `ph` its phase: a smooth wobble in all three ways
 vec3 quiver(float t, float ph) { return vec3(sin(t * SHIVER_RATE + ph), 0.6 * sin(t * SHIVER_RATE * 1.31 + ph * 1.7), cos(t * SHIVER_RATE * 0.87 + ph * 2.3)); }
 
+// the unforming (game/unforming.zig): a radiant plant glitches, shatters
+// like glass and blinks out of reality as `g` runs 0..1. Slices of it tear
+// sideways and blocks jump out of place, a step at a time; then its shards
+// break away outward and up, opening at its facets as glass does. Every
+// move is a field of the world point (its seed and the step), so shared
+// vertices move alike until the facets themselves part.
+const float GLITCH_RATE = 14.0;
+vec3 unformAt(vec3 wp, vec3 n, vec3 base, float g, float seed, float t) {
+  if (g < 0.0) return wp;
+  float step = floor(t * GLITCH_RATE + seed * 37.0);
+  // horizontal slices torn sideways, more of them as it goes
+  float slice = floor(wp.y * 16.0);
+  vec3 hs = hash33(vec3(slice, step, seed * 91.0));
+  if (hs.x < 0.15 + 0.5 * g) wp.xz += (hs.yz - 0.5) * 0.3 * g;
+  // blocks jumping out of place for a step
+  vec3 hb = hash33(floor(wp * 9.0) + step * 1.37);
+  if (hb.x > 0.92 - 0.4 * g) wp += (hb - 0.5) * 0.12 * (0.3 + g);
+  // shattering: shards break away outward and up
+  float sh = smoothstep(0.55, 1.0, g);
+  vec3 hp = hash33(floor((wp - base) * 6.0) + seed * 13.0);
+  wp += (normalize(n + vec3(0.0, 0.6, 0.0)) * (0.3 + hp.x) + (hp - 0.5) * 0.6) * sh * sh * 1.2;
+  return wp;
+}
+
 void main() {
   float t = pc.eye_time.w;
+  v_glitch = ig.x;
   float growth = ia.x, fill = ia.y, seed = ia.z, aff = ia.w;
   // a bloom a forming halo draws in spirals to its centre (see haloSpiral),
   // folding back toward a bud as it arrives
@@ -243,7 +270,7 @@ void main() {
     // plucked, it is drawn after the paws, springing back once let go
     // (its root's soil end stays dug in)
     p.xz += it.xy * it.z * TUG_SLIDE * (rooted ? 1.0 - held : 1.0);
-    vec3 wp = base + p;
+    vec3 wp = unformAt(base + p, n, base, ig.x, seed, t);
     v_pos = wp;
     v_nrm = n;
     v_col = srgb2lin(col.rgb);
@@ -362,7 +389,7 @@ void main() {
   n = bendIn(n, it.xy, tug);
   // a confluence's growth keys already carry its size
   float s = (keyed ? 1.0 : mix(SEEDLING, 1.0, g)) * (SIZE_MIN + SIZE_SPREAD * fract(seed * 7.13));
-  vec3 wp = base + p * s;
+  vec3 wp = unformAt(base + p * s, n, base, ig.x, seed, t);
 
   v_pos = wp;
   v_nrm = n;

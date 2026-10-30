@@ -232,6 +232,11 @@ pub const Game=struct{
   /// `--plant`/`--structure`: one thing alone, its state set by hand (see
   /// specimen.zig); nothing else falls, grows or is drawn
   specimen:?Specimen=null,
+  /// the first world event: where it stands (saved)
+  unforming:lib.unforming.Unforming=.{},
+  /// the radiant plants as they were when it began, for their shards'
+  /// flight (not saved)
+  unformSources:std.ArrayList(lib.unforming.Source)=.empty,
   /// a fresh game on world `seed`: the wolf set down on the first fertile
   /// tile found spiralling out from the origin, the chunks round it streamed,
   /// and the waking messages said.
@@ -272,6 +277,7 @@ pub const Game=struct{
   /// frees everything the game owns.
   pub fn deinit(g:*Game)void{
     g.gardens.deinit(g.gpa);
+    g.unformSources.deinit(g.gpa);
     for(&g.inst)|*l|l.deinit(g.gpa);
     g.far.deinit(g.gpa);
     g.parts.deinit();
@@ -387,6 +393,8 @@ pub const Game=struct{
     try g.converge.tick(g.gpa,&g.world,&g.plants,&g.structs,&g.prog);
     g.prog.absorb(ev,tickTime);
     try st.Structures.tickWith(g.structCtx(ev),tickTime);
+    _=try lib.haloStructure.seek(g.structCtx(ev));
+    try lib.unforming.tick(g,tickTime);
     if(g.specimen)|*sp|try sp.after(g,tickTime);
     g.ticks+=1;
   }

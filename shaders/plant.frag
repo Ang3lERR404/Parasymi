@@ -25,6 +25,7 @@ layout(location = 8) flat in vec2 v_ghost; // a placement preview, and whether i
 layout(location = 9) in vec3 v_obj;
 layout(location = 10) in float v_glow; // the light a radiant fragment carries
 layout(location = 11) in vec2 v_pod;   // a pod: how far swelled (< 0 not one), how freshly its yield was taken
+layout(location = 13) flat in float v_glitch; // how far the unforming has shattered it 0..1 (< 0 none)
 layout(location = 12) flat in vec4 v_yield; // the colour of what it yields (linear), how ripe 0..1
 layout(location = 0) out vec4 o;
 
@@ -278,7 +279,24 @@ void surface() {
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
+// the unforming (plant.vert `unformAt`): the whole plant blinks out for a
+// step, more often as it goes; blocks of it are gone, more and more, until
+// nothing is left; a glitching block splits into cyan or magenta, and what
+// is left catches a cold white light
+void unform() {
+  float g = v_glitch;
+  if (g < 0.0) return;
+  float step = floor(pc.eye_time.w * 14.0 + v_inst.y * 37.0);
+  if (hash33(vec3(step, v_inst.y * 53.0, 3.0)).x < 0.08 + 0.45 * g * g) discard;
+  if (hash33(floor(v_pos * 14.0) + 11.0).x < g * g * 1.05) discard;
+  vec3 hf = hash33(floor(v_pos * 9.0) + step * 1.37);
+  vec3 split = hf.y > 0.5 ? vec3(0.4, 1.0, 1.0) : vec3(1.0, 0.35, 1.0);
+  if (hf.x > 0.85 - 0.3 * g) o.rgb = mix(o.rgb, split * 1.6, 0.7);
+  o.rgb += vec3(0.9, 0.9, 1.0) * g * 0.4;
+}
+
 void main() {
   surface();
+  unform();
   keepPass(o.a);
 }

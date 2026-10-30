@@ -170,6 +170,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `shared_nerves.zig` — SHARED NERVES: what a gathering crown and a ganglion make between them, grown side by side: Vultrixi, floaters tethered to a monfris that…
 - `spore_casting.zig` — SPORE CASTING: the parasites learn to send: sporecasters, which turn what they are fed into spore carriers that drift, however far, to the…
 - `thinning_veil.zig` — THE THINNING VEIL: hybrids flourish, and the world itself begins to shift (the first world event: sky and glow drift toward the celestial).
+- `unforming.zig` — THE UNFORMING: the study that ends the garden as it was.
 - `woven_stone.zig` — WOVEN STONE: what a loomfern and a lithophage make between them, grown side by side: weftstones, floating over the nodes, drawing them up…
 
 ## src/game/
@@ -226,25 +227,27 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `tests_kin.zig` — structures tested: messages, partners, outputs, growing, parents and children.
 
 ## src/game/structures/
-- `diamond.zig` — DIAMOND: where a halo's four blooms became one, floating high over the polyp at its ring's heart; or, once Celestial Defragmentation is…
+- `diamond.zig` — DIAMOND: where a halo's four blooms became one, floating high at the heart of their cross (four grown blooms `halo.reachTiles` out east…
 - `driftbraid.zig` — DRIFTBRAID: a braided conduit and a sporecaster grown into one, that trades both ways.
 - `ganglion.zig` — GANGLION: a parasite's nerve knot that shares out what it is fed.
 - `gathering_crown.zig` — GATHERING CROWN: a symbiote that gathers for the garden.
 - `germinator.zig` — GERMINATOR: a small tree that weaves by itself from what it is fed, running the same recipes the wolf weaves by hand, and the seeds besides…
-- `halo.zig` — the halo a diamond projects: not a structure itself, but what the polyp (while its blooms are drawn in and the diamond forms) and the…
+- `halo.zig` — the halo a diamond projects: not a structure itself, but what a diamond shows and holds, while its four blooms are drawn in and once it has…
 - `lithophage.zig` — LITHOPHAGE: a parasite that eats stone.
 - `loomfern.zig` — LOOMFERN: a fern that weaves fibre by itself, so the wolf need not pull it from moss.
 - `monfris.zig` — MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that weaves the advanced tier (`craft.advanced`), which nothing else can: its…
-- `polyp.zig` — POLYP: where a halo forms.
+- `polyp.zig` — POLYP: woven of both lineages, it feeds on the light of grown celestial blooms within `feedReach` tiles, and on it grows flowers of both…
 - `root_digger.zig` — ROOT-DIGGER: the first gathering automation.
 - `sap_cache.zig` — SAP CACHE: plain storage.
 - `sporecaster.zig` — SPORECASTER: a parasite that sends.
+- `strange_seed.zig` — STRANGE SEED: the seed the unforming gathered out of the shattered radiant light and let fall.
 - `vultrixi.zig` — VULTRIXI: a gathering crown and a ganglion grown into one floating body that feeds a monfris.
 - `weftstone.zig` — WEFTSTONE: a loomfern and a lithophage grown into one floating body.
 
 ## src/game/
 - `style.zig` — shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes.
 - `text.zig` — every player-facing string, loaded once at startup from `filePath` (`parasymi.cfg`) and never read again.
+- `unforming.zig` — THE UNFORMING: the garden's first world event, begun the moment the study of that name is learned.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 
 ## src/gfx/
@@ -257,6 +260,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `braided_conduit.zig` — mesh: BRAIDED CONDUIT.
 - `conduit.zig` — mesh: CONDUIT.
 - `convergence_kit.zig` — the lineages mixed: what grows where symbiote and parasite have become one body, shared by the confluence (a plant, grown through keys) and…
+- `drift_flower.zig` — mesh: DRIFT FLOWER.
 - `driftbraid.zig` — mesh: DRIFTBRAID.
 - `ganglion.zig` — mesh: GANGLION.
 - `gathering_crown.zig` — mesh: GATHERING CROWN.
@@ -283,8 +287,10 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sap_cache.zig` — mesh: SAP CACHE.
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
+- `strange_seed.zig` — mesh: STRANGE SEED.
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with
 - `turn_root.zig` — mesh: TURN ROOT.
+- `unform_shard.zig` — mesh: UNFORM SHARD.
 - `vultrixi.zig` — mesh: VULTRIXI.
 - `weftstone.zig` — mesh: WEFTSTONE.
 - `wolf_belly.zig` — mesh: WOLF BELLY.

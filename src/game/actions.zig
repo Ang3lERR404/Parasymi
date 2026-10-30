@@ -137,12 +137,21 @@ pub fn feed(g:*Game,j:st.Id)void{
   g.linger=lingerTrade;
   if(moved==0)g.prog.say(txt.s.msg.wantsNothing,.{});
 }
-/// what a click (or the interact key) on a structure does: one that keeps
-/// items opens its panel, one that is paired is configured, any other is
-/// fed from the belly.
+/// what a click (or the interact key) on a structure does: one that hands
+/// something over straight away does (into the belly, or back if it is
+/// full), one that keeps items opens its panel, one that is paired is
+/// configured, any other is fed from the belly.
 pub fn interact(g:*Game,h:[2]i32,j:st.Id)void{
   // the structure clicked
   const s=g.structs.get(j);
+  if(st.handOver(s))|it|{
+    if(g.player.inv.add(it,1)==0){
+      _=s.inv.add(it,1);
+      g.prog.say(txt.s.msg.bellyFull,.{});
+    }
+    g.linger=lingerTrade;
+    return;
+  }
   if(s.def().store){
     g.open=h;
     g.mode=.structure;

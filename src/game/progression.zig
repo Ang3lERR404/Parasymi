@@ -85,6 +85,8 @@ const techs=struct{
   pub const sharedNerves=@import("research/shared_nerves.zig");
   /// monfris, born of a weftstone and a driftbraid
   pub const interweaving=@import("research/interweaving.zig");
+  /// the first world event: the radiant plants shatter, the lineages die
+  pub const unforming=@import("research/unforming.zig");
 };
 /// the registry over `techs`: ids, `has` and `module` for the hooks
 const reg=registry.Registry(techs);
@@ -103,6 +105,8 @@ pub const Discovery=enum{
   crownAndNerve,
   /// the two convergent structures grown side by side: opens the study of monfris
   weftAndDrift,
+  /// a polyp's first flower let drift: opens the study of the unforming
+  driftFlower,
 };
 /// a technology's id, one per module in `techs`
 pub const Id=reg.Id;
@@ -344,6 +348,10 @@ pub const Progression=struct{
       .weftAndDrift=>{
         g.say(txt.s.msg.weftMeetsDrift,.{});
         g.say(txt.s.msg.researchNamed,.{txt.research(.interweaving).name});
+      },
+      .driftFlower=>{
+        g.say(txt.s.msg.flowerDrifts,.{});
+        g.say(txt.s.msg.researchNamed,.{txt.research(.unforming).name});
       },
     }
   }

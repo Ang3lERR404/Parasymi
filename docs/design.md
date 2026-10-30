@@ -210,23 +210,51 @@ Radiance is a field of light that some plants need to live.
 - **Hover panel:** RADIATING/DARK + links for a bloom; DRAWING
   RADIANCE/WITHERING for a plant that needs it.
 
-## Halo and diamond (`structures/polyp.zig`, `halo.zig`, `diamond.zig`)
-- **The polyp:** 1×1, grows in 6 s; costs 4 fibre + 3 essence + 2
-  starlight + 2 ley shard. Each tick it checks for grown blooms (HP > 0.5)
-  on the four points 5 tiles out east, south, west and north.
-- **The event, once ever, over 5 s:** the blooms spiral in to where their
-  cross of beams meets and fold to buds. Meanwhile a diamond gathers there
-  and projects the halo (see [visual.md](visual.md#halo)).
-- **As they meet:** the blooms are consumed, a flash spreads, and a
-  DIAMOND structure is put down, floating there (`Def.floating`/`hover`/
-  `bare`). The polyp stays as it is.
+## Halo and diamond (`halo.zig`, `diamond.zig`)
+- **Four blooms are enough:** grown blooms (HP > 0.5) on the four points
+  5 tiles east, south, west and north of a tile with no diamond over it
+  form a halo there (`halo.seek`, every tick). No polyp is needed.
+- **The event, once per ring, over 5 s:** a DIAMOND is put down floating
+  over the heart (`Diamond.born = .halo`). The blooms spiral in to it and
+  fold to buds while it gathers and projects the halo (see
+  [visual.md](visual.md#halo)).
+- **As they meet:** the blooms are consumed and a flash spreads.
 - **Fields:** the ring's field has radius 5 while forming; the diamond's,
   radius 7. Points without a grown bloom dim their arcs to 0.3.
 - **What it opens:** a diamond discovers `.diamond`, opening CELESTIAL
   DEFRAGMENTATION. That lets diamonds be woven and put over any dry tile
-  (they gather as they grow, then flash). The diamond is the world event's
-  future launch point.
+  (they gather as they grow, then flash).
 - **Demo:** west of the garden, the fourth bloom finishes ~20 s in.
+
+## Polyp (`structures/polyp.zig`)
+- **Convergent:** woven of both lineages (`polyp_convergent.zig` WOVEN,
+  the gardener's pick). 1×1, grows in 6 s; costs 4 fibre + 3 essence + 2
+  starlight + 2 ley shard.
+- **Feeds** on every grown bloom within 4 tiles: 20 s of one bloom's light
+  grows a DRIFT FLOWER (the confluence's flower, no stem). It rises off
+  the crown and drifts round it, never far and never fading, up to 5.
+- **Pulled from the air:** a click hands one to the belly (`handOver`
+  hook). What drift flowers are for is still open (the gardener's call).
+- **Its first flower** discovers `.driftFlower`, opening THE UNFORMING.
+
+## The unforming (`game/unforming.zig`): the first world event
+Begun the moment THE UNFORMING (after Celestial Defragmentation; 30 units
+of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
+- **Radiant plants** (bloom, vesper) glitch, shatter like glass and blink
+  out, one after another over 6 s, each in 5 s (GPU: `PlantInstance.glitch`,
+  plant.vert `unformAt`, plant.frag `unform`; `--plant=bloom --state=unform`).
+- **Their shards** fly up to one point 14 m over their middle and gather
+  into a STRANGE SEED, which falls (2.2 s) and lies on the ground, never
+  planting itself: a structure the wolf may pick up. Its lineage is still
+  to be designed (the gardener's call).
+- **The lineages die:** symbiotic and parasitic plants wither, and the
+  lineage structures (`Def.unforms`: loomfern, gathering crown, braided
+  conduit, lithophage, ganglion, sporecaster) grow back down to nothing
+  and are gone (`Structure.fade`), over 8 s, each in 6 s. Convergent
+  plants and structures, the polyp, the diamond and the common structures
+  (conduit, sap cache, germinator, root-digger) stay.
+- **The arsthraxia evolves** instead (`Msg.unform`: `evolved`); its
+  convergent look is still to be chosen.
 
 ## Research panel (T, `hud/research.zig`)
 The research tree is drawn as a sapling growing in soil. It is laid out

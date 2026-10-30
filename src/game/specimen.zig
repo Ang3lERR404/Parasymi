@@ -166,13 +166,16 @@ pub const State=union(enum){
   /// a plant grown, its yield ripening from nothing to full in its pods,
   /// again and again
   ripen,
+  /// a radiant plant grown, glitching, shattering and blinking out as the
+  /// unforming takes it, again and again (game/unforming.zig)
+  unform,
   /// shown as set from outside (the animation editor, tools/animedit.zig)
   look:Look,
   /// a name, a share of growth (`0.4`) or a span (`0.2..0.8`)
   pub fn parse(s:[]const u8)error{BadState}!State{
     if(eql(u8,s,"mature") or eql(u8,s,"idle"))return.{.held=1};
-    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck,ripen},s))|k|return switch(k){
-      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,.ripen=>.ripen,
+    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck,ripen,unform},s))|k|return switch(k){
+      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,.ripen=>.ripen,.unform=>.unform,
     };
     if(indexOf(u8,s,".."))|dots|{
       // where the dots are, and the shares either side of them
@@ -189,6 +192,7 @@ pub const State=union(enum){
       .grow,.span,.held=>true,
       .turn,.look=>what!=.samples,
       .wither,.flow,.drain,.dark,.live,.pluck,.ripen=>what==.plant,
+      .unform=>switch(what){.plant=>|sp|lib.unforming.radiant(sp),.structure,.samples=>false},
       .active=>what==.structure,
     };
   }
@@ -376,6 +380,8 @@ pub const Specimen=struct{
             s.feedT=holdTime;
           }
         }
+        // unforming: the event held where it is this far through its shattering
+        if(s.state==.unform)g.unforming=.{.phase=.shattering,.t=lib.unforming.momentOf(seed,s.share())};
         // the plants lit by radiance; it alone, lit as its look says
         const rad=&g.eco.radiance.radiating;
         try rad.resize(g.gpa,g.plants.len());
@@ -510,7 +516,7 @@ pub const Specimen=struct{
       .ripen=>.{.ripe=k},
       .live=>.{.growth=0},
       .look=>|l|l,
-      .active,.turn,.pluck=>.{},
+      .active,.turn,.pluck,.unform=>.{},
     };
   }
 };
@@ -560,6 +566,8 @@ test"a state is a name, a share of growth or a span"{
   try testing.expectEqual(@as(f32,0.4),(try State.parse("0.4")).held);
   try testing.expectEqual([2]f32{0.2,0.8},(try State.parse("0.2..0.8")).span);
   try testing.expectError(error.BadState,State.parse("sideways"));
+  try testing.expect((try State.parse("unform")).suits(.{.plant=.bloom}));
+  try testing.expect(!(try State.parse("unform")).suits(.{.plant=.lumenroot}));
   try testing.expect((try State.parse("active")).suits(.{.structure=.germinator}));
   try testing.expect(!(try State.parse("wither")).suits(.{.structure=.germinator}));
 }

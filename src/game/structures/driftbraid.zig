@@ -243,7 +243,7 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
       ctx.ss.get(i).state.driftbraid.kept.getPtr(a.item).*+=took;
       return.{.took=took};
     },
-    .lit=>return.ignored,
+    .lit,.unform=>return.ignored,
   }
 }
 /// the first thing it holds that came by spore.

@@ -1,27 +1,21 @@
-//! POLYP: where a halo forms. When four grown celestial blooms stand on the
-//! four points `halo.reachTiles` tiles out east, south, west and north of
-//! it, the halo forms (checked each tick until it does, then never again):
-//! the blooms spiral in to the heart of the ring, where their cross of
-//! beams meets, slowly and then exponentially faster, while a diamond
-//! gathers there from shards of light and projects the halo's ring through
-//! the points they left. Where they meet they become one: the diamond, a
-//! structure of its own (`diamond.zig`), is put down floating high over
-//! the polyp, with a flash of light. The polyp is left as it was. While the
-//! halo forms, its ring is already a field of celestial energy (see
-//! `halo.zig`).
+//! POLYP: woven of both lineages, it feeds on the light of grown celestial
+//! blooms within `feedReach` tiles, and on it grows flowers of both
+//! lineages with no stem, letting them drift off its crown as a polyp
+//! lets its jellyfish go: they drift round it, never far and never
+//! fading, up to `most` at once, until the wolf pulls one from the air (a
+//! click, `pull`). The halo no longer needs it: four blooms in a cross
+//! form the diamond on their own (`halo.seek`).
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
-/// the allocator type every drawing call may fail with
+/// the allocator the drawing calls may fail with
 const Allocator=std.mem.Allocator;
 /// all the maths: vectors, matrices, easing
 const m=lib.engine.core.math;
-/// the species registry, to tell a celestial bloom by its radiance
-const species=lib.species;
-/// a disc of celestial energy the ecology powers plants within
-const Field=lib.ecology.Field;
 /// the structures registry: `Def`, `Structure`, the hooks' context
 const st=lib.structures;
+/// what can be held: its drifting flowers
+const items=lib.items;
 /// the tools a bulb icon is drawn with
 const iconKit=lib.icon;
 /// every player-facing string
@@ -30,237 +24,166 @@ const txt=lib.txt;
 const prog=lib.progression;
 /// the HUD's shared sizes and colours
 const style=lib.style;
-/// the scene's list of moving parts the forming halo adds to each frame
+/// the scene's list of moving parts its flowers are drawn into
 const Parts=lib.parts.Parts;
 /// the UI's draw batch, which the panel text goes into
 const Draw=lib.engine.ui.draw.Draw;
 /// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
-/// the halo's shared rules and drawing (`halo.zig`)
+/// the halo's helpers: whether a grown bloom stands at a tile
 const halo=lib.haloStructure;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.haloDiamond,.haloFlash,.haloProjection,.haloRing};
-/// what a polyp is: grown from its seed, one tile across, swaying gently,
-/// standing a little under a tile tall, rich in sap
-pub const def:st.Def=.{.item=.polyp,.size=1,.mesh=.polyp,.sway=0.4,.tall=0.9,.grow=6,.sap=0.6};
-/// where a polyp's halo stands
-pub const Phase=enum(u8){
-  /// waiting for a grown bloom on each of its four points
-  open,
-  /// the blooms spiralling in, the diamond gathering
-  forming,
-  /// the diamond has formed; it never forms again
-  formed,
-};
-/// what a polyp remembers: where its halo stands, and for how long
+pub const meshes=.{.driftFlower};
+/// what a polyp is: grown from its bulb, one tile across, swaying gently,
+/// standing a tile tall, rich in sap
+pub const def:st.Def=.{.item=.polyp,.size=1,.mesh=.polyp,.sway=0.4,.tall=1,.grow=6,.sap=0.6};
+/// how far (tiles, either way) it reaches for blooms to feed on
+pub const feedReach:i32=4;
+/// seconds of one bloom's light it takes to grow a flower
+const feedTime:f32=20;
+/// the most flowers it lets drift at once (the exact fives of both lineages)
+pub const most:u32=5;
+/// seconds a new flower takes to rise out of its crown to where it drifts
+const rise:f32=3;
+/// where its crown is, over its foot (where flowers rise from)
+const crownAt=m.v3(0,0.78,0);
+/// how far out round it its flowers drift, and how high
+const driftR:f32=0.55;
+/// (their height over its foot, give or take `bob`)
+const driftH:f32=0.95;
+/// how far a drifting flower bobs up and down
+const bob:f32=0.12;
+/// radians a second its flowers drift round it
+const driftTurn:f32=0.12;
+/// what a polyp remembers: how far along the next flower is, and how long
+/// since the last rose
 pub const State=struct{
-  /// where its halo stands
-  phase:Phase=.open,
-  /// seconds since the halo began forming
-  t:f32=0,
+  /// how far grown the next flower is (0..1)
+  feed:f32=0,
+  /// seconds since the last flower rose off it
+  since:f32=rise,
 };
-/// open: forms the halo once all four points hold a grown bloom; forming:
-/// counts up to `halo.form`, then consumes the blooms and puts down the
-/// diamond over it; formed: rests. Returns true while something changes.
-pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)Allocator.Error!bool{
+/// how many grown, unwithered blooms within `feedReach` it feeds on
+fn blooms(ctx:st.Ctx,x:i32,y:i32)u32{
+  // the count so far
+  var n:u32=0;
+  var dy:i32=-feedReach;
+  while(dy<=feedReach):(dy+=1){
+    var dx:i32=-feedReach;
+    while(dx<=feedReach):(dx+=1){
+      if(halo.active(ctx.plants,ctx.w,.{x+dx,y+dy}))n+=1;
+    }
+  }
+  return n;
+}
+/// feeds on every grown bloom near enough, growing a flower once it has had
+/// `feedTime` seconds of one bloom's light, and lets it rise off its crown,
+/// until `most` drift round it. Returns whether it is feeding.
+pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // the polyp itself, and its remembered state
   const self=ctx.ss.get(i);
-  const h=&self.state.polyp;
-  switch(h.phase){
-    .open=>{
-      for(0..4)|k|if(!halo.active(ctx.plants,ctx.w,halo.pointAt(self.x,self.y,k)))return false;
-      h.phase=.forming;
-      h.t=0;
-      ctx.g.say(txt.s.msg.haloForms,.{});
-      return true;
-    },
-    .forming=>{
-      h.t+=dt;
-      if(h.t<halo.form)return true;
-      h.phase=.formed;
-      // they meet: the blooms are consumed into the diamond
-      // (where the polyp stands, and its seed, kept before the list may grow)
-      const x=self.x;
-      const y=self.y;
-      const seed=self.seed;
-      for(0..4)|k|{
-        // this point's tile, and the plant on it
-        const at=halo.pointAt(x,y,k);
-        const id=ctx.plants.at(ctx.w,at[0],at[1]) orelse continue;
-        if(species.get(ctx.plants.list.items(.sp)[id.idx()]).radiance>0)ctx.plants.remove(ctx.w,id);
-      }
-      // decision: a diamond already floating over the polyp (put there by
-      // hand) takes the halo's place; no second one is formed
-      if(try ctx.ss.spawnChild(ctx.gpa,ctx.w,i,.{.x=x,.y=y,.kind=.diamond,.seed=seed}))|d|{
-        // it is born whole (no growing in), its light still the blooms'
-        _=ctx.ss.send(ctx,d,.lit);
-      }
-      ctx.g.say(txt.s.msg.diamondForms,.{});
-      ctx.g.discover(.diamond);
-      return true;
-    },
-    .formed=>return false,
+  const p=&self.state.polyp;
+  p.since+=dt;
+  if(self.inv.count(.driftFlower)>=most)return false;
+  // how many blooms it feeds on
+  const n=blooms(ctx,self.x,self.y);
+  if(n==0)return false;
+  p.feed+=dt*m.f(n)/feedTime;
+  if(p.feed>=1 and self.inv.add(.driftFlower,1)==1){
+    p.feed=0;
+    p.since=0;
+    ctx.g.discover(.driftFlower);
+  }
+  return true;
+}
+/// a click pulls one drifting flower from the air
+pub fn handOver(s:*st.Structure)?items.Item{
+  return if(s.inv.take(.driftFlower,1)).driftFlower else null;
+}
+/// its flowers drifting round it, the newest rising out of its crown
+pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
+  // how many drift, and how far the newest has risen
+  const n=s.inv.count(.driftFlower);
+  const risen=m.smooth(m.clamp01(s.state.polyp.since/rise));
+  for(0..n)|k|{
+    // its own phase, the bearing it drifts at, and where that is
+    const ph=m.ratio(k,most)+s.seed;
+    const a=tf*driftTurn+ph*m.tau;
+    const at=ctr+m.v3(@cos(a)*driftR*(1+0.15*@sin(tf*0.3+ph*9)),driftH+bob*@sin(tf*0.7+ph*11),@sin(a)*driftR*(1+0.15*@sin(tf*0.3+ph*9)));
+    // the newest rises from the crown and opens as it comes
+    const newest=k+1==n;
+    const k1=if(newest)risen else 1;
+    const p=ctr+crownAt+(at-ctr-crownAt)*m.splat3(k1);
+    try out.emit(.driftFlower,m.chain(&.{m.translate(p),m.rotY(tf*0.2+ph*m.tau),m.rotX(0.25*@sin(tf*0.5+ph*7)),m.scale3(m.splat3(m.lerp(0.3,1,k1)))}),.{.phase=ph,.glow=0.3});
   }
 }
-/// the ring's disc while the halo forms (the diamond holds it after).
-pub fn field(s:*const st.Structure)?Field{
-  if(s.state.polyp.phase!=.forming)return null;
-  return.{.x=s.x,.y=s.y,.radius=m.f(halo.reachTiles)};
-}
-/// a bloom on one of a forming halo's points is drawn in to the ring's heart,
-/// where the blooms' cross of beams meets (the GPU spirals it there).
-pub fn hold(s:*const st.Structure,wx:i32,wy:i32)?st.Hold{
-  // its remembered state
-  const h=&s.state.polyp;
-  if(h.phase!=.forming)return null;
-  for(0..4)|k|{
-    // this point's tile
-    const at=halo.pointAt(s.x,s.y,k);
-    if(at[0]==wx and at[1]==wy)return.{.k=h.t/halo.form,.seat=halo.hover};
-  }
-  return null;
-}
-/// while the halo forms: the diamond gathering at the ring's heart, its
-/// projection and ring.
-pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,_:f32)Allocator.Error!void{
-  // its remembered state
-  const h=&s.state.polyp;
-  if(h.phase!=.forming)return;
-  try halo.draw(out,s.seed,ctr+m.v3(0,halo.hover,0),ctr,h.t/halo.form,@splat(1));
-}
-/// its line in the panel: waiting for blooms (and how far out), forming,
-/// or formed.
+/// its line in the panel: what it feeds on and how many flowers drift
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
-  switch(s.state.polyp.phase){
-    .open=>_=try d.print(x,y,style.textBody,style.dim,txt.s.describe.haloOpen,.{halo.reachTiles}),
-    .forming=>_=try d.text(x,y,style.textBody,style.gold,txt.s.describe.haloForming),
-    .formed=>_=try d.text(x,y,style.textBody,style.dim,txt.s.describe.haloFormed),
-  }
+  // how many drift
+  const n=s.inv.count(.driftFlower);
+  if(s.activity<0.05 and n<most)_=try d.print(x,y,style.textBody,style.dim,txt.s.describe.polypHungry,.{feedReach})
+  else _=try d.print(x,y,style.textBody,style.gold,txt.s.describe.polypFeeds,.{n,most});
 }
-test"four grown blooms on a polyp's points form a halo; the diamond it leaves powers further and can be studied"{
+test"a polyp feeds on a grown bloom near it, letting flowers drift up to five, and one is pulled from the air"{
   // the test harness and its allocator
   const testing=std.testing;
   const gpa=testing.allocator;
-  // chunk layout, the world, the plants and the ecology
+  // chunk layout, the world, the plants
   const ck=lib.ck;
   const World=lib.world.World;
   const Plants=lib.plants.Plants;
-  const Ecology=lib.ecology.Ecology;
   // the world, streamed in round the origin
   var w=World.init(gpa,5);
   defer w.deinit();
   try w.stream(.{.x=0,.y=0},1,100);
   // the chunk at the origin, laid flat with bare soil
   const c=w.chunkOfTile(0,0).?;
-  for(0..16)|y|for(0..16)|x|{const t=y*ck.sizeTiles+x;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
-  // the plants and structures
+  for(0..16)|yy|for(0..16)|xx|{const t=yy*ck.sizeTiles+xx;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
+  // the plants, structures and what the gardener understands
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
-  // the ecology, the structures' fields, and what the gardener understands
-  var eco:Ecology=.{};
-  defer eco.deinit(gpa);
-  var fl:std.ArrayList(Field)=.empty;
-  defer fl.deinit(gpa);
   var g:prog.Progression=.{};
-  // where the polyp stands
-  const px=7;
-  const py=7;
-  try testing.expect(try ss.place(gpa,&w,px,py,.polyp,0,0));
-  // a vesper inside the ring and one outside it (inside the diamond's
-  // reach), both beyond every point's bloom field
-  try testing.expect(try plants.place(gpa,&w,px-1,py-1,.vesper,0.1));
-  try testing.expect(try plants.place(gpa,&w,px+4,py+4,.vesper,0.2));
-  // runs the ecology and the structures together
-  const run=struct{
-    /// ticks fields, ecology and structures at 60 Hz for `secs` seconds
-    fn runFor(e:*Ecology,p:*Plants,ww:*World,s:*st.Structures,gg:*prog.Progression,f:*std.ArrayList(Field),secs:f32)!void{
-      // the tick length, and the time run so far
-      const dt:f32=1.0/60.0;
-      var t:f32=0;
-      while(t<secs):(t+=dt){
-        try st.fields(s,testing.allocator,f);
-        _=try e.tick(testing.allocator,p,ww,.{.fields=f.items},dt);
-        try s.tick(testing.allocator,ww,p,gg,dt);
-      }
-    }
-  };
-  // plants a grown bloom
-  const bloom=struct{
-    /// plants a full-grown, mana-rich bloom at (x, y)
-    fn at(p:*Plants,ww:*World,x:i32,y:i32)!void{
-      try testing.expect(try p.placeEx(testing.allocator,ww,x,y,.{.x=x,.y=y,.chunk=undefined,.tile=undefined,.sp=.bloom,.seed=0,.growth=1,.mana=10}));
-    }
-  };
-  // asks whether a plant is powered
-  const powered=struct{
-    /// whether the plant at (x, y) is powered by celestial energy
-    fn at(e:*const Ecology,p:*const Plants,ww:*const World,x:i32,y:i32)bool{
-      return e.radiance.powered.items[p.at(ww,x,y).?.idx()];
-    }
-  };
-  // the polyp
-  const id=ss.at(&w,px,py).?;
-  // three points: nothing happens, and the vesper inside has no radiance
-  for(halo.points[0..3])|k|try bloom.at(&plants,&w,px+k[0]*halo.reachTiles,py+k[1]*halo.reachTiles);
-  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,0.5);
-  try testing.expectEqual(Phase.open,ss.get(id).state.polyp.phase);
-  try testing.expect(!powered.at(&eco,&plants,&w,px-1,py-1));
-  // the fourth: the halo forms, and its ring powers its disc at once
-  try bloom.at(&plants,&w,px+halo.points[3][0]*halo.reachTiles,py+halo.points[3][1]*halo.reachTiles);
-  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,0.1);
-  try testing.expectEqual(Phase.forming,ss.get(id).state.polyp.phase);
-  try testing.expect(powered.at(&eco,&plants,&w,px-1,py-1));
-  try testing.expect(!powered.at(&eco,&plants,&w,px+4,py+4));
-  // how an east point's bloom is held just after the halo starts
-  const early=hold(ss.get(id),px+halo.reachTiles,py).?;
-  try testing.expect(early.k>0 and early.k<0.05);
-  try testing.expectEqual(prog.Status.locked,g.status(.celestialDefragmentation));
-  // they meet: consumed into a diamond, a structure of its own floating over
-  // the polyp, which stays as it was; its field reaches further
-  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,halo.form+0.5);
-  try testing.expectEqual(Phase.formed,ss.get(id).state.polyp.phase);
-  try testing.expectEqual(st.Kind.polyp,ss.get(w.occAt(px,py).asStructure().?).kind());
-  // the diamond now floating over the polyp
-  const dia=ss.at(&w,px,py).?;
-  try testing.expectEqual(st.Kind.diamond,ss.get(dia).kind());
-  try testing.expectEqual(id,ss.getParent(dia).?);
-  for(halo.points)|k|try testing.expect(plants.at(&w,px+k[0]*halo.reachTiles,py+k[1]*halo.reachTiles)==null);
-  try testing.expect(powered.at(&eco,&plants,&w,px-1,py-1));
-  try testing.expect(powered.at(&eco,&plants,&w,px+4,py+4));
-  // and the diamond's lattice can now be studied
-  try testing.expectEqual(prog.Status.open,g.status(.celestialDefragmentation));
-  // it never forms again; the empty points' arcs dim but stay
-  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,10);
-  try testing.expectEqual(@as(usize,2),ss.list.items.len);
-  for(ss.get(dia).state.diamond.light)|l|try testing.expect(l<0.5 and l>=halo.dim);
-  // uprooting the diamond leaves the polyp
-  _=ss.remove(&w,dia);
-  try testing.expectEqual(st.Kind.polyp,ss.get(ss.at(&w,px,py).?).kind());
+  try testing.expect(try ss.place(gpa,&w,7,7,.polyp,0,0));
+  // the polyp, grown
+  const id=ss.at(&w,7,7).?;
+  ss.get(id).grown=1;
+  // the tick context
+  const ctx:st.Ctx=.{.gpa=gpa,.w=&w,.plants=&plants,.g=&g,.ss=&ss};
+  // no bloom: it starves
+  for(0..600)|_|try st.Structures.tickWith(ctx,1.0/60.0);
+  try testing.expectEqual(@as(u32,0),ss.get(id).inv.count(.driftFlower));
+  // a grown bloom two tiles off: it feeds, until five drift
+  try testing.expect(try plants.placeEx(gpa,&w,9,7,.{.x=9,.y=7,.chunk=undefined,.tile=undefined,.sp=.bloom,.seed=0,.growth=1,.mana=10}));
+  for(0..60*@as(usize,@intFromFloat(feedTime))*7)|_|try st.Structures.tickWith(ctx,1.0/60.0);
+  try testing.expectEqual(most,ss.get(id).inv.count(.driftFlower));
+  // one is pulled from the air
+  try testing.expectEqual(items.Item.driftFlower,handOver(ss.get(id)).?);
+  try testing.expectEqual(most-1,ss.get(id).inv.count(.driftFlower));
 }
-/// its bulb: a pearl bud on a sprout, threads of light running out to four
-/// blooms on a ring round it (it calls the halo).
+/// its bulb: a woven stem opening into a violet disc, three flowers of
+/// both lineages drifting off it, bobbing.
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
-  // the pearl at the heart, and the four blooms round it
-  const heart:iconKit.P=.{0,0.6};
-  const points=[_]iconKit.P{.{-0.5,0.6},.{0,0.86},.{0.5,0.6},.{0,0.38}};
-  for(points)|q|try ic.stem(.{heart,heart,q,q},0.06,iconThread);
-  try ic.stem(.{.{0,iconKit.topAt},.{0.08,0.3},.{-0.06,0.45},heart},0.1,iconKit.stemCol);
-  try ic.glow(heart,0.25,iconGlow);
-  try ic.bud(heart,0.12,iconPearl,0.6);
-  for(points,0..)|q,i|{
-    // how bright this bloom pulses now (0..1)
-    const lit=0.5+0.5*@sin(ic.t*2+m.f(i)*1.6);
-    try ic.bud(q,0.11,iconBloom,lit);
+  // the disc at its top
+  const disc:iconKit.P=.{0,0.55};
+  try ic.stem(.{.{0,iconKit.topAt},.{0.07,0.3},.{-0.06,0.42},disc},0.1,iconKit.stemCol);
+  try ic.stem(.{.{0,iconKit.topAt},.{-0.07,0.3},.{0.06,0.42},disc},0.06,iconPale);
+  try ic.bud(disc,0.13,iconDisc,0.7);
+  for(0..3)|i|{
+    // where this flower drifts, bobbing
+    const a=m.f(i)*2.1+ic.t*0.4;
+    const at:iconKit.P=.{0.45*@cos(a),0.72+0.12*@sin(a)+0.04*@sin(ic.t*2+m.f(i))};
+    try ic.glow(at,0.12,iconGlow);
+    try ic.bud(at,0.09,iconFlower,0.5+0.5*@sin(ic.t*1.5+m.f(i)*2));
   }
   try ic.coat(col);
 }
-/// the warm pale gold of the threads of light in its bulb
-const iconThread:Color=.{255,236,180,200};
-/// the pearly pink of the bud at its heart
-const iconPearl:Color=.{235,205,230,255};
-/// the bright mint of the four blooms
-const iconBloom:Color=.{140,255,215,255};
-/// the soft warm glow behind the pearl
-const iconGlow:Color=.{255,236,200,80};
+/// the pale strand woven through its stem in its bulb
+const iconPale:Color=.{225,220,240,255};
+/// the violet of its disc
+const iconDisc:Color=.{170,120,230,255};
+/// the warm rose of a drifting flower
+const iconFlower:Color=.{245,150,200,255};
+/// the soft glow round a drifting flower
+const iconGlow:Color=.{255,200,230,70};

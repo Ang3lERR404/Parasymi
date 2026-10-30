@@ -62,7 +62,7 @@ const v3=m.v3;
 pub const meshes=.{.lithophageRoot,.lithophageRootFar,.lithophageCrystal,.germinatorPool,.germinatorPour,.itemPod};
 /// what a lithophage is: grown from its seed, one tile across, a pale
 /// store that swaps sap, swaying a little
-pub const def:st.Def=.{.item=.lithophage,.size=1,.mesh=.lithophage,.store=true,.grow=6,.sway=0.35,.tall=0.7,.sap=0.32,.pale=true};
+pub const def:st.Def=.{.item=.lithophage,.size=1,.mesh=.lithophage,.store=true,.grow=6,.sway=0.35,.tall=0.7,.sap=0.32,.pale=true,.unforms=true};
 /// seconds it takes to draw one mineral up out of the ground (or eat one
 /// it was fed)
 pub const draw:f32=3;

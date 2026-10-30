@@ -1,5 +1,7 @@
-//! DIAMOND: where a halo's four blooms became one, floating high over the
-//! polyp at its ring's heart; or, once Celestial Defragmentation is known,
+//! DIAMOND: where a halo's four blooms became one, floating high at the
+//! heart of their cross (four grown blooms `halo.reachTiles` out east,
+//! south, west and north of a tile are enough: `halo.seek` finds them and
+//! puts it down there, forming, the blooms spiralling in to it); or, once Celestial Defragmentation is known,
 //! woven and put down over any dry tile. Small and still, a cut crystal that
 //! only catches light. It fragments that light into the halo's ring around
 //! it (see `halo.zig`), and holds a field of celestial energy wider than it.
@@ -34,28 +36,75 @@ const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 /// the halo it projects and holds: its sizes, timing and drawing
 const halo=lib.haloStructure;
+/// the species registry, to tell a celestial bloom by its radiance
+const species=lib.species;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.haloFlash,.haloProjection,.haloRing};
 /// what a diamond is: one tile, floating as high as the blooms hang, at
 /// the heart of its ring, over whatever is under it; it draws itself
 /// (`bare`, forming on the GPU) and takes 8 s to gather when put down
 pub const def:st.Def=.{.item=.diamond,.size=1,.mesh=.haloDiamond,.floating=true,.hover=halo.hover,.bare=true,.grow=8};
-/// what a diamond remembers: how long since it formed, and its arcs' light
+/// how a diamond came to be
+pub const Born=enum(u8){
+  /// woven and put down by hand: it gathers as it grows in
+  woven,
+  /// of a halo: its four blooms spiral in to it over `halo.form`, then
+  /// are consumed into it
+  halo,
+};
+/// what a diamond remembers: how it came to be, how long since, and its arcs' light
 pub const State=struct{
-  /// seconds since it formed (grown)
+  /// how it came to be
+  born:Born=.woven,
+  /// seconds since it formed (grown); of a halo, since its blooms began
+  /// spiralling in
   t:f32=0,
   /// per point of its ring: how brightly the arcs beside it shine
   light:[4]f32=@splat(halo.dim),
 };
 /// counts on from its forming (up to the end of its flash) and lets its
-/// arcs brighten or dim with the blooms on its ring's points; never busy
+/// arcs brighten or dim with the blooms on its ring's points. Of a halo,
+/// its blooms spiral in first, its arcs lit by them, and are consumed into
+/// it as they meet; busy only then.
 pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
-  // the diamond and its remembered state
+  // the diamond and its remembered state, and how far it had come
   const self=ctx.ss.get(i);
   const d=&self.state.diamond;
-  d.t=@min(d.t+dt,halo.form+halo.flash);
+  const was=d.t;
+  // how long its blooms take to come in first (none, woven)
+  const first:f32=if(d.born==.halo)halo.form else 0;
+  d.t=@min(d.t+dt,first+halo.form+halo.flash);
+  if(d.t<first){
+    d.light=@splat(1);
+    return true;
+  }
+  if(d.born==.halo and was<first){
+    // they meet: the blooms are consumed into it
+    for(0..4)|k|{
+      // this point's tile, and the plant on it
+      const at=halo.pointAt(self.x,self.y,k);
+      const id=ctx.plants.at(ctx.w,at[0],at[1]) orelse continue;
+      if(species.get(ctx.plants.list.items(.sp)[id.idx()]).radiance>0)ctx.plants.remove(ctx.w,id);
+    }
+    ctx.g.say(txt.s.msg.diamondForms,.{});
+    ctx.g.discover(.diamond);
+    return true;
+  }
   halo.relight(&d.light,ctx.plants,ctx.w,self.x,self.y,dt);
   return false;
+}
+/// a bloom on one of a forming halo's points is drawn in to the ring's
+/// heart, where the blooms' cross of beams meets (the GPU spirals it there)
+pub fn hold(s:*const st.Structure,wx:i32,wy:i32)?st.Hold{
+  // its remembered state
+  const d=&s.state.diamond;
+  if(d.born!=.halo or d.t>=halo.form)return null;
+  for(0..4)|k|{
+    // this point's tile
+    const at=halo.pointAt(s.x,s.y,k);
+    if(at[0]==wx and at[1]==wy)return.{.k=d.t/halo.form,.seat=halo.hover};
+  }
+  return null;
 }
 /// `lit`: born whole of a halo, its light still the blooms'
 pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
@@ -64,18 +113,25 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
       ctx.ss.get(i).state.diamond.light=@splat(1);
       return.done;
     },
-    .arrived=>return.ignored,
+    .arrived,.unform=>return.ignored,
   }
 }
-/// its field of celestial energy, `halo.diamondR` round it, once grown
+/// its field of celestial energy, `halo.diamondR` round it, once grown;
+/// while its halo forms, the ring's disc
 pub fn field(s:*const st.Structure)?Field{
   if(s.grown<1)return null;
+  // its remembered state
+  const d=&s.state.diamond;
+  if(d.born==.halo and d.t<halo.form)return.{.x=s.x,.y=s.y,.radius=m.f(halo.reachTiles)};
   return.{.x=s.x,.y=s.y,.radius=halo.diamondR};
 }
 /// how far along its halo is: growing in, it gathers as the halo's blooms
-/// would bring it together; formed, past 1
+/// would bring it together; of a halo, as its blooms come in; formed, past 1
 fn along(s:*const st.Structure)f32{
-  return if(s.grown<1)s.grown else 1+s.state.diamond.t/halo.form;
+  // its remembered state
+  const d=&s.state.diamond;
+  if(d.born==.halo)return d.t/halo.form;
+  return if(s.grown<1)s.grown else 1+d.t/halo.form;
 }
 /// draws its halo: the diamond hanging `hover` over its tile, the ring
 /// round it, as far formed as it has come
@@ -85,6 +141,99 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,_:f32)Allocator.Error!void
 /// its line in the panel: how much of its ring is lit
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
   _=try d.print(x,y,style.textBody,style.gold,txt.s.describe.diamond,.{halo.lit(s.state.diamond.light)});
+}
+test"four grown blooms in a cross form a diamond at their heart, no polyp needed; it powers further and can be studied"{
+  // the test harness and its allocator
+  const testing=std.testing;
+  const gpa=testing.allocator;
+  // chunk layout, the world, the plants and the ecology
+  const ck=lib.ck;
+  const World=lib.world.World;
+  const Plants=lib.plants.Plants;
+  const Ecology=lib.ecology.Ecology;
+  // the world, streamed in round the origin
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, laid flat with bare soil
+  const c=w.chunkOfTile(0,0).?;
+  for(0..16)|y|for(0..16)|x|{const t=y*ck.sizeTiles+x;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
+  // the plants and structures
+  var plants:Plants=.{};
+  defer plants.deinit(gpa);
+  var ss:st.Structures=.{};
+  defer ss.deinit(gpa);
+  // the ecology, the structures' fields, and what the gardener understands
+  var eco:Ecology=.{};
+  defer eco.deinit(gpa);
+  var fl:std.ArrayList(Field)=.empty;
+  defer fl.deinit(gpa);
+  var g:prog.Progression=.{};
+  // the ring's heart
+  const px=7;
+  const py=7;
+  // a vesper inside the ring and one outside it (inside the diamond's
+  // reach), both beyond every point's bloom field
+  try testing.expect(try plants.place(gpa,&w,px-1,py-1,.vesper,0.1));
+  try testing.expect(try plants.place(gpa,&w,px+4,py+4,.vesper,0.2));
+  // runs the ecology, the structures and the search for halos together
+  const run=struct{
+    /// ticks fields, ecology, structures and the search at 60 Hz for `secs` seconds
+    fn runFor(e:*Ecology,p:*Plants,ww:*World,s:*st.Structures,gg:*prog.Progression,f:*std.ArrayList(Field),secs:f32)!void{
+      // the tick length, and the time run so far
+      const dt:f32=1.0/60.0;
+      var t:f32=0;
+      while(t<secs):(t+=dt){
+        try st.fields(s,testing.allocator,f);
+        _=try e.tick(testing.allocator,p,ww,.{.fields=f.items},dt);
+        try s.tick(testing.allocator,ww,p,gg,dt);
+        _=try halo.seek(.{.gpa=testing.allocator,.w=ww,.plants=p,.g=gg,.ss=s});
+      }
+    }
+  };
+  // plants a grown bloom
+  const bloom=struct{
+    /// plants a full-grown, mana-rich bloom at (x, y)
+    fn at(p:*Plants,ww:*World,x:i32,y:i32)!void{
+      try testing.expect(try p.placeEx(testing.allocator,ww,x,y,.{.x=x,.y=y,.chunk=undefined,.tile=undefined,.sp=.bloom,.seed=0,.growth=1,.mana=10}));
+    }
+  };
+  // asks whether a plant is powered
+  const powered=struct{
+    /// whether the plant at (x, y) is powered by celestial energy
+    fn at(e:*const Ecology,p:*const Plants,ww:*const World,x:i32,y:i32)bool{
+      return e.radiance.powered.items[p.at(ww,x,y).?.idx()];
+    }
+  };
+  // three points: nothing happens, and the vesper inside has no radiance
+  for(halo.points[0..3])|k|try bloom.at(&plants,&w,px+k[0]*halo.reachTiles,py+k[1]*halo.reachTiles);
+  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,0.5);
+  try testing.expectEqual(@as(usize,0),ss.list.items.len);
+  try testing.expect(!powered.at(&eco,&plants,&w,px-1,py-1));
+  // the fourth: a diamond forms at the heart, and its ring powers its disc at once
+  try bloom.at(&plants,&w,px+halo.points[3][0]*halo.reachTiles,py+halo.points[3][1]*halo.reachTiles);
+  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,0.1);
+  try testing.expectEqual(@as(usize,1),ss.list.items.len);
+  // the diamond, born of the halo
+  const dia=ss.floaterAt(px,py).?;
+  try testing.expectEqual(Born.halo,ss.get(dia).state.diamond.born);
+  try testing.expect(powered.at(&eco,&plants,&w,px-1,py-1));
+  try testing.expect(!powered.at(&eco,&plants,&w,px+4,py+4));
+  // how an east point's bloom is held just after the halo starts
+  const early=hold(ss.get(dia),px+halo.reachTiles,py).?;
+  try testing.expect(early.k>0 and early.k<0.05);
+  try testing.expectEqual(prog.Status.locked,g.status(.celestialDefragmentation));
+  // they meet: consumed into the diamond; its field reaches further
+  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,halo.form+0.5);
+  for(halo.points)|k|try testing.expect(plants.at(&w,px+k[0]*halo.reachTiles,py+k[1]*halo.reachTiles)==null);
+  try testing.expect(powered.at(&eco,&plants,&w,px-1,py-1));
+  try testing.expect(powered.at(&eco,&plants,&w,px+4,py+4));
+  // and the diamond's lattice can now be studied
+  try testing.expectEqual(prog.Status.open,g.status(.celestialDefragmentation));
+  // it never forms again; the empty points' arcs dim but stay
+  try run.runFor(&eco,&plants,&w,&ss,&g,&fl,10);
+  try testing.expectEqual(@as(usize,1),ss.list.items.len);
+  for(ss.get(dia).state.diamond.light)|l|try testing.expect(l<0.5 and l>=halo.dim);
 }
 /// its bulb: a low sprout, and over it, floating free on a thread of light,
 /// the cut diamond: shards spiral in to it, and it splits light into needle

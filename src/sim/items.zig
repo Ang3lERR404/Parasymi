@@ -77,6 +77,12 @@ pub const Item=enum(u8){
   monfris,
   /// the bulb of a vultrixi
   vultrixi,
+  /// a stemless flower of both lineages a polyp lets drift, fed on the
+  /// blooms' light; pulled from the air beside it
+  driftFlower,
+  /// the seed the shattered radiant light gathered into and let fall: of
+  /// a lineage not yet known, it never plants itself
+  strangeSeed,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -121,6 +127,8 @@ const infos=EnumArray(Item,Info).init(.{
   .leyCrystal=.{.col=.{200,160,255,255}},
   .monfris=.{.col=.{210,175,230,255}},
   .vultrixi=.{.col=.{230,200,215,255}},
+  .driftFlower=.{.col=.{240,150,200,255}},
+  .strangeSeed=.{.col=.{235,240,255,255}},
 });
 /// one slot's worth: an item and how many of it
 pub const Stack=struct{

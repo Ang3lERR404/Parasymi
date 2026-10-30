@@ -64,6 +64,14 @@ pub fn release(s:*Structure)?items.Item{
     inline else=>|k|if(comptime reg.has(k,"release"))reg.module(k).release(s)else null,
   };
 }
+/// what a click on it hands the wolf straight away, taken out of it (a
+/// polyp's drifting flower, pulled from the air); null: a click does what
+/// it otherwise does
+pub fn handOver(s:*Structure)?items.Item{
+  return switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"handOver"))reg.module(k).handOver(s)else null,
+  };
+}
 /// does kind `k` do anything when configured?
 pub fn configurable(k:Kind)bool{
   return switch(k){

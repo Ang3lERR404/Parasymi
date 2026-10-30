@@ -213,6 +213,7 @@ pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
     try structures(g,reach,tf);
   }
   if(alone)try g.specimen.?.drawSamples(g);
+  try lib.unforming.draw(g,tf);
   if(!alone){
     try ghost(g,tf);
     try motes(g);
@@ -500,6 +501,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // its yield ripening on it, in its pods, and what it is
     .ripe=.{if(d.growth>=1)m.clamp01(d.essence/def.manaCap)else 0,m.f(def.genome.pods),def.genome.podR,d.since},
     .yield=color.Rgba8.of(def.yields.info().col).toF4(),
+    .glitch=if(!d.ghost and lib.unforming.radiant(d.sp)).{g.unforming.glitchOf(d.seed),0,0,0}else vertex.noGlitch,
   });
   // a celestial bloom is the garden's light: its core sheds it round
   // about, pearl tinted by its film, pulsing slowly, brighter as it
@@ -510,8 +512,10 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     const assembled=m.smooth(m.clamp01((d.growth-bloomLitFrom)/(1-bloomLitFrom)));
     const drawn=haloMod.spiral(m.v3(at[0],y+bloomCore,at[2]),halo);
     const pulse=1+bloomPulse*@sin(tf*bloomPulseRate+d.seed*m.tau);
+    // how far the unforming has shattered it (its light goes out with it)
+    const shattered=m.clamp01(g.unforming.glitchOf(d.seed));
     // how strong its light is now
-    const strength=bloomLight*assembled*d.health*drawn.open*pulse*(if(d.radiating)@as(f32,1)else bloomDark);
+    const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark);
     if(strength>0){
       // its light's tint, pearl blended toward its film's hue
       const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*0.03),bloomFilm);
@@ -551,6 +555,7 @@ fn structures(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
       m.rotY(pose.spin),m.rotX(pose.rock[0]),m.rotZ(pose.rock[1]),m.translate(-ctr),
     });
     defer g.parts.around=null;
+    // unforming, it is drawn grown back down as far as it has gone
     if(!s.def().bare)try g.parts.emit(s.def().mesh,m.mul(s.place(ctr),m.scale3(m.v3(breathe,2-breathe,breathe))),.{
       .glow=glow+glowActive*a,.flutter=flutterAmount,.phase=s.seed,.fade=s.def().sap,
       .sway=s.def().sway,.tall=s.def().tall,.grown=s.grown,

@@ -15,6 +15,8 @@ const reg=lib.structures.reg;
 pub const Msg=union(enum){
   /// born whole: its light already full (a diamond a halo formed)
   lit,
+  /// the unforming has begun (an arsthraxia evolves)
+  unform,
   /// `n` of `item` came in from afar (spores landing); by default it is
   /// taken in as `insert` does
   arrived:struct{item:items.Item,n:u16},

@@ -157,7 +157,21 @@ pub const State=struct{
   fed:f32=0,
   /// how far its flower's outer whorl and inner cup have turned
   turn:[2]f32=@splat(0),
+  /// evolved by the unforming from the symbiotic lineage into the
+  /// convergent one (its convergent look is still to be chosen)
+  evolved:bool=false,
 };
+/// `unform`: the unforming takes the symbiotic lineage, but an arsthraxia
+/// evolves instead
+pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
+  switch(msg){
+    .unform=>{
+      ctx.ss.get(i).state.arsthraxia.evolved=true;
+      return.done;
+    },
+    .lit,.arrived=>return.ignored,
+  }
+}
 /// condenses the study a little (a flare when a unit is done), turns its
 /// flower with its work and grows what is learned on it. Returns whether
 /// it is studying.

@@ -23,7 +23,7 @@ pub const max=1<<16;
 /// where each vertex stream comes from: mesh, instance, next growth key
 const bindings=&[_]vk.VertexInputBindingDescription{pipeline.binding(vertex.Mesh,0,.vertex),pipeline.binding(vertex.PlantInstance,1,.instance),pipeline.binding(vertex.Mesh,2,.vertex)};
 /// every attribute of those streams, at its shader location
-const attrs=&(pipeline.attrs(vertex.Mesh,0,0)++pipeline.attrs(vertex.PlantInstance,1,5)++pipeline.attrs(vertex.MeshPose,2,13));
+const attrs=&(pipeline.attrs(vertex.Mesh,0,0)++pipeline.attrs(vertex.PlantInstance,1,5)++pipeline.attrs(vertex.MeshPose,2,14));
 /// the solid plants pipeline: plant.vert grows and sways each, plant.frag shades it
 pub const desc:pass.Desc=.{
   .vert=@embedFile("plant.vert"),.frag=@embedFile("plant.frag"),

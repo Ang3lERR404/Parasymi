@@ -1,6 +1,7 @@
-//! the halo a diamond projects: not a structure itself, but what the polyp
-//! (while its blooms are drawn in and the diamond forms) and the diamond
-//! (once it has) both show and hold. The diamond fragments light into a
+//! the halo a diamond projects: not a structure itself, but what a diamond
+//! shows and holds, while its four blooms are drawn in and once it has
+//! formed. `seek` finds four grown blooms in a cross and puts a diamond
+//! down forming at its heart. The diamond fragments light into a
 //! ring floating `reachTiles` tiles around it at a bloom's hover: a
 //! projection of light rays thrown up and out from the crystal
 //! (`haloProjection`) and the ring they make (`haloRing`), its light split
@@ -31,6 +32,10 @@ const species=lib.species;
 const Plants=lib.plants.Plants;
 /// the scene's list of moving parts the halo adds to each frame
 const Parts=lib.parts.Parts;
+/// the structures registry: the diamond a halo puts down, the hooks' context
+const st=lib.structures;
+/// every player-facing string
+const txt=lib.txt;
 /// the ring's radius, tiles: the blooms' points lie this far out along the
 /// axes, on it
 pub const reachTiles:i32=5;
@@ -91,6 +96,32 @@ pub fn spiral(p:m.V3,halo:[4]f32)struct{at:m.V3,open:f32}{
 /// the tile of the ring's point `k` round a centre at (x, y)
 pub fn pointAt(x:i32,y:i32,k:usize)[2]i32{
   return.{x+points[k][0]*reachTiles,y+points[k][1]*reachTiles};
+}
+/// finds four grown blooms on the points of a ring round a tile no diamond
+/// hangs over yet, and puts a diamond down there, born of the halo they
+/// form: they spiral in to it. Returns whether one began.
+pub fn seek(ctx:st.Ctx)Allocator.Error!bool{
+  // the plants' columns
+  const s=ctx.plants.list.slice();
+  for(s.items(.sp),s.items(.x),s.items(.y),0..)|sp,x,y,i|{
+    if(species.get(sp).radiance<=0 or s.items(.growth)[i]<1)continue;
+    // taken as the ring's east point: the heart west of it
+    const cx=x-points[0][0]*reachTiles;
+    const cy=y-points[0][1]*reachTiles;
+    if(ctx.ss.floaterAt(cx,cy)!=null)continue;
+    // whether every point holds a grown bloom
+    var all=true;
+    for(0..4)|k|all=all and active(ctx.plants,ctx.w,pointAt(cx,cy,k));
+    if(!all)continue;
+    if(!try ctx.ss.place(ctx.gpa,ctx.w,cx,cy,.diamond,0,0.45))continue;
+    // the diamond just put down: born whole, its blooms coming in
+    const d=ctx.ss.get(.of(ctx.ss.list.items.len-1));
+    d.grown=1;
+    d.state.diamond.born=.halo;
+    ctx.g.say(txt.s.msg.haloForms,.{});
+    return true;
+  }
+  return false;
 }
 /// whether a grown, unwithered celestial bloom stands at a tile
 pub fn active(p:*const Plants,w:*const World,at:[2]i32)bool{

@@ -226,8 +226,8 @@ whole.)
 - **Monfris:** four corner weaves twining into one crowned trunk.
 
 ## Halo
-This is what plays while a polyp's halo forms
-([design.md](design.md#halo-and-diamond-structurespolypzig-halozig-diamondzig)).
+This is what plays while a halo forms from four blooms
+([design.md](design.md#halo-and-diamond-halozig-diamondzig)).
 
 ### The blooms come in
 - The blooms spiral in to the ring's heart at bloom hover height, over

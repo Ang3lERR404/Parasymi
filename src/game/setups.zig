@@ -158,18 +158,18 @@ const lastFrom:f32=0.85;
 /// the last corner's bloom's growing time (s)
 const lastSpan:f32=133;
 /// west of the garden, put down after the fast-forward so it plays out
-/// live: a polyp growing in, three grown blooms on the points of its
-/// halo's ring and a fourth finishing (in ~20 s, time to walk over); as
-/// it does, the halo forms. Two vespers draw on the east point's
+/// live: three grown blooms on the points of a ring and a fourth
+/// finishing (in ~20 s, time to walk over); as it does, the halo forms
+/// and a diamond gathers at its heart. A polyp grows in beside the heart,
+/// feeding on the blooms' light and letting its flowers drift. Two vespers draw on the east point's
 /// bloom: one inside the ring, which it keeps once the bloom is drawn
 /// away, one outside it, which only the diamond's wider field reaches.
 fn haloGarden(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
-  // the halo's reach in tiles, and the polyp's tile, west of the garden
+  // the halo's reach in tiles, and its heart's tile, west of the garden
   const r=halo.reachTiles;
   const x=cx-19;
   const z=cz+2;
-  if(!try g.structs.place(g.gpa,&g.world,x,z,.polyp,0,0.45))return;
-  g.structs.sprout(g.structs.at(&g.world,x,z).?);
+  if(try g.structs.place(g.gpa,&g.world,x+2,z+1,.polyp,0,0.45))g.structs.sprout(g.structs.at(&g.world,x+2,z+1).?);
   for(halo.points,0..)|c,i|{
     // this bloom's tile, on a point of the ring
     const bx=x+c[0]*r;

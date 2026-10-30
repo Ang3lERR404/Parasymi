@@ -1,6 +1,6 @@
-//! mesh: POLYP, CONVERGENT. the polyp's hydra moved onto the convergence
-//! kit, two looks laid beside it to compare
-//! (`--samples=polyp,polypWoven,polypMarbled`). WOVEN: its stem the kit's
+//! mesh: POLYP, CONVERGENT. the polyp's hydra on the convergence kit:
+//! WOVEN, the polyp's own (`polyp` in the library), and MARBLED, a look
+//! laid beside it to compare (`--samples=polyp,polypMarbled`). WOVEN: its stem the kit's
 //! weave of green and pale strands, parting into a cage round a marbled
 //! sac of both saps at its gut and gathering again under a violet mouth
 //! disc; five lilac fronds rolling into croziers crown it, five pale

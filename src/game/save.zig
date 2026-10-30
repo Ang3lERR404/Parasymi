@@ -104,7 +104,7 @@ const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the stored layout's version: bumped whenever one changes
-const version:u32=25;
+const version:u32=26;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -232,6 +232,7 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
   try w.put(Belly,g.player.inv);
   try w.put(craft.Crafter,g.weave);
   try w.put(prog.Progression,g.prog);
+  try w.put(lib.unforming.Unforming,g.unforming);
   // everything it grew
   // the plant list's columns
   const s=g.plants.list.slice();
@@ -294,6 +295,7 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
   g.player.inv=try r.get(Belly);
   g.weave=try r.get(craft.Crafter);
   g.prog=try r.get(prog.Progression);
+  g.unforming=try r.get(lib.unforming.Unforming);
   g.cam.target=g.player.pos;
   // how many plants are stored
   const plants=try r.get(u32);

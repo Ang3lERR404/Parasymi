@@ -78,7 +78,7 @@ pub fn send(ss:*Structures,ctx:Ctx,to:Id,msg:Msg)Reply{
   };
   if(r!=.ignored)return r;
   return switch(msg){
-    .lit=>.ignored,
+    .lit,.unform=>.ignored,
     .arrived=>|a|.{.took=ss.insert(ctx.g,to,a.item,a.n)},
   };
 }
@@ -188,6 +188,12 @@ pub fn tickWith(ctx:Ctx,dt:f32)Allocator.Error!void{
     }
     // the structure, fetched after linking (a link may move the list)
     const g0=ss.get(id);
+    // unforming, it works no more, and grows back down as it goes
+    if(g0.fade>0){
+      g0.grown=@min(g0.grown,1-g0.fade);
+      g0.activity=0;
+      continue;
+    }
     // whether it worked this tick: a sprout only grows, never works
     const active=if(g0.grown<1)blk:{
       g0.grown=@min(1,g0.grown+dt/g0.def().grow);

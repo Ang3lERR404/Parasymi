@@ -26,6 +26,8 @@ pub const view=@import("game/view.zig");
 pub const player=@import("game/player.zig");
 /// one plant or structure standing alone, for `--plant=` / `--structure=`
 pub const specimen=@import("game/specimen.zig");
+/// the first world event: the radiant plants shatter, the lineages die, a seed falls
+pub const unforming=@import("game/unforming.zig");
 /// the loading screen: a night with a tendril growing across it
 pub const loading=@import("game/loading.zig");
 /// the gardener's folder, where every file of theirs lives

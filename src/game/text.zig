@@ -173,6 +173,14 @@ pub const Strings=struct{
     weftMeetsDrift:S="",
     /// after a pairing's discovery: the study (`{0}`) it opens
     researchNamed:S="",
+    /// the discovery of a polyp's first flower let drift
+    flowerDrifts:S="",
+    /// the unforming learned, just before it begins
+    unformingNear:S="",
+    /// the unforming begun: the radiant plants shatter, the lineages die
+    unformingBegins:S="",
+    /// the seed of the shattered light fallen to the ground
+    seedFalls:S="",
     /// a vultrixi is being configured: choose the monfris it feeds
     tetherChoose:S="",
     /// a vultrixi is tethered to the monfris chosen
@@ -435,12 +443,10 @@ pub const Strings=struct{
     weftIonizes:S="",
     /// a weftstone with no stone within reach to draw
     weftStarved:S="",
-    /// a polyp waiting for grown blooms on its ring's four points
-    haloOpen:S="",
-    /// a polyp's halo forming
-    haloForming:S="",
-    /// a polyp's halo formed
-    haloFormed:S="",
+    /// a polyp with no grown bloom near enough to feed on, and how near
+    polypHungry:S="",
+    /// a polyp feeding: its flowers adrift and the most it lets drift
+    polypFeeds:S="",
     /// a diamond projecting its halo, and how many points are lit
     diamond:S="",
   }=.{},

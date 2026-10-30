@@ -16,6 +16,8 @@
 //!   receive(s, g, item, edge) bool  a carrier taking an item handed in at
 //!                               `edge` (counted from the way it faces)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
+//!   handOver(s) ?Item           what a click hands the wolf straight away,
+//!                               taken out of it (a polyp's drifting flower)
 //!   message(ctx, id, msg) Reply what it makes of a `Msg` another sends it
 //!                               (`Structures.send`; `.ignored`: the
 //!                               message's default)
@@ -127,6 +129,8 @@ pub const fields=hooks.fields;
 pub const hold=hooks.hold;
 /// hand back what a structure holds outside its slots
 pub const release=hooks.release;
+/// what a click on it hands the wolf straight away (`handOver`)
+pub const handOver=hooks.handOver;
 /// whether a structure answers the player's configure
 pub const configurable=hooks.configurable;
 /// the player's configure on a structure
@@ -157,7 +161,7 @@ pub const kinds=struct{
   pub const arsthraxia=@import("structures/arsthraxia.zig");
   /// works the resource node beside it, one item at a time
   pub const rootDigger=@import("structures/root_digger.zig");
-  /// where a halo forms, among four celestial blooms
+  /// woven of both lineages, feeding on blooms' light, letting flowers drift
   pub const polyp=@import("structures/polyp.zig");
   /// the cut crystal a halo's blooms become, floating high
   pub const diamond=@import("structures/diamond.zig");
@@ -181,6 +185,8 @@ pub const kinds=struct{
   pub const monfris=@import("structures/monfris.zig");
   /// a floating body tethered to feed a monfris
   pub const vultrixi=@import("structures/vultrixi.zig");
+  /// the seed the unforming let fall, lying where it landed
+  pub const strangeSeed=@import("structures/strange_seed.zig");
 };
 /// the registry built from `kinds`: ids, tables, hook dispatch
 pub const reg=registry.Registry(kinds);
@@ -240,6 +246,9 @@ pub const Def=struct{
   far:bool=false,
   /// a parasite's: the roots it turns on (R) are pale, not bark
   pale:bool=false,
+  /// of the symbiotic or parasitic lineage: the unforming takes it, grown
+  /// back down to nothing and gone (game/unforming.zig)
+  unforms:bool=false,
 };
 /// every kind's `def`, looked up by kind
 pub const defs=reg.table(Def,"def");
