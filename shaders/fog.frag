@@ -23,19 +23,19 @@ layout(location = 0) out vec4 o;
 // the haze over everything: how dense per unit of the old distance fog's
 // density (pc.fog.w, thinner as the camera draws back, so a far view never
 // drowns), thinning over HAZE_FALL with height above HAZE_BASE
-const float HAZE = 0.6;
+const float HAZE = 0.4;
 const float HAZE_BASE = 0.0;
 const float HAZE_FALL = 14.0;
 // the low air the garden stands in, among its plants (what the key light
 // falls through in shafts): how dense on the ground, thinning over LOW_FALL
 // above it, denser by night and at dawn and dusk (LOW_NIGHT times)
-const float LOW_AIR = 0.022;
+const float LOW_AIR = 0.014;
 const float LOW_FALL = 2.5;
 const float LOW_NIGHT = 1.4;
 // the mist: how dense at its thickest, how thick it lies on the ground, and
 // the hollows it pools in (everything below POOL_TOP, fading in over
 // POOL_FADE), denser by night (MIST_NIGHT times)
-const float MIST = 0.07;
+const float MIST = 0.045;
 const float MIST_HUG = 0.45;
 const float POOL_TOP = 1.1;
 const float POOL_FADE = 0.7;
