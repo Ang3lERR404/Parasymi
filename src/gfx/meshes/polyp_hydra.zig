@@ -61,11 +61,42 @@ pub const Body=struct{
   reach:f32,
   /// the colour at its foot (the young one's is its parent's flesh)
   base:color.Rgb,
+  /// how its head is made
+  head:Head=.cone,
 };
+/// how wide an open head's disc flares, as a share of its body's radius
+const openFlare:f32=2.6;
 /// builds the hydra. It grows on a hidden stalk (gfx/growth.zig): the roots
 /// and foot disc spread, the body rises, its head cone closes, the long
 /// tentacles reach out of it and down, and last the young one buds from its side.
-pub fn build(b:*mg.Builder)Allocator.Error!void{
+pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.cone);}
+/// how a hydra's head is made
+pub const Head=enum{
+  /// a pointed cone, the mouth at its tip, the long knotted tentacles
+  /// leaving from under it
+  cone,
+  /// opening into the polyp's oral disc and slit mouth, crowned with its
+  /// eight feathery tentacles
+  feathered,
+  /// opening into the polyp's oral disc and slit mouth, its long knotted
+  /// tentacles ending in feathery plumes
+  plumed,
+};
+/// a mixed look (`--samples=polyp,polypHydraFeathered`): the single hydra
+/// opening into the polyp's mouth disc, crowned with its feathery tentacles
+pub const feathered=struct{
+  /// builds the hydra, feathered
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.feathered);}
+};
+/// a mixed look (`--samples=polyp,polypHydraPlumed`): the single hydra
+/// opening into the polyp's mouth disc, its long tentacles ending in
+/// feathery plumes
+pub const plumed=struct{
+  /// builds the hydra, plumed
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try single(b,.plumed);}
+};
+/// the single hydra, headed as `head` says
+fn single(b:*mg.Builder,head:Head)Allocator.Error!void{
   // its own random stream, the same every build
   var rng=pal.rngFor("polypHydra");
   // the skeleton every part is timed along
@@ -79,11 +110,11 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     try mg.ellipsoid(b,.{.center=v3(0,0.005,0),.radii=v3(0.065,0.018,0.065),.col=foot.toRgba8(255),.part=.tendril,.rings=6,.segs=14});
     try k.along(b,s,trunk);
   }
-  try body(b,&k,trunk,.{.r=0.03,.arms=6,.reach=1,.base=foot},&rng);
+  try body(b,&k,trunk,.{.r=0.03,.arms=6,.reach=1,.base=foot,.head=head},&rng);
   // the young one, budding from its side and turning upward
   const side=k.point(trunk,0.42);
   const bud=k.branch(trunk,0.42,&.{side,side+v3(0.07,0.02,0.04),side+v3(0.13,0.08,0.07),side+v3(0.15,0.17,0.08)},.{.pace=bodyPace,.delay=0.2});
-  try body(b,&k,bud,.{.r=0.016,.arms=4,.reach=0.2,.base=gut},&rng);
+  try body(b,&k,bud,.{.r=0.016,.arms=4,.reach=0.2,.base=gut,.head=head},&rng);
   k.finish(b);
 }
 /// a mixed look, to compare beside it (`--samples=polyp,polypHydras`): a
@@ -155,6 +186,12 @@ pub fn body(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,o:Body,rng:*Rng)Alloca
     // slender, swelling at its gut, narrowing to the head
     r.*=o.r*(0.8+0.45*@exp(-(f-0.66)*(f-0.66)*20))*(1-0.2*m.smooth(m.clamp01((f-0.88)/0.12)));
     c.*=o.base.lerp(pearl,m.smooth(m.clamp01(f/0.4))).lerp(gut,0.5*@exp(-(f-0.66)*(f-0.66)*30)).toRgba8(255);
+    if(o.head!=.cone){
+      // an open head: the body opens like a trumpet into its disc
+      const ff=m.clamp01((f-0.84)/0.16);
+      r.*=m.lerp(r.*,o.r*openFlare,ff*ff);
+      c.*=c.toRgb().lerp(lib.polypMesh.disc,m.smooth(ff)).toRgba8(255);
+    }
   }
   {
     // where the body's vertices begin
@@ -169,6 +206,20 @@ pub fn body(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,o:Body,rng:*Rng)Alloca
   const e2=m.cross(up,e1);
   // the head's radius, where the body ends
   const hr=rs[bodyRings-1];
+  if(o.head!=.cone){
+    try lib.polypMesh.mouthOn(b,k,id,top,up,hr,rng);
+    for(0..if(o.head==.feathered)feathers else o.arms)|j|{
+      // this tentacle's bearing, and the flat way out along it
+      const a=(m.f(j)+rng.range(-0.15,0.15))/m.f(if(o.head==.feathered)feathers else o.arms)*m.tau;
+      const out=e1*m.splat3(@cos(a))+e2*m.splat3(@sin(a));
+      switch(o.head){
+        .feathered=>try lib.polypMesh.tentacle(b,k,id,.{.top=top,.up=up,.e1=e1,.e2=e2,.dr=hr,.r=hr/lib.polypMesh.flare},a,rng),
+        .plumed=>try hanging(b,k,id,.{.root=top+out*m.splat3(hr*0.86)+up*m.splat3(hr*0.04),.out=out,.up=up,.len=o.reach*rng.range(0.85,1.15),.r0=o.r*0.3,.tip=.plume},rng),
+        .cone=>{},
+      }
+    }
+    return;
+  }
   {
     // the head cone, closing to a point round the mouth at its tip
     var cp:[6]V3=undefined;
@@ -207,7 +258,22 @@ pub const Hang=struct{
   len:f32,
   /// its radius at the root
   r0:f32,
+  /// how its tip ends
+  tip:Tip=.bare,
 };
+/// how a hanging tentacle's tip ends
+pub const Tip=enum{
+  /// tapering to a bare point
+  bare,
+  /// in a feathery plume of the polyp's soft pinnules
+  plume,
+};
+/// feathery tentacles round an open head, `Head.feathered`
+const feathers=8;
+/// where along a plumed tentacle its plume begins (0 root .. 1 tip)
+const plumeFrom:f32=0.62;
+/// pinnule pairs in a plume
+const plumePairs=7;
 /// one tentacle off spline `head`'s tip as `o` says: up and out, over,
 /// then hanging far down, drifting aside, beaded with stinging knots,
 /// tapering to a point (shared with the mixed polyps)
@@ -237,7 +303,8 @@ pub fn hanging(b:*mg.Builder,k:*growth.Skeleton,head:growth.Id,o:Hang,rng:*Rng)A
     const f=m.ratio(i,tentacleRings-1);
     t.*=m.lerp(0.6,1,f);
     // a stinging knot swelling here and there along it (a smooth field)
-    const bead=m.smooth(m.clamp01(@sin(f*n*m.tau)*2-1));
+    // (a plumed one's knots stop where its plume begins)
+    const bead=if(o.tip==.plume and f>plumeFrom-0.05)0 else m.smooth(m.clamp01(@sin(f*n*m.tau)*2-1));
     r.*=o.r0*@min(1,f*6+0.4)*(1-f*0.9)*(1+0.9*bead);
     cc.*=thread.lerp(knot,bead).toRgba8(255);
   }
@@ -245,4 +312,13 @@ pub fn hanging(b:*mg.Builder,k:*growth.Skeleton,head:growth.Id,o:Hang,rng:*Rng)A
   const s=b.mark();
   try b.tubeC(&p,&tts,&trs,&tcs,null,.tendril,6);
   try k.along(b,s,arm);
+  if(o.tip==.bare)return;
+  for(0..plumePairs)|q|{
+    // how far along this pair sits, and how far into the plume
+    const u=m.lerp(plumeFrom,0.95,m.ratio(q,plumePairs-1));
+    const g=m.ratio(q,plumePairs-1);
+    // fullest a little into the plume, shorter toward its tip
+    const size=@sin(m.pi*m.lerp(0.25,1,g));
+    try lib.polypMesh.pinnulePair(b,k,arm,&p,u,across,o.len*0.09*size,o.r0*0.5,thread.lerp(knot,0.4+0.5*g).toRgba8(255));
+  }
 }

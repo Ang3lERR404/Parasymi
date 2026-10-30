@@ -57,8 +57,8 @@ const mound=v3(0.3,0.12,0.28);
 const flesh=color.rgb(0.56,0.46,0.66);
 /// the pale pearly lilac the columns rise into
 const pearl=color.rgb(0.78,0.72,0.86);
-/// the warm rose-lilac of an oral disc
-const disc=color.rgb(0.74,0.52,0.74);
+/// the warm rose-lilac of an oral disc (the open-mouthed hydras' too)
+pub const disc=color.rgb(0.74,0.52,0.74);
 /// the soft lilac at a tentacle's root
 const lilac=color.rgb(0.62,0.52,0.78);
 /// the near-white pearl a tentacle fades to at its tip
@@ -74,7 +74,7 @@ const hangReach:f32=8;
 /// feathery side branches (pinnules) each side of a tentacle
 const pinnules=7;
 /// how wide an oral disc flares, as a share of its column's radius
-const flare:f32=1.8;
+pub const flare:f32=1.8;
 /// how slender a column's stalk is, as a share of its radius (the disc,
 /// mouth and tentacles keep the full radius)
 const slender:f32=0.55;
@@ -193,15 +193,7 @@ fn polyp(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id,p:Polyp,i:usize,crown:
   // the disc's radius, and where the column ends in it
   const dr=p.r*flare;
   const top=sp[columnRings-1];
-  {
-    // the mouth: a raised mound at the disc's heart, a dark slit along its
-    // crest, turned to face the way the disc does
-    const s=b.mark();
-    try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(dr*0.42,dr*0.2,dr*0.36),.col=disc.lerp(pearl,0.35).toRgba8(255),.part=.tendril,.rings=6,.segs=12,.t=1});
-    try mg.ellipsoid(b,.{.center=v3(0,dr*0.17,0),.radii=v3(dr*0.26,dr*0.06,dr*0.07),.col=mouth.toRgba8(255),.part=.tendril,.rings=4,.segs=10,.t=1});
-    b.xform(s,m.chain(&.{m.translate(top),m.alignY(up),m.rotY(rng.range(0,m.tau))}));
-    try k.on(b,s,column,1,.{.from=top});
-  }
+  try mouthOn(b,k,column,top,up,dr,rng);
   if(i==0){
     // the tallest holds a bead of resin in its mouth
     const s=b.mark();
@@ -222,8 +214,19 @@ fn polyp(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id,p:Polyp,i:usize,crown:
   }
   for(0..tentacles)|j|try tentacle(b,k,column,.{.top=top,.up=up,.e1=e1,.e2=e2,.dr=dr,.r=p.r},(m.f(j)+turn+rng.range(-0.15,0.15))/tentacles*m.tau,rng);
 }
+/// the mouth on an oral disc `dr` wide at the tip `top` of spline
+/// `column`, facing `up`: a raised mound at the disc's heart, a dark slit
+/// along its crest (shared with the open-mouthed hydras)
+pub fn mouthOn(b:*mg.Builder,k:*growth.Skeleton,column:growth.Id,top:V3,up:V3,dr:f32,rng:*Rng)Allocator.Error!void{
+  // where its vertices begin
+  const s=b.mark();
+  try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(dr*0.42,dr*0.2,dr*0.36),.col=disc.lerp(pearl,0.35).toRgba8(255),.part=.tendril,.rings=6,.segs=12,.t=1});
+  try mg.ellipsoid(b,.{.center=v3(0,dr*0.17,0),.radii=v3(dr*0.26,dr*0.06,dr*0.07),.col=mouth.toRgba8(255),.part=.tendril,.rings=4,.segs=10,.t=1});
+  b.xform(s,m.chain(&.{m.translate(top),m.alignY(up),m.rotY(rng.range(0,m.tau))}));
+  try k.on(b,s,column,1,.{.from=top});
+}
 /// an oral disc a crown of tentacles grows round
-const Disc=struct{
+pub const Disc=struct{
   /// where its heart is, the column's top
   top:V3,
   /// the way it faces
@@ -240,7 +243,7 @@ const Disc=struct{
 /// one tentacle off disc `o`'s rim at bearing `a` on spline `column`: it
 /// rises out of the rim, arches outward and curls down at its tip, tapering
 /// to a point, soft pinnules feathering both its sides
-fn tentacle(b:*mg.Builder,k:*growth.Skeleton,column:growth.Id,o:Disc,a:f32,rng:*Rng)Allocator.Error!void{
+pub fn tentacle(b:*mg.Builder,k:*growth.Skeleton,column:growth.Id,o:Disc,a:f32,rng:*Rng)Allocator.Error!void{
   // the flat way out along its bearing, the way across it, and its length
   const out=o.e1*m.splat3(@cos(a))+o.e2*m.splat3(@sin(a));
   const across=m.norm(m.cross(o.up,out));
@@ -281,33 +284,36 @@ fn tentacle(b:*mg.Builder,k:*growth.Skeleton,column:growth.Id,o:Disc,a:f32,rng:*
   // the pinnules: short soft fingers either side, bending toward the tip
   // as a feather's barbs do, shorter toward it, their ends rounded
   for(0..pinnules)|q|{
-    // how far along the tentacle this pair sits, and where
+    // how far along the tentacle this pair sits
     const u=0.15+0.7*m.ratio(q,pinnules-1);
-    const at=m.alongPath(&p,u);
-    // the way the tentacle runs there
-    const tg=m.norm(m.alongPath(&p,u+0.03)-m.alongPath(&p,u-0.03));
-    // their length, thickness, colour and tu.x
-    const pl=o.r*0.8*(1-u*0.5);
-    const pr=r0*0.4*(1-u*0.4);
-    const col=lilac.lerp(tipCol,m.smooth(u)+0.1).toRgba8(255);
-    const pt=m.lerp(0.6,1,u);
-    for([_]f32{-1,1})|sg|{
-      // the way it leaves the tentacle, and the way it bends to at its end
-      const d0=m.norm(across*m.splat3(sg)+tg*m.splat3(0.4));
-      const d1=m.norm(across*m.splat3(sg*0.6)+tg);
-      // its points, tu.x and radii: swelling a little, then rounding off
-      var fp:[5]V3=undefined;
-      var fts:[5]f32=undefined;
-      var frs:[5]f32=undefined;
-      for(&fp,&fts,&frs,[_]f32{0,0.3,0.6,0.85,1},[_]f32{0.8,1,0.95,0.7,0.25})|*x,*t,*r,f,w|{
-        x.*=at+m.norm(d0+(d1-d0)*m.splat3(f))*m.splat3(pl*f);
-        t.*=pt;
-        r.*=pr*w;
-      }
-      // where its vertices begin
-      const s=b.mark();
-      try b.tubeR(&fp,&fts,&frs,col,.tendril,5);
-      try k.on(b,s,arm,k.nearest(arm,at),.{.from=at});
+    try pinnulePair(b,k,arm,&p,u,across,o.r*0.8*(1-u*0.5),r0*0.4*(1-u*0.4),lilac.lerp(tipCol,m.smooth(u)+0.1).toRgba8(255));
+  }
+}
+/// a pair of pinnules at `u` along tentacle `p` (grown on spline `arm`):
+/// soft fingers `pl` long and `pr` thick either side (`across`), bending
+/// toward the tip as a feather's barbs do, their ends rounded
+pub fn pinnulePair(b:*mg.Builder,k:*growth.Skeleton,arm:growth.Id,p:[]const V3,u:f32,across:V3,pl:f32,pr:f32,col:color.Rgba8)Allocator.Error!void{
+  // where the pair sits, and the way the tentacle runs there
+  const at=m.alongPath(p,u);
+  const tg=m.norm(m.alongPath(p,u+0.03)-m.alongPath(p,u-0.03));
+  // their tu.x
+  const pt=m.lerp(0.6,1,u);
+  for([_]f32{-1,1})|sg|{
+    // the way it leaves the tentacle, and the way it bends to at its end
+    const d0=m.norm(across*m.splat3(sg)+tg*m.splat3(0.4));
+    const d1=m.norm(across*m.splat3(sg*0.6)+tg);
+    // its points, tu.x and radii: swelling a little, then rounding off
+    var fp:[5]V3=undefined;
+    var fts:[5]f32=undefined;
+    var frs:[5]f32=undefined;
+    for(&fp,&fts,&frs,[_]f32{0,0.3,0.6,0.85,1},[_]f32{0.8,1,0.95,0.7,0.25})|*x,*t,*r,f,w|{
+      x.*=at+m.norm(d0+(d1-d0)*m.splat3(f))*m.splat3(pl*f);
+      t.*=pt;
+      r.*=pr*w;
     }
+    // where its vertices begin
+    const s=b.mark();
+    try b.tubeR(&fp,&fts,&frs,col,.tendril,5);
+    try k.on(b,s,arm,k.nearest(arm,at),.{.from=at});
   }
 }
