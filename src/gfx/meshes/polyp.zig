@@ -71,6 +71,9 @@ const tentacles=8;
 const pinnules=7;
 /// how wide an oral disc flares, as a share of its column's radius
 const flare:f32=1.8;
+/// how slender a column's stalk is, as a share of its radius (the disc,
+/// mouth and tentacles keep the full radius)
+const slender:f32=0.55;
 /// how long a tentacle runs, as a share of its column's radius
 const reach:f32=3;
 /// the columns rise this much slower than a unit a second's share
@@ -84,8 +87,8 @@ const tentacleRings=16;
 /// little at the neck, then opening like a trumpet into the disc
 fn columnProfile(k:f32)f32{
   // how far into the trumpet's flare (0 below it .. 1 the rim)
-  const f=m.clamp01((k-0.8)/0.2);
-  return(1+0.4*@exp(-k*10))*(1-0.1*@exp(-(k-0.74)*(k-0.74)*120))*(1+(flare-1)*f*f);
+  const f=m.clamp01((k-0.74)/0.26);
+  return(1+0.6*@exp(-k*10))*(1-0.1*@exp(-(k-0.68)*(k-0.68)*120))*(1+(flare/slender-1)*f*f);
 }
 /// a column's colour at `k` along it: dusky at the foot, pearl up its
 /// length, warming to the disc's rose at the rim
@@ -142,7 +145,7 @@ fn polyp(b:*mg.Builder,k:*growth.Skeleton,heart:growth.Id,p:Polyp,i:usize,rng:*R
   var cs:[columnRings]color.Rgba8=undefined;
   for(&ts,&rs,&cs,0..)|*t,*r,*col,j|{
     t.*=m.ratio(j,columnRings-1);
-    r.*=p.r*columnProfile(t.*);
+    r.*=p.r*slender*columnProfile(t.*);
     col.*=columnColour(t.*);
   }
   {
