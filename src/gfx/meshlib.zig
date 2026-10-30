@@ -216,6 +216,10 @@ const parts=struct{
   pub const polypHydraFeathered=@import("meshes/polyp_hydra.zig").feathered;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, its long tentacles plumed at their tips
   pub const polypHydraPlumed=@import("meshes/polyp_hydra.zig").plumed;
+  /// a convergent look for the polyp: its stem a weave of both lineages caging a sac of both saps
+  pub const polypWoven=@import("meshes/polyp_convergent.zig").woven;
+  /// a convergent look for the polyp: its smooth flesh marbled with both saps, a sac at its gut
+  pub const polypMarbled=@import("meshes/polyp_convergent.zig").marbled;
   /// the diamond a halo leaves, gathered in from its shards
   pub const haloDiamond=@import("meshes/halo.zig").diamond;
   // translucent, over everything

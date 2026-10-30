@@ -327,6 +327,10 @@ pub const Hang=struct{
   r0:f32,
   /// how its tip ends
   tip:Tip=.bare,
+  /// its colour (the convergent looks' their own)
+  col:color.Rgb=thread,
+  /// its stinging knots' colour
+  knotCol:color.Rgb=knot,
 };
 /// how a hanging tentacle's tip ends
 pub const Tip=enum{
@@ -371,7 +375,7 @@ pub fn hanging(b:*mg.Builder,k:*growth.Skeleton,head:growth.Id,o:Hang,rng:*Rng)A
     // (a plumed one's knots stop where its plume begins)
     const bead=if(o.tip==.plume and f>plumeFrom-0.05)0 else m.smooth(m.clamp01(@sin(f*n*m.tau)*2-1));
     r.*=o.r0*@min(1,f*6+0.4)*(1-f*0.9)*(1+0.9*bead);
-    cc.*=thread.lerp(knot,bead).toRgba8(255);
+    cc.*=o.col.lerp(o.knotCol,bead).toRgba8(255);
   }
   // where its vertices begin
   const s=b.mark();
@@ -384,6 +388,6 @@ pub fn hanging(b:*mg.Builder,k:*growth.Skeleton,head:growth.Id,o:Hang,rng:*Rng)A
     const g=m.ratio(q,plumePairs-1);
     // fullest a little into the plume, shorter toward its tip
     const size=@sin(m.pi*m.lerp(0.25,1,g));
-    try lib.polypMesh.pinnulePair(b,k,arm,&p,u,across,o.len*0.09*size,o.r0*0.5,thread.lerp(knot,0.4+0.5*g).toRgba8(255));
+    try lib.polypMesh.pinnulePair(b,k,arm,&p,u,across,o.len*0.09*size,o.r0*0.5,o.col.lerp(o.knotCol,0.4+0.5*g).toRgba8(255));
   }
 }

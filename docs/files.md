@@ -276,6 +276,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `paw_pad.zig` — mesh: PAW PAD.
 - `pluck_burst.zig` — mesh: PLUCK BURST.
 - `polyp.zig` — mesh: POLYP COLONY.
+- `polyp_convergent.zig` — mesh: POLYP, CONVERGENT.
 - `polyp_hydra.zig` — mesh: POLYP.
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
