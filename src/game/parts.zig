@@ -77,6 +77,9 @@ pub const Look=struct{
   carryCol:[3]f32=.{0,0,0},
   /// a placement preview: drawn, but casts no shadow
   ghost:bool=false,
+  /// how far it is blended into its mesh's next key (0..1; a bud opening
+  /// between two of its shapes)
+  morph:f32=0,
   /// a skinned mesh: the bones (one bit each) whose part of it is not
   /// drawn, though it still casts its shadow (the wolf's head, seen from
   /// its eyes)
@@ -243,5 +246,6 @@ pub fn instance(mat:m.M4,look:Look)PartInstance{
     .e=.{0,look.carryCol[0],look.carryCol[1],look.carryCol[2]},
     .h=look.halo,
     .flags=if(look.ghost)vertex.partGhost else 0,
+    .k=.{look.morph,0,0,0},
   };
 }

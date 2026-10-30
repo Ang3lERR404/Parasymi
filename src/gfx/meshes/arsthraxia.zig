@@ -6,7 +6,8 @@
 //! strands: thought climbs it while it studies (part.vert).
 //! The structure emits the rest, each built here in its own space: the
 //! flower's two whorls (`whorl`, `cup`), turning while it studies; the
-//! satellite saps (`satellite`), the core (`core`) and the wisps drawn
+//! satellites, thought-buds (`budKey`, opening through its keys, their
+//! hearts `budHeart`), the core (`core`) and the wisps drawn
 //! into it (`wisp`); and what research grows on it: the vines climbing its
 //! stems (`vines`, Arsthraxia) and its offshoots (`shoot`, the minor
 //! studies). `whole` is it at rest with its flower: the placement preview.
@@ -351,19 +352,6 @@ pub const vines=struct{
     sk.finish(b);
   }
 };
-/// mesh: ARSTHRAXIA SATELLITE. a small sap of resin held in two grown vine
-/// bands, one of those the old core split into; spun round the core.
-pub const satellite=struct{
-  /// how big the sap is: its radius
-  pub const radius:f32=0.075;
-  /// builds the satellite: a small resin pod wrapped by two crossing vine bands
-  pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try kit.resinPod(b,v3(0,0,0),v3(radius,radius,radius),8,12);
-    // two bands wrapping it, pole to pole, crossing
-    const arcs=[_][4]f32{.{0.15,0.3,2.99,2.4},.{0.2,3.5,2.9,5.6}};
-    try mg.bands(b,v3(0,0,0),v3(radius,radius,radius),&arcs,1,0.008,0.12,0x0B5,pal.vine);
-  }
-};
 /// how a thought-bud's petals lie: how many, and whether they furl round
 /// one another
 pub const BudStyle=struct{
@@ -377,10 +365,11 @@ pub const BudStyle=struct{
 };
 /// how long a thought-bud's petals are
 const budLen:f32=0.11;
-/// a thought-bud (a satellite to come) round the origin, its petals
-/// `open` (0 closed .. 1 open): a small green calyx under it, the violet
-/// petals closed round where its heart glows (`budHeart`, emitted), its stamens arching out
-/// only as it opens (closed, it hides them)
+/// a thought-bud, a satellite, round the origin, its petals `open` (0
+/// closed .. 1 open): a small green calyx under it, the violet petals
+/// furled shut round where its heart glows (`budHeart`, emitted), its
+/// stamens arching out as it opens (closed, they lie hidden in its heart;
+/// every opening alike, vertex for vertex, so one blends into the next)
 pub fn thoughtBud(b:*mg.Builder,st:BudStyle,open:f32)Allocator.Error!void{
   // where the petals root, just over the calyx
   const heart=v3(0,0.012,0);
@@ -411,10 +400,9 @@ pub fn thoughtBud(b:*mg.Builder,st:BudStyle,open:f32)Allocator.Error!void{
       .col=petalHeart.toRgba8(255),.tip=petalRim.toRgba8(255),.t=1,.part=.leaf,
     });
   }
-  // its stamens, only once it has opened enough to show them
-  if(open<0.35)return;
+  // its stamens, drawn out of its heart as it opens
   try mg.stamens(b,.{
-    .heart=heart,.axis=v3(0,1,0),.n=5,.len=0.07*open,.r=0.003,.anther=0.016,
+    .heart=heart,.axis=v3(0,1,0),.n=5,.len=0.07*@max(open,0.1),.r=0.003,.anther=0.016,
     .lean=0.35,.arch=0.5,.col=stamen.toRgba8(255),.t=1,.seed=0x7B0D,
   });
 }
@@ -449,6 +437,29 @@ fn budSample(b:*mg.Builder,st:BudStyle)Allocator.Error!void{
     b.xform(s,m.chain(&.{m.translate(v3((m.f(i)-1)*sampleStep,sampleLift,0)),m.scale3(m.splat3(show))}));
   }
 }
+/// the thought-bud the satellites became: five petals furled round one
+/// another, opening as a pinwheel
+pub const spiral=BudStyle{.n=5,.furl=0.1,.width=0.5};
+/// how many shapes a thought-bud opens through, closed to open
+pub const budKeys=4;
+/// mesh: ARSTHRAXIA BUD (key `k` of `budKeys`). a satellite, a spiral
+/// thought-bud `k` shares of the way open; drawn blended into the next
+/// key's shape (its `next`) as it opens
+pub fn budKey(comptime k:usize)type{
+  // how far open this key is
+  const open=m.ratio(k,budKeys-1);
+  // the open bud blends into nothing further
+  if(k+1==budKeys)return struct{
+    /// builds the bud, open
+    pub fn build(b:*mg.Builder)Allocator.Error!void{try thoughtBud(b,spiral,open);}
+  };
+  return struct{
+    /// builds the bud this far open
+    pub fn build(b:*mg.Builder)Allocator.Error!void{try thoughtBud(b,spiral,open);}
+    /// the key it opens into
+    pub const next=std.fmt.comptimePrint("arsthraxiaBud{d}",.{k+1});
+  };
+}
 /// the hearts glowing in a sample's three buds: dim closed, bright open
 const sampleGlows=blk:{
   // the hearts, one per bud
@@ -463,25 +474,11 @@ const sampleGlows=blk:{
   }
   break:blk gs;
 };
-/// mesh: ARSTHRAXIA BUD FOUR. a sample: a thought-bud of four broad petals
-pub const budFour=struct{
-  /// builds the sample: closed, half open, open
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,.{.n=4,.width=0.7});}
-  /// its hearts, glowing
-  pub const glows:[]const lib.meshlib.Glow=&sampleGlows;
-};
-/// mesh: ARSTHRAXIA BUD FIVE. a sample: a thought-bud of five petals
-pub const budFive=struct{
-  /// builds the sample: closed, half open, open
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,.{.n=5});}
-  /// its hearts, glowing
-  pub const glows:[]const lib.meshlib.Glow=&sampleGlows;
-};
-/// mesh: ARSTHRAXIA BUD SPIRAL. a sample: a thought-bud of five petals
-/// furled round one another, opening as a pinwheel
+/// mesh: ARSTHRAXIA BUD SPIRAL. a sample: the satellites' thought-bud
+/// closed, half open and open, three times its size
 pub const budSpiral=struct{
   /// builds the sample: closed, half open, open
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,.{.n=5,.furl=0.1,.width=0.5});}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try budSample(b,spiral);}
   /// its hearts, glowing
   pub const glows:[]const lib.meshlib.Glow=&sampleGlows;
 };

@@ -206,6 +206,19 @@ whole.)
 - **Research grows on it:** vines climb the stems (Arsthraxia,
   `Study.vines`), and each minor study adds a braided offshoot bough with
   a vine round it and its own flower.
+- **Satellites are thought-buds:** small violet buds like its crown's,
+  five petals furled round one another over a warm amber heart lit from
+  within (`budHeart`, emitted with its own glow); a green calyx under each.
+  At rest they cluster shut round the core, facing out; studying, they
+  split, spin out and open like pinwheels, stamens drawn out of their
+  hearts, wisps streaming from them into the core. Their hearts warm the
+  air (a light round the core, one per offshoot's bud).
+  - The opening is the GPU's: four keys of one vertex layout (`budKey`,
+    closed to open), each blended into the next in part.vert (binding 4,
+    the instance's `morph`). A part mesh declares the key it blends into
+    as `next`; it must be built after it, vertex for vertex alike.
+  - Seen up close: `--samples=arsthraxiaBudSpiral` (closed, half, open,
+    three times its size).
 
 ### Sap cache
 - A resin gourd cupped by a calyx on a woven bole.

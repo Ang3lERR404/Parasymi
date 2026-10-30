@@ -28,18 +28,23 @@ layout(location = 12) in vec4 iw;   // sway, height of the sway, how far below t
 layout(location = 13) in vec4 ie;   // placement: 0 matrix, 1 curve (tail), 2 star mote; then its parameters
 layout(location = 14) in vec4 ih;   // a forming halo it belongs to: its centre, how far along (< 0 none)
 layout(location = 15) in uint iflags; // PART_GHOST, ... (vertex.zig)
+layout(location = 16) in vec4 ik;   // how far it is blended into its mesh's next key
 // per-vertex skin (skinned meshes only): four bone indices, one per byte, and their weights
-layout(location = 16) in uint sbones;
-layout(location = 17) in vec4 sweights;
+layout(location = 17) in uint sbones;
+layout(location = 18) in vec4 sweights;
 // how each of those weights changes across the mesh: its x, y and z
-layout(location = 18) in vec4 sgx;
-layout(location = 19) in vec4 sgy;
-layout(location = 20) in vec4 sgz;
+layout(location = 19) in vec4 sgx;
+layout(location = 20) in vec4 sgy;
+layout(location = 21) in vec4 sgz;
 // per-vertex growth (structures grown along growth splines, gfx/growth.zig):
 // where it grows out of, and when it begins, how long it takes, when its
 // spline began and was done (gat.y 0: not on a spline)
-layout(location = 21) in vec3 gfrom;
-layout(location = 22) in vec4 gat;
+layout(location = 22) in vec3 gfrom;
+layout(location = 23) in vec4 gat;
+// the same vertex in its mesh's next key (itself where the mesh has none):
+// a bud opening blends into it
+layout(location = 24) in vec3 kpos;
+layout(location = 25) in vec3 knrm;
 
 // iflags: a placement preview (vertex.PART_GHOST)
 const uint PART_GHOST = 1u;
@@ -134,8 +139,9 @@ void main() {
     M = mat4(0.0);
     for (int k = 0; k < 4; k++) M += sweights[k] * bone(B, base, k);
   }
-  vec3 p = pos;
-  vec3 nm = nrm;
+  // blended into its next key's shape (a bud opening, petal by petal)
+  vec3 p = mix(pos, kpos, ik.x);
+  vec3 nm = ik.x > 0.0 ? normalize(mix(nrm, knrm, ik.x)) : nrm;
   // grown along a growth spline (growth.glsl): a leaf unfolds from its
   // base, tips last
   float lag = PART_IN(FOLIAGE, part) ? LEAF_LAG * gat.y * tu.y : 0.0;

@@ -243,6 +243,9 @@ pub const Ext=struct{
   plantMorph:[plantMeshes]u64=@splat(0),
   /// (first vertex, count) per part slot
   partRanges:[meshlib.slots][2]u32=@splat(.{0,0}),
+  /// per part slot, the byte offset from its mesh to its next key's (the
+  /// part shader blends toward it); 0 where it has none
+  partMorph:[meshlib.slots]u64=@splat(0),
   /// per part slot: whether any of its vertices can be see-through (sap,
   /// resin, shadow, beam, halo); the glass pass draws only those
   partGlassy:[meshlib.slots]bool=@splat(false),
@@ -280,6 +283,8 @@ const Growing=struct{
   plantMorph:[plantMeshes]u64=@splat(0),
   /// (first vertex, count) per part slot, as grown
   partRanges:[meshlib.slots][2]u32=@splat(.{0,0}),
+  /// per part slot, the byte offset to its next key's mesh
+  partMorph:[meshlib.slots]u64=@splat(0),
   /// per part slot: whether any of it can be see-through
   partGlassy:[meshlib.slots]bool=@splat(false),
   /// `--plant`/`--structure`: those meshes alone; every other range stays
@@ -334,6 +339,16 @@ const Growing=struct{
       _=g.done.fetchAdd(1,.monotonic);
     };
     b.lod=0;
+    // keys blend vertex for vertex into the next key, built after them
+    for(shown)|id|if(meshlib.next(id))|nx|for(0..meshgen.lods)|l|{
+      // this key's range and the next key's
+      const a=g.partRanges[meshlib.slot(id,@intCast(l))];
+      const z=g.partRanges[meshlib.slot(nx,@intCast(l))];
+      if(z[1]==0)continue;
+      if(a[1]!=z[1])@panic("part keys differ in vertex count");
+      if(z[0]<a[0])@panic("a part's next key is built before it");
+      g.partMorph[meshlib.slot(id,@intCast(l))]=@as(u64,z[0]-a[0])*@sizeOf(vertex.Mesh);
+    };
     glassy(b.v.items,&g.partRanges,&g.partGlassy);
     _=try b.skinOf(b.v.items.len);
     _=try b.growOf(b.v.items.len);
@@ -410,6 +425,7 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   x.plantRanges=g.plantRanges;
   x.plantMorph=g.plantMorph;
   x.partRanges=g.partRanges;
+  x.partMorph=g.partMorph;
   x.partGlassy=g.partGlassy;
   // read by every plant and part draw, every frame: in device memory
   x.meshes=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(b.v.items));
@@ -439,6 +455,7 @@ pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots][2]u32,kept
   const x=&r.ext;
   x.plantRanges=@splat(.{0,0});
   x.plantMorph=@splat(0);
+  x.partMorph=@splat(0);
   if(b.v.items.len==0){
     x.partRanges=@splat(.{0,0});
     x.partGlassy=@splat(false);

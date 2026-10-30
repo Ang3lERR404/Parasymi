@@ -30,13 +30,15 @@ const renderer=lib.renderer;
 pub const max=1<<15;
 /// skinned parts' bones a frame can hold
 pub const maxBones=256;
-/// where each vertex stream comes from: mesh, instance, skin weights, growth timing
+// binding 4: the same mesh buffer, offset to the mesh's next key, so an
+// instance blends into it (see the renderer's `Ext.partMorph`)
+/// where each vertex stream comes from: mesh, instance, skin weights, growth timing, next key
 const bindings=&[_]vk.VertexInputBindingDescription{
   pipeline.binding(vertex.Mesh,0,.vertex),pipeline.binding(vertex.PartInstance,1,.instance),pipeline.binding(vertex.Skin,2,.vertex),
-  pipeline.binding(vertex.Grow,3,.vertex),
+  pipeline.binding(vertex.Grow,3,.vertex),pipeline.binding(vertex.Mesh,4,.vertex),
 };
 /// every attribute of those streams, at its shader location
-const attrs=&(pipeline.attrs(vertex.Mesh,0,0)++pipeline.attrs(vertex.PartInstance,1,5)++pipeline.attrs(vertex.Skin,2,16)++pipeline.attrs(vertex.Grow,3,21));
+const attrs=&(pipeline.attrs(vertex.Mesh,0,0)++pipeline.attrs(vertex.PartInstance,1,5)++pipeline.attrs(vertex.Skin,2,17)++pipeline.attrs(vertex.Grow,3,22)++pipeline.attrs(vertex.MeshPose,4,24));
 /// the solid parts pipeline: part.vert places each instance, part.frag shades it
 pub const desc:pass.Desc=.{
   .vert=@embedFile("part.vert"),.frag=@embedFile("part.frag"),
@@ -82,9 +84,9 @@ pub fn prepare(r:*renderer.Renderer,f:*Frame,scene:*const renderer.Scene,stats:*
 pub fn record(r:*renderer.Renderer,f:*Frame,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
   draw(r,f,cmd,stats,.parts);
 }
-/// draws every mesh's run of instances with pass `p`'s pipeline: the
-/// see-through pass skips meshes with nothing see-through, the shadow pass
-/// casts each with its coarsest level of detail
+/// draws every mesh's run of instances with pass `p`'s pipeline, each bound
+/// to its next key: the see-through pass skips meshes with nothing
+/// see-through, the shadow pass casts each with its coarsest level of detail
 fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*renderer.Stats,p:renderer.Pass)void{
   if(stats.parts==0)return;
   cmd.bindPipeline(.graphics,r.pipe(p));
@@ -94,6 +96,7 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*ren
     if(f.counts[i]==0 or (p==.partsGlass and !r.ext.partGlassy[i]))continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.partsShadow)renderer.caster(i)else i;
+    cmd.bindVertexBuffers(4,&.{r.ext.meshes.buf},&.{r.ext.partMorph[mesh]});
     cmd.draw(r.ext.partRanges[mesh][1],f.counts[i],r.ext.partRanges[mesh][0],f.first[i]);
     stats.draws+=1;
   }

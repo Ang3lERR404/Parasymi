@@ -4,11 +4,12 @@
 //! the unit starts).
 //!
 //! It is seen through by its work, never by bobbing or breathing: idle, it
-//! stands still in the wind, its satellite saps fused as one core of sap
-//! over its flower. Studying, thought climbs its nerves from the roots in
-//! violet pulses (part.vert), its flower's whorls open and turn against
-//! each other, the satellites split apart and spin round where the core
-//! stood, shedding wisps of energy that condense into a new core there,
+//! stands still in the wind, its satellites (thought-buds, warm hearts lit
+//! in them) clustered shut over its flower. Studying, thought climbs its
+//! nerves from the roots in violet pulses (part.vert), its flower's whorls
+//! open and turn against each other, the buds split apart, spin round
+//! where they clustered and open, shedding wisps of energy from their
+//! hearts that condense into a core there,
 //! swelling as the unit condenses; a unit done flares it and sends one
 //! surge of light up its nerves.
 //! What is learned grows on it: Arsthraxia sends vines climbing its stems;
@@ -54,7 +55,7 @@ const v3=m.v3;
 // decision: drawn by its own `emit` (`bare`), so its look carries what it
 // is doing (its nerves' light, a unit's surge) instead of the shared breath
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.driftFlower,.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaSatellite,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
+pub const meshes=.{.driftFlower,.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaBud0,.arsthraxiaBud1,.arsthraxiaBud2,.arsthraxiaBud3,.arsthraxiaBudHeart,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
 /// what the lab is: 2×2, keeping what it is fed, swaying from its root two
 /// tiles tall, growing in over 8 s; shown whole (`preview`) before it is put down
 pub const def:st.Def=.{.item=.arsthraxia,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true};
@@ -127,8 +128,19 @@ const fusedR:f32=0.075;
 const fusedScale:f32=1.9;
 /// how fast the fused core turns, all together (rad/s)
 const fusedTurn:f32=0.3;
-/// how see-through a satellite's sap is at its thinnest
-const satSap:f32=0.55;
+/// the satellites' thought-buds, by how far open, closed first
+const budIds=[mesh.budKeys]lib.meshlib.Id{.arsthraxiaBud0,.arsthraxiaBud1,.arsthraxiaBud2,.arsthraxiaBud3};
+/// how brightly a bud's heart glows, closed and open
+const heartGlow=[2]f32{0.35,1.2};
+/// the warm light the core's buds throw round it together, at rest and
+/// split open
+const budGloop=[2]f32{0.25,0.9};
+/// how far that light reaches (world units)
+const budReach:f32=2.2;
+/// the warm light an offshoot's bud throws, at rest and open
+const tipGloop=[2]f32{0.1,0.4};
+/// how far that light reaches
+const tipReach:f32=1.2;
 /// the wisps: their light, more while fed
 const wispGlow:f32=1.6;
 /// an offshoot's own satellite: how far over its flower it hangs
@@ -259,6 +271,31 @@ fn fused(k:usize,tf:f32)V3{
   const a=m.f(k)*golden+tf*fusedTurn;
   return v3(@cos(a)*r,y,@sin(a)*r);
 }
+/// turns +y to `dir` (unit) the shortest way round, spun `spin` about it
+/// first: no twist leaps as `dir` swings about
+fn facing(dir:V3,spin:f32)m.M4{
+  // how far it tilts from upright, and toward which bearing
+  const tilt=m.acos(dir[1]);
+  const bearing=m.atan2(-dir[2],dir[0]);
+  return m.chain(&.{m.rotY(bearing),m.rotZ(-tilt),m.rotY(spin-bearing)});
+}
+/// a satellite: a thought-bud at `at` facing `dir`, `size` its scale and
+/// `open` how far it has opened (0..1), its heart glowing in it; `fed`
+/// brightens that heart
+fn bud(out:*Parts,at:V3,dir:V3,spin:f32,size:f32,open:f32,fed:f32,look:Look)Allocator.Error!void{
+  // where it stands and which way it faces, as it is drawn
+  const frame=m.chain(&.{m.translate(at),facing(dir,spin),m.scale3(m.splat3(size))});
+  // the key it is drawn from, and how far on into the next it is blended
+  const kf=m.clamp01(open)*m.f(mesh.budKeys-1);
+  const key=@min(m.floorTo(usize,kf),mesh.budKeys-2);
+  var petals=look;
+  petals.morph=kf-m.f(key);
+  try out.emit(budIds[key],frame,petals);
+  // its heart, lit from within
+  var heart=look;
+  heart.glow=m.lerp(heartGlow[0],heartGlow[1],open)*(1+fedGlow*fed);
+  try out.emit(.arsthraxiaBudHeart,m.chain(&.{frame,m.translate(mesh.budHeartAt),m.scale3(m.splat3(mesh.budHeartR))}),heart);
+}
 /// a wisp of energy from `from` (going `ahead`) curling into the core at `heart`
 fn wisp(out:*Parts,from:V3,ahead:V3,heart:V3,reach:f32,look:Look)Allocator.Error!void{
   // the way to the heart, the lag that curls it, and the curve's four points
@@ -343,8 +380,6 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const fed=a.fed;
   // the satellites' look
   var sat=sway;
-  sat.fade=satSap;
-  sat.glow=0.1+0.3*split;
   // the wisps' look: brighter fed, seen only as they split
   var thread=sway;
   thread.glow=wispGlow*(1+fedGlow*fed);
@@ -356,10 +391,14 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     if(appear<=0)continue;
     // its orbit, where it is between resting and spinning, and its size
     const o=orbit(k,tf);
-    const at=m.lerpV(heart+fused(k,tf)*m.splat3(fusedR*a.reach),heart+o.at*m.splat3(reach),split);
+    const rest=fused(k,tf);
+    const at=m.lerpV(heart+rest*m.splat3(fusedR*a.reach),heart+o.at*m.splat3(reach),split);
     const r=m.lerp(fusedScale,1,split)*a.reach*form*appear;
+    // it faces out from the core, closed in the cluster, opening as it spins out
+    const outward=m.lerpV(rest,o.at,split);
+    const dir=if(m.len(outward)>1e-3)m.norm(outward)else rest;
     sat.drop=at[1]-ctr[1];
-    try out.emit(.arsthraxiaSatellite,m.chain(&.{m.translate(at),m.rotY(tf*selfSpin+m.f(k)),m.scale3(m.splat3(r))}),sat);
+    try bud(out,at,dir,tf*selfSpin+m.f(k),r,split*appear,fed,sat);
     if(split>0.02){
       thread.phase=s.seed+m.f(k)*0.17;
       try wisp(out,at,o.ahead,heart,split*appear,thread);
@@ -378,12 +417,15 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const over=m.mulPoint(shootAt(base,k),tip.at+tip.axis*m.splat3(tipLift));
     const at=over+v3(@cos(turn),0,@sin(turn))*m.splat3(tipOrbit*a.reach);
     sat.drop=at[1]-ctr[1];
-    try out.emit(.arsthraxiaSatellite,m.chain(&.{m.translate(at),m.rotY(tf*selfSpin),m.scale3(m.splat3(tipScale*a.reach*grow*form))}),sat);
+    try bud(out,at,v3(0,1,0),tf*selfSpin,tipScale*a.reach*grow*form,split,fed,sat);
+    try out.light(at,mesh.budLight*m.splat3(m.lerp(tipGloop[0],tipGloop[1],split)*grow*form),tipReach);
     if(split>0.02){
       thread.phase=s.seed+0.5+m.f(k)*0.23;
       try wisp(out,at,v3(-@sin(turn),0,@cos(turn)),heart,split*grow,thread);
     }
   }
+  // the buds' hearts warm the air round the core
+  try out.light(heart,mesh.budLight*m.splat3(m.lerp(budGloop[0],budGloop[1],split)*form),budReach);
   // the energy condensing where the old core stood: swelling as the unit
   // condenses, flaring as it is done and gathering anew
   // how far the unit has condensed (eased), and the core's radius

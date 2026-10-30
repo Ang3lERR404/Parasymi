@@ -146,15 +146,17 @@ const parts=struct{
   pub const arsthraxiaVines=@import("meshes/arsthraxia.zig").vines;
   /// a shoot grown along its own splines by research's progress
   pub const arsthraxiaShoot=@import("meshes/arsthraxia.zig").shoot;
-  /// a small sap of resin held in two vine bands, spun round the core
-  pub const arsthraxiaSatellite=@import("meshes/arsthraxia.zig").satellite;
+  /// a satellite: a thought-bud furled shut, blending open into the next
+  pub const arsthraxiaBud0=@import("meshes/arsthraxia.zig").budKey(0);
+  /// a thought-bud a third open
+  pub const arsthraxiaBud1=@import("meshes/arsthraxia.zig").budKey(1);
+  /// a thought-bud two thirds open
+  pub const arsthraxiaBud2=@import("meshes/arsthraxia.zig").budKey(2);
+  /// a thought-bud open
+  pub const arsthraxiaBud3=@import("meshes/arsthraxia.zig").budKey(3);
   /// the warm heart glowing in a thought-bud
   pub const arsthraxiaBudHeart=@import("meshes/arsthraxia.zig").budHeart;
-  /// a sample: a thought-bud of four broad petals, closed, half open, open
-  pub const arsthraxiaBudFour=@import("meshes/arsthraxia.zig").budFour;
-  /// a sample: a thought-bud of five petals, closed, half open, open
-  pub const arsthraxiaBudFive=@import("meshes/arsthraxia.zig").budFive;
-  /// a sample: a thought-bud of five furled petals, closed, half open, open
+  /// a sample: the satellites' thought-bud, closed, half open, open
   pub const arsthraxiaBudSpiral=@import("meshes/arsthraxia.zig").budSpiral;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
@@ -277,6 +279,13 @@ pub const Glow=struct{
   /// how far that light reaches
   reach:f32,
 };
+/// the key mesh `id` blends into (its `next`, by name; none: null): a bud's
+/// next shape as it opens, built after it, vertex for vertex alike
+pub fn next(id:Id)?Id{
+  return switch(id){
+    inline else=>|k|if(@hasDecl(reg.module(k),"next"))comptime(std.meta.stringToEnum(Id,reg.module(k).next).?)else null,
+  };
+}
 /// what glows with sample `id` (its `glows`; none: nothing)
 pub fn glows(id:Id)[]const Glow{
   return switch(id){

@@ -169,6 +169,9 @@ pub const PartInstance=extern struct{
   h:[4]f32=noHalo,
   /// `partGhost`, ...: what it is beyond its mesh
   flags:u32=0,
+  /// x how far it is blended into its mesh's next key (0..1, the library's
+  /// `next`: a bud opening); yzw unused
+  k:[4]f32=.{0,0,0,0},
 };
 /// `PartInstance.flags`: a placement preview (casts no shadow); part.vert
 /// reads it as `PART_GHOST`
