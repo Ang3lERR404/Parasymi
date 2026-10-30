@@ -267,7 +267,8 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
   driftbraid, monfris, Vultrixi) and the strange seed remain.
 - **The arsthraxia evolves** instead (`Msg.unform`: `evolved`): drawn
   woven of both lineages (`arsthraxia_convergent.zig`, the gardener's
-  pick), its whorls in the kit's living colours.
+  pick). Its flower is the kit's own, two blooms nested, floating a
+  little over its calyx, tethered to it by thin strands of both lineages.
 - **The stars shatter:** every starlight mote shatters at once as it
   begins (`Starfall.shatterAll`), and no star falls again: starlight is
   no longer to be had.

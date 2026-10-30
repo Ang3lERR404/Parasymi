@@ -39,6 +39,8 @@ const Parts=lib.parts.Parts;
 const Look=lib.parts.Look;
 /// its mesh: where its stalk, flower heart and offshoots are
 const mesh=lib.arsthraxia;
+/// its evolved mesh: how far over its heart its flower floats
+const wovenMesh=lib.arsthraxiaConvergent;
 /// the garden's growth timing: how far a grown form has formed
 const growth=lib.growth;
 /// the UI's draw batch, which the panel text goes into
@@ -140,6 +142,10 @@ const tipScale:f32=0.7;
 /// the golden angle (radians): spreads the satellites round the fused
 /// core evenly, as round a sphere
 const golden:f32=2.39996;
+/// how far an evolved one's floating flower bobs on its tethers (m)
+const floatBob:f32=0.012;
+/// how fast it bobs (rad/s)
+const floatRate:f32=1.1;
 /// what the lab remembers: its study under way, what has grown on it,
 /// and how its flower and light stand
 pub const State=struct{
@@ -289,8 +295,11 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   var flower=body;
   flower.drop=mesh.heartAt[1];
   const open=v3(1+whorlWide*busy,1-whorlOpen*busy,1+whorlWide*busy);
-  try out.emit(if(woven).arsthraxiaWovenWhorl else .arsthraxiaWhorl,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[0]),m.scale3(open)})),flower);
-  try out.emit(if(woven).arsthraxiaWovenCup else .arsthraxiaCup,m.mul(base,m.chain(&.{m.translate(mesh.heartAt),m.rotY(a.turn[1])})),flower);
+  // (evolved, its flower floats over its heart, bobbing a little on its tethers)
+  const bloomAt=if(woven)mesh.heartAt+v3(0,wovenMesh.lift+floatBob*@sin(tf*floatRate+s.seed*7),0)else mesh.heartAt;
+  flower.drop=bloomAt[1];
+  try out.emit(if(woven).arsthraxiaWovenWhorl else .arsthraxiaWhorl,m.mul(base,m.chain(&.{m.translate(bloomAt),m.rotY(a.turn[0]),m.scale3(open)})),flower);
+  try out.emit(if(woven).arsthraxiaWovenCup else .arsthraxiaCup,m.mul(base,m.chain(&.{m.translate(bloomAt),m.rotY(a.turn[1])})),flower);
   // its stemless branches: drift flowers held up its stems in a spiral,
   // the newest growing in
   for(0..@min(a.branches,branchesDrawn))|k|{

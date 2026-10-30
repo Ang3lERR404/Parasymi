@@ -100,6 +100,8 @@ pub const sporecasterStructure=@import("game/structures/sporecaster.zig");
 pub const growth=@import("gfx/growth.zig");
 /// mesh: the arsthraxia, a bloom that studies
 pub const arsthraxia=@import("gfx/meshes/arsthraxia.zig");
+/// mesh: the arsthraxia the unforming evolves, woven of both lineages
+pub const arsthraxiaConvergent=@import("gfx/meshes/arsthraxia_convergent.zig");
 /// mesh: the braided conduit, a woven channel between structures
 pub const braidedConduit=@import("gfx/meshes/braided_conduit.zig");
 /// mesh: the conduit, a vine that carries between structures

@@ -5,11 +5,14 @@
 //! each stem is the convergence kit's weave of green and pale strands, the
 //! resin pod a marbled sac of both saps, the root mat and foot leaves the
 //! kit's foot (a pale bulb, five pale roots, five green braided ones), each
-//! tendril a lilac frond rolling into a crozier, the calyx pale frondlets;
-//! its two whorls are coloured as the kit's living petals (warm at the
-//! heart to violet at the rim), its stamens pearl. The structure emits the
-//! whorls as it does the arsthraxia's (`whorl`, `cup`); `whole` is its
-//! preview. It grows along growth splines.
+//! tendril a lilac frond rolling into a crozier, the calyx pale frondlets.
+//! Its flower is the kit's own, two nested: a broad bloom (`whorl`) and a
+//! smaller one rising out of it (`cup`), each a bead of both saps in a
+//! calyx of lilac frondlets, living petals and pearl stamens. It floats a
+//! little over the calyx, not quite let go: tethered to it by thin strands
+//! of both lineages drawn in to its heart (`tethers`). The structure emits
+//! the blooms as it does the arsthraxia's whorls, `lift` over its heart;
+//! `whole` is its preview. It grows along growth splines.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -34,42 +37,43 @@ const v3=m.v3;
 /// a stem's weave: a plain braid of both, opening a little where the
 /// stems part round the cage
 const stemStalk:pk.Stalk=.{.girth=0.055,.part=1.2,.from=0.55,.to=0.85};
+/// how far over the arsthraxia's heart its flower floats, held by its tethers
+pub const lift:f32=0.13;
+/// how many tethers hold it (alternately green and pale: both lineages)
+const tetherCount=6;
 /// mesh: ARSTHRAXIA WOVEN. the evolved arsthraxia's stand alone, as the
 /// structure grows it: its whorls and core are emitted
 pub const stand=struct{
   /// builds the woven stand
   pub fn build(b:*mg.Builder)Allocator.Error!void{try standOf(b);}
 };
-/// mesh: ARSTHRAXIA WOVEN WHORL. its broad outer whorl in the kit's living
-/// colours, warm at the heart to violet at the rim, opening round its heart
-/// (the origin); it turns slowly while it studies
+/// mesh: ARSTHRAXIA WOVEN WHORL. its broad flower, the kit's: a bead of
+/// both saps in a calyx of five lilac frondlets, nine living petals warm at
+/// the heart to violet at the rim, pearl stamens; its heart the origin. It
+/// turns slowly while it studies.
 pub const whorl=struct{
-  /// builds the outer whorl: nine broad petals opening wide
+  /// builds the broad bloom, opening in the arsthraxia's flower's time
   pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try ax.petals(b,9,0,0,.{
-      .base=v3(0,0,0),.out=undefined,.len=0.62,.width=0.3,.rise=0.55,.flare=0.7,.cup=0.4,
-      .col=kit.petalBase,.tip=kit.petalTip,.t=1,.part=.leaf,
-    });
+    try bloomAt(b,.{.heart=v3(0,0,0),.len=0.5,.petals=9,.seed=0x7C50},0);
   }
 };
-/// mesh: ARSTHRAXIA WOVEN CUP. its inner whorl in the kit's living colours,
-/// pearl stamens arching out of its heart (the origin)
+/// mesh: ARSTHRAXIA WOVEN CUP. the smaller bloom rising out of the broad
+/// one's heart, the kit's too: five living petals, its own calyx and bead;
+/// it turns against the broad one while it studies
 pub const cup=struct{
-  /// builds the cup: five upright petals, then nine pearl stamens opening after them
+  /// builds the small bloom, opening after the broad one
   pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try ax.petals(b,5,0.5,9,.{
-      .base=v3(0,0,0),.out=undefined,.len=0.42,.width=0.22,.rise=1.15,.flare=0.4,.cup=0.4,
-      .col=kit.petalBase,.tip=kit.petalTip,.t=1,.part=.leaf,
-    });
-    // where the stamens' vertices begin, so they open last
-    const s=b.mark();
-    try mg.stamens(b,.{
-      .heart=v3(0,0,0),.axis=v3(0,1,0),.n=9,.len=0.32,.r=0.009,.anther=0.055,
-      .lean=0.4,.arch=0.6,.col=kit.pearl,.t=1,.seed=0x7C05,
-    });
-    try growth.tag(b,s,v3(0,0,0),.{1-ax.form+ax.whorlStagger*14,ax.petalOpen});
+    try bloomAt(b,.{.heart=v3(0,0.09,0),.len=0.28,.petals=5,.spin=0.63,.seed=0x7C51},12);
   }
 };
+/// the kit's bloom `f`, opening as the arsthraxia's flower does, `after`
+/// petals' staggers late
+fn bloomAt(b:*mg.Builder,f:kit.Bloom,after:usize)Allocator.Error!void{
+  // where its vertices begin, so it opens in its turn
+  const s=b.mark();
+  try kit.bloom(b,f);
+  try growth.tag(b,s,f.heart,.{1-ax.form+ax.whorlStagger*m.f(after),ax.petalOpen*3});
+}
 /// mesh: ARSTHRAXIA WOVEN WHOLE. it at rest with its flower: the evolved
 /// arsthraxia's preview
 pub const whole=struct{
@@ -80,7 +84,7 @@ pub const whole=struct{
     const s=b.mark();
     try whorl.build(b);
     try cup.build(b);
-    b.xform(s,m.translate(ax.heartAt));
+    b.xform(s,m.translate(ax.heartAt+v3(0,lift,0)));
   }
 };
 /// the convergent stand: three woven stems on the kit's foot, a frond off
@@ -107,6 +111,7 @@ fn standOf(b:*mg.Builder)Allocator.Error!void{
   }
   try cage(b,&sk,stems[0]);
   try calyx(b,&sk,stems[0]);
+  try tethers(b,&sk,stems[0]);
   sk.finish(b);
 }
 /// stem `k` along the arsthraxia's own course, woven of both lineages
@@ -155,6 +160,35 @@ fn cage(b:*mg.Builder,sk:*growth.Skeleton,trunk:growth.Id)Allocator.Error!void{
   const p=b.mark();
   try kit.sac(b,.{.center=at,.radii=v3(0.11,0.14,0.11),.t=0.7,.arms=3,.phase=0.9});
   try sk.on(b,p,id,sk.nearest(id,at),.{.from=at});
+}
+/// the strands its floating flower is held by: from round the calyx's
+/// heart they bow out a little and draw in again to the flower's own heart
+/// on its axis (so it may turn and bob, still held), alternately a
+/// symbiote's green and a parasite's pale, thinning as they rise
+fn tethers(b:*mg.Builder,sk:*growth.Skeleton,trunk:growth.Id)Allocator.Error!void{
+  // where they spring from, and where they are drawn in to (inside its bead)
+  const from=ax.heartAt-v3(0,0.04,0);
+  const to=ax.heartAt+v3(0,lift+0.05,0);
+  for(0..tetherCount)|i|{
+    // this tether's bearing (radians), the way out along it, and its own sway
+    const a=(m.f(i)+0.25)/m.f(tetherCount)*m.tau;
+    const out=v3(@cos(a),0,@sin(a));
+    const w=0.015*@sin(m.f(i)*2.7);
+    // its course: out of the calyx, bowing out, in to the flower's heart
+    const c=[_]V3{
+      from+out*m.splat3(0.035),
+      from+out*m.splat3(0.08+w)+v3(0,lift*0.45,0),
+      to-v3(0,0.06,0)+out*m.splat3(0.05),
+      to,
+    };
+    // its course resampled smooth
+    var p:[10]V3=undefined;
+    m.splineResample(&c,&p);
+    // where its vertices begin, so it draws out after the calyx opens
+    const s=b.mark();
+    try kit.taper(b,&p,0.007,0.35,1,1,if(i%2==0)kit.green else kit.pale,.tendril,4);
+    try sk.on(b,s,trunk,1,.{.from=from,.delay=ax.petalStagger*m.f(kit.fold+i)});
+  }
 }
 /// the calyx the stems gather into: five pale frondlet sepals, exactly
 /// alike, cupped up under the flower, greening at their tips
