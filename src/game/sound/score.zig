@@ -1,12 +1,7 @@
 //! the day's music on paper: pulse, scale, chords and how its voices are tuned.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
-const dsp = engine.core.dsp;
-const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const RATE = lib.sound.RATE;
 
 // ---- the day's music ----

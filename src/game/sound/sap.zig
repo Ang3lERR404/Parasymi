@@ -1,12 +1,9 @@
 //! the sap settling, heard from inside the wolf (first person): a groan with gloops.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;
 const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const SILENT = lib.sound.SILENT;
 const vary = lib.sound.footstep.vary;
 

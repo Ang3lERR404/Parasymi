@@ -1,12 +1,9 @@
 //! a mote of starlight twinkling: a few glassy pings dying in a shimmer.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;
 const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const samples = lib.sound.sap.samples;
 const vary = lib.sound.footstep.vary;
 

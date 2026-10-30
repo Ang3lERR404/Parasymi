@@ -1,12 +1,9 @@
 //! the arsthraxia's completion: a pop into a deep thud and a fracturing shimmer.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;
 const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const SILENT = lib.sound.SILENT;
 const vary = lib.sound.footstep.vary;
 

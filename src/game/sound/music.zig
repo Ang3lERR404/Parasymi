@@ -1,12 +1,9 @@
 //! the day's music playing: phrases of plunks over a slow pulse, fading with the light.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;
 const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const BAR = lib.sound.score.BAR;
 const BARS = lib.sound.score.BARS;
 const BREATHE = lib.sound.score.BREATHE;

@@ -27,13 +27,6 @@
 //!   all with a dark echo three steps behind; it rises with the morning and
 //!   fades out at dusk.
 const lib = @import("../lib.zig");
-const std = lib.std;
-const testing = std.testing;
-const engine = lib.engine;
-const m = engine.core.math;
-const dsp = engine.core.dsp;
-const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 pub const footstep = @import("sound/footstep.zig");
 pub const sap = @import("sound/sap.zig");
 pub const wind = @import("sound/wind.zig");

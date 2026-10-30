@@ -1,12 +1,9 @@
 //! the wind over the garden: a hush in slow gusts, whistling in the strong ones.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;
 const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const RETUNE = lib.sound.sap.RETUNE;
 const samples = lib.sound.sap.samples;
 

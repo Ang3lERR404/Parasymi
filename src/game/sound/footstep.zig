@@ -1,7 +1,5 @@
 //! a footstep: leaf litter rustled and crushed under a paw over a muffled pad.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;

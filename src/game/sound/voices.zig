@@ -1,12 +1,9 @@
 //! the music's instruments: the piano plunk, the soft drum and the dark echo.
 const lib = @import("../../lib.zig");
-const std = lib.std;
-const testing = std.testing;
 const engine = lib.engine;
 const m = engine.core.math;
 const dsp = engine.core.dsp;
 const rng = engine.core.rng;
-const Footfall = lib.player.Footfall;
 const DETUNE = lib.sound.score.DETUNE;
 const DETUNE_LEVEL = lib.sound.score.DETUNE_LEVEL;
 const DRUM = lib.sound.score.DRUM;
