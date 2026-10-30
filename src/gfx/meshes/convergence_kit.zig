@@ -760,6 +760,22 @@ pub fn confluence(b:*mg.Builder,g:species.Genome,seed:u64,gr:f32)Allocator.Error
     var sec:[steps]Section=undefined;
     sections(st,&sec);
     try weave(b,&sp,&ts,&sec,.{.seed=seed^0xC0F});
+    // its yield: pods of both saps hanging from the weave just over where
+    // the trunks fuse, small while it is young (every key has them all)
+    // how far up the weave they hang, when they form there, and the genome sized to this key
+    const pu:f32=0.38;
+    const pt=m.lerp(fuseT*0.85,canopyT,pu);
+    var pg=g;
+    pg.podR=g.podR*m.lerp(0.3,1,gw.rise);
+    // how far out the weave's parted strands lie there
+    const ps=pk.section(st,pu);
+    for(0..g.pods)|k|{
+      // this pod's bearing, the way out to it and where its stalk leaves the weave
+      const ang=a0+m.ratio(k,g.pods)*m.tau+0.4;
+      const out=v3(@cos(ang),0,@sin(ang));
+      const root=m.alongPath(&sp,pu)+out*m.splat3(ps.open+ps.strand*0.5);
+      _=try mg.pods.hanging(b,pg,k,root,out,pg.podR*0.6,green,pt);
+    }
   }
   // the canopy: a great sac of both saps at the top, a flower of both on
   // it, and five boughs arching out round it, alike, each its own leaves

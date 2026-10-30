@@ -64,7 +64,10 @@ pub const Ring=enum(u8){
   /// the thin ring of light round it all
   halo,
   /// living leaves floating beneath the heart
-  leaves
+  leaves,
+  /// beads of its yield held round the heart (part `.pod`, their bearing
+  /// their place among its pods), swelling as it ripens
+  yield,
 };
 /// tu.y a thread adds at its heart end (0 at what it holds; common.glsl
 /// `RADIANT_THREAD`)
@@ -436,6 +439,15 @@ pub fn star(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
     .order=.{0.6,0.85},.col=lc,.tip=color.mix(lc,body,0.5),
   },lite,seed+%0x1EAF,&rng);
   try motes(b,radius,7,lite,&rng);
+  // its yield: beads of light held round its core, the last to settle
+  for(0..g.pods)|k|{
+    // this bead's bearing (its place among the pods, which the shaders
+    // read back), and where its vertices begin
+    const a=(m.f(k)+0.5)/m.f(g.pods)*m.tau;
+    const s=b.mark();
+    try mg.ellipsoid(b,.{.center=v3(@cos(a),0.2,@sin(a))*m.splat3(radius*0.62),.radii=m.splat3(g.podR),.col=lite,.part=.pod,.rings=5,.segs=7});
+    fragment(b,s,.{.order=m.lerp(0.88,0.98,m.ratio(k,@max(g.pods,1))),.ring=.yield,.bearing=a});
+  }
   b.xform(start,m.translate(v3(0,g.stemH,0)));
 }
 /// every vertex since `start` is gathered: a fragment with a valid order
@@ -448,7 +460,7 @@ fn expectGathered(b:*const mg.Builder,start:usize)!void{
     for(0..3)|i|try std.testing.expect(v.pos[i]==v.pos[i] and v.nrm[i]==v.nrm[i]);
     // the ring it belongs to, with any thread's share dropped
     const ring=@floor(v.tu[1]+0.01);
-    try std.testing.expect(ring>=0 and ring<=@intFromEnum(Ring.leaves));
+    try std.testing.expect(ring>=0 and ring<=@intFromEnum(Ring.yield));
   }
   // nothing of it is on a growth spline
   try std.testing.expect(b.grow.items.len<=start);

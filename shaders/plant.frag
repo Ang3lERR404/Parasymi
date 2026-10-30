@@ -9,7 +9,9 @@
 // the growth is old and thick, thin and see-through where it is new. Sap has
 // no light of its own: it shows only by light carried through it (behind,
 // at grazing angles, through thin new growth), so plants dim with the day
-// and keep only a rim at night, as the wolf does.
+// and keep only a rim at night, as the wolf does. Only their yield holds a
+// light of its own: ripening, a plant's sap takes on what it yields, and
+// its ripe pods glow softly from within.
 
 layout(location = 0) in vec3 v_pos;
 layout(location = 1) in vec3 v_nrm;
@@ -22,6 +24,8 @@ layout(location = 7) in float v_young;
 layout(location = 8) flat in vec2 v_ghost; // a placement preview, and whether it fits
 layout(location = 9) in vec3 v_obj;
 layout(location = 10) in float v_glow; // the light a radiant fragment carries
+layout(location = 11) in vec2 v_pod;   // a pod: how far swelled (< 0 not one), how freshly its yield was taken
+layout(location = 12) flat in vec4 v_yield; // the colour of what it yields (linear), how ripe 0..1
 layout(location = 0) out vec4 o;
 
 // what the sap carries at night (moonlight; by day plain white)
@@ -54,6 +58,15 @@ const float OWN_HUE_FILM = 0.45;
 const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
 const vec3 GHOST_BLOCKED = vec3(1.0, 0.35, 0.3);
 const float GHOST_PULSE = 4.0;
+// ripening: how far a plant's sap takes on its yield's colour, and how
+// much more of it shows, when it is ripe
+const float RIPE_TINT = 0.4;
+const float RIPE_SHOW = 0.6;
+// a ripe pod's own light, how slowly it breathes (rad/s), and how bright
+// the sap a just-plucked nub weeps
+const float POD_GLOW = 0.12;
+const float POD_BREATH_RATE = 1.6;
+const float POD_WOUND = 0.35;
 
 // the sap each lineage carries. Parasites are alien rather than hostile: a
 // pale sap with a thin-film sheen whose hue turns with the view angle.
@@ -81,6 +94,32 @@ void surface() {
   float sh = keyShadow(v_pos, n);
   vec3 klit = lit * sh;
 
+  float ripe = v_yield.a;
+  vec3 yieldCol = v_yield.rgb;
+  if (part == PART_POD && !formIn(FORMS_FREE, v_form)) {
+    // a pod (meshgen `pods`): its yield ripening as a bead of sap in its
+    // colour. Empty it is a pale nub of the lineage's own sap, dense and
+    // dull; swelling it clears and takes on the yield's colour; ripe it
+    // holds a soft light of its own, slowly breathing, brightest face-on.
+    // Just plucked, the nub left weeps bright sap that dries as it heals.
+    float sw = clamp(v_pod.x, 0.0, 1.0), wound = v_pod.y;
+    vec3 col = mix(sapOf(aff, ndv, seed) * 0.45, yieldCol, smoothstep(0.0, 0.6, sw));
+    vec3 deep = col * mix(0.3, 0.12, sw) * health;
+    PointLit pl = pointLights(v_pos, n, reflect(-V, n), true);
+    vec3 c = shadeLitWith(deep, n, sh, pl.plain);
+    c += mix(col * 0.04, col * 0.55, pow(1.0 - ndv, 2.5)) * (0.3 + 0.5 * sw) * lit;
+    c += col * max(dot(-n, SUN), 0.0) * 0.15 * sw * klit;
+    c += col * pl.wrapped * 0.3;
+    c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * sw * lit * 0.3;
+    float glow = sw * sw * (0.8 + 0.2 * sin(pc.eye_time.w * POD_BREATH_RATE + seed * 9.0));
+    c += yieldCol * glow * POD_GLOW * ndv * ndv * health;
+    c += mix(col, vec3(1.0), 0.3) * wound * POD_WOUND * lit;
+    vec3 g = sapGlistenWith(n, V, v_pos, v_obj, col, 0.2 * sw * (1.0 - fres), sh, pl.mirrored) * health * mix(0.3, 1.0, max(sw, wound));
+    float a = max(mix(mix(0.97, 0.6, sw), 1.0, fres), clamp(dot(g, vec3(0.33)), 0.0, 1.0));
+    if (v_ghost.x > 0.5) a *= 0.5;
+    o = vec4(applyFog(c + g, v_pos), a);
+    return;
+  }
   if (formIn(FORMS_FREE, v_form)) {
     // a radiant plant (the celestial bloom, the vesper): the only things in
     // the garden that truly glow, and
@@ -94,10 +133,17 @@ void surface() {
     // less light (v_glow: a vesper's living leaves) keeps more of its own
     // colour and body; withering out of radiance, the light goes out of it.
     float core = part == PART_BLOOM ? 1.3 : 1.1;
-    float glow = v_glow * mix(0.25, 1.0, health);
+    float glow = v_glow * mix(0.25, 1.0, health) * (1.0 + 0.3 * ripe);
     vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + seed * 3.0 + pc.eye_time.w * 0.03);
     float filmy = (formIn(FORMS_OWN_HUE, v_form) ? OWN_HUE_FILM : 1.0) * mix(0.3, 1.0, v_glow);
-    vec3 col = mix(v_col, film, (part == PART_BLOOM ? 0.25 : 0.4 + 0.35 * fres) * filmy);
+    // a bead of its yield: a dim seed of light empty, the yield's colour
+    // and fully lit ripe; just plucked, a flash where it was
+    vec3 own = v_col;
+    if (part == PART_POD) {
+      own = mix(v_col * 0.35, yieldCol, v_pod.x);
+      glow *= mix(0.2, 1.3, v_pod.x) + v_pod.y;
+    }
+    vec3 col = mix(own, film, (part == PART_BLOOM ? 0.25 : 0.4 + 0.35 * fres) * filmy * (part == PART_POD ? 0.4 : 1.0));
     vec3 c = shadeLit(col * mix(0.6, 0.2, v_glow), n, v_pos, sh);
     c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4 * glow;
     c += col * max(dot(-n, SUN), 0.0) * 0.4;
@@ -190,9 +236,12 @@ void surface() {
   vec3 sap = mix(sapOf(aff, ndv, seed), v_col, 0.25);
   sap = mix(sap, vec3(1.0, 0.85, 1.0), VEIL * 0.5);
   if (green) sap = v_col * GREEN_THROUGH;
+  // ripening, its sap takes on what it yields, and more of it shows (a
+  // symbiote's leaves keep their own green)
+  if (!green) sap = mix(sap, yieldCol, ripe * RIPE_TINT);
   float through = max(dot(-n, SUN), 0.0) * sh;
   float wrap = clamp(dot(n, SUN) * 0.5 + 0.5, 0.0, 1.0) * mix(0.4, 1.0, sh);
-  float show = mix(0.1, 1.0, thin) * (0.35 + 0.65 * fill);
+  float show = mix(0.1, 1.0, thin) * (0.35 + 0.65 * fill) * (1.0 + (green ? 0.0 : ripe * RIPE_SHOW));
   // light scattered inside thin tissue tints it with its sap; light from
   // behind and at grazing angles shows the sap most (a bloom's or a mote's
   // light too, wrapping round the tissue it falls on)

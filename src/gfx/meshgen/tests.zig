@@ -82,3 +82,27 @@ test"a confluence's growth keys share one vertex layout and grow taller"{
   try testing.expect(end.v==keys-2 and end.f==1);
   try testing.expect(growthKey(.lumenroot,0.5)==null);
 }
+test"every plant that yields ripens it in all its pods, where the paws reach for it"{
+  inline for(lib.species.ids)|id|{
+    // its kind, and the shape a grown one takes (a confluence's last key)
+    const def=lib.species.get(id);
+    const variant:u32=if(def.genome.form==.confluence)keys-1 else 0;
+    var b:Builder=.{.gpa=testing.allocator};
+    defer b.deinit();
+    try plant(&b,id,variant);
+    // which pods were found, and the heights of their vertices summed
+    var seen=[_]bool{false}**16;
+    var sum:f32=0;
+    var n:usize=0;
+    for(b.v.items)|v|if(v.part==@intFromEnum(lib.vertex.Part.pod)){
+      seen[@min(m.floorTo(usize,m.f(v.col.a)/255*m.f(def.genome.pods)),15)]=true;
+      sum+=v.pos[1];
+      n+=1;
+    };
+    // as many pods as its genome, each its own; none on a plant that yields nothing
+    var found:usize=0;
+    for(seen)|s|found+=@intFromBool(s);
+    try testing.expectEqual(@as(usize,def.genome.pods),found);
+    if(n>0)try testing.expect(@abs(sum/m.f(n)-def.pluck)<0.15);
+  }
+}

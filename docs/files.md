@@ -274,6 +274,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `palette.zig` — shared look for library meshes: the vine-wolf palette (woody cores, living vines, leaves, amber sap) and a per-mesh deterministic random…
 - `parasite_kit.zig` — the parasitic lineage's body, shared by its plants (`plant`, the `coil` form) and its structures: alien, not hostile, and plainly a…
 - `paw_pad.zig` — mesh: PAW PAD.
+- `pluck_burst.zig` — mesh: PLUCK BURST.
 - `polyp.zig` — mesh: POLYP.
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
@@ -301,6 +302,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `flowers.zig` — flowers, buds and leaves set along a path.
 - `laminae.zig` — laminae: leaves with a body, folding to a midrib.
 - `petals.zig` — petals and stamens: a flower's pieces.
+- `pods.zig` — pods: a plant's yield ripening on it, beads of sap where the paws pluck it.
 - `shoots.zig` — a plant from its genome, and the shoots branching off its spine.
 - `tests.zig` — the garden's meshes tested: blades and growth keys.
 

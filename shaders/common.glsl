@@ -52,6 +52,7 @@ const float SHEEN_POWER = 40.0;
 #define PART_ESSENCE 14   // liquid essence a germinator pours, spins and winds
 #define PART_ENERGY 15    // research energy an arsthraxia condenses
 #define PART_NERVE 16     // an arsthraxia's nerve: thought rises through it
+#define PART_POD 17       // a plant's yield ripening on it, a bead of sap
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))

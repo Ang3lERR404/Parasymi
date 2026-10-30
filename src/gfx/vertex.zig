@@ -65,12 +65,16 @@ pub const Part=enum(u32){
   energy,
   /// an arsthraxia's nerve: thought rises through it
   nerve,
+  /// a plant's yield ripening on it, a bead of sap in its colour (meshgen
+  /// `pod`): col.a its place among the plant's pods, tu.y its radius; it
+  /// swells from a pale nub as the plant ripens (plant.vert)
+  pod,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve=>false,
   };
 }
@@ -100,7 +104,15 @@ pub const PlantInstance=extern struct{
   /// its bend after the gardener's paws plucking it: xy the way it bends
   /// on the ground (unit length), z how far (radians at its tip), w unused
   tug:[4]f32=.{0,0,0,0},
+  /// its yield ripening on it: x how ripe, 0..1 (its essence over its
+  /// cap), y how many pods it ripens in, z a radiant pod's radius (mesh
+  /// space), w seconds since its yield last came loose in the paws
+  ripe:[4]f32=.{0,0,0,noPluck},
+  /// the colour of what it yields (sRGB 0..1), w unused
+  yield:[4]f32=.{1,1,1,0},
 };
+/// `PlantInstance.ripe.w` for a plant never plucked (long since)
+pub const noPluck:f32=1e4;
 /// one tile's worth of ground detail, read per instance by detail.vert,
 /// which grows the tile's grass blades (or its clods and stones on soil)
 /// from it: the ground itself stays one baked mesh, the detail is the GPU's.
@@ -145,7 +157,8 @@ pub const PartInstance=extern struct{
   /// conduit's core carries (`q.x`); 2 a star mote (c3 its centre; y phase, z life, w its trail
   /// echo, -1 when resting); along a curve, q.yzw its essence's colour
   /// (sRGB 0..1); 3 skinned (y the first of its bones in the
-  /// frame's bone buffer; each vertex by its `Skin`)
+  /// frame's bone buffer; each vertex by its `Skin`); 4 a burst flung out
+  /// from where a yield came loose (y how far through its life, 0..1)
   e:[4]f32=.{0,0,0,0},
   /// a forming halo it belongs to (see `noHalo`)
   h:[4]f32=noHalo,

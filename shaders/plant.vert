@@ -11,7 +11,7 @@ layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 nrm;
 layout(location = 2) in vec4 col;
 layout(location = 3) in vec2 tu;    // height along plant, position along blade
-layout(location = 4) in uint part;  // 0 stem 1 leaf 2 bloom 3 thorn 4 tendril
+layout(location = 4) in uint part;  // 0 stem 1 leaf 2 bloom 3 thorn 4 tendril ... 17 pod
 // per-instance
 layout(location = 5) in vec3 ipos;
 layout(location = 6) in vec4 ia;    // growth, mana fill, seed, affinity
@@ -20,8 +20,10 @@ layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (
 // the same vertex in the next growth key (equals pos/nrm for keyless plants)
 layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre, how far along (< 0 none)
 layout(location = 10) in vec4 it;   // its bend after the gardener's paws plucking it: the way on the ground (xy), how far (z, radians at its tip)
-layout(location = 11) in vec3 pos_next;
-layout(location = 12) in vec3 nrm_next;
+layout(location = 11) in vec4 ir;   // its yield ripening: how ripe 0..1, its pods, a radiant pod's radius, seconds since its yield last came loose
+layout(location = 12) in vec4 iy;   // the colour of what it yields (sRGB)
+layout(location = 13) in vec3 pos_next;
+layout(location = 14) in vec3 nrm_next;
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
@@ -34,16 +36,20 @@ layout(location = 5) flat out float v_form;
 layout(location = 8) flat out vec2 v_ghost; // a placement preview, and whether it fits
 layout(location = 9) out vec3 v_obj;          // the plant-space point (sap bubbles ride with it)
 layout(location = 10) out float v_glow;       // how much light a radiant fragment carries (1 elsewhere)
+layout(location = 11) out vec2 v_pod;         // a pod: how far it has swelled 0..1 (< 0 not a pod), how freshly its yield was taken 1..0
+layout(location = 12) flat out vec4 v_yield;  // the colour of what it yields (linear), how ripe the plant is 0..1
 
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
 // a radiant plant's turning: each ring's pace (rad/s, alternating ways),
 // by its radiant_kit.Ring: core, inner, middle, outer whorl, motes, halo,
 // leaves (a ring past the table turns as the last)
-const float SPIN[7] = float[7](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02);
+// leaves, the beads of its yield (with the core; a ring past the table
+// turns as the last)
+const float SPIN[8] = float[8](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02, 0.03);
 // the light each ring carries (v_glow): the core and its threads fullest,
 // a vesper's floating leaves living tissue that carries little
-const float GLOW[7] = float[7](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3);
+const float GLOW[8] = float[8](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 1.0);
 const float MOTE_RATE = 0.07; // how often a mote spirals in (cycles/s)
 // how it gathers (common.glsl gatherAway, gatherIn): fragments settle
 // ARRIVE_PACE of growth apart by order, each over ARRIVE_SPAN, coming in
@@ -74,6 +80,19 @@ const float SIZE_MIN = 0.85;
 const float SIZE_SPREAD = 0.3;
 // how far behind the growing front growth still reads as new (v_young)
 const float YOUNG_SPAN = 0.55;
+// a pod empty of its yield is a nub this share of its ripe size; ripe, it
+// breathes by POD_BREATH of its size at POD_BREATH_RATE (rad/s)
+const float POD_NUB = 0.3;
+const float POD_BREATH = 0.04;
+const float POD_BREATH_RATE = 1.6;
+// once its yield comes loose the plant shivers: its leaves, petals and
+// pods quiver SHIVER metres at their tips at SHIVER_RATE (rad/s), the
+// quiver dying away at SHIVER_FADE a second; the nub a pod leaves weeps
+// for WOUND_FADE seconds as it heals
+const float SHIVER = 0.018;
+const float SHIVER_RATE = 31.0;
+const float SHIVER_FADE = 2.6;
+const float WOUND_FADE = 4.0;
 
 // what each form does its own way (sets of FORM_ bits, common.glsl): a new
 // form, or a new species of one, takes up a behaviour by joining its set.
@@ -92,6 +111,16 @@ const uint FORMS_PARTING = FORM_BIT(FORM_COIL);
 // filaments hanging from a float, rippling like a jelly's
 const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
 
+// how far pod `place` (col.a: its place among `pods`) has swelled when its
+// plant is `ripe` (0..1): each fills in turn, the first first
+float podSwell(float place, float ripe, float pods) {
+  float k = floor(place * pods);
+  return smoothstep(0.0, 1.0, clamp(ripe * pods - k, 0.0, 1.0));
+}
+// how much the plant still shivers, `since` seconds after its yield came loose
+float shiverLeft(float since) { return since >= 0.0 ? exp(-since * SHIVER_FADE) : 0.0; }
+// a quiver at time `t`, `ph` its phase: a smooth wobble in all three ways
+vec3 quiver(float t, float ph) { return vec3(sin(t * SHIVER_RATE + ph), 0.6 * sin(t * SHIVER_RATE * 1.31 + ph * 1.7), cos(t * SHIVER_RATE * 0.87 + ph * 2.3)); }
 
 void main() {
   float t = pc.eye_time.w;
@@ -110,6 +139,12 @@ void main() {
   // grows smoothly instead of stepping from one shape to the next
   vec3 p = mix(pos, pos_next, ic.x);
   vec3 n = normalize(mix(nrm, nrm_next, ic.x));
+  // its yield: how ripe, and how freshly it was taken
+  float ripe = clamp(ir.x, 0.0, 1.0);
+  float shiver = shiverLeft(ir.w);
+  bool pod = part == PART_POD;
+  v_yield = vec4(srgb2lin(clamp(iy.rgb, 0.0, 1.0)), ripe);
+  v_pod = vec2(-1.0, 0.0);
 
   if (formIn(FORMS_FREE, ib.w)) {
     // a flower whose petals float free of it, gathered by its core (the
@@ -122,7 +157,17 @@ void main() {
     // its floating leaves (ring 6) fold and breathe as the petals do.
     Fragment f = fragmentOf(tu, col.a);
     float order = f.order, bearing = f.bearing, ring = f.ring, held = f.held;
-    bool leaves = ring > 5.5;
+    bool leaves = abs(ring - 6.0) < 0.5;
+    // a bead of its yield (ring 7) swells from a nub about its own centre
+    // (ir.z its radius) as it ripens, breathing once ripe; just taken, it
+    // quivers
+    if (pod) {
+      float sw = podSwell(col.a, ripe, ir.y);
+      float size = mix(POD_NUB, 1.0, sw) * (1.0 + POD_BREATH * sw * sin(t * POD_BREATH_RATE + bearing * 3.0));
+      p -= n * ir.z * (1.0 - size);
+      p += quiver(t, bearing * 5.0) * SHIVER * 0.5 * shiver;
+      v_pod = vec2(sw, exp(-max(ir.w, 0.0) / WOUND_FADE) * (1.0 - sw));
+    }
     bool petals = (ring > 0.5 && ring < 3.5) || leaves;
     bool motes = abs(ring - 4.0) < 0.5;
     bool falling = formIn(FORMS_FALLING, ib.w);
@@ -168,7 +213,7 @@ void main() {
     p = gatherIn(p, from, away, 0.0, turns);
     n = gatherTurn(n, away, turns);
     // each ring turns at its own slow pace, alternating ways
-    int ri = clamp(int(ring), 0, 6);
+    int ri = clamp(int(ring), 0, 7);
     float spin = SPIN[ri];
     mat2 turn = rot(t * spin + seed * TAU);
     p.xz = turn * p.xz;
@@ -217,7 +262,15 @@ void main() {
   // the main plant, meshgen `shootFold`): an offshoot comes up pressed to
   // its stem, its bud or bloom a narrow closed one, and leans out and opens
   // as growth passes where it leaves (a confluence grows them in its keys)
-  float shoot = keyed ? 0.0 : 1.0 - col.a;
+  float shoot = keyed || pod ? 0.0 : 1.0 - col.a;
+  // a pod (meshgen `pods`) swells from a nub about its own centre (tu.y
+  // its radius) as the plant ripens, each in turn, breathing once ripe
+  if (pod) {
+    float sw = podSwell(col.a, ripe, ir.y);
+    float size = mix(POD_NUB, 1.0, sw) * (1.0 + POD_BREATH * sw * sin(t * POD_BREATH_RATE + col.a * 20.0 + seed * TAU));
+    p -= n * tu.y * (1.0 - size);
+    v_pod = vec2(sw, exp(-max(ir.w, 0.0) / WOUND_FADE) * (1.0 - sw));
+  }
   bool trunk = shoot < 0.002;
   // (a confluence's canopy opens in its growth keys instead, on its leader).
   // Weighted along the leaf (tu.y 0 at its base), so a leaf's base stays
@@ -230,7 +283,7 @@ void main() {
   if (crowned && trunk) {
     float unfurl = smoothstep(0.3, 1.0, growth);
     if (part == PART_TENDRIL || (part == PART_BLOOM && tu.x >= 0.9)) p.xz *= mix(0.3, 1.0, unfurl);
-    else if (part == PART_BLOOM) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
+    else if (part == PART_BLOOM || pod) p.xz *= mix(0.55, 1.0, grownPast(tu.x, 0.7, 0.35, growth));
   }
   // a cage comes up woven tight round its core and parts from the foot up
   if (formIn(FORMS_PARTING, ib.w) && trunk && part == PART_STEM && tu.y > 0.0) p.xz *= mix(1.0 - tu.y, 1.0, grownPast(tu.x, 0.8, 0.35, growth));
@@ -250,6 +303,12 @@ void main() {
   if (aff > 0.0 && part == PART_LEAF) p.xz *= 1.0 + 0.04 * aff * tu.y * sin(t * 0.9 + seed * TAU);
   // leaves and petals lift a touch in the gusts, tips most (bases stay)
   if (sheet) p.y += LEAF_LIFT * tu.y * tu.y * gust * sin(t * LEAF_LIFT_RATE + seed * 11.0 + h * 3.0);
+  // its yield just taken, it shivers: leaves and petals quiver at their
+  // tips, the pods on their stalks, dying away
+  if (shiver > 0.0) {
+    if (sheet) p += quiver(t, seed * 17.0 + h * 9.0) * SHIVER * tu.y * tu.y * shiver;
+    if (pod) p += quiver(t, seed * 17.0 + col.a * 13.0) * SHIVER * 0.6 * shiver;
+  }
   // parasites: fronds curl and uncurl slowly while feeding, alien but
   // unhurried; thorns barely stir
   if (aff < -0.5) {

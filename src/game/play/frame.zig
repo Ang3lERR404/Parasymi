@@ -236,9 +236,15 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   // plucking: the pluck under way goes on, the paws at the plant's yield
   // (moving off, or gathering from a node, lets it go)
   if(gathering or wish[0]!=0 or wish[1]!=0)g.pluck=null;
+  // what the pluck under way had given before this frame
+  const had=if(g.pluck)|p|p.got else 0;
   const plucked=actions.pluckOn(g,dt);
   if(plucked!=null)if(g.pluck)|p|{
-    work=view.pluckPoint(g,p.id.idx(),g.player.pos);
+    // where the paws pluck: a yield come loose there this frame bursts
+    // out round them, and the plant shivers
+    const at=view.pluckPoint(g,p.id.idx(),g.player.pos);
+    work=at;
+    if(p.got>had)g.tug.loosed(at);
   };
   tugOn(g,plucked,dt);
   // weaving: hands work at the chest while the queue runs
@@ -302,6 +308,8 @@ fn tugOn(g:*Game,plucked:?f32,dt:f32)void{
     const d=m.v3(g.player.pos[0]-p.at[0],0,g.player.pos[2]-p.at[2]);
     const l=m.len(d);
     if(l>1e-3)g.tug.dir=.{d[0]/l,d[2]/l};
+    // (a plant newly taken hold of has not shivered yet)
+    if(g.tug.id!=p.id or m.len(g.tug.at-p.at)>1e-4)g.tug.since=lib.vertex.noPluck;
     g.tug.id=p.id;
     g.tug.at=p.at;
     if(!p.freed)want=pluck.bend(def,pluck.size(s.items(.seed)[i]))*pryPull(k);

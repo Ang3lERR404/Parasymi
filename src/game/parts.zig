@@ -21,6 +21,8 @@ const placeCurve:f32=1;
 const placeMote:f32=2;
 /// how part.vert places a skinned mesh, moved by its bones
 const placeSkin:f32=3;
+/// part.vert's burst placement: flung out from where a yield came loose
+const placeBurst:f32=4;
 /// culling spheres: a mesh reaches `bound` times its scale plus
 /// `boundPad` from its origin
 const bound:f32=2.5;
@@ -210,6 +212,15 @@ pub const Parts=struct{
     inst.e=.{placeMote,phase,life,echo};
     if(p.view)|v|if(!v.sphere(at,moteBound))return;
     try p.add(.mote,at,inst);
+  }
+  /// a burst of library mesh `id` at `at`, `reach` across, `age` through
+  /// its life (0..1): part.vert flings its beads out and shrinks them away
+  pub fn emitBurst(p:*Parts,id:meshlib.Id,at:m.V3,reach:f32,age:f32,lookIn:Look)Allocator.Error!void{
+    // the burst's instance
+    var inst=instance(m.chain(&.{m.translate(at),m.scale3(m.splat3(reach))}),lookIn);
+    inst.e=.{placeBurst,age,0,0};
+    if(!p.sees(at,reach*2+boundPad))return;
+    try p.add(id,at,inst);
   }
   /// every slot's instances this frame, as slices for the renderer
   pub fn slices(p:*const Parts)[meshlib.slots][]const PartInstance{

@@ -128,6 +128,15 @@ pub const Genome=struct{
   tendrilCurl:f32=0.4,
   /// how much noise bends them
   tendrilWobble:f32=0.2,
+  /// its yield ripens on it in this many pods, beads of sap in the
+  /// yield's colour where it is plucked (meshgen `pod`; 0 none): each
+  /// swells from a pale nub as the plant ripens, and is taken by paw
+  pods:u8=0,
+  /// how big each pod is, ripe (m, a radius)
+  podR:f32=0.03,
+  /// how far up its stem (0..1) a stemmed plant's pods hang (at its
+  /// `Species.pluck` height, where the paws reach for them)
+  podAt:f32=0.9,
   /// the stem's colour
   stemCol:color.Rgb,
   /// the leaves' colour

@@ -544,11 +544,14 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64)Allocator.Error!void{
     rootPath(i,fold,g.stemR*4.5,seed^0x2007,&c);
     try frondTube(b,&c,g.stemR*0.45,0.1,0,0.03,light,.stem,4);
   }
-  // its sacs, on the core inside the cage
+  // its sacs, on the core inside the cage: its yield ripens in them, a
+  // pod a sac (as many as it has pods)
   for(0..g.thorns)|i|{
-    // where this sac hangs and how big it is
+    // where this sac hangs and how big it is, and where its vertices begin
     const o=organ(s,h,i,g.thorns,0.6);
+    const at=b.mark();
     try mg.ellipsoid(b,.{.center=v3(0,h*o.u,0),.radii=v3(o.r,o.r*1.15,o.r),.col=sap,.part=.bloom,.rings=6,.segs=9,.t=o.u*0.85});
+    if(i<g.pods)mg.pods.mark(b,at,i,g.pods,o.r*1.05);
   }
   // a bulb at its neck, the crown springing round it
   const neck=sp[steps-1];

@@ -47,6 +47,9 @@ undeclared mesh; an unfinished skeleton (debug assert).
 ## A species
 1. **Its module**: `sim/species/<name>.zig` with `def` (stats, lineage,
    form, genome, `.seed`). One line in `parts` in `sim/species.zig`.
+   If it yields, its genome's `pods` (and `podR`, `podAt` for a stemmed
+   one) ripen on it where `.pluck` says the paws reach (its form's kit
+   places them; a test holds the two together).
 2. **Seed item**: a tag at the end of `items.Item` + its colour in
    `infos`.
 3. **Seed icon**: `game/seeds/<name>.zig` (`item` + `icon`), one line in

@@ -96,6 +96,14 @@ pub fn drift(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!vo
     .len=g.bloomR*0.45,.r=g.bloomR*0.022,.anther=g.bloomR*0.11,
     .lean=0.45,.arch=0.5,.col=filament(g),.t=0.9,.spin=m.f(variant),.seed=seed,
   });
+  // its yield: beads of starlight gathered in the dish's heart, among
+  // its stamens, over the cup of its inner whorl
+  for(0..g.pods)|k|{
+    // the way out to this bead, and where it rests
+    const ang=lib.meshgen.pods.bearing(k,variant);
+    const at=np[7]+m.v3(@cos(ang),0,@sin(ang))*m.splat3(g.bloomR*0.12)+m.v3(0,g.bloomR*0.22,0);
+    try lib.meshgen.pods.bead(b,g,k,at,g.podR,0.9);
+  }
   // offshoots: slender stalks leaning out of the neck beneath the dish,
   // each lifting a bud or a small bloom of its own to the sky
   // a separate stream for the offshoots, so they leave the rest unchanged

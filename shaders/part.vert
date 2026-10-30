@@ -68,6 +68,7 @@ const int PLACE_MATRIX = 0;
 const int PLACE_CURVE = 1;   // along a Catmull-Rom curve (the tail, beams)
 const int PLACE_MOTE = 2;    // a star mote
 const int PLACE_SKINNED = 3; // by its bones
+const int PLACE_BURST = 4;   // a burst flung out where a yield came loose
 
 // how a diamond gathers (common.glsl gatherAway, gatherIn): its facets
 // settle PRISM_PACE of the way apart by order, each over PRISM_SPAN,
@@ -82,6 +83,12 @@ const float FLASH_TO = 3.2;
 // a star mote: how fast it turns (rad/s), how far its echoes trail above it
 const float MOTE_TURN = 0.35;
 const float ECHO_RISE = 0.16;
+// a burst where a yield came loose (meshes/pluck_burst.zig): its beads'
+// radius (mesh space), how far its motes drift up and its drops fall
+// over its life (mesh space: the matrix sizes it)
+const float BURST_BEAD = 0.11;
+const float BURST_RISE = 0.5;
+const float BURST_FALL = 1.6;
 // sap pulses running along a part (rad/s), and a part's own glow beside a
 // glowing sap part's
 const float PULSE_RATE = 3.0;
@@ -267,6 +274,21 @@ void main() {
       // the mesh was squeezed to 0..1 along its length: undo that on its normals
       wn = B * nrm.x + T * (nrm.y / ie.w) + N * nrm.z;
     }
+  } else if (mode == PLACE_BURST) {
+    // a burst (ie.y how far through its life, 0..1): each bead flies out
+    // the way it lies (its centre a radius in from its skin), fast then
+    // slowing; motes of light (tu.y below 0.5) drift up, drops of sap arc
+    // down; each its own pace (tu.y), all swelling in at once and shrinking
+    // away over the burst's life
+    float age = clamp(ie.y, 0.0, 1.0);
+    bool drop = tu.y >= 0.5;
+    float pace = mix(0.65, 1.3, fract(tu.y * 2.0));
+    vec3 c = pos - nrm * BURST_BEAD;
+    vec3 at = c * (1.0 - pow(1.0 - age, 3.0)) * pace;
+    at.y += drop ? -BURST_FALL * age * age : BURST_RISE * age * pace;
+    float size = (1.0 - age) * (drop ? 1.0 : 0.65) * smoothstep(0.0, 0.06, age);
+    w = M * vec4(at + nrm * BURST_BEAD * size, 1.0);
+    wn = mat3(M) * nrm;
   } else if (mode == PLACE_MOTE) {
     // a star mote: it turns slowly, tilts, twinkles and, resting, hovers
     // with a slow breath; falling, its echoes (ie.w 1..3) trail above it,
@@ -404,7 +426,7 @@ void main() {
   // what is light itself casts no shadow (a star mote, PARTS_LIGHT: a beam,
   // a halo's flash, ring and rays), nor does the soft shadow under a floater
   // or a placement preview
-  if (mode == PLACE_MOTE || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u) gl_Position = UNSEEN;
+  if (mode == PLACE_MOTE || mode == PLACE_BURST || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u) gl_Position = UNSEEN;
 #endif
 }
 

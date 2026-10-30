@@ -30,6 +30,8 @@ pub const def:species.Species=.{
     .stemH=2.8,.stemR=0.2,.segments=0,.curl=0,.wobble=0.08,
     .leaves=0,.leafLen=0,.leafW=0,.leafDroop=0,
     .petals=8,.bloomR=0.55,.thorns=0,.tendrils=0,.shoots=.{0,0},
+    // its yield: four beads of the lineages' sap where its trunks fuse
+    .pods=4,.podR=0.055,
     .stemCol=color.rgb(0.36,0.58,0.24),.leafCol=color.rgb(0.68,0.62,0.82),.bloomCol=color.rgb(0.58,0.36,0.9),
   },
   .parents=.{.lumenroot,.thornleech},

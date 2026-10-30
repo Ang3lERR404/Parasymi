@@ -14,6 +14,8 @@ const swap=std.mem.swap;
 const engine=lib.engine;
 /// all the maths: vectors, matrices, easing, tiles
 const m=engine.core.math;
+/// colour types: what a plant yields, as its pods colour it
+const color=engine.core.color;
 /// hashing a tile or index to a steady random value
 const rng=engine.core.rng;
 /// the chunk layer: tiles, coordinates
@@ -65,6 +67,13 @@ const plantBoundUp:f32=0.6;
 /// how far out from a broad plant's centre (metres a tile past the first)
 /// the paws find its yield, on the side facing the wolf
 const pluckOut:f32=0.45;
+/// the burst where a plucked yield comes loose: how long it lasts (s), how
+/// far it flings (m), and how brightly its beads glow
+const burstLife:f32=0.9;
+/// (how far it flings, m)
+const burstReach:f32=0.32;
+/// (how brightly its beads glow at first)
+const burstGlow:f32=1.6;
 /// floaters: how far they bob (metres), a slow rise and a quicker one
 const bobAmount=[2]f32{0.07,0.025};
 /// floaters: how fast each bob runs (radians a second)
@@ -191,6 +200,7 @@ pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
   g.parts.clear();
   g.parts.look(g.cam.viewEye(),m.Frustum.of(g.cam.viewProj()),g.sky.lightDir());
   try plants(g,reach,tf);
+  try burst(g);
   try threads(g,tf);
   // a specimen stands alone: no wolf, ghosts or motes, and a plant no
   // nodes or structures (their meshes were never built)
@@ -257,10 +267,25 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
       .flow=s.items(.flow)[i],.health=s.items(.health)[i],
       .dir=s.items(.dir)[i],.turn=s.items(.turn)[i],
       .tug=g.tug.of(ck.PlantId.of(i),s.items(.at)[i]),
+      .essence=s.items(.essence)[i],
+      .since=g.tug.sinceOf(ck.PlantId.of(i),s.items(.at)[i]),
       // (worked out each tick: a plant sown since has none yet)
       .radiating=i<radiating.len and radiating[i],
     },tf);
   }
+}
+/// the burst where a plucked plant's yield came loose, while it lasts:
+/// motes and drops of what it yields flung out round the paws, glowing
+/// and shrinking away
+fn burst(g:*Game)Allocator.Error!void{
+  // the plucked plant, if any, and how far through its life the burst is
+  const id=g.tug.id orelse return;
+  if(g.tug.since>=burstLife or id.idx()>=g.plants.len())return;
+  const age=g.tug.since/burstLife;
+  // what the plant yields, its colour
+  const def=species.get(g.plants.list.items(.sp)[id.idx()]);
+  const col=color.Rgba8.of(def.yields.info().col).toF4();
+  try g.parts.emitBurst(.pluckBurst,g.tug.burst,burstReach,age,.{.glow=burstGlow*(1-age),.tint=.{col[0],col[1],col[2],1}});
 }
 /// a thin film's hue as the shaders take it (common.glsl `filmHue`): one
 /// turn of the rainbow per unit of `x`
@@ -416,6 +441,10 @@ const Drawn=struct{
   turn:turn.Turn=.{},
   /// its bend after the paws plucking it (`pluck.Tug.of`)
   tug:[4]f32=@splat(0),
+  /// the yield it has ripened (units)
+  essence:f32=0,
+  /// seconds since its yield last came loose in the paws (`pluck.Tug.sinceOf`)
+  since:f32=vertex.noPluck,
 };
 /// draws one plant (or its placement preview): culled to the view, posed
 /// as it turns, floated over its shadow if it floats, its instance added to
@@ -467,6 +496,9 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     .c=.{key.f,if(d.ghost)1 else 0,if(d.fits)1 else 0,m.dirYaw(d.dir)+pose.spin},
     .h=halo,
     .tug=d.tug,
+    // its yield ripening on it, in its pods, and what it is
+    .ripe=.{if(d.growth>=1)m.clamp01(d.essence/def.manaCap)else 0,m.f(def.genome.pods),def.genome.podR,d.since},
+    .yield=color.Rgba8.of(def.yields.info().col).toF4(),
   });
   // a celestial bloom is the garden's light: its core sheds it round
   // about, pearl tinted by its film, pulsing slowly, brighter as it

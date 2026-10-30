@@ -447,6 +447,27 @@ Harvest on a ripe plant is taken by paw, never all at once:
   upright and settles (`pluck.Tug`, an underdamped spring), and one
   paw, in turn, carries a **bead** of the yield's colour (`itemPod`)
   cupped at its knuckles to the belly (`pluckStow`, slower than a node's).
+- **Bursts and shivers** there (`pluck.Tug.loosed`): motes of the yield
+  drift up and drops of it arc down round the paws (`pluckBurst`,
+  part.vert's burst placement), and the plant's leaves, petals and pods
+  quiver, dying away (plant.vert `SHIVER*`).
+
+### Ripening (`meshgen/pods.zig`, part `.pod`)
+A plant's yield shows on it, where the paws pluck it:
+- **Pods** (`Genome.pods`, `podR`): beads of sap, one per share of its
+  cap. A symbiote hangs them on short stalks from its stem (`podAt`); a
+  thornleech ripens in the sacs in its cage; a driftwisp gathers starlight
+  in its dish's heart; a confluence hangs them from its weave over where
+  the trunks fuse; a vesper holds beads of light round its core
+  (radiant fragments, ring `.yield`).
+- **Swelling** (`PlantInstance.ripe`): each fills in turn as the essence
+  builds, from a dark nub to a bead of the yield's colour
+  (`PlantInstance.yield`), shrunk about its own centre on the GPU (tu.y
+  its radius). Ripe, it breathes and holds a soft light of its own.
+- **The whole plant** takes on its yield as it ripens: its sap tints toward
+  the yield's colour and shows more (a symbiote's leaves keep their green).
+- **Taken**, a pod empties back to its nub, which weeps bright sap for a
+  few seconds (`WOUND_FADE`) and swells again as the plant ripens anew.
 
 ### Belly stages (`Player.stage`, `gaits`)
 - Stages: light (< 1/3 full), heavy, full (> 2/3), blended over

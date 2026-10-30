@@ -398,6 +398,17 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
       try mg.bud(b,g,sh.at,sh.axis,srng.range(0.65,0.85),m.f(i)*1.3,sh.t1);
     mg.shootFold(b,s,1);
   }
+  // its yield: pods hanging from the stem where the paws pluck it, each
+  // on a short stalk out of the braid, a golden angle round from the last
+  for(0..g.pods)|k|{
+    // how far up the stem it hangs (a little apart from its neighbour), its bearing and the way out
+    const pk=g.podAt+0.04*(m.f(k%2)-0.5);
+    const ang=mg.pods.bearing(k,variant);
+    const out=v3(@cos(ang),0,@sin(ang));
+    // the stem's ring nearest that height, for its radius
+    const ri:usize=@intFromFloat(pk*(res-1));
+    _=try mg.pods.hanging(b,g,k,m.alongPath(&spine,pk)+out*m.splat3(radii[ri]*0.85),out,g.podR*0.5,strand,pk);
+  }
   // the bloom: its bead of resin in the cup of sepals, the petals rising
   // from its crown
   try mg.flower(b,g,spine[res-1],m.norm(spine[res-1]-spine[res-4]),1,m.f(variant),1,.{.resin=pal.sap});

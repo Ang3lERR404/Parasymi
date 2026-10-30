@@ -77,9 +77,27 @@ pub const Tug=struct{
   x:f32=0,
   /// how fast it is bending
   v:f32=0,
+  /// seconds since its yield last came loose in the paws (it shivers, the
+  /// nub left weeping; `vertex.noPluck` long since)
+  since:f32=lib.vertex.noPluck,
+  /// where that yield came loose, which bursts out round it
+  burst:m.V3=@splat(0),
+  /// its yield comes loose at `at`: it shivers and bursts from there
+  pub fn loosed(t:*Tug,at:m.V3)void{
+    t.since=0;
+    t.burst=at;
+  }
+  /// seconds since plant `id`, standing at `at`, last gave up its yield in
+  /// the paws (`vertex.noPluck` for any other)
+  pub fn sinceOf(t:Tug,id:PlantId,at:m.V3)f32{
+    const bent=t.id orelse return lib.vertex.noPluck;
+    if(bent!=id or m.len(at-t.at)>1e-4)return lib.vertex.noPluck;
+    return t.since;
+  }
   /// `dt` toward a bend of `want` radians, in steps short enough that a
   /// long frame never throws it
   pub fn to(t:*Tug,want:f32,dt:f32)void{
+    t.since=@min(t.since+dt,lib.vertex.noPluck);
     // the spring's angular frequency, and the time left to step
     const w=tugFreq*m.tau;
     var left=@min(dt,tugLongest);

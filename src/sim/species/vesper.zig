@@ -30,6 +30,8 @@ pub const def:species.Species=.{
     .leaves=5,.leafLen=0.28,.leafW=0.07,.leafDroop=0.5,
     // a five-rayed star
     .petals=5,.bloomR=0.17,.thorns=0,.tendrils=0,
+    // its yield: three beads of light held round its core
+    .pods=3,.podR=0.03,
     .shoots=.{0,0},
     // dusk: a deep violet body, dusky leaves, a pale gold evening light
     .stemCol=color.rgb(0.42,0.3,0.78),.leafCol=color.rgb(0.36,0.5,0.62),.bloomCol=color.rgb(1.0,0.86,0.6),

@@ -22,6 +22,8 @@ pub const shoots=@import("meshgen/shoots.zig");
 pub const flowers=@import("meshgen/flowers.zig");
 /// drifts: floaters held up by a sap lantern, filaments trailing below
 pub const drifts=@import("meshgen/drifts.zig");
+/// pods: a plant's yield ripening on it, beads of sap where it is plucked
+pub const pods=@import("meshgen/pods.zig");
 /// the meshgen tests: a blade's body and a confluence's growth keys
 pub const tests=@import("meshgen/tests.zig");
 /// a curved blade drooping out from its base (leaf or petal)
@@ -179,5 +181,6 @@ test{
   _=shoots;
   _=flowers;
   _=drifts;
+  _=pods;
   _=tests;
 }

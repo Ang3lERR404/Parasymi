@@ -82,8 +82,6 @@ const feedRate:f32=0.4;
 const carry:f32=2;
 /// plucked, the wolf starts this far (m) from its footprint's edge
 const standBack:f32=1.2;
-/// the plucking state's plucks, what the plant is ripened to each loop
-const ripe:f32=m.f(lib.pluck.most)+0.5;
 /// the specimen's seed (its variant, its phase)
 const seed:f32=0.37;
 /// what stands alone
@@ -121,13 +119,16 @@ pub const State=union(enum){
   /// a plant grown and ripe, plucked by the wolf (drawn beside it) as
   /// harvest does it in play, ripened afresh each loop
   pluck,
+  /// a plant grown, its yield ripening from nothing to full in its pods,
+  /// again and again
+  ripen,
   /// shown as set from outside (the animation editor, tools/animedit.zig)
   look:Look,
   /// a name, a share of growth (`0.4`) or a span (`0.2..0.8`)
   pub fn parse(s:[]const u8)error{BadState}!State{
     if(eql(u8,s,"mature") or eql(u8,s,"idle"))return.{.held=1};
-    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck},s))|k|return switch(k){
-      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,
+    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck,ripen},s))|k|return switch(k){
+      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,.ripen=>.ripen,
     };
     if(indexOf(u8,s,".."))|dots|{
       // where the dots are, and the shares either side of them
@@ -142,7 +143,7 @@ pub const State=union(enum){
   pub fn suits(s:State,what:Subject)bool{
     return switch(s){
       .grow,.span,.held,.turn,.look=>true,
-      .wither,.flow,.drain,.dark,.live,.pluck=>what==.plant,
+      .wither,.flow,.drain,.dark,.live,.pluck,.ripen=>what==.plant,
       .active=>what==.structure,
     };
   }
@@ -157,6 +158,8 @@ pub const Look=struct{
   flow:f32=0,
   /// how healthy, 0..1
   health:f32=1,
+  /// how ripe its yield, 0..1 of its cap (its pods swell with it)
+  ripe:f32=0,
   /// whether its radiance network is lit
   radiating:bool=true
 };
@@ -183,7 +186,7 @@ pub const Specimen=struct{
   /// plucking it), or what the structure draws and the resource nodes round it
   pub fn only(s:*const Specimen,arena:Allocator)Allocator.Error!renderer.Only{
     switch(s.what){
-      .plant=>|sp|return.{.species=sp,.parts=if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.bellyLump,.itemPod,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale}},
+      .plant=>|sp|return.{.species=sp,.parts=if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale}},
       .structure=>|k|{
         // the meshes, gathered
         var list:std.ArrayList(meshlib.Id)=.empty;
@@ -308,13 +311,15 @@ pub const Specimen=struct{
         p.items(.flow)[0]=l.flow;
         p.items(.health)[0]=l.health;
         p.items(.span)[0]=never;
+        // its yield, as ripe as its look (plucked, ripened full below)
+        if(s.state!=.pluck)p.items(.essence)[0]=l.ripe*def.manaCap;
         // plucked: once the last pluck is done and its end held, ripened
         // afresh and harvested again
         if(s.state==.pluck){
           if(g.pluck!=null)s.feedT=holdTime;
           s.feedT-=dt;
           if(s.feedT<=0){
-            p.items(.essence)[0]=ripe;
+            p.items(.essence)[0]=def.manaCap;
             actions.harvest(g,s.at);
             s.feedT=holdTime;
           }
@@ -429,6 +434,7 @@ pub const Specimen=struct{
       .flow=>.{.flow=0.5-0.5*@cos(s.t/s.loop()*m.tau)},
       .drain=>.{.mana=1-k},
       .dark=>.{.radiating=false},
+      .ripen=>.{.ripe=k},
       .live=>.{.growth=0},
       .look=>|l|l,
       .active,.turn,.pluck=>.{},

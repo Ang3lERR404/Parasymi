@@ -24,6 +24,8 @@ pub const def:species.Species=.{
     .stemH=0.6,.stemR=0.045,.segments=0,.curl=0,.wobble=0,
     .leaves=0,.leafLen=0,.leafW=0,.leafDroop=0,
     .petals=0,.bloomR=0.06,.thorns=3,.tendrils=5,.shoots=.{0,0},
+    // its yield ripens in the sacs in its cage, one a sac
+    .pods=3,
     .stemCol=color.rgb(0.56,0.54,0.62),.leafCol=color.rgb(0.68,0.62,0.82),.bloomCol=color.rgb(0.46,0.62,0.86),
   },
 };

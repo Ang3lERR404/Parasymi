@@ -56,6 +56,8 @@ const parts=struct{
   pub const nodeLey=@import("meshes/node_ley.zig");
   /// a fallen fragment of starlight, a small faceted bipyramid
   pub const mote=@import("meshes/mote.zig");
+  /// what bursts out where a plant's yield comes loose: motes and drops of it
+  pub const pluckBurst=@import("meshes/pluck_burst.zig");
   // structures
   /// a living root conduit digging up out of the soil, running straight
   pub const conduit=@import("meshes/conduit.zig");
