@@ -93,10 +93,10 @@ pub fn put(g:*Game,h:[2]i32)Allocator.Error!void{
       .x=h[0],.y=h[1],.chunk=undefined,.tile=undefined,.sp=sp,.seed=g.rng.float(),.dir=g.placeDir,
     })
   else if(st.kindOf(item))|k |
-    try g.structs.place(g.gpa,&g.world,h[0],h[1],k,g.placeDir,g.rng.float())
+    try g.structs.placeNear(g.gpa,&g.world,st.Structures.spot(k,h,g.hoverAt),k,g.placeDir,g.rng.float())
   else false;
   if(ok){
-    if(st.kindOf(item)!=null)g.structs.sprout(g.structs.at(&g.world,h[0],h[1]).?);
+    if(st.kindOf(item)!=null)g.structs.sprout(.of(g.structs.list.items.len-1));
     _=g.player.inv.take(item,1);
     g.plantCd=putCooldown;
     g.linger=lingerPut;
@@ -108,7 +108,7 @@ pub fn canPut(g:*const Game,h:[2]i32)bool{
   // the hotbar's chosen item; none, and nothing can be put
   const item=g.selected() orelse return false;
   if(item.plants())|sp|return g.plants.canPlaceNear(&g.world,Plants.spot(sp,h,g.hoverAt),sp);
-  if(st.kindOf(item))|k|return g.structs.canPlace(&g.world,h[0],h[1],k);
+  if(st.kindOf(item))|k|return g.structs.canPlaceNear(&g.world,st.Structures.spot(k,h,g.hoverAt),k);
   return false;
 }
 /// queues weave `i` (an index into `craft.hand`) in the wolf's own hands,

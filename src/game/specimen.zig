@@ -490,7 +490,7 @@ test"a structure alone draws only the meshes it declares"{
       parts.clear();
       for(g.structs.list.items)|*s|{
         // its centre on the ground
-        const ctr=m.footprintCentre(s.x,s.y,s.def().size,g.heightAt(s.x,s.y));
+        const ctr=s.at+m.v3(0,g.heightAt(s.x,s.y),0);
         try st.emit(s,&parts,ctr,t);
       }
       for(parts.lists,0..)|l,slot|if(l.items.len>0){

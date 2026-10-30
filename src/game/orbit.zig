@@ -165,7 +165,7 @@ pub const Orbit=struct{
           // the structure's kind
           const def=s.def();
           // its centre, halfway up its height and over any hover
-          const c=m.footprintCentre(s.x,s.y,def.size,g.heightAt(s.x,s.y)+def.tall*tallFocus+def.hover);
+          const c=s.at+m.v3(0,g.heightAt(s.x,s.y)+def.tall*tallFocus+def.hover,0);
           // how far it is from the wolf
           const d=m.len(c-wolf);
           if(d<near){near=d;best=c;}

@@ -228,3 +228,21 @@ test"uprooting keeps the others in the order they were put down, each found on i
   try testing.expect(w.occAt(0,0).asStructure()==null and w.occAt(3,0).asStructure()==null);
   try expectIndexed(&ss);
 }
+test"floating structures hang off the grid, a tile's width apart at least"{
+  // the test allocator, a small loaded world, and the structures
+  const gpa=testing.allocator;
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  try w.stream(.{.x=0,.y=0},1,100);
+  var ss:Structures=.{};
+  defer ss.deinit(gpa);
+  // one hung off its tile's centre keeps its own point, found by the tile under it
+  try testing.expect(try ss.placeNear(gpa,&w,m.v3(2.2,0,3.9),.weftstone,0,0));
+  try testing.expectEqual(@as(f32,2.2),ss.get(.of(0)).at[0]);
+  try testing.expect(ss.floaterAt(2,3)!=null);
+  // too near it, or over its tile, it may not hang; a metre off it may
+  try testing.expect(!ss.canPlaceNear(&w,m.v3(2.9,0,3.9),.weftstone));
+  try testing.expect(!ss.canPlaceNear(&w,m.v3(2.95,0,3.05),.weftstone));
+  try testing.expect(try ss.placeNear(gpa,&w,m.v3(3.25,0,3.9),.weftstone,0,0));
+  try testing.expect(ss.floaterAt(3,3)!=null);
+}

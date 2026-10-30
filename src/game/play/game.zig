@@ -299,10 +299,19 @@ pub const Game=struct{
     // the ray through the cursor, the floater it touches first, and how far along it the march has come
     const ray=g.cam.ray(cursor[0],cursor[1],screen[0],screen[1]);
     const touched=g.plants.floaterOnRay(ray.o,ray.d,Hang,.{.g=g});
+    // and the floating structure it touches first
+    const touchedSt=g.structs.floaterOnRay(ray.o,ray.d,Ground,.{.g=g});
     var t:f32=0;
     // how far the march goes at most
     const maxT=g.cam.dist*pickRangeMult;
     while(t<maxT):(t+=pickStep){
+      if(touchedSt)|f|if(f.t<=t and (if(touched)|p|f.t<=p.t else true)){
+        // a floating structure before the ground (and any floating plant): its tile and where it stands
+        const s=g.structs.get(f.id);
+        g.hover=.{s.x,s.y};
+        g.hoverAt=s.at;
+        return;
+      };
       if(touched)|f|if(f.t<=t){
         // a floater before the ground: its tile and where it stands
         g.hover=.{g.plants.list.items(.x)[f.id.idx()],g.plants.list.items(.y)[f.id.idx()]};
@@ -320,6 +329,13 @@ pub const Game=struct{
       }
     }
   }
+  /// the ground's height under each floating structure, for the cursor to touch it
+  const Ground=struct{
+    /// the garden they hang in
+    g:*const Game,
+    /// the ground's height at tile (`x`, `y`)
+    pub fn at(h:Ground,x:i32,y:i32)f32{return h.g.heightAt(x,y);}
+  };
   /// where each floating plant hangs, still, for the cursor to touch
   const Hang=struct{
     /// the garden they hang in

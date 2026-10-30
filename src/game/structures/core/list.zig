@@ -30,6 +30,11 @@ const freshState=lib.structures.structure.freshState;
 const reg=lib.structures.reg;
 /// an id once a slot before it is taken out
 const slotDown=lib.structures.structure.slotDown;
+/// how close two floating structures may hang, centre to centre (m): as
+/// close as on neighbouring tiles
+pub const floatGap=1.0;
+/// how near a cursor ray must pass a floating structure to touch it (m)
+pub const floatTouch=0.7;
 /// every structure standing in the garden, in the order put down (the
 /// order they tick in), with the indexes kept beside it
 pub const Structures=struct{
@@ -57,43 +62,116 @@ pub const Structures=struct{
   /// the structure at slot `id`, to read or change in place
   pub fn get(ss:*Structures,id:Id)*Structure{return&ss.list.items[id.idx()];}
   /// whether a structure of kind `k` may go down at tile `wx`,`wy`: a
-  /// floater over any streamed tile without another floater, anything
-  /// else on a footprint free and of ground it may stand on
+  /// floater at the tile's centre, anything else on a footprint free and of
+  /// ground it may stand on
   pub fn canPlace(ss:*const Structures,w:*const World,wx:i32,wy:i32,k:Kind)bool{
-    if(defs.get(k).floating){
-      // over any tile, whatever stands on it, but not over another
-      _=w.chunkOfTile(wx,wy) orelse return false;
-      return ss.floaterAt(wx,wy)==null;
-    }
+    if(defs.get(k).floating)return ss.canFloat(w,m.tileCentre(wx,wy,0));
     return switch(k){
       inline else=>|t|w.footprintFree(wx,wy,defs.get(t).size,if(comptime reg.has(t,"ground"))reg.module(t).ground else anyTile),
     };
   }
-  /// put a fresh structure of kind `k` down at `wx`,`wy`, facing `dir`,
-  /// marking its footprint (unless it floats) and indexing it. Returns
-  /// false, changing nothing, if it may not go there.
+  /// whether a structure of kind `k` may go down at ground point `pt`: a
+  /// floater right there, anything else on the footprint centred nearest it
+  pub fn canPlaceNear(ss:*const Structures,w:*const World,pt:m.V3,k:Kind)bool{
+    if(defs.get(k).floating)return ss.canFloat(w,pt);
+    // the footprint's top-left tile
+    const t=anchor(pt,k);
+    return ss.canPlace(w,t[0],t[1],k);
+  }
+  /// the anchor tile a structure of kind `k` takes for ground point `pt`:
+  /// the tile under a floater, else the top-left of the footprint centred nearest it
+  fn anchor(pt:m.V3,k:Kind)[2]i32{
+    // how far its footprint's centre is from its top-left tile's
+    const half=if(defs.get(k).floating)0 else m.f(defs.get(k).size-1)*0.5;
+    return m.tileAt(pt-m.v3(half,0,half));
+  }
+  /// whether a floating structure may hang at ground point `pt`: over a
+  /// streamed tile, whatever stands on it, no nearer another floating
+  /// structure than `floatGap`, and not over the same tile as one (each is
+  /// found, and held by a `Ref`, by the tile under it)
+  fn canFloat(ss:*const Structures,w:*const World,pt:m.V3)bool{
+    // the tile under the point
+    const t=m.tileAt(pt);
+    _=w.chunkOfTile(t[0],t[1]) orelse return false;
+    if(ss.floaterAt(t[0],t[1])!=null)return false;
+    for(ss.list.items)|*s|if(s.def().floating){
+      // the way to that one, flat on the ground
+      const d=(s.at-pt)*m.v3(1,0,1);
+      if(m.dot(d,d)<floatGap*floatGap)return false;
+    };
+    return true;
+  }
+  /// where a structure of kind `k` stands when put down from the cursor,
+  /// over tile `t` at ground point `pt`: a floater right at `pt`, off the
+  /// grid; anything else on the footprint whose top-left is `t`
+  pub fn spot(k:Kind,t:[2]i32,pt:m.V3)m.V3{
+    return if(defs.get(k).floating)m.v3(pt[0],0,pt[2])else m.footprintCentre(t[0],t[1],defs.get(k).size,0);
+  }
+  /// put a fresh structure of kind `k` down at `wx`,`wy` (a floater at the
+  /// tile's centre), facing `dir`, marking its footprint (unless it floats)
+  /// and indexing it. Returns false, changing nothing, if it may not go there.
   pub fn place(ss:*Structures,gpa:Allocator,w:*World,wx:i32,wy:i32,k:Kind,dir:m.Dir,seed:f32)Allocator.Error!bool{
-    if(!ss.canPlace(w,wx,wy,k))return false;
-    // the slot it will take: the end of the list
+    return ss.placeNear(gpa,w,spot(k,.{wx,wy},m.tileCentre(wx,wy,0)),k,dir,seed);
+  }
+  /// put a fresh structure of kind `k` down at ground point `pt`: a floater
+  /// hangs right there, anything else takes the footprint centred nearest
+  /// `pt`; as `place`.
+  pub fn placeNear(ss:*Structures,gpa:Allocator,w:*World,pt:m.V3,k:Kind,dir:m.Dir,seed:f32)Allocator.Error!bool{
+    if(!ss.canPlaceNear(w,pt,k))return false;
+    // its anchor tile, where it stands, and the slot it will take: the end of the list
+    const def=defs.get(k);
+    const t=anchor(pt,k);
+    const stands=if(def.floating)m.v3(pt[0],0,pt[2])else m.footprintCentre(t[0],t[1],def.size,0);
     const idx=Id.of(ss.list.items.len);
     try ss.list.ensureUnusedCapacity(gpa,1);
     try ss.kin.ensureUnusedCapacity(gpa,1);
     try ss.where.ensureUnusedCapacity(gpa,1);
-    ss.list.appendAssumeCapacity(.{.x=wx,.y=wy,.dir=dir,.seed=seed,.state=freshState(k)});
+    ss.list.appendAssumeCapacity(.{.x=t[0],.y=t[1],.at=stands,.dir=dir,.seed=seed,.state=freshState(k)});
     ss.kin.appendAssumeCapacity(.{});
     ss.where.putAssumeCapacityNoClobber(ss.get(idx).ref(),idx);
-    if(!defs.get(k).floating)w.setFootprint(wx,wy,defs.get(k).size,Occ.structure(idx));
+    if(!def.floating)w.setFootprint(t[0],t[1],def.size,Occ.structure(idx));
     return true;
   }
+  /// the floating structure a ray from `o` along unit `d` passes nearest
+  /// its start, within `floatTouch` of where it hangs (its point, `hover`
+  /// over the ground `groundOf` gives), and how far along the ray that is
+  pub fn floaterOnRay(ss:*const Structures,o:m.V3,d:m.V3,comptime Ground:type,ground:Ground)?Touch{
+    // the nearest so far
+    var best:?Touch=null;
+    for(ss.list.items,0..)|*s,i|if(s.def().floating){
+      // where it hangs, how far along the ray it lies, and how far off it
+      const c=s.at+m.v3(0,@max(ground.at(s.x,s.y),0)+s.def().hover,0);
+      const t=m.dot(c-o,d);
+      if(t<=0)continue;
+      if(best)|b|if(t>=b.t)continue;
+      const off=c-(o+d*m.splat3(t));
+      if(m.dot(off,off)>floatTouch*floatTouch)continue;
+      best=.{.id=Id.of(i),.t=t};
+    };
+    return best;
+  }
+  /// a floating structure a ray touches, and how far along it
+  pub const Touch=struct{
+    /// the structure
+    id:Id,
+    /// how far along the ray (m)
+    t:f32,
+  };
   /// put a saved structure back as it was (inventory, state, whom it
   /// depends on), owning what its state holds; once all are back,
   /// `relink`. Returns whether it fit (if not, `s` is still the caller's).
   pub fn restore(ss:*Structures,gpa:Allocator,w:*World,s:Structure)Allocator.Error!bool{
-    if(!try ss.place(gpa,w,s.x,s.y,s.kind(),s.dir,s.seed))return false;
+    // where it stood: a floater's own point if it lies over its tile (a
+    // garden saved before floaters left the grid has none), else its tile's
+    const own=s.def().floating and m.tileAt(s.at)[0]==s.x and m.tileAt(s.at)[1]==s.y;
+    if(!try ss.placeNear(gpa,w,if(own)s.at else spot(s.kind(),.{s.x,s.y},m.tileCentre(s.x,s.y,0)),s.kind(),s.dir,s.seed))return false;
     // the fresh one just put down, overwritten by the saved one
     const put=&ss.list.items[ss.list.items.len-1];
     put.deinit(gpa);
+    // (keeping where it was put)
+    const stands=put.at;
     put.*=s;
+    put.at=stands;
     return true;
   }
   /// rebuild who is whose child from each structure's `parent`

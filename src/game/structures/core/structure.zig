@@ -62,6 +62,9 @@ pub const Structure=struct{
   x:i32,
   /// its footprint's north row (tiles)
   y:i32,
+  /// where it stands across the ground (y 0): a floater's own free point,
+  /// off the grid, else its footprint's centre
+  at:m.V3=@splat(0),
   /// the way it faces (R turns it)
   dir:m.Dir=0,
   /// its own seed: how it sways and varies from its neighbours

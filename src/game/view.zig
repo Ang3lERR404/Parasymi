@@ -455,9 +455,9 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     }
   }
 }
-/// a structure's centre on the ground (metres), its footprint's middle
+/// a structure's centre on the ground (metres): its footprint's middle, or a floater's own point
 fn structCentre(g:*const Game,s:*const st.Structure)m.V3{
-  return m.footprintCentre(s.x,s.y,s.def().size,g.heightAt(s.x,s.y));
+  return s.at+m.v3(0,g.heightAt(s.x,s.y),0);
 }
 /// structures breathe and glow with their activity; each kind adds its own
 /// extras through its `emit` hook.
@@ -550,7 +550,7 @@ fn ghost(g:*Game,tf:f32)Allocator.Error!void{
   const k=st.kindOf(item) orelse return;
   const def=st.defs.get(k);
   // (a floating one where it will hang)
-  const ctr=m.footprintCentre(h[0],h[1],def.size,g.heightAt(h[0],h[1])+ghostLift+def.hover);
+  const ctr=st.Structures.spot(k,h,g.hoverAt)+m.v3(0,g.heightAt(h[0],h[1])+ghostLift+def.hover,0);
   // its tint: fits or blocked
   const tint=if(ok)ghostFits else ghostBlocked;
   try g.parts.emit(def.preview orelse def.mesh,m.chain(&.{m.translate(ctr),m.rotY(m.dirYaw(g.placeDir)),m.scale3(m.splat3(ghostScale))}),.{.glow=ghostGlow+ghostPulse*@sin(tf*ghostPulseRate),.tint=tint,.ghost=true});
