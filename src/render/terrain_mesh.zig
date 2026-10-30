@@ -6,7 +6,8 @@
 //! top (grass on every tile but soil, clods and stones on soil) is not meshed here: each such
 //! tile gets one `DetailTile` record and the GPU grows the detail from it.
 //! Border neighbours come from the generator directly, so a chunk can be
-//! meshed without its neighbours being loaded.
+//! meshed without its neighbours being loaded (sealed as it is, once the
+//! ley lines have sealed).
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -70,6 +71,10 @@ const Ring=struct{
   col:[w*w]color.Rgb=undefined,
   /// ley intensity 0..1
   ley:[w*w]f32=undefined,
+  /// how deep into a ley line each tile lies: 0 off it .. 1 `lineReach`
+  /// tiles or more in from its edge (the line seals from its edges in to
+  /// its heart along it, terrain.frag)
+  depth:[w*w]f32=@splat(0),
   /// where tile (lx, ly) sits in the ring (-1 .. sizeTiles each way)
   fn at(_:*const Ring,lx:i32,ly:i32)usize{return@intCast((ly+1)*w+(lx+1));}
 };
@@ -98,8 +103,9 @@ fn fill(r:*Ring,seed:u64,c:*const ck.Chunk)void{
         r.kind[i]=c.kind[t];
         r.ley[i]=m.clamp01(c.leyCap[t]/gen.leyMax);
       }else{
-        // the generator's sample of the tile beyond
-        const s=gen.sample(seed,wx,wy);
+        // the generator's sample of the tile beyond (its ley line sealed, as this chunk's are)
+        const raw=gen.sample(seed,wx,wy);
+        const s=if(c.sealed)gen.sealOf(raw)else raw;
         r.h[i]=s.height;
         r.kind[i]=s.kind;
         r.ley[i]=m.clamp01(s.ley/gen.leyMax);
@@ -110,6 +116,44 @@ fn fill(r:*Ring,seed:u64,c:*const ck.Chunk)void{
       r.col[i]=color.rgb(b.r*jitter,b.g*jitter,b.b*jitter);
     }
   }
+  if(!c.sealed)lineDepth(r,seed,c);
+}
+/// how many tiles in from a ley line's edge its depth is full
+const lineReach=2;
+/// fills each ring tile's depth into its ley line: the distance from its
+/// centre to the nearest tile off the line, over `lineReach` (the ring's
+/// own kinds, and the generator's beyond it)
+fn lineDepth(r:*Ring,seed:u64,c:*const ck.Chunk)void{
+  // how far across the tiles looked through are: the ring and `lineReach` beyond
+  const ew=Ring.w+2*lineReach;
+  // whether each is on a ley line
+  var on:[ew*ew]bool=undefined;
+  for(0..ew)|y|for(0..ew)|x|{
+    // its place in the ring (-1-lineReach ..)
+    const lx=@as(i32,@intCast(x))-1-lineReach;
+    const ly=@as(i32,@intCast(y))-1-lineReach;
+    const inRing=lx>=-1 and lx<=ck.sizeTiles and ly>=-1 and ly<=ck.sizeTiles;
+    on[y*ew+x]=if(inRing)r.kind[r.at(lx,ly)]==.ley else gen.sample(seed,c.originX()+lx,c.originY()+ly).kind==.ley;
+  };
+  for(0..Ring.w)|y|for(0..Ring.w)|x|{
+    // this tile among those looked through
+    const ex=x+lineReach;
+    const ey=y+lineReach;
+    if(!on[ey*ew+ex])continue;
+    // the nearest tile off the line (squared tiles), searched round it
+    var near:i32=lineReach*lineReach;
+    var dy:i32=-lineReach;
+    while(dy<=lineReach):(dy+=1){
+      // the column offset being looked at
+      var dx:i32=-lineReach;
+      while(dx<=lineReach):(dx+=1){
+        // the tile there
+        const k=@as(usize,@intCast(@as(i32,@intCast(ey))+dy))*ew+@as(usize,@intCast(@as(i32,@intCast(ex))+dx));
+        if(!on[k])near=@min(near,dx*dx+dy*dy);
+      }
+    }
+    r.depth[y*Ring.w+x]=@sqrt(m.f(near))/lineReach;
+  };
 }
 /// a point of the half-tile grid (chunk-local, tile lx spans 2lx..2lx+2,
 /// its centre at 2lx+1): shared by the tiles that meet there
@@ -141,6 +185,8 @@ const Shared=struct{
   col:color.Rgb,
   /// their average ley intensity, 0..1
   ley:f32,
+  /// their average depth into a ley line, 0..1
+  depth:f32,
 };
 /// a shared point among the tiles `ts`: their average height, colour and ley
 fn shared(r:*const Ring,ts:[]const usize)Shared{
@@ -150,6 +196,7 @@ fn shared(r:*const Ring,ts:[]const usize)Shared{
   var cg:f32=0;
   var cb:f32=0;
   var ley:f32=0;
+  var depth:f32=0;
   // how many tiles share it
   const n=m.f(ts.len);
   for(ts)|t|{
@@ -158,8 +205,9 @@ fn shared(r:*const Ring,ts:[]const usize)Shared{
     cg+=r.col[t].g;
     cb+=r.col[t].b;
     ley+=r.ley[t];
+    depth+=r.depth[t];
   }
-  return.{.h=h/n,.col=color.rgb(cr/n,cg/n,cb/n),.ley=ley/n};
+  return.{.h=h/n,.col=color.rgb(cr/n,cg/n,cb/n),.ley=ley/n,.depth=depth/n};
 }
 /// appends one ground vertex: where it is, its normal, colour and info
 fn put(out:*std.ArrayList(TV),gpa:Allocator,p:V3,n:V3,c:color.Rgba8,info:[4]u8)Allocator.Error!void{
@@ -222,6 +270,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
     var gc:[3][3]color.Rgba8=undefined;
     var gn:[3][3]V3=undefined;
     var gl:[3][3]u8=undefined;
+    var gd:[3][3]u8=undefined;
     for([_][2]usize{.{0,0},.{2,0},.{0,2},.{2,2},.{1,1}})|g|{
       // which corner or centre this is, across and down
       const gx=g[0];
@@ -233,6 +282,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
       const s=grid.at(px,py);
       // ley fades across tile borders like the colour does
       gl[gy][gx]=m.unorm8(s.ley);
+      gd[gy][gx]=m.unorm8(s.depth);
       gh[gy][gx]=s.h;
       gc[gy][gx]=s.col.toRgba8(255);
       // central differences over half-tile steps
@@ -250,7 +300,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
       for([_][2]usize{.{1,1},corners[j],corners[(j+1)%4]})|cn|{
         // this vertex: the centre or a corner, at its height
         const at=v3(x0+0.5*m.f(cn[0]),gh[cn[1]][cn[0]],z0+0.5*m.f(cn[1]));
-        try put(out,gpa,at,gn[cn[1]][cn[0]],gc[cn[1]][cn[0]],.{info[0],gl[cn[1]][cn[0]],info[2],info[3]});
+        try put(out,gpa,at,gn[cn[1]][cn[0]],gc[cn[1]][cn[0]],.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]});
       }
     }
     // the detail on it (grass, or clods and stones on soil) is grown on the

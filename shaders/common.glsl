@@ -1,4 +1,4 @@
-//! shared by every world pass: push constants, garden wind, growth, gathering, halo spiral and shading (shadows and points of light from the engine's light.glsl).
+//! shared by every world pass: push constants, the sky's shift, garden wind, growth, gathering, halo spiral, the plexus and shading (shadows and points of light from the engine's light.glsl).
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference_uvec2 : require
 #ifdef SHADOW
@@ -11,7 +11,7 @@ layout(push_constant) uniform Push {
   vec4 fog;       // rgb fog/sky colour (linear), w fog density
   vec4 misc;      // x veil 0..1, y ley sight 0/1, zw hovered tile (x,z)
   vec4 sun;       // xyz direction toward the key light (sun or moon), w daylight 0..1
-  vec4 feet[2];   // the wolf's paws: xyz world position, w facing yaw
+  vec4 feet[2];   // the wolf's paws: xyz world position; [0].w facing yaw, [1].w the sky's shift
   vec4 view;      // xy camera target (x,z), z fog-out start, w fog-out end (horizontal)
   uvec2 bones;    // the parts pass: the address of this frame's bones (part.vert)
   uvec2 light;    // the address of this frame's Lighting
@@ -23,6 +23,13 @@ layout(push_constant) uniform Push {
 // far the veil has drawn over it (0 none .. 1 full)
 #define DAYLIGHT pc.sun.w
 #define VEIL pc.misc.x
+// how far the unforming has shifted the sky, 0 the old one .. 1 the ley's
+// glow for good (sky.zig `Sky.shift`); the ley lines seal over part of it
+#define SHIFT pc.feet[1].w
+const float SEAL_FROM = 0.15;  // (unforming.zig sealFrom; must match)
+const float SEAL_SPAN = 0.6;   // (unforming.zig sealSpan; must match)
+// how far the ley lines have sealed, 0 open .. 1 closed
+float sealed() { return clamp((SHIFT - SEAL_FROM) / SEAL_SPAN, 0.0, 1.0); }
 // a light or a colour that turns with the day: `night` by night, `day` at noon
 vec3 byDay(vec3 night, vec3 day) { return mix(night, day, DAYLIGHT); }
 
@@ -90,6 +97,45 @@ bool isLantern(float form, int part, float h) { return part == PART_BLOOM && h <
 
 // tile kinds (world tile `Kind`, info.x * 255; must match)
 const int TILE_SOIL = 0;
+
+float hash12(vec2 p) {
+  vec3 q = fract(vec3(p.xyx) * 0.1031);
+  q += dot(q, q.yzx + 33.33);
+  return fract((q.x + q.y) * q.z);
+}
+
+float segDist(vec2 p, vec2 a, vec2 b) {
+  vec2 ab = b - a;
+  float h = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-6), 0.0, 1.0);
+  return length(p - a - ab * h);
+}
+
+// faint points drifting over a plane (`wp`, two cells per unit), joined by
+// threads of light where they come near one another (a plexus): over the
+// ley lines (terrain.frag), and across the shifted sky (sky.frag)
+float plexus(vec2 wp, float t) {
+  vec2 g = wp * 2.0;
+  vec2 id = floor(g);
+  vec2 pts[9];
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+    vec2 c = id + vec2(i, j);
+    float r1 = hash12(c), r2 = hash12(c + 17.1), r3 = hash12(c + 41.7);
+    vec2 drift = vec2(sin(t * (0.15 + 0.2 * r1) + r2 * TAU), cos(t * (0.13 + 0.2 * r3) + r1 * TAU));
+    pts[(j + 1) * 3 + (i + 1)] = c + 0.5 + 0.36 * drift;
+  }
+  float v = 0.0;
+  for (int k = 0; k < 9; k++) {
+    float d = length(g - pts[k]);
+    v += (1.0 - smoothstep(0.02, 0.07, d)) * 0.9;
+    for (int l = k + 1; l < 9; l++) {
+      float len = length(pts[k] - pts[l]);
+      float near = 1.0 - smoothstep(0.45, 0.95, len);
+      if (near <= 0.0) continue;
+      v += near * (1.0 - smoothstep(0.006, 0.02, segDist(g, pts[k], pts[l]))) * 0.45;
+    }
+  }
+  return v;
+}
 
 // light colours: the moon's cool blue (scaled down by night), the sun's warm
 // white, and the amber of sap (linear), the garden's one accent
@@ -282,14 +328,22 @@ vec3 srgb2lin(vec3 c) { return pow(c, vec3(GAMMA)); }
 // the key light's strength: the moon's by night, the sun's by day
 const float MOON_STRENGTH = 0.35;
 const float SUN_STRENGTH = 1.1;
-// the key light's colour and strength (the sun by day, the moon by night)
-vec3 keyLight() { return byDay(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH); }
+// the shifted sky's light (the ley's glow overhead): a deep violet by night,
+// a rose violet by day, softer than the sun (the whole sky glows)
+const vec3 LEYLIGHT_NIGHT = vec3(0.16, 0.11, 0.36);
+const vec3 LEYLIGHT_DAY = vec3(0.78, 0.55, 1.0);
+// the key light's colour and strength (the sun by day, the moon by night;
+// once shifted, the ley's glow)
+vec3 keyLight() { return mix(byDay(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH), byDay(LEYLIGHT_NIGHT, LEYLIGHT_DAY * 0.8), SHIFT); }
 
 // the ambient light: the sky's by day (veiled, toward violet), by night, the
 // ground's bounce (dimmed to this share by night), and how strong it all is
 const vec3 SKY_DAY = vec3(0.35, 0.40, 0.50);
 const vec3 SKY_VEILED = vec3(0.45, 0.30, 0.65);
 const vec3 SKY_NIGHT = vec3(0.07, 0.09, 0.18);
+// the shifted sky's: the ley's glow all round, by night and by day
+const vec3 SKY_LEY_NIGHT = vec3(0.1, 0.06, 0.22);
+const vec3 SKY_LEY_DAY = vec3(0.45, 0.3, 0.7);
 const vec3 GROUND_BOUNCE = vec3(0.12, 0.10, 0.08);
 const float GROUND_NIGHT = 0.3;
 const float AMBIENT = 0.55;
@@ -299,7 +353,7 @@ vec3 shadeLitWith(vec3 albedo, vec3 n, float sh, vec3 points) {
   float ndl = max(dot(n, SUN), 0.0);
   float day = DAYLIGHT;
   vec3 sky = mix(SKY_DAY, SKY_VEILED, VEIL);
-  sky = byDay(SKY_NIGHT, sky);
+  sky = mix(byDay(SKY_NIGHT, sky), byDay(SKY_LEY_NIGHT, SKY_LEY_DAY), SHIFT);
   vec3 ground = GROUND_BOUNCE * mix(GROUND_NIGHT, 1.0, day);
   vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * AMBIENT;
   vec3 sun = keyLight() * ndl * sh;
@@ -375,7 +429,7 @@ vec3 sapGlistenWith(vec3 n, vec3 V, vec3 wpos, vec3 obj, vec3 sapc, float clear,
   vec3 key = keyLight();
   vec3 c = key * (hardSpot(R, SUN, SUN_SPOT) * SUN_SPOT_GAIN + hardSpot(R, SUN, SUN_CORE) * SUN_CORE_GAIN) * sh;
   // the sky overhead, mirrored as a hard-edged window of light
-  vec3 sky = byDay(MOONLIGHT * 0.25, mix(SKY_DAY, SKY_VEILED, VEIL) + 0.5);
+  vec3 sky = mix(byDay(MOONLIGHT * 0.25, mix(SKY_DAY, SKY_VEILED, VEIL) + 0.5), byDay(SKY_LEY_NIGHT * 2.0, SKY_LEY_DAY + 0.4), SHIFT);
   c += sky * hardSpot(R, vec3(0.0, 1.0, 0.0), SKY_SPOT) * SKY_SPOT_GAIN;
   // every point of light nearby (blooms, motes) is mirrored too
   c += mirrored;

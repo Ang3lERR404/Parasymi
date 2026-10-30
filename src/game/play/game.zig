@@ -237,6 +237,9 @@ pub const Game=struct{
   /// the radiant plants as they were when it began, for their shards'
   /// flight (not saved)
   unformSources:std.ArrayList(lib.unforming.Source)=.empty,
+  /// the ley nodes shattered as the ley lines sealed, for their shards'
+  /// drift (not saved)
+  leyDrifts:std.ArrayList(lib.unforming.Drift)=.empty,
   /// a fresh game on world `seed`: the wolf set down on the first fertile
   /// tile found spiralling out from the origin, the chunks round it streamed,
   /// and the waking messages said.
@@ -278,6 +281,7 @@ pub const Game=struct{
   pub fn deinit(g:*Game)void{
     g.gardens.deinit(g.gpa);
     g.unformSources.deinit(g.gpa);
+    g.leyDrifts.deinit(g.gpa);
     for(&g.inst)|*l|l.deinit(g.gpa);
     g.far.deinit(g.gpa);
     g.parts.deinit();

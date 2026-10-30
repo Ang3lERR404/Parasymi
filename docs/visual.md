@@ -26,7 +26,10 @@ lowland).
   - grass blades on everything but soil (tile-coloured, wind-swayed);
   - clods and stones on soil.
 - **Ley:** ley lines carry a faint drifting plexus (a web of thin lines);
-  ley sight glows smoothly across tiles.
+  ley sight glows smoothly across tiles. At the unforming they seal: each
+  closes from its edges in to its heart (each vertex's depth into its
+  line, `terrain_mesh.lineDepth`, info.w), bare soil behind a bright
+  violet seam; their nodes' shards drift off and blink out.
 - `info.z = 255` marks the top surface.
 - Fog closes in before the edge of the world. Paws leave contact shadows.
 
@@ -274,7 +277,15 @@ The bloom post-process makes the glow round the glints.
 ## Sky
 - A gradient dome, sun and moon, stars.
 - Star motes (faceted core, ring, needle rays) turn, twinkle, hover and
-  trail echoes while falling.
+  trail echoes while falling. At the unforming each shatters into 6
+  crystal shards of its warm light, flung out and fading (1.4 s).
+- **Shifted** (after the unforming, `SHIFT` in common.glsl, the paws'
+  spare push slot): the ley's glow. No sun, moon or stars; veils of violet
+  light flowing slowly, warped through one another, their hue wandering;
+  a plexus drifting across the dome (the ley lines' own, laid on a plane
+  over the eye); a glowing band along the horizon; all pulsing as the ley
+  lines did. Rose violet by day, deep blue violet by night. The key light
+  and the ambient sky turn ley violet with it.
 - A low camera pitch widens the view toward the horizon.
 
 ## Lighting (engine `render/light.zig`)

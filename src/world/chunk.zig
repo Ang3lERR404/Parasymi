@@ -118,6 +118,9 @@ pub const Chunk=struct{
   gpuSlot:?MeshSlot=null,
   /// whether its ground must be meshed again
   dirty:bool=true,
+  /// whether its ley lines have sealed (the unforming: gen.sealOf); its
+  /// ground is meshed so, and so are its neighbours from the generator
+  sealed:bool=false,
   /// its first tile's world x
   pub fn originX(c:*const Chunk)i32{return c.at.x*sizeTiles;}
   /// its first tile's world y (z in the world)

@@ -1,5 +1,8 @@
 //! day/night cycle and starfall. At night starlight motes drift down near the
-//! player and hover over the ground until dawn burns them away.
+//! player and hover over the ground until dawn burns them away. The
+//! unforming shifts the sky for good (`Sky.shift`): it turns the ley's
+//! violet, glowing, its sun and moon gone, the glow's own turning the only
+//! tell of day and night; the motes shatter, and no star falls again.
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -56,35 +59,55 @@ const daySky=[3]f32{0.16,0.22,0.32};
 const veiledSky=[3]f32{0.2,0.12,0.38};
 /// the dusk glow near the horizon
 const duskSky=[3]f32{0.32,0.13,0.08};
+/// the shifted sky (after the unforming), the ley's glow: by night, a deep
+/// blue violet
+const leyNight=[3]f32{0.03,0.02,0.09};
+/// by day, a rose violet
+const leyDay=[3]f32{0.24,0.1,0.4};
+/// the shifted sky's key light circles this far off the zenith (its glow
+/// overhead, no sun to swing it)
+const leyLean:f32=0.3;
 /// the sky's clock: the time of day, which lights, colours and names it
 pub const Sky=struct{
   /// time of day 0..1 (0 midnight, 0.5 noon)
   tod:f32=startTod,
+  /// how far the unforming has shifted it, 0 the old sky .. 1 the ley's for
+  /// good (set each tick from the event, not saved)
+  shift:f32=0,
   /// moves the clock on by `dt` seconds, wrapping at a full day
   pub fn update(s:*Sky,dt:f32)void{s.tod=@mod(s.tod+dt/dayLen,1);}
   /// sun elevation -1..1
   pub fn elevation(s:*const Sky)f32{return-@cos(s.tod*m.tau);}
   /// how much daylight there is, 0..1 (eased in round dawn)
   pub fn daylight(s:*const Sky)f32{return m.smooth(m.clamp01((s.elevation()-dawnAt)/dawnSpan));}
-  /// direction toward the key light: the sun by day, a cool moon by night.
+  /// direction toward the key light: the sun by day, a cool moon by night;
+  /// once shifted, the glow overhead, circling slowly with the day
   pub fn lightDir(s:*const Sky)m.V3{
     // the clock as an angle, and the sun's elevation
     const az=s.tod*m.tau;
     const e=s.elevation();
-    if(e>sunAbove)return m.norm(m.v3(@cos(az)*sunSwing,@max(e,sunLow)+sunLift,sunLean));
-    return m.norm(m.v3(-@cos(az)*moonSwing,-e+moonLift,moonLean));
+    // the old sky's key light
+    const old=if(e>sunAbove)m.norm(m.v3(@cos(az)*sunSwing,@max(e,sunLow)+sunLift,sunLean))
+      else m.norm(m.v3(-@cos(az)*moonSwing,-e+moonLift,moonLean));
+    if(s.shift<=0)return old;
+    // the shifted sky's: its glow overhead
+    const glow=m.norm(m.v3(@cos(az)*leyLean,1,@sin(az)*leyLean));
+    return m.norm(old+(glow-old)*m.splat3(m.smooth(s.shift)));
   }
   /// linear sky/fog colour, with dusk glow near the horizon.
-  /// `veil` blends the day colour toward the celestial palette (0..1).
+  /// `veil` blends the day colour toward the celestial palette (0..1);
+  /// the shift turns it all to the ley's glow, rose by day, deep by night
   pub fn color(s:*const Sky,veil:f32)[3]f32{
     // daylight, and the sun's elevation
     const d=s.daylight();
     const e=s.elevation();
     // how much the dusk glows, near the horizon
     const dusk=m.clamp01(1-@abs(e)/duskBand)*duskGlow;
+    // how far it has shifted
+    const sh=m.smooth(s.shift);
     // the colour, built channel by channel
     var o:[3]f32=undefined;
-    inline for(0..3)|i|o[i]=m.lerp(m.lerp(nightSky[i],m.lerp(daySky[i],veiledSky[i],veil),d),duskSky[i],dusk);
+    inline for(0..3)|i|o[i]=m.lerp(m.lerp(m.lerp(nightSky[i],m.lerp(daySky[i],veiledSky[i],veil),d),duskSky[i],dusk),m.lerp(leyNight[i],leyDay[i],d),sh);
     return o;
   }
   /// the time of day's name: dawn or dusk near the horizon, else day or night
@@ -112,8 +135,14 @@ pub const Mote=struct{
   /// how far its sway has it off the point it fell toward
   sway:f32=0,
   /// being drawn to the wolf's chest (actions.catchStarlight moves it)
-  pulled:bool=false
+  pulled:bool=false,
+  /// seconds since it shattered (the unforming), < 0 whole; gone at `shatterTime`
+  shatter:f32=-1,
+  /// whether it is shattering
+  pub fn shattering(mo:Mote)bool{return mo.shatter>=0;}
 };
+/// seconds a shattered mote's shards take to fly apart and fade
+pub const shatterTime:f32=1.4;
 /// how many motes fall a second at full night (starfall tuning: tune here,
 /// not scattered through update)
 const spawnRate:f32=0.9;
@@ -170,10 +199,21 @@ pub const Starfall=struct{
   quiet:f32=0,
   /// the twinkle since `twinkled` last took it
   twinkle:?Twinkle=null,
+  /// no star falls any more: the unforming shattered them (set each tick
+  /// from the event)
+  stilled:bool=false,
   /// the most motes that may be about at once
   pub const max=80;
   /// frees the motes
   pub fn deinit(sf:*Starfall,gpa:Allocator)void{sf.motes.deinit(gpa);}
+  /// every mote shatters at once, and no star falls again (the unforming)
+  pub fn shatterAll(sf:*Starfall)void{
+    sf.stilled=true;
+    for(sf.motes.items)|*mo|{
+      mo.shatter=0;
+      mo.pulled=false;
+    }
+  }
   /// the twinkle since last asked, once
   pub fn twinkled(sf:*Starfall)?Twinkle{
     defer sf.twinkle=null;
@@ -185,7 +225,7 @@ pub const Starfall=struct{
     sf.listen(around,dt);
     // how deep the night is, 0..1
     const night=1-sky.daylight();
-    if(night>spawnNight and sf.motes.items.len<max){
+    if(!sf.stilled and night>spawnNight and sf.motes.items.len<max){
       sf.acc+=dt*spawnRate*night;
       while(sf.acc>=1):(sf.acc-=1){
         // a random bearing and distance round the wolf
@@ -203,6 +243,13 @@ pub const Starfall=struct{
     while(i<sf.motes.items.len){
       // the mote
       const mo=&sf.motes.items[i];
+      if(mo.shattering()){
+        // its shards flying apart, gone once faded
+        mo.shatter+=dt;
+        if(mo.shatter>=shatterTime){_=sf.motes.swapRemove(i);continue;}
+        i+=1;
+        continue;
+      }
       if(mo.pulled){i+=1;continue;}
       if(ground.walkable(m.tileOf(mo.pos[0]),m.tileOf(mo.pos[2])))|h|mo.ground=h;
       // its rest height, bobbing
@@ -233,10 +280,30 @@ pub const Starfall=struct{
     sf.quiet=sf.rng.range(twinkleGap[0],twinkleGap[1]);
     // the nearest mote, counted further off as it burns away
     var nearest:f32=twinkleNear;
-    for(sf.motes.items)|mo|nearest=@min(nearest,m.len(mo.pos-around)*mo.life+twinkleNear*(1-mo.life));
+    for(sf.motes.items)|mo|if(!mo.shattering()){nearest=@min(nearest,m.len(mo.pos-around)*mo.life+twinkleNear*(1-mo.life));};
     if(nearest<twinkleNear)sf.twinkle=.{.near=1-nearest/twinkleNear};
   }
 };
+test"the unforming shatters every mote at once, and no star falls again"{
+  // a starfall with a fixed seed, its motes, the sky at midnight and a flat world
+  var sf:Starfall=.{.rng=Rng.init(3)};
+  defer sf.deinit(testing.allocator);
+  for(0..5)|k|try sf.motes.append(testing.allocator,.{.pos=m.v3(m.f(k),1,0),.vy=0,.phase=0.1*m.f(k)});
+  const sky:Sky=.{.tod=0};
+  var w=World.init(testing.allocator,1);
+  defer w.deinit();
+  sf.shatterAll();
+  // a few seconds of the deepest night
+  for(0..240)|_|try sf.update(testing.allocator,&sky,m.v3(0,0,0),&w,1.0/60.0);
+  try testing.expectEqual(@as(usize,0),sf.motes.items.len);
+}
+test"the shifted sky is the ley's, with no sun to key it"{
+  // noon, the old sky and the shifted one
+  const old:Sky=.{.tod=0.5};
+  const shifted:Sky=.{.tod=0.5,.shift=1};
+  try testing.expect(shifted.color(0)[2]>shifted.color(0)[1]*2);
+  try testing.expect(shifted.lightDir()[1]>0.9 and old.color(0)[0]<shifted.color(0)[0]);
+}
 test"a near mote twinkles now and then, a far one never"{
   // a starfall with a fixed seed, and one mote far off
   var sf:Starfall=.{.rng=Rng.init(7)};

@@ -340,6 +340,7 @@ pub fn catchStarlight(g:*Game,dt:f32)void{
   while(i<g.stars.motes.items.len){
     // the mote, the way to the chest, and how far that is
     const mo=&g.stars.motes.items[i];
+    if(mo.shattering()){i+=1;continue;}
     const d=chest-mo.pos;
     const dist=m.len(d);
     if(dist<attract){

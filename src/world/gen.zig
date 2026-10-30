@@ -81,7 +81,14 @@ const slotL:f32=5;
 /// the node noise above which a patch tile bears one
 const slotAmount:f32=0.4;
 /// what the generator makes of one tile: its height, ground kind, ley and resource
-pub const Sample=struct{height:f32,kind:ck.Kind,ley:f32,res:ck.Res=0};
+pub const Sample=struct{height:f32,kind:ck.Kind,ley:f32,res:ck.Res=0,sealed:f32=leyBase};
+/// what a tile becomes once the ley lines seal (the unforming): a ley line
+/// closes to a scar of bare soil, holding only the ley a tile off the
+/// lines would, its shards gone; any other tile is as it was
+pub fn sealOf(s:Sample)Sample{
+  if(s.kind!=.ley)return s;
+  return.{.height=s.height,.kind=.soil,.ley=s.sealed,.res=0,.sealed=s.sealed};
+}
 /// the tile at world (wx, wy) for `seed`: its terraced height, kind, ley and
 /// any resource node; the same for the same seed and tile, whatever is loaded
 pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
@@ -117,7 +124,7 @@ pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
   const patch=noise.fbm(seed+%5,x/patchL,y/patchL,patchOct);
   // the resource it holds, if a node sits here
   const res:ck.Res=if(patch>patchAmount and slot>slotAmount)@intFromFloat(resMin+h*resSpread)else 0;
-  return.{.height=height,.kind=kind,.ley=ley,.res=res};
+  return.{.height=height,.kind=kind,.ley=ley,.res=res,.sealed=leyBase+vein*vein*vein};
 }
 /// the ground height of world tile (wx, wy)
 pub fn heightAt(seed:u64,wx:i32,wy:i32)f32{return sample(seed,wx,wy).height;}

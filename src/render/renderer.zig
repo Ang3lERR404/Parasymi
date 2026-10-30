@@ -109,7 +109,9 @@ pub const WorldPush=extern struct{
   misc:[4]f32,
   /// xyz the way toward the key light (sun or moon), w daylight 0..1
   sun:[4]f32,
-  /// the wolf's paws for contact shadows: world x, y, z, facing yaw
+  /// the wolf's paws for contact shadows: world x, y, z; the first's w its
+  /// facing yaw (both paws face alike), the second's w how far the
+  /// unforming has shifted the sky (common.glsl `SHIFT`)
   feet:[2][4]f32,
   /// x,y: what the camera looks at (x, z); z,w: horizontal distance from it
   /// fog starts closing in and where the world is fully hidden

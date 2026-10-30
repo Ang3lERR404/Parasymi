@@ -7,9 +7,15 @@
 //! (a `strangeSeed` the wolf may pick up). The symbiotic and parasitic
 //! lineages die with them: their plants wither, their structures unform
 //! (grown back down to nothing and gone), all but the arsthraxia, which
-//! evolves instead (`Msg.unform`). What is convergent or common stays.
+//! evolves instead (`Msg.unform`). What is convergent stays.
+//! The sky goes with them. Every starlight mote shatters at once and no
+//! star falls again; the sky shifts for good to the ley's violet glow, its
+//! sun and moon gone (`Sky.shift`); the ley lines seal up, closing to scars
+//! of bare soil (`gen.sealOf`), and the ley shard nodes on them shatter,
+//! their shards drifting off weightless and blinking out.
 //! The radiant plants' glitching is drawn on the GPU (plant.vert/.frag,
-//! `PlantInstance.glitch`).
+//! `PlantInstance.glitch`), the shifting sky and the closing ley lines too
+//! (sky.frag, terrain.frag, common.glsl `SHIFT`).
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -23,6 +29,10 @@ const rng=lib.engine.core.rng;
 const species=lib.species;
 /// the structures registry: what dies, the arsthraxia's evolving
 const st=lib.structures;
+/// the chunk grid: the ley tiles that seal
+const ck=lib.ck;
+/// the world generator: what a sealed tile becomes
+const gen=lib.gen;
 /// every player-facing string
 const txt=lib.txt;
 /// the scene's list of moving parts the shards and seed go into
@@ -60,6 +70,24 @@ const dieTime:f32=6;
 const fallTime:f32=2.2;
 /// the whole of the shattering: every plant gone and its shards arrived
 const shatterEnd:f32=spread+shatterTime+flyTime;
+/// seconds in that the sky begins to shift
+const shiftFrom:f32=1;
+/// seconds the sky takes to shift
+const shiftTime:f32=12;
+/// how far through the shift the ley lines begin to seal (0..1; common.glsl
+/// SEAL_FROM, must match)
+const sealFrom:f32=0.15;
+/// how much of the shift their sealing takes (common.glsl SEAL_SPAN, must match)
+const sealSpan:f32=0.6;
+/// seconds in that the ley lines have sealed: their nodes shatter then
+pub const sealEnd:f32=shiftFrom+(sealFrom+sealSpan)*shiftTime;
+/// seconds a ley node's shards drift before the last has blinked out
+const driftTime:f32=30;
+/// shards each ley node breaks into
+const driftShards=7;
+/// once in, how long the event keeps its clock running: every lineage gone
+/// and every drifting shard blinked out
+const settled:f32=@max(dieSpread+dieTime+1,sealEnd+driftTime);
 /// what the event remembers (saved with the garden)
 pub const Unforming=struct{
   /// where it stands
@@ -68,6 +96,14 @@ pub const Unforming=struct{
   t:f32=0,
   /// where the seed gathers, in the sky (world space)
   at:[3]f32=.{0,0,0},
+  /// whether the ley lines have sealed (every chunk streamed in after is
+  /// sealed as it comes, its nodes simply gone)
+  sealed:bool=false,
+  /// how far the sky has shifted, 0 not at all .. 1 for good
+  pub fn shift(u:*const Unforming)f32{
+    if(u.phase==.waiting)return 0;
+    return m.clamp01((u.t-shiftFrom)/shiftTime);
+  }
   /// a radiant plant's shattering, 0 its first glitch .. 1 gone (< 0 not
   /// yet, or no event), its moment drawn from its seed
   pub fn glitchOf(u:*const Unforming,seed:f32)f32{
@@ -104,6 +140,17 @@ pub const Source=struct{
   /// where it stood (its middle, a little over its foot)
   at:m.V3,
   /// its seed, which sets its moment
+  seed:f32,
+};
+/// one ley node as it shattered: where it stood, how full it was and its
+/// own random, for its shards' drift (not saved: a garden loaded then
+/// has none drifting)
+pub const Drift=struct{
+  /// where it stood (its tile's centre on the ground)
+  at:m.V3,
+  /// how full it was (0..1), which sizes its shards
+  full:f32,
+  /// its own random, 0..1
   seed:f32,
 };
 /// the moment of the event at which a radiant plant of seed `seed` is `k`
@@ -148,12 +195,53 @@ pub fn tick(g:*Game,dt:f32)Allocator.Error!void{
       if(u.t>=shatterEnd+fallTime)try land(g);
     },
     .landed=>{
-      // the lineages still dying after it lands
-      u.t+=dt;
-      if(u.t>dieSpread+dieTime+1)return;
-      try shatter(g);
-      try unform(g);
+      // the lineages still dying after it lands, the shards still drifting
+      if(u.t<settled)u.t+=dt;
+      if(u.t<=dieSpread+dieTime+1){
+        try shatter(g);
+        try unform(g);
+      }
     },
+  }
+  if(u.phase==.waiting)return;
+  // the sky shifting, no star falling, and the ley lines sealed once closed
+  g.sky.shift=u.shift();
+  g.stars.stilled=true;
+  if(u.t>=sealEnd)try seal(g);
+}
+/// the ley lines sealed: every streamed chunk's ley tiles closed to soil
+/// (`gen.sealOf`) and meshed again. The first time, the ley shard nodes
+/// standing on them shatter and drift off; chunks streamed in later are
+/// sealed as they come, their nodes simply gone.
+fn seal(g:*Game)Allocator.Error!void{
+  // the event, and whether this is the moment they close
+  const u=&g.unforming;
+  const first=!u.sealed;
+  u.sealed=true;
+  if(first)g.leyDrifts.clearRetainingCapacity();
+  // the walk over every streamed chunk
+  var it=g.world.map.valueIterator();
+  while(it.next())|cp|{
+    // the chunk
+    const c=cp.*;
+    if(c.sealed)continue;
+    c.sealed=true;
+    c.dirty=true;
+    for(0..ck.tileCount)|t|{
+      if(c.kind[t]!=.ley)continue;
+      // the tile's place, and what it becomes
+      const wx,const wz=c.tileOf(t);
+      const s=gen.sealOf(gen.sample(g.world.seed,wx,wz));
+      if(first and c.res[t]>0)try g.leyDrifts.append(g.gpa,.{
+        .at=m.tileCentre(wx,wz,c.height[t]),
+        .full=m.f(c.res[t])/gen.resFull,
+        .seed=rng.unit(rng.hash2(0xD0D,wx,wz)),
+      });
+      c.kind[t]=s.kind;
+      c.res[t]=s.res;
+      c.leyCap[t]=s.ley;
+      c.ley[t]=@min(c.ley[t],s.ley);
+    }
   }
 }
 /// it begins: the radiant plants are found and the seed's point set over
@@ -176,6 +264,7 @@ fn begin(g:*Game)Allocator.Error!void{
   u.at=.{mid[0],g.heightAt(m.floorTo(i32,mid[0]),m.floorTo(i32,mid[2]))+skyHeight,mid[2]};
   u.phase=.shattering;
   u.t=0;
+  g.stars.shatterAll();
   for(0..g.structs.list.items.len)|i|_=g.structs.send(g.structCtx(.{}),.of(i),.unform);
   g.prog.say(txt.s.msg.unformingBegins,.{});
 }
@@ -244,11 +333,14 @@ fn land(g:*Game)Allocator.Error!void{
 }
 /// tiles round where it fell the seed may land on, if that is taken
 const landSearch:i32=6;
-/// the shards in flight and the seed, gathering, falling: drawn each frame
+/// the ley shards drifting, the shards in flight and the seed, gathering,
+/// falling: drawn each frame
 pub fn draw(g:*Game,tf:f32)Allocator.Error!void{
   // the event
   const u=&g.unforming;
-  if(u.phase==.waiting or u.phase==.landed or g.specimen!=null)return;
+  if(u.phase==.waiting or g.specimen!=null)return;
+  try drifts(g,tf);
+  if(u.phase==.landed)return;
   // where the seed gathers
   const sky=m.v3(u.at[0],u.at[1],u.at[2]);
   for(g.unformSources.items)|src|for(0..shardsEach)|j|{
@@ -270,6 +362,72 @@ pub fn draw(g:*Game,tf:f32)Allocator.Error!void{
   if(k<=0)return;
   try g.parts.emit(.strangeSeed,m.chain(&.{m.translate(at),m.rotY(tf*0.6),m.scale3(m.splat3(m.lerp(0.2,1,k)))}),.{.glow=1+k,.phase=0.5,.flutter=1-k});
   try g.parts.light(at,m.v3(0.9,0.85,1.0)*m.splat3(1.5*k),8);
+}
+/// the shattered ley nodes' shards drifting off weightless, tumbling apart
+/// and rising slowly, glowing violet, until each blinks out of reality
+fn drifts(g:*Game,tf:f32)Allocator.Error!void{
+  // how far through their drift they all are (0..1; they shattered together)
+  const k=(g.unforming.t-sealEnd)/driftTime;
+  if(k<0 or k>=1)return;
+  // how far they have spread, easing out (nothing pushes them on)
+  const e=1-(1-k)*(1-k);
+  for(g.leyDrifts.items)|d|{
+    // how much light is left in them, and the node's size
+    const left=1-m.smooth(m.clamp01((k-0.55)/0.45));
+    const size=driftSize(d.full);
+    for(0..driftShards)|j|{
+      // this shard's own randoms: its heading out, its rise, its spin, its moment
+      const h=rng.hash2(0x1E7,m.floorTo(i32,d.seed*100003),@intCast(j));
+      const r0=rng.unit(h);
+      const r1=rng.unit(rng.hash2(0x1E8,@bitCast(h),3));
+      const r2=rng.unit(rng.hash2(0x1E9,@bitCast(h),5));
+      // it blinks out of reality: flickering more as it fades, then gone
+      // (its own moment within the last stretch)
+      const out=0.6+0.4*r2;
+      if(k>out)continue;
+      const flick=m.clamp01((k-(out-0.25))/0.25);
+      if(flick>0 and rng.unit(rng.hash2(0x1EA,m.floorTo(i32,tf*9+r1*7),@intCast(j)))<flick*0.7)continue;
+      // where it has drifted to: out, up and bobbing
+      const a=r0*m.tau+m.f(j)*2.4;
+      const at=d.at+m.v3(@cos(a)*(0.12+0.7*e)*(0.6+0.6*r1),0.25+e*(1.2+1.4*r2)+0.06*@sin(tf*(0.8+r1)+a),@sin(a)*(0.12+0.7*e)*(0.6+0.6*r1));
+      try g.parts.emit(.unformShard,m.chain(&.{m.translate(at),m.rotY(tf*(0.3+0.5*r1)+a),m.rotX(tf*(0.2+0.4*r2)+r0*7),m.scale3(m.splat3(size*(2.6+1.6*r0)))}),.{.glow=1.6*left+0.3,.phase=r0,.tint=.{0.62,0.42,1.0,0.6}});
+    }
+    try g.parts.light(d.at+m.v3(0,0.3+e*1.5,0),driftLight*m.splat3(left*size),driftReach);
+  }
+}
+/// a drifting shard's size by how full its node was (as a node shrinks as it empties)
+fn driftSize(full:f32)f32{return m.lerp(0.75,1.3,full);}
+/// the drifting shards' violet light, at a full node
+const driftLight=m.V3{0.4,0.24,0.8};
+/// how far it reaches (m)
+const driftReach:f32=2.6;
+test"the ley lines seal: ley tiles close to soil, their nodes shattering into drifting shards"{
+  // the test harness and its allocator
+  const testing=std.testing;
+  const gpa=testing.allocator;
+  // a fresh game, its world streamed in round the wolf
+  var g=try Game.init(gpa,lib.play.defaultSeed);
+  defer g.deinit();
+  try g.world.stream(g.focus(),2,1000);
+  // the chunk the wolf stands in, two of its tiles made a ley line, one bearing a node
+  const c=m.tileAt(g.player.pos);
+  const ch=g.world.chunkOfTile(c[0],c[1]).?;
+  const t=lib.ck.localIndex(c[0],c[1]);
+  ch.kind[t]=.ley;
+  ch.res[t]=gen.resFull;
+  ch.kind[t+1]=.ley;
+  ch.res[t+1]=0;
+  // the event, as its ley lines close
+  g.unforming=.{.phase=.landed,.t=sealEnd};
+  try tick(&g,lib.play.tickTime);
+  try testing.expect(g.unforming.sealed and ch.sealed);
+  try testing.expectEqual(lib.ck.Kind.soil,ch.kind[t]);
+  try testing.expectEqual(@as(lib.ck.Res,0),ch.res[t]);
+  // every streamed tile sealed; the one node drifting (and any the world bore)
+  var it=g.world.map.valueIterator();
+  while(it.next())|cp|for(cp.*.kind)|k|try testing.expect(k!=.ley);
+  try testing.expect(g.leyDrifts.items.len>=1);
+  try testing.expect(g.stars.stilled and g.sky.shift>0.7);
 }
 test"a radiant plant's moment falls within the spread, and its shattering runs 0..1"{
   // the test harness

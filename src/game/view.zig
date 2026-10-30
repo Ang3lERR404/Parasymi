@@ -18,6 +18,8 @@ const m=engine.core.math;
 const color=engine.core.color;
 /// hashing a tile or index to a steady random value
 const rng=engine.core.rng;
+/// the sky: its motes, and how long one takes to shatter
+const skyMod=lib.sky;
 /// the chunk layer: tiles, coordinates
 const ck=lib.ck;
 /// every plant kind's definition
@@ -238,7 +240,7 @@ pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
       .view=.{g.cam.target[0],g.cam.target[2],reach*fogNear,reach},
       .feet=.{
         .{feet[0][0],feet[0][1],feet[0][2],g.player.facing},
-        .{feet[1][0],feet[1][1],feet[1][2],g.player.facing},
+        .{feet[1][0],feet[1][1],feet[1][2],g.sky.shift},
       },
     },
     .clear=sky,
@@ -656,11 +658,40 @@ fn nodes(g:*Game,nr:i32)Allocator.Error!void{
     }
   }
 }
+/// a mote shattering (the unforming): its shards of starlight flung out
+/// round where it was, tumbling, shrinking and fading, a last flash of its
+/// light going with them
+fn moteShards(g:*Game,mo:skyMod.Mote)Allocator.Error!void{
+  // how far through it is (0..1), how far its shards have flown (easing out)
+  const k=m.clamp01(mo.shatter/skyMod.shatterTime);
+  const e=1-(1-k)*(1-k)*(1-k);
+  for(0..moteShardCount)|j|{
+    // this shard's heading: spread round the mote, tipped up and down
+    const a=mo.phase*m.tau*5+m.f(j)*golden;
+    const up=@sin(mo.phase*17+m.f(j)*1.9)*0.8;
+    const dir=m.norm(m.v3(@cos(a),up,@sin(a)));
+    const at=mo.pos+dir*m.splat3(moteShardReach*e);
+    try g.parts.emit(.unformShard,m.chain(&.{m.translate(at),m.rotY(a+k*6),m.rotX(up*3+k*5),m.scale3(m.splat3(moteShardSize*(1-k)))}),.{.glow=2*(1-k),.phase=@mod(mo.phase+m.f(j)*0.13,1),.tint=.{moteCol[0],moteCol[1],moteCol[2],0.8}});
+  }
+  try g.parts.light(mo.pos,moteCol*m.splat3(moteLight*2*(1-k)),moteReach);
+}
+/// shards each shattering mote breaks into
+const moteShardCount=6;
+/// how far its shards fly (m)
+const moteShardReach:f32=0.9;
+/// how big each starts (of the shard mesh)
+const moteShardSize:f32=2.0;
+/// the golden angle (radians), spreading its shards evenly round it
+const golden:f32=2.39996;
 /// fallen starlight: each mote turns slowly and twinkles, hovering with a
 /// slow breath over the ground; while it falls, fading echoes of it trail
 /// above, a streak of light.
 fn motes(g:*Game)Allocator.Error!void{
   for(g.stars.motes.items)|mo|{
+    if(mo.shattering()){
+      try moteShards(g,mo);
+      continue;
+    }
     // how faded the mote is, 0..1
     const fade=m.clamp01(mo.life);
     try g.parts.emitMote(mo.pos,mo.phase,fade,if(mo.falling)0 else-1,moteSize*fade);

@@ -6,7 +6,7 @@
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 nrm;
 layout(location = 2) in vec4 col;
-layout(location = 3) in vec4 info; // kind/255, ley, top, -
+layout(location = 3) in vec4 info; // kind/255, ley, top, depth into a ley line
 
 layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;

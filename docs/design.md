@@ -268,6 +268,22 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
 - **The arsthraxia evolves** instead (`Msg.unform`: `evolved`): drawn
   woven of both lineages (`arsthraxia_convergent.zig`, the gardener's
   pick), its whorls in the kit's living colours.
+- **The stars shatter:** every starlight mote shatters at once as it
+  begins (`Starfall.shatterAll`), and no star falls again: starlight is
+  no longer to be had.
+- **The sky shifts for good** (1 s in, over 12 s; `Sky.shift`): it turns
+  the ley's violet, glowing, its sun and moon (and stars) gone. The glow
+  turning rose by day and deep by night is the only tell of the time.
+  The key light becomes the glow overhead, ley-tinted.
+- **The ley lines seal up** (over the middle of the shift; done 10 s in):
+  each closes from its edges in to its heart, a bright seam at the
+  closing edge, to a scar of bare soil (`gen.sealOf`: soil, only the ley
+  a tile off the lines holds). Every chunk streamed in later is sealed as
+  it comes (`Chunk.sealed`).
+- **The ley shard nodes shatter** as the lines close: each breaks into 7
+  violet shards that drift off weightless, rising and tumbling apart, and
+  blink out of reality over 30 s (`Drift`, not saved). Ley shards are no
+  longer to be had.
 
 ## Research panel (T, `hud/research.zig`)
 The research tree is drawn as a sapling growing in soil. It is laid out
