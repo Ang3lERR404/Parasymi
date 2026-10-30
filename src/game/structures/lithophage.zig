@@ -20,6 +20,7 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
@@ -250,23 +251,11 @@ const iconSacGlow:Color=.{120,160,220,70};
 const iconGem:Color=.{200,170,255,255};
 const iconEss:Color=.{150,140,130,255};
 // ---- tests ----
-const testDt:f32=0.05;
+const testDt=bench.testDt;
 /// soil round (2, 2), a grit node at (3, 2) holding `res`
 fn fixture(w:*World,res:ck.Res)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  var it=w.map.valueIterator();
-  while(it.next())|cp|@memset(&cp.*.res,0);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..6)|x|for(0..5)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-  };
+  const c=try bench.ground(w,.{.width=6,.depth=5,.bare=true});
   c.res[2*ck.sizeTiles+3]=res;
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
 }
 test"a lithophage drains the node beside it into a crystal, then saps it into grit"{
   const gpa=testing.allocator;
@@ -282,7 +271,7 @@ test"a lithophage drains the node beside it into a crystal, then saps it into gr
   const id=ss.at(&w,2,2).?;
   // its root reaches the node, then six grit make a crystal, sapped back out
   const secs=1/rootGrow+draw*crystal+sap*yield+1;
-  try run(&ss,&w,&plants,&g,secs);
+  try bench.run(&ss,&w,&plants,&g,secs);
   try testing.expectEqual(@as(u32,yield),ss.get(id).inv.count(.grit));
   // (the next is already being drawn up)
   const left=w.chunkOfTile(3,2).?.res[2*ck.sizeTiles+3];
@@ -306,10 +295,10 @@ test"a lithophage eats the ley shards it is fed, each worth three grit"{
   try testing.expectEqual(@as(u16,0),ss.insert(&g,id,.fibre,2));
   // grit it never takes: what it holds is what it sapped
   try testing.expectEqual(@as(u16,0),ss.insert(&g,id,.grit,2));
-  try run(&ss,&w,&plants,&g,draw*2+sap*yield+1);
+  try bench.run(&ss,&w,&plants,&g,draw*2+sap*yield+1);
   try testing.expectEqual(@as(u32,yield),ss.get(id).inv.count(.grit));
   // nothing round it, nothing fed: it rests
-  try run(&ss,&w,&plants,&g,30);
+  try bench.run(&ss,&w,&plants,&g,30);
   try testing.expectEqual(@as(u32,yield),ss.get(id).inv.count(.grit));
   try testing.expect(ss.get(id).activity<0.01);
 }
@@ -326,6 +315,6 @@ test"a lithophage's grit is carried off by a conduit behind it"{
   try testing.expect(try ss.place(gpa,&w,2,2,.lithophage,0,0));
   try testing.expect(try ss.place(gpa,&w,2,3,.conduit,1,0));
   try testing.expect(try ss.place(gpa,&w,2,4,.sapCache,0,0));
-  try run(&ss,&w,&plants,&g,80);
+  try bench.run(&ss,&w,&plants,&g,80);
   try testing.expect(ss.get(ss.at(&w,2,4).?).inv.count(.grit)>=yield*2);
 }

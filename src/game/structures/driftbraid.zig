@@ -23,12 +23,12 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
 const style=lib.style;
 const Parts=lib.parts.Parts;
-const Look=lib.parts.Look;
 const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 const mesh=lib.driftbraid;
@@ -206,8 +206,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     });
   }
   if(s.grown<1)return;
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
     const it=slot orelse continue;
@@ -215,10 +214,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
     const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
-    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
-      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(it.item.info().col).toF4(),
-      .sway=def.sway,.tall=def.tall,.drop=at[1],
-    });
+    try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
 }
@@ -261,26 +257,12 @@ const iconSacGlow:Color=.{170,140,230,70};
 const iconSpore:Color=.{235,225,255,255};
 const iconSporeBack:Color=.{245,200,140,255};
 // ---- tests ----
-const testDt:f32=0.05;
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..30)|x|for(0..2)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 test"driftbraids pair both ways and trade what each is fed, never sending it back"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=30,.depth=2});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -298,7 +280,7 @@ test"driftbraids pair both ways and trade what each is fed, never sending it bac
   _=ss.insert(&g,b,.grit,9);
   // nothing fed may leave by conduit
   try testing.expect(ss.output(a)==null and !ss.gives(a,.essence));
-  try run(&ss,&w,&plants,&g,30);
+  try bench.run(&ss,&w,&plants,&g,30);
   try testing.expectEqual(@as(u32,12),ss.get(b).inv.count(.essence));
   try testing.expectEqual(@as(u32,9),ss.get(a).inv.count(.grit));
   try testing.expectEqual(@as(u32,0),ss.get(a).inv.count(.essence));
@@ -314,7 +296,7 @@ test"what a driftbraid received is handed on to its neighbours"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=30,.depth=2});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -326,6 +308,6 @@ test"what a driftbraid received is handed on to its neighbours"{
   st.configure(&ss,ss.at(&w,0,0).?,&g);
   st.configure(&ss,ss.at(&w,20,0).?,&g);
   _=ss.insert(&g,ss.at(&w,0,0).?,.fibre,10);
-  try run(&ss,&w,&plants,&g,30);
+  try bench.run(&ss,&w,&plants,&g,30);
   try testing.expectEqual(@as(u32,10),ss.get(ss.at(&w,21,0).?).inv.count(.fibre));
 }

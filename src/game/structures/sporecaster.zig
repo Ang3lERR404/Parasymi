@@ -20,12 +20,12 @@ const gen=lib.gen;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
 const style=lib.style;
 const Parts=lib.parts.Parts;
-const Look=lib.parts.Look;
 const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 const mesh=lib.sporecaster;
@@ -187,8 +187,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     });
   }
   if(s.grown<1)return;
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
     const it=slot orelse continue;
@@ -196,10 +195,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
     const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
-    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
-      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(it.item.info().col).toF4(),
-      .sway=def.sway,.tall=def.tall,.drop=at[1],
-    });
+    try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
 }
@@ -249,27 +245,12 @@ const iconSac:Color=.{120,160,220,200};
 const iconSacGlow:Color=.{120,160,220,70};
 const iconSpore:Color=.{235,225,255,255};
 // ---- tests ----
-const testDt:f32=0.05;
-/// soil along y = 0 and y = 1 from x = 0 to 29
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..30)|x|for(0..2)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 test"sporecasters pair by configuring one, then the one it sends to"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=30,.depth=2});
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
@@ -294,7 +275,7 @@ test"spores carry what a caster is fed to the one it is paired with, however far
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=30,.depth=2});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -308,7 +289,7 @@ test"spores carry what a caster is fed to the one it is paired with, however far
   try testing.expectEqual(@as(u16,7),ss.insert(&g,a,.grit,7));
   // a caster that sends lets nothing go to conduits
   try testing.expect(ss.output(a)==null);
-  try run(&ss,&w,&plants,&g,24);
+  try bench.run(&ss,&w,&plants,&g,24);
   const b=ss.get(ss.at(&w,28,0).?);
   try testing.expectEqual(@as(u32,12),b.inv.count(.essence));
   try testing.expectEqual(@as(u32,7),b.inv.count(.grit));
@@ -320,7 +301,7 @@ test"spores whose caster is uprooted turn home with what they carry"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=30,.depth=2});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -331,11 +312,11 @@ test"spores whose caster is uprooted turn home with what they carry"{
   const a=ss.at(&w,0,0).?;
   try testing.expect(ss.pairWith(a,ss.at(&w,28,0).?));
   _=ss.insert(&g,a,.fibre,10);
-  try run(&ss,&w,&plants,&g,1);
+  try bench.run(&ss,&w,&plants,&g,1);
   _=ss.remove(&w,ss.at(&w,28,0).?);
   // uprooting it cut the pairing
   try testing.expect(ss.get(ss.at(&w,0,0).?).partner()==null);
-  try run(&ss,&w,&plants,&g,24);
+  try bench.run(&ss,&w,&plants,&g,24);
   const back=ss.get(ss.at(&w,0,0).?);
   try testing.expectEqual(@as(u32,10),back.inv.count(.fibre));
   for(back.state.sporecaster.spores)|sp|try testing.expect(sp==null);

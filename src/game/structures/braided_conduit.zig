@@ -18,6 +18,7 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
@@ -226,26 +227,12 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
 const iconBeads=[_]Color{.{255,215,120,255},.{120,170,90,255},.{170,120,255,255},.{150,140,130,255}};
 const iconRun:f32=0.4;
 // ---- tests ----
-const testDt:f32=0.05;
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..8)|x|for(0..3)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 test"a braided conduit carries four kinds side by side, each in its own lane"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=8,.depth=3});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -265,7 +252,7 @@ test"a braided conduit carries four kinds side by side, each in its own lane"{
   for(b.state.braidedConduit.lanes)|l|{if(l.item!=null)kinds+=1;}
   try testing.expectEqual(@as(usize,lanes),kinds);
   try testing.expectEqual(@as(u32,lanes),b.inv.total());
-  try run(&ss,&w,&plants,&g,12);
+  try bench.run(&ss,&w,&plants,&g,12);
   const dst=ss.get(ss.at(&w,3,0).?);
   for([_]items.Item{.essence,.fibre,.grit,.leyShard})|it|try testing.expectEqual(@as(u32,10),dst.inv.count(it));
 }
@@ -273,7 +260,7 @@ test"a braided conduit hands on into a conduit and takes from one"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=8,.depth=3});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -287,7 +274,7 @@ test"a braided conduit hands on into a conduit and takes from one"{
   try testing.expect(try ss.place(gpa,&w,4,0,.sapCache,0,0));
   _=ss.insert(&g,ss.at(&w,0,0).?,.fibre,5);
   _=ss.insert(&g,ss.at(&w,0,0).?,.grit,5);
-  try run(&ss,&w,&plants,&g,20);
+  try bench.run(&ss,&w,&plants,&g,20);
   const dst=ss.get(ss.at(&w,4,0).?);
   try testing.expectEqual(@as(u32,5),dst.inv.count(.fibre));
   try testing.expectEqual(@as(u32,5),dst.inv.count(.grit));
@@ -298,7 +285,7 @@ test"a braided conduit turns: fed from the side, it hands on ahead"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=8,.depth=3});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -310,7 +297,7 @@ test"a braided conduit turns: fed from the side, it hands on ahead"{
   try testing.expect(try ss.place(gpa,&w,2,1,.sapCache,0,0));
   try testing.expect(try ss.place(gpa,&w,1,2,.sapCache,0,0));
   _=ss.insert(&g,ss.at(&w,1,0).?,.essence,1);
-  try run(&ss,&w,&plants,&g,3);
+  try bench.run(&ss,&w,&plants,&g,3);
   try testing.expectEqual(@as(u32,1),ss.get(ss.at(&w,2,1).?).inv.count(.essence));
   try testing.expectEqual(@as(u32,0),ss.get(ss.at(&w,1,2).?).inv.count(.essence));
   // (fed from its -z side: the edge three quarters round from the way it faces)

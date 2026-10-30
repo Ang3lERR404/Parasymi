@@ -94,10 +94,7 @@ pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32
 }
 /// only finished weaves leave: anything woven, so one woven before the
 /// recipe was changed still goes (what it weaves from never is).
-pub fn output(s:*const st.Structure)?items.Item{
-  for(s.inv.slot)|slot|if(slot)|it|if(craft.woven(it.item))return it.item;
-  return null;
-}
+pub fn output(s:*const st.Structure)?items.Item{return s.firstHeld(craft.woven);}
 /// anything woven it holds.
 pub fn gives(s:*const st.Structure,item:items.Item)bool{return craft.woven(item) and s.inv.count(item)>0;}
 /// its panel offers every weave.

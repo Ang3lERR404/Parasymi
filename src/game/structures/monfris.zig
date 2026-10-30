@@ -84,10 +84,7 @@ fn made(item:items.Item)bool{
   for(craft.advanced)|r|if(craft.hand[r].out==item)return true;
   return false;
 }
-pub fn output(s:*const st.Structure)?items.Item{
-  for(s.inv.slot)|slot|if(slot)|it|if(made(it.item))return it.item;
-  return null;
-}
+pub fn output(s:*const st.Structure)?items.Item{return s.firstHeld(made);}
 pub fn gives(s:*const st.Structure,item:items.Item)bool{return made(item) and s.inv.count(item)>0;}
 /// its panel offers the advanced tier.
 pub fn recipes()[]const u8{return&craft.advanced;}
@@ -119,8 +116,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   if(s.grown<1)return;
   const base=s.place(ctr);
   const h=&s.state.monfris;
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
     const it=slot orelse continue;
@@ -128,10 +124,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.sacR[0]*ringRadius;
     const at=mesh.sacAt+v3(@cos(a)*ring,-mesh.sacR[1]*0.3+bobAmount*@sin(tf*1.2+m.f(j)*2),@sin(a)*ring);
     const r=lumpR+lumpGrow*m.ratio(it.n,items.stack);
-    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
-      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(it.item.info().col).toF4(),
-      .sway=def.sway,.tall=def.tall,.drop=at[1],
-    });
+    try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
   if(h.weave.busy()){

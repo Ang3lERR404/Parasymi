@@ -212,6 +212,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `conduit.zig` — ROOT CONDUIT: the first logistics.
 
 ## src/game/structures/core/
+- `bench.zig` — the test bench: a little patch of ground every structure's tests grow on, and the clock that runs them.
 - `dispatch.zig` — the hook dispatch over every structure: one comptime switch each, no per-kind code.
 - `handoff.zig` — handing items on from a structure to its neighbours.
 - `hooks.zig` — per-structure hooks the HUD, the renderer and the garden ask through.

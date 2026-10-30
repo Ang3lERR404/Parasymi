@@ -17,6 +17,7 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
@@ -318,19 +319,8 @@ const iconSpark:Color=.{210,170,255,120};
 const iconGrit:Color=.{150,140,130,255};
 const iconLey:Color=.{200,160,255,255};
 // ---- tests ----
-const testDt:f32=0.05;
+const testDt=bench.testDt;
 /// soil round (2, 2), grit and ley nodes beside it
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  var it=w.map.valueIterator();
-  while(it.next())|cp|@memset(&cp.*.res,0);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..6)|x|for(0..6)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-  };
-}
 fn putNode(w:*World,x:usize,y:usize,item:items.Item,n:ck.Res)void{
   const c=w.chunkOfTile(0,0).?;
   const t=y*ck.sizeTiles+x;
@@ -340,15 +330,11 @@ fn putNode(w:*World,x:usize,y:usize,item:items.Item,n:ck.Res)void{
   }
   c.res[t]=n;
 }
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
 test"a weftstone floats over the nodes, draws them up and ionizes them into ley crystals"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=6,.depth=6,.bare=true});
   putNode(&w,2,2,.grit,30);
   putNode(&w,4,3,.leyShard,10);
   var plants:Plants=.{};
@@ -359,11 +345,11 @@ test"a weftstone floats over the nodes, draws them up and ionizes them into ley 
   // right over the grit node: floating, it takes no room there
   try testing.expect(try ss.place(gpa,&w,2,2,.weftstone,0,0));
   const id=ss.floaterAt(2,2).?;
-  try run(&ss,&w,&plants,&g,1/reachDistance+0.2);
+  try bench.run(&ss,&w,&plants,&g,1/reachDistance+0.2);
   var latched:u32=0;
   for(ss.get(id).state.weftstone.reach)|r|{if(r>=1)latched+=1;}
   try testing.expectEqual(@as(u32,2),latched);
-  try run(&ss,&w,&plants,&g,draw*(ionGrit+ionLey)*2+ionize*2);
+  try bench.run(&ss,&w,&plants,&g,draw*(ionGrit+ionLey)*2+ionize*2);
   const s=ss.get(id);
   try testing.expect(s.inv.count(.leyCrystal)>=1);
   try testing.expect(ss.output(id)==.leyCrystal and !ss.gives(id,.grit));
@@ -375,7 +361,7 @@ test"a weftstone's tendrils reach no further than R and latch no more than LATCH
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=6,.depth=6,.bare=true});
   for(0..6)|x|for(0..6)|y|putNode(&w,x,y,.grit,5);
   var plants:Plants=.{};
   defer plants.deinit(gpa);
@@ -383,7 +369,7 @@ test"a weftstone's tendrils reach no further than R and latch no more than LATCH
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,2,2,.weftstone,0,0));
-  try run(&ss,&w,&plants,&g,1/reachDistance+0.2);
+  try bench.run(&ss,&w,&plants,&g,1/reachDistance+0.2);
   var latched:u32=0;
   for(ss.get(ss.floaterAt(2,2).?).state.weftstone.reach,tiles)|r,o|if(r>0){
     latched+=1;

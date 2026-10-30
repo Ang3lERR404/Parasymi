@@ -70,6 +70,7 @@ pub const handoff=@import("structures/core/handoff.zig");
 pub const hooks=@import("structures/core/hooks.zig");
 pub const testsFlow=@import("structures/core/tests_flow.zig");
 pub const testsKin=@import("structures/core/tests_kin.zig");
+pub const bench=@import("structures/core/bench.zig");
 pub const Msg=messages.Msg;
 pub const Reply=messages.Reply;
 pub const Pairs=messages.Pairs;

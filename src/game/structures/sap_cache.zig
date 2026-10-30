@@ -115,8 +115,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const base=s.place(ctr);
   const formed=growth.formed(pod.form,s.grown);
   const sway:Look=.{.phase=s.seed,.sway=def.sway,.tall=def.tall,.glow=glow};
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var k:usize=0;
   var target=pod.podAt;
   for(s.inv.slot,0..)|slot,si|{

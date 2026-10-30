@@ -18,6 +18,7 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
@@ -254,21 +255,7 @@ const iconPetal:Color=.{235,160,100,255};
 const iconSac:Color=.{180,140,230,220};
 const iconPearl:Color=.{220,212,238,255};
 // ---- tests ----
-const testDt:f32=0.05;
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..16)|x|for(0..16)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 fn tether(ss:*st.Structures,w:*World,g:*prog.Progression,v:[2]i32,loom:[2]i32)void{
   st.configure(ss,ss.floaterAt(v[0],v[1]).?,g);
   st.configure(ss,ss.at(w,loom[0],loom[1]).?,g);
@@ -277,7 +264,7 @@ test"Vultrixi tether to a monfris, six at most, each bringing one kind of its we
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=16,.depth=16});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -289,7 +276,7 @@ test"Vultrixi tether to a monfris, six at most, each bringing one kind of its we
   for(0..7)|k|tether(&ss,&w,&g,.{@intCast(k+1),2},.{6,6});
   try testing.expectEqual(@as(u32,monfris.tethers),ss.childCount(ss.at(&w,6,6).?));
   try testing.expect(ss.get(ss.floaterAt(7,2).?).parent==null);
-  try run(&ss,&w,&plants,&g,0.1);
+  try bench.run(&ss,&w,&plants,&g,0.1);
   // the diamond's four kinds go to the first four, in order; the rest idle
   const r=craft.hand[ss.get(ss.at(&w,6,6).?).state.monfris.recipe];
   for(0..6)|k|{
@@ -301,7 +288,7 @@ test"a Vultrixi pulls what a structure lets go into its monfris, which weaves it
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=16,.depth=16});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -322,7 +309,7 @@ test"a Vultrixi pulls what a structure lets go into its monfris, which weaves it
   // a germinator's unwoven ingredients are never pulled
   try testing.expect(try ss.place(gpa,&w,13,1,.germinator,0,0));
   _=ss.insert(&g,ss.at(&w,13,1).?,.fibre,6);
-  try run(&ss,&w,&plants,&g,40);
+  try bench.run(&ss,&w,&plants,&g,40);
   try testing.expect(ss.get(loom).inv.count(.diamond)>=1);
   try testing.expectEqual(@as(u32,6),ss.get(ss.at(&w,13,1).?).inv.count(.fibre));
 }

@@ -17,6 +17,7 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
@@ -27,7 +28,6 @@ const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 const play=lib.play;
 const actions=lib.actions;
-const Look=lib.parts.Look;
 const mesh=lib.rootDigger;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.bellyLump,.diggerClod,.diggerRoot};
@@ -163,8 +163,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   // what it has dug, hanging in its gourd
   if(s.grown<1)return;
   const base=s.place(ctr);
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
     const it=slot orelse continue;
@@ -172,10 +171,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.podR[0]*ringRadius;
     const at=mesh.podAt+m.v3(@cos(a)*ring,bobAmount*@sin(tf*0.9+m.f(j)*2),@sin(a)*ring);
     const r=lumpR+lumpGrow*m.ratio(it.n,buffer);
-    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
-      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(it.item.info().col).toF4(),
-      .sway=def.sway,.tall=def.tall,.drop=at[1],
-    });
+    try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
 }
@@ -191,26 +187,13 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
 }
 // ---- tests ----
 /// tests tick structures at 20 Hz
-const testDt:f32=0.05;
+const testDt=bench.testDt;
 /// a strip of soil at y = 0 (x = 0..5) with a moss node of `res` fibre at
 /// (2, 0); the digger goes at (1, 0).
 fn fixture(w:*World,res:ck.Res)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  var it=w.map.valueIterator();
-  while(it.next())|cp|@memset(&cp.*.res,0);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..6)|x|for(0..2)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
+  const c=try bench.ground(w,.{.width=6,.depth=2,.bare=true});
   c.kind[2]=.moss;
   c.res[2]=res;
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
 }
 test"a digger beside a node draws one item every 4 seconds"{
   const gpa=testing.allocator;
@@ -224,9 +207,9 @@ test"a digger beside a node draws one item every 4 seconds"{
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,1,0,.rootDigger,0,0));
   const id=ss.at(&w,1,0).?;
-  try run(&ss,&w,&plants,&g,3.9);
+  try bench.run(&ss,&w,&plants,&g,3.9);
   try testing.expectEqual(@as(u32,0),ss.get(id).inv.count(.fibre));
-  try run(&ss,&w,&plants,&g,8.2);
+  try bench.run(&ss,&w,&plants,&g,8.2);
   try testing.expectEqual(@as(u32,3),ss.get(id).inv.count(.fibre));
   try testing.expectEqual(@as(ck.Res,2),w.chunkOfTile(2,0).?.res[2]);
 }
@@ -241,7 +224,7 @@ test"a digger with no node beside it idles"{
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,4,1,.rootDigger,0,0));
-  try run(&ss,&w,&plants,&g,20);
+  try bench.run(&ss,&w,&plants,&g,20);
   const s=ss.get(ss.at(&w,4,1).?);
   try testing.expectEqual(@as(u32,0),s.inv.total());
   try testing.expect(s.state.rootDigger.dig==null);
@@ -259,7 +242,7 @@ test"a digger with nowhere to send buffers 8, then pauses"{
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,1,0,.rootDigger,0,0));
-  try run(&ss,&w,&plants,&g,60);
+  try bench.run(&ss,&w,&plants,&g,60);
   try testing.expectEqual(@as(u32,buffer),ss.get(ss.at(&w,1,0).?).inv.total());
   try testing.expectEqual(@as(ck.Res,20-buffer),w.chunkOfTile(2,0).?.res[2]);
 }

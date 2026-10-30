@@ -16,12 +16,12 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
 const style=lib.style;
 const Parts=lib.parts.Parts;
-const Look=lib.parts.Look;
 const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 const meshlib=lib.meshlib;
@@ -131,10 +131,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
 }
 pub fn wants(_:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return 0;}
 /// the oldest thing it gathered.
-pub fn output(s:*const st.Structure)?items.Item{
-  for(s.inv.slot)|slot|if(slot)|it|return it.item;
-  return null;
-}
+pub fn output(s:*const st.Structure)?items.Item{return s.firstHeld(st.Structure.anything);}
 pub fn gives(s:*const st.Structure,item:items.Item)bool{return s.inv.count(item)>0;}
 /// its roots out to the plants round it, what it last gathered travelling
 /// up one, and what it holds hanging in its pod.
@@ -158,8 +155,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
       .glow=moteGlow,.tint=color.Rgba8.of(c.carried.info().col).toF4(),
     });
   }
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var j:usize=0;
   for(s.inv.slot)|slot|{
     const it=slot orelse continue;
@@ -167,10 +163,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.podR[0]*ringRadius;
     const at=mesh.podAt+v3(@cos(a)*ring,bobAmount*@sin(tf*0.9+m.f(j)*2),@sin(a)*ring);
     const r=lumpR+lumpGrow*m.ratio(it.n,buffer);
-    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
-      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(it.item.info().col).toF4(),
-      .sway=def.sway,.tall=def.tall,.drop=at[1],
-    });
+    try s.emitLump(out,base,at,r,it.item,glow);
     j+=1;
   }
 }
@@ -204,21 +197,7 @@ const iconSap:Color=.{255,190,90,255};
 const iconGlow:Color=.{255,190,90,80};
 const iconPetal:Color=.{245,190,100,255};
 // ---- tests ----
-const testDt:f32=0.05;
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..7)|x|for(0..7)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 fn ripe(gpa:Allocator,w:*World,plants:*Plants,x:i32,y:i32,essence:f32)!void{
   try testing.expect(try plants.placeEx(gpa,w,x,y,.{.x=x,.y=y,.chunk=undefined,.tile=undefined,.sp=.lumenroot,.seed=0,.growth=1,.essence=essence}));
 }
@@ -226,7 +205,7 @@ test"a gathering crown roots out to every plant within two tiles and gathers the
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=7,.depth=7});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -239,7 +218,7 @@ test"a gathering crown roots out to every plant within two tiles and gathers the
   try ripe(gpa,&w,&plants,3,5,2);
   try ripe(gpa,&w,&plants,1,1,2);
   try ripe(gpa,&w,&plants,6,3,2);
-  try run(&ss,&w,&plants,&g,30);
+  try bench.run(&ss,&w,&plants,&g,30);
   const id=ss.at(&w,3,3).?;
   try testing.expectEqual(@as(u32,8),ss.get(id).inv.count(.essence));
   // the one three tiles out is left alone
@@ -250,7 +229,7 @@ test"a gathering crown hands what it gathers to a cache beside it"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=7,.depth=7});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -259,7 +238,7 @@ test"a gathering crown hands what it gathers to a cache beside it"{
   try testing.expect(try ss.place(gpa,&w,3,3,.gatheringCrown,0,0));
   try testing.expect(try ss.place(gpa,&w,3,4,.sapCache,0,0));
   try ripe(gpa,&w,&plants,5,3,20);
-  try run(&ss,&w,&plants,&g,40);
+  try bench.run(&ss,&w,&plants,&g,40);
   try testing.expect(ss.get(ss.at(&w,3,4).?).inv.count(.essence)>=15);
   try testing.expectEqual(@as(u32,0),ss.get(ss.at(&w,3,3).?).inv.total());
 }

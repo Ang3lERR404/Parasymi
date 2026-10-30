@@ -18,12 +18,12 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
 const style=lib.style;
 const Parts=lib.parts.Parts;
-const Look=lib.parts.Look;
 const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 const mesh=lib.ganglion;
@@ -115,8 +115,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     });
   }
   if(s.grown<1)return;
-  var n:usize=0;
-  for(s.inv.slot)|slot|{if(slot!=null)n+=1;}
+  const n=s.inv.used();
   var k:usize=0;
   const base=s.place(ctr);
   for(s.inv.slot)|slot|{
@@ -125,10 +124,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const ring=if(n==1)0 else mesh.heartR[0]*ringRadius;
     const at=mesh.heartAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.1+m.f(k)*2),@sin(a)*ring);
     const r=lumpR+lumpGrow*m.ratio(it.n,holdTime);
-    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
-      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(it.item.info().col).toF4(),
-      .sway=def.sway,.tall=def.tall,.drop=at[1],
-    });
+    try s.emitLump(out,base,at,r,it.item,glow);
     k+=1;
   }
 }
@@ -162,26 +158,12 @@ const iconSac:Color=.{120,160,220,200};
 const iconSacGlow:Color=.{120,160,220,70};
 const iconBead:Color=.{255,215,120,255};
 // ---- tests ----
-const testDt:f32=0.05;
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..6)|x|for(0..5)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.soil;
-    c.height[t]=1;
-    c.res[t]=0;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 test"a ganglion splits a conduit line, never back into it"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=6,.depth=5});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -199,7 +181,7 @@ test"a ganglion splits a conduit line, never back into it"{
   try testing.expect(try ss.place(gpa,&w,2,3,.conduit,1,0));
   try testing.expect(try ss.place(gpa,&w,2,4,.sapCache,0,0));
   _=ss.insert(&g,ss.at(&w,0,2).?,.fibre,30);
-  try run(&ss,&w,&plants,&g,40);
+  try bench.run(&ss,&w,&plants,&g,40);
   for([_][2]i32{.{4,2},.{2,0},.{2,4}})|o|{
     const n=ss.get(ss.at(&w,o[0],o[1]).?).inv.count(.fibre);
     try testing.expect(n>=8 and n<=12);
@@ -210,7 +192,7 @@ test"a ganglion feeds each neighbour only what it wants"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=6,.depth=5});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -226,7 +208,7 @@ test"a ganglion feeds each neighbour only what it wants"{
   try testing.expectEqual(@as(u16,4),ss.insert(&g,id,.essence,4));
   try testing.expectEqual(@as(u16,4),ss.insert(&g,id,.grit,4));
   try testing.expectEqual(@as(u16,0),ss.insert(&g,id,.grit,1));
-  try run(&ss,&w,&plants,&g,6);
+  try bench.run(&ss,&w,&plants,&g,6);
   // the essence shared out between them, the grit kept
   try testing.expectEqual(@as(u32,0),ss.get(id).inv.count(.essence));
   try testing.expectEqual(@as(u32,4),ss.get(id).inv.count(.grit));

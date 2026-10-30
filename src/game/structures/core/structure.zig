@@ -5,6 +5,11 @@ const Allocator=std.mem.Allocator;
 const activeTag=std.meta.activeTag;
 const engine=lib.engine;
 const m=engine.core.math;
+/// colours: an item's colour turned to the four floats a part is tinted by
+const color=engine.core.color;
+/// the scene's parts list, and how one part looks
+const Parts=lib.parts.Parts;
+const Look=lib.parts.Look;
 const ck=lib.ck;
 const World=lib.world.World;
 const items=lib.items;
@@ -97,6 +102,25 @@ pub const Structure=struct{
   /// at the size it has grown to (breathing aside)
   pub fn place(s:*const Structure,ctr:m.V3)m.M4{
     return m.chain(&.{m.translate(ctr),m.rotY(m.dirYaw(s.dir)),m.scale3(s.grownScale())});
+  }
+  /// the first thing it holds that `keep` lets go, oldest slot first: what
+  /// an `output` hook hands down a conduit (null: nothing to give).
+  pub fn firstHeld(s:*const Structure,comptime keep:fn(items.Item)bool)?items.Item{
+    for(s.inv.slot)|slot|if(slot)|it|if(keep(it.item))return it.item;
+    return null;
+  }
+  /// a `keep` for `firstHeld` that lets anything go.
+  pub fn anything(_:items.Item)bool{return true;}
+  /// one held thing shown as a lump of resin: drawn at `at` inside the
+  /// structure's frame `base`, `r` across, tinted the item's colour and
+  /// glowing `glow`, swaying with the structure that holds it.
+  pub fn emitLump(s:*const Structure,out:*Parts,base:m.M4,at:m.V3,r:f32,item:items.Item,glow:f32)Allocator.Error!void{
+    // the structure's kind: how far it sways, how tall it stands
+    const d=s.def();
+    try out.emit(.bellyLump,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),Look{
+      .glow=glow,.phase=s.seed,.tint=color.Rgba8.of(item.info().col).toF4(),
+      .sway=d.sway,.tall=d.tall,.drop=at[1],
+    });
   }
 };
 /// everything a structure's behaviour may touch.

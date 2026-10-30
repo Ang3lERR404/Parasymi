@@ -15,6 +15,7 @@ const World=lib.world.World;
 const items=lib.items;
 const Plants=lib.plants.Plants;
 const st=lib.structures;
+const bench=st.bench;
 const iconKit=lib.icon;
 const txt=lib.txt;
 const prog=lib.progression;
@@ -189,27 +190,12 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
 }
 const iconFibre:Color=.{120,170,90,255};
 // ---- tests ----
-const testDt:f32=0.05;
-fn fixture(w:*World)!void{
-  try w.stream(.{.x=0,.y=0},1,100);
-  var it=w.map.valueIterator();
-  while(it.next())|cp|@memset(&cp.*.res,0);
-  const c=w.chunkOfTile(0,0).?;
-  for(0..4)|x|for(0..2)|y|{
-    const t=y*ck.sizeTiles+x;
-    c.kind[t]=.moss;
-    c.height[t]=1;
-  };
-}
-fn run(ss:*st.Structures,w:*World,plants:*Plants,g:*prog.Progression,seconds:f32)!void{
-  var t:f32=0;
-  while(t<seconds):(t+=testDt)try ss.tick(testing.allocator,w,plants,g,testDt);
-}
+const testDt=bench.testDt;
 test"a loomfern weaves fibre slowly unfed, and fast from essence"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=4,.depth=2,.kind=.moss,.bare=true});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -217,12 +203,12 @@ test"a loomfern weaves fibre slowly unfed, and fast from essence"{
   var g:prog.Progression=.{};
   try testing.expect(try ss.place(gpa,&w,0,0,.loomfern,0,0));
   const id=ss.at(&w,0,0).?;
-  try run(&ss,&w,&plants,&g,slow*2+0.2);
+  try bench.run(&ss,&w,&plants,&g,slow*2+0.2);
   try testing.expectEqual(@as(u32,2),ss.get(id).inv.count(.fibre));
   // fed one essence: four fibre at the fast pace
   try testing.expectEqual(@as(u16,1),ss.insert(&g,id,.essence,1));
   try testing.expectEqual(@as(u16,0),ss.insert(&g,id,.grit,1));
-  try run(&ss,&w,&plants,&g,fast*perEssence+0.2);
+  try bench.run(&ss,&w,&plants,&g,fast*perEssence+0.2);
   try testing.expectEqual(@as(u32,2+perEssence),ss.get(id).inv.count(.fibre));
   try testing.expectEqual(@as(u32,0),ss.get(id).inv.count(.essence));
   // only fibre leaves it
@@ -233,7 +219,7 @@ test"a loomfern hands its fibre to a neighbour, and rests when full"{
   const gpa=testing.allocator;
   var w=World.init(gpa,5);
   defer w.deinit();
-  try fixture(&w);
+  _=try bench.ground(&w,.{.width=4,.depth=2,.kind=.moss,.bare=true});
   var plants:Plants=.{};
   defer plants.deinit(gpa);
   var ss:st.Structures=.{};
@@ -243,9 +229,9 @@ test"a loomfern hands its fibre to a neighbour, and rests when full"{
   try testing.expect(try ss.place(gpa,&w,1,0,.sapCache,0,0));
   try testing.expect(try ss.place(gpa,&w,3,1,.loomfern,0,0));
   _=ss.insert(&g,ss.at(&w,0,0).?,.essence,essenceStock);
-  try run(&ss,&w,&plants,&g,30);
+  try bench.run(&ss,&w,&plants,&g,30);
   try testing.expect(ss.get(ss.at(&w,1,0).?).inv.count(.fibre)>=9);
-  try run(&ss,&w,&plants,&g,slow*(buffer+2));
+  try bench.run(&ss,&w,&plants,&g,slow*(buffer+2));
   const lone=ss.get(ss.at(&w,3,1).?);
   try testing.expectEqual(@as(u32,buffer),lone.inv.count(.fibre));
   try testing.expect(lone.activity<0.01);
