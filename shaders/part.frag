@@ -51,6 +51,18 @@ const float ENERGY_RINGS = 14.0;
 const float ENERGY_CLOSE = 5.0;
 const float ENERGY_PULSES = 3.0;
 const float ENERGY_RUN = 8.0;
+// the constellate web: its blue, the pale it lightens to as a beat passes,
+// how often its heart beats (s), how fast a beat runs through it (m/s),
+// where in the beat the two thumps fall and how sharp they are, how much a
+// beat fades for every metre it runs
+const vec3 PLEXUS_BLUE = vec3(0.04, 0.16, 0.85);
+const vec3 PLEXUS_PALE = vec3(0.62, 0.86, 1.0);
+const float PLEXUS_PERIOD = 1.6;
+const float PLEXUS_SPEED = 0.9;
+const float PLEXUS_LUB = 0.06;
+const float PLEXUS_DUB = 0.2;
+const float PLEXUS_THUMP = 0.035;
+const float PLEXUS_FADE = 0.35;
 // the halo's projection: how many rays it has round it
 const float RAYS = 40.0;
 // the roles thin enough for light from behind to shine through (leaves,
@@ -132,6 +144,36 @@ void surface() {
     c = (film * haze * 0.25 + rays * 0.9 + mix(mc, vec3(m), 0.35) * 2.5) * (0.12 + 0.88 * lit);
     float a = clamp(haze * 0.18 + ray_a * 0.45 + m, 0.0, 1.0);
     o = vec4(applyFog(c, v_pos), a * ends * (0.3 + 0.7 * lit));
+    return;
+  }
+  if (part == PART_PLEXUS) {
+    // the constellate web (v_u: 0 a point, 1 a line, 2 a pane; v_t how far
+    // a beat runs through it to reach here). Its heart beats lub-dub, and
+    // each beat runs out through the web, reaching here v_t / SPEED late,
+    // fading as it goes: it lightens the blue toward pale as it passes. A
+    // point is a solid light; a line glows thin; a pane is a sheet of blue
+    // glass, brighter at its grazing edges.
+    float t = pc.eye_time.w;
+    float ph = fract((t - v_t / PLEXUS_SPEED) / PLEXUS_PERIOD + v_phase);
+    float lub = (ph - PLEXUS_LUB) / PLEXUS_THUMP;
+    float dub = (ph - PLEXUS_DUB) / PLEXUS_THUMP;
+    float beat = (exp(-lub * lub) + 0.6 * exp(-dub * dub)) / (1.0 + PLEXUS_FADE * v_t);
+    float ndv = abs(dot(raw, V));
+    int kind = int(v_u + 0.5);
+    vec3 col = mix(PLEXUS_BLUE, PLEXUS_PALE, clamp(beat, 0.0, 1.0));
+    float a;
+    if (kind == 0) {
+      c = mix(col, PLEXUS_PALE, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
+      a = 1.0;
+    } else if (kind == 1) {
+      c = col * (0.7 + 3.0 * beat);
+      a = clamp(0.5 + 0.5 * beat, 0.0, 1.0);
+    } else {
+      float rim = pow(1.0 - ndv, 3.0);
+      c = col * (0.25 + 0.6 * rim + 1.8 * beat);
+      a = clamp(0.22 + 0.4 * rim + 0.45 * beat, 0.0, 1.0);
+    }
+    o = vec4(applyFog(c, v_pos), a);
     return;
   }
   if (part == PART_ENERGY) {

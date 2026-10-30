@@ -69,12 +69,16 @@ pub const Part=enum(u32){
   /// `pod`): col.a its place among the plant's pods, tu.y its radius; it
   /// swells from a pale nub as the plant ripens (plant.vert)
   pod,
+  /// the constellate web: points, lines and panes of blue light (tu.y
+  /// which), lightened by each beat as it runs out to them (tu.x how far
+  /// it runs to reach them)
+  plexus,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve=>false,
   };
 }
