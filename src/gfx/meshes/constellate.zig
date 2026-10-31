@@ -134,7 +134,7 @@ const Vert=struct{
 };
 /// put one vertex of the web, as `Vert` describes it
 fn put(b:*mg.Builder,v:Vert)Allocator.Error!void{
-  try b.v.append(b.gpa,.{.pos=v.at,.nrm=v.out,.col=color.Rgba8.of(.{v.ids[0],v.ids[1],v.ids[2],@intFromEnum(v.kind)+4*@intFromEnum(v.shape)}),.tu=v.tu,.part=@intFromEnum(lib.vertex.Part.plexus)});
+  try b.v.append(b.gpa,.{.pos=v.at,.nrm=v.out,.col=color.Rgba8.of(.{v.ids[0],v.ids[1],v.ids[2],@intFromEnum(v.kind)+4*@intFromEnum(v.shape)}),.tu=.{v.tu[0],v.tu[1],0},.part=@intFromEnum(lib.vertex.Part.plexus)});
 }
 /// one web: which shape it holds, how far its lines reach, how many points,
 /// and in how many points at a time they keep to themselves
@@ -163,7 +163,7 @@ fn points(b:*mg.Builder,w:Web)Allocator.Error!void{
       v.nrm=m.norm(v.pos);
       v.pos=v3(w.reach,twin,0);
       v.col=color.Rgba8.of(.{id,id,id,@intFromEnum(Kind.point)+4*@intFromEnum(w.shape)});
-      v.tu=.{0,0};
+      v.tu=.{0,0,0};
     }
   };
 }

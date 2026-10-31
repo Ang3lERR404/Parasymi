@@ -27,6 +27,7 @@ layout(location = 10) in float v_glow; // the light a radiant fragment carries
 layout(location = 11) in vec2 v_pod;   // a pod: how far swelled (< 0 not one), how freshly its yield was taken
 layout(location = 13) flat in float v_glitch; // how far the unforming has shattered it 0..1 (< 0 none)
 layout(location = 12) flat in vec4 v_yield; // the colour of what it yields (linear), how ripe 0..1
+layout(location = 14) in vec2 v_sheet;      // a leaf or petal: along it 0..1, across it 1..3 (0: not a sheet)
 layout(location = 0) out vec4 o;
 
 // what the sap carries at night (moonlight; by day plain white)
@@ -216,6 +217,9 @@ void surface() {
   // on its structures (part.frag): unmuted, the light through them theirs
   bool green = aff > 0.5 && part == PART_LEAF;
   if (green) body = v_col;
+  // a leaf's or petal's own surface: veins, the net between, edge and base
+  float trans;
+  body = sheetColour(body, part, v_sheet, trans);
   body = mix(DEAD_BROWN, body, health);
   // symbiotes and parasites are matte living tissue, stems, vines, leaves
   // and petals alike: sap shows through them, but nothing wet or glossy sits
@@ -246,8 +250,8 @@ void surface() {
   // light scattered inside thin tissue tints it with its sap; light from
   // behind and at grazing angles shows the sap most (a bloom's or a mote's
   // light too, wrapping round the tissue it falls on)
-  c += sap * lit * (through * 0.8 + fres * 0.45 + wrap * 0.22) * show * health;
-  c += sap * pl.wrapped * 0.6 * show * health;
+  c += sap * lit * (through * 0.8 * trans + fres * 0.45 + wrap * 0.22) * show * health;
+  c += sap * pl.wrapped * 0.6 * show * health * trans;
   // sap moving through the plant (sharing, draining) brightens it as it passes
   c += sap * lit * moving * 0.3 * show;
   // sap is alive: bubbles drifting up inside thin growth, beads of it

@@ -58,7 +58,7 @@ pub const Petal=struct{
 /// runs base to tip.
 pub fn petal(b:*Builder,p:Petal)Allocator.Error!void{
   // how many rows the petal has, claw to tip
-  const ringCount=7;
+  const ringCount=10;
   // straight up, which the petal rises from
   const up=m.v3(0,1,0);
   // the way its width lies, across its facing

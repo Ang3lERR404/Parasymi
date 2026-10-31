@@ -79,6 +79,17 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
 ## Plants
 ### All plants
 - 4 variants per species, picked by tile.
+- **Leaves and petals** (`meshgen.lamina`) are finely built: 13 points
+  across the face, 8 across the back, up to 13 rows, so their curves read
+  smooth. Each vertex carries where across the sheet it lies (mesh
+  `tu.z`, 1..3 edge to edge, 0 off a sheet), and the shaders draw their
+  surface from it (surface.glsl `sheetColour`, on plants and structures
+  alike):
+  - a leaf: a pale midrib, lateral veins arching out toward the tip and
+    fading before the edge, a fine net of veinlets between them, a
+    yellower edge, a paler base; light through it is shaded by its veins;
+  - a petal: fine streaks running out from its claw, a deeper throat, a
+    paler edge.
 - **Material** (plant.frag) speaks the wolf's vocabulary:
   - muted skin, a sheen like fibre;
   - old growth densifies to root brown;

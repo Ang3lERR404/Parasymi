@@ -41,8 +41,9 @@ pub const Mesh=extern struct{
   /// its colour, eight bits a channel
   col:color.Rgba8,
   /// x: height along the thing 0..1 (a game drives growth and sway off it),
-  /// y: position along a sheet (a leaf, a petal) 0..1
-  tu:[2]f32,
+  /// y: position along a sheet (a leaf, a petal) 0..1, z: across a sheet,
+  /// 1..3 edge to edge (its midrib at 2), 0 off any sheet
+  tu:[3]f32,
   /// its role (the game's enum, see gfx/meshgen.zig `Mesher`)
   part:u32,
 };

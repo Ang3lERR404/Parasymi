@@ -90,3 +90,77 @@ void keepPass(float a) {
   if (a < SOLID) discard;
 #endif
 }
+
+// ---- leaves and petals (meshgen laminae: along 0..1 base to tip, across
+// 1..3 edge to edge, its midrib at 2; 0 off any sheet) ----
+// lateral vein pairs along a leaf; streaks across a petal
+const float LEAF_LATERALS = 7.0;
+const float PETAL_STREAKS = 9.0;
+// what a sheet's surface holds at a point: its veins (midrib, laterals, or
+// a petal's streaks) 0..1, the fine net between them 0..1, how near its edge
+// 0..1, and where on it the point lies
+struct Sheet { float vein; float net; float edge; float along; float across; };
+// how near `p` lies to a border between worley cells: 1 on the border
+float sheetNet(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 d = vec2(8.0);
+  for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+    vec2 o = vec2(x, y);
+    vec2 c = o + vec2(hash12(i + o), hash12(i + o + 23.1)) - f;
+    float e = dot(c, c);
+    if (e < d.x) d = vec2(e, d.x); else if (e < d.y) d.y = e;
+  }
+  d = sqrt(d);
+  return 1.0 - smoothstep(0.02, 0.09, d.y - d.x);
+}
+// a leaf's surface: the midrib, lateral veins arching out from it toward
+// the tip and fading before the edge, and the fine net of veinlets between
+// them (each fading out where a pixel spans too much to show it)
+Sheet leafSheet(vec2 sh) {
+  float along = sh.x, across = sh.y - 2.0, a = abs(across);
+  float fa = fwidth(a);
+  float mid = 1.0 - smoothstep(0.035, 0.06 + 2.0 * fa, a);
+  float phase = along * LEAF_LATERALS - a * 1.25 + a * a * 0.45;
+  float fp = fwidth(phase);
+  float d = abs(fract(phase + 0.5) - 0.5);
+  float w = mix(0.07, 0.025, a);
+  float lat = (1.0 - smoothstep(w, w + fp * 1.5, d)) * smoothstep(0.04, 0.12, a) * (1.0 - smoothstep(0.8, 0.96, a));
+  lat *= smoothstep(0.03, 0.12, along) * (1.0 - smoothstep(0.86, 0.98, along)) * (1.0 - smoothstep(0.25, 0.6, fp));
+  vec2 q = vec2(across * 9.0, along * 24.0);
+  float net = sheetNet(q) * (1.0 - smoothstep(0.3, 0.8, length(fwidth(q))));
+  return Sheet(max(mid, lat), net, smoothstep(0.72, 1.0, a), along, across);
+}
+// a petal's surface: fine streaks running out from its claw, wavering,
+// fading toward its tip, and its edge
+Sheet petalSheet(vec2 sh) {
+  float along = sh.x, across = sh.y - 2.0, a = abs(across);
+  float phase = across * PETAL_STREAKS + 0.18 * sin(along * 7.0 + across * 3.0);
+  float fp = fwidth(phase);
+  float d = abs(fract(phase + 0.5) - 0.5);
+  float streak = (1.0 - smoothstep(0.08, 0.08 + fp * 1.5, d)) * (1.0 - smoothstep(0.55, 0.95, along)) * (1.0 - smoothstep(0.3, 0.7, fp));
+  return Sheet(streak, 0.0, smoothstep(0.78, 1.0, a), along, across);
+}
+// a sheet's colour from its plain `body`: a leaf's veins paler and
+// yellower, the net between them a shade darker, its edge a little
+// yellower, its base paler; a petal's streaks deeper, its throat deeper,
+// its edge paler. `trans` (out): how much of the light through it gets
+// past its veins (they shade what shines through)
+vec3 sheetColour(vec3 body, int part, vec2 sh, out float trans) {
+  trans = 1.0;
+  if (sh.y < 0.5) return body;
+  if (part == PART_LEAF || part == PART_EAR) {
+    Sheet s = leafSheet(sh);
+    body = mix(body, body * vec3(1.3, 1.32, 0.92) + 0.015, s.vein * 0.6);
+    body *= 1.0 - 0.09 * s.net;
+    body = mix(body, body * vec3(1.1, 1.12, 0.78), s.edge * 0.45);
+    body *= mix(1.12, 1.0, smoothstep(0.0, 0.25, s.along));
+    trans = (1.0 - 0.55 * s.vein) * (1.0 - 0.3 * s.net);
+  } else if (part == PART_BLOOM) {
+    Sheet s = petalSheet(sh);
+    body = mix(body, body * 0.7, s.vein * 0.4);
+    body *= mix(0.75, 1.0, smoothstep(0.0, 0.4, s.along));
+    body = mix(body, mix(body, vec3(1.0), 0.18), s.edge * 0.5);
+    trans = 1.0 - 0.35 * s.vein;
+  }
+  return body;
+}

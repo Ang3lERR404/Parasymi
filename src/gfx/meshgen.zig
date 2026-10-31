@@ -77,7 +77,7 @@ pub const leavesAlong=flowers.leavesAlong;
 /// one leaf at a point along a path (the grower's leaf: `growth.Skeleton.leaves`)
 pub const leafAt=flowers.leafAt;
 /// how many segments a blade's midrib is cut into, base to tip
-pub const bladeSegs=8;
+pub const bladeSegs=12;
 /// mesh variants grown per species, so neighbouring plants differ in shape.
 pub const variantCount=4;
 /// the engine's builder and primitives, writing the garden's vertex roles

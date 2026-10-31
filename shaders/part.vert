@@ -14,7 +14,7 @@ out float gl_ClipDistance[1];
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 nrm;
 layout(location = 2) in vec4 col;
-layout(location = 3) in vec2 tu;
+layout(location = 3) in vec3 tu;    // along the part, along a sheet, across a sheet (1..3; 0 none)
 layout(location = 4) in uint part;  // 0 vine 1 leaf 2 sap/glow 3 claw/thorn 4 root 5 sap-lined leaf (ear) 6 resin ... 13 a conduit's core
 // per-instance
 layout(location = 5) in vec4 c0;
@@ -67,6 +67,7 @@ layout(location = 7) out float v_u;
 layout(location = 8) out vec3 v_obj;       // mesh-space point (sap bubbles ride with the body)
 layout(location = 9) flat out float v_phase; // per-instance phase (seeds a beam's motes)
 layout(location = 10) flat out float v_aux;  // a beam: 1 for a halo's edge; a flash: its age 0..1
+layout(location = 11) out vec2 v_sheet;      // a leaf or petal: along it 0..1, across it 1..3 (0: not a sheet)
 
 // how an instance is placed (vertex.zig `PartInstance.e.x`; must match)
 const int PLACE_MATRIX = 0;
@@ -702,7 +703,7 @@ void main() {
   // face and growing as it comes, one after another from its foot up,
   // fitting together as the blooms meet; then it is still
   if (part == PART_PRISM && drawn) {
-    float away = gatherAway(fragmentOf(tu, col.a).order, PRISM_PACE, PRISM_SPAN, sqrt(haloPull(ih.w)));
+    float away = gatherAway(fragmentOf(tu.xy, col.a).order, PRISM_PACE, PRISM_SPAN, sqrt(haloPull(ih.w)));
     p = gatherIn(p, nrm * PRISM_REACH, away, 1.0, PRISM_TURN);
     nm = gatherTurn(nm, away, PRISM_TURN);
   }
@@ -994,6 +995,7 @@ void main() {
   if (part == PART_HALO || part == PART_PROJECTION) v_fade = length(c0.xyz);
   if (drawn && part == PART_SHADOW) v_fade *= 1.0 - haloFold(ih.w);
   v_u = tu.y;
+  v_sheet = vec2(tu.y, tu.z);
   // the constellate web carries how far its beat runs to reach here, what
   // it is, and how much of it shows (as its glow)
   if (part == PART_PLEXUS) {

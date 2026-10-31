@@ -23,6 +23,7 @@ layout(location = 7) in float v_u;
 layout(location = 8) in vec3 v_obj;
 layout(location = 9) flat in float v_phase; // per-instance phase (seeds a beam's motes)
 layout(location = 10) flat in float v_aux;  // a beam: 1 for a halo's edge; a flash: its age 0..1
+layout(location = 11) in vec2 v_sheet;      // a leaf or petal: along it 0..1, across it 1..3 (0: not a sheet)
 layout(location = 0) out vec4 o;
 
 const vec3 SAP = AMBER;                        // linear amber, the only accent
@@ -445,7 +446,9 @@ void surface() {
     alpha = mix(v_fade, 1.0, fres);
     c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), sh, pl.mirrored, alpha);
   } else {
-    vec3 albedo = v_col;
+    // a leaf's or petal's own surface: veins, the net between, edge and base
+    float trans;
+    vec3 albedo = sheetColour(v_col, part, v_sheet, trans);
     float inner = 0.0;
     if (part == PART_STONE) {
       // weathered stone: its grain lights it, tipping the normal (the
@@ -467,7 +470,7 @@ void surface() {
     c = shadeLitWith(albedo, n, sh, pl.plain);
     // leaves and sap are thin/translucent: back light shines through (a
     // bloom's or a mote's too)
-    if (PART_IN(THIN, part)) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pl.behind * 0.3);
+    if (PART_IN(THIN, part)) c += albedo * (max(dot(-n, SUN), 0.0) * 0.3 * sh + pl.behind * 0.3) * trans;
     c += SAP * inner * 0.25;
     // woven strands: a Kajiya-Kay sheen across the tube's tangent so vines
     // read as directional fibres rather than flat facets

@@ -23,12 +23,13 @@ const stride=lib.meshgen.stride;
 /// half a leaf's or petal's thickness, as a share of its broadest half-width
 pub const laminaThick:f32=0.055;
 /// most rows a lamina may have
-const maxLamina=12;
+const maxLamina=16;
 /// a lamina's cross-section, once round: the face (its cupped side) edge to
 /// edge with the vein's crest at its middle, round the right edge, the
-/// back, round the left edge
-const faceU=[_]f32{-1,-0.5,-0.07,0,0.07,0.5,1};
-const backU=[_]f32{1,0.5,0,-0.5,-1};
+/// back, round the left edge (finely, so its curve reads smooth, never faceted)
+const faceU=[_]f32{-1,-0.82,-0.62,-0.42,-0.22,-0.07,0,0.07,0.22,0.42,0.62,0.82,1};
+/// (the back, edge to edge)
+const backU=[_]f32{1,0.7,0.4,0.13,-0.13,-0.4,-0.7,-1};
 /// the edge's bevel: the angles (off the midplane) it is rounded over at
 const bevel=[_]f32{0.9,-0.9};
 /// how many points go round a lamina's cross-section
@@ -84,6 +85,8 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
   var tpl:[maxLamina][columns]V3=undefined;
   // each point's colour, the vein's paler
   var cs:[maxLamina][columns]color.Rgba8=undefined;
+  // how far across the sheet each point lies (-1 .. 1, the midrib at 0)
+  var ac:[columns]f32=undefined;
   // the vein's pale colour, as the vertex holds it
   const pale=veinPale.toRgba8(255);
   for(0..rows)|i|{
@@ -108,6 +111,7 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
       const rise:f32=if(u!=0)0 else if(l.vein)|v|@min(v[i],0.3*w)else 0;
       pts[i][j]=mid(l,i,u)+fc*m.splat3(half*(1-edgeThin*u*u)+rise);
       tpl[i][j]=fc;
+      ac[j]=u;
       cs[i][j]=if(rise>0)color.mix(l.col[i],pale,0.35)else l.col[i];
       j+=1;
     }
@@ -122,6 +126,7 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
         const out=sd*m.splat3(e*@cos(a))+fc*m.splat3(@sin(a));
         pts[i][j]=mid(l,i,e)+out*m.splat3(rim);
         tpl[i][j]=out;
+        ac[j]=e;
         cs[i][j]=l.col[i];
         j+=1;
       }
@@ -129,6 +134,7 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
       for(backU)|u|{
         pts[i][j]=mid(l,i,u)-fc*m.splat3(half*(1-edgeThin*u*u));
         tpl[i][j]=-fc;
+        ac[j]=u;
         cs[i][j]=l.col[i];
         j+=1;
       }
@@ -172,7 +178,11 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
       // front faces wind counter-clockwise seen from outside
       // its winding, flipped to run counter-clockwise from outside
       const order=if(m.dot(m.cross(p[1]-p[0],p[2]-p[0]),n)<0)[3]usize{tri[0],tri[2],tri[1]}else tri;
-      for(order)|v|try b.put(pts[r[v]][c[v]],ns[r[v]][c[v]],cs[r[v]][c[v]],l.t,m.ratio(r[v],rows-1),l.part);
+      for(order)|v|{
+        try b.put(pts[r[v]][c[v]],ns[r[v]][c[v]],cs[r[v]][c[v]],l.t,m.ratio(r[v],rows-1),l.part);
+        // where across the sheet it lies, for its veins (1 .. 3)
+        b.v.items[b.v.items.len-1].tu[2]=ac[c[v]]+2;
+      }
     }
   };
 }

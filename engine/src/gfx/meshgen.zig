@@ -240,7 +240,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     /// add one vertex: at `p` facing `n` (normalised here), coloured `col`,
     /// tu `t` up the thing and `u` across, with role `part`
     pub fn put(b:*Builder,p:V3,n:V3,col:color.Rgba8,t:f32,u:f32,part:Part)Allocator.Error!void{
-      try b.v.append(b.gpa,.{.pos=p,.nrm=m.norm(n),.col=col,.tu=.{t,u},.part=@intFromEnum(part)});
+      try b.v.append(b.gpa,.{.pos=p,.nrm=m.norm(n),.col=col,.tu=.{t,u,0},.part=@intFromEnum(part)});
     }
     /// apply a transform to every vertex added since `start` (build in a unit
     /// space, then place/scale into the final part space).

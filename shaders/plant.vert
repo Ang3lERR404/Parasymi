@@ -10,7 +10,7 @@ invariant gl_Position;
 layout(location = 0) in vec3 pos;
 layout(location = 1) in vec3 nrm;
 layout(location = 2) in vec4 col;
-layout(location = 3) in vec2 tu;    // height along plant, position along blade
+layout(location = 3) in vec3 tu;    // height along plant, position along blade, across a sheet (1..3; 0 none)
 layout(location = 4) in uint part;  // 0 stem 1 leaf 2 bloom 3 thorn 4 tendril ... 17 pod
 // per-instance
 layout(location = 5) in vec3 ipos;
@@ -40,6 +40,7 @@ layout(location = 10) out float v_glow;       // how much light a radiant fragme
 layout(location = 11) out vec2 v_pod;         // a pod: how far it has swelled 0..1 (< 0 not a pod), how freshly its yield was taken 1..0
 layout(location = 12) flat out vec4 v_yield;  // the colour of what it yields (linear), how ripe the plant is 0..1
 layout(location = 13) flat out float v_glitch; // how far the unforming has shattered it 0..1 (< 0 none)
+layout(location = 14) out vec2 v_sheet;       // a leaf or petal: along it 0..1, across it 1..3 (0: not a sheet)
 
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
@@ -154,6 +155,7 @@ vec3 unformAt(vec3 wp, vec3 n, vec3 base, float g, float seed, float t) {
 }
 
 void main() {
+  v_sheet = vec2(tu.y, tu.z);
   float t = pc.eye_time.w;
   v_glitch = ig.x;
   float growth = ia.x, fill = ia.y, seed = ia.z, aff = ia.w;
@@ -187,7 +189,7 @@ void main() {
     // the core). Motes of light spiral in and are taken up. It never bends
     // from a root. A vesper's pieces fall to it out of the sky instead, and
     // its floating leaves (ring 6) fold and breathe as the petals do.
-    Fragment f = fragmentOf(tu, col.a);
+    Fragment f = fragmentOf(tu.xy, col.a);
     float order = f.order, bearing = f.bearing, ring = f.ring, held = f.held;
     bool leaves = abs(ring - 6.0) < 0.5;
     bool rooted = abs(ring - 8.0) < 0.5;

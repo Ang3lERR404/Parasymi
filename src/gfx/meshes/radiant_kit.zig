@@ -94,7 +94,7 @@ pub fn fragment(b:*mg.Builder,start:usize,f:Fragment)void{
   // the bearing as a byte, a whole turn over 0..255
   const a:u8=@intFromFloat(@mod(f.bearing,m.tau)/m.tau*255);
   for(b.v.items[start..])|*v|{
-    v.tu=.{f.order,m.f(@intFromEnum(f.ring))};
+    v.tu=.{f.order,m.f(@intFromEnum(f.ring)),0};
     v.col.a=a;
   }
 }

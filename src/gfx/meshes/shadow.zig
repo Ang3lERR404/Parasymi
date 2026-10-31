@@ -42,5 +42,5 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   // tu.x carries the radial fraction (patch writes `us` to tu.y): move it over
   const start=b.mark();
   try mg.patch(b,r,c,&pts,&ns,&cs,&us,0,.shadow);
-  for(b.v.items[start..])|*v|v.tu=.{v.tu[1],0};
+  for(b.v.items[start..])|*v|v.tu=.{v.tu[1],0,0};
 }
