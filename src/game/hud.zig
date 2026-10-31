@@ -263,6 +263,8 @@ pub const panels=struct{
   pub const pause=@import("hud/pause.zig");
   /// the options panel
   pub const options=@import("hud/options.zig");
+  /// the keybinds list
+  pub const keybinds=@import("hud/keybinds.zig");
   /// the saved gardens list
   pub const gardens=@import("hud/gardens.zig");
   /// the naming card for a new garden

@@ -1,5 +1,7 @@
 //! what every key and mouse button does, loaded once at startup from
-//! `filePath` (`controls.cfg`) and never read again. Game code asks about an
+//! `filePath` (`controls.cfg`) and never read again; the KEYBINDS menu
+//! rebinds an action (`rebind`, `reset`) and writes what differs from the
+//! game's own back to the file (`write`). Game code asks about an
 //! `Action`, never a key: `ctl.pressed(in, .harvest)`.
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
@@ -20,6 +22,10 @@ const splitScalar=std.mem.splitScalar;
 const values=std.enums.values;
 /// the test harness
 const testing=std.testing;
+/// deep equality, for whether two bindings are the same key
+const eqlDeep=std.meta.eql;
+/// a text writer, for writing the bindings out
+const Writer=Io.Writer;
 /// the runtime cfg reader and its list separator
 const ctext=lib.engine.core.text;
 /// the platform's keyboard and mouse state
@@ -128,6 +134,8 @@ pub const Action=enum{
   options,
   /// while paused: open the saved gardens
   gardens,
+  /// while paused: open the keybinds
+  keybinds,
   /// typing: take back the selection, else the character before the caret
   erase,
   /// typing: take out the selection, else the character after the caret
@@ -183,13 +191,27 @@ pub const Binds=struct{
   len:u8=0,
   /// the real bindings, as a slice
   pub fn items(b:*const Binds)[]const Bind{return b.list[0..b.len];}
+  /// whether `b` and `o` hold the same bindings in the same order
+  pub fn same(b:*const Binds,o:*const Binds)bool{
+    if(b.len!=o.len)return false;
+    for(b.items(),o.items())|x,y|if(!eqlDeep(x,y))return false;
+    return true;
+  }
 };
 /// the cfg as written: each action a list of key and button names.
 const Source=struct{bind:EnumArray(Action,[]const u8)=.initFill("")};
 /// the loaded bindings; empty until `load` (headless tests `fill` them).
-// decision: one process-wide table, set once at startup and read-only
-// after, like `txt.s`.
+// decision: one process-wide table, set once at startup like `txt.s`;
+// only the KEYBINDS menu changes it after, between frames.
 pub var map:EnumArray(Action,Binds)=.initFill(.{});
+/// the game's own bindings, as shipped, for what a reset returns to and
+/// what is written back (empty until `load`; tests set it to `map`)
+pub var stock:EnumArray(Action,Binds)=.initFill(.{});
+/// the controls file could not be written
+pub const WriteError=error{ControlsUnwritable};
+/// the most the written file can hold (an action's line is well under
+/// a hundred bytes)
+const maxWritten:usize=1<<14;
 /// the cfg could not be read, or named a key that does not exist
 /// (or too many for one action)
 pub const Error=error{NoControls,BadControls}||Allocator.Error;
@@ -200,6 +222,8 @@ pub fn load(gpa:Allocator,io:Io)Error!void{
   // the cfg text in home (made or refreshed from the game's own), freed once parsed
   const src=try home.stock(gpa,io,filePath,default);
   defer gpa.free(src);
+  try fill(&.{default});
+  stock=map;
   fill(&.{default,src})catch|e|switch(e){
     error.OutOfMemory=>return error.OutOfMemory,
     else=>{
@@ -245,7 +269,62 @@ pub fn fill(texts:[]const[]const u8)Error!void{
   map=out;
 }
 /// forgets every binding (tests, so they do not leak into the next)
-pub fn unload()void{map=.initFill(.{});}
+pub fn unload()void{
+  map=.initFill(.{});
+  stock=.initFill(.{});
+}
+/// sets `b` in place of `a`'s first binding of its kind (the keyboard's
+/// and mouse's, or the gamepad's), else beside its others while there is
+/// room, else over its last; a key it already has leaves it as it is
+pub fn rebind(a:Action,b:Bind)void{
+  // the action's bindings
+  const bs=map.getPtr(a);
+  for(bs.items())|have|if(eqlDeep(have,b))return;
+  for(bs.list[0..bs.len])|*have|if(have.onPad()==b.onPad()){
+    have.*=b;
+    return;
+  };
+  if(bs.len<maxBinds){
+    bs.list[bs.len]=b;
+    bs.len+=1;
+    return;
+  }
+  bs.list[maxBinds-1]=b;
+}
+/// `a` bound as the game ships it again
+pub fn reset(a:Action)void{map.set(a,stock.get(a));}
+/// every action bound as the game ships it again
+pub fn resetAll()void{map=stock;}
+/// whether `a` is bound otherwise than the game ships it
+pub fn changed(a:Action)bool{return!map.getPtrConst(a).same(stock.getPtrConst(a));}
+/// writes the bindings that differ from the game's own to `w` as a cfg
+/// (`[bind]`, a line each), so the rest follow the game's as it changes
+pub fn format(w:*Writer)Writer.Error!void{
+  try w.writeAll("# Parasymi: bindings set in the KEYBINDS menu (or by hand). Only\n# those changed from the game's own are here; the rest follow it.\n# `action = name | name`, names as in the game's controls.cfg.\n\n[bind]\n");
+  for(values(Action))|a|if(changed(a)){
+    try w.print("{t} = ",.{a});
+    for(map.getPtrConst(a).items(),0..)|b,i|{
+      if(i>0)try w.writeAll(&.{' ',ctext.listSep,' '});
+      try b.write(w);
+    }
+    try w.writeByte('\n');
+  };
+}
+/// writes the bindings to `filePath` in home: what differs from the
+/// game's own, or (nothing changed) the game's own file, stamped, so it
+/// follows the game again
+pub fn write(io:Io)WriteError!void{
+  // whether any action is bound otherwise than shipped
+  const any=for(values(Action))|a|{
+    if(changed(a))break true;
+  }else false;
+  if(!any)return home.restock(io,filePath,default);
+  // room for the file, and the writer that fills it
+  var buf:[maxWritten]u8=undefined;
+  var w:Writer=.fixed(&buf);
+  format(&w) catch return error.ControlsUnwritable;
+  home.dir().writeFile(io,.{.sub_path=filePath,.data=w.buffered()}) catch return error.ControlsUnwritable;
+}
 /// is any key or button bound to `a` held?
 pub fn down(in:*const Input,a:Action)bool{
   for(map.getPtrConst(a).items())|b|if(in.down(b))return true;
@@ -276,4 +355,27 @@ test"the controls file binds every action"{
   try fill(&.{@embedFile("controls.cfg")});
   for(values(Action))|a|try testing.expect(map.get(a).len>0);
   try testing.expectEqual(Bind{.button=.left},map.get(.use).list[0]);
+}
+test"a rebound action is written back, read back the same, and reset"{
+  defer unload();
+  try fill(&.{default});
+  stock=map;
+  // a key takes the place of the first key, a pad button of the first pad button
+  rebind(.moveForward,.{.key=.i});
+  rebind(.back,.{.pad=.y});
+  try testing.expectEqual(Bind{.key=.i},map.get(.moveForward).list[0]);
+  try testing.expectEqual(Bind{.key=.up},map.get(.moveForward).list[1]);
+  try testing.expectEqual(Bind{.pad=.y},map.get(.back).list[1]);
+  try testing.expect(changed(.moveForward) and changed(.back) and !changed(.use));
+  // room for the file, the writer that fills it, and the bindings as written
+  var buf:[maxWritten]u8=undefined;
+  var w:Writer=.fixed(&buf);
+  try format(&w);
+  const want=map;
+  try fill(&.{default,w.buffered()});
+  for(values(Action))|a|try testing.expect(map.getPtrConst(a).same(want.getPtrConst(a)));
+  reset(.moveForward);
+  try testing.expect(!changed(.moveForward));
+  resetAll();
+  for(values(Action))|a|try testing.expect(!changed(a));
 }

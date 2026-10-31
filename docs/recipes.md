@@ -149,9 +149,10 @@ A pass any game could use goes in the engine instead
 ## An input
 1. An `ctl.Action` tag in `game/controls.zig`.
 2. A `[bind]` line in `src/cfg/controls.cfg`.
-3. Text names it as `{@action}`.
+3. Its name in `[action]` of `src/cfg/parasymi.cfg` (the keybinds menu).
+4. Text names it as `{@action}`.
 
-Test catches: an unbound action.
+Test catches: an unbound or unnamed action.
 
 ## A player-facing string
 1. A field in `txt.Strings` (`game/text.zig`).

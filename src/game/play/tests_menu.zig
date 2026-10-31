@@ -468,3 +468,43 @@ test"the HUD holds as many clickable rows as are drawn"{
   try testing.expectEqual(@as(usize,500),g.rows.all().len);
   try testing.expect(g.rows.at(.{1997,2})!=null);
 }
+test"a keybind clicked listens: the next key binds it, back cancels, the other button resets it"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  ctl.stock=ctl.map;
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  g.mode=.paused;
+  try click.on(&g,&in,hud.row(.pause,.{.row=.keybinds}),screen);
+  try testing.expectEqual(Mode.keybinds,g.mode);
+  try click.on(&g,&in,hud.row(.keybinds,.{.action=.run}),screen);
+  try testing.expectEqual(ctl.Action.run,g.rebinding.?);
+  // back while listening cancels, the menu stays
+  try click.key(&g,&in,.back,screen);
+  try testing.expectEqual(null,g.rebinding);
+  try testing.expectEqual(Mode.keybinds,g.mode);
+  // listening again, the next key pressed is the new one
+  try click.on(&g,&in,hud.row(.keybinds,.{.action=.run}),screen);
+  in.advance();
+  in.hold(.{.key=.b},true);
+  try g.update(&in,tickTime,screen);
+  in.advance();
+  in.hold(.{.key=.b},false);
+  try testing.expectEqual(null,g.rebinding);
+  try testing.expectEqual(engine.platform.input.Bind{.key=.b},ctl.map.get(.run).list[0]);
+  try testing.expect(g.request.?==.bindings);
+  g.request=null;
+  // the other button sets it back as shipped
+  try click.press(&g,&in,hud.row(.keybinds,.{.action=.run}),screen,.remove);
+  try testing.expect(!ctl.changed(.run));
+  try testing.expect(g.request.?==.bindings);
+  try click.on(&g,&in,hud.row(.keybinds,.back),screen);
+  try testing.expectEqual(Mode.paused,g.mode);
+}

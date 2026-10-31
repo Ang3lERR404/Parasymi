@@ -19,6 +19,8 @@ const startsWith=std.mem.startsWith;
 const stringToEnum=std.meta.stringToEnum;
 /// the test helpers
 const testing=std.testing;
+/// a text writer, for writing a bind's name
+const Writer=std.Io.Writer;
 /// GLFW: the window, keys and mouse buttons
 const glfw=@import("zglfw");
 /// a keyboard key, as GLFW names it
@@ -49,6 +51,17 @@ pub const Bind=union(enum){
     if(eql(u8,name,@tagName(Key.unknown)))return null;
     return if(stringToEnum(Key,name))|k|.{.key=k}else null;
   }
+  /// writes the bind's name to `w` as `parse` reads it back (`w`,
+  /// `mouse_left`, `pad_a`)
+  pub fn write(b:Bind,w:*Writer)Writer.Error!void{
+    switch(b){
+      .key=>|k|try w.writeAll(@tagName(k)),
+      .button=>|k|try w.print(mouse++"{t}",.{k}),
+      .pad=>|k|try w.print(pad++"{t}",.{k}),
+    }
+  }
+  /// whether `b` is a gamepad's button (else the keyboard's or the mouse's)
+  pub fn onPad(b:Bind)bool{return b==.pad;}
 };
 /// which keys are held, one bit a key
 const Keys=EnumSet(Key);
@@ -192,6 +205,14 @@ pub const Input=struct{
       .button,.pad=>false,
     };
   }
+  /// the first key, mouse button or gamepad button that went down this
+  /// frame (keys first), if any: what a binding being set is set to
+  pub fn anyPressed(in:*const Input)?Bind{
+    for(comptime values(Key))|k|if(k!=.unknown and in.pressed(.{.key=k}))return.{.key=k};
+    for(comptime values(Button))|k|if(in.pressed(.{.button=k}))return.{.button=k};
+    for(comptime values(PadButton))|k|if(in.pressed(.{.pad=k}))return.{.pad=k};
+    return null;
+  }
   /// headless tests: hold `b` down (or let it go) as of this frame.
   pub fn hold(in:*Input,b:Bind,on:bool)void{
     switch(b){
@@ -272,13 +293,23 @@ test"binds parse by key and mouse button name"{
   try testing.expectEqual(Bind{.pad=.dpad_up},Bind.parse("pad_dpad_up").?);
   try testing.expectEqual(Bind{.pad=.a},Bind.parse("pad_a").?);
   try testing.expectEqual(null,Bind.parse("pad_z"));
+  // each written name parses back to the bind it was written from
+  for([_]Bind{.{.key=.left_shift},.{.key=.F5},.{.button=.right},.{.pad=.dpad_up}})|b|{
+    // room for the name, and the writer that fills it
+    var buf:[32]u8=undefined;
+    var w:Writer=.fixed(&buf);
+    try b.write(&w);
+    try testing.expectEqual(b,Bind.parse(w.buffered()).?);
+  }
 }
 test"a bind goes down, repeats while held long, and is let go"{
   // an input without a window, of its own clipboard
   var clip=Clip{};
   var in:Input=.{.win=undefined,.ownClip=&clip};
+  try testing.expectEqual(null,in.anyPressed());
   in.hold(.{.pad=.a},true);
   try testing.expect(in.pressed(.{.pad=.a}) and in.repeated(.{.pad=.a}));
+  try testing.expectEqual(Bind{.pad=.a},in.anyPressed().?);
   in.advance();
   try testing.expect(in.down(.{.pad=.a})and!in.pressed(.{.pad=.a}));
   in.hold(.{.pad=.a},false);

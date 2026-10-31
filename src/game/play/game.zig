@@ -170,6 +170,10 @@ pub const Game=struct{
   namingFrom:Mode=.roam,
   /// the saved gardens list's scroll: by wheel, its stem, or the row chosen
   gardenList:Scroll=.{.shown=gardensShown},
+  /// the keybinds list's scroll: by wheel, its stem, or the row the keys are on
+  bindList:Scroll=.{.shown=lib.play.bindsShown},
+  /// the keybinds menu: the action listening for its new key, if any
+  rebinding:?lib.controls.Action=null,
   /// keeps running while paused, so the UI still breathes.
   uiTime:f64=0,
   /// the hotbar's items
@@ -465,6 +469,10 @@ pub const Game=struct{
   pub const choose=lib.play.menus.choose;
   /// opens the saved gardens (`menus.openGardens`)
   pub const openGardens=lib.play.menus.openGardens;
+  /// opens the keybinds (`menus.openKeybinds`)
+  pub const openKeybinds=lib.play.menus.openKeybinds;
+  /// the keybinds list scrolled, or a key bound (`menus.keybinds`)
+  pub const keybinds=lib.play.menus.keybinds;
   /// main has listed the gardens (`menus.listed`)
   pub const listed=lib.play.menus.listed;
   /// scrolls the gardens list (`menus.scroll`)

@@ -121,7 +121,7 @@ zig build run -- --demo --inspect=eyes --shots=4 --orbit=8 --pitch=30
 ```
 
 ## A HUD panel
-`--panel=<belly|research|paused|options|gardens|naming>` holds it open and
+`--panel=<belly|research|paused|options|keybinds|gardens|naming>` holds it open and
 keeps the HUD in `--inspect` shots (`--panel=overview` roams with alt mode
 held on), e.g.
 

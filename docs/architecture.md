@@ -35,8 +35,14 @@ How game code asks about input:
 - Modifiers are actions too (`alt`, `take`, `run`).
 - The mouse wheel and cursor are axes, not bindings.
 
-Adding one: a new input = an `Action` tag + a cfg line. The test fails on
-an unbound action.
+Adding one: a new input = an `Action` tag + a cfg line + its name in
+`[action]` of `parasymi.cfg` (the keybinds menu lists it). The tests fail
+on an unbound or unnamed action.
+
+Rebinding in game (pause menu, KEYBINDS): `ctl.rebind`/`reset` change
+`ctl.map` between frames; main (`.bindings` request) writes what differs
+from `ctl.stock` with `ctl.write`, then reads the strings again so every
+`{@action}` follows.
 
 Headless tests `ctl.fill` the embedded cfg and `ctl.hold` actions.
 

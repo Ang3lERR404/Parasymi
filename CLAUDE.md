@@ -78,7 +78,7 @@ zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
 zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
-zig build run -- --panel=<belly|research|paused|options|gardens|naming|overview>
+zig build run -- --panel=<belly|research|paused|options|keybinds|gardens|naming|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
 zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --channel=<name> --shot]

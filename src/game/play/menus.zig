@@ -22,6 +22,10 @@ const flyFastSpeed=lib.play.flyFastSpeed;
 const gardenEase=lib.play.gardenEase;
 /// how many rows a wheel notch scrolls the gardens list
 const gardenNotch=lib.play.gardenNotch;
+/// keybinds menu: how many rows a wheel notch scrolls
+const bindNotch=lib.play.bindNotch;
+/// every action, one keybinds row each, in order
+const actions=lib.std.enums.values(ctl.Action);
 /// the HUD under the mouse, the keys and the pad
 const pointer=lib.play.pointer;
 /// the game, which these act on
@@ -35,8 +39,10 @@ const PauseRow=lib.play.PauseRow;
 /// turns it (the other button turns it back); in the saved gardens it
 /// chooses a garden, or saves or loads it. The arrows, tab and the pad
 /// move between the rows and confirm chooses; keys still work for the
-/// pause rows; the name prompt takes the typing.
+/// pause rows; the name prompt takes the typing; a keybind listening
+/// takes the next key.
 pub fn menu(g:*Game,in:*const Input,dt:f32)void{
+  if(g.mode==.keybinds)if(g.rebinding)|a|return listen(g,in,a);
   pointer.point(g,in,in.mouse);
   // the HUD row under the mouse, if any
   const hit=g.rows.at(in.mouse);
@@ -44,12 +50,14 @@ pub fn menu(g:*Game,in:*const Input,dt:f32)void{
   if(g.mode==.paused){
     if(ctl.pressed(in,.quit))g.request=.quit;
     if(ctl.pressed(in,.options))g.mode=.options;
+    if(ctl.pressed(in,.keybinds))g.openKeybinds();
     if(ctl.pressed(in,.gardens))g.openGardens();
   }
   pointer.steer(g,in);
   pointer.typeInto(g,in);
   pointer.clicks(g,in,hit);
   if(g.mode==.gardens)g.scroll(in,dt);
+  if(g.mode==.keybinds)g.keybinds(in,dt);
   if(g.mode==.options)hud.panels.options.tick(g,dt);
 }
 /// does what pause row `row` says: resume, open the options or the saved
@@ -58,6 +66,7 @@ pub fn choose(g:*Game,row:PauseRow)void{
   switch(row){
     .@"resume"=>g.mode=.roam,
     .options=>g.mode=.options,
+    .keybinds=>g.openKeybinds(),
     .gardens=>g.openGardens(),
     .fullscreen=>g.opts.fullscreen=!g.opts.fullscreen,
     .quit=>g.request=.quit,
@@ -72,6 +81,33 @@ pub fn openGardens(g:*Game)void{
   g.deleting=false;
   g.gardenList.reset();
   g.keyFocus=null;
+}
+/// the keybinds menu opens at its top, listening for nothing
+pub fn openKeybinds(g:*Game)void{
+  g.mode=.keybinds;
+  g.rebinding=null;
+  g.bindList.reset();
+  g.keyFocus=null;
+}
+/// the action `a` listening: the first key, mouse or pad button pressed
+/// binds it (back, which cancels, never reaches here); main writes the
+/// bindings out
+fn listen(g:*Game,in:*const Input,a:ctl.Action)void{
+  g.bindList.keep(@intFromEnum(a));
+  const b=in.anyPressed() orelse return;
+  ctl.rebind(a,b);
+  g.rebinding=null;
+  g.request=.bindings;
+}
+/// the wheel scrolls the keybinds list (its stem, held, drags it: the
+/// keybinds panel's `drag`); the row the keys are on is kept in view
+pub fn keybinds(g:*Game,in:*const Input,dt:f32)void{
+  g.bindList.wheel(in.scroll,bindNotch);
+  if(hud.own(.keybinds,g.keyFocus))|p|switch(p){
+    .action=>|a|g.bindList.keep(@intFromEnum(a)),
+    .reset,.back,.scroll=>{},
+  };
+  g.bindList.tick(actions.len,dt,gardenEase);
 }
 /// main has just listed the gardens (`gardens`): the played one is
 /// chosen (else the choice is kept in range) and scrolled into view.

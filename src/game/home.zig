@@ -124,6 +124,9 @@ fn untouched(text:[]const u8)?[]const u8{
   const body=text[nl+1..];
   return if(Wyhash.hash(0,body)==hash)body else null;
 }
+/// puts the game's own `default` back as `path`, stamped, so it is
+/// refreshed with the game again (an edited copy given up)
+pub fn restock(io:Io,path:[]const u8,default:[]const u8)void{write(io,path,default);}
 /// writes `body` under a stamp of itself (a failure only costs the copy).
 fn write(io:Io,path:[]const u8,body:[]const u8)void{
   // the file being written, made fresh

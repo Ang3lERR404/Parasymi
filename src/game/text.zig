@@ -22,6 +22,8 @@ const toUpper=std.ascii.toUpper;
 const assert=std.debug.assert;
 /// the test harness
 const testing=std.testing;
+/// every tag of an enum, for the test that every action is named
+const values=std.enums.values;
 /// finds a token in a string (tests)
 const indexOf=std.mem.indexOf;
 /// a type's fields, for counting list entries against enums
@@ -219,6 +221,8 @@ pub const Strings=struct{
     noFullscreen:S="",
     /// the options file could not be written, and why (`{0}`)
     optionsUnsaved:S="",
+    /// the controls file could not be written, and why (`{0}`)
+    controlsUnsaved:S="",
     /// a saved garden (`{0}`) is deleted
     deleted:S="",
     /// a saved garden could not be deleted, and why (`{0}`)
@@ -328,6 +332,18 @@ pub const Strings=struct{
     autosave:S="",
     /// the options panel's way back
     optionsBack:S="",
+    /// the keybinds panel's title
+    keybindsTitle:S="",
+    /// how the keybinds panel is worked
+    keybindsHint:S="",
+    /// a row waiting for the key to bind it to
+    keybindsListen:S="",
+    /// an action bound to nothing
+    keybindsNone:S="",
+    /// the button that binds every action as the game ships it
+    keybindsReset:S="",
+    /// marks an action bound otherwise than the game ships it
+    keybindsChanged:S="",
     /// the saved gardens panel's title
     gardensTitle:S="",
     /// the row that starts a fresh garden
@@ -473,6 +489,8 @@ pub const Strings=struct{
   research:EnumArray(prog.Id,ResearchText)=.initFill(.{}),
   /// each structure's name
   structure:EnumArray(st.Kind,Named)=.initFill(.{}),
+  /// each action's name, as the keybinds panel lists it
+  action:EnumArray(ctl.Action,S)=.initFill(""),
   /// shown names of keys (for `{@action}`); optional
   key:EnumArray(input.Key,?S)=.initFill(null),
   /// shown names of mouse buttons (for `{@action}`); optional
@@ -581,6 +599,7 @@ test"the strings file fills every key, shown with the bound keys"{
   try fill(gpa,&.{default});
   try testing.expect(indexOf(u8,s.msg.nightHint,s.mouse.get(.middle).?)!=null);
   try testing.expectEqual(count(s.hud.pauseKeys),count(s.hud.pauseLabels));
+  for(values(ctl.Action))|a|try testing.expect(s.action.get(a).len>0);
   try testing.expectEqual(fields(lib.play.PauseRow).len,count(s.hud.pauseLabels));
   // the options module, whose lists the strings must match
   const opt=lib.options;

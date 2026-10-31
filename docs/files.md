@@ -100,7 +100,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `actions.zig` — what the wolf does to the world: gather, put (sow/grow), weave, feed and take from structures, interact with them, harvest, uproot, turn…
-- `controls.zig` — what every key and mouse button does, loaded once at startup from `filePath` (`controls.cfg`) and never read again.
+- `controls.zig` — what every key and mouse button does, loaded once at startup from `filePath` (`controls.cfg`) and never read again; the KEYBINDS menu…
 - `convergence.zig` — convergence: where a mature symbiote and a mature parasite meet, within two tiles of each other or joined by a chain of conduits, a…
 - `craft.zig` — weaving: turning gathered matter into seeds and structure bulbs.
 - `home.zig` — where the gardener's files live: `%LOCALAPPDATA%\Parasymi` (the strings, the controls, the options and `saves/`), made on first start.
@@ -118,6 +118,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `hotbar.zig` — the hotbar: a row of husks hanging from a vine, each empty or holding an item the gardener dropped on it from the belly, with the belly's…
 - `hover.zig` — what is under the cursor, on a trellis beside it: a structure (its name and what it is doing), a plant (its name, how far grown and what it…
 - `inspect.zig` — the free camera's reminder: a small glowing tendril by the top-left with how to get back.
+- `keybinds.zig` — the keybinds (pause menu, KEYBINDS): the world stays frozen behind the veil.
 - `log.zig` — recent messages (newest first, fading) and the control hint line.
 - `naming.zig` — the name prompt: the garden being saved is given a name (saving a fresh one from the saved gardens, or the save key before it has one).
 - `options.zig` — the options panel (pause menu, OPTIONS): the world stays frozen behind the veil.

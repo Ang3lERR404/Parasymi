@@ -1,8 +1,9 @@
 # Controls
 
-The defaults live in `src/cfg/controls.cfg`. They can be rebound in the
-gardener's own copy (see [architecture.md](architecture.md#inputs)). Key
-names below are the defaults.
+The defaults live in `src/cfg/controls.cfg`. They are rebound in the
+pause menu's KEYBINDS, or by hand in the gardener's own copy (see
+[architecture.md](architecture.md#inputs)). Key names below are the
+defaults.
 
 ## Play
 ### Moving and the camera
@@ -109,7 +110,7 @@ B / Start** goes back. Moving the mouse gives it the lead again.
 
 ### Pause
 Rows are clicked or keyed: **Q** = save and quit, **O** = options,
-**G** = saved gardens.
+**K** = keybinds, **G** = saved gardens.
 
 ### Options panel
 Toggles (a bud that blooms when on), pickers (a value between two leaves)
@@ -117,6 +118,22 @@ and the autosave slider (a seed riding a stem of stops). LMB turns a
 setting, RMB turns it back; a picker's leaves turn it their way; the
 slider is dragged along. **Left/Right** turn the setting the keys are on.
 Esc/BACK returns to the pause menu.
+
+### Keybinds panel
+(Pause menu only; `hud/keybinds.zig`, `Mode.keybinds`.)
+
+- **The list:** every action, its name and the keys bound to it. Scroll
+  with the wheel or by dragging its stem (`bindsShown` rows).
+- **Rebinding:** LMB (or Enter / A) on a row listens: the next key, mouse
+  button or pad button pressed takes the place of the row's first binding
+  of its kind (keyboard and mouse, or pad); its others stay. **Esc**
+  cancels the listening.
+- **RMB** sets a row back as the game ships it; **ALL DEFAULTS** every
+  row. A row bound otherwise is marked `*`, in green.
+- Each change is written at once to the gardener's `controls.cfg` (only
+  the actions that differ; none, and the game's own file comes back) and
+  every `{@action}` shown is redrawn with the new key.
+- **BACK/Esc.**
 
 ### Saved gardens panel
 (Pause menu only; `hud/gardens.zig`, `Mode.gardens`.)

@@ -121,6 +121,9 @@ pub const Request=union(enum){
   delete:save.Name,
   /// save and leave
   quit,
+  /// the keybinds menu changed the bindings: write them out, and show
+  /// every `{@action}` as now bound
+  bindings,
 };
 /// the pause menu's rows, in `txt.s.hud.pauseLabels` order
 pub const PauseRow=enum{
@@ -128,6 +131,8 @@ pub const PauseRow=enum{
   @"resume",
   /// the options panel
   options,
+  /// the keybinds
+  keybinds,
   /// the saved gardens
   gardens,
   /// fullscreen on or off
@@ -155,6 +160,12 @@ pub const gardensShown=7;
 pub const gardenNotch:f32=1;
 /// saved gardens menu: how fast the list follows (share a second)
 pub const gardenEase:f32=14;
+/// keybinds menu: rows in view at once (it scrolls past them)
+pub const bindsShown=12;
+/// keybinds menu: the height (pixels) of one action's row
+pub const bindRowH:f32=40;
+/// keybinds menu: how many rows a wheel notch scrolls
+pub const bindNotch:f32=2;
 /// what has the wolf's attention; only one at a time.
 pub const Mode=enum{
   /// out in the garden: moving, gathering, placing
@@ -170,6 +181,9 @@ pub const Mode=enum{
   paused,
   /// the world is frozen and the options panel is open (from the pause menu)
   options,
+  /// the world is frozen and the keybinds are listed (from the pause
+  /// menu): an action clicked listens for its new key
+  keybinds,
   /// the world is frozen and the saved gardens are listed (from the pause
   /// menu): save as one, load one
   gardens,
@@ -180,7 +194,7 @@ pub const Mode=enum{
   inspect,
   /// the world keeps moving underneath (everything but the pause menu, the
   /// panels opened from it and the name prompt)
-  pub fn live(md:Mode)bool{return md!=.paused and md!=.options and md!=.gardens and md!=.naming;}
+  pub fn live(md:Mode)bool{return md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming;}
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode)bool{return md==.belly or md==.structure;}
 };

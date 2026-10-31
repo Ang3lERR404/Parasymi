@@ -177,7 +177,7 @@ pub fn main(init:Init)!void{
       panel=.roam;
       overview=true;
     }else if(startsWith(u8,a,"--panel="))panel=switch(stringToEnum(play.Mode,a["--panel=".len..]) orelse return error.BadPanel){
-      inline.belly,.research,.paused,.options,.gardens,.naming=>|p|p,
+      inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming=>|p|p,
       else=>return error.BadPanel,
     };
   }
@@ -327,7 +327,7 @@ pub fn main(init:Init)!void{
     if(game.request)|rq|{
       game.request=null;
       // a lone thing's world is never saved, and no garden replaces it
-      if(game.specimen!=null){
+      if(game.specimen!=null and rq!=.bindings){
         if(rq==.quit)window.setShouldClose(true);
         continue;
       }
@@ -354,6 +354,7 @@ pub fn main(init:Init)!void{
           if(!try reground(&loadScreen,r,&input,&last,&game))break;
         },
         .list=>relist(gpa,io,&game),
+        .bindings=>try rebound(gpa,io,&game),
         .quit=>{
           // a garden never named is kept as the autosave
           keep(gpa,io,&game,game.slot orelse save.Name.of(save.auto).?);
@@ -482,6 +483,18 @@ fn letGo(gpa:Allocator,io:Io,game:*Game,name:save.Name)void{
   };
   game.prog.say(txt.s.msg.deleted,.{name.slice()});
   relist(gpa,io,game);
+}
+/// the keybinds menu changed the bindings: they are written to the
+/// controls file, and the strings read again so every `{@action}` shows
+/// the key now bound
+// decision: the strings are read afresh rather than patched; nothing keeps
+// a string past the frame it is shown in (messages are copied).
+fn rebound(gpa:Allocator,io:Io,game:*Game)!void{
+  // why the file could not be written, if it could not
+  const failed:?controls.WriteError=if(controls.write(io))|_|null else|e|e;
+  txt.unload(gpa);
+  try txt.load(gpa,io);
+  if(failed)|e|game.prog.say(txt.s.msg.controlsUnsaved,.{e});
 }
 /// the saved gardens menu's list, made afresh
 fn relist(gpa:Allocator,io:Io,game:*Game)void{

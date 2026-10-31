@@ -58,15 +58,18 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   // system keys work everywhere; Esc closes a panel first, then pauses
   // (not while a name is typed, nor for a garden that has none yet: a
   // name is asked for first)
-  if(g.mode!=.naming){
+  // (nor while a keybind listens: the key pressed is its new one)
+  const listening=g.rebinding!=null and g.mode==.keybinds;
+  if(!listening and g.mode!=.naming){
     if(ctl.pressed(in,.save))if(g.slot!=null){g.request=.save;}else g.startNaming();
     if(ctl.pressed(in,.load))g.request=.load;
   }
-  if(ctl.pressed(in,.fullscreen))g.opts.fullscreen=!g.opts.fullscreen;
+  if(ctl.pressed(in,.fullscreen)and!listening)g.opts.fullscreen=!g.opts.fullscreen;
   if(ctl.pressed(in,.back))switch(g.mode){
     .roam=>g.mode=.paused,
     .belly,.structure,.research,.paused=>g.mode=.roam,
     .options,.gardens=>g.mode=.paused,
+    .keybinds=>if(listening){g.rebinding=null;}else{g.mode=.paused;},
     .naming=>g.mode=g.namingFrom,
     .inspect=>g.inspect(in,false),
   }else if(!g.mode.live())g.menu(in,dt);
