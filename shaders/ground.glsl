@@ -33,11 +33,14 @@ const float GROUND_SOFT = 0.12;
 // each kind's own shape rises, then sharpened, so borders wander in blobs
 // and fray at their edges instead of following the tiles
 vec4 groundBlend(vec2 p, vec4 w) {
-  vec4 shape = vec4(
-    groundFbm(p * 1.3 + 3.1),                                   // soil: broad
-    0.7 * groundFbm(p * 1.7 + 11.0) + 0.3 * groundNoise(p * 9.0), // moss: clumped, frayed
-    groundFbm(p * 0.9 + 23.0),                                  // stone: slabs
-    groundFbm(p * 1.1 + 41.0));                                 // ley: drifting
+  // all one kind here (deep inside its ground): nothing to melt
+  if (max(max(w.x, w.y), max(w.z, w.w)) > 0.995) return step(vec4(0.995), w);
+  // each kind's shape, worked out only where there is any of it
+  vec4 shape = vec4(0.0);
+  if (w.x > 0.0) shape.x = groundFbm(p * 1.3 + 3.1);                                    // soil: broad
+  if (w.y > 0.0) shape.y = 0.7 * groundFbm(p * 1.7 + 11.0) + 0.3 * groundNoise(p * 9.0); // moss: clumped, frayed
+  if (w.z > 0.0) shape.z = groundFbm(p * 0.9 + 23.0);                                   // stone: slabs
+  if (w.w > 0.0) shape.w = groundFbm(p * 1.1 + 41.0);                                   // ley: drifting
   // a ley line is often one tile wide: it holds its ground more firmly, so
   // it never breaks apart between the kinds round it
   vec4 s = w * vec4(1.0, 1.0, 1.0, LEY_HOLD) * (1.0 - GROUND_FRAY + 2.0 * GROUND_FRAY * shape);

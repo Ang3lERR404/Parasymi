@@ -34,7 +34,14 @@ lowland).
   grain fades out where a pixel spans too much.
 - **Detail, grown on the GPU** (detail pass, `detail.vert`) from one
   `DetailTile` per tile, within `detailR` (28 tiles):
-  - grass blades on everything but soil (tile-coloured, wind-swayed);
+  - grass, as thick as the ground beneath is grassy (moss full, ley most,
+    stone a little, soil none), its kinds melted exactly as the ground's
+    are, so grass thins and frays across borders: up to 96 blades a tile
+    in tufts of six fanning from their heart, each a curved, tapering
+    blade of three bands arching along its lean, dark at the root and pale
+    at the tip in the colour of the ground it rises from (moss green, ley
+    violet, stone grey-green; a few straw tips), its normal leaned skyward
+    so both faces catch light, wind-swayed; far off fewer and wider;
   - clods and stones on soil.
 - **Ley:** ley lines carry a faint drifting plexus (a web of thin lines);
   ley sight glows smoothly across tiles. At the unforming they seal: each

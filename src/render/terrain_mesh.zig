@@ -42,15 +42,6 @@ fn baseColor(k:ck.Kind)color.Rgb{
     .ley=>color.rgb(0.30,0.24,0.45),
   };
 }
-/// how many grass blades grow on a tile of each kind (detail.vert grows them)
-fn blades(k:ck.Kind)u32{
-  return switch(k){
-    .soil=>0,
-    .moss=>8,
-    .ley=>6,
-    .stone=>2,
-  };
-}
 /// each tile's colour varies by `jitterAmount` about `jitterMin` of its kind's
 const jitterMin:f32=0.9;
 /// how widely a tile's colour wanders (a share of its kind's colour)
@@ -388,16 +379,15 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
         try put(out,gpa,.{.p=at,.n=gn[cn[1]][cn[0]],.c=gc[cn[1]][cn[0]],.info=.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]},.mat=gm[cn[1]][cn[0]]});
       }
     }
-    // the detail on it (grass, or clods and stones on soil) is grown on the
-    // GPU from this one record (shaders/detail.vert)
-    // how many blades it grows
-    const n=blades(k);
-    if(n==0 and k!=.soil)continue;
+    // the detail on it (grass as thick as the ground beneath is grassy,
+    // clods and stones on soil) is grown on the GPU from this one record
+    // (shaders/detail.vert), every tile having some
     try detail.append(gpa,.{
       .at=.{x0,gh[1][1],z0},
       .corners=.{gh[0][0],gh[2][0],gh[2][2],gh[0][2]},
       .col=r.col[i].toRgba8(255),
-      .info=.{@intFromEnum(k),ley,@intCast(n),0},
+      .info=.{@intFromEnum(k),ley,0,0},
+      .k00=gm[0][0],.k01=gm[2][0],.k11=gm[2][2],.k10=gm[0][2],.kc=gm[1][1],
     });
   };
 }

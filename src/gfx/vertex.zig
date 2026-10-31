@@ -136,8 +136,20 @@ pub const DetailTile=extern struct{
   corners:[4]f32,
   /// the tile's ground colour, which its blades take on
   col:color.Rgba8,
-  /// tile kind, ley 0..255, grass blades, unused
+  /// tile kind, ley 0..255, unused, unused
   info:[4]u8,
+  /// how much of each kind of ground (soil, moss, stone, ley) lies at its
+  /// corner (x0,z0), as the ground beneath shares it out: grass grows as
+  /// thick as the ground it stands on is grassy, so it thins across borders
+  k00:[4]u8,
+  /// (at its corner (x0,z1))
+  k01:[4]u8,
+  /// (at its corner (x1,z1))
+  k11:[4]u8,
+  /// (at its corner (x1,z0))
+  k10:[4]u8,
+  /// (at its centre)
+  kc:[4]u8,
 };
 /// a rigid procedural part (creature limb, resource node, mote, structure piece).
 pub const PartInstance=extern struct{
