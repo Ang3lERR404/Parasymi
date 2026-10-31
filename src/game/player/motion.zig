@@ -155,6 +155,7 @@ pub fn animate(p:*Player,ground:?*const World,dt:f32)void{
   const fell=p.step(ground,spd,dt);
   p.slosh(fell,dt);
   p.springs(dt);
+  p.trailTail(dt);
 }
 /// which of the belly's stages the wolf is in: 0 light .. 1 heavy .. 2
 /// full, blending over `stageBlend` about each threshold
@@ -239,6 +240,8 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
     }
     // its pad squashes as it plants, springing back as it lifts
     m.spring(&f.pad,&f.padV,if(f.planted())1 else 0,padFreq,dt);
+    // it feels the slope of the ground under it, settling to it
+    f.nrm=m.norm(m.lerpV(f.nrm,p.groundNormal(ground,f.at),m.clamp01(dt*lib.player.tuning.slopeRate)));
   }
   return fell;
 }

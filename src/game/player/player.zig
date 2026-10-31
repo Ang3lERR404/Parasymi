@@ -103,6 +103,9 @@ const Foot=struct{
   pad:f32=1,
   /// how fast the pad is easing
   padV:f32=0,
+  /// which way the ground under it faces (the world's up on level
+  /// ground), eased as it moves: its sole is laid along it
+  nrm:V3=v3(0,1,0),
   /// whether it is down: its swing finished
   pub fn planted(f:*const Foot)bool{return f.t>=1;}
 };
@@ -231,6 +234,11 @@ pub const Player=struct{
   /// a pose set from outside (the animation editor, tools/animedit.zig),
   /// shown in place of the procedural one; null in play
   posed:?skel.Pose=null,
+  /// each joint of the tail and its tip in the world, trailing behind its
+  /// swinging rest shape (null until first laid out)
+  tailAt:?[skel.tailCount+1]V3=null,
+  /// where each was a step before (its motion)
+  tailWas:[skel.tailCount+1]V3=@splat(v3(0,0,0)),
   /// tile-aware: no wading, one terrace step at a time.
   /// Walks it toward `wish` (a direction on the ground, length up to 1) at walk or
   /// sprint speed, sliding along what it cannot climb, its height springing
@@ -293,6 +301,17 @@ pub const Player=struct{
     const r=m.mulV(p.heading(),.{x,0,restFoot[s][2],1});
     return p.onGround(ground,v3(r[0],0,r[2]));
   }
+  /// which way the ground faces at `at` (up without a world): its slope
+  /// felt `slopeSpan` either way across and along
+  pub fn groundNormal(_:*const Player,ground:?*const World,at:V3)V3{
+    // the world, or level ground
+    const g=ground orelse return v3(0,1,0);
+    // how far the ground is felt either way, and its rise across and along
+    const e=lib.player.tuning.slopeSpan;
+    const dx=g.surfaceAt(at[0]+e,at[2])-g.surfaceAt(at[0]-e,at[2]);
+    const dz=g.surfaceAt(at[0],at[2]+e)-g.surfaceAt(at[0],at[2]-e);
+    return m.norm(v3(-dx,2*e,-dz));
+  }
   /// `at` set down on the ground as it is drawn (level with the body
   /// without a world), so a paw never sinks into a slope
   pub fn onGround(p:*const Player,ground:?*const World,at:V3)V3{
@@ -342,12 +361,16 @@ pub const Player=struct{
   pub const bellyRoom=lib.player.springs.bellyRoom;
   /// the skeleton's pose this frame (posing.zig)
   pub const pose=lib.player.posing.pose;
+  /// the tail trailing behind its rest shape (posing.zig)
+  pub const trailTail=lib.player.posing.trailTail;
   /// the belly-rest idle's arms (posing.zig)
   pub const restArms=lib.player.posing.restArms;
   /// the arms reached to the gathering wrists (posing.zig)
   pub const armsToWrists=lib.player.posing.armsToWrists;
   /// the legs reached to the feet (posing.zig)
   pub const legs=lib.player.posing.legs;
+  /// how far the hips drop so the feet reach the ground (posing.zig)
+  pub const hipDrop=lib.player.posing.hipDrop;
   /// where its eyes are in the world (posing.zig)
   pub const eyes=lib.player.posing.eyes;
   /// the posed, skinned wolf emitted into the scene (posing.zig)

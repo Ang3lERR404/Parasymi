@@ -577,10 +577,26 @@ A plant's yield shows on it, where the paws pluck it:
 ### Motion
 - **Feet** are planted in the world and swung on arcs when the gait's
   phase says so (or, standing, when a foot is left behind).
-- **Legs:** digitigrade (walking on the toes, as dogs do) leg IK
-  (`solveLeg`: thigh + metatarsal solved as one link).
+- **Legs:** digitigrade (walking on the toes, as dogs do), every bone its
+  own (`solveLeg`): the metatarsal stands back up from the ball at its
+  rest angle, swung part way with the reach and folded mid-swing; thigh
+  and shin reach the hock, the knee forward, the shin folding back.
+- **Feet hug the ground:** each foot feels the slope under it
+  (`Foot.nrm`, eased) and its sole is tipped and rolled flat along it
+  (`Limb.roll`); the hips drop so a foot down a slope or off a step still
+  reaches (`hipDrop`).
+- **Arms:** the elbow is placed toward a pole (back and a little out;
+  swung out on the hip in the belly rest), the shoulder's swing and twist
+  read back from the upper arm's whole frame (`solveArmPole`). Gathering,
+  each paw turns to grip: palm toward the other paw across what they
+  hold, fingers cupped over it (`handTo`).
 - **Body:** the pelvis bobs at footfalls, sways, turns and rolls; the
   chest counter-turns.
-- **Springs** (`Swing`): lean, bank, arms, head, ears and tail.
-- **Head:** steadied against the bob; an idle look-around; ear flicks.
+- **Springs** (`Swing`): lean, bank, arms, head, ears and the tail's sway.
+- **Head:** neck and skull turn as one chain to face exactly where it
+  looks (the neck a share, the skull the rest), whatever the body below
+  does; an idle look-around; ear flicks.
+- **Tail:** a trailing chain (engine `rig.trail`): each joint carries on
+  with its own motion, is drawn back to the tail's swinging rest shape
+  and held at its length, so it swings through, lags a turn and settles.
 - Breath and panting quicken with effort.

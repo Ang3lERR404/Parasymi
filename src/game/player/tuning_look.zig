@@ -178,5 +178,13 @@ pub const tailDroop:f32=0.16;
 pub const tailFreq:f32=7;
 /// how much softer each joint's spring is than the one before
 pub const tailFreqStep:f32=1.2;
+/// the share of the turn toward the gaze the neck takes (the skull the rest)
+pub const neckShare:f32=0.4;
+/// how strongly each point of the tail is drawn back to its swinging rest
+/// shape (per second, at its root; its tip half as strongly)
+pub const tailStiff:f32=11;
+/// how much of its own motion each point of the tail keeps from one
+/// sixtieth of a second to the next (how far it follows through)
+pub const tailKeep:f32=0.86;
 /// how damped the tail's springs are (low: it swishes)
 pub const tailDamp:f32=0.45;

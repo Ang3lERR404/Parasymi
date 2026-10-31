@@ -79,10 +79,31 @@ test"the leg reaches its resting foot in its resting pose"{
   for(skel.sides,0..)|sd,s|{
     // this side's resting foot, and the leg solved to reach it
     const foot=m.origin(w[@intFromEnum(sd.foot)]);
-    const l=solveLeg(foot-v3(skel.sign(s)*skel.hipX,skel.hipY,0),0,0,0);
+    const l=solveLeg(.{.d=foot-v3(skel.sign(s)*skel.hipX,skel.hipY,0)});
     try testing.expectApproxEqAbs(skel.restThigh,l.root.x,1e-3);
     try testing.expectApproxEqAbs(skel.restKnee,l.mid,1e-3);
     try testing.expectApproxEqAbs(skel.restHock,l.low.x,1e-3);
+  }
+}
+test"each leg bone is its own: a foot set forward and down is reached, its sole laid along the slope"{
+  // the bones at the rest pose, and a slope rising ahead and to the left
+  const w=skel.fk(.{});
+  const slope=m.norm(v3(0.25,1,-0.3));
+  // the pose with each leg solved onto its foot, moved forward and down
+  var q:skel.Pose=.{};
+  // where each foot is wanted
+  var want:[2]V3=undefined;
+  for(skel.sides,0..)|sd,s|{
+    want[s]=m.origin(w[@intFromEnum(sd.foot)])+v3(0,-0.04,0.12);
+    q.legs[s]=solveLeg(.{.d=want[s]-v3(skel.sign(s)*skel.hipX,skel.hipY,0),.ground=slope});
+  }
+  // the bones so posed: each ball where it is wanted, each sole facing the slope
+  const pw=skel.fk(q);
+  for(skel.sides,0..)|sd,s|{
+    // the foot bone's frame
+    const f=pw[@intFromEnum(sd.foot)];
+    try testing.expect(m.len(m.origin(f)-want[s])<2e-3);
+    try testing.expect(m.dot(m.norm(v3(f[1][0],f[1][1],f[1][2])),slope)>0.99);
   }
 }
 test"seen from its own eyes, the head leads toward where they look and nods with them"{
@@ -124,7 +145,7 @@ test"an arm's wrist reaches what it is solved for"{
   for([_]V3{v3(0.1,-0.35,0.2),v3(0.02,-0.25,0.3),v3(0.15,-0.4,0.05)})|d|{
     // a pose with just the right arm solved to reach `d`
     var q:skel.Pose=.{};
-    q.arms[1]=solveArm(d);
+    q.arms[1]=solveArm(d,1);
     // the bones of that pose, and where the wrist got to from the shoulder
     const w=skel.fk(q);
     const got=m.mulPoint(m.inverseRigid(chest),m.origin(w[@intFromEnum(skel.sides[1].hand)]))-skel.shoulder;

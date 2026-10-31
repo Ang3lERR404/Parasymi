@@ -50,6 +50,10 @@ pub const solveLeg=ik.solveLeg;
 pub const solveArm=ik.solveArm;
 /// an arm reaching its wrist with the elbow swung round
 pub const solveArmTurned=ik.solveArmTurned;
+/// an arm reaching its wrist, its elbow toward a pole
+pub const solveArmPole=ik.solveArmPole;
+/// the wrist's turn laying a hand along fingers and palm
+pub const handTo=ik.handTo;
 test{
   _=tuning;
   _=tuningLook;

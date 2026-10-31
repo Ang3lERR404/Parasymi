@@ -253,6 +253,9 @@ pub const Limb=struct{
   low:Turn=.{},
   /// the foot's turn at the ball (legs only)
   foot:f32=0,
+  /// the foot's roll about its own length, laying its sole flat across a
+  /// slope (legs only)
+  roll:f32=0,
 };
 /// a hand's fingers: how each curls in toward the palm, and how they fan
 pub const Hand=struct{
@@ -360,7 +363,7 @@ pub fn fk(p:Pose)[count]M4{
     set(&w,sd.thigh,m.chain(&.{at(&w,.pelvis),t(v3(x*hipX,0,0)),leg.root.m4()}));
     set(&w,sd.shin,m.chain(&.{at(&w,sd.thigh),t(v3(0,-thighLength,0)),m.rotX(leg.mid)}));
     set(&w,sd.meta,m.chain(&.{at(&w,sd.shin),t(v3(0,-shinLength,0)),leg.low.m4()}));
-    set(&w,sd.foot,m.chain(&.{at(&w,sd.meta),t(v3(0,-metaLength,0)),m.rotX(leg.foot)}));
+    set(&w,sd.foot,m.chain(&.{at(&w,sd.meta),t(v3(0,-metaLength,0)),m.rotX(leg.foot),m.rotZ(leg.roll)}));
     set(&w,sd.ear,m.chain(&.{at(&w,.head),t(earAt*v3(x,1,1)),m.rotZ(-x*earTilt),m.rotX(earTilt),p.ears[s].m4()}));
   }
   return w;

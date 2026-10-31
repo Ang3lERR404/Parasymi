@@ -149,6 +149,18 @@ const tipShare=lib.player.tuningLook.tipShare;
 const toeHang=lib.player.tuning.toeHang;
 /// where in a unit's pry the wrench ends (0..1)
 const wrenchEnd=lib.player.tuning.wrenchEnd;
+/// how far a gripping paw's fingers cup in toward what it holds (a share of the forearm's line)
+const gripCup:f32=0.45;
+/// how far they tip down over it (a share of the forearm's line)
+const gripDown:f32=0.2;
+/// the engine's rig helpers: a turn read out of a frame, the trailing chain
+const animRig=engine.anim.rig;
+/// the share of the turn toward the gaze the neck takes
+const neckShare=lib.player.tuningLook.neckShare;
+/// how strongly the tail is drawn back to its rest shape (1/s at its root)
+const tailStiff=lib.player.tuningLook.tailStiff;
+/// how much of its own motion the tail keeps (a sixtieth of a second's)
+const tailKeep=lib.player.tuningLook.tailKeep;
 /// the bind pose, inverted, the skin matrices start from
 const bindInv=lib.player.ik.bindInv;
 /// the belly's lumps
@@ -165,6 +177,13 @@ const solveLeg=lib.player.ik.solveLeg;
 /// a pose set from outside (`posed`) wins
 pub fn pose(p:*const Player)skel.Pose{
   if(p.posed)|q|return q;
+  // the pose, its tail laid along the trailing chain once there is one
+  var q=restShape(p);
+  if(p.tailAt)|pts|tailAlong(p,&q,pts);
+  return q;
+}
+/// the pose before the tail trails: its tail in its swinging rest shape
+fn restShape(p:*const Player)skel.Pose{
   // how far into stride, how far into the work gesture, how deep the squat
   const st=p.stride;
   const work=p.reach.x*(1-p.squat.x);
@@ -192,10 +211,9 @@ pub fn pose(p:*const Player)skel.Pose{
   // where in its breath the wolf is, -1..1
   const breath=@sin(p.breath);
   q.breath=1+m.lerp(breathAmount,breathRun,st)*breath;
-  // the head holds its gaze: it takes back the body's lean and bob
-  const bodyPitch=q.pelvis.x+q.waist.x+q.chest.x;
-  q.neck=.{.x=-0.4*bodyPitch+0.5*p.nod.x,.y=0.4*p.look.x-0.3*q.chest.y};
-  q.head=.{.x=-0.6*bodyPitch+0.5*p.nod.x-bob*1.5+0.02*breath,.y=0.6*p.look.x-0.3*q.chest.y,.z=-0.5*p.bank.x};
+  // the head holds its gaze: neck and skull, as one chain, turn the head
+  // to face just where it looks, whatever the body below does
+  aimHead(&q,.{.x=p.nod.x+0.02*breath,.y=p.look.x,.z=-0.5*p.bank.x});
   q.jaw=pant*st*(0.6+0.4*breath);
   q.gut=p.fullness;
   for(0..2)|s|{
@@ -217,12 +235,67 @@ pub fn pose(p:*const Player)skel.Pose{
   // a little further
   // (crouching, it lifts to balance the lean)
   for(&q.tail,p.tail,0..)|*j,sp,i|j.*=.{.x=(if(i==0)-tailLift*@max(st,sq*low)else tailDroop*(1-0.6*st)),.z=sp.x};
+  q.hip[1]-=p.hipDrop(q);
   q.legs=p.legs(q);
   if(sq>0)p.armsToWrists(&q,sq);
   // how far into the belly-rest idle
   const resting=p.restPose.x*(1-sq);
   if(resting>0)restArms(&q,resting);
   return q;
+}
+/// the neck and skull turned, as one chain, so the head faces `gaze` (a
+/// turn in wolf space: how far it looks round, nods and tilts): the neck
+/// takes `neckShare` of the turn the chest leaves, the skull exactly the rest
+fn aimHead(q:*skel.Pose,gaze:skel.Turn)void{
+  // the chest's turn in wolf space, and the head's wanted from it
+  const chest=m.chain(&.{q.pelvis.m4(),q.waist.m4(),q.chest.m4()});
+  const want=gaze.m4();
+  const rel=animRig.turnOf(m.chain(&.{m.inverseRigid(chest),want}));
+  q.neck=.{.x=rel.x*neckShare,.y=rel.y*neckShare,.z=rel.z*neckShare};
+  q.head=animRig.turnOf(m.chain(&.{m.inverseRigid(m.chain(&.{chest,q.neck.m4()})),want}));
+}
+/// each tail joint and its tip in wolf space, for pose `q`
+fn tailJoints(q:skel.Pose)[skel.tailCount+1]V3{
+  // the bones, and the joints filled in below
+  const w=skel.fk(q);
+  var out:[skel.tailCount+1]V3=undefined;
+  inline for(.{Bone.tail0,Bone.tail1,Bone.tail2,Bone.tail3},0..)|b,i|out[i]=m.origin(w[@intFromEnum(b)]);
+  out[skel.tailCount]=m.mulPoint(w[@intFromEnum(Bone.tail3)],v3(0,skel.tailSeg,0));
+  return out;
+}
+/// one step of the tail trailing (motion.zig, after the springs): each
+/// joint carries on with its own motion, is drawn back toward its place in
+/// the tail's swinging rest shape and held at its length from the root, so
+/// the tail swings through, lags a turn and settles as one chain
+pub fn trailTail(p:*Player,dt:f32)void{
+  // the rest shape this step, in the world
+  var rest=tailJoints(restShape(p));
+  const root=p.heading();
+  for(&rest)|*r|r.*=m.mulPoint(root,r.*);
+  // the chain, laid out on its rest shape the first time
+  var pts=p.tailAt orelse blk:{
+    p.tailWas=rest;
+    break:blk rest;
+  };
+  animRig.trail(&pts,&p.tailWas,&rest,.{.stiff=tailStiff,.keep=tailKeep,.seg=skel.tailSeg},dt);
+  p.tailAt=pts;
+}
+/// the tail's joints turned to lie along the trailing chain `pts` (in the
+/// world): each segment turned in its parent's frame to run toward the next point
+fn tailAlong(p:*const Player,q:*skel.Pose,pts:[skel.tailCount+1]V3)void{
+  // the way into wolf space, and the tail's root frame
+  const toWolf=m.inverseRigid(p.heading());
+  const w=skel.fk(q.*);
+  var frame=m.chain(&.{w[@intFromEnum(Bone.pelvis)],m.translate(skel.tailAt),m.rotX(skel.tailTilt)});
+  for(0..skel.tailCount)|i|{
+    if(i>0)frame=m.chain(&.{frame,m.translate(v3(0,skel.tailSeg,0))});
+    // the way this segment runs, in its parent's frame
+    const d=m.mulDir(m.inverseRigid(frame),m.mulDir(toWolf,pts[i+1]-pts[i]));
+    const l=m.norm(d);
+    // the turn that lays its +Y along it (no twist)
+    q.tail[i]=.{.x=m.atan2(l[2],l[1]),.z=m.asin(-l[0])};
+    frame=m.chain(&.{frame,q.tail[i].m4()});
+  }
 }
 /// the belly-rest idle, blended in by `r`: the right wrist onto the top
 /// of the belly, the palm laid on it; the left on the hip, the wrist
@@ -242,7 +315,7 @@ pub fn restArms(q:*skel.Pose,r:f32)void{
     // which side, how far the elbow swings out, and the arm reaching there
     const x=skel.sign(s);
     const out:f32=if(s==0)restElbowOut else 0;
-    const ik=solveArmTurned(m.mulPoint(into,at[s])-skel.shoulder*v3(x,1,1),-x*out);
+    const ik=solveArmTurned(m.mulPoint(into,at[s])-skel.shoulder*v3(x,1,1),s,-x*out);
     // the arm being posed
     const a=&q.arms[s];
     a.root=skel.Turn.blend(a.root,ik.root,r);
@@ -263,39 +336,66 @@ pub fn armsToWrists(p:*const Player,q:*skel.Pose,sq:f32)void{
   // the pry's unit share, and how far the wrists twist with the wrench
   const k=p.gather orelse 0;
   const twist=pryTwist*m.smooth(m.clamp01((k-pullEnd)/(wrenchEnd-pullEnd)))*(1-m.smooth(m.clamp01((k-wrenchEnd)/(1-wrenchEnd))));
+  // where each wrist is wanted, in the chest's frame
+  const grip=[2]V3{m.mulPoint(into,p.wrist[0].pos),m.mulPoint(into,p.wrist[1].pos)};
   for(0..2)|s|{
     // which side, where the wrist is wanted from the shoulder, and the reach
     const x=skel.sign(s);
-    const at=m.mulPoint(into,p.wrist[s].pos)-skel.shoulder*v3(x,1,1);
-    const ik=solveArm(at);
+    const ik=solveArm(grip[s]-skel.shoulder*v3(x,1,1),s);
+    // the paw turned to grip: its palm toward the other paw across what
+    // they hold, its fingers on from the forearm, cupped over it and down
+    const palm=m.norm(grip[1-s]-grip[s]);
+    const fingers=m.norm(lib.player.ik.forearmDir(ik)+palm*m.splat3(gripCup)+v3(0,-gripDown,0));
+    const hand=lib.player.ik.handTo(ik,s,fingers,palm);
     // the arm being posed
     const a=&q.arms[s];
     a.root=skel.Turn.blend(a.root,ik.root,sq);
     a.mid=m.lerp(a.mid,ik.mid,sq);
-    // how far into stowing this paw is (0..1)
+    // how far into stowing this paw is (0..1): it lets go its grip and
+    // curls in toward the belly
     const stowing=m.clamp01(p.stowLeft(s)*3);
-    a.low=.{.x=m.lerp(a.low.x,0.35*(1-stowing)+0.9*stowing,sq),.y=m.lerp(a.low.y,-x*twist*(1-stowing),sq),.z=a.low.z};
+    const held=skel.Turn.blend(.{.x=hand.x,.y=hand.y-x*twist,.z=hand.z},.{.x=0.9},stowing);
+    a.low=skel.Turn.blend(a.low,held,sq);
   }
 }
-/// each leg reaching its foot, by inverse kinematics in the pelvis's frame
-pub fn legs(p:*const Player,q:skel.Pose)[2]skel.Limb{
-  // the two legs' turns, filled in below
-  var out:[2]skel.Limb=undefined;
+/// what each leg reaches for in pose `q`: its foot from the hip joint in
+/// the pelvis's frame, how folded and hanging it is mid-swing, and the
+/// ground under it in wolf space
+fn reaches(p:*const Player,q:skel.Pose)[2]lib.player.ik.Reach{
+  // the two legs' reaches, filled in below
+  var out:[2]lib.player.ik.Reach=undefined;
   // the way from the world into wolf space, and into the pelvis's frame
   const toWolf=m.inverseRigid(p.heading());
   const pelvis=m.chain(&.{translate(q.hip),q.pelvis.m4()});
   const into=m.inverseRigid(pelvis);
-  // how far the pelvis is pitched, which the feet stay level against
-  const pelvisPitch=q.pelvis.x;
-  for(&out,0..)|*l,s|{
+  for(&out,0..)|*r,s|{
     // the foot, in wolf space, then in the pelvis's frame
     const f=p.feet[s];
     const fw=m.mulV(toWolf,.{f.at[0],f.at[1],f.at[2],1});
     const fp=m.mulV(into,fw);
     // how far through its swing the foot is lifted (0 planted)
     const swing=if(f.planted())@as(f32,0)else@sin(f.t*m.pi);
-    l.*=solveLeg(v3(fp[0],fp[1],fp[2])-v3(skel.sign(s)*skel.hipX,0,0),swingFold*swing,pelvisPitch,toeHang*swing);
+    r.*=.{
+      .d=v3(fp[0],fp[1],fp[2])-v3(skel.sign(s)*skel.hipX,0,0),
+      .fold=swingFold*swing,.pelvis=q.pelvis,.hang=toeHang*swing,
+      .ground=m.mulDir(toWolf,f.nrm),
+    };
   }
+  return out;
+}
+/// how far the hips drop so both feet reach the ground under them (a foot
+/// down a slope or off a step pulls them down, never up)
+pub fn hipDrop(p:*const Player,q:skel.Pose)f32{
+  // the further of the two legs' overreach
+  var drop:f32=0;
+  for(reaches(p,q))|r|drop=@max(drop,lib.player.ik.overreach(r.d,r.fold));
+  return drop;
+}
+/// each leg reaching its foot, by inverse kinematics in the pelvis's frame
+pub fn legs(p:*const Player,q:skel.Pose)[2]skel.Limb{
+  // the two legs' turns, filled in below
+  var out:[2]skel.Limb=undefined;
+  for(&out,reaches(p,q))|*l,r|l.*=solveLeg(r);
   return out;
 }
 /// where its eyes are in the world this frame

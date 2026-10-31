@@ -11,6 +11,8 @@ const rig=engine.anim.rig;
 const skel=lib.skeleton;
 /// a point or direction in 3D
 const V3=m.V3;
+/// builds a 3D vector from its three parts
+const v3=m.v3;
 /// a 4x4 transform
 const M4=m.M4;
 /// one bone of the wolf's skeleton
@@ -33,77 +35,131 @@ pub const restFoot=blk:{
 pub fn bit(b:Bone)u64{return@as(u64,1)<<@intFromEnum(b);}
 /// the skeleton's bind pose, inverted (what the skin matrices start from)
 pub fn bindInv()[skel.count]M4{return skel.inverses(skel.bind());}
-/// the leg reaching `d` (the ball, from the hip joint, in the pelvis's
-/// frame). Digitigrade: the metatarsal keeps its angle to the thigh (`fold`
-/// more mid-swing), so thigh and metatarsal act as one link and the shin as
-/// the other, solved by the law of cosines; the knee always folds back.
-/// The foot is kept level with the ground (the pelvis tilted by
-/// `pelvisPitch`), its toes hanging by `hang`.
-pub fn solveLeg(d:V3,fold:f32,pelvisPitch:f32,hang:f32)skel.Limb{
+/// the angle the metatarsal stands at, at rest, from the pelvis's down (about X)
+const restMeta=skel.restThigh+skel.restKnee+skel.restHock;
+/// the way from the hip to the resting ball, at rest, as a limb's turn about X
+const restReach=blk:{
+  // the resting ball from the left hip, in the pelvis's frame
+  const d=restFoot[0]-v3(-skel.hipX,skel.hipY,0);
+  break:blk m.atan2(-d[2],-d[1]);
+};
+/// how much of the leg's swing toward its foot the metatarsal follows
+const metaFollow=lib.player.tuning.metaFollow;
+/// what a leg reaches for: its foot and the ground under it
+pub const Reach=struct{
+  /// the ball, from the hip joint, in the pelvis's frame
+  d:V3,
+  /// how much more the metatarsal folds (mid-swing)
+  fold:f32=0,
+  /// the pelvis's turn, which the foot is kept level against
+  pelvis:skel.Turn=.{},
+  /// how far the toes hang (mid-swing)
+  hang:f32=0,
+  /// which way the ground under the foot faces, in wolf space
+  ground:V3=v3(0,1,0),
+};
+/// where the hock is wanted, in the leg's own plane (height, depth), and
+/// the hip's roll out to that plane: the metatarsal its own bone, standing
+/// at its rest angle swung part way with the reach and folded by `fold`,
+/// run back up from the ball
+const Hock=struct{
+  /// the hip's roll out to the side
+  ab:f32,
+  /// the metatarsal's angle from the pelvis's down
+  mu:f32,
+  /// the hock's height in the leg's plane
+  y:f32,
+  /// the hock's depth in the leg's plane
+  z:f32,
+};
+/// the hock wanted for a foot at `d` (see `Hock`)
+fn hockFor(d:V3,fold:f32)Hock{
   // out to the side first (the hip's roll), then in its own plane
   const ab=m.atan2(d[0],-d[1]);
   // the reach turned into the leg's own plane, and its height and depth there
   const plane=m.mulV(m.rotZ(-ab),.{d[0],d[1],d[2],0});
-  const dy=plane[1];
-  const dz=plane[2];
-  // how far the metatarsal is folded off the thigh's line
-  const delta=skel.restKnee+skel.restHock-fold;
-  // thigh and metatarsal as one link: its length and the angle it sits at
-  // from the thigh's own
-  const cy=skel.thighLength+skel.metaLength*@cos(delta);
-  const cz=skel.metaLength*@sin(delta);
-  const lv=@sqrt(cy*cy+cz*cz);
-  const phi=m.atan2(cz,cy);
-  // the two-link solve: the angles at the root and at the knee
-  const ik=rig.twoBone(lv,skel.shinLength,@sqrt(dy*dy+dz*dz));
-  // the direction toward the ball, as a limb's turn about X
-  const beta=m.atan2(-dz,-dy);
-  // the turns of thigh, shin and metatarsal, each from the pelvis's down
-  const th=beta-ik.root-phi;
-  const shin=beta+ik.end;
-  const meta=th+delta;
+  // the way toward the ball, as a limb's turn about X
+  const beta=m.atan2(-plane[2],-plane[1]);
+  // the metatarsal: its rest angle, swung part way with the reach, folded
+  const mu=restMeta+metaFollow*m.angleDiff(restReach,beta)-fold;
+  return.{.ab=ab,.mu=mu,.y=plane[1]+skel.metaLength*@cos(mu),.z=plane[2]+skel.metaLength*@sin(mu)};
+}
+/// how much further than thigh and shin comfortably reach the hock lies
+/// for a foot at `d` (0 within reach): how far the hips must drop
+pub fn overreach(d:V3,fold:f32)f32{
+  // the hock wanted, and the most thigh and shin are asked to span
+  const h=hockFor(d,fold);
+  const most=(skel.thighLength+skel.shinLength)*lib.player.tuning.reachShare;
+  return@max(@sqrt(h.y*h.y+h.z*h.z)-most,0);
+}
+/// the leg reaching its foot, digitigrade, each bone its own: the
+/// metatarsal stands back up from the ball at its own angle (`hockFor`),
+/// thigh and shin reach the hock by the law of cosines with the knee
+/// forward and the shin folding back, and the foot is laid along the
+/// ground: level against the pelvis's pitch and roll, tipped and rolled
+/// with the slope under it, its toes hanging by `hang`
+pub fn solveLeg(r:Reach)skel.Limb{
+  // the hock wanted, and thigh and shin reaching it
+  const h=hockFor(r.d,r.fold);
+  const ik=rig.twoBone(skel.thighLength,skel.shinLength,@sqrt(h.y*h.y+h.z*h.z));
+  // the way toward the hock, as a limb's turn about X
+  const bh=m.atan2(-h.z,-h.y);
+  // the turns of thigh and shin, each from the pelvis's down
+  const th=bh-ik.root;
+  const shin=bh+ik.end;
+  // the ground's slope along the foot and across it
+  const slopePitch=m.atan2(r.ground[2],r.ground[1]);
+  const slopeRoll=m.atan2(-r.ground[0],r.ground[1]);
   return.{
-    .root=.{.x=th,.z=ab},
+    .root=.{.x=th,.z=h.ab},
     .mid=shin-th,
-    .low=.{.x=meta-shin},
-    .foot=-meta-pelvisPitch+hang,
+    .low=.{.x=h.mu-shin},
+    .foot=-h.mu-r.pelvis.x+r.hang+slopePitch,
+    .roll=slopeRoll-h.ab-r.pelvis.z,
   };
 }
+/// which way an elbow points when nothing else asks (the right arm's;
+/// the left's mirrored): back, a little out and down
+const elbowBack=v3(0.35,-0.15,-1);
 /// the arm reaching its wrist to `d` (from the shoulder joint, in the
-/// chest's frame): the elbow's bend from the law of cosines (always
-/// forward), then the shoulder turned out (about Z) and forward (about X)
-/// to carry the bent arm's wrist onto `d`.
-pub fn solveArm(d:V3)skel.Limb{
-  // the upper arm's and forearm's lengths
+/// chest's frame), its elbow pointing out toward `pole`: the elbow placed
+/// by the law of cosines in the plane of the reach and the pole, the upper
+/// arm's whole frame turned to run down to it with the forearm bending
+/// forward onto the wrist (the shoulder's swing and its twist both, read
+/// back as one turn), the elbow bent by what is left
+pub fn solveArmPole(d:V3,pole:V3)skel.Limb{
+  // the upper arm's and forearm's lengths, and the triangle they make
   const a=skel.upperArm;
   const b=skel.forearmLength;
-  // the two-link solve, how far the wrist can reach, and the elbow's bend
-  const ik=rig.twoBone(a,b,m.len(d));
-  const l=ik.reach;
-  const mid=ik.bend;
-  // the bent arm's wrist in its own frame: down the upper arm, the forearm
-  // bent forward from it
-  const y0=-(a+b*@cos(mid));
-  const z0=b*@sin(mid);
-  // the target pulled in to the reach, and the shoulder's turn out about Z
-  const dd=d*m.splat3(l/@max(m.len(d),1e-6));
-  const zr=m.asin(m.clamp(dd[0]/-y0,-1,1));
-  // the bent wrist's height once turned out
-  const y1=y0*@cos(zr);
-  // (wrapped to the nearest turn: the difference of two angles can come
-  // out a whole turn round, and an arm blended toward it would spin)
-  const xr=m.angleDiff(0,m.atan2(dd[2],dd[1])-m.atan2(z0,y1));
-  return.{.root=.{.x=xr,.z=zr},.mid=mid};
+  const tri=rig.twoBone(a,b,m.len(d));
+  // the elbow, and the wrist where the arm can reach it
+  const e=rig.middle(a,b,d,pole);
+  const wrist=m.norm(d)*m.splat3(tri.reach);
+  // the upper arm's +Y runs back up from the elbow; its +Z is the way the
+  // forearm bends, square to it (away from the pole, held straight)
+  const y=-m.norm(e);
+  const fore=wrist-e;
+  var z=fore-y*m.splat3(m.dot(fore,y));
+  if(m.len(z)<1e-6)z=y*m.splat3(m.dot(pole,y))-pole;
+  return.{.root=rig.turnOf(rig.frame(y,m.cross(y,m.norm(z)))),.mid=tri.bend};
 }
-/// `solveArm` with the shoulder first turned by `y` about the chest's
-/// vertical: the wrist still reaches `d`, but the elbow swings round the
-/// line from shoulder to wrist (out from the body, or in)
-pub fn solveArmTurned(d:V3,y:f32)skel.Limb{
-  // the arm solved in the shoulder's turned frame, then given that turn
-  var ik=solveArm(m.mulPoint(m.rotY(-y),d));
-  ik.root.y=y;
-  return ik;
+/// the arm on side `s` reaching its wrist to `d` (from the shoulder, in the
+/// chest's frame), the elbow back and a little out
+pub fn solveArm(d:V3,s:usize)skel.Limb{return solveArmPole(d,elbowBack*v3(skel.sign(s),1,1));}
+/// `solveArm` with the elbow swung by `y` about the chest's vertical (out
+/// from the body, or in): the wrist still reaches `d`
+pub fn solveArmTurned(d:V3,s:usize,y:f32)skel.Limb{return solveArmPole(d,m.mulDir(m.rotY(y),elbowBack*v3(skel.sign(s),1,1)));}
+/// the wrist's turn that lays the hand of arm `l` (side `s`) with its
+/// fingers along `fingers` and its palm facing `palm` (both in the chest's
+/// frame; the palm faces the hand's -x on the right, +x on the left)
+pub fn handTo(l:skel.Limb,s:usize,fingers:V3,palm:V3)skel.Turn{
+  // the forearm's frame in the chest's, and the hand's wanted there
+  const fore=m.chain(&.{l.root.m4(),m.rotX(-l.mid)});
+  const want=rig.frame(-fingers,palm*m.splat3(-skel.sign(s)));
+  return rig.turnOf(m.chain(&.{m.inverseRigid(fore),want}));
 }
+/// which way the forearm of arm `l` runs, elbow to wrist, in the chest's frame
+pub fn forearmDir(l:skel.Limb)V3{return m.mulDir(m.chain(&.{l.root.m4(),m.rotX(-l.mid)}),v3(0,-1,0));}
 /// how far through its pull and wrench the pry is at unit share `k` (0 on
 /// the grip .. 1 wrenched), easing back to the grip after
 pub fn pryPull(k:f32)f32{

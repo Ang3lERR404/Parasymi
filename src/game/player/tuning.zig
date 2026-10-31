@@ -208,6 +208,16 @@ pub const toeHang:f32=0.55;
 pub const liftArc:f32=0.8;
 /// the metatarsal folds this much more under the leg mid-swing
 pub const swingFold:f32=0.45;
+/// how much of the leg's swing toward its foot the metatarsal follows (the
+/// rest of the reach taken up by thigh and shin)
+pub const metaFollow:f32=0.5;
+/// how fast a foot's sense of the ground under it settles to a new slope (1/s)
+pub const slopeRate:f32=14;
+/// how far the ground is felt round a foot to read its slope (m)
+pub const slopeSpan:f32=0.15;
+/// the share of thigh and shin's full length the hock is reached with
+/// before the hips drop to let a foot reach the ground below
+pub const reachShare:f32=0.97;
 /// the pelvis: how far it sinks with stride and bobs at each footfall,
 /// sways over the planted foot, turns and rolls with the stride
 /// (this one: how far it sinks at full stride, m)
