@@ -352,15 +352,25 @@ const vec3 SKY_LEY_DAY = vec3(0.45, 0.3, 0.7);
 const vec3 GROUND_BOUNCE = vec3(0.12, 0.10, 0.08);
 const float GROUND_NIGHT = 0.3;
 const float AMBIENT = 0.55;
+// how much of the sky's light still reaches a shaded place: what shades it
+// from the key light (a canopy, the leaves above, a boulder's flank) also
+// hides much of the sky, so shade deepens under things and inside foliage
+const float SKY_IN_SHADE = 0.68;
+// by night, colours lit by the moon and sky fade toward a cool grey, as
+// eyes see in the dark (how far, at the darkest night, and the grey's tint);
+// what glows of itself keeps its colour
+const float NIGHT_GREY = 0.45;
+const vec3 NIGHT_TINT = vec3(0.78, 0.88, 1.12);
 // a surface lit by the sky, the key light (`sh` of it reaching it, see
 // keyShadow) and the points of light (`points`, as pointLight gives them)
 vec3 shadeLitWith(vec3 albedo, vec3 n, float sh, vec3 points) {
+  albedo = mix(albedo, vec3(dot(albedo, vec3(0.3, 0.59, 0.11))) * NIGHT_TINT, NIGHT_GREY * (1.0 - DAYLIGHT));
   float ndl = max(dot(n, SUN), 0.0);
   float day = DAYLIGHT;
   vec3 sky = mix(SKY_DAY, SKY_VEILED, VEIL);
   sky = mix(byDay(SKY_NIGHT, sky), byDay(SKY_LEY_NIGHT, SKY_LEY_DAY), SHIFT);
   vec3 ground = GROUND_BOUNCE * mix(GROUND_NIGHT, 1.0, day);
-  vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * AMBIENT;
+  vec3 amb = mix(ground, sky, n.y * 0.5 + 0.5) * AMBIENT * mix(SKY_IN_SHADE, 1.0, sh);
   vec3 sun = keyLight() * ndl * sh;
   return albedo * (amb + sun + points);
 }

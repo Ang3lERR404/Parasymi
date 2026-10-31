@@ -21,6 +21,8 @@ layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer Li
 };
 // the shadow map: a depth layer per cascade, read with depth compares
 layout(set = 0, binding = 0) uniform sampler2DArrayShadow shadow_map;
+// the same map's raw depths (how far a shadow falls from what casts it)
+layout(set = 0, binding = 1) uniform sampler2DArray shadow_depth;
 
 // where a world point lands on screen (or, drawing shadow casters, in the
 // cascade this view draws)
@@ -34,8 +36,21 @@ vec4 project(vec3 w) {
 // a vertex placed here is clipped away (what casts no shadow)
 const vec4 UNSEEN = vec4(0.0, 0.0, 2.0, 1.0);
 
-// texels apart the shadow filter's taps are
-const float SHADOW_TAP = 1.2;
+// the shadow filter's taps: a Poisson disc of sixteen, the first eight of
+// them (every other one) searching for what casts the shadow
+const vec2 POISSON[16] = vec2[16](
+  vec2(-0.94201624, -0.39906216), vec2(0.94558609, -0.76890725), vec2(-0.09418410, -0.92938870), vec2(0.34495938, 0.29387760),
+  vec2(-0.91588581, 0.45771432), vec2(-0.81544232, -0.87912464), vec2(-0.38277543, 0.27676845), vec2(0.97484398, 0.75648379),
+  vec2(0.44323325, -0.97511554), vec2(0.53742981, -0.47373420), vec2(-0.26496911, -0.41893023), vec2(0.79197514, 0.19090188),
+  vec2(-0.24188840, 0.99706507), vec2(-0.81409955, 0.91437590), vec2(0.19984126, 0.78641367), vec2(0.14383161, -0.14100790));
+// how wide the key light looks (radians): a shadow's edge softens by this
+// much for each unit it falls from what casts it, sharp where they touch
+const float LIGHT_SPREAD = 0.02;
+// how far round (texels) what casts a shadow is searched for, and the
+// narrowest and widest a shadow's soft edge grows (texels)
+const float BLOCKER_REACH = 6.0;
+const float PENUMBRA_MIN = 1.0;
+const float PENUMBRA_MAX = 7.0;
 // how far a point is pushed off its surface toward the light (texels), and
 // how much more where the light grazes it
 const float SHADOW_BIAS = 0.8;
@@ -48,10 +63,15 @@ const float CASCADE_BLEND_TO = 0.97;
 const float SHADOW_FADE = 0.8;
 
 // how much of the key light reaches `wpos` through cascade `i` (1 lit, 0
-// in shadow), filtered over 2x2 taps of 2x2 compares each; `edge` how far
-// out across the cascade it lies (0 centre .. 1 rim; 2 outside it). The
-// point is pushed off its surface toward the light by a texel or so (more
-// on slopes the light grazes) so a surface never shadows itself.
+// in shadow); `edge` how far out across the cascade it lies (0 centre .. 1
+// rim; 2 outside it). The point is pushed off its surface toward the light
+// by a texel or so (more on slopes the light grazes) so a surface never
+// shadows itself. The shadow's edge hardens where it meets what casts it
+// and softens as it falls away (the light has a breadth, LIGHT_SPREAD):
+// the depth of what stands between is searched round the point, its
+// distance gives the soft edge's width, and sixteen compares over a
+// Poisson disc that wide (turned by a hash of the place, so no pattern
+// bands) filter it.
 float cascadeLit(Lighting L, int i, vec3 wpos, vec3 nl, float slope, out float edge) {
   float tx = L.texel[i];
   vec4 q = L.cascade[i] * vec4(wpos + nl * tx * (SHADOW_BIAS + SHADOW_SLOPE_BIAS * slope), 1.0);
@@ -61,12 +81,25 @@ float cascadeLit(Lighting L, int i, vec3 wpos, vec3 nl, float slope, out float e
     return 1.0;
   }
   vec2 uv = q.xy * 0.5 + 0.5;
-  vec2 tap = SHADOW_TAP / vec2(textureSize(shadow_map, 0).xy);
-  float s = 0.0;
-  for (int y = 0; y < 2; y++) for (int x = 0; x < 2; x++) {
-    s += texture(shadow_map, vec4(uv + (vec2(x, y) - 0.5) * tap, float(i), q.z));
+  vec2 texel = 1.0 / vec2(textureSize(shadow_map, 0).xy);
+  // the taps turned by a hash of the place: steady in the world, never banding
+  float ang = 6.2831853 * fract(sin(dot(floor(wpos * 512.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  mat2 turn = mat2(cos(ang), sin(ang), -sin(ang), cos(ang));
+  // what stands between: the mean depth of the blockers round about
+  float sum = 0.0, count = 0.0;
+  for (int k = 0; k < 8; k++) {
+    float d = texture(shadow_depth, vec3(uv + turn * POISSON[k * 2] * BLOCKER_REACH * texel, float(i))).r;
+    if (d < q.z) { sum += d; count += 1.0; }
   }
-  return s * 0.25;
+  if (count < 0.5) return 1.0;
+  // how far (world units) the shadow falls from them: the depth between,
+  // over the cascade's depth per unit along the light
+  float perUnit = length(vec3(L.cascade[i][0][2], L.cascade[i][1][2], L.cascade[i][2][2]));
+  float gap = (q.z - sum / count) / max(perUnit, 1e-6);
+  float pen = clamp(gap * LIGHT_SPREAD / tx, PENUMBRA_MIN, PENUMBRA_MAX);
+  float s = 0.0;
+  for (int k = 0; k < 16; k++) s += texture(shadow_map, vec4(uv + turn * POISSON[k] * pen * texel, float(i), q.z));
+  return s / 16.0;
 }
 
 // how much of the key light (sun or moon) reaches a surface at `wpos`

@@ -31,7 +31,7 @@ const vertex=@import("../gfx/vertex.zig");
 /// slices of the view, each its own layer (light.glsl CASCADES)
 pub const cascades=3;
 /// texels along each side of a cascade's layer
-pub const res=1536;
+pub const res=2048;
 /// points of light a frame can hold (light.glsl MAX_LIGHTS)
 pub const maxLights=32;
 /// the views the casters draw: one per cascade
@@ -175,6 +175,9 @@ pub const Shadow=struct{
   view:vk.ImageView=.null_handle,
   /// the compare sampler the world shaders read it through
   sampler:vk.Sampler=.null_handle,
+  /// a plain sampler reading its raw depths (for how far a shadow falls
+  /// from what casts it)
+  depthSampler:vk.Sampler=.null_handle,
   /// the descriptor set's layout: one image-and-sampler binding
   setLayout:vk.DescriptorSetLayout=.null_handle,
   /// the pool its one set comes from
@@ -223,20 +226,32 @@ pub const Shadow=struct{
       .compare_enable=.true,.compare_op=.less_or_equal,.min_lod=0,.max_lod=0,
       .border_color=.float_opaque_white,.unnormalized_coordinates=.false,
     },null);
-    // the set's one binding: the map, read by both stages
+    // a plain sampler on the same map: the depths themselves, unfiltered
+    s.depthSampler=try c.device.createSampler(&.{
+      .mag_filter=.nearest,.min_filter=.nearest,.mipmap_mode=.nearest,
+      .address_mode_u=.clamp_to_edge,.address_mode_v=.clamp_to_edge,.address_mode_w=.clamp_to_edge,
+      .mip_lod_bias=0,.anisotropy_enable=.false,.max_anisotropy=1,
+      .compare_enable=.false,.compare_op=.always,.min_lod=0,.max_lod=0,
+      .border_color=.float_opaque_white,.unnormalized_coordinates=.false,
+    },null);
+    // the set's two bindings: the map through each sampler, read by both stages
     const bindings=[_]vk.DescriptorSetLayoutBinding{
       .{.binding=0,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
+      .{.binding=1,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
     };
     s.setLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=bindings.len,.p_bindings=&bindings},null);
     // room for that one descriptor
-    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=1}};
+    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=2}};
     s.pool=try c.device.createDescriptorPool(&.{.max_sets=1,.pool_size_count=sizes.len,.p_pool_sizes=&sizes},null);
     try c.device.allocateDescriptorSets(&.{.descriptor_pool=s.pool,.descriptor_set_count=1,.p_set_layouts=@ptrCast(&s.setLayout)},@ptrCast(&s.set));
     // what the set's binding points at: the map's view, through the sampler
     const info=[_]vk.DescriptorImageInfo{.{.sampler=s.sampler,.image_view=s.view,.image_layout=.shader_read_only_optimal}};
+    // ...and through the plain sampler
+    const depthInfo=[_]vk.DescriptorImageInfo{.{.sampler=s.depthSampler,.image_view=s.view,.image_layout=.shader_read_only_optimal}};
     // the write that points it there
     const writes=[_]vk.WriteDescriptorSet{
       .{.dst_set=s.set,.dst_binding=0,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=&info,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
+      .{.dst_set=s.set,.dst_binding=1,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=&depthInfo,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
     };
     c.device.updateDescriptorSets(&writes,null);
   }
@@ -245,6 +260,7 @@ pub const Shadow=struct{
     c.device.destroyDescriptorPool(s.pool,null);
     c.device.destroyDescriptorSetLayout(s.setLayout,null);
     c.device.destroySampler(s.sampler,null);
+    c.device.destroySampler(s.depthSampler,null);
     c.device.destroyImageView(s.view,null);
     c.device.destroyImage(s.image,null);
     c.device.freeMemory(s.mem,null);

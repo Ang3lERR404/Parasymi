@@ -368,7 +368,19 @@ The bloom post-process makes the glow round the glints.
 ### Shadows
 - The key light (sun or moon) casts shadows through a cascaded shadow map:
   3 cascades, shadow pictures each covering a wider area out from the
-  camera (1536² each). `fit` snaps them to texels so they hold still.
+  camera (2048² each). `fit` snaps them to texels so they hold still.
+- **Soft shadows that harden at contact** (engine light.glsl
+  `cascadeLit`): the light has a breadth (`LIGHT_SPREAD`), so a shadow's
+  edge is sharp where it meets what casts it and softens as it falls
+  away. The blockers' depth is searched round each point (8 taps of the
+  raw depths, the map's second binding), their distance sets the soft
+  edge's width (1..7 texels), and 16 compares over a Poisson disc that
+  wide, turned by a hash of the place, filter it.
+- **Shade hides the sky** (common.glsl `SKY_IN_SHADE`): where the key
+  light is shaded, the sky's light is too, a share of it, so shade
+  deepens under things and inside foliage.
+- **Night sight** (`NIGHT_GREY`): by night, lit colours fade toward a
+  cool grey as eyes see in the dark; what glows keeps its colour.
 - They are drawn in one multiview pass per caster (all 3 at once:
   `gl_ViewIndex`, `project()`), with casters at their coarsest LOD
   (`renderer.caster`).
