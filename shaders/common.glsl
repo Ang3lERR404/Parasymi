@@ -61,6 +61,7 @@ const float SHEEN_POWER = 40.0;
 #define PART_NERVE 16     // an arsthraxia's nerve: thought rises through it
 #define PART_POD 17       // a plant's yield ripening on it, a bead of sap
 #define PART_PLEXUS 18    // the constellate web: points, lines, panes of light
+#define PART_STONE 19     // weathered stone: grained, flecked, lichened
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))

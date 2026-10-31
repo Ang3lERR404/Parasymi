@@ -288,7 +288,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `item_pod.zig` — mesh: ITEM POD.
 - `lithophage.zig` — mesh: LITHOPHAGE.
 - `loomfern.zig` — mesh: LOOMFERN.
-- `mineral_kit.zig` — shared pieces for the ground's minerals: crystals and faceted stones, flat-faced (each face its own normal) so they catch the light as cut…
+- `mineral_kit.zig` — shared pieces for the ground's minerals: crystals, flat-faced (each face its own normal) so they catch the light as cut planes, and…
 - `monfris.zig` — mesh: MONFRIS.
 - `mote.zig` — mesh: MOTE.
 - `node_fibre.zig` — mesh: NODE FIBRE.

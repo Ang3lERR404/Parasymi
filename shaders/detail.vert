@@ -5,8 +5,8 @@
 #include "ground.glsl"
 
 // The ground's detail, grown here from one record per tile (DetailTile). On
-// soil, a clod heaped up and a small stone half sunk in it, each a faceted
-// lump (the first 60 vertices). Then up to 96 grass blades in tufts of six,
+// soil, a clod heaped up and a small pebble half sunk in it, each a
+// rounded lump, smoothly shaded (the first 192 vertices). Then up to 96 grass blades in tufts of six,
 // each a curved, tapering blade of three bands fanning out from its tuft's
 // heart: they grow as thick as the ground beneath
 // them is grassy (its kinds melted together exactly as terrain.frag melts
@@ -35,7 +35,11 @@ layout(location = 4) out vec4 v_mat; // the ground's kinds: unused off the groun
 
 // vertices the lumps take, then the grass: how many blades at most, and the
 // vertices each runs (two bands of two triangles, a tip of one)
-const int LUMP_VERTS = 60;
+const int LUMP_VERTS = 192;
+// corners round each ring of a lump, and the vertices a lump runs (a band
+// of two triangles a side, a crown and a bottom of one)
+const int LUMP_SIDES = 8;
+const int LUMP_ONE = LUMP_SIDES * 4 * 3;
 const int BLADES = 96;
 // blades to a tuft, and how far from its heart they rise
 const int TUFT = 6;
@@ -208,9 +212,11 @@ void main() {
   vec3 tile = srgb2lin(col.rgb);
   vec2 cell = at.xz;
 
-  // soil: lumps of 10 triangles (5 around the crown, 5 under), two per tile
-  int lump = vi / 30;
-  int j = vi - lump * 30;
+  // soil: rounded lumps of 32 triangles, two per tile: a ring round its
+  // middle, a shoulder ring above it turned half a step, a crown and a
+  // buried bottom, shaded smooth as the rounded lump they stand for
+  int lump = vi / LUMP_ONE;
+  int j = vi - lump * LUMP_ONE;
   int tri = j / 3;
   int corner = j - tri * 3;
   vec3 k = vec3(cell, float(lump) + 11.0);
@@ -219,29 +225,52 @@ void main() {
   float fx = mix(0.12, 0.88, hash13(k + 0.3));
   float fz = mix(0.12, 0.88, hash13(k + 2.1));
   float r = stone ? mix(0.025, 0.055, hash13(k + 4.4)) : mix(0.05, 0.1, hash13(k + 4.4));
-  float flat_ = stone ? 0.7 : 0.35;
+  float flat_ = stone ? 0.75 : 0.6;
   vec3 c = vec3(cell.x + fx, groundAt(fx, fz), cell.y + fz);
   float turn = TAU * hash13(k + 6.6);
-  // the triangle's three points: ring i, ring i+1 and the crown (top) or
-  // the buried bottom
-  int i = tri - (tri >= 5 ? 5 : 0);
-  bool top = tri < 5;
+  // the ring point `i` round it (`up`: the shoulder ring), and the crown and bottom
   vec3 q[3];
-  for (int n = 0; n < 2; n++) {
-    int ri = (i + n) - ((i + n) >= 5 ? 5 : 0);
-    float a = turn + TAU * float(ri) / 5.0;
-    vec3 kr = k + float(ri) * 13.1;
-    float d = r * mix(0.75, 1.25, hash13(kr + 0.7));
-    q[n] = c + vec3(cos(a) * d, r * flat_ * 0.25 * hash13(kr + 1.9), sin(a) * d);
+  for (int n = 0; n < 3; n++) {
+    // which point this corner of the triangle is: a middle point, a
+    // shoulder point, the crown (-1) or the bottom (-2)
+    int i = 0, ring = 0;
+    if (tri < 2 * LUMP_SIDES) {
+      int seg = tri / 2;
+      bool second = tri - seg * 2 == 1;
+      int corners0[3] = int[3](0, 1, 2), corners1[3] = int[3](1, 3, 2);
+      int cc = second ? corners1[n] : corners0[n];
+      // 0: middle seg, 1: middle seg+1, 2: shoulder seg, 3: shoulder seg+1
+      i = seg + (cc == 1 || cc == 3 ? 1 : 0);
+      ring = cc >= 2 ? 1 : 0;
+    } else if (tri < 3 * LUMP_SIDES) {
+      int seg = tri - 2 * LUMP_SIDES;
+      i = seg + (n == 1 ? 1 : 0);
+      ring = n == 2 ? -1 : 1;
+    } else {
+      int seg = tri - 3 * LUMP_SIDES;
+      i = seg + (n == 2 ? 1 : 0);
+      ring = n == 1 ? -2 : 0;
+    }
+    i = i - (i >= LUMP_SIDES ? LUMP_SIDES : 0);
+    vec3 kr = k + float(i) * 13.1 + float(ring) * 5.3;
+    if (ring == -1) q[n] = c + vec3(r * (hash13(k + 8.1) - 0.5) * 0.2, r * flat_, r * (hash13(k + 9.3) - 0.5) * 0.2);
+    else if (ring == -2) q[n] = c - vec3(0.0, r * flat_ * 0.6, 0.0);
+    else {
+      float a = turn + TAU * (float(i) + 0.5 * float(ring)) / float(LUMP_SIDES);
+      float d = r * mix(0.72, 1.2, hash13(kr + 0.7)) * (ring == 1 ? mix(0.55, 0.8, hash13(kr + 2.6)) : 1.0);
+      float h = ring == 1 ? r * flat_ * mix(0.5, 0.9, hash13(kr + 1.9)) : r * flat_ * 0.15 * hash13(kr + 1.9);
+      q[n] = c + vec3(cos(a) * d, h, sin(a) * d);
+    }
   }
-  q[2] = top ? c + vec3(r * (hash13(k + 8.1) - 0.5) * 0.16, r * flat_, r * (hash13(k + 9.3) - 0.5) * 0.16) : c - vec3(0.0, r * flat_ * 0.6, 0.0);
-  vec3 n = normalize(cross(q[1] - q[0], q[2] - q[0]));
-  if (dot(n, q[0] + q[1] + q[2] - 3.0 * c) < 0.0) n = -n;
-  vec3 p = corner == 0 ? q[0] : (corner == 1 ? q[1] : q[2]);
+  vec3 p = q[corner];
+  // its normal: the rounded lump's (an ellipsoid round its heart)
+  vec3 heart = c + vec3(0.0, r * flat_ * 0.25, 0.0);
+  vec3 n = normalize((p - heart) / vec3(r * r, r * flat_ * r * flat_, r * r));
   vec3 grey = STONE_GREY * mix(0.75, 1.15, hash13(k + 10.7));
   v_pos = p;
   v_nrm = n;
-  v_col = stone ? srgb2lin(grey) : tile * vec3(0.78, 0.72, 0.68);
+  // a clod's crust dries paler on top, darker and damper underneath
+  v_col = stone ? srgb2lin(grey) * mix(0.8, 1.05, n.y * 0.5 + 0.5) : tile * vec3(0.8, 0.75, 0.7) * mix(0.75, 1.1, n.y * 0.5 + 0.5);
   v_info = vec4(info.x, info.y, 0.0, 0.0);
   gl_Position = project(p);
 }

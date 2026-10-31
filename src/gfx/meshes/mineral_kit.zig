@@ -1,6 +1,7 @@
-//! shared pieces for the ground's minerals: crystals and faceted stones,
-//! flat-faced (each face its own normal) so they catch the light as cut
-//! planes. Not a mesh itself; the node meshes use it.
+//! shared pieces for the ground's minerals: crystals, flat-faced (each
+//! face its own normal) so they catch the light as cut planes, and
+//! weathered stones, smooth boulders ground down to rounded worn faces.
+//! Not a mesh itself; the node meshes use it.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -91,38 +92,105 @@ pub fn crystal(b:*mg.Builder,c:Crystal,rng:*Rng)Allocator.Error!void{
     try facet(b,.{lo[i],foot,lo[j]},inside,.{c.col,c.col,c.col},0,c.part);
   }
 }
-/// a faceted stone half sunk in the ground at `at`, radius `r`, `flat` how
-/// tall it stands (a share of `r`): two irregular rings of points between
-/// a flat-ish crown and a buried bottom, `col` on its flanks paling to
-/// `lite` up its top faces
+/// rings from a boulder's buried foot to its crown, at full detail
+const boulderRings=12;
+/// sides round each of its rings, at full detail
+const boulderSides=18;
+/// how many worn faces a boulder is ground down to
+const boulderCuts=7;
+/// how many lumps and dents swell or sink its body
+const boulderLumps=4;
+/// how softly a worn face rounds off into the body round it
+const cutSoft:f32=0.05;
+/// a boulder's shape before it is scaled: worn faces (planes it is ground
+/// down to) and lumps, round its centre
+const Boulder=struct{
+  /// each worn face's outward direction
+  cutN:[boulderCuts]V3,
+  /// how far out each lies
+  cutD:[boulderCuts]f32,
+  /// each lump's direction
+  lumpN:[boulderLumps]V3,
+  /// how far each swells (a dent below zero)
+  lumpA:[boulderLumps]f32,
+  /// how far out (a share of its radius) the body reaches in direction `d`:
+  /// a sphere swelled and dented by its lumps, ground down to its worn
+  /// faces, each rounded off smoothly into the rest
+  fn reach(bd:*const Boulder,d:V3)f32{
+    // the body before its worn faces
+    var r:f32=1;
+    for(bd.lumpN,bd.lumpA)|n,a|r+=a*@exp((m.dot(d,n)-1)*5);
+    for(bd.cutN,bd.cutD)|n,c|{
+      // how squarely the face meets this direction
+      const k=m.dot(d,n);
+      if(k<0.05)continue;
+      r=smin(r,c/k,cutSoft);
+    }
+    return r;
+  }
+};
+/// the smaller of `a` and `b`, the corner between them rounded over `k`
+fn smin(a:f32,b:f32,k:f32)f32{
+  // how far toward `a` the blend leans
+  const h=m.clamp01(0.5+0.5*(b-a)/k);
+  return m.lerp(b,a,h)-k*h*(1-h);
+}
+/// a weathered stone half sunk in the ground at `at`, radius `r`, `flat`
+/// how tall it stands (a share of `r`): a smooth boulder, lumpy, ground
+/// down to a few worn faces whose edges are rounded off, its foot buried;
+/// `col` on its flanks paling to `lite` up its sky-turned faces, shaded as
+/// stone (part `.stone`: grain, flecks, hollows, lichen)
 pub fn stone(b:*mg.Builder,at:V3,r:f32,flat:f32,col:color.Rgba8,lite:color.Rgba8,rng:*Rng)Allocator.Error!void{
-  // how many corners round each ring
-  const s=7;
-  // the middle ring (its widest) and the upper ring (its shoulders)
-  var mid:[s]V3=undefined;
-  var up:[s]V3=undefined;
-  // how far the whole stone is turned
+  // its shape: worn faces and lumps
+  var bd:Boulder=undefined;
+  for(&bd.cutN,&bd.cutD)|*n,*d|{
+    n.*=m.norm(v3(rng.range(-1,1),rng.range(-0.25,1),rng.range(-1,1)));
+    d.*=rng.range(0.66,0.86);
+  }
+  for(&bd.lumpN,&bd.lumpA)|*n,*a|{
+    n.*=m.norm(v3(rng.range(-1,1),rng.range(-0.6,1),rng.range(-1,1)));
+    a.*=rng.range(-0.1,0.16);
+  }
+  // how many rings and sides it keeps at this level of detail
+  const rings=@max(4,@as(usize,boulderRings)>>@intCast(b.lod));
+  const sides=b.around(boulderSides,7);
+  // its centre (raised so a third of it lies buried) and its half sizes
+  const centre=at+v3(0,r*flat*0.3,0);
+  const half=v3(r,r*flat*0.75,r);
+  // how far it is turned
   const turn=rng.range(0,m.tau);
-  for(0..s)|i|{
-    // this corner's jittered bearing and uneven radius
-    const a=turn+m.tau*m.ratio(i,s)+rng.range(-0.2,0.2);
-    const rr=r*rng.range(0.8,1.15);
-    mid[i]=at+v3(@cos(a)*rr,r*flat*rng.range(0.1,0.35),@sin(a)*rr);
-    // the shoulder's bearing, halfway to the next corner
-    const a2=a+m.pi/m.f(s);
-    up[i]=at+v3(@cos(a2)*rr*0.62,r*flat*rng.range(0.7,0.95),@sin(a2)*rr*0.62);
-  }
-  // the crown on top, nudged off centre, and the buried bottom
-  const crown=at+v3(r*rng.range(-0.1,0.1),r*flat*1.05,r*rng.range(-0.1,0.1));
-  const bottom=at-v3(0,r*flat*0.5,0);
-  // a point inside, for facing the faces out
-  const inside=at+v3(0,r*flat*0.3,0);
-  for(0..s)|i|{
-    // the next corner round
-    const j=(i+1)%s;
-    try facet(b,.{mid[i],mid[j],up[i]},inside,.{col,col,lite},0.4,.stem);
-    try facet(b,.{mid[j],up[j],up[i]},inside,.{col,lite,lite},0.4,.stem);
-    try facet(b,.{up[i],up[j],crown},inside,.{lite,lite,lite},0.5,.stem);
-    try facet(b,.{mid[i],bottom,mid[j]},inside,.{col,col,col},0.4,.stem);
-  }
+  // each ring's points, from the buried foot (ring 0) up to the crown
+  var pts:[boulderRings+1][boulderSides]V3=undefined;
+  for(0..rings+1)|i|for(0..sides)|j|{
+    // the way out from the centre: up from straight down, and round
+    const th=m.ratio(i,rings)*m.pi;
+    const ph=turn+m.ratio(j,sides)*m.tau;
+    const d=v3(@sin(th)*@cos(ph),-@cos(th),@sin(th)*@sin(ph));
+    pts[i][j]=centre+d*half*m.splat3(bd.reach(d));
+  };
+  // each point's normal: across its ring and up between its neighbours
+  // (straight down and up at the foot and crown), turned outward
+  var nrm:[boulderRings+1][boulderSides]V3=undefined;
+  for(0..rings+1)|i|for(0..sides)|j|{
+    // the points either side round the ring, and below and above
+    const across=pts[i][(j+1)%sides]-pts[i][(j+sides-1)%sides];
+    const up=pts[@min(i+1,rings)][j]-pts[if(i==0)0 else i-1][j];
+    var n=if(i==0)v3(0,-1,0)else if(i==rings)v3(0,1,0)else m.norm(m.cross(across,up));
+    if(m.dot(n,pts[i][j]-centre)<0)n=-n;
+    nrm[i][j]=n;
+  };
+  for(0..rings)|i|for(0..sides)|j|{
+    // the next side round
+    const k=(j+1)%sides;
+    // the band's quad, below then above (a triangle at the foot and crown)
+    const q=[4][2]usize{.{i,j},.{i,k},.{i+1,k},.{i+1,j}};
+    for([_]usize{0,2,1,0,3,2},0..)|c,o|{
+      if(i==0 and o<3)continue;
+      if(i+1==rings and o>=3)continue;
+      // this corner
+      const at2=q[c];
+      const n=nrm[at2[0]][at2[1]];
+      try b.put(pts[at2[0]][at2[1]],n,color.mix(col,lite,m.smooth(m.clamp01(n[1]*0.8+0.2))),0.4,0,.stone);
+    }
+  };
 }

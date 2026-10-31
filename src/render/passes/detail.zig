@@ -24,10 +24,10 @@ pub const desc:pass.Desc=.{
   .bindings=&.{pipeline.binding(vertex.DetailTile,0,.instance)},
   .attrs=&pipeline.attrs(vertex.DetailTile,0,0),
 };
-/// vertices each tile's instance runs: two faceted lumps of 10 triangles
+/// vertices each tile's instance runs: two rounded lumps of 32 triangles
 /// on soil, then up to 96 curved grass blades of 5 triangles, in tufts
 /// (what a tile does not use folds away). Matches detail.vert.
-pub const vertsPerTile=60+96*15;
+pub const vertsPerTile=192+96*15;
 /// how far from the view's focus (tiles, to a chunk's nearest edge) the
 /// detail is drawn
 const detailR:f32=28;

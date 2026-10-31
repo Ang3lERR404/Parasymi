@@ -77,13 +77,16 @@ pub const Part=enum(u32){
   /// which), lightened by each beat as it runs out to them (tu.x how far
   /// it runs to reach them)
   plexus,
+  /// weathered stone: grained, flecked, darker in its hollows, lichened
+  /// where it faces the sky (part.frag, in its own mesh space)
+  stone,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
     .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus=>true,
-    .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve=>false,
+    .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve,.stone=>false,
   };
 }
 /// the engine's mesh layouts (gfx/meshgen.zig builds them): one plain vertex

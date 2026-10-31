@@ -42,7 +42,8 @@ lowland).
     at the tip in the colour of the ground it rises from (moss green, ley
     violet, stone grey-green; a few straw tips), its normal leaned skyward
     so both faces catch light, wind-swayed; far off fewer and wider;
-  - clods and stones on soil.
+  - on soil, a clod and a pebble: rounded lumps of eight sides, heaped
+    unevenly, smoothly shaded; a clod's crust paler on top.
 - **Ley:** ley lines carry a faint drifting plexus (a web of thin lines);
   ley sight glows smoothly across tiles. At the unforming they seal: each
   closes from its edges in to its heart (each vertex's depth into its
@@ -305,9 +306,15 @@ This is what plays while a halo forms from four blooms
   round.
 - As they meet, a flash spreads (`haloFlash`, part 9).
 
-## Resource nodes (`mineralKit`, flat facets)
+## Resource nodes (`mineralKit`)
+- **Stones** are weathered boulders, smooth and lumpy, ground down to a
+  few worn faces with rounded edges, a third buried; shaded as stone
+  (part `.stone`, part.frag in mesh space): mottled grey, fine grain that
+  tips the light, dark and pale flecks, darker hollows, lichen on the
+  faces turned to the sky.
+- **Crystals** stay flat-faced, cut planes catching the light.
 - **Ley shards:** a violet crystal cluster.
-- **Grit:** faceted stones with quartz chips.
+- **Grit:** boulders with quartz chips.
 - **Fibre:** a swaying clump of arching stalks.
 
 ## Sap

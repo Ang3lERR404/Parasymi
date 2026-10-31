@@ -3,6 +3,7 @@
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "surface.glsl"
+#include "ground.glsl"
 #ifdef AIR
 #include "volume.glsl"
 #include "air.glsl"
@@ -83,6 +84,53 @@ const uint FIBRES = PART_BIT(PART_STEM) | PART_BIT(PART_CORE) | PART_BIT(PART_NE
 // sapLifeAt (surface.glsl) for this fragment
 vec3 sapLife(vec3 c, vec3 sapc, vec3 n, vec3 V, float inside, float sh, vec3 mirrored, inout float alpha) {
   return sapLifeAt(c, sapc, n, V, v_pos, v_obj, inside, sh, mirrored, alpha);
+}
+
+// weathered stone (sRGB): the dark of its hollows and flecks, its pale
+// flecks, the lichen that takes the faces turned to the sky; how deep its
+// grain lights it, and how many grains a unit of its mesh holds
+const vec3 STONE_HOLLOW = vec3(0.16, 0.15, 0.15);
+const vec3 STONE_FLECK = vec3(0.86, 0.84, 0.78);
+const vec3 STONE_LICHEN = vec3(0.56, 0.6, 0.38);
+const float STONE_BUMP = 0.04;
+const float STONE_GRAIN = 9.0;
+// value noise 0..1 in three dimensions, smooth between hashed lattice corners
+float rockNoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+  float a = hash12(i.xy + i.z * 17.13), b = hash12(i.xy + vec2(1.0, 0.0) + i.z * 17.13);
+  float c = hash12(i.xy + vec2(0.0, 1.0) + i.z * 17.13), d = hash12(i.xy + vec2(1.0, 1.0) + i.z * 17.13);
+  float e = hash12(i.xy + (i.z + 1.0) * 17.13), g = hash12(i.xy + vec2(1.0, 0.0) + (i.z + 1.0) * 17.13);
+  float h = hash12(i.xy + vec2(0.0, 1.0) + (i.z + 1.0) * 17.13), k = hash12(i.xy + vec2(1.0, 1.0) + (i.z + 1.0) * 17.13);
+  return mix(mix(mix(a, b, u.x), mix(c, d, u.x), u.y), mix(mix(e, g, u.x), mix(h, k, u.x), u.y), u.z);
+}
+// three octaves of it, each turned off the last
+float rockFbm(vec3 p) {
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 3; i++) {
+    s += a * rockNoise(p);
+    p = p.yzx * 2.03 + 11.7;
+    a *= 0.5;
+  }
+  return s;
+}
+// a stone's surface at mesh point `q` (world normal `n`): its colour from
+// the vertex's grey, mottled, flecked dark and pale, darker down in its
+// hollows, lichened up its sky-turned faces; and how high its grain stands
+struct StoneSurface { vec3 albedo; float height; };
+StoneSurface stoneSurface(vec3 base, vec3 q, vec3 n) {
+  vec3 p = q * STONE_GRAIN;
+  float mottle = rockFbm(p * 0.35);
+  float grain = rockNoise(p * 2.0) * 0.6 + rockNoise(p * 5.0) * 0.4;
+  float hollow = smoothstep(0.55, 0.25, rockFbm(p * 0.8 + 5.0));
+  vec3 c = base * (0.78 + 0.44 * mottle) * (0.88 + 0.24 * grain);
+  c = mix(c, srgb2lin(STONE_HOLLOW), hollow * 0.45);
+  float fleck = rockNoise(p * 7.0 + 3.0);
+  c = mix(c, srgb2lin(STONE_HOLLOW), smoothstep(0.9, 0.95, fleck) * 0.6);
+  c = mix(c, srgb2lin(STONE_FLECK), smoothstep(0.1, 0.03, fleck) * 0.6);
+  float lichen = smoothstep(0.55, 0.62, rockFbm(p * 0.6 + 21.0)) * smoothstep(0.35, 0.8, n.y);
+  c = mix(c, srgb2lin(STONE_LICHEN) * (0.8 + 0.4 * grain), lichen * 0.75);
+  return StoneSurface(c, grain * 0.6 + (1.0 - hollow) * 0.4 + lichen * 0.2);
 }
 
 void surface() {
@@ -399,6 +447,17 @@ void surface() {
   } else {
     vec3 albedo = v_col;
     float inner = 0.0;
+    if (part == PART_STONE) {
+      // weathered stone: its grain lights it, tipping the normal (the
+      // surface gradient, from screen derivatives)
+      StoneSurface s = stoneSurface(v_col, v_obj, n);
+      albedo = s.albedo;
+      vec3 dpx = dFdx(v_pos), dpy = dFdy(v_pos);
+      vec3 r1 = cross(dpy, n), r2 = cross(n, dpx);
+      float det = dot(dpx, r1);
+      vec3 grad = sign(det) * (dFdx(s.height) * r1 + dFdy(s.height) * r2);
+      n = normalize(abs(det) * n - grad * STONE_BUMP);
+    }
     // the inner face of an ear (the side opposite its normal) is sap-lined
     if (part == PART_EAR) {
       inner = dot(raw, V) < 0.0 ? 1.0 : 0.0;
