@@ -59,9 +59,11 @@ const Kind=enum(u8){
 const Shape=enum(u8){
   /// a loose spindle of points drifting wide
   cluster,
-  /// a petal: rows from a narrow base to a round tip, cupped, no midrib
+  /// a petal: rows from a narrow base out to its round tip, cupped, no
+  /// midrib
   petal,
-  /// a leaf: a midrib and two edges, folded to the midrib, pointed
+  /// a leaf: a stalk running on as a midrib, two edges, folded a little
+  /// up from the midrib, pointed
   leaf,
   /// a closed bud: a teardrop of points in a golden spiral
   bud,
@@ -161,7 +163,7 @@ pub const petal=struct{
 /// mesh: CONSTELLATE LEAF. a leaf of light, a part to build with
 pub const leaf=struct{
   /// builds the leaf's web
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.leaf,0.2);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.leaf,0.22);}
 };
 /// mesh: CONSTELLATE BUD. a closed bud of light, a part to build with
 pub const bud=struct{

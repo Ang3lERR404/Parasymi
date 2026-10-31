@@ -116,6 +116,10 @@ const int PLEXUS_LEAF = 2;
 const int PLEXUS_BUD = 3;
 const int PLEXUS_FLOWER = 4;
 const float PLEXUS_PART_DRIFT = 0.025;
+// a petal's rows, base to tip: how many points each holds (30 in all)
+// and how far along the petal it lies
+const int PLEXUS_PETAL_ROWS[8] = int[8](2, 3, 4, 5, 5, 5, 4, 2);
+const float PLEXUS_PETAL_ALONG[8] = float[8](0.02, 0.14, 0.28, 0.42, 0.56, 0.7, 0.84, 0.96);
 const float PLEXUS_SLOW = 0.12;
 const float PLEXUS_QUICK = 0.32;
 const float PLEXUS_POINT_R = 0.015;
@@ -138,26 +142,37 @@ vec3 plexusRest(float id, int shape) {
   vec3 h = hash33(vec3(id, 3.1, 7.7));
   vec3 jit = (h - 0.5) * 0.04;
   if (shape == PLEXUS_PETAL) {
-    // a petal: six rows of five from its narrow base to its round tip,
-    // broadest two thirds up, cupped and curling back toward its tip;
-    // no midrib (id 2 the base's middle)
-    float row = floor(id / 5.0);
-    float u = (row + 0.3) / 5.6;
-    float v = (id - row * 5.0) / 2.0 - 1.0;
-    float w = 0.26 * sin(0.5 * TAU * min(u * 1.12, 1.0)) * (0.35 + 0.65 * u) + 0.06;
-    float cup = 0.1 * (1.0 - v * v) * sin(0.5 * TAU * u);
-    return vec3(v * w, 0.75 + 0.6 * u, 0.28 * u * u - cup) + jit;
+    // a petal: eight rows from its narrow base (two, id 0 the heart) out
+    // through its broadest (five) to its round tip (two), cupped and
+    // curling back toward its tip; no midrib
+    int n = 2;
+    float row = 0.0;
+    float first = 0.0;
+    for (int r = 0; r < 8; r++) {
+      n = PLEXUS_PETAL_ROWS[r];
+      if (id < first + float(n)) { row = float(r); break; }
+      first += float(n);
+    }
+    float u = PLEXUS_PETAL_ALONG[int(row)];
+    float v = n > 1 ? (id - first) / float(n - 1) * 2.0 - 1.0 : 0.0;
+    float w = 0.27 * pow(max(sin(0.5 * TAU * min(u, 0.97)), 0.0), 0.6) * (0.4 + 0.6 * u) + 0.025;
+    float cup = 0.12 * (1.0 - v * v) * sin(0.5 * TAU * u);
+    return vec3(v * w * 0.95, 0.7 + 0.65 * u, 0.3 * u * u - cup) + jit * 0.6;
   }
   if (shape == PLEXUS_LEAF) {
-    // a leaf: a midrib of ten from its stalk to its point (id 0 the base),
-    // ten down either edge, the blade folded up to the midrib and arching
-    // out
+    // a leaf: a midrib of ten from the foot of its stalk (id 0, its
+    // heart) to its point, ten down either edge of the blade, which begins
+    // a fifth of the way up; it reaches out and up from the stalk, its
+    // edges folded a little up from the midrib, widest a third of the way
+    // along its blade and drawn to a point
     float side = id < 10.0 ? 0.0 : (id < 20.0 ? -1.0 : 1.0);
     float k = id < 10.0 ? id : mod(id - 10.0, 10.0);
-    float u = id < 10.0 ? k / 9.0 : (k + 0.6) / 10.6;
-    float w = 0.17 * pow(sin(0.5 * TAU * u), 0.8) * (1.0 - 0.25 * u);
-    float rise = 0.6 + 0.85 * u - 0.15 * u * u;
-    return vec3(side * w, rise + abs(side) * 0.03, 0.35 * u * u + abs(side) * w * 0.5) + jit * 0.5;
+    float ub = id < 10.0 ? max(k / 9.0 - 0.2, 0.0) / 0.8 : (k + 0.5) / 10.0;
+    float u = id < 10.0 ? k / 9.0 : 0.2 + 0.8 * ub;
+    float w = 0.24 * pow(sin(0.5 * TAU * ub), 0.75) * (1.0 - 0.35 * ub);
+    vec3 c = vec3(0.0, 0.55 + 0.75 * u - 0.25 * u * u, 0.6 * u);
+    vec3 up = normalize(vec3(0.0, 0.6, -(0.75 - 0.5 * u)));
+    return c + vec3(side * w, 0.0, 0.0) + up * abs(side) * w * 0.3 + jit * 0.4;
   }
   if (shape == PLEXUS_BUD) {
     // a bud: closed, a teardrop of points wound in a golden spiral from
@@ -195,7 +210,7 @@ vec3 plexusRest(float id, int shape) {
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
-float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : (shape == PLEXUS_PETAL ? 2.0 : 0.0); }
+float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : 0.0; }
 // where it is at time `t`: drifting round its rest, each axis on two slow
 // waves of its own (a part only a little, keeping its form)
 vec3 plexusAt(float id, int shape, float t) {
