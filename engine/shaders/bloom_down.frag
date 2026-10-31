@@ -23,7 +23,18 @@ float weight(vec3 c) {
   return pc.threshold > 0.0 ? 1.0 / (1.0 + max(c.r, max(c.g, c.b))) : 1.0;
 }
 
-vec3 tap(vec2 d) { return texture(src, v_uv + d * pc.texel).rgb; }
+// the brightest a pixel is let into the glow: one gone infinite (or NaN)
+// for a frame would otherwise blur out into a square that blinks
+const float BLOOM_MAX = 1.0e4;
+
+// a tap of the image above; on the first step a broken pixel (not a
+// number, or infinite) counts as dark and a blazing one is held at BLOOM_MAX
+vec3 tap(vec2 d) {
+  vec3 c = texture(src, v_uv + d * pc.texel).rgb;
+  if (pc.threshold <= 0.0) return c;
+  if (any(isnan(c)) || any(isinf(c))) return vec3(0.0);
+  return min(c, vec3(BLOOM_MAX));
+}
 
 void main() {
   vec3 a = tap(vec2(-2, -2)), b = tap(vec2(0, -2)), c = tap(vec2(2, -2));
