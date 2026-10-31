@@ -100,6 +100,8 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # the selected form's gizmo (1/2/3) moves, turns, sizes it;
                                   # `m` picks the shader (part role) a form is drawn with;
                                   # `x` twins a form mirrored across the middle (x=0);
+                                  # click the path (top left) to rename the sculpt: its
+                                  # clip and every nest using it follow (`--rename=`)
                                   # `t` shapes (tubes curl; a nest places another
                                   # sculpt as one form, `p` picks it), `i` inks,
                                   # ctrl+click groups, `g` snaps;

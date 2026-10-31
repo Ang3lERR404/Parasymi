@@ -113,12 +113,15 @@ pub fn main(init:std.process.Init)!void{
   // `--rig`: start in rig mode; `--try=<pitch>,<yaw>,<roll>`: the last bone test-turned so (degrees)
   var startRig=false;
   var tryTurn:m.V3=.{0,0,0};
+  // `--rename=<name>`: the sculpt renamed so at once, as a click on its path would
+  var renameAs:?[]const u8=null;
   for(args[1..])|a|{
     if(startsWith(u8,a,"--mesh="))name=a["--mesh=".len..];
     if(startsWith(u8,a,"--gizmo="))mode=stringToEnum(gizmo.Mode,a["--gizmo=".len..]) orelse return error.BadGizmo;
     if(eql(u8,a,"--shot"))shot=true;
     if(eql(u8,a,"--rig"))startRig=true;
     if(startsWith(u8,a,"--try="))tryTurn=try turnsOf(a["--try=".len..]);
+    if(startsWith(u8,a,"--rename="))renameAs=a["--rename=".len..];
   }
   if(name.len==0 or indexOfAny(u8,name,notInName)!=null){
     log.err("--mesh={s}: a plain file name, kept as "++dir++"/<name>"++ext,.{name});
@@ -154,6 +157,7 @@ pub fn main(init:std.process.Init)!void{
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
   defer if(e.parts)|*f|f.deinit();
+  defer if(e.ownedPath)|p|gpa.free(p);
   try e.reloadParts();
   e.rigMode=startRig;
   if(e.doc.bones.items.len>0){
@@ -166,6 +170,10 @@ pub fn main(init:std.process.Init)!void{
     if(e.dirty)return error.SaveFailed;
     e.say("new {s}",.{path});
     log.info("new {s}",.{path});
+  }
+  if(renameAs)|n|{
+    try e.renameTo(n);
+    log.info("{s}",.{e.note[0..e.noteLen]});
   }
   // the game's files (controls, strings), as the game reads them
   try ps.home.open(io,init.environ_map);

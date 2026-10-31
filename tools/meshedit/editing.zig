@@ -71,7 +71,19 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
   // whether shift is held (fine drags)
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
   // whether a name was being typed as the frame began
-  const typing=e.naming!=null;
+  const typing=e.naming!=null or e.renaming!=null;
+  if(e.renaming)|*t|{
+    _=t.feed(labels.keys(in));
+    if(in.pressed(.{.key=.escape}))e.renaming=null
+    else if(labels.named(in)){
+      // the name typed, kept while the typing ends
+      var name:[labels.nameCap]u8=undefined;
+      const n=t.slice().len;
+      @memcpy(name[0..n],t.slice());
+      e.renaming=null;
+      try e.renameTo(name[0..n]);
+    }
+  }
   if(e.naming)|*t|{
     // how many things there are to name: bones in rig mode, else forms
     const nameable=if(e.rigMode)e.doc.bones.items.len else e.pieces().len;
@@ -208,7 +220,10 @@ fn formAct(e:*Editor,a:Act,shift:bool)Allocator.Error!void{
 /// selects it and drags it, on the gizmo drags its handle, on a handle in
 /// view selects its form; any press ends naming
 fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,origin:V3,shift:bool)Allocator.Error!void{
-  if(in.pressed(.{.button=.left}))e.naming=null;
+  if(in.pressed(.{.button=.left})){
+    e.naming=null;
+    e.renaming=null;
+  }
   // whether ctrl is held: a click then gathers a form into the group (or lets it go)
   const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
   // the mouse (px)
@@ -224,11 +239,14 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
   const g=if(inRig)rigging.gizmoAt(e,origin)else e.gizmoAt(origin);
   // whether the mouse is over the toolbar, and over any panel, where the gizmo doesn't answer
   const onBar=e.bar.over(in.mouse);
-  const ui=onBar or overUi(listRows(listed),mx,my);
+  const onName=e.overName(in.mouse);
+  const ui=onBar or onName or overUi(listRows(listed),mx,my);
   e.hot=if(e.drag==.gizmo)e.part else if(g!=null and !ui)g.?.pick(view,in.mouse)else null;
   if(in.pressed(.{.button=.left})){
     if(onBar){
       // the toolbar's own: its click comes as the button is let go
+    }else if(onName){
+      e.renaming=labels.typing(e.ownName());
     }else if(mx<pad+listW and my>=listY and my<vy){
       // the row pressed on, counted from the first in view
       const r:usize=@intFromFloat(@floor((my-listY)/row));

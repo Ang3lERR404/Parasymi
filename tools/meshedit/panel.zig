@@ -17,6 +17,9 @@ const ps=@import("parasymi");
 const gizmo=@import("../gizmo.zig");
 /// the HUD's shared colours and type sizes
 const s=ps.style;
+/// where sculpts are kept, and their ending
+const dir=meshedit.settings.dir;
+const ext=meshedit.settings.ext;
 /// a point in the sculpt (m)
 const V3=m.V3;
 /// the editor's root, through which its other files are reached
@@ -83,11 +86,14 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
   // buffers for the path line and the cells line
   var pb:[160]u8=undefined;
   var cb:[64]u8=undefined;
+  // the name as it is typed, if the path was clicked
+  const renaming=if(e.renaming)|*t|t.slice()else null;
   _=try toolbar.backed(d,pad,pad,&.{
-    .{.words=bufPrint(&pb,"{s}{s}",.{e.path,if(e.dirty)" *"else""}) catch e.path,.col=sel},
+    .{.words=if(renaming)|r|bufPrint(&pb,"{s}/{s}{s}   enter: rename   esc: keep",.{dir,r,ext})catch"?" else bufPrint(&pb,"{s}{s}",.{e.path,if(e.dirty)" *"else""}) catch e.path,.col=sel},
     .{.words=bufPrint(&cb,"cells {d:.4} m   {d} forms",.{e.doc.cell,e.pieces().len})catch"?",.col=plain},
     .{.words=e.note[0..e.noteLen],.col=s.dim},
   });
+  if(e.renaming)|*t|try typed(d,pad+Draw.width(dir++"/",text),pad,t);
   // the toolbar, laid out for the mode as it is now
   e.bar.lay(buttons.items(e),screen,screen[1]-pad);
   try e.bar.draw(d,buttons.lit(e),buttons.live(e));

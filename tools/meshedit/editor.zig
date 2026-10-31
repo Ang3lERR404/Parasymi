@@ -67,6 +67,26 @@ const Vals=meshedit.settings.Vals;
 const rig=meshedit.rig;
 /// every sculpt kept in one folder, for the nests
 const Folder=ps.sculptDoc.Folder;
+/// formats a new path
+const allocPrint=std.fmt.allocPrint;
+/// where in a name any of a set of bytes first falls
+const indexOfAny=std.mem.indexOfAny;
+/// replaces every match in text
+const replaceOwned=std.mem.replaceOwned;
+/// the bytes a sculpt's name may not hold (a space too: nests name it on one line)
+const notInName=meshedit.settings.notInName++" ";
+/// the file ending every kept mesh carries
+const ext=meshedit.settings.ext;
+/// where clips are kept, and their ending
+const clipDir="src/anim";
+const clipExt=".anim";
+/// the toolbar's line height, which the path is written at
+const toolbar=@import("../toolbar.zig");
+/// a box in screen pixels, and text widths
+const Box=engine.ui.box.Box;
+const Draw=engine.ui.draw.Draw;
+/// the gap round the panel's edges (px)
+const pad=meshedit.settings.pad;
 /// where a path's last part begins
 const lastIndexOfScalar=std.mem.lastIndexOfScalar;
 /// whether a name ends so
@@ -124,8 +144,19 @@ pub const Editor=struct{
   bar:meshedit.buttons.Bar=.{},
   /// the help (`h`): what the mouse does, and the keys' other ways
   helpShown:bool=false,
+  /// the sculpt's own name as it is typed, once its path is clicked (null:
+  /// not renaming); enter renames it, escape lets it be
+  renaming:?labels.Typed=null,
+  /// the path after a rename, owned (the first is the run's)
+  ownedPath:?[]u8=null,
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
+  /// whether `at` (px) is on the sculpt's path, top left, which a click renames
+  pub fn overName(e:*const Editor,at:[2]f32)bool{
+    // the path's box (px)
+    const box:Box=.{.x=pad-6,.y=pad-6,.w=Draw.width(e.path,meshedit.settings.text)+12,.h=toolbar.lineH+4};
+    return box.contains(at);
+  }
   /// this sculpt's own name (its file's, without the folder or ending)
   pub fn ownName(e:*const Editor)[]const u8{
     // the path's last part
@@ -177,16 +208,86 @@ pub const Editor=struct{
   /// write the mesh to its file, making `src/mesh` if need be, and say how
   /// that went
   pub fn save(e:*Editor)void{
+    if(!e.writeDoc(&e.doc,e.path))return;
+    e.dirty=false;
+    e.say("saved {s}",.{e.path});
+  }
+  /// mesh `d` written to `path`, making `src/mesh` if need be; false (and
+  /// said) if it would not be written
+  fn writeDoc(e:*Editor,d:*const Doc,path:[]const u8)bool{
     // the I/O the save goes through
     const io=e.io;
     // the mesh's text, written into memory first
     var out:Writer.Allocating=.init(e.gpa);
     defer out.deinit();
-    e.doc.write(&out.writer) catch return e.say("save failed: out of memory",.{});
-    Dir.cwd().createDirPath(io,dir)catch|er|return e.say("save failed: {t}",.{er});
-    Dir.cwd().writeFile(io,.{.sub_path=e.path,.data=out.written()})catch|er|return e.say("save failed: {t}",.{er});
+    d.write(&out.writer)catch{
+      e.say("save failed: out of memory",.{});
+      return false;
+    };
+    Dir.cwd().createDirPath(io,dir)catch|er|{
+      e.say("save failed: {t}",.{er});
+      return false;
+    };
+    Dir.cwd().writeFile(io,.{.sub_path=path,.data=out.written()})catch|er|{
+      e.say("save failed: {t}",.{er});
+      return false;
+    };
+    return true;
+  }
+  /// the sculpt renamed `name`: kept under the new name (as it is now,
+  /// saved), the old file let go, its clip (`src/anim/<name>.anim`) renamed
+  /// with it and keyed for the new name, and every other sculpt's nest that
+  /// used the old name using the new one; a name taken, empty or not a
+  /// plain file name is refused, saying why
+  pub fn renameTo(e:*Editor,name:[]const u8)Allocator.Error!void{
+    // the I/O, and the allocator the new path is kept with
+    const io=e.io;
+    const gpa=e.gpa;
+    // the old name, kept while the path changes under it
+    const old=try gpa.dupe(u8,e.ownName());
+    defer gpa.free(old);
+    if(eql(u8,name,old))return;
+    if(name.len==0 or indexOfAny(u8,name,notInName)!=null)return e.say("a plain name, please: no spaces or {s}",.{notInName});
+    try e.reloadParts();
+    if(e.parts)|f|for(f.names.items)|n|{
+      if(eql(u8,n,name))return e.say("{s} is taken",.{name});
+    };
+    // where the sculpt is kept from now on
+    const path=try allocPrint(gpa,dir++"/{s}"++ext,.{name});
+    if(!e.writeDoc(&e.doc,path)){
+      gpa.free(path);
+      return;
+    }
+    Dir.cwd().deleteFile(io,e.path)catch|er|switch(er){
+      error.FileNotFound=>{},
+      else=>e.say("{s} kept: {t}",.{e.path,er}),
+    };
+    if(e.ownedPath)|p|gpa.free(p);
+    e.ownedPath=path;
+    e.path=path;
     e.dirty=false;
-    e.say("saved {s}",.{e.path});
+    // the clip of the old name, renamed and keyed for the new one
+    const clipMoved=try renameClip(gpa,io,old,name);
+    // every other sculpt's nests that used the old name
+    // how many sculpts were rewritten
+    var nests:usize=0;
+    if(e.parts)|*f|for(f.docs.items,f.names.items)|*d,n|{
+      if(eql(u8,n,old))continue;
+      // whether this sculpt nests the old name anywhere
+      var uses=false;
+      for(d.pieces.items)|*p|if(eql(u8,p.use.slice(),old)){
+        p.use=.of(name);
+        uses=true;
+      };
+      if(!uses)continue;
+      // where that sculpt is kept
+      const theirs=try allocPrint(gpa,dir++"/{s}"++ext,.{n});
+      defer gpa.free(theirs);
+      if(e.writeDoc(d,theirs))nests+=1;
+    };
+    try e.reloadParts();
+    e.stale=true;
+    e.say("renamed to {s}{s}; nests in {d} other sculpts follow",.{name,if(clipMoved)", its clip too"else"",nests});
   }
   /// the mesh as it is now kept in the history, once the hands let go (no
   /// drag held, no name being typed): a whole drag is one step back
@@ -357,6 +458,31 @@ pub fn anglesOf(r:m.M4)V3{
   // the turns about y (z's heading) and z (how far x tips up, against y)
   const ay=m.mulDir(r,v3(0,1,0));
   return v3(deg(x),deg(m.atan2(az[0],az[2])),deg(m.atan2(ax[1],ay[1])));
+}
+/// the clip of sculpt `old` (if there is one) kept again as sculpt
+/// `name`'s, its subject keyed to it, the old file let go; whether it was
+fn renameClip(gpa:Allocator,io:Io,old:[]const u8,name:[]const u8)Allocator.Error!bool{
+  // where the clip was and will be
+  const from=try allocPrint(gpa,clipDir++"/{s}"++clipExt,.{old});
+  defer gpa.free(from);
+  const to=try allocPrint(gpa,clipDir++"/{s}"++clipExt,.{name});
+  defer gpa.free(to);
+  // its text, if it is kept
+  const kept=Dir.cwd().readFileAlloc(io,from,gpa,.limited(1<<22))catch|er|switch(er){
+    error.OutOfMemory=>return error.OutOfMemory,
+    else=>return false,
+  };
+  defer gpa.free(kept);
+  // its subject line, before and after
+  const was=try allocPrint(gpa,"subject sculpt:{s}\n",.{old});
+  defer gpa.free(was);
+  const now=try allocPrint(gpa,"subject sculpt:{s}\n",.{name});
+  defer gpa.free(now);
+  const moved=try replaceOwned(u8,gpa,kept,was,now);
+  defer gpa.free(moved);
+  Dir.cwd().writeFile(io,.{.sub_path=to,.data=moved}) catch return false;
+  Dir.cwd().deleteFile(io,from) catch return true;
+  return true;
 }
 /// mesh `d` as the text its file would hold, the caller's to free
 pub fn text(gpa:Allocator,d:*const Doc)Allocator.Error![]u8{

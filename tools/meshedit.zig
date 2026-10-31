@@ -12,6 +12,8 @@
 //! (a name not yet kept starts a new mesh, written there at once)
 //! (`--gizmo=move|turn|size` starts the gizmo so; `--rig` in rig mode,
 //! `--try=<pitch>,<yaw>,<roll>` its last bone test-turned so (degrees);
+//! `--rename=<name>` renames the sculpt at once, as a click on its path
+//! (top left) and a typed name do: its clip and every nest using it follow;
 //! `--shot` saves one frame
 //! to `shots/meshedit.png` and closes, for checking it headless.)
 //! Each form is placed by `pos`, turned by `rot` (degrees, y then x then

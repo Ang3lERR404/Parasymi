@@ -36,8 +36,8 @@ const Draw=engine.ui.draw.Draw;
 const Allocator=std.mem.Allocator;
 /// the HUD's shared colours and type sizes
 const s=ps.style;
-/// the editors' panel text size
-const small=s.textSmall;
+/// the editors' panel text size, names typed in it the same
+const small=s.textSub;
 /// the game, reached through its import hub
 const ps=@import("parasymi");
 /// the wolf's skeleton: how many tail segments and fingers it has
