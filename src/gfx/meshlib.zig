@@ -184,6 +184,8 @@ const parts=struct{
   pub const constellateHeartRising=@import("meshes/constellate.zig").heartRising;
   /// a sketch: the constellate heart blooming into its grand flower
   pub const constellateHeartBlooming=@import("meshes/constellate.zig").heartBlooming;
+  /// a sketch: the constellate heart's chain reaction
+  pub const constellateHeartChain=@import("meshes/constellate.zig").heartChain;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;

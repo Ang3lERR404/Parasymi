@@ -105,6 +105,14 @@ const Shape=enum(u8){
   /// the heart's filaments, three of eight points each, dripping from its
   /// foot
   heartFilament=24,
+  /// the first of the petlets on the heart's blooms, four to a bloom, the
+  /// rest following it (`heartPetlet`+4*bloom+petlet)
+  heartPetlet=25,
+  /// the first of the heart's five grand petals, the rest following it
+  heartGrand=41,
+  /// the fragments the heart's first bloom lets go, three points each,
+  /// on their way to build petlets
+  heartSeed=46,
   /// the yielder's other petals, by number
   _,
 };
@@ -235,7 +243,17 @@ fn sprig(b:*mg.Builder)Allocator.Error!void{
     for(0..3)|c|try ribbon(b,.{@intCast(27+c),0,@intFromEnum(Shape.sprigLeafHigh)},.bond,.sprigStem,v3(1,0,layer));
   }
 }
-/// the heart at `stage` (0 bound, 1 rising, 2 blooming; it rides in every
+/// the heart's chain reaction: the heart blooming (stage 3), with the
+/// petlets its blooms are built (four to each), its grand petals, and the
+/// fragments on their way between blooms
+fn chain(b:*mg.Builder)Allocator.Error!void{
+  try heart(b,3);
+  for(0..16)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartPetlet)+k),.reach=3+0.3*0.4*0.7,.n=12});
+  for(0..5)|p|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartGrand)+p),.reach=3+0.17*1.6*0.7});
+  try cluster(b,.{.shape=.heartSeed,.reach=3.2,.n=36,.group=3});
+}
+/// the heart at `stage` (0 bound, 1 rising, 2 blooming, 3 its chain
+/// reaction; it rides in every
 /// vertex's reach, whole part): a stem with four buds fastened at its
 /// joints, bonded, and the filaments that drip from its foot once it rises;
 /// each web's reach shrunk with the part, so its lines join only what they
@@ -321,4 +339,11 @@ pub const heartRising=struct{
 pub const heartBlooming=struct{
   /// builds the heart, blooming
   pub fn build(b:*mg.Builder)Allocator.Error!void{try heart(b,2);}
+};
+/// mesh: CONSTELLATE HEART, CHAIN. four petlets snapped to one bloom set off
+/// a chain reaction: its fragments build petlets on the others, the heart
+/// swelling, and once all are done it grows and grand petals open
+pub const heartChain=struct{
+  /// builds the heart's chain reaction
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try chain(b);}
 };

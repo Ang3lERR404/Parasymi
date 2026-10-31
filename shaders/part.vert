@@ -158,6 +158,27 @@ const float PLEXUS_HEART_BLOOMING = 16.0;
 // and which way it reaches out
 const float PLEXUS_HEART_JOINT[4] = float[4](9.0, 18.0, 27.0, 27.0);
 const vec3 PLEXUS_HEART_SIDE[4] = vec3[4](vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0));
+// the heart's chain reaction (stage 3, from its blooms all open): four
+// petlets snapped to its first bloom make it a yielder of fragments only;
+// each fragment spins slowly over to another bloom and builds a petlet
+// there, every petlet done swelling the heart; when all four blooms are
+// done the heart grows past its first size and grand petals open between
+// its own. Its webs: the petlets (four on each bloom, `PLEXUS_HEART_PETLET`
+// + 4 * bloom + petlet), its grand petals (five, one after another), the
+// fragments on their way (twelve of three points each). How long it all
+// takes before it begins again (s), how often a fragment is let go, how
+// long one takes on its way and how long a petlet takes to build
+const int PLEXUS_HEART_PETLET = 25;
+const int PLEXUS_HEART_GRAND = 41;
+const int PLEXUS_HEART_SEED = 46;
+const float PLEXUS_HEART_CHAIN = 50.0;
+const float PLEXUS_HEART_EVERY = 2.5;
+const float PLEXUS_HEART_WAY = 4.0;
+const float PLEXUS_HEART_BUILD = 1.5;
+// a petlet's rows, base to tip: how many points each holds (12 in all) and
+// how far along it lies
+const int PLEXUS_PETLET_ROWS[6] = int[6](1, 2, 3, 3, 2, 1);
+const float PLEXUS_PETLET_ALONG[6] = float[6](0.02, 0.2, 0.4, 0.6, 0.8, 0.97);
 // which stage of the heart the web being placed is at
 float plexStage = 0.0;
 const vec3 PLEXUS_YIELD_MIDDLE = vec3(0.0, 1.13, 0.0);
@@ -363,17 +384,50 @@ vec4 plexusYield(float id, int shape, float t) {
   float ang = c / 3.0 * TAU + t * 1.3;
   return vec4(mid + 0.07 * env * (cos(ang) * e1 + sin(ang) * e2), env);
 }
+// how far into the chain reaction it is at time `t` (s), and how much of
+// it is still standing (it all comes undone quickly at the end, to begin
+// again)
+float plexusChainAt(float t) { return mod(t, PLEXUS_HEART_CHAIN); }
+float plexusChainKeep(float t) { return 1.0 - smoothstep(PLEXUS_HEART_CHAIN - 4.0, PLEXUS_HEART_CHAIN - 1.0, plexusChainAt(t)); }
+// how far petlet `j` of the heart's bloom `k` is built at time `t`: the
+// first bloom's four snapped on from the start, the others' each built
+// once the fragment let go for it arrives
+float plexusChainPetlet(int k, int j, float t) {
+  if (k == 0) return plexusChainKeep(t);
+  float a = PLEXUS_HEART_EVERY * float((k - 1) * 4 + j) + PLEXUS_HEART_WAY;
+  return smoothstep(a, a + PLEXUS_HEART_BUILD, plexusChainAt(t)) * plexusChainKeep(t);
+}
+// how big the heart is at time `t` (its first size 1): shrunk once it
+// rises; in the chain reaction swelling with every petlet built, then
+// growing past its first size once all four blooms are done
+float plexusHeartSize(float t) {
+  if (plexStage < 0.5) return 1.0;
+  if (plexStage < 2.5) return 0.7;
+  float done = 0.0;
+  for (int k = 1; k < 4; k++) for (int j = 0; j < 4; j++) done += plexusChainPetlet(k, j, t);
+  float x = plexusChainAt(t);
+  float last = PLEXUS_HEART_EVERY * 11.0 + PLEXUS_HEART_WAY + PLEXUS_HEART_BUILD;
+  return 0.7 + 0.2 * done / 12.0 + 0.45 * smoothstep(last, last + 5.0, x) * plexusChainKeep(t);
+}
+// how far the heart's grand petals have opened at time `t`, one after
+// another once it has grown
+float plexusChainGrand(int p, float t) {
+  float a = PLEXUS_HEART_EVERY * 11.0 + PLEXUS_HEART_WAY + PLEXUS_HEART_BUILD + 4.0 + 1.2 * float(p);
+  return smoothstep(a, a + 5.0, plexusChainAt(t)) * plexusChainKeep(t);
+}
 // how far the heart's stem has become its grand flower at time `t` (0 a
 // stem, 1 the flower): only while blooming, slowly, and undone quickly
-// before the blooming begins again
+// before the blooming begins again; all of it in the chain reaction
 float plexusHeartMorph(float t) {
   if (plexStage < 1.5) return 0.0;
+  if (plexStage > 2.5) return 1.0;
   float x = mod(t, PLEXUS_HEART_BLOOMING);
   return smoothstep(2.0, 12.0, x) * (1.0 - smoothstep(14.0, 16.0, x));
 }
 // how far the heart's bud `k` has bloomed at time `t`: one after another
 float plexusHeartBloom(int k, float t) {
   if (plexStage < 1.5) return 0.0;
+  if (plexStage > 2.5) return 1.0;
   float x = mod(t, PLEXUS_HEART_BLOOMING);
   return smoothstep(1.0 + 2.0 * float(k), 4.0 + 2.0 * float(k), x) * (1.0 - smoothstep(14.0, 16.0, x));
 }
@@ -385,12 +439,12 @@ float plexusHeartGrow(float k, float t) {
   float x = mod(t, PLEXUS_HEART_RISING);
   return smoothstep(1.5 * k, 1.5 * k + 3.0, x) * (1.0 - smoothstep(9.0, 10.0, x));
 }
-// a point `p` of the heart once it rises: shrunk toward its foot, lifted
+// a point `p` of the heart once it rises: sized about its foot, lifted
 // off the ground and gently bobbing
 vec3 plexusHeartLift(vec3 p, float t) {
   if (plexStage < 0.5) return p;
   vec3 foot = vec3(0.0, 0.5, 0.0);
-  return foot + (p - foot) * 0.7 + vec3(0.0, 0.45 + 0.04 * sin(t * 0.8), 0.0);
+  return foot + (p - foot) * plexusHeartSize(t) + vec3(0.0, 0.45 + 0.04 * sin(t * 0.8), 0.0);
 }
 // where point `id` (drifted by `moved`) of the heart's stem is at time
 // `t`: a stem, becoming a grand flower opening over where its top was
@@ -406,7 +460,73 @@ vec3 plexusHeartBud(float id, int k, float t, vec3 moved) {
   vec3 base = plexusHeartStem(PLEXUS_HEART_JOINT[k] + 1.0, t, vec3(0.0));
   vec3 along = normalize(PLEXUS_HEART_SIDE[k] * 0.8 + vec3(0.0, 0.6, 0.0));
   vec3 face = normalize(cross(along, vec3(0.0, 1.0, 0.0)));
-  return plexusFasten(q, vec3(0.0, 0.75, 0.0), base, along, face, 0.6 * (plexStage > 0.5 ? 0.7 : 1.0));
+  return plexusFasten(q, vec3(0.0, 0.75, 0.0), base, along, face, 0.6 * plexusHeartSize(t));
+}
+// where point `id` of a petlet rests on its own: a small petal, rows
+// from a narrow base to a round tip, cupped, as a petal is
+vec3 plexusPetlet(float id) {
+  int n = 1;
+  int row = 0;
+  float first = 0.0;
+  for (int r = 0; r < 6; r++) {
+    n = PLEXUS_PETLET_ROWS[r];
+    if (id < first + float(n)) { row = r; break; }
+    first += float(n);
+  }
+  float u = PLEXUS_PETLET_ALONG[row];
+  float v = n > 1 ? (id - first) / float(n - 1) * 2.0 - 1.0 : 0.0;
+  float w = 0.27 * pow(max(sin(0.5 * TAU * min(u, 0.97)), 0.0), 0.6) * (0.4 + 0.6 * u) + 0.025;
+  float cup = 0.12 * (1.0 - v * v) * sin(0.5 * TAU * u);
+  return vec3(v * w * 0.95, 0.7 + 0.65 * u, 0.3 * u * u - cup);
+}
+// a lone part's point `q`, its own `origin` set on `base`, reaching out
+// along `outward` and leaning up by `lean` (rad), at `size`
+vec3 plexusSpread(vec3 q, vec3 origin, vec3 base, vec3 outward, float lean, float size) {
+  vec3 across = normalize(cross(vec3(0.0, 1.0, 0.0), outward));
+  vec3 along = outward * cos(lean) + vec3(0.0, sin(lean), 0.0);
+  return plexusFasten(q, origin, base, along, cross(across, along), size);
+}
+// where the middle of the heart's bloom `k` is at time `t`
+vec3 plexusHeartBloomMiddle(int k, float t) { return plexusHeartBud(0.0, k, t, vec3(0.0)); }
+// where point `id` (drifted by `moved`) of petlet `j` on the heart's bloom
+// `k` is: standing out from the bloom's middle between its own petals,
+// leaning up, unfolding from its base as it is built
+vec3 plexusHeartPetlet(float id, int k, int j, float t, vec3 moved) {
+  float a = (float(j) + 0.5) / 4.0 * TAU + float(k) * 0.9;
+  vec3 outward = vec3(cos(a), 0.0, sin(a));
+  float built = plexusChainPetlet(k, j, t);
+  return plexusSpread(plexusPetlet(id) + moved, vec3(0.0, 0.7, 0.0), plexusHeartBloomMiddle(k, t) + outward * 0.03, outward, 0.55, 0.4 * plexusHeartSize(t) * (0.05 + 0.95 * built));
+}
+// where point `id` (drifted by `moved`) of the heart's grand petal `p` is:
+// from the grand flower's middle, between two of its own petals, reaching
+// about half again as far, leaning up a little, opening as it forms
+vec3 plexusHeartGrand(float id, int p, float t, vec3 moved) {
+  float a = (float(p) + 0.5) / 5.0 * TAU;
+  vec3 outward = vec3(cos(a), 0.0, sin(a));
+  vec3 middle = (plexusForm(0.0, PLEXUS_FLOWER) - vec3(0.0, 1.0, 0.0)) * 2.2 + vec3(0.0, 1.5, 0.0);
+  float open = plexusChainGrand(p, t);
+  vec3 q = plexusSpread(plexusForm(id, PLEXUS_PETAL) + moved, vec3(0.0, 0.7, 0.0), middle + outward * 0.25, outward, mix(1.2, 0.3, open), 1.6 * (0.05 + 0.95 * open));
+  return plexusHeartLift(q, t);
+}
+// what of a fragment the heart's first bloom lets go, point `id` at time
+// `t`: where it is (xyz) and how much of it there is (w). Fragment i is
+// let go every so often, spins slowly on its way to the bloom whose
+// petlet it builds, arcing up, and melts into that petlet as it arrives
+vec4 plexusHeartSeed(float id, float t) {
+  float i = floor(id / 3.0);
+  float c = id - i * 3.0;
+  float s = (plexusChainAt(t) - PLEXUS_HEART_EVERY * i) / PLEXUS_HEART_WAY;
+  int k = 1 + int(i / 4.0);
+  vec3 from = plexusHeartBloomMiddle(0, t) + vec3(0.0, 0.08, 0.0);
+  vec3 to = plexusHeartBloomMiddle(k, t);
+  float e = smoothstep(0.0, 1.0, clamp(s, 0.0, 1.0));
+  vec3 mid = mix(from, to, e) + vec3(0.0, 0.25 * sin(0.5 * TAU * clamp(s, 0.0, 1.0)), 0.0);
+  float env = smoothstep(0.0, 0.15, s) * (1.0 - smoothstep(0.85, 1.0, s)) * plexusChainKeep(t);
+  float spin = t * 1.1 + i;
+  vec3 e1 = normalize(vec3(cos(spin), 0.5, sin(spin)));
+  vec3 e2 = normalize(cross(e1, vec3(0.2, 1.0, 0.3)));
+  float ang = c / 3.0 * TAU + t * 0.9;
+  return vec4(mid + 0.06 * env * (cos(ang) * e1 + sin(ang) * e2), env);
 }
 // where point `id` of the heart's filaments is: filament k hangs from
 // point k of the stem's foot, dripping down as it grows, its young tip
@@ -442,6 +562,9 @@ vec3 plexusAt(float id, int shape, float t) {
   if (shape == PLEXUS_HEART_STEM) return plexusHeartStem(id, t, moved);
   if (shape == PLEXUS_HEART_FILAMENT) return plexusHeartFilament(id, t);
   if (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) return plexusHeartBud(id, shape - PLEXUS_HEART_BUD, t, moved);
+  if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) return plexusHeartPetlet(id, (shape - PLEXUS_HEART_PETLET) / 4, (shape - PLEXUS_HEART_PETLET) % 4, t, moved);
+  if (shape >= PLEXUS_HEART_GRAND && shape < PLEXUS_HEART_SEED) return plexusHeartGrand(id, shape - PLEXUS_HEART_GRAND, t, moved);
+  if (shape == PLEXUS_HEART_SEED) return plexusHeartSeed(id, t).xyz;
   return plexusRest(id, shape) + moved;
 }
 // how much a line between `a` and `b` shows: whole within its reach's
@@ -635,11 +758,18 @@ void main() {
     int hs = shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
     // the heart's stem reaches further as it becomes its grand flower
     if (shape == PLEXUS_HEART_STEM) reach *= mix(1.0, 2.7, plexusHeartMorph(t));
+    // in the chain reaction the heart's webs reach as far as it has grown
+    if (plexStage > 2.5 && shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) reach *= plexusHeartSize(t) / 0.7;
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
     // how much there is of what a yielder yields, as it grows and is let go
     // (or of a heart's filament as it drips down)
     float yield = shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING ? plexusYield(ids.x, shape, t).w : 1.0;
     if (shape == PLEXUS_HEART_FILAMENT) yield = smoothstep(0.0, 0.1, plexusHeartGrow(floor(ids.x / 8.0), t));
+    // (or of a petlet as it is built, a grand petal as it opens, a
+    // fragment on its way)
+    if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) yield = smoothstep(0.0, 0.3, plexusChainPetlet((shape - PLEXUS_HEART_PETLET) / 4, (shape - PLEXUS_HEART_PETLET) % 4, t));
+    if (shape >= PLEXUS_HEART_GRAND && shape < PLEXUS_HEART_SEED) yield = smoothstep(0.0, 0.3, plexusChainGrand(shape - PLEXUS_HEART_GRAND, t));
+    if (shape == PLEXUS_HEART_SEED) yield = plexusHeartSeed(ids.x, t).w;
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
     bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;
