@@ -155,6 +155,10 @@ pub const Editor=struct{
   copied:[most]Held=undefined,
   /// how many keys are copied
   copiedLen:usize=0,
+  /// the toolbar down the right side: a button for every act
+  bar:animedit.buttons.Bar=.{},
+  /// the help (`h`): what the mouse does, and the keys' other ways
+  helpShown:bool=false,
   /// the selected channel's key at the playhead given the next ease
   /// round (`way` 1) or the one before (-1), saying which
   pub fn turnEase(e:*Editor,way:i32)void{

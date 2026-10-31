@@ -120,6 +120,10 @@ pub const Editor=struct{
   /// every other sculpt kept beside this one, read again before each
   /// meshing, for the nests (none read yet: nests are left out)
   parts:?Folder=null,
+  /// the toolbar down the right side: a button for every act
+  bar:meshedit.buttons.Bar=.{},
+  /// the help (`h`): what the mouse does, and the keys' other ways
+  helpShown:bool=false,
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
   /// this sculpt's own name (its file's, without the folder or ending)

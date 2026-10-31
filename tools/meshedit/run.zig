@@ -270,7 +270,7 @@ pub fn main(init:std.process.Init)!void{
     game.time+=dt;
     game.cam.aspect=screen[0]/@max(screen[1],1);
     // whether the mouse is over the panel, where the wheel doesn't zoom
-    const pointerOverUi=overUi(listRows(e.pieces().len),input.mouse[0],input.mouse[1]);
+    const pointerOverUi=e.bar.over(input.mouse) or overUi(listRows(e.pieces().len),input.mouse[0],input.mouse[1]);
     if(ctl.down(&input,.orbit))cam.turn(input.mouseDelta);
     if(input.scroll!=0 and !pointerOverUi)cam.zoom(input.scroll);
     if(e.focus and e.rigMode and e.doc.bones.items.len>0){

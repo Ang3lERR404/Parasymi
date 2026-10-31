@@ -11,8 +11,6 @@ const m=engine.core.math;
 const clip=engine.anim.clip;
 /// the keys and buttons held this frame
 const Input=engine.platform.input.Input;
-/// a keyboard key, named as the window library names it
-const Key=engine.platform.input.Key;
 /// the game, reached through its import hub
 const ps=@import("parasymi");
 /// the wolf's skeleton and its `Pose`
@@ -57,8 +55,12 @@ const inTimeline=animedit.editor.inTimeline;
 const joints=animedit.rigging.joints;
 /// whether a point is over the channel list
 const overList=animedit.editor.overList;
-/// whether key `k` went down this frame
-fn hit(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
+/// everything a key or a button does, and the keys that do them
+const buttons=animedit.buttons;
+/// everything a key or a button does
+const Act=buttons.Act;
+/// where the toolbar must end above the timeline and its caption (px)
+const barBottom=animedit.settings.barBottom;
 /// one frame's keys and mouse (`over` the list or the timeline), the
 /// wolf's joints as `rg` sees them. While a mark is being named the keys
 /// type its name (enter or escape done), the mouse still answering.
@@ -74,7 +76,10 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
     }
     if(labels.named(in))e.naming=null;
   }
-  if(!typing)try answerKeys(e,in);
+  if(!typing)for(buttons.binds)|b|if(b.hit(in))try act(e,b.act,in);
+  // the toolbar, and a button clicked on it
+  e.bar.lay(buttons.all(),screen,barBottom(screen));
+  if(e.bar.click(in,buttons.live(e)))|a|try act(e,a,in);
   if(e.playing){
     e.t+=dt;
     if(e.t>=e.clip.length)e.t=@mod(e.t,e.clip.length);
@@ -82,48 +87,51 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
   try answerMouse(e,in,screen,rg,shift);
   try e.settle();
 }
-/// one frame's keys: playing, the playhead, the clip's length, the
-/// channel, keying, eases, marks, copying and pasting, saving, undo and redo
-fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
-  // whether shift is held (key to key, unmark), and whether ctrl is
+/// act `a`, as its key or its button asks (shift, read from `in`, turns
+/// the ease back and undo forward): playing, the playhead, the clip's
+/// length, the channel, keying, eases, marks, copying and pasting, saving,
+/// undo and redo
+pub fn act(e:*Editor,a:Act,in:*const Input)Allocator.Error!void{
+  // whether shift is held
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
-  const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
-  if(hit(in,.space))e.playing=!e.playing;
-  for([_]Key{.left,.right},[_]f32{-1,1})|k,dir|if(hit(in,k)){
-    e.playing=false;
-    e.t=if(shift)e.clip.nextKey(e.t,dir) orelse e.t else m.clamp(snap(e.t)+dir/fps,0,e.clip.length);
-  };
-  if(hit(in,.home))e.t=0;
-  if(hit(in,.page_up))e.clip.length+=lengthStep;
-  if(hit(in,.page_down))e.clip.length=@max(lengthMin,e.clip.length-lengthStep);
-  if(hit(in,.page_up) or hit(in,.page_down)){
-    e.t=@min(e.t,e.clip.length);
-    e.dirty=true;
-  }
-  if(hit(in,.up) and e.sel>0)e.sel-=1;
-  if(hit(in,.down) and e.sel+1<e.shown.len)e.sel+=1;
-  if(hit(in,.k))try e.key(e.sel);
-  if(hit(in,.a))for(0..e.shown.len)|i|try e.key(i);
-  if(hit(in,.x) or hit(in,.delete)){
-    if(e.clip.remove(e.chName(e.sel),e.t))e.dirty=true;
-  }
-  if(hit(in,.r)){
-    e.setValue(e.sel,e.rest(e.sel));
-    if(e.clip.track(e.chName(e.sel))!=null)try e.key(e.sel);
-  }
-  if(ctrl and hit(in,.s))e.save();
-  if(ctrl and hit(in,.z)){
-    if(shift)try e.redo()else try e.undo();
-  }
-  if(ctrl and hit(in,.y))try e.redo();
-  if(ctrl and hit(in,.c))e.copy();
-  if(ctrl and hit(in,.v))try e.paste(if(shift).mirrored else.plain);
-  if(!ctrl and hit(in,.e))e.turnEase(if(shift)-1 else 1);
-  if(hit(in,.period))e.focus=true;
-  if(hit(in,.m)){
-    if(shift){
-      if(e.clip.unmark(e.t))e.dirty=true;
-    }else try e.startMark();
+  switch(a){
+    .play=>e.playing=!e.playing,
+    .frameBack,.frameOn=>{
+      e.playing=false;
+      // which way the playhead steps
+      const dir:f32=if(a==.frameOn)1 else -1;
+      e.t=m.clamp(snap(e.t)+dir/fps,0,e.clip.length);
+    },
+    .keyBack,.keyOn=>{
+      e.playing=false;
+      e.t=e.clip.nextKey(e.t,if(a==.keyOn)1 else -1) orelse e.t;
+    },
+    .start=>e.t=0,
+    .longer,.shorter=>{
+      e.clip.length=if(a==.longer)e.clip.length+lengthStep else@max(lengthMin,e.clip.length-lengthStep);
+      e.t=@min(e.t,e.clip.length);
+      e.dirty=true;
+    },
+    .prevChannel=>e.sel-|=1,
+    .nextChannel=>if(e.sel+1<e.shown.len){e.sel+=1;},
+    .key=>try e.key(e.sel),
+    .keyAll=>for(0..e.shown.len)|i|try e.key(i),
+    .unkey=>if(e.clip.remove(e.chName(e.sel),e.t)){e.dirty=true;},
+    .rest=>{
+      e.setValue(e.sel,e.rest(e.sel));
+      if(e.clip.track(e.chName(e.sel))!=null)try e.key(e.sel);
+    },
+    .save=>e.save(),
+    .undo=>if(shift)try e.redo()else try e.undo(),
+    .redo=>try e.redo(),
+    .copy=>e.copy(),
+    .paste=>try e.paste(.plain),
+    .pasteMirrored=>try e.paste(.mirrored),
+    .ease=>e.turnEase(if(shift)-1 else 1),
+    .focus=>e.focus=true,
+    .mark=>try e.startMark(),
+    .unmark=>if(e.clip.unmark(e.t)){e.dirty=true;},
+    .help=>e.helpShown=!e.helpShown,
   }
 }
 /// one frame's mouse: a press on the timeline scrubs, on a row selects it
@@ -138,11 +146,14 @@ fn answerMouse(e:*Editor,in:*const Input,screen:[2]f32,rg:*const Rig,shift:bool)
   const my=in.mouse[1];
   // the selected joint and its gizmo, if the wolf's
   const gz=e.gizmoAt(rg);
-  // whether the mouse is over the panel, where gizmos don't answer
-  const ui=overList(screen,mx,my) or inTimeline(screen,mx,my);
+  // whether the mouse is over the toolbar, and over any panel, where gizmos don't answer
+  const onBar=e.bar.over(in.mouse);
+  const ui=onBar or overList(screen,mx,my) or inTimeline(screen,mx,my);
   e.hot=if(e.drag==.gizmo)e.part else if(gz!=null and !ui)gz.?.g.pick(rg.view,in.mouse)else null;
   if(in.pressed(.{.button=.left})){
-    if(inTimeline(screen,mx,my)){
+    if(onBar){
+      // the toolbar's own: its click comes as the button is let go
+    }else if(inTimeline(screen,mx,my)){
       e.drag=.timeline;
       e.playing=false;
     }else if(mx<pad+listW and my>=listY){

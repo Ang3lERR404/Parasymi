@@ -35,8 +35,14 @@ const Editor=animedit.editor.Editor;
 const fps=animedit.settings.fps;
 /// the playhead's colour
 const head=animedit.settings.head;
-/// the help along the top
-const help=animedit.settings.help;
+/// the toolbar, and the backed text the path, the note and the help are written on
+const toolbar=@import("../toolbar.zig");
+/// every act, the toolbar's buttons, and the help
+const buttons=animedit.buttons;
+/// the help, as backed lines
+const helpLines=toolbar.lines(&buttons.help);
+/// how far down a row its glow sits (px), level with its words
+const glowY=animedit.settings.glowY;
 /// a joint's dot colour
 const joint=animedit.settings.joint;
 /// how lit a joint's dot is
@@ -49,8 +55,6 @@ const keyedColor=animedit.settings.keyedColor;
 const keyDim=animedit.settings.keyDim;
 /// a key's dot radius (px)
 const keyR=animedit.settings.keyR;
-/// the height of one line of help (px)
-const lineH=animedit.settings.lineH;
 /// how wide the channel list is (px)
 const listW=animedit.settings.listW;
 /// how far down the window the channel list starts (px)
@@ -95,9 +99,9 @@ pub fn fits(_:*const Editor,screen:[2]f32)usize{
   return@intFromFloat(@max(1,@floor(h/row)));
 }
 /// draws the editor over the scene: the wolf's joints and the selected
-/// one's gizmo, the help, the clip's path and note, the channel list with
-/// each value, and the timeline with its keys and playhead
-pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!void{
+/// one's gizmo, the clip's path and note, the toolbar and the help, the
+/// channel list with each value, and the timeline with its keys and playhead
+pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!void{
   // the window's width and height (px)
   const screenW=screen[0];
   const screenH=screen[1];
@@ -113,16 +117,16 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
       try z.g.draw(d,rg.view,e.hot);
     }
   }
-  // where the next line of help goes (px)
-  var y:f32=pad;
-  for(help)|h|{
-    _=try d.text(pad,y,text,bare,h);
-    y+=lineH;
-  }
   // a buffer for the clip's path, starred when unsaved
   var pb:[160]u8=undefined;
-  _=try d.text(screenW-pad-420,pad,s.textLabel,sel,bufPrint(&pb,"{s}{s}",.{e.path,if(e.dirty)" *"else""}) catch e.path);
-  if(e.noteLen>0)_=try d.text(screenW-pad-420,pad+lineH+4,text,keyedColor,e.note[0..e.noteLen]);
+  _=try toolbar.backed(d,pad,pad,&.{
+    .{.words=bufPrint(&pb,"{s}{s}",.{e.path,if(e.dirty)" *"else""}) catch e.path,.col=sel},
+    .{.words=e.note[0..e.noteLen],.col=s.dim},
+  });
+  // the toolbar, and the help beside the list
+  e.bar.lay(buttons.all(),screen,animedit.settings.barBottom(screen));
+  try e.bar.draw(d,buttons.lit(e),buttons.live(e));
+  if(e.helpShown)_=try toolbar.backed(d,pad+listW+3*pad,pad,&helpLines);
   // the channel list
   // how many rows of the list fit
   const rows=e.fits(screen);
@@ -135,13 +139,13 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
     // whether the channel has keys, and the colour it is written in
     const keyed=e.clip.track(e.chName(i))!=null and e.clip.track(e.chName(i)).?.keys.items.len>0;
     const col=if(i==e.sel)sel else if(keyed)keyedColor else bare;
-    if(i==e.sel)try d.glow(pad+8,ry+7,10,s.menuHover);
+    if(i==e.sel)try d.glow(pad+8,ry+glowY,12,s.menuHover);
     _=try d.text(pad+18,ry,text,col,e.chLabel(i));
     // the channel's value, written to three places
     var vb:[24]u8=undefined;
     const vs=bufPrint(&vb,"{d:.3}",.{e.value(i)})catch"?";
     _=try d.text(pad+valueX,ry,text,col,vs);
-    if(keyed and e.clip.track(e.chName(i)).?.at(e.t)!=null)try d.pod(pad+listW-14,ry+7,4,col,1,0);
+    if(keyed and e.clip.track(e.chName(i)).?.at(e.t)!=null)try d.pod(pad+listW-14,ry+glowY,4,col,1,0);
   }
   if(e.top>0)_=try d.text(pad+listW-30,listY-20,text,bare,"...");
   if(e.top+rows<e.shown.len)_=try d.text(pad+listW-30,listY+m.f(rows)*row,text,bare,"...");
@@ -161,7 +165,7 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
   while(sec<=e.clip.length+clip.same):(sec+=0.5){
     // the mark's text
     var sb:[16]u8=undefined;
-    _=try d.text(at(tx,tw,e.clip.length,sec)-4,ty+tlH+6,text,bare,bufPrint(&sb,"{d}",.{sec})catch"?");
+    _=try d.text(at(tx,tw,e.clip.length,sec)-4,ty+tlH+6,text,keyedColor,bufPrint(&sb,"{d}",.{sec})catch"?");
   }
   for(e.clip.tracks.items)|tr|for(tr.keys.items)|k|{
     try d.pod(at(tx,tw,e.clip.length,k.t),ty+tlH/2,keyR,keyDim,0,0);
@@ -187,9 +191,9 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
   var hb:[200]u8=undefined;
   // the selected channel's key at the playhead, if it has one
   const here=e.clip.keyAt(e.chName(e.sel),e.t);
-  _=try d.text(tx,ty-26,text,head,bufPrint(&hb,"{s} {d:.2} / {d:.2} s   frame {d}   channel {s}{s}{s}{s}{s}",.{
+  _=try toolbar.backed(d,tx,ty-34,&.{.{.col=head,.words=bufPrint(&hb,"{s} {d:.2} / {d:.2} s   frame {d}   channel {s}{s}{s}{s}{s}",.{
     if(e.playing)"playing"else"paused",e.t,e.clip.length,@as(u32,@intFromFloat(@round(e.t*fps))),e.chLabel(e.sel),
     if(here!=null)"   ease "else"",if(here)|k|@tagName(k.ease)else"",
     if(e.markHere()!=null)"   mark "else"",e.markHere() orelse "",
-  })catch"?");
+  })catch"?"}});
 }

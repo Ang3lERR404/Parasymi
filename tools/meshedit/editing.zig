@@ -9,8 +9,6 @@ const engine=ps.engine;
 const m=engine.core.math;
 /// the keys and buttons held this frame
 const Input=engine.platform.input.Input;
-/// a keyboard key, named as the window library names it
-const Key=engine.platform.input.Key;
 /// the game, reached through its import hub
 const ps=@import("parasymi");
 /// the move, turn and size handles on the selected form
@@ -61,8 +59,10 @@ const nextShade=meshedit.settings.nextShade;
 const overUi=meshedit.settings.overUi;
 /// where the values start under the form rows
 const valuesY=meshedit.settings.valuesY;
-/// whether key `k` went down this frame
-fn hit(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
+/// everything a key or a button does, and the keys that do them
+const buttons=meshedit.buttons;
+/// everything a key or a button does
+const Act=buttons.Act;
 /// one frame's keys and mouse; `handles` where each form's handle is on
 /// screen (null behind the eye), the gizmo seen through `view` with the
 /// sculpt at `origin`. While a form is being named the keys type its name
@@ -90,32 +90,52 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
   const was:?Vals=if(e.pieces().len>0 and !e.rigMode)e.pieces()[e.sel].v else null;
   const wasSel=e.sel;
   const wasCount=e.pieces().len;
-  if(!typing)try answerKeys(e,in);
+  if(!typing)for(buttons.binds)|b|if(b.hit(in))try act(e,b.act,in);
+  // the toolbar, laid out for the mode as it is, and a button clicked on it
+  e.bar.lay(buttons.items(e),view.screen,view.screen[1]-pad);
+  if(e.bar.click(in,buttons.live(e)))|a|try act(e,a,in);
   try answerMouse(e,in,handles,view,origin,shift);
   if(was)|w|if(e.sel==wasSel and e.pieces().len==wasCount)e.follow(w);
   try e.settle();
 }
-/// one frame's keys: forms made, removed, moved, reshaped, carved,
-/// twinned, shaded and named; values stepped and set at rest; the gizmo's mode; the cells;
-/// saving; undo and redo
-fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
-  // whether shift is held (shader back), and whether ctrl is
+/// act `a`, as its key or its button asks (shift, read from `in`, steps
+/// back or does every bone): the mode, the help, saving, undo and redo, the
+/// gizmo's mode and the cells here; the rest the forms' (or the bones')
+pub fn act(e:*Editor,a:Act,in:*const Input)Allocator.Error!void{
+  // whether shift is held
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
-  const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
+  switch(a){
+    .rig=>{
+      e.rigMode=!e.rigMode;
+      e.ch=0;
+      if(e.mode==.size)e.mode=.move;
+      e.say("{s}",.{if(e.rigMode)"rig mode: the bones"else"the forms"});
+    },
+    .help=>e.helpShown=!e.helpShown,
+    .save=>e.save(),
+    .undo=>if(shift)try e.redo()else try e.undo(),
+    .redo=>try e.redo(),
+    .move=>e.mode=.move,
+    .turn=>e.mode=.turn,
+    .size=>if(!e.rigMode){e.mode=.size;},
+    .finer=>{
+      e.doc.cell=@max(cellMin,e.doc.cell-cellStep);
+      e.changed();
+    },
+    .coarser=>{
+      e.doc.cell+=cellStep;
+      e.changed();
+    },
+    else=>if(e.rigMode)try rigging.act(e,a,shift)else try formAct(e,a,shift),
+  }
+}
+/// an act on the forms (`shift` held with it): forms made, removed, moved,
+/// reshaped, carved, inked, twinned, shaded, snapped, put on a bone and
+/// named; values stepped and set at rest
+fn formAct(e:*Editor,a:Act,shift:bool)Allocator.Error!void{
   // the allocator new forms are kept with
   const gpa=e.gpa;
-  if(hit(in,.j)){
-    e.rigMode=!e.rigMode;
-    e.ch=0;
-    if(e.mode==.size)e.mode=.move;
-    e.say("{s}",.{if(e.rigMode)"rig mode: the bones"else"the forms"});
-  }
-  if(ctrl and hit(in,.s))e.save();
-  if(ctrl and hit(in,.z))if(shift)try e.redo()else try e.undo();
-  if(ctrl and hit(in,.y))try e.redo();
-  if(e.rigMode)return rigging.keys(e,in);
-  if(hit(in,.o) and e.pieces().len>0)rigging.stepBone(e,shift);
-  if(hit(in,.n)){
+  if(a==.make){
     // the new form: a copy of the selected one, a little off, else a fresh one
     var p:Piece=if(e.pieces().len>0)e.pieces()[e.sel]else.{};
     if(e.pieces().len>0)p.v.pos+=newOff;
@@ -123,32 +143,30 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     const at=if(e.pieces().len>0)e.sel+1 else 0;
     try e.doc.pieces.insert(gpa,at,p);
     e.sel=at;
-    e.changed();
+    return e.changed();
   }
-  if(e.pieces().len>0){
-    if(hit(in,.delete)){
+  if(e.pieces().len==0)return;
+  // the forms, in order, and the selected one
+  const pieceList=e.pieces();
+  const p=&pieceList[e.sel];
+  switch(a){
+    .remove=>{
       _=e.doc.pieces.orderedRemove(e.sel);
       e.sel-|=@intFromBool(e.sel>=e.pieces().len);
       e.changed();
-    }
-  }
-  if(e.pieces().len>0){
-    // the forms, in order
-    const pieceList=e.pieces();
-    if(hit(in,.tab))e.sel=(e.sel+1)%pieceList.len;
-    if(hit(in,.page_up) and e.sel>0){
+    },
+    .next=>e.sel=(e.sel+1)%pieceList.len,
+    .raise=>if(e.sel>0){
       std.mem.swap(Piece,&pieceList[e.sel],&pieceList[e.sel-1]);
       e.sel-=1;
       e.changed();
-    }
-    if(hit(in,.page_down) and e.sel+1<pieceList.len){
+    },
+    .lower=>if(e.sel+1<pieceList.len){
       std.mem.swap(Piece,&pieceList[e.sel],&pieceList[e.sel+1]);
       e.sel+=1;
       e.changed();
-    }
-    // the selected form
-    const p=&pieceList[e.sel];
-    if(hit(in,.t)){
+    },
+    .shape=>{
       p.kind=switch(p.kind){.ellipsoid=>.cone,.cone=>.box,.box=>.tube,.tube=>.nest,.nest=>.ellipsoid};
       // a nest starts at its sculpt's own size, using the first other sculpt
       if(p.kind==.nest){
@@ -156,43 +174,34 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
         if(p.use.len==0)e.stepPart(p,false);
       }else if(p.kind==.ellipsoid)p.v.size=(Vals{}).size;
       e.changed();
-    }
-    if(hit(in,.c)){
+    },
+    .carve=>{
       p.carve=!p.carve;
       p.ink=false;
       e.changed();
-    }
-    if(hit(in,.p) and p.kind==.nest)e.stepPart(p,shift);
-    if(hit(in,.i)){
+    },
+    .part=>if(p.kind==.nest)e.stepPart(p,shift),
+    .ink=>{
       p.ink=!p.ink;
       p.carve=false;
       e.changed();
-    }
-    if(hit(in,.g))e.snap();
-    if(hit(in,.x)){
+    },
+    .snap=>e.snap(),
+    .twin=>{
       p.twin=!p.twin;
       e.changed();
-    }
-    if(hit(in,.m)){
+    },
+    .shader=>{
       p.shade=nextShade(p.shade,if(shift).back else.on);
       e.changed();
-    }
-    if(hit(in,.up) and e.ch>0)e.ch-=1;
-    if(hit(in,.down) and e.ch+1<Ch.count)e.ch+=1;
-    if(hit(in,.r))e.set(Ch.get(&Vals{},e.ch));
-    if(hit(in,.period))e.focus=true;
-    if(hit(in,.enter) or hit(in,.kp_enter))e.naming=labels.typing(p.name.slice());
-  }
-  if(hit(in,.one))e.mode=.move;
-  if(hit(in,.two))e.mode=.turn;
-  if(hit(in,.three))e.mode=.size;
-  if(hit(in,.left_bracket)){
-    e.doc.cell=@max(cellMin,e.doc.cell-cellStep);
-    e.changed();
-  }
-  if(hit(in,.right_bracket)){
-    e.doc.cell+=cellStep;
-    e.changed();
+    },
+    .bone=>rigging.stepBone(e,shift),
+    .prevValue=>e.ch-|=1,
+    .nextValue=>if(e.ch+1<Ch.count){e.ch+=1;},
+    .rest=>e.set(Ch.get(&Vals{},e.ch)),
+    .focus=>e.focus=true,
+    .name=>e.naming=labels.typing(p.name.slice()),
+    else=>{},
   }
 }
 /// one frame's mouse: a press on a form row selects it, on a value row
@@ -213,11 +222,14 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
   const vy=valuesY(listRows(listed));
   // the selected form's (or bone's) gizmo
   const g=if(inRig)rigging.gizmoAt(e,origin)else e.gizmoAt(origin);
-  // whether the mouse is over the panel, where the gizmo doesn't answer
-  const ui=overUi(listRows(listed),mx,my);
+  // whether the mouse is over the toolbar, and over any panel, where the gizmo doesn't answer
+  const onBar=e.bar.over(in.mouse);
+  const ui=onBar or overUi(listRows(listed),mx,my);
   e.hot=if(e.drag==.gizmo)e.part else if(g!=null and !ui)g.?.pick(view,in.mouse)else null;
   if(in.pressed(.{.button=.left})){
-    if(mx<pad+listW and my>=listY and my<vy){
+    if(onBar){
+      // the toolbar's own: its click comes as the button is let go
+    }else if(mx<pad+listW and my>=listY and my<vy){
       // the row pressed on, counted from the first in view
       const r:usize=@intFromFloat(@floor((my-listY)/row));
       if(inRig){

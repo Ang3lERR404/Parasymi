@@ -11,10 +11,6 @@ const bufPrint=std.fmt.bufPrint;
 const engine=ps.engine;
 /// all the maths: vectors, matrices
 const m=engine.core.math;
-/// the keys and buttons held this frame
-const Input=engine.platform.input.Input;
-/// a keyboard key, named as the window library names it
-const Key=engine.platform.input.Key;
 /// the UI's draw batch, which the bones go into
 const Draw=engine.ui.draw.Draw;
 /// the game, reached through its import hub
@@ -37,6 +33,8 @@ const meshedit=@import("../meshedit.zig");
 const rig=meshedit.rig;
 /// the editor's state
 const Editor=meshedit.editor.Editor;
+/// everything a key or a button does
+const Act=meshedit.buttons.Act;
 /// the dim colour, the selected one, a plain one, a twinned one
 const bare=meshedit.settings.bare;
 const sel=meshedit.settings.sel;
@@ -50,6 +48,8 @@ const row=meshedit.settings.row;
 const kindX=meshedit.settings.kindX;
 const valueX=meshedit.settings.valueX;
 const text=meshedit.settings.text;
+/// how far down a row its glow sits (px)
+const glowY=meshedit.settings.glowY;
 const panel=meshedit.settings.panel;
 /// where the values start under the bone rows
 const valuesY=meshedit.settings.valuesY;
@@ -78,8 +78,6 @@ fn put(v:V3,i:usize,x:f32)V3{
 }
 /// `v` with part `i` moved by `by`
 fn bump(v:V3,i:usize,by:f32)V3{return put(v,i,lane(v,i)+by);}
-/// whether key `k` went down this frame
-fn hit(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
 /// the bones now: every kept bone's test turn (each twin's mirrored from
 /// its bone's), posed where the sculpt stands at `origin`; `out` gets
 /// each bone's matrix, the skeleton is returned
@@ -201,34 +199,30 @@ pub fn remove(e:*Editor)void{
   e.bsel=@min(e.bsel,bones.items.len-|1);
   e.changed();
 }
-/// one frame's keys in rig mode: bones made, removed, twinned, named,
-/// stepped through; values stepped and set back; the gizmo's mode
-pub fn keys(e:*Editor,in:*const Input)Allocator.Error!void{
-  // whether shift is held (every bone's test turn set back)
-  const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
-  if(hit(in,.n))try add(e);
-  // the bones kept
-  const n=e.doc.bones.items.len;
-  if(n==0)return;
-  if(hit(in,.delete))remove(e);
+/// an act in rig mode (`shift` held with it): bones made, removed,
+/// twinned, named, stepped through; values stepped and set back
+pub fn act(e:*Editor,a:Act,shift:bool)Allocator.Error!void{
+  if(a==.make)return add(e);
   if(e.doc.bones.items.len==0)return;
-  if(hit(in,.x)){
-    e.doc.bones.items[e.bsel].twin=!e.doc.bones.items[e.bsel].twin;
-    if(rig.count(e.doc.bones.items)>rig.maxBones){
-      e.doc.bones.items[e.bsel].twin=false;
-      e.say("no room for a twin",.{});
-    }else e.changed();
+  switch(a){
+    .remove=>remove(e),
+    .twin=>{
+      e.doc.bones.items[e.bsel].twin=!e.doc.bones.items[e.bsel].twin;
+      if(rig.count(e.doc.bones.items)>rig.maxBones){
+        e.doc.bones.items[e.bsel].twin=false;
+        e.say("no room for a twin",.{});
+      }else e.changed();
+    },
+    .next=>e.bsel=(e.bsel+1)%e.doc.bones.items.len,
+    .prevValue=>e.ch-|=1,
+    .nextValue=>if(e.ch+1<valueRows){e.ch+=1;},
+    .rest=>{
+      if(shift)e.turns=@splat(.{0,0,0})else e.turns[e.bsel]=.{0,0,0};
+    },
+    .focus=>e.focus=true,
+    .name=>e.naming=labels.typing(e.doc.bones.items[e.bsel].name.slice()),
+    else=>{},
   }
-  if(hit(in,.tab))e.bsel=(e.bsel+1)%e.doc.bones.items.len;
-  if(hit(in,.up) and e.ch>0)e.ch-=1;
-  if(hit(in,.down) and e.ch+1<valueRows)e.ch+=1;
-  if(hit(in,.r)){
-    if(shift)e.turns=@splat(.{0,0,0})else e.turns[e.bsel]=.{0,0,0};
-  }
-  if(hit(in,.period))e.focus=true;
-  if(hit(in,.enter) or hit(in,.kp_enter))e.naming=labels.typing(e.doc.bones.items[e.bsel].name.slice());
-  if(hit(in,.one))e.mode=.move;
-  if(hit(in,.two))e.mode=.turn;
 }
 /// the selected bone's name typed as `typed`: kept only while it is
 /// neither empty nor another bone's
@@ -256,14 +250,14 @@ pub fn draw(e:*Editor,d:*Draw,view:gizmo.View,origin:V3)Allocator.Error!void{
   const bones=e.doc.bones.items;
   const rows=listRows(bones.len);
   try d.trellis(pad,listY-6,listW,m.f(rows)*row+12,panel,0.3);
-  if(bones.len==0)_=try d.text(pad+18,listY,text,bare,"no bones: n makes the root");
+  if(bones.len==0)_=try d.text(pad+18,listY,text,bare,"no bones: new bone (n) makes the root");
   for(bones,0..)|b,i|{
     if(i>=rows)break;
     // this row (px), its colour, and whether its name is being typed
     const ry=listY+m.f(i)*row;
     const col=if(i==e.bsel)sel else if(b.twin)grouped else plain;
     const typing=i==e.bsel and e.naming!=null;
-    if(i==e.bsel)try d.glow(pad+8,ry+7,10,s.menuHover);
+    if(i==e.bsel)try d.glow(pad+8,ry+glowY,12,s.menuHover);
     // its number, its name, then what it hangs from and its twin, dim
     var nb:[8]u8=undefined;
     const nx=try d.text(pad+18,ry,text,col,bufPrint(&nb,"{d}  ",.{i+1})catch"?");
@@ -279,7 +273,7 @@ pub fn draw(e:*Editor,d:*Draw,view:gizmo.View,origin:V3)Allocator.Error!void{
       // this value's row (px), and its colour
       const ry=vy+m.f(i)*row;
       const col=if(i==e.ch)sel else if(i>=3)bare else plain;
-      if(i==e.ch)try d.glow(pad+8,ry+7,10,s.menuHover);
+      if(i==e.ch)try d.glow(pad+8,ry+glowY,12,s.menuHover);
       _=try d.text(pad+18,ry,text,col,valueWords[i]);
       var vb:[24]u8=undefined;
       _=try d.text(pad+valueX,ry,text,col,bufPrint(&vb,"{d:.3}",.{value(e,i)})catch"?");

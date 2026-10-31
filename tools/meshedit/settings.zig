@@ -84,23 +84,23 @@ pub const noFeet:f32=1e9;
 /// layout (px): the gap round the panel's edges
 pub const pad:f32=16;
 /// the size of the panel's text
-pub const text:f32=s.textSmall;
+pub const text:f32=s.textSub;
+/// how far down a row its glow sits, level with its words
+pub const glowY:f32=5;
 /// the height of one row of the list or the values
-pub const row:f32=18;
+pub const row:f32=22;
 /// how far down the window the form list starts
-pub const listY:f32=100;
+pub const listY:f32=104;
 /// how wide the form list is
-pub const listW:f32=470;
+pub const listW:f32=590;
 /// the most form rows shown at once
 pub const listRowCount=12;
 /// how far in from the list's left a value is written
-pub const valueX:f32=200;
+pub const valueX:f32=250;
 /// where a form's shape shows in its row, after its name
-pub const kindX:f32=190;
+pub const kindX:f32=238;
 /// where a form's shader shows in its row
-pub const shadeX:f32=365;
-/// the height of one line of the help along the top
-pub const lineH:f32=20;
+pub const shadeX:f32=456;
 /// the gap between the form list and the values under it
 const gap:f32=14;
 /// a form's handle in view (the selected one shows its gizmo instead): its radius (px)
@@ -111,7 +111,7 @@ pub const pickRadius:f32=14;
 pub const sel:Color=s.gold;
 /// a value that is set, and a form that adds
 pub const plain:Color=s.white;
-/// a dim note, and the help
+/// a dim note
 pub const bare:Color=s.dim;
 /// a form that carves
 pub const carve:Color=s.growth;
@@ -131,19 +131,6 @@ pub const jointR:f32=5;
 pub const jointFocus:f32=0.12;
 /// the panels behind the list and the values
 pub const panel:Color=s.panel;
-/// the help along the top: every key the editor answers to
-pub const help=[_][]const u8{
-  "n new form (from the selected)   del remove   pgup/pgdn move in the list   tab next form   enter name it   m shader (shift back)",
-  "t shape (a tube curls; a nest places another sculpt, p picks it)   c carve   i ink   x twin   ctrl+click group   g snap   o bone   j rig",
-  "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y redo",
-  "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
-};
-/// the help along the top in rig mode: every key it answers to
-pub const rigHelp=[_][]const u8{
-  "rig mode (j: back to the forms)   n new bone (on the selected; the first is the root)   del remove   x twin   tab next bone   enter name it",
-  "up/down value   drag value (shift fine)   r test turn back to rest (shift: every bone)   click a joint: select   ctrl+s save   ctrl+z undo",
-  "gizmo: 1 move the joint   2 test turn (never kept)   middle drag orbit   wheel zoom   . focus the joint   forms: o steps the bone a form rides",
-};
 /// how a form's values read in the panel (a cone's size aside: `valueLabel`)
 const valueLabels=labels.all(&.{
   .{.path="pos",.word="place",.axes=.{"across","up","depth"}},

@@ -344,7 +344,7 @@ pub fn main(init:std.process.Init)!void{
     game.time+=dt;
     game.cam.aspect=screen[0]/@max(screen[1],1);
     // whether the mouse is over the panel, where the wheel scrolls the list
-    const overUi=overList(screen,input.mouse[0],input.mouse[1]) or inTimeline(screen,input.mouse[0],input.mouse[1]);
+    const overUi=e.bar.over(input.mouse) or overList(screen,input.mouse[0],input.mouse[1]) or inTimeline(screen,input.mouse[0],input.mouse[1]);
     if(ctl.down(&input,.orbit))cam.turn(input.mouseDelta);
     if(input.scroll!=0 and !overUi)cam.zoom(input.scroll);
     if(e.focus){

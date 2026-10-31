@@ -2,7 +2,9 @@
 //! the wolf's skeleton, for one plant or structure alone, or for a sculpt rigged
 //! in the mesh editor (animedit/sculpt.zig: its place and each bone's turns), shown live on
 //! the game's own renderer, and keeps it as text in `src/anim/<name>.anim`.
-//! The game does not play clips back yet. From the repo root:
+//! The game plays a sculpt's clip of its own name. A toolbar down the
+//! window's right side has a button for every key (tools/toolbar.zig,
+//! animedit/buttons.zig); `h` shows what the mouse does. From the repo root:
 //!   zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name>]
 //! (a name not yet kept starts a new clip, written there at once)
 //! (`--at=<s>` starts the playhead there, `--channel=<name>` on that
@@ -57,6 +59,8 @@ pub const rigging=@import("animedit/rigging.zig");
 pub const sculpt=@import("animedit/sculpt.zig");
 /// the editor's state: the clip, the subject, the playhead, the selection
 pub const editor=@import("animedit/editor.zig");
+/// every act a key or a button does, and the toolbar's buttons
+pub const buttons=@import("animedit/buttons.zig");
 /// what the gardener's hands do to the clip: keying, dragging, saving
 pub const editing=@import("animedit/editing.zig");
 /// the side panel: the channels, their values and the timeline

@@ -4,8 +4,10 @@
 //! or only inking their colour), meshed again as
 //! it is edited and shown on the game's own renderer, alone on the
 //! generated ground (no wolf, plants or structures), and keeps it as text
-//! in `src/mesh/<name>.mesh`. The game does not read these yet. From the
-//! repo root:
+//! in `src/mesh/<name>.mesh`, which the game reads at startup
+//! (game/sculpts.zig). A toolbar down the window's right side has a button
+//! for every key (tools/toolbar.zig, meshedit/buttons.zig), lit while what
+//! it toggles is on; `h` shows what the mouse does. From the repo root:
 //!   zig build meshedit -- [--mesh=<name>]
 //! (a name not yet kept starts a new mesh, written there at once)
 //! (`--gizmo=move|turn|size` starts the gizmo so; `--rig` in rig mode,
@@ -66,6 +68,8 @@ pub const rig=@import("meshedit/rig.zig");
 pub const rigging=@import("meshedit/rigging.zig");
 /// the editor's state: the forms, the selection, the gizmo, the camera
 pub const editor=@import("meshedit/editor.zig");
+/// every act a key or a button does, and the toolbar's buttons
+pub const buttons=@import("meshedit/buttons.zig");
 /// what the gardener's hands do to the forms: picking, dragging, saving
 pub const editing=@import("meshedit/editing.zig");
 /// the side panel: the selected form's fields and the shader it picks
@@ -81,6 +85,7 @@ test{
   _=@import("orbit.zig");
   _=@import("labels.zig");
   _=@import("history.zig");
+  _=@import("toolbar.zig");
 }
 test{
   _=settings;

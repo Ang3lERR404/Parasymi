@@ -1,4 +1,4 @@
-//! the mesh editor's panel: the form list, the values and the help.
+//! the mesh editor's panel: the form list, the values, the toolbar and the help.
 /// the standard library, reached through the game's hub
 const std=ps.std;
 /// the allocator type drawing may fail with
@@ -35,10 +35,13 @@ const Ch=meshedit.settings.Ch;
 const Editor=meshedit.editor.Editor;
 /// a form's handle radius (px)
 const handleR=meshedit.settings.handleR;
-/// the help along the top
-const help=meshedit.settings.help;
-/// the height of one line of help (px)
-const lineH=meshedit.settings.lineH;
+/// the toolbar, and the backed text the path, the note and the help are written on
+const toolbar=@import("../toolbar.zig");
+/// every act, the toolbar's buttons, and the help
+const buttons=meshedit.buttons;
+/// the help, as backed lines
+const helpLines=toolbar.lines(&buttons.help);
+const rigHelpLines=toolbar.lines(&buttons.rigHelp);
 /// the most form rows shown at once
 const listRowCount=meshedit.settings.listRowCount;
 /// how wide the form list is (px)
@@ -65,30 +68,30 @@ const valueLabel=meshedit.settings.valueLabel;
 const typed=@import("../labels.zig").drawTyped;
 /// the panel's text size
 const text=meshedit.settings.text;
+/// how far down a row its glow sits (px), level with its words
+const glowY=meshedit.settings.glowY;
 /// how far in from the list's left a value is written (px)
 const valueX=meshedit.settings.valueX;
 /// how many form rows show
 const listRows=meshedit.settings.listRows;
 /// where the values start under the form rows
 const valuesY=meshedit.settings.valuesY;
-/// draws the editor over the scene: the help, the mesh's path, cells and
-/// note, the form list, the selected form's values, every other form's
-/// handle where it stands, and the selected form's gizmo
+/// draws the editor over the scene: the mesh's path, cells and note, the
+/// toolbar and the help, the form list, the selected form's values, every
+/// other form's handle where it stands, and the selected form's gizmo
 pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.View,origin:V3)Allocator.Error!void{
-  // the window's width (px)
-  const w=screen[0];
-  // where the next line of help goes (px)
-  var y:f32=pad;
-  for(if(e.rigMode)&meshedit.settings.rigHelp else&help)|h|{
-    _=try d.text(pad,y,text,bare,h);
-    y+=lineH;
-  }
   // buffers for the path line and the cells line
   var pb:[160]u8=undefined;
-  _=try d.text(w-pad-420,pad,s.textLabel,sel,bufPrint(&pb,"{s}{s}",.{e.path,if(e.dirty)" *"else""}) catch e.path);
   var cb:[64]u8=undefined;
-  _=try d.text(w-pad-420,pad+lineH+4,text,plain,bufPrint(&cb,"cells {d:.4} m   {d} forms   gizmo {t}",.{e.doc.cell,e.pieces().len,e.mode})catch"?");
-  if(e.noteLen>0)_=try d.text(w-pad-420,pad+2*(lineH+4),text,plain,e.note[0..e.noteLen]);
+  _=try toolbar.backed(d,pad,pad,&.{
+    .{.words=bufPrint(&pb,"{s}{s}",.{e.path,if(e.dirty)" *"else""}) catch e.path,.col=sel},
+    .{.words=bufPrint(&cb,"cells {d:.4} m   {d} forms",.{e.doc.cell,e.pieces().len})catch"?",.col=plain},
+    .{.words=e.note[0..e.noteLen],.col=s.dim},
+  });
+  // the toolbar, laid out for the mode as it is now
+  e.bar.lay(buttons.items(e),screen,screen[1]-pad);
+  try e.bar.draw(d,buttons.lit(e),buttons.live(e));
+  if(e.helpShown)_=try toolbar.backed(d,pad+listW+3*pad,pad,if(e.rigMode)&rigHelpLines else&helpLines);
   // rig mode: the bones, their values and the skeleton, and the selected joint's gizmo
   if(e.rigMode){
     try meshedit.rigging.draw(e,d,view,origin);
@@ -105,7 +108,7 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     if(i>=e.pieces().len)break;
     const p=e.pieces()[i];
     const ry=listY+m.f(r)*row;
-    if(i==e.sel)try d.glow(pad+8,ry+7,10,s.menuHover);
+    if(i==e.sel)try d.glow(pad+8,ry+glowY,12,s.menuHover);
     // the colour the row is written in, and whether its name is being typed
     const col=if(i==e.sel)sel else if(p.grouped)grouped else if(p.ink)ink else if(p.carve)carve else plain;
     const typing=i==e.sel and e.naming!=null;
@@ -132,7 +135,7 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
       // this value's row (px), and the colour it is written in
       const ry=vy+m.f(i)*row;
       const col=if(i==e.ch)sel else plain;
-      if(i==e.ch)try d.glow(pad+8,ry+7,10,s.menuHover);
+      if(i==e.ch)try d.glow(pad+8,ry+glowY,12,s.menuHover);
       _=try d.text(pad+18,ry,text,col,valueLabel(p.kind,i));
       // a buffer for the value, written to three places
       var vb:[24]u8=undefined;
@@ -141,9 +144,9 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     // the bone it rides, under its values (once there are bones)
     if(e.doc.bones.items.len>0){
       var bb:[40]u8=undefined;
-      _=try d.text(pad+18,vy+m.f(Ch.count)*row+10,text,bare,bufPrint(&bb,"on {s}   (o: next bone)",.{e.doc.bones.items[@min(p.bone,e.doc.bones.items.len-1)].name.slice()})catch"?");
+      _=try d.text(pad+18,vy+m.f(Ch.count)*row+10,text,bare,bufPrint(&bb,"on {s}",.{e.doc.bones.items[@min(p.bone,e.doc.bones.items.len-1)].name.slice()})catch"?");
     }
-  }else _=try d.text(pad+18,vy,text,bare,"no forms: n makes one");
+  }else _=try d.text(pad+18,vy,text,bare,"no forms: new form (n) makes one");
   // each form's handle where it stands
   for(handles,0..)|h,i|if(h)|at|{
     // this form, and its handle's colour

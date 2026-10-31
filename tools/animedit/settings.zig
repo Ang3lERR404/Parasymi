@@ -64,17 +64,17 @@ pub const jointSize:f32=0.12;
 /// layout (px): the gap round the panel's edges
 pub const pad:f32=16;
 /// the size of the panel's text
-pub const text:f32=s.textSmall;
+pub const text:f32=s.textSub;
+/// how far down a row its glow sits, level with its words
+pub const glowY:f32=5;
 /// the height of one channel's row in the list
-pub const row:f32=18;
+pub const row:f32=22;
 /// how far down the window the channel list starts
-pub const listY:f32=140;
+pub const listY:f32=80;
 /// how wide the channel list is
-pub const listW:f32=380;
+pub const listW:f32=470;
 /// how far in from the list's left a channel's value is written
-pub const valueX:f32=270;
-/// the height of one line of the help along the top
-pub const lineH:f32=20;
+pub const valueX:f32=340;
 /// the timeline's height along the bottom
 pub const tlH:f32=44;
 /// how far above the window's bottom the timeline sits
@@ -109,12 +109,5 @@ pub const panel:Color=s.panel;
 pub const markStem:Color=s.barkYoung;
 /// a mark's bud and its name
 pub const markBud:Color=s.bud;
-/// the help along the top: every key the editor answers to
-pub const help=[_][]const u8{
-  "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
-  "up/down channel   drag value: key it (shift fine)   k key   a key all   x unkey   r rest",
-  "e ease the key here (shift: back)   ctrl+c copy the keys here   ctrl+v paste (shift: mirrored)",
-  "ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo   . focus   middle drag orbit",
-  "wheel zoom (over the list: scroll)   wolf: click a joint, drag its gizmo (shift fine)",
-  "m mark the playhead and name it (on a mark: rename; enter done)   shift+m unmark",
-};
+/// where the toolbar must end, above the timeline and the playhead's caption (px)
+pub fn barBottom(screen:[2]f32)f32{return screen[1]-tlBottom-tlH-36;}

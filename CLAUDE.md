@@ -90,6 +90,8 @@ zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<
                                   # animation editor (tools/animedit.zig): keys a clip
                                   # on the real renderer, saves src/anim/<name>.anim;
                                   # wolf joints are clickable, their gizmo keys them
+                                  # (both editors: a toolbar of buttons down the right
+                                  # side does what every key does; `h` shows the help)
                                   # the camera orbits freely as meshedit's, `.` focuses
                                   # the selected joint (tools/orbit.zig)
 zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
