@@ -110,3 +110,37 @@ test"a whole drag undoes in one step and redoes again"{
   try e.redo();
   try testing.expectApproxEqAbs(@as(f32,0.5),e.pieces()[0].v.pos[0],1e-5);
 }
+test"a twinned form reads back so, and its surface is mirrored across the middle"{
+  // the testing allocator, a mesh of one turned box off to one side with a twin
+  const gpa=testing.allocator;
+  var d:Doc=.{.cell=0.02};
+  defer d.deinit(gpa);
+  try d.pieces.append(gpa,.{.kind=.box,.carve=false,.twin=true,.v=.{.pos=.{0.3,0.2,0.05},.rot=.{10,25,-15},.size=.{0.08,0.05,0.12}}});
+  // the mesh's text, and the mesh read back from it
+  var out:Writer.Allocating=.init(gpa);
+  defer out.deinit();
+  try d.write(&out.writer);
+  var back=try Doc.parse(gpa,out.written());
+  defer back.deinit(gpa);
+  try testing.expect(back.pieces.items[0].twin);
+  try testing.expect(!back.pieces.items[0].carve);
+  // the surface, which reaches as far to one side as to the other
+  var b:meshgen.Builder=.{.gpa=gpa};
+  defer b.deinit();
+  try d.mesh(gpa,null,false,&b);
+  try testing.expect(b.v.items.len>0);
+  // the farthest the surface reaches to either side (m)
+  var lo:f32=0;
+  var hi:f32=0;
+  for(b.v.items)|v|{
+    lo=@min(lo,v.pos[0]);
+    hi=@max(hi,v.pos[0]);
+  }
+  try testing.expectApproxEqAbs(hi,-lo,0.02);
+  // the twin's turn is the form's, mirrored: as far below the middle as the form is above it
+  const t=d.pieces.items[0].mirrored();
+  try testing.expectEqual(@as(f32,-0.3),t.v.pos[0]);
+  try testing.expectEqual(@as(f32,10),t.v.rot[0]);
+  try testing.expectEqual(@as(f32,-25),t.v.rot[1]);
+  try testing.expectEqual(@as(f32,15),t.v.rot[2]);
+}

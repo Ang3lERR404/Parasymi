@@ -13,6 +13,8 @@
 //! z) and sized by `size` (radii; a cone's x and z its radii at its foot
 //! and its tip, y half its length; a box's half extents); `round` rounds a
 //! box, `melt` is how far it melts into what is before it, `col` its colour.
+//! `x` gives the selected form a twin, mirrored across the sculpt's middle
+//! (x=0): it follows its form as it is shaped (one ear makes both).
 //! `enter` names the selected form (`snout`, `left ear`): typed in its row,
 //! enter or escape done, kept in the file; the panel shows each value in
 //! words (`place up`, `colour red`, a cone's `tip radius`).

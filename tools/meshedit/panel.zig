@@ -104,9 +104,9 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     const nx=try d.text(pad+18,ry,text,col,bufPrint(&nb,"{d}  ",.{i+1})catch"?");
     if(typing)try typed(d,nx,ry,&e.naming.?)
     else _=try d.text(nx,ry,text,if(p.name.len>0)col else bare,if(p.name.len>0)p.name.slice()else@tagName(p.kind));
-    // its shape (when named) and whether it carves, dim
-    var kb:[24]u8=undefined;
-    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.carve)" carve"else""})catch"?");
+    // its shape (when named), whether it carves and whether it has a twin, dim
+    var kb:[32]u8=undefined;
+    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.carve)" carve"else"",if(p.twin)" twin"else""})catch"?");
     _=try d.text(pad+shadeX,ry,text,if(i==e.sel)sel else bare,@tagName(p.shade));
   }
   if(e.top>0)_=try d.text(pad+listW-30,listY-20,text,bare,"...");
@@ -135,6 +135,10 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     const p=e.pieces()[i];
     const col=if(i==e.sel)sel else if(p.carve)carve else plain;
     if(i!=e.sel)try d.pod(at[0],at[1],handleR,col,1,0);
+  };
+  // each twin's mark where it stands, dim: it follows its form, never picked itself
+  for(e.pieces())|p|if(p.twin){
+    if(view.project(origin+p.mirrored().v.pos))|at|try d.pod(at[0],at[1],handleR*0.6,bare,1,0);
   };
   // the selected form's gizmo over everything in view
   if(e.gizmoAt(origin))|g|try g.draw(d,view,e.hot);

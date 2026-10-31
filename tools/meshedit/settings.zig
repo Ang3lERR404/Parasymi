@@ -84,7 +84,7 @@ pub const row:f32=18;
 /// how far down the window the form list starts
 pub const listY:f32=100;
 /// how wide the form list is
-pub const listW:f32=400;
+pub const listW:f32=470;
 /// the most form rows shown at once
 pub const listRowCount=12;
 /// how far in from the list's left a value is written
@@ -92,7 +92,7 @@ pub const valueX:f32=200;
 /// where a form's shape shows in its row, after its name
 pub const kindX:f32=190;
 /// where a form's shader shows in its row
-pub const shadeX:f32=290;
+pub const shadeX:f32=365;
 /// the height of one line of the help along the top
 pub const lineH:f32=20;
 /// the gap between the form list and the values under it
@@ -113,7 +113,7 @@ pub const carve:Color=s.growth;
 pub const panel:Color=s.panel;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
-  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   m shader (shift back)   tab next form   enter name it",
+  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   x twin   m shader (shift back)   tab next form   enter name it",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };

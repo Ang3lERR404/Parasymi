@@ -83,8 +83,8 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
   try answerMouse(e,in,handles,view,origin,shift);
   try e.settle();
 }
-/// one frame's keys: forms made, removed, moved, reshaped, carved, shaded
-/// and named; values stepped and set at rest; the gizmo's mode; the cells;
+/// one frame's keys: forms made, removed, moved, reshaped, carved,
+/// twinned, shaded and named; values stepped and set at rest; the gizmo's mode; the cells;
 /// saving; undo and redo
 fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
   // whether shift is held (shader back), and whether ctrl is
@@ -131,6 +131,10 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     }
     if(hit(in,.c)){
       p.carve=!p.carve;
+      e.changed();
+    }
+    if(hit(in,.x)){
+      p.twin=!p.twin;
       e.changed();
     }
     if(hit(in,.m)){

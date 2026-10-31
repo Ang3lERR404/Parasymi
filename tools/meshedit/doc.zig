@@ -66,6 +66,9 @@ pub const Piece=struct{
   kind:Kind=.ellipsoid,
   /// whether it is carved out of what is before it (else melted in)
   carve:bool=false,
+  /// whether a twin of it stands mirrored across the sculpt's middle (x=0),
+  /// following it as it is shaped
+  twin:bool=false,
   /// the shader (part role) its part of the surface is drawn with
   shade:Part=.stem,
   /// where it stands, how it is turned and sized, and its colour
@@ -90,6 +93,18 @@ pub const Piece=struct{
       .part=@intFromEnum(p.shade),
     };
   }
+  /// its twin: mirrored across the sculpt's middle (x=0), so its place
+  /// across flips, and so do its turns about y and z (a mirror leaves the
+  /// turn about x alone); every shape is even across its own x, so the
+  /// shape itself is its own mirror
+  pub fn mirrored(p:Piece)Piece{
+    // the twin, its values flipped
+    var t=p;
+    t.v.pos[0]=-p.v.pos[0];
+    t.v.rot[1]=-p.v.rot[1];
+    t.v.rot[2]=-p.v.rot[2];
+    return t;
+  }
   /// the farthest it reaches from the sculpt's origin (m)
   pub fn reach(p:Piece)f32{
     return m.len(p.v.pos)+m.len(p.v.size)+p.v.melt;
@@ -104,11 +119,11 @@ pub const Doc=struct{
   /// lets the forms go
   pub fn deinit(d:*Doc,gpa:Allocator)void{d.pieces.deinit(gpa);}
   /// writes the mesh as text: the header, the cell size, then each form's
-  /// kind, name (if it has one), shader and every value, one to a line
+  /// kind (and `carve`, `twin`), name (if it has one), shader and every value, one to a line
   pub fn write(d:*const Doc,w:*Writer)Writer.Error!void{
     try w.print(header++"\ncell {d}\n",.{d.cell});
     for(d.pieces.items)|*p|{
-      try w.print("form {t}{s}\n",.{p.kind,if(p.carve)" carve"else""});
+      try w.print("form {t}{s}{s}\n",.{p.kind,if(p.carve)" carve"else"",if(p.twin)" twin"else""});
       if(p.name.len>0)try w.print("name {s}\n",.{p.name.slice()});
       try w.print("shade {t}\n",.{p.shade});
       for(Ch.names,0..)|n,i|try w.print("{s} {d}\n",.{n,Ch.get(&p.v,i)});
@@ -134,10 +149,13 @@ pub const Doc=struct{
       if(eql(u8,word,"cell")){
         d.cell=@max(cellMin,parseFloat(f32,it.next() orelse return error.BadMesh) catch return error.BadMesh);
       }else if(eql(u8,word,"form")){
-        // the new form's shape, and whether it carves
+        // the new form's shape, then whether it carves and has a twin
         const kind=stringToEnum(Kind,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
-        const carve=if(it.next())|c|eql(u8,c,"carve")else false;
-        try d.pieces.append(gpa,.{.kind=kind,.carve=carve});
+        var p:Piece=.{.kind=kind};
+        while(it.next())|flag|{
+          if(eql(u8,flag,"carve"))p.carve=true else if(eql(u8,flag,"twin"))p.twin=true else return error.BadMesh;
+        }
+        try d.pieces.append(gpa,p);
       }else if(eql(u8,word,"name")){
         if(d.pieces.items.len==0)return error.BadMesh;
         // the name: the rest of the line, spaces and all
@@ -171,7 +189,12 @@ pub const Doc=struct{
     // the sculpt the forms are melted into
     var sc:sculpt.Sculpt=.{.gpa=gpa,.parents=&.{null},.io=io};
     defer sc.deinit();
-    for(d.pieces.items)|p|try sc.add(p.form());
+    // each form, then its twin right after it (so the two melt or carve
+    // as one into what came before)
+    for(d.pieces.items)|p|{
+      try sc.add(p.form());
+      if(p.twin)try sc.add(p.mirrored().form());
+    }
     // the cell size this time (m)
     const h=@max(d.cell,2*far/maxCells)*(if(coarse)dragCoarse else 1);
     try sc.mesh(meshgen.gen,b,h,0.5,.stem);
