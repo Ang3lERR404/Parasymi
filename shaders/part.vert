@@ -107,6 +107,15 @@ const float DIM_GLOW = 0.06;
 const int PLEXUS_POINTS = 30;
 const int PLEXUS_HEART = 15;
 const float PLEXUS_DRIFT = 0.13;
+// what shape a web holds (meshes/constellate.zig `Shape`): a loose
+// cluster, or one of the plant parts a gardener builds with; a part's
+// points drift only a little, so it keeps its form
+const int PLEXUS_CLUSTER = 0;
+const int PLEXUS_PETAL = 1;
+const int PLEXUS_LEAF = 2;
+const int PLEXUS_BUD = 3;
+const int PLEXUS_FLOWER = 4;
+const float PLEXUS_PART_DRIFT = 0.025;
 const float PLEXUS_SLOW = 0.12;
 const float PLEXUS_QUICK = 0.32;
 const float PLEXUS_POINT_R = 0.015;
@@ -123,24 +132,79 @@ const float PLEXUS_LINE_W = 0.007;
 const float PLEXUS_PANE = 0.005;
 const float PLEXUS_SOFT = 0.8;
 
-// where constellate point `id` rests: an upright spindle of them, widest in
-// the middle, from knee height to over the wolf's head
-vec3 plexusRest(float id) {
+// where constellate point `id` rests in a web of `shape`, each point
+// nudged a little off its place so no part is ruled straight
+vec3 plexusRest(float id, int shape) {
   vec3 h = hash33(vec3(id, 3.1, 7.7));
+  vec3 jit = (h - 0.5) * 0.04;
+  if (shape == PLEXUS_PETAL) {
+    // a petal: six rows of five from its narrow base to its round tip,
+    // broadest two thirds up, cupped and curling back toward its tip;
+    // no midrib (id 2 the base's middle)
+    float row = floor(id / 5.0);
+    float u = (row + 0.3) / 5.6;
+    float v = (id - row * 5.0) / 2.0 - 1.0;
+    float w = 0.26 * sin(0.5 * TAU * min(u * 1.12, 1.0)) * (0.35 + 0.65 * u) + 0.06;
+    float cup = 0.1 * (1.0 - v * v) * sin(0.5 * TAU * u);
+    return vec3(v * w, 0.75 + 0.6 * u, 0.28 * u * u - cup) + jit;
+  }
+  if (shape == PLEXUS_LEAF) {
+    // a leaf: a midrib of ten from its stalk to its point (id 0 the base),
+    // ten down either edge, the blade folded up to the midrib and arching
+    // out
+    float side = id < 10.0 ? 0.0 : (id < 20.0 ? -1.0 : 1.0);
+    float k = id < 10.0 ? id : mod(id - 10.0, 10.0);
+    float u = id < 10.0 ? k / 9.0 : (k + 0.6) / 10.6;
+    float w = 0.17 * pow(sin(0.5 * TAU * u), 0.8) * (1.0 - 0.25 * u);
+    float rise = 0.6 + 0.85 * u - 0.15 * u * u;
+    return vec3(side * w, rise + abs(side) * 0.03, 0.35 * u * u + abs(side) * w * 0.5) + jit * 0.5;
+  }
+  if (shape == PLEXUS_BUD) {
+    // a bud: closed, a teardrop of points wound in a golden spiral from
+    // its base (id 0) to its tip (the last)
+    float u = id / float(PLEXUS_POINTS - 1);
+    float a = id * 2.39996;
+    float r = 0.17 * pow(sin(0.5 * TAU * pow(u, 0.75)), 0.9);
+    return vec3(cos(a) * r, 0.75 + 0.55 * u, sin(a) * r) + jit * 0.5;
+  }
+  if (shape == PLEXUS_FLOWER) {
+    // a flower head, open: its heart (id 0) in the middle of a domed disc
+    // of nine, five petals of four round it (base, two flanks, tip),
+    // cupped up toward their tips
+    if (id < 0.5) return vec3(0.0, 1.13, 0.0);
+    if (id < 9.5) {
+      float a = (id - 1.0) / 9.0 * TAU;
+      return vec3(cos(a) * 0.075, 1.1 + 0.015 * mod(id, 2.0), sin(a) * 0.075) + jit * 0.3;
+    }
+    float p = floor((id - 10.0) / 4.0);
+    float k = mod(id - 10.0, 4.0);
+    float r = k < 0.5 ? 0.18 : (k < 2.5 ? 0.3 : 0.42);
+    float off = k < 0.5 || k > 2.5 ? 0.0 : (k < 1.5 ? -0.22 : 0.22);
+    float a = p / 5.0 * TAU + off;
+    float lift = 0.15 * (r / 0.42) * (r / 0.42);
+    return vec3(cos(a) * r, 1.0 + lift, sin(a) * r) + jit * 0.5;
+  }
+  // a loose cluster: an upright spindle of them, widest in the middle,
+  // from knee height to over the wolf's head
   float up = id / float(PLEXUS_POINTS - 1);
   float wide = 0.2 + 0.4 * sin(0.5 * TAU * up);
   float a = h.x * TAU;
   float r = wide * mix(0.35, 1.0, h.y);
   return vec3(cos(a) * r, 0.5 + 1.2 * up + (h.z - 0.5) * 0.12, sin(a) * r);
 }
+// which point is the heart of a web of `shape`, where its beat starts: the
+// spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
+// head's middle
+float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : (shape == PLEXUS_PETAL ? 2.0 : 0.0); }
 // where it is at time `t`: drifting round its rest, each axis on two slow
-// waves of its own
-vec3 plexusAt(float id, float t) {
+// waves of its own (a part only a little, keeping its form)
+vec3 plexusAt(float id, int shape, float t) {
   vec3 f = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 11.3, 2.9)));
   vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 5.7, 19.1)));
   vec3 ph = hash33(vec3(id, 23.9, 1.3)) * TAU;
   vec3 d = 0.6 * sin(t * f + ph) + 0.4 * sin(t * g * 1.7 + ph.yzx * 2.0);
-  return plexusRest(id) + PLEXUS_DRIFT * d * vec3(1.0, 0.6, 1.0);
+  float drift = shape == PLEXUS_CLUSTER ? PLEXUS_DRIFT : PLEXUS_PART_DRIFT;
+  return plexusRest(id, shape) + drift * d * vec3(1.0, 0.6, 1.0);
 }
 // how much a line between `a` and `b` shows: whole within its reach's
 // soft edge, gone beyond its reach
@@ -148,13 +212,13 @@ float plexusLink(vec3 a, vec3 b, float reach) { return 1.0 - smoothstep(reach * 
 // where one light of point `id`'s pair is at time `t` (`twin` 1 the first,
 // -1 its companion): circling the other round where the point has drifted
 // to, each pair about an axis and at a pace of its own
-vec3 plexusLight(float id, float t, float twin) {
+vec3 plexusLight(float id, int shape, float t, float twin) {
   vec3 h = hash33(vec3(id, 41.7, 13.3));
   vec3 axis = normalize(h - 0.5 + vec3(0.0, 0.6, 0.0));
   vec3 side = normalize(cross(axis, abs(axis.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   float spin = t * mix(PLEXUS_PAIR_SLOW, PLEXUS_PAIR_QUICK, h.z) + h.x * TAU;
   vec3 orbit = side * cos(spin) + cross(axis, side) * sin(spin);
-  return plexusAt(id, t) + orbit * PLEXUS_PAIR * twin * mix(1.0 - PLEXUS_PAIR_LEAN, PLEXUS_PAIR_LEAN, step(0.0, twin));
+  return plexusAt(id, shape, t) + orbit * PLEXUS_PAIR * twin * mix(1.0 - PLEXUS_PAIR_LEAN, PLEXUS_PAIR_LEAN, step(0.0, twin));
 }
 // a conduit's amber pulses: how fast they run (rad/s)
 const float CORE_RUN_RATE = 2.6;
@@ -308,14 +372,17 @@ void main() {
     // (pos.z: 0 the firsts', 1 the companions', each joining only its own
     // lights); every point drifting, the heart among them
     vec3 ids = floor(col.rgb * 255.0 + 0.5);
-    plexKind = floor(col.a * 255.0 + 0.5);
+    float code = floor(col.a * 255.0 + 0.5);
+    plexKind = mod(code, 4.0);
+    // what shape the web holds (alpha's high part)
+    int shape = int(code / 4.0);
     float reach = pos.x;
     float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
     plexLayer = step(twin, 0.0);
-    vec3 A = plexusLight(ids.x, t, twin);
-    vec3 B = plexusLight(ids.y, t, twin);
-    vec3 C = plexusLight(ids.z, t, twin);
-    vec3 H = plexusAt(float(PLEXUS_HEART), t);
+    vec3 A = plexusLight(ids.x, shape, t, twin);
+    vec3 B = plexusLight(ids.y, shape, t, twin);
+    vec3 C = plexusLight(ids.z, shape, t, twin);
+    vec3 H = plexusAt(plexusHeart(shape), shape, t);
     // how thin this layer's lines are: the companions' as their lights
     float thin = mix(PLEXUS_COMPANION, 1.0, step(0.0, twin));
     vec3 lp;
