@@ -180,10 +180,12 @@ Code:
 
 Meshes:
 - Every flower has stamens (`meshgen.stamens`); closed buds hide theirs.
-- Geometry watertight and seamless (shared rings, capped tubes/lofts,
-  smooth deformation fields only).
+- Geometry watertight and seamless (shared rings, tubes/lofts closed in
+  rounded ends, `Builder.tips`; smooth deformation fields only). Only
+  thorns and claws keep sharp points (`.sharp`).
 - Grown vines are Catmull-Rom splines (`growthPath()`/`grow()`), root
-  fixed, tapering to a point at both ends.
+  fixed, tapering at both ends to a rounded point; a branch flares into
+  the stem it leaves (`meshgen.collar`).
 - Leaves and petals have a body (`meshgen.lamina`); leaves fold to a
   midrib, petals have none.
 - Structures grow along a `growth.Skeleton`, timing from the skeleton

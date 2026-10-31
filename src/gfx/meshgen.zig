@@ -137,6 +137,8 @@ pub const grow=eg.grow;
 pub const growthPath=eg.growthPath;
 /// the radii of a tube tapering to a point at both ends
 pub const taperRadii=eg.taperRadii;
+/// how a branch flares into the stem it leaves (a factor on its radius)
+pub const collar=eg.collar;
 /// growth keys a confluence is built at, evenly from sprout (0) to bloom (1).
 /// Every key has the same vertices in the same order, so the plant shader
 /// blends between the two around a plant's growth: it grows, never jumps.

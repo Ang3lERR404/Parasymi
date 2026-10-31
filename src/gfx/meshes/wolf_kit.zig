@@ -415,6 +415,10 @@ pub fn claw(b:*mg.Builder,base:V3,dir:V3,down:V3,len:f32,r:f32,col:color.Rgba8)A
     ts[i]=0;
     rs[i]=r*(1-k)+0.0006;
   }
+  // a claw keeps its point sharp
+  const tips=b.tips;
+  b.tips=.sharp;
+  defer b.tips=tips;
   try b.tubeR(&path,&ts,&rs,col,.thorn,5);
 }
 /// a digit: a knuckle, a finger or toe arching from `base` along `dir` and

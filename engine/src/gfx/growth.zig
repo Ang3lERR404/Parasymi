@@ -311,7 +311,11 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
       var rs:[res]f32=undefined;
       var ts:[res]f32=undefined;
       mg.taperRadii(o.r0,o.tip,&rs);
-      for(&ts,0..)|*t,i|t.*=m.lerp(o.t0,o.t1,m.ratio(i,res-1));
+      for(&ts,&rs,0..)|*t,*r,i|{
+        t.*=m.lerp(o.t0,o.t1,m.ratio(i,res-1));
+        // a branch flares into its parent
+        if(k.s[id.idx()].parent!=null)r.*=mg.collar(m.ratio(i,res-1))*r.*;
+      }
       // where the tube's vertices begin
       const s=b.mark();
       try b.tubeR(&k.s[id.idx()].pts,&ts,&rs,o.col,o.part,o.sides);
@@ -351,7 +355,7 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
       for(&rs,&ts,&turn,0..)|*r,*t,*a,i|{
         // how far along the spline this point is (0..1)
         const u=m.ratio(i,res-1);
-        r.*=o.girth*m.lerp(1,o.tip,u);
+        r.*=o.girth*m.lerp(1,o.tip,u)*(if(k.s[id.idx()].parent!=null)mg.collar(u)else 1);
         t.*=m.lerp(o.t0,o.t1,u);
         a.*=u*o.twist;
       }
@@ -460,8 +464,11 @@ test"pieces built along a spline grow from its root to its tip"{
   try testing.expectApproxEqAbs(@as(f32,0.8),b.grow.items[b.grow.items.len-1].at[0]+b.grow.items[b.grow.items.len-1].at[1],1e-5);
   try testing.expect(b.grow.items[0].at[1]==0);
   for(b.v.items[s..l],b.grow.items[s..l])|v,g|{
-    try testing.expect(m.len(@as(V3,g.from)-m.v3(0,v.pos[1],0))<0.02);
-    try testing.expectApproxEqAbs(v.pos[1]*k.get(t).time,g.at[0],0.02);
+    // how far up the trunk it lies (its rounded ends dome past the trunk's
+    // ends, and grow from them)
+    const y=m.clamp01(v.pos[1]);
+    try testing.expect(m.len(@as(V3,g.from)-m.v3(0,y,0))<0.02);
+    try testing.expectApproxEqAbs(y*k.get(t).time,g.at[0],0.02);
   }
 }
 /// plain white, for the tests' pieces

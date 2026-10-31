@@ -380,7 +380,7 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
       // how far along the offshoot, 0..1
       const s=m.ratio(j,mg.shootRes-1);
       t.*=m.lerp(sh.t0,sh.t1,s);
-      r.*=shootR*m.lerp(1,0.55,s);
+      r.*=shootR*m.lerp(1,0.55,s)*mg.collar(s);
     }
     // where the offshoot's braid begins
     const s0=b.mark();

@@ -34,6 +34,8 @@ const keys=lib.meshgen.keys;
 const drift=lib.meshgen.drifts.drift;
 /// bends control points the way a vine grows
 const grow=lib.meshgen.grow;
+/// how a branch flares into the stem it leaves
+const collar=lib.meshgen.collar;
 /// grow one of a species' mesh variants from its genome. Deterministic per
 /// (species, variant): the stem and tendrils are grown vines, so every
 /// variant leans, wobbles and curls a little differently. A confluence's
@@ -96,7 +98,7 @@ pub fn offshoot(b:*Builder,spine:[]const V3,k:f32,t0:f32,ang:f32,len:f32,r0:f32,
     // how far out along the shoot this ring is (0..1)
     const s=m.ratio(j,res-1);
     t.*=m.lerp(sh.t0,sh.t1,s);
-    r.*=r0*m.lerp(1,0.55,s);
+    r.*=r0*m.lerp(1,0.55,s)*collar(s);
     c.*=col;
     c.a=m.unorm8(1-s);
   }

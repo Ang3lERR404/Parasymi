@@ -54,8 +54,10 @@ by radiant_kit (enforced by its test).
 ## Rules for every kit
 
 From CLAUDE.md:
-- Grown vines are Catmull-Rom splines, tapering at both ends.
-- Geometry is watertight (shared rings, capped tubes).
+- Grown vines are Catmull-Rom splines, tapering at both ends to rounded
+  points; branches flare into the stem they leave (`collar`).
+- Geometry is watertight (shared rings, tubes closed in rounded ends;
+  only claws and thorns stay sharp).
 - Leaves and petals have a body (`meshgen.lamina`).
 - Every flower has stamens.
 - LOD comes free from the `Builder` primitives.

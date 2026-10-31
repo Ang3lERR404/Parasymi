@@ -34,6 +34,20 @@ const maxSides=16;
 const maxLoft=24;
 /// most rows or columns a patch may have
 const maxPatch=128;
+/// how many rings a rounded end closes over at full detail (each level of
+/// detail halves them, never under two)
+const domeRings=4;
+/// an end this thin (a share of its tube's thickest ring) is a point: it is
+/// rounded off over its last segment instead of capped beyond it
+const pointShare:f32=0.2;
+/// how a tube or loft closes at its ends
+pub const Tips=enum{
+  /// rounded: a blunt end domes out like a fingertip, a point closes in a
+  /// rounded bullet over its last segment
+  round,
+  /// as built: a blunt end capped flat, a point left sharp (thorns, claws)
+  sharp,
+};
 /// levels of detail every mesh is built at: 0 full, then each level keeps
 /// every other ring/row along a surface and half its sides around (see
 /// `Builder.lod`), so far things draw with a fraction of the vertices.
@@ -156,6 +170,18 @@ pub fn growthPath(g:Growth,out:[]V3)void{
   grow(out,g);
 }
 /// radii tapering smoothly from `r0` at the base to `r0 * tip` at the end.
+/// how much thicker a branch swells where it leaves its parent stem, at its root
+const collarSwell:f32=0.7;
+/// how far along a branch (a share of its length) its collar eases away
+const collarSpan:f32=0.14;
+/// how thick a branch is `u` along it (0 root .. 1 tip) for its collar: it
+/// flares into the stem it leaves like a real branch's collar, so it grows
+/// out of it instead of being stuck into it (a factor on its radius)
+pub fn collar(u:f32)f32{
+  // how far into the collar's easing this is, 0 at the root
+  const k=m.clamp01(u/collarSpan);
+  return 1+collarSwell*(1-k)*(1-k);
+}
 pub fn taperRadii(r0:f32,tip:f32,out:[]f32)void{
   for(out,0..)|*r,i|r.*=r0*(1-m.ratio(i,out.len-1)*(1-tip));
 }
@@ -186,6 +212,9 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     /// `step()`-th ring along their length and `around()` of their sides, the
     /// same way every time, so growth keys built at one level still match
     lod:u32=0,
+    /// how tubes and lofts close at their ends (claws and thorns set `.sharp`
+    /// round their own building, and set it back)
+    tips:Tips=.round,
     /// how many points along a surface to step over at this level
     pub fn step(b:*const Builder)usize{return@as(usize,1)<<@intCast(b.lod);}
     /// how many sides a ring keeps at this level (never fewer than `min`)
@@ -287,14 +316,42 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       var keep:[maxSpine]usize=undefined;
       // how many rings are kept
       const kn=stride(n,b.step(),&keep);
-      for(0..kn-1)|j|for(0..sides)|k|{
-        // the next side round, wrapping
-        const k1=(k+1)%sides;
-        // the quad's side indices and ring indices, corner by corner
-        const q=[4]usize{k,k1,k1,k};
-        const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
-        for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],cols[r[c]],ts[r[c]],uOf(us,r[c]),part);
-      };
+      // whether each end is rounded off as a point over its last kept
+      // segment (it needs a segment of its own to round)
+      const round=b.tips==.round;
+      const pointFirst=round and kn>=3 and pointed(radii,0);
+      const pointLast=round and kn>=3 and pointed(radii,n-1);
+      for(0..kn-1)|j|{
+        if((j==0 and pointFirst)or(j==kn-2 and pointLast))continue;
+        for(0..sides)|k|{
+          // the next side round, wrapping
+          const k1=(k+1)%sides;
+          // the quad's side indices and ring indices, corner by corner
+          const q=[4]usize{k,k1,k1,k};
+          const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
+          for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],cols[r[c]],ts[r[c]],uOf(us,r[c]),part);
+        }
+      }
+      if(round){
+        for([_]bool{true,false})|first|{
+          // the end ring and the ring the end closes from: a point rounds
+          // off from the kept ring before it, a blunt end domes beyond itself
+          const e=if(first)0 else n-1;
+          const isPoint=if(first)pointFirst else pointLast;
+          const from=if(!isPoint)e else if(first)keep[1]else keep[kn-2];
+          // the way out of the tube there
+          const out=if(isPoint)m.norm(spine[e]-spine[from])else if(first)m.norm(spine[0]-spine[1])else m.norm(spine[n-1]-spine[n-2]);
+          // how far the end reaches: to the point, or a blunt end's own radius
+          const reach=if(isPoint)m.len(spine[e]-spine[from])else radii[e];
+          if(radii[from]<1e-4 or reach<1e-5)continue;
+          try b.dome(.{
+            .centre=spine[from],.out=out,.ring=rings[from][0..sides],.norms=norms[from][0..sides],
+            .across=radii[from],.reach=reach,.col=cols[from],.t0=ts[from],.t1=ts[e],.u=uOf(us,e),
+            .part=part,.start=first,
+          });
+        }
+        return;
+      }
       // caps (skipped where the tube tapers to a point anyway)
       for([_]usize{0,n-1})|i|{
         if(radii[i]<1e-4)continue;
@@ -308,6 +365,81 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
           try b.put(rings[i][k1],out,cols[i],ts[i],uOf(us,i),part);
         }
       }
+    }
+    /// one rounded end to close: a quarter ellipsoid from a ring out to a point
+    const Dome=struct{
+      /// the ring's centre on the spine
+      centre:V3,
+      /// which way the end runs, out of the tube
+      out:V3,
+      /// the ring's points
+      ring:[]const V3,
+      /// their outward normals
+      norms:[]const V3,
+      /// how wide the ring is (its radius, or a loft's smaller half width)
+      across:f32,
+      /// how far out beyond the ring the end reaches
+      reach:f32,
+      /// its colour
+      col:color.Rgba8,
+      /// tu.x at the ring and at the point
+      t0:f32,
+      /// (tu.x at the point)
+      t1:f32,
+      /// tu.y throughout
+      u:f32,
+      /// its role
+      part:Part,
+      /// whether it closes the tube's start (wound the other way round)
+      start:bool,
+    };
+    /// closes a ring into a rounded end: rings shrinking along a quarter
+    /// ellipse (`across` wide, `reach` out), their normals turning smoothly
+    /// from the tube's to straight out, to a point on the spine
+    fn dome(b:*Builder,d:Dome)Allocator.Error!void{
+      // how many rings it closes over at this level
+      const rings=@max(2,@as(usize,domeRings)>>@intCast(b.lod));
+      // the sides round each ring
+      const sides=d.ring.len;
+      for(0..rings)|j|{
+        // the angle up the ellipse at this band's inner and outer rings
+        const a0=m.ratio(j,rings)*m.tau/4;
+        const a1=m.ratio(j+1,rings)*m.tau/4;
+        // how far along the end each ring is (tu.x)
+        const t0=m.lerp(d.t0,d.t1,@sin(a0));
+        const t1=m.lerp(d.t0,d.t1,@sin(a1));
+        // the last band closes to the point: one triangle a side
+        const last=j+1==rings;
+        for(0..sides)|k|{
+          // the next side round, wrapping
+          const k1=(k+1)%sides;
+          // the band's quad: its inner pair, then its outer pair
+          const q=[4]V3{domePoint(d,k,a0),domePoint(d,k1,a0),domePoint(d,k1,a1),domePoint(d,k,a1)};
+          const n=[4]V3{domeNormal(d,k,a0),domeNormal(d,k1,a0),domeNormal(d,k1,a1),domeNormal(d,k,a1)};
+          const ts=[4]f32{t0,t0,t1,t1};
+          // (the start's end faces the other way: wound the other way round)
+          const order:[6]usize=if(d.start).{0,2,1,0,3,2}else.{0,1,2,0,2,3};
+          for(order,0..)|c,o|{
+            if(last and o>=3)break;
+            try b.put(q[c],n[c],d.col,ts[c],d.u,d.part);
+          }
+        }
+      }
+    }
+    /// where side `k` of a dome's ring lies at angle `a` up its ellipse
+    fn domePoint(d:Dome,k:usize,a:f32)V3{
+      return d.centre+(d.ring[k]-d.centre)*m.splat3(@cos(a))+d.out*m.splat3(d.reach*@sin(a));
+    }
+    /// which way side `k` of a dome faces at angle `a` up its ellipse
+    fn domeNormal(d:Dome,k:usize,a:f32)V3{
+      return m.norm(d.norms[k]*m.splat3(@cos(a)/d.across)+d.out*m.splat3(@sin(a)/d.reach));
+    }
+    /// whether end ring `i` of `radii` is a point (rounded over its last segment)
+    fn pointed(radii:[]const f32,i:usize)bool{
+      // the thickest ring
+      var top:f32=0;
+      for(radii)|r|top=@max(top,r);
+      return radii[i]<=pointShare*top;
     }
     /// the tu.y of ring `i`: from `us` if given, else zero
     fn uOf(us:?[]const f32,i:usize)f32{return if(us)|s|s[i]else 0;}
@@ -453,6 +585,23 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
       for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],col,ts[r[c]],0,part);
     };
+    if(b.tips==.round){
+      // each end domes out beyond itself, as far as its section is thin
+      for([_]bool{true,false})|first|{
+        // the end ring
+        const e=if(first)0 else n-1;
+        // the way out of the loft there
+        const out=if(first)m.norm(spine[0]-spine[1])else m.norm(spine[n-1]-spine[n-2]);
+        // the section's smaller half size: how far the end reaches
+        const across=@min(widths[e],heights[e]);
+        if(across<1e-5)continue;
+        try b.dome(.{
+          .centre=spine[e],.out=out,.ring=rings[e][0..sides],.norms=norms[e][0..sides],
+          .across=across,.reach=across,.col=col,.t0=ts[e],.t1=ts[e],.u=0,.part=part,.start=first,
+        });
+      }
+      return;
+    }
     for([_]usize{0,n-1})|i|{
       // which way the cap faces: out of the loft's end
       const out=if(i==0)m.norm(spine[0]-spine[1])else m.norm(spine[n-1]-spine[n-2]);
@@ -608,13 +757,16 @@ test"a tube keeps fewer rings and sides at a coarser level of detail, its caps c
     var b:M.Builder=.{.gpa=testing.allocator,.lod=@intCast(l)};
     defer b.deinit();
     try b.tube(&spine,&ts,0.1,0.05,color.rgb(0.4,0.3,0.2).toRgba8(255),.stem,8);
-    // two triangles a side between kept rings, a fan a side at each cap
+    // two triangles a side between kept rings; each blunt end a rounded
+    // dome: two a side for each band but the last, one a side there
     // the sides kept at this level
     const sides:usize=b.around(8,3);
     // the rings kept at this level, and how many there are
     var keep:[8]usize=undefined;
     const rings=stride(spine.len,b.step(),&keep);
-    try testing.expectEqual((rings-1)*sides*6+2*sides*3,b.v.items.len);
+    // the bands each dome closes over at this level
+    const bands=@max(2,@as(usize,domeRings)>>@intCast(b.lod));
+    try testing.expectEqual((rings-1)*sides*6+2*((bands-1)*sides*6+sides*3),b.v.items.len);
     c.*=b.v.items.len;
   }
   try testing.expect(counts[1]<counts[0]);
