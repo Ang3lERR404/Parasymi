@@ -21,34 +21,40 @@ const labels=@import("../labels.zig");
 const V3=m.V3;
 /// makes a `V3` from its three parts
 const v3=m.v3;
-/// meshes are kept here (from the repo root)
-pub const dir="src/mesh";
-/// the file ending every kept mesh carries
-pub const ext=".mesh";
+/// sculpts are kept here (from the repo root), with this ending
+pub const dir=ps.sculptDoc.dir;
+pub const ext=ps.sculptDoc.ext;
+/// the first line of a mesh's text
+pub const header=ps.sculptDoc.header;
+/// the surface's cell size to start, the finest it may be, and the most
+/// cells across the whole sculpt
+pub const cell=ps.sculptDoc.cell;
+pub const cellMin=ps.sculptDoc.cellMin;
+pub const maxCells=ps.sculptDoc.maxCells;
+/// how many times wider the cells are while a value is dragged
+pub const dragCoarse=ps.sculptDoc.dragCoarse;
+/// the shape a form takes
+pub const Kind=ps.sculptDoc.Kind;
+/// how many degrees of a tube's curl each segment takes
+pub const curlStep=ps.sculptDoc.curlStep;
+/// a form's numbers
+pub const Vals=ps.sculptDoc.Vals;
+/// every value of a form, each a channel the panel shows and the text keeps
+pub const Ch=ps.sculptDoc.Ch;
 /// a mesh's name is a plain file name: none of these
 pub const notInName="/\\:.*?\"<>|";
-/// the first line of a mesh's text
-pub const header="# mesh";
 /// `--shot` writes its one frame here
 pub const shotPath="shots/meshedit.png";
 /// how many frames `--shot` waits first, so the world has settled
 pub const shotFrames=30;
 /// a stalled frame counts as at most this long (s)
 pub const maxDt:f64=0.1;
-/// the surface's cell size to start (m)
-pub const cell:f32=0.01;
 /// how much `[`/`]` widen or narrow the cells (m)
 pub const cellStep:f32=0.0025;
-/// the finest the cells may be (m)
-pub const cellMin:f32=0.0025;
-/// the most cells across the whole sculpt (past that they widen)
-pub const maxCells:f32=256;
 /// the least a form's size may be (m)
 pub const sizeMin:f32=0.005;
 /// while a value is dragged the surface is meshed again at most this often (s)
 pub const remesh:f32=0.08;
-/// and its cells this many times wider then (full detail once let go)
-pub const dragCoarse:f32=2;
 /// a drag changes a length this much per pixel (m)
 pub const dragLen:f32=0.002;
 /// a turn this much per pixel (degrees)
@@ -138,41 +144,6 @@ pub const rigHelp=[_][]const u8{
   "up/down value   drag value (shift fine)   r test turn back to rest (shift: every bone)   click a joint: select   ctrl+s save   ctrl+z undo",
   "gizmo: 1 move the joint   2 test turn (never kept)   middle drag orbit   wheel zoom   . focus the joint   forms: o steps the bone a form rides",
 };
-/// the shape a form takes
-pub const Kind=enum{
-  /// a round body with three radii
-  ellipsoid,
-  /// a rounded cone from a foot to a tip
-  cone,
-  /// a box with rounded edges
-  box,
-  /// a tube from its foot up along y, curling toward x as it goes: a horn,
-  /// a tail, a tendril
-  tube,
-};
-/// the most a tube's curl is cut into segments: one for each this many
-/// degrees of it (at least one, at most the sculpt's `chainMax`)
-pub const curlStep:f32=12;
-/// a form's numbers, every one a value the editor shows and keeps
-pub const Vals=struct{
-  /// where it stands (m)
-  pos:V3=.{0,0.3,0},
-  /// how it is turned (degrees: y, then x, then z)
-  rot:V3=.{0,0,0},
-  /// its radii (an ellipsoid's), foot and tip radii and half length (a
-  /// cone's x, z and y), or half extents (a box's) (m)
-  size:V3=.{0.15,0.15,0.15},
-  /// how much a box's edges are rounded (m)
-  round:f32=0.02,
-  /// how far it melts into the forms before it (m); an ink form's fade
-  melt:f32=0.03,
-  /// how far a tube curls toward x from its foot to its tip (degrees)
-  curl:f32=0,
-  /// its colour, red, green and blue (0..1)
-  col:V3=.{0.45,0.42,0.3},
-};
-/// every value of a form, each a channel the panel shows and the text keeps
-pub const Ch=clip.Channels(Vals);
 /// how a form's values read in the panel (a cone's size aside: `valueLabel`)
 const valueLabels=labels.all(&.{
   .{.path="pos",.word="place",.axes=.{"across","up","depth"}},

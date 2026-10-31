@@ -199,6 +199,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/game/
 - `resources.zig` — what each kind of ground offers: the item gathered from its resource nodes and how those nodes look.
 - `save.zig` — saving and restoring the garden.
+- `sculpts.zig` — the gardener's sculpts, read once at startup: every `.mesh` the mesh editor keeps (`src/mesh/`, beside the repo; then `sculpts/` in the…
 - `seeds.zig` — plant seeds in the HUD.
 
 ## src/game/seeds/
@@ -315,6 +316,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
 - `sap_cache.zig` — mesh: SAP CACHE.
+- `sculpt.zig` — mesh: SCULPT.
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
 - `strange_seed.zig` — mesh: STRANGE SEED.
@@ -346,6 +348,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/gfx/
 - `meshlib.zig` — catalogue of rigid procedural part meshes, one module (or a companion struct inside its owner's module) each under `meshes/` exposing…
+- `sculpt_doc.zig` — a sculpt as the mesh editor keeps it (`src/mesh/<name>.mesh`): its forms (ellipsoids, rounded cones, rounded boxes, curling tubes, each…
+- `sculpt_rig.zig` — a sculpt's bones: each a joint where it turns, hung off a parent, so a mesh made in the editor bends as one skin (the sculpt weights every…
 - `vertex.zig` — GPU vertex/instance layouts.
 
 ## src/

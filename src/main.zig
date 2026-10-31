@@ -125,6 +125,9 @@ pub fn main(init:Init)!void{
   defer home.close(io);
   home.adopt(io,options.filePath,options.filePath);
   home.adopt(io,save.legacy,home.saves++sepStr++save.legacy);
+  // the gardener's sculpts and their clips, read once (sculpts.zig)
+  try lib.sculpts.load(gpa,io);
+  defer lib.sculpts.unload();
   // the gardener's settings; `--novsync` overrides theirs for this run
   var opts=try options.load(gpa,io);
   // `--demo`, `--stress` and `--load`: which garden to start in
@@ -143,7 +146,7 @@ pub fn main(init:Init)!void{
   // `--plant=<species>` / `--structure=<kind>` stands it alone (its
   // meshes alone built), `--state=` held or looped (grow, mature, 0.4,
   // 0.2..0.8; plants wither, flow, drain, dark, live; structures idle,
-  // active; default grow), `--period=` seconds a loop; `--samples=<mesh>,...`
+  // active; default grow), `--period=` seconds a loop; `--sculpt=<name>` one sculpt looping its clip; `--samples=<mesh>,...`
   // lays library meshes side by side along the x axis to compare
   var lone:?specimen.Specimen=null;
   var state:specimen.State=.grow;
@@ -170,6 +173,14 @@ pub fn main(init:Init)!void{
     if(startsWith(u8,a,"--seed="))seed=try parseInt(u64,a["--seed=".len..],0);
     if(startsWith(u8,a,"--plant="))lone=.{.what=.{.plant=stringToEnum(species.Id,a["--plant=".len..]) orelse return error.BadPlant}};
     if(startsWith(u8,a,"--structure="))lone=.{.what=.{.structure=stringToEnum(st.Kind,a["--structure=".len..]) orelse return error.BadStructure}};
+    if(startsWith(u8,a,"--sculpt=")){
+      // the sculpt named, which must be on the shelf
+      const i=lib.sculpts.find(a["--sculpt=".len..]) orelse {
+        log.err("{s}: no such sculpt in "++lib.sculptDoc.dir,.{a});
+        return error.BadSculpt;
+      };
+      lone=.{.what=.{.sculpt=@intCast(i)}};
+    }
     if(startsWith(u8,a,"--samples="))lone=.{.what=.{.samples=try specimen.Samples.parse(a["--samples=".len..])}};
     if(startsWith(u8,a,"--state="))state=try specimen.State.parse(a["--state=".len..]);
     if(startsWith(u8,a,"--period="))period=try parseFloat(f32,a["--period=".len..]);

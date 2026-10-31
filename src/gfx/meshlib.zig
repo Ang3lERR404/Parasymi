@@ -60,6 +60,23 @@ const parts=struct{
   pub const mote=@import("meshes/mote.zig");
   /// what bursts out where a plant's yield comes loose: motes and drops of it
   pub const pluckBurst=@import("meshes/pluck_burst.zig");
+  // the gardener's sculpts, one slot each (sculpts.slots of them)
+  /// the first sculpt on the shelf
+  pub const sculpt0=@import("meshes/sculpt.zig").Slot(0);
+  /// the second
+  pub const sculpt1=@import("meshes/sculpt.zig").Slot(1);
+  /// the third
+  pub const sculpt2=@import("meshes/sculpt.zig").Slot(2);
+  /// the fourth
+  pub const sculpt3=@import("meshes/sculpt.zig").Slot(3);
+  /// the fifth
+  pub const sculpt4=@import("meshes/sculpt.zig").Slot(4);
+  /// the sixth
+  pub const sculpt5=@import("meshes/sculpt.zig").Slot(5);
+  /// the seventh
+  pub const sculpt6=@import("meshes/sculpt.zig").Slot(6);
+  /// the eighth
+  pub const sculpt7=@import("meshes/sculpt.zig").Slot(7);
   // structures
   /// a living root conduit digging up out of the soil, running straight
   pub const conduit=@import("meshes/conduit.zig");
@@ -331,6 +348,8 @@ pub const ids=reg.ids;
 pub const slots=count*mg.lods;
 /// where a mesh at a level of detail sits in per-slot tables.
 pub fn slot(id:Id,lod:u32)usize{return@as(usize,@intFromEnum(id))*mg.lods+lod;}
+/// the sculpt slots, in order: the shelf's `i`th sculpt is drawn from the `i`th
+pub const sculptSlots=[_]Id{.sculpt0,.sculpt1,.sculpt2,.sculpt3,.sculpt4,.sculpt5,.sculpt6,.sculpt7};
 /// build one mesh at one level of detail into `b` (leaving `b.lod` there),
 /// recording its (first vertex, count).
 pub fn buildOne(b:*mg.Builder,id:Id,lod:u32,ranges:*[slots][2]u32)Allocator.Error!void{

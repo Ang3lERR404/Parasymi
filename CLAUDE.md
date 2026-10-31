@@ -6,7 +6,10 @@ Zig 0.16, zglfw + vulkan-zig (Vulkan 1.3), Windows only. No asset files:
 every mesh, the font and all UI shapes are procedural; the only data files
 are `src/cfg/parasymi.cfg` (strings), `src/cfg/controls.cfg` (bindings) and
 animation clips in `src/anim/*.anim` and sculpts in `src/mesh/*.mesh` (from
-the tools' editors; the game reads neither yet).
+the tools' editors; still procedural: forms melted into one surface at
+startup, never stored meshes). The game reads every sculpt and the clip of
+its own name at startup (`game/sculpts.zig`, also `sculpts/` in the
+gardener's folder) into 8 library slots, drawn skinned, the clip looping.
 The generic half (core, platform, Vulkan base, generic renderer and world
 streaming, UI) is its own package in `engine/`, reached as
 `@import("engine")`; see [docs/engine.md](docs/engine.md).
@@ -76,6 +79,7 @@ zig build run -- --stress         # 120×120 plant field
 zig build run -- --load           # newest saved garden
 zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
+zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip
 zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit

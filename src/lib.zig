@@ -34,6 +34,8 @@ pub const loading=@import("game/loading.zig");
 pub const home=@import("game/home.zig");
 /// every player-facing string, read from parasymi.cfg
 pub const txt=@import("game/text.zig");
+/// the gardener's sculpts, read at startup, each looping its clip
+pub const sculpts=@import("game/sculpts.zig");
 /// the key and button bindings, read from controls.cfg
 pub const controls=@import("game/controls.zig");
 /// the gardener's settings: vsync, antialiasing, fullscreen and the rest
@@ -50,6 +52,10 @@ pub const skeleton=@import("gfx/meshes/wolf_skeleton.zig");
 pub const style=@import("game/style.zig");
 /// the per-frame list of rigid parts, grouped by library mesh
 pub const parts=@import("game/parts.zig");
+/// a sculpt as the mesh editor keeps it: forms, bones, text, meshing
+pub const sculptDoc=@import("gfx/sculpt_doc.zig");
+/// a sculpt's bones: twins, posing
+pub const sculptRig=@import("gfx/sculpt_rig.zig");
 /// plant pieces: stems, leaves, petals, stamens
 pub const meshgen=@import("gfx/meshgen.zig");
 /// the mesh library: every built mesh, in draw order

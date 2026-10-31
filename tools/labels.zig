@@ -138,26 +138,11 @@ pub const lookRules=[_]Rule{
   .{.path="ripe",.word="ripeness"},
 };
 /// the most bytes a typed name holds
-pub const nameCap=24;
+pub const nameCap=ps.sculptDoc.nameCap;
 /// a name being typed: the characters a garden's name may hold
 pub const Typed=textInput.TextInput(nameCap,ps.save.nameChar);
-/// a name kept by value (a form's)
-pub const Name=struct{
-  /// its bytes; the first `len` are real
-  buf:[nameCap]u8=undefined,
-  /// how many bytes it holds
-  len:u8=0,
-  /// the name's text
-  pub fn slice(n:*const Name)[]const u8{return n.buf[0..n.len];}
-  /// `text` as a name, cut to fit
-  pub fn of(text:[]const u8)Name{
-    // the name being filled
-    var n=Name{};
-    n.len=@intCast(@min(text.len,nameCap));
-    @memcpy(n.buf[0..n.len],text[0..n.len]);
-    return n;
-  }
-};
+/// a name kept by value (a form's, a bone's)
+pub const Name=ps.sculptDoc.Name;
 /// `text` ready to be typed into: all of it there, the caret at its end
 pub fn typing(text:[]const u8)Typed{
   // the input, filled with the text

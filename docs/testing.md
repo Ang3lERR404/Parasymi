@@ -91,6 +91,17 @@ spawn, so looks can be compared at once.
 zig build run -- --samples=polypColony,polyp,polypHydraPlumed --state=mature --inspect=player --shots=3 --orbit=9 --dist=3.2 --pitch=18 --tod=0.5
 ```
 
+## A sculpt in the world
+`--sculpt=<name>` stands one of the gardener's sculpts (`src/mesh/<name>.mesh`,
+made in the mesh editor) alone on the free tile nearest spawn, drawn
+skinned and looping the clip of its own name (`src/anim/<name>.anim`, keyed
+in the animation editor with `--mesh=<name>`); without one it stands at
+rest. The game reads every sculpt at startup, the first 8 by name.
+
+```
+zig build run -- --sculpt=<name> --inspect=player --shots=3 --orbit=6 --dist=1.6 --pitch=15
+```
+
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.
 

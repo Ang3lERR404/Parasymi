@@ -3,6 +3,9 @@
 const lib=@import("lib.zig");
 test{
   _=lib.txt;
+  _=lib.sculpts;
+  _=lib.sculptDoc;
+  _=lib.sculptRig;
   _=lib.controls;
   _=lib.gen;
   _=lib.world;
