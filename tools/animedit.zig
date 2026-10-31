@@ -13,6 +13,11 @@
 //! joint under the mouse), and its gizmo (tools/gizmo.zig) keys it as it
 //! is dragged: rings for a joint's turns, one ring for a hinge, arrows
 //! (and the centre, across the view) for the hips' place.
+//! The list shows each channel in words (`right shoulder lean`; the file
+//! keeps its path, `arms.1.root.z`). `m` marks the playhead, a named
+//! moment of the clip (`left paw lands`), its name typed on the timeline
+//! (enter or escape done; `m` on a mark renames it, shift `m` takes it
+//! out); shift and the arrows stop at marks as at keys.
 //! The camera orbits as the mesh editor's does (tools/orbit.zig): freely,
 //! over the top and under alike (middle drag; the wheel zooms); `.` eases
 //! it onto the selected joint (else back onto the whole subject).

@@ -15,6 +15,8 @@ const meshlib=ps.meshlib;
 const s=ps.style;
 /// a part role: the shader a part of the surface is drawn with
 const Part=ps.vertex.Part;
+/// the editors' words for values, and typed names
+const labels=@import("../labels.zig");
 /// a point or size in the sculpt (m)
 const V3=m.V3;
 /// makes a `V3` from its three parts
@@ -82,13 +84,15 @@ pub const row:f32=18;
 /// how far down the window the form list starts
 pub const listY:f32=100;
 /// how wide the form list is
-pub const listW:f32=300;
+pub const listW:f32=400;
 /// the most form rows shown at once
 pub const listRowCount=12;
 /// how far in from the list's left a value is written
-pub const valueX:f32=150;
+pub const valueX:f32=200;
+/// where a form's shape shows in its row, after its name
+pub const kindX:f32=190;
 /// where a form's shader shows in its row
-pub const shadeX:f32=190;
+pub const shadeX:f32=290;
 /// the height of one line of the help along the top
 pub const lineH:f32=20;
 /// the gap between the form list and the values under it
@@ -109,7 +113,7 @@ pub const carve:Color=s.growth;
 pub const panel:Color=s.panel;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
-  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   m shader (shift back)   tab next form",
+  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   m shader (shift back)   tab next form   enter name it",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
@@ -140,6 +144,21 @@ pub const Vals=struct{
 };
 /// every value of a form, each a channel the panel shows and the text keeps
 pub const Ch=clip.Channels(Vals);
+/// how a form's values read in the panel (a cone's size aside: `valueLabel`)
+const valueLabels=labels.all(&.{
+  .{.path="pos",.word="place",.axes=.{"across","up","depth"}},
+  .{.path="rot",.word="turn",.axes=.{"pitch","yaw","roll"}},
+  .{.path="size",.word="size",.axes=.{"width","height","depth"}},
+  .{.path="round",.word="edge rounding"},
+  .{.path="melt",.word="melt"},
+  .{.path="col",.word="colour",.axes=labels.colourAxes},
+},&Ch.names);
+/// how a cone's size reads: the radius at its foot, half its length, the radius at its tip
+const coneSize=[3][]const u8{"foot radius","half length","tip radius"};
+/// value `i` of a form shaped `kind`, in words
+pub fn valueLabel(kind:Kind,i:usize)[]const u8{
+  return if(kind==.cone and i>=sizeX and i<sizeX+3)coneSize[i-sizeX]else valueLabels[i];
+}
 /// which way the shader is stepped through the roles
 const Way=enum{
   /// to the next role

@@ -55,8 +55,13 @@ const Kind=meshedit.settings.Kind;
 const maxCells=meshedit.settings.maxCells;
 /// a form's numbers
 const Vals=meshedit.settings.Vals;
-/// one form of the sculpt: its shape, whether it carves, its shader and values
+/// a form's name, kept by value
+const Name=@import("../labels.zig").Name;
+/// one form of the sculpt: its name, its shape, whether it carves, its
+/// shader and values
 pub const Piece=struct{
+  /// what the gardener calls it (`snout`, `left ear`); may be empty
+  name:Name=.{},
   /// an ellipsoid, a rounded cone or a rounded box
   kind:Kind=.ellipsoid,
   /// whether it is carved out of what is before it (else melted in)
@@ -99,11 +104,13 @@ pub const Doc=struct{
   /// lets the forms go
   pub fn deinit(d:*Doc,gpa:Allocator)void{d.pieces.deinit(gpa);}
   /// writes the mesh as text: the header, the cell size, then each form's
-  /// kind, shader and every value, one to a line
+  /// kind, name (if it has one), shader and every value, one to a line
   pub fn write(d:*const Doc,w:*Writer)Writer.Error!void{
     try w.print(header++"\ncell {d}\n",.{d.cell});
-    for(d.pieces.items)|p|{
-      try w.print("form {t}{s}\nshade {t}\n",.{p.kind,if(p.carve)" carve"else"",p.shade});
+    for(d.pieces.items)|*p|{
+      try w.print("form {t}{s}\n",.{p.kind,if(p.carve)" carve"else""});
+      if(p.name.len>0)try w.print("name {s}\n",.{p.name.slice()});
+      try w.print("shade {t}\n",.{p.shade});
       for(Ch.names,0..)|n,i|try w.print("{s} {d}\n",.{n,Ch.get(&p.v,i)});
     }
   }
@@ -131,6 +138,10 @@ pub const Doc=struct{
         const kind=stringToEnum(Kind,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
         const carve=if(it.next())|c|eql(u8,c,"carve")else false;
         try d.pieces.append(gpa,.{.kind=kind,.carve=carve});
+      }else if(eql(u8,word,"name")){
+        if(d.pieces.items.len==0)return error.BadMesh;
+        // the name: the rest of the line, spaces and all
+        d.pieces.items[d.pieces.items.len-1].name=.of(trim(u8,it.rest()," \t"));
       }else if(eql(u8,word,"shade")){
         if(d.pieces.items.len==0)return error.BadMesh;
         d.pieces.items[d.pieces.items.len-1].shade=stringToEnum(Part,it.next() orelse return error.BadMesh) orelse return error.BadMesh;

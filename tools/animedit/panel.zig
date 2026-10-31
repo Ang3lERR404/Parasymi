@@ -77,6 +77,12 @@ const tlBottom=animedit.settings.tlBottom;
 const tlH=animedit.settings.tlH;
 /// how far in from the list's left a value is written (px)
 const valueX=animedit.settings.valueX;
+/// a mark's stem up the timeline
+const markStem=animedit.settings.markStem;
+/// a mark's bud and its name
+const markBud=animedit.settings.markBud;
+/// a name as it is typed, its caret in it
+const typed=@import("../labels.zig").drawTyped;
 /// the joint a pose channel belongs to
 const jointOf=animedit.rigging.jointOf;
 /// every joint a gizmo turns
@@ -130,7 +136,7 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
     const keyed=e.clip.track(e.chName(i))!=null and e.clip.track(e.chName(i)).?.keys.items.len>0;
     const col=if(i==e.sel)sel else if(keyed)keyedColor else bare;
     if(i==e.sel)try d.glow(pad+8,ry+7,10,s.menuHover);
-    _=try d.text(pad+18,ry,text,col,e.chName(i));
+    _=try d.text(pad+18,ry,text,col,e.chLabel(i));
     // the channel's value, written to three places
     var vb:[24]u8=undefined;
     const vs=bufPrint(&vb,"{d:.3}",.{e.value(i)})catch"?";
@@ -163,12 +169,24 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
   if(e.clip.track(e.chName(e.sel)))|tr|for(tr.keys.items)|k|{
     try d.pod(at(tx,tw,e.clip.length,k.t),ty+tlH/2,selKeyR,sel,1,0);
   };
+  // each mark: a young stem up the timeline, a bud on top, its name beside
+  for(e.clip.marks.items)|mk|{
+    // where the mark stands (px), and whether its name is being typed
+    const mx=at(tx,tw,e.clip.length,mk.t);
+    const typing=e.naming!=null and @abs(e.namingAt-mk.t)<clip.same;
+    try d.limb(.{mx,ty+tlH},.{mx,ty+2},2,1.2,markStem,mk.t);
+    try d.pod(mx,ty+2,3.5,markBud,0.6,mk.t);
+    if(typing)try typed(d,mx+6,ty+3,&e.naming.?)
+    else _=try d.text(mx+6,ty+3,text,markBud,mk.name);
+  }
   // where the playhead stands (px)
   const hx=at(tx,tw,e.clip.length,e.t);
   try d.limb(.{hx,ty-6},.{hx,ty+tlH+2},3,2,head,0);
-  // the playhead's caption: playing or paused, the time, the frame, the channel
-  var hb:[96]u8=undefined;
-  _=try d.text(tx,ty-26,text,head,bufPrint(&hb,"{s} {d:.2} / {d:.2} s   frame {d}   channel {s}",.{
-    if(e.playing)"playing"else"paused",e.t,e.clip.length,@as(u32,@intFromFloat(@round(e.t*fps))),e.chName(e.sel),
+  // the playhead's caption: playing or paused, the time, the frame, the
+  // channel, and the mark it stands on
+  var hb:[160]u8=undefined;
+  _=try d.text(tx,ty-26,text,head,bufPrint(&hb,"{s} {d:.2} / {d:.2} s   frame {d}   channel {s}{s}{s}",.{
+    if(e.playing)"playing"else"paused",e.t,e.clip.length,@as(u32,@intFromFloat(@round(e.t*fps))),e.chLabel(e.sel),
+    if(e.markHere()!=null)"   mark "else"",e.markHere() orelse "",
   })catch"?");
 }

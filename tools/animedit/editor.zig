@@ -29,8 +29,14 @@ const specimen=ps.specimen;
 const PoseCh=clip.Channels(skel.Pose);
 /// every f32 of a specimen's `Look`, each a channel a clip can key
 const LookCh=clip.Channels(specimen.Look);
+/// the editors' words for values, and typed names
+const labels=@import("../labels.zig");
 /// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
+/// each pose channel in words
+const poseLabels=animedit.settings.poseLabels;
+/// each look channel in words
+const lookLabels=animedit.settings.lookLabels;
 /// where clips are kept
 const dir=animedit.settings.dir;
 /// what is being dragged
@@ -102,6 +108,11 @@ pub const Editor=struct{
   note:[96]u8=undefined,
   /// how much of `note` is written
   noteLen:usize=0,
+  /// a mark's name as it is typed (null: not naming), the keys answering
+  /// only it meanwhile
+  naming:?labels.Typed=null,
+  /// when the mark being named falls (s)
+  namingAt:f32=0,
   /// the selected channel's joint and its gizmo (the wolf's alone)
   pub fn gizmoAt(e:*const Editor,rg:*const Rig)?struct{j:Joint,g:gizmo.Gizmo}{
     if(!e.wolf())return null;
@@ -176,6 +187,24 @@ pub const Editor=struct{
   /// the name of row `i`'s channel, as the clip keys it
   pub fn chName(e:*const Editor,i:usize)[]const u8{
     return if(e.wolf())PoseCh.names[e.shown[i]]else LookCh.names[e.shown[i]];
+  }
+  /// the name of row `i`'s channel in words, as the panel shows it
+  pub fn chLabel(e:*const Editor,i:usize)[]const u8{
+    return if(e.wolf())poseLabels[e.shown[i]]else lookLabels[e.shown[i]];
+  }
+  /// the mark at the playhead's name, if one is there
+  pub fn markHere(e:*const Editor)?[]const u8{
+    return if(e.clip.markAt(e.t))|i|e.clip.marks.items[i].name else null;
+  }
+  /// a mark at the playhead (made if none is there), its name to be typed
+  pub fn startMark(e:*Editor)Allocator.Error!void{
+    if(e.markHere()==null){
+      try e.clip.mark(e.t,"");
+      e.dirty=true;
+    }
+    e.playing=false;
+    e.naming=labels.typing(e.markHere().?);
+    e.namingAt=e.t;
   }
   /// row `i`'s value shown now
   pub fn value(e:*const Editor,i:usize)f32{

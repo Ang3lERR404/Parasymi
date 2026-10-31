@@ -53,6 +53,12 @@ const row=meshedit.settings.row;
 const sel=meshedit.settings.sel;
 /// how far in from the list's left a form's shader is written (px)
 const shadeX=meshedit.settings.shadeX;
+/// how far in from the list's left a form's shape is written (px)
+const kindX=meshedit.settings.kindX;
+/// value `i` of a form, in words
+const valueLabel=meshedit.settings.valueLabel;
+/// a name as it is typed, its caret in it
+const typed=@import("../labels.zig").drawTyped;
 /// the panel's text size
 const text=meshedit.settings.text;
 /// how far in from the list's left a value is written (px)
@@ -90,10 +96,17 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     const p=e.pieces()[i];
     const ry=listY+m.f(r)*row;
     if(i==e.sel)try d.glow(pad+8,ry+7,10,s.menuHover);
-    // a buffer for the row's text, and the colour it is written in
-    var lb:[48]u8=undefined;
+    // the colour the row is written in, and whether its name is being typed
     const col=if(i==e.sel)sel else if(p.carve)carve else plain;
-    _=try d.text(pad+18,ry,text,col,bufPrint(&lb,"{d}  {t}{s}",.{i+1,p.kind,if(p.carve)"  carve"else""})catch"?");
+    const typing=i==e.sel and e.naming!=null;
+    // its number, then its name (as typed, the caret in it), else its shape
+    var nb:[8]u8=undefined;
+    const nx=try d.text(pad+18,ry,text,col,bufPrint(&nb,"{d}  ",.{i+1})catch"?");
+    if(typing)try typed(d,nx,ry,&e.naming.?)
+    else _=try d.text(nx,ry,text,if(p.name.len>0)col else bare,if(p.name.len>0)p.name.slice()else@tagName(p.kind));
+    // its shape (when named) and whether it carves, dim
+    var kb:[24]u8=undefined;
+    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.carve)" carve"else""})catch"?");
     _=try d.text(pad+shadeX,ry,text,if(i==e.sel)sel else bare,@tagName(p.shade));
   }
   if(e.top>0)_=try d.text(pad+listW-30,listY-20,text,bare,"...");
@@ -105,12 +118,12 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     // the selected form
     const p=e.pieces()[e.sel];
     try d.trellis(pad,vy-6,listW,m.f(Ch.count)*row+12,panel,0.6);
-    for(Ch.names,0..)|n,i|{
+    for(0..Ch.count)|i|{
       // this value's row (px), and the colour it is written in
       const ry=vy+m.f(i)*row;
       const col=if(i==e.ch)sel else plain;
       if(i==e.ch)try d.glow(pad+8,ry+7,10,s.menuHover);
-      _=try d.text(pad+18,ry,text,col,n);
+      _=try d.text(pad+18,ry,text,col,valueLabel(p.kind,i));
       // a buffer for the value, written to three places
       var vb:[24]u8=undefined;
       _=try d.text(pad+valueX,ry,text,col,bufPrint(&vb,"{d:.3}",.{Ch.get(&p.v,i)})catch"?");

@@ -27,6 +27,8 @@ const gizmo=@import("../gizmo.zig");
 const V3=m.V3;
 /// makes a `V3` from its three parts
 const v3=m.v3;
+/// the editors' words for values, and typed names
+const labels=@import("../labels.zig");
 /// the editor's root, through which its other files are reached
 const meshedit=@import("../meshedit.zig");
 /// every value of a form, each a named channel
@@ -87,6 +89,9 @@ pub const Editor=struct{
   noteLen:usize=0,
   /// the camera is asked onto the selected form
   focus:bool=false,
+  /// the selected form's name as it is typed (null: not naming), the
+  /// keys answering only it meanwhile
+  naming:?labels.Typed=null,
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
   /// show a note under the help, cut to fit its buffer

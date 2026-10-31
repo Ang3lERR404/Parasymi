@@ -23,6 +23,8 @@ const specimen=ps.specimen;
 const PoseCh=clip.Channels(skel.Pose);
 /// every f32 of a specimen's `Look`, each a channel a clip can key
 const LookCh=clip.Channels(specimen.Look);
+/// the editors' words for values, and typed names
+const labels=@import("../labels.zig");
 /// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
 /// how much a drag changes a value per pixel
@@ -55,22 +57,37 @@ const inTimeline=animedit.editor.inTimeline;
 const joints=animedit.rigging.joints;
 /// whether a point is over the channel list
 const overList=animedit.editor.overList;
+/// whether key `k` went down this frame
+fn hit(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
 /// one frame's keys and mouse (`over` the list or the timeline), the
-/// wolf's joints as `rg` sees them
+/// wolf's joints as `rg` sees them. While a mark is being named the keys
+/// type its name (enter or escape done), the mouse still answering.
 pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Allocator.Error!void{
-  // whether shift is held (fine drags, key to key), and whether ctrl is
+  // whether shift is held (fine drags)
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
-  const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
-  // whether key `k` went down this frame
-  const hit=struct{
-    /// whether key `k` went down this frame
-    fn f(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
-  }.f;
-  if(hit(in,.space))e.playing=!e.playing;
+  // whether a name was being typed as the frame began
+  const typing=e.naming!=null;
+  if(e.naming)|*t|{
+    if(t.feed(labels.keys(in))!=.same){
+      try e.clip.mark(e.namingAt,t.slice());
+      e.dirty=true;
+    }
+    if(labels.named(in))e.naming=null;
+  }
+  if(!typing)try answerKeys(e,in);
   if(e.playing){
     e.t+=dt;
     if(e.t>=e.clip.length)e.t=@mod(e.t,e.clip.length);
   }
+  try answerMouse(e,in,screen,rg,shift);
+}
+/// one frame's keys: playing, the playhead, the clip's length, the
+/// channel, keying, marks, saving
+fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
+  // whether shift is held (key to key, unmark), and whether ctrl is
+  const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
+  const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
+  if(hit(in,.space))e.playing=!e.playing;
   for([_]Key{.left,.right},[_]f32{-1,1})|k,dir|if(hit(in,k)){
     e.playing=false;
     e.t=if(shift)e.clip.nextKey(e.t,dir) orelse e.t else m.clamp(snap(e.t)+dir/fps,0,e.clip.length);
@@ -95,8 +112,17 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
   }
   if(ctrl and hit(in,.s))e.save();
   if(hit(in,.period))e.focus=true;
-  // the mouse: a press on the timeline scrubs, on a row selects it and
-  // drags its value
+  if(hit(in,.m)){
+    if(shift){
+      if(e.clip.unmark(e.t))e.dirty=true;
+    }else try e.startMark();
+  }
+}
+/// one frame's mouse: a press on the timeline scrubs, on a row selects it
+/// and drags its value, on the gizmo drags its handle, on a joint selects
+/// it; any press ends naming
+fn answerMouse(e:*Editor,in:*const Input,screen:[2]f32,rg:*const Rig,shift:bool)Allocator.Error!void{
+  if(in.pressed(.{.button=.left}))e.naming=null;
   // how many rows of the list fit the window
   const rows=e.fits(screen);
   // the mouse (px)

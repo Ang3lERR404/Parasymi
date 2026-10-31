@@ -13,6 +13,9 @@
 //! z) and sized by `size` (radii; a cone's x and z its radii at its foot
 //! and its tip, y half its length; a box's half extents); `round` rounds a
 //! box, `melt` is how far it melts into what is before it, `col` its colour.
+//! `enter` names the selected form (`snout`, `left ear`): typed in its row,
+//! enter or escape done, kept in the file; the panel shows each value in
+//! words (`place up`, `colour red`, a cone's `tip radius`).
 //! Each form also picks the shader its part of the surface is drawn with
 //! (`m`, shift `m` back): one of the game's part roles (vertex.Part:
 //! stem, leaf, bloom, resin, ...), as part.vert/part.frag shade it; where
@@ -47,6 +50,7 @@ pub const main=run.main;
 test{
   _=gizmo;
   _=@import("orbit.zig");
+  _=@import("labels.zig");
 }
 test{
   _=settings;

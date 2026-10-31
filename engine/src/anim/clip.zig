@@ -3,6 +3,7 @@
 //! it is kept in. `Channels(T)` reads and writes every f32 of a plain
 //! struct (nested structs, arrays, vectors) as a channel of its own, named
 //! by its path (`arms.0.root.x`), so a whole pose or look can be keyed.
+//! A clip also holds marks: named moments along it (a footfall, a blink).
 /// the standard library
 const std=@import("std");
 /// the allocator type clips own their names and keys through
@@ -60,9 +61,16 @@ pub const Track=struct{
     return null;
   }
 };
+/// a named moment in a clip, as a footfall or a blink is
+pub const Mark=struct{
+  /// when it falls (seconds into the clip)
+  t:f32,
+  /// what it is called (may be empty); owned by the clip
+  name:[]const u8,
+};
 /// what reading a clip's text can fail with
 pub const ParseError=error{
-  /// a line that is not a header, comment, `subject`, `length` or `key`,
+  /// a line that is not a header, comment, `subject`, `length`, `key` or `mark`,
   /// or one missing its words or numbers
   BadClip,
   /// no room for the clip's names and keys
@@ -78,18 +86,49 @@ pub const Clip=struct{
   length:f32=2,
   /// its tracks, one per channel keyed, in the order they were first keyed
   tracks:std.ArrayList(Track)=.empty,
+  /// its marks, in time order
+  marks:std.ArrayList(Mark)=.empty,
   /// an empty clip of `subject`, which is copied
   pub fn init(gpa:Allocator,subject:[]const u8)Allocator.Error!Clip{
     return.{.gpa=gpa,.subject=try gpa.dupe(u8,subject)};
   }
-  /// frees the subject, every track's name and keys, and the tracks
+  /// frees the subject, every track's name and keys, the tracks, and the marks
   pub fn deinit(c:*Clip)void{
     for(c.tracks.items)|*tr|{
       c.gpa.free(tr.name);
       tr.keys.deinit(c.gpa);
     }
     c.tracks.deinit(c.gpa);
+    for(c.marks.items)|mk|c.gpa.free(mk.name);
+    c.marks.deinit(c.gpa);
     c.gpa.free(c.subject);
+  }
+  /// the mark at `t` (within `same` seconds), if there is one: its index
+  pub fn markAt(c:*const Clip,t:f32)?usize{
+    for(c.marks.items,0..)|mk,i|if(@abs(mk.t-t)<same)return i;
+    return null;
+  }
+  /// a mark named `name` (copied) at `t`; one already there is renamed
+  pub fn mark(c:*Clip,t:f32,name:[]const u8)Allocator.Error!void{
+    // the name, owned by the clip
+    const owned=try c.gpa.dupe(u8,name);
+    if(c.markAt(t))|i|{
+      c.gpa.free(c.marks.items[i].name);
+      c.marks.items[i].name=owned;
+      return;
+    }
+    errdefer c.gpa.free(owned);
+    // where the new mark goes, keeping the marks in time order
+    var i:usize=0;
+    while(i<c.marks.items.len and c.marks.items[i].t<t)i+=1;
+    try c.marks.insert(c.gpa,i,.{.t=t,.name=owned});
+  }
+  /// the mark at `t` taken out; whether there was one
+  pub fn unmark(c:*Clip,t:f32)bool{
+    // the mark at `t`
+    const i=c.markAt(t) orelse return false;
+    c.gpa.free(c.marks.orderedRemove(i).name);
+    return true;
   }
   /// the track named `name`, or null when none is keyed yet
   pub fn track(c:*const Clip,name:[]const u8)?*Track{
@@ -127,22 +166,28 @@ pub const Clip=struct{
   pub fn sample(c:*const Clip,name:[]const u8,t:f32)?f32{
     return if(c.track(name))|tr|tr.sample(t)else null;
   }
-  /// the nearest key time after (`dir` 1) or before (-1) `t` on any track
+  /// the nearest key or mark time after (`dir` 1) or before (-1) `t`
   pub fn nextKey(c:*const Clip,t:f32,dir:f32)?f32{
-    // the nearest key time so far
+    // the nearest time so far
     var best:?f32=null;
     for(c.tracks.items)|tr|for(tr.keys.items)|k|{
       // how far ahead (along `dir`) this key lies
       const d=(k.t-t)*dir;
       if(d>same and (best==null or d<(best.?-t)*dir))best=k.t;
     };
+    for(c.marks.items)|mk|{
+      // how far ahead (along `dir`) this mark lies
+      const d=(mk.t-t)*dir;
+      if(d>same and (best==null or d<(best.?-t)*dir))best=mk.t;
+    }
     return best;
   }
-  /// its text: a header, `subject`, `length`, then a `key <channel> <time>
-  /// <value>` line for each key
+  /// its text: a header, `subject`, `length`, a `key <channel> <time>
+  /// <value>` line for each key, then a `mark <time> <name>` line for each mark
   pub fn write(c:*const Clip,w:*Writer)Writer.Error!void{
     try w.print("{s}\nsubject {s}\nlength {d}\n",.{header,c.subject,c.length});
     for(c.tracks.items)|tr|for(tr.keys.items)|k|try w.print("key {s} {d} {d}\n",.{tr.name,k.t,k.v});
+    for(c.marks.items)|mk|try w.print("mark {d} {s}\n",.{mk.t,mk.name});
   }
   /// a clip from its text (`#` starts a comment)
   pub fn parse(gpa:Allocator,text:[]const u8)ParseError!Clip{
@@ -172,6 +217,11 @@ pub const Clip=struct{
         const t=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
         const v=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
         try c.put(name,t,v);
+      }else if(eql(u8,word,"mark")){
+        // the mark's time, then its name: the rest of the line, spaces and all
+        const ts=it.next() orelse return error.BadClip;
+        const t=parseFloat(f32,ts) catch return error.BadClip;
+        try c.mark(t,trim(u8,it.rest()," \t"));
       }else return error.BadClip;
     }
     return c;
@@ -309,6 +359,14 @@ test"a track eases between its keys and holds past its ends"{
   try testing.expectEqual(@as(f32,0),c.nextKey(1,-1).?);
   try testing.expect(c.remove("a",1));
   try testing.expect(!c.remove("a",1));
+  // a mark is a stop on the way too, renamed in place and taken out
+  try c.mark(0.5,"step");
+  try c.mark(0.5,"left step");
+  try testing.expectEqual(@as(usize,1),c.marks.items.len);
+  try testing.expectEqualStrings("left step",c.marks.items[c.markAt(0.5).?].name);
+  try testing.expectEqual(@as(f32,0.5),c.nextKey(0,1).?);
+  try testing.expect(c.unmark(0.5));
+  try testing.expect(!c.unmark(0.5));
 }
 test"a clip comes back from its text"{
   // the allocator, which finds leaks
@@ -320,6 +378,8 @@ test"a clip comes back from its text"{
   try c.put("head.x",0,0.25);
   try c.put("head.x",0.75,-0.5);
   try c.put("jaw",0.5,0.1);
+  try c.mark(0.25,"paw lands");
+  try c.mark(1,"");
   // the clip's text, written into memory
   var out:Writer.Allocating=.init(gpa);
   defer out.deinit();
@@ -331,6 +391,9 @@ test"a clip comes back from its text"{
   try testing.expectEqual(@as(f32,1.5),back.length);
   try testing.expectEqual(@as(f32,-0.5),back.sample("head.x",1).?);
   try testing.expectEqual(@as(f32,0.1),back.sample("jaw",0).?);
+  try testing.expectEqual(@as(usize,2),back.marks.items.len);
+  try testing.expectEqualStrings("paw lands",back.marks.items[0].name);
+  try testing.expectEqualStrings("",back.marks.items[1].name);
   try testing.expectError(error.BadClip,Clip.parse(gpa,"key head.x zero 1"));
 }
 test"every f32 of a struct is a channel, named by its path"{

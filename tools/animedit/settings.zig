@@ -19,6 +19,12 @@ const s=ps.style;
 const PoseCh=clip.Channels(skel.Pose);
 /// every f32 of a specimen's `Look`, each a channel a clip can key
 const LookCh=clip.Channels(specimen.Look);
+/// the editors' words for values, and typed names
+const labels=@import("../labels.zig");
+/// each pose channel in words (`right shoulder lean`)
+pub const poseLabels=labels.all(labels.poseRules,&PoseCh.names);
+/// each look channel in words (`sap flow`)
+pub const lookLabels=labels.all(&labels.lookRules,&LookCh.names);
 /// clips are kept here (from the repo root)
 pub const dir="src/anim";
 /// `--shot` writes its one frame here
@@ -99,9 +105,14 @@ pub const keyDim:Color=.{190,210,190,220};
 pub const joint:Color=.{190,210,190,200};
 /// the panels behind the list and the timeline
 pub const panel:Color=s.panel;
+/// a mark's stem up the timeline
+pub const markStem:Color=s.barkYoung;
+/// a mark's bud and its name
+pub const markBud:Color=s.bud;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
   "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
   "up/down channel   drag value: key it (shift fine)   k key   a key all   x unkey   r rest",
   "ctrl+s save   middle drag orbit   wheel zoom (over the list: scroll)   . focus   wolf: click a joint, drag its gizmo (shift fine)",
+  "m mark the playhead and name it (on a mark: rename; enter done)   shift+m unmark",
 };

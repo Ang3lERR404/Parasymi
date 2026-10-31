@@ -19,6 +19,8 @@ const gizmo=@import("../gizmo.zig");
 const V3=m.V3;
 /// makes a `V3` from its three parts
 const v3=m.v3;
+/// the editors' words for values, and typed names
+const labels=@import("../labels.zig");
 /// the editor's root, through which its other files are reached
 const meshedit=@import("../meshedit.zig");
 /// the finest the cells may be (m)
@@ -57,18 +59,36 @@ const nextShade=meshedit.settings.nextShade;
 const overUi=meshedit.settings.overUi;
 /// where the values start under the form rows
 const valuesY=meshedit.settings.valuesY;
+/// whether key `k` went down this frame
+fn hit(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
 /// one frame's keys and mouse; `handles` where each form's handle is on
 /// screen (null behind the eye), the gizmo seen through `view` with the
-/// sculpt at `origin`
+/// sculpt at `origin`. While a form is being named the keys type its name
+/// (enter or escape done), the mouse still answering.
 pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,origin:V3)Allocator.Error!void{
-  // whether shift is held (fine drags, shader back), and whether ctrl is
+  // whether shift is held (fine drags)
+  const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
+  // whether a name was being typed as the frame began
+  const typing=e.naming!=null;
+  if(e.naming)|*t|{
+    if(e.pieces().len==0)e.naming=null else{
+      if(t.feed(labels.keys(in))!=.same){
+        e.pieces()[e.sel].name=.of(t.slice());
+        e.dirty=true;
+      }
+      if(labels.named(in))e.naming=null;
+    }
+  }
+  if(!typing)try answerKeys(e,in);
+  try answerMouse(e,in,handles,view,origin,shift);
+}
+/// one frame's keys: forms made, removed, moved, reshaped, carved, shaded
+/// and named; values stepped and set at rest; the gizmo's mode; the cells;
+/// saving
+fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
+  // whether shift is held (shader back), and whether ctrl is
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
   const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
-  // whether key `k` went down this frame
-  const hit=struct{
-    /// whether key `k` went down this frame
-    fn f(i:*const Input,k:Key)bool{return i.pressed(.{.key=k});}
-  }.f;
   // the allocator new forms are kept with
   const gpa=e.gpa;
   if(hit(in,.n)){
@@ -120,6 +140,7 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
     if(hit(in,.down) and e.ch+1<Ch.count)e.ch+=1;
     if(hit(in,.r))e.set(Ch.get(&Vals{},e.ch));
     if(hit(in,.period))e.focus=true;
+    if(hit(in,.enter) or hit(in,.kp_enter))e.naming=labels.typing(p.name.slice());
   }
   if(hit(in,.one))e.mode=.move;
   if(hit(in,.two))e.mode=.turn;
@@ -133,9 +154,12 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
     e.changed();
   }
   if(ctrl and hit(in,.s))e.save();
-  // the mouse: a press on a form row selects it, on a value row selects
-  // it and drags it, on the gizmo drags its handle, on a handle in view
-  // selects its form
+}
+/// one frame's mouse: a press on a form row selects it, on a value row
+/// selects it and drags it, on the gizmo drags its handle, on a handle in
+/// view selects its form; any press ends naming
+fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,origin:V3,shift:bool)Allocator.Error!void{
+  if(in.pressed(.{.button=.left}))e.naming=null;
   // the mouse (px)
   const mx=in.mouse[0];
   const my=in.mouse[1];

@@ -27,7 +27,7 @@ test"a mesh's text reads back as written"{
   var d:Doc=.{.cell=0.02};
   defer d.deinit(gpa);
   try d.pieces.append(gpa,.{});
-  try d.pieces.append(gpa,.{.kind=.box,.carve=true,.shade=.resin,.v=.{.pos=.{0.1,0.2,-0.3},.round=0.01}});
+  try d.pieces.append(gpa,.{.name=.of("left ear tip"),.kind=.box,.carve=true,.shade=.resin,.v=.{.pos=.{0.1,0.2,-0.3},.round=0.01}});
   // the mesh's text
   var out:Writer.Allocating=.init(gpa);
   defer out.deinit();
@@ -37,7 +37,8 @@ test"a mesh's text reads back as written"{
   defer back.deinit(gpa);
   try testing.expectEqual(d.cell,back.cell);
   try testing.expectEqual(d.pieces.items.len,back.pieces.items.len);
-  for(d.pieces.items,back.pieces.items)|a,z|{
+  for(d.pieces.items,back.pieces.items)|*a,*z|{
+    try testing.expectEqualStrings(a.name.slice(),z.name.slice());
     try testing.expectEqual(a.kind,z.kind);
     try testing.expectEqual(a.carve,z.carve);
     try testing.expectEqual(a.shade,z.shade);
