@@ -175,7 +175,7 @@ const vec3 PLEXUS_HEART_SIDE[4] = vec3[4](vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0
 const int PLEXUS_HEART_PETLET = 25;
 const int PLEXUS_HEART_GRAND = 41;
 const int PLEXUS_HEART_SEED = 46;
-const float PLEXUS_HEART_CHAIN = 96.0;
+const float PLEXUS_HEART_CHAIN = 104.0;
 const float PLEXUS_HEART_EVERY = 2.0;
 const float PLEXUS_HEART_WAY = 4.5;
 // the heart settling into a builder (stage 4, from the chain done): its
@@ -197,12 +197,12 @@ const int PLEXUS_HEART_CURRENT = 48;
 const int PLEXUS_HEART_ROSE = 49;
 const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 44.0;
-const float PLEXUS_HEART_DROP = 1.2;
+const float PLEXUS_HEART_DROP = 1.1;
 // the heart's whole story in one (stage 5 in the mesh): bound, rising,
 // blooming, its chain reaction, settling into a builder, each stage in
 // turn on one clock, then fading away to begin again. How long each stage
 // is held (s) and how long the fade out and in at the ends
-const float PLEXUS_STORY[5] = float[5](6.0, 8.0, 14.0, 86.0, 38.0);
+const float PLEXUS_STORY[5] = float[5](6.0, 8.0, 14.0, 96.0, 38.0);
 const float PLEXUS_STORY_FADE = 3.0;
 // a petlet's rows, base to tip: how many points each holds (12 in all) and
 // how far along it lies
@@ -474,7 +474,8 @@ float plexusRise(float t) {
 }
 // how big the heart is at time `t` (its first size 1): shrunk once it
 // rises; in the chain reaction swelling with every fragment that arrives,
-// then growing past its first size once all four blooms are done
+// then growing slowly past its first size once all four blooms are done,
+// until it stands twice the wolf's height, tendril tips to rose
 float plexusHeartSize(float t) {
   if (plexStage < 0.5) return 1.0;
   // (in the story, shrinking as it rises)
@@ -484,7 +485,7 @@ float plexusHeartSize(float t) {
   float done = 0.0;
   for (int k = 1; k < 4; k++) done += plexusChainLanded(k, x);
   float last = plexusChainDone();
-  return 0.7 + (0.2 * done / 48.0 + 0.45 * smoothstep(last, last + 5.0, x)) * plexusChainKeep(t);
+  return 0.7 + (0.2 * done / 48.0 + 1.4 * smoothstep(last, last + 12.0, x)) * plexusChainKeep(t);
 }
 // how far into its settling the heart is at time `t` (s), and how much of
 // it still holds (it all goes back quickly at the end, to begin again)
@@ -506,7 +507,7 @@ float plexusSettleDrop(float t) {
 // how far the heart's grand petals have opened at time `t`, one after
 // another once it has grown
 float plexusChainGrand(int p, float t) {
-  float a = plexusChainDone() + 4.0 + 1.2 * float(p);
+  float a = plexusChainDone() + 12.0 + 1.2 * float(p);
   return smoothstep(a, a + 5.0, plexusChainAt(t)) * plexusChainKeep(t);
 }
 // how far the heart's stem has become its grand flower at time `t` (0 a
@@ -669,10 +670,10 @@ vec3 plexusHeartFilament(float id, float t) {
   float grow = plexusHeartGrow(k, t);
   vec3 anchor = plexusHeartStem(k, t, vec3(0.0));
   vec3 side = normalize(vec3(anchor.x, 0.0, anchor.z) + vec3(1e-4, 0.0, 0.0));
-  float s = j / 7.0 * 0.6 * grow;
+  float s = j / 7.0 * 0.6 * grow * plexusHeartSize(t) / 0.7;
   float bend = mix(14.0, 0.5, grow);
   vec3 p = anchor + side * (1.0 - cos(bend * s)) / bend - vec3(0.0, sin(bend * s) / bend, 0.0);
-  return p + vec3(sin(t * 0.9 + k * 2.0), 0.0, cos(t * 0.7 + k)) * 0.03 * j / 7.0;
+  return p + vec3(sin(t * 0.9 + k * 2.0), 0.0, cos(t * 0.7 + k)) * 0.03 * j / 7.0 * plexusHeartSize(t) / 0.7;
 }
 // a point `p` of the heart's bloom `k` (placed where it was fastened) once
 // it bursts free: pushed out a little, then drifting slowly down to the
