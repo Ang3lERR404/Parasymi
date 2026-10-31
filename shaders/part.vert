@@ -123,8 +123,9 @@ const float PLEXUS_PART_DRIFT = 0.025;
 // motes of light it yields, the point it gathers them in. Where its middle
 // is, how far out the petals stand, how they lean up open and shut (rad),
 // how fast they turn round the head (rad/s), where their tips gather; how
-// long a gathering takes (s), and when in it (a share) the petals are shut,
-// the gathered point is let go, they are open again
+// long a gathering takes (s), when in it (a share) the gathered point is
+// let go; the spring the petals move on (how fast it swings, rad/s, and
+// dies away, 1/s), and how far behind the one before each petal follows (s)
 const int PLEXUS_YIELD_CORE = 5;
 const int PLEXUS_YIELD_PETAL = 6;
 const int PLEXUS_YIELD_FRAGMENT = 11;
@@ -137,9 +138,10 @@ const float PLEXUS_YIELD_SHUT = 1.35;
 const float PLEXUS_YIELD_SPIN = 0.15;
 const vec3 PLEXUS_YIELD_GATHER = vec3(0.0, 1.75, 0.0);
 const float PLEXUS_YIELD_CYCLE = 6.0;
-const float PLEXUS_YIELD_CLOSED = 0.45;
 const float PLEXUS_YIELD_RELEASE = 0.7;
-const float PLEXUS_YIELD_OPEN = 0.9;
+const float PLEXUS_YIELD_SWING = 4.5;
+const float PLEXUS_YIELD_DAMP = 2.2;
+const float PLEXUS_YIELD_LAG = 0.07;
 // a petal's rows, base to tip: how many points each holds (30 in all)
 // and how far along the petal it lies
 const int PLEXUS_PETAL_ROWS[8] = int[8](2, 3, 4, 5, 5, 5, 4, 2);
@@ -238,17 +240,26 @@ vec3 plexusForm(float id, int shape) {
 vec3 plexusRest(float id, int shape) { return plexusForm(id, shape == PLEXUS_YIELD_CORE ? PLEXUS_FLOWER : shape); }
 // how far a yielder's petals have turned in at time `t` (0 open, 1 shut):
 // over each gathering they close, hold while the gathered point fills, and
-// open again once it is let go
+// open again once it is let go; each move on a spring, overshooting a
+// little and settling (a damped swing: how fast it swings, rad/s, and how
+// fast it dies away, 1/s), the opening the livelier
 float plexusShut(float t) {
-  float s = fract(t / PLEXUS_YIELD_CYCLE);
-  return smoothstep(0.0, PLEXUS_YIELD_CLOSED, s) * (1.0 - smoothstep(PLEXUS_YIELD_RELEASE, PLEXUS_YIELD_OPEN, s));
+  float x = fract(t / PLEXUS_YIELD_CYCLE) * PLEXUS_YIELD_CYCLE;
+  float let = PLEXUS_YIELD_RELEASE * PLEXUS_YIELD_CYCLE;
+  // closing, from the start of the gathering
+  float shut = 1.0 - exp(-PLEXUS_YIELD_DAMP * x) * cos(PLEXUS_YIELD_SWING * x);
+  // opening, from the moment the gathered point is let go
+  float y = max(x - let, 0.0);
+  float stay = x < let ? 1.0 : exp(-PLEXUS_YIELD_DAMP * 1.2 * y) * cos(PLEXUS_YIELD_SWING * 1.2 * y);
+  return shut * stay;
 }
 // where a point `q` of a lone petal (plexusForm) is on a yielder's petal
 // `k` at time `t`: the petals turn slowly round the head all the while,
 // each standing out from the core's rim and leaning up; as they shut they
-// rise and turn in, and their tips are drawn to one point over the core
+// rise and turn in, and their tips are drawn to one point over the core;
+// each petal a moment behind the one before, so they move as a ripple
 vec3 plexusPetal(vec3 q, int k, float t) {
-  float shut = plexusShut(t);
+  float shut = plexusShut(t - float(k) * PLEXUS_YIELD_LAG);
   float a = float(k) / 5.0 * TAU + t * PLEXUS_YIELD_SPIN;
   vec3 outward = vec3(cos(a), 0.0, sin(a));
   vec3 across = vec3(-sin(a), 0.0, cos(a));
@@ -258,7 +269,7 @@ vec3 plexusPetal(vec3 q, int k, float t) {
   vec3 base = PLEXUS_YIELD_MIDDLE + outward * PLEXUS_YIELD_OUT + vec3(0.0, 0.03, 0.0);
   vec3 p = base + q.x * across + (q.y - 0.7) * along + q.z * face;
   float u = clamp((q.y - 0.7) / 0.65, 0.0, 1.0);
-  return mix(p, PLEXUS_YIELD_GATHER, shut * pow(u, 2.5));
+  return mix(p, PLEXUS_YIELD_GATHER, clamp(shut, 0.0, 1.0) * pow(u, 2.5));
 }
 // what a yielder gathers and yields, point `id` of `shape` at time `t`:
 // where it is (xyz) and how much of it there is (w, 0 to 1). While the
