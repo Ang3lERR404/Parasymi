@@ -18,12 +18,12 @@ const save=lib.save;
 const dollyPerNotch=lib.play.dollyPerNotch;
 /// how much faster the free camera flies with Shift held
 const flyFastSpeed=lib.play.flyFastSpeed;
-/// how many gardens' rows are in view at once
-const gardensShown=lib.play.gardensShown;
 /// how fast the gardens list follows its scroll (share a second)
 const gardenEase=lib.play.gardenEase;
 /// how many rows a wheel notch scrolls the gardens list
 const gardenNotch=lib.play.gardenNotch;
+/// the HUD under the mouse, the keys and the pad
+const pointer=lib.play.pointer;
 /// the game, which these act on
 const Game=lib.play.game.Game;
 /// the saved gardens menu's buttons
@@ -33,11 +33,11 @@ const PauseRow=lib.play.PauseRow;
 /// the pause menu and the panels opened from it, while the world is
 /// frozen: a click on a pause row does what it says; on an option it
 /// turns it (the other button turns it back); in the saved gardens it
-/// chooses a garden, or saves or loads it. Keys still work for the pause
-/// rows.
+/// chooses a garden, or saves or loads it. The arrows, tab and the pad
+/// move between the rows and confirm chooses; keys still work for the
+/// pause rows; the name prompt takes the typing.
 pub fn menu(g:*Game,in:*const Input,dt:f32)void{
-  g.mouse=in.mouse;
-  g.pointer=.{.at=in.mouse,.down=ctl.down(in,.use),.went=ctl.pressed(in,.use)};
+  pointer.point(g,in,in.mouse);
   // the HUD row under the mouse, if any
   const hit=g.rows.at(in.mouse);
   g.pointed=hit;
@@ -46,12 +46,11 @@ pub fn menu(g:*Game,in:*const Input,dt:f32)void{
     if(ctl.pressed(in,.options))g.mode=.options;
     if(ctl.pressed(in,.gardens))g.openGardens();
   }
-  if(g.mode==.naming)g.typeName(in);
-  if(hit)|p|{
-    if(ctl.pressed(in,.use))hud.click(g,p,.use,in)
-    else if(ctl.pressed(in,.remove))hud.click(g,p,.remove,in);
-  }
+  pointer.steer(g,in);
+  pointer.typeInto(g,in);
+  pointer.clicks(g,in,hit);
   if(g.mode==.gardens)g.scroll(in,dt);
+  if(g.mode==.options)hud.panels.options.tick(g,dt);
 }
 /// does what pause row `row` says: resume, open the options or the saved
 /// gardens, toggle fullscreen, or ask main to save and leave.
@@ -71,8 +70,8 @@ pub fn openGardens(g:*Game)void{
   g.garden=0;
   g.overwrite=false;
   g.deleting=false;
-  g.gardenTop=0;
-  g.gardenAt=0;
+  g.gardenList.reset();
+  g.keyFocus=null;
 }
 /// main has just listed the gardens (`gardens`): the played one is
 /// chosen (else the choice is kept in range) and scrolled into view.
@@ -82,26 +81,21 @@ pub fn listed(g:*Game)void{
   g.deleting=false;
   if(g.slot)|n|for(g.gardens.items,1..)|e,i|if(e.name.is(n.slice())){g.garden=i;};
   g.garden=@min(g.garden,g.gardens.items.len);
-  // the topmost the list may scroll to while the chosen garden stays in view
-  const first=@max(m.f(g.garden)-m.f(gardensShown-1),0);
-  g.gardenTop=@min(m.clamp(g.gardenTop,first,m.f(g.garden)),g.gardenScroll());
+  // scrolled no further than the chosen garden needs to stay in view
+  const l=&g.gardenList;
+  l.keep(g.garden);
+  l.top=@min(l.top,l.most(g.gardens.items.len+1));
 }
-/// how far the gardens list scrolls (rows above the first in view)
-pub fn gardenScroll(g:*const Game)f32{
-  return m.f((g.gardens.items.len+1)-|gardensShown);
-}
-/// the wheel scrolls the gardens list; its groove, held, drags it
-/// (a click on it takes hold of it: the gardens panel's `click`)
+/// the wheel scrolls the gardens list (its stem, held, drags it: the
+/// gardens panel's `drag`); it eases to where it is wanted
 pub fn scroll(g:*Game,in:*const Input,dt:f32)void{
-  // how far the list can scroll at most
-  const most=g.gardenScroll();
-  g.gardenTop-=in.scroll*gardenNotch;
-  if(!ctl.down(in,.use))g.scrolling=false;
-  if(g.scrolling)if(g.rows.find(hud.row(.gardens,.scroll)))|r|{
-    g.gardenTop=m.clamp(r.local(in.mouse)[1],0,1)*most;
+  g.gardenList.wheel(in.scroll,gardenNotch);
+  // the row the keys are on is kept in view
+  if(hud.own(.gardens,g.keyFocus))|p|switch(p){
+    .garden=>|i|g.gardenList.keep(i),
+    .act,.back,.scroll=>{},
   };
-  g.gardenTop=m.clamp(g.gardenTop,0,most);
-  g.gardenAt+=(g.gardenTop-g.gardenAt)*@min(1,dt*gardenEase);
+  g.gardenList.tick(g.gardens.items.len+1,dt,gardenEase);
 }
 /// SAVE: a fresh garden asks for its name; over a saved one only when
 /// asked twice. LOAD: the chosen saved garden. DELETE: the chosen one,
@@ -131,15 +125,8 @@ pub fn startNaming(g:*Game)void{
   g.typed.clear();
   g.overwrite=false;
   g.request=.list;
-}
-/// the name prompt: typing adds to the name, erase takes back, confirm
-/// is OK
-pub fn typeName(g:*Game,in:*const Input)void{
-  switch(g.typed.feed(.{.typed=in.typed(),.erase=ctl.pressed(in,.erase),.confirm=ctl.pressed(in,.confirm)})){
-    .same=>{},
-    .changed=>g.overwrite=false,
-    .submitted=>g.nameChosen(),
-  }
+  g.typing=hud.row(.naming,.field);
+  g.keyFocus=null;
 }
 /// the garden typed is taken
 pub fn nameTaken(g:*const Game)bool{

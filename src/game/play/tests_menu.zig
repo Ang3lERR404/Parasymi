@@ -12,6 +12,8 @@ const bufPrint=std.fmt.bufPrint;
 const engine=lib.engine;
 /// all the maths: conversions, minutes
 const m=engine.core.math;
+/// a clipboard of a test's own
+const Clip=engine.platform.input.Clip;
 /// the keys and buttons, set by hand here
 const Input=engine.platform.input.Input;
 /// the bindings: actions held and loaded
@@ -61,20 +63,33 @@ test"the wolf stays put without input"{
 pub const click=struct{
   /// press the left button over the middle of the first row picking `want`
   pub fn on(gg:*Game,i:*Input,want:hud.Pick,sc:[2]f32)!void{return press(gg,i,want,sc,.use);}
-  /// press `a` with the mouse over the middle of the first row picking `want`
+  /// press `a` with the mouse over the middle of the first row picking
+  /// `want`, a frame down and (for `use`, whose buttons click as it is let
+  /// go) a frame let go
   pub fn press(gg:*Game,i:*Input,want:hud.Pick,sc:[2]f32,a:ctl.Action)!void{
     try hud.build(gg,sc);
-    for(gg.rows.box[0..gg.rows.len],gg.rows.pick[0..gg.rows.len])|q,p|{
-      if(!eqlDeep(p,want))continue;
-      i.mouse=q.center();
+    for(gg.rows.all())|r|{
+      if(!eqlDeep(r.pick,want))continue;
+      i.mouse=r.box.center();
       i.advance();
       ctl.hold(i,a,true);
       try gg.update(i,tickTime,sc);
       i.advance();
       ctl.hold(i,a,false);
+      if(a==.use)try gg.update(i,tickTime,sc);
       return;
     }
     return error.TestUnexpectedResult;
+  }
+  /// press the key (or button) of `a` for a frame, the HUD drawn first,
+  /// and let it go
+  pub fn key(gg:*Game,i:*Input,a:ctl.Action,sc:[2]f32)!void{
+    try hud.build(gg,sc);
+    i.advance();
+    ctl.hold(i,a,true);
+    try gg.update(i,tickTime,sc);
+    i.advance();
+    ctl.hold(i,a,false);
   }
 };
 test"clicking a research node or weave recipe picks it; number keys only pick the hotbar"{
@@ -162,14 +177,14 @@ test"the saved gardens scroll, save over one or delete it only when asked twice,
   in.scroll=-2;
   try g.update(&in,tickTime,screen);
   in.scroll=0;
-  try testing.expectEqual(@as(f32,2),g.gardenTop);
+  try testing.expectEqual(@as(f32,2),g.gardenList.top);
   in.scroll=-100;
   try g.update(&in,tickTime,screen);
   in.scroll=0;
-  try testing.expectEqual(m.f(4),g.gardenTop);
+  try testing.expectEqual(m.f(4),g.gardenList.top);
   // the list follows, bringing the last rows into view
   for(0..60)|_|try g.update(&in,tickTime,screen);
-  try testing.expectApproxEqAbs(m.f(4),g.gardenAt,0.01);
+  try testing.expectApproxEqAbs(m.f(4),g.gardenList.at,0.01);
   // a fresh garden asks its name first
   try click.on(&g,&in,hud.row(.gardens,.{.act=.save}),screen);
   try testing.expectEqual(Mode.naming,g.mode);
@@ -276,4 +291,180 @@ test"the garden saves itself once the autosave interval is played"{
   g.opts.autosave=0;
   for(0..1000)|_|try g.update(&in,stepS,testScreen);
   try testing.expect(g.request==null);
+}
+test"a menu button clicks as mouse1 is let go over it; sliding off first takes it back"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  g.mode=.paused;
+  try hud.build(&g,screen);
+  // the options row, pressed and held: nothing yet
+  const b=g.rows.find(hud.row(.pause,.{.row=.options})).?;
+  in.mouse=b.center();
+  in.advance();
+  ctl.hold(&in,.use,true);
+  try g.update(&in,tickTime,screen);
+  try testing.expectEqual(Mode.paused,g.mode);
+  // slid off and let go: still nothing
+  in.mouse=.{-1e4,-1e4};
+  in.advance();
+  try g.update(&in,tickTime,screen);
+  in.advance();
+  ctl.hold(&in,.use,false);
+  try g.update(&in,tickTime,screen);
+  try testing.expectEqual(Mode.paused,g.mode);
+  // pressed and let go over it: it opens the options
+  try click.on(&g,&in,hud.row(.pause,.{.row=.options}),screen);
+  try testing.expectEqual(Mode.options,g.mode);
+}
+test"the keys move between a menu's rows, turn settings left and right, and confirm chooses"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window), the mouse out of the way
+  var in:Input=.{.win=undefined};
+  in.mouse=.{-1e4,-1e4};
+  g.opts=.{.aa=.off};
+  g.mode=.paused;
+  // down from nowhere lands on the first row, down again on the next
+  try click.key(&g,&in,.focusDown,screen);
+  try testing.expect(eqlDeep(g.keyFocus.?,hud.row(.pause,.{.row=.@"resume"})));
+  try click.key(&g,&in,.focusDown,screen);
+  try testing.expect(eqlDeep(g.keyFocus.?,hud.row(.pause,.{.row=.options})));
+  // the row the keys are on is pointed at, as the mouse would
+  try testing.expect(g.points(hud.row(.pause,.{.row=.options})));
+  try click.key(&g,&in,.confirm,screen);
+  try testing.expectEqual(Mode.options,g.mode);
+  // in the options, right turns the setting the keys are on, not moving off it
+  try click.key(&g,&in,.focusDown,screen);
+  try testing.expect(eqlDeep(g.keyFocus.?,hud.row(.options,.{.setting=.antialias})));
+  try click.key(&g,&in,.focusRight,screen);
+  try testing.expectEqual(renderer.Antialias.fxaa,g.opts.aa);
+  try click.key(&g,&in,.focusLeft,screen);
+  try testing.expectEqual(renderer.Antialias.off,g.opts.aa);
+  // tab steps on through the rows, round past the last
+  try click.key(&g,&in,.focusNext,screen);
+  try testing.expect(eqlDeep(g.keyFocus.?,hud.row(.options,.{.setting=.vsync})));
+  try click.key(&g,&in,.focusRight,screen);
+  try testing.expect(!g.opts.vsync);
+  // the autosave slider stops at its ends
+  g.opts.autosave=60;
+  g.keyFocus=hud.row(.options,.{.setting=.autosave});
+  try click.key(&g,&in,.focusRight,screen);
+  try testing.expectEqual(@as(u8,60),g.opts.autosave);
+  try click.key(&g,&in,.focusLeft,screen);
+  try testing.expectEqual(@as(u8,30),g.opts.autosave);
+  // the mouse moving takes the lead back
+  in.mouseDelta=.{3,0};
+  try g.update(&in,tickTime,screen);
+  in.mouseDelta=.{0,0};
+  try testing.expect(g.keyFocus==null);
+}
+test"a slider is dragged along its stem; a picker's leaves turn it either way"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  g.opts=.{.aa=.fxaa,.autosave=5};
+  g.mode=.options;
+  try hud.build(&g,screen);
+  // the autosave row: pressed at its right end, then dragged far left
+  const b=g.rows.find(hud.row(.options,.{.setting=.autosave})).?;
+  in.mouse=.{b.x+b.w-4,b.y+b.h/2};
+  in.advance();
+  ctl.hold(&in,.use,true);
+  try g.update(&in,tickTime,screen);
+  try testing.expectEqual(@as(u8,60),g.opts.autosave);
+  in.mouse=.{b.x-200,b.y-300};
+  in.advance();
+  try g.update(&in,tickTime,screen);
+  try testing.expectEqual(@as(u8,0),g.opts.autosave);
+  in.advance();
+  ctl.hold(&in,.use,false);
+  try g.update(&in,tickTime,screen);
+  // the picker's leaves: the left turns it back, the right on
+  try click.on(&g,&in,hud.row(.options,.{.less=.antialias}),screen);
+  try testing.expectEqual(renderer.Antialias.off,g.opts.aa);
+  try click.on(&g,&in,hud.row(.options,.{.more=.antialias}),screen);
+  try testing.expectEqual(renderer.Antialias.fxaa,g.opts.aa);
+}
+test"the name prompt's caret moves, typing goes in there, and a selection is cut and pasted"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window), with a clipboard of its own
+  var clip=Clip{};
+  var in:Input=.{.win=undefined,.ownClip=&clip};
+  in.mouse=.{-1e4,-1e4};
+  g.startNaming();
+  g.request=null;
+  for("moss")|c|in.type1(c);
+  try g.update(&in,tickTime,screen);
+  in.typedLen=0;
+  // two back, and a letter typed there
+  try click.key(&g,&in,.caretLeft,screen);
+  try click.key(&g,&in,.caretLeft,screen);
+  in.type1('a');
+  try g.update(&in,tickTime,screen);
+  in.typedLen=0;
+  try testing.expectEqualStrings("moass",g.typed.slice());
+  // all of it selected and cut away, then pasted back twice
+  ctl.hold(&in,.chord,true);
+  try click.key(&g,&in,.selectAll,screen);
+  try click.key(&g,&in,.cut,screen);
+  try testing.expectEqualStrings("",g.typed.slice());
+  try testing.expectEqualStrings("moass",clip.slice());
+  try click.key(&g,&in,.paste,screen);
+  try click.key(&g,&in,.paste,screen);
+  ctl.hold(&in,.chord,false);
+  try testing.expectEqualStrings("moassmoass",g.typed.slice());
+  // a click on the field puts the caret where it lands: at its start
+  const b=g.rows.find(hud.row(.naming,.field)).?;
+  in.mouse=.{b.x+1,b.y+b.h/2};
+  in.advance();
+  ctl.hold(&in,.use,true);
+  try g.update(&in,tickTime,screen);
+  in.advance();
+  ctl.hold(&in,.use,false);
+  try testing.expectEqual(@as(usize,0),g.typed.caret);
+  // confirm hands it on: saved under that name
+  try click.key(&g,&in,.confirm,screen);
+  try testing.expectEqualStrings("moassmoass",g.request.?.saveAs.slice());
+}
+test"the HUD holds as many clickable rows as are drawn"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  for(0..500)|i|try g.rows.add(.{.x=m.f(i)*4,.y=0,.w=4,.h=4},hud.row(.pause,.{.row=.quit}));
+  try testing.expectEqual(@as(usize,500),g.rows.all().len);
+  try testing.expect(g.rows.at(.{1997,2})!=null);
 }

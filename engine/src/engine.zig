@@ -8,7 +8,8 @@
 //!   gfx       Vulkan context, swapchain, buffers, pipelines, mesh layouts, mesh builder, SDF sculpting, growth splines
 //!   world     the chunk grid and the streamed chunk map
 //!   render    frame orchestration and passes, post (bloom, AA), light, camera
-//!   ui        SDF draw batch, font, layout boxes, buttons, text inputs
+//!   ui        SDF draw batch (clipped), font, layout boxes, columns and grids,
+//!             buttons, text inputs, scrolled lists, sliders, focus
 /// Vulkan bindings (vulkan-zig), for the game's own Vulkan code
 pub const vk=@import("vulkan");
 /// GLFW windows and input (zglfw), for the game's own windowing code
@@ -99,10 +100,20 @@ pub const ui=struct{
   pub const font=@import("ui/font.zig");
   /// layout boxes and their hit tests
   pub const box=@import("ui/box.zig");
-  /// a button's state under the mouse: idle, hovering, pressed, held
+  /// a button's state under the mouse: idle, hovering, pressed, held,
+  /// released; a click as a release over the button pressed
   pub const button=@import("ui/button.zig");
-  /// a text input: typing, erasing, enter, its caret's side
+  /// a text input: typing at its caret, selecting, erasing, cutting,
+  /// pasting, enter, its text's side
   pub const textInput=@import("ui/text_input.zig");
+  /// laying boxes out: columns of rows, grids of cells
+  pub const layout=@import("ui/layout.zig");
+  /// a scrolled list: where it is wanted, where it has eased, what shows
+  pub const scroll=@import("ui/scroll.zig");
+  /// a slider's track and stops under the mouse
+  pub const slider=@import("ui/slider.zig");
+  /// keyboard and gamepad focus: the nearest box each way, or the next
+  pub const focus=@import("ui/focus.zig");
 };
 /// the shadow casters' fragment shader (depth alone), for a game's shadow passes
 pub const shadowFrag=@embedFile("shadow.frag");
@@ -132,4 +143,8 @@ test{
   _=ui.box;
   _=ui.button;
   _=ui.textInput;
+  _=ui.layout;
+  _=ui.scroll;
+  _=ui.slider;
+  _=ui.focus;
 }

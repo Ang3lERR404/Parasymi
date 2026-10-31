@@ -1,5 +1,6 @@
 //! the pause menu (Esc): the world holds its breath behind a soft veil.
-//! Each row is clicked (or its key pressed) to do what it says.
+//! Each row is clicked (or its key pressed, or the keys moved onto it and
+//! confirm pressed) to do what it says.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -13,6 +14,8 @@ const m=lib.engine.core.math;
 const play=lib.play;
 /// the UI's draw batch, and text widths
 const Draw=lib.engine.ui.draw.Draw;
+/// laying the rows out down the panel
+const Column=lib.engine.ui.layout.Column;
 /// the HUD's shared sizes and colours
 const s=lib.style;
 /// the HUD: picks, presses, rows and bullets
@@ -23,6 +26,8 @@ const txt=lib.txt;
 const Input=lib.engine.platform.input.Input;
 /// a button's state, for each row
 const buttonState=lib.hudButton.stateOf;
+/// the HUD's panel component
+const Panel=lib.hudPanel.Panel;
 /// the panel's width (pixels)
 const pw:f32=480;
 /// the height (pixels) of its title band, above the first row
@@ -39,6 +44,8 @@ const keyX:f32=112;
 const labelX:f32=190;
 /// a row's clickable band, from this far left of its pod
 const rowInset:f32=50;
+/// how far a row's line of text sits below its box's top (pixels)
+const lineY:f32=optionH/2-8;
 /// how many rows the menu has
 const rows=fields(play.PauseRow).len;
 /// shown while paused.
@@ -48,40 +55,36 @@ pub const Pick=union(enum){
   /// the menu row, which says what it does
   row:play.PauseRow
 };
+/// a row clicks as mouse1 is let go over it
+pub fn fire(_:Pick)hud.Fire{return.release;}
 /// a click does what the row says
 pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
   if(press==.use)switch(p){.row=>|r|g.choose(r)};
 }
 /// draws the veil and the panel: the title and each row's bud, key and
-/// label, lit under the mouse and registered to be clicked.
+/// label, lit under the mouse (or the keys) and registered to be clicked.
 pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
-  try d.glow(w/2,h/2,@max(w,h)*s.veilReach,s.veil);
-  // the rows' keys and labels
+  // the rows' keys and labels (one of each per row: the strings test checks)
   const keys=txt.s.hud.pauseKeys;
   const labels=txt.s.hud.pauseLabels;
-  // one label and key per row (the strings test checks the counts)
-  const n=rows;
-  // the panel's height, and its top-left corner
-  const ph=headerH+optionH*m.f(n)+padBottom;
-  const px=(w-pw)/2;
-  const py=(h-ph)/2;
-  try d.trellis(px,py,pw,ph,s.pausePanel,0.55);
-  g.rows.add(.{.x=px,.y=py,.w=pw,.h=ph},.panel);
-  // the title, centred over the panel
-  const title=txt.s.hud.paused;
-  _=try d.text(w/2-Draw.width(title,s.textBanner)/2,py+s.titleY,s.textBanner,s.gold,title);
-  for(0..n)|i|{
-    // this row's line top, which row it is, its box, its state and
-    // whether the mouse is over it
-    const y=py+headerH+optionH*m.f(i);
+  // the panel, centred
+  const pn=Panel.menu(.{w,h},pw,headerH+optionH*m.f(rows)+padBottom,0.55,txt.s.hud.paused);
+  try pn.draw(g,d,.{w,h});
+  const px=pn.box.x;
+  // the rows, down the panel under its title band
+  var col=Column.in(.{.x=px+podX-rowInset,.y=pn.box.y+headerH-lineY,.w=pw-2*(podX-rowInset),.h=optionH*m.f(rows)},0);
+  for(0..rows)|i|{
+    // which row it is, its box, its line of text, its state and whether
+    // the mouse is over it
     const row:play.PauseRow=@enumFromInt(i);
-    const box:hud.Box=.{.x=px+podX-rowInset,.y=y-optionH/2+8,.w=pw-2*(podX-rowInset),.h=optionH};
+    const box=col.next(optionH);
+    const y=box.y+lineY;
     const st=buttonState(g,hud.row(.pause,.{.row=row}),box);
     const over=st.over();
     if(over)try d.glow(px+pw/2,y+8,pw*@as(f32,if(st.down())0.36 else 0.42),s.menuHover);
-    try hud.bullet(d,px+podX,y+8,9,s.gold,switch(st){.idle=>0.15,.hovering=>1,.pressed,.held=>0.7},m.f(i)*0.4);
+    try hud.bullet(d,px+podX,y+8,9,s.gold,switch(st){.idle=>0.15,.hovering,.released=>1,.pressed,.held=>0.7},m.f(i)*0.4);
     _=try d.text(px+keyX,y,s.textLabel,s.dim,txt.nth(keys,i));
     _=try d.text(px+labelX,y,s.textLabel,if(over)s.gold else s.white,txt.nth(labels,i));
-    g.rows.add(box,hud.row(.pause,.{.row=row}));
+    try g.rows.add(box,hud.row(.pause,.{.row=row}));
   }
 }

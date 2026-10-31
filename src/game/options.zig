@@ -61,6 +61,55 @@ pub const Setting=enum{
   /// how often the garden saves itself
   autosave
 };
+/// how many settings there are
+pub const settingCount=fields(Setting).len;
+/// how a setting is set in the options panel
+pub const Kind=enum{
+  /// on or off: a bud that opens when on
+  toggle,
+  /// one of a few modes, turned either way between two leaves
+  picker,
+  /// one of a run of stops along a stem
+  slider,
+};
+/// how `set` is set
+pub fn kind(set:Setting)Kind{
+  return switch(set){
+    .antialias=>.picker,
+    .vsync,.fullscreen=>.toggle,
+    .autosave=>.slider,
+  };
+}
+/// whether the toggle `set` is on (false for any other kind)
+pub fn isOn(o:*const Options,set:Setting)bool{
+  return switch(set){
+    .vsync=>o.vsync,
+    .fullscreen=>o.fullscreen,
+    .antialias,.autosave=>false,
+  };
+}
+/// how many stops the slider `set` has (1 for any other kind)
+pub fn stops(set:Setting)usize{
+  return switch(set){
+    .autosave=>autosaveMinutes.len,
+    .antialias,.vsync,.fullscreen=>1,
+  };
+}
+/// which stop the slider `set` is at (0 for any other kind)
+pub fn stopOf(o:*const Options,set:Setting)usize{
+  return switch(set){
+    .autosave=>autosaveIndex(o.autosave),
+    .antialias,.vsync,.fullscreen=>0,
+  };
+}
+/// the slider `set` moved to stop `i` (kept to its stops; any other kind
+/// is left as it is)
+pub fn setStop(o:*Options,set:Setting,i:usize)void{
+  switch(set){
+    .autosave=>o.autosave=autosaveMinutes[@min(i,autosaveMinutes.len-1)],
+    .antialias,.vsync,.fullscreen=>{},
+  }
+}
 /// where `minutes` is in `autosaveMinutes` (else the next longer one there)
 fn autosaveIndex(minutes:u8)usize{
   for(autosaveMinutes,0..)|a,i|if(a>=minutes)return i;
@@ -206,4 +255,18 @@ test"anti-aliasing turns both ways and skips what the GPU cannot take"{
   o.autosave=60;
   step(&o,.autosave,1,4);
   try testing.expectEqual(@as(u8,0),o.autosave);
+}
+test"each setting is a toggle, a picker or a slider; a slider is set by its stops"{
+  // the defaults
+  var o:Options=.{};
+  try testing.expectEqual(Kind.toggle,kind(.vsync));
+  try testing.expectEqual(Kind.picker,kind(.antialias));
+  try testing.expectEqual(Kind.slider,kind(.autosave));
+  try testing.expect(isOn(&o,.vsync)and!isOn(&o,.fullscreen));
+  try testing.expectEqual(autosaveMinutes.len,stops(.autosave));
+  try testing.expectEqual(@as(usize,3),stopOf(&o,.autosave));
+  setStop(&o,.autosave,1);
+  try testing.expectEqual(@as(u8,1),o.autosave);
+  setStop(&o,.autosave,99);
+  try testing.expectEqual(@as(u8,60),o.autosave);
 }

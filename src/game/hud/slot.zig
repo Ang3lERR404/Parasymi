@@ -59,7 +59,7 @@ pub const Slot=struct{
   /// registers its box and draws it; true once it has grown enough to show
   /// what it holds.
   pub fn draw(sl:Slot,g:*play.Game,d:*Draw)Allocator.Error!bool{
-    g.rows.add(sl.box,sl.pick);
+    try g.rows.add(sl.box,sl.pick);
     if(sl.grown<=0)return false;
     // the box's middle, and its smaller side
     const c=sl.center();

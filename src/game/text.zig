@@ -477,6 +477,8 @@ pub const Strings=struct{
   key:EnumArray(input.Key,?S)=.initFill(null),
   /// shown names of mouse buttons (for `{@action}`); optional
   mouse:EnumArray(input.Button,?S)=.initFill(null),
+  /// shown names of gamepad buttons (for `{@action}`); optional
+  pad:EnumArray(input.PadButton,?S)=.initFill(null),
 };
 /// the loaded strings; empty until `load` (headless tests run without them).
 // decision: one process-wide table, set once at startup and read-only
@@ -550,6 +552,7 @@ pub fn bindName(w:*Io.Writer,b:input.Bind)Io.Writer.Error!void{
   const named,const tag=switch(b){
     .key=>|k|.{s.key.get(k),@tagName(k)},
     .button=>|k|.{s.mouse.get(k),@tagName(k)},
+    .pad=>|k|.{s.pad.get(k),@tagName(k)},
   };
   if(named)|n|return w.writeAll(n);
   for(tag)|c|try w.writeByte(toUpper(c));

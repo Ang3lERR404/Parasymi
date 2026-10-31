@@ -20,6 +20,8 @@ const craft=lib.craft;
 const Draw=lib.engine.ui.draw.Draw;
 /// the HUD's shared sizes and colours
 const s=lib.style;
+/// the HUD's panel component
+const Panel=lib.hudPanel.Panel;
 /// the HUD: picks, presses, rows and bullets
 const hud=lib.hud;
 /// every player-facing string
@@ -75,6 +77,8 @@ pub const Pick=union(enum){
   /// the weave, by its index in `craft.hand`
   recipe:u8
 };
+/// a recipe clicks as mouse1 is let go over it
+pub fn fire(_:Pick)hud.Fire{return.release;}
 /// a click chooses the weave (carrying something, it just puts it down)
 pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
   if(press!=.use)return;
@@ -100,8 +104,7 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   const ph=headerH+(if(choices.len>0)recipesH(choices.len)else 0)+labelH+belly.height+hintH;
   const px=(w-pw)/2;
   const py=(h-ph)/2-s.panelLift;
-  try d.trellis(px,py,pw,ph,s.panel,0.41);
-  g.rows.add(.{.x=px,.y=py,.w=pw,.h=ph},.panel);
+  try(Panel{.box=.{.x=px,.y=py,.w=pw,.h=ph},.col=s.panel,.seed=0.41}).draw(g,d,.{w,h});
   _=try d.text(px+margin,py+40,s.textTitle,s.gold,txt.structure(sp.kind()));
   try st.describe(sp,d,&g.prog,px+margin,py+80);
   // the next block's top (pixels), moving down as each is drawn

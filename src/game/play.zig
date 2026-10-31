@@ -25,6 +25,8 @@ pub const frame=@import("play/frame.zig");
 pub const belly=@import("play/belly.zig");
 /// the menus: pause, options, saved gardens, the name prompt
 pub const menus=@import("play/menus.zig");
+/// the HUD by mouse, keys and pad: clicks, drags, focus, typing
+pub const pointer=@import("play/pointer.zig");
 /// the menus' tests
 pub const testsMenu=@import("play/tests_menu.zig");
 /// the belly's and carrying's tests

@@ -69,11 +69,21 @@ adds on top.
 - Game: `renderer` (the garden's `G`), passes, terrain meshing.
 
 ### ui
-- Engine: draw, font, box, and the components' behaviour: `button`
-  (a box and the pointer give one of idle, hovering, pressed, held) and
-  `textInput` (typing, erase, enter; text and caret kept to the left-hand
-  side, the centre or the right-hand side of its box).
-- Game: how they look (`hud/button.zig`, `hud/field.zig`, `hud/slot.zig`).
+- Engine: draw (with a clip rectangle every quad is cut to), font, box,
+  and the components' behaviour: `button` (a box and the pointer give one
+  of idle, hovering, pressed, held, released; `Press` makes a click a
+  release over the button pressed), `textInput` (typing at a caret,
+  selecting, erasing either way, cut and paste, enter; text kept to the
+  left-hand side, the centre or the right-hand side of its box; `Edit`
+  types into any input), `layout` (columns of rows, grids of cells),
+  `scroll` (where a list is wanted, how far it has eased, what shows),
+  `slider` (stops along a track) and `focus` (the nearest box each way,
+  or the next).
+- Platform input also reads the first gamepad's buttons (`pad_*` binds),
+  keys the system repeats while held, and the clipboard.
+- Game: how they look (`hud/button.zig`, `hud/field.zig`, `hud/slot.zig`,
+  `hud/panel.zig`, `hud/scroll.zig`, `hud/toggle.zig`, `hud/slider.zig`,
+  `hud/picker.zig`).
 
 ### shaders
 - Engine: post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`

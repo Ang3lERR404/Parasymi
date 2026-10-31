@@ -7,11 +7,15 @@ layout(location = 2) in vec2 size;
 layout(location = 3) in vec4 col;
 layout(location = 4) in uvec2 bits;
 layout(location = 5) in vec2 param;
+layout(location = 6) in vec4 clip;
 layout(location = 0) out vec2 v_uv;
 layout(location = 1) out vec4 v_col;
 layout(location = 2) flat out uvec2 v_bits;
 layout(location = 3) flat out vec2 v_size;
 layout(location = 4) flat out vec2 v_param;
+// the rectangle it is cut to, and where this corner sits (both screen pixels)
+layout(location = 5) flat out vec4 v_clip;
+layout(location = 6) out vec2 v_px;
 // the palette's sRGB colours to linear (as common.glsl srgb2lin)
 const float GAMMA = 2.2;
 void main() {
@@ -20,5 +24,7 @@ void main() {
   v_bits = bits;
   v_size = size;
   v_param = param;
+  v_clip = clip;
+  v_px = pos;
   gl_Position = vec4(pos / pc.screen * 2.0 - 1.0, 0.0, 1.0);
 }

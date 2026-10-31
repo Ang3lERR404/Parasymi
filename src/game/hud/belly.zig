@@ -20,6 +20,8 @@ const craft=lib.craft;
 const Draw=lib.engine.ui.draw.Draw;
 /// the HUD's shared sizes and colours
 const s=lib.style;
+/// the HUD's panel component
+const Panel=lib.hudPanel.Panel;
 /// every player-facing string
 const txt=lib.txt;
 /// all the maths: conversions, easing, angles
@@ -79,6 +81,9 @@ pub const Pick=union(enum){
   /// a recipe woven by hand, by its index in `craft.hand`
   weave:usize
 };
+/// a slot lifts or places as mouse1 goes down; a recipe weaves as it is
+/// let go over it
+pub fn fire(p:Pick)hud.Fire{return switch(p){.slot,.store=>.press,.weave=>.release};}
 /// a slot lifts or puts down (with take held, a stack moves straight across
 /// to the other side); discard throws a belly stack away; a recipe weaves
 /// (or, carrying something, the click just puts it down).
@@ -117,8 +122,7 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   const ph=headerH+slotsH+weaveH+40;
   const px=(w-pw)/2;
   const py=(h-ph)/2-s.panelLift;
-  try d.trellis(px,py,pw,ph,s.panel,0.33);
-  g.rows.add(.{.x=px,.y=py,.w=pw,.h=ph},.panel);
+  try(Panel{.box=.{.x=px,.y=py,.w=pw,.h=ph},.col=s.panel,.seed=0.33}).draw(g,d,.{w,h});
   _=try d.text(px+72,py+s.titleY,s.textTitle,s.gold,txt.s.hud.bellyTitle);
   _=try d.print(px+pw-200,py+38,s.textSub,s.dim,txt.s.hud.bellyFill,.{g.player.inv.fill()*100});
   _=try d.text(px+72,py+58,s.textFine,s.dim,txt.s.hud.bellyHint);
@@ -279,7 +283,7 @@ fn weaves(g:*play.Game,d:*Draw,px:f32,wy:f32)Allocator.Error!void{
     const r=craft.hand[i];
     const colx=px+70+m.f(k%2)*colW;
     const y=wy+42+weaveRowH*m.f(k/2);
-    g.rows.add(.{.x=colx-10,.y=y-24,.w=colW-20,.h=weaveRowH},hud.row(.belly,.{.weave=i}));
+    try g.rows.add(.{.x=colx-10,.y=y-24,.w=colW-20,.h=weaveRowH},hud.row(.belly,.{.weave=i}));
     // whether it is understood, and whether the belly holds enough to weave it
     const open=r.unlocked(&g.prog);
     const ok=open and craft.Crafter.can(g.player.inv.bag(),r);

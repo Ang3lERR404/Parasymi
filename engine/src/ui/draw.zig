@@ -18,6 +18,12 @@ const font=@import("font.zig");
 const ctext=@import("../core/text.zig");
 /// one UI vertex: where it sits, its shape, colour and parameters
 const UiVertex=@import("../gfx/vertex.zig").Ui;
+/// a box in screen pixels, which drawing can be cut to
+const Box=@import("box.zig").Box;
+/// a clip rectangle (left, top, right, bottom pixels), as the shader reads it
+pub const Clip=[4]f32;
+/// no clip: everything shows, wherever it is drawn
+pub const noClip=Clip{-1e9,-1e9,1e9,1e9};
 /// a UI colour: four bytes, red, green, blue and alpha
 pub const Color=[4]u8;
 /// which distance field a quad is shaded with; must match the shape switch
@@ -87,13 +93,27 @@ pub const Draw=struct{
   sprouts:[maxSprouts]Sprout=undefined,
   /// how many sprouts are kept
   nSprouts:usize=0,
+  /// what is drawn now is cut to this rectangle (`clipTo` narrows it)
+  clip:Clip=noClip,
   /// frees the vertices
   pub fn deinit(d:*Draw)void{d.v.deinit(d.gpa);}
+  /// cuts what is drawn from now on to `b` (within the clip already in
+  /// force), as a list's rows are to the list; returns the clip that was,
+  /// to put back with `unclip` once the cut drawing is done
+  pub fn clipTo(d:*Draw,b:Box)Clip{
+    // the clip in force, kept to be put back
+    const was=d.clip;
+    d.clip=.{@max(was[0],b.x),@max(was[1],b.y),@min(was[2],b.x+b.w),@min(was[3],b.y+b.h)};
+    return was;
+  }
+  /// puts back the clip `was` (as `clipTo` returned it)
+  pub fn unclip(d:*Draw,was:Clip)void{d.clip=was;}
   /// starts a frame at time `now`: what was not drawn last frame is
   /// forgotten, so it grows afresh when drawn again.
   pub fn clear(d:*Draw,now:f32)void{
     d.v.clearRetainingCapacity();
     d.now=now;
+    d.clip=noClip;
     // how many sprouts are kept so far
     var n:usize=0;
     for(d.sprouts[0..d.nSprouts])|sp|{
@@ -127,7 +147,7 @@ pub const Draw=struct{
     const p=[4][2]f32{.{x,y},.{x+w,y},.{x+w,y+h},.{x,y+h}};
     const uv=[4][2]f32{.{0,0},.{uw,0},.{uw,uh},.{0,uh}};
     for([_]usize{0,1,2,0,2,3})|i|{
-      try d.v.append(d.gpa,.{.pos=p[i],.uv=uv[i],.size=.{w,h},.col=col,.bits=bits,.param=param});
+      try d.v.append(d.gpa,.{.pos=p[i],.uv=uv[i],.size=.{w,h},.col=col,.bits=bits,.param=param,.clip=d.clip});
     }
   }
   /// a quad laid along unit direction `u` from `a`: local x runs along it
@@ -148,7 +168,7 @@ pub const Draw=struct{
       o.*=.{a[0]+u[0]*x-u[1]*y,a[1]+u[1]*x+u[0]*y};
     }
     for([_]usize{0,1,2,0,2,3})|i|{
-      try d.v.append(d.gpa,.{.pos=p[i],.uv=uv[i],.size=.{w,h},.col=col,.bits=.{shapeMark,@intFromEnum(kind)},.param=param});
+      try d.v.append(d.gpa,.{.pos=p[i],.uv=uv[i],.size=.{w,h},.col=col,.bits=.{shapeMark,@intFromEnum(kind)},.param=param,.clip=d.clip});
     }
   }
   /// shapes get a margin so wobble/glow can spill past the nominal bounds.
@@ -254,4 +274,20 @@ test"a trellis grows from the frame it is first drawn, afresh after a break"{
   d.clear(13);
   d.clear(14);
   try std.testing.expectEqual(@as(f32,0),d.grown(0.5,1));
+}
+test"a clip narrows within the one in force, is put back, and every quad carries it"{
+  // a batch over the test allocator
+  var d:Draw=.{.gpa=std.testing.allocator};
+  defer d.deinit();
+  d.clear(0);
+  // cut to a list, then within it to a row poking out of its right side
+  const outer=d.clipTo(.{.x=10,.y=10,.w=100,.h=50});
+  const inner=d.clipTo(.{.x=50,.y=0,.w=100,.h=30});
+  try std.testing.expectEqual(Clip{50,10,110,30},d.clip);
+  try d.glow(60,20,4,.{255,255,255,255});
+  try std.testing.expectEqual(Clip{50,10,110,30},d.v.items[0].clip);
+  d.unclip(inner);
+  try std.testing.expectEqual(Clip{10,10,110,60},d.clip);
+  d.unclip(outer);
+  try std.testing.expectEqual(noClip,d.clip);
 }

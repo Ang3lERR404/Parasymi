@@ -74,6 +74,16 @@ pub const hudSlot=@import("game/hud/slot.zig");
 pub const hudButton=@import("game/hud/button.zig");
 /// a HUD text field: typed text on a stem, its caret a blinking bud
 pub const hudField=@import("game/hud/field.zig");
+/// a HUD panel: a trellis round its box, its title, a menu's veil
+pub const hudPanel=@import("game/hud/panel.zig");
+/// a HUD scrolled list: rows sliding by, cut to its box, its stem
+pub const hudScroll=@import("game/hud/scroll.zig");
+/// a HUD toggle: a bud that opens into a bloom when on
+pub const hudToggle=@import("game/hud/toggle.zig");
+/// a HUD slider: a seed riding a stem of stops
+pub const hudSlider=@import("game/hud/slider.zig");
+/// a HUD picker: a value between two leaves that turn it
+pub const hudPicker=@import("game/hud/picker.zig");
 /// item icons: a seed broken open, a pod, a mote
 pub const icon=@import("game/icon.zig");
 /// `--inspect`: the camera turning round one thing, taking shots

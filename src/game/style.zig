@@ -80,6 +80,8 @@ pub const veil:C=.{4,6,10,200};
 pub const pausePanel:C=.{18,26,20,244};
 /// a pause menu row or option under the mouse
 pub const menuHover:C=.{255,215,130,40};
+/// selected text: a sheath of sap lit behind its letters
+pub const selection:C=.{255,200,110,95};
 /// research panel's bed: dusk-dark, a little violet, the sapling's sky
 pub const researchPanel:C=.{24,22,30,240};
 /// research row: completed

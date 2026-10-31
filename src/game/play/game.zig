@@ -42,6 +42,8 @@ const renderer=lib.renderer;
 const vertex=lib.vertex;
 /// the UI's draw batch, which the HUD fills
 const Draw=engine.ui.draw.Draw;
+/// a scrolled list's place, for the saved gardens
+const Scroll=engine.ui.scroll.Scroll;
 /// the sky: day and night, and the starfall
 const skyMod=lib.sky;
 /// the player module
@@ -66,6 +68,8 @@ const save=lib.save;
 const Specimen=lib.specimen.Specimen;
 /// how many hotbar slots there are
 const barSlots=lib.play.barSlots;
+/// how many gardens' rows are in view at once
+const gardensShown=lib.play.gardensShown;
 /// what a frame or a build may fail with: running out of memory
 const Error=lib.play.Error;
 /// what the cursor may carry
@@ -125,7 +129,7 @@ pub const Game=struct{
   /// the HUD's draw batch, rebuilt each frame
   ui:Draw,
   /// what a click on the HUD would land on, as drawn last frame
-  rows:hud.Rows=.{},
+  rows:hud.Rows,
   /// the HUD area under the mouse this frame (panels show what it points at)
   pointed:?hud.Pick=null,
   /// the research sapling's growth, kept between frames
@@ -138,6 +142,10 @@ pub const Game=struct{
   request:?Request=null,
   /// the gardener's settings; main applies them when they change
   opts:options.Options=.{},
+  /// each setting as the options panel shows it, easing toward its value:
+  /// how open a toggle's bud is, where a slider's seed rides (-1: not yet
+  /// shown, so it starts where it is)
+  settingShown:[options.settingCount]f32=@splat(-1),
   /// the most MSAA samples the GPU takes (main sets it from the renderer)
   mostSamples:u32=8,
   /// the garden being played, as saved (null until it is saved or loaded)
@@ -160,12 +168,8 @@ pub const Game=struct{
   typed:save.Typed=.{},
   /// the mode the name prompt returns to
   namingFrom:Mode=.roam,
-  /// the first garden row in view, as wanted (scrolled by wheel or stem)
-  gardenTop:f32=0,
-  /// the first garden row in view, eased toward `gardenTop`
-  gardenAt:f32=0,
-  /// the list's scroll groove is held (dragged)
-  scrolling:bool=false,
+  /// the saved gardens list's scroll: by wheel, its stem, or the row chosen
+  gardenList:Scroll=.{.shown=gardensShown},
   /// keeps running while paused, so the UI still breathes.
   uiTime:f64=0,
   /// the hotbar's items
@@ -183,6 +187,14 @@ pub const Game=struct{
   /// the cursor and the use button (mouse1) this frame, for the HUD's
   /// buttons to say whether they are hovered, pressed or held
   pointer:lib.engine.ui.button.Pointer=.{},
+  /// the HUD row mouse1 went down on, while held: let go over it, it
+  /// clicks (a row firing on release); held, it is dragged
+  press:lib.engine.ui.button.Press(hud.Pick)=.{},
+  /// the menu row the keys or the pad are on (null: the mouse leads); it
+  /// is pointed at as the mouse would be, until the mouse moves
+  keyFocus:?hud.Pick=null,
+  /// the HUD row being typed into, if any
+  typing:?hud.Pick=null,
   /// the window holds the cursor for looking out of the wolf's eyes; the
   /// frame it is taken its jump is not a look
   looking:bool=false,
@@ -258,6 +270,7 @@ pub const Game=struct{
       .player=.{.pos=m.v3(0.5,0,0.5)},
       .parts=Parts.init(gpa),
       .ui=.{.gpa=gpa},
+      .rows=.{.gpa=gpa},
     };
     errdefer g.deinit();
     // start on dry land: spiral out from the origin until a fertile tile shows up.
@@ -291,6 +304,7 @@ pub const Game=struct{
     g.far.deinit(g.gpa);
     g.parts.deinit();
     g.ui.deinit();
+    g.rows.deinit();
     g.stars.deinit(g.gpa);
     g.eco.deinit(g.gpa);
     g.fields.deinit(g.gpa);
@@ -417,6 +431,8 @@ pub const Game=struct{
   pub const holds=lib.play.belly.holds;
   /// whether the mouse is over a given HUD row (`belly.points`)
   pub const points=lib.play.belly.points;
+  /// whether mouse1 went down on a given HUD row and is held (`pointer.grips`)
+  pub const grips=lib.play.pointer.grips;
   /// UI seconds, wrapped small for sway (`belly.uiT`)
   pub const uiT=lib.play.belly.uiT;
   /// the selected hotbar item (`belly.selected`)
@@ -451,16 +467,12 @@ pub const Game=struct{
   pub const openGardens=lib.play.menus.openGardens;
   /// main has listed the gardens (`menus.listed`)
   pub const listed=lib.play.menus.listed;
-  /// how far the gardens list scrolls (`menus.gardenScroll`)
-  pub const gardenScroll=lib.play.menus.gardenScroll;
   /// scrolls the gardens list (`menus.scroll`)
   pub const scroll=lib.play.menus.scroll;
   /// a saved gardens button (`menus.gardenAct`)
   pub const gardenAct=lib.play.menus.gardenAct;
   /// asks for the name of the garden to save (`menus.startNaming`)
   pub const startNaming=lib.play.menus.startNaming;
-  /// the name prompt's typing (`menus.typeName`)
-  pub const typeName=lib.play.menus.typeName;
   /// whether the typed name is taken (`menus.nameTaken`)
   pub const nameTaken=lib.play.menus.nameTaken;
   /// OK on the name prompt (`menus.nameChosen`)

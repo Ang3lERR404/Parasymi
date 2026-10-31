@@ -28,6 +28,12 @@ const hud=lib.hud;
 const txt=lib.txt;
 /// the keys and buttons down this frame
 const Input=lib.engine.platform.input.Input;
+/// the HUD's panel component
+const Panel=lib.hudPanel.Panel;
+/// the HUD's scrolled list component
+const scroll=lib.hudScroll;
+/// the scroll stem's clickable width (pixels)
+const stemW=scroll.stemW;
 /// the HUD's button component
 const Button=lib.hudButton.Button;
 /// the panel's width (pixels)
@@ -52,8 +58,6 @@ const chosenGlow:f32=34;
 const textX:f32=26;
 /// the scroll stem: how far (pixels) in from the panel's right edge
 const stemX:f32=34;
-/// the scroll stem's clickable width (pixels)
-const stemW:f32=28;
 /// rows fade out over this much of a row past the list's ends
 const fadeRows:f32=0.5;
 /// the seconds in a minute, an hour and a day, for how long ago a save was
@@ -72,8 +76,8 @@ pub const Pick=union(enum){
   /// the scroll stem, dragged while held
   scroll
 };
-/// a click chooses a garden, presses a button, returns to the pause menu,
-/// or takes hold of the stem (dragged while held)
+/// a click chooses a garden, presses a button or returns to the pause menu
+/// (the stem is dragged, by `drag`)
 pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
   if(press!=.use)return;
   switch(p){
@@ -84,54 +88,56 @@ pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
     },
     .act=>|a|g.gardenAct(a),
     .back=>g.mode=.paused,
-    .scroll=>g.scrolling=true,
+    .scroll=>{},
   }
+}
+/// the stem takes hold as mouse1 goes down; every other row clicks as it
+/// is let go over it
+pub fn fire(p:Pick)hud.Fire{return switch(p){.scroll=>.press,.garden,.act,.back=>.release};}
+/// the stem is the mouse's; the keys scroll by moving down the rows
+pub fn focusable(p:Pick)bool{return p!=.scroll;}
+/// the stem held: the list dragged to where the cursor is along it
+pub fn drag(g:*play.Game,p:Pick,b:hud.Box,at:[2]f32)void{
+  if(p==.scroll)scroll.dragged(&g.gardenList,g.gardens.items.len+1,b,at);
 }
 /// `c` with its alpha scaled by `a`
 pub fn faded(c:Color,a:f32)Color{
   return.{c[0],c[1],c[2],@intFromFloat(m.f(c[3])*m.clamp01(a))};
 }
+/// the list of gardens as it is laid out in the panel `pn`
+fn listOf(g:*const play.Game,pn:Panel)scroll.List{
+  // the list's box: under the title band, from the rows' left to the stem
+  const b=pn.box;
+  return.{.box=.{.x=b.x+padX/2,.y=b.y+headerH-12,.w=b.w-padX/2-stemX+scroll.stemW/2,.h=listH},.rowH=rowH,.total=g.gardens.items.len+1,.at=&g.gardenList,.fade=fadeRows};
+}
 /// draws the veil and the panel: the title, the list of gardens (scrolled,
-/// fading at its ends, each row registered to be clicked), the scroll stem,
-/// SAVE, LOAD and BACK, and the hint.
+/// fading at its ends and cut to them, each row registered to be clicked),
+/// the scroll stem, SAVE, LOAD and BACK, and the hint.
 pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
-  try d.glow(screenW/2,screenH/2,@max(screenW,screenH)*s.veilReach,s.veil);
-  // the panel's height, and its top-left corner
+  // the panel, centred, and the clock for pulses and sway
   const ph=headerH+listH+actsH+hintH;
-  const px=(screenW-pw)/2;
-  const py=(screenH-ph)/2;
-  // the clock, for pulses and sway
+  const pn=Panel.menu(.{screenW,screenH},pw,ph,0.83,txt.s.hud.gardensTitle);
+  try pn.draw(g,d,.{screenW,screenH});
+  const px=pn.box.x;
   const t=g.uiT();
-  try d.trellis(px,py,pw,ph,s.pausePanel,0.83);
-  g.rows.add(.{.x=px,.y=py,.w=pw,.h=ph},.panel);
-  // the title, centred over the panel
-  const title=txt.s.hud.gardensTitle;
-  _=try d.text(screenW/2-Draw.width(title,s.textBanner)/2,py+s.titleY,s.textBanner,s.gold,title);
-  // the list, scrolled to `gardenAt`; rows fade in and out at its ends
-  // the list's top, how many rows it has (a fresh one first), and the last shown
-  const top=py+headerH-12;
-  const n=g.gardens.items.len+1;
-  const last=m.f(play.gardensShown-1);
-  for(0..n)|i|{
-    // this row's place in the scrolled list (0: at the top), and its opacity
-    const pos=m.f(i)-g.gardenAt;
-    const a=1-@max(-pos,pos-last,0)/fadeRows;
+  // the list: the glows under the rows first (soft, so never cut), then the
+  // rows cut to the list (and the half row either end they fade over)
+  const li=listOf(g,pn);
+  for(0..li.total)|i|if(g.points(hud.row(.gardens,.{.garden=i})))try d.glow(px+pw/2,li.mid(i),pw*0.3,faded(s.menuHover,li.shows(i)));
+  const was=d.clipTo(lib.engine.ui.layout.inset(li.box,0,-rowH*fadeRows));
+  for(0..li.total)|i|{
+    // how much of this row shows
+    const a=li.shows(i);
     if(a<=0)continue;
-    // the row's middle height
-    const mid=top+rowH*(pos+0.5);
     // (under the chosen row's DELETE, added as it is drawn)
-    if(a>0.5){
-      // the row's clickable band, clipped to the list
-      const y0=@max(mid-rowH/2,top);
-      const y1=@min(mid+rowH/2,top+listH);
-      g.rows.add(.{.x=px+padX/2,.y=y0,.w=pw-padX-stemW,.h=y1-y0},hud.row(.gardens,.{.garden=i}));
-    }
-    try row(g,d,i,px,mid,a,t);
+    if(a>0.5)if(li.row(i,li.box.x,li.box.w-scroll.stemW))|rb|try g.rows.add(rb,hud.row(.gardens,.{.garden=i}));
+    try row(g,d,i,px,li.mid(i),a,t);
   }
-  try stem(g,d,px+pw-stemX,top,t);
+  d.unclip(was);
+  try li.stem(g,d,hud.row(.gardens,.scroll),t);
   // the buttons: SAVE (asking first before saving over a garden), LOAD, BACK
   // the buttons' middle height, and whether a saved garden is chosen (LOAD)
-  const by=top+listH+actsH/2;
+  const by=li.box.y+listH+actsH/2;
   const saved=g.garden>0;
   // SAVE's label: asking first before saving over
   const saveLabel=if(g.overwrite)txt.s.hud.gardensOverwrite else txt.s.hud.gardensSave;
@@ -140,7 +146,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   try button(g,d,px+pw*0.82,by,txt.s.hud.optionsBack,hud.row(.gardens,.back),true,0);
   // the hint, centred along the bottom
   const hint=txt.s.hud.gardensHint;
-  _=try d.text(screenW/2-Draw.width(hint,s.textFine)/2,py+ph-hintH+4,s.textFine,s.dim,hint);
+  _=try d.text(screenW/2-Draw.width(hint,s.textFine)/2,pn.box.y+ph-hintH+4,s.textFine,s.dim,hint);
 }
 /// row `i` (0: a fresh garden) centred at `mid`, at opacity `a`
 fn row(g:*play.Game,d:*Draw,i:usize,px:f32,mid:f32,a:f32,t:f32)Allocator.Error!void{
@@ -148,7 +154,6 @@ fn row(g:*play.Game,d:*Draw,i:usize,px:f32,mid:f32,a:f32,t:f32)Allocator.Error!v
   const chosen=g.garden==i;
   const over=g.points(hud.row(.gardens,.{.garden=i}));
   const x=px+padX;
-  if(over)try d.glow(px+pw/2,mid,pw*0.3,faded(s.menuHover,a));
   // the chosen one: its pod glows and a tendril runs under it
   if(chosen){
     try d.glow(x,mid,chosenGlow,faded(s.researchActive,a));
@@ -200,22 +205,6 @@ fn ago(buf:[]u8,secs:i64)[]const u8{
   var k:usize=secondsPer.len-1;
   while(secs<secondsPer[k])k-=1;
   return txt.bufRender(buf,txt.nth(list,k+1),.{@divFloor(secs,secondsPer[k])});
-}
-/// the list's scroll stem down the right side, a bud riding it where the
-/// list is; only there while the list runs past what fits
-fn stem(g:*play.Game,d:*Draw,x:f32,top:f32,t:f32)Allocator.Error!void{
-  // how far the list can scroll (rows past what fits)
-  const most=m.f((g.gardens.items.len+1)-|play.gardensShown);
-  if(most<=0)return;
-  // whether the stem is pointed at or held
-  const over=g.points(hud.row(.gardens,.scroll)) or g.scrolling;
-  // how far the stem sways now (pixels)
-  const sway=1.5*@sin(t*1.3);
-  try d.limb(.{x+sway,top+4},.{x-sway,top+listH-4},3,2,s.barkYoung,0);
-  // where the bud rides on the stem
-  const y=top+12+(listH-24)*m.clamp01(g.gardenAt/most);
-  try d.grain(x,y,14,22,if(over)s.gold else s.bud,if(over)0.4 else 0.1,t*0.2);
-  g.rows.add(.{.x=x-stemW/2,.y=top,.w=stemW,.h=listH},hud.row(.gardens,.scroll));
 }
 /// a button: a pod and its label centred on (cx, mid); dim when it would
 /// do nothing; `call` pulses its glow (asking)

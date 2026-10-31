@@ -1,10 +1,10 @@
 //! a button, the second of the HUD's components: a bud and its label in a
 //! box the mouse lands on. The engine says which state it is in (idle,
-//! hovering, pressed, held: ui/button.zig); this is only how each looks: a
-//! closed bud at rest, opening and glowing under the mouse, pressed a little
-//! shut and in while mouse1 is down on it. Dim when it would do nothing;
-//! `call` pulses its glow (asking first). What a click does is its panel's
-//! `click` hook, as for any row.
+//! hovering, pressed, held, released: ui/button.zig); this is only how
+//! each looks: a closed bud at rest, opening and glowing under the mouse
+//! (or the keys), pressed a little shut and in while mouse1 is down on it.
+//! Dim when it would do nothing; `call` pulses its glow (asking first).
+//! What a click does is its panel's `click` hook, as for any row.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -64,9 +64,11 @@ pub const Size=enum{
 };
 /// the state of the button picking `p` laid out in `b`: idle unless the
 /// mouse points at it (the topmost row under the cursor), else as the
-/// pointer says
+/// pointer says; the keys on it, it is hovered
 pub fn stateOf(g:*const play.Game,p:hud.Pick,b:Box)State{
-  return if(g.points(p))ui.state(b,g.pointer)else.idle;
+  if(!g.points(p))return.idle;
+  if(g.keyFocus!=null)return.hovering;
+  return ui.state(b,g.pointer);
 }
 /// `c` with its alpha scaled by `a`
 fn faded(c:Color,a:f32)Color{
@@ -119,9 +121,9 @@ pub const Button=struct{
     // its label's colour: dim when it would do nothing
     const col=if(!b.live)s.unknown else if(st.over() or b.call>0)s.gold else b.size.restCol();
     // how open its bud is: closed at rest, open under the mouse, half shut pressed
-    const open:f32=switch(st){.idle=>restOpen,.hovering=>1,.pressed,.held=>pressedOpen};
+    const open:f32=switch(st){.idle=>restOpen,.hovering,.released=>1,.pressed,.held=>pressedOpen};
     try hud.bullet(d,c[0]-w/2-b.size.budGap(),c[1]+down,b.size.bud(),if(b.live)b.size.budCol()else s.unknown,open,c[0]*0.01);
     _=try d.text(c[0]-w/2,c[1]-b.size.rise()+down,b.size.text(),col,b.label);
-    g.rows.add(b.box(),b.pick);
+    try g.rows.add(b.box(),b.pick);
   }
 };

@@ -30,6 +30,9 @@ pub const Ui=extern struct{
   bits:[2]u32,
   /// shape parameters: x value/selection 0..1, y phase/seed
   param:[2]f32,
+  /// the screen rectangle it is cut to (left, top, right, bottom pixels):
+  /// nothing of it shows outside, as a list scrolled past its ends
+  clip:[4]f32,
 };
 /// one vertex of a built mesh: where it is, which way it faces, its colour,
 /// how far up the thing it sits and what part of it it belongs to

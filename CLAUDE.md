@@ -110,14 +110,16 @@ build. New shaders go in `build.zig`'s list (the engine's in
 `engine/src/` (`@import("engine")`, never imports the game):
 ```
 core      math, color, rng, noise, registry, jobs, text, png, dsp
-platform  input, display (fullscreen), audio (WASAPI output)
+platform  input (keys, mouse, gamepad, clipboard), display (fullscreen),
+          audio (WASAPI output)
 anim      joint turns, two-bone IK, skinning matrices, keyframed clips
 gfx       Vulkan ctx, swapchain, buffers, pipelines, mesh/UI/light layouts,
           mesh builder + primitives (Mesher), SDF sculpting,
           growth splines (Grower)
 world     chunk grid, World(L) streaming
 render    Renderer(G) frame orchestration, post (bloom, AA), light, camera, ui pass
-ui        SDF draw batch, font, layout box (x, y, w, h + hit test)
+ui        SDF draw batch (clipped), font, layout box (x, y, w, h + hit test),
+          columns and grids, buttons, text inputs, scroll, slider, focus
 ```
 `src/` (the game):
 ```
@@ -148,7 +150,7 @@ registry kinds outside the registry file; add a hook.
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `gives`, `receive`, `release`, `handOver`, `message`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon`, `meshes`, `meets`, `adopts`, `pairs` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
-| hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order), `Pick`, `click`, `shows` |
+| hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order), `Pick`, `click`, `shows`, `fire`, `focusable`, `drag`, `nudge`, `edit`, `typed` |
 | render passes | `render/renderer.zig` (`passes`; engine `Renderer(G)`) | `desc` (`.target`: shadow/world/screen), `Frame`, `initFrame`/`deinitFrame`, `prepare`, `record` |
 
 Items (`sim/items.zig`, ids stored by value: new items go last) and weave

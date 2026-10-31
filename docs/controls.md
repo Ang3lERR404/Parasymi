@@ -101,13 +101,22 @@ arsthraxia, digger) opens its panel (`Mode.structure`,
 - The panel closes when you are out of reach.
 
 ## Menus
+A menu's buttons click when LMB is let go over them, so sliding off
+first takes the click back. The keys and a gamepad work every menu:
+**arrows / d-pad** move to the nearest row that way, **Tab / RB** to the
+next (with **Shift**, the one before), **Enter / A** chooses it, **Esc /
+B / Start** goes back. Moving the mouse gives it the lead again.
+
 ### Pause
 Rows are clicked or keyed: **Q** = save and quit, **O** = options,
 **G** = saved gardens.
 
 ### Options panel
-LMB turns a setting, RMB turns it back, Esc/BACK returns to the pause
-menu.
+Toggles (a bud that blooms when on), pickers (a value between two leaves)
+and the autosave slider (a seed riding a stem of stops). LMB turns a
+setting, RMB turns it back; a picker's leaves turn it their way; the
+slider is dragged along. **Left/Right** turn the setting the keys are on.
+Esc/BACK returns to the pause menu.
 
 ### Saved gardens panel
 (Pause menu only; `hud/gardens.zig`, `Mode.gardens`.)
@@ -123,8 +132,13 @@ menu.
 ### Name prompt
 (`hud/naming.zig`, `Mode.naming`; the world is frozen.)
 
-- Type the name: letters, digits, a few marks (`save.Name.put`).
-- Backspace erases.
+- Type the name: letters, digits, a few marks (`save.Name.put`); it goes
+  in at the caret.
+- Left/Right, Home/End move the caret (with Shift, selecting); a click
+  on the name puts it there.
+- Backspace erases the selection or the letter before the caret, Delete
+  the one after.
+- Ctrl+A selects all, Ctrl+C copies, Ctrl+X cuts, Ctrl+V pastes.
 - Enter/OK saves (press twice over a taken name).
 - Esc/CANCEL returns.
 - Never `autosave` or blank.

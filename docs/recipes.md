@@ -103,18 +103,34 @@ Tests catch: a sown species without a seed icon; cfg keys.
      (play.zig never switches over picks).
    - The item a row shows (for the tooltip) is its `shows(g, p)`.
    - `hud.own` reads the pointed row back as the panel's `Pick`.
-4. **Item slots** use the `hud/slot.zig` component, never a hand-drawn
+   - A button-like row clicks on release: `fire(p)` returns `.release`
+     (slots and stems keep the default, `.press`).
+   - A row held and dragged (a stem, a slider) is its `drag(g, p, box,
+     at)`; left/right turning a focused row's value is its `nudge`.
+   - The keys and pad reach every row of the top panel but those whose
+     `focusable(p)` is false.
+   - A row typed into gives its input with `edit(g, p)` and hears what
+     the typing did with `typed(g, p, fed)`; setting `g.typing` to it
+     makes it the one typed into.
+4. **The panel itself** is `hud/panel.zig`'s `Panel` (`Panel.menu` for a
+   veiled menu): its trellis, title and click-swallowing backdrop. Lay
+   its rows out with the engine's `layout.Column`/`Grid`.
+5. **Item slots** use the `hud/slot.zig` component, never a hand-drawn
    husk. A `Slot` is a box, a pick, and the husk's share of the box. It
    registers its box, draws the husk and glows, and its look scales with
    the box.
-5. **Buttons** use `hud/button.zig` (`Button`: its middle, label, pick
+6. **Buttons** use `hud/button.zig` (`Button`: its middle, label, pick
    and box height); the engine's `ui/button.zig` says whether it is idle,
-   hovering, pressed or held, the component only how each looks. A row
-   that is a button in its own layout asks `stateOf(g, pick, box)`.
-6. **Text inputs** are an engine `TextInput(cap, accept)` fed each frame
-   (`feed`: typed, erase, enter) and drawn by `hud/field.zig`, the text
-   and its caret kept to the input's `alignment` (left, centre, right).
-7. **Strings** under `[hud]`.
+   hovering, pressed, held or released, the component only how each
+   looks. A row that is a button in its own layout asks `stateOf(g, pick,
+   box)`. Settings use `hud/toggle.zig`, `hud/picker.zig` and
+   `hud/slider.zig`; a list longer than its room uses `hud/scroll.zig`
+   (`List`: rows sliding by, cut to its box with `Draw.clipTo`, its stem).
+7. **Text inputs** are an engine `TextInput(cap, accept)` fed each frame
+   by `play/pointer.zig` (typed, the caret moved, selection, erase both
+   ways, cut, paste, enter) and drawn by `hud/field.zig`, the text kept
+   to the input's `alignment` (left, centre, right).
+8. **Strings** under `[hud]`.
 
 ## A render pass
 1. **Its module**: `render/passes/<name>.zig` with `desc` (`.target`),

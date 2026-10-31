@@ -128,10 +128,42 @@ pub const Action=enum{
   options,
   /// while paused: open the saved gardens
   gardens,
-  /// typing a name: take back the last character
+  /// typing: take back the selection, else the character before the caret
   erase,
-  /// typing a name: accept it
+  /// typing: take out the selection, else the character after the caret
+  eraseAhead,
+  /// typing: accept it; in a menu, choose the row the keys are on
   confirm,
+  /// in a menu: move to the row above (the nearest that way)
+  focusUp,
+  /// in a menu: move to the row below
+  focusDown,
+  /// in a menu: move to the row on the left, or turn a setting back
+  focusLeft,
+  /// in a menu: move to the row on the right, or turn a setting on
+  focusRight,
+  /// in a menu: move to the next row (with extend, the one before)
+  focusNext,
+  /// held: moving the caret selects; with focusNext, steps back
+  extend,
+  /// typing: move the caret back a character
+  caretLeft,
+  /// typing: move the caret on a character
+  caretRight,
+  /// typing: move the caret before the first character
+  caretHome,
+  /// typing: move the caret after the last character
+  caretEnd,
+  /// held: with selectAll, copy, cut or paste, does that
+  chord,
+  /// typing, with chord: select all of the text
+  selectAll,
+  /// typing, with chord: copy the selection to the clipboard
+  copy,
+  /// typing, with chord: cut the selection to the clipboard
+  cut,
+  /// typing, with chord: paste the clipboard in at the caret
+  paste,
   /// save the garden
   save,
   /// load the newest saved garden
@@ -222,6 +254,17 @@ pub fn down(in:*const Input,a:Action)bool{
 /// did a key or button bound to `a` go down this frame?
 pub fn pressed(in:*const Input,a:Action)bool{
   for(map.getPtrConst(a).items())|b|if(in.pressed(b))return true;
+  return false;
+}
+/// was a key or button bound to `a` let go this frame?
+pub fn released(in:*const Input,a:Action)bool{
+  for(map.getPtrConst(a).items())|b|if(in.released(b))return true;
+  return false;
+}
+/// did a key or button bound to `a` go down this frame, or (held long
+/// enough) repeat, as a held arrow or erase does?
+pub fn repeated(in:*const Input,a:Action)bool{
+  for(map.getPtrConst(a).items())|b|if(in.repeated(b))return true;
   return false;
 }
 /// headless tests: hold `a`'s first binding down (or let it go).

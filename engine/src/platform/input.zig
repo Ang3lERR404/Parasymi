@@ -1,4 +1,6 @@
-//! per-frame input snapshot with edge detection, fed by GLFW. Keys and
+//! per-frame input snapshot with edge detection, fed by GLFW. Keys, mouse
+//! buttons and the first gamepad's buttons are polled; held keys the system
+//! repeats, the wheel and typing come by callback. Keys and
 //! buttons are asked about as a `Bind`; what each one does is the game's
 //! business (`game/controls.zig`, read from `controls.cfg`).
 /// the standard library
@@ -26,15 +28,24 @@ pub const Button=glfw.MouseButton;
 /// a mouse button's name in a binding is this prefix and the button's
 /// (`mouse_left`); a key's is its GLFW name (`w`, `left_shift`, `F5`, `one`).
 pub const mouse="mouse_";
-/// one physical key or mouse button.
+/// a gamepad's button, as GLFW names it (its standard layout: a, b, x, y,
+/// the bumpers, back, start, the sticks pressed, the d-pad)
+pub const PadButton=glfw.Gamepad.Button;
+/// a gamepad button's name in a binding is this prefix and the button's
+/// (`pad_a`, `pad_dpad_up`)
+pub const pad="pad_";
+/// one physical key, mouse button or gamepad button.
 pub const Bind=union(enum){
   /// a key on the keyboard
   key:Key,
   /// a button on the mouse
   button:Button,
+  /// a button on the gamepad
+  pad:PadButton,
   /// the bind named `name`, or null for no such key or button.
   pub fn parse(name:[]const u8)?Bind{
     if(startsWith(u8,name,mouse))if(stringToEnum(Button,name[mouse.len..]))|b|return.{.button=b};
+    if(startsWith(u8,name,pad))if(stringToEnum(PadButton,name[pad.len..]))|b|return.{.pad=b};
     if(eql(u8,name,@tagName(Key.unknown)))return null;
     return if(stringToEnum(Key,name))|k|.{.key=k}else null;
   }
@@ -45,6 +56,19 @@ const Keys=EnumSet(Key);
 pub const maxTyped=16;
 /// which mouse buttons are held, one bit a button
 const Buttons=EnumSet(Button);
+/// which gamepad buttons are held, one bit a button
+const PadButtons=EnumSet(PadButton);
+/// a clipboard of a test's own: the text put on it
+pub const Clip=struct{
+  /// the text's bytes; only the first `len` are real
+  buf:[maxClip]u8=undefined,
+  /// how many bytes it holds
+  len:usize=0,
+  /// the text put on it
+  pub fn slice(c:*const Clip)[]const u8{return c.buf[0..c.len];}
+};
+/// the longest text the clipboard is read or written with, in bytes
+pub const maxClip=256;
 /// what the keys, mouse and window did this frame and the last, sampled
 /// once a frame by `update`; callbacks gather scroll, typing and resizes
 pub const Input=struct{
@@ -76,12 +100,23 @@ pub const Input=struct{
   typingBuf:[maxTyped]u21=undefined,
   /// how many of `typingBuf` are filled
   typingLen:u8=0,
+  /// the keys the system repeated this frame, held long enough to type again
+  rep:Keys=.initEmpty(),
+  /// the keys being repeated for next frame, gathered by the callback
+  repAcc:Keys=.initEmpty(),
+  /// the gamepad's buttons held this frame (the first gamepad plugged in)
+  pcur:PadButtons=.initEmpty(),
+  /// the gamepad's buttons held last frame
+  pprev:PadButtons=.initEmpty(),
+  /// headless tests: a clipboard of their own instead of the window's
+  ownClip:?*Clip=null,
   /// must be called once the Input has its final address.
   pub fn attach(in:*Input)void{
     in.win.setUserPointer(in);
     _=in.win.setScrollCallback(onScroll);
     _=in.win.setFramebufferSizeCallback(onResize);
     _=in.win.setCharCallback(onChar);
+    _=in.win.setKeyCallback(onKey);
   }
   /// samples the keys, buttons and cursor for a new frame and moves what
   /// the callbacks gathered (scroll, typing) into it; last frame's state
@@ -102,6 +137,25 @@ pub const Input=struct{
     in.typedBuf=in.typingBuf;
     in.typedLen=in.typingLen;
     in.typingLen=0;
+    in.rep=in.repAcc;
+    in.repAcc=.initEmpty();
+    in.pprev=in.pcur;
+    in.pcur=padHeld();
+  }
+  /// the buttons held on the first gamepad plugged in (none without one)
+  fn padHeld()PadButtons{
+    // the buttons held, filled from the first gamepad found
+    var held=PadButtons.initEmpty();
+    for(0..glfw.Joystick.maximum_supported)|i|{
+      // this joystick, and it as a gamepad, if it is one
+      const j:glfw.Joystick=@enumFromInt(@as(c_int,@intCast(i)));
+      const gp=j.asGamepad() orelse continue;
+      // its state; one that will not read is passed over
+      const st=gp.getState() catch continue;
+      for(comptime values(PadButton))|b|held.setPresent(b,st.buttons[@intFromEnum(b)]==.press);
+      return held;
+    }
+    return held;
   }
   /// the characters typed this frame
   pub fn typed(in:*const Input)[]const u21{return in.typedBuf[0..in.typedLen];}
@@ -112,6 +166,7 @@ pub const Input=struct{
     return switch(b){
       .key=>|k|in.cur.contains(k),
       .button=>|k|in.bcur.contains(k),
+      .pad=>|k|in.pcur.contains(k),
     };
   }
   /// did `b` go down this frame?
@@ -119,6 +174,22 @@ pub const Input=struct{
     return switch(b){
       .key=>|k|in.cur.contains(k)and!in.prev.contains(k),
       .button=>|k|in.bcur.contains(k)and!in.bprev.contains(k),
+      .pad=>|k|in.pcur.contains(k)and!in.pprev.contains(k),
+    };
+  }
+  /// was `b` let go this frame?
+  pub fn released(in:*const Input,b:Bind)bool{
+    return switch(b){
+      .key=>|k|in.prev.contains(k)and!in.cur.contains(k),
+      .button=>|k|in.bprev.contains(k)and!in.bcur.contains(k),
+      .pad=>|k|in.pprev.contains(k)and!in.pcur.contains(k),
+    };
+  }
+  /// did `b` go down this frame, or (a key held long enough) repeat?
+  pub fn repeated(in:*const Input,b:Bind)bool{
+    return in.pressed(b) or switch(b){
+      .key=>|k|in.rep.contains(k),
+      .button,.pad=>false,
     };
   }
   /// headless tests: hold `b` down (or let it go) as of this frame.
@@ -126,12 +197,37 @@ pub const Input=struct{
     switch(b){
       .key=>|k|in.cur.setPresent(k,on),
       .button=>|k|in.bcur.setPresent(k,on),
+      .pad=>|k|in.pcur.setPresent(k,on),
     }
   }
   /// headless tests: start the next frame from this one, as `update` does.
   pub fn advance(in:*Input)void{
     in.prev=in.cur;
     in.bprev=in.bcur;
+    in.pprev=in.pcur;
+    in.rep=.initEmpty();
+  }
+  /// headless tests: key `k` repeats this frame, as if held long.
+  pub fn repeat1(in:*Input,k:Key)void{in.rep.insert(k);}
+  /// the text on the clipboard (empty without any), GLFW's until the next
+  /// call; an input of its own clipboard (tests) gives what was put on it
+  pub fn clipboard(in:*const Input)[]const u8{
+    if(in.ownClip)|c|return c.slice();
+    return in.win.getClipboardString() orelse "";
+  }
+  /// `text` put on the clipboard (no more than `maxClip` bytes of it)
+  pub fn setClipboard(in:*const Input,text:[]const u8)void{
+    // the text as GLFW takes it, its end marked by a zero
+    var buf:[maxClip+1]u8=undefined;
+    const n=@min(text.len,maxClip);
+    @memcpy(buf[0..n],text[0..n]);
+    buf[n]=0;
+    if(in.ownClip)|c|{
+      @memcpy(c.buf[0..n],buf[0..n]);
+      c.len=n;
+      return;
+    }
+    in.win.setClipboardString(buf[0..n:0]);
   }
   /// hide and hold the cursor for mouse look, or give it back.
   pub fn capture(in:*const Input,on:bool)void{
@@ -149,6 +245,14 @@ fn onChar(w:*glfw.Window,c:u32)callconv(.c)void{
   const in=w.getUserPointer(Input) orelse return;
   if(c<=0x10ffff)push(&in.typingBuf,&in.typingLen,@intCast(c));
 }
+/// GLFW's key callback: gathers the keys the system repeats (held long
+/// enough to type again) for the next frame; presses and releases are
+/// polled by `update`
+fn onKey(w:*glfw.Window,k:Key,_:c_int,a:glfw.Action,_:glfw.Mods)callconv(.c)void{
+  // the input this window belongs to
+  const in=w.getUserPointer(Input) orelse return;
+  if(a==.repeat and k!=.unknown)in.repAcc.insert(k);
+}
 /// appends `c` while there is room (more in one frame are dropped)
 fn push(buf:*[maxTyped]u21,len:*u8,c:u21)void{
   if(len.*==maxTyped)return;
@@ -165,4 +269,26 @@ test"binds parse by key and mouse button name"{
   try testing.expectEqual(Bind{.button=.right},Bind.parse("mouse_right").?);
   try testing.expectEqual(null,Bind.parse("unknown"));
   try testing.expectEqual(null,Bind.parse("mouse_nose"));
+  try testing.expectEqual(Bind{.pad=.dpad_up},Bind.parse("pad_dpad_up").?);
+  try testing.expectEqual(Bind{.pad=.a},Bind.parse("pad_a").?);
+  try testing.expectEqual(null,Bind.parse("pad_z"));
+}
+test"a bind goes down, repeats while held long, and is let go"{
+  // an input without a window, of its own clipboard
+  var clip=Clip{};
+  var in:Input=.{.win=undefined,.ownClip=&clip};
+  in.hold(.{.pad=.a},true);
+  try testing.expect(in.pressed(.{.pad=.a}) and in.repeated(.{.pad=.a}));
+  in.advance();
+  try testing.expect(in.down(.{.pad=.a})and!in.pressed(.{.pad=.a}));
+  in.hold(.{.pad=.a},false);
+  try testing.expect(in.released(.{.pad=.a}));
+  // a key held long repeats, without going down again
+  in.hold(.{.key=.left},true);
+  in.advance();
+  try testing.expect(!in.repeated(.{.key=.left}));
+  in.repeat1(.left);
+  try testing.expect(in.repeated(.{.key=.left})and!in.pressed(.{.key=.left}));
+  in.setClipboard("moss");
+  try testing.expectEqualStrings("moss",in.clipboard());
 }

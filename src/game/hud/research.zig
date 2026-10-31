@@ -34,6 +34,8 @@ const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 /// the HUD's shared sizes and colours
 const s=lib.style;
+/// the HUD's panel component
+const Panel=lib.hudPanel.Panel;
 /// every player-facing string
 const txt=lib.txt;
 /// all the maths: vectors, easing, angles
@@ -357,6 +359,8 @@ pub const Pick=union(enum){
   /// the study at this node
   node:Id
 };
+/// a node clicks as mouse1 is let go over it
+pub fn fire(_:Pick)hud.Fire{return.release;}
 /// a click chooses what is studied (carrying something, it just puts it down)
 pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
   if(press!=.use)return;
@@ -371,8 +375,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   const ph=@min(screenH-2*margin,maxH);
   const px=screenW-pw-margin;
   const py=(screenH-ph)/2;
-  try d.trellis(px,py,pw,ph,s.researchPanel,0.77);
-  g.rows.add(.{.x=px,.y=py,.w=pw,.h=ph},.panel);
+  try(Panel{.box=.{.x=px,.y=py,.w=pw,.h=ph},.col=s.researchPanel,.seed=0.77}).draw(g,d,.{screenW,screenH});
   _=try d.text(px+56,py+s.titleY,s.textTitle,s.gold,txt.s.hud.researchTitle);
   _=try d.text(px+56,py+58,s.textSmall,s.dim,txt.s.hud.researchHint);
   // the sapling's growth, and how far its trunk should reach
@@ -450,7 +453,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
     try node(d,f,&l,g,id,grown[1+i],rad[0]);
     // its hit area's side (pixels)
     const hit=@max(0.7*f.k,minHit);
-    g.rows.add(.{.x=c[0]-hit/2,.y=c[1]-hit/2,.w=hit,.h=hit},hud.row(.research,.{.node=id}));
+    try g.rows.add(.{.x=c[0]-hit/2,.y=c[1]-hit/2,.w=hit,.h=hit},hud.row(.research,.{.node=id}));
   };
   try card(g,d,px,py+ph-cardH,hover orelse g.prog.current);
 }

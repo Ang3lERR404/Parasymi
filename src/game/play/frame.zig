@@ -36,6 +36,8 @@ const Error=lib.play.Error;
 const followHeight=lib.play.followHeight;
 /// how quickly the camera follows (share a second)
 const followLerp=lib.play.followLerp;
+/// the HUD by mouse, keys and pad: the pointer, clicks and drags
+const pointer=lib.play.pointer;
 /// the game, which a frame runs
 const Game=lib.play.game.Game;
 /// how many chunks stream in each frame
@@ -114,8 +116,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   // a click lands on the HUD panel under the mouse before the world: rows
   // choose research, weave a recipe, lift or put down an item; a panel's
   // backdrop just absorbs it
-  g.mouse=cursor;
-  g.pointer=.{.at=cursor,.down=ctl.down(in,.use),.went=ctl.pressed(in,.use)};
+  pointer.point(g,in,cursor);
   // a structure's panel closes once it is gone or out of reach
   if(g.mode==.structure and g.opened()==null)g.mode=.roam;
   if(!g.mode.sorting())g.held=null;
@@ -128,13 +129,11 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   const uiHit=if(inspecting or looking)null else g.rows.at(cursor);
   g.pointed=uiHit;
   if(!ctl.down(in,.use))g.useSpent=false;
-  if(ctl.pressed(in,.use)){
-    if(uiHit)|hit|hud.click(g,hit,.use,in)else if(g.held!=null){
-      g.drop();
-      g.useSpent=true;
-    }
+  if(ctl.pressed(in,.use) and uiHit==null and g.held!=null){
+    g.drop();
+    g.useSpent=true;
   }
-  if(ctl.pressed(in,.remove))if(uiHit)|hit|hud.click(g,hit,.remove,in);
+  pointer.clicks(g,in,uiHit);
   // discard throws away the belly stack carried, else the one under the cursor
   if(ctl.pressed(in,.discard) and g.mode.sorting()){
     if(g.held)|h|switch(h){
