@@ -180,8 +180,8 @@ const float PLEXUS_HEART_EVERY = 2.0;
 const float PLEXUS_HEART_WAY = 4.5;
 // the heart settling into a builder (stage 4, from the chain done): its
 // blooms burst free in a puff of fragments and drift slowly down to lie on
-// the ground as parts; the heart, keeping its size, floats down near the
-// ground, its tendrils curling up, and faint currents of energy flow in
+// the ground as parts; the heart, keeping its size, floats down to hover
+// over the ground, its tendrils hanging free, and faint currents of energy flow in
 // from the air below and round it, like water, rising into its base. Its
 // webs beside the heart's own: the fragments that burst from the blooms
 // (six of three points from each), the currents (seven of ten points). How
@@ -190,7 +190,7 @@ const float PLEXUS_HEART_WAY = 4.5;
 const int PLEXUS_HEART_BURST = 47;
 const int PLEXUS_HEART_CURRENT = 48;
 const float PLEXUS_HEART_SETTLE = 44.0;
-const float PLEXUS_HEART_DROP = 1.9;
+const float PLEXUS_HEART_DROP = 1.2;
 // a petlet's rows, base to tip: how many points each holds (12 in all) and
 // how far along it lies
 const int PLEXUS_PETLET_ROWS[6] = int[6](1, 2, 3, 3, 2, 1);
@@ -494,8 +494,6 @@ float plexusHeartBloom(int k, float t) {
 // while bound, one after another while rising, all while blooming
 float plexusHeartGrow(float k, float t) {
   if (plexStage < 0.5) return 0.0;
-  // (curling up again as the heart comes down to the ground)
-  if (plexStage > 3.5) return 1.0 - 0.65 * plexusSettleDrop(t);
   if (plexStage > 1.5) return 1.0;
   float x = mod(t, PLEXUS_HEART_RISING);
   return smoothstep(1.5 * k, 1.5 * k + 3.0, x) * (1.0 - smoothstep(9.0, 10.0, x));
