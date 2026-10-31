@@ -1,6 +1,7 @@
 //! a rudimentary mesh editor: sculpts one seamless surface out of forms
-//! (engine gfx/sculpt.zig: ellipsoids, rounded cones, rounded boxes, each
-//! melted into the ones before it or carved out of them), meshed again as
+//! (engine gfx/sculpt.zig: ellipsoids, rounded cones, rounded boxes and
+//! curling tubes, each melted into the ones before it, carved out of them
+//! or only inking their colour), meshed again as
 //! it is edited and shown on the game's own renderer, alone on the
 //! generated ground (no wolf, plants or structures), and keeps it as text
 //! in `src/mesh/<name>.mesh`. The game does not read these yet. From the
@@ -11,10 +12,17 @@
 //! to `shots/meshedit.png` and closes, for checking it headless.)
 //! Each form is placed by `pos`, turned by `rot` (degrees, y then x then
 //! z) and sized by `size` (radii; a cone's x and z its radii at its foot
-//! and its tip, y half its length; a box's half extents); `round` rounds a
-//! box, `melt` is how far it melts into what is before it, `col` its colour.
+//! and its tip, y half its length; a box's half extents; a tube's x and z
+//! its radii at its foot and its tip, y its length); `round` rounds a
+//! box, `melt` is how far it melts into what is before it (an ink form's
+//! fade), `curl` how far a tube turns toward x from its foot to its tip
+//! (degrees: a horn, a tail), `col` its colour. `t` steps the shape, `c`
+//! carves, `i` inks (colour only, adding nothing: an eye's dark ring).
 //! `x` gives the selected form a twin, mirrored across the sculpt's middle
 //! (x=0): it follows its form as it is shaped (one ear makes both).
+//! ctrl and a click gathers a form into the selected one's group (or lets
+//! it go): the group moves and turns with it, round where it stands; `g`
+//! snaps the selected form and its group to the grid.
 //! `enter` names the selected form (`snout`, `left ear`): typed in its row,
 //! enter or escape done, kept in the file; the panel shows each value in
 //! words (`place up`, `colour red`, a cone's `tip radius`).

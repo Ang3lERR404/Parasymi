@@ -49,6 +49,8 @@ const Ch=meshedit.settings.Ch;
 const dragCoarse=meshedit.settings.dragCoarse;
 /// the first line of a mesh's text
 const header=meshedit.settings.header;
+/// how many degrees of a tube's curl each segment takes
+const curlStep=meshedit.settings.curlStep;
 /// the shape a form takes
 const Kind=meshedit.settings.Kind;
 /// the most cells across the whole sculpt
@@ -62,10 +64,16 @@ const Name=@import("../labels.zig").Name;
 pub const Piece=struct{
   /// what the gardener calls it (`snout`, `left ear`); may be empty
   name:Name=.{},
-  /// an ellipsoid, a rounded cone or a rounded box
+  /// an ellipsoid, a rounded cone, a rounded box or a curling tube
   kind:Kind=.ellipsoid,
   /// whether it is carved out of what is before it (else melted in)
   carve:bool=false,
+  /// whether it only inks the colour of the surface where it lies, adding
+  /// nothing (its melt the fade round it): the dark round an eye, a stripe
+  ink:bool=false,
+  /// whether it is gathered into the selected form's group, moving and
+  /// turning with it (only while editing: never kept in the file)
+  grouped:bool=false,
   /// whether a twin of it stands mirrored across the sculpt's middle (x=0),
   /// following it as it is shaped
   twin:bool=false,
@@ -84,32 +92,61 @@ pub const Piece=struct{
         .ellipsoid=>.{.ellipsoid=.{.c=z,.r=v.size}},
         .cone=>.{.cone=.{.a=v3(0,-v.size[1],0),.b=v3(0,v.size[1],0),.ra=v.size[0],.rb=v.size[2]}},
         .box=>.{.box=.{.c=z,.half=v.size,.round=@min(v.round,@reduce(.Min,v.size))}},
+        .tube=>.{.chain=arc(v)},
       },
       .at=at,
       .bone=0,
       .col=color.rgb(v.col[0],v.col[1],v.col[2]).toRgba8(255),
       .k=v.melt,
-      .carve=p.carve,
+      .carve=p.carve and !p.ink,
+      .ink=if(p.ink)@max(v.melt,inkMin)else 0,
       .part=@intFromEnum(p.shade),
     };
   }
   /// its twin: mirrored across the sculpt's middle (x=0), so its place
   /// across flips, and so do its turns about y and z (a mirror leaves the
-  /// turn about x alone); every shape is even across its own x, so the
-  /// shape itself is its own mirror
+  /// turn about x alone); every shape is even across its own x but a
+  /// tube's curl, so the curl flips too
   pub fn mirrored(p:Piece)Piece{
     // the twin, its values flipped
     var t=p;
     t.v.pos[0]=-p.v.pos[0];
     t.v.rot[1]=-p.v.rot[1];
     t.v.rot[2]=-p.v.rot[2];
+    t.v.curl=-p.v.curl;
     return t;
   }
   /// the farthest it reaches from the sculpt's origin (m)
   pub fn reach(p:Piece)f32{
-    return m.len(p.v.pos)+m.len(p.v.size)+p.v.melt;
+    // how far its shape reaches from its place: a tube its length and its widest radius
+    const own=if(p.kind==.tube)p.v.size[1]+@max(p.v.size[0],p.v.size[2])else m.len(p.v.size);
+    return m.len(p.v.pos)+own+p.v.melt;
   }
 };
+/// the least fade an ink form takes (m), so it never inks a hard edge
+const inkMin:f32=0.005;
+/// a tube's centre line: from its foot at the origin up along y for its
+/// length (`size` y), bending toward x round a circle as it goes so that
+/// it has turned by `curl` degrees at its tip; its radius eases from its
+/// foot's (`size` x) to its tip's (`size` z). One segment for each
+/// `curlStep` degrees of curl.
+pub fn arc(v:Vals)sculpt.Chain{
+  // the curl (rad), the length, and how many segments it is cut into
+  const turn=m.rad(v.curl);
+  const len=v.size[1];
+  const n:usize=m.clamp(@as(usize,@intFromFloat(@ceil(@abs(v.curl)/curlStep))),1,sculpt.chainMax);
+  // the chain being laid
+  var c:sculpt.Chain=.{.n=@intCast(n)};
+  for(0..n+1)|i|{
+    // how far along it this point is (0..1), and how far it has turned there (rad)
+    const t=m.f(i)/m.f(n);
+    const a=turn*t;
+    // nearly straight: along y; else round the circle the curl draws
+    c.pts[i]=if(@abs(turn)<1e-4)v3(0,len*t,0)else v3(len/turn*(1-@cos(a)),len/turn*@sin(a),0);
+    c.r[i]=m.lerp(v.size[0],v.size[2],t);
+  }
+  return c;
+}
 /// what a mesh's text holds: its cells and its forms, in order
 pub const Doc=struct{
   /// how fine the surface is meshed: the cell size (m)
@@ -119,11 +156,11 @@ pub const Doc=struct{
   /// lets the forms go
   pub fn deinit(d:*Doc,gpa:Allocator)void{d.pieces.deinit(gpa);}
   /// writes the mesh as text: the header, the cell size, then each form's
-  /// kind (and `carve`, `twin`), name (if it has one), shader and every value, one to a line
+  /// kind (and `carve`, `ink`, `twin`), name (if it has one), shader and every value, one to a line
   pub fn write(d:*const Doc,w:*Writer)Writer.Error!void{
     try w.print(header++"\ncell {d}\n",.{d.cell});
     for(d.pieces.items)|*p|{
-      try w.print("form {t}{s}{s}\n",.{p.kind,if(p.carve)" carve"else"",if(p.twin)" twin"else""});
+      try w.print("form {t}{s}{s}{s}\n",.{p.kind,if(p.carve)" carve"else"",if(p.ink)" ink"else"",if(p.twin)" twin"else""});
       if(p.name.len>0)try w.print("name {s}\n",.{p.name.slice()});
       try w.print("shade {t}\n",.{p.shade});
       for(Ch.names,0..)|n,i|try w.print("{s} {d}\n",.{n,Ch.get(&p.v,i)});
@@ -153,7 +190,7 @@ pub const Doc=struct{
         const kind=stringToEnum(Kind,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
         var p:Piece=.{.kind=kind};
         while(it.next())|flag|{
-          if(eql(u8,flag,"carve"))p.carve=true else if(eql(u8,flag,"twin"))p.twin=true else return error.BadMesh;
+          if(eql(u8,flag,"carve"))p.carve=true else if(eql(u8,flag,"ink"))p.ink=true else if(eql(u8,flag,"twin"))p.twin=true else return error.BadMesh;
         }
         try d.pieces.append(gpa,p);
       }else if(eql(u8,word,"name")){
@@ -178,11 +215,12 @@ pub const Doc=struct{
   /// too big for that many; `dragCoarse` times them while `coarse`);
   /// nothing when no form adds anything
   pub fn mesh(d:*const Doc,gpa:Allocator,io:?Io,coarse:bool,b:*meshgen.Builder)Allocator.Error!void{
-    // whether any form adds (else there is nothing to mesh), and the farthest reach
+    // whether any form adds (neither carving nor inking; else there is
+    // nothing to mesh), and the farthest reach
     var solid=false;
     var far:f32=0;
     for(d.pieces.items)|p|{
-      solid=solid or !p.carve;
+      solid=solid or (!p.carve and !p.ink);
       far=@max(far,p.reach());
     }
     if(!solid)return;

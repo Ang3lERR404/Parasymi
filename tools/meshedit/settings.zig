@@ -109,12 +109,21 @@ pub const plain:Color=s.white;
 pub const bare:Color=s.dim;
 /// a form that carves
 pub const carve:Color=s.growth;
+/// a form that only inks the surface's colour (a soft violet)
+pub const ink:Color=.{205,175,240,255};
+/// a form gathered into the selected one's group, moving and turning with it
+pub const grouped:Color=s.freecam;
+/// `g` snaps the selected forms' places and sizes to this (m)
+pub const snapLen:f32=0.005;
+/// and their turns to this (degrees)
+pub const snapDeg:f32=15;
 /// the panels behind the list and the values
 pub const panel:Color=s.panel;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
-  "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   x twin   m shader (shift back)   tab next form   enter name it",
-  "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo",
+  "n new form (from the selected)   del remove   pgup/pgdn move in the list   tab next form   enter name it   m shader (shift back)",
+  "t shape (a tube curls by its curl)   c carve   i ink (colour only)   x twin   ctrl+click gather into a group   g snap",
+  "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y redo",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
 /// the shape a form takes
@@ -125,7 +134,13 @@ pub const Kind=enum{
   cone,
   /// a box with rounded edges
   box,
+  /// a tube from its foot up along y, curling toward x as it goes: a horn,
+  /// a tail, a tendril
+  tube,
 };
+/// the most a tube's curl is cut into segments: one for each this many
+/// degrees of it (at least one, at most the sculpt's `chainMax`)
+pub const curlStep:f32=12;
 /// a form's numbers, every one a value the editor shows and keeps
 pub const Vals=struct{
   /// where it stands (m)
@@ -137,8 +152,10 @@ pub const Vals=struct{
   size:V3=.{0.15,0.15,0.15},
   /// how much a box's edges are rounded (m)
   round:f32=0.02,
-  /// how far it melts into the forms before it (m)
+  /// how far it melts into the forms before it (m); an ink form's fade
   melt:f32=0.03,
+  /// how far a tube curls toward x from its foot to its tip (degrees)
+  curl:f32=0,
   /// its colour, red, green and blue (0..1)
   col:V3=.{0.45,0.42,0.3},
 };
@@ -151,13 +168,21 @@ const valueLabels=labels.all(&.{
   .{.path="size",.word="size",.axes=.{"width","height","depth"}},
   .{.path="round",.word="edge rounding"},
   .{.path="melt",.word="melt"},
+  .{.path="curl",.word="curl (tube)"},
   .{.path="col",.word="colour",.axes=labels.colourAxes},
 },&Ch.names);
 /// how a cone's size reads: the radius at its foot, half its length, the radius at its tip
 const coneSize=[3][]const u8{"foot radius","half length","tip radius"};
+/// how a tube's size reads: the radius at its foot, its length, the radius at its tip
+const tubeSize=[3][]const u8{"foot radius","length","tip radius"};
 /// value `i` of a form shaped `kind`, in words
 pub fn valueLabel(kind:Kind,i:usize)[]const u8{
-  return if(kind==.cone and i>=sizeX and i<sizeX+3)coneSize[i-sizeX]else valueLabels[i];
+  if(i<sizeX or i>=sizeX+3)return valueLabels[i];
+  return switch(kind){
+    .cone=>coneSize[i-sizeX],
+    .tube=>tubeSize[i-sizeX],
+    .ellipsoid,.box=>valueLabels[i],
+  };
 }
 /// which way the shader is stepped through the roles
 const Way=enum{

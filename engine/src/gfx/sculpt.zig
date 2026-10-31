@@ -1,5 +1,5 @@
 //! sculpting one seamless surface out of many forms: each form (an
-//! ellipsoid, a rounded cone, a rounded box) is a signed distance field,
+//! ellipsoid, a rounded cone, a rounded box, a tube through points) is a signed distance field,
 //! the forms melt into one another by smooth union (or are carved away by
 //! smooth subtraction), and the whole is meshed once at startup with
 //! surface nets: one vertex per surface cell, pulled onto the surface,
@@ -39,6 +39,38 @@ pub const Shape=union(enum){
   cone:struct{a:V3,b:V3,ra:f32,rb:f32},
   /// centre, half extents (rounding included) and the rounding radius
   box:struct{c:V3,half:V3,round:f32},
+  /// a tube through points: rounded cones from each point to the next, the
+  /// radius at each its own, joined without seams (a horn, a tail)
+  chain:Chain,
+};
+/// the most segments a chain may have
+pub const chainMax=32;
+/// a tube through `n`+1 points (`n` segments), each with its radius
+pub const Chain=struct{
+  /// the points along it, the first `n`+1 used
+  pts:[chainMax+1]V3=@splat(.{0,0,0}),
+  /// the radius at each point
+  r:[chainMax+1]f32=@splat(0),
+  /// how many segments it has (1..chainMax)
+  n:u8=1,
+  /// the signed distance from `p` to the tube: the nearest of its segments
+  fn dist(c:*const Chain,p:V3)f32{
+    // the nearest so far
+    var d:f32=m.inf(f32);
+    for(0..c.n)|i|d=@min(d,roundCone(p,c.pts[i],c.pts[i+1],c.r[i],c.r[i+1]));
+    return d;
+  }
+  /// the sphere (centre, radius) it lies in
+  fn bound(c:*const Chain)struct{c:V3,r:f32}{
+    // the points' middle
+    var mid=v3(0,0,0);
+    for(0..c.n+1)|i|mid+=c.pts[i];
+    mid/=m.splat3(m.f(c.n+1));
+    // the farthest any point's ball reaches from it
+    var far:f32=0;
+    for(0..c.n+1)|i|far=@max(far,m.len(c.pts[i]-mid)+c.r[i]);
+    return.{.c=mid,.r=far};
+  }
 };
 /// one form of the sculpt: its shape, where it sits and how it is
 /// stretched, which bone carries it, its colour, and how it melts in
@@ -139,11 +171,12 @@ fn roundBox(p:V3,half:V3,r:f32)f32{
   return m.len(out)+@min(@reduce(.Max,q),0)-r;
 }
 /// the signed distance from `p` to shape `s`, in the shape's own space
-fn shapeDist(s:Shape,p:V3)f32{
-  return switch(s){
+fn shapeDist(s:*const Shape,p:V3)f32{
+  return switch(s.*){
     .ellipsoid=>|e|ellipsoid(p-e.c,e.r),
     .cone=>|c|roundCone(p,c.a,c.b,c.ra,c.rb),
     .box=>|x|roundBox(p-x.c,x.half,x.round),
+    .chain=>|*c|c.dist(p),
   };
 }
 /// the sphere (centre, radius) a shape lies in, in its own space
@@ -152,6 +185,11 @@ fn shapeBound(s:Shape)struct{c:V3,r:f32}{
     .ellipsoid=>|e|.{.c=e.c,.r=@reduce(.Max,e.r)},
     .cone=>|c|.{.c=(c.a+c.b)*m.splat3(0.5),.r=m.len(c.b-c.a)*0.5+@max(c.ra,c.rb)},
     .box=>|x|.{.c=x.c,.r=m.len(x.half)},
+    .chain=>|c|{
+      // the chain's own sphere
+      const b=c.bound();
+      return.{.c=b.c,.r=b.r};
+    },
   };
 }
 /// a colour's rgb as a vector of 0..255 values, for blending
@@ -215,7 +253,7 @@ pub const Sculpt=struct{
   fn formDist(pf:*const Placed,p:V3)f32{
     // the point in the form's own, unstretched space
     const q=m.mulPoint(pf.inv,p)/pf.f.stretch;
-    return shapeDist(pf.f.shape,q)*pf.shrink;
+    return shapeDist(&pf.f.shape,q)*pf.shrink;
   }
   /// the field at `p` from the forms listed (indices into `forms`)
   fn dist(s:*const Sculpt,p:V3,list:[]const u32)f32{
@@ -773,4 +811,29 @@ test"each vertex takes the role of the form it lies nearest"{
   }
   try testing.expectEqual(@as(usize,0),seen[@intFromEnum(Role.stem)]);
   try testing.expect(seen[@intFromEnum(Role.leaf)]>0 and seen[@intFromEnum(Role.bloom)]>0);
+}
+test"a chain of one segment is its cone, and a bent chain is as near as its nearest segment"{
+  // the test helpers
+  const testing=std.testing;
+  // a chain of one segment, and the cone it should equal
+  var one:Chain=.{.n=1};
+  one.pts[0]=v3(0,0,0);
+  one.pts[1]=v3(0,0.3,0);
+  one.r[0]=0.05;
+  one.r[1]=0.02;
+  const cone:Shape=.{.cone=.{.a=v3(0,0,0),.b=v3(0,0.3,0),.ra=0.05,.rb=0.02}};
+  for([_]V3{v3(0.1,0.1,0),v3(0,-0.2,0.05),v3(0.02,0.4,-0.01)})|p|{
+    try testing.expectApproxEqAbs(shapeDist(&cone,p),shapeDist(&.{.chain=one},p),1e-6);
+  }
+  // a chain bent through a corner: inside at the corner, outside past it
+  var bent:Chain=.{.n=2};
+  bent.pts[0]=v3(0,0,0);
+  bent.pts[1]=v3(0,0.2,0);
+  bent.pts[2]=v3(0.2,0.2,0);
+  bent.r=@splat(0.03);
+  try testing.expect(shapeDist(&.{.chain=bent},v3(0,0.2,0))<0);
+  try testing.expect(shapeDist(&.{.chain=bent},v3(0.2,0,0))>0.1);
+  // its sphere holds every point's ball
+  const b=shapeBound(.{.chain=bent});
+  for(0..3)|i|try testing.expect(m.len(bent.pts[i]-b.c)+0.03<=b.r+1e-6);
 }

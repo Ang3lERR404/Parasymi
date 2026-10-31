@@ -79,8 +79,14 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
       if(labels.named(in))e.naming=null;
     }
   }
+  // the selected form's values as the frame began (its group follows
+  // whatever this frame does to its place and turn), and which it was
+  const was:?Vals=if(e.pieces().len>0)e.pieces()[e.sel].v else null;
+  const wasSel=e.sel;
+  const wasCount=e.pieces().len;
   if(!typing)try answerKeys(e,in);
   try answerMouse(e,in,handles,view,origin,shift);
+  if(was)|w|if(e.sel==wasSel and e.pieces().len==wasCount)e.follow(w);
   try e.settle();
 }
 /// one frame's keys: forms made, removed, moved, reshaped, carved,
@@ -126,13 +132,20 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     // the selected form
     const p=&pieceList[e.sel];
     if(hit(in,.t)){
-      p.kind=switch(p.kind){.ellipsoid=>.cone,.cone=>.box,.box=>.ellipsoid};
+      p.kind=switch(p.kind){.ellipsoid=>.cone,.cone=>.box,.box=>.tube,.tube=>.ellipsoid};
       e.changed();
     }
     if(hit(in,.c)){
       p.carve=!p.carve;
+      p.ink=false;
       e.changed();
     }
+    if(hit(in,.i)){
+      p.ink=!p.ink;
+      p.carve=false;
+      e.changed();
+    }
+    if(hit(in,.g))e.snap();
     if(hit(in,.x)){
       p.twin=!p.twin;
       e.changed();
@@ -167,6 +180,8 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
 /// view selects its form; any press ends naming
 fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,origin:V3,shift:bool)Allocator.Error!void{
   if(in.pressed(.{.button=.left}))e.naming=null;
+  // whether ctrl is held: a click then gathers a form into the group (or lets it go)
+  const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
   // the mouse (px)
   const mx=in.mouse[0];
   const my=in.mouse[1];
@@ -181,7 +196,7 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
     if(mx<pad+listW and my>=listY and my<vy){
       // the form row pressed on, counted from the first in view
       const r:usize=@intFromFloat(@floor((my-listY)/row));
-      if(e.top+r<e.pieces().len)e.sel=e.top+r;
+      if(e.top+r<e.pieces().len)e.pick(e.top+r,ctrl);
     }else if(mx<pad+listW and my>=vy and my<vy+m.f(Ch.count)*row and e.pieces().len>0){
       e.ch=@intFromFloat(@floor((my-vy)/row));
       e.drag=.value;
@@ -189,16 +204,18 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
       e.part=part;
       e.drag=.gizmo;
     }else{
-      // the nearest handle so far (px)
+      // the nearest handle so far (px), and its form
       var best:f32=pickRadius;
+      var near:?usize=null;
       for(handles,0..)|h,i|if(h)|at|{
         // how far this form's handle is from the mouse (px)
         const d=m.len(v3(at[0]-mx,at[1]-my,0));
         if(d<best){
           best=d;
-          e.sel=i;
+          near=i;
         }
       };
+      if(near)|i|e.pick(i,ctrl);
     }
   }
   if(!in.down(.{.button=.left}))e.drag=.none;

@@ -25,6 +25,10 @@ const meshedit=@import("../meshedit.zig");
 const bare=meshedit.settings.bare;
 /// the colour of a form that carves
 const carve=meshedit.settings.carve;
+/// the colour of a form that only inks
+const ink=meshedit.settings.ink;
+/// the colour of a form gathered into the group
+const grouped=meshedit.settings.grouped;
 /// every value of a form, each a named channel
 const Ch=meshedit.settings.Ch;
 /// the editor's state
@@ -97,16 +101,16 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     const ry=listY+m.f(r)*row;
     if(i==e.sel)try d.glow(pad+8,ry+7,10,s.menuHover);
     // the colour the row is written in, and whether its name is being typed
-    const col=if(i==e.sel)sel else if(p.carve)carve else plain;
+    const col=if(i==e.sel)sel else if(p.grouped)grouped else if(p.ink)ink else if(p.carve)carve else plain;
     const typing=i==e.sel and e.naming!=null;
     // its number, then its name (as typed, the caret in it), else its shape
     var nb:[8]u8=undefined;
     const nx=try d.text(pad+18,ry,text,col,bufPrint(&nb,"{d}  ",.{i+1})catch"?");
     if(typing)try typed(d,nx,ry,&e.naming.?)
     else _=try d.text(nx,ry,text,if(p.name.len>0)col else bare,if(p.name.len>0)p.name.slice()else@tagName(p.kind));
-    // its shape (when named), whether it carves and whether it has a twin, dim
+    // its shape (when named), whether it carves or inks and whether it has a twin, dim
     var kb:[32]u8=undefined;
-    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.carve)" carve"else"",if(p.twin)" twin"else""})catch"?");
+    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.carve)" carve"else"",if(p.ink)" ink"else"",if(p.twin)" twin"else""})catch"?");
     _=try d.text(pad+shadeX,ry,text,if(i==e.sel)sel else bare,@tagName(p.shade));
   }
   if(e.top>0)_=try d.text(pad+listW-30,listY-20,text,bare,"...");
@@ -133,7 +137,7 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
   for(handles,0..)|h,i|if(h)|at|{
     // this form, and its handle's colour
     const p=e.pieces()[i];
-    const col=if(i==e.sel)sel else if(p.carve)carve else plain;
+    const col=if(i==e.sel)sel else if(p.grouped)grouped else if(p.ink)ink else if(p.carve)carve else plain;
     if(i!=e.sel)try d.pod(at[0],at[1],handleR,col,1,0);
   };
   // each twin's mark where it stands, dim: it follows its form, never picked itself

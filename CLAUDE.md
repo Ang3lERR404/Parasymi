@@ -94,6 +94,7 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # the selected form's gizmo (1/2/3) moves, turns, sizes it;
                                   # `m` picks the shader (part role) a form is drawn with;
                                   # `x` twins a form mirrored across the middle (x=0);
+                                  # `t` shapes (tubes curl), `i` inks, ctrl+click groups, `g` snaps;
                                   # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
                                   # both editors: ctrl+z undo, ctrl+y redo, a whole

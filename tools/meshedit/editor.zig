@@ -57,6 +57,12 @@ const rot=meshedit.settings.rot;
 const sizeX=meshedit.settings.sizeX;
 /// the least a form's size may be (m)
 const sizeMin=meshedit.settings.sizeMin;
+/// what `g` snaps places and sizes to (m)
+const snapLen=meshedit.settings.snapLen;
+/// and turns to (degrees)
+const snapDeg=meshedit.settings.snapDeg;
+/// a form's numbers
+const Vals=meshedit.settings.Vals;
 /// the editor: the mesh being sculpted, the selection, the gizmo, and
 /// whether the surface must be meshed again
 pub const Editor=struct{
@@ -156,6 +162,53 @@ pub const Editor=struct{
     e.changed();
     e.say("{s}",.{done});
   }
+  /// form `i` clicked: selected, or with ctrl (`gather`) gathered into the
+  /// group or let go of it (the selected form leads the group, never in it)
+  pub fn pick(e:*Editor,i:usize,gather:bool)void{
+    if(!gather){
+      e.sel=i;
+      return;
+    }
+    if(i==e.sel)return;
+    // the form gathered or let go
+    const p=&e.pieces()[i];
+    p.grouped=!p.grouped;
+    e.say("{s} {d}",.{if(p.grouped)"gathered"else"let go",i+1});
+  }
+  /// how many forms are gathered into the group (the selected one aside)
+  pub fn groupCount(e:*Editor)usize{
+    // the count so far
+    var n:usize=0;
+    for(e.pieces(),0..)|p,i|n+=@intFromBool(p.grouped and i!=e.sel);
+    return n;
+  }
+  /// the group carried along with the selected form, which was `was` as
+  /// the frame began: moved as far as it moved, and turned as it turned,
+  /// round where it stands
+  pub fn follow(e:*Editor,was:Vals)void{
+    // the selected form now
+    const now=e.pieces()[e.sel].v;
+    if(@reduce(.And,now.pos==was.pos) and @reduce(.And,now.rot==was.rot))return;
+    if(e.groupCount()==0)return;
+    // the turn it took this frame: its turn now after undoing its turn before
+    const by=m.mul(turnOf(now.rot),m.inverseRigid(turnOf(was.rot)));
+    for(e.pieces(),0..)|*p,i|if(p.grouped and i!=e.sel){
+      p.v.pos=now.pos+m.mulDir(by,p.v.pos-was.pos);
+      p.v.rot=anglesOf(m.mul(by,turnOf(p.v.rot)));
+    };
+    e.changed();
+  }
+  /// the selected form and its group snapped: places and sizes to
+  /// `snapLen`, turns to `snapDeg`
+  pub fn snap(e:*Editor)void{
+    for(e.pieces(),0..)|*p,i|if(i==e.sel or p.grouped){
+      p.v.pos=@round(p.v.pos/m.splat3(snapLen))*m.splat3(snapLen);
+      p.v.size=@max(@round(p.v.size/m.splat3(snapLen))*m.splat3(snapLen),m.splat3(sizeMin));
+      p.v.rot=@round(p.v.rot/m.splat3(snapDeg))*m.splat3(snapDeg);
+    };
+    e.changed();
+    e.say("snapped",.{});
+  }
   /// the selected value set to `v`, kept where it makes sense
   pub fn set(e:*Editor,v:f32)void{e.setCh(e.ch,v);}
   /// the selected form's value `ch` set to `v`, kept where it makes sense
@@ -225,6 +278,26 @@ pub const Editor=struct{
   /// draws the panel and the forms' handles
   pub const draw=meshedit.panel.draw;
 };
+/// an angle in radians as degrees, as a form's turns are kept
+fn deg(a:f32)f32{return a/m.rad(1);}
+/// a form's `turns` (degrees: y, then x, then z, as `rot` keeps them) as a matrix
+pub fn turnOf(turns:V3)m.M4{
+  return m.chain(&.{m.rotY(m.rad(turns[1])),m.rotX(m.rad(turns[0])),m.rotZ(m.rad(turns[2]))});
+}
+/// the turns (degrees, kept as `rot` keeps them) a turn matrix `r` is made
+/// of; straight up or down (no turn about x left to tell y and z apart)
+/// it is all y
+pub fn anglesOf(r:m.M4)V3{
+  // where the turn carries the x and z axes
+  const ax=m.mulDir(r,v3(1,0,0));
+  const az=m.mulDir(r,v3(0,0,1));
+  // the turn about x, from how far z tips up or down
+  const x=m.asin(-az[1]);
+  if(@abs(az[1])>1-1e-6)return v3(deg(x),deg(m.atan2(-ax[2],ax[0])),0);
+  // the turns about y (z's heading) and z (how far x tips up, against y)
+  const ay=m.mulDir(r,v3(0,1,0));
+  return v3(deg(x),deg(m.atan2(az[0],az[2])),deg(m.atan2(ax[1],ay[1])));
+}
 /// mesh `d` as the text its file would hold, the caller's to free
 pub fn text(gpa:Allocator,d:*const Doc)Allocator.Error![]u8{
   // the text, written into memory
