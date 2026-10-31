@@ -198,7 +198,9 @@ const int PLEXUS_PETAL_ROWS[8] = int[8](2, 3, 4, 5, 5, 5, 4, 2);
 const float PLEXUS_PETAL_ALONG[8] = float[8](0.02, 0.14, 0.28, 0.42, 0.56, 0.7, 0.84, 0.96);
 const float PLEXUS_SLOW = 0.12;
 const float PLEXUS_QUICK = 0.32;
-const float PLEXUS_POINT_R = 0.015;
+const float PLEXUS_POINT_R = 0.009;
+// how big a mote of light a yielder gathers or yields is, beside a point
+const float PLEXUS_MOTE_R = 0.015;
 // each point is a pair of lights circling each other: how far apart they
 // are, how much of that the first (the larger) keeps to the middle's far
 // side (the smaller swings wider), how big the companion is beside it, how
@@ -780,7 +782,7 @@ void main() {
     if (plexKind < 0.5) {
       // a point: one light of its pair (pos.y 1 the first, -1 its
       // companion, the smaller)
-      lp = A + nrm * PLEXUS_POINT_R * thin * yield * (1.0 + plexMote) * swell;
+      lp = A + nrm * (plexMote > 0.5 ? PLEXUS_MOTE_R * (1.0 + plexMote) : PLEXUS_POINT_R * swell) * thin * yield;
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * nrm;
     } else if (plexKind < 1.5 || plexKind > 2.5) {
