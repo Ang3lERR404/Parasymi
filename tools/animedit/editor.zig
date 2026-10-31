@@ -37,6 +37,8 @@ const labels=@import("../labels.zig");
 const History=@import("../history.zig").History;
 /// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
+/// a rigged sculpt the clip may move
+const sculptRig=animedit.sculpt;
 /// each pose channel in words
 const poseLabels=animedit.settings.poseLabels;
 /// each look channel in words
@@ -108,6 +110,8 @@ pub const Editor=struct{
   io:Io,
   /// who the clip moves
   subject:Subject,
+  /// a rigged sculpt's bones and channels, when the clip moves one
+  sculpt:?*sculptRig.Sculpt=null,
   /// where the clip is kept (`src/anim/<name>.anim`)
   path:[]const u8,
   /// the clip being keyed
@@ -304,14 +308,16 @@ pub const Editor=struct{
     }
     return best;
   }
-  /// whether the clip moves the wolf (else one thing alone)
+  /// whether the clip moves the wolf (else one thing alone, or a sculpt)
   pub fn wolf(e:*const Editor)bool{return e.subject==.wolf;}
   /// the name of row `i`'s channel, as the clip keys it
   pub fn chName(e:*const Editor,i:usize)[]const u8{
+    if(e.sculpt)|sc|return sc.names[e.shown[i]];
     return if(e.wolf())PoseCh.names[e.shown[i]]else LookCh.names[e.shown[i]];
   }
   /// the name of row `i`'s channel in words, as the panel shows it
   pub fn chLabel(e:*const Editor,i:usize)[]const u8{
+    if(e.sculpt)|sc|return sc.words[e.shown[i]];
     return if(e.wolf())poseLabels[e.shown[i]]else lookLabels[e.shown[i]];
   }
   /// the mark at the playhead's name, if one is there
@@ -330,14 +336,17 @@ pub const Editor=struct{
   }
   /// row `i`'s value shown now
   pub fn value(e:*const Editor,i:usize)f32{
+    if(e.sculpt)|sc|return sc.vals[e.shown[i]];
     return if(e.wolf())PoseCh.get(&e.pose,e.shown[i])else LookCh.get(&e.look,e.shown[i]);
   }
   /// set row `i`'s value (a look's kept within 0..1)
   pub fn setValue(e:*Editor,i:usize,v:f32)void{
-    if(e.wolf())PoseCh.set(&e.pose,e.shown[i],v)else LookCh.set(&e.look,e.shown[i],m.clamp01(v));
+    if(e.sculpt)|sc|sc.vals[e.shown[i]]=v
+    else if(e.wolf())PoseCh.set(&e.pose,e.shown[i],v)else LookCh.set(&e.look,e.shown[i],m.clamp01(v));
   }
-  /// its value at rest (the default pose or look)
+  /// its value at rest (the default pose or look; a sculpt's none)
   pub fn rest(e:*const Editor,i:usize)f32{
+    if(e.sculpt!=null)return 0;
     return if(e.wolf())PoseCh.get(&skel.Pose{},e.shown[i])else LookCh.get(&specimen.Look{},e.shown[i]);
   }
   /// every keyed channel set from the clip at the playhead

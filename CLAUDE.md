@@ -82,7 +82,7 @@ zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --
 zig build run -- --panel=<belly|research|paused|options|keybinds|gardens|naming|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
-zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name> --at=S --channel=<name> --shot]
+zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name> --at=S --channel=<name> --shot]
                                   # animation editor (tools/animedit.zig): keys a clip
                                   # on the real renderer, saves src/anim/<name>.anim;
                                   # wolf joints are clickable, their gizmo keys them

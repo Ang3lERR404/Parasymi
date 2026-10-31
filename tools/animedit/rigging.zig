@@ -211,16 +211,21 @@ pub const Thing=union(enum){
     };
   }
 };
-/// who the clip moves: the wolf, or one plant or structure alone
+/// who the clip moves: the wolf, one plant or structure alone, or a
+/// rigged sculpt from the mesh editor
 pub const Subject=union(enum){
   /// the vine-wolf, keyed through its joints and pose channels
   wolf,
   /// a plant or structure alone, keyed through its `Look`
   thing:Thing,
-  /// its word in the clip (`wolf`, `plant:<species>`, `structure:<kind>`)
+  /// a sculpt kept as `src/mesh/<name>.mesh`, keyed through its bones
+  sculpt:[]const u8,
+  /// its word in the clip (`wolf`, `plant:<species>`, `structure:<kind>`,
+  /// `sculpt:<name>`)
   pub fn word(sj:Subject,buf:[]u8)[]const u8{
     return switch(sj){
       .wolf=>"wolf",
+      .sculpt=>|n|bufPrint(buf,"sculpt:{s}",.{n}) catch "sculpt",
       .thing=>|t|switch(t){
         .plant=>|sp|bufPrint(buf,"plant:{t}",.{sp}) catch unreachable,
         .structure=>|k|bufPrint(buf,"structure:{t}",.{k}) catch unreachable,
@@ -231,6 +236,7 @@ pub const Subject=union(enum){
   pub fn name(sj:Subject)[]const u8{
     return switch(sj){
       .wolf=>"wolf",
+      .sculpt=>|n|n,
       .thing=>|t|switch(t){
         .plant=>|sp|@tagName(sp),
         .structure=>|k|@tagName(k),

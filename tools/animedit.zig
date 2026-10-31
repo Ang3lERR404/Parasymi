@@ -1,8 +1,9 @@
 //! a rudimentary animation editor: keys a clip (engine anim/clip.zig) for
-//! the wolf's skeleton, or for one plant or structure alone, shown live on
+//! the wolf's skeleton, for one plant or structure alone, or for a sculpt rigged
+//! in the mesh editor (animedit/sculpt.zig: its place and each bone's turns), shown live on
 //! the game's own renderer, and keeps it as text in `src/anim/<name>.anim`.
 //! The game does not play clips back yet. From the repo root:
-//!   zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name>]
+//!   zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name>]
 //! (a name not yet kept starts a new clip, written there at once)
 //! (`--at=<s>` starts the playhead there, `--channel=<name>` on that
 //! channel; `--shot` saves one frame to `shots/animedit.png` and closes,
@@ -52,6 +53,8 @@ const LookCh=clip.Channels(specimen.Look);
 pub const settings=@import("animedit/settings.zig");
 /// the wolf's joints as the editor sees them: dots, picking and gizmos
 pub const rigging=@import("animedit/rigging.zig");
+/// a rigged sculpt from the mesh editor, moved through its bones
+pub const sculpt=@import("animedit/sculpt.zig");
 /// the editor's state: the clip, the subject, the playhead, the selection
 pub const editor=@import("animedit/editor.zig");
 /// what the gardener's hands do to the clip: keying, dragging, saving
@@ -65,6 +68,7 @@ pub const main=run.main;
 test{
   _=settings;
   _=rigging;
+  _=sculpt;
   _=editor;
   _=editing;
   _=panel;

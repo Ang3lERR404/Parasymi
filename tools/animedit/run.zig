@@ -97,6 +97,20 @@ const growthOnly=animedit.editor.growthOnly;
 const inTimeline=animedit.editor.inTimeline;
 /// whether a point is over the channel list
 const overList=animedit.editor.overList;
+/// a rigged sculpt the clip may move, and the mesh it is read as
+const Sculpt=animedit.sculpt.Sculpt;
+const Doc=animedit.sculpt.Doc;
+/// the mesh library, whose first slot a sculpt is drawn from
+const meshlib=ps.meshlib;
+/// the game's mesh builder, which a sculpt is meshed into
+const meshgen=ps.meshgen;
+/// the most bones a sculpt may have
+const maxBones=@import("../meshedit/rig.zig").maxBones;
+/// where sculpts are kept, and their file ending
+const meshDir=@import("../meshedit.zig").settings.dir;
+const meshExt=@import("../meshedit.zig").settings.ext;
+/// the library slot a sculpt is drawn from: nothing else is drawn
+const sculptSlot:meshlib.Id=meshlib.ids[0];
 /// the animation editor's start: reads the subject and clip from the
 /// flags, loads or makes the clip, opens the game's window and renderer on
 /// a quiet world with the wolf or the one thing alone, then runs frames,
@@ -108,7 +122,7 @@ pub fn main(init:std.process.Init)!void{
   const arena=init.arena.allocator();
   // the command line, kept in the arena
   const args=try init.minimal.args.toSlice(arena);
-  // `--wolf`/`--plant=`/`--structure=`: who the clip moves
+  // `--wolf`/`--plant=`/`--structure=`/`--mesh=`: who the clip moves
   var subject:?Subject=null;
   // `--clip=`: the clip's name, else the subject's own
   var name:?[]const u8=null;
@@ -122,6 +136,7 @@ pub fn main(init:std.process.Init)!void{
     if(eql(u8,a,"--wolf"))subject=.wolf;
     if(startsWith(u8,a,"--plant="))subject=.{.thing=.{.plant=stringToEnum(ps.species.Id,a["--plant=".len..]) orelse return error.BadPlant}};
     if(startsWith(u8,a,"--structure="))subject=.{.thing=.{.structure=stringToEnum(ps.structures.Kind,a["--structure=".len..]) orelse return error.BadStructure}};
+    if(startsWith(u8,a,"--mesh="))subject=.{.sculpt=a["--mesh=".len..]};
     if(startsWith(u8,a,"--clip="))name=a["--clip=".len..];
     if(startsWith(u8,a,"--at="))start=try std.fmt.parseFloat(f32,a["--at=".len..]);
     if(startsWith(u8,a,"--channel="))channel=a["--channel=".len..];
@@ -129,7 +144,7 @@ pub fn main(init:std.process.Init)!void{
   }
   // who the clip moves, which the flags must say
   const sj=subject orelse {
-    log.err("usage: zig build animedit -- --wolf | --plant=<species> | --structure=<kind> [--clip=<name>]",.{});
+    log.err("usage: zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name>]",.{});
     return error.NoSubject;
   };
   // the clip's name, checked to be a plain file name
@@ -176,10 +191,31 @@ pub fn main(init:std.process.Init)!void{
     .shown=switch(sj){
       .wolf=>&allPose,
       .thing=>|t|if(t==.plant)&allLook else&growthOnly,
+      .sculpt=>&.{},
     },
   };
   defer e.clip.deinit();
   defer e.history.deinit();
+  // a sculpt's mesh and bones, read from the mesh editor's file
+  var rigged:?Sculpt=switch(sj){
+    .sculpt=>|n|load:{
+      if(n.len==0 or indexOfAny(u8,n,notInName)!=null)return error.BadMesh;
+      // the mesh's path and text
+      const mpath=try std.fmt.allocPrint(arena,meshDir++"/{s}"++meshExt,.{n});
+      const text=try Dir.cwd().readFileAlloc(io,mpath,gpa,.limited(1<<22));
+      defer gpa.free(text);
+      // the mesh, its channels made from its bones
+      var doc=try Doc.parse(gpa,text);
+      errdefer doc.deinit(gpa);
+      break:load try Sculpt.init(gpa,doc);
+    },
+    else=>null,
+  };
+  defer if(rigged)|*sc|sc.deinit();
+  if(rigged)|*sc|{
+    e.sculpt=sc;
+    e.shown=sc.order;
+  }
   e.t=m.clamp(start,0,e.clip.length);
   if(channel)|want|e.sel=for(0..e.shown.len)|i|{
     if(eql(u8,e.chName(i),want))break i;
@@ -216,11 +252,11 @@ pub fn main(init:std.process.Init)!void{
   input.attach();
   // the one thing alone in a fresh world, or none for the wolf
   var lone:?specimen.Specimen=switch(sj){
-    .wolf=>null,
+    .wolf,.sculpt=>null,
     .thing=>|t|.{.what=t.subject(),.state=.{.look=.{}}},
   };
   // the renderer, building only the meshes the subject needs
-  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(arena)else null,.io=io});
+  const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(arena)else if(sj==.sculpt).{.parts=&.{sculptSlot}}else null,.io=io});
   defer r.deinit();
   // every mesh grows, then the world wakes and its ground is meshed,
   // behind the game's loading screen
@@ -243,10 +279,22 @@ pub fn main(init:std.process.Init)!void{
     game.specimen=l;
     try game.specimen.?.sow(&game);
   }
+  // a sculpt meshed once, as every level of detail of its slot
+  var built:meshgen.Builder=.{.gpa=gpa};
+  defer built.deinit();
+  if(rigged)|*sc|{
+    try sc.doc.mesh(gpa,io,false,&built);
+    // where in the builder each library slot's level of detail lies
+    var ranges:[meshlib.slots][2]u32=@splat(.{0,0});
+    const run:[2]u32=.{0,@intCast(built.mark())};
+    for(0..meshgen.lods)|l|ranges[meshlib.slot(sculptSlot,@intCast(l))]=run;
+    try renderer.setParts(r,&built,ranges,0);
+  }
   // where the camera looks to start, and from how far
   const home=game.player.pos+m.v3(0,lookUp,0);
   const homeDist:f32=switch(sj){
     .wolf=>camDist,
+    .sculpt=>camThing,
     .thing=>|t|camThing+camPer*m.f(switch(t){
       .plant=>|sp|ps.species.get(sp).size,
       .structure=>|k|ps.structures.defs.get(k).size,
@@ -284,6 +332,7 @@ pub fn main(init:std.process.Init)!void{
     e.sample();
     switch(sj){
       .wolf=>game.player.posed=e.pose,
+      .sculpt=>{},
       .thing=>game.specimen.?.state=.{.look=e.look},
     }
     // the camera orbits the subject freely and zooms; nothing of play runs
@@ -305,6 +354,16 @@ pub fn main(init:std.process.Init)!void{
     try renderer.syncWorld(r,&game.world,6,renderer.meshMs);
     // what the renderer draws this frame
     var scene=try ps.view.scene(&game,screen);
+    // a sculpt alone where the wolf would stand, its skin bent by its bones
+    var sculptBones:[maxBones]m.M4=undefined;
+    var sculptInst:[1]ps.vertex.PartInstance=undefined;
+    if(rigged)|*sc|{
+      for(&scene.parts)|*p|p.*=&.{};
+      const k=sc.pose(m.translate(game.player.pos),&sculptBones);
+      scene.bones=sculptBones[0..k.count];
+      sculptInst[0]=ps.parts.skinned(game.player.pos,0,.{});
+      scene.parts[meshlib.slot(sculptSlot,0)]=&sculptInst;
+    }
     rg=.{
       .view=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen},
       .bones=bonesOf(e.pose,game.player.heading()),
