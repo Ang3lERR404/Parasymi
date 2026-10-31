@@ -189,6 +189,13 @@ const float PLEXUS_HEART_WAY = 4.5;
 // comes down
 const int PLEXUS_HEART_BURST = 47;
 const int PLEXUS_HEART_CURRENT = 48;
+// the heart's grand flower is a layered rose: its stem becomes the rose's
+// tight middle, a golden spiral, and three rings of five petals (ten points
+// each) open round it one ring after another, the inner hugging it, the
+// outer open with their lips curled back. The rose petals' web, and where
+// the rose's middle and its petals' feet sit (before the heart is sized)
+const int PLEXUS_HEART_ROSE = 49;
+const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 44.0;
 const float PLEXUS_HEART_DROP = 1.2;
 // the heart's whole story in one (stage 5 in the mesh): bound, rising,
@@ -536,17 +543,46 @@ vec3 plexusHeartLift(vec3 p, float t) {
   return foot + (p - foot) * plexusHeartSize(t) + vec3(0.0, (0.45 + 0.04 * sin(t * 0.8)) * plexusRise(t) - down, 0.0);
 }
 // where point `id` (drifted by `moved`) of the heart's stem is at time
-// `t`: a stem, becoming a grand flower opening over where its top was
+// `t`: a stem, drawing in to become its rose's tight middle, a golden
+// spiral wound up from where its petals stand
 vec3 plexusHeartStem(float id, float t, vec3 moved) {
   vec3 stem = plexusForm(id, PLEXUS_STEM);
-  vec3 grand = (plexusForm(id, PLEXUS_FLOWER) - vec3(0.0, 1.0, 0.0)) * 2.2 + vec3(0.0, 1.5, 0.0);
-  return plexusHeartLift(mix(stem, grand, plexusHeartMorph(t)) + moved, t);
+  vec3 middle = (plexusForm(id, PLEXUS_BUD) - vec3(0.0, 0.75, 0.0)) * 0.7 + vec3(0.0, PLEXUS_ROSE_FOOT + 0.06, 0.0);
+  return plexusHeartLift(mix(stem, middle, plexusHeartMorph(t)) + moved, t);
+}
+// how far ring `ring` (0 inner, 2 outer) of the heart's rose has opened at
+// time `t`: one ring after another as the stem becomes it
+float plexusRoseOpen(float ring, float t) { return smoothstep(ring * 0.2, ring * 0.2 + 0.6, plexusHeartMorph(t)); }
+// where point `id` (drifted by `moved`) of the heart's rose petals is at
+// time `t`: petal id/10 (ring by fives, each ring turned on from the last),
+// its ten points its foot, then three rows of three across it (an edge,
+// its middle, the other edge), the last its lip. Each lies on a ball round the rose's middle,
+// running from under it up its side, so together they make a round rose:
+// the inner ring's lips folded in over the middle, the outer ring wider and
+// open, its lips curling back out. Closed, each is tucked small under it
+vec3 plexusHeartRose(float id, float t, vec3 moved) {
+  float p = floor(id / 10.0);
+  float j = id - p * 10.0;
+  float ring = floor(p / 5.0);
+  float i = p - ring * 5.0;
+  float open = plexusRoseOpen(ring, t);
+  float row = j < 0.5 ? 0.0 : 1.0 + floor((j - 1.0) / 3.0);
+  float u = row / 3.0;
+  float v = j < 0.5 ? 0.0 : mod(j - 1.0, 3.0) - 1.0;
+  float a = i / 5.0 * TAU + ring * 0.63;
+  float rad = mix(0.08, 0.17 + 0.08 * ring, open) * (1.0 + 0.25 * ring * open * u * u * u);
+  float polar = mix(2.6, mix(2.4, 0.45 + 0.4 * ring, open), u);
+  float az = a + v * (0.5 + 0.1 * ring) * (row < 1.5 ? 0.7 : (row < 2.5 ? 1.0 : 0.85));
+  vec3 middle = vec3(0.0, PLEXUS_ROSE_FOOT + 0.25, 0.0);
+  return plexusHeartLift(middle + rad * vec3(sin(polar) * cos(az), cos(polar), sin(polar) * sin(az)) + moved, t);
 }
 // where point `id` of the heart's bud `k` is: fastened at its joint,
 // reaching out and up, blooming from a bud into a flower head
 vec3 plexusHeartBud(float id, int k, float t, vec3 moved) {
   vec3 q = mix(plexusForm(id, PLEXUS_BUD), (plexusForm(id, PLEXUS_FLOWER) - vec3(0.0, 1.0, 0.0)) * 0.8 + vec3(0.0, 0.8, 0.0), plexusHeartBloom(k, t)) + moved;
-  vec3 base = plexusHeartStem(PLEXUS_HEART_JOINT[k] + 1.0, t, vec3(0.0));
+  // (fastened at its joint, then round the rose's rim as the stem becomes it)
+  vec3 rim = PLEXUS_HEART_SIDE[k] * 0.34 + vec3(0.0, PLEXUS_ROSE_FOOT + 0.14, 0.0);
+  vec3 base = plexusHeartLift(mix(plexusForm(PLEXUS_HEART_JOINT[k] + 1.0, PLEXUS_STEM), rim, plexusHeartMorph(t)), t);
   vec3 along = normalize(PLEXUS_HEART_SIDE[k] * 0.8 + vec3(0.0, 0.6, 0.0));
   vec3 face = normalize(cross(along, vec3(0.0, 1.0, 0.0)));
   return plexusFasten(q, vec3(0.0, 0.75, 0.0), base, along, face, 0.6 * plexusHeartSize(t));
@@ -591,9 +627,9 @@ vec3 plexusHeartPetlet(float id, int k, int j, float t, vec3 moved) {
 vec3 plexusHeartGrand(float id, int p, float t, vec3 moved) {
   float a = (float(p) + 0.5) / 5.0 * TAU;
   vec3 outward = vec3(cos(a), 0.0, sin(a));
-  vec3 middle = (plexusForm(0.0, PLEXUS_FLOWER) - vec3(0.0, 1.0, 0.0)) * 2.2 + vec3(0.0, 1.5, 0.0);
+  vec3 middle = vec3(0.0, PLEXUS_ROSE_FOOT + 0.05, 0.0);
   float open = plexusChainGrand(p, t);
-  vec3 q = plexusSpread(plexusForm(id, PLEXUS_PETAL) + moved, vec3(0.0, 0.7, 0.0), middle + outward * 0.25, outward, mix(1.2, 0.3, open), 1.6 * (0.05 + 0.95 * open));
+  vec3 q = plexusSpread(plexusForm(id, PLEXUS_PETAL) + moved, vec3(0.0, 0.7, 0.0), middle + outward * 0.3, outward, mix(1.2, 0.3, open), 1.6 * (0.05 + 0.95 * open));
   return plexusHeartLift(q, t);
 }
 // what of a fragment the heart's done blooms let go, point `id` at time
@@ -723,6 +759,7 @@ vec3 plexusAt(float id, int shape, float t) {
   if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
   if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) return plexusSprig(id, shape, moved);
   if (shape == PLEXUS_HEART_STEM) return plexusHeartStem(id, t, moved);
+  if (shape == PLEXUS_HEART_ROSE) return plexusHeartRose(id, t, moved);
   if (shape == PLEXUS_HEART_FILAMENT) return plexusHeartFilament(id, t);
   if (shape >= PLEXUS_HEART_GRAND && shape < PLEXUS_HEART_SEED) return plexusHeartGrand(id, shape - PLEXUS_HEART_GRAND, t, moved);
   if (shape == PLEXUS_HEART_SEED) return plexusHeartSeed(id, t).xyz;
@@ -896,6 +933,11 @@ void main() {
   // heart, straight across), how much of it shows, what it is
   float plexBeat = 0.0;
   float plexFade = 1.0;
+  // how bright it shines where the heart's webs crowd close (its rose and
+  // the tight middle its stem becomes, its buds, its petlets), so their
+  // lights do not run together into one white glare and the shape still
+  // reads; 1 elsewhere
+  float plexCrowd = 1.0;
   float plexKind = 0.0;
   float plexLayer = 0.0;
   // whether it is light a yielder gathers or yields: 1 a mote, 2 the
@@ -948,10 +990,10 @@ void main() {
     bool bloomPart = (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) || (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND);
     if (plexStage > 3.5 && bloomPart) hs = shape;
     // the heart's stem reaches further as it becomes its grand flower
-    if (shape == PLEXUS_HEART_STEM) reach *= mix(1.0, 2.7, plexusHeartMorph(t));
+    if (shape == PLEXUS_HEART_STEM) reach *= mix(1.0, 0.82, plexusHeartMorph(t));
     // in the chain reaction the heart's webs reach as far as it has grown
     // (all through the story, built at its risen size)
-    if ((plexStage > 2.5 || plexStory > 0.5) && shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) reach *= plexusHeartSize(t) / 0.7;
+    if ((plexStage > 2.5 || plexStory > 0.5) && ((shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) || shape == PLEXUS_HEART_ROSE)) reach *= plexusHeartSize(t) / 0.7;
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
     // how much there is of what a yielder yields, as it grows and is let go
     // (or of a heart's filament as it drips down)
@@ -967,11 +1009,16 @@ void main() {
     }
     if (shape >= PLEXUS_HEART_GRAND && shape < PLEXUS_HEART_SEED) yield = smoothstep(0.0, 0.3, plexusChainGrand(shape - PLEXUS_HEART_GRAND, t));
     if (shape == PLEXUS_HEART_SEED) yield = plexusHeartSeed(ids.x, t).w;
+    // (or of a rose petal as its ring opens)
+    if (shape == PLEXUS_HEART_ROSE) yield = smoothstep(0.0, 0.25, plexusRoseOpen(floor(ids.x / 50.0), t));
     // (or of a fragment burst from a bloom, or a current, faint, each of
     // its lines as much as its fainter end)
     if (shape == PLEXUS_HEART_BURST) yield = plexusHeartBurst(ids.x, t).w;
     if (shape == PLEXUS_HEART_CURRENT) yield = min(min(plexusCurrentShow(ids.x, t), plexusCurrentShow(ids.y, t)), plexusCurrentShow(ids.z, t));
     yield *= plexStoryShow;
+    if (shape == PLEXUS_HEART_STEM) plexCrowd = mix(1.0, 0.35, plexusHeartMorph(t));
+    if (shape == PLEXUS_HEART_ROSE || (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT)) plexCrowd = 0.45;
+    if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) plexCrowd = 0.6;
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
     bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;
@@ -1198,7 +1245,8 @@ void main() {
     v_t = plexBeat;
     // what it is, 4 more on the companions' layer, 8 more for a mote of light
     v_u = plexKind + 4.0 * plexLayer + 8.0 * step(0.5, plexMote);
-    v_glow = plexFade;
+    // (a pane shines whole, crowded or not, so the rose's petals read)
+    v_glow = plexFade * (plexKind > 1.5 && plexKind < 2.5 ? 1.0 : plexCrowd);
   }
   v_obj = p;
   // a constellate line: how far across it (-1 to 1), for its glow

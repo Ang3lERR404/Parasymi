@@ -119,6 +119,9 @@ const Shape=enum(u8){
   /// the currents of energy flowing up into a settled heart's base, seven
   /// of ten points
   heartCurrent,
+  /// the petals of the rose the heart's stem becomes, three rings of five,
+  /// ten points each
+  heartRose,
   /// the yielder's other petals, by number
   _,
 };
@@ -293,6 +296,7 @@ fn heart(b:*mg.Builder,stage:f32)Allocator.Error!void{
   // how much the whole shrinks once it rises
   const shrink:f32=if(stage==0)1 else 0.7;
   try cluster(b,.{.shape=.heartStem,.reach=stage+0.17*shrink});
+  try cluster(b,.{.shape=.heartRose,.reach=stage+0.28*shrink,.n=150,.group=10});
   for(0..4)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartBud)+k),.reach=stage+0.2*0.6*shrink});
   try cluster(b,.{.shape=.heartFilament,.reach=stage+0.12,.n=24,.group=8});
   for(0..4)|k|for([_]f32{0,1})|layer|{

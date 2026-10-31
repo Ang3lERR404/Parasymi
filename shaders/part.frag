@@ -237,7 +237,8 @@ void surface() {
     vec3 col = mix(blue, pale, clamp(beat, 0.0, 1.0));
     float a;
     if (kind == 0) {
-      c = mote ? pale * 4.0 : mix(col, pale, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
+      // (v_glow: dimmer where the heart's webs crowd close)
+      c = mote ? pale * 4.0 : mix(col, pale, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat) * v_glow;
       a = 1.0;
     } else if (kind == 1 || kind == 3) {
       // a line is a glow: a thin bright core (v_obj.x how far across it)
