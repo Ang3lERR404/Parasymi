@@ -210,7 +210,9 @@ const float PLEXUS_PAIR_LEAN = 0.4;
 const float PLEXUS_COMPANION = 0.7;
 const float PLEXUS_PAIR_SLOW = 0.6;
 const float PLEXUS_PAIR_QUICK = 1.4;
-const float PLEXUS_LINE_W = 0.007;
+// how far a line's glow reaches either side of it (its bright core a
+// share of that, part.frag)
+const float PLEXUS_LINE_W = 0.022;
 const float PLEXUS_PANE = 0.005;
 const float PLEXUS_SOFT = 0.8;
 
@@ -990,6 +992,8 @@ void main() {
     v_glow = plexFade;
   }
   v_obj = p;
+  // a constellate line: how far across it (-1 to 1), for its glow
+  if (part == PART_PLEXUS) v_obj = vec3(tu.y, 0.0, 0.0);
   v_phase = ip.z;
   v_aux = ip.y;
   // the halo's ring and the rays making it appear as its diamond forms

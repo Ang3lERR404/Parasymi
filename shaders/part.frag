@@ -178,8 +178,13 @@ void surface() {
       c = mote ? pale * 4.0 : mix(col, pale, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
       a = 1.0;
     } else if (kind == 1 || kind == 3) {
-      c = col * (0.7 + 3.0 * beat) * v_glow;
-      a = clamp(0.5 + 0.5 * beat, 0.0, 1.0) * v_glow;
+      // a line is a glow: a thin bright core (v_obj.x how far across it)
+      // fading softly out either side
+      float x = v_obj.x;
+      float core = exp(-x * x * 40.0);
+      float halo = exp(-x * x * 4.0);
+      c = (col * (0.8 + 3.0 * beat) * halo + pale * core * (0.6 + 1.5 * beat)) * v_glow;
+      a = clamp(0.55 * halo + 0.5 * core + 0.3 * beat * halo, 0.0, 1.0) * v_glow;
     } else {
       float rim = pow(1.0 - ndv, 3.0);
       c = col * (0.32 + 0.6 * rim + 1.8 * beat) * v_glow;
