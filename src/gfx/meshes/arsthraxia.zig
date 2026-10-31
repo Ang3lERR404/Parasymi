@@ -103,8 +103,8 @@ fn stand(b:*mg.Builder)Allocator.Error!void{
   // the three stems' splines, the first the trunk the rest hang on
   var stems:[stemCount]growth.Id=undefined;
   for(&stems,0..)|*id,k|id.*=try stem(b,&sk,if(k==0)null else stems[0],k);
-  try kit.rootMat(b,8,1.0,0.075,0x7B01,.{.k=&sk,.id=stems[0]});
-  try kit.footLeaves(b,7,0.27,0.5,0.18,0x7B02,.{.k=&sk,.id=stems[0],.u=footAt});
+  try kit.rootMat(b,11,1.15,0.068,0x7B01,.{.k=&sk,.id=stems[0]});
+  try kit.footLeaves(b,10,0.29,0.54,0.19,0x7B02,.{.k=&sk,.id=stems[0],.u=footAt});
   for(stems,0..)|id,k|try tendril(b,&sk,id,k);
   try cage(b,&sk,stems[0]);
   try calyx(b,&sk,stems[0]);
@@ -145,7 +145,7 @@ fn stem(b:*mg.Builder,sk:*growth.Skeleton,first:?growth.Id,k:usize)Allocator.Err
   const s=b.mark();
   try mg.braidAround(b,path,&ts,&rs,&turn,5,pal.strandWobble,0x7B20+%k*7,nerve,pal.vine,.nerve);
   try sk.along(b,s,id);
-  try sk.leaves(b,id,.{.n=3,.len=0.3,.width=0.1,.from=0.15,.to=0.48,.t0=0.1,.t1=0.5,.col=pal.leafDark,.tip=pal.leafLite,.seed=0x7B30+%k*11});
+  try sk.leaves(b,id,.{.n=6,.len=0.3,.width=0.1,.from=0.12,.to=0.55,.t0=0.1,.t1=0.5,.col=pal.leafDark,.tip=pal.leafLite,.seed=0x7B30+%k*11});
   return id;
 }
 /// off stem `k` where the cage is widest, a tendril reaching out and up,
@@ -162,7 +162,7 @@ fn tendril(b:*mg.Builder,sk:*growth.Skeleton,id:growth.Id,k:usize)Allocator.Erro
   // the tendril's own vine off the stem
   const t=sk.vine(id,u,.{.start=undefined,.direction=m.norm(out+side*m.splat3(0.4)+v3(0,0.55,0)),.length=0.42,.wobble=0.15,.curl=0.45,.seed=0x7B40+%k*13},7,.{.after=.passing});
   try sk.tube(b,t,.{.r0=0.016,.tip=0.05,.col=pal.vine,.sides=5,.t0=0.75,.t1=0.95});
-  try sk.leaves(b,t,.{.n=2,.len=0.15,.width=0.055,.from=0.2,.to=0.6,.t0=0.75,.t1=0.95,.col=pal.leafDark,.tip=pal.leafLite,.seed=0x7B48+%k*5});
+  try sk.leaves(b,t,.{.n=4,.len=0.15,.width=0.055,.from=0.2,.to=0.6,.t0=0.75,.t1=0.95,.col=pal.leafDark,.tip=pal.leafLite,.seed=0x7B48+%k*5});
 }
 /// inside the cage: a nerve rising up its middle from the trunk to the
 /// flower's heart, a pod of resin threaded on it where the cage is widest

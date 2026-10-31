@@ -80,7 +80,7 @@ const ribPace:f32=1.5;
 /// how many points each vine is drawn with
 const ribRes=48;
 /// a leaf off a vine of the first set, where along it (0..1)
-const ribLeaf=[_]f32{0.32,0.58};
+const ribLeaf=[_]f32{0.22,0.42,0.62,0.8};
 /// the collar binding the neck: its radius
 const collarR:f32=0.068;
 /// the share of its growth, once all else is grown, over which the lid forms
@@ -112,8 +112,8 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   k.tail=form;
   // the bole's hidden spline, up from under the soil to the calyx
   const bole=k.trunk(&.{v3(0,-0.04,0),v3(0.008,calyx[1]*0.5,-0.006),calyx},.{.pace=bolePace});
-  try kit.rootMat(b,6,0.5,0.05,0x5AC1,.{.k=&k,.id=bole});
-  try kit.footLeaves(b,6,0.2,0.36,0.15,0x5AC2,.{.k=&k,.id=bole,.u=footAt});
+  try kit.rootMat(b,9,0.6,0.045,0x5AC1,.{.k=&k,.id=bole});
+  try kit.footLeaves(b,9,0.2,0.4,0.15,0x5AC2,.{.k=&k,.id=bole,.u=footAt});
   {
     // the bole's points, growth stamps and radii along its spline
     var sp:[growth.res]V3=undefined;
@@ -157,8 +157,9 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   for(0..2)|set|for(0..ribs)|i|try rib(b,&k,bole,set,i);
   try collar(b,&k,stem);
   // leafy vines curling up and out of the collar
-  try kit.leafyVine(b,neck,neck+v3(0.16,0.3,0.06),0.022,0.4,3,0.75,1,0x5AC4,.{.k=&k,.id=stem,.u=0.86});
-  try kit.leafyVine(b,neck,neck+v3(-0.1,0.17,-0.12),0.016,-0.35,2,0.75,0.95,0x5AC6,.{.k=&k,.id=stem,.u=0.86});
+  try kit.leafyVine(b,neck,neck+v3(0.16,0.3,0.06),0.02,0.4,6,0.75,1,0x5AC4,.{.k=&k,.id=stem,.u=0.86});
+  try kit.leafyVine(b,neck,neck+v3(-0.1,0.17,-0.12),0.016,-0.35,5,0.75,0.95,0x5AC6,.{.k=&k,.id=stem,.u=0.86});
+  try kit.leafyVine(b,neck,neck+v3(-0.04,0.24,0.17),0.014,0.3,4,0.78,0.97,0x5AC8,.{.k=&k,.id=stem,.u=0.86});
   k.finish(b);
 }
 /// vine `i` of set `set` of the basket: out of the calyx, winding up over
@@ -220,7 +221,7 @@ fn rib(b:*mg.Builder,k:*growth.Skeleton,bole:growth.Id,set:usize,i:usize)Allocat
   // a leaf off it, lifting away from the gourd and swept on up it
   var rng=Rng.init(0x5AC7+%i*13);
   for(ribLeaf,0..)|u,l|{
-    if((i+l)%2==1)continue;
+    if((i+l)%3==2)continue;
     // how far along the vine the leaf sits, jittered, and how far up the gourd
     const f=u+rng.range(-0.04,0.04);
     const v=m.lerp(ribFrom,ribTo,f);

@@ -57,8 +57,8 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   var k=growth.Skeleton.begin(b);
   // the hidden stalk: from just under the ground up to the crown
   const stalk=k.trunk(&.{v3(0,-0.03,0),v3(0.01,0.12,-0.008),v3(-0.006,0.22,0.004),crown},.{.pace=1.6});
-  try kit.rootMat(b,6,0.45,0.045,0x6C01,.{.k=&k,.id=stalk});
-  try kit.footLeaves(b,7,0.12,0.36,0.15,0x6C02,.{.k=&k,.id=stalk,.u=0.08});
+  try kit.rootMat(b,9,0.55,0.04,0x6C01,.{.k=&k,.id=stalk});
+  try kit.footLeaves(b,10,0.12,0.4,0.15,0x6C02,.{.k=&k,.id=stalk,.u=0.08});
   {
     // the stalk's path, its growth timing and its radius along it
     var sp:[growth.res]V3=undefined;

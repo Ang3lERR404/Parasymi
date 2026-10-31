@@ -94,7 +94,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   var k=growth.Skeleton.begin(b);
   // the hidden stem, from under the soil up to the gourd's foot
   const stem=k.trunk(&.{v3(0,-0.05,0),v3(0.008,0.07,-0.006),podAt-v3(0,podR[1],0)},.{.pace=stemPace});
-  try kit.rootMat(b,5,0.46,0.034,0xD161,.{.k=&k,.id=stem});
+  try kit.rootMat(b,8,0.55,0.03,0xD161,.{.k=&k,.id=stem});
   // the gourd, swelling at the stem's top
   const g=b.mark();
   try kit.resinPod(b,podAt,podR,10,14);
@@ -154,7 +154,7 @@ fn clutch(b:*mg.Builder,k:*growth.Skeleton,stem:growth.Id,i:usize)Allocator.Erro
     try k.on(b,s,id,u,.{.from=v3(at[0],-0.01,at[2])});
   }
   try k.braid(b,id,.{.girth=clutchR,.tip=0.3,.strands=3,.twist=2.6,.wobble=pal.strandWobble,.seed=0xD163+%i*7,.core=pal.core,.strand=pal.vine,.t0=0.05,.t1=0.7});
-  try k.leaves(b,id,.{.n=1+@as(u32,@intCast(i%2)),.len=0.12,.width=0.042,.from=0.42,.to=0.62,.t0=0.3,.t1=0.6,.col=pal.leafDark,.tip=pal.leafLite,.seed=0xD164+%i*5});
+  try k.leaves(b,id,.{.n=3+@as(u32,@intCast(i%2)),.len=0.12,.width=0.042,.from=0.3,.to=0.72,.t0=0.3,.t1=0.6,.col=pal.leafDark,.tip=pal.leafLite,.seed=0xD164+%i*5});
 }
 /// mesh: DIGGER ROOT. the root it digs with, from under the knot along +X
 /// into the node on the next tile: woven as a conduit (`conduit.arch`), it
