@@ -223,10 +223,14 @@ own).
 (`Def.still`: no breath, so its emitted pieces stay on it; `Def.preview`
 whole.)
 
-- **Shape:** a small tree. A woven trunk on a root mat; five braided boughs
-  rise round a core of thin resin sap held in a calyx, and arch over it to
-  hold flower cups (with stamens) above it. A sapwood spindle runs up
-  through the core.
+- **Shape:** a small tree, natural and uneven. A fine woven trunk
+  buttressed into a wide root mat, ten foot leaves sprawling round it;
+  five slender braided boughs, each straying its own way, rise round a
+  core of thin resin sap held in a calyx (its sepals each their own
+  length), and arch over it to hold flower cups (with stamens) above it.
+  Each bough carries eleven leaves, three leafy twigs at uneven heights
+  leaning their own ways, and a fan of five leaves behind its cup, so the
+  crown is crowded. A sapwood spindle runs up through the core.
 - **Weaving is shown by its progress alone:**
   - The cups hold what it stocks (pools of `.essence`, kept level).
   - They tip and pour it (curve-placed streams, colour in `q.yzw`).
