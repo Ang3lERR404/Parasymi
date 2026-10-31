@@ -57,8 +57,9 @@ When a change alters what one of these says, update it in the same commit.
   whole-structure scaling.
 - **Finish line**: work until the phase's criteria are met; take the next
   step instead of "next I would…"; stop only for a blocking decision.
-- **Working**: commit and push `devel` after every verified change (builds,
-  tests pass) without asking; never commit `parasymi.sav`; report broken
+- **Working**: commit `devel` after every verified change (builds,
+  tests pass) without asking, and push once 10 commits are waiting
+  unpushed; never commit `parasymi.sav`; report broken
   work, don't commit it. Verify visual work in the running game
   (`--plant`/`--structure` + `--inspect` shots, read the PNGs) and say what
   was not checked.
