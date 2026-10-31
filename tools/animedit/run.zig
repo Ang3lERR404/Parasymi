@@ -162,8 +162,12 @@ pub fn main(init:std.process.Init)!void{
     defer gpa.free(text);
     break:load try clip.Clip.parse(gpa,text);
   };
+  // the clip's text as it was read, where the history starts
+  const first=try animedit.editor.text(gpa,&c);
+  defer gpa.free(first);
   // the editor, showing every channel of the wolf or a plant, or a structure's growth
   var e:Editor=.{
+    .history=try .init(gpa,first),
     .gpa=gpa,
     .io=io,
     .subject=sj,
@@ -175,6 +179,7 @@ pub fn main(init:std.process.Init)!void{
     },
   };
   defer e.clip.deinit();
+  defer e.history.deinit();
   e.t=m.clamp(start,0,e.clip.length);
   if(channel)|want|e.sel=for(0..e.shown.len)|i|{
     if(eql(u8,e.chName(i),want))break i;

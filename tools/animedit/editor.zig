@@ -11,6 +11,8 @@ const Dir=Io.Dir;
 const Writer=Io.Writer;
 /// formats text into a fixed buffer (the note)
 const bufPrint=std.fmt.bufPrint;
+/// trades two values in place (the clip for the one read back)
+const swap=std.mem.swap;
 /// the engine package, as the game's hub hands it on
 const engine=ps.engine;
 /// all the maths: vectors, clamps, lengths
@@ -31,6 +33,8 @@ const PoseCh=clip.Channels(skel.Pose);
 const LookCh=clip.Channels(specimen.Look);
 /// the editors' words for values, and typed names
 const labels=@import("../labels.zig");
+/// undo and redo: each settled clip kept as its text
+const History=@import("../history.zig").History;
 /// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
 /// each pose channel in words
@@ -113,6 +117,49 @@ pub const Editor=struct{
   naming:?labels.Typed=null,
   /// when the mark being named falls (s)
   namingAt:f32=0,
+  /// the clips before and after this one, for undo and redo
+  history:History,
+  /// the clip as it is now kept in the history, once the hands let go (no
+  /// drag held, no mark being named): a whole drag is one step back
+  pub fn settle(e:*Editor)Allocator.Error!void{
+    if(e.drag!=.none or e.naming!=null)return;
+    // the clip's text now
+    const now=try text(e.gpa,&e.clip);
+    defer e.gpa.free(now);
+    _=try e.history.settle(now);
+  }
+  /// one step back through the history, saying so (nothing while a drag is held)
+  pub fn undo(e:*Editor)Allocator.Error!void{
+    if(e.drag!=.none)return;
+    try e.settle();
+    e.restore(try e.history.undo(),"undone","nothing to undo");
+  }
+  /// one step forward again, saying so (nothing while a drag is held)
+  pub fn redo(e:*Editor)Allocator.Error!void{
+    if(e.drag!=.none)return;
+    try e.settle();
+    e.restore(try e.history.redo(),"redone","nothing to redo");
+  }
+  /// the clip read back from the history's `kept` text (null: `none`
+  /// said) and shown at the playhead; a channel whose keys all went back
+  /// to its rest
+  fn restore(e:*Editor,kept:?[]const u8,done:[]const u8,none:[]const u8)void{
+    // the text to read, if there was a step to take
+    const t=kept orelse return e.say("{s}",.{none});
+    // the clip as it was then (the history's own text, which reads back)
+    var back=clip.Clip.parse(e.gpa,t)catch|er|return e.say("{s} failed: {t}",.{done,er});
+    for(0..e.shown.len)|i|{
+      if(e.clip.track(e.chName(i))!=null and back.track(e.chName(i))==null)e.setValue(i,e.rest(i));
+    }
+    swap(clip.Clip,&e.clip,&back);
+    back.deinit();
+    e.t=@min(e.t,e.clip.length);
+    e.naming=null;
+    e.playing=false;
+    e.sample();
+    e.dirty=true;
+    e.say("{s}",.{done});
+  }
   /// the selected channel's joint and its gizmo (the wolf's alone)
   pub fn gizmoAt(e:*const Editor,rg:*const Rig)?struct{j:Joint,g:gizmo.Gizmo}{
     if(!e.wolf())return null;
@@ -254,6 +301,14 @@ pub const Editor=struct{
   /// draws the panel, the timeline and the joints
   pub const draw=animedit.panel.draw;
 };
+/// clip `c` as the text its file would hold, the caller's to free
+pub fn text(gpa:Allocator,c:*const clip.Clip)Allocator.Error![]u8{
+  // the text, written into memory
+  var out:Writer.Allocating=.init(gpa);
+  defer out.deinit();
+  c.write(&out.writer) catch return error.OutOfMemory;
+  return out.toOwnedSlice();
+}
 /// whether (`x`,`y`) (px) is on the timeline, with a little slack round it
 pub fn inTimeline(screen:[2]f32,x:f32,y:f32)bool{
   // the timeline's top edge (px)

@@ -132,8 +132,12 @@ pub fn main(init:std.process.Init)!void{
     break:load try Doc.parse(gpa,text);
   };
   // the editor, sculpting that mesh
-  var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode};
+  // the mesh's text as it was read, where the history starts
+  const first=try meshedit.editor.text(gpa,&doc);
+  defer gpa.free(first);
+  var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode,.history=try .init(gpa,first)};
   defer e.doc.deinit(gpa);
+  defer e.history.deinit();
   if(made){
     e.dirty=true;
     e.save();

@@ -114,7 +114,7 @@ pub const panel:Color=s.panel;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   t shape   c carve   m shader (shift back)   tab next form   enter name it",
-  "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save",
+  "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
 /// the shape a form takes

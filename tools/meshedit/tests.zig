@@ -1,4 +1,4 @@
-//! the mesh editor tested: its text, shaders and meshing.
+//! the mesh editor tested: its text, shaders, meshing, undo and redo.
 /// the standard library, reached through the game's hub
 const std=ps.std;
 /// the I/O interface
@@ -19,6 +19,8 @@ const meshedit=@import("../meshedit.zig");
 const Ch=meshedit.settings.Ch;
 /// the mesh as kept: its cells and its forms
 const Doc=meshedit.doc.Doc;
+/// the editor's state, its undo and redo tested
+const Editor=meshedit.editor.Editor;
 /// the shader after (or before) a form's
 const nextShade=meshedit.settings.nextShade;
 test"a mesh's text reads back as written"{
@@ -75,4 +77,36 @@ test"carving alone makes no surface, a form makes a closed one"{
   try d.mesh(gpa,null,false,&b);
   try testing.expect(b.v.items.len>0);
   try testing.expectEqual(@as(usize,0),b.v.items.len%3);
+}
+test"a whole drag undoes in one step and redoes again"{
+  // the testing allocator, a mesh of one form, and the editor on it
+  const gpa=testing.allocator;
+  var d:Doc=.{};
+  try d.pieces.append(gpa,.{});
+  // the mesh's text as it starts
+  const first=try meshedit.editor.text(gpa,&d);
+  defer gpa.free(first);
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first)};
+  defer e.doc.deinit(gpa);
+  defer e.history.deinit();
+  // a drag held over several frames: nothing settles until it ends
+  e.drag=.value;
+  for(0..5)|_|{
+    e.nudge(Ch.find("pos.x").?,0.1);
+    try e.settle();
+  }
+  try testing.expectEqual(@as(usize,0),e.history.back.items.len);
+  e.drag=.none;
+  try e.settle();
+  try testing.expectEqual(@as(usize,1),e.history.back.items.len);
+  // a form made after it, then both undone one at a time
+  try e.doc.pieces.append(gpa,.{});
+  try e.settle();
+  try e.undo();
+  try testing.expectEqual(@as(usize,1),e.pieces().len);
+  try testing.expectApproxEqAbs(@as(f32,0.5),e.pieces()[0].v.pos[0],1e-5);
+  try e.undo();
+  try testing.expectEqual(@as(f32,0),e.pieces()[0].v.pos[0]);
+  try e.redo();
+  try testing.expectApproxEqAbs(@as(f32,0.5),e.pieces()[0].v.pos[0],1e-5);
 }

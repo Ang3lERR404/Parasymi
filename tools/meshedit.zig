@@ -25,6 +25,8 @@
 //! (a ring for each of its turns), `3` sizes it (along its own axes).
 //! The camera orbits the sculpt freely (middle drag, over the top and
 //! under it alike; the wheel zooms); `.` eases it onto the selected form.
+//! `ctrl+z` undoes (tools/history.zig), `ctrl+y` or `ctrl+shift+z` redoes:
+//! a whole drag, or a whole typed name, is one step.
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
@@ -51,6 +53,7 @@ test{
   _=gizmo;
   _=@import("orbit.zig");
   _=@import("labels.zig");
+  _=@import("history.zig");
 }
 test{
   _=settings;

@@ -80,9 +80,10 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
     if(e.t>=e.clip.length)e.t=@mod(e.t,e.clip.length);
   }
   try answerMouse(e,in,screen,rg,shift);
+  try e.settle();
 }
 /// one frame's keys: playing, the playhead, the clip's length, the
-/// channel, keying, marks, saving
+/// channel, keying, marks, saving, undo and redo
 fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
   // whether shift is held (key to key, unmark), and whether ctrl is
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
@@ -111,6 +112,10 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     if(e.clip.track(e.chName(e.sel))!=null)try e.key(e.sel);
   }
   if(ctrl and hit(in,.s))e.save();
+  if(ctrl and hit(in,.z)){
+    if(shift)try e.redo()else try e.undo();
+  }
+  if(ctrl and hit(in,.y))try e.redo();
   if(hit(in,.period))e.focus=true;
   if(hit(in,.m)){
     if(shift){

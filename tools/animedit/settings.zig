@@ -113,6 +113,6 @@ pub const markBud:Color=s.bud;
 pub const help=[_][]const u8{
   "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
   "up/down channel   drag value: key it (shift fine)   k key   a key all   x unkey   r rest",
-  "ctrl+s save   middle drag orbit   wheel zoom (over the list: scroll)   . focus   wolf: click a joint, drag its gizmo (shift fine)",
+  "ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo   middle drag orbit   wheel zoom (over the list: scroll)   . focus   wolf: click a joint, drag its gizmo (shift fine)",
   "m mark the playhead and name it (on a mark: rename; enter done)   shift+m unmark",
 };

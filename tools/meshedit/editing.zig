@@ -81,10 +81,11 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
   }
   if(!typing)try answerKeys(e,in);
   try answerMouse(e,in,handles,view,origin,shift);
+  try e.settle();
 }
 /// one frame's keys: forms made, removed, moved, reshaped, carved, shaded
 /// and named; values stepped and set at rest; the gizmo's mode; the cells;
-/// saving
+/// saving; undo and redo
 fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
   // whether shift is held (shader back), and whether ctrl is
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
@@ -154,6 +155,8 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     e.changed();
   }
   if(ctrl and hit(in,.s))e.save();
+  if(ctrl and hit(in,.z))if(shift)try e.redo()else try e.undo();
+  if(ctrl and hit(in,.y))try e.redo();
 }
 /// one frame's mouse: a press on a form row selects it, on a value row
 /// selects it and drags it, on the gizmo drags its handle, on a handle in

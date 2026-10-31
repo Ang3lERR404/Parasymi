@@ -29,6 +29,8 @@ const V3=m.V3;
 const v3=m.v3;
 /// the editors' words for values, and typed names
 const labels=@import("../labels.zig");
+/// undo and redo: each settled mesh kept as its text
+const History=@import("../history.zig").History;
 /// the editor's root, through which its other files are reached
 const meshedit=@import("../meshedit.zig");
 /// every value of a form, each a named channel
@@ -92,6 +94,8 @@ pub const Editor=struct{
   /// the selected form's name as it is typed (null: not naming), the
   /// keys answering only it meanwhile
   naming:?labels.Typed=null,
+  /// the meshes before and after this one, for undo and redo
+  history:History,
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
   /// show a note under the help, cut to fit its buffer
@@ -116,6 +120,41 @@ pub const Editor=struct{
     Dir.cwd().writeFile(io,.{.sub_path=e.path,.data=out.written()})catch|er|return e.say("save failed: {t}",.{er});
     e.dirty=false;
     e.say("saved {s}",.{e.path});
+  }
+  /// the mesh as it is now kept in the history, once the hands let go (no
+  /// drag held, no name being typed): a whole drag is one step back
+  pub fn settle(e:*Editor)Allocator.Error!void{
+    if(e.drag!=.none or e.naming!=null)return;
+    // the mesh's text now
+    const now=try text(e.gpa,&e.doc);
+    defer e.gpa.free(now);
+    _=try e.history.settle(now);
+  }
+  /// one step back through the history, saying so (nothing while a drag is held)
+  pub fn undo(e:*Editor)Allocator.Error!void{
+    if(e.drag!=.none)return;
+    try e.settle();
+    e.restore(try e.history.undo(),"undone","nothing to undo");
+  }
+  /// one step forward again, saying so (nothing while a drag is held)
+  pub fn redo(e:*Editor)Allocator.Error!void{
+    if(e.drag!=.none)return;
+    try e.settle();
+    e.restore(try e.history.redo(),"redone","nothing to redo");
+  }
+  /// the mesh read back from the history's `kept` text (null: `none` said),
+  /// the selection kept within its forms
+  fn restore(e:*Editor,kept:?[]const u8,done:[]const u8,none:[]const u8)void{
+    // the text to read, if there was a step to take
+    const t=kept orelse return e.say("{s}",.{none});
+    // the mesh as it was then (the history's own text, which reads back)
+    const back=Doc.parse(e.gpa,t)catch|er|return e.say("{s} failed: {t}",.{done,er});
+    e.doc.deinit(e.gpa);
+    e.doc=back;
+    e.sel=@min(e.sel,e.pieces().len-|1);
+    e.naming=null;
+    e.changed();
+    e.say("{s}",.{done});
   }
   /// the selected value set to `v`, kept where it makes sense
   pub fn set(e:*Editor,v:f32)void{e.setCh(e.ch,v);}
@@ -186,3 +225,11 @@ pub const Editor=struct{
   /// draws the panel and the forms' handles
   pub const draw=meshedit.panel.draw;
 };
+/// mesh `d` as the text its file would hold, the caller's to free
+pub fn text(gpa:Allocator,d:*const Doc)Allocator.Error![]u8{
+  // the text, written into memory
+  var out:Writer.Allocating=.init(gpa);
+  defer out.deinit();
+  d.write(&out.writer) catch return error.OutOfMemory;
+  return out.toOwnedSlice();
+}

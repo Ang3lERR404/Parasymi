@@ -95,6 +95,8 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # `m` picks the shader (part role) a form is drawn with;
                                   # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
+                                  # both editors: ctrl+z undo, ctrl+y redo, a whole
+                                  # drag one step (tools/history.zig)
 zig build audiocheck              # sound path check (tools/audiocheck.zig): plays a
                                   # dsp.Voice through platform.audio, records it back by
                                   # loopback, fails unless heard at its pitch (needs speakers)

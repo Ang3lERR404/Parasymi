@@ -21,6 +21,8 @@
 //! The camera orbits as the mesh editor's does (tools/orbit.zig): freely,
 //! over the top and under alike (middle drag; the wheel zooms); `.` eases
 //! it onto the selected joint (else back onto the whole subject).
+//! `ctrl+z` undoes (tools/history.zig), `ctrl+y` or `ctrl+shift+z` redoes:
+//! a whole drag, or a whole typed mark name, is one step.
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
