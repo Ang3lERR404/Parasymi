@@ -113,6 +113,12 @@ const Shape=enum(u8){
   /// the fragments the heart's done blooms let go, three points each,
   /// sixteen for each bloom built, each becoming three points of a petlet
   heartSeed=46,
+  /// the fragments that burst from the heart's blooms as they break free,
+  /// six of three points from each
+  heartBurst,
+  /// the currents of energy flowing up into a settled heart's base, seven
+  /// of ten points
+  heartCurrent,
   /// the yielder's other petals, by number
   _,
 };
@@ -247,13 +253,25 @@ fn sprig(b:*mg.Builder)Allocator.Error!void{
 /// petlets its blooms are built (four to each), its grand petals, and the
 /// fragments on their way between blooms
 fn chain(b:*mg.Builder)Allocator.Error!void{
-  try heart(b,3);
-  for(0..16)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartPetlet)+k),.reach=3+0.3*0.4*0.7,.n=12});
-  for(0..5)|p|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartGrand)+p),.reach=3+0.17*1.6*0.7});
+  try grown(b,3);
   try cluster(b,.{.shape=.heartSeed,.reach=3.2,.n=144,.group=3});
 }
+/// the heart at `stage` with all its blooms' petlets and its grand petals
+fn grown(b:*mg.Builder,stage:f32)Allocator.Error!void{
+  try heart(b,stage);
+  for(0..16)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartPetlet)+k),.reach=stage+0.3*0.4*0.7,.n=12});
+  for(0..5)|p|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartGrand)+p),.reach=stage+0.17*1.6*0.7});
+}
+/// the heart settling into a builder (stage 4): its blooms bursting free
+/// in a puff of fragments and drifting down to the ground, the heart
+/// coming down near it, currents of energy flowing up into its base
+fn builder(b:*mg.Builder)Allocator.Error!void{
+  try grown(b,4);
+  try cluster(b,.{.shape=.heartBurst,.reach=4.2,.n=72,.group=3});
+  try cluster(b,.{.shape=.heartCurrent,.reach=4.22,.n=70,.group=10});
+}
 /// the heart at `stage` (0 bound, 1 rising, 2 blooming, 3 its chain
-/// reaction; it rides in every
+/// reaction, 4 settling into a builder; it rides in every
 /// vertex's reach, whole part): a stem with four buds fastened at its
 /// joints, bonded, and the filaments that drip from its foot once it rises;
 /// each web's reach shrunk with the part, so its lines join only what they
@@ -347,4 +365,11 @@ pub const heartBlooming=struct{
 pub const heartChain=struct{
   /// builds the heart's chain reaction
   pub fn build(b:*mg.Builder)Allocator.Error!void{try chain(b);}
+};
+/// mesh: CONSTELLATE HEART, BUILDER. its blooms burst free and drift down
+/// to lie as parts; the heart settles near the ground, currents of energy
+/// rising into its base, to build new forms
+pub const heartBuilder=struct{
+  /// builds the heart settling into a builder
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try builder(b);}
 };
