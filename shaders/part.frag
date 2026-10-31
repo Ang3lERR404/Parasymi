@@ -12,8 +12,8 @@
 #define applyFog(c, p) (c)
 #endif
 
-layout(location = 0) in vec3 v_pos;
-layout(location = 1) in vec3 v_nrm;
+layout(location = 0) centroid in vec3 v_pos;
+layout(location = 1) centroid in vec3 v_nrm;
 layout(location = 2) in vec3 v_col;
 layout(location = 3) in float v_glow;
 layout(location = 4) flat in float v_part;

@@ -74,7 +74,8 @@ const float SHADOW_FADE = 0.8;
 // bands) filter it.
 float cascadeLit(Lighting L, int i, vec3 wpos, vec3 nl, float slope, out float edge) {
   float tx = L.texel[i];
-  vec4 q = L.cascade[i] * vec4(wpos + nl * tx * (SHADOW_BIAS + SHADOW_SLOPE_BIAS * slope), 1.0);
+  mat4 C = L.cascade[i];
+  vec4 q = C * vec4(wpos + nl * tx * (SHADOW_BIAS + SHADOW_SLOPE_BIAS * slope), 1.0);
   edge = max(abs(q.x), abs(q.y));
   if (edge >= 1.0 || q.z >= 1.0) {
     edge = 2.0;
@@ -82,23 +83,43 @@ float cascadeLit(Lighting L, int i, vec3 wpos, vec3 nl, float slope, out float e
   }
   vec2 uv = q.xy * 0.5 + 0.5;
   vec2 texel = 1.0 / vec2(textureSize(shadow_map, 0).xy);
+  // the surface's own plane across the map (receiver plane): how its depth
+  // runs per unit of uv, so a tap off to the side is compared with the
+  // surface there, never with the point's own depth (a surface tilted to
+  // the light, or curving, would shadow itself in dotted lines). The
+  // normal in the map's space comes from the cascade's rows' cross products.
+  vec3 r0 = vec3(C[0][0], C[1][0], C[2][0]), r1 = vec3(C[0][1], C[1][1], C[2][1]), r2 = vec3(C[0][2], C[1][2], C[2][2]);
+  vec3 nc = vec3(dot(cross(r1, r2), nl), dot(cross(r2, r0), nl), dot(cross(r0, r1), nl));
+  vec2 dzduv = -2.0 * nc.xy / (sign(nc.z) * max(abs(nc.z), 0.25 * length(nc)));
   // the taps turned by a hash of the place: steady in the world, never banding
-  float ang = 6.2831853 * fract(sin(dot(floor(wpos * 512.0), vec3(12.9898, 78.233, 37.719))) * 43758.5453);
+  uvec3 cell = uvec3(ivec3(floor(wpos * 512.0)));
+  uint h = cell.x * 73856093u ^ cell.y * 19349663u ^ cell.z * 83492791u;
+  h = (h ^ (h >> 16)) * 0x7feb352du;
+  h = (h ^ (h >> 15)) * 0x846ca68bu;
+  h ^= h >> 16;
+  float ang = 6.2831853 * float(h) * (1.0 / 4294967296.0);
   mat2 turn = mat2(cos(ang), sin(ang), -sin(ang), cos(ang));
-  // what stands between: the mean depth of the blockers round about
+  // what stands between: the mean depth of the blockers round about (all
+  // sixteen taps and the point itself, so a thin caster is not missed)
   float sum = 0.0, count = 0.0;
-  for (int k = 0; k < 8; k++) {
-    float d = texture(shadow_depth, vec3(uv + turn * POISSON[k * 2] * BLOCKER_REACH * texel, float(i))).r;
-    if (d < q.z) { sum += d; count += 1.0; }
+  for (int k = 0; k <= 16; k++) {
+    vec2 o = k < 16 ? turn * POISSON[k] * BLOCKER_REACH * texel : vec2(0.0);
+    float d = texture(shadow_depth, vec3(uv + o, float(i))).r;
+    float z = q.z + min(dot(dzduv, o), 0.0);
+    if (d < z) { sum += d; count += 1.0; }
   }
-  if (count < 0.5) return 1.0;
+  // nothing found round about: one filtered compare at the point itself
+  if (count < 0.5) return texture(shadow_map, vec4(uv, float(i), q.z));
   // how far (world units) the shadow falls from them: the depth between,
   // over the cascade's depth per unit along the light
   float perUnit = length(vec3(L.cascade[i][0][2], L.cascade[i][1][2], L.cascade[i][2][2]));
   float gap = (q.z - sum / count) / max(perUnit, 1e-6);
   float pen = clamp(gap * LIGHT_SPREAD / tx, PENUMBRA_MIN, PENUMBRA_MAX);
   float s = 0.0;
-  for (int k = 0; k < 16; k++) s += texture(shadow_map, vec4(uv + turn * POISSON[k] * pen * texel, float(i), q.z));
+  for (int k = 0; k < 16; k++) {
+    vec2 o = turn * POISSON[k] * pen * texel;
+    s += texture(shadow_map, vec4(uv + o, float(i), q.z + min(dot(dzduv, o), 0.0)));
+  }
   return s / 16.0;
 }
 

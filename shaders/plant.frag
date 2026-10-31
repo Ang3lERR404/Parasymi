@@ -13,8 +13,8 @@
 // light of its own: ripening, a plant's sap takes on what it yields, and
 // its ripe pods glow softly from within.
 
-layout(location = 0) in vec3 v_pos;
-layout(location = 1) in vec3 v_nrm;
+layout(location = 0) centroid in vec3 v_pos;
+layout(location = 1) centroid in vec3 v_nrm;
 layout(location = 2) in vec3 v_col;
 layout(location = 3) in vec2 v_sap;   // mana fill, sap moving through
 layout(location = 4) flat in vec4 v_inst;
