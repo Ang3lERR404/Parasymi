@@ -55,12 +55,26 @@ shaded 0.55). From the ground up:
   0.46 × length / radius.
 - **Roots**: the stem flares into 5 braided roots (`roots`) hugging the
   ground, plus braided prop roots (`tendrils`).
-- **Foot leaves**: genome `rosette` of them.
+- **Foot leaves**: genome `rosette` of them: broad old leaves sprawling
+  low on short stalks, each its own size, toothed, twisted, rippled,
+  yellower with age.
 - **Vines**: `vines` leafy vines twining up it, pointed at both ends.
-- **Leaves and thorns**: the leaf envelope, thorns.
+- **Leaves and thorns**: genome `leaves` of them up the stem on their own
+  stalks (`mg.leaf`), a golden angle apart with strays, biggest and
+  drooping most low down, each its own size, droop, twist and ripple,
+  tips curling; toothed on a herb, smooth-edged past `toothedUpTo` (a
+  tree's); `crownLeaves` young ones folded round the crown; thorns.
 - **Offshoots**: braided (`mg.shootPath`, folded by
   `mg.shootFoldNearest`), ending in buds or blooms.
 - **Bloom**: on a resin bead (`mg.flower`, `.{.resin = pal.sap}`).
+
+## Leaves
+Every leaf in the lineage's pieces (foot leaves, vines' leaves, the
+grower's leaves) is a natural one (`mg.natural`: the plain blade's reach,
+size and colours, its own twist, ripple, tip curl and teeth drawn from
+where it grows, on a stalk of its own). The convergence kit's leaflets
+and the loomfern's pinnae are natural too, sitting on their rachis
+(`.sessile`).
 
 ## Who uses it
 

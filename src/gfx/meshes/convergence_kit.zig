@@ -388,7 +388,7 @@ fn frondAlong(b:*mg.Builder,f:Frond,c:*const[arc+coil]V3,on:?On)Allocator.Error!
     for([_]f32{1,-1})|sgn|{
       // which way this leaflet points: out to its side, swept on, lifted, jittered
       const dir=m.norm(sd*m.splat3(sgn)+tan*m.splat3(0.5+rng.range(-0.12,0.12))+v3(0,rng.range(0.05,0.25),0));
-      try mg.blade(b,at,dir,len*rng.range(0.85,1.12),f.leafW*rng.range(0.85,1.1),0.4,leafDark,leafLite,m.lerp(f.t0,f.t1,k),.leaf);
+      try mg.natural(b,at,dir,len*rng.range(0.85,1.12),f.leafW*rng.range(0.85,1.1),0.4,leafDark,leafLite,m.lerp(f.t0,f.t1,k),.sessile);
     }
     if(on)|o|try o.k.on(b,pair,o.id,o.k.nearest(o.id,at),.{.from=at});
   }

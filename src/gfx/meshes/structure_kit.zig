@@ -126,7 +126,7 @@ pub fn footLeaves(b:*mg.Builder,n:u32,r:f32,len:f32,width:f32,seed:u64,on:?On)Al
     const base=v3(@cos(a)*r,0.08,@sin(a)*r);
     // where its vertices begin
     const s=b.mark();
-    try mg.blade(b,base,dir,len*rng.range(0.85,1.1),width,0.7,pal.leafDark,pal.leafLite,0.4,.leaf);
+    try mg.natural(b,base,dir,len*rng.range(0.85,1.1),width,0.7,pal.leafDark,pal.leafLite,0.4,.stalked);
     if(on)|o|try o.k.on(b,s,o.id,o.u,.{.from=base,.delay=footStagger*m.f(i)});
   }
 }
@@ -177,6 +177,17 @@ const thick:f32=0.1;
 const roots=5;
 /// the golden angle: leaves and offshoots turn by it, each a little apart
 const golden:f32=2.39996;
+/// how many young leaves stand folded round a plant's crown
+const crownLeaves=3;
+/// the longest leaf (m) still cut with teeth: longer ones (a tree's) are smooth-edged
+const toothedUpTo:f32=0.45;
+/// a point `k` up a stem (`spine`, its `radii`), pushed out toward its skin
+/// along bearing `a`: where a leaf's stalk leaves it
+fn onStem(spine:[]const V3,radii:[]const f32,k:f32,a:f32)V3{
+  // the stem's ring nearest that height, for its radius
+  const ri:usize=@intFromFloat(m.clamp(k,0,1)*m.f(radii.len-1));
+  return m.alongPath(spine,k)+v3(@cos(a),0,@sin(a))*m.splat3(radii[ri]*0.8);
+}
 /// a symbiote (the `herb` form) grown from its genome, in the lineage's
 /// body: a braided stem, strands wound tight round a darker core, each a
 /// little different, flaring into a mat of braided roots sinking into the
@@ -194,6 +205,13 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
   // its leaves' shaded base, and their true colour at the tips
   const leaf=color.shade(g.leafCol,0.6);
   const leafTip=g.leafCol.toRgba8(255);
+  // the leaves' stalks; the yellower green old leaves age to; a young
+  // leaf's fresh tip
+  const stalk=color.shade(g.stemCol,0.8);
+  const aged=color.rgb(0.55,0.66,0.26);
+  const youngTip=color.rgb(0.6,0.95,0.5).toRgba8(255);
+  // a herb's leaves are toothed; a tree's broad ones smooth-edged (1, 0)
+  const teeth:f32=if(g.leafLen>toothedUpTo)0 else 1;
   // the stem: a grown vine rising from the root, flaring where it meets
   // the ground so it grows out of the soil rather than standing on it
   const res=32;
@@ -257,13 +275,19 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
       }
       try mg.braid(b,&p,&rt,&rr,3,2.2,pal.strandWobble,seed+%i*7,core,strand);
     }
-    // the rosette: broad leaves lying out round the foot, unfolding first
+    // the rosette: broad old leaves sprawling low round the foot on short
+    // stalks, each its own size, toothed, twisted and rippled, yellower
+    // than the young growth above; unfolding first
     for(0..g.rosette)|i|{
-      // this leaf's bearing, the flat way out, and its base by the stem
-      const a=(m.f(i)+rng.range(-0.2,0.2))/m.f(g.rosette)*m.tau+m.f(variant)*0.7+0.5;
-      const out=v3(@cos(a),0,@sin(a));
-      const base=out*m.splat3(g.stemR*1.2)+v3(0,g.stemR*1.5,0);
-      try mg.blade(b,base,m.norm(out+v3(0,0.3,0)),g.leafLen*rng.range(1.05,1.25),g.leafW*1.3,0.7,leaf,leafTip,0.04,.leaf);
+      // this leaf's bearing, and the stem's skin there
+      const a=(m.f(i)+rng.range(-0.3,0.3))/m.f(g.rosette)*m.tau+m.f(variant)*0.7+0.5;
+      const at=v3(@cos(a)*g.stemR*1.2,g.stemR*1.5,@sin(a)*g.stemR*1.2);
+      try mg.leaf(b,.{
+        .at=at,.dir=m.norm(v3(@cos(a),rng.range(-0.15,0.1),@sin(a))),
+        .len=g.leafLen*rng.range(0.95,1.45),.width=g.leafW*rng.range(1.15,1.5),.droop=rng.range(0.45,0.7),.curl=rng.range(0,0.15),
+        .twist=rng.range(-0.5,0.5),.wave=rng.range(0.12,0.25),.teeth=teeth*rng.range(5,7),.stalk=rng.range(0.2,0.35),
+        .col=color.shade(aged,0.6),.tip=color.mix(aged.toRgba8(255),leafTip,rng.range(0,0.5)),.stalkCol=stalk,.t=0.02,
+      });
     }
   }
   // leafy vines twining up the stem from its foot, rooted at it and
@@ -306,24 +330,34 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
     try b.tubeR(&p,&vt,&vs,color.mix(strand,leafTip,0.25),.stem,5);
     try mg.leavesAlong(b,&p,4,g.leafLen*0.4,g.leafW*0.55,0.2,0.9,k0,k1,leaf,leafTip,seed+%vi*29);
   }
-  // leaves in a phyllotactic spiral up the stem, all on one envelope: the
-  // lowest longest and drooping most, rising and shortening toward the
-  // crown, their bases tucked into the stem
+  // leaves up the stem on their own stalks, a golden angle round from the
+  // last (strayed): biggest and drooping most low down, smaller toward the
+  // crown, each its own size, droop, twist and ripple, toothed, the tips
+  // curling; the low ones yellower with age
   const from=g.leafFrom;
   for(0..g.leaves)|i|{
-    // how far up the stem this leaf sits, and how far up the leaves (0..1)
-    const k=from+(0.92-from)*m.ratio(i,@max(g.leaves,1));
-    const up=m.ratio(i,@max(g.leaves,1));
-    // the stem there, the leaf's bearing, and the way it reaches
-    const at=m.alongPath(&spine,k);
-    const ang=m.f(i)*golden+m.f(variant);
-    const dir=m.norm(v3(@cos(ang),0.15+0.45*up,@sin(ang)));
-    // its length and droop, both easing off toward the crown
-    const len=g.leafLen*m.lerp(1.25,0.55,up)*rng.range(0.93,1.07);
-    const droop=g.leafDroop*m.lerp(1.3,0.6,up);
-    // its base, tucked back into the stem
-    const base=at-v3(@cos(ang),0,@sin(ang))*m.splat3(g.stemR*0.4);
-    try mg.blade(b,base,dir,len,g.leafW*m.lerp(1.1,0.8,up),droop,leaf,leafTip,k,.leaf);
+    // how far up the leaves (0..1), and how far up the stem this one sits
+    const up=m.ratio(i,@max(g.leaves,1)-1);
+    const k=m.clamp(m.lerp(@max(from-0.08,0.1),0.88,up)+rng.range(-0.02,0.02),0.02,0.95);
+    // its bearing
+    const ang=m.f(i)*golden+m.f(variant)+rng.range(-0.35,0.35);
+    try mg.leaf(b,.{
+      .at=onStem(&spine,&radii,k,ang),.dir=m.norm(v3(@cos(ang),m.lerp(0.05,0.5,up)+rng.range(-0.1,0.1),@sin(ang))),
+      .len=g.leafLen*m.lerp(1.35,0.5,up)*rng.range(0.75,1.3),.width=g.leafW*m.lerp(1.3,0.85,up)*rng.range(0.8,1.15),
+      .droop=g.leafDroop*m.lerp(1.5,0.6,up)*rng.range(0.7,1.3),.curl=rng.range(0,0.25),.twist=rng.range(-0.7,0.7),
+      .wave=rng.range(0.05,0.18),.teeth=teeth*rng.range(4,6),.stalk=rng.range(0.25,0.45),
+      .col=leaf,.tip=color.mix(aged.toRgba8(255),leafTip,m.lerp(0.4,1,up)),.stalkCol=stalk,.t=k,
+    });
+  }
+  // young leaves at the crown, still folded, standing up round the bloom
+  for(0..crownLeaves)|i|{
+    // its bearing
+    const ang=m.f(i)/crownLeaves*m.tau+rng.range(-0.4,0.4);
+    try mg.leaf(b,.{
+      .at=onStem(&spine,&radii,0.93,ang),.dir=m.norm(v3(@cos(ang),1.6,@sin(ang))),
+      .len=g.leafLen*rng.range(0.3,0.42),.width=g.leafW*0.7,.droop=0.05,.twist=rng.range(-0.4,0.4),.open=0.4,
+      .col=color.shade(g.leafCol,0.7),.tip=color.mix(leafTip,youngTip,0.6),.stalkCol=stalk,.t=0.9,
+    });
   }
   // thorns: small, short, pressed to the stem
   for(0..g.thorns)|i|{

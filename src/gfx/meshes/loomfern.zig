@@ -190,7 +190,7 @@ fn frond(b:*mg.Builder,k:*growth.Skeleton,bole:growth.Id,i:usize)Allocator.Error
     for([_]f32{1,-1})|sgn|{
       // which way this leaflet points: out to its side, swept on, a little up
       const dir=m.norm(side*m.splat3(sgn)+tan*m.splat3(0.55)+v3(0,0.12,0));
-      try mg.blade(b,at,dir,len,pinnaW*(1-0.5*m.ratio(j,pinnae-1)),0.45,pal.leafDark,pal.leafLite,m.lerp(0.3,1,u),.leaf);
+      try mg.natural(b,at,dir,len,pinnaW*(1-0.5*m.ratio(j,pinnae-1)),0.45,pal.leafDark,pal.leafLite,m.lerp(0.3,1,u),.sessile);
     }
     try k.on(b,s,id,u,.{});
   }

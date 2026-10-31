@@ -74,6 +74,14 @@ pub const flower=flowers.flower;
 pub const bud=flowers.bud;
 /// grows small leaves along a vine, turning round it, smaller toward the tip
 pub const leavesAlong=flowers.leavesAlong;
+/// how a leaf is shaped: stalk, outline, teeth, droop, twist, ripple, curl
+pub const Leaf=blades.Leaf;
+/// builds a leaf on its stalk, botanical and uneven (blades.zig)
+pub const leaf=blades.leaf;
+/// whether a natural leaf grows on a stalk of its own
+pub const Stalk=blades.Stalk;
+/// a natural leaf in place of a plain blade, varied by where it grows
+pub const natural=blades.natural;
 /// one leaf at a point along a path (the grower's leaf: `growth.Skeleton.leaves`)
 pub const leafAt=flowers.leafAt;
 /// how many segments a blade's midrib is cut into, base to tip

@@ -114,7 +114,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     const dir=m.norm(v3(@cos(a),1.1+0.25*m.f(i%2),@sin(a)));
     // where its vertices begin
     const s=b.mark();
-    try mg.blade(b,crown,dir,0.16+0.04*m.f(i%2),0.055,0.55,pal.leafDark,pal.leafLite,1,.leaf);
+    try mg.natural(b,crown,dir,0.16+0.04*m.f(i%2),0.055,0.55,pal.leafDark,pal.leafLite,1,.stalked);
     try k.on(b,s,sprout,1,.{.from=crown,.delay=0.025*m.f(i)});
   }
   k.finish(b);

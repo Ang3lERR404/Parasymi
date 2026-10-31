@@ -195,7 +195,7 @@ fn bough(b:*mg.Builder,sk:*growth.Skeleton,stem:growth.Id,k:usize)Allocator.Erro
     const dir=m.norm(out+side+v3(0,0.7,0));
     // where its vertices begin, so it unfolds as the bough passes
     const s1=b.mark();
-    try mg.blade(b,behind,dir,0.27*rng.range(0.85,1.1),0.1,0.55,pal.leafDark,pal.leafLite,behind[1]/tall,.leaf);
+    try mg.natural(b,behind,dir,0.27*rng.range(0.85,1.1),0.1,0.55,pal.leafDark,pal.leafLite,behind[1]/tall,.stalked);
     try sk.on(b,s1,id,0.9,.{.from=behind});
   }
 }

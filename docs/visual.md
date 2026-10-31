@@ -112,7 +112,12 @@ These are the symbiotic structures' body.
   stems wind alike.
 - **Roots:** the stem flares into a mat of 5 braided roots that arch down,
   hug the ground and sink in.
-- **Leaves:** a rosette of broad leaves round the foot (genome `rosette`).
+- **Leaves:** natural and uneven, never clones (`meshgen.leaf`): each
+  on its own stalk, its own size, droop, twist and edge ripple, toothed,
+  its tip curling. A low rosette of broad old leaves sprawls round the foot
+  (genome `rosette`), yellower with age; many leaves climb the stem,
+  biggest low down; young ones stand folded round the crown. Every
+  structure's and convergent leaf is grown the same way (`meshgen.natural`).
   Leafy vines twine up the stem, tapering at both ends (`vines`). One vase
   leaf envelope rises up it (`leafFrom`, for tree crowns).
 - **Offshoots:** braided (`meshgen.shootPath`; genome `shoots` = the

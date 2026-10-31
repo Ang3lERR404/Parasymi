@@ -335,7 +335,7 @@ fn cluster(b:*mg.Builder,sp:[]const V3,rs:[]const f32,u:f32,n:u8,side:f32,rng:*R
     const dir=m.norm(flat*m.splat3(@cos(a))+out*m.splat3(@sin(a))+v3(0,leafLift,0));
     // the middle leaf of three the longest
     const len=leafLen*rng.range(0.85,1.1)*(if(n==3 and l==1)@as(f32,1.2)else 1);
-    try mg.blade(b,tip,dir,len,leafW,0.4,pal.leafDark,pal.leafLite,u,.leaf);
+    try mg.natural(b,tip,dir,len,leafW,0.4,pal.leafDark,pal.leafLite,u,.stalked);
   }
 }
 /// soil heaped where the root breaks the ground at `at`, clods round it,

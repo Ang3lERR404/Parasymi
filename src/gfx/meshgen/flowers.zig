@@ -20,6 +20,8 @@ const V3=m.V3;
 const Builder=lib.meshgen.Builder;
 /// builds a curved blade: sepals and leaves
 const blade=lib.meshgen.blades.blade;
+/// a natural leaf, varied by where it grows (vines' leaves)
+const natural=lib.meshgen.blades.natural;
 /// builds a closed ellipsoid: calyx, bead, bud heart
 const ellipsoid=lib.meshgen.ellipsoid;
 /// builds one petal
@@ -173,5 +175,5 @@ pub fn leafAt(b:*Builder,path:[]const V3,k:f32,i:usize,len:f32,width:f32,t0:f32,
   out=m.norm(out);
   // its length, smaller toward the tip
   const l=len*m.lerp(1,0.6,k)*rng.range(0.85,1.15);
-  try blade(b,at,out,l,width*m.lerp(1,0.7,k),0.35,col,tip,m.lerp(t0,t1,k),.leaf);
+  try natural(b,at,out,l,width*m.lerp(1,0.7,k),0.35,col,tip,m.lerp(t0,t1,k),.stalked);
 }

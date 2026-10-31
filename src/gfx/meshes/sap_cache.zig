@@ -232,7 +232,7 @@ fn rib(b:*mg.Builder,k:*growth.Skeleton,bole:growth.Id,set:usize,i:usize)Allocat
     const dir=m.norm(at[1]*m.splat3(0.75)+m.norm(up)*m.splat3(0.8));
     // where the leaf's vertices begin
     const ls=b.mark();
-    try mg.blade(b,at[0],dir,0.12*rng.range(0.85,1.1),0.042,0.45,pal.leafDark,pal.leafLite,m.lerp(0.3,0.75,f),.leaf);
+    try mg.natural(b,at[0],dir,0.12*rng.range(0.85,1.1),0.042,0.45,pal.leafDark,pal.leafLite,m.lerp(0.3,0.75,f),.stalked);
     try k.on(b,ls,id,f,.{.from=at[0]});
   }
 }
