@@ -267,11 +267,24 @@ fn grown(b:*mg.Builder,stage:f32)Allocator.Error!void{
 /// coming down near it, currents of energy flowing up into its base
 fn builder(b:*mg.Builder)Allocator.Error!void{
   try grown(b,4);
-  try cluster(b,.{.shape=.heartBurst,.reach=4.2,.n=72,.group=3});
-  try cluster(b,.{.shape=.heartCurrent,.reach=4.22,.n=70,.group=10});
+  try settling(b,4);
+}
+/// what bursts from the heart's blooms and flows into it as it settles, at
+/// `stage`
+fn settling(b:*mg.Builder,stage:f32)Allocator.Error!void{
+  try cluster(b,.{.shape=.heartBurst,.reach=stage+0.2,.n=72,.group=3});
+  try cluster(b,.{.shape=.heartCurrent,.reach=stage+0.22,.n=70,.group=10});
+}
+/// the heart's whole story in one (stage 5): every web any stage has, the
+/// GPU telling which stage it is at by its clock
+fn story(b:*mg.Builder)Allocator.Error!void{
+  try grown(b,5);
+  try cluster(b,.{.shape=.heartSeed,.reach=5.2,.n=144,.group=3});
+  try settling(b,5);
 }
 /// the heart at `stage` (0 bound, 1 rising, 2 blooming, 3 its chain
-/// reaction, 4 settling into a builder; it rides in every
+/// reaction, 4 settling into a builder, 5 all of them in turn; it rides
+/// in every
 /// vertex's reach, whole part): a stem with four buds fastened at its
 /// joints, bonded, and the filaments that drip from its foot once it rises;
 /// each web's reach shrunk with the part, so its lines join only what they
@@ -372,4 +385,11 @@ pub const heartChain=struct{
 pub const heartBuilder=struct{
   /// builds the heart settling into a builder
   pub fn build(b:*mg.Builder)Allocator.Error!void{try builder(b);}
+};
+/// mesh: CONSTELLATE HEART. its whole story in one: bound, rising,
+/// blooming, its chain reaction, settling into a builder, then beginning
+/// again
+pub const heartWhole=struct{
+  /// builds the heart's whole story
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try story(b);}
 };

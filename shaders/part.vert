@@ -191,6 +191,12 @@ const int PLEXUS_HEART_BURST = 47;
 const int PLEXUS_HEART_CURRENT = 48;
 const float PLEXUS_HEART_SETTLE = 44.0;
 const float PLEXUS_HEART_DROP = 1.2;
+// the heart's whole story in one (stage 5 in the mesh): bound, rising,
+// blooming, its chain reaction, settling into a builder, each stage in
+// turn on one clock, then fading away to begin again. How long each stage
+// is held (s) and how long the fade out and in at the ends
+const float PLEXUS_STORY[5] = float[5](6.0, 8.0, 14.0, 86.0, 38.0);
+const float PLEXUS_STORY_FADE = 3.0;
 // a petlet's rows, base to tip: how many points each holds (12 in all) and
 // how far along it lies
 const int PLEXUS_PETLET_ROWS[6] = int[6](1, 2, 3, 3, 2, 1);
@@ -200,6 +206,14 @@ float plexStage = 0.0;
 // whether the heart's settling carries what is being placed down with it
 // (0 while placing a bloom that has burst free, or its fragments)
 float plexDropOn = 1.0;
+// whether the web being placed tells the heart's whole story (1), how far
+// into its stage it is (s), and how much of it shows at the ends
+float plexStory = 0.0;
+float plexLocal = 0.0;
+float plexStoryShow = 1.0;
+// how far into its stage the heart is at time `t` (s): on the story's clock,
+// or looping the stage alone every `loop` s
+float plexusStageClock(float t, float loop) { return plexStory > 0.5 ? plexLocal : mod(t, loop); }
 const vec3 PLEXUS_YIELD_MIDDLE = vec3(0.0, 1.13, 0.0);
 const float PLEXUS_YIELD_OUT = 0.5;
 const float PLEXUS_YIELD_LEAN = 0.5;
@@ -414,7 +428,11 @@ vec4 plexusYield(float id, int shape, float t) {
 // how far into the chain reaction it is at time `t` (s), and how much of
 // it is still standing (it all comes undone quickly at the end, to begin
 // again)
-float plexusChainAt(float t) { return plexStage > 3.5 ? PLEXUS_HEART_CHAIN - 5.0 : mod(t, PLEXUS_HEART_CHAIN); }
+float plexusChainAt(float t) {
+  if (plexStage > 3.5) return PLEXUS_HEART_CHAIN - 5.0;
+  if (plexStory > 0.5) return plexStage < 2.5 ? -100.0 : plexLocal;
+  return mod(t, PLEXUS_HEART_CHAIN);
+}
 float plexusChainKeep(float t) { return 1.0 - smoothstep(PLEXUS_HEART_CHAIN - 4.0, PLEXUS_HEART_CHAIN - 1.0, plexusChainAt(t)); }
 // when the blooms begin building bloom `k` (1 to 3, s into the chain): the
 // first at once, each next once the last fragment of the one before has
@@ -433,17 +451,27 @@ float plexusChainDone() { return plexusChainLetGo(3, 15.0) + PLEXUS_HEART_WAY; }
 // time `t`: the first bloom's snapped on from the start, the others' three
 // at a time, as the fragment that becomes them arrives
 float plexusChainPetlet(int k, int j, float id, float t) {
-  if (k == 0) return plexusChainKeep(t);
+  // (snapped on as the story's chain begins)
+  if (k == 0) return plexStory > 0.5 ? smoothstep(0.0, 1.5, plexusChainAt(t)) : plexusChainKeep(t);
   float a = plexusChainLetGo(k, float(j * 4) + floor(id / 3.0)) + PLEXUS_HEART_WAY;
   return smoothstep(a - 0.15, a + 0.35, plexusChainAt(t)) * plexusChainKeep(t);
 }
 // how many fragments have arrived at bloom `k` by `x` s into the chain
 float plexusChainLanded(int k, float x) { return clamp((x - plexusChainStart(k) - PLEXUS_HEART_WAY) * float(k) / PLEXUS_HEART_EVERY + 1.0, 0.0, 16.0); }
+// how far the heart has risen off the ground at time `t` (0 bound, 1 up):
+// in the story, slowly as its rising begins; on its own, at once
+float plexusRise(float t) {
+  if (plexStage < 0.5) return 0.0;
+  if (plexStory > 0.5 && plexStage < 1.5) return smoothstep(0.0, 4.0, plexLocal);
+  return 1.0;
+}
 // how big the heart is at time `t` (its first size 1): shrunk once it
 // rises; in the chain reaction swelling with every fragment that arrives,
 // then growing past its first size once all four blooms are done
 float plexusHeartSize(float t) {
   if (plexStage < 0.5) return 1.0;
+  // (in the story, shrinking as it rises)
+  if (plexStory > 0.5 && plexStage < 1.5) return mix(1.0, 0.7, plexusRise(t));
   if (plexStage < 2.5) return 0.7;
   float x = plexusChainAt(t);
   float done = 0.0;
@@ -453,7 +481,7 @@ float plexusHeartSize(float t) {
 }
 // how far into its settling the heart is at time `t` (s), and how much of
 // it still holds (it all goes back quickly at the end, to begin again)
-float plexusSettleAt(float t) { return mod(t, PLEXUS_HEART_SETTLE); }
+float plexusSettleAt(float t) { return plexStory > 0.5 && plexStage < 3.5 ? -100.0 : plexusStageClock(t, PLEXUS_HEART_SETTLE); }
 float plexusSettleKeep(float t) { return 1.0 - smoothstep(PLEXUS_HEART_SETTLE - 4.0, PLEXUS_HEART_SETTLE - 1.0, plexusSettleAt(t)); }
 // when the heart's bloom `k` bursts free (s into the settling)
 float plexusSettleLet(int k) { return 3.0 + 0.6 * float(k); }
@@ -480,14 +508,14 @@ float plexusChainGrand(int p, float t) {
 float plexusHeartMorph(float t) {
   if (plexStage < 1.5) return 0.0;
   if (plexStage > 2.5) return 1.0;
-  float x = mod(t, PLEXUS_HEART_BLOOMING);
+  float x = plexusStageClock(t, PLEXUS_HEART_BLOOMING);
   return smoothstep(2.0, 12.0, x) * (1.0 - smoothstep(14.0, 16.0, x));
 }
 // how far the heart's bud `k` has bloomed at time `t`: one after another
 float plexusHeartBloom(int k, float t) {
   if (plexStage < 1.5) return 0.0;
   if (plexStage > 2.5) return 1.0;
-  float x = mod(t, PLEXUS_HEART_BLOOMING);
+  float x = plexusStageClock(t, PLEXUS_HEART_BLOOMING);
   return smoothstep(1.0 + 2.0 * float(k), 4.0 + 2.0 * float(k), x) * (1.0 - smoothstep(14.0, 16.0, x));
 }
 // how far the heart's filament `k` has dripped down at time `t`: none
@@ -495,7 +523,7 @@ float plexusHeartBloom(int k, float t) {
 float plexusHeartGrow(float k, float t) {
   if (plexStage < 0.5) return 0.0;
   if (plexStage > 1.5) return 1.0;
-  float x = mod(t, PLEXUS_HEART_RISING);
+  float x = plexusStageClock(t, PLEXUS_HEART_RISING);
   return smoothstep(1.5 * k, 1.5 * k + 3.0, x) * (1.0 - smoothstep(9.0, 10.0, x));
 }
 // a point `p` of the heart once it rises: sized about its foot, lifted
@@ -505,7 +533,7 @@ vec3 plexusHeartLift(vec3 p, float t) {
   if (plexStage < 0.5) return p;
   vec3 foot = vec3(0.0, 0.5, 0.0);
   float down = PLEXUS_HEART_DROP * plexusSettleDrop(t) * plexDropOn;
-  return foot + (p - foot) * plexusHeartSize(t) + vec3(0.0, 0.45 + 0.04 * sin(t * 0.8) - down, 0.0);
+  return foot + (p - foot) * plexusHeartSize(t) + vec3(0.0, (0.45 + 0.04 * sin(t * 0.8)) * plexusRise(t) - down, 0.0);
 }
 // where point `id` (drifted by `moved`) of the heart's stem is at time
 // `t`: a stem, becoming a grand flower opening over where its top was
@@ -885,6 +913,22 @@ void main() {
     int shape = int(code / 4.0);
     // the reach (pos.x), its whole part the heart's stage
     plexStage = floor(pos.x);
+    // (the whole story: which stage it is at now, how far into it, and how
+    // much shows as it fades out at the end and in at the start)
+    if (plexStage > 4.5) {
+      float total = 0.0;
+      for (int k = 0; k < 5; k++) total += PLEXUS_STORY[k];
+      float x = mod(t, total);
+      plexStory = 1.0;
+      plexStoryShow = smoothstep(0.0, PLEXUS_STORY_FADE, x) * (1.0 - smoothstep(total - PLEXUS_STORY_FADE, total, x));
+      plexStage = 4.0;
+      float start = 0.0;
+      for (int k = 0; k < 5; k++) {
+        if (x < start + PLEXUS_STORY[k]) { plexStage = float(k); break; }
+        start += PLEXUS_STORY[k];
+      }
+      plexLocal = x - start;
+    }
     float reach = fract(pos.x);
     float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
     plexLayer = step(twin, 0.0);
@@ -906,7 +950,8 @@ void main() {
     // the heart's stem reaches further as it becomes its grand flower
     if (shape == PLEXUS_HEART_STEM) reach *= mix(1.0, 2.7, plexusHeartMorph(t));
     // in the chain reaction the heart's webs reach as far as it has grown
-    if (plexStage > 2.5 && shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) reach *= plexusHeartSize(t) / 0.7;
+    // (all through the story, built at its risen size)
+    if ((plexStage > 2.5 || plexStory > 0.5) && shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) reach *= plexusHeartSize(t) / 0.7;
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
     // how much there is of what a yielder yields, as it grows and is let go
     // (or of a heart's filament as it drips down)
@@ -926,6 +971,7 @@ void main() {
     // its lines as much as its fainter end)
     if (shape == PLEXUS_HEART_BURST) yield = plexusHeartBurst(ids.x, t).w;
     if (shape == PLEXUS_HEART_CURRENT) yield = min(min(plexusCurrentShow(ids.x, t), plexusCurrentShow(ids.y, t)), plexusCurrentShow(ids.z, t));
+    yield *= plexStoryShow;
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
     bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;
