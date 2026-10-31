@@ -108,6 +108,9 @@ pub const pass=struct{
     nearer:bool=false,
     /// whether it blends over what is there by its alpha
     blend:bool=false,
+    /// with `blend`: add its colour onto what is there instead (light
+    /// laid on light), what is there's alpha kept where its own is 0
+    additive:bool=false,
     /// what it draws into
     target:Target=.world,
     /// with MSAA, shade every sample: its fragments choose for themselves
@@ -148,7 +151,7 @@ pub const pass=struct{
       .bindings=d.bindings,.attrs=d.attrs,
       .layout=layout,
       .colorFormat=switch(d.target){.shadow=>.undefined,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
-      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.world,.blend=d.blend,.cull=false,
+      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,
       .samples=postMod.sampleFlags(if(d.target==.world)samples else 1),.perSample=d.perSample,
       .viewMask=if(d.target==.shadow)light.views else 0,
       .depthBias=if(d.target==.shadow)light.bias else null,

@@ -3,6 +3,13 @@
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "surface.glsl"
+#ifdef AIR
+#include "volume.glsl"
+#include "air.glsl"
+// what glows lights the air itself: its light taken before the distance
+// fog, which the air pass's own march stands in for
+#define applyFog(c, p) (c)
+#endif
 
 layout(location = 0) in vec3 v_pos;
 layout(location = 1) in vec3 v_nrm;
@@ -415,7 +422,27 @@ void surface() {
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
+#ifdef AIR
+// how strongly what glows lights the air round it, per unit of the air's
+// density
+const float AIR_GLOW = 3.0;
+// the air round what glows (render/passes/parts.zig `air`): drawn into the
+// fog's volume, the same light it shines with, spread wider (part.vert
+// under AIR), fading out to its edge, and lighting only as much as the air
+// there is dense: brighter in the mist, faint in clear air, hidden behind
+// what stands in front of it
+void main() {
+  int part = int(v_part + 0.5);
+  if (!PART_IN(PARTS_LIGHT, part)) discard;
+  if (gl_FragCoord.z > volumeDepth(ivec2(gl_FragCoord.xy)) + 1e-6) discard;
+  surface();
+  vec3 V = normalize(pc.eye_time.xyz - v_pos);
+  float soft = pow(abs(dot(normalize(v_nrm), V)), 2.0);
+  o = vec4(max(o.rgb, 0.0) * clamp(o.a, 0.0, 1.0) * soft * airDensity(v_pos, pc.eye_time.w) * AIR_GLOW, 0.0);
+}
+#else
 void main() {
   surface();
   keepPass(o.a);
 }
+#endif

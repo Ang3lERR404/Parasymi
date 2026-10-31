@@ -155,6 +155,16 @@ over them.
 
 A new see-through part role goes in `vertex.seeThrough`.
 
+### What glows lights the air
+Every part that is light itself (`PARTS_LIGHT`: beams, flashes, the halo,
+energy, the constellate's lines and points) also lights the fog round it.
+`partsAir` draws the see-through runs once more into the fog's volume,
+after its march, with shaders built with `-DAIR`: each glow spread wider
+(part.vert), its light added on (`additive`) as much as the air there is
+dense (`airDensity`, shaders/air.glsl, the same air the fog marches), and
+hidden behind what stands in front of it. A new glowing role only needs to
+be in `PARTS_LIGHT` and `vertex.seeThrough`.
+
 ### Other rules
 - part.vert picks how to place a part by `PartInstance.e.x`:
   - 0 matrix;

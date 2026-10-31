@@ -95,6 +95,8 @@ pub const passes=struct{
   pub const partsGlass=@import("passes/parts.zig").glass;
   /// the air over everything, marched after the world into its volume
   pub const fog=@import("passes/fog.zig");
+  /// the air round what glows, lit after the fog's march
+  pub const partsAir=@import("passes/parts.zig").air;
   /// the HUD, over the finished picture
   pub const ui=er.ui;
 };

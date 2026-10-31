@@ -52,6 +52,10 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
 - **Glow:** the points of light (blooms, motes) light the air round them;
   the ley lines' glow rises off the ground into the mist, pulsing with
   them (read from the overhead map, the ground drawn from above).
+- **Everything that glows lights the air** (a standing rule): beams,
+  flashes, the halo, energy, the constellate's glowing edges and points
+  each cast a soft haze into the fog round them, brighter in the mist,
+  faint in clear air (`partsAir`, docs/architecture.md).
 
 ## Plants
 ### All plants

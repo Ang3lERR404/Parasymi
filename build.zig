@@ -24,12 +24,15 @@ const shaders=[_][]const u8{
 /// imported under their own name: (name, source, define). The glass
 /// variants draw only the see-through fragments the plain ones skip; the
 /// shadow variants place what casts into each cascade of the key light's
-/// shadow map; the overhead ones draw the ground from above for the fog.
+/// shadow map; the overhead ones draw the ground from above for the fog;
+/// the air ones light the fog round what glows.
 const variants=[_][3][]const u8{
   .{"plant_glass.frag","plant.frag","GLASS"},
   .{"part_glass.frag","part.frag","GLASS"},
   .{"plant_shadow.vert","plant.vert","SHADOW"},
   .{"part_shadow.vert","part.vert","SHADOW"},
+  .{"part_air.vert","part.vert","AIR"},
+  .{"part_air.frag","part.frag","AIR"},
   .{"terrain_overhead.vert","terrain.vert","OVERHEAD"},
   .{"terrain_overhead.frag","terrain.frag","OVERHEAD"},
 };

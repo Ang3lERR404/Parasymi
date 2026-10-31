@@ -213,6 +213,10 @@ const float PLEXUS_PAIR_QUICK = 1.4;
 // how far a line's glow reaches either side of it (its bright core a
 // share of that, part.frag)
 const float PLEXUS_LINE_W = 0.022;
+// in the air round what glows (AIR): how much wider a constellate line's
+// glow and point's light reach, and how far out any other glow's shell
+const float AIR_SPREAD = 5.0;
+const float AIR_REACH = 0.08;
 const float PLEXUS_PANE = 0.005;
 const float PLEXUS_SOFT = 0.8;
 
@@ -785,6 +789,9 @@ void main() {
       // a point: one light of its pair (pos.y 1 the first, -1 its
       // companion, the smaller)
       lp = A + nrm * (plexMote > 0.5 ? PLEXUS_MOTE_R * (1.0 + plexMote) : PLEXUS_POINT_R * swell) * thin * yield;
+#ifdef AIR
+      lp = A + (lp - A) * AIR_SPREAD;
+#endif
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * nrm;
     } else if (plexKind < 1.5 || plexKind > 2.5) {
@@ -799,7 +806,11 @@ void main() {
       vec3 across = cross(T, toEye);
       vec3 right = across / max(length(across), 1e-6);
       float pinch = sqrt(max(sin(0.5 * TAU * tu.x), 0.0));
-      w = vec4(wc + right * tu.y * PLEXUS_LINE_W * thin * pinch * plexFade, 1.0);
+      float lineW = PLEXUS_LINE_W;
+#ifdef AIR
+      lineW *= AIR_SPREAD;
+#endif
+      w = vec4(wc + right * tu.y * lineW * thin * pinch * plexFade, 1.0);
       wn = toEye;
     } else {
       // a pane (tu its corner's weights, pos.y its face): it shows while
@@ -999,7 +1010,16 @@ void main() {
   // the halo's ring and the rays making it appear as its diamond forms
   // (from its shards, as its blooms close in)
   if (part == PART_HALO || part == PART_PROJECTION) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
+#ifdef AIR
+  // the air round what glows: any glow but the constellate's swelled out
+  // along its normal into a soft shell; what does not glow, and the
+  // constellate's panes (glass, not light), unseen
+  if (PART_IN(PARTS_LIGHT, part) && part != PART_PLEXUS) w.xyz += normalize(wn) * AIR_REACH;
+#endif
   gl_Position = project(w.xyz);
+#ifdef AIR
+  if (!PART_IN(PARTS_LIGHT, part) || (part == PART_PLEXUS && plexKind > 1.5 && plexKind < 2.5)) gl_Position = UNSEEN;
+#endif
 #ifndef SHADOW
   // a skinned mesh may hide what some of its bones carry (the wolf's head,
   // seen from its own eyes): ie.zw a mask of bones, 24 to a float. Clipped

@@ -93,7 +93,7 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*ren
   cmd.pushConstants(r.layout(.world),pass.stages,0,@sizeOf(renderer.WorldPush),&f.push);
   cmd.bindVertexBuffers(0,&.{r.ext.meshes.buf,f.inst.buf,r.ext.skins.buf,r.ext.grows.buf},&.{0,0,0,0});
   for(0..meshlib.slots)|i|{
-    if(f.counts[i]==0 or (p==.partsGlass and !r.ext.partGlassy[i]))continue;
+    if(f.counts[i]==0 or ((p==.partsGlass or p==.partsAir) and !r.ext.partGlassy[i]))continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.partsShadow)renderer.caster(i)else i;
     cmd.bindVertexBuffers(4,&.{r.ext.meshes.buf},&.{r.ext.partMorph[mesh]});
@@ -129,5 +129,23 @@ pub const shadow=struct{
   /// draws every caster into the shadow map
   pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
     draw(r,&r.frames[r.fi].pass.parts,cmd,stats,.partsShadow);
+  }
+};
+/// the air round what glows (beams, flashes, the halo, energy, the
+/// constellate's lines and points): the same instances drawn again into the
+/// fog's volume after its march, each glow spread wider and its light added
+/// to the air there as much as the air is dense (part.frag under AIR), so
+/// what glows lights the mist round it
+pub const air=struct{
+  /// the air pipeline: added onto the volume, testing the world's depth
+  /// itself (the volume has none of its own)
+  pub const desc:pass.Desc=.{
+    .vert=@embedFile("part_air.vert"),.frag=@embedFile("part_air.frag"),
+    .bindings=bindings,.attrs=attrs,
+    .depth=false,.blend=true,.additive=true,.target=.volume,
+  };
+  /// draws the runs with anything see-through (every glow is), lighting the air
+  pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
+    draw(r,&r.frames[r.fi].pass.parts,cmd,stats,.partsAir);
   }
 };
