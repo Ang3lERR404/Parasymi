@@ -3,6 +3,16 @@
 const std=ps.std;
 /// formats text into a fixed buffer (a subject's word)
 const bufPrint=std.fmt.bufPrint;
+/// whether a name begins with a prefix
+const startsWith=std.mem.startsWith;
+/// whether a name ends with a suffix
+const endsWith=std.mem.endsWith;
+/// whether two names are the same
+const eql=std.mem.eql;
+/// a name turned into its enum tag, or null if none matches (the tests' bones)
+const stringToEnum=std.meta.stringToEnum;
+/// the test helpers
+const testing=std.testing;
 /// the engine package, as the game's hub hands it on
 const engine=ps.engine;
 /// all the maths: vectors, matrices, turns
@@ -88,6 +98,50 @@ fn side(comptime i:usize,xAxis:m.V3,nx:m.V3)[8]Joint{
     joint("legs."++n++".foot",sd.foot,.hinge,xAxis),
   };
 }
+/// where a pose channel goes in the wolf's mirror image across its middle
+/// (x=0): the channel it becomes and the sign its value takes
+pub const Mirror=struct{
+  /// the channel on the other side (itself down the middle)
+  ch:usize,
+  /// -1 where the mirror turns the value round, else 1
+  sign:f32,
+};
+/// the pose's lists that hold a left then a right, traded in the mirror
+const paired=[_][]const u8{"arms.","legs.","hands.","ears."};
+/// pose channel `name` on the other side: `arms.0...` is `arms.1...` and
+/// back; a channel down the middle is itself
+fn across(comptime name:[]const u8)[]const u8{
+  for(paired)|p|{
+    if(startsWith(u8,name,p) and name.len>p.len){
+      // the side's digit, traded for the other
+      const other=switch(name[p.len]){
+        '0'=>"1",
+        '1'=>"0",
+        else=>@compileError("a paired list holds two sides: "++name),
+      };
+      return p++other++name[p.len+1..];
+    }
+  }
+  return name;
+}
+/// the sign pose channel `name` takes in the mirror: the hips' place
+/// across (x) and every turn's twist and roll (y, z) about the flipped
+/// axis run the other way, as does a foot's roll; the pitches (x), the
+/// hinges, the fingers (whose curl the skeleton already sides) and the
+/// rest keep theirs
+fn flip(comptime name:[]const u8)f32{
+  if(startsWith(u8,name,"hip."))return if(eql(u8,name,"hip.x"))-1 else 1;
+  if(endsWith(u8,name,".y") or endsWith(u8,name,".z") or endsWith(u8,name,".roll"))return -1;
+  return 1;
+}
+/// each pose channel's place in the mirror, by channel
+pub const mirrors=blk:{
+  @setEvalBranchQuota(10_000_000);
+  // the mirror filled channel by channel
+  var out:[PoseCh.count]Mirror=undefined;
+  for(PoseCh.names,0..)|n,i|out[i]=.{.ch=PoseCh.find(across(n)).?,.sign=flip(n)};
+  break:blk out;
+};
 /// the joint channel `ch` of the pose belongs to
 pub fn jointOf(ch:usize)?usize{
   for(joints,0..)|j,i|for(j.chans)|c|if(c==ch)return i;
@@ -195,3 +249,43 @@ pub const Drag=enum{
   /// the selected joint's gizmo, keying it as it turns
   gizmo,
 };
+/// bone `b`'s twin across the wolf's middle (`armL` is `armR`); a bone
+/// down the middle is its own
+fn twin(b:skel.Bone)skel.Bone{
+  // the bone's name, and its last letter, which names its side
+  const name=@tagName(b);
+  const last=name[name.len-1];
+  if(last!='L' and last!='R')return b;
+  // the name with its side traded
+  var buf:[32]u8=undefined;
+  const other=bufPrint(&buf,"{s}{c}",.{name[0..name.len-1],@as(u8,if(last=='L')'R'else'L')}) catch return b;
+  return stringToEnum(skel.Bone,other) orelse b;
+}
+test"a pose mirrored channel by channel is the wolf's mirror image across its middle"{
+  // a pose with every channel moved its own way, the sides unlike
+  var p:skel.Pose=.{};
+  for(0..PoseCh.count)|i|PoseCh.set(&p,i,PoseCh.get(&p,i)+0.37*(m.f(i%7)-3)/3);
+  // the pose mirrored: each value set on its channel across, turned as the mirror turns it
+  var q:skel.Pose=.{};
+  for(mirrors,0..)|mr,i|PoseCh.set(&q,mr.ch,mr.sign*PoseCh.get(&p,i));
+  // each bone's frame in either pose
+  const a=skel.fk(p);
+  const b=skel.fk(q);
+  try testing.expectEqual(skel.Bone.armR,twin(.armL));
+  try testing.expectEqual(skel.Bone.tip3L,twin(.tip3R));
+  try testing.expectEqual(skel.Bone.head,twin(.head));
+  for(a,0..)|wa,i|{
+    // the bone's twin's frame in the mirrored pose
+    const wb=b[@intFromEnum(twin(@enumFromInt(i)))];
+    inline for(0..4)|r|inline for(0..4)|c|{
+      // a mirror across x turns round each entry pairing x with another axis
+      const sg:f32=if((r==0)!=(c==0))-1 else 1;
+      try testing.expectApproxEqAbs(sg*wa[r][c],wb[r][c],1e-4);
+    };
+  }
+  // mirrored twice, every channel is back where it was
+  for(mirrors,0..)|mr,i|{
+    try testing.expectEqual(i,mirrors[mr.ch].ch);
+    try testing.expectEqual(@as(f32,1),mr.sign*mirrors[mr.ch].sign);
+  }
+}

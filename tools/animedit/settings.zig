@@ -68,7 +68,7 @@ pub const text:f32=s.textSmall;
 /// the height of one channel's row in the list
 pub const row:f32=18;
 /// how far down the window the channel list starts
-pub const listY:f32=100;
+pub const listY:f32=140;
 /// how wide the channel list is
 pub const listW:f32=380;
 /// how far in from the list's left a channel's value is written
@@ -113,6 +113,8 @@ pub const markBud:Color=s.bud;
 pub const help=[_][]const u8{
   "space play   left/right frame (shift: key to key)   home start   pgup/pgdn length",
   "up/down channel   drag value: key it (shift fine)   k key   a key all   x unkey   r rest",
-  "ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo   middle drag orbit   wheel zoom (over the list: scroll)   . focus   wolf: click a joint, drag its gizmo (shift fine)",
+  "e ease the key here (shift: back)   ctrl+c copy the keys here   ctrl+v paste (shift: mirrored)",
+  "ctrl+s save   ctrl+z undo   ctrl+y (ctrl+shift+z) redo   . focus   middle drag orbit",
+  "wheel zoom (over the list: scroll)   wolf: click a joint, drag its gizmo (shift fine)",
   "m mark the playhead and name it (on a mark: rename; enter done)   shift+m unmark",
 };

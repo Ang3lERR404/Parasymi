@@ -83,7 +83,7 @@ pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Alloc
   try e.settle();
 }
 /// one frame's keys: playing, the playhead, the clip's length, the
-/// channel, keying, marks, saving, undo and redo
+/// channel, keying, eases, marks, copying and pasting, saving, undo and redo
 fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
   // whether shift is held (key to key, unmark), and whether ctrl is
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
@@ -116,6 +116,9 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     if(shift)try e.redo()else try e.undo();
   }
   if(ctrl and hit(in,.y))try e.redo();
+  if(ctrl and hit(in,.c))e.copy();
+  if(ctrl and hit(in,.v))try e.paste(if(shift).mirrored else.plain);
+  if(!ctrl and hit(in,.e))e.turnEase(if(shift)-1 else 1);
   if(hit(in,.period))e.focus=true;
   if(hit(in,.m)){
     if(shift){

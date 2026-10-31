@@ -1,5 +1,6 @@
 //! keyframed animation, the generic half: a clip is a set of named
-//! channels, each a run of keys (time, value) eased between, and the text
+//! channels, each a run of keys (time, value) eased between, each key's
+//! ease shaping the way on to the next (smooth unless said), and the text
 //! it is kept in. `Channels(T)` reads and writes every f32 of a plain
 //! struct (nested structs, arrays, vectors) as a channel of its own, named
 //! by its path (`arms.0.root.x`), so a whole pose or look can be keyed.
@@ -20,6 +21,12 @@ const trim=std.mem.trim;
 const eql=std.mem.eql;
 /// reads a float from its digits
 const parseFloat=std.fmt.parseFloat;
+/// a word turned into its enum tag, or null if none matches
+const stringToEnum=std.meta.stringToEnum;
+/// every tag of an enum, in order (the tests walk the eases)
+const values=std.enums.values;
+/// where a run of bytes first falls in another (the tests find a key's line)
+const indexOf=std.mem.indexOf;
 /// the test helpers
 const testing=std.testing;
 /// the engine's maths: lerp, smoothstep
@@ -28,12 +35,50 @@ const m=@import("../core/math.zig");
 pub const same:f32=1e-4;
 /// the first line of a clip's text
 pub const header="# clip";
-/// one key: a value pinned at a time
+/// how far `back` swings past the next key before it settles (the
+/// classic overshoot: about a tenth of the way, at its widest)
+pub const overshoot:f32=1.70158;
+/// how a key's value runs on to the next key's: the curve's shape, from
+/// 0 at the key to 1 at the next
+pub const Ease=enum{
+  /// eased out of the key and into the next, flat at both (smoothstep):
+  /// the default, kept unwritten in a clip's text
+  smooth,
+  /// straight on at one pace
+  linear,
+  /// held at the key, then a jump at the next
+  step,
+  /// a slow start, gathering pace into the next key
+  easeIn,
+  /// a quick start, slowing to a stop at the next key
+  easeOut,
+  /// quick, swinging a little past the next key and settling back onto it
+  back,
+  /// how far along (0 at the key, 1 at the next; `back` a little past
+  /// before 1) the value is at share `k` of the way in time
+  pub fn at(ea:Ease,k:f32)f32{
+    return switch(ea){
+      .smooth=>m.smooth(k),
+      .linear=>k,
+      .step=>if(k<1)0 else 1,
+      .easeIn=>k*k,
+      .easeOut=>k*(2-k),
+      .back=>back:{
+        // how far is left to go, a negative share
+        const r=k-1;
+        break:back 1+r*r*((overshoot+1)*r+overshoot);
+      },
+    };
+  }
+};
+/// one key: a value pinned at a time, and the ease on to the next
 pub const Key=struct{
   /// when the key sits (seconds into the clip)
   t:f32,
   /// the value it holds there
-  v:f32
+  v:f32,
+  /// how the value runs from here to the next key
+  ease:Ease=.smooth,
 };
 /// one channel's keys, in time order
 pub const Track=struct{
@@ -42,7 +87,7 @@ pub const Track=struct{
   /// its keys, sorted by time
   keys:std.ArrayList(Key)=.empty,
   /// its value at `t`: held before the first key and after the last,
-  /// eased in and out between two (null without keys)
+  /// between two run as the first's ease shapes it (null without keys)
   pub fn sample(tr:*const Track,t:f32)?f32{
     // the keys
     const k=tr.keys.items;
@@ -51,7 +96,7 @@ pub const Track=struct{
     for(k[1..],1..)|b,i|if(t<b.t){
       // the key before `t`
       const a=k[i-1];
-      return m.lerp(a.v,b.v,m.smooth((t-a.t)/(b.t-a.t)));
+      return m.lerp(a.v,b.v,a.ease.at((t-a.t)/(b.t-a.t)));
     };
     return k[k.len-1].v;
   }
@@ -71,7 +116,7 @@ pub const Mark=struct{
 /// what reading a clip's text can fail with
 pub const ParseError=error{
   /// a line that is not a header, comment, `subject`, `length`, `key` or `mark`,
-  /// or one missing its words or numbers
+  /// or one missing its words or numbers, or a key's ease not one known
   BadClip,
   /// no room for the clip's names and keys
   OutOfMemory
@@ -135,7 +180,8 @@ pub const Clip=struct{
     for(c.tracks.items)|*tr|if(eql(u8,tr.name,name))return tr;
     return null;
   }
-  /// `name` keyed to `v` at `t` (an existing key there takes the value)
+  /// `name` keyed to `v` at `t` (an existing key there takes the value
+  /// and keeps its ease; a new one eases smooth)
   pub fn put(c:*Clip,name:[]const u8,t:f32,v:f32)Allocator.Error!void{
     // the channel's track, made (with its name copied) when it is new
     const tr=c.track(name) orelse add:{
@@ -153,6 +199,25 @@ pub const Clip=struct{
     var i:usize=0;
     while(i<tr.keys.items.len and tr.keys.items[i].t<t)i+=1;
     try tr.keys.insert(c.gpa,i,.{.t=t,.v=v});
+  }
+  /// `name` keyed to `v` at `t` with the ease `ea` on to the next key
+  pub fn putEased(c:*Clip,name:[]const u8,t:f32,v:f32,ea:Ease)Allocator.Error!void{
+    try c.put(name,t,v);
+    _=c.ease(name,t,ea);
+  }
+  /// `name`'s key at `t` given the ease `ea`; whether there was one
+  pub fn ease(c:*Clip,name:[]const u8,t:f32,ea:Ease)bool{
+    // the channel's track, and the key at `t`
+    const tr=c.track(name) orelse return false;
+    const i=tr.at(t) orelse return false;
+    tr.keys.items[i].ease=ea;
+    return true;
+  }
+  /// `name`'s key at `t`, if there is one
+  pub fn keyAt(c:*const Clip,name:[]const u8,t:f32)?Key{
+    // the channel's track, and the key at `t`
+    const tr=c.track(name) orelse return null;
+    return tr.keys.items[tr.at(t) orelse return null];
   }
   /// `name`'s key at `t` taken out; whether there was one
   pub fn remove(c:*Clip,name:[]const u8,t:f32)bool{
@@ -183,10 +248,16 @@ pub const Clip=struct{
     return best;
   }
   /// its text: a header, `subject`, `length`, a `key <channel> <time>
-  /// <value>` line for each key, then a `mark <time> <name>` line for each mark
+  /// <value> [ease]` line for each key (the ease left off when smooth, so
+  /// clips from before eases read and write the same), then a `mark
+  /// <time> <name>` line for each mark
   pub fn write(c:*const Clip,w:*Writer)Writer.Error!void{
     try w.print("{s}\nsubject {s}\nlength {d}\n",.{header,c.subject,c.length});
-    for(c.tracks.items)|tr|for(tr.keys.items)|k|try w.print("key {s} {d} {d}\n",.{tr.name,k.t,k.v});
+    for(c.tracks.items)|tr|for(tr.keys.items)|k|{
+      try w.print("key {s} {d} {d}",.{tr.name,k.t,k.v});
+      if(k.ease!=.smooth)try w.print(" {t}",.{k.ease});
+      try w.writeByte('\n');
+    };
     for(c.marks.items)|mk|try w.print("mark {d} {s}\n",.{mk.t,mk.name});
   }
   /// a clip from its text (`#` starts a comment)
@@ -212,11 +283,12 @@ pub const Clip=struct{
       }else if(eql(u8,word,"length")){
         c.length=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
       }else if(eql(u8,word,"key")){
-        // the key's channel, time and value
+        // the key's channel, time and value, and its ease (smooth unless said)
         const name=it.next() orelse return error.BadClip;
         const t=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
         const v=parseFloat(f32,it.next() orelse return error.BadClip) catch return error.BadClip;
-        try c.put(name,t,v);
+        const ea=if(it.next())|ew|stringToEnum(Ease,ew) orelse return error.BadClip else.smooth;
+        try c.putEased(name,t,v,ea);
       }else if(eql(u8,word,"mark")){
         // the mark's time, then its name: the rest of the line, spaces and all
         const ts=it.next() orelse return error.BadClip;
@@ -395,6 +467,67 @@ test"a clip comes back from its text"{
   try testing.expectEqualStrings("paw lands",back.marks.items[0].name);
   try testing.expectEqualStrings("",back.marks.items[1].name);
   try testing.expectError(error.BadClip,Clip.parse(gpa,"key head.x zero 1"));
+  try testing.expectError(error.BadClip,Clip.parse(gpa,"key head.x 0 1 wobbly"));
+}
+test"each ease starts at its key, ends at the next, and runs its own way between"{
+  for(values(Ease))|ea|{
+    try testing.expectApproxEqAbs(@as(f32,0),ea.at(0),1e-6);
+    try testing.expectApproxEqAbs(@as(f32,1),ea.at(1),1e-6);
+  }
+  try testing.expectApproxEqAbs(@as(f32,0.5),Ease.smooth.at(0.5),1e-6);
+  try testing.expectApproxEqAbs(@as(f32,0.25),Ease.linear.at(0.25),1e-6);
+  // step holds the key all the way to the next
+  try testing.expectEqual(@as(f32,0),Ease.step.at(0.99));
+  // ease in lags the straight line, ease out leads it
+  try testing.expect(Ease.easeIn.at(0.5)<0.5);
+  try testing.expect(Ease.easeOut.at(0.5)>0.5);
+  // back swings past the next key before settling onto it
+  // the farthest back reaches along the way
+  var most:f32=0;
+  for(1..100)|i|most=@max(most,Ease.back.at(m.f(i)/100));
+  try testing.expect(most>1.05 and most<1.15);
+  try testing.expect(Ease.back.at(0.2)>Ease.linear.at(0.2));
+  // in a clip: a key's ease shapes the way on to the next, and putting a
+  // new value keeps it
+  var c=try Clip.init(testing.allocator,"thing");
+  defer c.deinit();
+  try c.putEased("a",0,0,.step);
+  try c.put("a",1,4);
+  try testing.expectEqual(@as(f32,0),c.sample("a",0.9).?);
+  try testing.expectEqual(@as(f32,4),c.sample("a",1).?);
+  try c.put("a",0,2);
+  try testing.expectEqual(Ease.step,c.keyAt("a",0).?.ease);
+  try testing.expect(c.ease("a",0,.linear));
+  try testing.expectApproxEqAbs(@as(f32,3),c.sample("a",0.5).?,1e-5);
+  try testing.expect(!c.ease("a",0.5,.back));
+  try testing.expect(c.keyAt("b",0)==null);
+}
+test"a clip written before eases reads back and writes out the same, and eases keep"{
+  // the allocator, which finds leaks
+  const gpa=testing.allocator;
+  // a clip's text as kept before keys had eases
+  const old="# clip\nsubject wolf\nlength 2\nkey arms.1.root.x 0 0.30598304\nkey arms.1.root.x 1.0666667 0.1910734\nkey arms.1.mid 0.56666666 1.953561\nmark 0.5 paw lands\n";
+  var c=try Clip.parse(gpa,old);
+  defer c.deinit();
+  for(c.tracks.items)|tr|for(tr.keys.items)|k|try testing.expectEqual(Ease.smooth,k.ease);
+  // the clip written again, word for word what it was
+  var out:Writer.Allocating=.init(gpa);
+  defer out.deinit();
+  try c.write(&out.writer);
+  try testing.expectEqualStrings(old,out.written());
+  // every ease but smooth written after its key's value, and read back
+  try testing.expect(c.ease("arms.1.root.x",0,.back));
+  try testing.expect(c.ease("arms.1.mid",0.56666666,.step));
+  // the eased clip's text
+  var eased:Writer.Allocating=.init(gpa);
+  defer eased.deinit();
+  try c.write(&eased.writer);
+  try testing.expect(indexOf(u8,eased.written(),"key arms.1.root.x 0 0.30598304 back\n")!=null);
+  var back=try Clip.parse(gpa,eased.written());
+  defer back.deinit();
+  try testing.expectEqual(Ease.back,back.keyAt("arms.1.root.x",0).?.ease);
+  try testing.expectEqual(Ease.smooth,back.keyAt("arms.1.root.x",1.0666667).?.ease);
+  try testing.expectEqual(Ease.step,back.keyAt("arms.1.mid",0.56666666).?.ease);
 }
 test"every f32 of a struct is a channel, named by its path"{
   // a float, a bool (no channel), a vector and an array of structs

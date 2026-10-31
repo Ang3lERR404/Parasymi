@@ -183,10 +183,13 @@ pub fn draw(e:*const Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!
   const hx=at(tx,tw,e.clip.length,e.t);
   try d.limb(.{hx,ty-6},.{hx,ty+tlH+2},3,2,head,0);
   // the playhead's caption: playing or paused, the time, the frame, the
-  // channel, and the mark it stands on
-  var hb:[160]u8=undefined;
-  _=try d.text(tx,ty-26,text,head,bufPrint(&hb,"{s} {d:.2} / {d:.2} s   frame {d}   channel {s}{s}{s}",.{
+  // channel, its key's ease if it is keyed here, and the mark it stands on
+  var hb:[200]u8=undefined;
+  // the selected channel's key at the playhead, if it has one
+  const here=e.clip.keyAt(e.chName(e.sel),e.t);
+  _=try d.text(tx,ty-26,text,head,bufPrint(&hb,"{s} {d:.2} / {d:.2} s   frame {d}   channel {s}{s}{s}{s}{s}",.{
     if(e.playing)"playing"else"paused",e.t,e.clip.length,@as(u32,@intFromFloat(@round(e.t*fps))),e.chLabel(e.sel),
+    if(here!=null)"   ease "else"",if(here)|k|@tagName(k.ease)else"",
     if(e.markHere()!=null)"   mark "else"",e.markHere() orelse "",
   })catch"?");
 }

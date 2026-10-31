@@ -205,4 +205,13 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   })});
   testStep.dependOn(&b.addRunArtifact(meshTests).step);
+  // the animation editor's tests (eases, copying, the wolf's mirror),
+  // built from its own root the same way
+  const animTests=b.addTest(.{.root_module=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/animedit.zig"),
+    .imports=toolImports,
+  })});
+  testStep.dependOn(&b.addRunArtifact(animTests).step);
 }

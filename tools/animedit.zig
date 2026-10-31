@@ -23,6 +23,13 @@
 //! it onto the selected joint (else back onto the whole subject).
 //! `ctrl+z` undoes (tools/history.zig), `ctrl+y` or `ctrl+shift+z` redoes:
 //! a whole drag, or a whole typed mark name, is one step.
+//! Each key eases on to the next its own way: `e` turns the selected
+//! channel's key at the playhead to the next ease (smooth, linear, step,
+//! ease in, ease out, back: a little past and settling), shift `e` the one
+//! before; the caption under the timeline names it. `ctrl+c` copies every
+//! channel's key at the playhead, eases and all; `ctrl+v` keys them at the
+//! playhead, and on the wolf `ctrl+shift+v` keys them mirrored, left and
+//! right traded and each twist and roll turned round (rigging.zig's `mirrors`).
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit

@@ -71,6 +71,34 @@ const gizmoOf=animedit.rigging.gizmoOf;
 const jointOf=animedit.rigging.jointOf;
 /// every joint a gizmo turns
 const joints=animedit.rigging.joints;
+/// where a pose channel goes in the wolf's mirror image
+const Mirror=animedit.rigging.Mirror;
+/// each pose channel's place in the mirror
+const mirrors=animedit.rigging.mirrors;
+/// how a key runs on to the next
+const Ease=clip.Ease;
+/// how many eases there are, which `e` cycles round
+const easeCount=@typeInfo(Ease).@"enum".fields.len;
+/// the test helpers
+const testing=std.testing;
+/// the most channels a subject shows, and so the most keys copied at once
+const most=@max(PoseCh.count,LookCh.count);
+/// one key copied: its row, its value and its ease
+pub const Held=struct{
+  /// the row (into `shown`) it was keyed on
+  row:usize,
+  /// the value it held
+  v:f32,
+  /// how it ran on to its next key
+  ease:Ease,
+};
+/// how copied keys are pasted: as they were, or the wolf's left and right traded
+pub const Paste=enum{
+  /// each key back on its own channel
+  plain,
+  /// each key on its channel across the wolf's middle, turned as a mirror turns it
+  mirrored,
+};
 /// the editor: the clip being keyed, what it moves, the playhead, the
 /// selection and what is held
 pub const Editor=struct{
@@ -119,6 +147,53 @@ pub const Editor=struct{
   namingAt:f32=0,
   /// the clips before and after this one, for undo and redo
   history:History,
+  /// the keys copied (`ctrl+c`), the first `copiedLen` of them held
+  copied:[most]Held=undefined,
+  /// how many keys are copied
+  copiedLen:usize=0,
+  /// the selected channel's key at the playhead given the next ease
+  /// round (`way` 1) or the one before (-1), saying which
+  pub fn turnEase(e:*Editor,way:i32)void{
+    // the channel's name, and its key at the playhead
+    const name=e.chName(e.sel);
+    const k=e.clip.keyAt(name,e.t) orelse return e.say("no key here to ease",.{});
+    // the ease round from the key's own
+    const ea:Ease=@enumFromInt(@mod(@as(i32,@intFromEnum(k.ease))+way,@as(i32,easeCount)));
+    _=e.clip.ease(name,e.t,ea);
+    e.dirty=true;
+    e.say("ease {t}",.{ea});
+  }
+  /// every channel's key at the playhead copied, with its ease, saying how many
+  pub fn copy(e:*Editor)void{
+    e.copiedLen=0;
+    for(0..e.shown.len)|i|if(e.clip.keyAt(e.chName(i),e.t))|k|{
+      e.copied[e.copiedLen]=.{.row=i,.v=k.v,.ease=k.ease};
+      e.copiedLen+=1;
+    };
+    e.say("copied {d} keys",.{e.copiedLen});
+  }
+  /// the copied keys keyed at the playhead, `how` says on which channels
+  /// (only the wolf has sides to trade; a thing pastes plain either way)
+  pub fn paste(e:*Editor,how:Paste)Allocator.Error!void{
+    if(e.copiedLen==0)return e.say("nothing copied",.{});
+    // whether the keys go across the wolf's middle
+    const across=how==.mirrored and e.wolf();
+    for(e.copied[0..e.copiedLen])|h|{
+      // where the key goes, and the sign its value takes there
+      const mr:Mirror=if(across)mirrors[e.shown[h.row]]else.{.ch=e.shown[h.row],.sign=1};
+      const r=e.rowOf(mr.ch) orelse continue;
+      e.setValue(r,mr.sign*h.v);
+      try e.clip.putEased(e.chName(r),e.t,e.value(r),h.ease);
+    }
+    e.playing=false;
+    e.dirty=true;
+    e.say("pasted {d} keys{s}",.{e.copiedLen,if(across)" mirrored"else""});
+  }
+  /// the row showing channel `ch`, if one does
+  fn rowOf(e:*const Editor,ch:usize)?usize{
+    for(e.shown,0..)|c,i|if(c==ch)return i;
+    return null;
+  }
   /// the clip as it is now kept in the history, once the hands let go (no
   /// drag held, no mark being named): a whole drag is one step back
   pub fn settle(e:*Editor)Allocator.Error!void{
@@ -335,3 +410,51 @@ pub const allLook=blk:{
 };
 /// a structure shows only its growth
 pub const growthOnly=[_]usize{LookCh.find("growth").?};
+test"a key's ease cycles round, keys copy and paste (mirrored across the wolf), and a paste undoes"{
+  // the testing allocator, an empty clip of the wolf, and the editor on it
+  const gpa=testing.allocator;
+  var c=try clip.Clip.init(gpa,"wolf");
+  // the clip's text as it starts
+  const first=try text(gpa,&c);
+  defer gpa.free(first);
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.subject=.wolf,.path="unused",.clip=c,.shown=&allPose,.history=try .init(gpa,first)};
+  defer e.clip.deinit();
+  defer e.history.deinit();
+  // the left shoulder's twist and pitch, and the jaw, keyed at the start
+  const twist=PoseCh.find("arms.0.root.y").?;
+  const pitch=PoseCh.find("arms.0.root.x").?;
+  const jaw=PoseCh.find("jaw").?;
+  for([_]usize{twist,pitch,jaw},[_]f32{0.4,-0.3,0.2})|ch,v|{
+    e.setValue(ch,v);
+    try e.key(ch);
+  }
+  // the twist's key eased round to `back`, the last, and on round to smooth
+  e.sel=twist;
+  e.turnEase(-1);
+  try testing.expectEqual(Ease.back,e.clip.keyAt("arms.0.root.y",0).?.ease);
+  e.turnEase(1);
+  try testing.expectEqual(Ease.smooth,e.clip.keyAt("arms.0.root.y",0).?.ease);
+  e.turnEase(-1);
+  try e.settle();
+  e.copy();
+  try testing.expectEqual(@as(usize,3),e.copiedLen);
+  // pasted as they were a second on
+  e.t=1;
+  try e.paste(.plain);
+  try testing.expectEqual(@as(f32,0.4),e.clip.keyAt("arms.0.root.y",1).?.v);
+  try testing.expectEqual(Ease.back,e.clip.keyAt("arms.0.root.y",1).?.ease);
+  try e.settle();
+  // pasted mirrored a second later: onto the right shoulder, the twist turned round
+  e.t=2;
+  try e.paste(.mirrored);
+  try testing.expectEqual(@as(f32,-0.4),e.clip.keyAt("arms.1.root.y",2).?.v);
+  try testing.expectEqual(Ease.back,e.clip.keyAt("arms.1.root.y",2).?.ease);
+  try testing.expectEqual(@as(f32,-0.3),e.clip.keyAt("arms.1.root.x",2).?.v);
+  try testing.expectEqual(@as(f32,0.2),e.clip.keyAt("jaw",2).?.v);
+  try testing.expect(e.clip.keyAt("arms.0.root.y",2)==null);
+  // the mirrored paste is one step back
+  try e.settle();
+  try e.undo();
+  try testing.expect(e.clip.keyAt("arms.1.root.y",2)==null);
+  try testing.expect(e.clip.keyAt("arms.0.root.y",1)!=null);
+}
