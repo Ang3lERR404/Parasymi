@@ -174,6 +174,10 @@ const parts=struct{
   pub const constellateFlower=@import("meshes/constellate.zig").flower;
   /// a sketch: a constellate yielder, petals snapped to a flower head
   pub const constellateYield=@import("meshes/constellate.zig").yield;
+  /// a sketch: a constellate stem, the part others fasten to
+  pub const constellateStem=@import("meshes/constellate.zig").stem;
+  /// a sketch: a constellate sprig, a branch and two leaves on a stem
+  pub const constellateSprig=@import("meshes/constellate.zig").sprigMesh;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;

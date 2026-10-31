@@ -131,6 +131,16 @@ const int PLEXUS_YIELD_PETAL = 6;
 const int PLEXUS_YIELD_FRAGMENT = 11;
 const int PLEXUS_YIELD_LIGHT = 12;
 const int PLEXUS_YIELD_GATHERING = 13;
+// a stem: the plain part everything else holds to, its joints (every third
+// ring) where other stems and leaves fasten; a sprig built on one: its
+// stem, a branch stem fastened at its middle joint, a leaf at its lowest
+// joint and another at its highest (each its own shape so a web joins only
+// its own points; bonds fasten them)
+const int PLEXUS_STEM = 14;
+const int PLEXUS_SPRIG_STEM = 15;
+const int PLEXUS_SPRIG_BRANCH = 16;
+const int PLEXUS_SPRIG_LEAF = 17;
+const int PLEXUS_SPRIG_LEAF_HIGH = 18;
 const vec3 PLEXUS_YIELD_MIDDLE = vec3(0.0, 1.13, 0.0);
 const float PLEXUS_YIELD_OUT = 0.5;
 const float PLEXUS_YIELD_LEAN = 0.5;
@@ -162,9 +172,15 @@ const float PLEXUS_LINE_W = 0.007;
 const float PLEXUS_PANE = 0.005;
 const float PLEXUS_SOFT = 0.8;
 
+// whether point `id` of a stem is on one of its joints, where other stems
+// and leaves fasten (every third ring above its foot)
+bool plexusJoint(float id) {
+  float ring = floor(id / 3.0);
+  return ring > 0.5 && mod(ring, 3.0) < 0.5;
+}
 // where constellate point `id` rests in a part of `shape` on its own (a
-// petal, leaf, bud, flower head, loose cluster), each point nudged a little
-// off its place so no part is ruled straight
+// petal, leaf, bud, flower head, stem, loose cluster), each point nudged a
+// little off its place so no part is ruled straight
 vec3 plexusForm(float id, int shape) {
   vec3 h = hash33(vec3(id, 3.1, 7.7));
   vec3 jit = (h - 0.5) * 0.04;
@@ -209,6 +225,16 @@ vec3 plexusForm(float id, int shape) {
     float r = 0.17 * pow(sin(0.5 * TAU * pow(u, 0.75)), 0.9);
     return vec3(cos(a) * r, 0.75 + 0.55 * u, sin(a) * r) + jit * 0.5;
   }
+  if (shape == PLEXUS_STEM) {
+    // a stem: ten rings of three wound round its length from its foot
+    // (id 0, its heart) up, thinning as it rises and leaning a little; a
+    // ring every third (its joints) swelling where things fasten
+    float ring = floor(id / 3.0);
+    float u = ring / 9.0;
+    float a = (id - ring * 3.0) / 3.0 * TAU + ring * 0.7;
+    float r = 0.035 * (1.0 - 0.3 * u) + (plexusJoint(id) ? 0.025 : 0.0);
+    return vec3(cos(a) * r + 0.06 * sin(0.5 * TAU * u), 0.5 + 1.2 * u, sin(a) * r) + jit * 0.2;
+  }
   if (shape == PLEXUS_FLOWER) {
     // a flower head, open: its heart (id 0) in the middle of a domed disc
     // of nine, five petals of four round it (base, two flanks, tip),
@@ -237,7 +263,23 @@ vec3 plexusForm(float id, int shape) {
 // where constellate point `id` rests in a web of `shape`: a part on its
 // own where it is, a yielder's core where a flower head is (its petals
 // move, `plexusPetal`)
-vec3 plexusRest(float id, int shape) { return plexusForm(id, shape == PLEXUS_YIELD_CORE ? PLEXUS_FLOWER : shape); }
+vec3 plexusRest(float id, int shape) { return plexusForm(id, shape == PLEXUS_YIELD_CORE ? PLEXUS_FLOWER : (shape == PLEXUS_SPRIG_STEM ? PLEXUS_STEM : shape)); }
+// a lone part's point `q`, its own `origin` set on `base` and turned so
+// its up runs `along` and its front `face`, at `size`
+vec3 plexusFasten(vec3 q, vec3 origin, vec3 base, vec3 along, vec3 face, float size) {
+  vec3 d = (q - origin) * size;
+  return base + d.x * cross(along, face) + d.y * along + d.z * face;
+}
+// where point `id` (drifted by `moved`) of a part fastened in a sprig is:
+// the branch stem from the sprig stem's middle joint, leaning out to one
+// side; a leaf from its lowest joint reaching out the other way, another
+// from its highest reaching out a third
+vec3 plexusSprig(float id, int shape, vec3 moved) {
+  if (shape == PLEXUS_SPRIG_BRANCH) return plexusFasten(plexusForm(id, PLEXUS_STEM) + moved, vec3(0.0, 0.5, 0.0), plexusForm(19.0, PLEXUS_STEM) + vec3(-0.04, 0.0, 0.0), normalize(vec3(-0.65, 0.75, 0.1)), vec3(0.0, 0.0, 1.0), 0.65);
+  vec3 q = plexusForm(id, PLEXUS_LEAF) + moved;
+  if (shape == PLEXUS_SPRIG_LEAF) return plexusFasten(q, vec3(0.0, 0.55, 0.0), plexusForm(10.0, PLEXUS_STEM) + vec3(0.03, 0.0, 0.0), normalize(vec3(0.2, 1.0, 0.0)), vec3(1.0, 0.0, 0.0), 0.75);
+  return plexusFasten(q, vec3(0.0, 0.55, 0.0), plexusForm(28.0, PLEXUS_STEM) + vec3(0.0, 0.0, 0.03), normalize(vec3(0.0, 1.0, 0.25)), normalize(vec3(0.3, 0.0, 1.0)), 0.65);
+}
 // how far a yielder's petals have turned in at time `t` (0 open, 1 shut):
 // over each gathering they close, hold while the gathered point fills, and
 // open again once it is let go; each move on a spring, overshooting a
@@ -310,7 +352,7 @@ float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEA
 // waves of its own (a part only a little, keeping its form); a yielder's
 // petal then carried round with it, what it yields on its own way
 vec3 plexusAt(float id, int shape, float t) {
-  if (shape >= PLEXUS_YIELD_FRAGMENT) return plexusYield(id, shape, t).xyz;
+  if (shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING) return plexusYield(id, shape, t).xyz;
   vec3 f = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 11.3, 2.9)));
   vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 5.7, 19.1)));
   vec3 ph = hash33(vec3(id, 23.9, 1.3)) * TAU;
@@ -318,6 +360,7 @@ vec3 plexusAt(float id, int shape, float t) {
   float drift = shape == PLEXUS_CLUSTER ? PLEXUS_DRIFT : PLEXUS_PART_DRIFT;
   vec3 moved = drift * d * vec3(1.0, 0.6, 1.0);
   if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
+  if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) return plexusSprig(id, shape, moved);
   return plexusRest(id, shape) + moved;
 }
 // how much a line between `a` and `b` shows: whole within its reach's
@@ -499,23 +542,28 @@ void main() {
     vec3 A = plexusLight(ids.x, shape, t, twin);
     vec3 B = plexusLight(ids.y, shape, t, twin);
     vec3 C = plexusLight(ids.z, shape, t, twin);
-    // a bond (kind 3) joins a yielder's core (ids.x), or the point it
-    // gathers, to a point of one of its petals (ids.y of petal ids.z): the
-    // core to each base, the gathering to each tip
-    if (plexKind > 2.5) B = plexusLight(ids.y, PLEXUS_YIELD_PETAL + int(ids.z), t, twin);
-    // a yielder's webs all beat from its core's heart
-    int hs = shape >= PLEXUS_YIELD_CORE ? PLEXUS_YIELD_CORE : shape;
+    // a bond (kind 3) joins point ids.x of its own web to point ids.y of
+    // another (of shape ids.z): a yielder's core to each petal's base, the
+    // point it gathers to each tip; a sprig's stem joint to what fastens
+    // there
+    if (plexKind > 2.5) B = plexusLight(ids.y, int(ids.z), t, twin);
+    // a build's webs all beat from one heart: a yielder's from its core's,
+    // a sprig's from its stem's foot
+    int hs = shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape);
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
     // how much there is of what a yielder yields, as it grows and is let go
-    float yield = shape >= PLEXUS_YIELD_FRAGMENT ? plexusYield(ids.x, shape, t).w : 1.0;
+    float yield = shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING ? plexusYield(ids.x, shape, t).w : 1.0;
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING ? 2.0 : 0.0);
+    // a stem's joints, where things fasten, hold larger lights
+    bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH;
+    float swell = stemmed && plexusJoint(ids.x) ? 1.5 : 1.0;
     // how thin this layer's lines are: the companions' as their lights
     float thin = mix(PLEXUS_COMPANION, 1.0, step(0.0, twin));
     vec3 lp;
     if (plexKind < 0.5) {
       // a point: one light of its pair (pos.y 1 the first, -1 its
       // companion, the smaller)
-      lp = A + nrm * PLEXUS_POINT_R * thin * yield * (1.0 + plexMote);
+      lp = A + nrm * PLEXUS_POINT_R * thin * yield * (1.0 + plexMote) * swell;
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * nrm;
     } else if (plexKind < 1.5 || plexKind > 2.5) {

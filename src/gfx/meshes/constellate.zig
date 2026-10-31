@@ -86,6 +86,17 @@ const Shape=enum(u8){
   yieldLight,
   /// the one point a yielder's shut petals gather light and fragments in
   yieldGathering,
+  /// a stem: rings wound up its length, a joint every third where other
+  /// stems and leaves fasten
+  stem,
+  /// a sprig's stem, the others fastened to its joints
+  sprigStem,
+  /// a sprig's branch stem, fastened at its stem's middle joint
+  sprigBranch,
+  /// a sprig's leaf at its stem's lowest joint
+  sprigLeaf,
+  /// a sprig's leaf at its stem's highest joint
+  sprigLeafHigh,
   /// the yielder's other petals, by number
   _,
 };
@@ -191,12 +202,30 @@ fn yielder(b:*mg.Builder)Allocator.Error!void{
   for(0..5)|k|for([_]f32{0,1})|layer|{
     // the core's heart to both points of petal k's base, the gathered
     // point to both of its tip
-    for([_]u8{0,1})|to|try ribbon(b,.{0,to,@intCast(k)},.bond,.yieldCore,v3(1,0,layer));
-    for([_]u8{28,29})|to|try ribbon(b,.{0,to,@intCast(k)},.bond,.yieldGathering,v3(1,0,layer));
+    // which petal's web
+    const petalWeb:u8=@intCast(@intFromEnum(Shape.yieldPetal)+k);
+    for([_]u8{0,1})|to|try ribbon(b,.{0,to,petalWeb},.bond,.yieldCore,v3(1,0,layer));
+    for([_]u8{28,29})|to|try ribbon(b,.{0,to,petalWeb},.bond,.yieldGathering,v3(1,0,layer));
   };
   try cluster(b,.{.shape=.yieldFragment,.reach=0.3,.n=9,.group=3});
   try points(b,.{.shape=.yieldLight,.reach=0,.n=2});
   try points(b,.{.shape=.yieldGathering,.reach=0,.n=1});
+}
+/// a sprig: a stem, a branch stem fastened at its middle joint, a leaf at
+/// its lowest joint and another at its highest, bonds from each joint's
+/// ring to the foot of what fastens there
+fn sprig(b:*mg.Builder)Allocator.Error!void{
+  try cluster(b,.{.shape=.sprigStem,.reach=0.17});
+  try cluster(b,.{.shape=.sprigBranch,.reach=0.17});
+  try cluster(b,.{.shape=.sprigLeaf,.reach=0.22});
+  try cluster(b,.{.shape=.sprigLeafHigh,.reach=0.22});
+  for([_]f32{0,1})|layer|{
+    // the branch's foot ring to the middle joint's, point for point
+    for(0..3)|c|try ribbon(b,.{@intCast(18+c),@intCast(c),@intFromEnum(Shape.sprigBranch)},.bond,.sprigStem,v3(1,0,layer));
+    // each leaf's stalk foot to its joint's ring
+    for(0..3)|c|try ribbon(b,.{@intCast(9+c),0,@intFromEnum(Shape.sprigLeaf)},.bond,.sprigStem,v3(1,0,layer));
+    for(0..3)|c|try ribbon(b,.{@intCast(27+c),0,@intFromEnum(Shape.sprigLeafHigh)},.bond,.sprigStem,v3(1,0,layer));
+  }
 }
 /// mesh: CONSTELLATE, LOOSE. the points drifting, few of them joined
 pub const loose=struct{
@@ -239,4 +268,15 @@ pub const flower=struct{
 pub const yield=struct{
   /// builds the yielder
   pub fn build(b:*mg.Builder)Allocator.Error!void{try yielder(b);}
+};
+/// mesh: CONSTELLATE STEM. a stem of light, the part others fasten to
+pub const stem=struct{
+  /// builds the stem's web
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.stem,.reach=0.17});}
+};
+/// mesh: CONSTELLATE SPRIG. a stem with a branch stem and two leaves
+/// fastened to its joints
+pub const sprigMesh=struct{
+  /// builds the sprig
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try sprig(b);}
 };
