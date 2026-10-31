@@ -119,7 +119,7 @@ blending requires.
 | User | Uses |
 |---|---|
 | `meshgen.zig` (form `.confluence`) | `confluence` — species `confluence` |
-| `weftstone.zig` | `weaveOn`, `frondOn`, `sac`, `taper`, palette, `fold` |
+| `weftstone.zig` | `sac`, `taper`, palette (`knot`, `pale`, `green`), `fold` |
 | `driftbraid.zig` (approved reference look) | `weaveOn`, `footOn`, `bloom`, `sac`, palette, `fold` |
 | `monfris.zig` | `weave`, `weaveOn`, `sections`, `bloom`, `sac`, `rootPath`, palette |
 | `vultrixi.zig` | `sac`, palette (`petalBase`/`petalTip`, `pale`, `pearl`), `fold` |

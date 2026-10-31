@@ -953,8 +953,9 @@ void main() {
   float pulse = 0.65 + 0.35 * sin(t * PULSE_RATE - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == PART_BLOOM || part == PART_THREAD) ? 1.0 : DIM_GLOW) * pulse * twinkle;
   // a flash, a halo's projection and research energy shine as bright as
-  // their glow, never pulsing; a prism has no light of its own
-  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY) v_glow = ip.x;
+  // their glow, never pulsing, as does a spark (it flickers on its own);
+  // a prism has no light of its own
+  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY || part == PART_SPARK) v_glow = ip.x;
   // the ring: an arc is as bright as the points at its ends (tint holds
   // the four points' light, east, south, west, north; tu.x its angle)
   if (part == PART_HALO) {

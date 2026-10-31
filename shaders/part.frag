@@ -60,6 +60,12 @@ const float ENERGY_RINGS = 14.0;
 const float ENERGY_CLOSE = 5.0;
 const float ENERGY_PULSES = 3.0;
 const float ENERGY_RUN = 8.0;
+// a spark of lightning: its violet edge, its white-hot core, how tight
+// that core is, and how fast it flickers
+const vec3 SPARK_EDGE = vec3(0.55, 0.32, 1.0);
+const vec3 SPARK_CORE = vec3(1.0, 0.96, 1.0);
+const float SPARK_TIGHT = 6.0;
+const float SPARK_FLICKER = 47.0;
 // the constellate web: its blue, the pale it lightens to as a beat passes,
 // how often its heart beats (s), how fast a beat runs through it (m/s),
 // where in the beat the two thumps fall and how sharp they are, how much a
@@ -281,6 +287,23 @@ void surface() {
       c = col * body * (0.25 + 1.3 * run) * (0.5 + 0.5 * v_t) * v_glow;
       a = clamp(body * (0.15 + 0.75 * run), 0.0, 1.0) * ends * clamp(v_fade, 0.0, 1.0);
     }
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+  if (part == PART_SPARK) {
+    // a spark of lightning (v_t 0..1 along it): light itself, a white-hot
+    // core seen face-on, violet toward its edge, flickering fast; brighter
+    // than white, so the glow takes it up (v_glow how bright, v_fade how
+    // much is left of it)
+    if (dot(raw, V) < 0.0) discard;
+    float t = pc.eye_time.w;
+    float ndv = clamp(dot(raw, V), 0.0, 1.0);
+    float core = pow(ndv, SPARK_TIGHT);
+    float flick = 0.6 + 0.4 * sin(t * SPARK_FLICKER + v_t * 9.0 + v_phase * TAU);
+    vec3 col = mix(SPARK_EDGE, SPARK_CORE, core);
+    float ends = smoothstep(0.0, 0.08, v_t) * smoothstep(1.0, 0.92, v_t);
+    c = col * (0.6 + 2.4 * core) * flick * v_glow;
+    float a = clamp((0.25 + 0.75 * core) * flick, 0.0, 1.0) * ends * clamp(v_fade, 0.0, 1.0);
     o = vec4(applyFog(c, v_pos), a);
     return;
   }

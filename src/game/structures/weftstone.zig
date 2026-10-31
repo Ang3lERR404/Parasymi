@@ -59,7 +59,7 @@ const v3=m.v3;
 /// a driftbraid grown beside it: the study of interweaving
 pub const meets:st.Meeting=.{.kind=.driftbraid,.found=.weftAndDrift};
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.itemPod,.lithophageCrystal,.weftstoneTendril};
+pub const meshes=.{.itemPod,.lithophageCrystal,.weftstoneTendril,.weftstoneSpark};
 /// what a weftstone is: grown from its seed, one tile across, a floating
 /// store, tall, swaying a little
 pub const def:st.Def=.{.item=.weftstone,.size=1,.mesh=.weftstone,.store=true,.grow=7,.sway=0.3,.tall=1.2,.sap=0.3,.floating=true};
@@ -97,14 +97,29 @@ const crystalSize:f32=1.05;
 const crystalTurn:f32=0.4;
 /// the size of a finished crystal held in the bulb
 const heldSize:f32=0.32;
-/// sparks crackling round the crystal while it ionizes: how many,
+/// lightning jumping in its chamber while it ionizes: the most sparks at
+/// once (one at first, tiny, more and longer as the crystal forms),
 const sparks=5;
 /// how often they jump (jumps a second),
-const sparkRate:f32=14;
-/// how large each spark is,
-const sparkSize:f32=0.12;
-/// and how brightly they flare
-const sparkGlow:f32=1.4;
+const sparkRate:f32=9;
+/// how far a spark kinks off its line (world units),
+const sparkJag:f32=0.025;
+/// how brightly they flare,
+const sparkGlow:f32=2.2;
+/// and the violet light they throw round the chamber (linear, times its strength)
+const sparkLight=v3(0.6,0.4,1.0);
+/// air drawn in through its vanes: how many motes at once,
+const airMotes=10;
+/// how long each takes to spiral in (seconds),
+const airTime:f32=3.2;
+/// how far out over the vanes each starts,
+const airFrom:f32=0.42;
+/// how large each is,
+const airSize:f32=0.09;
+/// how brightly each glows,
+const airGlow:f32=0.45;
+/// and its colour: pale, cool air
+const airCol:[4]f32=.{0.78,0.86,1.0,1};
 /// how brightly its tendrils glow
 const glow:f32=0.18;
 /// the tiles its tendrils may reach, as offsets, nearest first
@@ -320,32 +335,29 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     look.tint=color.Rgba8.of(it.info().col).toF4();
     try out.emit(.itemPod,m.chain(&.{m.translate(p),m.scale3(m.splat3(moteSize*@sin(m.pi*m.clamp01(ws.t*1.1))))}),look);
   };
-  // the ley crystal's colour, for the sparks
-  const ley=color.Rgba8.of(items.Item.leyCrystal.info().col).toF4();
+  // air drawn in: motes spiralling down through the vanes into the chamber
+  for(0..airMotes)|j|{
+    // how far along its way in this mote is (0..1), and that eased
+    const f=@mod(tf/airTime+m.ratio(j,airMotes)+s.seed,1);
+    const e=m.smooth(f);
+    // its bearing, winding in as it falls, and where it is
+    const a=m.ratio(j,airMotes)*m.tau*2.3+e*m.tau*1.4;
+    const r=airFrom*(1-e)*(1-e)+mesh.bulbR[0]*0.3*e;
+    const at=v3(@cos(a)*r,m.lerp(mesh.bulbAt[1]+0.32,mesh.bulbAt[1],e),@sin(a)*r);
+    // its look: faint pale air, swelling in and fading out
+    var look=sway;
+    look.glow=airGlow;
+    look.tint=airCol;
+    look.drop=at[1];
+    try out.emit(.itemPod,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(airSize*@sin(m.pi*f)))})),look);
+  }
   if(ws.ionizing){
     // the crystal's look: swaying from the bulb's height, brighter as it forms
     var look=sway;
     look.drop=mesh.bulbAt[1];
     look.glow=0.3+0.5*ws.ion;
     try out.emit(.lithophageCrystal,m.mul(base,m.chain(&.{m.translate(mesh.bulbAt),m.rotY(tf*crystalTurn+s.seed*4),m.scale3(m.splat3(crystalSize*@sqrt(ws.ion)))})),look);
-    // sparks: each jumps to a new place round the crystal many times a
-    // second, flickering
-    const step=@floor(tf*sparkRate);
-    for(0..sparks)|j|{
-      // a hash of this jump, and from it the spark's angle and height (-0.7..0.7)
-      const h=@sin((step+m.f(j)*17.3)*12.9898+s.seed*78.233)*43758.5453;
-      const a=(h-@floor(h))*m.tau;
-      const y=@sin(h*1.7)*0.7;
-      // how far out from the crystal, and where it flares
-      const rr=mesh.bulbR[0]*(0.45+0.4*ws.ion);
-      const at=mesh.bulbAt+v3(@cos(a)*rr*@sqrt(1-y*y),y*mesh.bulbR[1]*0.6,@sin(a)*rr*@sqrt(1-y*y));
-      // the spark's look: blazing, the ley crystal's colour
-      var lookS=sway;
-      lookS.glow=sparkGlow;
-      lookS.tint=ley;
-      lookS.drop=at[1];
-      try out.emit(.itemPod,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(sparkSize*(0.6+0.4*@abs(@sin(h)))))})),lookS);
-    }
+    try sparksIn(s,out,base,tf);
   }
   // the crystals it holds, nestled in the bottom of its bulb
   const held=s.inv.count(.leyCrystal);
@@ -358,6 +370,42 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     look.drop=at[1];
     try out.emit(.lithophageCrystal,m.mul(base,m.chain(&.{m.translate(at),m.rotY(a),m.scale3(m.splat3(heldSize))})),look);
   }
+}
+/// a number 0..1 from a jump `step`, a spark `j` and what is asked of it
+/// `q`, the same for the same three, scattered for any other
+fn hash(step:f32,j:usize,q:f32,seed:f32)f32{
+  // a fast scramble of the four
+  const h=@sin(step*12.9898+m.f(j)*78.233+q*37.719+seed*91.31)*43758.5453;
+  return h-@floor(h);
+}
+/// the lightning in its chamber as it ionizes, jumping anew `sparkRate`
+/// times a second: at first one tiny spark off a node toward the crystal,
+/// then more and longer as the crystal forms, node to crystal and node to
+/// node, and their violet light flickering round the chamber
+fn sparksIn(s:*const st.Structure,out:*Parts,base:m.M4,tf:f32)Allocator.Error!void{
+  // how far the crystal has formed, eased, and which jump this is
+  const f=m.smooth(s.state.weftstone.ion);
+  const step=@floor(tf*sparkRate);
+  // how many sparks jump now
+  const n=1+m.floorTo(usize,f*m.f(sparks-1)+0.3);
+  for(0..n)|j|{
+    // the node it leaps from, and whether it leaps to another node or the crystal
+    const from=m.floorTo(usize,hash(step,j,1,s.seed)*m.f(mesh.nodes))%mesh.nodes;
+    const toNode=hash(step,j,2,s.seed)<0.6*f;
+    const a=mesh.node(from);
+    const target=if(toNode)mesh.node((from+1+m.floorTo(usize,hash(step,j,3,s.seed)*3))%mesh.nodes)else mesh.bulbAt;
+    // how far it gets: a short crack at first, the whole way once the crystal is near formed
+    const end=m.lerpV(a,target,m.lerp(0.3,1,f)*m.lerp(0.75,1,hash(step,j,4,s.seed)));
+    // its two kinks between, thrown off its line
+    var c:[4]V3=.{a,m.lerpV(a,end,0.33),m.lerpV(a,end,0.66),end};
+    for(c[1..3],0..)|*p,k|p.*+=v3(hash(step,j,5+m.f(k),s.seed)-0.5,hash(step,j,7+m.f(k),s.seed)-0.5,hash(step,j,9+m.f(k),s.seed)-0.5)*m.splat3(2*sparkJag*m.len(end-a)/mesh.bulbR[0]);
+    for(&c)|*p|p.*=m.mulPoint(base,p.*);
+    // the way its kinks lie across it, turned each jump
+    const side=m.norm(v3(hash(step,j,11,s.seed)-0.5,hash(step,j,12,s.seed)-0.5,hash(step,j,13,s.seed)-0.5)+v3(1e-3,0,0));
+    try out.emitCurve(.weftstoneSpark,c,side,1,1,.{.glow=sparkGlow*m.lerp(0.6,1,f),.phase=hash(step,j,14,s.seed)});
+  }
+  // the light they throw round the chamber, flickering with them
+  try out.light(m.mulPoint(base,mesh.bulbAt),sparkLight*m.splat3((0.4+1.2*f)*(0.6+0.4*hash(step,0,15,s.seed))),1.4);
 }
 /// its line in the panel: ionizing (with a tendril of progress), starved
 /// (no node latched), or drawing: latched nodes, bulb and crystals held.
@@ -380,22 +428,32 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   }
   _=try d.print(x,y,style.textBody,style.white,txt.s.describe.weftDraws,.{latched,s.inv.count(.grit),bulbGrit,s.inv.count(.leyShard),bulbLey,crystals,crystalCount});
 }
-/// its bulb: a twined stalk rising out of the seed to a crown of two
-/// fronds, a bulb under them with a crystal sparking in it, tendrils
-/// reaching down to stones either side.
+/// its bulb: a caged chamber with a crystal sparking in it, two vanes
+/// strung with threads fanned out over it, tendrils reaching down to
+/// stones either side.
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
-  // where its bulb hangs
-  const bulb:iconKit.P=.{0,0.55};
+  // where its chamber hangs, and the knot over it the vanes fan from
+  const bulb:iconKit.P=.{0,0.5};
+  const knot:iconKit.P=.{0,0.7};
   for([_]f32{-1,1})|sx|{
     // the stone this side's tendril reaches
     const stone:iconKit.P=.{0.7*sx,-0.25};
-    try ic.stem(.{bulb,.{0.3*sx,0.35},.{0.6*sx,0.1},stone},0.035,iconTendril);
+    try ic.stem(.{bulb,.{0.3*sx,0.3},.{0.6*sx,0.1},stone},0.035,iconTendril);
     try ic.gem(stone,0.09,if(sx<0)iconGrit else iconLey);
-    try ic.stem(.{.{0,0.72},.{0.25*sx,0.98},.{0.5*sx,0.95},.{0.6*sx,0.78}},0.04,iconFrond);
-    for(0..3)|j|try ic.leaf(iconKit.curve(.{.{0,0.72},.{0.25*sx,0.98},.{0.5*sx,0.95},.{0.6*sx,0.78}},0.3+0.2*m.f(j)),if(sx>0)1.9 else m.pi-1.9,0.12,0.05,iconKit.sprout,0.9);
+    // this side's vane: two ribs out of the knot, threads strung between
+    const lo=[4]iconKit.P{knot,.{0.2*sx,0.74},.{0.45*sx,0.8},.{0.65*sx,0.86}};
+    const hi=[4]iconKit.P{knot,.{0.15*sx,0.82},.{0.35*sx,0.95},.{0.5*sx,1.02}};
+    for(1..5)|j|{
+      // how far out the vane this thread is strung
+      const u=m.ratio(j,5);
+      const a=iconKit.curve(lo,u);
+      const b=iconKit.curve(hi,u);
+      try ic.stem(.{a,a,b,b},0.012,iconThread);
+    }
+    try ic.stem(lo,0.03,iconPale);
+    try ic.stem(hi,0.03,iconPale);
   }
-  try ic.stem(.{bulb,.{0.04,0.6},.{-0.04,0.66},.{0,0.72}},0.05,iconPale);
-  try ic.bud(bulb,0.16,iconSac,0.5);
+  try ic.bud(bulb,0.17,iconSac,0.5);
   // the spark's flicker (0..1), quick
   const k=@mod(ic.t*3+ic.phase,1);
   try ic.glow(bulb,0.12+0.06*k,iconSpark);
@@ -404,9 +462,9 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
 }
 /// the violet of its tendrils in its bulb
 const iconTendril:Color=.{175,160,210,255};
-/// the violet of its crown's fronds
-const iconFrond:Color=.{175,160,210,255};
-/// the pale lilac of its twined stalk
+/// the green of the threads strung across its vanes
+const iconThread:Color=.{120,190,110,255};
+/// the pale lilac of its vanes' ribs
 const iconPale:Color=.{185,180,205,255};
 /// the rosy, half-clear bulb
 const iconSac:Color=.{210,150,120,210};

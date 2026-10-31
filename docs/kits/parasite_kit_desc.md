@@ -111,7 +111,8 @@ tu.x is height (the crown is 0.85..1).
 | `ganglion.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `nodule`, `wobble`, palette |
 | `sporecaster.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `frondPath`, `pod`, `podGirth`, `podFoot`, palette |
 | `convergence_kit.zig` | `Section`, `Stalk`, `section`, `parting`, `lattice`, `frondPath`, `nodule`, `fold`, `twist`, palette |
-| `driftbraid`, `monfris`, `weftstone`, `vultrixi` | `Stalk`/`Section`, `nodule`, `frondPath`, `core` (via convergent meshes) |
+| `driftbraid`, `monfris`, `vultrixi` | `Stalk`/`Section`, `nodule`, `frondPath`, `core` (via convergent meshes) |
+| `weftstone` | `nodule` (knots, nodes, vane pearls) |
 
 ## GPU side
 

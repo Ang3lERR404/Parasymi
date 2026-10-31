@@ -62,13 +62,14 @@ const float SHEEN_POWER = 40.0;
 #define PART_POD 17       // a plant's yield ripening on it, a bead of sap
 #define PART_PLEXUS 18    // the constellate web: points, lines, panes of light
 #define PART_STONE 19     // weathered stone: grained, flecked, lichened
+#define PART_SPARK 20     // a spark of lightning: white-hot core, violet edge
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))
 #define PART_IN(set, p) ((((set) >> uint(p)) & 1u) != 0u)
 // the roles that are light itself: they cast no shadow (part.vert SHADOW)
 // and are not lit by the key light (part.frag)
-const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY) | PART_BIT(PART_PLEXUS);
+const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY) | PART_BIT(PART_PLEXUS) | PART_BIT(PART_SPARK);
 // the roles that are a plant's leaves and petals (plant.vert, plant.frag):
 // they unfurl as it grows, lift in the gusts, always read as thin and show
 // no fibres

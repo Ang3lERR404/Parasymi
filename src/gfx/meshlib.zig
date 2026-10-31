@@ -285,6 +285,8 @@ const parts=struct{
   pub const haloFlash=@import("meshes/halo.zig").flash;
   /// soft rays sent between two celestial blooms
   pub const bloomThread=@import("meshes/bloom_thread.zig");
+  /// a spark of lightning jumping in a weftstone's chamber as it ionizes
+  pub const weftstoneSpark=@import("meshes/weftstone.zig").spark;
 };
 /// the registry over `parts`: their ids, count and builders
 const reg=registry.Registry(parts);

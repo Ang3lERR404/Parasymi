@@ -302,7 +302,17 @@ whole.)
 ### Others
 - **Loomfern:** a fern: fronds, croziers (the curled-up fern tips), and a
   sheaf winding on its spindle from threads off the fronds.
-- **Weftstone:** crystal + sparks in its bulb as it ionizes.
+- **Weftstone:** an ionizer, no leafy crown.
+  - A clear chamber of both saps in a net of five green and five pale
+    strands, knotted violet where they cross.
+  - Five pale nodes reach in round its middle.
+  - Five vanes fan out of its top knot: two pale ribs and a bar each,
+    strung across with fine green threads, like a loom's warp.
+  - Air motes spiral in through the vanes into the chamber, always.
+  - Ionizing, lightning jumps between the nodes and the crystal
+    (`weftstoneSpark`, part `spark`: white-hot core, violet edge, lights
+    the fog). It starts as one tiny spark and grows to five long ones as
+    the crystal forms.
 - **Driftbraid:** its look is the approved reference for convergent
   structures.
 - **Monfris:** four corner weaves twining into one crowned trunk.
