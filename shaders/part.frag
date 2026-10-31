@@ -182,8 +182,8 @@ void surface() {
       a = clamp(0.5 + 0.5 * beat, 0.0, 1.0) * v_glow;
     } else {
       float rim = pow(1.0 - ndv, 3.0);
-      c = col * (0.25 + 0.6 * rim + 1.8 * beat) * v_glow;
-      a = clamp(0.22 + 0.4 * rim + 0.45 * beat, 0.0, 1.0) * v_glow;
+      c = col * (0.32 + 0.6 * rim + 1.8 * beat) * v_glow;
+      a = clamp(0.4 + 0.35 * rim + 0.4 * beat, 0.0, 1.0) * v_glow;
     }
     o = vec4(applyFog(c, v_pos), a);
     return;
