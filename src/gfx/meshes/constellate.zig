@@ -84,6 +84,8 @@ const Shape=enum(u8){
   yieldFragment=11,
   /// the motes of light a yielder yields, rising quicker
   yieldLight,
+  /// the one point a yielder's shut petals gather light and fragments in
+  yieldGathering,
   /// the yielder's other petals, by number
   _,
 };
@@ -178,20 +180,23 @@ fn web(b:*mg.Builder,w:Web,layer:f32)Allocator.Error!void{
     for([_][2]f32{a,c,bb})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,-1,layer),.tu=q});
   };
 }
-/// a yielder: five petals snapped to a flower head, which becomes its core;
-/// bonds join the core (its heart, and the tip of its own small petal
-/// facing each) to both lights at each petal's base; it yields fragments
-/// and motes of light, rising from the core
+/// a yielder: five petals snapped to a flower head, which becomes its core,
+/// turning slowly round it; bonds join the core's heart to each petal's
+/// base. Over and over its petals shut, their tips gathering air and energy
+/// into one point of light, threads of light running to it from each tip,
+/// and when it is full it is let go as a mote of light and a new fragment
 fn yielder(b:*mg.Builder)Allocator.Error!void{
   try cluster(b,.{.shape=.yieldCore,.reach=0.21});
   for(0..5)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.yieldPetal)+k),.reach=0.17});
   for(0..5)|k|for([_]f32{0,1})|layer|{
-    // the core's heart, and the tip of its small petal facing petal k
-    const tip:u8=@intCast(10+4*k+3);
-    for([_]u8{0,tip})|from|for([_]u8{0,1})|to|try ribbon(b,.{from,to,@intCast(k)},.bond,.yieldCore,v3(1,0,layer));
+    // the core's heart to both points of petal k's base, the gathered
+    // point to both of its tip
+    for([_]u8{0,1})|to|try ribbon(b,.{0,to,@intCast(k)},.bond,.yieldCore,v3(1,0,layer));
+    for([_]u8{28,29})|to|try ribbon(b,.{0,to,@intCast(k)},.bond,.yieldGathering,v3(1,0,layer));
   };
   try cluster(b,.{.shape=.yieldFragment,.reach=0.3,.n=9,.group=3});
-  try points(b,.{.shape=.yieldLight,.reach=0,.n=4});
+  try points(b,.{.shape=.yieldLight,.reach=0,.n=2});
+  try points(b,.{.shape=.yieldGathering,.reach=0,.n=1});
 }
 /// mesh: CONSTELLATE, LOOSE. the points drifting, few of them joined
 pub const loose=struct{
