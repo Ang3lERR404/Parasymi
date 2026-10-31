@@ -44,7 +44,7 @@ const names=shaders++blk:{
   break:blk n;
 };
 /// what the game's shaders include
-const includes=[_][]const u8{"common.glsl","surface.glsl"};
+const includes=[_][]const u8{"common.glsl","surface.glsl","ground.glsl","air.glsl"};
 /// builds the garden: compiles every shader, makes the game, `animedit`,
 /// `meshedit` and `audiocheck`, and the `test` step that runs the game's,
 /// the engine's and the mesh editor's tests

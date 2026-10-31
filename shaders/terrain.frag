@@ -1,14 +1,17 @@
 #version 450
-//! terrain shading: tile colour, ley sight and its plexus, the ley lines
+//! terrain shading: the ground's kinds melted together with their own
+//! surfaces (ground.glsl), ley sight and its plexus, the ley lines
 //! sealing (the unforming), shadows, fog. With OVERHEAD, the ground seen
 //! from above for the fog: the glow it sends into the air, and its height.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
+#include "ground.glsl"
 
 layout(location = 0) in vec3 v_pos;
 layout(location = 1) in vec3 v_nrm;
 layout(location = 2) in vec3 v_col;
 layout(location = 3) in vec4 v_info;
+layout(location = 4) in vec4 v_mat;
 layout(location = 0) out vec4 o;
 
 // ley sight: the currents' colour (plain, veiled), and the plexus's pale tint
@@ -27,6 +30,10 @@ const float HOVER_PULSE = 6.0;
 // darkness there
 const vec2 PAW_SHADOW = vec2(0.12, 0.18);
 const float PAW_SHADOW_DARK = 0.7;
+// how deep the ground's bumps light it, and how far from the eye (world
+// units a pixel spans) its finest grain fades out
+const float GROUND_BUMP = 0.035;
+const float GRAIN_FADE = 0.035;
 // seen from above, a ley line's plexus as the air takes it: its threads too
 // fine to tell apart, an even glow this strong over the line
 const float PLEXUS_AIR = 0.35;
@@ -75,8 +82,24 @@ void main() {
 #endif
   // how much of the key light reaches here: what stands between it and the
   // sun or moon (a plant, a structure, the wolf, a hill) shades it
+  vec3 albedo = v_col;
+  if (ground) {
+    // the ground's own stuff: its kinds melted along frayed borders, each
+    // with its surface, the finest grain fading where a pixel spans too much
+    vec2 p = v_pos.xz;
+    float span = length(fwidth(p));
+    float fine = 1.0 - smoothstep(GRAIN_FADE * 0.5, GRAIN_FADE, span);
+    GroundSurface g = groundOf(p, groundBlend(p, v_mat), fine);
+    albedo = g.albedo;
+    // its bumps tip the normal (the surface gradient, from screen derivatives)
+    vec3 dpx = dFdx(v_pos), dpy = dFdy(v_pos);
+    vec3 r1 = cross(dpy, n), r2 = cross(n, dpx);
+    float det = dot(dpx, r1);
+    vec3 grad = sign(det) * (dFdx(g.height) * r1 + dFdy(g.height) * r2);
+    n = normalize(abs(det) * n - grad * GROUND_BUMP * fine);
+  }
   float sh = keyShadow(v_pos, n);
-  vec3 c = shadeLit(mix(v_col, srgb2lin(SEALED_SOIL), closed), n, v_pos, sh) + glow;
+  vec3 c = shadeLit(mix(albedo, srgb2lin(SEALED_SOIL), closed), n, v_pos, sh) + glow;
   // hovered tile
   if (ground && all(equal(floor(v_pos.xz), pc.misc.zw))) c += HOVER * (0.7 + 0.3 * sin(t * HOVER_PULSE));
   // contact shadows: a soft ellipse under each paw, long along the facing,

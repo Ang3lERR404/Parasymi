@@ -21,8 +21,12 @@ pub const Terrain=extern struct{
   nrm:[3]f32,
   /// its colour, before the shader's lighting
   col:color.Rgba8,
-  /// x: tile kind, y: ley intensity, z: is-top-face, w: unused
+  /// x: tile kind, y: ley intensity, z: is-top-face, w: depth into a ley line
   info:[4]u8,
+  /// how much of each kind of ground is here (soil, moss, stone, ley; the
+  /// tiles meeting at it share it out), which terrain.frag melts together
+  /// along wandering, noisy borders
+  mat:[4]u8,
 };
 /// shading role of a vertex; shaders key secondary motion and glow off it
 /// (common.glsl's `PART_*` numbers match these tags in order)

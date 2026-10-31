@@ -19,6 +19,7 @@ layout(location = 0) out vec3 v_pos;
 layout(location = 1) out vec3 v_nrm;
 layout(location = 2) out vec3 v_col;
 layout(location = 3) out vec4 v_info;
+layout(location = 4) out vec4 v_mat; // the ground's kinds: unused off the ground
 
 // a grass blade: how long it grows (min, max), its half width at the root,
 // how far it may lean
@@ -72,12 +73,14 @@ void hide() {
   v_nrm = vec3(0.0, 1.0, 0.0);
   v_col = vec3(0.0);
   v_info = vec4(0.0);
+  v_mat = vec4(0.0);
 }
 
 void main() {
   float t = pc.eye_time.w;
   int kind = int(info.x * 255.0 + 0.5);
   int vi = gl_VertexIndex;
+  v_mat = vec4(0.0);
   vec3 tile = srgb2lin(col.rgb);
   vec2 cell = at.xz;
 

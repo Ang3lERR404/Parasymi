@@ -21,6 +21,17 @@ lowland).
 - **Shape:** each tile is a fan of four triangles, its centre at the
   tile's height. Corners are shared (height, colour and ley averaged), with
   smooth normals.
+- **Kinds melt together** (`shaders/ground.glsl`, per pixel): each vertex
+  carries how much soil, moss, stone and ley lies round it (every tile
+  within 2 tiles, by a smooth falloff, `kindsAt`). The shader pushes each
+  kind's border out where its own shape rises (moss in clumps, stone in
+  slabs) and sharpens it, so borders wander in blobs and fray, never on
+  the tile grid. Ley holds its ground firmer, so a line never breaks.
+- **Surfaces:** soil in damp and dry patches with crumbly grain and pale
+  pebbles; moss in heaped cushions, deep in the folds, gold on top, fuzzy;
+  stone in warm and cool slabs split by dark cracks, flecked with lichen;
+  ley ground grained in violet. Their bumps tip the normal; the finest
+  grain fades out where a pixel spans too much.
 - **Detail, grown on the GPU** (detail pass, `detail.vert`) from one
   `DetailTile` per tile, within `detailR` (28 tiles):
   - grass blades on everything but soil (tile-coloured, wind-swayed);

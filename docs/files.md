@@ -80,6 +80,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `detail.vert` — ground detail grown per tile from one DetailTile: grass blades, and clods and stones on soil.
 - `fog.frag` — the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the…
 - `fog.vert` — one full-screen triangle for the fog, handing on the inverse view-projection (worked out once a vertex, not once a texel).
+- `ground.glsl` — the ground's own stuff, worked out per pixel: soil, moss, stone and ley ground melted into each other along wandering, frayed borders…
 - `part.frag` — material of library parts (structures, the wolf, nodes, beams, motes): fibre, sap, resin, essence, light.
 - `part.vert` — places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 - `plant.frag` — plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
@@ -87,7 +88,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sky.frag` — the sky dome: gradient by night and day, sun, moon and stars; once the unforming has shifted it, the ley's glow: veils of violet light…
 - `sky.vert` — one full-screen triangle at the far plane, turned back into view directions.
 - `surface.glsl` — fragment-stage helpers for plant and part materials: what needs screen-space derivatives or discards.
-- `terrain.frag` — terrain shading: tile colour, ley sight and its plexus, the ley lines sealing (the unforming), shadows, fog.
+- `terrain.frag` — terrain shading: the ground's kinds melted together with their own surfaces (ground.glsl), ley sight and its plexus, the ley lines sealing…
 - `terrain.vert` — terrain tiles (the smooth fans of render/terrain_mesh.zig) to clip space.
 
 ## src/

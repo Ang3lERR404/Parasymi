@@ -63,6 +63,8 @@ const topSurface:u8=255;
 const Ring=struct{
   /// how many tiles across the ring is: the chunk and one each side
   const w=ck.sizeTiles+2;
+  /// how many tiles across the wider ring of kinds is: `blendMargin` beyond each side
+  const fw=ck.sizeTiles+2*blendMargin;
   /// each tile's height
   h:[w*w]f32=undefined,
   /// each tile's kind
@@ -75,9 +77,23 @@ const Ring=struct{
   /// tiles or more in from its edge (the line seals from its edges in to
   /// its heart along it, terrain.frag)
   depth:[w*w]f32=@splat(0),
+  /// each tile's kind out to `blendMargin` beyond the chunk, for how the kinds blend
+  far:[fw*fw]ck.Kind=undefined,
   /// where tile (lx, ly) sits in the ring (-1 .. sizeTiles each way)
   fn at(_:*const Ring,lx:i32,ly:i32)usize{return@intCast((ly+1)*w+(lx+1));}
+  /// the kind of tile (lx, ly), out to `blendMargin` beyond the chunk (clamped there)
+  fn farKind(r:*const Ring,lx:i32,ly:i32)ck.Kind{
+    // clamped into the wider ring
+    const x=@max(-blendMargin,@min(ck.sizeTiles+blendMargin-1,lx))+blendMargin;
+    const y=@max(-blendMargin,@min(ck.sizeTiles+blendMargin-1,ly))+blendMargin;
+    return r.far[@intCast(y*fw+x)];
+  }
 };
+/// how far beyond the chunk (tiles) the kinds are read for blending
+const blendMargin=2;
+/// how far (tiles) a tile's kind reaches into the ground round it: the kinds
+/// melt over this much, so no border follows a tile's edge
+const blendReach:f32=2;
 /// reads every tile of the ring around chunk `c`: inside from the chunk,
 /// beyond from the generator; each tile's colour jittered by its place
 fn fill(r:*Ring,seed:u64,c:*const ck.Chunk)void{
@@ -116,7 +132,55 @@ fn fill(r:*Ring,seed:u64,c:*const ck.Chunk)void{
       r.col[i]=color.rgb(b.r*jitter,b.g*jitter,b.b*jitter);
     }
   }
+  // the wider ring of kinds: the ring's own, the generator's beyond it
+  var fy:i32=-blendMargin;
+  while(fy<ck.sizeTiles+blendMargin):(fy+=1){
+    // the column of the wider ring being read
+    var fx:i32=-blendMargin;
+    while(fx<ck.sizeTiles+blendMargin):(fx+=1){
+      // whether the ring already holds it
+      const inRing=fx>=-1 and fx<=ck.sizeTiles and fy>=-1 and fy<=ck.sizeTiles;
+      // the generator's sample of it otherwise (sealed as this chunk is)
+      const k=if(inRing)r.kind[r.at(fx,fy)]else blk:{
+        const raw=gen.sample(seed,ox+fx,oy+fy);
+        break:blk(if(c.sealed)gen.sealOf(raw)else raw).kind;
+      };
+      r.far[@intCast((fy+blendMargin)*Ring.fw+fx+blendMargin)]=k;
+    }
+  }
   if(!c.sealed)lineDepth(r,seed,c);
+}
+/// the share of each kind of ground at half-tile point (px, py): every tile
+/// within `blendReach` counted by a smooth falloff from its centre, so kinds
+/// melt across tiles in soft curves (terrain.frag frays the border further)
+fn kindsAt(r:*const Ring,px:i32,py:i32)[4]f32{
+  // the point in tiles
+  const x=m.f(px)/2;
+  const y=m.f(py)/2;
+  // each kind's weight so far, and the total
+  var mat:[4]f32=@splat(0);
+  var sum:f32=0;
+  // the tiles that may reach it
+  const r0x:i32=@intFromFloat(@floor(x-blendReach));
+  const r0y:i32=@intFromFloat(@floor(y-blendReach));
+  var ty=r0y;
+  while(m.f(ty)<=y+blendReach):(ty+=1){
+    // the column of tiles being counted
+    var tx=r0x;
+    while(m.f(tx)<=x+blendReach):(tx+=1){
+      // how far its centre is, as a share of the reach
+      const dx=m.f(tx)+0.5-x;
+      const dy=m.f(ty)+0.5-y;
+      const d2=(dx*dx+dy*dy)/(blendReach*blendReach);
+      if(d2>=1)continue;
+      // its weight, falling smoothly to nothing at the reach
+      const wgt=(1-d2)*(1-d2);
+      mat[@intFromEnum(r.farKind(tx,ty))]+=wgt;
+      sum+=wgt;
+    }
+  }
+  for(&mat)|*k|k.*/=sum;
+  return mat;
 }
 /// how many tiles in from a ley line's edge its depth is full
 const lineReach=2;
@@ -175,7 +239,10 @@ fn point(r:*const Ring,px:i32,py:i32)Shared{
     ts[n]=r.at(@max(-1,@min(ck.sizeTiles,tx)),@max(-1,@min(ck.sizeTiles,ty)));
     n+=1;
   };
-  return shared(r,ts[0..n]);
+  // the shares of kinds, from the tiles round about, not only these
+  var p=shared(r,ts[0..n]);
+  p.mat=kindsAt(r,px,py);
+  return p;
 }
 /// one point the tiles meeting there share: its height, colour and ley
 const Shared=struct{
@@ -187,6 +254,9 @@ const Shared=struct{
   ley:f32,
   /// their average depth into a ley line, 0..1
   depth:f32,
+  /// how much of each kind of ground (soil, moss, stone, ley) is here, from
+  /// the tiles round about (`kindsAt`)
+  mat:[4]f32,
 };
 /// a shared point among the tiles `ts`: their average height, colour and ley
 fn shared(r:*const Ring,ts:[]const usize)Shared{
@@ -207,11 +277,24 @@ fn shared(r:*const Ring,ts:[]const usize)Shared{
     ley+=r.ley[t];
     depth+=r.depth[t];
   }
-  return.{.h=h/n,.col=color.rgb(cr/n,cg/n,cb/n),.ley=ley/n,.depth=depth/n};
+  return.{.h=h/n,.col=color.rgb(cr/n,cg/n,cb/n),.ley=ley/n,.depth=depth/n,.mat=@splat(0)};
 }
-/// appends one ground vertex: where it is, its normal, colour and info
-fn put(out:*std.ArrayList(TV),gpa:Allocator,p:V3,n:V3,c:color.Rgba8,info:[4]u8)Allocator.Error!void{
-  try out.append(gpa,.{.pos=.{p[0],p[1],p[2]},.nrm=.{n[0],n[1],n[2]},.col=c,.info=info});
+/// one ground vertex before it is put down: where it is, its normal, colour, info and kinds of ground
+const Put=struct{
+  /// where it is
+  p:V3,
+  /// its normal
+  n:V3,
+  /// its colour
+  c:color.Rgba8,
+  /// kind, ley, top, depth into a ley line
+  info:[4]u8,
+  /// the share of each kind of ground there
+  mat:[4]u8,
+};
+/// appends one ground vertex
+fn put(out:*std.ArrayList(TV),gpa:Allocator,v:Put)Allocator.Error!void{
+  try out.append(gpa,.{.pos=.{v.p[0],v.p[1],v.p[2]},.nrm=.{v.n[0],v.n[1],v.n[2]},.col=v.c,.info=v.info,.mat=v.mat});
 }
 /// every shared point of a chunk's half-tile grid (one point beyond it on
 /// each side, for slopes at its border), worked out once
@@ -271,6 +354,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
     var gn:[3][3]V3=undefined;
     var gl:[3][3]u8=undefined;
     var gd:[3][3]u8=undefined;
+    var gm:[3][3][4]u8=undefined;
     for([_][2]usize{.{0,0},.{2,0},.{0,2},.{2,2},.{1,1}})|g|{
       // which corner or centre this is, across and down
       const gx=g[0];
@@ -283,6 +367,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
       // ley fades across tile borders like the colour does
       gl[gy][gx]=m.unorm8(s.ley);
       gd[gy][gx]=m.unorm8(s.depth);
+      for(0..4)|q|gm[gy][gx][q]=m.unorm8(s.mat[q]);
       gh[gy][gx]=s.h;
       gc[gy][gx]=s.col.toRgba8(255);
       // central differences over half-tile steps
@@ -300,7 +385,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
       for([_][2]usize{.{1,1},corners[j],corners[(j+1)%4]})|cn|{
         // this vertex: the centre or a corner, at its height
         const at=v3(x0+0.5*m.f(cn[0]),gh[cn[1]][cn[0]],z0+0.5*m.f(cn[1]));
-        try put(out,gpa,at,gn[cn[1]][cn[0]],gc[cn[1]][cn[0]],.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]});
+        try put(out,gpa,.{.p=at,.n=gn[cn[1]][cn[0]],.c=gc[cn[1]][cn[0]],.info=.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]},.mat=gm[cn[1]][cn[0]]});
       }
     }
     // the detail on it (grass, or clods and stones on soil) is grown on the
