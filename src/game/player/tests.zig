@@ -255,3 +255,31 @@ test"the arms ease into the gathering and belly-rest poses without swinging roun
     }
   }
 }
+test"walking, sprinting, turning back and stopping, no leg joint ever jumps and the hips never sink to a trailing foot"{
+  // a wolf standing at the origin
+  var p:Player=.{.pos=v3(0,0,0)};
+  p.animate(null,testDt);
+  // each leg's knee, hock and ball last frame (in the world), once there is one
+  var last:?[2][3]V3=null;
+  // the moves asked for in turn: which way (x, z) and how fast (m/s)
+  const moves=[_][3]f32{.{0,1,1.5},.{0,-1,1.5},.{1,0,1},.{-1,1,1},.{0,1,6.5},.{0,-1,6.5},.{0,0,0},.{1,1,6.5},.{-1,-1,6.5},.{0,0,0}};
+  for(moves)|mv|for(0..90)|_|{
+    // the velocity wished for, eased toward, the body moved and turned to it
+    const want=if(mv[2]>0)m.norm(v3(mv[0],0,mv[1]))*m.splat3(mv[2])else v3(0,0,0);
+    p.vel+=(want-p.vel)*m.splat3(@min(1,testDt*lib.player.tuning.accelResponse));
+    p.pos+=p.vel*m.splat3(testDt);
+    if(p.groundSpeed()>0.3)p.facing+=m.angleDiff(p.facing,m.atan2(p.vel[0],p.vel[2]))*@min(1,testDt*lib.player.tuning.turnResponse);
+    p.animate(null,testDt);
+    // the pose, and its bones in the world
+    const q=p.pose();
+    var w=skel.fk(q);
+    for(&w)|*b|b.*=m.mul(p.heading(),b.*);
+    try testing.expect(q.hip[1]>skel.hipY*0.6);
+    // each leg's joints this frame
+    var now:[2][3]V3=undefined;
+    for(skel.sides,&now)|sd,*n|n.*=.{m.origin(w[@intFromEnum(sd.shin)]),m.origin(w[@intFromEnum(sd.meta)]),m.origin(w[@intFromEnum(sd.foot)])};
+    // none moved further in a frame than a sprinting swing carries it
+    if(last)|l|for(l,now)|a,b|for(a,b)|j0,j1|try testing.expect(m.len(j1-j0)<0.3);
+    last=now;
+  };
+}

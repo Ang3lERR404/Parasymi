@@ -192,8 +192,14 @@ pub const swingSpeedMin:f32=0.5;
 pub const swingMin:f32=0.12;
 /// the longest a striding swing lasts (s)
 pub const swingMax:f32=0.4;
+/// the fastest a swinging paw moves over the ground (m/s): about twice a
+/// sprint, as a running paw passes the body
+pub const swingSpeedMax:f32=15;
 /// a planted foot never trails the hip by more than this before it lifts
 pub const trailMax:f32=0.5;
+/// a planted foot trailing this far lifts even while the other swings (a
+/// sprint's flight, a sudden turn), so it is never left to be put back
+pub const trailHard:f32=0.7;
 /// a foot this far from the body (a load, a teleport) is put straight back
 pub const lost:f32=1.2;
 /// how high a swinging foot lifts (standing, and more at full stride), and
@@ -218,6 +224,9 @@ pub const slopeSpan:f32=0.15;
 /// the share of thigh and shin's full length the hock is reached with
 /// before the hips drop to let a foot reach the ground below
 pub const reachShare:f32=0.97;
+/// the furthest the hips drop for a foot out of reach (m): a foot further
+/// off is reached by a straightening leg, never by the body sinking to it
+pub const dropMax:f32=0.12;
 /// the pelvis: how far it sinks with stride and bobs at each footfall,
 /// sways over the planted foot, turns and rolls with the stride
 /// (this one: how far it sinks at full stride, m)

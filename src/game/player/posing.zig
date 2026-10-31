@@ -389,7 +389,7 @@ pub fn hipDrop(p:*const Player,q:skel.Pose)f32{
   // the further of the two legs' overreach
   var drop:f32=0;
   for(reaches(p,q))|r|drop=@max(drop,lib.player.ik.overreach(r.d,r.fold));
-  return drop;
+  return@min(drop,lib.player.tuning.dropMax);
 }
 /// each leg reaching its foot, by inverse kinematics in the pelvis's frame
 pub fn legs(p:*const Player,q:skel.Pose)[2]skel.Limb{

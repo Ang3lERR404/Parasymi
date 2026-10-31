@@ -97,10 +97,14 @@ const strideResponse=lib.player.tuning.strideResponse;
 const swingMax=lib.player.tuning.swingMax;
 /// the shortest a striding swing lasts (s)
 const swingMin=lib.player.tuning.swingMin;
+/// the fastest a swinging paw moves over the ground (m/s)
+const swingSpeedMax=lib.player.tuning.swingSpeedMax;
 /// the slowest speed a swing is timed for (m/s)
 const swingSpeedMin=lib.player.tuning.swingSpeedMin;
 /// a planted foot never trails the hip further than this (m)
 const trailMax=lib.player.tuning.trailMax;
+/// a planted foot this far behind lifts whatever the other does (m)
+const trailHard=lib.player.tuning.trailHard;
 /// its top walking speed (m/s)
 const walkSpeed=lib.player.tuning.walkSpeed;
 /// how far through its pull and wrench a unit's pry is (0..1)
@@ -208,7 +212,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
       // how far it is from where it rests
       const off=m.len(f.at-p.rest(ground,s));
       // a foot trailing too far always lifts (the other one is down by then)
-      var lift=off>trailMax and other.planted();
+      var lift=(off>trailMax and other.planted()) or off>trailHard;
       if(moving){
         // the gait lifts it as its stance ends
         lift=lift or (ph>=p.duty and f.phase<p.duty);
@@ -225,13 +229,30 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
     }
     f.phase=ph;
     if(!f.planted()){
+      // the swing's ease and lift before this frame, and the foot under its lift
+      const k0=m.smooth(f.t);
+      var base=f.at;
+      base[1]-=f.lift*m.pow(f32,@sin(f.t*m.pi),liftArc);
       f.t=@min(1,f.t+dt/f.dur);
       // the swing's time left, where it will land, and how far along it is
       const left=(1-f.t)*f.dur;
       const to=p.onGround(ground,p.rest(ground,s)+p.vel*m.splat3(left)+ahead);
       const k=m.smooth(f.t);
-      f.at=m.lerpV(f.from,to,k);
-      f.at[1]=m.lerp(f.from[1],to[1],k)+f.lift*m.pow(f32,@sin(f.t*m.pi),liftArc);
+      // decision: the foot closes this frame's share of what is left to its
+      // landing, never re-lerped from where it set off, so a landing that
+      // moves (a turn, a stop, a wall, a step) bends the swing, never jumps it
+      const share=if(k0<1)(k-k0)/(1-k0)else 1;
+      // that share over the ground, never faster than a paw can swing (a
+      // landing flung far by a sudden reversal is stepped toward, not leapt to)
+      var by=(to-base)*m.splat3(share);
+      const over=@sqrt(by[0]*by[0]+by[2]*by[2]);
+      const most=swingSpeedMax*dt;
+      if(over>most){
+        by[0]*=most/over;
+        by[2]*=most/over;
+      }
+      f.at=base+by;
+      f.at[1]+=f.lift*m.pow(f32,@sin(f.t*m.pi),liftArc);
       if(f.planted()){
         f.at[1]=to[1];
         fell=true;
