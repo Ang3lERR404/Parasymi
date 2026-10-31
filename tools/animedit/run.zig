@@ -283,7 +283,10 @@ pub fn main(init:std.process.Init)!void{
   var built:meshgen.Builder=.{.gpa=gpa};
   defer built.deinit();
   if(rigged)|*sc|{
-    try sc.doc.mesh(gpa,io,false,&built);
+    // every sculpt kept beside it, for its nests
+    var parts=try ps.sculptDoc.Folder.load(gpa,io,Dir.cwd(),meshDir);
+    defer parts.deinit();
+    try sc.doc.mesh(gpa,io,false,&built,parts.lookup());
     // where in the builder each library slot's level of detail lies
     var ranges:[meshlib.slots][2]u32=@splat(.{0,0});
     const run:[2]u32=.{0,@intCast(built.mark())};

@@ -45,6 +45,10 @@ const V3=m.V3;
 const v3=m.v3;
 /// the sculpt's bones: joints, parents, twins
 const rig=lib.sculptRig;
+/// a 4×4 matrix: where a form stands
+const M4=m.M4;
+/// whether a file name ends so
+const endsWith=std.mem.endsWith;
 /// one bone of the sculpt
 const Bone=rig.Bone;
 /// sculpts are kept here (from the repo root)
@@ -80,7 +84,6 @@ pub const Name=struct{
     return n;
   }
 };
-
 /// the shape a form takes
 pub const Kind=enum{
   /// a round body with three radii
@@ -92,8 +95,11 @@ pub const Kind=enum{
   /// a tube from its foot up along y, curling toward x as it goes: a horn,
   /// a tail, a tendril
   tube,
+  /// another whole sculpt (`use`), placed, turned and scaled (`size` x, the
+  /// same every way) as one form, its own forms melting in: a part made
+  /// once and used in many (a claw, an eye)
+  nest,
 };
-
 /// the most a tube's curl is cut into segments: one for each this many
 /// degrees of it (at least one, at most the sculpt's `chainMax`)
 pub const curlStep:f32=12;
@@ -115,7 +121,6 @@ pub const Vals=struct{
   /// its colour, red, green and blue (0..1)
   col:V3=.{0.45,0.42,0.3},
 };
-
 /// every value of a form, each a channel the panel shows and the text keeps
 pub const Ch=clip.Channels(Vals);
 /// one form of the sculpt: its name, its shape, whether it carves, its
@@ -123,6 +128,8 @@ pub const Ch=clip.Channels(Vals);
 pub const Piece=struct{
   /// what the gardener calls it (`snout`, `left ear`); may be empty
   name:Name=.{},
+  /// a nest's sculpt, by name (`claw`: `src/mesh/claw.mesh`)
+  use:Name=.{},
   /// an ellipsoid, a rounded cone, a rounded box or a curling tube
   kind:Kind=.ellipsoid,
   /// whether it is carved out of what is before it (else melted in)
@@ -143,11 +150,22 @@ pub const Piece=struct{
   shade:Part=.stem,
   /// where it stands, how it is turned and sized, and its colour
   v:Vals=.{},
-  /// as the sculpt takes it
-  pub fn form(p:Piece)sculpt.Form{
-    // its values, its place and turn as one matrix, and the origin in its frame
+  /// as the sculpt takes it (a shape: never a nest, which `Doc` opens)
+  pub fn form(p:Piece)sculpt.Form{return p.formIn(m.identity,1);}
+  /// its place and turn as one matrix, its place `s` times as far out
+  pub fn placed(p:Piece,s:f32)M4{
+    // its values
     const v=p.v;
-    const at=m.chain(&.{m.translate(v.pos),m.rotY(m.rad(v.rot[1])),m.rotX(m.rad(v.rot[0])),m.rotZ(m.rad(v.rot[2]))});
+    return m.chain(&.{m.translate(v.pos*m.splat3(s)),m.rotY(m.rad(v.rot[1])),m.rotX(m.rad(v.rot[0])),m.rotZ(m.rad(v.rot[2]))});
+  }
+  /// as the sculpt takes it standing in `at`, everything about it `s`
+  /// times as big (a form of a nested sculpt)
+  pub fn formIn(p:Piece,at:M4,s:f32)sculpt.Form{
+    // its values `s` times as big, and the origin in its frame
+    var v=p.v;
+    v.size*=m.splat3(s);
+    v.round*=s;
+    v.melt*=s;
     const z=v3(0,0,0);
     return.{
       .shape=switch(p.kind){
@@ -155,8 +173,9 @@ pub const Piece=struct{
         .cone=>.{.cone=.{.a=v3(0,-v.size[1],0),.b=v3(0,v.size[1],0),.ra=v.size[0],.rb=v.size[2]}},
         .box=>.{.box=.{.c=z,.half=v.size,.round=@min(v.round,@reduce(.Min,v.size))}},
         .tube=>.{.chain=arc(v)},
+        .nest=>unreachable,
       },
-      .at=at,
+      .at=m.mul(at,p.placed(s)),
       .bone=0,
       .col=color.rgb(v.col[0],v.col[1],v.col[2]).toRgba8(255),
       .k=v.melt,
@@ -242,6 +261,7 @@ pub const Doc=struct{
     for(d.pieces.items)|*p|{
       try w.print("form {t}{s}{s}{s}\n",.{p.kind,if(p.carve)" carve"else"",if(p.ink)" ink"else"",if(p.twin)" twin"else""});
       if(p.name.len>0)try w.print("name {s}\n",.{p.name.slice()});
+      if(p.kind==.nest)try w.print("use {s}\n",.{p.use.slice()});
       if(d.bones.items.len>0)try w.print("on {s}\n",.{d.bones.items[@min(p.bone,d.bones.items.len-1)].name.slice()});
       try w.print("shade {t}\n",.{p.shade});
       for(Ch.names,0..)|n,i|try w.print("{s} {d}\n",.{n,Ch.get(&p.v,i)});
@@ -299,6 +319,9 @@ pub const Doc=struct{
         if(d.pieces.items.len==0)return error.BadMesh;
         // the name: the rest of the line, spaces and all
         d.pieces.items[d.pieces.items.len-1].name=.of(trim(u8,it.rest()," \t"));
+      }else if(eql(u8,word,"use")){
+        if(d.pieces.items.len==0)return error.BadMesh;
+        d.pieces.items[d.pieces.items.len-1].use=.of(trim(u8,it.rest()," \t"));
       }else if(eql(u8,word,"shade")){
         if(d.pieces.items.len==0)return error.BadMesh;
         d.pieces.items[d.pieces.items.len-1].shade=stringToEnum(Part,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
@@ -314,40 +337,195 @@ pub const Doc=struct{
     return d;
   }
   /// its surface into `b`, cells `cell` across (wider where the sculpt is
-  /// too big for that many; `dragCoarse` times them while `coarse`);
-  /// nothing when no form adds anything
-  pub fn mesh(d:*const Doc,gpa:Allocator,io:?Io,coarse:bool,b:*meshgen.Builder)Allocator.Error!void{
-    // whether any form adds (neither carving nor inking; else there is
-    // nothing to mesh), and the farthest reach
-    var solid=false;
-    var far:f32=0;
-    for(d.pieces.items)|p|{
-      solid=solid or (!p.carve and !p.ink);
-      far=@max(far,p.reach());
-    }
-    if(!solid)return;
+  /// too big for that many; `dragCoarse` times them while `coarse`), each
+  /// nest opened through `lookup` (none: nests are left out); nothing when
+  /// no form adds anything
+  pub fn mesh(d:*const Doc,gpa:Allocator,io:?Io,coarse:bool,b:*meshgen.Builder,lookup:?Lookup)Allocator.Error!void{
     // the bones the forms ride, twins counted
     const k=rig.skeleton(d.bones.items);
     // the sculpt the forms are melted into, weighted to those bones
     var sc:sculpt.Sculpt=.{.gpa=gpa,.parents=k.parents[0..k.count],.io=io};
     defer sc.deinit();
-    // each form on its bone, then its twin on the bone's twin, right after
-    // it (so the two melt or carve as one into what came before)
-    for(d.pieces.items)|p|{
-      // the form's bone, kept within the bones there are
-      const on:u8=if(d.bones.items.len==0)0 else@min(p.bone,d.bones.items.len-1);
-      // the form as the sculpt takes it, then its twin
-      var f=p.form();
-      f.bone=k.ride(on,false);
-      try sc.add(f);
-      if(p.twin){
-        var t=p.mirrored().form();
-        t.bone=k.ride(on,true);
-        try sc.add(t);
-      }
-    }
+    if(!try d.addForms(&sc,&k,lookup,.{}))return;
+    // the farthest any form reaches from the origin
+    var far:f32=0;
+    for(sc.forms.items)|pf|far=@max(far,m.len(pf.centre)+pf.reach);
     // the cell size this time (m)
     const h=@max(d.cell,2*far/maxCells)*(if(coarse)dragCoarse else 1);
     try sc.mesh(meshgen.gen,b,h,0.5,.stem);
   }
+  /// where a sculpt's forms are being put: in what frame, how big, whether
+  /// mirrored, on what bone, and how deep among nests
+  const Within=struct{
+    /// the frame the forms stand in
+    at:M4=m.identity,
+    /// how many times as big as kept they are
+    s:f32=1,
+    /// whether each is mirrored across its sculpt's middle (a twin's nest)
+    mirror:bool=false,
+    /// the bone every form rides (a nest's), else each its own
+    bone:?u8=null,
+    /// how many nests deep
+    depth:u8=0,
+  };
+  /// every form (and its twin) put into `sc` within `w`, each nest opened
+  /// through `lookup` and its forms put in after the forms before it, so
+  /// they melt in where the nest stands; whether any adds to the surface
+  fn addForms(d:*const Doc,sc:*sculpt.Sculpt,k:*const rig.Skeleton,lookup:?Lookup,w:Within)Allocator.Error!bool{
+    // whether any form adds (neither carving nor inking)
+    var solid=false;
+    for(d.pieces.items)|p|for([_]bool{false,true})|twin|{
+      if(twin and !p.twin)continue;
+      // the form as it stands: mirrored once for a twin, once inside a twin's nest
+      const q=if(twin!=w.mirror)p.mirrored()else p;
+      // the bone it rides: the nest's, else its own (a twin its bone's twin)
+      const on:u8=if(d.bones.items.len==0)0 else@min(p.bone,d.bones.items.len-1);
+      const bone=w.bone orelse k.ride(on,twin);
+      if(q.kind==.nest){
+        if(w.depth>=nestDepth)continue;
+        // the sculpt it places (unknown: left out)
+        const inner=(lookup orelse continue).find(q.use.slice()) orelse continue;
+        solid=try inner.addForms(sc,k,lookup,.{.at=m.mul(w.at,q.placed(w.s)),.s=w.s*@max(q.v.size[0],nestScaleMin),.mirror=twin!=w.mirror,.bone=bone,.depth=w.depth+1}) or solid;
+        continue;
+      }
+      // the form as the sculpt takes it, on its bone
+      var f=q.formIn(w.at,w.s);
+      f.bone=bone;
+      try sc.add(f);
+      solid=solid or (!q.carve and !q.ink);
+    };
+    return solid;
+  }
 };
+/// how many nests deep a sculpt is opened (a sculpt nesting itself stops here)
+pub const nestDepth=4;
+/// the least a nest's scale may be
+const nestScaleMin:f32=0.01;
+/// finds a sculpt by name, for the nests: `find` on whatever holds them
+pub const Lookup=struct{
+  /// what holds the sculpts
+  ctx:*const anyopaque,
+  /// the sculpt in `ctx` named so, if there is one
+  findIn:*const fn(ctx:*const anyopaque,name:[]const u8)?*const Doc,
+  /// the sculpt named `name`, if there is one
+  pub fn find(l:Lookup,name:[]const u8)?*const Doc{return l.findIn(l.ctx,name);}
+};
+/// every sculpt kept in one folder, read at once, for the nests (the
+/// editors read `dir`; a file that will not read is passed over)
+pub const Folder=struct{
+  /// the allocator the sculpts and names are kept with
+  gpa:Allocator,
+  /// each sculpt's name, and the sculpt
+  names:std.ArrayList([]u8)=.empty,
+  docs:std.ArrayList(Doc)=.empty,
+  /// every `.mesh` in `path` under `root` (none there: an empty folder)
+  pub fn load(gpa:Allocator,io:Io,root:Io.Dir,path:[]const u8)Allocator.Error!Folder{
+    // the folder being filled
+    var f:Folder=.{.gpa=gpa};
+    errdefer f.deinit();
+    // the directory, open to be walked
+    var dirH=root.openDir(io,path,.{.iterate=true}) catch return f;
+    defer dirH.close(io);
+    var it=dirH.iterate();
+    while(it.next(io) catch return f)|e|{
+      if(e.kind!=.file or !endsWith(u8,e.name,ext))continue;
+      // its text, read and parsed
+      const text=dirH.readFileAlloc(io,e.name,gpa,.limited(1<<22)) catch continue;
+      defer gpa.free(text);
+      var doc=Doc.parse(gpa,text)catch|er|switch(er){
+        error.OutOfMemory=>return error.OutOfMemory,
+        error.BadMesh=>continue,
+      };
+      errdefer doc.deinit(gpa);
+      // its name, kept
+      const name=try gpa.dupe(u8,e.name[0..e.name.len-ext.len]);
+      errdefer gpa.free(name);
+      try f.names.append(gpa,name);
+      errdefer _=f.names.pop();
+      try f.docs.append(gpa,doc);
+    }
+    return f;
+  }
+  /// lets every sculpt go
+  pub fn deinit(f:*Folder)void{
+    for(f.names.items)|n|f.gpa.free(n);
+    for(f.docs.items)|*d|d.deinit(f.gpa);
+    f.names.deinit(f.gpa);
+    f.docs.deinit(f.gpa);
+  }
+  /// the sculpt named `name`, if it is here
+  pub fn find(f:*const Folder,name:[]const u8)?*const Doc{
+    for(f.names.items,f.docs.items)|n,*d|if(eql(u8,n,name))return d;
+    return null;
+  }
+  /// a lookup over this folder
+  pub fn lookup(f:*const Folder)Lookup{
+    return.{.ctx=f,.findIn=struct{
+      /// the sculpt named so in the folder `ctx`
+      fn findIn(ctx:*const anyopaque,name:[]const u8)?*const Doc{
+        return@as(*const Folder,@ptrCast(@alignCast(ctx))).find(name);
+      }
+    }.findIn};
+  }
+};
+/// the test helpers
+const testing=std.testing;
+test"a nest places another sculpt's forms, scaled, twinned in mirror, and reads back"{
+  const gpa=testing.allocator;
+  // a folder of one part: a claw, a tube curling one way off to the side
+  var f:Folder=.{.gpa=gpa};
+  defer f.deinit();
+  try f.names.append(gpa,try gpa.dupe(u8,"claw"));
+  try f.docs.append(gpa,.{});
+  try f.docs.items[0].pieces.append(gpa,.{.kind=.tube,.v=.{.pos=.{0.05,0,0},.size=.{0.04,0.3,0.01},.curl=60}});
+  // a body nesting the claw at half its size, twinned across the middle
+  var d:Doc=.{.cell=0.01};
+  defer d.deinit(gpa);
+  try d.pieces.append(gpa,.{.v=.{.pos=.{0,0.3,0},.size=.{0.1,0.1,0.1}}});
+  try d.pieces.append(gpa,.{.kind=.nest,.use=.of("claw"),.twin=true,.v=.{.pos=.{0.2,0.3,0},.size=.{0.5,1,1}}});
+  // its text keeps the nest and what it uses
+  var out:Writer.Allocating=.init(gpa);
+  defer out.deinit();
+  try d.write(&out.writer);
+  var back=try Doc.parse(gpa,out.written());
+  defer back.deinit(gpa);
+  try testing.expect(back.pieces.items[1].kind==.nest);
+  try testing.expectEqualStrings("claw",back.pieces.items[1].use.slice());
+  // meshed: as far to one side as the other, the claws reaching past the body
+  var b:meshgen.Builder=.{.gpa=gpa};
+  defer b.deinit();
+  try back.mesh(gpa,null,false,&b,f.lookup());
+  // the farthest the surface reaches to either side (m)
+  var lo:f32=0;
+  var hi:f32=0;
+  for(b.v.items)|v|{
+    lo=@min(lo,v.pos[0]);
+    hi=@max(hi,v.pos[0]);
+  }
+  try testing.expect(hi>0.2);
+  try testing.expectApproxEqAbs(hi,-lo,0.02);
+  // without the folder the nest is left out: only the body
+  var bare:meshgen.Builder=.{.gpa=gpa};
+  defer bare.deinit();
+  try back.mesh(gpa,null,false,&bare,null);
+  for(bare.v.items)|v|try testing.expect(@abs(v.pos[0])<0.15);
+}
+test"a sculpt nesting itself stops at the depth"{
+  const gpa=testing.allocator;
+  // a folder whose one sculpt nests itself, smaller and off to the side
+  var f:Folder=.{.gpa=gpa};
+  defer f.deinit();
+  try f.names.append(gpa,try gpa.dupe(u8,"self"));
+  try f.docs.append(gpa,.{});
+  try f.docs.items[0].pieces.append(gpa,.{.v=.{.size=.{0.05,0.05,0.05}}});
+  try f.docs.items[0].pieces.append(gpa,.{.kind=.nest,.use=.of("self"),.v=.{.pos=.{0.2,0,0},.size=.{0.5,1,1}}});
+  // meshed: one ball for each depth, the last as far as the depth allows
+  var b:meshgen.Builder=.{.gpa=gpa};
+  defer b.deinit();
+  try f.docs.items[0].mesh(gpa,null,false,&b,f.lookup());
+  // the farthest it reaches (m): each ball half the last, half as far on
+  // (0.2, 0.3, 0.35, 0.375 out), the finest under a cell and so unseen
+  var hi:f32=0;
+  for(b.v.items)|v|hi=@max(hi,v.pos[0]);
+  try testing.expect(hi>0.3 and hi<0.4);
+}

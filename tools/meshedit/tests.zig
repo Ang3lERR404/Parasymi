@@ -68,7 +68,7 @@ test"a form's shader shades its part of the surface, and the list wraps round"{
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
   try d.pieces.append(gpa,.{.shade=.leaf});
-  try d.mesh(gpa,null,false,&b);
+  try d.mesh(gpa,null,false,&b,null);
   try testing.expect(b.v.items.len>0);
   for(b.v.items)|v|try testing.expectEqual(@intFromEnum(Part.leaf),v.part);
   // the last role, which steps on round to the first
@@ -84,10 +84,10 @@ test"carving alone makes no surface, a form makes a closed one"{
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
   try d.pieces.append(gpa,.{.carve=true});
-  try d.mesh(gpa,null,false,&b);
+  try d.mesh(gpa,null,false,&b,null);
   try testing.expectEqual(@as(usize,0),b.v.items.len);
   try d.pieces.append(gpa,.{.kind=.cone});
-  try d.mesh(gpa,null,false,&b);
+  try d.mesh(gpa,null,false,&b,null);
   try testing.expect(b.v.items.len>0);
   try testing.expectEqual(@as(usize,0),b.v.items.len%3);
 }
@@ -140,7 +140,7 @@ test"a twinned form reads back so, and its surface is mirrored across the middle
   // the surface, which reaches as far to one side as to the other
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
-  try d.mesh(gpa,null,false,&b);
+  try d.mesh(gpa,null,false,&b,null);
   try testing.expect(b.v.items.len>0);
   // the farthest the surface reaches to either side (m)
   var lo:f32=0;
@@ -183,10 +183,10 @@ test"a tube curls round its circle, an ink form adds nothing, and both read back
   try d.pieces.append(gpa,.{.kind=.tube,.ink=true,.twin=true,.v=.{.curl=-40}});
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
-  try d.mesh(gpa,null,false,&b);
+  try d.mesh(gpa,null,false,&b,null);
   try testing.expectEqual(@as(usize,0),b.v.items.len);
   try d.pieces.insert(gpa,0,.{});
-  try d.mesh(gpa,null,false,&b);
+  try d.mesh(gpa,null,false,&b,null);
   try testing.expect(b.v.items.len>0);
   // the text read back keeps the tube, its ink, its twin and its curl
   var out:Writer.Allocating=.init(gpa);
@@ -275,7 +275,7 @@ test"bones read back, twins hang mirrored off their parents' twins, and the skin
   // the mesh's vertices ride more than one bone, the forearms' their elbows
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
-  try back.mesh(gpa,null,false,&b);
+  try back.mesh(gpa,null,false,&b,null);
   // whether some vertex rides the elbow, and some its twin
   var elbow=false;
   var twin=false;

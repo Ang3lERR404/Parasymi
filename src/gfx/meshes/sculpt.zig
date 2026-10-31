@@ -22,7 +22,7 @@ pub fn Slot(comptime i:usize)type{
       // the sculpt as kept, its cells widened for the level of detail
       var doc=sculpts.all()[i].rigged.doc;
       doc.cell*=@floatFromInt(@as(u32,1)<<@intCast(b.lod));
-      try doc.mesh(b.gpa,null,false,b);
+      try doc.mesh(b.gpa,null,false,b,sculpts.lookup());
     }
   };
 }

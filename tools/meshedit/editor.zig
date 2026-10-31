@@ -65,6 +65,12 @@ const snapDeg=meshedit.settings.snapDeg;
 const Vals=meshedit.settings.Vals;
 /// the sculpt's bones
 const rig=meshedit.rig;
+/// every sculpt kept in one folder, for the nests
+const Folder=ps.sculptDoc.Folder;
+/// where a path's last part begins
+const lastIndexOfScalar=std.mem.lastIndexOfScalar;
+/// whether a name ends so
+const endsWith=std.mem.endsWith;
 /// the editor: the mesh being sculpted, the selection, the gizmo, and
 /// whether the surface must be meshed again
 pub const Editor=struct{
@@ -111,8 +117,50 @@ pub const Editor=struct{
   /// each kept bone's test turn (degrees, as a form's `rot`): how the skin
   /// bends is tried with it, never kept
   turns:[rig.maxBones]V3=@splat(.{0,0,0}),
+  /// every other sculpt kept beside this one, read again before each
+  /// meshing, for the nests (none read yet: nests are left out)
+  parts:?Folder=null,
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
+  /// this sculpt's own name (its file's, without the folder or ending)
+  pub fn ownName(e:*const Editor)[]const u8{
+    // the path's last part
+    const base=e.path[(lastIndexOfScalar(u8,e.path,'/') orelse return e.path)+1..];
+    return if(endsWith(u8,base,meshedit.settings.ext))base[0..base.len-meshedit.settings.ext.len]else base;
+  }
+  /// every sculpt kept beside this one read again (a part edited elsewhere
+  /// shows at once); one that will not read keeps the last read
+  pub fn reloadParts(e:*Editor)Allocator.Error!void{
+    // the folder read afresh
+    const fresh=try Folder.load(e.gpa,e.io,Dir.cwd(),dir);
+    if(e.parts)|*old|old.deinit();
+    e.parts=fresh;
+  }
+  /// the nests' lookup: every other sculpt, none before the first reading
+  pub fn lookup(e:*const Editor)?ps.sculptDoc.Lookup{
+    return if(e.parts)|*f|f.lookup()else null;
+  }
+  /// nest `p`'s sculpt stepped on to the next kept beside this one (`back`:
+  /// the one before), never this one itself
+  pub fn stepPart(e:*Editor,p:*Piece,back:bool)void{
+    // the sculpts there are
+    const f=if(e.parts)|*x|x else return e.say("no other sculpts read yet",.{});
+    const names=f.names.items;
+    // where the nest's sculpt is among them (none: before the first)
+    var at:usize=for(names,0..)|n,i|{
+      if(eql(u8,n,p.use.slice()))break i;
+    }else names.len;
+    for(0..names.len)|_|{
+      at=if(back)(at+names.len-1)%names.len else(at+1)%names.len;
+      if(at>=names.len)at=0;
+      if(!eql(u8,names[at],e.ownName())){
+        p.use=.of(names[at]);
+        e.changed();
+        return e.say("nest uses {s}",.{names[at]});
+      }
+    }
+    e.say("no other sculpts to nest: make one first",.{});
+  }
   /// show a note under the help, cut to fit its buffer
   pub fn say(e:*Editor,comptime fmt:[]const u8,args:anytype)void{
     e.noteLen=if(bufPrint(&e.note,fmt,args))|w|w.len else|_|e.note.len;

@@ -115,8 +115,8 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
     if(typing)try typed(d,nx,ry,&e.naming.?)
     else _=try d.text(nx,ry,text,if(p.name.len>0)col else bare,if(p.name.len>0)p.name.slice()else@tagName(p.kind));
     // its shape (when named), whether it carves or inks and whether it has a twin, dim
-    var kb:[32]u8=undefined;
-    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.carve)" carve"else"",if(p.ink)" ink"else"",if(p.twin)" twin"else""})catch"?");
+    var kb:[64]u8=undefined;
+    _=try d.text(pad+kindX,ry,text,bare,bufPrint(&kb,"{s}{s}{s}{s}{s}{s}",.{if(p.name.len>0 or typing)@tagName(p.kind)else"",if(p.kind==.nest)" "else"",if(p.kind==.nest)p.use.slice()else"",if(p.carve)" carve"else"",if(p.ink)" ink"else"",if(p.twin)" twin"else""})catch"?");
     _=try d.text(pad+shadeX,ry,text,if(i==e.sel)sel else bare,@tagName(p.shade));
   }
   if(e.top>0)_=try d.text(pad+listW-30,listY-20,text,bare,"...");

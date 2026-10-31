@@ -149,7 +149,12 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     // the selected form
     const p=&pieceList[e.sel];
     if(hit(in,.t)){
-      p.kind=switch(p.kind){.ellipsoid=>.cone,.cone=>.box,.box=>.tube,.tube=>.ellipsoid};
+      p.kind=switch(p.kind){.ellipsoid=>.cone,.cone=>.box,.box=>.tube,.tube=>.nest,.nest=>.ellipsoid};
+      // a nest starts at its sculpt's own size, using the first other sculpt
+      if(p.kind==.nest){
+        p.v.size=.{1,1,1};
+        if(p.use.len==0)e.stepPart(p,false);
+      }else if(p.kind==.ellipsoid)p.v.size=(Vals{}).size;
       e.changed();
     }
     if(hit(in,.c)){
@@ -157,6 +162,7 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
       p.ink=false;
       e.changed();
     }
+    if(hit(in,.p) and p.kind==.nest)e.stepPart(p,shift);
     if(hit(in,.i)){
       p.ink=!p.ink;
       p.carve=false;

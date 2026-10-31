@@ -153,6 +153,8 @@ pub fn main(init:std.process.Init)!void{
   var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode,.history=try .init(gpa,first)};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
+  defer if(e.parts)|*f|f.deinit();
+  try e.reloadParts();
   e.rigMode=startRig;
   if(e.doc.bones.items.len>0){
     e.bsel=e.doc.bones.items.len-1;
@@ -252,7 +254,8 @@ pub fn main(init:std.process.Init)!void{
       b.v.clearRetainingCapacity();
       b.skin.clearRetainingCapacity();
       b.grow.clearRetainingCapacity();
-      try e.doc.mesh(gpa,io,coarse,&b);
+      if(!coarse)try e.reloadParts();
+      try e.doc.mesh(gpa,io,coarse,&b,e.lookup());
       // the whole surface, as every level of detail of the slot
       const run:[2]u32=.{0,@intCast(b.mark())};
       for(0..meshgen.lods)|l|ranges[meshlib.slot(slotId,@intCast(l))]=run;

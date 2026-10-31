@@ -134,7 +134,7 @@ pub const panel:Color=s.panel;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   tab next form   enter name it   m shader (shift back)",
-  "t shape (a tube curls by its curl)   c carve   i ink (colour only)   x twin   ctrl+click gather into a group   g snap   o bone   j rig",
+  "t shape (a tube curls; a nest places another sculpt, p picks it)   c carve   i ink   x twin   ctrl+click group   g snap   o bone   j rig",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y redo",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
 };
@@ -164,9 +164,12 @@ pub fn valueLabel(kind:Kind,i:usize)[]const u8{
   return switch(kind){
     .cone=>coneSize[i-sizeX],
     .tube=>tubeSize[i-sizeX],
+    .nest=>nestSize[i-sizeX],
     .ellipsoid,.box=>valueLabels[i],
   };
 }
+/// how a nest's size reads: one scale, the same every way
+const nestSize=[3][]const u8{"scale","(unused)","(unused)"};
 /// which way the shader is stepped through the roles
 const Way=enum{
   /// to the next role

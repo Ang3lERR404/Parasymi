@@ -24,7 +24,12 @@
 //! (x=0): it follows its form as it is shaped (one ear makes both).
 //! ctrl and a click gathers a form into the selected one's group (or lets
 //! it go): the group moves and turns with it, round where it stands; `g`
-//! snaps the selected form and its group to the grid.
+//! snaps the selected form and its group to the grid. A nest (`t` on to it)
+//! places another whole sculpt kept beside this one as one form (`p` picks
+//! which; its `size` x the scale, the same every way): its forms melt in
+//! where it stands, ride its bone, and a twin mirrors all of it; the other
+//! sculpts are read again before each meshing, so a part edited elsewhere
+//! shows at once.
 //! `j` is rig mode (meshedit/rigging.zig): the bones listed in place of the
 //! forms, each a joint hung off its parent (the first, the root), `n`
 //! hanging a new one off the selected, `x` twinning it across the middle;

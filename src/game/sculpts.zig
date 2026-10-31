@@ -5,7 +5,7 @@
 //! (`src/anim/<name>.anim`, or `sculpts/<name>.anim`). The first `slots` of
 //! them, in name order, are meshed into the library's sculpt slots
 //! (meshes/sculpt.zig) and drawn skinned, their bones turned by their clip
-//! looping. A sculpt's channels: the root's place, then each bone's pitch,
+//! looping; every one may be nested in another (`lookup`). A sculpt's channels: the root's place, then each bone's pitch,
 //! yaw and roll (radians).
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
@@ -188,8 +188,8 @@ pub fn find(name:[]const u8)?usize{
 }
 /// reads every sculpt and its clip: beside the repo first, then the
 /// gardener's folder (a name already read is passed over); a file that
-/// will not read is told in the log and passed over. Only the first
-/// `slots` in name order are kept.
+/// will not read is told in the log and passed over. Every one is kept
+/// (to be nested); only the first `slots` in name order are drawn.
 pub fn load(gpa:Allocator,io:Io)Allocator.Error!void{
   unload();
   shelfGpa=gpa;
@@ -199,12 +199,16 @@ pub fn load(gpa:Allocator,io:Io)Allocator.Error!void{
     /// whether `a` comes before `b` by name
     fn before(_:void,a:Kept,b:Kept)bool{return lessThan(u8,a.name,b.name);}
   }.before);
-  while(shelf.items.len>slots){
-    // the one past the slots, let go
-    var gone=shelf.pop().?;
-    log.warn("sculpt {s}: only {d} sculpts are drawn",.{gone.name,slots});
-    gone.deinit(gpa);
-  }
+  for(shelf.items[@min(slots,shelf.items.len)..])|k|log.info("sculpt {s}: past the first {d}, nested only",.{k.name,slots});
+}
+/// a lookup over the shelf, for the nests
+pub fn lookup()sculptDoc.Lookup{
+  return.{.ctx=&shelf,.findIn=struct{
+    /// the sculpt named so on the shelf
+    fn findIn(_:*const anyopaque,name:[]const u8)?*const Doc{
+      return&shelf.items[find(name) orelse return null].rigged.doc;
+    }
+  }.findIn};
 }
 /// every sculpt in `meshes` under `root`, each with its clip from `clips`
 fn readDir(gpa:Allocator,io:Io,root:Dir,meshes:[]const u8,clips:[]const u8)Allocator.Error!void{
