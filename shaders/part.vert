@@ -139,8 +139,8 @@ const float PLEXUS_YIELD_SPIN = 0.15;
 const vec3 PLEXUS_YIELD_GATHER = vec3(0.0, 1.75, 0.0);
 const float PLEXUS_YIELD_CYCLE = 6.0;
 const float PLEXUS_YIELD_RELEASE = 0.7;
-const float PLEXUS_YIELD_SWING = 4.5;
-const float PLEXUS_YIELD_DAMP = 2.2;
+const float PLEXUS_YIELD_SWING = 3.6;
+const float PLEXUS_YIELD_DAMP = 1.8;
 const float PLEXUS_YIELD_LAG = 0.07;
 // a petal's rows, base to tip: how many points each holds (30 in all)
 // and how far along the petal it lies
