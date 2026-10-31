@@ -179,6 +179,10 @@ pub fn main(init:Init)!void{
         log.err("{s}: no such sculpt in "++lib.sculptDoc.dir,.{a});
         return error.BadSculpt;
       };
+      if(i>=lib.sculpts.slots){
+        log.err("{s}: only the first {d} sculpts by name are drawn",.{a,lib.sculpts.slots});
+        return error.BadSculpt;
+      }
       lone=.{.what=.{.sculpt=@intCast(i)}};
     }
     if(startsWith(u8,a,"--samples="))lone=.{.what=.{.samples=try specimen.Samples.parse(a["--samples=".len..])}};
