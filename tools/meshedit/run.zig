@@ -9,6 +9,10 @@ const Dir=Io.Dir;
 const eql=std.mem.eql;
 /// whether an argument begins with a flag's name
 const startsWith=std.mem.startsWith;
+/// reads a decimal number (`--try=`)
+/// splits text at each comma (`--try=`)
+const splitScalar=std.mem.splitScalar;
+const parseFloat=std.fmt.parseFloat;
 /// where in a name any of a set of bytes first falls
 const indexOfAny=std.mem.indexOfAny;
 /// a name turned into its enum tag, or null if none matches
@@ -63,6 +67,12 @@ const Doc=meshedit.doc.Doc;
 const ext=meshedit.settings.ext;
 /// the editor's state
 const Editor=meshedit.editor.Editor;
+/// the sculpt's bones
+const rig=meshedit.rig;
+/// the rig mode: the bones posed, and their joints on screen
+const rigging=meshedit.rigging;
+/// how big a joint is framed when `.` eases the camera onto it (m)
+const jointFocus=meshedit.settings.jointFocus;
 /// how high (m) over the ground the camera looks
 const lookUp=meshedit.settings.lookUp;
 /// the longest a stalled frame counts as (s)
@@ -100,10 +110,15 @@ pub fn main(init:std.process.Init)!void{
   var shot=false;
   // `--gizmo=`: what the gizmo does to start
   var mode:gizmo.Mode=.move;
+  // `--rig`: start in rig mode; `--try=<pitch>,<yaw>,<roll>`: the last bone test-turned so (degrees)
+  var startRig=false;
+  var tryTurn:m.V3=.{0,0,0};
   for(args[1..])|a|{
     if(startsWith(u8,a,"--mesh="))name=a["--mesh=".len..];
     if(startsWith(u8,a,"--gizmo="))mode=stringToEnum(gizmo.Mode,a["--gizmo=".len..]) orelse return error.BadGizmo;
     if(eql(u8,a,"--shot"))shot=true;
+    if(eql(u8,a,"--rig"))startRig=true;
+    if(startsWith(u8,a,"--try="))tryTurn=try turnsOf(a["--try=".len..]);
   }
   if(name.len==0 or indexOfAny(u8,name,notInName)!=null){
     log.err("--mesh={s}: a plain file name, kept as "++dir++"/<name>"++ext,.{name});
@@ -138,6 +153,11 @@ pub fn main(init:std.process.Init)!void{
   var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode,.history=try .init(gpa,first)};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
+  e.rigMode=startRig;
+  if(e.doc.bones.items.len>0){
+    e.bsel=e.doc.bones.items.len-1;
+    e.turns[e.bsel]=tryTurn;
+  }
   if(made){
     e.dirty=true;
     e.save();
@@ -218,9 +238,10 @@ pub fn main(init:std.process.Init)!void{
     // handles and the gizmo as last frame's camera saw them
     const seen:gizmo.View=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen};
     handles.clearRetainingCapacity();
-    for(e.pieces())|p|try handles.append(gpa,seen.project(origin+p.v.pos));
+    if(e.rigMode)try rigging.handles(&e,seen,origin,&handles,gpa)else for(e.pieces())|p|try handles.append(gpa,seen.project(origin+p.v.pos));
     try e.handle(&input,handles.items,seen,origin);
     e.sel=@min(e.sel,e.pieces().len-|1);
+    e.bsel=@min(e.bsel,e.doc.bones.items.len-|1);
     // the surface meshed again once it changed (while dragging, not every frame)
     e.since+=dt;
     // (coarser while dragging, at full detail once let go)
@@ -249,7 +270,9 @@ pub fn main(init:std.process.Init)!void{
     const pointerOverUi=overUi(listRows(e.pieces().len),input.mouse[0],input.mouse[1]);
     if(ctl.down(&input,.orbit))cam.turn(input.mouseDelta);
     if(input.scroll!=0 and !pointerOverUi)cam.zoom(input.scroll);
-    if(e.focus and e.pieces().len>0){
+    if(e.focus and e.rigMode and e.doc.bones.items.len>0){
+      cam.focus(origin+e.doc.bones.items[e.bsel].at,jointFocus);
+    }else if(e.focus and e.pieces().len>0){
       // the selected form's values
       const v=e.pieces()[e.sel].v;
       cam.focus(origin+v.pos,@reduce(.Max,v.size));
@@ -263,13 +286,17 @@ pub fn main(init:std.process.Init)!void{
     for(&scene.instances)|*p|p.*=&.{};
     scene.lights=&.{};
     for(&scene.push.feet)|*f|f.*=.{noFeet,noFeet,noFeet,0};
-    // the sculpt, drawn once where it stands
-    const inst=[1]ps.vertex.PartInstance{ps.parts.instance(m.translate(origin),.{})};
+    // the sculpt, drawn once where it stands, its skin carried by its
+    // bones as they are test-turned
+    var bones:[rig.maxBones]m.M4=undefined;
+    const k=rigging.posed(&e,origin,&bones);
+    scene.bones=bones[0..k.count];
+    const inst=[1]ps.vertex.PartInstance{ps.parts.skinned(origin,0,.{})};
     scene.parts[meshlib.slot(slotId,0)]=&inst;
-    // handles drawn where the forms are now (one may have gone or come)
+    // handles drawn where the forms (or joints) are now (one may have gone or come)
     const view:gizmo.View=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen};
     handles.clearRetainingCapacity();
-    for(e.pieces())|p|try handles.append(gpa,view.project(origin+p.v.pos));
+    if(e.rigMode)try rigging.handles(&e,view,origin,&handles,gpa)else for(e.pieces())|p|try handles.append(gpa,view.project(origin+p.v.pos));
     ui.clear(@floatCast(game.uiTime));
     try e.draw(&ui,screen,handles.items,view,origin);
     scene.ui=ui.v.items;
@@ -289,6 +316,14 @@ pub fn main(init:std.process.Init)!void{
     }
   }
   if(e.dirty)log.warn("{s}: unsaved changes dropped",.{path});
+}
+/// `--try=`'s turns: pitch, yaw and roll (degrees), commas between, the ones left out none
+fn turnsOf(text:[]const u8)error{BadTry}!m.V3{
+  // the turns read so far, and the text's numbers one by one
+  var t:[3]f32=.{0,0,0};
+  var it=splitScalar(u8,text,',');
+  for(&t)|*x|x.*=parseFloat(f32,it.next() orelse break) catch return error.BadTry;
+  return t;
 }
 /// one frame of the loading screen; false once the window is closed
 fn loadFrame(l:*loading.Loading,r:*Renderer,input:*Input,last:*f64,stage:loading.Stage,at:loading.Progress)!bool{

@@ -28,6 +28,10 @@ const turnOf=meshedit.editor.turnOf;
 const anglesOf=meshedit.editor.anglesOf;
 /// all the maths: angles
 const m=ps.engine.core.math;
+/// the sculpt's bones
+const rig=meshedit.rig;
+/// makes a `V3` from its three parts
+const v3=m.v3;
 /// a point or turn (three numbers)
 const V3=m.V3;
 /// the shader after (or before) a form's
@@ -226,4 +230,91 @@ test"a group moves and turns with the selected form, round where it stands"{
   e.pieces()[1].v.pos[0]=0.0123;
   e.snap();
   try testing.expectApproxEqAbs(@as(f32,0.01),e.pieces()[1].v.pos[0],1e-6);
+}
+test"bones read back, twins hang mirrored off their parents' twins, and the skin rides them"{
+  // the mesh of the rig check: a root, a shoulder and an elbow, both twinned
+  const gpa=testing.allocator;
+  var d:Doc=.{.cell=0.02};
+  defer d.deinit(gpa);
+  try d.bones.append(gpa,.{.name=.of("root")});
+  try d.bones.append(gpa,.{.name=.of("shoulder"),.parent=0,.at=.{0.12,0.45,0},.twin=true});
+  try d.bones.append(gpa,.{.name=.of("elbow"),.parent=1,.at=.{0.3,0.45,0},.twin=true});
+  try d.pieces.append(gpa,.{.v=.{.pos=.{0,0.35,0},.size=.{0.12,0.2,0.1}}});
+  try d.pieces.append(gpa,.{.kind=.cone,.twin=true,.bone=2,.v=.{.pos=.{0.39,0.45,0},.rot=.{0,0,90},.size=.{0.04,0.09,0.025}}});
+  // read back from its text
+  var out:Writer.Allocating=.init(gpa);
+  defer out.deinit();
+  try d.write(&out.writer);
+  var back=try Doc.parse(gpa,out.written());
+  defer back.deinit(gpa);
+  try testing.expectEqual(@as(usize,3),back.bones.items.len);
+  try testing.expectEqualStrings("elbow",back.bones.items[2].name.slice());
+  try testing.expectEqual(@as(?u8,1),back.bones.items[2].parent);
+  try testing.expect(back.bones.items[2].twin);
+  try testing.expectEqual(@as(u8,2),back.pieces.items[1].bone);
+  // the skeleton: the twins after the kept, the elbow's twin off the shoulder's
+  const k=rig.skeleton(back.bones.items);
+  try testing.expectEqual(@as(usize,5),k.count);
+  try testing.expectEqual(@as(?u8,3),k.twinOf[1]);
+  try testing.expectEqual(@as(?u8,4),k.twinOf[2]);
+  try testing.expectEqual(@as(?u8,3),k.parents[4]);
+  try testing.expectEqual(@as(f32,-0.3),k.at[4][0]);
+  // at rest every bone carries the sculpt only where it is placed
+  var bones:[rig.maxBones]m.M4=undefined;
+  const turns=[_]V3{.{0,0,0}}**5;
+  rig.pose(&k,&turns,v3(0,0,0),m.translate(v3(1,0,0)),bones[0..5]);
+  for(bones[0..5])|b|try testing.expectApproxEqAbs(@as(f32,1.3),m.mulPoint(b,v3(0.3,0,0))[0],1e-5);
+  // the elbow turned a quarter about z: its joint stays, a point past it swings up
+  var bent=turns;
+  bent[2]=.{0,0,90};
+  rig.pose(&k,&bent,v3(0,0,0),m.identity,bones[0..5]);
+  const j=m.mulPoint(bones[2],v3(0.3,0.45,0));
+  try testing.expectApproxEqAbs(@as(f32,0.3),j[0],1e-5);
+  const tip=m.mulPoint(bones[2],v3(0.4,0.45,0));
+  try testing.expectApproxEqAbs(@as(f32,0.55),tip[1],1e-5);
+  // the mesh's vertices ride more than one bone, the forearms' their elbows
+  var b:meshgen.Builder=.{.gpa=gpa};
+  defer b.deinit();
+  try back.mesh(gpa,null,false,&b);
+  // whether some vertex rides the elbow, and some its twin
+  var elbow=false;
+  var twin=false;
+  for(b.v.items,b.skin.items)|v,sk|{
+    if(sk.weights[0]<200)continue;
+    // the bone it rides most
+    const first=sk.bones&255;
+    elbow=elbow or (first==2 and v.pos[0]>0.35);
+    twin=twin or (first==4 and v.pos[0] < -0.35);
+  }
+  try testing.expect(elbow and twin);
+}
+test"a bone taken out hands its children and its forms to its parent"{
+  // a mesh of three bones in a line and a form on each
+  const gpa=testing.allocator;
+  var d:Doc=.{};
+  try d.bones.append(gpa,.{.name=.of("root")});
+  try d.bones.append(gpa,.{.name=.of("mid"),.parent=0});
+  try d.bones.append(gpa,.{.name=.of("tip"),.parent=1});
+  for(0..3)|i|try d.pieces.append(gpa,.{.bone=@intCast(i)});
+  const first=try meshedit.editor.text(gpa,&d);
+  defer gpa.free(first);
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first)};
+  defer e.doc.deinit(gpa);
+  defer e.history.deinit();
+  // the middle bone taken out
+  e.bsel=1;
+  meshedit.rigging.remove(&e);
+  try testing.expectEqual(@as(usize,2),e.doc.bones.items.len);
+  try testing.expectEqual(@as(?u8,0),e.doc.bones.items[1].parent);
+  try testing.expectEqual(@as(u8,0),e.pieces()[1].bone);
+  try testing.expectEqual(@as(u8,1),e.pieces()[2].bone);
+  // the root stays while other bones hang off it
+  e.bsel=0;
+  meshedit.rigging.remove(&e);
+  try testing.expectEqual(@as(usize,2),e.doc.bones.items.len);
+  // a new bone hangs off the selected one, named the first free
+  e.bsel=1;
+  try meshedit.rigging.add(&e);
+  try testing.expectEqual(@as(?u8,1),e.doc.bones.items[2].parent);
+  try testing.expectEqualStrings("bone 3",e.doc.bones.items[2].name.slice());
 }

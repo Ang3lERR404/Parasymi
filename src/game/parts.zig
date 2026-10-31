@@ -200,12 +200,7 @@ pub const Parts=struct{
   /// about where it is (to cull it and pick its level of detail)
   pub fn emitSkinned(p:*Parts,id:meshlib.Id,base:u32,at:m.V3,lookIn:Look)Allocator.Error!void{
     if(!p.sees(at,bound+boundPad))return;
-    // the instance, at about where it stands
-    var inst=instance(m.translate(at),lookIn);
-    // (the mask 24 bones to a float, as part.vert reads it)
-    std.debug.assert(lookIn.hide<1<<2*hideWord);
-    inst.e=.{placeSkin,m.f(base),m.f(lookIn.hide&(1<<hideWord)-1),m.f(lookIn.hide>>hideWord)};
-    try p.add(id,at,inst);
+    try p.add(id,at,skinned(at,base,lookIn));
   }
   /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
   /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
@@ -233,6 +228,17 @@ pub const Parts=struct{
     return out;
   }
 };
+/// an instance of a skinned mesh, moved by this frame's bones from `base`
+/// on, standing about at `at`, looking as `look` says (its `hide` the
+/// bones whose part is not drawn)
+pub fn skinned(at:m.V3,base:u32,look:Look)PartInstance{
+  // the instance, at about where it stands
+  var inst=instance(m.translate(at),look);
+  // (the mask 24 bones to a float, as part.vert reads it)
+  std.debug.assert(look.hide<1<<2*hideWord);
+  inst.e=.{placeSkin,m.f(base),m.f(look.hide&(1<<hideWord)-1),m.f(look.hide>>hideWord)};
+  return inst;
+}
 /// an instance placed by its matrix, looking as `look` says
 pub fn instance(mat:m.M4,look:Look)PartInstance{
   return.{

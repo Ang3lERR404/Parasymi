@@ -42,7 +42,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `growth.zig` — growth splines: the hidden skeleton a grown thing is built on and grows along.
 - `meshgen.zig` — procedural mesh construction, the generic half: a `Builder` holding a mesh's vertices (with skin weights and growth records beside them, and
 - `pipeline.zig` — graphics pipeline construction for dynamic rendering.
-- `sculpt.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box) is a signed distance field, the…
+- `sculpt.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box, a tube through points) is a…
 - `swapchain.zig` — swapchain + matching depth buffer.
 - `vertex.zig` — the GPU layouts the engine itself defines: built meshes (with skin and growth records beside them), UI quads and points of light.
 

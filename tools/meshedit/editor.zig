@@ -63,6 +63,8 @@ const snapLen=meshedit.settings.snapLen;
 const snapDeg=meshedit.settings.snapDeg;
 /// a form's numbers
 const Vals=meshedit.settings.Vals;
+/// the sculpt's bones
+const rig=meshedit.rig;
 /// the editor: the mesh being sculpted, the selection, the gizmo, and
 /// whether the surface must be meshed again
 pub const Editor=struct{
@@ -102,6 +104,13 @@ pub const Editor=struct{
   naming:?labels.Typed=null,
   /// the meshes before and after this one, for undo and redo
   history:History,
+  /// rig mode (`j`): the bones listed and placed in place of the forms
+  rigMode:bool=false,
+  /// the bone selected in rig mode
+  bsel:usize=0,
+  /// each kept bone's test turn (degrees, as a form's `rot`): how the skin
+  /// bends is tried with it, never kept
+  turns:[rig.maxBones]V3=@splat(.{0,0,0}),
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
   /// show a note under the help, cut to fit its buffer
@@ -158,6 +167,7 @@ pub const Editor=struct{
     e.doc.deinit(e.gpa);
     e.doc=back;
     e.sel=@min(e.sel,e.pieces().len-|1);
+    e.bsel=@min(e.bsel,e.doc.bones.items.len-|1);
     e.naming=null;
     e.changed();
     e.say("{s}",.{done});
@@ -280,10 +290,8 @@ pub const Editor=struct{
 };
 /// an angle in radians as degrees, as a form's turns are kept
 fn deg(a:f32)f32{return a/m.rad(1);}
-/// a form's `turns` (degrees: y, then x, then z, as `rot` keeps them) as a matrix
-pub fn turnOf(turns:V3)m.M4{
-  return m.chain(&.{m.rotY(m.rad(turns[1])),m.rotX(m.rad(turns[0])),m.rotZ(m.rad(turns[2]))});
-}
+/// a form's turns (degrees: y, then x, then z, as `rot` keeps them) as a matrix
+pub const turnOf=rig.turnOf;
 /// the turns (degrees, kept as `rot` keeps them) a turn matrix `r` is made
 /// of; straight up or down (no turn about x left to tell y and z apart)
 /// it is all y

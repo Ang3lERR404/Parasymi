@@ -8,7 +8,9 @@
 //! repo root:
 //!   zig build meshedit -- [--mesh=<name>]
 //! (a name not yet kept starts a new mesh, written there at once)
-//! (`--gizmo=move|turn|size` starts the gizmo so; `--shot` saves one frame
+//! (`--gizmo=move|turn|size` starts the gizmo so; `--rig` in rig mode,
+//! `--try=<pitch>,<yaw>,<roll>` its last bone test-turned so (degrees);
+//! `--shot` saves one frame
 //! to `shots/meshedit.png` and closes, for checking it headless.)
 //! Each form is placed by `pos`, turned by `rot` (degrees, y then x then
 //! z) and sized by `size` (radii; a cone's x and z its radii at its foot
@@ -23,6 +25,12 @@
 //! ctrl and a click gathers a form into the selected one's group (or lets
 //! it go): the group moves and turns with it, round where it stands; `g`
 //! snaps the selected form and its group to the grid.
+//! `j` is rig mode (meshedit/rigging.zig): the bones listed in place of the
+//! forms, each a joint hung off its parent (the first, the root), `n`
+//! hanging a new one off the selected, `x` twinning it across the middle;
+//! the gizmo moves a joint (`1`) or test-turns its bone (`2`, never kept)
+//! so the skin can be seen to bend. Each form rides one bone (`o` steps
+//! it), its twin the bone's twin, and the sculpt weights the skin to them.
 //! `enter` names the selected form (`snout`, `left ear`): typed in its row,
 //! enter or escape done, kept in the file; the panel shows each value in
 //! words (`place up`, `colour red`, a cone's `tip radius`).
@@ -47,6 +55,10 @@ const gizmo=@import("gizmo.zig");
 pub const settings=@import("meshedit/settings.zig");
 /// the sculpt as text: its forms read from and written to a `.mesh` file
 pub const doc=@import("meshedit/doc.zig");
+/// the sculpt's bones: joints, parents, twins, and posing them
+pub const rig=@import("meshedit/rig.zig");
+/// the rig mode: the bones listed, placed and test-turned
+pub const rigging=@import("meshedit/rigging.zig");
 /// the editor's state: the forms, the selection, the gizmo, the camera
 pub const editor=@import("meshedit/editor.zig");
 /// what the gardener's hands do to the forms: picking, dragging, saving
@@ -68,6 +80,8 @@ test{
 test{
   _=settings;
   _=doc;
+  _=rig;
+  _=rigging;
   _=editor;
   _=editing;
   _=panel;

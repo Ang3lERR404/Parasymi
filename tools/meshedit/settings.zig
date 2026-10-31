@@ -117,14 +117,26 @@ pub const grouped:Color=s.freecam;
 pub const snapLen:f32=0.005;
 /// and their turns to this (degrees)
 pub const snapDeg:f32=15;
+/// how far a new bone's joint stands above its parent's (m)
+pub const newBoneUp:f32=0.1;
+/// a joint's dot in rig mode (px)
+pub const jointR:f32=5;
+/// `.` frames a joint as a thing this big (m)
+pub const jointFocus:f32=0.12;
 /// the panels behind the list and the values
 pub const panel:Color=s.panel;
 /// the help along the top: every key the editor answers to
 pub const help=[_][]const u8{
   "n new form (from the selected)   del remove   pgup/pgdn move in the list   tab next form   enter name it   m shader (shift back)",
-  "t shape (a tube curls by its curl)   c carve   i ink (colour only)   x twin   ctrl+click gather into a group   g snap",
+  "t shape (a tube curls by its curl)   c carve   i ink (colour only)   x twin   ctrl+click gather into a group   g snap   o bone   j rig",
   "up/down value   drag value (shift fine)   r value at rest   [ ] cells   click a handle: select   ctrl+s save   ctrl+z undo   ctrl+y redo",
   "gizmo: 1 move   2 turn   3 size   drag its handles (shift fine)   middle drag orbit   wheel zoom   . focus the form",
+};
+/// the help along the top in rig mode: every key it answers to
+pub const rigHelp=[_][]const u8{
+  "rig mode (j: back to the forms)   n new bone (on the selected; the first is the root)   del remove   x twin   tab next bone   enter name it",
+  "up/down value   drag value (shift fine)   r test turn back to rest (shift: every bone)   click a joint: select   ctrl+s save   ctrl+z undo",
+  "gizmo: 1 move the joint   2 test turn (never kept)   middle drag orbit   wheel zoom   . focus the joint   forms: o steps the bone a form rides",
 };
 /// the shape a form takes
 pub const Kind=enum{

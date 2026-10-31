@@ -59,6 +59,10 @@ const maxCells=meshedit.settings.maxCells;
 const Vals=meshedit.settings.Vals;
 /// a form's name, kept by value
 const Name=@import("../labels.zig").Name;
+/// the sculpt's bones: joints, parents, twins
+const rig=meshedit.rig;
+/// one bone of the sculpt
+const Bone=rig.Bone;
 /// one form of the sculpt: its name, its shape, whether it carves, its
 /// shader and values
 pub const Piece=struct{
@@ -74,6 +78,9 @@ pub const Piece=struct{
   /// whether it is gathered into the selected form's group, moving and
   /// turning with it (only while editing: never kept in the file)
   grouped:bool=false,
+  /// the bone it rides (an index among the mesh's bones; its twin rides
+  /// that bone's twin)
+  bone:u8=0,
   /// whether a twin of it stands mirrored across the sculpt's middle (x=0),
   /// following it as it is shaped
   twin:bool=false,
@@ -153,15 +160,34 @@ pub const Doc=struct{
   cell:f32=cell,
   /// its forms, in the order they melt into one another
   pieces:std.ArrayList(Piece)=.empty,
-  /// lets the forms go
-  pub fn deinit(d:*Doc,gpa:Allocator)void{d.pieces.deinit(gpa);}
-  /// writes the mesh as text: the header, the cell size, then each form's
-  /// kind (and `carve`, `ink`, `twin`), name (if it has one), shader and every value, one to a line
+  /// its bones, each after its parent (none: one root carries it all)
+  bones:std.ArrayList(Bone)=.empty,
+  /// lets the forms and bones go
+  pub fn deinit(d:*Doc,gpa:Allocator)void{
+    d.pieces.deinit(gpa);
+    d.bones.deinit(gpa);
+  }
+  /// the bone kept by `name`, if there is one
+  pub fn boneNamed(d:*const Doc,name:[]const u8)?u8{
+    for(d.bones.items,0..)|b,i|if(eql(u8,b.name.slice(),name))return@intCast(i);
+    return null;
+  }
+  /// writes the mesh as text: the header, the cell size, then each bone's
+  /// name, parent, joint and twin, then each form's kind (and `carve`,
+  /// `ink`, `twin`), name (if it has one), bone (if there are any), shader
+  /// and every value, one to a line
   pub fn write(d:*const Doc,w:*Writer)Writer.Error!void{
     try w.print(header++"\ncell {d}\n",.{d.cell});
+    for(d.bones.items)|*b|{
+      try w.print("bone {s}\n",.{b.name.slice()});
+      if(b.parent)|p|try w.print("parent {s}\n",.{d.bones.items[p].name.slice()});
+      try w.print("joint {d} {d} {d}\n",.{b.at[0],b.at[1],b.at[2]});
+      if(b.twin)try w.writeAll("twin\n");
+    }
     for(d.pieces.items)|*p|{
       try w.print("form {t}{s}{s}{s}\n",.{p.kind,if(p.carve)" carve"else"",if(p.ink)" ink"else"",if(p.twin)" twin"else""});
       if(p.name.len>0)try w.print("name {s}\n",.{p.name.slice()});
+      if(d.bones.items.len>0)try w.print("on {s}\n",.{d.bones.items[@min(p.bone,d.bones.items.len-1)].name.slice()});
       try w.print("shade {t}\n",.{p.shade});
       for(Ch.names,0..)|n,i|try w.print("{s} {d}\n",.{n,Ch.get(&p.v,i)});
     }
@@ -185,6 +211,27 @@ pub const Doc=struct{
       const word=it.next() orelse continue;
       if(eql(u8,word,"cell")){
         d.cell=@max(cellMin,parseFloat(f32,it.next() orelse return error.BadMesh) catch return error.BadMesh);
+      }else if(eql(u8,word,"bone")){
+        // a new bone: its name, the rest of the line (unique, never empty)
+        const name=trim(u8,it.rest()," \t");
+        if(name.len==0 or d.boneNamed(name)!=null or rig.count(d.bones.items)>=rig.maxBones)return error.BadMesh;
+        try d.bones.append(gpa,.{.name=.of(name)});
+      }else if(eql(u8,word,"parent") or eql(u8,word,"joint") or (eql(u8,word,"twin") and d.pieces.items.len==0)){
+        if(d.bones.items.len==0)return error.BadMesh;
+        // the bone last begun
+        const b=&d.bones.items[d.bones.items.len-1];
+        if(eql(u8,word,"parent")){
+          b.parent=d.boneNamed(trim(u8,it.rest()," \t")) orelse return error.BadMesh;
+          if(b.parent.?+1>=d.bones.items.len)return error.BadMesh;
+        }else if(eql(u8,word,"joint")){
+          inline for(0..3)|i|b.at[i]=parseFloat(f32,it.next() orelse return error.BadMesh) catch return error.BadMesh;
+        }else{
+          b.twin=true;
+          if(rig.count(d.bones.items)>rig.maxBones)return error.BadMesh;
+        }
+      }else if(eql(u8,word,"on")){
+        if(d.pieces.items.len==0)return error.BadMesh;
+        d.pieces.items[d.pieces.items.len-1].bone=d.boneNamed(trim(u8,it.rest()," \t")) orelse return error.BadMesh;
       }else if(eql(u8,word,"form")){
         // the new form's shape, then whether it carves and has a twin
         const kind=stringToEnum(Kind,it.next() orelse return error.BadMesh) orelse return error.BadMesh;
@@ -224,14 +271,25 @@ pub const Doc=struct{
       far=@max(far,p.reach());
     }
     if(!solid)return;
-    // the sculpt the forms are melted into
-    var sc:sculpt.Sculpt=.{.gpa=gpa,.parents=&.{null},.io=io};
+    // the bones the forms ride, twins counted
+    const k=rig.skeleton(d.bones.items);
+    // the sculpt the forms are melted into, weighted to those bones
+    var sc:sculpt.Sculpt=.{.gpa=gpa,.parents=k.parents[0..k.count],.io=io};
     defer sc.deinit();
-    // each form, then its twin right after it (so the two melt or carve
-    // as one into what came before)
+    // each form on its bone, then its twin on the bone's twin, right after
+    // it (so the two melt or carve as one into what came before)
     for(d.pieces.items)|p|{
-      try sc.add(p.form());
-      if(p.twin)try sc.add(p.mirrored().form());
+      // the form's bone, kept within the bones there are
+      const on:u8=if(d.bones.items.len==0)0 else@min(p.bone,d.bones.items.len-1);
+      // the form as the sculpt takes it, then its twin
+      var f=p.form();
+      f.bone=k.ride(on,false);
+      try sc.add(f);
+      if(p.twin){
+        var t=p.mirrored().form();
+        t.bone=k.ride(on,true);
+        try sc.add(t);
+      }
     }
     // the cell size this time (m)
     const h=@max(d.cell,2*far/maxCells)*(if(coarse)dragCoarse else 1);

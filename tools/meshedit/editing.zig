@@ -31,6 +31,8 @@ const cellStep=meshedit.settings.cellStep;
 const Ch=meshedit.settings.Ch;
 /// the editor's state
 const Editor=meshedit.editor.Editor;
+/// the rig mode: the bones listed, placed and test-turned
+const rigging=meshedit.rigging;
 /// the share of a drag shift keeps, for fine work
 const fine=meshedit.settings.fine;
 /// the most form rows shown at once
@@ -71,17 +73,21 @@ pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,o
   // whether a name was being typed as the frame began
   const typing=e.naming!=null;
   if(e.naming)|*t|{
-    if(e.pieces().len==0)e.naming=null else{
+    // how many things there are to name: bones in rig mode, else forms
+    const nameable=if(e.rigMode)e.doc.bones.items.len else e.pieces().len;
+    if(nameable==0)e.naming=null else{
       if(t.feed(labels.keys(in))!=.same){
-        e.pieces()[e.sel].name=.of(t.slice());
-        e.dirty=true;
+        if(e.rigMode)rigging.rename(e,t.slice())else{
+          e.pieces()[e.sel].name=.of(t.slice());
+          e.dirty=true;
+        }
       }
       if(labels.named(in))e.naming=null;
     }
   }
   // the selected form's values as the frame began (its group follows
   // whatever this frame does to its place and turn), and which it was
-  const was:?Vals=if(e.pieces().len>0)e.pieces()[e.sel].v else null;
+  const was:?Vals=if(e.pieces().len>0 and !e.rigMode)e.pieces()[e.sel].v else null;
   const wasSel=e.sel;
   const wasCount=e.pieces().len;
   if(!typing)try answerKeys(e,in);
@@ -98,6 +104,17 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
   const ctrl=in.down(.{.key=.left_control}) or in.down(.{.key=.right_control});
   // the allocator new forms are kept with
   const gpa=e.gpa;
+  if(hit(in,.j)){
+    e.rigMode=!e.rigMode;
+    e.ch=0;
+    if(e.mode==.size)e.mode=.move;
+    e.say("{s}",.{if(e.rigMode)"rig mode: the bones"else"the forms"});
+  }
+  if(ctrl and hit(in,.s))e.save();
+  if(ctrl and hit(in,.z))if(shift)try e.redo()else try e.undo();
+  if(ctrl and hit(in,.y))try e.redo();
+  if(e.rigMode)return rigging.keys(e,in);
+  if(hit(in,.o) and e.pieces().len>0)rigging.stepBone(e,shift);
   if(hit(in,.n)){
     // the new form: a copy of the selected one, a little off, else a fresh one
     var p:Piece=if(e.pieces().len>0)e.pieces()[e.sel]else.{};
@@ -171,9 +188,6 @@ fn answerKeys(e:*Editor,in:*const Input)Allocator.Error!void{
     e.doc.cell+=cellStep;
     e.changed();
   }
-  if(ctrl and hit(in,.s))e.save();
-  if(ctrl and hit(in,.z))if(shift)try e.redo()else try e.undo();
-  if(ctrl and hit(in,.y))try e.redo();
 }
 /// one frame's mouse: a press on a form row selects it, on a value row
 /// selects it and drags it, on the gizmo drags its handle, on a handle in
@@ -185,19 +199,25 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
   // the mouse (px)
   const mx=in.mouse[0];
   const my=in.mouse[1];
+  // what the list holds (bones in rig mode, else forms), and how many values each shows
+  const inRig=e.rigMode;
+  const listed=if(inRig)e.doc.bones.items.len else e.pieces().len;
+  const valueCount:usize=if(inRig)rigging.valueRows else Ch.count;
   // where the values start (px)
-  const vy=valuesY(listRows(e.pieces().len));
-  // the selected form's gizmo
-  const g=e.gizmoAt(origin);
+  const vy=valuesY(listRows(listed));
+  // the selected form's (or bone's) gizmo
+  const g=if(inRig)rigging.gizmoAt(e,origin)else e.gizmoAt(origin);
   // whether the mouse is over the panel, where the gizmo doesn't answer
-  const ui=overUi(listRows(e.pieces().len),mx,my);
+  const ui=overUi(listRows(listed),mx,my);
   e.hot=if(e.drag==.gizmo)e.part else if(g!=null and !ui)g.?.pick(view,in.mouse)else null;
   if(in.pressed(.{.button=.left})){
     if(mx<pad+listW and my>=listY and my<vy){
-      // the form row pressed on, counted from the first in view
+      // the row pressed on, counted from the first in view
       const r:usize=@intFromFloat(@floor((my-listY)/row));
-      if(e.top+r<e.pieces().len)e.pick(e.top+r,ctrl);
-    }else if(mx<pad+listW and my>=vy and my<vy+m.f(Ch.count)*row and e.pieces().len>0){
+      if(inRig){
+        if(r<listed)e.bsel=r;
+      }else if(e.top+r<listed)e.pick(e.top+r,ctrl);
+    }else if(mx<pad+listW and my>=vy and my<vy+m.f(valueCount)*row and listed>0){
       e.ch=@intFromFloat(@floor((my-vy)/row));
       e.drag=.value;
     }else if(e.hot)|part|{
@@ -215,18 +235,23 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
           near=i;
         }
       };
-      if(near)|i|e.pick(i,ctrl);
+      if(near)|i|{
+        if(inRig)e.bsel=i else e.pick(i,ctrl);
+      }
     }
   }
   if(!in.down(.{.button=.left}))e.drag=.none;
-  if(e.pieces().len==0)e.drag=.none;
+  if(listed==0)e.drag=.none;
+  // the share of a drag kept: all, or with shift a little for fine work
+  const k:f32=if(shift)fine else 1;
   if(e.drag==.value and in.mouseDelta[0]!=0){
-    e.set(Ch.get(&e.pieces()[e.sel].v,e.ch)+in.mouseDelta[0]*e.rate()*(if(shift)fine else 1));
+    if(inRig)rigging.setValue(e,e.ch,rigging.value(e,e.ch)+in.mouseDelta[0]*rigging.rate(e.ch)*k)
+    else e.set(Ch.get(&e.pieces()[e.sel].v,e.ch)+in.mouseDelta[0]*e.rate()*k);
   }
   if(e.drag==.gizmo and (in.mouseDelta[0]!=0 or in.mouseDelta[1]!=0))if(g)|gz|{
     // where the mouse was last frame (px)
     const from=[2]f32{mx-in.mouseDelta[0],my-in.mouseDelta[1]};
-    e.dragGizmo(gz,view,from,in.mouse,if(shift)fine else 1);
+    if(inRig)rigging.dragGizmo(e,gz,view,from,in.mouse,k)else e.dragGizmo(gz,view,from,in.mouse,k);
   };
   if(e.drag!=.gizmo)e.part=null;
   // the selection kept in view

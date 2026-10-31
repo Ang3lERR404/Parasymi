@@ -79,7 +79,7 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
   const w=screen[0];
   // where the next line of help goes (px)
   var y:f32=pad;
-  for(help)|h|{
+  for(if(e.rigMode)&meshedit.settings.rigHelp else&help)|h|{
     _=try d.text(pad,y,text,bare,h);
     y+=lineH;
   }
@@ -89,6 +89,12 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
   var cb:[64]u8=undefined;
   _=try d.text(w-pad-420,pad+lineH+4,text,plain,bufPrint(&cb,"cells {d:.4} m   {d} forms   gizmo {t}",.{e.doc.cell,e.pieces().len,e.mode})catch"?");
   if(e.noteLen>0)_=try d.text(w-pad-420,pad+2*(lineH+4),text,plain,e.note[0..e.noteLen]);
+  // rig mode: the bones, their values and the skeleton, and the selected joint's gizmo
+  if(e.rigMode){
+    try meshedit.rigging.draw(e,d,view,origin);
+    if(meshedit.rigging.gizmoAt(e,origin))|g|try g.draw(d,view,e.hot);
+    return;
+  }
   // the forms
   // how many form rows show
   const rows=listRows(e.pieces().len);
@@ -131,6 +137,11 @@ pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,handles:[]const?[2]f32,view:gizmo.Vi
       // a buffer for the value, written to three places
       var vb:[24]u8=undefined;
       _=try d.text(pad+valueX,ry,text,col,bufPrint(&vb,"{d:.3}",.{Ch.get(&p.v,i)})catch"?");
+    }
+    // the bone it rides, under its values (once there are bones)
+    if(e.doc.bones.items.len>0){
+      var bb:[40]u8=undefined;
+      _=try d.text(pad+18,vy+m.f(Ch.count)*row+10,text,bare,bufPrint(&bb,"on {s}   (o: next bone)",.{e.doc.bones.items[@min(p.bone,e.doc.bones.items.len-1)].name.slice()})catch"?");
     }
   }else _=try d.text(pad+18,vy,text,bare,"no forms: n makes one");
   // each form's handle where it stands
