@@ -145,6 +145,17 @@ vec3 plexusAt(float id, float t) {
 // how much a line between `a` and `b` shows: whole within its reach's
 // soft edge, gone beyond its reach
 float plexusLink(vec3 a, vec3 b, float reach) { return 1.0 - smoothstep(reach * PLEXUS_SOFT, reach, length(b - a)); }
+// where one light of point `id`'s pair is at time `t` (`twin` 1 the first,
+// -1 its companion): circling the other round where the point has drifted
+// to, each pair about an axis and at a pace of its own
+vec3 plexusLight(float id, float t, float twin) {
+  vec3 h = hash33(vec3(id, 41.7, 13.3));
+  vec3 axis = normalize(h - 0.5 + vec3(0.0, 0.6, 0.0));
+  vec3 side = normalize(cross(axis, abs(axis.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+  float spin = t * mix(PLEXUS_PAIR_SLOW, PLEXUS_PAIR_QUICK, h.z) + h.x * TAU;
+  vec3 orbit = side * cos(spin) + cross(axis, side) * sin(spin);
+  return plexusAt(id, t) + orbit * PLEXUS_PAIR * twin * mix(1.0 - PLEXUS_PAIR_LEAN, PLEXUS_PAIR_LEAN, step(0.0, twin));
+}
 // a conduit's amber pulses: how fast they run (rad/s)
 const float CORE_RUN_RATE = 2.6;
 // thought climbing an arsthraxia's nerves: its colour (linear violet), how
@@ -292,26 +303,24 @@ void main() {
   float plexKind = 0.0;
   if (part == PART_PLEXUS) {
     // its points (colour r, g, b their ids), what it is (alpha), the
-    // cluster's reach (pos.x); every point drifting, the heart among them
+    // cluster's reach (pos.x); for a line or pane, which layer of the web
+    // (pos.z: 0 the firsts', 1 the companions', each joining only its own
+    // lights); every point drifting, the heart among them
     vec3 ids = floor(col.rgb * 255.0 + 0.5);
     plexKind = floor(col.a * 255.0 + 0.5);
     float reach = pos.x;
-    vec3 A = plexusAt(ids.x, t);
-    vec3 B = plexusAt(ids.y, t);
-    vec3 C = plexusAt(ids.z, t);
+    float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
+    vec3 A = plexusLight(ids.x, t, twin);
+    vec3 B = plexusLight(ids.y, t, twin);
+    vec3 C = plexusLight(ids.z, t, twin);
     vec3 H = plexusAt(float(PLEXUS_HEART), t);
+    // how thin this layer's lines are: the companions' as their lights
+    float thin = mix(PLEXUS_COMPANION, 1.0, step(0.0, twin));
     vec3 lp;
     if (plexKind < 0.5) {
-      // a point: a pair of lights (pos.y 1 the first, -1 its companion,
-      // the smaller) circling each other round where it has drifted to,
-      // each pair about an axis and at a pace of its own
-      vec3 h = hash33(vec3(ids.x, 41.7, 13.3));
-      vec3 axis = normalize(h - 0.5 + vec3(0.0, 0.6, 0.0));
-      vec3 side = normalize(cross(axis, abs(axis.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
-      float spin = t * mix(PLEXUS_PAIR_SLOW, PLEXUS_PAIR_QUICK, h.z) + h.x * TAU;
-      vec3 orbit = side * cos(spin) + cross(axis, side) * sin(spin);
-      float first = step(0.0, pos.y);
-      lp = A + orbit * PLEXUS_PAIR * pos.y * mix(1.0 - PLEXUS_PAIR_LEAN, PLEXUS_PAIR_LEAN, first) + nrm * PLEXUS_POINT_R * mix(PLEXUS_COMPANION, 1.0, first);
+      // a point: one light of its pair (pos.y 1 the first, -1 its
+      // companion, the smaller)
+      lp = A + nrm * PLEXUS_POINT_R * thin;
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * nrm;
     } else if (plexKind < 1.5) {
@@ -325,7 +334,7 @@ void main() {
       vec3 across = cross(T, toEye);
       vec3 right = across / max(length(across), 1e-6);
       float pinch = sqrt(max(sin(0.5 * TAU * tu.x), 0.0));
-      w = vec4(wc + right * tu.y * PLEXUS_LINE_W * pinch * plexFade, 1.0);
+      w = vec4(wc + right * tu.y * PLEXUS_LINE_W * thin * pinch * plexFade, 1.0);
       wn = toEye;
     } else {
       // a pane (tu its corner's weights, pos.y its face): it shows while
