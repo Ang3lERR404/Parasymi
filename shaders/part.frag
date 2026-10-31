@@ -57,6 +57,9 @@ const float ENERGY_RUN = 8.0;
 // beat fades for every metre it runs
 const vec3 PLEXUS_BLUE = vec3(0.04, 0.16, 0.85);
 const vec3 PLEXUS_PALE = vec3(0.62, 0.86, 1.0);
+// the companions' layer of the web: cyan, going pale sea-glass as a beat passes
+const vec3 PLEXUS_CYAN = vec3(0.02, 0.5, 0.6);
+const vec3 PLEXUS_CYAN_PALE = vec3(0.6, 1.0, 0.95);
 const float PLEXUS_PERIOD = 1.6;
 const float PLEXUS_SPEED = 0.9;
 const float PLEXUS_LUB = 0.06;
@@ -160,11 +163,16 @@ void surface() {
     float dub = (ph - PLEXUS_DUB) / PLEXUS_THUMP;
     float beat = (exp(-lub * lub) + 0.6 * exp(-dub * dub)) / (1.0 + PLEXUS_FADE * v_t);
     float ndv = abs(dot(raw, V));
-    int kind = int(v_u + 0.5);
-    vec3 col = mix(PLEXUS_BLUE, PLEXUS_PALE, clamp(beat, 0.0, 1.0));
+    // what it is, and whether it is on the companions' layer (v_u 4 more)
+    int code = int(v_u + 0.5);
+    int kind = code % 4;
+    bool second = code >= 4;
+    vec3 blue = second ? PLEXUS_CYAN : PLEXUS_BLUE;
+    vec3 pale = second ? PLEXUS_CYAN_PALE : PLEXUS_PALE;
+    vec3 col = mix(blue, pale, clamp(beat, 0.0, 1.0));
     float a;
     if (kind == 0) {
-      c = mix(col, PLEXUS_PALE, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
+      c = mix(col, pale, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
       a = 1.0;
     } else if (kind == 1) {
       c = col * (0.7 + 3.0 * beat) * v_glow;

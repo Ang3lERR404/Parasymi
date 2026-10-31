@@ -301,6 +301,7 @@ void main() {
   float plexBeat = 0.0;
   float plexFade = 1.0;
   float plexKind = 0.0;
+  float plexLayer = 0.0;
   if (part == PART_PLEXUS) {
     // its points (colour r, g, b their ids), what it is (alpha), the
     // cluster's reach (pos.x); for a line or pane, which layer of the web
@@ -310,6 +311,7 @@ void main() {
     plexKind = floor(col.a * 255.0 + 0.5);
     float reach = pos.x;
     float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
+    plexLayer = step(twin, 0.0);
     vec3 A = plexusLight(ids.x, t, twin);
     vec3 B = plexusLight(ids.y, t, twin);
     vec3 C = plexusLight(ids.z, t, twin);
@@ -522,7 +524,8 @@ void main() {
   // it is, and how much of it shows (as its glow)
   if (part == PART_PLEXUS) {
     v_t = plexBeat;
-    v_u = plexKind;
+    // what it is, and 4 more on the companions' layer
+    v_u = plexKind + 4.0 * plexLayer;
     v_glow = plexFade;
   }
   v_obj = p;
