@@ -8,7 +8,10 @@
 //! shown at three reaches, the lines reaching further each time: loose,
 //! forming, crystalline. Beside it, the plant parts a gardener builds a
 //! constellate plant from, each a web holding a shape (`Shape`): a petal,
-//! a leaf, a bud, an open flower head.
+//! a leaf, a bud, an open flower head. And the first thing built from
+//! them: a yielder, five petals snapped to a flower head, which becomes
+//! its core, bonded to every petal's base; it yields motes of light and new
+//! fragments, rising from it.
 //!
 //! All of it is the GPU's (part.vert, part.frag `PART_PLEXUS`): where each
 //! point rests and how it drifts, which lines and panes show, the beat. So
@@ -53,6 +56,9 @@ const Kind=enum(u8){
   line,
   /// a pane across three
   pane,
+  /// a yielder's bond: a line from its core to the base of one of its
+  /// petals (ids: the core's point, the petal's, which petal)
+  bond,
 };
 /// what shape a web holds (part.vert `PLEXUS_CLUSTER`…): where on the GPU
 /// each point rests, and which is its heart
@@ -69,6 +75,17 @@ const Shape=enum(u8){
   bud,
   /// an open flower head: a domed disc and five petals round it
   flower,
+  /// a yielder's core: the flower head its petals were snapped to
+  yieldCore,
+  /// the first of a yielder's five petals, the rest following it
+  /// (`yieldPetal`+k for petal k)
+  yieldPetal,
+  /// the fragments a yielder yields, three points each, rising from it
+  yieldFragment=11,
+  /// the motes of light a yielder yields, rising quicker
+  yieldLight,
+  /// the yielder's other petals, by number
+  _,
 };
 /// one vertex of the web: what it belongs to and where on it
 const Vert=struct{
@@ -90,89 +107,131 @@ const Vert=struct{
 fn put(b:*mg.Builder,v:Vert)Allocator.Error!void{
   try b.v.append(b.gpa,.{.pos=v.at,.nrm=v.out,.col=color.Rgba8.of(.{v.ids[0],v.ids[1],v.ids[2],@intFromEnum(v.kind)+4*@intFromEnum(v.shape)}),.tu=v.tu,.part=@intFromEnum(lib.vertex.Part.plexus)});
 }
-/// one cluster: every point, every line that could join two, every pane
-/// that could fill three, holding `shape`; a line shows within `reach`
-fn cluster(b:*mg.Builder,shape:Shape,reach:f32)Allocator.Error!void{
-  // each point: a pair of lights circling each other, two balls, their
-  // vertices keeping only their direction out and which of the pair
-  // (pos.y: 1 the first, -1 its companion)
-  for(0..count)|i|for([_]f32{1,-1})|twin|{
+/// one web: which shape it holds, how far its lines reach, how many points,
+/// and in how many points at a time they keep to themselves
+const Web=struct{
+  /// the shape it holds
+  shape:Shape,
+  /// a line shows within this
+  reach:f32,
+  /// how many points it has
+  n:usize=count,
+  /// its points join only within runs of this many (0: all of them)
+  group:usize=0,
+  /// whether points `i` and `j` may join
+  fn together(w:Web,i:usize,j:usize)bool{return w.group==0 or i/w.group==j/w.group;}
+};
+/// one web's points, each a pair of lights circling each other: two balls,
+/// their vertices keeping only their direction out and which of the pair
+/// (pos.y: 1 the first, -1 its companion)
+fn points(b:*mg.Builder,w:Web)Allocator.Error!void{
+  for(0..w.n)|i|for([_]f32{1,-1})|twin|{
     // where its vertices begin, and its id
     const s=b.mark();
     const id:u8=@intCast(i);
     try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(1,1,1),.col=color.Rgba8.of(.{0,0,0,0}),.part=.plexus,.rings=6,.segs=8});
     for(b.v.items[s..])|*v|{
       v.nrm=m.norm(v.pos);
-      v.pos=v3(reach,twin,0);
-      v.col=color.Rgba8.of(.{id,id,id,@intFromEnum(Kind.point)+4*@intFromEnum(shape)});
+      v.pos=v3(w.reach,twin,0);
+      v.col=color.Rgba8.of(.{id,id,id,@intFromEnum(Kind.point)+4*@intFromEnum(w.shape)});
       v.tu=.{0,0};
     }
   };
-  // each layer of the web: 0 joining the first lights, 1 the companions
-  for([_]f32{0,1})|layer|try web(b,shape,reach,layer);
+}
+/// one web whole: its points, then each layer of it (0 joining the first
+/// lights, 1 the companions)
+fn cluster(b:*mg.Builder,w:Web)Allocator.Error!void{
+  try points(b,w);
+  for([_]f32{0,1})|layer|try web(b,w,layer);
+}
+/// one ribbon of line, cut along its length and turned to the eye on the
+/// GPU, between the points `ids` name
+fn ribbon(b:*mg.Builder,ids:[3]u8,kind:Kind,shape:Shape,at:V3)Allocator.Error!void{
+  for(0..lineSteps)|k|{
+    // where this piece begins and ends along it
+    const s0=m.ratio(k,lineSteps);
+    const s1=m.ratio(k+1,lineSteps);
+    for([_][2]f32{.{s0,-1},.{s1,-1},.{s1,1},.{s0,-1},.{s1,1},.{s0,1}})|c|try put(b,.{.ids=ids,.kind=kind,.shape=shape,.at=at,.tu=c});
+  }
 }
 /// one layer of the web (`layer` 0 the first lights', 1 the companions'):
 /// every line that could join two of its lights, every pane that could fill
 /// three
-fn web(b:*mg.Builder,shape:Shape,reach:f32,layer:f32)Allocator.Error!void{
+fn web(b:*mg.Builder,w:Web,layer:f32)Allocator.Error!void{
   // the reach and layer every vertex carries
-  const at=v3(reach,0,layer);
-  // each line: a ribbon cut along its length, turned to the eye on the GPU
-  for(0..count)|i|for(i+1..count)|j|{
-    // its two points
-    const ids=[3]u8{@intCast(i),@intCast(j),@intCast(j)};
-    for(0..lineSteps)|k|{
-      // where this piece begins and ends along it
-      const s0=m.ratio(k,lineSteps);
-      const s1=m.ratio(k+1,lineSteps);
-      for([_][2]f32{.{s0,-1},.{s1,-1},.{s1,1},.{s0,-1},.{s1,1},.{s0,1}})|c|try put(b,.{.ids=ids,.kind=.line,.shape=shape,.at=at,.tu=c});
-    }
+  const at=v3(w.reach,0,layer);
+  // each line
+  for(0..w.n)|i|for(i+1..w.n)|j|{
+    if(!w.together(i,j))continue;
+    try ribbon(b,.{@intCast(i),@intCast(j),@intCast(j)},.line,w.shape,at);
   };
   // each pane: two faces, wound opposite ways so one faces either side
-  for(0..count)|i|for(i+1..count)|j|for(j+1..count)|k|{
+  for(0..w.n)|i|for(i+1..w.n)|j|for(j+1..w.n)|k|{
+    if(!w.together(i,j) or !w.together(j,k))continue;
     // its three points
     const ids=[3]u8{@intCast(i),@intCast(j),@intCast(k)};
     // its corners' weights: all of the first, all of the second, all of the third
     const a=[2]f32{1,0};
     const bb=[2]f32{0,1};
     const c=[2]f32{0,0};
-    for([_][2]f32{a,bb,c})|w|try put(b,.{.ids=ids,.kind=.pane,.shape=shape,.at=v3(reach,1,layer),.tu=w});
-    for([_][2]f32{a,c,bb})|w|try put(b,.{.ids=ids,.kind=.pane,.shape=shape,.at=v3(reach,-1,layer),.tu=w});
+    for([_][2]f32{a,bb,c})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,1,layer),.tu=q});
+    for([_][2]f32{a,c,bb})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,-1,layer),.tu=q});
   };
+}
+/// a yielder: five petals snapped to a flower head, which becomes its core;
+/// bonds join the core (its heart, and the tip of its own small petal
+/// facing each) to both lights at each petal's base; it yields fragments
+/// and motes of light, rising from the core
+fn yielder(b:*mg.Builder)Allocator.Error!void{
+  try cluster(b,.{.shape=.yieldCore,.reach=0.21});
+  for(0..5)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.yieldPetal)+k),.reach=0.17});
+  for(0..5)|k|for([_]f32{0,1})|layer|{
+    // the core's heart, and the tip of its small petal facing petal k
+    const tip:u8=@intCast(10+4*k+3);
+    for([_]u8{0,tip})|from|for([_]u8{0,1})|to|try ribbon(b,.{from,to,@intCast(k)},.bond,.yieldCore,v3(1,0,layer));
+  };
+  try cluster(b,.{.shape=.yieldFragment,.reach=0.3,.n=9,.group=3});
+  try points(b,.{.shape=.yieldLight,.reach=0,.n=4});
 }
 /// mesh: CONSTELLATE, LOOSE. the points drifting, few of them joined
 pub const loose=struct{
   /// builds the cluster, lines short
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.cluster,0.26);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.cluster,.reach=0.26});}
 };
 /// mesh: CONSTELLATE, FORMING. more joined, the first panes filling in
 pub const forming=struct{
   /// builds the cluster, lines longer
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.cluster,0.38);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.cluster,.reach=0.38});}
 };
 /// mesh: CONSTELLATE, CRYSTALLINE. joined through, panes across most of it
 pub const crystalline=struct{
   /// builds the cluster, lines long
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.cluster,0.5);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.cluster,.reach=0.5});}
 };
 /// mesh: CONSTELLATE PETAL. a petal of light, a part to build with
 pub const petal=struct{
   /// builds the petal's web
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.petal,0.17);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.petal,.reach=0.17});}
 };
 /// mesh: CONSTELLATE LEAF. a leaf of light, a part to build with
 pub const leaf=struct{
   /// builds the leaf's web
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.leaf,0.22);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.leaf,.reach=0.22});}
 };
 /// mesh: CONSTELLATE BUD. a closed bud of light, a part to build with
 pub const bud=struct{
   /// builds the bud's web
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.bud,0.2);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.bud,.reach=0.2});}
 };
 /// mesh: CONSTELLATE FLOWER HEAD. an open flower head of light, a part to
 /// build with
 pub const flower=struct{
   /// builds the flower head's web
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.flower,0.21);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.flower,.reach=0.21});}
+};
+/// mesh: CONSTELLATE YIELDER. five petals snapped to a flower head, now
+/// its core, bonded to every petal's base; it yields light and fragments
+pub const yield=struct{
+  /// builds the yielder
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try yielder(b);}
 };

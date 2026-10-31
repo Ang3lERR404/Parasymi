@@ -116,6 +116,21 @@ const int PLEXUS_LEAF = 2;
 const int PLEXUS_BUD = 3;
 const int PLEXUS_FLOWER = 4;
 const float PLEXUS_PART_DRIFT = 0.025;
+// a yielder: five or more petals snapped to a flower head, which becomes
+// its core, joined to every petal's base; its webs (each its own shape so
+// a web joins only its own points): the core, its five petals (one after
+// another), the fragments it yields (three of three points each), the
+// motes of light it yields. The petals stand out from the core and lean up
+// (rad); a fragment rises and is let go over its life (s), a mote quicker
+const int PLEXUS_YIELD_CORE = 5;
+const int PLEXUS_YIELD_PETAL = 6;
+const int PLEXUS_YIELD_FRAGMENT = 11;
+const int PLEXUS_YIELD_LIGHT = 12;
+const vec3 PLEXUS_YIELD_MIDDLE = vec3(0.0, 1.13, 0.0);
+const float PLEXUS_YIELD_OUT = 0.5;
+const float PLEXUS_YIELD_LEAN = 0.5;
+const float PLEXUS_YIELD_LIFE = 6.0;
+const float PLEXUS_YIELD_MOTE = 2.6;
 // a petal's rows, base to tip: how many points each holds (30 in all)
 // and how far along the petal it lies
 const int PLEXUS_PETAL_ROWS[8] = int[8](2, 3, 4, 5, 5, 5, 4, 2);
@@ -136,9 +151,10 @@ const float PLEXUS_LINE_W = 0.007;
 const float PLEXUS_PANE = 0.005;
 const float PLEXUS_SOFT = 0.8;
 
-// where constellate point `id` rests in a web of `shape`, each point
-// nudged a little off its place so no part is ruled straight
-vec3 plexusRest(float id, int shape) {
+// where constellate point `id` rests in a part of `shape` on its own (a
+// petal, leaf, bud, flower head, loose cluster), each point nudged a little
+// off its place so no part is ruled straight
+vec3 plexusForm(float id, int shape) {
   vec3 h = hash33(vec3(id, 3.1, 7.7));
   vec3 jit = (h - 0.5) * 0.04;
   if (shape == PLEXUS_PETAL) {
@@ -207,6 +223,44 @@ vec3 plexusRest(float id, int shape) {
   float r = wide * mix(0.35, 1.0, h.y);
   return vec3(cos(a) * r, 0.5 + 1.2 * up + (h.z - 0.5) * 0.12, sin(a) * r);
 }
+// where constellate point `id` rests in a web of `shape`: a part on its
+// own where it is, a yielder's core where a flower head is, each of its
+// petals turned out round the core, its base at the core's rim, leaning up
+vec3 plexusRest(float id, int shape) {
+  if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) {
+    vec3 q = plexusForm(id, PLEXUS_PETAL);
+    float a = float(shape - PLEXUS_YIELD_PETAL) / 5.0 * TAU;
+    vec3 outward = vec3(cos(a), 0.0, sin(a));
+    vec3 across = vec3(-sin(a), 0.0, cos(a));
+    vec3 along = outward * cos(PLEXUS_YIELD_LEAN) + vec3(0.0, sin(PLEXUS_YIELD_LEAN), 0.0);
+    vec3 face = cross(across, along);
+    vec3 base = PLEXUS_YIELD_MIDDLE + outward * PLEXUS_YIELD_OUT + vec3(0.0, 0.03, 0.0);
+    return base + q.x * across + (q.y - 0.7) * along + q.z * face;
+  }
+  return plexusForm(id, shape == PLEXUS_YIELD_CORE ? PLEXUS_FLOWER : shape);
+}
+// what a yielder yields, point `id` of `shape` at time `t`: where it is
+// (xyz) and how much of it there is (w, 0 to 1). A fragment (three points,
+// a small pane) is born at the core, grows, rises turning out and tumbling,
+// and is let go; a mote of light rises straight and quick, swelling and
+// fading
+vec4 plexusYield(float id, int shape, float t) {
+  if (shape == PLEXUS_YIELD_LIGHT) {
+    float s = fract(t / PLEXUS_YIELD_MOTE + id / 4.0);
+    vec3 h = hash33(vec3(id, 7.1, 3.3)) - 0.5;
+    return vec4(PLEXUS_YIELD_MIDDLE + vec3(h.x * 0.12, 0.05 + 1.6 * s, h.z * 0.12), sin(0.5 * TAU * s));
+  }
+  float f = floor(id / 3.0);
+  float c = id - f * 3.0;
+  float s = fract(t / PLEXUS_YIELD_LIFE + f / 3.0);
+  float env = smoothstep(0.0, 0.15, s) * (1.0 - smoothstep(0.75, 1.0, s));
+  float sa = s * TAU * 0.8 + f * 2.1;
+  vec3 mid = PLEXUS_YIELD_MIDDLE + vec3(cos(sa), 0.0, sin(sa)) * 0.25 * s + vec3(0.0, 0.05 + 1.1 * s, 0.0);
+  vec3 e1 = normalize(vec3(cos(t + f), 0.4, sin(t + f)));
+  vec3 e2 = normalize(cross(e1, vec3(0.3, 1.0, 0.2)));
+  float ang = c / 3.0 * TAU + t * 1.3;
+  return vec4(mid + 0.07 * env * (cos(ang) * e1 + sin(ang) * e2), env);
+}
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
@@ -214,6 +268,7 @@ float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEA
 // where it is at time `t`: drifting round its rest, each axis on two slow
 // waves of its own (a part only a little, keeping its form)
 vec3 plexusAt(float id, int shape, float t) {
+  if (shape >= PLEXUS_YIELD_FRAGMENT) return plexusYield(id, shape, t).xyz;
   vec3 f = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 11.3, 2.9)));
   vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 5.7, 19.1)));
   vec3 ph = hash33(vec3(id, 23.9, 1.3)) * TAU;
@@ -381,6 +436,8 @@ void main() {
   float plexFade = 1.0;
   float plexKind = 0.0;
   float plexLayer = 0.0;
+  // whether it is a mote of light a yielder yields
+  float plexMote = 0.0;
   if (part == PART_PLEXUS) {
     // its points (colour r, g, b their ids), what it is (alpha), the
     // cluster's reach (pos.x); for a line or pane, which layer of the web
@@ -397,20 +454,29 @@ void main() {
     vec3 A = plexusLight(ids.x, shape, t, twin);
     vec3 B = plexusLight(ids.y, shape, t, twin);
     vec3 C = plexusLight(ids.z, shape, t, twin);
-    vec3 H = plexusAt(plexusHeart(shape), shape, t);
+    // a bond (kind 3) joins a yielder's core (ids.x) to the base of one
+    // of its petals (ids.y of petal ids.z)
+    if (plexKind > 2.5) B = plexusLight(ids.y, PLEXUS_YIELD_PETAL + int(ids.z), t, twin);
+    // a yielder's webs all beat from its core's heart
+    int hs = shape >= PLEXUS_YIELD_CORE ? PLEXUS_YIELD_CORE : shape;
+    vec3 H = plexusAt(plexusHeart(hs), hs, t);
+    // how much there is of what a yielder yields, as it grows and is let go
+    float yield = shape >= PLEXUS_YIELD_FRAGMENT ? plexusYield(ids.x, shape, t).w : 1.0;
+    plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : 0.0;
     // how thin this layer's lines are: the companions' as their lights
     float thin = mix(PLEXUS_COMPANION, 1.0, step(0.0, twin));
     vec3 lp;
     if (plexKind < 0.5) {
       // a point: one light of its pair (pos.y 1 the first, -1 its
       // companion, the smaller)
-      lp = A + nrm * PLEXUS_POINT_R * thin;
+      lp = A + nrm * PLEXUS_POINT_R * thin * yield * (1.0 + plexMote);
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * nrm;
-    } else if (plexKind < 1.5) {
+    } else if (plexKind < 1.5 || plexKind > 2.5) {
       // a line (tu.x along it, tu.y which side): a ribbon turned to the
-      // eye, pointed at both ends, thinning to nothing as its points part
-      plexFade = plexusLink(A, B, reach);
+      // eye, pointed at both ends, thinning to nothing as its points part;
+      // a bond always holds
+      plexFade = (plexKind > 2.5 ? 1.0 : plexusLink(A, B, reach)) * yield;
       lp = mix(A, B, tu.x);
       vec3 wc = (M * vec4(lp, 1.0)).xyz;
       vec3 T = mat3(M) * (B - A);
@@ -424,7 +490,7 @@ void main() {
       // a pane (tu its corner's weights, pos.y its face): it shows while
       // all three of its lines do, drawn in toward its middle as any of
       // them breaks
-      plexFade = min(min(plexusLink(A, B, reach), plexusLink(A, C, reach)), plexusLink(B, C, reach));
+      plexFade = min(min(plexusLink(A, B, reach), plexusLink(A, C, reach)), plexusLink(B, C, reach)) * yield;
       vec3 mid = (A + B + C) / 3.0;
       vec3 corner = A * tu.x + B * tu.y + C * (1.0 - tu.x - tu.y);
       vec3 cr = cross(B - A, C - A);
@@ -606,8 +672,8 @@ void main() {
   // it is, and how much of it shows (as its glow)
   if (part == PART_PLEXUS) {
     v_t = plexBeat;
-    // what it is, and 4 more on the companions' layer
-    v_u = plexKind + 4.0 * plexLayer;
+    // what it is, 4 more on the companions' layer, 8 more for a mote of light
+    v_u = plexKind + 4.0 * plexLayer + 8.0 * plexMote;
     v_glow = plexFade;
   }
   v_obj = p;

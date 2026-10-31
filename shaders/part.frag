@@ -163,18 +163,21 @@ void surface() {
     float dub = (ph - PLEXUS_DUB) / PLEXUS_THUMP;
     float beat = (exp(-lub * lub) + 0.6 * exp(-dub * dub)) / (1.0 + PLEXUS_FADE * v_t);
     float ndv = abs(dot(raw, V));
-    // what it is, and whether it is on the companions' layer (v_u 4 more)
+    // what it is (3 a bond, drawn as a line), whether it is on the
+    // companions' layer (v_u 4 more), whether a mote of light a yielder
+    // yields (8 more: pale light itself, brighter than any point)
     int code = int(v_u + 0.5);
     int kind = code % 4;
-    bool second = code >= 4;
+    bool second = (code / 4) % 2 == 1;
+    bool mote = code >= 8;
     vec3 blue = second ? PLEXUS_CYAN : PLEXUS_BLUE;
     vec3 pale = second ? PLEXUS_CYAN_PALE : PLEXUS_PALE;
     vec3 col = mix(blue, pale, clamp(beat, 0.0, 1.0));
     float a;
     if (kind == 0) {
-      c = mix(col, pale, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
+      c = mote ? pale * 4.0 : mix(col, pale, 0.35 * pow(ndv, 2.0)) * (1.6 + 4.0 * beat);
       a = 1.0;
-    } else if (kind == 1) {
+    } else if (kind == 1 || kind == 3) {
       c = col * (0.7 + 3.0 * beat) * v_glow;
       a = clamp(0.5 + 0.5 * beat, 0.0, 1.0) * v_glow;
     } else {
