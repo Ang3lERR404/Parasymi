@@ -122,6 +122,11 @@ const Shape=enum(u8){
   /// the petals of the rose the heart's stem becomes, three rings of five,
   /// ten points each
   heartRose,
+  /// a part the settled heart makes out of energy, a different one each
+  /// time round
+  heartMade,
+  /// the glowing spot the settled heart gathers energy in to make a part
+  heartMadeGlow,
   /// the yielder's other petals, by number
   _,
 };
@@ -277,6 +282,10 @@ fn builder(b:*mg.Builder)Allocator.Error!void{
 fn settling(b:*mg.Builder,stage:f32)Allocator.Error!void{
   try cluster(b,.{.shape=.heartBurst,.reach=stage+0.2,.n=72,.group=3});
   try cluster(b,.{.shape=.heartCurrent,.reach=stage+0.22,.n=70,.group=10});
+  // the part it makes (its reach set on the GPU by which part), and the
+  // spot it gathers the energy in
+  try cluster(b,.{.shape=.heartMade,.reach=stage+0.2});
+  try points(b,.{.shape=.heartMadeGlow,.reach=stage,.n=1});
 }
 /// the heart's whole story in one (stage 5): every web any stage has, the
 /// GPU telling which stage it is at by its clock
@@ -385,7 +394,8 @@ pub const heartChain=struct{
 };
 /// mesh: CONSTELLATE HEART, BUILDER. its blooms burst free and drift down
 /// to lie as parts; the heart settles near the ground, currents of energy
-/// rising into its base, to build new forms
+/// rising into its base, and builds: a whole part forms out of the energy
+/// before it, and a bundle of its tendrils draws it away to the wolf
 pub const heartBuilder=struct{
   /// builds the heart settling into a builder
   pub fn build(b:*mg.Builder)Allocator.Error!void{try builder(b);}
