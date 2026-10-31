@@ -97,6 +97,14 @@ const Shape=enum(u8){
   sprigLeaf,
   /// a sprig's leaf at its stem's highest joint
   sprigLeafHigh,
+  /// the heart's stem, becoming its grand flower
+  heartStem,
+  /// the first of the heart's four buds, the rest following it
+  /// (`heartBud`+k for bud k)
+  heartBud,
+  /// the heart's filaments, three of eight points each, dripping from its
+  /// foot
+  heartFilament=24,
   /// the yielder's other petals, by number
   _,
 };
@@ -227,6 +235,24 @@ fn sprig(b:*mg.Builder)Allocator.Error!void{
     for(0..3)|c|try ribbon(b,.{@intCast(27+c),0,@intFromEnum(Shape.sprigLeafHigh)},.bond,.sprigStem,v3(1,0,layer));
   }
 }
+/// the heart at `stage` (0 bound, 1 rising, 2 blooming; it rides in every
+/// vertex's reach, whole part): a stem with four buds fastened at its
+/// joints, bonded, and the filaments that drip from its foot once it rises;
+/// each web's reach shrunk with the part, so its lines join only what they
+/// did at full size
+fn heart(b:*mg.Builder,stage:f32)Allocator.Error!void{
+  // how much the whole shrinks once it rises
+  const shrink:f32=if(stage==0)1 else 0.7;
+  try cluster(b,.{.shape=.heartStem,.reach=stage+0.17*shrink});
+  for(0..4)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartBud)+k),.reach=stage+0.2*0.6*shrink});
+  try cluster(b,.{.shape=.heartFilament,.reach=stage+0.12,.n=24,.group=8});
+  for(0..4)|k|for([_]f32{0,1})|layer|{
+    // bud k's joint ring, and the bud's web
+    const joint=[4]u8{9,18,27,27};
+    const budWeb:u8=@intCast(@intFromEnum(Shape.heartBud)+k);
+    for(0..3)|c|try ribbon(b,.{@intCast(joint[k]+c),0,budWeb},.bond,.heartStem,v3(stage+0.5,0,layer));
+  };
+}
 /// mesh: CONSTELLATE, LOOSE. the points drifting, few of them joined
 pub const loose=struct{
   /// builds the cluster, lines short
@@ -279,4 +305,20 @@ pub const stem=struct{
 pub const sprigMesh=struct{
   /// builds the sprig
   pub fn build(b:*mg.Builder)Allocator.Error!void{try sprig(b);}
+};
+/// mesh: CONSTELLATE HEART, BOUND. four buds fastened to a stem
+pub const heartBound=struct{
+  /// builds the heart, bound
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try heart(b,0);}
+};
+/// mesh: CONSTELLATE HEART, RISING. lifted, shrunk, filaments dripping
+pub const heartRising=struct{
+  /// builds the heart, rising
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try heart(b,1);}
+};
+/// mesh: CONSTELLATE HEART, BLOOMING. buds blooming one by one, the stem
+/// becoming a grand flower
+pub const heartBlooming=struct{
+  /// builds the heart, blooming
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try heart(b,2);}
 };

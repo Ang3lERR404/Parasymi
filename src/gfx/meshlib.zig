@@ -178,6 +178,12 @@ const parts=struct{
   pub const constellateStem=@import("meshes/constellate.zig").stem;
   /// a sketch: a constellate sprig, a branch and two leaves on a stem
   pub const constellateSprig=@import("meshes/constellate.zig").sprigMesh;
+  /// a sketch: the constellate heart, four buds fastened to a stem
+  pub const constellateHeartBound=@import("meshes/constellate.zig").heartBound;
+  /// a sketch: the constellate heart rising, filaments dripping from it
+  pub const constellateHeartRising=@import("meshes/constellate.zig").heartRising;
+  /// a sketch: the constellate heart blooming into its grand flower
+  pub const constellateHeartBlooming=@import("meshes/constellate.zig").heartBlooming;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;

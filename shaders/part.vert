@@ -141,6 +141,25 @@ const int PLEXUS_SPRIG_STEM = 15;
 const int PLEXUS_SPRIG_BRANCH = 16;
 const int PLEXUS_SPRIG_LEAF = 17;
 const int PLEXUS_SPRIG_LEAF_HIGH = 18;
+// the heart, as it comes to be: four buds fastened to a stem's joints, then
+// the whole rising a little, shrunk, filaments dripping from its foot one
+// by one and unfurling, then the buds blooming one after another as the
+// stem becomes a grand flower. Its webs: the stem, its four buds (one
+// after another), its filaments (three of eight points each). Which stage
+// a web is at rides in its reach's whole part (0 bound, 1 rising, 2
+// blooming), set for every function below as `plexStage`; how long the
+// rising and the blooming each take before they begin again (s)
+const int PLEXUS_HEART_STEM = 19;
+const int PLEXUS_HEART_BUD = 20;
+const int PLEXUS_HEART_FILAMENT = 24;
+const float PLEXUS_HEART_RISING = 10.0;
+const float PLEXUS_HEART_BLOOMING = 16.0;
+// where on the stem each bud fastens (the first point of its joint's ring)
+// and which way it reaches out
+const float PLEXUS_HEART_JOINT[4] = float[4](9.0, 18.0, 27.0, 27.0);
+const vec3 PLEXUS_HEART_SIDE[4] = vec3[4](vec3(1.0, 0.0, 0.0), vec3(-1.0, 0.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(0.0, 0.0, -1.0));
+// which stage of the heart the web being placed is at
+float plexStage = 0.0;
 const vec3 PLEXUS_YIELD_MIDDLE = vec3(0.0, 1.13, 0.0);
 const float PLEXUS_YIELD_OUT = 0.5;
 const float PLEXUS_YIELD_LEAN = 0.5;
@@ -344,6 +363,65 @@ vec4 plexusYield(float id, int shape, float t) {
   float ang = c / 3.0 * TAU + t * 1.3;
   return vec4(mid + 0.07 * env * (cos(ang) * e1 + sin(ang) * e2), env);
 }
+// how far the heart's stem has become its grand flower at time `t` (0 a
+// stem, 1 the flower): only while blooming, slowly, and undone quickly
+// before the blooming begins again
+float plexusHeartMorph(float t) {
+  if (plexStage < 1.5) return 0.0;
+  float x = mod(t, PLEXUS_HEART_BLOOMING);
+  return smoothstep(2.0, 12.0, x) * (1.0 - smoothstep(14.0, 16.0, x));
+}
+// how far the heart's bud `k` has bloomed at time `t`: one after another
+float plexusHeartBloom(int k, float t) {
+  if (plexStage < 1.5) return 0.0;
+  float x = mod(t, PLEXUS_HEART_BLOOMING);
+  return smoothstep(1.0 + 2.0 * float(k), 4.0 + 2.0 * float(k), x) * (1.0 - smoothstep(14.0, 16.0, x));
+}
+// how far the heart's filament `k` has dripped down at time `t`: none
+// while bound, one after another while rising, all while blooming
+float plexusHeartGrow(float k, float t) {
+  if (plexStage < 0.5) return 0.0;
+  if (plexStage > 1.5) return 1.0;
+  float x = mod(t, PLEXUS_HEART_RISING);
+  return smoothstep(1.5 * k, 1.5 * k + 3.0, x) * (1.0 - smoothstep(9.0, 10.0, x));
+}
+// a point `p` of the heart once it rises: shrunk toward its foot, lifted
+// off the ground and gently bobbing
+vec3 plexusHeartLift(vec3 p, float t) {
+  if (plexStage < 0.5) return p;
+  vec3 foot = vec3(0.0, 0.5, 0.0);
+  return foot + (p - foot) * 0.7 + vec3(0.0, 0.45 + 0.04 * sin(t * 0.8), 0.0);
+}
+// where point `id` (drifted by `moved`) of the heart's stem is at time
+// `t`: a stem, becoming a grand flower opening over where its top was
+vec3 plexusHeartStem(float id, float t, vec3 moved) {
+  vec3 stem = plexusForm(id, PLEXUS_STEM);
+  vec3 grand = (plexusForm(id, PLEXUS_FLOWER) - vec3(0.0, 1.0, 0.0)) * 2.2 + vec3(0.0, 1.5, 0.0);
+  return plexusHeartLift(mix(stem, grand, plexusHeartMorph(t)) + moved, t);
+}
+// where point `id` of the heart's bud `k` is: fastened at its joint,
+// reaching out and up, blooming from a bud into a flower head
+vec3 plexusHeartBud(float id, int k, float t, vec3 moved) {
+  vec3 q = mix(plexusForm(id, PLEXUS_BUD), (plexusForm(id, PLEXUS_FLOWER) - vec3(0.0, 1.0, 0.0)) * 0.8 + vec3(0.0, 0.8, 0.0), plexusHeartBloom(k, t)) + moved;
+  vec3 base = plexusHeartStem(PLEXUS_HEART_JOINT[k] + 1.0, t, vec3(0.0));
+  vec3 along = normalize(PLEXUS_HEART_SIDE[k] * 0.8 + vec3(0.0, 0.6, 0.0));
+  vec3 face = normalize(cross(along, vec3(0.0, 1.0, 0.0)));
+  return plexusFasten(q, vec3(0.0, 0.75, 0.0), base, along, face, 0.6 * (plexStage > 0.5 ? 0.7 : 1.0));
+}
+// where point `id` of the heart's filaments is: filament k hangs from
+// point k of the stem's foot, dripping down as it grows, its young tip
+// curled tight and unfurling as it lengthens, swaying a little
+vec3 plexusHeartFilament(float id, float t) {
+  float k = floor(id / 8.0);
+  float j = id - k * 8.0;
+  float grow = plexusHeartGrow(k, t);
+  vec3 anchor = plexusHeartStem(k, t, vec3(0.0));
+  vec3 side = normalize(vec3(anchor.x, 0.0, anchor.z) + vec3(1e-4, 0.0, 0.0));
+  float s = j / 7.0 * 0.6 * grow;
+  float bend = mix(14.0, 0.5, grow);
+  vec3 p = anchor + side * (1.0 - cos(bend * s)) / bend - vec3(0.0, sin(bend * s) / bend, 0.0);
+  return p + vec3(sin(t * 0.9 + k * 2.0), 0.0, cos(t * 0.7 + k)) * 0.03 * j / 7.0;
+}
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
@@ -361,6 +439,9 @@ vec3 plexusAt(float id, int shape, float t) {
   vec3 moved = drift * d * vec3(1.0, 0.6, 1.0);
   if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
   if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) return plexusSprig(id, shape, moved);
+  if (shape == PLEXUS_HEART_STEM) return plexusHeartStem(id, t, moved);
+  if (shape == PLEXUS_HEART_FILAMENT) return plexusHeartFilament(id, t);
+  if (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) return plexusHeartBud(id, shape - PLEXUS_HEART_BUD, t, moved);
   return plexusRest(id, shape) + moved;
 }
 // how much a line between `a` and `b` shows: whole within its reach's
@@ -536,7 +617,9 @@ void main() {
     plexKind = mod(code, 4.0);
     // what shape the web holds (alpha's high part)
     int shape = int(code / 4.0);
-    float reach = pos.x;
+    // the reach (pos.x), its whole part the heart's stage
+    plexStage = floor(pos.x);
+    float reach = fract(pos.x);
     float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
     plexLayer = step(twin, 0.0);
     vec3 A = plexusLight(ids.x, shape, t, twin);
@@ -549,13 +632,17 @@ void main() {
     if (plexKind > 2.5) B = plexusLight(ids.y, int(ids.z), t, twin);
     // a build's webs all beat from one heart: a yielder's from its core's,
     // a sprig's from its stem's foot
-    int hs = shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape);
+    int hs = shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
+    // the heart's stem reaches further as it becomes its grand flower
+    if (shape == PLEXUS_HEART_STEM) reach *= mix(1.0, 2.7, plexusHeartMorph(t));
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
     // how much there is of what a yielder yields, as it grows and is let go
+    // (or of a heart's filament as it drips down)
     float yield = shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING ? plexusYield(ids.x, shape, t).w : 1.0;
+    if (shape == PLEXUS_HEART_FILAMENT) yield = smoothstep(0.0, 0.1, plexusHeartGrow(floor(ids.x / 8.0), t));
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
-    bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH;
+    bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;
     float swell = stemmed && plexusJoint(ids.x) ? 1.5 : 1.0;
     // how thin this layer's lines are: the companions' as their lights
     float thin = mix(PLEXUS_COMPANION, 1.0, step(0.0, twin));
