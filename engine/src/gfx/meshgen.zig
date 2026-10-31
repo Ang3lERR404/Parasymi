@@ -40,6 +40,9 @@ const domeRings=4;
 /// an end this thin (a share of its tube's thickest ring) is a point: it is
 /// rounded off over its last segment instead of capped beyond it
 const pointShare:f32=0.2;
+/// tu.z on a tube's sides: this, plus how far round its ring a point lies
+/// (0..1), so a shader can run fibres along it (sheets use 1..3, see vertex.Mesh)
+pub const tubeRound:f32=4;
 /// how a tube or loft closes at its ends
 pub const Tips=enum{
   /// rounded: a blunt end domes out like a fingertip, a point closes in a
@@ -329,7 +332,13 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
           // the quad's side indices and ring indices, corner by corner
           const q=[4]usize{k,k1,k1,k};
           const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
-          for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],cols[r[c]],ts[r[c]],uOf(us,r[c]),part);
+          // how far round each corner lies (the closing side runs on to a
+          // whole turn, so nothing reads back across the seam)
+          const roundAt=[4]f32{m.ratio(k,sides),m.ratio(k+1,sides),m.ratio(k+1,sides),m.ratio(k,sides)};
+          for([_]usize{0,1,2,0,2,3})|c|{
+            try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],cols[r[c]],ts[r[c]],uOf(us,r[c]),part);
+            b.v.items[b.v.items.len-1].tu[2]=tubeRound+roundAt[c];
+          }
         }
       }
       if(round){

@@ -89,7 +89,10 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
     fading before the edge, a fine net of veinlets between them, a
     yellower edge, a paler base; light through it is shaded by its veins;
   - a petal: fine streaks running out from its claw, a deeper throat, a
-    paler edge.
+    paler edge;
+  - stems and tendrils: fine ridges along them (a tube's sides carry
+    how far round they lie, tu.z 4..5), darker in their grooves, fibres
+    streaking lighter and darker (`stemGrain`), on all their light.
 - **Material** (plant.frag) speaks the wolf's vocabulary:
   - muted skin, a sheen like fibre;
   - old growth densifies to root brown;

@@ -140,14 +140,35 @@ Sheet petalSheet(vec2 sh) {
   float streak = (1.0 - smoothstep(0.08, 0.08 + fp * 1.5, d)) * (1.0 - smoothstep(0.55, 0.95, along)) * (1.0 - smoothstep(0.3, 0.7, fp));
   return Sheet(streak, 0.0, smoothstep(0.78, 1.0, a), along, across);
 }
-// a sheet's colour from its plain `body`: a leaf's veins paler and
+// a sheet's colour from its plain `body` (and a stem's, from its grain): a leaf's veins paler and
 // yellower, the net between them a shade darker, its edge a little
 // yellower, its base paler; a petal's streaks deeper, its throat deeper,
 // its edge paler. `trans` (out): how much of the light through it gets
 // past its veins (they shade what shines through)
-vec3 sheetColour(vec3 body, int part, vec2 sh, out float trans) {
+// ridges round a stem, and how far its fibres run before they change
+const float STEM_RIDGES = 9.0;
+const float STEM_FIBRE = 40.0;
+// a stem's surface (a tube: `round` 0..1 round its ring, `t` along it):
+// fine ridges running its length, darker in their grooves, and fibres
+// streaking along them, lighter and darker by turns (fading where a
+// pixel spans too much); a factor on its colour
+float stemGrain(float round, float t) {
+  float ph = round * STEM_RIDGES;
+  float fr = fwidth(ph);
+  float ridge = 0.5 + 0.5 * cos(ph * TAU);
+  float streak = hash12(vec2(floor(round * STEM_RIDGES * 3.0), floor(t * STEM_FIBRE)));
+  float k = 1.0 - smoothstep(0.3, 0.7, fr);
+  return 1.0 + k * ((ridge - 0.5) * 0.34 + (streak - 0.5) * 0.2);
+}
+// how a lit stem or tendril is grained (`stemGrain` on a tube's sides, 1
+// anywhere else): taken on all its light, its skin's and its sap's alike
+float grainOf(int part, vec2 sh, float t) {
+  return (sh.y > 3.5 && (part == PART_STEM || part == PART_TENDRIL)) ? stemGrain(fract(sh.y), t) : 1.0;
+}
+vec3 sheetColour(vec3 body, int part, vec2 sh, float t, out float trans) {
   trans = 1.0;
   if (sh.y < 0.5) return body;
+  if (sh.y > 3.5) return body;
   if (part == PART_LEAF || part == PART_EAR) {
     Sheet s = leafSheet(sh);
     body = mix(body, body * vec3(1.3, 1.32, 0.92) + 0.015, s.vein * 0.6);

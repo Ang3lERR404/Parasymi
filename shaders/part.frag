@@ -448,7 +448,7 @@ void surface() {
   } else {
     // a leaf's or petal's own surface: veins, the net between, edge and base
     float trans;
-    vec3 albedo = sheetColour(v_col, part, v_sheet, trans);
+    vec3 albedo = sheetColour(v_col, part, v_sheet, v_t, trans);
     float inner = 0.0;
     if (part == PART_STONE) {
       // weathered stone: its grain lights it, tipping the normal (the
@@ -477,6 +477,8 @@ void surface() {
     float tl = length(tgrad);
     if (PART_IN(FIBRES, part) && tl > 0.0) c += fibreLight(albedo, byDay(NIGHT_LIT, SUNLIGHT), tgrad, tl, n, V, 0.28, sh);
     c += v_col * v_glow * 2.2;
+    // a stem's ridges and fibres grain all its light
+    c *= grainOf(part, v_sheet, v_t);
   }
   // rim light keeps the silhouette readable at night
   float rim = pow(1.0 - max(dot(n, V), 0.0), RIM_POW);

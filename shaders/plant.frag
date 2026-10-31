@@ -219,7 +219,7 @@ void surface() {
   if (green) body = v_col;
   // a leaf's or petal's own surface: veins, the net between, edge and base
   float trans;
-  body = sheetColour(body, part, v_sheet, trans);
+  body = sheetColour(body, part, v_sheet, v_t, trans);
   body = mix(DEAD_BROWN, body, health);
   // symbiotes and parasites are matte living tissue, stems, vines, leaves
   // and petals alike: sap shows through them, but nothing wet or glossy sits
@@ -266,6 +266,8 @@ void surface() {
   if (glisten > 0.0) c += sapGlistenWith(n, V, v_pos, v_obj, sap, thin * show, sh, pl.mirrored) * glisten;
 
 
+  // a stem's ridges and fibres grain all its light
+  c *= grainOf(part, v_sheet, v_t);
   // rim light keeps the silhouette readable at night (as on the wolf)
   float rim = pow(1.0 - ndv, RIM_POW);
   c += v_col * rim * mix(0.3, 0.1, day);
