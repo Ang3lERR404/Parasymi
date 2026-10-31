@@ -51,7 +51,7 @@ const frondStagger:f32=0.06;
 const rachisR:f32=0.014;
 /// how many pairs of leaflets run along each frond, from `pinnaFrom` to
 /// its tip, longest near its foot
-const pinnae=14;
+const pinnae=20;
 /// where along a frond its leaflets begin (0..1)
 const pinnaFrom:f32=0.22;
 /// a leaflet's length at its longest
@@ -119,7 +119,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   var k=growth.Skeleton.begin(b);
   // the hidden bole: from just under the ground up to the crown
   const bole=k.trunk(&.{v3(0,-0.04,0),v3(0.008,crown[1]*0.5,-0.006),crown},.{.pace=bolePace});
-  try kit.rootMat(b,5,0.42,0.04,0x10F1,.{.k=&k,.id=bole});
+  try kit.rootMat(b,8,0.5,0.036,0x10F1,.{.k=&k,.id=bole});
   {
     // the bole's path, its growth timing and its radius along it
     var sp:[growth.res]V3=undefined;

@@ -687,7 +687,7 @@ pub fn confluence(b:*mg.Builder,g:species.Genome,seed:u64,gr:f32)Allocator.Error
         r.*=radius*0.62*(1+0.7*m.pow(f32,1-u,5))*m.lerp(1,0.55,u);
       }
       try mg.braid(b,&sp,&ts,&rs,6,2.6,pal.strandWobble*1.5,seed^0x5B,pal.core,green);
-      try mg.leavesAlong(b,&sp,4,radius*1.6*gw.reach+0.01,radius*0.55*gw.reach+0.004,0.25,0.85,ts[0],ts[steps-1],leafDark,leafLite,seed^0x1EF);
+      try mg.leavesAlong(b,&sp,7,radius*1.6*gw.reach+0.01,radius*0.55*gw.reach+0.004,0.25,0.85,ts[0],ts[steps-1],leafDark,leafLite,seed^0x1EF);
       // green braided roots splaying out of its foot, each its own
       for(0..4)|i|{
         // this root's heading: fanned round the trunk's outer side, jittered
@@ -799,7 +799,7 @@ pub fn confluence(b:*mg.Builder,g:species.Genome,seed:u64,gr:f32)Allocator.Error
     var p:[24]V3=undefined;
     m.splineResample(c[0..10],&p);
     try taper(b,&p,radius*0.32,0.4,canopyT,0.97,lilac,.tendril,6);
-    try mg.leavesAlong(b,&p,4,radius*1.5*gw.reach+0.01,radius*0.5*gw.reach+0.004,0.2,0.8,canopyT,0.97,leafDark,leafLite,seed+%i*211);
+    try mg.leavesAlong(b,&p,7,radius*1.5*gw.reach+0.01,radius*0.5*gw.reach+0.004,0.2,0.8,canopyT,0.97,leafDark,leafLite,seed+%i*211);
     try bloom(b,.{.heart=p[23],.len=g.bloomR*0.5*m.lerp(0.3,1,gw.reach),.t=1,.open=gw.bloom,.spin=a,.petals=fold,.seed=seed^0xB1});
   }
   // the crowning flower lifts clear of the sac as it opens

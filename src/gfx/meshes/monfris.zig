@@ -99,7 +99,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     // its branch on the skeleton, a little after the sac
     const id=k.branch(trunk,1,&c,.{.delay=0.06});
     try k.tube(b,id,.{.r0=0.024,.tip=0.4,.col=kit.lilac,.part=.tendril,.sides=6,.t0=0.8,.t1=1});
-    try k.leaves(b,id,.{.n=4,.len=0.12,.width=0.04,.from=0.4,.to=0.85,.t0=0.8,.t1=1,.col=kit.leafDark,.tip=kit.leafLite,.seed=0x4EA3+%i*97});
+    try k.leaves(b,id,.{.n=8,.len=0.12,.width=0.04,.from=0.25,.to=0.9,.t0=0.8,.t1=1,.col=kit.leafDark,.tip=kit.leafLite,.seed=0x4EA3+%i*97});
     // where its flower's vertices begin, and the bough's tip it opens at
     const fl=b.mark();
     const tip=k.point(id,1);

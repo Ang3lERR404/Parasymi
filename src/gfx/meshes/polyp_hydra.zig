@@ -147,7 +147,7 @@ fn single(b:*mg.Builder,head:Head)Allocator.Error!void{
   var k=growth.Skeleton.begin(b);
   // its body, rising in a soft S
   const trunk=k.trunk(&.{v3(0,0,0),v3(0.02,0.25,0.01),v3(-0.025,0.5,0.03),v3(0.02,0.76,0)},.{.pace=bodyPace});
-  try kit.rootMat(b,4,0.32,0.035,0x9171,.{.k=&k,.id=trunk});
+  try kit.rootMat(b,7,0.4,0.03,0x9171,.{.k=&k,.id=trunk});
   {
     // the foot disc gripping the soil
     const s=b.mark();

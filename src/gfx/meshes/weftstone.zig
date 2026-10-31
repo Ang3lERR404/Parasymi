@@ -95,7 +95,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     const a=0.4+m.ratio(i,kit.fold)*m.tau;
     _=try kit.frondOn(b,&k,stalk,1,.{
       .from=crown,.out=v3(@cos(a),0,@sin(a)),.len=0.55,.r=0.011,
-      .rise=1.0,.curl=3.0,.pairs=8,.leafLen=0.1,.leafW=0.022,
+      .rise=1.0,.curl=3.0,.pairs=12,.leafLen=0.1,.leafW=0.022,
       .t0=0.4,.t1=1,.seed=0x3EF2,.leafSeed=0x3EF3+%i*131,
     },.{.delay=0.04*m.f(i)});
   }
@@ -126,7 +126,7 @@ pub const tendril=struct{
       c.*=color.mix(kit.lilac,kit.leafLite,m.smooth(m.clamp01((f-0.3)/0.6)));
     }
     try b.tubeC(&p,&ts,&rs,&cs,null,.tendril,5);
-    try mg.leavesAlong(b,&p,2,0.05,0.018,0.3,0.7,0,0.94,kit.leafDark,kit.leafLite,0x3E71);
+    try mg.leavesAlong(b,&p,4,0.05,0.018,0.3,0.7,0,0.94,kit.leafDark,kit.leafLite,0x3E71);
     // the grip: three claws splaying out of its end and hooking in
     for(0..3)|i|{
       // this claw's heading round the stem, and the flat direction it splays along

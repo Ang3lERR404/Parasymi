@@ -118,7 +118,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     // the frond's own branch of the skeleton, grown just after the sac
     const id=k.branch(stalk,1,&c,.{.delay=0.08});
     try k.tube(b,id,.{.r0=0.014,.tip=0.45,.col=kit.lilac,.part=.tendril,.sides=5,.t0=0.75,.t1=1});
-    try k.leaves(b,id,.{.n=3,.len=0.08,.width=0.028,.from=0.45,.to=0.85,.t0=0.75,.t1=1,.col=kit.leafDark,.tip=kit.leafLite,.seed=0xD1F3+%i*97});
+    try k.leaves(b,id,.{.n=6,.len=0.08,.width=0.028,.from=0.3,.to=0.9,.t0=0.75,.t1=1,.col=kit.leafDark,.tip=kit.leafLite,.seed=0xD1F3+%i*97});
     // where the flower's vertices begin, so it opens last
     const fl=b.mark();
     // the frond's tip, where its flower sits
