@@ -7,7 +7,8 @@ defaults.
 
 ## Play
 ### Moving and the camera
-- **WASD** move, **Shift** run, **wheel** zoom.
+- **WASD** move, **Shift** run, **wheel** zoom (or hold
+  **Numpad +/−**, six notches a second).
 - **MMB drag** orbits the camera round the wolf: yaw (turning round) is
   free; pitch (looking down) is 8°–89°, default 55°.
 - **Ctrl+F:** free inspection camera.

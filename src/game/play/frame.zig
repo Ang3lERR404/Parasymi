@@ -46,6 +46,8 @@ const streamFrame=lib.play.streamFrame;
 const streamRadius=lib.play.streamRadius;
 /// how quickly the shown timings follow the measured ones
 const timingEase=lib.play.timingEase;
+/// how many wheel notches a second a held zoom key turns
+const keyZoomRate:f32=6;
 /// one frame of play, `dt` seconds on a screen `screen` pixels across:
 /// system keys, the menus while frozen, then (live) the sky, camera and
 /// looking, panels and hotbar keys, HUD clicks, movement, what the cursor
@@ -161,10 +163,14 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:[2]f32)Error!void{
   const wl=@sqrt(wish[0]*wish[0]+wish[1]*wish[1]);
   if(wl>1)wish=.{wish[0]/wl,wish[1]/wl};
   // the camera orbits round the wolf while dragged; the wheel zooms, all
-  // the way in into its eyes
+  // the way in into its eyes, and the zoom keys as a wheel turned while held
   if(!inspecting){
     if(ctl.down(in,.orbit)and!g.cam.inEyes())g.cam.orbit(in.mouseDelta);
-    if(in.scroll!=0)g.cam.zoom(in.scroll,g.player.eyes());
+    // the notches the zoom keys turn this frame, in (+) or out
+    var keyed:f32=0;
+    if(ctl.down(in,.zoomIn))keyed+=keyZoomRate*dt;
+    if(ctl.down(in,.zoomOut))keyed-=keyZoomRate*dt;
+    if(in.scroll+keyed!=0)g.cam.zoom(in.scroll+keyed,g.player.eyes());
   }
   // interaction with the hovered tile (none while inspecting)
   g.aim(cursor,screen,inspecting);

@@ -59,6 +59,10 @@ pub const Action=enum{
   run,
   /// held: dragging the mouse orbits the camera round the wolf
   orbit,
+  /// held: zoom the camera in, as the wheel turned forward (all the way, into the eyes)
+  zoomIn,
+  /// held: zoom the camera out, as the wheel turned back
+  zoomOut,
   /// held: with it `freeCam` toggles the free camera and `rise` sinks
   alt,
   /// held: plant what is in hand; on a structure, interact; click a panel
