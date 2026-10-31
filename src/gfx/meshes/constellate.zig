@@ -110,8 +110,8 @@ const Shape=enum(u8){
   heartPetlet=25,
   /// the first of the heart's five grand petals, the rest following it
   heartGrand=41,
-  /// the fragments the heart's first bloom lets go, three points each,
-  /// on their way to build petlets
+  /// the fragments the heart's done blooms let go, three points each,
+  /// sixteen for each bloom built, each becoming three points of a petlet
   heartSeed=46,
   /// the yielder's other petals, by number
   _,
@@ -250,7 +250,7 @@ fn chain(b:*mg.Builder)Allocator.Error!void{
   try heart(b,3);
   for(0..16)|k|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartPetlet)+k),.reach=3+0.3*0.4*0.7,.n=12});
   for(0..5)|p|try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.heartGrand)+p),.reach=3+0.17*1.6*0.7});
-  try cluster(b,.{.shape=.heartSeed,.reach=3.2,.n=36,.group=3});
+  try cluster(b,.{.shape=.heartSeed,.reach=3.2,.n=144,.group=3});
 }
 /// the heart at `stage` (0 bound, 1 rising, 2 blooming, 3 its chain
 /// reaction; it rides in every
@@ -341,7 +341,8 @@ pub const heartBlooming=struct{
   pub fn build(b:*mg.Builder)Allocator.Error!void{try heart(b,2);}
 };
 /// mesh: CONSTELLATE HEART, CHAIN. four petlets snapped to one bloom set off
-/// a chain reaction: its fragments build petlets on the others, the heart
+/// a chain reaction: its fragments build the next bloom's petlets one
+/// fragment at a time, each bloom done joining in on the next, the heart
 /// swelling, and once all are done it grows and grand petals open
 pub const heartChain=struct{
   /// builds the heart's chain reaction
