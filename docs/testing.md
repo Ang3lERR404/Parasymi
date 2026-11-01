@@ -30,6 +30,9 @@ Use it whenever any of these change:
   nodes or structures.
 - **Ignored:** saves, loads and autosave; also `--demo`/`--stress`/`--load`
   when used with it.
+- **A water plant** (`Species.onWater`, the mire lily) gets a pond: a
+  spring (`Parts.spring`) pours gently onto its tile until the water
+  stands 0.2 m deep, so it floats (give it 30 s or more of `--orbit`).
 
 ## States
 `--state=` picks what it shows (default `grow`). A state that does not

@@ -167,7 +167,7 @@ pub const Moisture=extern struct{
   /// seconds the field was stepped on by this frame (the pass sets it)
   at:m.Vice(f32,4),
   /// how much it breathes a second into the low mist and into the cloud
-  /// over it, unused, unused
+  /// over it, how much water it pours onto the ground a second, unused
   rate:m.Vice(f32,4),
 };
 /// one step of the moisture field, read by moisture.vert from its one instance

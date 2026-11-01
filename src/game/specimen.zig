@@ -77,6 +77,11 @@ const activePeriod:f32=30;
 const turnPeriod:f32=turn.time+1;
 /// live, a grown (or dead) plant is sown afresh this long after
 const regrow:f32=4;
+/// a lone water plant's pond: how deep it is filled (m), the spring's reach
+/// (units) and how much it pours a second (field units)
+const pondDeep:f32=0.2;
+const pondReach:f32=2.5;
+const pondPour:f32=3;
 /// held, a plant never grows on its own
 const never:f32=1e9;
 /// a sculpt's clip is timed by the game's clock wrapped this often (s),
@@ -423,7 +428,8 @@ pub const Specimen=struct{
     const sm=switch(s.what){
       .samples=>|x|x,
       .sculpt=>|i|return drawSculpt(g,i,m.footprintCentre(s.at[0],s.at[1],1,g.heightAt(s.at[0],s.at[1]))),
-      .plant,.structure=>return,
+      .plant=>|sp|return pond(g,sp,s.at),
+      .structure=>return,
     };
     // what they show this moment
     const l=s.look();
@@ -444,6 +450,18 @@ pub const Specimen=struct{
     }
   }
   /// the `i`th sculpt standing at `at`, its bones where its clip has them now
+  /// a plant that floats on water (`Species.onWater`) shown alone: a
+  /// spring pours rain onto the ground round its tile until the water
+  /// stands `pondDeep` over it, so it floats on a pond
+  fn pond(g:*Game,sp:species.Id,at:m.Vice(i32,2))Allocator.Error!void{
+    if(!species.get(sp).onWater)return;
+    // the chunk under it, and how deep the water stands there now
+    const c=g.world.chunkOfTile(at[0],at[1]) orelse return;
+    if(c.pool[ck.localIndex(at[0],at[1])]>=pondDeep)return;
+    // the spring, in the middle of its tile
+    const mid=m.footprintCentre(at[0],at[1],1,0);
+    try g.parts.spring(.{mid[0],mid[2]},pondReach,pondPour);
+  }
   fn drawSculpt(g:*Game,i:u8,at:m.V3)Allocator.Error!void{
     // the sculpt, its bones now, and where they go in this frame's list
     const k=&lib.sculpts.all()[i];

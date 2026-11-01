@@ -34,8 +34,9 @@ const padRows=14;
 const notch:f32=0.16;
 /// how far each pad lies over the one beneath it, so none flicker (m)
 const padStack:f32=0.0015;
-/// how high a pad lies over the water (m), so the water never shows through it
-const padFloat:f32=0.004;
+/// how high a pad lies over the water (m): over its ripples, its bob and
+/// the water rising since it was last read back, so it never sinks under
+const padFloat:f32=0.025;
 /// points along a stem, crown to pad
 const stemRes=16;
 /// how many roots the crown sends down
@@ -86,7 +87,7 @@ pub fn lily(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!voi
   }
   // the bloom on its own stem, resting on the water near the middle
   const fa=m.f(variant)*1.7+0.4;
-  const top=v3(@cos(fa)*g.leafLen*0.35,0.012,@sin(fa)*g.leafLen*0.35);
+  const top=v3(@cos(fa)*g.leafLen*0.35,padFloat+0.01,@sin(fa)*g.leafLen*0.35);
   try stem(b,crown,top-v3(0,0.01,0),g.stemR*1.1,stemCol,0.85,seed^0xF10);
   try mg.flower(b,g,top,v3(0,1,0),1,m.f(variant),0.95,.skin);
   // its yield: beads floating on the water round the bloom

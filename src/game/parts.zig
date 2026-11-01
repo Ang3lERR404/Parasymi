@@ -157,6 +157,12 @@ pub const Parts=struct{
   pub fn breathe(p:*Parts,at:m.Vice(f32,2),reach:f32,low:f32,high:f32)Allocator.Error!void{
     try p.moisture.append(p.gpa,.{.at=.{at[0],at[1],reach,0},.rate=.{low,high,0,0}});
   }
+  /// a spring at world (x, z) `at`: `water` a second poured onto the
+  /// ground over a soft disc `reach` across (the moisture field's
+  /// ground water, which pools past wet through and runs downhill)
+  pub fn spring(p:*Parts,at:m.Vice(f32,2),reach:f32,water:f32)Allocator.Error!void{
+    try p.moisture.append(p.gpa,.{.at=.{at[0],at[1],reach,0},.rate=.{0,0,water,0}});
+  }
   /// a mesh placed by its matrix: skipped when out of view (a sphere a few
   /// times its scale), at the level of detail for its distance.
   pub fn emit(p:*Parts,id:meshlib.Id,matIn:m.M4,lookIn:Look)Allocator.Error!void{

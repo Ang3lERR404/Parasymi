@@ -171,7 +171,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
     .dst_color_blend_factor=if(d.additive).one else.one_minus_src_alpha,
     .color_blend_op=.add,
     .src_alpha_blend_factor=.one,
-    .dst_alpha_blend_factor=.one_minus_src_alpha,
+    .dst_alpha_blend_factor=if(d.additive).one else.one_minus_src_alpha,
     .alpha_blend_op=.add,
     .color_write_mask=.{.r=true,.g=true,.b=true,.a=true},
   }};
