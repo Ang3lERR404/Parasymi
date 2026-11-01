@@ -60,7 +60,7 @@ pub fn prepare(r:*renderer.Renderer,f:*Frame,scene:*const renderer.Scene,stats:*
     };
   }
 }
-/// their solid fragments.
+/// their solid fragments, of the triangles the head pass left.
 pub fn record(r:*renderer.Renderer,f:*Frame,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
   draw(r,f,cmd,scene,stats,.plants);
 }
@@ -76,16 +76,34 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,scene:*con
     if(f.counts[i]==0)continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.plantsShadow)renderer.caster(i)else i;
-    // its welded run, and how many of its indices this pass skips: the
-    // glass pass only its see-through tail, unless a preview is among them
+    // its welded run, and which of its indices this pass draws: the head
+    // pass its always-solid head, the solid pass the rest, the glass pass
+    // its see-through tail (all of it if a preview is among them)
     const run=r.ext.plantRuns[mesh];
-    const skip=if(p==.plantsGlass and !f.ghosts[i])run.early else 0;
-    if(skip==run.count)continue;
+    const from=if(p==.plants or p==.plantsGlass and !f.ghosts[i])run.early else 0;
+    const to=if(p==.plantsHead)run.early else run.count;
+    if(from==to)continue;
     cmd.bindVertexBuffers(2,&.{r.ext.meshes.buf},&.{r.ext.plantMorph[mesh]});
-    cmd.drawIndexed(run.count-skip,f.counts[i],run.first+skip,@intCast(run.base),f.first[i]);
+    cmd.drawIndexed(to-from,f.counts[i],run.first+from,@intCast(run.base),f.first[i]);
     stats.draws+=1;
   }
 }
+/// the plants' always-solid triangles (each mesh's head, `Run.early`:
+/// stems, leaves, thorns, tendrils of plants that are not of light),
+/// shaded by plant.frag built without the materials they never take
+/// (HEAD): the same colours, from a lighter shader. The solid pass then
+/// shades the rest.
+pub const head=struct{
+  /// the head pipeline: plant.vert as ever, plant_head.frag
+  pub const desc:pass.Desc=.{
+    .vert=@embedFile("plant.vert"),.frag=@embedFile("plant_head.frag"),
+    .bindings=bindings,.attrs=attrs,.perSample=true,
+  };
+  /// draws every mesh's always-solid head
+  pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+    draw(r,&r.frames[r.fi].pass.plants,cmd,scene,stats,.plantsHead);
+  }
+};
 /// the plants' see-through fragments (thin petals, a confluence's sap, a
 /// placement preview), drawn once every solid surface is down: the same
 /// instances, blended over what is there, writing no depth.

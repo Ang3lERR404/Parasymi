@@ -93,9 +93,13 @@ pub const passes=struct{
   pub const terrain=@import("passes/terrain.zig");
   /// the grass, clods and stones the GPU grows on the ground near the camera
   pub const detail=@import("passes/detail.zig");
-  /// the plants' solid fragments
+  /// the plants' always-solid triangles, from a lighter shader
+  pub const plantsHead=@import("passes/plants.zig").head;
+  /// the plants' other solid fragments
   pub const plants=@import("passes/plants.zig");
-  /// the parts' solid fragments: the wolf, nodes, motes, structures
+  /// the parts' always-solid triangles, from a lighter shader
+  pub const partsHead=@import("passes/parts.zig").head;
+  /// the parts' other solid fragments: the wolf, nodes, motes, structures
   pub const parts=@import("passes/parts.zig");
   // see-through fragments of plants and parts, over every solid one
   /// the plants' see-through fragments, blended over the solids

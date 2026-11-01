@@ -155,6 +155,10 @@ void surface() {
   bool inner_ear = part == PART_EAR && dot(raw, V) < 0.0;
   // what is light itself (PARTS_LIGHT: beams, a halo's flash, ring and
   // rays) shines on its own, the key light left out: each its own material
+#ifndef HEAD
+  // (built with HEAD, for each mesh's always-solid triangles alone, what
+  // is light itself, a ground shadow, resin and sap are left out: those
+  // triangles never take them, and the shader is lighter without them)
   if (part == PART_THREAD) {
     // soft rays sent from one bloom to the other: no core, a faint haze
     // across the width (v_u -1..1) with a few soft streaks in it, each
@@ -389,6 +393,7 @@ void surface() {
     o = vec4(applyFog(c, v_pos), al);
     return;
   }
+#endif
   // how much of the key light reaches what is left (what stands between it
   // and the sun or moon shades it): it shades the light's glints, the
   // light carried through sap and leaves and the fibres' sheen with it
@@ -431,6 +436,7 @@ void surface() {
     o = vec4(applyFog(c, v_pos), 1.0);
     return;
   }
+#ifndef HEAD
   if (part == PART_SHADOW) {
     // a soft shadow on the ground: darkest at its centre, gone at its rim
     float r = clamp(v_t, 0.0, 1.0);
@@ -469,7 +475,9 @@ void surface() {
     c += SAP * pl.behind * 0.25;
     alpha = mix(v_fade, 1.0, fres);
     c = sapLife(c, SAP, -raw, V, 0.6 * (1.0 - fres), sh, pl.mirrored, alpha);
-  } else {
+  } else
+#endif
+  {
     // a leaf's or petal's own surface: veins, the net between, edge and base
     float trans;
     vec3 albedo = sheetColour(v_col, part, v_sheet, v_t, trans);

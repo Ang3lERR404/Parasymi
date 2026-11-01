@@ -80,7 +80,7 @@ pub fn prepare(r:*renderer.Renderer,f:*Frame,scene:*const renderer.Scene,stats:*
   f.push=scene.push;
   f.push.bones=.{@truncate(at),@truncate(at>>32)};
 }
-/// their solid fragments.
+/// their solid fragments, of the triangles the head pass left.
 pub fn record(r:*renderer.Renderer,f:*Frame,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
   draw(r,f,cmd,stats,.parts);
 }
@@ -97,16 +97,33 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*ren
     if(f.counts[i]==0 or ((p==.partsGlass or p==.partsAir) and !r.ext.partGlassy[i]))continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.partsShadow)renderer.caster(i)else i;
-    // its welded run, and how many of its indices this pass skips: the
-    // glass and air passes only its see-through tail
+    // its welded run, and which of its indices this pass draws: the head
+    // pass its always-solid head, the solid, glass and air passes the
+    // rest (its see-through tail), the shadow pass all of it
     const run=r.ext.partRuns[mesh];
-    const skip=if(p==.partsGlass or p==.partsAir)run.early else 0;
-    if(skip==run.count)continue;
+    const from=if(p==.partsShadow or p==.partsHead)0 else run.early;
+    const to=if(p==.partsHead)run.early else run.count;
+    if(from==to)continue;
     cmd.bindVertexBuffers(4,&.{r.ext.meshes.buf},&.{r.ext.partMorph[mesh]});
-    cmd.drawIndexed(run.count-skip,f.counts[i],run.first+skip,@intCast(run.base),f.first[i]);
+    cmd.drawIndexed(to-from,f.counts[i],run.first+from,@intCast(run.base),f.first[i]);
     stats.draws+=1;
   }
 }
+/// the parts' always-solid triangles (each mesh's head, `Run.early`: every
+/// role `vertex.seeThrough` leaves out), shaded by part.frag built without
+/// the materials they never take (HEAD): the same colours, from a lighter
+/// shader. The solid pass then shades the rest.
+pub const head=struct{
+  /// the head pipeline: part.vert as ever, part_head.frag
+  pub const desc:pass.Desc=.{
+    .vert=@embedFile("part.vert"),.frag=@embedFile("part_head.frag"),
+    .bindings=bindings,.attrs=attrs,.perSample=true,
+  };
+  /// draws every mesh's always-solid head
+  pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
+    draw(r,&r.frames[r.fi].pass.parts,cmd,stats,.partsHead);
+  }
+};
 /// the parts' see-through fragments (sap and resin, shadows, beams, the
 /// halo), drawn once every solid surface is down: the same instances,
 /// blended over what is there, writing no depth.

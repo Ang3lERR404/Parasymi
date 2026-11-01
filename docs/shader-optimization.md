@@ -436,7 +436,35 @@ The weld puts each mesh's see-through triangles last (`Soup.late`,
 
 If plant.frag or part.frag gains a new see-through path, add it to
 `plantGlassy` or `vertex.seeThrough`, or it will vanish from the glass
-pass.
+pass (and, below, from the solid one).
+
+### Applied: lighter shaders for the always-solid triangles (2026-11-01)
+Knock-outs of plant.frag at msaa8, demo (plants 11.1 ms): the key
+shadow 4.5 (blocker search 1.8, soft filter 1.5, cascade blend 0.2), the
+points of light 1.4, a leaf's veins 1.2 (its fine net 0.8).
+- Each mesh's head (`Run.early`) is drawn by its own pass
+  (`plantsHead`, `partsHead`) with the shader built under HEAD: plant.frag
+  without the pod, radiant, sap-bloom, resin and lantern materials,
+  part.frag without light, ground shadows, resin and sap. Those triangles
+  never take those paths, so the colours are the same; the shader is
+  lighter (fewer registers, more fragments in flight). The plain passes
+  draw the tails with the whole shader.
+- A leaf's vein net is not searched where it has faded out wholly
+  (`leafSheet`: the same 0).
+- plants+head 11.1 -> ~9.7 ms, parts+head 4.5 -> 2.45; demo 21.5 -> 18.2,
+  stress 17.1 -> 15.6.
+
+Tried, no gain (reverted):
+- a depth pre-pass of the always-solid triangles: plants hardly hide
+  each other from the garden's camera, so the pass cost (0.9 ms demo, 4
+  in stress) more than it saved (0.6);
+- explicit level-0 sampling of the shadow map (one mip, no anisotropy,
+  so exact): no gain on the depth reads, and `textureGrad` on the compare
+  sampler doubled the plant pass (a slow path on this GPU).
+
+What is left in plant.frag is mostly the key shadow's soft filter (33
+texture reads a sample, 8 samples a pixel). Making it cheaper would
+change the shadows' look: the user's call.
 
 Not art-safe (ask before): lower `min_sample_shading`, coarser LOD
 distances, cached far-cascade shadows (the sway would lag), impostors for

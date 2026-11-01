@@ -191,7 +191,15 @@ over them.
    with `-DGLASS` (build.zig `variants`). They blend the rest over every
    solid surface, testing depth but writing none.
 
-A new see-through part role goes in `vertex.seeThrough`.
+Each grown mesh keeps its see-through triangles last (the weld's
+`Run.early`). `plantsHead`/`partsHead` draw the always-solid head with
+shaders built with `-DHEAD` (only the materials those triangles take);
+`plants`/`parts` draw the tail with the whole shader; the glass and air
+passes draw only the tail.
+
+A new see-through part role goes in `vertex.seeThrough` (a plant's in
+`renderer.plantGlassy`), or it is drawn with the HEAD shader and never
+in the glass pass.
 
 ### What glows lights the air
 Every part that is light itself (`PARTS_LIGHT`: beams, flashes, the halo,

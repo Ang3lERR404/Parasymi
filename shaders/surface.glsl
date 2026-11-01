@@ -127,7 +127,10 @@ Sheet leafSheet(vec2 sh) {
   float lat = (1.0 - smoothstep(w, w + fp * 1.5, d)) * smoothstep(0.04, 0.12, a) * (1.0 - smoothstep(0.8, 0.96, a));
   lat *= smoothstep(0.03, 0.12, along) * (1.0 - smoothstep(0.86, 0.98, along)) * (1.0 - smoothstep(0.25, 0.6, fp));
   vec2 q = vec2(across * 9.0, along * 24.0);
-  float net = sheetNet(q) * (1.0 - smoothstep(0.3, 0.8, length(fwidth(q))));
+  // the net shows only where a pixel spans little of it: where it has
+  // faded out wholly its cells are not searched at all
+  float netShows = 1.0 - smoothstep(0.3, 0.8, length(fwidth(q)));
+  float net = netShows > 0.0 ? sheetNet(q) * netShows : 0.0;
   return Sheet(max(mid, lat), net, smoothstep(0.72, 1.0, a), along, across);
 }
 // a petal's surface: fine streaks running out from its claw, wavering,

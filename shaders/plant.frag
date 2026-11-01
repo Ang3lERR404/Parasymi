@@ -98,6 +98,10 @@ void surface() {
 
   float ripe = v_yield.a;
   vec3 yieldCol = v_yield.rgb;
+#ifndef HEAD
+  // (built with HEAD, for each mesh's always-solid triangles alone, the
+  // materials below are left out: those triangles never take them, and the
+  // shader is lighter without them)
   if (part == PART_POD && !formIn(FORMS_FREE, v_form)) {
     // a pod (meshgen `pods`): its yield ripening as a bead of sap in its
     // colour. Empty it is a pale nub of the lineage's own sap, dense and
@@ -204,6 +208,7 @@ void surface() {
     return;
   }
 
+#endif
   // thickness: old growth is dense, new growth thin; leaves and petals are
   // always thin. A wilting plant's skin dulls toward dead brown.
   float thin = clamp(v_young, 0.0, 1.0);
