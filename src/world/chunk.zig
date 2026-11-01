@@ -117,6 +117,9 @@ pub const Chunk=struct{
   /// through), read back from the air once a second (game/weather.zig;
   /// not saved: dry until it rains)
   wet:[tileCount]f32=@splat(0),
+  /// how deep the rain stands pooled over each tile (m), read back with
+  /// `wet` (not saved)
+  pool:[tileCount]f32=@splat(0),
   /// gatherable resource left on the tile (0 = no node). The item is decided by `kind`.
   res:[tileCount]Res,
   /// occupant of each tile (see `Occ`).

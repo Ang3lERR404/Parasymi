@@ -82,6 +82,7 @@ const float FORM_DRIFT = 2.0;
 const float FORM_CONFLUENCE = 3.0;
 const float FORM_RADIANT = 4.0;
 const float FORM_STAR = 5.0;
+const float FORM_LILY = 6.0;
 bool isForm(float f, float form) { return abs(f - form) < 0.5; }
 // sets of forms, one bit each (as the roles' sets): what forms do alike is
 // keyed off a set (formIn), so a new form joins a behaviour by joining it

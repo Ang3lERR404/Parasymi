@@ -260,6 +260,11 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
 }
 /// plant instances near the camera, grouped by mesh: each plant's variant
 /// comes from its tile, so it always regrows the same shape.
+/// where a plant of species `sp` on tile `t` of chunk `c` is drawn from:
+/// the ground's height, or the water's over it for one that floats on it
+fn groundOf(sp:species.Id,c:*const ck.Chunk,t:u16)f32{
+  return c.height[t]+if(species.get(sp).onWater)c.pool[t]else 0;
+}
 fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
   for(&g.inst)|*l|l.clearRetainingCapacity();
   // the plants' columns, and which blooms radiate
@@ -270,7 +275,7 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
     const ctr=g.plants.centre(i);
     if(@abs(ctr[0]-g.cam.target[0])>reach or @abs(ctr[1]-g.cam.target[2])>reach)continue;
     try plant(g,.{
-      .sp=s.items(.sp)[i],.x=s.items(.x)[i],.y=s.items(.y)[i],.at=s.items(.at)[i],.ground=s.items(.chunk)[i].height[s.items(.tile)[i]],
+      .sp=s.items(.sp)[i],.x=s.items(.x)[i],.y=s.items(.y)[i],.at=s.items(.at)[i],.ground=groundOf(s.items(.sp)[i],s.items(.chunk)[i],s.items(.tile)[i]),
       .growth=s.items(.growth)[i],.mana=s.items(.mana)[i],.seed=s.items(.seed)[i],
       .flow=s.items(.flow)[i],.health=s.items(.health)[i],
       .dir=s.items(.dir)[i],.turn=s.items(.turn)[i],

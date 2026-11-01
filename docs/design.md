@@ -261,7 +261,12 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
      soaked ground (`needsSoak`): where the rain has left its tile wetter
      than half (`Chunk.wet`, read back with the field each second,
      `ecology.soakedAt`) it grows; drier, it halts and withers over about
-     100 s, so a grove's showers keep it. Hovering it says which.
+     eight minutes, waiting out the dry spells between showers. Hovering it
+     says which. A water lily (the `lily` form, meshgen/lilies.zig): its
+     crown roots under the water, long stems rising to round notched pads
+     lying on it and one bloom resting on it; drawn at the water's level
+     (`Species.onWater`, `Chunk.pool`), its pads drifting and bobbing there
+     (plant.vert `FORMS_AFLOAT`). Four grow along the demo grove's edge.
 5. **The storm** (to come): a new plant, a weftstone kin charging ions to
    strike the rain clouds into storms; the weather fully formed.
 

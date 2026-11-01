@@ -356,6 +356,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `drifts.zig` — the drifting plants: tendrils and lanterns.
 - `flowers.zig` — flowers, buds and leaves set along a path.
 - `laminae.zig` — laminae: leaves with a body, folding to a midrib.
+- `lilies.zig` — lilies: a water lily (the `lily` form), its origin on the water's surface.
 - `petals.zig` — petals and stamens: a flower's pieces.
 - `pods.zig` — pods: a plant's yield ripening on it, beads of sap where the paws pluck it.
 - `shoots.zig` — a plant from its genome, and the shoots branching off its spine.

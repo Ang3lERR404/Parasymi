@@ -118,6 +118,14 @@ const uint FORMS_CROWNED = FORM_BIT(FORM_COIL);
 const uint FORMS_PARTING = FORM_BIT(FORM_COIL);
 // filaments hanging from a float, rippling like a jelly's
 const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
+// lying afloat on the water (meshgen/lilies.zig, its origin the surface):
+// what lies on it drifts on the wind and bobs on slow ripples, never
+// bending from a root; how far it drifts (m), how far it bobs (m), how
+// deep under the surface the stems still follow it (m)
+const uint FORMS_AFLOAT = FORM_BIT(FORM_LILY);
+const float AFLOAT_DRIFT = 0.025;
+const float AFLOAT_BOB = 0.006;
+const float AFLOAT_DEEP = 0.15;
 
 // how far pod `place` (col.a: its place among `pods`) has swelled when its
 // plant is `ripe` (0..1): each fills in turn, the first first
@@ -365,6 +373,15 @@ void main() {
     float ph = t * 1.4 - down * 8.0 + seed * TAU;
     p.xz += vec2(sin(ph + p.x * 9.0), cos(ph * 0.83 + p.z * 9.0)) * 0.03 * down;
   }
+  // afloat: what lies on the water drifts with the wind, swinging slowly
+  // back and forth on its stem, and bobs on ripples running under it; the
+  // stems below follow it, less the deeper they lie
+  bool afloat = formIn(FORMS_AFLOAT, ib.w);
+  if (afloat) {
+    float on = smoothstep(-AFLOAT_DEEP, 0.0, p.y);
+    p.xz += wdir * AFLOAT_DRIFT * (0.6 + 0.4 * sin(t * 0.4 + seed * TAU)) * (0.5 + gust) * on;
+    p.y += AFLOAT_BOB * sin(t * 1.3 + dot(ipos.xz + p.xz, vec2(5.1, 3.7)) + seed * TAU) * on;
+  }
   // convergent: blooms turn, very slowly (a confluence's canopy stays on its stems)
   if (abs(aff) < 0.5 && part == PART_BLOOM && !keyed && trunk) p.xz = rot(t * 0.12 + seed * TAU) * p.xz;
 
@@ -381,7 +398,7 @@ void main() {
   // slow and reaches the tip after the base. What hangs below the root (a
   // floater's filaments) swings the other way, so it trails downwind.
   float ang = windLean(t, wind, seed * TAU, h, sway) * h * h;
-  ang *= smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
+  ang *= afloat ? 0.0 : smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
   p = bendIn(p, wdir, ang);
   n = bendIn(n, wdir, ang);
   // plucked, it bends after the paws drawing its yield back, the same way

@@ -29,6 +29,9 @@ pub const soakTime:f32=60;
 /// rain this heavy over loaded ground (a share of a downpour) is the
 /// garden's first rain
 const firstRain:f32=0.15;
+/// how deep a unit of the field's pooled water stands (m; moisture.glsl
+/// MOISTURE_POOL_DEPTH, must match)
+const poolDepth:f32=0.08;
 /// the weather as the game keeps it: when it last read the field back
 pub const Weather=struct{
   /// the world's time (s) since the ground was last soaked
@@ -68,6 +71,7 @@ pub const Weather=struct{
         const f=Volume.texelIn(field,.{m.f(wx)+0.5,m.f(wz)+0.5});
         // (past 1 the field's alpha is water pooled on wet-through ground)
         c.wet[t]=@min(f[3],1);
+        c.pool[t]=@max(f[3]-1,0)*poolDepth;
         c.water[t]=soaked(c.water[t],c.waterCap[t],c.wet[t],dt);
         if(f[2]>firstRain)raining=true;
       }

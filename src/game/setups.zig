@@ -123,7 +123,17 @@ fn grove(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
     const j=try nearest(g,at[0]+@as(i32,@intCast(k%groveRow))*3,at[1]+@as(i32,@intCast(k/groveRow))*3,.nebularbor,0.3+0.2*m.f(k)) orelse continue;
     g.structs.get(j).grown=groveGrown;
   }
+  // mire lilies grown along the grove's near edge, where its rain soaks
+  // and pools, so they float on it
+  for(0..groveLilies)|k|{
+    // this lily's tile
+    const x=at[0]+@as(i32,@intCast(k))*2;
+    const z=at[1]-1;
+    _=try g.plants.placeEx(g.gpa,&g.world,x,z,.{.x=x,.y=z,.chunk=undefined,.tile=undefined,.sp=.mireLily,.seed=0.2+0.15*m.f(k),.growth=1});
+  }
 }
+/// how many mire lilies grow along the demo grove's edge
+const groveLilies=4;
 /// a symbiote and a parasite two tiles apart, left to converge (a
 /// confluence's stages are viewed with `--plant=confluence`).
 fn confluences(g:*Game,cx:i32,cz:i32)Allocator.Error!void{

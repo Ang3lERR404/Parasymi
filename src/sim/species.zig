@@ -85,6 +85,11 @@ pub const Form=enum(u8){
   /// round its core (`bloomR`) and `leaves` floating free beneath, all
   /// gathered, falling in from the sky (radiant_kit `star`)
   star,
+  /// a water lily, its origin on the water's surface: a crown rooted
+  /// `stemH` under it, long stems rising to `leaves` round notched pads
+  /// (`leafLen` across) lying flat on the water, one bloom of `petals`
+  /// resting on it (meshgen/lilies.zig); drawn at the water's level
+  lily,
 };
 /// procedural mesh parameters (see gfx/meshgen.zig).
 pub const Genome=struct{
@@ -206,6 +211,9 @@ pub const Species=struct{
   link:f32=0,
   /// it needs celestial energy: outside every field it halts and withers
   needsRadiance:bool=false,
+  /// it floats on the water pooled over its tile: drawn at the water's
+  /// level (its mesh's origin), not the ground's
+  onWater:bool=false,
   /// it needs ground the rain has soaked: where it is drier than
   /// `ecology.soakedAt` it halts and slowly withers
   needsSoak:bool=false,
@@ -241,7 +249,7 @@ test"a body of one lineage's kit is grown only for that lineage"{
       .coil=>.parasitic,
       .confluence=>.convergent,
       .radiant,.star=>.radiant,
-      .herb,.drift=>null,
+      .herb,.drift,.lily=>null,
     };
     if(of)|l|try testing.expectEqual(l,s.lineage);
   }

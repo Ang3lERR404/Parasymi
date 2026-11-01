@@ -67,9 +67,9 @@ pub const Events=struct{
 const unpoweredWither:f32=0.06;
 /// how wet a tile's ground must be for a plant that needs soaked ground
 /// to live (`Species.needsSoak`), and how fast it withers drier (health/s:
-/// about a hundred seconds, so a grove's showers keep it)
+/// about eight minutes, so it waits out the dry spells between showers)
 pub const soakedAt:f32=0.5;
-const dryWither:f32=0.01;
+const dryWither:f32=0.002;
 /// the mana each unit of the ground's water drunk gives (`Species.waterDraw`)
 pub const waterMana:f32=30;
 /// floaters drink this share of their draw by day, all of it at full night
@@ -564,5 +564,5 @@ test"a mire lily drinks soaked ground and withers on dry"{
   try testing.expect(after[0][0]>0 and after[0][1]>0.99 and after[0][2]<0.8);
   // dry: it stood still and withered
   try testing.expectEqual(@as(f32,0),after[1][0]);
-  try testing.expect(after[1][1]<0.9);
+  try testing.expect(after[1][1]<0.99);
 }

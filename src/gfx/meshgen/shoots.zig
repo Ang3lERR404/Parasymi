@@ -51,6 +51,7 @@ pub fn plant(b:*Builder,id:species.Id,variant:u32)Allocator.Error!void{
     .drift=>try drift(b,g,seed+@as(u64,variant)*131,variant),
     .radiant=>try radiantKit.plant(b,g,seed+@as(u64,variant)*131,variant),
     .star=>try radiantKit.star(b,g,seed+@as(u64,variant)*131,variant),
+    .lily=>try lib.meshgen.lilies.lily(b,g,seed+@as(u64,variant)*131,variant),
     // a confluence's variants are its growth keys, all grown from one seed
     .confluence=>try convergenceKit.confluence(b,g,seed,m.ratio(variant,keys-1)),
   }

@@ -24,6 +24,8 @@ pub const flowers=@import("meshgen/flowers.zig");
 pub const drifts=@import("meshgen/drifts.zig");
 /// pods: a plant's yield ripening on it, beads of sap where it is plucked
 pub const pods=@import("meshgen/pods.zig");
+/// lilies: a water lily's pads and bloom on the water, its crown beneath
+pub const lilies=@import("meshgen/lilies.zig");
 /// the meshgen tests: a blade's body and a confluence's growth keys
 pub const tests=@import("meshgen/tests.zig");
 /// a curved blade drooping out from its base (leaf or petal)
@@ -155,7 +157,7 @@ pub const keys=8;
 /// confluence its growth keys.
 pub fn variants(id:species.Id)u32{
   return switch(species.get(id).genome.form){
-    .herb,.coil,.drift,.radiant,.star=>variantCount,
+    .herb,.coil,.drift,.radiant,.star,.lily=>variantCount,
     .confluence=>keys,
   };
 }
@@ -170,7 +172,7 @@ pub const Key=struct{
 /// null for a species of fixed shapes
 pub fn growthKey(id:species.Id,growth:f32)?Key{
   switch(species.get(id).genome.form){
-    .herb,.coil,.drift,.radiant,.star=>return null,
+    .herb,.coil,.drift,.radiant,.star,.lily=>return null,
     .confluence=>{
       // how far through the keys the growth lies, and the key just below it
       const x=m.clamp01(growth)*(keys-1);
@@ -192,5 +194,6 @@ test{
   _=flowers;
   _=drifts;
   _=pods;
+  _=lilies;
   _=tests;
 }
