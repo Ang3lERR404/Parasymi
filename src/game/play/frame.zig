@@ -82,15 +82,17 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     g.moved=0;
     return;
   }
-  g.time+=dt;
-  g.moved=dt;
+  // how far the world moves this frame: the clock's time, as fast as it runs
+  const wdt:f32=dt*@as(f32,@floatCast(g.speed));
+  g.time+=wdt;
+  g.moved=wdt;
   // the garden saves itself every so often (only time played counts)
   g.sinceSave+=dt;
   if(g.opts.autosave>0 and g.sinceSave>=m.f(g.opts.autosave)*m.sPerMin and g.request==null){
     g.request=.autosave;
     g.sinceSave=0;
   }
-  g.sky.update(dt);
+  g.sky.update(wdt);
   // decision: alt + freeCam (Ctrl+F) toggles the free inspection camera
   // (harvest alone, F, harvests)
   // alt held, for the free camera and to keep harvest off

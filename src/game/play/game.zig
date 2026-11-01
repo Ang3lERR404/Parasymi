@@ -236,6 +236,10 @@ pub const Game=struct{
   fullWarned:bool=false,
   /// seconds of the world moving (not while frozen), for structures' turns
   time:f64=0,
+  /// how many times faster than the clock the world runs (`--speed=`, for
+  /// watching something slow unattended: its ticks, sky and air together,
+  /// so all of it keeps in step; the air's step caps it at about 6 at 60 fps)
+  speed:f64=1,
   /// how far the world moved this frame (s; 0 while frozen): what the air's
   /// moisture is stepped on by
   moved:f32=0,
@@ -408,7 +412,7 @@ pub const Game=struct{
   /// fixed-step simulation; never more than `maxCatchup` ticks per frame.
   pub fn simulate(g:*Game,frameDt:f64)Error!void{
     if(!g.mode.live())return;
-    g.acc=@min(g.acc+frameDt,tickTime*maxCatchup);
+    g.acc=@min(g.acc+frameDt*g.speed,tickTime*maxCatchup*g.speed);
     while(g.acc>=tickTime):(g.acc-=tickTime)try g.step();
   }
   /// one fixed tick of everything that lives: ecology, convergence,

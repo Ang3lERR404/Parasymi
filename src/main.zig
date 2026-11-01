@@ -136,6 +136,8 @@ pub fn main(init:Init)!void{
   var load=false;
   // `--tod=`: the time of day to start at (0..1), else the sky's own
   var tod:?f32=null;
+  // `--speed=`: how many times faster the world runs (for slow things watched unattended)
+  var speed:f64=1;
   // the world's seed: `--seed=`, else one of its own (see below)
   var seed:?u64=null;
   // `--inspect[=player|<species>|<structure>|x,z]` turns the camera round
@@ -175,6 +177,7 @@ pub fn main(init:Init)!void{
     if(eql(u8,a,"--load"))load=true;
     if(eql(u8,a,"--unforming"))unforming=true;
     if(startsWith(u8,a,"--tod="))tod=try parseFloat(f32,a["--tod=".len..]);
+    if(startsWith(u8,a,"--speed="))speed=try parseFloat(f64,a["--speed=".len..]);
     if(startsWith(u8,a,"--seed="))seed=try parseInt(u64,a["--seed=".len..],0);
     if(startsWith(u8,a,"--plant="))lone=.{.what=.{.plant=stringToEnum(species.Id,a["--plant=".len..]) orelse return error.BadPlant}};
     if(startsWith(u8,a,"--structure="))lone=.{.what=.{.structure=stringToEnum(st.Kind,a["--structure=".len..]) orelse return error.BadStructure}};
@@ -286,6 +289,7 @@ pub fn main(init:Init)!void{
     if(stress)try setups.stress(&game,stressSide);
   }
   if(tod)|t|game.sky.tod=t;
+  game.speed=speed;
   if(unforming)game.prog.done.insert(.unforming);
   if(inspect)|f|{
     turn.focus=f;

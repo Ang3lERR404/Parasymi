@@ -125,6 +125,17 @@ time   = 3 + k * orbit / n          // 3 s settle, then evenly spaced
 growth = (time mod (period + 1.5)) / period   // the loop is period + 1.5 s hold
 ```
 
+## Faster than the clock
+`--speed=N` runs the world N times faster: its ticks, its sky and the
+air's moisture together, so everything keeps in step. For slow things
+watched unattended (a grove's cloud forming and raining takes minutes):
+at 6, two minutes show twelve. The air steps at most 0.1 s a frame, so
+above about 6 at 60 fps it falls behind the rest.
+
+```
+zig build run -- --speed=6 --demo --inspect=nebularbor --shots=4 --orbit=120 --dist=22 --pitch=25
+```
+
 ## First person
 `--inspect=eyes` looks out of the wolf's eyes, turning round where it
 stands, `--pitch=` degrees down (65 shows its chest and belly), e.g.
