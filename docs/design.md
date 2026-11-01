@@ -235,7 +235,9 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
    every few minutes; the demo's grove of nine, east of the garden, after
    two, then near steadily). It rains until the cloud is rained out to 0.7,
    harder the thicker it is, each shower building and easing and drawing
-   the cloud down; the rain feeds the grove's own roots.
+   the cloud down; a shower spreads through its cloud, raining wherever a
+   neighbour rains and the cloud is thick enough to keep on; the rain
+   feeds the grove's own roots.
 3. **Rain refills the ground:** where it rains the ground grows wet
    (one shower soaks it through, a downpour in 2.5 s; drying to a third
    in 5 minutes). Once a second the game reads the whole field back (the
@@ -315,15 +317,19 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
    (after the root wells, needs `firstRain`; 30 units of 3 convergence
    essence + 2 ley crystals) from a weftstone, 4 convergence essence and 2
    ley crystals. It holds up to 5 ley crystals. While rain falls on it
-   (`Chunk.rain` past 0.15) and it holds one, it charges over 45 s (dry,
-   its charge fades), its five lanterns, flown on threads up into the
-   cloud, beating brighter and faster. Full, it strikes: a bolt up the
+   (the heaviest within 3 tiles, where its lanterns fly, past 0.15) and
+   it holds one, it charges over 30 s of rain, building over a grove's
+   showers (dry, it fades over about 8 minutes); its five lanterns, flown
+   free on threads up into the cloud (each its own piece, wandering on the
+   air its own way, `stormLantern`, `stormThread`), beat brighter and
+   faster. Full, it strikes: a bolt up the
    spire and every thread into the cloud, the lanterns flashing, the
    crystal spent. The storm lasts two minutes: it feeds the cloud over it
    (0.06 a second, 3 units round), so the rain stays heavy, and bolts
    strike the ground within 7 units of it, 18 a minute, each flash
    lighting the fog. The first storm is a discovery (`firstStorm`); the
-   weather is fully formed.
+   weather is fully formed. In the demo one stands between the lilies,
+   holding five crystals.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined

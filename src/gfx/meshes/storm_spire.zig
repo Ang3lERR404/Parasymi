@@ -158,14 +158,8 @@ fn spire(b:*mg.Builder,l:Look)Allocator.Error!void{
     const knot=b.mark();
     try pk.nodule(b,tip,m.splat3(l.stalk.girth*0.32),0.7,kit.pale,kit.lilac,kit.pearl);
     try k.on(b,knot,sh,1,.{.from=tip});
-    // the thread: rising from the knot, drifting out on the air, to its kite
-    const kite=kiteAt(i);
-    const th=k.branch(sh,1,&.{tip,m.lerpV(tip,kite,0.35)+out*m.splat3(0.15),m.lerpV(tip,kite,0.7)+out*m.splat3(0.08),kite-v3(0,l.kiteR,0)},.{.pace=2});
-    try k.tube(b,th,.{.r0=0.004,.tip=0.7,.col=threadCol,.sides=4,.t0=0.75,.t1=0.95});
-    // the kite at its end
-    const mk=b.mark();
-    try kiteOf(b,l,kite,a);
-    try k.on(b,mk,th,1,.{.from=kite-v3(0,l.kiteR,0)});
+    // (its thread and lantern fly free of it: `thread`, `lantern`, flown
+    // by structures/storm_spire.zig)
   }
   k.finish(b);
 }
@@ -339,5 +333,32 @@ pub const bolt=struct{
       }
       try b.tubeR(&fp,&ft,&fr,kit.pearl,.spark,4);
     }
+  }
+};
+/// mesh: one of its lanterns, flown free of the spire on its thread
+/// (structures/storm_spire.zig places it, drifting): woven strands round a
+/// small glowing sac, knotted top and bottom, round its origin
+pub const lantern=struct{
+  /// builds it
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try kiteOf(b,look,v3(0,0,0),0);}
+};
+/// mesh: a lantern's thread, built straight up +Y over 0..1 (bent on the GPU
+/// along the curve it hangs in, `Parts.emitCurve`): a fine lilac strand,
+/// the charge running up it
+pub const thread=struct{
+  /// lays it up 0..1
+  pub fn build(b:*mg.Builder)Allocator.Error!void{
+    // its points, their stamps and radii
+    var p:[16]V3=undefined;
+    var ts:[16]f32=undefined;
+    var rs:[16]f32=undefined;
+    for(&p,&ts,&rs,0..)|*q,*t,*r,i|{
+      // how far up it
+      const f=m.ratio(i,15);
+      q.*=v3(0,f,0);
+      t.*=f;
+      r.*=@max(0.004*m.lerp(1,0.7,f),2e-4);
+    }
+    try b.tubeR(&p,&ts,&rs,threadCol,.tendril,4);
   }
 };

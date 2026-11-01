@@ -39,6 +39,9 @@ const float RAIN_STOP = 0.7;
 const float RAIN_FLOOR = 0.25;
 const float RAIN_EASE = 0.35;
 const float RAIN_DRAW = 0.3;
+// how much rain its neighbours must be raining (their mean) for a shower
+// to spread into a texel whose cloud is thick enough to keep it
+const float RAIN_SPREAD = 0.05;
 // the ground under the rain: how long a downpour takes to soak it through,
 // and how long it takes to dry to a third once the rain stops (s)
 const float WET_SOAK = 2.5;
@@ -96,8 +99,10 @@ void main() {
   c.rg += (n.rg - c.rg) * clamp(spread * dt, 0.0, 1.0);
   c.rg *= exp(-dt / vec2(LOW_DRY, HIGH_DRY * (1.0 + GATHER_KEEP * held)));
   // rain: a cloud thick enough begins to rain and keeps raining until it is
-  // rained out thin, more the thicker it is; a shower builds and eases
-  bool raining = c.b > 0.01 ? c.g > RAIN_STOP : c.g > MOISTURE_RAIN_AT;
+  // rained out thin, more the thicker it is; a shower spreads through its
+  // cloud, raining wherever a neighbour rains and the cloud is thick enough
+  // to keep on; a shower builds and eases
+  bool raining = c.b > 0.01 || n.b > RAIN_SPREAD ? c.g > RAIN_STOP : c.g > MOISTURE_RAIN_AT;
   float want = raining ? mix(RAIN_FLOOR, 1.0, clamp((c.g - RAIN_STOP) / (MOISTURE_RAIN_AT - RAIN_STOP), 0.0, 1.0)) : 0.0;
   c.b += (want - c.b) * (1.0 - exp(-dt * RAIN_EASE));
   c.g -= c.b * RAIN_DRAW * dt;

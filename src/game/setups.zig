@@ -147,6 +147,12 @@ fn grove(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
     }
   }
   _=try g.plants.placeEx(g.gpa,&g.world,at[0]+3,at[1]-4,.{.x=at[0]+3,.y=at[1]-4,.chunk=undefined,.tile=undefined,.sp=.mossCreeper,.seed=0.4,.growth=1});
+  // a grown storm spire between the lilies, holding ley crystals, left to
+  // charge in the grove's rain and strike its cloud into a storm
+  if(try nearest(g,at[0]+1,at[1]-1,.stormSpire,0.6))|j|{
+    g.structs.get(j).grown=1;
+    _=g.structs.insert(&g.prog,j,.leyCrystal,5);
+  }
 }
 /// how many mire lilies grow along the demo grove's edge
 const groveLilies=4;

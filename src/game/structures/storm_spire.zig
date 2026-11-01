@@ -44,17 +44,18 @@ const V3=m.V3;
 /// builds a point
 const v3=m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.stormBolt};
+pub const meshes=.{.stormBolt,.stormLantern,.stormThread};
 /// what a storm spire is: of the convergent lineage, one tile across,
 /// grown in twenty seconds, drawn by itself (its lanterns reach up into the
 /// cloud, far over a tile), swaying a little more the higher
-pub const def:st.Def=.{.item=.stormSpire,.lineage=.convergent,.size=1,.mesh=.stormSpire,.grow=20,.sway=0.3,.tall=2.0,.sap=0.3};
+pub const def:st.Def=.{.item=.stormSpire,.lineage=.convergent,.size=1,.mesh=.stormSpire,.grow=20,.bare=true,.sway=0.3,.tall=2.0,.sap=0.3};
 /// rain this heavy over it (a share of a downpour) is enough to charge in
 const rainNeeded:f32=0.15;
 /// how long a charge takes under rain (s)
-const chargeTime:f32=45;
-/// how fast a charge fades with no rain (a share a second)
-const fadeRate:f32=0.01;
+const chargeTime:f32=30;
+/// how fast a charge fades with no rain (a share a second): slowly, so it
+/// builds over a grove's showers
+const fadeRate:f32=0.002;
 /// how long a storm lasts once struck (s)
 const stormTime:f32=120;
 /// how much cloud it feeds over itself a second through a storm, and how far
@@ -109,6 +110,23 @@ pub fn charged(charge:f32,rain:f32,crystal:bool,dt:f32)struct{f32,bool}{
   const c=charge+dt/chargeTime;
   return if(c>=1).{0,true}else.{c,false};
 }
+/// how far round it (tiles) its lanterns fly into the cloud: the rain it
+/// charges in is the heaviest within
+const cloudReach:i32=3;
+/// the heaviest rain over the tiles within `cloudReach` of tile (x, y)
+fn rainNear(w:*const lib.world.World,x:i32,y:i32)f32{
+  // the heaviest found so far
+  var most:f32=0;
+  var dy:i32=-cloudReach;
+  while(dy<=cloudReach):(dy+=1){
+    var dx:i32=-cloudReach;
+    while(dx<=cloudReach):(dx+=1){
+      const c=w.chunkOfTile(x+dx,y+dy) orelse continue;
+      most=@max(most,c.rain[ck.localIndex(x+dx,y+dy)]);
+    }
+  }
+  return most;
+}
 /// it wants ley crystals, up to what it holds
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32{
   if(item!=.leyCrystal)return 0;
@@ -120,8 +138,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // the spire, its state, and the rain on it
   const self=ctx.ss.get(i);
   const ss=&self.state.stormSpire;
-  const c=ctx.w.chunkOfTile(self.x,self.y) orelse return false;
-  const rain=c.rain[ck.localIndex(self.x,self.y)];
+  const rain=rainNear(ctx.w,self.x,self.y);
   ss.wet=rain>=rainNeeded;
   ss.struck+=dt;
   ss.storm=@max(ss.storm-dt,0);
@@ -156,6 +173,42 @@ fn bolt(out:*Parts,from:V3,to:V3,key:f32,bright:f32)Allocator.Error!void{
   const side=m.norm(v3(hash(key,4,5)-0.5,0,hash(key,6,7)-0.5)+v3(1e-3,0,0));
   try out.emitCurve(.stormBolt,c,side,1,1,.{.glow=boltGlow*bright,.phase=key});
 }
+/// how far a lantern wanders off where it rests, each way (m), how far it
+/// bobs, and how slowly (radians a second)
+const wander=v3(0.7,0.18,0.7);
+/// (how slowly it wanders)
+const wanderRate:f32=0.12;
+/// how far a thread bows off its straight line, slack in the air (a share of its length)
+const slack:f32=0.08;
+/// when (a share of its growth) its lanterns begin to rise from the offshoots' tips
+const riseFrom:f32=0.8;
+/// where lantern `k` of spire `s` flies now (world), the spire's frame
+/// `base`, at time `tf`: risen from its offshoot's tip as the spire grows,
+/// then wandering on the air on its own, each its own way
+fn lanternAt(s:*const st.Structure,base:m.M4,k:usize,tf:f32)V3{
+  // its own phase, and how far it has risen
+  const ph=s.seed*13+m.f(k)*2.1;
+  const risen=m.smooth(m.unlerp(riseFrom,1,s.grown));
+  const drift=v3(@sin(tf*wanderRate+ph)+0.4*@sin(tf*wanderRate*2.3+ph*3),@sin(tf*wanderRate*3.1+ph*5),@cos(tf*wanderRate*0.8+ph*2)+0.4*@cos(tf*wanderRate*1.9+ph))*wander;
+  return m.lerpV(m.mulPoint(base,mesh.tipAt(k)),m.mulPoint(base,mesh.kiteAt(k))+drift,risen);
+}
+/// its lanterns flown free on their threads: each thread hung slack from
+/// its offshoot's tip to its lantern, the lantern turning slowly, glowing
+/// `lit` (0..1)
+fn fly(s:*const st.Structure,out:*Parts,base:m.M4,tf:f32,lit:f32)Allocator.Error!void{
+  if(s.grown<=riseFrom)return;
+  for(0..mesh.kites)|k|{
+    // the tip it is tied to, where it flies, and the way it bows across
+    const tip=m.mulPoint(base,mesh.tipAt(k));
+    const at=lanternAt(s,base,k,tf);
+    const d=at-tip;
+    const across=m.norm(v3(d[2],0,-d[0])+v3(1e-3,0,0));
+    const bow=across*m.splat3(slack*m.len(d)*@sin(tf*wanderRate*1.7+m.f(k)));
+    const end=at-v3(0,mesh.look.kiteR*1.2,0);
+    try out.emitCurve(.stormThread,.{tip,m.lerpV(tip,end,0.33)+bow,m.lerpV(tip,end,0.66)+bow*m.splat3(0.6),end},across,1,1,.{.phase=s.seed,.glow=lit});
+    try out.emit(.stormLantern,m.chain(&.{m.translate(at),m.rotY(tf*0.2+m.f(k)*1.3)}),.{.phase=s.seed+m.f(k),.fade=def.sap,.glow=lit});
+  }
+}
 /// itself; its lanterns glowing in the cloud as it charges, flickering
 /// like a heartbeat; the strike up its threads into the cloud; through a
 /// storm, lightning striking the ground round it
@@ -164,20 +217,21 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const ss=&s.state.stormSpire;
   const base=s.place(ctr);
   try out.emitReaching(def.mesh,base,.{.phase=s.seed,.fade=def.sap,.sway=def.sway,.tall=def.tall,.grown=s.grown},meshReach);
-  if(s.grown<1)return;
+  if(s.grown<1)return try fly(s,out,base,tf,0);
   // its lanterns: a beat that quickens and brightens as it charges, all
   // of them at once as it strikes
   const beat=0.5+0.5*@sin(tf*m.lerp(1.5,7,ss.charge));
   const flash=m.clamp01(1-ss.struck/strikeLife);
   const lit=@max(ss.charge*ss.charge*(0.4+0.6*beat),flash);
-  if(lit>0.02)for(0..mesh.kites)|k|try out.light(m.mulPoint(base,mesh.kiteAt(k)),lanternGlow*m.splat3(lit*1.5),lanternReach);
+  try fly(s,out,base,tf,lit);
+  if(lit>0.02)for(0..mesh.kites)|k|try out.light(lanternAt(s,base,k,tf),lanternGlow*m.splat3(lit*1.5),lanternReach);
   // the strike: a bolt up the spire to each offshoot's tip, up its thread
   // to its lantern, and from the lantern up into the cloud
   if(flash>0){
     const top=m.mulPoint(base,mesh.topAt());
     for(0..mesh.kites)|k|{
       // this lantern, and the tip its thread leaves
-      const kite=m.mulPoint(base,mesh.kiteAt(k));
+      const kite=lanternAt(s,base,k,tf);
       const tip=m.mulPoint(base,mesh.tipAt(k));
       const key=m.f(ss.storms)*7+m.f(k)+@floor(tf*12)*0.37;
       try bolt(out,tip,kite,key,flash);

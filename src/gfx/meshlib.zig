@@ -294,6 +294,10 @@ const parts=struct{
   pub const stormSpire=@import("meshes/storm_spire.zig");
   /// a bolt of lightning a storm spire strikes, bent along its curve on the GPU
   pub const stormBolt=@import("meshes/storm_spire.zig").bolt;
+  /// one of a storm spire's lanterns, flown free on its thread
+  pub const stormLantern=@import("meshes/storm_spire.zig").lantern;
+  /// a storm spire's lantern thread, bent along the curve it hangs in on the GPU
+  pub const stormThread=@import("meshes/storm_spire.zig").thread;
   // the halo: its polyp and the diamond it forms
   /// the polyp: woven of both lineages, its stem caging a sac of both saps, fronds and plumed tentacles crowning it
   pub const polyp=@import("meshes/polyp_convergent.zig").woven;
