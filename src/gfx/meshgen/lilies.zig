@@ -43,6 +43,17 @@ const stemRes=16;
 const roots=4;
 /// the golden angle: each pad a little apart from the last
 const golden:f32=2.39996;
+/// how many sepals lie under a bloom
+const sepals=4;
+/// a bloom's rings of petals, outer to inner: how many, how long (of the
+/// bloom's radius), how steeply each rises and how far it flares open
+const rings=[_]m.Vec(f32,4){.{12,1,0.18,0.12},.{10,0.85,0.55,0.25},.{8,0.62,1.0,0.35}};
+/// how narrow a petal is (its half-width, of its length): pointed
+const petalNarrow:f32=0.24;
+/// how many stamens stand in a bloom's heart
+const heartStamens=16;
+/// the heart's gold
+const heartCol=color.rgb(1.0,0.78,0.28);
 /// a water lily grown from its genome, its origin the water's surface;
 /// grown by tu.x (plant.vert): its crown first, then its stems rising and
 /// their pads opening one by one, its bloom last
@@ -89,13 +100,53 @@ pub fn lily(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!voi
   const fa=m.f(variant)*1.7+0.4;
   const top=v3(@cos(fa)*g.leafLen*0.35,padFloat+0.01,@sin(fa)*g.leafLen*0.35);
   try stem(b,crown,top-v3(0,0.01,0),g.stemR*1.1,stemCol,0.85,seed^0xF10);
-  try mg.flower(b,g,top,v3(0,1,0),1,m.f(variant),0.95,.skin);
+  try bloom(b,g,top,m.f(variant),0.95);
   // its yield: beads floating on the water round the bloom
   for(0..g.pods)|k|{
     // this bead's bearing round the bloom
     const pa=mg.pods.bearing(k,variant);
-    try mg.pods.bead(b,g,k,top+v3(@cos(pa)*g.bloomR*0.95,g.podR*0.6,@sin(pa)*g.bloomR*0.95),g.podR,0.95);
+    try mg.pods.bead(b,g,k,top+v3(@cos(pa)*g.bloomR*1.25,g.podR*0.6-0.01,@sin(pa)*g.bloomR*1.25),g.podR,0.95);
   }
+}
+/// a water lily's bloom open on the water at `top`: four green sepals
+/// lying flat under it, then rings of narrow pointed petals, the outer
+/// lying almost flat, each ring further in standing more upright and
+/// shorter, opening into a star round a golden heart of stamens
+fn bloom(b:*Builder,g:species.Genome,top:V3,spin:f32,t:f32)Allocator.Error!void{
+  // the sepals: green above, flat on the water
+  for(0..sepals)|i|{
+    // this sepal's bearing
+    const a=(m.f(i)+0.5)/sepals*m.tau+spin;
+    try mg.petal(b,.{
+      .base=top,.out=v3(@cos(a),0,@sin(a)),.len=g.bloomR*0.95,.width=g.bloomR*0.3,
+      .rise=0.1,.flare=0.05,.cup=0.15,
+      .col=color.shade(g.leafCol,0.6),.tip=g.leafCol.toRgba8(255),.t=t-0.03,.part=.leaf,
+    });
+  }
+  // the rings of petals, outer to inner: how many, how long, how wide,
+  // how steeply each rises and flares
+  for(rings,0..)|ring,k|{
+    // its petals' count, their bearing offset so each ring sits between
+    // the last's, their base lifted a little over the last's
+    const n:usize=@intFromFloat(ring[0]);
+    const off=m.f(k)*0.5;
+    const base=top+v3(0,0.004*m.f(k),0);
+    for(0..n)|i|{
+      // this petal's bearing
+      const a=(m.f(i)+off)/m.f(n)*m.tau+spin*0.37;
+      try mg.petal(b,.{
+        .base=base,.out=v3(@cos(a),0,@sin(a)),.len=g.bloomR*ring[1],.width=g.bloomR*ring[1]*petalNarrow,
+        .rise=ring[2],.flare=ring[3],.cup=0.45,
+        .col=color.mix(g.bloomCol.toRgba8(255),heartCol.toRgba8(255),0.25),.tip=g.bloomCol.toRgba8(255),.t=t,
+      });
+    }
+  }
+  // the golden heart: many stamens standing up out of it
+  try mg.stamens(b,.{
+    .heart=top+v3(0,0.01,0),.axis=v3(0,1,0),.n=heartStamens,
+    .len=g.bloomR*0.4,.r=g.bloomR*0.03,.anther=g.bloomR*0.16,
+    .lean=0.45,.arch=0.4,.col=heartCol.toRgba8(255),.spin=spin,.t=t,.seed=@as(u32,@bitCast(spin)),
+  });
 }
 /// a stem rising from the crown under the water to `to`, slack and a
 /// little wandering, tapering to its rounded ends; formed from `t`'s first

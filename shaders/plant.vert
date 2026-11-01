@@ -118,11 +118,9 @@ const uint FORMS_CROWNED = FORM_BIT(FORM_COIL);
 const uint FORMS_PARTING = FORM_BIT(FORM_COIL);
 // filaments hanging from a float, rippling like a jelly's
 const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
-// lying afloat on the water (meshgen/lilies.zig, its origin the surface):
-// what lies on it drifts on the wind and bobs on slow ripples, never
-// bending from a root; how far it drifts (m), how far it bobs (m), how
-// deep under the surface the stems still follow it (m)
-const uint FORMS_AFLOAT = FORM_BIT(FORM_LILY);
+// afloat (common.glsl FORMS_AFLOAT): how far what lies on the water drifts
+// on the wind (m), how far it bobs on slow ripples (m), how deep under the
+// surface the stems still follow it (m)
 const float AFLOAT_DRIFT = 0.025;
 const float AFLOAT_BOB = 0.006;
 const float AFLOAT_DEEP = 0.15;

@@ -92,6 +92,10 @@ bool formIn(uint set, float f) { return ((set >> uint(f + 0.5)) & 1u) != 0u; }
 // free of a core, gathered and turned by it, never bending from a root and
 // glowing with the light they carry (the celestial bloom, the vesper)
 const uint FORMS_FREE = FORM_BIT(FORM_RADIANT) | FORM_BIT(FORM_STAR);
+// lying afloat on the water (meshgen/lilies.zig, its origin the surface):
+// what lies on it drifts and bobs, never bending from a root (plant.vert),
+// and its pads keep their own green (plant.frag)
+const uint FORMS_AFLOAT = FORM_BIT(FORM_LILY);
 // the forms whose petals are a lantern of clear sap (meshgen `lantern`,
 // below LANTERN_TOP along the plant): it is drawn see-through and, being
 // clear, casts no shadow (plant.vert SHADOW and plant.frag agree on it)
