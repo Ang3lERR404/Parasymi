@@ -65,6 +65,13 @@ pub const Events=struct{
 };
 /// health lost per second by a plant that needs radiance and has none
 const unpoweredWither:f32=0.06;
+/// how wet a tile's ground must be for a plant that needs soaked ground
+/// to live (`Species.needsSoak`), and how fast it withers drier (health/s:
+/// about a hundred seconds, so a grove's showers keep it)
+pub const soakedAt:f32=0.5;
+const dryWither:f32=0.01;
+/// the mana each unit of the ground's water drunk gives (`Species.waterDraw`)
+pub const waterMana:f32=30;
 /// floaters drink this share of their draw by day, all of it at full night
 const dayDrink:f32=0.1;
 /// a drawn ley tile refills this share of its deficit per second
@@ -329,6 +336,10 @@ pub const Ecology=struct{
         const got=@min(c.ley[t],sp.leyDraw*dt);
         c.ley[t]+=(c.leyCap[t]-c.ley[t])*leyRefill*dt-got;
         dm[i]+=got;
+        // the ground's water it drinks, at most what the tile holds
+        const drunk=@min(c.water[t],sp.waterDraw*dt);
+        c.water[t]-=drunk;
+        dm[i]+=drunk*waterMana;
       }
       // how many of its kin it is linked with
       var kin:f32=0;
@@ -380,6 +391,11 @@ pub const Ecology=struct{
       // without celestial energy a plant that needs it halts and withers
       if(sp.needsRadiance and !powered[i]){
         dh[i]-=unpoweredWither*dt;
+        continue;
+      }
+      // on ground the rain has not soaked, one that needs it halts and withers
+      if(sp.needsSoak and c.wet[t]<soakedAt){
+        dh[i]-=dryWither*dt;
         continue;
       }
       if(growth[i]<1){
@@ -519,4 +535,34 @@ test"blooms power plants in range, link into networks, and uprooting cuts them o
   try testing.expect(p.list.items(.health)[a]<0.8 and p.list.items(.health)[b]<0.8);
   // one bloom left: nothing to link to
   try testing.expectEqual(@as(usize,0),eco.radiance.links.items.len);
+}
+test"a mire lily drinks soaked ground and withers on dry"{
+  // the test allocator
+  const gpa=testing.allocator;
+  // its growth, health and the tile's water left, on soaked then dry ground
+  var after:[2]m.Vice(f32,3)=undefined;
+  for([_]f32{1,0},0..)|wetness,k|{
+    // a small loaded world
+    var w=World.init(gpa,5);
+    defer w.deinit();
+    try w.stream(.{.x=0,.y=0},1,100);
+    // the chunk at the origin, its first tile soil with water, wet as this case
+    const c=w.chunkOfTile(0,0).?;
+    c.kind[0]=.soil;
+    c.water[0]=0.8;
+    c.wet[0]=wetness;
+    // the lily, and the ecology over it
+    var p:Plants=.{};
+    defer p.deinit(gpa);
+    var eco:Ecology=.{};
+    defer eco.deinit(gpa);
+    try testing.expect(try p.place(gpa,&w,0,0,.mireLily,0.1));
+    for(0..testHz*20)|_|_=try eco.tick(gpa,&p,&w,.{},testDt);
+    after[k]=.{p.list.items(.growth)[0],p.list.items(.health)[0],c.water[0]};
+  }
+  // soaked: it grew and drank the ground's water, healthy
+  try testing.expect(after[0][0]>0 and after[0][1]>0.99 and after[0][2]<0.8);
+  // dry: it stood still and withered
+  try testing.expectEqual(@as(f32,0),after[1][0]);
+  try testing.expect(after[1][1]<0.9);
 }

@@ -127,7 +127,7 @@ fn plant(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,i:ck.PlantId,near:bool)All
   // whether the network has caught up to this plant yet
   const known=i.idx()<rad.powered.items.len;
   // a bloom waiting on its network, or a plant that draws radiance, says so
-  const waits=(def.radiance>0 and !(known and rad.radiating.items[i.idx()])) or def.needsRadiance;
+  const waits=(def.radiance>0 and !(known and rad.radiating.items[i.idx()])) or def.needsRadiance or def.needsSoak;
   // where the card's first line goes, and the current line's left and top
   // how many lines it takes, the air's last
   const lines:f32=@as(f32,if(waits)4 else 3)+@as(f32,if(wet(g)!=null)1 else 0);
@@ -167,5 +167,10 @@ fn plant(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,i:ck.PlantId,near:bool)All
     // whether it is drawing radiance now
     const lit=known and rad.powered.items[i.idx()];
     _=try d.text(x,y+lineH,s.textNote,if(lit)s.gold else s.dim,if(lit)txt.s.hud.drawingRadiance else txt.s.hud.withering);
+  }
+  if(def.needsSoak){
+    // whether the ground under it is soaked now
+    const wetNow=p.chunk.wet[p.tile]>=lib.ecology.soakedAt;
+    _=try d.text(x,y+lineH,s.textNote,if(wetNow)s.gold else s.dim,if(wetNow)txt.s.hud.soaked else txt.s.hud.drying);
   }
 }

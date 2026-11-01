@@ -314,6 +314,10 @@ pub const Strings=struct{
     drawingRadiance:S="",
     /// a radiant-fed plant without light, withering
     withering:S="",
+    /// a plant that needs soaked ground, on it and drinking
+    soaked:S="",
+    /// a plant that needs soaked ground, on dry ground, withering
+    drying:S="",
     /// the label by the sap tendril
     sap:S="",
     /// the pause menu's title

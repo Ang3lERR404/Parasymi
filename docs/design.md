@@ -250,9 +250,18 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
 4. **The first rain** over the loaded garden is a discovery (`firstRain`).
    The breeds it opens (the gardener's picks, to be built on the pools):
    a moss creeper (spreads moss onto wet soil, so groves can grow), a
-   mire lily (grows only on soaked ground, turning ground water into
-   essence), a root well (stores rainwater above ground) and a cache
+   mire lily, a root well (stores rainwater above ground) and a cache
    taking the sap cache's place after the unforming, with more slots.
+   - **Mire lily** (`species/mire_lily.zig`, built): MIRE BLOOMING (after
+     the unforming, needs `firstRain`; 20 units of 2 convergence essence
+     + 1 ley crystal) lets germinators weave its seed (2 convergence
+     essence + 2 grit). Convergent, 1×1. It never draws the ley: it
+     drinks its tile's ground water (`waterDraw` 0.006/s, each unit 30
+     mana, `ecology.waterMana`) and yields convergence essence. It needs
+     soaked ground (`needsSoak`): where the rain has left its tile wetter
+     than half (`Chunk.wet`, read back with the field each second,
+     `ecology.soakedAt`) it grows; drier, it halts and withers over about
+     100 s, so a grove's showers keep it. Hovering it says which.
 5. **The storm** (to come): a new plant, a weftstone kin charging ions to
    strike the rain clouds into storms; the weather fully formed.
 

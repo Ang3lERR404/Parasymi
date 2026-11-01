@@ -113,6 +113,10 @@ pub const Chunk=struct{
   /// the water each tile's ground holds when it has been left alone: wet
   /// where moss grows, dry on stone and high ground
   waterCap:[tileCount]f32,
+  /// how wet the rain has left each tile's ground (0 dry .. 1 wet
+  /// through), read back from the air once a second (game/weather.zig;
+  /// not saved: dry until it rains)
+  wet:[tileCount]f32=@splat(0),
   /// gatherable resource left on the tile (0 = no node). The item is decided by `kind`.
   res:[tileCount]Res,
   /// occupant of each tile (see `Occ`).

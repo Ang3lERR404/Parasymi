@@ -197,6 +197,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `ley_sight.zig` — LEY SIGHT: the ley currents beneath the ground become visible.
 - `lithophagy.zig` — LITHOPHAGY: the parasites learn to feed on stone: lithophages, which draw the mineral nodes all round them into a crystal and sap it away as
 - `living_looms.zig` — LIVING LOOMS: the symbiotes lend their weaving to the garden: loomferns, which weave fibre by themselves, and gathering crowns, which root…
+- `mire_blooming.zig` — MIRE BLOOMING: once the first rain has fallen, germinators weave mire lily seeds, a breed of both lineages that roots in soaked ground.
 - `root_communion.zig` — ROOT COMMUNION: symbiotic links reach a second ring of neighbours.
 - `sap_satellites.zig` — SAP SATELLITES: a minor study along Arsthraxia.
 - `seed_splicing.zig` — SEED SPLICING: germinators weave Vesper seeds, spliced from both lineages.
@@ -217,6 +218,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `driftwisp.zig` — DRIFTWISP spore: the sprout has let go of its seed and floats above it, a comb-jelly lantern of clear sap (its comb rows splitting the light
 - `hollowheart.zig` — HOLLOWHEART seed: a stout trunk carrying a broad crown, an amber heart glowing in its hollow and pulsing (a deep reservoir that feeds…
 - `lumenroot.zig` — LUMENROOT seed: a leafy sprout opening a cyan flower, motes of mana running from it to the little sprouts beside it (it shares with kin).
+- `mire_lily.zig` — MIRE LILY seed: a pale cupped lily on a short teal stem, broad pads lying round its foot, and rain falling into its cup (it lives on soaked…
 - `thornleech.zig` — THORNLEECH seed: a pale twisted stalk with a bulb and fronds curling round it, a bead of red sap drawn into it from a green leaf beside it…
 - `vesper.zig` — VESPER seed: an evening star come down over the seed, held up on a thread of light: a gold core in a star of five dusk-violet rays, two…
 
@@ -396,6 +398,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `driftwisp.zig` — DRIFTWISP: a floater that occupies no tile: a sap float holding up a catcher dish, filaments trailing beneath.
 - `hollowheart.zig` — HOLLOWHEART: a 2x2 heart-tree.
 - `lumenroot.zig` — LUMENROOT: the first symbiote.
+- `mire_lily.zig` — MIRE LILY: the first breed the rain opens, of both lineages.
 - `thornleech.zig` — THORNLEECH: the first parasite, alien rather than hostile (a coil, built by gfx/meshes/parasite_kit.zig: a lattice cage of a stalk with its…
 - `vesper.zig` — VESPER BLOOM: a radiant hybrid, spliced where symbiote and parasite touch.
 

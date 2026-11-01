@@ -87,6 +87,8 @@ const techs=struct{
   pub const interweaving=@import("research/interweaving.zig");
   /// the first world event: the radiant plants shatter, the lineages die
   pub const unforming=@import("research/unforming.zig");
+  /// the mire lily, opened by the first rain
+  pub const mireBlooming=@import("research/mire_blooming.zig");
 };
 /// the registry over `techs`: ids, `has` and `module` for the hooks
 const reg=registry.Registry(techs);

@@ -33,6 +33,8 @@ const parts=struct{
   pub const confluence=@import("species/confluence.zig");
   /// the celestial bloom, the garden's power source
   pub const bloom=@import("species/bloom.zig");
+  /// the first breed of the rain, drinking soaked ground into essence
+  pub const mireLily=@import("species/mire_lily.zig");
 };
 /// the registry over `parts`: their ids, count and definitions
 const reg=registry.Registry(parts);
@@ -174,6 +176,9 @@ pub const Species=struct{
   manaCap:f32,
   /// mana drawn from the ley field under the plant per second.
   leyDraw:f32,
+  /// the ground's water drunk from under the plant a second (0: none),
+  /// each unit of it turned into `ecology.waterMana` mana
+  waterDraw:f32=0,
   /// mana shared to (symbiotic) neighbours per second
   share:f32,
   /// mana stolen from (parasitic) neighbours per second
@@ -201,6 +206,9 @@ pub const Species=struct{
   link:f32=0,
   /// it needs celestial energy: outside every field it halts and withers
   needsRadiance:bool=false,
+  /// it needs ground the rain has soaked: where it is drier than
+  /// `ecology.soakedAt` it halts and slowly withers
+  needsSoak:bool=false,
   /// growth stages named on hover (0: unstaged; names in `game/text.zig`,
   /// the mesh itself grows continuously; see meshgen `keys`).
   stages:u8=0,

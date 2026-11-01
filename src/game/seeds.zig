@@ -40,6 +40,8 @@ const kinds=struct{
   pub const hollowheart=@import("seeds/hollowheart.zig");
   /// the celestial bloom's seed
   pub const bloom=@import("seeds/bloom.zig");
+  /// the mire lily's seed
+  pub const mireLily=@import("seeds/mire_lily.zig");
 };
 /// the seed registry built from `kinds`: its ids and its modules
 const reg=registry.Registry(kinds);
