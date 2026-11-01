@@ -365,6 +365,17 @@ pub fn next(id:Id)?Id{
     inline else=>|k|if(@hasDecl(reg.module(k),"next"))comptime(std.meta.stringToEnum(Id,reg.module(k).next).?)else null,
   };
 }
+/// a skinned sample's bones at time `t` (s), placed by `at`, written to
+/// `out`; returns how many
+pub const Pose=*const fn(t:f32,at:m.M4,out:[]m.M4)usize;
+/// the most bones a skinned sample poses
+pub const maxPoseBones=32;
+/// how sample `id` is posed (its `pose`; none: it is drawn rigid)
+pub fn poser(id:Id)?Pose{
+  return switch(id){
+    inline else=>|k|if(@hasDecl(reg.module(k),"pose"))reg.module(k).pose else null,
+  };
+}
 /// what glows with sample `id` (its `glows`; none: nothing)
 pub fn glows(id:Id)[]const Glow{
   return switch(id){

@@ -259,45 +259,132 @@ fn yielder(b:*mg.Builder)Allocator.Error!void{
   try points(b,.{.shape=.yieldLight,.reach=0,.n=2});
   try points(b,.{.shape=.yieldGathering,.reach=0,.n=1});
 }
-/// one limb of the hyena of stars, its own web (part.vert `PLEXUS_HYENA_A`…
-/// lays it, in the same order): how many points it holds, how far its lines
-/// reach, and the limb it hangs from with which of that one's points its
-/// bonds fasten to (none: it only lies against the rest)
+/// how a limb of the hyena drifts as he hovers, turning about its joint:
+/// how far forward and back, side to side and about itself (rad), how fast
+/// (rad/s; the other two turns a little quicker and slower) and when
+const Drift=struct{
+  /// forward and back (about x)
+  pitch:f32=0,
+  /// side to side (about z)
+  roll:f32=0,
+  /// about itself (about y)
+  yaw:f32=0,
+  /// how fast
+  rate:f32=0.5,
+  /// when
+  phase:f32=0,
+};
+/// one limb of the hyena of stars, its own web on its own bone (part.vert
+/// `PLEXUS_HYENA_A`… lays it, in the same order): how many points it holds,
+/// how far its lines reach, the limb it hangs from and which of that one's
+/// points its bonds fasten to (none: it only lies against it), the joint it
+/// turns about (its first end, part.vert `PLEXUS_HYENA_A`) and how it drifts
 const Limb=struct{
   /// how many points
   n:usize,
   /// how far its lines reach
   reach:f32,
-  /// the limb it hangs from, and the point of it its bonds reach
-  from:?struct{u8,u8}=null,
+  /// the limb it hangs from (none: he hangs from nothing, his chest)
+  parent:?u8=null,
+  /// the point of its parent its bonds reach (none: no bonds)
+  bond:?u8=null,
+  /// where it turns (mesh space, his bind pose)
+  joint:V3,
+  /// how it drifts as he hovers
+  drift:Drift=.{},
 };
-/// the hyena's limbs: torso, neck, head, muzzle, two ears, mane, then each
-/// arm (upper, fore, hand, left then right), each leg (thigh, shin, foot,
-/// left then right), tail
+/// the hyena's limbs, every parent before its children: chest, belly,
+/// neck, head, muzzle, two ears, mane, then each arm (upper, fore, paw,
+/// left then right), each leg (thigh, shin, hock, paw, left then right),
+/// tail, then lying against them as the wolf has: two pectorals, a round
+/// gut, two rear lobes
 const limbs=[_]Limb{
-  .{.n=40,.reach=0.17},.{.n=18,.reach=0.13,.from=.{0,0}},.{.n=30,.reach=0.13,.from=.{1,17}},.{.n=18,.reach=0.11,.from=.{2,29}},
-  .{.n=10,.reach=0.09},.{.n=10,.reach=0.09},.{.n=20,.reach=0.1},
-  .{.n=18,.reach=0.12,.from=.{0,2}},.{.n=16,.reach=0.11,.from=.{7,17}},.{.n=8,.reach=0.08,.from=.{8,15}},
-  .{.n=18,.reach=0.12,.from=.{0,3}},.{.n=16,.reach=0.11,.from=.{10,17}},.{.n=8,.reach=0.08,.from=.{11,15}},
-  .{.n=22,.reach=0.13,.from=.{0,39}},.{.n=18,.reach=0.11,.from=.{13,21}},.{.n=10,.reach=0.08,.from=.{14,17}},
-  .{.n=22,.reach=0.13,.from=.{0,38}},.{.n=18,.reach=0.11,.from=.{16,21}},.{.n=10,.reach=0.08,.from=.{17,17}},
-  .{.n=14,.reach=0.1,.from=.{0,37}},
+  .{.n=36,.reach=0.17,.joint=v3(0,1.2,0),.drift=.{.pitch=0.03,.rate=0.7}},
+  .{.n=28,.reach=0.16,.parent=0,.bond=35,.joint=v3(0,1.18,0.03),.drift=.{.pitch=0.02,.roll=0.02,.rate=0.6,.phase=1}},
+  .{.n=22,.reach=0.14,.parent=0,.bond=0,.joint=v3(0,1.48,-0.04),.drift=.{.pitch=0.05,.rate=0.4}},
+  .{.n=28,.reach=0.12,.parent=2,.bond=21,.joint=v3(0,1.72,0.06),.drift=.{.pitch=0.06,.roll=0.05,.yaw=0.35,.rate=0.31}},
+  .{.n=20,.reach=0.1,.parent=3,.bond=27,.joint=v3(0,1.77,0.12)},
+  .{.n=12,.reach=0.09,.parent=3,.joint=v3(0.07,1.84,0),.drift=.{.pitch=0.08,.roll=0.12,.rate=1.7}},
+  .{.n=12,.reach=0.09,.parent=3,.joint=v3(-0.07,1.84,0),.drift=.{.pitch=0.08,.roll=0.12,.rate=1.5,.phase=2}},
+  .{.n=24,.reach=0.1,.parent=2,.joint=v3(0,1.62,-0.1),.drift=.{.roll=0.03,.rate=0.9}},
+  .{.n=20,.reach=0.12,.parent=0,.bond=2,.joint=v3(0.19,1.48,0),.drift=.{.pitch=0.1,.roll=0.05,.rate=0.55}},
+  .{.n=18,.reach=0.11,.parent=8,.bond=19,.joint=v3(0.25,1.18,0.06),.drift=.{.pitch=0.12,.rate=0.55,.phase=-0.6}},
+  .{.n=10,.reach=0.08,.parent=9,.bond=17,.joint=v3(0.27,0.93,0.14),.drift=.{.pitch=0.15,.rate=0.55,.phase=-1.2}},
+  .{.n=20,.reach=0.12,.parent=0,.bond=3,.joint=v3(-0.19,1.48,0),.drift=.{.pitch=0.1,.roll=0.05,.rate=0.55,.phase=2}},
+  .{.n=18,.reach=0.11,.parent=11,.bond=19,.joint=v3(-0.25,1.18,0.06),.drift=.{.pitch=0.12,.rate=0.55,.phase=1.4}},
+  .{.n=10,.reach=0.08,.parent=12,.bond=17,.joint=v3(-0.27,0.93,0.14),.drift=.{.pitch=0.15,.rate=0.55,.phase=0.8}},
+  .{.n=24,.reach=0.13,.parent=1,.bond=27,.joint=v3(0.1,0.96,0),.drift=.{.pitch=0.1,.roll=0.03,.rate=0.45,.phase=0.5}},
+  .{.n=20,.reach=0.11,.parent=14,.bond=23,.joint=v3(0.12,0.7,0.1),.drift=.{.pitch=0.14,.rate=0.45,.phase=-0.1}},
+  .{.n=12,.reach=0.09,.parent=15,.bond=19,.joint=v3(0.12,0.47,-0.04),.drift=.{.pitch=0.12,.rate=0.45,.phase=-0.7}},
+  .{.n=10,.reach=0.08,.parent=16,.bond=11,.joint=v3(0.12,0.3,0),.drift=.{.pitch=0.2,.rate=0.45,.phase=-1.3}},
+  .{.n=24,.reach=0.13,.parent=1,.bond=26,.joint=v3(-0.1,0.96,0),.drift=.{.pitch=0.1,.roll=0.03,.rate=0.45,.phase=2.9}},
+  .{.n=20,.reach=0.11,.parent=18,.bond=23,.joint=v3(-0.12,0.7,0.1),.drift=.{.pitch=0.14,.rate=0.45,.phase=2.3}},
+  .{.n=12,.reach=0.09,.parent=19,.bond=19,.joint=v3(-0.12,0.47,-0.04),.drift=.{.pitch=0.12,.rate=0.45,.phase=1.7}},
+  .{.n=10,.reach=0.08,.parent=20,.bond=11,.joint=v3(-0.12,0.3,0),.drift=.{.pitch=0.2,.rate=0.45,.phase=1.1}},
+  .{.n=18,.reach=0.11,.parent=1,.bond=25,.joint=v3(0,0.98,-0.13),.drift=.{.pitch=0.08,.yaw=0.35,.rate=0.8}},
+  .{.n=16,.reach=0.09,.parent=0,.joint=v3(0.075,1.42,0.11)},
+  .{.n=16,.reach=0.09,.parent=0,.joint=v3(-0.075,1.42,0.11)},
+  .{.n=24,.reach=0.12,.parent=1,.joint=v3(0,1.1,0.1),.drift=.{.pitch=0.02,.rate=0.9}},
+  .{.n=16,.reach=0.1,.parent=1,.joint=v3(0.08,0.99,-0.08),.drift=.{.pitch=0.03,.rate=0.45,.phase=0.5}},
+  .{.n=16,.reach=0.1,.parent=1,.joint=v3(-0.08,0.99,-0.08),.drift=.{.pitch=0.03,.rate=0.45,.phase=2.9}},
 };
-/// where the flowers of both lineages sit in his mane
-const maneFlowers=[_]V3{v3(0.05,1.89,-0.04),v3(-0.06,1.85,-0.09),v3(0.01,1.7,-0.15)};
+/// the flowers of both lineages in his mane: where each sits and the limb
+/// it rides (the head, the mane)
+const maneFlowers=[_]struct{V3,u8}{.{v3(0.05,1.89,-0.04),3},.{v3(-0.06,1.85,-0.09),3},.{v3(0.01,1.7,-0.15),7}};
+/// how far he bobs as he hovers (m), and how fast (rad/s)
+const bob:f32=0.035;
+/// how fast he bobs (rad/s)
+const bobRate:f32=1.1;
+/// how many bones he has: one to a limb
+pub const hyenaBones=limbs.len;
+/// every vertex since `start` rides bone `own` alone (a bond's far end
+/// rides `other`, part.vert)
+fn ride(b:*mg.Builder,start:usize,own:u8,other:u8)Allocator.Error!void{
+  for(try b.skinOf(start))|*q|q.*=.{.bones=@as(u32,own)|@as(u32,other)<<8,.weights=.{255,0,0,0}};
+}
 /// act 2's gardener: a hyena of stars, a living constellation standing
 /// upright as he hovers, his legs hanging; every limb its own web of paired
-/// lights, bonds fastening each to the one it hangs from, all beating from
-/// his chest; a few flowers of both lineages in his mane
+/// lights on its own bone, bonds fastening each to the one it hangs from,
+/// all beating from his chest; a few flowers of both lineages in his mane
 fn hyena(b:*mg.Builder)Allocator.Error!void{
   for(limbs,0..)|l,k|{
-    // which limb it is, riding in the reach's whole part
+    // which limb it is, riding in the reach's whole part, and where its
+    // vertices begin
     const seg=m.f(k);
+    const own:u8=@intCast(k);
+    const s=b.mark();
     try cluster(b,.{.shape=.hyena,.reach=seg+l.reach,.n=l.n});
-    const from=l.from orelse continue;
-    for([_]f32{0,1})|layer|for([_]u8{0,1})|own|try ribbon(b,.{own,from[1],from[0]},.bond,.hyena,v3(seg+0.5,0,layer));
+    try ride(b,s,own,own);
+    const to=l.bond orelse continue;
+    const parent=l.parent.?;
+    const bs=b.mark();
+    for([_]f32{0,1})|layer|for([_]u8{0,1})|from|try ribbon(b,.{from,to,parent},.bond,.hyena,v3(seg+0.5,0,layer));
+    try ride(b,bs,own,parent);
   }
-  for(maneFlowers,0..)|at,k|try kit.bloom(b,.{.heart=at,.len=0.07,.spin=m.f(k)*1.3,.seed=0x4E7A+k});
+  for(maneFlowers,0..)|fl,k|{
+    // where the flower's vertices begin
+    const s=b.mark();
+    try kit.bloom(b,.{.heart=fl[0],.len=0.07,.spin=m.f(k)*1.3,.seed=0x4E7A+k});
+    try ride(b,s,fl[1],fl[1]);
+  }
+}
+/// his bones at time `t` (s), placed by `at`: he bobs as he hovers, and
+/// every limb drifts about its joint, carried by the one it hangs from.
+/// Returns how many it filled (`hyenaBones`).
+pub fn hyenaPose(t:f32,at:m.M4,out:[]m.M4)usize{
+  for(limbs,0..)|l,k|{
+    // its drift, and its turn about its joint now
+    const d=l.drift;
+    const turn=m.chain(&.{
+      m.translate(l.joint),
+      m.rotX(d.pitch*@sin(d.rate*t+d.phase)),
+      m.rotZ(d.roll*@sin(d.rate*1.3*t+d.phase+1)),
+      m.rotY(d.yaw*@sin(d.rate*0.7*t+d.phase+2)),
+      m.translate(-l.joint),
+    });
+    out[k]=if(l.parent)|p|m.mul(out[p],turn)else m.chain(&.{at,m.translate(v3(0,bob*@sin(bobRate*t),0)),turn});
+  }
+  return limbs.len;
 }
 /// a sprig: a stem, a branch stem fastened at its middle joint, a leaf at
 /// its lowest joint and another at its highest, bonds from each joint's
@@ -491,4 +578,6 @@ pub const tendrilArc=struct{
 pub const hyenaMesh=struct{
   /// builds him
   pub fn build(b:*mg.Builder)Allocator.Error!void{try hyena(b);}
+  /// his bones as a sample (`meshlib.Pose`): hovering, every limb drifting
+  pub const pose=hyenaPose;
 };

@@ -230,37 +230,59 @@ const float PLEXUS_TENDRIL_FLOW = 0.06;
 const float PLEXUS_TENDRIL_RIDING = 8.0;
 const float PLEXUS_TENDRIL_PART = 0.3;
 // act 2's gardener, a hyena of stars (meshes/constellate.zig `limbs`, the
-// same order): upright as he hovers, legs hanging, every limb its own web
-// whose points wind round it from one end to the other on the golden
-// angle, rounding in at both ends. Each limb's ends (mesh space) with its
-// radius there, how many points it holds, and how flat it is front to back.
-// The point of his torso his beat starts from (his chest), and how far a
-// limb's points drift
+// same order): upright as he hovers, legs hanging, a hyena's build (a thick
+// neck curving forward, high shoulders, a deep chest, a long blunt muzzle,
+// big round ears, bent legs on long hocks with paws, a bushy tail; and as
+// the wolf has, pectorals, a round gut and rear lobes). Every
+// limb is its own web whose points wind round it from one end to the other
+// on the golden angle along a gentle curve, its radius swelling where its
+// muscle is and rounding in at both ends. Each limb (in his bind pose, mesh
+// space): its first end and radius there, its last end and radius, the
+// point its curve bends toward and how much it swells, where along it the
+// swell is, how flat it is front to back, how many points it holds, and how
+// dim its web shines where it crowds close (his chest and head would glare
+// into one white blur). The point of his chest his beat starts from, which
+// limbs are tufted (the mane, the tail), and how far a limb's points drift
 const int PLEXUS_HYENA = 58;
 const int PLEXUS_HYENA_TORSO = 0;
-const float PLEXUS_HYENA_CHEST = 6.0;
-const float PLEXUS_HYENA_DRIFT = 0.012;
-const vec4 PLEXUS_HYENA_A[20] = vec4[20](
-  vec4(0.0, 1.42, 0.02, 0.16), vec4(0.0, 1.46, 0.0, 0.085), vec4(0.0, 1.74, -0.08, 0.1), vec4(0.0, 1.72, 0.08, 0.07),
-  vec4(0.07, 1.8, -0.01, 0.05), vec4(-0.07, 1.8, -0.01, 0.05), vec4(0.0, 1.86, -0.05, 0.03),
-  vec4(0.2, 1.4, 0.0, 0.06), vec4(0.25, 1.13, 0.04, 0.048), vec4(0.27, 0.9, 0.12, 0.035),
-  vec4(-0.2, 1.4, 0.0, 0.06), vec4(-0.25, 1.13, 0.04, 0.048), vec4(-0.27, 0.9, 0.12, 0.035),
-  vec4(0.09, 0.98, 0.0, 0.08), vec4(0.11, 0.66, 0.06, 0.055), vec4(0.11, 0.38, -0.02, 0.035),
-  vec4(-0.09, 0.98, 0.0, 0.08), vec4(-0.11, 0.66, 0.06, 0.055), vec4(-0.11, 0.38, -0.02, 0.035),
-  vec4(0.0, 1.0, -0.12, 0.04));
-const vec4 PLEXUS_HYENA_B[20] = vec4[20](
-  vec4(0.0, 0.98, 0.0, 0.13), vec4(0.0, 1.66, 0.04, 0.075), vec4(0.0, 1.74, 0.09, 0.11), vec4(0.0, 1.64, 0.31, 0.045),
-  vec4(0.11, 1.9, -0.03, 0.05), vec4(-0.11, 1.9, -0.03, 0.05), vec4(0.0, 1.2, -0.17, 0.025),
-  vec4(0.25, 1.13, 0.04, 0.048), vec4(0.27, 0.9, 0.12, 0.035), vec4(0.27, 0.82, 0.15, 0.025),
-  vec4(-0.25, 1.13, 0.04, 0.048), vec4(-0.27, 0.9, 0.12, 0.035), vec4(-0.27, 0.82, 0.15, 0.025),
-  vec4(0.11, 0.66, 0.06, 0.06), vec4(0.11, 0.38, -0.02, 0.035), vec4(0.11, 0.27, 0.07, 0.025),
-  vec4(-0.11, 0.66, 0.06, 0.06), vec4(-0.11, 0.38, -0.02, 0.035), vec4(-0.11, 0.27, 0.07, 0.025),
-  vec4(0.0, 0.78, -0.27, 0.03));
-const float PLEXUS_HYENA_N[20] = float[20](40.0, 18.0, 30.0, 18.0, 10.0, 10.0, 20.0, 18.0, 16.0, 8.0, 18.0, 16.0, 8.0, 22.0, 18.0, 10.0, 22.0, 18.0, 10.0, 14.0);
-// how dim each limb's web shines where it crowds close (its torso and head
-// would glare into one white blur)
-const float PLEXUS_HYENA_CROWD[20] = float[20](0.18, 0.4, 0.25, 0.4, 0.6, 0.6, 0.45, 0.6, 0.6, 0.7, 0.6, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5);
-const float PLEXUS_HYENA_FLAT[20] = float[20](0.72, 1.0, 0.95, 1.0, 0.6, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
+const float PLEXUS_HYENA_CHEST = 8.0;
+const float PLEXUS_HYENA_DRIFT = 0.01;
+const vec4 PLEXUS_HYENA_A[28] = vec4[28](
+  vec4(0.0, 1.52, -0.02, 0.13), vec4(0.0, 1.18, 0.03, 0.13), vec4(0.0, 1.48, -0.04, 0.11), vec4(0.0, 1.76, -0.02, 0.09), vec4(0.0, 1.77, 0.12, 0.07),
+  vec4(0.07, 1.84, 0.0, 0.05), vec4(-0.07, 1.84, 0.0, 0.05), vec4(0.0, 1.9, 0.02, 0.035),
+  vec4(0.19, 1.48, 0.0, 0.07), vec4(0.25, 1.18, 0.06, 0.05), vec4(0.27, 0.93, 0.14, 0.04),
+  vec4(-0.19, 1.48, 0.0, 0.07), vec4(-0.25, 1.18, 0.06, 0.05), vec4(-0.27, 0.93, 0.14, 0.04),
+  vec4(0.1, 0.96, 0.0, 0.09), vec4(0.12, 0.7, 0.1, 0.055), vec4(0.12, 0.47, -0.04, 0.035), vec4(0.12, 0.3, 0.0, 0.03),
+  vec4(-0.1, 0.96, 0.0, 0.09), vec4(-0.12, 0.7, 0.1, 0.055), vec4(-0.12, 0.47, -0.04, 0.035), vec4(-0.12, 0.3, 0.0, 0.03),
+  vec4(0.0, 0.98, -0.13, 0.04),
+  vec4(0.02, 1.42, 0.11, 0.055), vec4(-0.02, 1.42, 0.11, 0.055), vec4(0.0, 1.22, 0.08, 0.1), vec4(0.02, 1.0, -0.08, 0.06), vec4(-0.02, 1.0, -0.08, 0.06));
+const vec4 PLEXUS_HYENA_B[28] = vec4[28](
+  vec4(0.0, 1.18, 0.04, 0.15), vec4(0.0, 0.92, -0.01, 0.13), vec4(0.0, 1.72, 0.08, 0.08), vec4(0.0, 1.78, 0.13, 0.09), vec4(0.0, 1.71, 0.34, 0.045),
+  vec4(0.13, 1.97, -0.03, 0.05), vec4(-0.13, 1.97, -0.03, 0.05), vec4(0.0, 1.28, -0.17, 0.025),
+  vec4(0.25, 1.18, 0.06, 0.05), vec4(0.27, 0.93, 0.14, 0.04), vec4(0.27, 0.83, 0.17, 0.03),
+  vec4(-0.25, 1.18, 0.06, 0.05), vec4(-0.27, 0.93, 0.14, 0.04), vec4(-0.27, 0.83, 0.17, 0.03),
+  vec4(0.12, 0.7, 0.1, 0.06), vec4(0.12, 0.47, -0.04, 0.035), vec4(0.12, 0.3, 0.0, 0.03), vec4(0.12, 0.24, 0.08, 0.032),
+  vec4(-0.12, 0.7, 0.1, 0.06), vec4(-0.12, 0.47, -0.04, 0.035), vec4(-0.12, 0.3, 0.0, 0.03), vec4(-0.12, 0.24, 0.08, 0.032),
+  vec4(0.0, 0.7, -0.3, 0.03),
+  vec4(0.13, 1.43, 0.09, 0.05), vec4(-0.13, 1.43, 0.09, 0.05), vec4(0.0, 1.0, 0.08, 0.1), vec4(0.14, 0.99, -0.08, 0.06), vec4(-0.14, 0.99, -0.08, 0.06));
+const vec4 PLEXUS_HYENA_C[28] = vec4[28](
+  vec4(0.0, 1.36, 0.07, 0.03), vec4(0.0, 1.05, 0.04, -0.02), vec4(0.0, 1.64, -0.02, 0.01), vec4(0.0, 1.82, 0.06, 0.03), vec4(0.0, 1.76, 0.24, 0.0),
+  vec4(0.11, 1.92, 0.0, 0.015), vec4(-0.11, 1.92, 0.0, 0.015), vec4(0.0, 1.62, -0.16, 0.015),
+  vec4(0.24, 1.34, 0.0, 0.015), vec4(0.27, 1.05, 0.12, 0.012), vec4(0.28, 0.88, 0.17, 0.0),
+  vec4(-0.24, 1.34, 0.0, 0.015), vec4(-0.27, 1.05, 0.12, 0.012), vec4(-0.28, 0.88, 0.17, 0.0),
+  vec4(0.12, 0.84, 0.08, 0.02), vec4(0.12, 0.58, 0.05, 0.015), vec4(0.12, 0.38, -0.03, 0.0), vec4(0.12, 0.25, 0.03, 0.0),
+  vec4(-0.12, 0.84, 0.08, 0.02), vec4(-0.12, 0.58, 0.05, 0.015), vec4(-0.12, 0.38, -0.03, 0.0), vec4(-0.12, 0.25, 0.03, 0.0),
+  vec4(0.0, 0.86, -0.27, 0.035),
+  vec4(0.075, 1.4, 0.14, 0.015), vec4(-0.075, 1.4, 0.14, 0.015), vec4(0.0, 1.1, 0.16, 0.04), vec4(0.08, 0.97, -0.15, 0.03), vec4(-0.08, 0.97, -0.15, 0.03));
+const float PLEXUS_HYENA_SWELL[28] = float[28](0.4, 0.3, 0.5, 0.45, 0.5, 0.6, 0.6, 0.3, 0.35, 0.3, 0.5, 0.35, 0.3, 0.5, 0.35, 0.25, 0.5, 0.5, 0.35, 0.25, 0.5, 0.5, 0.6, 0.5, 0.5, 0.55, 0.5, 0.5);
+const float PLEXUS_HYENA_FLAT[28] = float[28](0.75, 0.75, 1.0, 1.0, 1.0, 0.5, 0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.6, 0.6, 0.8, 0.8, 0.8);
+const float PLEXUS_HYENA_N[28] = float[28](36.0, 28.0, 22.0, 28.0, 20.0, 12.0, 12.0, 24.0, 20.0, 18.0, 10.0, 20.0, 18.0, 10.0, 24.0, 20.0, 12.0, 10.0, 24.0, 20.0, 12.0, 10.0, 18.0, 16.0, 16.0, 24.0, 16.0, 16.0);
+const float PLEXUS_HYENA_CROWD[28] = float[28](0.16, 0.2, 0.3, 0.22, 0.35, 0.5, 0.5, 0.4, 0.5, 0.5, 0.6, 0.5, 0.5, 0.6, 0.45, 0.5, 0.6, 0.6, 0.45, 0.5, 0.6, 0.6, 0.45, 0.35, 0.35, 0.3, 0.4, 0.4);
+// how far off his beat is taken to start (part.frag fades a beat to half
+// by about this far)
+const float PLEXUS_HYENA_BEAT = 3.0;
+const int PLEXUS_HYENA_MANE = 7;
+const int PLEXUS_HYENA_TAIL = 22;
 const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 56.0;
 const float PLEXUS_HEART_DROP = 1.1;
@@ -881,23 +903,29 @@ vec4 plexusTendrilRide(float id, int height, float t, vec3 moved) {
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
 float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_CHEST : 0.0); }
-// where point `id` of the hyena's limb `seg` rests: wound round the limb
-// from its first end to its last on the golden angle, its radius rounding
-// in at both ends, flattened front to back as the limb is
+// where point `id` of the hyena's limb `seg` rests in his bind pose: wound
+// round the limb's curve from its first end to its last on the golden
+// angle, its radius swelling where its muscle is and rounding in at both
+// ends, flattened front to back as the limb is; the mane's and tail's
+// points stand out unevenly, tufted
 vec3 plexusHyena(float id, float seg) {
   int s = int(seg);
   vec4 a = PLEXUS_HYENA_A[s];
   vec4 b = PLEXUS_HYENA_B[s];
+  vec4 c = PLEXUS_HYENA_C[s];
   float u = (id + 0.5) / PLEXUS_HYENA_N[s];
-  vec3 ax = b.xyz - a.xyz;
-  vec3 d = normalize(ax);
+  vec3 on = (1.0 - u) * (1.0 - u) * a.xyz + 2.0 * u * (1.0 - u) * c.xyz + u * u * b.xyz;
+  vec3 d = normalize((1.0 - u) * (c.xyz - a.xyz) + u * (b.xyz - c.xyz));
   vec3 side = normalize(cross(d, abs(d.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   vec3 up = cross(side, d);
   float ang = id * 2.39996;
-  float r = mix(a.w, b.w, u) * sqrt(max(sin(0.5 * TAU * mix(0.04, 0.96, u)), 0.0));
+  float sw = (u - PLEXUS_HYENA_SWELL[s]) / 0.25;
+  float r = (mix(a.w, b.w, u) + c.w * exp(-sw * sw)) * sqrt(max(sin(0.5 * TAU * mix(0.04, 0.96, u)), 0.0));
+  vec3 h = hash33(vec3(id, seg, 4.3));
+  if (s == PLEXUS_HYENA_MANE || s == PLEXUS_HYENA_TAIL) r *= 1.0 + 0.9 * h.z;
   vec3 off = (side * cos(ang) + up * sin(ang)) * r;
   off.z *= PLEXUS_HYENA_FLAT[s];
-  return a.xyz + ax * u + off + (hash33(vec3(id, seg, 4.3)) - 0.5) * 0.01;
+  return on + off + (h - 0.5) * 0.01;
 }
 // where it is at time `t`: drifting round its rest, each axis on two slow
 // waves of its own (a part only a little, keeping its form); a yielder's
@@ -1099,6 +1127,8 @@ void main() {
   // lights do not run together into one white glare and the shape still
   // reads; 1 elsewhere
   float plexCrowd = 1.0;
+  // how much of that its panes keep (all of it but the hyena's)
+  float plexPaneCrowd = 1.0;
   float plexKind = 0.0;
   float plexLayer = 0.0;
   // whether it is light a yielder gathers or yields: 1 a mote, 2 the
@@ -1177,6 +1207,15 @@ void main() {
     if (shape == PLEXUS_HYENA) plexSeg = float(PLEXUS_HYENA_TORSO);
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
     plexSeg = limb;
+    // (posed by his bones, each limb riding its own: a bond's far end and
+    // his chest are carried by theirs, then brought into this limb's)
+    if (shape == PLEXUS_HYENA && mode == PLACE_SKINNED) {
+      Bones BB = Bones(pc.bones);
+      int base = int(ie.y + 0.5);
+      mat4 back = inverse(M);
+      if (plexKind > 2.5) B = (back * bone(BB, base, 1) * vec4(B, 1.0)).xyz;
+      H = (back * BB.m[base + PLEXUS_HYENA_TORSO] * vec4(H, 1.0)).xyz;
+    }
     // how much there is of what a yielder yields, as it grows and is let go
     // (or of a heart's filament as it drips down)
     float yield = shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING ? plexusYield(ids.x, shape, t).w : 1.0;
@@ -1211,6 +1250,7 @@ void main() {
     if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) plexCrowd = 0.6;
     if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) plexCrowd = 0.55;
     if (shape == PLEXUS_HYENA) plexCrowd = PLEXUS_HYENA_CROWD[int(plexSeg)];
+    if (shape == PLEXUS_HYENA) plexPaneCrowd = min(plexCrowd * 1.5, 1.0);
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING || shape == PLEXUS_HEART_MADE_GLOW ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
     bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;
@@ -1260,7 +1300,9 @@ void main() {
       w = M * vec4(lp, 1.0);
       wn = mat3(M) * n;
     }
-    plexBeat = length(lp - H);
+    // (his beat starts as far off as it would have faded to half, so it
+    // never glares through his dense body)
+    plexBeat = length(lp - H) + (shape == PLEXUS_HYENA ? PLEXUS_HYENA_BEAT : 0.0);
   } else if (mode == PLACE_CURVE) {
     // a curve (the tail): the mesh runs straight up +Y over 0..1; each point
     // goes to that fraction along the Catmull-Rom curve through c0..c3 (the
@@ -1437,8 +1479,9 @@ void main() {
     v_t = plexBeat;
     // what it is, 4 more on the companions' layer, 8 more for a mote of light
     v_u = plexKind + 4.0 * plexLayer + 8.0 * step(0.5, plexMote);
-    // (a pane shines whole, crowded or not, so the rose's petals read)
-    v_glow = plexFade * (plexKind > 1.5 && plexKind < 2.5 ? 1.0 : plexCrowd);
+    // (a pane shines whole, crowded or not, so the rose's petals read; the
+    // hyena's are dimmed as his lines are, his glass stacking deep)
+    v_glow = plexFade * (plexKind > 1.5 && plexKind < 2.5 ? plexPaneCrowd : plexCrowd);
   }
   v_obj = p;
   // a constellate line: how far across it (-1 to 1), for its glow

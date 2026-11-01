@@ -439,6 +439,15 @@ pub const Specimen=struct{
       const at=m.footprintCentre(x,s.at[1],1,g.heightAt(x,s.at[1]));
       // how it sways
       const like=likeOf(id);
+      // (a skinned sample: posed by its bones, on the game's clock)
+      if(meshlib.poser(id))|pose|{
+        // its bones now, and where they go in this frame's list
+        var bones:[meshlib.maxPoseBones]m.M4=undefined;
+        const n=pose(@floatCast(@mod(g.time,loopWrap)),m.translate(at),&bones);
+        const base=try g.parts.pose(bones[0..n]);
+        try g.parts.emitSkinned(id,base,at,.{.phase=seed});
+        continue;
+      }
       try g.parts.emit(id,m.translate(at),.{.phase=seed,.fade=like.sap,.sway=like.sway,.tall=like.tall,.grown=l.growth});
       // what glows with it, lit from within, throwing its light
       for(meshlib.glows(id))|gl|{
