@@ -79,6 +79,12 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
   the wind; thin pale streaks lit by the sky, each splashing a ring that
   spreads and fades where it lands. Ground the rain has soaked is darker
   and a little bluer, its grass too (terrain.frag), drying slowly.
+- **Pools** (`passes/pools.zig`, pools.vert/.frag): the rain pooled in
+  the dips, a surface grown on the GPU over every texel near the view at
+  the water's level, sinking into the ground at a soft shore. Still and
+  dark: clear in the shallows, murky where deep, mirroring the sky (more
+  at a graze) and the key light's glint, stirred by the wind and ringed
+  by the rain falling on it.
 - **Light shafts:** the key light is looked up in its shadow map at every
   step, so what shades the ground shades the air: light falls through the
   gaps between plants and structures, and glows toward the sun (forward

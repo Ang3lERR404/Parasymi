@@ -232,17 +232,27 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
    drifts and spreads far less and lasts 10× longer, piling up heavy.
 2. **Rain falls on its own** where cloud grows past 1.4 (a grove of four
    young trees first rains after about three minutes, then in showers
-   every few minutes). It rains until the cloud is rained out to 0.7,
+   every few minutes; the demo's grove of nine, east of the garden, after
+   two, then near steadily). It rains until the cloud is rained out to 0.7,
    harder the thicker it is, each shower building and easing and drawing
    the cloud down; the rain feeds the grove's own roots.
 3. **Rain refills the ground:** where it rains the ground grows wet
-   (soaked through in 40 s of a downpour, drying to a third in 5
-   minutes). Once a second the game reads the whole field back (the
+   (one shower soaks it through, a downpour in 2.5 s; drying to a third
+   in 5 minutes). Once a second the game reads the whole field back (the
    engine's `field`) and soaks every loaded tile's water back up toward
    all it holds, as fast as the ground over it is wet (a third of what is
    missing left after a minute wet through; never past its cap).
-4. **The first rain** over the loaded garden is a discovery (`firstRain`);
-   the new convergent breeds it opens are still to be designed.
+   **It pools:** rain on ground already wet through stands on it as water
+   (the field's alpha past 1) and runs downhill, levelling out in the
+   dips and valleys (moisture.frag, on the GPU, no water made or lost on
+   the way); pooled, it dries away over 10 minutes, keeping the ground
+   under it wet through. The pools pass draws it (`passes/pools.zig`).
+4. **The first rain** over the loaded garden is a discovery (`firstRain`).
+   The breeds it opens (the gardener's picks, to be built on the pools):
+   a moss creeper (spreads moss onto wet soil, so groves can grow), a
+   mire lily (grows only on soaked ground, turning ground water into
+   essence), a root well (stores rainwater above ground) and a cache
+   taking the sap cache's place after the unforming, with more slots.
 5. **The storm** (to come): a new plant, a weftstone kin charging ions to
    strike the rain clouds into storms; the weather fully formed.
 

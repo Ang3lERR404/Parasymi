@@ -21,7 +21,7 @@ const shaders=[_][]const u8{
   "fog.vert","fog.frag",
   "moisture.vert","moisture.frag",
   "moisture_source.vert","moisture_source.frag",
-  "rain.vert","rain.frag",
+  "rain.vert","rain.frag","pools.vert","pools.frag",
 };
 /// shaders compiled a second time from the same source with a define,
 /// imported under their own name: (name, source, define). The glass

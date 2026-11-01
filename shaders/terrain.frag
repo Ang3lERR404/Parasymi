@@ -8,6 +8,7 @@
 #include "ground.glsl"
 #ifndef OVERHEAD
 #include "volume.glsl"
+#include "moisture.glsl"
 #endif
 
 layout(location = 0) centroid in vec3 v_pos;
@@ -107,7 +108,7 @@ void main() {
   }
 #ifndef OVERHEAD
   // the rain soaking it (and its grass) darker
-  float wet = texture(field_map, overheadUv(v_pos)).a;
+  float wet = moistureWet(texture(field_map, overheadUv(v_pos)).a);
   albedo *= mix(vec3(1.0), WET_TINT * (1.0 - WET_DARK), wet);
 #endif
   float sh = keyShadow(v_pos, n);

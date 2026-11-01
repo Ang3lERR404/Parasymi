@@ -1,5 +1,5 @@
 #version 450
-//! the moisture field's next step at each texel (render/passes/moisture.zig): the last step drifted along the garden's wind, spread into its neighbours and drying away; thick cloud gathering, holding together and raining itself out, the rain soaking the ground. Red the low mist, green the cloud, blue the rain falling, alpha the ground's wetness.
+//! the moisture field's next step at each texel (render/passes/moisture.zig): the last step drifted along the garden's wind, spread into its neighbours and drying away; thick cloud gathering, holding together and raining itself out, the rain soaking the ground, and what the soaked ground cannot take running downhill to pool in its dips. Red the low mist, green the cloud, blue the rain falling, alpha the ground's water: its wetness up to 1, the water pooled on it past 1.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "volume.glsl"
@@ -41,8 +41,30 @@ const float RAIN_EASE = 0.35;
 const float RAIN_DRAW = 0.3;
 // the ground under the rain: how long a downpour takes to soak it through,
 // and how long it takes to dry to a third once the rain stops (s)
-const float WET_SOAK = 40.0;
+const float WET_SOAK = 2.5;
 const float WET_DRY = 300.0;
+// pooled water (the ground's water past wet through, MOISTURE_POOL_DEPTH a
+// unit deep, moisture.glsl): how fast it runs downhill (the share of the
+// difference in level closed a second, between neighbours), and how long
+// it takes to dry away to a third
+const float POOL_FLOW = 1.0;
+const float POOL_DRY = 600.0;
+
+// the pool at `uv` as the last step left it (pool units) and its level
+// (world units): the ground's height there with the water on it
+vec2 pool(vec2 uv) {
+  float p = max(texture(field_map, uv).a - 1.0, 0.0);
+  return vec2(p, texture(overhead_map, uv).a + p * MOISTURE_POOL_DEPTH);
+}
+
+// what runs from the pool `a` into its neighbour `b` this step (negative:
+// from it), worked out the same from either side so no water is made or
+// lost: as much as levels them, never more than a quarter of what the one
+// it leaves holds
+float runs(vec2 a, vec2 b, float dt) {
+  float f = (a.y - b.y) / MOISTURE_POOL_DEPTH * 0.5 * clamp(POOL_FLOW * dt, 0.0, 0.5);
+  return clamp(f, -0.25 * b.x, 0.25 * a.x);
+}
 
 // the mist at `uv`, the cloud and the rain at `uv2`, as the last step left them
 vec3 at(vec2 uv, vec2 uv2) {
@@ -79,9 +101,14 @@ void main() {
   float want = raining ? mix(RAIN_FLOOR, 1.0, clamp((c.g - RAIN_STOP) / (MOISTURE_RAIN_AT - RAIN_STOP), 0.0, 1.0)) : 0.0;
   c.b += (want - c.b) * (1.0 - exp(-dt * RAIN_EASE));
   c.g -= c.b * RAIN_DRAW * dt;
-  // the ground under it (which stays where it is): soaked by the rain on
-  // it, drying slowly once the rain stops
-  float wet = texture(field_map, uv).a;
-  wet = min(wet + c.b * dt / WET_SOAK, 1.0) * exp(-dt / WET_DRY);
-  o = vec4(max(c, 0.0), wet);
+  // the ground under it (which stays where it is): past wet through, its
+  // water pools and runs downhill into its neighbours, levelling out in the
+  // dips; then the rain on it soaks in. Pooled, the water slowly dries
+  // away, the ground under it kept wet through; bare, the ground dries
+  vec2 here = pool(uv);
+  float lost = runs(here, pool(uv + dx), dt) + runs(here, pool(uv - dx), dt) + runs(here, pool(uv + dy), dt) + runs(here, pool(uv - dy), dt);
+  float ground = max(texture(field_map, uv).a - lost, 0.0) + c.b * dt / WET_SOAK;
+  float p = max(ground - 1.0, 0.0) * exp(-dt / POOL_DRY);
+  float wet = p > 0.0 ? 1.0 : ground * exp(-dt / WET_DRY);
+  o = vec4(max(c, 0.0), wet + p);
 }

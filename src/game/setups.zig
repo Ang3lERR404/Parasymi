@@ -93,7 +93,9 @@ pub fn demo(g:*Game,seconds:f32)Allocator.Error!void{
 }
 /// how many nebularbors the demo's grove holds, and how far into their
 /// lives they are (real trees, a little aged)
-const groveTrees=4;
+const groveTrees=9;
+/// trees along each row of the grove, 3 tiles apart
+const groveRow=3;
 /// (how far into their lives)
 const groveGrown:f32=0.25;
 /// a grove of nebularbors on the nearest moss east of the garden, side by
@@ -118,7 +120,7 @@ fn grove(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
   g.structs.get(f).grown=groveGrown;
   for(1..groveTrees)|k|{
     // the next tree, as near the first as it fits
-    const j=try nearest(g,at[0]+@as(i32,@intCast(k%2))*3,at[1]+@as(i32,@intCast(k/2))*3,.nebularbor,0.3+0.2*m.f(k)) orelse continue;
+    const j=try nearest(g,at[0]+@as(i32,@intCast(k%groveRow))*3,at[1]+@as(i32,@intCast(k/groveRow))*3,.nebularbor,0.3+0.2*m.f(k)) orelse continue;
     g.structs.get(j).grown=groveGrown;
   }
 }

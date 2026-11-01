@@ -66,7 +66,8 @@ pub const Weather=struct{
         // the tile's place, and the field over its middle
         const wx,const wz=c.tileOf(t);
         const f=Volume.texelIn(field,.{m.f(wx)+0.5,m.f(wz)+0.5});
-        c.water[t]=soaked(c.water[t],c.waterCap[t],f[3],dt);
+        // (past 1 the field's alpha is water pooled on wet-through ground)
+        c.water[t]=soaked(c.water[t],c.waterCap[t],@min(f[3],1),dt);
         if(f[2]>firstRain)raining=true;
       }
     }

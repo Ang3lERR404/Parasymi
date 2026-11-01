@@ -101,6 +101,8 @@ pub const passes=struct{
   pub const partsHead=@import("passes/parts.zig").head;
   /// the parts' other solid fragments: the wolf, nodes, motes, structures
   pub const parts=@import("passes/parts.zig");
+  /// the rain pooled in the ground's dips, over the solids
+  pub const pools=@import("passes/pools.zig");
   // see-through fragments of plants and parts, over every solid one
   /// the plants' see-through fragments, blended over the solids
   pub const plantsGlass=@import("passes/plants.zig").glass;
