@@ -93,7 +93,7 @@ pub const Occ=enum(u32){
 /// a chunk at `at` with its tiles not yet filled (the generator fills them)
 pub fn blank(at:Coord)Chunk{
   return.{.at=at,.height=undefined,.kind=undefined,.ley=undefined,.leyCap=undefined,
-    .res=undefined,.occ=undefined};
+    .water=undefined,.waterCap=undefined,.res=undefined,.occ=undefined};
 }
 /// one 32x32 block of the world: each tile's ground, mana, resource and occupant
 pub const Chunk=struct{
@@ -107,6 +107,12 @@ pub const Chunk=struct{
   ley:[tileCount]f32,
   /// the most ley mana each tile refills to
   leyCap:[tileCount]f32,
+  /// the water in the ground under each tile now (0..1 of a tile soaked
+  /// through), which roots drink and which slowly comes back
+  water:[tileCount]f32,
+  /// the water each tile's ground holds when it has been left alone: wet
+  /// where moss grows, dry on stone and high ground
+  waterCap:[tileCount]f32,
   /// gatherable resource left on the tile (0 = no node). The item is decided by `kind`.
   res:[tileCount]Res,
   /// occupant of each tile (see `Occ`).

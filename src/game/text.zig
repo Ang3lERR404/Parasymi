@@ -457,7 +457,7 @@ pub const Strings=struct{
     vultLoose:S="",
     /// an untethered Vultrixi relaying an item along its kin
     vultRelays:S="",
-    /// a nebularbor breathing: into the mist and into its cloud, a minute
+    /// a nebularbor drinking and breathing: water drunk, into the mist and into its cloud, a minute
     breathes:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",

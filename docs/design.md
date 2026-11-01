@@ -201,15 +201,22 @@ plant.
   growing: its life (`grow` 24000 s, 80 days) is drawn along a curve
   that slows forever (`drawn`), a sapling putting out young leaves, a real
   tree at 8 days, then old age: its last young leaves fall one by one and
-  an offshoot grows where each was, and woven strands harden its foot. It
-  has no work: it breathes moisture into the air (`breath` hook), a mist
-  round its foot and a cloud over its crown, more the further along its
-  life (up to 1.6× a real tree's). The moisture is a field on the GPU
-  (`passes/moisture.zig`) that drifts on the wind, spreads and dries; the
-  fog draws it. Hovering any tile reads the air over it (`AIR MIST x CLOUD
-  y`, read back from the GPU: the engine's `probe`). It does nothing yet:
-  the weather begins here. It draws on nothing, so it can never run the
-  ground dry. Still to come: its roots drinking the ground's water.
+  an offshoot grows where each was, and woven strands harden its foot.
+  - **Ground water** (`Chunk.water`/`waterCap`, from the generator's
+    wetness: moss holds well over a third, stone little; not saved, like
+    the ley). Hovering a tile shows it (`WATER x%`).
+  - **Its roots drink** (all through its life, `Def.worksGrowing`) from its
+    3×3 and the ring round it, an even share from each, more the further
+    along its life; never below 40% of a tile's water (`floor`), and every
+    tile drunk from refills toward it (1/600 of what is missing a second).
+  - **It breathes** (`breath` hook) a trickle of its own (8%) and what it
+    drinks, a mist round its foot and a cloud over its crown; in its old
+    age it makes up to 1.6× the mist of each drop. Dry ground: the
+    trickle alone.
+  - The moisture is a field on the GPU (`passes/moisture.zig`) that drifts
+    on the wind, spreads and dries; the fog draws it. Hovering any tile
+    reads the air over it (`AIR MIST x CLOUD y`, read back from the GPU:
+    the engine's `probe`). It does nothing yet: the weather begins here.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined

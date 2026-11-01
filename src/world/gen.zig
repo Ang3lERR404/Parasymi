@@ -47,6 +47,14 @@ const hillL:f32=14;
 const hillAmount:f32=0.25;
 /// the wetness wavelength (tiles)
 const wetL:f32=55;
+/// the wetness at which a tile's ground holds no water, and the span over
+/// which it comes to hold all it can (moss, past `wetAmount`, holds well
+/// over a third)
+const dryAt:f32=-0.3;
+/// (the span)
+const soakSpan:f32=0.9;
+/// how much of its water stone keeps: it hardly holds any
+const stoneWater:f32=0.15;
 /// the ley veins' wavelength (tiles)
 const veinL:f32=45;
 /// the resource patches' wavelength (tiles)
@@ -81,13 +89,13 @@ const slotL:f32=5;
 /// the node noise above which a patch tile bears one
 const slotAmount:f32=0.4;
 /// what the generator makes of one tile: its height, ground kind, ley and resource
-pub const Sample=struct{height:f32,kind:ck.Kind,ley:f32,res:ck.Res=0,sealed:f32=leyBase};
+pub const Sample=struct{height:f32,kind:ck.Kind,ley:f32,res:ck.Res=0,sealed:f32=leyBase,water:f32=0};
 /// what a tile becomes once the ley lines seal (the unforming): a ley line
 /// closes to a scar of bare soil, holding only the ley a tile off the
 /// lines would, its shards gone; any other tile is as it was
 pub fn sealOf(s:Sample)Sample{
   if(s.kind!=.ley)return s;
-  return.{.height=s.height,.kind=.soil,.ley=s.sealed,.res=0,.sealed=s.sealed};
+  return.{.height=s.height,.kind=.soil,.ley=s.sealed,.res=0,.sealed=s.sealed,.water=s.water};
 }
 /// the tile at world (wx, wy) for `seed`: its terraced height, kind, ley and
 /// any resource node; the same for the same seed and tile, whatever is loaded
@@ -124,7 +132,9 @@ pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
   const patch=noise.fbm(seed+%5,x/patchL,y/patchL,patchOct);
   // the resource it holds, if a node sits here
   const res:ck.Res=if(patch>patchAmount and slot>slotAmount)@intFromFloat(resMin+h*resSpread)else 0;
-  return.{.height=height,.kind=kind,.ley=ley,.res=res,.sealed=leyBase+vein*vein*vein};
+  // the water its ground holds: as wet as it is, little in stone
+  const water=m.unlerp(dryAt,dryAt+soakSpan,wet)*(if(kind==.stone)stoneWater else 1);
+  return.{.height=height,.kind=kind,.ley=ley,.res=res,.sealed=leyBase+vein*vein*vein,.water=water};
 }
 /// the ground height of world tile (wx, wy)
 pub fn heightAt(seed:u64,wx:i32,wy:i32)f32{return sample(seed,wx,wy).height;}
@@ -139,6 +149,8 @@ pub fn generate(seed:u64,c:*ck.Chunk)void{
     c.kind[i]=s.kind;
     c.ley[i]=s.ley;
     c.leyCap[i]=s.ley;
+    c.water[i]=s.water;
+    c.waterCap[i]=s.water;
     c.res[i]=s.res;
     c.occ[i]=.none;
   }

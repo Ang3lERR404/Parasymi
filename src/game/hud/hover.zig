@@ -88,7 +88,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
     return;
   }
   try d.trellis(panelX,panelY,360,if(wet(g)!=null)60+lineH else 60,s.card,0.6);
-  _=try d.print(textX,textTop,s.textLabel,s.white,txt.s.hud.tile,.{txt.tile(c.kind[t]),c.leyCap[t]});
+  _=try d.print(textX,textTop,s.textLabel,s.white,txt.s.hud.tile,.{txt.tile(c.kind[t]),c.leyCap[t],c.water[t]*100});
   if(!near)_=try d.text(textX+248,textTop+2,s.textNote,s.dim,txt.s.hud.tooFar);
   if(wet(g))|a|try air(d,textX,textTop+lineH+4,a);
 }

@@ -194,11 +194,11 @@ pub fn tickWith(ctx:Ctx,dt:f32)Allocator.Error!void{
       g0.activity=0;
       continue;
     }
-    // whether it worked this tick: a sprout only grows, never works
-    const active=if(g0.grown<1)blk:{
-      g0.grown=@min(1,g0.grown+dt/g0.def().grow);
-      break:blk false;
-    }else switch(g0.kind()){
+    // whether it worked this tick: a sprout only grows, never works (but
+    // one whose life is all growing works as it grows)
+    const growing=g0.grown<1;
+    if(growing)g0.grown=@min(1,g0.grown+dt/g0.def().grow);
+    const active=if(growing and !g0.def().worksGrowing)false else switch(g0.kind()){
       // a tick that may put something down can fail for room
       inline else=>|k|if(comptime reg.has(k,"tick"))try orFail(reg.module(k).tick(ctx,id,dt))else false,
     };

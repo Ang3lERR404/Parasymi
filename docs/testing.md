@@ -55,7 +55,9 @@ their end 1.5 s, then start again.
 | `active` | structure | grown and working its real `tick`: every 0.4 s handed one of the next thing it `wants` (a carrier: into it from behind, let go 2 s later), what it made (an `output` it does not want) taken away; put down afresh each loop. Emitted pieces (cups, pours, roots to nodes, lids, crystals) as in play |
 
 ### Held states
-Held states skip the world's tick.
+Held states skip the world's tick. (So a nebularbor held breathes only
+its trickle: its roots drink in its tick. Use `active` to see its mist
+and cloud.)
 
 - A plant gets growth, mana, flow, health and radiating written.
 - A structure runs only its `link` hooks (`Structures.link`: a conduit's

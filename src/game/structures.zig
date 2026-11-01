@@ -256,6 +256,9 @@ pub const Def=struct{
   /// what it emits travels far from it (a sporecaster's spores): it is
   /// emitted however far it stands from the view
   far:bool=false,
+  /// its `tick` runs while it grows too, not only once grown: a life that
+  /// is all growing (the nebularbor's roots drink from the first day)
+  worksGrowing:bool=false,
   /// the lineage it belongs to, the one place that says so: every kind
   /// names it (null only while it is not yet known, as the strange seed's);
   /// what the unforming does to it, whether a monfris or the hands weave
