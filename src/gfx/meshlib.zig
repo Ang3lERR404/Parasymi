@@ -278,6 +278,12 @@ const parts=struct{
   pub const vultrixi=@import("meshes/vultrixi.zig");
   /// the weftstone: a loomfern and a lithophage grown into one, floating
   pub const weftstone=@import("meshes/weftstone.zig");
+  /// a look for the moisture tree: the dew-bearer, curtains of strands hanging from its arching boughs
+  pub const moistureWeeping=@import("meshes/moisture_tree.zig").weeping;
+  /// a look for the moisture tree: the cloud-bearer, forking limbs crowned flat as an umbrella
+  pub const moistureCloud=@import("meshes/moisture_tree.zig").cloud;
+  /// a look for the moisture tree: the cloud-bearer's umbrella with the dew-bearer's strands at its rim
+  pub const moistureBlend=@import("meshes/moisture_tree.zig").blend;
   // the halo: its polyp and the diamond it forms
   /// the polyp: woven of both lineages, its stem caging a sac of both saps, fronds and plumed tentacles crowning it
   pub const polyp=@import("meshes/polyp_convergent.zig").woven;

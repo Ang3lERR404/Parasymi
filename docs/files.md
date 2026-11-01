@@ -89,7 +89,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `part.vert` — places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 - `plant.frag` — plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
 - `plant.vert` — plants by form: growth, wind, parasite cages and crowns, lantern filaments, confluence keys, radiant gathering and falling.
-- `sky.frag` — the sky dome: gradient by night and day, sun, moon and stars; once the unforming has shifted it, the ley's glow: veils of violet light…
+- `sky.frag` — the sky dome: gradient by night and day, sun, moon and stars; at the unforming the old sky shatters like glass from the zenith down, a ring…
 - `sky.vert` — one full-screen triangle at the far plane, turned back into view directions.
 - `surface.glsl` — fragment-stage helpers for plant and part materials: what needs screen-space derivatives or discards.
 - `terrain.frag` — terrain shading: the ground's kinds melted together with their own surfaces (ground.glsl), ley sight and its plexus, the ley lines sealing…
@@ -182,7 +182,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `deep_rooting.zig` — DEEP ROOTING: root-diggers, which work resource nodes so the wolf no longer has to.
 - `drift_spores.zig` — DRIFT SPORES: the first floaters, Driftwisps, which condense starlight.
 - `hungering_tendrils.zig` — HUNGERING TENDRILS: parasites drain twice as hard.
-- `interweaving.zig` — INTERWEAVING: what a weftstone and a driftbraid make between them, grown side by side: monfris, 2x2 trees of both lineages that weave the…
+- `interweaving.zig` — INTERWEAVING: what a weftstone and a driftbraid make between them, grown side by side: monfris, 2x2 trees of both lineages that weave…
 - `lattice_of_thought.zig` — LATTICE OF THOUGHT: a minor study along Arsthraxia.
 - `ley_sight.zig` — LEY SIGHT: the ley currents beneath the ground become visible.
 - `lithophagy.zig` — LITHOPHAGY: the parasites learn to feed on stone: lithophages, which draw the mineral nodes all round them into a crystal and sap it away as
@@ -264,7 +264,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `halo.zig` — the halo a diamond projects: not a structure itself, but what a diamond shows and holds, while its four blooms are drawn in and once it has…
 - `lithophage.zig` — LITHOPHAGE: a parasite that eats stone.
 - `loomfern.zig` — LOOMFERN: a fern that weaves fibre by itself, so the wolf need not pull it from moss.
-- `monfris.zig` — MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that weaves the advanced tier (`craft.advanced`), which nothing else can: its…
+- `monfris.zig` — MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that weaves everything of both lineages, the convergent bulbs (and, once the…
 - `polyp.zig` — POLYP: woven of both lineages, it feeds on the light of grown celestial blooms within `feedReach` tiles, and on it grows flowers of both…
 - `root_digger.zig` — ROOT-DIGGER: the first gathering automation.
 - `sap_cache.zig` — SAP CACHE: plain storage.
@@ -301,6 +301,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `lithophage.zig` — mesh: LITHOPHAGE.
 - `loomfern.zig` — mesh: LOOMFERN.
 - `mineral_kit.zig` — shared pieces for the ground's minerals: crystals, flat-faced (each face its own normal) so they catch the light as cut planes, and…
+- `moisture_tree.zig` — mesh: the MOISTURE TREE's looks, grown full, for the gardener to pick between (`--samples=`): a tree of both lineages on its 3x3 ground, the
 - `monfris.zig` — mesh: MONFRIS.
 - `mote.zig` — mesh: MOTE.
 - `node_fibre.zig` — mesh: NODE FIBRE.
@@ -381,7 +382,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `hollowheart.zig` — HOLLOWHEART: a 2x2 heart-tree.
 - `lumenroot.zig` — LUMENROOT: the first symbiote.
 - `thornleech.zig` — THORNLEECH: the first parasite, alien rather than hostile (a coil, built by gfx/meshes/parasite_kit.zig: a lattice cage of a stalk with its…
-- `vesper.zig` — VESPER BLOOM: the first convergent hybrid, spliced where symbiote and parasite touch.
+- `vesper.zig` — VESPER BLOOM: a radiant hybrid, spliced where symbiote and parasite touch.
 
 ## src/sim/
 - `turn.zig` — turning what stands in the garden (R): a rooted plant or structure pulls its roots up out of the ground, heaves itself up on them, steps…
