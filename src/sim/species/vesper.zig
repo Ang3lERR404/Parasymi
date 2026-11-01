@@ -1,4 +1,4 @@
-//! VESPER BLOOM: the first convergent hybrid, spliced where symbiote and
+//! VESPER BLOOM: a radiant hybrid, spliced where symbiote and
 //! parasite touch. Shares with symbiotes and drains parasites. The evening
 //! star's flower, of the radiant lineage's body (radiant_kit `star`): it
 //! is gathered, never grown, falling in from the sky piece by piece, and
@@ -11,10 +11,10 @@ const species=lib.species;
 const engine=lib.engine;
 /// colour types, for its genome's dusk violet and evening gold
 const color=engine.core.color;
-/// the vesper bloom: a convergent star of lumenroot and thornleech that
+/// the vesper bloom: a radiant star of lumenroot and thornleech that
 /// shares and drains, and withers outside a bloom's field
 pub const def:species.Species=.{
-  .lineage=.convergent,.seed=.seedVesper,
+  .lineage=.radiant,.seed=.seedVesper,
   .matureTime=16,.manaCap=24,.leyDraw=0.8,.share=0.6,.drain=0.8,.yield=0.4,
   // plucked from its core, hanging on light over its tile
   .pluck=0.6,

@@ -178,7 +178,7 @@ plant.
   evolved it into a convergent structure (`Recipe.evolves`), and the
   advanced tier only it weaves
   (`Recipe.advanced`, none yet); together `craft.loomFor`. Never the
-  diamond or the vesper seed (not convergent), which are the
+  diamond or the vesper seed (radiant), which are the
   germinator's. It never lets go of what its weave eats (a
   weftstone while it weaves a monfris). Fed by at most 6 Vultrixi
   (`monfris.tethers`, because a weave of its has at most 6 kinds), by

@@ -362,10 +362,11 @@ pub const Ecology=struct{
           // this neighbour's slot and lineage
           const j=id.idx();
           const lj=species.get(sps[j]).lineage;
-          // whether it is prey: a parasite takes from non-parasites, a convergent from parasites
+          // whether it is prey: a parasite takes from non-parasites, a convergent
+          // or radiant one from parasites
           const prey=switch(lin){
             .parasitic=>lj!=.parasitic,
-            .convergent=>lj==.parasitic,
+            .convergent,.radiant=>lj==.parasitic,
             .symbiotic=>false,
           };
           if(!prey)continue;

@@ -169,7 +169,7 @@ pub fn radiant(sp:species.Id)bool{
 }
 /// whether a species is of a lineage the event kills (symbiotic or parasitic, not radiant)
 fn dies(sp:species.Id)bool{
-  return !radiant(sp) and species.get(sp).lineage!=.convergent;
+  return switch(species.get(sp).lineage){.symbiotic,.parasitic=>!radiant(sp),.convergent,.radiant=>false};
 }
 /// one tick of the event: begun once its study is learned, it shatters the
 /// radiant plants, withers and unforms the lineages, gathers the seed and

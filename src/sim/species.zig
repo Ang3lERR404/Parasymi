@@ -48,9 +48,12 @@ pub const Lineage=enum(u8){
   parasitic,
   /// both at once: the first step toward the eventual merge of the two paths.
   convergent,
-  /// shader-side scalar: +1 symbiotic, -1 parasitic, 0 convergent.
+  /// the sky's: gathered from light, never grown (the vesper; it shares
+  /// with symbiotes and drains parasites)
+  radiant,
+  /// shader-side scalar: +1 symbiotic, -1 parasitic, 0 convergent or radiant.
   pub fn affinity(l:Lineage)f32{
-    return switch(l){.symbiotic=>1,.parasitic=>-1,.convergent=>0};
+    return switch(l){.symbiotic=>1,.parasitic=>-1,.convergent,.radiant=>0};
   }
 };
 /// how a genome is grown into a mesh (see gfx/meshgen.zig).
