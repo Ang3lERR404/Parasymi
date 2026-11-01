@@ -405,8 +405,8 @@ it differs from what is in effect.
 **Next (vertical slice):**
 1. ~~2–3 more per lineage~~ done as structures (the gardener's call)
 2. ~~Research tree to ~12 nodes~~
-3. First world event (something that *happens*, not just a research unlock)
-4. One "wow" visual moment (sky shift at convergence)
+3. ~~First world event (something that *happens*, not just a research unlock)~~
+4. ~~One "wow" visual moment (sky shift at convergence)~~
 
 Target: a stranger plays 2 hours and says "I want to see what happens
 next." "Celestial / beyond comprehension" is the next phase's look.

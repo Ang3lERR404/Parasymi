@@ -260,7 +260,7 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 `zig-pkg/`.
 
 ## Where things stand
-Done and next: [docs/design.md](docs/design.md#roadmap). Next (vertical
-slice): first world event (the diamond is its launch point), one "wow"
-visual moment (sky shift at convergence). Target: a stranger plays 2 hours
-and says "I want to see what happens next."
+Done and next: [docs/design.md](docs/design.md#roadmap). The vertical
+slice's list is done (the first world event, launched from the diamond, and
+the sky shift at convergence); what comes next is the gardener's to name.
+Target: a stranger plays 2 hours and says "I want to see what happens next."
