@@ -285,6 +285,21 @@ const float PLEXUS_HYENA_BEAT = 3.0;
 // reads in its lines
 const float PLEXUS_HYENA_POINT = 0.0045;
 const int PLEXUS_HYENA_MANE = 7;
+// a planted strange seed's loose fragments (meshes/constellate.zig
+// `seedWeb`, game/structures/strange_seed.zig): how many it has conjured
+// rides in the instance's growth (a share of PLEXUS_POINTS). Each rises out
+// of the seed's light, spiralling, to its place in a loose spindle round
+// and over it, then drifts there; lines and panes form between those that
+// come near, reaching further as more gather. Where they rise from, how
+// the sketch's spindle is shrunk round a seed, how many turns a rising one
+// makes and how wide, how far the lines reach when it has only begun (a
+// share of all its reach)
+const int PLEXUS_SEED_WEB = 59;
+const vec3 PLEXUS_SEED_FROM = vec3(0.0, 0.1, 0.0);
+const vec3 PLEXUS_SEED_SIZE = vec3(0.8, 0.7, 0.8);
+const float PLEXUS_SEED_TURNS = 1.5;
+const float PLEXUS_SEED_SWING = 0.15;
+const float PLEXUS_SEED_LOOSE = 0.68;
 const int PLEXUS_HYENA_TAIL = 22;
 const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 56.0;
@@ -313,6 +328,9 @@ float plexStoryShow = 1.0;
 float plexStoryRound = 0.0;
 // which of the hyena's limbs the web being placed is
 float plexSeg = 0.0;
+// how many fragments a planted strange seed has conjured, the one rising
+// now in part
+float plexSeedCount = 0.0;
 // how far into its stage the heart is at time `t` (s): on the story's clock,
 // or looping the stage alone every `loop` s
 float plexusStageClock(float t, float loop) { return plexStory > 0.5 ? plexLocal : mod(t, loop); }
@@ -905,6 +923,21 @@ vec4 plexusTendrilRide(float id, int height, float t, vec3 moved) {
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
+// how far a planted strange seed's fragment uid=197609(scarl) gid=197609 groups=197609 has come (0 not yet .. 1
+// there): it rises in turn as the seed conjures it
+float plexusSeedArrive(float id) { return clamp(plexSeedCount - id, 0.0, 1.0); }
+// how much of fragment uid=197609(scarl) gid=197609 groups=197609 shows: it swells in as it leaves the seed
+float plexusSeedShow(float id) { return smoothstep(0.0, 0.25, plexusSeedArrive(id)); }
+// where fragment uid=197609(scarl) gid=197609 groups=197609 is: rising out of the seed's light, spiralling up to
+// its place in a loose spindle round and over it, then drifting there
+vec3 plexusSeedWeb(float id, vec3 moved) {
+  float e = smoothstep(0.0, 1.0, plexusSeedArrive(id));
+  vec3 rest = plexusForm(id, PLEXUS_CLUSTER) * PLEXUS_SEED_SIZE + moved;
+  vec3 p = mix(PLEXUS_SEED_FROM, rest, e);
+  float a = (1.0 - e) * PLEXUS_SEED_TURNS * TAU + id;
+  p.xz += vec2(cos(a), sin(a)) * PLEXUS_SEED_SWING * sin(0.5 * TAU * e);
+  return p;
+}
 float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_CHEST : 0.0); }
 // where point `id` of the hyena's limb `seg` rests in his bind pose: wound
 // round the limb's curve from its first end to its last on the golden
@@ -941,9 +974,10 @@ vec3 plexusAt(float id, int shape, float t) {
   vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(hid, 5.7, 19.1)));
   vec3 ph = hash33(vec3(hid, 23.9, 1.3)) * TAU;
   vec3 d = 0.6 * sin(t * f + ph) + 0.4 * sin(t * g * 1.7 + ph.yzx * 2.0);
-  float drift = shape == PLEXUS_CLUSTER ? PLEXUS_DRIFT : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_DRIFT : PLEXUS_PART_DRIFT);
+  float drift = shape == PLEXUS_CLUSTER || shape == PLEXUS_SEED_WEB ? PLEXUS_DRIFT : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_DRIFT : PLEXUS_PART_DRIFT);
   vec3 moved = drift * d * vec3(1.0, 0.6, 1.0);
   if (shape == PLEXUS_HYENA) return plexusHyena(id, plexSeg) + moved;
+  if (shape == PLEXUS_SEED_WEB) return plexusSeedWeb(id, moved);
   if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
   if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) return plexusSprig(id, shape, moved);
   if (shape == PLEXUS_HEART_STEM) return plexusHeartStem(id, t, moved);
@@ -1169,6 +1203,12 @@ void main() {
       plexStoryRound = floor(t / total);
     }
     float reach = fract(pos.x);
+    // (a strange seed's web reaches further as more fragments gather:
+    // loose, then forming)
+    if (shape == PLEXUS_SEED_WEB) {
+      plexSeedCount = iw.w * float(PLEXUS_POINTS);
+      reach *= mix(PLEXUS_SEED_LOOSE, 1.0, iw.w);
+    }
     float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
     plexLayer = step(twin, 0.0);
     vec3 A = plexusLight(ids.x, shape, t, twin);
@@ -1188,7 +1228,7 @@ void main() {
     }
     // a build's webs all beat from one heart: a yielder's from its core's,
     // a sprig's from its stem's foot
-    int hs = shape == PLEXUS_HYENA ? PLEXUS_HYENA : shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
+    int hs = shape == PLEXUS_HYENA || shape == PLEXUS_SEED_WEB ? shape : shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
     // (a bloom burst free from a settling heart beats on its own, from its
     // base, and so does each of its petlets)
     bool bloomPart = (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) || (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND);
@@ -1247,6 +1287,9 @@ void main() {
     // pane as much as its faintest point, or of the part riding it)
     if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) yield = min(min(plexusTendril(ids.x, shape - PLEXUS_TENDRIL, t).w, plexusTendril(ids.y, shape - PLEXUS_TENDRIL, t).w), plexusTendril(ids.z, shape - PLEXUS_TENDRIL, t).w);
     if (shape >= PLEXUS_TENDRIL_RIDE && shape < PLEXUS_TENDRIL_RIDE + 3) yield = plexusTendrilRide(ids.x, shape - PLEXUS_TENDRIL_RIDE, t, vec3(0.0)).w;
+    // (or of a strange seed's fragments, each as it rises out of it, each
+    // line and pane once all its points have come)
+    if (shape == PLEXUS_SEED_WEB) yield = min(min(plexusSeedShow(ids.x), plexusSeedShow(ids.y)), plexusSeedShow(ids.z));
     yield *= plexStoryShow;
     if (shape == PLEXUS_HEART_STEM) plexCrowd = mix(1.0, 0.35, plexusHeartMorph(t));
     if (shape == PLEXUS_HEART_ROSE || (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT)) plexCrowd = 0.45;

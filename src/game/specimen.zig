@@ -351,6 +351,9 @@ pub const Specimen=struct{
         // whether it took root
         const ok=try g.structs.place(g.gpa,&g.world,s.at[0],s.at[1],k,0,seed);
         if(!ok)diag.whyNot(&g.structs,&g.world,s.at[0],s.at[1],k);
+        // (put down as by the gardener's hand, in the garden's act: a
+        // strange seed shown in act 2 is planted)
+        if(ok)st.sown(g.structs.get(.of(g.structs.list.items.len-1)),g.act);
         if(g.structs.list.items.len>0)g.structs.list.items[0].grown=l.growth;
       },
       // (samples and sculpts are drawn, never put down: `drawSamples`)

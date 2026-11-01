@@ -79,6 +79,7 @@ zig build run -- --demo           # test garden + structures, fast-forwarded
 zig build run -- --stress         # 120×120 plant field
 zig build run -- --load           # newest saved garden
 zig build run -- --demo --unforming   # the world event begins at once (docs/testing.md)
+zig build run -- --act2           # act 2 after the unforming: the star hyena (docs/testing.md)
 zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
 zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip
@@ -169,7 +170,7 @@ registry kinds outside the registry file; add a hook.
 |---|---|---|
 | species | `sim/species.zig` | `def` (genome drives the grown mesh) |
 | meshes | `gfx/meshlib.zig` | `build(b)` (order = draw order: translucent after what they cover) |
-| structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `gives`, `receive`, `release`, `handOver`, `message`, `configure`, `recipes`, `chosen`, `choose`, `emit`, `describe`, `ground`, `field`, `hold`, `icon`, `meshes`, `meets`, `adopts`, `pairs` |
+| structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `gives`, `receive`, `release`, `handOver`, `message`, `configure`, `recipes`, `chosen`, `choose`, `sown`, `emit`, `describe`, `ground`, `field`, `hold`, `icon`, `meshes`, `meets`, `adopts`, `pairs` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
 | hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order), `Pick`, `click`, `shows`, `fire`, `focusable`, `drag`, `nudge`, `edit`, `typed` |

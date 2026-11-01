@@ -401,8 +401,8 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
 - **Their shards** fly up to one point 14 m over their middle and gather
   into a STRANGE SEED in a star of their light, which falls (2.2 s), a
   burst of light where it lands, and lies on the ground, never
-  planting itself: a structure the wolf may pick up. Its lineage is still
-  to be designed (the gardener's call).
+  planting itself: a structure the wolf may pick up. It is the constellate
+  lineage's first, planted only in act 2 (below).
 - **Everything else dies:** symbiotic and parasitic plants wither, and
   every structure of another lineage (`Def.unforms()`, from `Def.lineage`:
   the base ones, conduit, sap cache, germinator, root-digger, all
@@ -434,6 +434,25 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
   blink out of reality over 30 s (`Drift`, not saved). Ley shards are no
   longer to be had.
 
+## Act 2: the star hyena
+A garden has two acts (`game/act.zig`, `Game.act`, saved). The second
+comes only after the unforming: once the wolf roots himself into the
+garden's tree (not yet in the game; `--act2` begins there, the unforming
+run through and its seed in his keeping), the gardener is the star hyena,
+a living constellation (constellate webs on 28 bones, `--samples=constellateHyena`)
+who never walks but hovers, leaning into his motion, his steps silent, the
+camera in his eyes. He works with the convergent lineage and the
+constellate one alone.
+- **The strange seed, planted:** put down by his hand (the `sown` hook) it
+  is planted; put down by the wolf's it only lies there. Planted, it
+  conjures a loose constellate fragment out of itself every 20 s, up to
+  30: each rises out of its light, spiralling, to drift loose round and
+  over it, lines and panes forming between those that come near, reaching
+  further as more gather (`strangeSeedWeb`, part.vert `plexusSeedWeb`;
+  how many in the instance's growth). Hover says how many.
+- **Next:** what the loose fragments are for: snapping them into parts,
+  yielders feeding the heart, the heart making parts, tendrils carrying
+  them (one loop).
 ## Research panel (T, `hud/research.zig`)
 The research tree is drawn as a sapling growing in soil. It is laid out
 from the prerequisites alone, so it never needs placing or adjusting.

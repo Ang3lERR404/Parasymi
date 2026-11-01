@@ -290,7 +290,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sap_cache.zig` — SAP CACHE: plain storage.
 - `sporecaster.zig` — SPORECASTER: a parasite that sends.
 - `storm_spire.zig` — STORM SPIRE: the last of the weather, a kin of the weftstone, of both lineages: a woven spire whose rings of vanes charge the air, five…
-- `strange_seed.zig` — STRANGE SEED: the seed the unforming gathered out of the shattered radiant light and let fall.
+- `strange_seed.zig` — STRANGE SEED: the seed the unforming gathered out of the shattered radiant light and let fall, the constellate lineage's first.
 - `tanglehold.zig` — TANGLEHOLD: plain storage of both lineages, taking the sap cache's place once the unforming has taken it, and holding twice as much.
 - `vultrixi.zig` — VULTRIXI: a gathering crown and a ganglion grown into one floating body that feeds a monfris.
 - `weftstone.zig` — WEFTSTONE: a loomfern and a lithophage grown into one floating body.

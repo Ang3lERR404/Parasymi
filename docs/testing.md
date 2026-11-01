@@ -157,6 +157,14 @@ sky shattering, e.g.
 zig build run -- --demo --unforming --inspect=eyes --pitch=-25 --shots=14 --orbit=14
 zig build run -- --demo --unforming --inspect=polyp --dist=40 --pitch=3 --shots=10 --orbit=20
 ```
+`--act2` begins the garden in act 2 after running the unforming through:
+the star hyena is the gardener, the strange seed in his keeping. With
+`--structure=strangeSeed --state=active` it stands planted alone (a long
+`--period=` keeps it from being put down afresh), e.g.
+
+```
+zig build run -- --act2 --structure=strangeSeed --state=active --period=2000 --speed=30 --inspect=strangeSeed --shots=4 --orbit=40 --dist=3.2 --pitch=10
+```
 
 ## A HUD panel
 `--panel=<belly|research|paused|options|keybinds|gardens|naming>` holds it open and

@@ -96,7 +96,12 @@ pub fn put(g:*Game,h:m.Vice(i32,2))Allocator.Error!void{
     try g.structs.placeNear(g.gpa,&g.world,st.Structures.spot(k,h,g.hoverAt),k,g.placeDir,g.rng.float())
   else false;
   if(ok){
-    if(st.kindOf(item)!=null)g.structs.sprout(.of(g.structs.list.items.len-1));
+    if(st.kindOf(item)!=null){
+      // the one just put down
+      const id:st.Id=.of(g.structs.list.items.len-1);
+      g.structs.sprout(id);
+      st.sown(g.structs.get(id),g.act);
+    }
     _=g.player.inv.take(item,1);
     g.plantCd=putCooldown;
     g.linger=lingerPut;

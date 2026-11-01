@@ -57,6 +57,13 @@ pub fn hold(ss:*const Structures,wx:i32,wy:i32)?struct{s:*const Structure,h:Hold
   };
   return null;
 }
+/// the gardener has just put structure `s` down by hand, in act `a`
+/// (`sown`: the strange seed is planted only in the hyena's)
+pub fn sown(s:*Structure,a:lib.act.Act)void{
+  switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"sown"))reg.module(k).sown(s,a),
+  }
+}
 /// take back one thing a structure holds outside its slots (a lane's
 /// item, a carried one), or null if it holds none there
 pub fn release(s:*Structure)?items.Item{

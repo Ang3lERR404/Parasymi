@@ -145,6 +145,9 @@ const Shape=enum(u8){
   /// act 2's gardener, a hyena of stars: one limb of him, which in the
   /// reach's whole part (`limbs`)
   hyena,
+  /// a planted strange seed's loose fragments, rising out of it in turn
+  /// (how many it has conjured rides in its instance's growth)
+  seedWeb,
   /// the yielder's other petals, by number
   _,
 };
@@ -580,4 +583,12 @@ pub const hyenaMesh=struct{
   pub fn build(b:*mg.Builder)Allocator.Error!void{try hyena(b);}
   /// his bones as a sample (`meshlib.Pose`): hovering, every limb drifting
   pub const pose=hyenaPose;
+};
+/// mesh: STRANGE SEED WEB. the loose fragments a planted strange seed
+/// conjures (game/structures/strange_seed.zig), each rising out of it in
+/// turn to drift loose round and over it, joined where they come near
+pub const seedWeb=struct{
+  /// builds every fragment it may ever conjure; part.vert shows as many
+  /// as it has
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.seedWeb,.reach=0.38});}
 };

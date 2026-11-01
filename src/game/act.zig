@@ -78,6 +78,31 @@ pub fn eyes(a:Act,p:*const Player,t:f32)m.V3{
     },
   };
 }
+/// how long the unforming may take to run through before act 2 (s)
+const unformingMost:f32=600;
+/// begin the hyena's act, which comes only after the unforming: the event
+/// run through to its end (the radiant plants shattered, the lineages
+/// gone, the ley sealed, the seed fallen), then the seed it let fall taken
+/// up into his keeping (`--act2`, until the wolf's rooting begins it in
+/// play)
+pub fn begin(g:*lib.play.Game)lib.play.Error!void{
+  try g.world.stream(g.focus(),2,1000);
+  g.prog.done.insert(.unforming);
+  // the structures standing before it: the seed it lets fall comes after
+  const before=g.structs.list.items.len;
+  // the seconds run
+  var t:f32=0;
+  while(!(g.unforming.phase==.landed and g.unforming.sealed) and t<unformingMost):(t+=lib.play.tickTime)try g.step();
+  g.act=.hyena;
+  // the seed it let fall, taken up
+  for(g.structs.list.items[@min(before,g.structs.list.items.len)..],before..)|s,i|if(s.kind()==.strangeSeed){
+    var gone=g.structs.remove(&g.world,.of(i));
+    gone.deinit(g.gpa);
+    break;
+  };
+  _=g.player.inv.add(.strangeSeed,1);
+  g.bar[0]=.strangeSeed;
+}
 /// whether act `a`'s gardener's steps sound (the hyena hovers)
 pub fn steps(a:Act)bool{return a==.wolf;}
 test"the hyena's eyes are at his head's height over where he stands, and an act survives a byte"{

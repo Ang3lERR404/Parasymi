@@ -16,6 +16,9 @@
 //!   receive(s, g, item, edge) bool  a carrier taking an item handed in at
 //!                               `edge` (counted from the way it faces)
 //!   release(s) ?Item            hand back anything it holds outside `inv`
+//!   sown(s, act)                the gardener has just put it down by hand,
+//!                               in which act (the strange seed is planted
+//!                               only in the hyena's)
 //!   handOver(s) ?Item           what a click hands the wolf straight away,
 //!                               taken out of it (a polyp's drifting flower)
 //!   message(ctx, id, msg) Reply what it makes of a `Msg` another sends it
@@ -133,6 +136,8 @@ pub const fields=hooks.fields;
 pub const hold=hooks.hold;
 /// hand back what a structure holds outside its slots
 pub const release=hooks.release;
+/// tell a structure the gardener has just put down by hand which act it is
+pub const sown=hooks.sown;
 /// what a click on it hands the wolf straight away (`handOver`)
 pub const handOver=hooks.handOver;
 /// whether a structure answers the player's configure

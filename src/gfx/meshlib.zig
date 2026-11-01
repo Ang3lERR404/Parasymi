@@ -307,6 +307,8 @@ const parts=struct{
   pub const driftFlower=@import("meshes/drift_flower.zig");
   /// the seed the unforming gathers out of the shattered radiant light
   pub const strangeSeed=@import("meshes/strange_seed.zig");
+  /// the loose fragments a planted strange seed conjures, rising out of it
+  pub const strangeSeedWeb=@import("meshes/constellate.zig").seedWeb;
   /// a shard of a shattering radiant plant, flying up to the seed
   pub const unformShard=@import("meshes/unform_shard.zig");
   /// an earlier look for the polyp, to compare: a slender hydra crowned with feathers and plumed tentacles, offshoots up its stem

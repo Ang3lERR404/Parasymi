@@ -164,8 +164,8 @@ pub fn main(init:Init)!void{
   // watch it unattended
   // decision: a test flag beside `--demo`, not a garden of its own
   var unforming=false;
-  // `--act2`: the garden begins in the star hyena's act, the strange seed
-  // in his keeping
+  // `--act2`: the garden begins in the star hyena's act, after the unforming
+  // has run its course, the seed it let fall in his keeping
   // decision: a test flag until the wolf's rooting begins act 2 in play
   var act2=false;
   for(args[1..])|a|{
@@ -284,6 +284,8 @@ pub fn main(init:Init)!void{
   if(lone)|l|{
     // alone in a fresh world: no garden loaded, sown or saved
     game.specimen=l;
+    // (shown in act 2: put down in the hyena's act, no world event run)
+    if(act2)game.act=.hyena;
     try game.specimen.?.sow(&game);
   }else{
     if(load){
@@ -296,11 +298,7 @@ pub fn main(init:Init)!void{
   if(tod)|t|game.sky.tod=t;
   game.speed=speed;
   if(unforming)game.prog.done.insert(.unforming);
-  if(act2){
-    game.act=.hyena;
-    _=game.player.inv.add(.strangeSeed,1);
-    game.bar[0]=.strangeSeed;
-  }
+  if(act2 and lone==null)try lib.act.begin(&game);
   if(inspect)|f|{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});
