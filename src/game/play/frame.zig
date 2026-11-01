@@ -106,7 +106,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     g.looking=looking;
   }else if(looking)g.cam.look(in.mouseDelta);
   // half of each side, to find the screen's middle
-  const half:m.Vec(f32,2)=@splat(0.5);
+  const half=m.splatOf(f32,2,0.5);
   // where the cursor is: the screen's middle while looking, else the mouse
   const cursor=if(looking)screen*half else in.mouse;
   // panels and selection
@@ -162,8 +162,8 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   // the camera's turn, the wish turned by it, and its length (kept at most 1)
   const yaw=g.cam.yaw;
   var wish=m.Vec(f32,2){@cos(yaw)*mx-@sin(yaw)*mz,-@sin(yaw)*mx-@cos(yaw)*mz};
-  const wl=@sqrt(m.sumOf(f32,2,wish*wish));
-  if(wl>1)wish/=@as(m.Vec(f32,2),@splat(wl));
+  const wl=m.lenOf(f32,2,wish);
+  if(wl>1)wish/=m.splatOf(f32,2,wl);
   // the camera orbits round the wolf while dragged; the wheel zooms, all
   // the way in into its eyes, and the zoom keys as a wheel turned while held
   if(!inspecting){
@@ -295,7 +295,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   g.cam.see(g.player.eyes());
   // the point the camera follows, above the wolf's feet
   const follow=g.player.pos+m.v3(0,followHeight,0);
-  g.cam.target+=(follow-g.cam.target)*m.splat3(@min(1,dt*followLerp));
+  g.cam.target=m.dampV(g.cam.target,follow,followLerp,dt);
   if(g.specimen==null){
     try g.stars.update(g.gpa,&g.sky,g.player.pos,&g.world,dt);
     actions.catchStarlight(g,dt);
@@ -321,7 +321,7 @@ fn tugOn(g:*Game,plucked:?f32,dt:f32)void{
     const l=m.len(d);
     if(l>1e-3)g.tug.dir=.{d[0]/l,d[2]/l};
     // (a plant newly taken hold of has not shivered yet)
-    if(g.tug.id!=p.id or m.len(g.tug.at-p.at)>1e-4)g.tug.since=lib.vertex.noPluck;
+    if(g.tug.id!=p.id or m.dist(g.tug.at,p.at)>1e-4)g.tug.since=lib.vertex.noPluck;
     g.tug.id=p.id;
     g.tug.at=p.at;
     if(!p.freed)want=pluck.bend(def,pluck.size(s.items(.seed)[i]))*pryPull(k);

@@ -337,7 +337,7 @@ fn frondCtrl(f:Frond,c:*[arc+coil]V3)void{
   // the way the coil turns toward, square to the heading and the side
   const up=m.cross(d,side);
   // how far each coil step goes, shrinking as it tightens
-  var step=m.len(c[arc-1]-c[arc-2])*0.8;
+  var step=m.dist(c[arc-1],c[arc-2])*0.8;
   for(0..coil)|j|{
     // how far round the coil this step has turned (radians)
     const a=m.ratio(j+1,coil)*f.coil*m.tau;
@@ -364,7 +364,7 @@ fn frondAlong(b:*mg.Builder,f:Frond,c:*const[arc+coil]V3,on:?On)Allocator.Error!
     const k=m.ratio(j,frondRes-1);
     t.*=m.lerp(f.t0,f.t1,k);
     r.*=f.r*m.lerp(1,0.18,k);
-    cl.*=color.mix(lilac,leafLite,m.smooth(m.clamp01((k-0.45)/0.5)));
+    cl.*=color.mix(lilac,leafLite,m.smooth(m.unlerp(0.45,0.95,k)));
   }
   try b.tubeC(&p,&ts,&rs,&cs,null,.tendril,5);
   if(on)|o|try o.k.along(b,stem,o.id);
@@ -624,8 +624,8 @@ const Grown=struct{
   fn at(gr:f32)Grown{
     return.{
       .rise=m.lerp(0.3,1,m.smooth(m.clamp01(gr/0.5))),
-      .reach=m.lerp(0.05,1,m.smooth(m.clamp01((gr-0.2)/0.55))),
-      .bloom=m.smooth(m.clamp01((gr-0.7)/0.3)),
+      .reach=m.lerp(0.05,1,m.smooth(m.unlerp(0.2,0.75,gr))),
+      .bloom=m.smooth(m.unlerp(0.7,1,gr)),
     };
   }
 };

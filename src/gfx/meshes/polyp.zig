@@ -92,13 +92,13 @@ const tentacleRings=16;
 /// little at the neck, then opening like a trumpet into the disc
 fn columnProfile(k:f32)f32{
   // how far into the trumpet's flare (0 below it .. 1 the rim)
-  const f=m.clamp01((k-0.74)/0.26);
+  const f=m.unlerp(0.74,1,k);
   return(1+0.6*@exp(-k*10))*(1-0.1*@exp(-(k-0.68)*(k-0.68)*120))*(1+(flare/slender-1)*f*f);
 }
 /// a column's colour at `k` along it: dusky at the foot, pearl up its
 /// length, warming to the disc's rose at the rim
 fn columnColour(k:f32)color.Rgba8{
-  return flesh.lerp(pearl,m.smooth(m.clamp01(k/0.7))).lerp(disc,m.smooth(m.clamp01((k-0.8)/0.2))).toRgba8(255);
+  return flesh.lerp(pearl,m.smooth(m.clamp01(k/0.7))).lerp(disc,m.smooth(m.unlerp(0.8,1,k))).toRgba8(255);
 }
 /// builds the colony. It grows on a hidden stalk (gfx/growth.zig): the roots
 /// spread with the mound, then each polyp's column rises out of it, its

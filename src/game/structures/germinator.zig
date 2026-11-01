@@ -223,7 +223,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const spin=stage(p,spinTimes);
   const wind=stage(p,windTimes);
   // how far the seed has grown on the spindle (0..1), and how far round the core has turned
-  const grownSeed=if(busy)m.smooth(m.clamp01((p-seedFrom)/(seedTo-seedFrom)))else 0;
+  const grownSeed=if(busy)m.smooth(m.unlerp(seedFrom,seedTo,p))else 0;
   const turn=turned(p,r.time,tf);
   // it all sways with the tree, from its root (`drop`: how high over it)
   const sway:Look=.{.phase=s.seed,.sway=def.sway,.tall=def.tall,.grown=s.grown};

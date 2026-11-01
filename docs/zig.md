@@ -52,7 +52,10 @@ Read this before writing any code. Where it and CLAUDE.md disagree, CLAUDE.md
   `core/math.zig`: `m.Vec(t,s)` for vectors whose lanes are summed together,
   `m.Vice(t,s)` for a plain row `[s]t` (GPU and save layouts, tables,
   lanes picked by a runtime index), `m.Mat(t,s,a)` for `a` columns of
-  `Vec(t,s)`. Never a bare `@Vector` or small `[N]T`.
+  `Vec(t,s)`. Never a bare `@Vector` or small `[N]T`. A `Vec` of any
+  width has `sumOf`, `meanOf` (of many), `lenOf` and `splatOf`; points have
+  `dist`; a ramp read back is `unlerp`; easing toward a target is `damp`
+  (`dampV`, `dampBy`), never `x+=(t-x)*@min(1,dt*k)`.
 - **Packed structs/unions** for bit-level layout.
 - **`anytype`** for ad-hoc polymorphism (use sparingly).
 

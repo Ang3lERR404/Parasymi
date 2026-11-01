@@ -35,10 +35,10 @@ pub const Scroll=struct{
     s.top=m.clamp(s.top,first,m.f(i));
   }
   /// a frame `dt` long over a list of `total` rows: what is wanted kept in
-  /// range, what is shown easing toward it (`ease` of the way a second)
+  /// range, what is shown easing toward it at `ease` a second (math.damp)
   pub fn tick(s:*Scroll,total:usize,dt:f32,ease:f32)void{
     s.top=m.clamp(s.top,0,s.most(total));
-    s.at+=(s.top-s.at)*@min(1,dt*ease);
+    s.at=m.damp(s.at,s.top,ease,dt);
   }
   /// where row `i` sits in view now (0 the top row's place; fractions while
   /// easing, negative above the list, `shown` or more below it)
@@ -67,12 +67,15 @@ test"a list scrolls by wheel and stem, keeps in range, and eases there"{
   s.wheel(-2,1.5);
   s.tick(10,1,1);
   try testing.expectEqual(@as(f32,3),s.top);
-  try testing.expectEqual(@as(f32,3),s.at);
+  try testing.expectApproxEqAbs(3*m.dampBy(1,1),s.at,1e-6);
+  // a long ease all but arrives
+  s.tick(10,10,1);
+  try testing.expectApproxEqAbs(@as(f32,3),s.at,1e-3);
   // too far up stays at the first row; easing goes part of the way
   s.wheel(20,1);
   s.tick(10,0.25,2);
   try testing.expectEqual(@as(f32,0),s.top);
-  try testing.expectApproxEqAbs(@as(f32,1.5),s.at,1e-6);
+  try testing.expectApproxEqAbs(m.damp(s.top+3,0,2,0.25),s.at,1e-3);
   s.drag(1,10);
   try testing.expectEqual(@as(f32,7),s.top);
   // a list that fits never scrolls

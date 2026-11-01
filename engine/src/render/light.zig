@@ -105,7 +105,7 @@ pub fn fit(vp:m.M4,eye:m.V3,target:m.V3,reach:f32,toward:m.V3)Fit{
   const farD=m.dot(farMid-eye,gaze);
   const far=@min(@min(reach,farD),reachMax);
   // splits: mostly logarithmic from a base near what the camera looks at
-  const base=@min(@max(m.len(target-eye)*splitBase,splitMin),far*0.5);
+  const base=@min(@max(m.dist(target,eye)*splitBase,splitMin),far*0.5);
   // where each slice begins and ends, along the gaze
   var cut:[cascades+1]f32=undefined;
   cut[0]=nearD;
@@ -138,7 +138,7 @@ pub fn fit(vp:m.M4,eye:m.V3,target:m.V3,reach:f32,toward:m.V3)Fit{
     }
     // the sphere's radius: the farthest corner from the centre
     var r:f32=0;
-    for(pts)|p|r=@max(r,m.len(p-mid));
+    for(pts)|p|r=@max(r,m.dist(p,mid));
     // the step the radius grows in
     const step=@max(r*radiusStep,stepMin);
     r=@ceil(r/step)*step;

@@ -218,7 +218,7 @@ pub fn whorl(b:*mg.Builder,radius:f32,wh:Whorl,lite:Rgba8,seed:u64,rng:*Rng)Allo
 fn tether(b:*mg.Builder,from:V3,to:V3,r:f32,lite:Rgba8,seed:u64,f:Fragment)Allocator.Error!void{
   // where the thread's vertices begin
   const s=b.mark();
-  _=try thread(b,.{.start=from,.direction=m.norm(to-from),.length=m.len(to-from),.wobble=0.25,.curl=0.1,.seed=seed},r,lite);
+  _=try thread(b,.{.start=from,.direction=m.norm(to-from),.length=m.dist(to,from),.wobble=0.25,.curl=0.1,.seed=seed},r,lite);
   fragment(b,s,f);
   for(b.v.items[s..])|*v|{
     // how far along from the heart to what it holds this vertex lies, 0..1

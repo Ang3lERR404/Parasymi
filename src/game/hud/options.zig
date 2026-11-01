@@ -152,7 +152,7 @@ pub fn tick(g:*play.Game,dt:f32)void{
     };
     // as shown now
     const v=&g.settingShown[i];
-    v.*=if(v.*<0)want else v.*+(want-v.*)*@min(1,dt*ease);
+    v.*=if(v.*<0)want else m.damp(v.*,want,ease,dt);
   }
 }
 /// draws the veil and the panel: the title, each setting's row (its label,

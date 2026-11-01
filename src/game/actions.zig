@@ -282,7 +282,7 @@ pub fn pluckOn(g:*Game,dt:f32)?f32{
   // the plant plucked: gone, or another moved into its slot, and it ends
   const i=p.id.idx();
   const s=g.plants.list.slice();
-  if(i>=s.len or m.len(s.items(.at)[i]-p.at)>1e-4){
+  if(i>=s.len or m.dist(s.items(.at)[i],p.at)>1e-4){
     g.pluck=null;
     return null;
   }
@@ -345,7 +345,7 @@ pub fn catchStarlight(g:*Game,dt:f32)void{
     const dist=m.len(d);
     if(dist<attract){
       mo.pulled=true;
-      mo.pos+=d*m.splat3(@min(1,dt*(pull-dist*pullFalloff)));
+      mo.pos=m.dampV(mo.pos,chest,pull-dist*pullFalloff,dt);
     }else if(mo.pulled){
       mo.pulled=false;
     }

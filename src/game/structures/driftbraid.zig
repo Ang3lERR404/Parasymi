@@ -271,7 +271,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     // a spore waiting over a full driftbraid hangs there, bobbing
     const hang=if(!sp.home and sp.t>=1)v3(0,hangDepth+0.05*@sin(tf*2+m.f(k)),0)else v3(0,0,0);
     // the way its tip leads, and the colour of what it carries
-    const dir=if(m.len(ahead-at)>m.eps)m.norm(ahead-at)else v3(0,1,0);
+    const dir=if(m.dist(ahead,at)>m.eps)m.norm(ahead-at)else v3(0,1,0);
     const col=color.Rgba8.of(sp.item.info().col).toF4();
     try out.emit(.sporeCarrier,m.chain(&.{m.translate(at+hang),m.alignY(dir),m.scale3(m.splat3(sporeSize))}),.{
       .glow=sporeGlow,.phase=ph,.fade=sporeFade,.tint=.{col[0],col[1],col[2],0},.flutter=0.5,

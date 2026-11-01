@@ -71,6 +71,9 @@ pub const inf=math.inf;
 pub inline fn f(x:anytype)f32{return@floatFromInt(x);}
 /// the value `t` of the way from `a` to `b` (0: a, 1: b; beyond either runs on)
 pub inline fn lerp(a:f32,b:f32,t:f32)f32{return a+(b-a)*t;}
+/// lerp undone: how far `x` lies of the way from `a` to `b`, held within 0..1
+/// (0 at a or before it, 1 at b or past it)
+pub inline fn unlerp(a:f32,b:f32,x:f32)f32{return clamp01((x-a)/(b-a));}
 /// `x` held within 0..1
 pub inline fn clamp01(x:f32)f32{return math.clamp(x,0,1);}
 /// cubic smoothstep of a 0..1 `t`: eases in and out, flat at both ends
@@ -186,10 +189,12 @@ pub inline fn dirYaw(d:Dir)f32{return-f(d)*pi/2.0;}
 // ---- vectors ----
 /// a vector from its three parts
 pub inline fn v3(x:f32,y:f32,z:f32)V3{return.{x,y,z};}
+/// a `Vec` of `s` lanes of `t`, every lane `x`
+pub inline fn splatOf(comptime t:type,comptime s:usize,x:t)Vec(t,s){return@splat(x);}
 /// a three-lane vector with every lane `s`
-pub inline fn splat3(s:f32)V3{return@splat(s);}
+pub inline fn splat3(s:f32)V3{return splatOf(f32,3,s);}
 /// a four-lane vector with every lane `s`
-pub inline fn splat4(s:f32)V4{return@splat(s);}
+pub inline fn splat4(s:f32)V4{return splatOf(f32,4,s);}
 /// the dot product: how far `a` and `b` lean the same way
 pub inline fn dot(a:V3,b:V3)f32{return@reduce(.Add,a*b);}
 /// every lane of `a` added up, for a `Vec` of any width: `sumOf(f32,2,d*d)`
@@ -200,16 +205,20 @@ pub inline fn sumOf(comptime t:type,comptime s:usize,a:Vec(t,s))t{return@reduce(
 pub fn meanOf(comptime t:type,comptime s:usize,pts:[]const Vec(t,s))Vec(t,s){
   assert(pts.len>0);
   // every point added together
-  var sum:Vec(t,s)=@splat(0);
+  var sum=splatOf(t,s,0);
   for(pts)|p|sum+=p;
   return switch(@typeInfo(t)){
-    .float=>sum/@as(Vec(t,s),@splat(@floatFromInt(pts.len))),
-    .int=>@divTrunc(sum,@as(Vec(t,s),@splat(@intCast(pts.len)))),
+    .float=>sum/splatOf(t,s,@floatFromInt(pts.len)),
+    .int=>@divTrunc(sum,splatOf(t,s,@intCast(pts.len))),
     else=>@compileError("meanOf takes lanes of floats or whole numbers"),
   };
 }
+/// the length of a `Vec` of floats of any width: `lenOf(f32,2,d)` on screen
+pub inline fn lenOf(comptime t:type,comptime s:usize,a:Vec(t,s))t{return@sqrt(sumOf(t,s,a*a));}
 /// a vector's length
-pub inline fn len(a:V3)f32{return@sqrt(dot(a,a));}
+pub inline fn len(a:V3)f32{return lenOf(f32,3,a);}
+/// how far apart two points are
+pub inline fn dist(a:V3,b:V3)f32{return len(a-b);}
 /// the vector turned unit length; one too short to point anywhere is left as is
 pub inline fn norm(a:V3)V3{
   // its length, divided out
@@ -267,7 +276,7 @@ pub fn splineResample(pts:[]const V3,out:[]V3)void{
   }
   dense[k]=pts[n-1];
   at[0]=0;
-  for(1..k+1)|i|at[i]=at[i-1]+len(dense[i]-dense[i-1]);
+  for(1..k+1)|i|at[i]=at[i-1]+dist(dense[i],dense[i-1]);
   // the curve's whole length
   const total=at[k];
   // the dense segment being walked, carried from one output point to the next
@@ -297,7 +306,7 @@ pub const Path=struct{
     // the running lengths, the first point at zero
     const cum=try alloc.alloc(f32,pts.len);
     cum[0]=0;
-    for(1..pts.len)|i|cum[i]=cum[i-1]+len(pts[i]-pts[i-1]);
+    for(1..pts.len)|i|cum[i]=cum[i-1]+dist(pts[i],pts[i-1]);
     return.{.pts=pts,.cum=cum,.total=cum[pts.len-1]};
   }
   /// frees the running lengths `build` allocated
@@ -443,6 +452,14 @@ pub fn alignY(dir:V3)M4{
   return.{.{x[0],x[1],x[2],0},.{dir[0],dir[1],dir[2],0},.{z[0],z[1],z[2],0},.{0,0,0,1}};
 }
 // ---- springs ----
+/// how much of the way to its target an easing at `rate` (per second)
+/// closes over `dt`: two half steps close as much as one whole, so it feels
+/// the same at any frame rate
+pub inline fn dampBy(rate:f32,dt:f32)f32{return 1-@exp(-rate*dt);}
+/// `from` eased toward `to` at `rate` (per second) over `dt`
+pub inline fn damp(from:f32,to:f32,rate:f32,dt:f32)f32{return lerp(from,to,dampBy(rate,dt));}
+/// a point eased toward `to` at `rate` (per second) over `dt`
+pub inline fn dampV(from:V3,to:V3,rate:f32,dt:f32)V3{return lerpV(from,to,dampBy(rate,dt));}
 /// critically damped spring step (for procedural secondary motion).
 /// Uses the exact closed-form solution, so it is stable for any `dt`.
 pub fn spring(pos:*f32,vel:*f32,target:f32,freq:f32,dt:f32)void{
@@ -594,6 +611,27 @@ test"the mean of many points is their middle, at any width"{
   // one point alone is its own mean
   try testing.expectEqual(V4{1,2,3,4},meanOf(f32,4,&.{V4{1,2,3,4}}));
 }
+test"unlerp undoes lerp and holds within 0..1"{
+  try testing.expectApproxEqAbs(@as(f32,0.25),unlerp(2,6,lerp(2,6,0.25)),1e-6);
+  try testing.expectEqual(@as(f32,0),unlerp(2,6,-1));
+  try testing.expectEqual(@as(f32,1),unlerp(2,6,9));
+  // running backward, high to low
+  try testing.expectApproxEqAbs(@as(f32,0.75),unlerp(6,2,3),1e-6);
+}
+test"damping feels the same at any frame rate"{
+  // one whole step, and the same time in two halves
+  const whole=damp(0,10,4,0.1);
+  const half=damp(damp(0,10,4,0.05),10,4,0.05);
+  try testing.expectApproxEqAbs(whole,half,1e-5);
+  try testing.expect(whole>0 and whole<10);
+  // a point eases the same way, lane by lane
+  try testing.expectApproxEqAbs(whole,dampV(v3(0,0,0),v3(10,0,0),4,0.1)[0],1e-5);
+}
+test"lengths and distances at any width"{
+  try testing.expectEqual(@as(f32,5),lenOf(f32,2,.{3,4}));
+  try testing.expectEqual(@as(f32,5),dist(v3(1,1,1),v3(4,5,1)));
+  try testing.expectEqual(Vec(i32,3){7,7,7},splatOf(i32,3,7));
+}
 test"spring-damper settles where its force balances"{
   // where the mass is and how fast it moves
   var p=v3(0,0,0);
@@ -603,7 +641,7 @@ test"spring-damper settles where its force balances"{
   const forceZ=3.0;
   for(0..120)|_|springDamper(&p,&v,v3(0,1,0),k,6,0.8,v3(0,0,forceZ),1.0/30.0);
   // equilibrium: displacement = force / k = 3/60 = 0.05
-  try testing.expect(len(p-v3(0,1,forceZ/k))<1e-3);
+  try testing.expect(dist(p,v3(0,1,forceZ/k))<1e-3);
   try testing.expect(len(v)<1e-3);
 }
 test"spring is stable for huge steps"{
@@ -675,10 +713,10 @@ test"catmull-rom passes through its inner points"{
   try testing.expectEqual(b,catmullRom(a,b,c,d,0));
   // the curve's far end
   const e=catmullRom(a,b,c,d,1);
-  try testing.expect(len(e-c)<1e-5);
+  try testing.expect(dist(e,c)<1e-5);
   // the middle of a straight run
   const mid=catmullRom(v3(0,0,0),v3(1,0,0),v3(2,0,0),v3(3,0,0),0.5);
-  try testing.expect(len(mid-v3(1.5,0,0))<1e-5);
+  try testing.expect(dist(mid,v3(1.5,0,0))<1e-5);
 }
 test"spline resampling keeps the ends and evens the spacing"{
   // a bent run of control points
@@ -686,11 +724,11 @@ test"spline resampling keeps the ends and evens the spacing"{
   // the run resampled to sixteen points
   var out:[16]V3=undefined;
   splineResample(&pts,&out);
-  try testing.expect(len(out[0]-pts[0])<1e-5);
-  try testing.expect(len(out[15]-pts[3])<1e-4);
+  try testing.expect(dist(out[0],pts[0])<1e-5);
+  try testing.expect(dist(out[15],pts[3])<1e-4);
   // the first gap, which every other must match
-  const step=len(out[1]-out[0]);
-  for(1..out.len)|i|try testing.expectApproxEqAbs(step,len(out[i]-out[i-1]),step*0.1);
+  const step=dist(out[1],out[0]);
+  for(1..out.len)|i|try testing.expectApproxEqAbs(step,dist(out[i],out[i-1]),step*0.1);
 }
 test"alignY maps +Y onto the direction, orthonormally"{
   for([_]V3{v3(0,1,0),v3(0,0,1),norm(v3(1,-2,0.5))})|d|{
@@ -698,7 +736,7 @@ test"alignY maps +Y onto the direction, orthonormally"{
     const r=alignY(d);
     // where +Y lands
     const y=mulV(r,.{0,1,0,0});
-    try testing.expect(len(v3(y[0],y[1],y[2])-d)<1e-5);
+    try testing.expect(dist(v3(y[0],y[1],y[2]),d)<1e-5);
     // where +X and +Z land
     const x=v3(r[0][0],r[0][1],r[0][2]);
     const z=v3(r[2][0],r[2][1],r[2][2]);

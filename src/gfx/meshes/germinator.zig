@@ -160,7 +160,7 @@ fn bough(b:*mg.Builder,sk:*growth.Skeleton,stem:growth.Id,k:usize)Allocator.Erro
     // each bough strays from the others between its ends
     if(j>0 and j<at.len-1)c.*+=v3(rng.range(-0.05,0.05),rng.range(-0.06,0.06),rng.range(-0.05,0.05));
   }
-  mg.grow(&ctrl,.{.start=ctrl[0],.direction=m.norm(ctrl[at.len-1]-ctrl[0]),.length=m.len(ctrl[at.len-1]-ctrl[0]),.wobble=0.22,.seed=0x6E50+%k*31});
+  mg.grow(&ctrl,.{.start=ctrl[0],.direction=m.norm(ctrl[at.len-1]-ctrl[0]),.length=m.dist(ctrl[at.len-1],ctrl[0]),.wobble=0.22,.seed=0x6E50+%k*31});
   // the tip stays where the cup stands
   ctrl[at.len-1]=tip(k);
   // the bough's own spline, leaving the trunk near its top

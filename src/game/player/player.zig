@@ -248,9 +248,8 @@ pub const Player=struct{
     const g=p.gait();
     const speed:f32=if(sprint)sprintSpeed*g.sprint else walkSpeed*g.walk;
     const target=v3(wish[0]*speed,0,wish[1]*speed);
-    // how much of the way to the wish velocity this frame closes
-    const k=@min(1,dt*accelResponse);
-    p.vel+=(target-p.vel)*m.splat3(k);
+    // eased toward the wish velocity
+    p.vel=m.dampV(p.vel,target,accelResponse,dt);
     if(p.work!=null)p.vel*=m.splat3(workDrag);
     // the height of the tile it stands on
     const here=ground.walkable(m.tileOf(p.pos[0]),m.tileOf(p.pos[2])) orelse p.pos[1];
@@ -280,7 +279,7 @@ pub const Player=struct{
     }
     // how far it is from facing what it wants, and the share turned this frame
     const diff=m.angleDiff(p.facing,want);
-    const turn=diff*@min(1,dt*turnResponse);
+    const turn=diff*m.dampBy(turnResponse,dt);
     p.facing+=turn;
     p.turn=turn/@max(dt,minDt);
   }

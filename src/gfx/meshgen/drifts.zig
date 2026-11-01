@@ -62,7 +62,7 @@ pub fn drift(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!vo
   // where the neck ends, a little astray, and its control points
   const neck=m.v3(rng.range(-0.02,0.02),floatR*0.95+g.stemH,rng.range(-0.02,0.02));
   var nc:[4]V3=undefined;
-  growthPath(.{.start=m.v3(0,floatR*0.75,0),.direction=m.norm(neck-m.v3(0,floatR*0.75,0)),.length=m.len(neck-m.v3(0,floatR*0.75,0)),.wobble=g.wobble,.seed=seed^0x57E4},&nc);
+  growthPath(.{.start=m.v3(0,floatR*0.75,0),.direction=m.norm(neck-m.v3(0,floatR*0.75,0)),.length=m.dist(neck,m.v3(0,floatR*0.75,0)),.wobble=g.wobble,.seed=seed^0x57E4},&nc);
   // the neck's smooth path, then per point when it forms and its radius
   var np:[8]V3=undefined;
   m.splineResample(&nc,&np);
@@ -157,7 +157,7 @@ pub fn drift(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!vo
       const w=k*waves*m.tau+ph;
       c.*=from+(to-from)*m.splat3(k)+out*m.splat3(@sin(w)*amp)+across*m.splat3(@sin(w*0.5+1.3)*amp*0.45);
     }
-    grow(&fc,.{.start=from,.direction=dir,.length=m.len(to-from),.wobble=g.tendrilWobble,.seed=seed+%i*31});
+    grow(&fc,.{.start=from,.direction=dir,.length=m.dist(to,from),.wobble=g.tendrilWobble,.seed=seed+%i*31});
     // its smooth path, then per point when it forms and its radius
     var fp:[40]V3=undefined;
     m.splineResample(&fc,&fp);

@@ -102,7 +102,7 @@ test"each leg bone is its own: a foot set forward and down is reached, its sole 
   for(skel.sides,0..)|sd,s|{
     // the foot bone's frame
     const f=pw[@intFromEnum(sd.foot)];
-    try testing.expect(m.len(m.origin(f)-want[s])<2e-3);
+    try testing.expect(m.dist(m.origin(f),want[s])<2e-3);
     try testing.expect(m.dot(m.norm(v3(f[1][0],f[1][1],f[1][2])),slope)>0.99);
   }
 }
@@ -133,10 +133,10 @@ test"a planted foot stays where it is planted while the wolf walks"{
     // the feet before this frame's step
     const before=p.feet;
     p.animate(null,testDt);
-    for(before,p.feet)|a,b|if(a.planted() and b.planted())try testing.expect(m.len(a.at-b.at)<1e-5);
+    for(before,p.feet)|a,b|if(a.planted() and b.planted())try testing.expect(m.dist(a.at,b.at)<1e-5);
   }
   // and both feet keep up with it
-  for(p.feet,0..)|f,s|try testing.expect(m.len(f.at-p.rest(null,s))<trailMax+0.1);
+  for(p.feet,0..)|f,s|try testing.expect(m.dist(f.at,p.rest(null,s))<trailMax+0.1);
 }
 test"an arm's wrist reaches what it is solved for"{
   // the bones at the rest pose, and the chest's frame among them
@@ -149,7 +149,7 @@ test"an arm's wrist reaches what it is solved for"{
     // the bones of that pose, and where the wrist got to from the shoulder
     const w=skel.fk(q);
     const got=m.mulPoint(m.inverseRigid(chest),m.origin(w[@intFromEnum(skel.sides[1].hand)]))-skel.shoulder;
-    try testing.expect(m.len(got-d)<2e-3);
+    try testing.expect(m.dist(got,d)<2e-3);
   }
 }
 test"gathering, the wolf squats, grips the node and each unit sends a paw to the belly"{
@@ -216,8 +216,8 @@ test"standing still with a heavy belly, one paw rests on it and the other on the
   const w=skel.fk(p.pose());
   const belly=m.mulPoint(w[@intFromEnum(Bone.gutTop)],restOn*v3(bellyMesh.rx,bellyMesh.upReach,bellyMesh.rz))+v3(0,restLift,0);
   const hip=m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1));
-  try testing.expect(m.len(m.origin(w[@intFromEnum(skel.sides[1].hand)])-belly)<0.03);
-  try testing.expect(m.len(m.origin(w[@intFromEnum(skel.sides[0].hand)])-hip)<0.03);
+  try testing.expect(m.dist(m.origin(w[@intFromEnum(skel.sides[1].hand)]),belly)<0.03);
+  try testing.expect(m.dist(m.origin(w[@intFromEnum(skel.sides[0].hand)]),hip)<0.03);
   // a light belly never takes the pose
   // a wolf with a light belly
   var q:Player=.{.pos=v3(0,0,0)};
@@ -249,7 +249,7 @@ test"the arms ease into the gathering and belly-rest poses without swinging roun
       for(0..2)|s|{
         h[s]=m.origin(w[@intFromEnum(skel.sides[s].hand)]);
         try testing.expect(@abs(q.arms[s].root.x)<=m.pi+testEps);
-        if(last)|l|try testing.expect(m.len(h[s]-l[s])<0.03);
+        if(last)|l|try testing.expect(m.dist(h[s],l[s])<0.03);
       }
       last=h;
     }
@@ -279,7 +279,7 @@ test"walking, sprinting, turning back and stopping, no leg joint ever jumps and 
     var now:[2][3]V3=undefined;
     for(skel.sides,&now)|sd,*n|n.*=.{m.origin(w[@intFromEnum(sd.shin)]),m.origin(w[@intFromEnum(sd.meta)]),m.origin(w[@intFromEnum(sd.foot)])};
     // none moved further in a frame than a sprinting swing carries it
-    if(last)|l|for(l,now)|a,b|for(a,b)|j0,j1|try testing.expect(m.len(j1-j0)<0.3);
+    if(last)|l|for(l,now)|a,b|for(a,b)|j0,j1|try testing.expect(m.dist(j1,j0)<0.3);
     last=now;
   };
 }

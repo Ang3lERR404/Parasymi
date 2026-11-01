@@ -225,7 +225,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   a.graft=@min(1,a.graft+dt/graftGrow);
   if(ctx.g.labTick(&a.lab,self.inv.bag(),study,dt))a.flare=1;
   a.flare=@max(0,a.flare-dt*flareFade);
-  a.fed+=((if(a.lab.fed)@as(f32,1)else 0)-a.fed)*@min(1,dt*fedEase);
+  a.fed=m.damp(a.fed,if(a.lab.fed)1 else 0,fedEase,dt);
   // its flower turns while it studies, easing in and out with it
   // how busy it is, eased (0..1)
   const busy=m.smooth(self.activity);

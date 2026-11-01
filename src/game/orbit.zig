@@ -152,7 +152,7 @@ pub const Orbit=struct{
           // its centre, lifted by the follow height and any hover
           const c=at+m.v3(0,g.heightAt(x,y)+focusUp+if(def.floating)def.hover else 0,0);
           // how far it is from the wolf
-          const d=m.len(c-wolf);
+          const d=m.dist(c,wolf);
           if(d<near){near=d;best=c;}
         };
         return best orelse wolf;
@@ -167,7 +167,7 @@ pub const Orbit=struct{
           // its centre, halfway up its height and over any hover
           const c=s.at+m.v3(0,g.heightAt(s.x,s.y)+def.tall*tallFocus+def.hover,0);
           // how far it is from the wolf
-          const d=m.len(c-wolf);
+          const d=m.dist(c,wolf);
           if(d<near){near=d;best=c;}
         };
         return best orelse wolf;

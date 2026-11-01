@@ -266,7 +266,7 @@ pub const Starfall=struct{
         mo.pos[1]=@max(rest,mo.pos[1]+mo.vy*dt);
       }else{
         mo.vy=-fallMin;
-        mo.pos[1]+=(rest-mo.pos[1])*@min(1,dt*landEase);
+        mo.pos[1]=m.damp(mo.pos[1],rest,landEase,dt);
       }
       // the sway is an offset that dies away as it nears the ground, so it
       // lands where it was falling toward
@@ -286,7 +286,7 @@ pub const Starfall=struct{
     sf.quiet=sf.rng.range(twinkleGap[0],twinkleGap[1]);
     // the nearest mote, counted further off as it burns away
     var nearest:f32=twinkleNear;
-    for(sf.motes.items)|mo|if(!mo.shattering()){nearest=@min(nearest,m.len(mo.pos-around)*mo.life+twinkleNear*(1-mo.life));};
+    for(sf.motes.items)|mo|if(!mo.shattering()){nearest=@min(nearest,m.dist(mo.pos,around)*mo.life+twinkleNear*(1-mo.life));};
     if(nearest<twinkleNear)sf.twinkle=.{.near=1-nearest/twinkleNear};
   }
 };

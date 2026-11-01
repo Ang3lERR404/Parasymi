@@ -271,7 +271,7 @@ pub const Camera=struct{
     }
   }
   /// 0 at the resting pitch and above, 1 at the lowest.
-  fn lowness(c:*const Camera)f32{return m.clamp01((restPitch-c.pitch)/(restPitch-lowPitch));}
+  fn lowness(c:*const Camera)f32{return m.unlerp(restPitch,lowPitch,c.pitch);}
   /// vertical field of view: it widens as the camera drops, so the wolf and
   /// the horizon fit in one frame.
   pub fn fov(c:*const Camera)f32{return m.lerp(c.fovy,wideFovy,c.lowness());}
@@ -358,8 +358,8 @@ test"the free camera starts where the follow view is and eases home"{
   const e=c.eye();
   const d=m.norm(c.aim()-e);
   c.startFree();
-  try testing.expect(m.len(c.viewEye()-e)<1e-5);
-  try testing.expect(m.len(c.view.free.forward()-d)<1e-4);
+  try testing.expect(m.dist(c.viewEye(),e)<1e-5);
+  try testing.expect(m.dist(c.view.free.forward(),d)<1e-4);
   // fly up and over the top: pitch is not clamped and nothing degenerates
   c.fly(.{0,3},m.v3(0.5,0,1),0.3,0);
   try testing.expect(c.view.free.pitch>m.halfPi);
@@ -369,7 +369,7 @@ test"the free camera starts where the follow view is and eases home"{
   try testing.expect(c.view==.returning);
   c.tick(0.2);
   try testing.expect(c.view==.follow);
-  try testing.expect(m.len(c.viewEye()-e)<1e-5);
+  try testing.expect(m.dist(c.viewEye(),e)<1e-5);
 }
 test"zoomed all the way in, the camera goes into the eyes and back out"{
   // a camera zoomed in a little past the nearest
@@ -381,9 +381,9 @@ test"zoomed all the way in, the camera goes into the eyes and back out"{
   c.zoom(1,eyes);
   try testing.expect(c.inEyes());
   // easing in, it starts where following left off
-  try testing.expect(m.len(c.viewEye()-c.eye())<1e-5);
+  try testing.expect(m.dist(c.viewEye(),c.eye())<1e-5);
   c.tick(eyesTime);
-  try testing.expect(m.len(c.viewEye()-eyes)<1e-5);
+  try testing.expect(m.dist(c.viewEye(),eyes)<1e-5);
   // the eyes look the way the camera faced, level; turning them turns it
   // the yaw before the eyes turn
   const yaw=c.yaw;
@@ -393,7 +393,7 @@ test"zoomed all the way in, the camera goes into the eyes and back out"{
   c.look(.{0,-1e7});
   try testing.expectEqual(eyesUp,c.gaze());
   try testing.expect(c.reach(50)==50);
-  try testing.expect(m.len(c.ray(800,450,1600,900).d-toward(c.yaw,eyesUp))<1e-3);
+  try testing.expect(m.dist(c.ray(800,450,1600,900).d,toward(c.yaw,eyesUp))<1e-3);
   // a notch out leaves, easing back to following
   c.zoom(-1,eyes);
   try testing.expect(!c.inEyes() and c.view==.eyes);
@@ -401,7 +401,7 @@ test"zoomed all the way in, the camera goes into the eyes and back out"{
   try testing.expect(c.view==.eyes);
   c.tick(eyesTime);
   try testing.expect(c.view==.follow);
-  try testing.expect(m.len(c.viewEye()-c.eye())<1e-5);
+  try testing.expect(m.dist(c.viewEye(),c.eye())<1e-5);
 }
 test"orbiting turns freely and tilts only within its limits"{
   // a camera at rest

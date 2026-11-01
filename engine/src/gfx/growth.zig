@@ -160,7 +160,7 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
       // the new spline, timed below
       var sp:Spline=.{.pts=undefined,.len=0,.parent=parent,.at=m.clamp01(u),.start=0,.time=0,.front=o.front};
       m.splineResample(ctrl,&sp.pts);
-      for(1..res)|i|sp.len+=m.len(sp.pts[i]-sp.pts[i-1]);
+      for(1..res)|i|sp.len+=m.dist(sp.pts[i],sp.pts[i-1]);
       sp.time=@max(minTime,sp.len*o.pace);
       if(parent)|p|{
         // the parent it waits on
@@ -426,7 +426,7 @@ test"branches wait for their spline, the whole closing at one"{
   const c=k.branch(a,1,&.{m.v3(0,0,0),m.v3(0.6,1.1,0)},.{});
   k.finish(&b);
   // a branch starts on its parent, and grows once it is done
-  try testing.expect(m.len(k.point(a,0)-k.point(t,0.5))<1e-4);
+  try testing.expect(m.dist(k.point(a,0),k.point(t,0.5))<1e-4);
   try testing.expectApproxEqAbs(k.when(t,1),k.when(a,0),1e-5);
   try testing.expectApproxEqAbs(k.when(a,1),k.when(c,0),1e-5);
   // a passing one as the front goes by
@@ -467,7 +467,7 @@ test"pieces built along a spline grow from its root to its tip"{
     // how far up the trunk it lies (its rounded ends dome past the trunk's
     // ends, and grow from them)
     const y=m.clamp01(v.pos[1]);
-    try testing.expect(m.len(@as(V3,g.from)-m.v3(0,y,0))<0.02);
+    try testing.expect(m.dist(@as(V3,g.from),m.v3(0,y,0))<0.02);
     try testing.expectApproxEqAbs(y*k.get(t).time,g.at[0],0.02);
   }
 }

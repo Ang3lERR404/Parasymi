@@ -222,7 +222,7 @@ pub const tendril=struct{
       q.*=v3(0.004*@sin(f*11),f,0.004*@cos(f*9));
       t.*=f;
       r.*=0.009*m.lerp(1,0.55,f);
-      c.*=color.mix(kit.lilac,kit.leafLite,m.smooth(m.clamp01((f-0.3)/0.6)));
+      c.*=color.mix(kit.lilac,kit.leafLite,m.smooth(m.unlerp(0.3,0.9,f)));
     }
     try b.tubeC(&p,&ts,&rs,&cs,null,.tendril,5);
     try mg.leavesAlong(b,&p,4,0.05,0.018,0.3,0.7,0,0.94,kit.leafDark,kit.leafLite,0x3E71);

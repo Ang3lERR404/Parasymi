@@ -221,7 +221,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
       const reach=clodOut*(0.7+0.3*m.f(j%2));
       // where it is on its arc, and its size (shrinking as it lands)
       const p=node+m.v3(@cos(a)*reach*t,clodFling*(0.8+0.2*m.f(j%3))*4*t*(1-t),@sin(a)*reach*t);
-      const size=clodSize*(0.75+0.25*m.f(j%2))*(1-m.smooth(m.clamp01((t-0.85)/0.15)));
+      const size=clodSize*(0.75+0.25*m.f(j%2))*(1-m.smooth(m.unlerp(0.85,1,t)));
       try out.emit(.diggerClod,m.chain(&.{m.translate(p),m.rotY(a+t*4),m.rotX(t*3+m.f(j)),m.scale3(m.splat3(size))}),.{.phase=s.seed});
     }
   }

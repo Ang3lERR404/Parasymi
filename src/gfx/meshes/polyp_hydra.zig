@@ -241,11 +241,11 @@ pub fn body(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,o:Body,rng:*Rng)Alloca
     const f=m.ratio(j,bodyRings-1);
     t.*=f;
     // slender, swelling at its gut, narrowing to the head
-    r.*=o.r*(0.8+0.45*@exp(-(f-0.66)*(f-0.66)*20))*(1-0.2*m.smooth(m.clamp01((f-0.88)/0.12)));
+    r.*=o.r*(0.8+0.45*@exp(-(f-0.66)*(f-0.66)*20))*(1-0.2*m.smooth(m.unlerp(0.88,1,f)));
     c.*=o.base.lerp(pearl,m.smooth(m.clamp01(f/0.4))).lerp(gut,0.5*@exp(-(f-0.66)*(f-0.66)*30)).toRgba8(255);
     if(o.head!=.cone){
       // an open head: the body opens like a trumpet into its disc
-      const ff=m.clamp01((f-0.84)/0.16);
+      const ff=m.unlerp(0.84,1,f);
       r.*=m.lerp(r.*,o.r*openFlare,ff*ff);
       c.*=c.toRgb().lerp(lib.polypMesh.disc,m.smooth(ff)).toRgba8(255);
     }

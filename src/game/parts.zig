@@ -161,7 +161,7 @@ pub const Parts=struct{
   /// distance from the eye calls for
   fn add(p:*Parts,id:meshlib.Id,at:m.V3,inst:PartInstance)Allocator.Error!void{
     // the level of detail its distance calls for
-    const lod=mg.lodAt(m.len(at-p.eye));
+    const lod=mg.lodAt(m.dist(at,p.eye));
     try p.lists[meshlib.slot(id,lod)].append(p.gpa,inst);
   }
   /// a mesh built straight up +Y over 0..1, bent on the GPU along the

@@ -172,7 +172,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     var r=shapeR+shapeGrow*m.clamp01(m.f(it.n)/shapeFull);
     if(si==c.inSlot and c.inT<1){
       target=at;
-      r*=1+gulp*@sin(m.pi*m.clamp01((c.inT-0.75)/0.25));
+      r*=1+gulp*@sin(m.pi*m.unlerp(0.75,1,c.inT));
     }
     try s.emitLump(out,base,at,r*formed,it.item,glow);
     k+=1;
@@ -193,7 +193,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     look.tint=color.Rgba8.of(c.inItem.info().col).toF4();
     look.drop=p[1];
     // its size, shrinking away as it reaches its stack
-    const size=mote*(1-m.smooth(m.clamp01((t-0.8)/0.2)));
+    const size=mote*(1-m.smooth(m.unlerp(0.8,1,t)));
     try out.emit(.itemPod,m.mul(base,m.chain(&.{m.translate(p),m.scale3(m.splat3(size))})),look);
   }
   // coming out: up from the gourd's heart, out through the mouth, away
@@ -210,7 +210,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     look.tint=color.Rgba8.of(c.outItem.info().col).toF4();
     look.drop=p[1];
     // its size: swelling in at the start, fading out at the end
-    const size=mote*m.smooth(m.clamp01(t/0.2))*(1-m.smooth(m.clamp01((t-0.75)/0.25)));
+    const size=mote*m.smooth(m.clamp01(t/0.2))*(1-m.smooth(m.unlerp(0.75,1,t)));
     try out.emit(.itemPod,m.mul(base,m.chain(&.{m.translate(p),m.scale3(m.splat3(size))})),look);
   }
   // the lid: its sepals turned open about their bases while anything passes

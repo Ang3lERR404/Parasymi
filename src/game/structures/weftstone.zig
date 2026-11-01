@@ -398,7 +398,7 @@ fn sparksIn(s:*const st.Structure,out:*Parts,base:m.M4,tf:f32)Allocator.Error!vo
     const end=m.lerpV(a,target,m.lerp(0.3,1,f)*m.lerp(0.75,1,hash(step,j,4,s.seed)));
     // its two kinks between, thrown off its line
     var c:[4]V3=.{a,m.lerpV(a,end,0.33),m.lerpV(a,end,0.66),end};
-    for(c[1..3],0..)|*p,k|p.*+=v3(hash(step,j,5+m.f(k),s.seed)-0.5,hash(step,j,7+m.f(k),s.seed)-0.5,hash(step,j,9+m.f(k),s.seed)-0.5)*m.splat3(2*sparkJag*m.len(end-a)/mesh.bulbR[0]);
+    for(c[1..3],0..)|*p,k|p.*+=v3(hash(step,j,5+m.f(k),s.seed)-0.5,hash(step,j,7+m.f(k),s.seed)-0.5,hash(step,j,9+m.f(k),s.seed)-0.5)*m.splat3(2*sparkJag*m.dist(end,a)/mesh.bulbR[0]);
     for(&c)|*p|p.*=m.mulPoint(base,p.*);
     // the way its kinks lie across it, turned each jump
     const side=m.norm(v3(hash(step,j,11,s.seed)-0.5,hash(step,j,12,s.seed)-0.5,hash(step,j,13,s.seed)-0.5)+v3(1e-3,0,0));

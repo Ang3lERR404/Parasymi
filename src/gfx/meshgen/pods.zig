@@ -80,6 +80,6 @@ test"a bead is marked as its pod, its radius on every vertex"{
     try std.testing.expectApproxEqAbs(@as(f32,0.05),v.tu[1],1e-6);
     // the centre sits a radius in along its normal
     const c=v3(v.pos[0],v.pos[1],v.pos[2])-v3(v.nrm[0],v.nrm[1],v.nrm[2])*m.splat3(0.05);
-    try std.testing.expect(m.len(c-v3(0,1,0))<1e-3);
+    try std.testing.expect(m.dist(c,v3(0,1,0))<1e-3);
   }
 }

@@ -89,9 +89,9 @@ test"the camera eases onto a focused thing and turns past straight up"{
   var c:camera.Camera=.{};
   o.focus(v3(1,2,3),0.1);
   for(0..200)|_|o.step(&c,0.02);
-  try testing.expect(m.len(o.target-v3(1,2,3))<1e-3);
+  try testing.expect(m.dist(o.target,v3(1,2,3))<1e-3);
   try testing.expectApproxEqAbs(@max(0.1*focusFit,focusMin),o.dist,1e-3);
-  try testing.expectApproxEqAbs(o.dist,m.len(c.view.free.pos-o.target),1e-3);
+  try testing.expectApproxEqAbs(o.dist,m.dist(c.view.free.pos,o.target),1e-3);
   // dragged over the top, the view still looks at the target
   o.pitch=m.rad(120);
   o.step(&c,0);

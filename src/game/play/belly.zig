@@ -44,7 +44,7 @@ pub fn arsthraxiaState(g:*const Game)?lib.sound.Sounds.Cmd{
 /// the view is in the wolf's eyes: its head is not drawn (its shadow is)
 pub fn headless(g:*const Game)bool{
   return switch(g.cam.view){
-    .eyes=>|y|m.len(g.cam.viewEye()-y.pos)<headClear,
+    .eyes=>|y|m.dist(g.cam.viewEye(),y.pos)<headClear,
     .follow,.free,.returning=>false,
   };
 }

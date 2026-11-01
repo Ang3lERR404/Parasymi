@@ -402,7 +402,7 @@ fn drifts(g:*Game,tf:f32)Allocator.Error!void{
   const e=1-(1-k)*(1-k);
   for(g.leyDrifts.items)|d|{
     // how much light is left in them, and the node's size
-    const left=1-m.smooth(m.clamp01((k-0.55)/0.45));
+    const left=1-m.smooth(m.unlerp(0.55,1,k));
     const size=driftSize(d.full);
     for(0..driftShards)|j|{
       // this shard's own randoms: its heading out, its rise, its spin, its moment

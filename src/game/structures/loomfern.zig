@@ -155,7 +155,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,_:f32)Allocator.Error!void
   const fed=f.fed>0 or s.inv.count(.essence)>0;
   // the sheaf: growing on the spindle as the weave goes, turning as it
   // winds the threads in
-  const sheaf=m.smooth(m.clamp01((p-sheafFrom)/(1-sheafFrom)));
+  const sheaf=m.smooth(m.unlerp(sheafFrom,1,p));
   if(sheaf>0){
     // the sheaf's look: swaying from the spindle's height
     var look=sway;

@@ -142,7 +142,7 @@ pub fn shootFoldNearest(b:*Builder,start:usize,path:[]const V3)void{
     // the nearest point of the path to this vertex
     var best:usize=0;
     for(path,0..)|p,j|{
-      if(m.len(p-v.pos)<m.len(path[best]-v.pos))best=j;
+      if(m.dist(p,v.pos)<m.dist(path[best],v.pos))best=j;
     }
     v.col.a=m.unorm8(1-m.ratio(best,path.len-1));
   }
@@ -171,7 +171,7 @@ pub fn shootFoldAlong(b:*Builder,start:usize,path:[]const V3)void{
     // the point of the path nearest the leaf's base
     var best:usize=0;
     for(path,0..)|p,j|{
-      if(m.len(p-base)<m.len(path[best]-base))best=j;
+      if(m.dist(p,base)<m.dist(path[best],base))best=j;
     }
     shootFoldRange(b,s,e,m.ratio(best,path.len-1));
     s=e;

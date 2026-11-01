@@ -335,7 +335,7 @@ pub fn armsToWrists(p:*const Player,q:*skel.Pose,sq:f32)void{
   const into=m.inverseRigid(w[@intFromEnum(Bone.chest)]);
   // the pry's unit share, and how far the wrists twist with the wrench
   const k=p.gather orelse 0;
-  const twist=pryTwist*m.smooth(m.clamp01((k-pullEnd)/(wrenchEnd-pullEnd)))*(1-m.smooth(m.clamp01((k-wrenchEnd)/(1-wrenchEnd))));
+  const twist=pryTwist*m.smooth(m.unlerp(pullEnd,wrenchEnd,k))*(1-m.smooth(m.unlerp(wrenchEnd,1,k)));
   // where each wrist is wanted, in the chest's frame
   const grip=[2]V3{m.mulPoint(into,p.wrist[0].pos),m.mulPoint(into,p.wrist[1].pos)};
   for(0..2)|s|{

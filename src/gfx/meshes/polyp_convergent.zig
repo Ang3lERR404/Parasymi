@@ -223,7 +223,7 @@ fn flesh(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,r:f32,dr:f32)Allocator.Er
   for(&ts,&rs,&cs,0..)|*t,*rr,*c,j|{
     // how far up the body, 0 foot .. 1 head, and how far into the head's flare
     const f=m.ratio(j,bodyRings-1);
-    const ff=m.clamp01((f-0.84)/0.16);
+    const ff=m.unlerp(0.84,1,f);
     t.*=f;
     rr.*=m.lerp(r*(0.8+0.3*@exp(-(f-gutU)*(f-gutU)*20)),dr,ff*ff);
     c.*=kit.pale;
@@ -239,7 +239,7 @@ fn flesh(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,r:f32,dr:f32)Allocator.Er
     const band=@sin(2*ph+h*18);
     const sap=if(band>0)kit.violet else kit.amber;
     const base=color.mix(kit.pale,sap,0.45*m.smooth(m.clamp01(@abs(band)*1.6-0.5)));
-    vx.col=color.mix(base,discCol.toRgba8(255),m.smooth(m.clamp01((h-0.86)/0.14)));
+    vx.col=color.mix(base,discCol.toRgba8(255),m.smooth(m.unlerp(0.86,1,h)));
   }
   try k.along(b,s,id);
 }

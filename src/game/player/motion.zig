@@ -135,19 +135,19 @@ pub fn animate(p:*Player,ground:?*const World,dt:f32)void{
   // the top walk and sprint speeds for that gait
   const walk=walkSpeed*g.walk;
   const sprint=sprintSpeed*g.sprint;
-  p.stride+=(m.clamp01(spd/walk)-p.stride)*@min(1,dt*strideResponse);
+  p.stride=m.damp(p.stride,m.clamp01(spd/walk),strideResponse,dt);
   p.cycle=(cycle+cyclePerSpeed*spd)*g.stride;
-  p.duty=m.lerp(dutySlow,dutyFast,m.clamp01((spd-1)/(sprint-1)));
+  p.duty=m.lerp(dutySlow,dutyFast,m.unlerp(1,sprint,spd));
   p.phase=@mod(p.phase+spd/p.cycle*dt,1);
   // how hard it is working: 0 at rest .. 1 at a full sprint
   const effort=m.clamp01(spd/sprint);
   p.breath+=dt*m.lerp(breathRate,breathRateRun,effort);
-  p.fullness+=(p.bellyFill()-p.fullness)*@min(1,dt*fullnessResponse);
+  p.fullness=m.damp(p.fullness,p.bellyFill(),fullnessResponse,dt);
   p.reach.to(if(p.work!=null)1 else 0,reachFreq,1,dt);
   p.pry(dt);
   p.still=if(p.stride<standing and p.work==null and p.gather==null)p.still+dt else 0;
   // how heavy the belly is for the rest pose: 0 .. 1 once full enough
-  const heavy=m.smooth(m.clamp01((p.fullness-restFull)/(restFullIn-restFull)));
+  const heavy=m.smooth(m.unlerp(restFull,restFullIn,p.fullness));
   p.restPose.to(if(p.still>restAfter)heavy else 0,restFreq,1,dt);
   // what the body feels: its acceleration, turned into its own frame
   const a=(p.vel-p.lastVel)/m.splat3(@max(dt,minDt));
@@ -202,7 +202,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
   for(&p.feet,0..)|*f,s|{
     // the other foot
     const other=&p.feet[1-s];
-    if(m.len(f.at-p.rest(ground,s))>lost){
+    if(m.dist(f.at,p.rest(ground,s))>lost){
       f.*=.{.at=p.rest(ground,s),.phase=f.phase};
       continue;
     }
@@ -210,7 +210,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
     const ph=@mod(p.phase+0.5*m.f(s),1);
     if(f.planted()){
       // how far it is from where it rests
-      const off=m.len(f.at-p.rest(ground,s));
+      const off=m.dist(f.at,p.rest(ground,s));
       // a foot trailing too far always lifts (the other one is down by then)
       var lift=(off>trailMax and other.planted()) or off>trailHard;
       if(moving){
@@ -218,7 +218,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
         lift=lift or (ph>=p.duty and f.phase<p.duty);
       }else{
         // standing, a foot left behind steps back under (one at a time)
-        lift=lift or (other.planted() and off>settle and off>=m.len(other.at-p.rest(ground,1-s)));
+        lift=lift or (other.planted() and off>settle and off>=m.dist(other.at,p.rest(ground,1-s)));
       }
       if(lift){
         f.from=f.at;

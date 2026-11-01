@@ -53,7 +53,7 @@ pub fn rootMat(b:*mg.Builder,n:u32,reach:f32,girth:f32,seed:u64,on:?On)Allocator
     const to=v3(@cos(a)*reach*rng.range(0.8,1.05),-0.04,@sin(a)*reach*rng.range(0.8,1.05));
     // its control points
     var c:[6]V3=undefined;
-    mg.growthPath(.{.start=from,.direction=m.norm(to-from),.length=m.len(to-from),.wobble=0.25,.seed=seed+%i*41},&c);
+    mg.growthPath(.{.start=from,.direction=m.norm(to-from),.length=m.dist(to,from),.wobble=0.25,.seed=seed+%i*41},&c);
     if(on)|o|{
       // its branch on the skeleton, growing with the spline it leaves
       const root=o.k.branch(o.id,o.u,&c,.{.after=.with});
@@ -81,7 +81,7 @@ pub fn rootMat(b:*mg.Builder,n:u32,reach:f32,girth:f32,seed:u64,on:?On)Allocator
 /// moved onto it), its leaves opening as it passes them.
 pub fn leafyVine(b:*mg.Builder,from:V3,to:V3,r0:f32,curl:f32,leaves:u32,t0:f32,t1:f32,seed:u64,on:?On)Allocator.Error!void{
   // how the vine grows: from `from` toward `to`, wavering and curling
-  const g:mg.Growth=.{.start=from,.direction=m.norm(to-from),.length=m.len(to-from),.wobble=0.18,.curl=curl,.seed=seed};
+  const g:mg.Growth=.{.start=from,.direction=m.norm(to-from),.length=m.dist(to,from),.wobble=0.18,.curl=curl,.seed=seed};
   if(on)|o|{
     // its branch on the skeleton
     const vine=o.k.vine(o.id,o.u,g,7,.{});
@@ -260,7 +260,7 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
         const s=m.ratio(j,c.len-1);
         p.*=out*m.splat3(m.lerp(g.stemR*0.6,reach,s))+v3(0,g.stemR*(2*(1-s)*(1-s)+0.3*s*(1-s)-s*s),0);
       }
-      mg.grow(&c,.{.start=c[0],.direction=m.norm(c[5]-c[0]),.length=m.len(c[5]-c[0]),.wobble=0.25,.seed=seed+%i*41});
+      mg.grow(&c,.{.start=c[0],.direction=m.norm(c[5]-c[0]),.length=m.dist(c[5],c[0]),.wobble=0.25,.seed=seed+%i*41});
       // the root resampled smooth
       var p:[12]V3=undefined;
       m.splineResample(&c,&p);
@@ -314,7 +314,7 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
       const ri:usize=@intFromFloat(k*(res-1));
       p.*=m.alongPath(&spine,k)+v3(@cos(a),0,@sin(a))*m.splat3(radii[ri]*1.05+vr);
     }
-    mg.grow(&c,.{.start=c[0],.direction=m.norm(c[steps-1]-c[0]),.length=m.len(c[steps-1]-c[0]),.wobble=0.06,.seed=seed+%vi*83});
+    mg.grow(&c,.{.start=c[0],.direction=m.norm(c[steps-1]-c[0]),.length=m.dist(c[steps-1],c[0]),.wobble=0.06,.seed=seed+%vi*83});
     // the vine resampled smooth
     var p:[veinRings]V3=undefined;
     m.splineResample(&c,&p);

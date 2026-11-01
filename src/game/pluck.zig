@@ -91,7 +91,7 @@ pub const Tug=struct{
   /// the paws (`vertex.noPluck` for any other)
   pub fn sinceOf(t:Tug,id:PlantId,at:m.V3)f32{
     const bent=t.id orelse return lib.vertex.noPluck;
-    if(bent!=id or m.len(at-t.at)>1e-4)return lib.vertex.noPluck;
+    if(bent!=id or m.dist(at,t.at)>1e-4)return lib.vertex.noPluck;
     return t.since;
   }
   /// `dt` toward a bend of `want` radians, in steps short enough that a
@@ -113,7 +113,7 @@ pub const Tug=struct{
   /// instance takes it: heading across, along, angle); none for any other
   pub fn of(t:Tug,id:PlantId,at:m.V3)m.Vice(f32,4){
     const bent=t.id orelse return@splat(0);
-    if(bent!=id or m.len(at-t.at)>1e-4)return@splat(0);
+    if(bent!=id or m.dist(at,t.at)>1e-4)return@splat(0);
     return.{t.dir[0],t.dir[1],t.x,0};
   }
 };

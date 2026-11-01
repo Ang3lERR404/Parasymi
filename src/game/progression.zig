@@ -384,7 +384,7 @@ pub const Progression=struct{
       g.died=0;
       g.diedT=0;
     }
-    g.veil+=(g.veilTarget()-g.veil)*@min(1,dt*veilEase);
+    g.veil=m.damp(g.veil,g.veilTarget(),veilEase,dt);
     for(&g.log)|*msg|msg.age+=dt;
   }
 };

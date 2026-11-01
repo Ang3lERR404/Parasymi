@@ -137,7 +137,7 @@ pub fn relight(light:*m.Vice(f32,4),p:*const Plants,w:*const World,x:i32,y:i32,d
   for(light,0..)|*l,k|{
     // where this point's light is heading
     const want:f32=if(active(p,w,pointAt(x,y,k)))1 else dim;
-    l.*+=(want-l.*)*@min(1,dt*lightEase);
+    l.*=m.damp(l.*,want,lightEase,dt);
   }
 }
 /// how many points shine as with a bloom (brighter than halfway from `dim` to 1)

@@ -204,7 +204,7 @@ pub fn tickWith(ctx:Ctx,dt:f32)Allocator.Error!void{
     };
     // fetched again: its own tick may have put another down and moved the list
     const s=ss.get(id);
-    s.activity+=((if(active)@as(f32,1)else 0)-s.activity)*@min(1,dt*activityEase);
+    s.activity=m.damp(s.activity,if(active)1 else 0,activityEase,dt);
   }
   // what is gone (fully faded: a drift flower taken into an arsthraxia),
   // lifted out, walking down the list so removing one never skips another

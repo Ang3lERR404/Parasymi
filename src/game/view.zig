@@ -389,7 +389,7 @@ fn threads(g:*Game,tf:f32)Allocator.Error!void{
     // which way is across the beam, level
     const side=m.norm(m.cross(span,m.v3(0,1,0)));
     // how far out the beam has reached, 0..1, as its bloom finishes
-    const reach=m.smooth(m.clamp01((s.items(.growth)[ia]-beamFrom)/(1-beamFrom)));
+    const reach=m.smooth(m.unlerp(beamFrom,1,s.items(.growth)[ia]));
     if(reach<=0)continue;
     // decision: one halo per beam; a beam between two halos' blooms (never
     // at once in practice) follows the first
@@ -460,7 +460,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   const reach=plantBound+m.f(def.size);
   if(!g.parts.sees(foot+m.v3(0,reach*plantBoundUp,0),reach))return;
   // the level of detail its distance from the eye calls for
-  const lod=meshgen.lodAt(m.len(foot-g.parts.eye));
+  const lod=meshgen.lodAt(m.dist(foot,g.parts.eye));
   // where it stands, across and up
   var at=d.at;
   var y=d.ground;
@@ -511,7 +511,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   // halo draws it in and dimming as it folds
   if(def.radiance>0 and !d.ghost){
     // how far it has assembled, where a forming halo draws its light, and its pulse
-    const assembled=m.smooth(m.clamp01((d.growth-bloomLitFrom)/(1-bloomLitFrom)));
+    const assembled=m.smooth(m.unlerp(bloomLitFrom,1,d.growth));
     const drawn=haloMod.spiral(m.v3(at[0],y+bloomCore,at[2]),halo);
     const pulse=1+bloomPulse*@sin(tf*bloomPulseRate+d.seed*m.tau);
     // how far the unforming has shattered it (its light goes out with it)

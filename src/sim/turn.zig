@@ -67,7 +67,7 @@ pub const Pose=struct{
   pub fn still(p:Pose)bool{return p.k>=1;}
 };
 /// how far through beat `b` (a window of shares) a turn `k` through it is, eased 0..1
-fn beat(k:f32,b:m.Vice(f32,2))f32{return m.smooth(m.clamp01((k-b[0])/(b[1]-b[0])));}
+fn beat(k:f32,b:m.Vice(f32,2))f32{return m.smooth(m.unlerp(b[0],b[1],k));}
 /// the pose of `t`, now facing `to`
 pub fn pose(t:Turn,to:m.Dir,now:f64,rooted:bool)Pose{
   // how far through its turn it is

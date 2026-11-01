@@ -200,7 +200,7 @@ test"the middle joint bends toward the pole and both links keep their length"{
   const target=m.v3(0.1,-0.4,0.05);
   const mid=middle(a,b,target,m.v3(0,0,1));
   try testing.expectApproxEqAbs(a,m.len(mid),1e-4);
-  try testing.expectApproxEqAbs(b,m.len(target-mid),1e-4);
+  try testing.expectApproxEqAbs(b,m.dist(target,mid),1e-4);
   try testing.expect(mid[2]>target[2]*m.len(mid)/m.len(target));
 }
 test"a trailing chain keeps its links and comes to rest on its rest shape"{
@@ -209,6 +209,6 @@ test"a trailing chain keeps its links and comes to rest on its rest shape"{
   var prev=pts;
   const rest=[_]V3{m.v3(0,0,0),m.v3(0,0.1,0),m.v3(0,0.2,0),m.v3(0,0.3,0)};
   for(0..600)|_|trail(&pts,&prev,&rest,.{.stiff=8,.keep=0.9,.seg=0.1},1.0/60.0);
-  for(1..4)|i|try testing.expectApproxEqAbs(@as(f32,0.1),m.len(pts[i]-pts[i-1]),1e-4);
-  try testing.expect(m.len(pts[3]-rest[3])<0.01);
+  for(1..4)|i|try testing.expectApproxEqAbs(@as(f32,0.1),m.dist(pts[i],pts[i-1]),1e-4);
+  try testing.expect(m.dist(pts[3],rest[3])<0.01);
 }

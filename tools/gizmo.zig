@@ -126,7 +126,7 @@ pub const Gizmo=struct{
   /// each handle's axis in the world (unit); null where there is none
   axes:[3]?V3,
   /// how long (m) a handle reaches: kept the same size on screen
-  fn reach(g:Gizmo,v:View)f32{return m.len(g.at-v.eye)*reachDistance;}
+  fn reach(g:Gizmo,v:View)f32{return m.dist(g.at,v.eye)*reachDistance;}
   /// point `i` of `segs` round the ring of radius `r` about axis `a`
   fn ringPoint(g:Gizmo,a:V3,r:f32,i:usize)V3{
     // the point's angle round the ring (rad)
@@ -184,7 +184,7 @@ pub const Gizmo=struct{
         const tip=v.project(g.at+a*m.splat3(r)) orelse return 0;
         const d=tip-c;
         // the handle's length on screen (px)
-        const l=@sqrt(m.sumOf(f32,2,d*d));
+        const l=m.lenOf(f32,2,d);
         if(l<endOn)return 0;
         // pixels along the handle's line, over its pixels per metre
         return m.sumOf(f32,2,(to-from)*d)/l/(l/r);
@@ -264,9 +264,7 @@ pub const Gizmo=struct{
 };
 /// the distance (px) between two points on screen
 fn dist2(a:m.Vec(f32,2),b:m.Vec(f32,2))f32{
-  // the run from one to the other
-  const d=a-b;
-  return @sqrt(m.sumOf(f32,2,d*d));
+  return m.lenOf(f32,2,a-b);
 }
 /// from `p` to the segment `a`..`b` (px)
 fn segDist(p:m.Vec(f32,2),a:m.Vec(f32,2),b:m.Vec(f32,2))f32{
@@ -277,8 +275,7 @@ fn segDist(p:m.Vec(f32,2),a:m.Vec(f32,2),b:m.Vec(f32,2))f32{
   const l2=m.sumOf(f32,2,ab*ab);
   const t=if(l2>m.eps)m.clamp01(m.sumOf(f32,2,ap*ab)/l2)else 0;
   // from the nearest point on the segment to `p`
-  const off=ap-ab*@as(m.Vec(f32,2),@splat(t));
-  return @sqrt(m.sumOf(f32,2,off*off));
+  return m.lenOf(f32,2,ap-ab*m.splatOf(f32,2,t));
 }
 /// a 1600x900 view from `eye` looking at the origin, for the tests
 fn testView(eye:V3)View{

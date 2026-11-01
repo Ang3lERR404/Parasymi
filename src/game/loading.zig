@@ -122,7 +122,7 @@ pub const Loading=struct{
     l.time+=dt;
     // the share made, which the shown one eases toward
     const want=share(at);
-    l.shown=@min(want,l.shown+(want-l.shown)*m.clamp01(dt*ease));
+    l.shown=@min(want,m.damp(l.shown,want,ease,dt));
   }
   /// a frame of play once loaded: the screen fades off it
   pub fn fadeStep(l:*Loading,dt:f32)void{

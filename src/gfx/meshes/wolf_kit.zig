@@ -249,7 +249,7 @@ pub fn resinLobe(b:*mg.Builder,s:*const Sculpt,at:M4,comptime Shape:type,comptim
     // where a cast from deep inside toward it comes out of the hide, if it does
     const hit=try s.castOut(deep,m.norm(on-deep),3*reachDistance);
     // whether that came out close to where it was expected
-    const near=if(hit)|c|i==0 or m.len(c.p-guess)<jump else false;
+    const near=if(hit)|c|i==0 or m.dist(c.p,guess)<jump else false;
     // the hide point taken: the cast's, or the hide nearest the guess
     const h=if(near)hit.?else try s.project(guess);
     hide[q]=h.p;
@@ -306,13 +306,13 @@ pub fn resinLobe(b:*mg.Builder,s:*const Sculpt,at:M4,comptime Shape:type,comptim
     // the outline's point at this angle
     const o=Shape.outline(a);
     // how far it has settled from the sheet onto the hide itself, 0..1
-    const on=m.smooth(m.clamp01((k-settle)/(1-settle)));
+    const on=m.smooth(m.unlerp(settle,1,k));
     // the point it rises from, between the smooth sheet and the hide
     const p0=m.lerpV(sheet[q],hide[q],on);
     // it rises along the smooth sheet's facing until close to the rim,
     // where it is low: raised far along the hide's own facing over a
     // crease tighter than its height (under the buttock), it would fold
-    const turn=m.smooth(m.clamp01((k-turnRate)/(1-turnRate)));
+    const turn=m.smooth(m.unlerp(turnRate,1,k));
     // the facing it rises along
     const n0=m.norm(m.lerpV(lift[q],up[q],turn));
     // how high the lobe stands off the hide here

@@ -116,7 +116,7 @@ pub const Wind=struct{
       // the hush, louder in a gust
       const hush=w.hush.low(n)*m.lerp(hushRange[0],hushRange[1],g);
       // how far past `whistleFrom` the gust is, 0..1, and the whistle it brings
-      const sing=m.clamp01((g-whistleFrom)/(1-whistleFrom));
+      const sing=m.unlerp(whistleFrom,1,g);
       const whistle=(w.whistle.tick(n)+underLevel*w.under.tick(n))*whistleAmount*sing*sing;
       s.*+=w.soft.low(hush+whistle)*w.level;
     }

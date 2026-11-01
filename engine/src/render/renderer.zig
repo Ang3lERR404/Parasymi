@@ -629,7 +629,7 @@ pub fn Renderer(comptime G:type)type{
       const eye=m.v3(p.eyeTime[0],p.eyeTime[1],p.eyeTime[2]);
       const target=m.v3(p.view[0],0,p.view[1]);
       // shadows reach the drawn world's far edge as the eye sees it
-      const reach=m.len(eye-target)+p.view[3];
+      const reach=m.dist(eye,target)+p.view[3];
       // the shadow cascades fitted to the view and the sun
       const cas=light.fit(p.vp,eye,target,reach,m.v3(p.sun[0],p.sun[1],p.sun[2]));
       // how many points of light it holds

@@ -66,7 +66,7 @@ fn inner(k:f32,u:f32)V3{
   // cupped, the rim rolling forward toward the inner side, a fold inside
   const cup=-cupDepth*(1-u*u)*rise;
   // the rim rolling forward at either edge
-  const rim=0.009*m.smooth(m.clamp01((@abs(u)-0.6)/0.4))*rise;
+  const rim=0.009*m.smooth(m.unlerp(0.6,1,@abs(u)))*rise;
   // and the fold: a groove beside a ridge running up inside
   const fold=-0.004*gauss(u,-0.3,0.16)*rise+0.0025*gauss(u,0.12,0.12)*rise;
   return v3(-u*half(k),k*height,cup+rim+fold);

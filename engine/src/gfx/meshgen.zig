@@ -351,7 +351,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
           // the way out of the tube there
           const out=if(isPoint)m.norm(spine[e]-spine[from])else if(first)m.norm(spine[0]-spine[1])else m.norm(spine[n-1]-spine[n-2]);
           // how far the end reaches: to the point, or a blunt end's own radius
-          const reach=if(isPoint)m.len(spine[e]-spine[from])else radii[e];
+          const reach=if(isPoint)m.dist(spine[e],spine[from])else radii[e];
           if(radii[from]<1e-4 or reach<1e-5)continue;
           try b.dome(.{
             .centre=spine[from],.out=out,.ring=rings[from][0..sides],.norms=norms[from][0..sides],
@@ -660,7 +660,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
         c.*=at+m.v3(@sin(th)*@cos(ph)*side,@cos(th),@sin(th)*@sin(ph))*radii*m.splat3(1.03);
       }
       grow(&ctrl,.{
-        .start=ctrl[0],.direction=m.norm(ctrl[ctrl.len-1]-ctrl[0]),.length=m.len(ctrl[ctrl.len-1]-ctrl[0]),
+        .start=ctrl[0],.direction=m.norm(ctrl[ctrl.len-1]-ctrl[0]),.length=m.dist(ctrl[ctrl.len-1],ctrl[0]),
         .wobble=wobble,.curl=0,.seed=seed+%i*17,
       });
       // the band's path, smoothed and resampled

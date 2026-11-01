@@ -384,7 +384,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   if(sp.t<0)sp.trunk=target else{
     // the time since the last draw (s), clamped so a long pause eases gently
     const dt:f32=@floatCast(m.clamp(g.uiTime-sp.t,0,easeDtMax));
-    sp.trunk+=(target-sp.trunk)*@min(1,dt*trunkEase);
+    sp.trunk=m.damp(sp.trunk,target,trunkEase,dt);
   }
   sp.t=g.uiTime;
   // the tree's area's top, and how the grown tree fits into it
@@ -577,5 +577,5 @@ test"the sapling lays itself out: hosts grow first, nodes keep apart"{
   var at:[nodeCount]V3=undefined;
   for(0..nodeCount)|i|at[i]=if(isBranch(i))l.stems[1+i].point(l.stems[1+i].len)
     else l.base[i]+heading(l.ang[i])*m.splat3(petiole+leafLen/2);
-  for(0..nodeCount)|i|for(i+1..nodeCount)|j|try testing.expect(m.len(at[i]-at[j])>0.5);
+  for(0..nodeCount)|i|for(i+1..nodeCount)|j|try testing.expect(m.dist(at[i],at[j])>0.5);
 }

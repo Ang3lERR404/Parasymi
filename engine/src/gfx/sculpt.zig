@@ -68,7 +68,7 @@ pub const Chain=struct{
     mid/=m.splat3(m.f(c.n+1));
     // the farthest any point's ball reaches from it
     var far:f32=0;
-    for(0..c.n+1)|i|far=@max(far,m.len(c.pts[i]-mid)+c.r[i]);
+    for(0..c.n+1)|i|far=@max(far,m.dist(c.pts[i],mid)+c.r[i]);
     return.{.c=mid,.r=far};
   }
 };
@@ -183,7 +183,7 @@ fn shapeDist(s:*const Shape,p:V3)f32{
 fn shapeBound(s:Shape)struct{c:V3,r:f32}{
   return switch(s){
     .ellipsoid=>|e|.{.c=e.c,.r=@reduce(.Max,e.r)},
-    .cone=>|c|.{.c=(c.a+c.b)*m.splat3(0.5),.r=m.len(c.b-c.a)*0.5+@max(c.ra,c.rb)},
+    .cone=>|c|.{.c=(c.a+c.b)*m.splat3(0.5),.r=m.dist(c.b,c.a)*0.5+@max(c.ra,c.rb)},
     .box=>|x|.{.c=x.c,.r=m.len(x.half)},
     .chain=>|c|{
       // the chain's own sphere
@@ -547,7 +547,7 @@ pub const Sculpt=struct{
       const c=lo+v3(m.f(bx*cells)+cells*0.5,m.f(by*cells)+cells*0.5,m.f(bz*cells)+cells*0.5)*m.splat3(h);
       cand.clearRetainingCapacity();
       for(s.forms.items,0..)|pf,i|{
-        if(m.len(c-pf.centre)-pf.reach<half+2*h+kmax){
+        if(m.dist(c,pf.centre)-pf.reach<half+2*h+kmax){
           try cand.append(gpa,@intCast(i));
         }
       }
@@ -659,7 +659,7 @@ pub const Sculpt=struct{
             const d=sc.dist(p,bl.cand);
             p-=sc.grad(p,bl.cand,hh*0.25)*m.splat3(d);
           }
-          if(m.len(p-start)>hh)p=start;
+          if(m.dist(p,start)>hh)p=start;
           // the surface's normal there
           const nrm=sc.grad(p,bl.cand,hh*0.35);
           // the colour and role there, and that colour short
@@ -738,7 +738,7 @@ pub const Sculpt=struct{
           for(&quad,q)|*pp,vi|pp.*=verts[vi].p;
           // split along the shorter diagonal
           // the two triangles the quad is split into
-          const tris:[2]m.Vice(usize,3)=if(m.len(quad[0]-quad[2])<=m.len(quad[1]-quad[3])).{.{0,1,2},.{0,2,3}}else.{.{0,1,3},.{1,2,3}};
+          const tris:[2]m.Vice(usize,3)=if(m.dist(quad[0],quad[2])<=m.dist(quad[1],quad[3])).{.{0,1,2},.{0,2,3}}else.{.{0,1,3},.{1,2,3}};
           for(tris)|tri|{
             // the triangle's face normal, as wound
             const fnrm=m.cross(quad[tri[1]]-quad[tri[0]],quad[tri[2]]-quad[tri[0]]);
@@ -835,5 +835,5 @@ test"a chain of one segment is its cone, and a bent chain is as near as its near
   try testing.expect(shapeDist(&.{.chain=bent},v3(0.2,0,0))>0.1);
   // its sphere holds every point's ball
   const b=shapeBound(.{.chain=bent});
-  for(0..3)|i|try testing.expect(m.len(bent.pts[i]-b.c)+0.03<=b.r+1e-6);
+  for(0..3)|i|try testing.expect(m.dist(bent.pts[i],b.c)+0.03<=b.r+1e-6);
 }
