@@ -195,6 +195,19 @@ pub inline fn dot(a:V3,b:V3)f32{return@reduce(.Add,a*b);}
 /// every lane of `a` added up, for a `Vec` of any width: `sumOf(f32,2,d*d)`
 /// is a 2D point's squared length
 pub inline fn sumOf(comptime t:type,comptime s:usize,a:Vec(t,s))t{return@reduce(.Add,a);}
+/// the mean of many points, each a `Vec` of `s` lanes of `t`: their middle,
+/// lane by lane (whole numbers round toward zero). Never asked of no points
+pub fn meanOf(comptime t:type,comptime s:usize,pts:[]const Vec(t,s))Vec(t,s){
+  assert(pts.len>0);
+  // every point added together
+  var sum:Vec(t,s)=@splat(0);
+  for(pts)|p|sum+=p;
+  return switch(@typeInfo(t)){
+    .float=>sum/@as(Vec(t,s),@splat(@floatFromInt(pts.len))),
+    .int=>@divTrunc(sum,@as(Vec(t,s),@splat(@intCast(pts.len)))),
+    else=>@compileError("meanOf takes lanes of floats or whole numbers"),
+  };
+}
 /// a vector's length
 pub inline fn len(a:V3)f32{return@sqrt(dot(a,a));}
 /// the vector turned unit length; one too short to point anywhere is left as is
@@ -571,6 +584,16 @@ pub const Frustum=struct{
   }
 };
 // ---- tests ----
+test"the mean of many points is their middle, at any width"{
+  // three points of a triangle, whose mean is its centroid
+  const tri=[_]V3{v3(0,0,0),v3(3,0,0),v3(0,6,3)};
+  try testing.expectEqual(centroid(tri[0],tri[1],tri[2]),meanOf(f32,3,&tri));
+  // whole-number tiles, rounding toward zero
+  const tiles=[_]Vec(i32,2){.{-3,1},.{0,2},.{1,4},.{0,0}};
+  try testing.expectEqual(Vec(i32,2){0,1},meanOf(i32,2,&tiles));
+  // one point alone is its own mean
+  try testing.expectEqual(V4{1,2,3,4},meanOf(f32,4,&.{V4{1,2,3,4}}));
+}
 test"spring-damper settles where its force balances"{
   // where the mass is and how fast it moves
   var p=v3(0,0,0);
