@@ -14,10 +14,16 @@ const assert=std.debug.assert;
 const Allocator=std.mem.Allocator;
 /// whether safety checks are on in this build (they guard the inverses)
 const runtimeSafety=std.debug.runtime_safety;
+/// a vector that does its sums all lanes at once (SIMD): `s` lanes of `t`,
+/// for positions, sizes and offsets that are added and scaled together
+pub fn Vec(comptime t:type,comptime s:usize)type{return @Vector(s,t);}
+/// a plain row of `s` boxes of `t`: an exact layout (GPU, saves), a table
+/// of numbers, or lanes picked by an index only known at runtime
+pub fn Vice(comptime t:type,comptime s:usize)type{return [s]t;}
 /// a point or direction in space: x east, y up, z south, in tiles
-pub const V3=@Vector(3,f32);
+pub const V3=Vec(f32,3);
 /// four lanes: a point with its w, a colour with alpha, a matrix column
-pub const V4=@Vector(4,f32);
+pub const V4=Vec(f32,4);
 /// a 4x4 matrix as four columns (column-major, as the GPU reads it)
 pub const M4=[4]V4;
 // ---- constants ----
