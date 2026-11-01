@@ -297,6 +297,13 @@ const parts=struct{
   pub const stormSpireStout=@import("meshes/storm_spire.zig").stout;
   /// a look for the storm spire: a caged chamber at its crown, lantern kites
   pub const stormSpireCaged=@import("meshes/storm_spire.zig").caged;
+  // the convergence kit's new bodies, to choose between side by side
+  /// a look for the kit: two stems grafted, scarred violet where they grew together
+  pub const driftbraidGrafted=@import("meshes/convergence_looks.zig").grafted;
+  /// a look for the kit: a living trunk netted in pale strangler roots
+  pub const driftbraidStrangler=@import("meshes/convergence_looks.zig").strangler;
+  /// a look for the kit: one soft see-through body, veins of both inside, tentacles hanging
+  pub const driftbraidTissue=@import("meshes/convergence_looks.zig").tissueLook;
   // the halo: its polyp and the diamond it forms
   /// the polyp: woven of both lineages, its stem caging a sac of both saps, fronds and plumed tentacles crowning it
   pub const polyp=@import("meshes/polyp_convergent.zig").woven;
