@@ -394,8 +394,8 @@ pub const heartChain=struct{
 };
 /// mesh: CONSTELLATE HEART, BUILDER. its blooms burst free and drift down
 /// to lie as parts; the heart settles near the ground, currents of energy
-/// rising into its base, and builds: a whole part forms out of the energy
-/// before it, and a bundle of its tendrils draws it away to the wolf
+/// rising into its base, and builds: a whole part slowly forms out of the
+/// energy on top of its rose, resting there until taken
 pub const heartBuilder=struct{
   /// builds the heart settling into a builder
   pub fn build(b:*mg.Builder)Allocator.Error!void{try builder(b);}

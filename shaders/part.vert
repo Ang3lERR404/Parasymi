@@ -196,26 +196,18 @@ const int PLEXUS_HEART_CURRENT = 48;
 // the rose's middle and its petals' feet sit (before the heart is sized)
 const int PLEXUS_HEART_ROSE = 49;
 // the settled heart builds: the energy its currents bring gathers in a
-// glowing spot before it, and a whole part forms there point by point (a
-// petal, a leaf, a bud, a flower head, a stem, a new one each time round),
-// hanging there until it is taken: here a bundle of the heart's tendrils
-// reaches out to where a wolf would stand and draws the part along it into
-// them. Its webs: the part it makes, the glowing spot. When in the settling
-// (s) the spot gathers, the part forms and how long that takes, the bundle
-// reaches out, the part is drawn along it and reaches the wolf, and the
-// bundle lets go; where the spot is beside the rose's middle, where the
-// wolf would stand, how big a part is made
+// glowing spot on top of its rose, and a whole part slowly forms there
+// point by point (a petal, a leaf, a bud, a flower head, a stem, a new one
+// each time round), resting there until it is taken. Its webs: the part it
+// makes, the glowing spot. When in the settling (s) the spot gathers, the
+// part forms and how long that takes; how far over the rose's middle the
+// spot is, how big a part is made
 const int PLEXUS_HEART_MADE = 50;
 const int PLEXUS_HEART_MADE_GLOW = 51;
 const float PLEXUS_MADE_GATHER = 24.0;
 const float PLEXUS_MADE_FORM = 26.0;
-const float PLEXUS_MADE_FORMING = 8.0;
-const float PLEXUS_MADE_REACH = 36.0;
-const float PLEXUS_MADE_DRAW = 39.0;
-const float PLEXUS_MADE_IN = 43.0;
-const float PLEXUS_MADE_LET = 47.0;
-const vec3 PLEXUS_MADE_SPOT = vec3(0.0, -1.3, 1.1);
-const vec3 PLEXUS_MADE_WOLF = vec3(2.6, 0.9, 1.6);
+const float PLEXUS_MADE_FORMING = 16.0;
+const vec3 PLEXUS_MADE_SPOT = vec3(0.0, 1.0, 0.0);
 const float PLEXUS_MADE_SIZE = 0.8;
 const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 56.0;
@@ -685,18 +677,9 @@ vec4 plexusHeartSeed(float id, float t) {
   vec3 to = plexusHeartPetlet(3.0 * mod(n, 4.0) + c, k, j, t, vec3(0.0));
   return vec4(mix(p, to, smoothstep(0.6, 1.0, sc)), env);
 }
-// how far a settled heart's tendrils have gathered into a bundle reaching
-// out to the wolf at time `t` (0 hanging free, 1 reaching all the way)
-float plexusBundle(float t) {
-  if (plexStage < 3.5) return 0.0;
-  float x = plexusSettleAt(t);
-  return smoothstep(PLEXUS_MADE_REACH, PLEXUS_MADE_DRAW, x) * (1.0 - smoothstep(PLEXUS_MADE_IN, PLEXUS_MADE_LET, x)) * plexusSettleKeep(t);
-}
 // where point `id` of the heart's filaments is: filament k hangs from
 // point k of the stem's foot, dripping down as it grows, its young tip
-// curled tight and unfurling as it lengthens, swaying a little; and once
-// it has settled and made a part, the three twist together into a bundle
-// reaching out, sagging a little, to the wolf, and fall back to hang again
+// curled tight and unfurling as it lengthens, swaying a little
 vec3 plexusHeartFilament(float id, float t) {
   float k = floor(id / 8.0);
   float j = id - k * 8.0;
@@ -706,17 +689,7 @@ vec3 plexusHeartFilament(float id, float t) {
   float s = j / 7.0 * 0.6 * grow * plexusHeartSize(t) / 0.7;
   float bend = mix(14.0, 0.5, grow);
   vec3 p = anchor + side * (1.0 - cos(bend * s)) / bend - vec3(0.0, sin(bend * s) / bend, 0.0);
-  p += vec3(sin(t * 0.9 + k * 2.0), 0.0, cos(t * 0.7 + k)) * 0.03 * j / 7.0 * plexusHeartSize(t) / 0.7;
-  float bu = plexusBundle(t);
-  if (bu <= 0.0) return p;
-  float f = j / 7.0;
-  vec3 dir = normalize(PLEXUS_MADE_WOLF - anchor);
-  vec3 e1 = normalize(cross(dir, vec3(0.0, 1.0, 0.0)));
-  vec3 e2 = cross(e1, dir);
-  float ang = k / 3.0 * TAU + f * 5.0 - t * 1.5;
-  vec3 along = anchor + (PLEXUS_MADE_WOLF - anchor) * f * bu - vec3(0.0, 0.3 * sin(0.5 * TAU * f) * bu, 0.0);
-  vec3 braid = (cos(ang) * e1 + sin(ang) * e2) * 0.07 * sin(0.5 * TAU * min(f * 1.2, 1.0));
-  return mix(p, along + braid, smoothstep(0.0, 0.3, bu));
+  return p + vec3(sin(t * 0.9 + k * 2.0), 0.0, cos(t * 0.7 + k)) * 0.03 * j / 7.0 * plexusHeartSize(t) / 0.7;
 }
 // a point `p` of the heart's bloom `k` (placed where it was fastened) once
 // it bursts free: pushed out a little, then drifting slowly down to the
@@ -792,8 +765,8 @@ int plexusMadeKind(float t) {
   float turn = plexStory > 0.5 ? plexStoryRound : floor(t / PLEXUS_HEART_SETTLE);
   return kinds[int(mod(turn, 5.0))];
 }
-// where the glowing spot the heart gathers energy in is at time `t`: before
-// the rose, below its middle
+// where the glowing spot the heart gathers energy in is at time `t`: on
+// top of its rose
 vec3 plexusMadeSpot(float t) { return plexusHeartLift(vec3(0.0, PLEXUS_ROSE_FOOT + 0.25, 0.0), t) + PLEXUS_MADE_SPOT; }
 // how much of the glowing spot shows at time `t`: gathering once the heart
 // has settled, spent as the part it makes is done
@@ -803,22 +776,16 @@ float plexusMadeGlow(float t) {
   return smoothstep(PLEXUS_MADE_GATHER, PLEXUS_MADE_FORM + 1.0, x) * (1.0 - smoothstep(PLEXUS_MADE_FORM + PLEXUS_MADE_FORMING - 1.0, PLEXUS_MADE_FORM + PLEXUS_MADE_FORMING + 1.0, x)) * plexusSettleKeep(t);
 }
 // what of the part the settled heart makes, point `id` (drifted by `moved`)
-// at time `t`: where it is (xyz) and how much of it there is (w). Point by
-// point, base first, each streams out of the glowing spot to its place in
-// the part; whole, it hangs there until the bundle of tendrils comes, then
-// is drawn to the bundle's foot and along it, shrinking, into the wolf
+// at time `t`: where it is (xyz) and how much of it there is (w). Slowly,
+// point by point, base first, each drifts up out of the glowing spot to its
+// place in the part; whole, it rests there on top of the rose until taken
 vec4 plexusHeartMade(float id, float t, vec3 moved) {
   if (plexStage < 3.5) return vec4(0.0);
   float x = plexusSettleAt(t);
   vec3 rel = (plexusForm(id, plexusMadeKind(t)) - vec3(0.0, 1.0, 0.0)) * PLEXUS_MADE_SIZE + moved;
-  vec3 spot = plexusMadeSpot(t);
   float a = PLEXUS_MADE_FORM + PLEXUS_MADE_FORMING * id / float(PLEXUS_POINTS);
-  float formed = smoothstep(a, a + 0.8, x);
-  float hop = smoothstep(PLEXUS_MADE_DRAW, PLEXUS_MADE_DRAW + 1.0, x);
-  float draw = smoothstep(PLEXUS_MADE_DRAW + 1.0, PLEXUS_MADE_IN, x);
-  vec3 middle = mix(mix(spot, plexusHeartStem(0.0, t, vec3(0.0)), hop), PLEXUS_MADE_WOLF, draw);
-  float env = smoothstep(a, a + 0.3, x) * (1.0 - smoothstep(PLEXUS_MADE_IN - 0.5, PLEXUS_MADE_IN, x)) * plexusSettleKeep(t);
-  return vec4(middle + rel * formed * mix(1.0, 0.15, draw), env);
+  float env = smoothstep(a, a + 0.5, x) * plexusSettleKeep(t);
+  return vec4(plexusMadeSpot(t) + rel * smoothstep(a, a + 1.5, x), env);
 }
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
@@ -1075,13 +1042,11 @@ void main() {
     if (shape == PLEXUS_HEART_MADE) hs = shape;
     // the heart's stem reaches further as it becomes its grand flower
     if (shape == PLEXUS_HEART_STEM) reach *= mix(1.0, 0.82, plexusHeartMorph(t));
-    // (the part the heart makes joins as far as that part does on its own;
-    // the tendrils further as they stretch into a bundle)
+    // (the part the heart makes joins as far as that part does on its own)
     if (shape == PLEXUS_HEART_MADE) {
       int mk = plexusMadeKind(t);
       reach = PLEXUS_MADE_SIZE * (mk == PLEXUS_LEAF ? 0.22 : (mk == PLEXUS_BUD ? 0.2 : (mk == PLEXUS_FLOWER ? 0.21 : 0.17)));
     }
-    if (shape == PLEXUS_HEART_FILAMENT) reach *= 1.0 + 0.8 * plexusBundle(t);
     // in the chain reaction the heart's webs reach as far as it has grown
     // (all through the story, built at its risen size)
     if ((plexStage > 2.5 || plexStory > 0.5) && ((shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) || shape == PLEXUS_HEART_ROSE)) reach *= plexusHeartSize(t) / 0.7;
