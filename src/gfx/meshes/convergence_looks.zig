@@ -176,6 +176,51 @@ fn stemAt(side:f32,u:f32)V3{
   const wd:f32=if(side>0)0.008*@sin(u*9+1.3)else 0;
   return v3(@cos(a)*(sep+wd),u*fuseH,@sin(a)*(sep+wd));
 }
+/// where two stems have grown together, and how big the callus round it is
+const Union=struct{
+  /// its middle
+  at:V3,
+  /// the green stem's middle there
+  green:V3,
+  /// the pale stem's middle there
+  pale:V3,
+  /// how far it swells past the stems' middles, and how deep it is square to them
+  r:f32,
+  /// half its length up the stems
+  h:f32,
+  /// its growth tu.x
+  t:f32,
+  /// turns its seam's wander, so no two seams run alike
+  phase:f32,
+};
+/// a graft's union: one smooth callus round where the two stems have grown
+/// together, long up them and wide across the join, its ends sinking into
+/// both; green on the green stem's side, pale on the pale one's, and
+/// between them a violet seam wandering up it, lit lilac along its middle
+fn graftUnion(b:*mg.Builder,u:Union)Allocator.Error!void{
+  // the way across the join (flat, pale to green), square to it, and half the join's width
+  const d0=v3(u.green[0]-u.pale[0],0,u.green[2]-u.pale[2]);
+  const across=if(m.len(d0)>1e-4)m.norm(d0)else v3(1,0,0);
+  const side=m.cross(v3(0,1,0),across);
+  const half=m.len(d0)*0.5;
+  // built round the origin in its own frame, then turned onto the join
+  const mk=b.mark();
+  try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(half+u.r,u.h,u.r*0.9),.col=scar,.part=.stem,.rings=14,.segs=18,.t=u.t});
+  for(b.v.items[mk..])|*vx|{
+    // its place and facing in its own frame
+    const q:V3=vx.pos;
+    const n:V3=vx.nrm;
+    vx.pos=u.at+across*m.splat3(q[0])+v3(0,q[1],0)+side*m.splat3(q[2]);
+    vx.nrm=across*m.splat3(n[0])+v3(0,n[1],0)+side*m.splat3(n[2]);
+    // how far to either side of the seam: -1 the pale's, 1 the green's,
+    // the seam wandering as it climbs
+    const s=q[0]/(half+u.r)+0.2*@sin(q[1]/u.h*4.2+u.phase)+0.08*@sin(q[2]/u.r*3+u.phase*2);
+    // how far into its own side, past the seam's width
+    const w=m.smooth(m.clamp01((@abs(s)-0.06)/0.3));
+    const seam=color.mix(kit.knot,scar,m.smooth(m.clamp01(@abs(s)/0.06)));
+    vx.col=color.mix(seam,if(s>0)kit.green else kit.pale,w);
+  }
+}
 /// the grafted look
 pub const grafted=struct{
   /// builds it
@@ -194,38 +239,60 @@ pub const grafted=struct{
     }
     const green=stems[0];
     const pale=stems[1];
-    try k.braid(b,green,.{.girth=0.032,.tip=0.72,.strands=4,.twist=2.4,.wobble=pal.strandWobble*1.4,.seed=0x6AF1,.core=pal.core,.strand=kit.green,.t0=0,.t1=0.55});
-    try k.tube(b,pale,.{.r0=0.031,.tip=0.75,.col=kit.pale,.part=.stem,.sides=7,.t0=0,.t1=0.55});
-    // the pale stem's exact nodes, between the grafts
-    for([_]f32{0.12,0.45,0.58})|u|{
-      const at=stemAt(-1,u);
+    try k.braid(b,green,.{.girth=0.032,.tip=0.5,.strands=4,.twist=2.4,.wobble=pal.strandWobble*1.4,.seed=0x6AF1,.core=pal.core,.strand=kit.green,.t0=0,.t1=0.55});
+    // the pale stem, swelling at its exact nodes between the grafts: its
+    // own skin thickening and paling to pearl into each, lilac at the
+    // middle, and out again, never a ring stuck on
+    {
+      var nodes:[3]f32=undefined;
+      for(&nodes,[_]f32{0.12,0.45,0.58})|*nu,u|nu.*=k.nearest(pale,stemAt(-1,u));
+      var pp:[tentRes]V3=undefined;
+      var pts:[tentRes]f32=undefined;
+      var prs:[tentRes]f32=undefined;
+      var pcs:[tentRes]Rgba8=undefined;
+      k.path(pale,0,1,&pp);
+      for(&pts,&prs,&pcs,0..)|*t,*r,*cl,i|{
+        const u=m.ratio(i,tentRes-1);
+        // how far into a node this point is (0 between, 1 at its middle)
+        var node:f32=0;
+        for(nodes)|nu|node=@max(node,m.smooth(m.clamp01(1-@abs(u-nu)/0.045)));
+        t.*=u*0.55;
+        r.*=0.031*m.lerp(1,0.75,u)*(1+0.32*node);
+        cl.*=color.mix(color.mix(kit.pale,kit.pearl,node),kit.lilac,m.smooth(m.clamp01((node-0.75)/0.25))*0.6);
+      }
       const mk=b.mark();
-      try pk.nodule(b,at,v3(0.031,0.02,0.031),0.3,kit.pale,kit.lilac,kit.pearl);
-      try k.on(b,mk,pale,k.nearest(pale,at),.{.from=at});
+      try b.tubeC(&pp,&pts,&prs,&pcs,null,.stem,8);
+      try k.along(b,mk,pale);
     }
-    // the scars where they have grown into each other: a violet swelling
-    // round the join, knotted lumps of both on it
-    var rng=Rng.init(0x6AF2);
-    for(grafts++[_]f32{0.97})|u|{
+    // where they have grown into each other: one callus round each join,
+    // the last (where they fuse for good) the longest
+    for(grafts++[_]f32{0.97},0..)|u,j|{
       const g=stemAt(1,u);
       const p=stemAt(-1,u);
       const at=m.lerpV(g,p,0.5);
-      // the way across the join, and its size (the last, where they fuse, the biggest)
-      const big:f32=if(u>0.9)1.1 else 1;
+      const last=u>0.9;
       const mk=b.mark();
-      try mg.ellipsoid(b,.{.center=at,.radii=v3(0.04*big,0.052*big,0.04*big),.col=scar,.part=.stem,.rings=7,.segs=10,.t=u*0.55});
-      for(0..3)|j|{
-        // a lump's place on the swelling
-        const a=m.ratio(j,3)*m.tau+rng.range(-0.5,0.5);
-        const lump=at+v3(@cos(a)*0.032*big,rng.range(-0.03,0.03),@sin(a)*0.032*big);
-        try mg.ellipsoid(b,.{.center=lump,.radii=m.splat3(0.017*big*rng.range(0.8,1.2)),.col=if(j%2==0)kit.knot else color.mix(kit.green,scar,0.5),.part=.stem,.rings=4,.segs=6,.t=u*0.55});
-      }
+      try graftUnion(b,.{.at=at+v3(0,if(last)@as(f32,0.035)else 0,0),.green=g,.pale=p,.r=if(last)@as(f32,0.036)else 0.027,.h=if(last)@as(f32,0.13)else 0.088,.t=u*0.55,.phase=m.f(j)*2.1});
       try k.on(b,mk,mid,u,.{.from=at,.delay=0.05});
     }
-    // fused: one stem of green strands over the pale core, to the top
+    // fused: one stem of green strands over the pale core, to the top,
+    // rising out of the last callus (no collar: the callus is its foot)
     const f0=stemAt(1,1);
     const fused=k.branch(green,1,&.{f0,f0+v3(0.012,0.1,0),f0+v3(-0.01,0.22,0.012),graftTop},.{});
-    try k.braid(b,fused,.{.girth=0.046,.tip=0.72,.strands=5,.twist=1.3,.wobble=pal.strandWobble*1.2,.seed=0x6AF3,.core=kit.pale,.strand=kit.green,.t0=0.55,.t1=0.72});
+    {
+      var fp:[res]V3=undefined;
+      var fts:[res]f32=undefined;
+      var frs:[res]f32=undefined;
+      k.path(fused,0,1,&fp);
+      for(&fts,&frs,0..)|*t,*r,i|{
+        const u=m.ratio(i,res-1);
+        t.*=m.lerp(0.55,0.72,u);
+        r.*=0.046*m.lerp(1,0.72,u)*m.lerp(0.45,1,m.smooth(m.clamp01(u/0.2)));
+      }
+      const mk=b.mark();
+      try mg.braid(b,&fp,&fts,&frs,5,1.3,pal.strandWobble*1.2,0x6AF3,kit.pale,kit.green);
+      try k.along(b,mk,fused);
+    }
     // leaves: the green stem's and the fused stem's, each on its own stalk
     try k.leaves(b,green,.{.n=9,.len=0.095,.width=0.036,.from=0.18,.to=0.92,.t0=0.2,.t1=0.6,.col=kit.leafDark,.tip=kit.leafLite,.seed=0x6AF4});
     try k.leaves(b,fused,.{.n=6,.len=0.09,.width=0.034,.from=0.15,.to=0.85,.t0=0.6,.t1=0.75,.col=kit.leafDark,.tip=kit.leafLite,.seed=0x6AF5});
@@ -370,6 +437,12 @@ fn bodyR(u:f32)f32{
 }
 /// where the tissue's tentacles hang from
 const collarU:f32=0.86;
+/// how many points a tentacle is built of (fine, so its beads swell smooth)
+const tentRes=64;
+/// where down a tentacle its beads of sap swell (shares of it)
+const beads=[_]f32{0.3,0.48,0.66,0.84};
+/// half a bead's length (a share of the tentacle)
+const beadHalf:f32=0.06;
 /// the tissue look
 pub const tissueLook=struct{
   /// builds it
@@ -435,11 +508,31 @@ pub const tissueLook=struct{
       const r0=bodyR(collarU);
       const c=[_]V3{ca,ca+out*m.splat3(r0*1.4)+v3(0,-0.01,0),ca+out*m.splat3(r0*2.0)+v3(0,-0.1,0),ca+out*m.splat3(r0*2.1)+v3(0,-0.22,0),ca+out*m.splat3(r0*1.7)+v3(0,-0.33,0),ca+out*m.splat3(r0*1.3)+v3(0,-0.37,0)};
       const t=k.branch(axis,collarU,&c,.{.after=.passing,.pace=1.3});
-      try k.tube(b,t,.{.r0=0.008,.tip=0.3,.col=kit.pale,.part=.tendril,.sides=5,.t0=0.6,.t1=0.8});
-      for([_]f32{0.3,0.48,0.66,0.84},0..)|u,j|{
+      // the tentacle, swelling into beads of amber sap down it, not beads
+      // stuck on: its own skin thickening and warming into each and out
+      // again, the beads smaller toward its tip
+      {
+        var tp:[tentRes]V3=undefined;
+        var tts:[tentRes]f32=undefined;
+        var trs:[tentRes]f32=undefined;
+        var tcs:[tentRes]Rgba8=undefined;
+        k.path(t,0,1,&tp);
+        for(&tts,&trs,&tcs,0..)|*tt,*r,*cl,j|{
+          const u=m.ratio(j,tentRes-1);
+          // how far into a bead this point is (0 between, 1 at its middle)
+          var bead:f32=0;
+          for(beads)|bu|bead=@max(bead,m.smooth(m.clamp01(1-@abs(u-bu)/beadHalf)));
+          tt.*=m.lerp(0.6,0.8,u);
+          r.*=0.008*m.lerp(1,0.3,u)*mg.collar(u)*(1+bead*m.lerp(1.5,0.9,u));
+          cl.*=color.mix(kit.pale,kit.amber,bead*0.9);
+        }
+        const mk=b.mark();
+        try b.tubeC(&tp,&tts,&trs,&tcs,null,.tendril,7);
+        try k.along(b,mk,t);
+      }
+      for(beads)|u|{
         const at=k.point(t,u);
         const mk=b.mark();
-        try mg.ellipsoid(b,.{.center=at,.radii=m.splat3(0.011*m.lerp(1.1,0.7,m.ratio(j,3))),.col=kit.amber,.part=.stem,.rings=4,.segs=6,.t=0.7});
         // decision: plumes only at full detail; past it they are under a pixel
         if(b.lod==0)for([_]f32{-1,1})|s|{
           const side=m.norm(m.cross(k.tangent(t,u),out));
