@@ -257,7 +257,7 @@ const vec4 PLEXUS_HYENA_A[28] = vec4[28](
   vec4(0.0, 0.98, -0.13, 0.04),
   vec4(0.0, 1.43, 0.12, 0.1), vec4(0.0, 1.43, 0.12, 0.1), vec4(0.0, 1.24, 0.08, 0.12), vec4(0.0, 1.0, -0.09, 0.1), vec4(0.0, 1.0, -0.09, 0.1));
 const vec4 PLEXUS_HYENA_B[28] = vec4[28](
-  vec4(0.0, 1.18, 0.04, 0.15), vec4(0.0, 0.92, -0.01, 0.13), vec4(0.0, 1.72, 0.08, 0.08), vec4(0.0, 1.78, 0.13, 0.09), vec4(0.0, 1.71, 0.34, 0.045),
+  vec4(0.0, 1.18, 0.04, 0.15), vec4(0.0, 0.92, -0.01, 0.13), vec4(0.0, 1.72, 0.08, 0.08), vec4(0.0, 1.78, 0.13, 0.09), vec4(0.0, 1.73, 0.27, 0.045),
   vec4(0.13, 1.97, -0.03, 0.05), vec4(-0.13, 1.97, -0.03, 0.05), vec4(0.0, 1.28, -0.17, 0.025),
   vec4(0.25, 1.18, 0.06, 0.05), vec4(0.27, 0.93, 0.14, 0.04), vec4(0.27, 0.83, 0.17, 0.03),
   vec4(-0.25, 1.18, 0.06, 0.05), vec4(-0.27, 0.93, 0.14, 0.04), vec4(-0.27, 0.83, 0.17, 0.03),
@@ -266,7 +266,7 @@ const vec4 PLEXUS_HYENA_B[28] = vec4[28](
   vec4(0.0, 0.7, -0.3, 0.03),
   vec4(0.2, 1.44, 0.1, 0.09), vec4(-0.2, 1.44, 0.1, 0.09), vec4(0.0, 0.98, 0.08, 0.12), vec4(0.2, 0.98, -0.09, 0.09), vec4(-0.2, 0.98, -0.09, 0.09));
 const vec4 PLEXUS_HYENA_C[28] = vec4[28](
-  vec4(0.0, 1.36, 0.07, 0.03), vec4(0.0, 1.05, 0.04, -0.02), vec4(0.0, 1.64, -0.02, 0.01), vec4(0.0, 1.82, 0.06, 0.03), vec4(0.0, 1.76, 0.24, 0.0),
+  vec4(0.0, 1.36, 0.07, 0.03), vec4(0.0, 1.05, 0.04, -0.02), vec4(0.0, 1.64, -0.02, 0.01), vec4(0.0, 1.82, 0.06, 0.03), vec4(0.0, 1.765, 0.2, 0.0),
   vec4(0.11, 1.92, 0.0, 0.015), vec4(-0.11, 1.92, 0.0, 0.015), vec4(0.0, 1.62, -0.16, 0.015),
   vec4(0.24, 1.34, 0.0, 0.015), vec4(0.27, 1.05, 0.12, 0.012), vec4(0.28, 0.88, 0.17, 0.0),
   vec4(-0.24, 1.34, 0.0, 0.015), vec4(-0.27, 1.05, 0.12, 0.012), vec4(-0.28, 0.88, 0.17, 0.0),
@@ -281,6 +281,9 @@ const float PLEXUS_HYENA_CROWD[28] = float[28](0.16, 0.2, 0.3, 0.22, 0.35, 0.5, 
 // how far off his beat is taken to start (part.frag fades a beat to half
 // by about this far)
 const float PLEXUS_HYENA_BEAT = 3.0;
+// how big his points of light are, finer than any part's so his shape
+// reads in its lines
+const float PLEXUS_HYENA_POINT = 0.0045;
 const int PLEXUS_HYENA_MANE = 7;
 const int PLEXUS_HYENA_TAIL = 22;
 const float PLEXUS_ROSE_FOOT = 1.45;
@@ -1261,7 +1264,7 @@ void main() {
     if (plexKind < 0.5) {
       // a point: one light of its pair (pos.y 1 the first, -1 its
       // companion, the smaller)
-      lp = A + nrm * (plexMote > 0.5 ? PLEXUS_MOTE_R * (1.0 + plexMote) : PLEXUS_POINT_R * swell) * thin * yield;
+      lp = A + nrm * (plexMote > 0.5 ? PLEXUS_MOTE_R * (1.0 + plexMote) : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_POINT : PLEXUS_POINT_R) * swell) * thin * yield;
 #ifdef AIR
       lp = A + (lp - A) * AIR_SPREAD;
 #endif
