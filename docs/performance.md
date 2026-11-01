@@ -108,7 +108,8 @@ Chunks (`chunkRadius`), plants and parts are culled to the view frustum
 - AA in release (demo): off 4.1, fxaa 3.9, msaa4 4.35, msaa8 4.9 ms.
 
 ## Shader optimization
-Read [shader-optimization.md](shader-optimization.md) first. It holds the
+Read [optimizing.md](optimizing.md) (the working method and scripts) and
+[shader-optimization.md](shader-optimization.md) (the researched rules) first. It holds the
 researched methods, what is art-safe, how to measure per pass, and what
 was applied.
 

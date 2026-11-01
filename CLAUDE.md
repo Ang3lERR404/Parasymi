@@ -34,6 +34,7 @@ idioms and what not to do), every session.
 | checking one plant/structure in game | [docs/testing.md](docs/testing.md) |
 | strings, inputs, threads, math, materials, passes | [docs/architecture.md](docs/architecture.md) |
 | frame time, LOD, culling, threading | [docs/performance.md](docs/performance.md) |
+| making a frame cheaper (measure, knock-outs, proving the look held, what worked) | [docs/optimizing.md](docs/optimizing.md) |
 | shaders, for speed | [docs/shader-optimization.md](docs/shader-optimization.md) |
 | player controls | [docs/controls.md](docs/controls.md) |
 

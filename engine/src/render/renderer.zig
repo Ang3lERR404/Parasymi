@@ -430,10 +430,22 @@ pub fn Renderer(comptime G:type)type{
     /// wait for the GPU, free everything and the renderer itself
     pub fn deinit(r:*R)void{
       // nothing to recover: teardown proceeds even if the device was lost
-      r.ctx.device.deviceWaitIdle()catch{};std.log.info("gpu {any} total {d}",.{r.gpuMs,r.gpuTotal});
+      r.ctx.device.deviceWaitIdle()catch{};
+      r.logTimes();
       r.release();
       r.ctx.deinit(r.gpa);
       r.gpa.destroy(r);
+    }
+    /// each stage's GPU time and the whole frame's, eased over the last
+    /// frames, one line each (`gpu <pass> <ms>`, then `gpu total <ms>`):
+    /// what a benchmark run reads once the window closes
+    /// (tools/perf/bench.sh)
+    fn logTimes(r:*const R)void{
+      if(r.gpuTotal==0)return;
+      inline for(reg.ids)|id|std.log.info("gpu {s} {d:.3}",.{@tagName(id),r.gpuMs[@intFromEnum(id)]});
+      std.log.info("gpu glow {d:.3}",.{r.gpuMs[glow]});
+      std.log.info("gpu compose {d:.3}",.{r.gpuMs[compose]});
+      std.log.info("gpu total {d:.3}",.{r.gpuTotal});
     }
     /// free every GPU object the renderer made (null handles are skipped).
     fn release(r:*R)void{

@@ -1,6 +1,8 @@
 # Shader optimization: methods that keep the art
 
-Research notes for future sessions (2026-10-25).
+Research notes for future sessions (2026-10-25, round two 2026-11-01).
+How to measure and apply them, step by step, with scripts:
+[optimizing.md](optimizing.md).
 
 **The rule over all of it** (CLAUDE.md, Visual authority): **an
 optimization may change cost, never the picture.**
@@ -252,23 +254,11 @@ caster.
 - LODs already cut counts.
 - Shadow casters use the coarsest LOD (we do).
 
-## Measurement (scratch procedure)
+## Measurement
 
-1. **Scratch edit** in `main.zig`'s play loop, after `r.draw`: count
-   frames. At 1500, log each `renderer.Pass` field name with
-   `r.gpuMs[i]`, then `r.gpuMs[renderer.glow]`, `[renderer.compose]`,
-   `r.gpuTotal`, and call `window.setShouldClose(true)`. Revert it after
-   (never commit it).
-2. **Build and run**: `zig build -Drelease=true`, then
-   `zig-out/bin/Parasymi.exe --demo --novsync --tod=0.45` (and
-   `--stress`). AA comes from the gardener's `options.cfg`
-   (`%LOCALAPPDATA%/Parasymi`): back it up, switch `antialias`, restore
-   it.
-3. **Knock-outs**: swap one snippet (e.g. `return 1.0` at the top of
-   `keyShadow`), rebuild, bench, restore. Run twice; noise is ~0.01 ms.
-4. **Prove the look held**: `--demo --inspect --shots=3 --tod=0.9` before
-   and after (git stash), and compare the shots. Use a debug build for
-   validation.
+The procedure and its scripts (`tools/perf/`: bench, knock-outs, shot
+diffs) are in [optimizing.md](optimizing.md). The game logs every
+pass's GPU time as it closes; no scratch edit is needed.
 
 ## Applied (2026-10-25), RTX 4060 Ti, 1600x900, demo, GPU ms
 
