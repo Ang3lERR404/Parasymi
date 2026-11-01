@@ -134,7 +134,7 @@ pub fn output(s:*const st.Structure)?items.Item{return s.firstHeld(craft.woven);
 /// anything woven it holds.
 pub fn gives(s:*const st.Structure,item:items.Item)bool{return craft.woven(item) and s.inv.count(item)>0;}
 /// its panel offers every weave.
-pub fn recipes()[]const u8{return&craft.all;}
+pub fn recipes(_:*const prog.Progression)[]const u8{return&craft.all;}
 /// the weave it is set to, for its panel to mark.
 pub fn chosen(s:*const st.Structure)?u8{return s.state.germinator.recipe;}
 /// set what it weaves, if the gardener understands it. A weave under way

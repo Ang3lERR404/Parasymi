@@ -23,7 +23,7 @@
 //!                               message's default)
 //!   configure(ss, id, g)        the player's "C" interaction (it may reach
 //!                               another structure: `Structures.pairing`)
-//!   recipes() []const u8        what its panel offers to weave (indices into
+//!   recipes(g) []const u8       what its panel offers to weave (indices into
 //!                               `craft.hand`); `chosen(s)` is the one it
 //!                               weaves, `choose(s, g, r)` sets it
 //!   emit(s, out, ctr, tf)       extra visuals beyond its mesh (placed as it is:

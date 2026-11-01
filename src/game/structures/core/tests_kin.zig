@@ -221,17 +221,24 @@ test"a germinator weaves structure bulbs as well as seeds, and lets go only what
   const craft=lib.craft;
   // every weave is on offer, the bulbs too, but the advanced tier, which
   // only a monfris weaves
-  try testing.expectEqual(craft.hand.len-craft.advanced.len,recipes(.germinator).len);
-  for(recipes(.monfris))|r|try testing.expect(craft.isLoom(r));
+  try testing.expectEqual(craft.hand.len-craft.advanced.len,recipes(.germinator,&g).len);
+  for(recipes(.monfris,&g))|r|try testing.expect(craft.isLoom(r));
   // a monfris weaves every weave of both lineages, and never a diamond
   for(craft.hand,0..)|h,r|{
     // whether the monfris offers this weave
-    const on=indexOfScalar(u8,recipes(.monfris),@intCast(r))!=null;
+    const on=indexOfScalar(u8,recipes(.monfris,&g),@intCast(r))!=null;
     if(h.convergent)try testing.expect(on);
-    if(h.out==.diamond)try testing.expect(!on);
+    if(h.out==.diamond or h.out==.seedVesper)try testing.expect(!on);
   }
+  // the arsthraxia is the monfris's only once the unforming has evolved it
+  for(craft.hand,0..)|h,r|if(h.out==.arsthraxia){
+    try testing.expect(indexOfScalar(u8,recipes(.monfris,&g),@intCast(r))==null);
+    g.done.insert(.unforming);
+    try testing.expect(indexOfScalar(u8,recipes(.monfris,&g),@intCast(r))!=null);
+    g.done.remove(.unforming);
+  };
   // the recipe that weaves a conduit bulb
-  const conduit=for(recipes(.germinator))|r|{
+  const conduit=for(recipes(.germinator,&g))|r|{
     if(craft.hand[r].out==.conduit)break r;
   }else unreachable;
   choose(ss.get(id),&g,conduit);

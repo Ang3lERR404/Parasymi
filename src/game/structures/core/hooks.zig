@@ -86,10 +86,11 @@ pub fn configure(ss:*Structures,id:Id,g:*prog.Progression)void{
   }
 }
 /// what kind `k`'s panel offers to weave, as indices into its recipe
-/// table (empty: it weaves nothing)
-pub fn recipes(k:Kind)[]const u8{
+/// table, as far as the gardener's garden has come (`g`; empty: it
+/// weaves nothing)
+pub fn recipes(k:Kind,g:*const prog.Progression)[]const u8{
   return switch(k){
-    inline else=>|t|if(comptime reg.has(t,"recipes"))reg.module(t).recipes()else&.{},
+    inline else=>|t|if(comptime reg.has(t,"recipes"))reg.module(t).recipes(g)else&.{},
   };
 }
 /// the recipe structure `s` weaves now (an index into its `recipes`), or

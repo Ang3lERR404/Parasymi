@@ -99,7 +99,7 @@ pub fn shows(g:*const play.Game,p:Pick)?items.Item{
 pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   // the opened structure, and the weaves it may be set to
   const sp=g.structs.get(g.opened().?);
-  const choices=st.recipes(sp.kind());
+  const choices=st.recipes(sp.kind(),&g.prog);
   // the panel's height, and its top-left corner
   const ph=headerH+(if(choices.len>0)recipesH(choices.len)else 0)+labelH+belly.height+hintH;
   const px=(w-pw)/2;

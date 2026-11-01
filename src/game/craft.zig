@@ -37,6 +37,9 @@ pub const Recipe=struct{
   /// of both lineages: a monfris weaves it too (a germinator still does,
   /// so the first monfris can be woven)
   convergent:bool=false,
+  /// of one lineage until the unforming, which evolves it into both (the
+  /// arsthraxia): a monfris weaves it too from then on
+  evolves:bool=false,
   /// whether the research it needs (if any) is known
   pub fn unlocked(r:Recipe,g:*const prog.Progression)bool{
     return if(r.needs)|id|g.done.contains(id)else true;
@@ -52,12 +55,12 @@ pub const hand=[_]Recipe{
   .{.out=.seedBloom,.in=&.{.{.item=.starlight,.n=3},.{.item=.leyShard,.n=1},.{.item=.essence,.n=2}},.time=3},
   .{.out=.seedHollowheart,.in=&.{.{.item=.essence,.n=4},.{.item=.fibre,.n=3},.{.item=.grit,.n=2}},.time=3,.needs=.canopyWeaving},
   // decision: the hybrid is spliced from both lineages' essence and what their meeting condenses
-  .{.out=.seedVesper,.in=&.{.{.item=.essence,.n=2},.{.item=.convergenceEssence,.n=1},.{.item=.fibre,.n=1}},.time=2.5,.needs=.seedSplicing,.convergent=true},
+  .{.out=.seedVesper,.in=&.{.{.item=.essence,.n=2},.{.item=.convergenceEssence,.n=1},.{.item=.fibre,.n=1}},.time=2.5,.needs=.seedSplicing},
   .{.out=.conduit,.n=2,.in=&.{.{.item=.fibre,.n=2},.{.item=.grit,.n=1}},.time=1},
   .{.out=.sapCache,.in=&.{.{.item=.fibre,.n=4},.{.item=.grit,.n=4}},.time=2},
   // no essence: nothing yields it until the germinator has woven a seed
   .{.out=.germinator,.in=&.{.{.item=.fibre,.n=6},.{.item=.grit,.n=4},.{.item=.starlight,.n=2}},.time=3},
-  .{.out=.arsthraxia,.in=&.{.{.item=.fibre,.n=8},.{.item=.grit,.n=6},.{.item=.essence,.n=4},.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2}},.time=4},
+  .{.out=.arsthraxia,.in=&.{.{.item=.fibre,.n=8},.{.item=.grit,.n=6},.{.item=.essence,.n=4},.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2}},.time=4,.evolves=true},
   .{.out=.rootDigger,.in=&.{.{.item=.fibre,.n=3},.{.item=.grit,.n=2},.{.item=.leyShard,.n=1}},.time=2,.needs=.deepRooting},
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
   .{.out=.polyp,.in=&.{.{.item=.fibre,.n=4},.{.item=.essence,.n=3},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=2}},.time=3},
@@ -104,9 +107,18 @@ pub const advanced=recipesWhere(isAdvanced,true);
 /// whether a monfris weaves the weave at `idx` in `hand`: the advanced
 /// tier, or anything of both lineages
 pub fn isLoom(idx:usize)bool{return hand[idx].advanced or hand[idx].convergent;}
-/// what a monfris may be set to: the advanced tier and every convergent
-/// seed and bulb (indices into `hand`).
+/// what a monfris may be set to before the unforming: the advanced tier
+/// and every convergent seed and bulb (indices into `hand`).
 pub const loom=recipesWhere(isLoom,true);
+/// whether a monfris weaves the weave at `idx` once the unforming has
+/// evolved what it evolves
+pub fn isLoomEvolved(idx:usize)bool{return isLoom(idx) or hand[idx].evolves;}
+/// what a monfris may be set to after the unforming: its weaves and what
+/// the unforming made convergent (indices into `hand`).
+pub const loomEvolved=recipesWhere(isLoomEvolved,true);
+/// what a monfris may be set to as far as the garden has come: more once
+/// the unforming has been.
+pub fn loomFor(g:*const prog.Progression)[]const u8{return if(g.done.contains(.unforming))&loomEvolved else&loom;}
 /// whether some weave makes `item` (what a germinator lets go of).
 pub fn woven(item:items.Item)bool{
   for(hand)|r|if(r.out==item)return true;

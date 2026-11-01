@@ -172,11 +172,14 @@ plant.
   spore and takes in what comes back. It lets go only what came by spore
   (`kept` counts per kind).
 - **Monfris** (weftstone + driftbraid, INTERWEAVING): 2×2. It weaves
-  everything convergent (`Recipe.convergent`: the vesper seed, weftstone,
+  everything convergent (`Recipe.convergent`: weftstone,
   driftbraid, monfris, Vultrixi; the germinator weaves these too, so the
-  first monfris can be made) and the advanced tier only it weaves
-  (`Recipe.advanced`, none yet); together `craft.loom`. Never the diamond,
-  which is the germinator's. It never lets go of what its weave eats (a
+  first monfris can be made), the arsthraxia once the unforming has
+  evolved it into a convergent structure (`Recipe.evolves`), and the
+  advanced tier only it weaves
+  (`Recipe.advanced`, none yet); together `craft.loomFor`. Never the
+  diamond or the vesper seed (not convergent), which are the
+  germinator's. It never lets go of what its weave eats (a
   weftstone while it weaves a monfris). Fed by at most 6 Vultrixi
   (`monfris.tethers`, because a weave of its has at most 6 kinds), by
   hand, or by conduits.
