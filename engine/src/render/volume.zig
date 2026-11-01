@@ -13,6 +13,13 @@
 //! so the half-size volume keeps the world's edges. Everything here runs on
 //! the GPU; the CPU only records it.
 //!
+//! A third image, the field, is the game's own state kept over the world
+//! on the GPU (laid out as the overhead map is, a texel a unit, wrapping):
+//! the game's `.field` passes write the next step of it every frame from
+//! the last, which they read through set 1 (volume.glsl `field_map`); every
+//! later pass reads the step just written. Two images take turns, one
+//! written while the other is read.
+//!
 //! The overhead map is fixed to the world and wraps: one texel a world
 //! unit, `overheadSize` units across, world (x, z) at uv (x, -z) /
 //! `overheadSize` (read through a repeating sampler; volume.glsl
@@ -78,14 +85,20 @@ pub const Volume=struct{
   linear:vk.Sampler=.null_handle,
   /// whether the overhead map holds anything yet (its first scope clears it)
   drawn:bool=false,
-  /// set 1 of the world layout: the world's depth and the overhead map
+  /// the field's two images, taking turns: one written while the other is read
+  field:[2]Image=.{.{},.{}},
+  /// which of them holds the latest step
+  fieldAt:u1=0,
+  /// whether the field holds anything yet (its first step starts from clear)
+  fieldDrawn:bool=false,
+  /// set 1 of the world layout: the world's depth, the overhead map and the field
   setLayout:vk.DescriptorSetLayout=.null_handle,
   /// the composite's set layout: the volume and the world's depth
   composeLayout:vk.DescriptorSetLayout=.null_handle,
-  /// the pool both sets come from
+  /// the pool every set comes from
   pool:vk.DescriptorPool=.null_handle,
-  /// (the volume passes' set)
-  set:vk.DescriptorSet=undefined,
+  /// (set 1, one for each field image it reads)
+  sets:[2]vk.DescriptorSet=undefined,
   /// (the composite's set)
   composeSet:vk.DescriptorSet=undefined,
   /// the composite's pipeline layout: its one set, no push constants
@@ -107,22 +120,23 @@ pub const Volume=struct{
   fn create(v:*Volume,c:*const Ctx,w:u32,h:u32,depth:vk.ImageView)!void{
     v.nearest=try c.device.createSampler(&sampler(.nearest,.clamp_to_edge),null);
     v.linear=try c.device.createSampler(&sampler(.linear,.repeat),null);
-    // two images, read by the fragment shader (the overhead map by the vertex too)
+    // images read by the shaders (the vertex too): set 1 three, the composite two
     const bindings=[_]vk.DescriptorSetLayoutBinding{
       .{.binding=0,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
       .{.binding=1,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
+      .{.binding=2,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
     };
     v.setLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=bindings.len,.p_bindings=&bindings},null);
-    v.composeLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=bindings.len,.p_bindings=&bindings},null);
-    // room for both sets' two images
-    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=4}};
-    v.pool=try c.device.createDescriptorPool(&.{.max_sets=2,.pool_size_count=sizes.len,.p_pool_sizes=&sizes},null);
-    // the two sets' layouts, and the sets made from them
-    const layouts=[_]vk.DescriptorSetLayout{v.setLayout,v.composeLayout};
-    var sets:[2]vk.DescriptorSet=undefined;
+    v.composeLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=2,.p_bindings=&bindings},null);
+    // room for set 1 twice over (three images each) and the composite's two
+    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=8}};
+    v.pool=try c.device.createDescriptorPool(&.{.max_sets=3,.pool_size_count=sizes.len,.p_pool_sizes=&sizes},null);
+    // the sets' layouts, and the sets made from them
+    const layouts=[_]vk.DescriptorSetLayout{v.setLayout,v.setLayout,v.composeLayout};
+    var sets:[3]vk.DescriptorSet=undefined;
     try c.device.allocateDescriptorSets(&.{.descriptor_pool=v.pool,.descriptor_set_count=sets.len,.p_set_layouts=&layouts},&sets);
-    v.set=sets[0];
-    v.composeSet=sets[1];
+    v.sets=.{sets[0],sets[1]};
+    v.composeSet=sets[2];
     v.layout=try c.device.createPipelineLayout(&.{.set_layout_count=1,.p_set_layouts=@ptrCast(&v.composeLayout),.push_constant_range_count=0,.p_push_constant_ranges=null},null);
     // the shared full-screen vertex shader and the composite's own
     const vs=try c.shader(@embedFile("post.vert"));
@@ -135,6 +149,7 @@ pub const Volume=struct{
       .depth=false,.depthAttachment=false,.blend=true,.premultiplied=true,.cull=false,
     });
     v.overhead=try Image.init(c,overheadRes,overheadRes,.{.format=format});
+    for(&v.field)|*fd|fd.*=try Image.init(c,overheadRes,overheadRes,.{.format=format});
     try v.images(c,w,h,depth);
   }
   /// a sampler filtering `filter`, addressing past the edges by `edge`
@@ -152,27 +167,32 @@ pub const Volume=struct{
   pub fn resize(v:*Volume,c:*const Ctx,w:u32,h:u32,depth:vk.ImageView)ctx.Error!void{
     v.images(c,w,h,depth)catch|e|return ctx.fold(e);
   }
-  /// the volume's image for `w`×`h`, and both sets pointed at what they read
+  /// the volume's image for `w`×`h`, and every set pointed at what it reads
   fn images(v:*Volume,c:*const Ctx,w:u32,h:u32,depth:vk.ImageView)!void{
     v.fog.deinit(c);
     v.fog=try Image.init(c,half(w),half(h),.{.format=format});
-    v.point(c,v.set,.{.{v.nearest,depth},.{v.linear,v.overhead.views[0]}});
-    v.point(c,v.composeSet,.{.{v.nearest,v.fog.views[0]},.{v.nearest,depth}});
+    for(v.sets,v.field)|s,fd|v.point(c,s,&.{.{v.nearest,depth},.{v.linear,v.overhead.views[0]},.{v.linear,fd.views[0]}});
+    v.point(c,v.composeSet,&.{.{v.nearest,v.fog.views[0]},.{v.nearest,depth}});
   }
-  /// point `set`'s two bindings at the two (sampler, view) pairs `to`
-  fn point(_:*const Volume,c:*const Ctx,set:vk.DescriptorSet,to:[2]struct{vk.Sampler,vk.ImageView})void{
-    // the two images, each read through its sampler
-    var infos:[2]vk.DescriptorImageInfo=undefined;
-    for(&infos,to)|*i,t|i.*=.{.sampler=t[0],.image_view=t[1],.image_layout=.shader_read_only_optimal};
+  /// a (sampler, view) pair a set's binding reads
+  const Read=struct{vk.Sampler,vk.ImageView};
+  /// point `set`'s first bindings, in order, at the (sampler, view) pairs `to` (at most three)
+  fn point(_:*const Volume,c:*const Ctx,set:vk.DescriptorSet,to:[]const Read)void{
+    // the images, each read through its sampler
+    var infos:[3]vk.DescriptorImageInfo=undefined;
+    for(infos[0..to.len],to)|*i,t|i.*=.{.sampler=t[0],.image_view=t[1],.image_layout=.shader_read_only_optimal};
     // the writes that point the bindings there
-    var writes:[2]vk.WriteDescriptorSet=undefined;
-    for(&writes,0..)|*wr,b|wr.*=.{.dst_set=set,.dst_binding=@intCast(b),.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=@ptrCast(&infos[b]),.p_buffer_info=undefined,.p_texel_buffer_view=undefined};
-    c.device.updateDescriptorSets(&writes,null);
+    var writes:[3]vk.WriteDescriptorSet=undefined;
+    for(writes[0..to.len],0..)|*wr,b|wr.*=.{.dst_set=set,.dst_binding=@intCast(b),.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=@ptrCast(&infos[b]),.p_buffer_info=undefined,.p_texel_buffer_view=undefined};
+    c.device.updateDescriptorSets(writes[0..to.len],null);
   }
+  /// set 1 as passes read it now: the field at its latest step
+  pub fn readSet(v:*const Volume)vk.DescriptorSet{return v.sets[v.fieldAt];}
   /// free everything the air holds and leave it empty (safe when empty)
   pub fn deinit(v:*Volume,c:*const Ctx)void{
     v.fog.deinit(c);
     v.overhead.deinit(c);
+    for(&v.field)|*fd|fd.deinit(c);
     c.device.destroyPipeline(v.pipe,null);
     c.device.destroyPipelineLayout(v.layout,null);
     c.device.destroyDescriptorPool(v.pool,null);
@@ -194,6 +214,32 @@ pub const Volume=struct{
   pub fn endOverhead(v:*const Volume,cmd:vk.CommandBufferProxy)void{
     cmd.endRendering();
     sw.barrier(cmd,v.overhead.image,post.range(0),.color_attachment_optimal,.shader_read_only_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
+  }
+  /// open the field passes' scope: the next step's image to write (wholly
+  /// rewritten, so cleared), the latest one read through `readSet`. The
+  /// very first time, the latest is cleared too, so the field starts empty.
+  pub fn beginField(v:*Volume,cmd:vk.CommandBufferProxy)void{
+    if(!v.fieldDrawn){
+      // the latest, cleared and handed to the shaders
+      const cur=v.field[v.fieldAt];
+      sw.barrier(cmd,cur.image,post.range(0),.undefined,.color_attachment_optimal,.{.top_of_pipe=true},.{},.{.color_attachment_output=true},.{.color_attachment_write=true});
+      scope(cmd,cur.views[0],cur.extent,.clear);
+      cmd.endRendering();
+      sw.barrier(cmd,cur.image,post.range(0),.color_attachment_optimal,.shader_read_only_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
+      v.fieldDrawn=true;
+    }
+    // the image the next step goes into (what read it last is done first)
+    const next=v.field[1-v.fieldAt];
+    sw.barrier(cmd,next.image,post.range(0),.undefined,.color_attachment_optimal,.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true},.{.color_attachment_output=true},.{.color_attachment_write=true,.color_attachment_read=true});
+    scope(cmd,next.views[0],next.extent,.clear);
+  }
+  /// close it: the step just written handed to the shaders, and made the latest
+  pub fn endField(v:*Volume,cmd:vk.CommandBufferProxy)void{
+    cmd.endRendering();
+    // the image the step went into
+    const next=v.field[1-v.fieldAt];
+    sw.barrier(cmd,next.image,post.range(0),.color_attachment_optimal,.shader_read_only_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
+    v.fieldAt=1-v.fieldAt;
   }
   /// after the world: its depth `depth` handed to the shaders, and the
   /// volume passes' scope opened, the volume cleared to clear air (nothing

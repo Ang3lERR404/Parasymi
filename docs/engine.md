@@ -124,9 +124,14 @@ A pass's `.target` is where it draws, in this order each frame:
   the world and wraps (a texel a unit, `volume.overheadSize` across) and
   is kept from frame to frame, so a pass redraws only a few pieces a frame,
   each pushed `volume.overheadOf` as its `vp`;
+- `field`: the game's own state kept over the world on the GPU, laid out
+  as the overhead map (a texel a unit, wrapping). Every frame its passes
+  write the next step whole from the last, which they read through set 1
+  (`volume.glsl` `field_map`); two images take turns. Every later pass reads
+  the new step. Skipped when no pass draws into it;
 - `world`: the HDR image;
-- `volume`: the air, at half size, reading the world's depth and the
-  overhead map (set 1, `volume.glsl`); rgb what the air sends to the eye, a
+- `volume`: the air, at half size, reading the world's depth, the
+  overhead map and the field (set 1, `volume.glsl`); rgb what the air sends to the eye, a
   how much shows through. The engine lays it over the HDR image before the
   glow;
 - `screen`: the HUD.

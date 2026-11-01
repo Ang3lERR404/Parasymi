@@ -15,7 +15,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `shadow.frag` — shadow casters write depth alone.
 - `ui.frag` — organic UI, all of it grown: every shape is an animated signed-distance field.
 - `ui.vert` — UI shapes to the screen; the palette's sRGB colours to linear.
-- `volume.glsl` — the air as a volume pass reads it (render/volume.zig): the world's depth under each volume texel, the overhead map (fixed to the world…
+- `volume.glsl` — the air as a volume pass reads it (render/volume.zig): the world's depth under each volume texel, the overhead map and the field (fixed to…
 - `volume_compose.frag` — the air laid over the world: each pixel takes the 4x4 half-size volume texels round it, softly weighted and by how near their depth lies to…
 
 ## engine/src/anim/
@@ -85,6 +85,11 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `fog.frag` — the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the…
 - `fog.vert` — one full-screen triangle for the fog, handing on the inverse view-projection (worked out once a vertex, not once a texel).
 - `ground.glsl` — the ground's own stuff, worked out per pixel: soil, moss, stone and ley ground melted into each other along wandering, frayed borders…
+- `moisture.frag` — the moisture field's next step at each texel (render/passes/moisture.zig): the last step drifted along the garden's wind, spread into its…
+- `moisture.glsl` — what the moisture field's passes share (render/passes/moisture.zig): how long a step may be.
+- `moisture.vert` — one full-screen triangle over the whole moisture field, so moisture.frag steps every texel of it on, handing on how long the step is.
+- `moisture_source.frag` — one breathing disc's share at a texel of the moisture field: most at its middle, none at its edge, added onto what is there.
+- `moisture_source.vert` — one thing breathing moisture laid onto the moisture field (render/passes/moisture.zig): a soft disc round where it stands, carrying what it…
 - `part.frag` — material of library parts (structures, the wolf, nodes, beams, motes): fibre, sap, resin, essence, light.
 - `part.vert` — places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 - `plant.frag` — plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
@@ -265,6 +270,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `lithophage.zig` — LITHOPHAGE: a parasite that eats stone.
 - `loomfern.zig` — LOOMFERN: a fern that weaves fibre by itself, so the wolf need not pull it from moss.
 - `monfris.zig` — MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that weaves everything of both lineages, the convergent bulbs (and, once the…
+- `nebularbor.zig` — NEBULARBOR: the mist tree, of both lineages, the first thing to breathe moisture into the garden's air.
 - `polyp.zig` — POLYP: woven of both lineages, it feeds on the light of grown celestial blooms within `feedReach` tiles, and on it grows flowers of both…
 - `root_digger.zig` — ROOT-DIGGER: the first gathering automation.
 - `sap_cache.zig` — SAP CACHE: plain storage.
@@ -301,9 +307,9 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `lithophage.zig` — mesh: LITHOPHAGE.
 - `loomfern.zig` — mesh: LOOMFERN.
 - `mineral_kit.zig` — shared pieces for the ground's minerals: crystals, flat-faced (each face its own normal) so they catch the light as cut planes, and…
-- `moisture_tree.zig` — mesh: the MOISTURE TREE's looks, grown full, for the gardener to pick between (`--samples=`): a tree of both lineages on its 3x3 ground, the
 - `monfris.zig` — mesh: MONFRIS.
 - `mote.zig` — mesh: MOTE.
+- `nebularbor.zig` — mesh: NEBULARBOR, the mist tree: a tree of both lineages on its 3x3 ground, the first thing to breathe moisture into the air…
 - `node_fibre.zig` — mesh: NODE FIBRE.
 - `node_grit.zig` — mesh: NODE GRIT.
 - `node_ley.zig` — mesh: NODE LEY.
@@ -360,6 +366,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/render/passes/
 - `detail.zig` — detail: the ground's grass, clods and stones, grown on the GPU.
 - `fog.zig` — fog: the air the garden stands in, marched on the GPU after the world at half the screen's size (fog.frag): a haze over everything, mist…
+- `moisture.zig` — moisture: the water in the garden's air, kept on the GPU as the engine's field (render/volume.zig, a texel a unit over the world…
 - `parts.zig` — parts: library meshes (the wolf, nodes, motes, structures), one instanced draw per mesh with a per-instance transform (or, for beams, motes…
 - `plants.zig` — plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
 - `sky.zig` — sky: the dome behind everything, drawn first as one full-screen triangle without depth (the world draws over it).

@@ -236,6 +236,9 @@ pub const Game=struct{
   fullWarned:bool=false,
   /// seconds of the world moving (not while frozen), for structures' turns
   time:f64=0,
+  /// how far the world moved this frame (s; 0 while frozen): what the air's
+  /// moisture is stepped on by
+  moved:f32=0,
   /// unspent time (s) carried to the next fixed tick
   acc:f64=0,
   /// how long the simulation took this frame (ms), eased

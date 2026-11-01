@@ -64,8 +64,37 @@ float mist(vec3 p, float ground, float t) {
 }
 // the low air's density at `p`, the ground `ground` under it
 float low(vec3 p, float ground) { return LOW_AIR * exp(-max(p.y - ground, 0.0) / LOW_FALL) * mix(LOW_NIGHT, 1.0, DAYLIGHT); }
-// how dense the air is at `p` at time `t`: its haze, low air and mist
+// what is breathed into the air (the moisture field, render/passes/
+// moisture.zig): how much fog a unit of its low mist makes, how thick that
+// mist lies on the ground; how much fog a unit of its cloud makes, the
+// height over the ground the cloud gathers at and how far it reaches up and
+// down from there, and how big its billows are (noise cells per unit)
+const float BREATH_MIST = 0.3;
+const float BREATH_HUG = 0.8;
+const float BREATH_CLOUD = 0.9;
+const float CLOUD_AT = 3.7;
+const float CLOUD_HALF = 0.75;
+const float CLOUD_CELL = 0.9;
+// the breathed mist and cloud's density at `p`, the ground `ground` under
+// it: the mist lying low and torn into the same wisps as the garden's own,
+// the cloud a billowing band over the ground, thickest at its middle
+float breathed(vec3 p, float ground, float t) {
+  vec2 f = texture(field_map, overheadUv(p)).rg;
+  if (f.r + f.g < 1e-4) return 0.0;
+  float h = p.y - ground;
+  float mistD = f.r * BREATH_MIST * exp(-max(h, 0.0) / BREATH_HUG) * (0.45 + 0.55 * wisps(p, t));
+  // how far into the band, 0 at its middle, 1 at its edge, and its billows
+  float into = abs(h - CLOUD_AT) / CLOUD_HALF;
+  vec2 w = vec2(cos(WIND_HEADING), sin(WIND_HEADING)) * MIST_DRIFT * 2.0 * t;
+  vec3 q = (p - vec3(w.x, 0.0, w.y)) * CLOUD_CELL;
+  float billow = 0.6 * noise3(q) + 0.4 * noise3(q * 2.1 + vec3(3.7, 8.1, 1.9));
+  float shape = 1.0 - smoothstep(0.35 + 0.5 * billow, 1.0, into);
+  float cloudD = f.g * BREATH_CLOUD * shape * smoothstep(0.35, 0.7, billow);
+  return mistD + cloudD;
+}
+// how dense the air is at `p` at time `t`: its haze, low air and mist, and
+// what is breathed into it
 float airDensity(vec3 p, float t) {
   float ground = texture(overhead_map, overheadUv(p)).a;
-  return haze(p.y) + low(p, ground) + mist(p, ground, t);
+  return haze(p.y) + low(p, ground) + mist(p, ground, t) + breathed(p, ground, t);
 }

@@ -1,18 +1,17 @@
-//! mesh: the MOISTURE TREE's looks, grown full, for the gardener to pick
-//! between (`--samples=`): a tree of both lineages on its 3x3 ground, the
-//! first thing to breathe moisture into the air (convergenceKit, the
-//! driftbraid's look). Each rises on one great weave of green and pale
-//! strands, knotted violet where they cross, rooted both ways:
+//! mesh: NEBULARBOR, the mist tree: a tree of both lineages on its 3x3
+//! ground, the first thing to breathe moisture into the air
+//! (convergenceKit, the driftbraid's look). It rises on one great weave of
+//! green and pale strands, knotted violet where they cross, rooted both
+//! ways; five limbs climb out of it, each forking in two under a sac and a
+//! flower of both, every fork's twig crowned with a tuft of upright leaves,
+//! so the crown spreads flat as an umbrella for its cloud to gather over;
+//! from the umbrella's rim curtains of lilac strands hang, leaved green,
+//! each ending in a bead of dew, the mist falling off them.
+//! Beside it the two looks it was blended from, to compare (`--samples=`):
 //! - `weeping` (Rorifera, the dew-bearer): five boughs arch up out of a
 //!   sac of both saps at its crown and fall away, and from the outer half
-//!   of each a curtain of lilac strands hangs nearly to the ground, leaved
-//!   green, each ending in a bead of dew;
-//! - `cloud` (Nimbifera, the cloud-bearer): five limbs climb out of its
-//!   trunk, each forking in two, every fork crowned with a tuft of upright
-//!   leaves, so the crown spreads flat as an umbrella for its cloud to
-//!   gather over; a sac and a flower of both at each fork;
-//! - `blend`: the cloud-bearer's umbrella, a curtain of the dew-bearer's
-//!   strands hanging from its rim.
+//!   of each a curtain of strands hangs nearly to the ground;
+//! - `cloud` (Nimbifera, the cloud-bearer): the umbrella alone.
 //! Laid out on a hidden skeleton (gfx/growth.zig), as every structure is.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
@@ -241,17 +240,14 @@ pub const cloud=struct{
     k.finish(b);
   }
 };
-/// mesh: the two blended: the cloud-bearer's umbrella with the
-/// dew-bearer's strands hanging from its rim
-pub const blend=struct{
-  /// builds the blend whole: the umbrella, three strands off every twig
-  pub fn build(b:*mg.Builder)Allocator.Error!void{
-    // the skeleton every part is timed along
-    var k=growth.Skeleton.begin(b);
-    // the trunk's top, under its umbrella
-    const top=v3(0.03,1.75,0.02);
-    const trunk=try trunkUp(b,&k,top,0x4B00);
-    try umbrellaCrown(b,&k,trunk,top,3);
-    k.finish(b);
-  }
-};
+/// builds the nebularbor whole: the trunk, its foot, the umbrella, three
+/// strands hanging off every twig
+pub fn build(b:*mg.Builder)Allocator.Error!void{
+  // the skeleton every part is timed along
+  var k=growth.Skeleton.begin(b);
+  // the trunk's top, under its umbrella
+  const top=v3(0.03,1.75,0.02);
+  const trunk=try trunkUp(b,&k,top,0x4B00);
+  try umbrellaCrown(b,&k,trunk,top,3);
+  k.finish(b);
+}

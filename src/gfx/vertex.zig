@@ -159,6 +159,22 @@ pub const DetailTile=extern struct{
   /// (at its centre)
   kc:m.Vice(u8,4),
 };
+/// something breathing moisture into the air, read per instance by
+/// moisture_source.vert, which lays it into the moisture field (render
+/// passes/moisture.zig) as a soft disc each frame
+pub const Moisture=extern struct{
+  /// x, z where it breathes from (world), its reach (units), and the
+  /// seconds the field was stepped on by this frame (the pass sets it)
+  at:m.Vice(f32,4),
+  /// how much it breathes a second into the low mist and into the cloud
+  /// over it, unused, unused
+  rate:m.Vice(f32,4),
+};
+/// one step of the moisture field, read by moisture.vert from its one instance
+pub const MoistureStep=extern struct{
+  /// x the seconds the world moved since the last step, yzw unused
+  dt:m.Vice(f32,4),
+};
 /// a rigid procedural part (creature limb, resource node, mote, structure piece).
 pub const PartInstance=extern struct{
   /// model matrix columns: the first

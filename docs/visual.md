@@ -64,6 +64,11 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
 - **Mist:** lies low on the ground and pools in the hollows (below the
   second terrace), torn into flat wisps drifting along the wind; denser by
   night.
+- **Breathed moisture:** what the nebularbor breathes, kept on the GPU as
+  a moisture field over the world (`passes/moisture.zig`, the engine's
+  field): a mist lying low round its foot, torn into the same wisps, and a
+  cloud gathering in a billowing band over its crown (3–4.5 over the
+  ground), both drifting off on the wind, spreading and slowly drying.
 - **Light shafts:** the key light is looked up in its shadow map at every
   step, so what shades the ground shades the air: light falls through the
   gaps between plants and structures, and glows toward the sun (forward

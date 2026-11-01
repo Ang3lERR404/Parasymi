@@ -140,8 +140,8 @@ Tests catch: a sown species without a seed icon; cfg keys.
    `prepare`, `record` (+ `Frame`, `initFrame`/`deinitFrame`). Its `desc`
    embeds its SPIR-V (`.vert = @embedFile("x.vert")`).
 2. **Register it**: one line in `passes` in `render/renderer.zig` (record
-   order; `.target` picks the stage: shadow, overhead, world, volume,
-   screen, [engine.md](engine.md#renderer)).
+   order; `.target` picks the stage: shadow, overhead, field, world,
+   volume, screen, [engine.md](engine.md#renderer)).
 3. **New shaders**: the file in `shaders/` with a `//!` header after
    `#version`, and its name in `shaders` in `build.zig`.
 

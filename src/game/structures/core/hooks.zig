@@ -114,6 +114,16 @@ pub fn emit(s:*const Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
     inline else=>|k|if(comptime reg.has(k,"emit"))try reg.module(k).emit(s,out,ctr,tf),
   }
 }
+/// how much moisture a structure breathes into the air: within `reach`
+/// (units) of its centre, `low` a second into the mist on the ground and
+/// `high` into the cloud over it
+pub const Breath=struct{reach:f32,low:f32,high:f32};
+/// what structure `s` breathes into the air, if anything (its `breath` hook)
+pub fn breath(s:*const Structure)?Breath{
+  return switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"breath"))reg.module(k).breath(s)else null,
+  };
+}
 /// write structure `s`'s line of hover text into `d` at `x`,`y`
 pub fn describe(s:*const Structure,d:*Draw,g:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
   switch(s.kind()){

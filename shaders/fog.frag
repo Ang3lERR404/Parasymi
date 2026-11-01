@@ -1,5 +1,5 @@
 #version 450
-//! the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the hollows, the key light falling through it in shafts, the points of light and the ley lines glowing in it.
+//! the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the hollows, what is breathed into it (mist and cloud), the key light falling through it in shafts, the points of light and the ley lines glowing in it.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "volume.glsl"
@@ -115,7 +115,7 @@ void main() {
     float s = s0 + span * k;
     vec3 p = eye + dir * s;
     vec4 under = groundAt(mix(uvA, uvB, k), ring);
-    float rho = haze(p.y) + low(p, under.a) + mist(p, under.a, t);
+    float rho = haze(p.y) + low(p, under.a) + mist(p, under.a, t) + breathed(p, under.a, t);
     vec3 glow = under.rgb * (0.5 + leyPulse(p, t)) * LEY_AIR * exp(-max(p.y - under.a, 0.0) / LEY_RISE) * ALBEDO;
     vec3 light = amb + key * airLit(L, p, s) + glow;
     gather(rho * ds, light, scat, trans);

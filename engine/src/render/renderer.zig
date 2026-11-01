@@ -75,6 +75,11 @@ pub const pass=struct{
     /// pushes its own `vp`, `volume.overheadOf`), before the world; kept
     /// from frame to frame, so a pass redraws only what changed
     overhead,
+    /// the field (volume.zig): the game's own state over the world, a
+    /// texel a unit as the overhead map, each frame's step written whole
+    /// from the last (read through set 1, volume.glsl `field_map`), after
+    /// the overhead map and before the world, which reads the new step
+    field,
     /// the world's HDR image
     world,
     /// the air's volume, half the screen's size, after the world: colour
@@ -150,7 +155,7 @@ pub const pass=struct{
       .vert=vs,.frag=fs,
       .bindings=d.bindings,.attrs=d.attrs,
       .layout=layout,
-      .colorFormat=switch(d.target){.shadow=>.undefined,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
+      .colorFormat=switch(d.target){.shadow=>.undefined,.overhead,.field,.world,.volume=>hdrFormat,.screen=>screen},
       .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,
       .samples=postMod.sampleFlags(if(d.target==.world)samples else 1),.perSample=d.perSample,
       .viewMask=if(d.target==.shadow)light.views else 0,
@@ -546,11 +551,17 @@ pub fn Renderer(comptime G:type)type{
       cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set},null);
       r.record(f,cmd,.overhead,&sc,&stats);
       r.volume.endOverhead(cmd);
+      if(comptime targets(.field)){
+        r.volume.beginField(cmd);
+        cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set,r.volume.readSet()},null);
+        r.record(f,cmd,.field,&sc,&stats);
+        r.volume.endField(cmd);
+      }
       r.beginWorld(cmd,scene.clear);
       r.record(f,cmd,.world,&sc,&stats);
       cmd.endRendering();
       r.volume.beginVolume(cmd,r.sc.depth);
-      cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set,r.volume.set},null);
+      cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set,r.volume.readSet()},null);
       r.record(f,cmd,.volume,&sc,&stats);
       r.volume.compose(cmd,r.post.hdr);
       r.post.glow(cmd);
@@ -581,6 +592,11 @@ pub fn Renderer(comptime G:type)type{
       r.fi=(r.fi+1)%frames;
       r.stats=stats;
       if(pres!=.success or acq.result==.suboptimal_khr)try r.recreate();
+    }
+    /// whether any of the game's passes draws into `target`
+    fn targets(comptime target:pass.Target)bool{
+      inline for(reg.ids)|id|if(reg.module(id).desc.target==target)return true;
+      return false;
     }
     /// every pass drawing into `target`, in declaration order
     fn record(r:*R,f:*Frame,cmd:vk.CommandBufferProxy,comptime target:pass.Target,scene:*const Scene,stats:*Stats)void{

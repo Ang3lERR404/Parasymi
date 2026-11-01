@@ -1,4 +1,4 @@
-//! the air as a volume pass reads it (render/volume.zig): the world's depth under each volume texel, the overhead map (fixed to the world, wrapping), the eye's ray through a texel.
+//! the air as a volume pass reads it (render/volume.zig): the world's depth under each volume texel, the overhead map and the field (fixed to the world, wrapping), the eye's ray through a texel.
 // The including shader declares push constants `pc` as light.glsl asks
 // (`vp`, `eye_time`, `light`) and includes light.glsl first.
 
@@ -6,6 +6,10 @@
 // above, a texel a world unit, wrapping every OVERHEAD_SIZE units)
 layout(set = 1, binding = 0) uniform sampler2D scene_depth;
 layout(set = 1, binding = 1) uniform sampler2D overhead_map;
+// the field: the game's own state over the world, laid out as the overhead
+// map is (read at `overheadUv`); a `.field` pass reads the last step here
+// and writes the next, every pass after it reads the new step
+layout(set = 1, binding = 2) uniform sampler2D field_map;
 
 // the pixel volume texel `t` stands for: its 2x2 block's first
 ivec2 volumePixel(ivec2 t) { return min(t * 2, textureSize(scene_depth, 0) - 1); }

@@ -79,9 +79,11 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     // (the frozen world's menus give back a cursor held for looking)
     if(g.looking)in.capture(false);
     g.looking=false;
+    g.moved=0;
     return;
   }
   g.time+=dt;
+  g.moved=dt;
   // the garden saves itself every so often (only time played counts)
   g.sinceSave+=dt;
   if(g.opts.autosave>0 and g.sinceSave>=m.f(g.opts.autosave)*m.sPerMin and g.request==null){

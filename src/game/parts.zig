@@ -105,6 +105,9 @@ pub const Parts=struct{
   toward:m.V3=.{0,1,0},
   /// this frame's points of light (see `light`)
   lights:std.ArrayList(vertex.Light)=.empty,
+  /// this frame's breaths of moisture into the air (see `breathe`), kept
+  /// however far off: the air is stepped on everywhere, seen or not
+  moisture:std.ArrayList(vertex.Moisture)=.empty,
   /// while set, everything emitted (and every light) is carried by it: a
   /// structure turning (R) takes all it draws along with its body
   around:?m.M4=null,
@@ -115,12 +118,14 @@ pub const Parts=struct{
     for(&p.lists)|*l|l.deinit(p.gpa);
     p.bones.deinit(p.gpa);
     p.lights.deinit(p.gpa);
+    p.moisture.deinit(p.gpa);
   }
   /// empties every list for the next frame, keeping their room
   pub fn clear(p:*Parts)void{
     for(&p.lists)|*l|l.clearRetainingCapacity();
     p.bones.clearRetainingCapacity();
     p.lights.clearRetainingCapacity();
+    p.moisture.clearRetainingCapacity();
   }
   /// set this frame's eye, view and the direction toward the key light
   /// before emitting
@@ -145,6 +150,12 @@ pub const Parts=struct{
     const at=if(p.around)|a|m.mulPoint(a,where)else where;
     if(p.view)|v|if(!v.sphere(at,reach))return;
     try p.lights.append(p.gpa,.{.pos=.{at[0],at[1],at[2],reach},.col=.{col[0],col[1],col[2],0}});
+  }
+  /// something breathing moisture into the air round `at` (x, z) within
+  /// `reach`: `low` a second into the mist on the ground, `high` into the
+  /// cloud over it (render passes/moisture.zig)
+  pub fn breathe(p:*Parts,at:m.Vice(f32,2),reach:f32,low:f32,high:f32)Allocator.Error!void{
+    try p.moisture.append(p.gpa,.{.at=.{at[0],at[1],reach,0},.rate=.{low,high,0,0}});
   }
   /// a mesh placed by its matrix: skipped when out of view (a sphere a few
   /// times its scale), at the level of detail for its distance.

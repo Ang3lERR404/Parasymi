@@ -78,6 +78,11 @@ pub const passes=struct{
   pub const partsShadow=@import("passes/parts.zig").shadow;
   /// the ground seen from above into the overhead map, for the fog
   pub const terrainOverhead=@import("passes/terrain.zig").overhead;
+  // the moisture in the air, stepped on in the engine's field before the world
+  /// the moisture field carried a step on: drifting, spreading, drying
+  pub const moistureField=@import("passes/moisture.zig").field;
+  /// what everything breathing moisture breathed since, laid onto it
+  pub const moistureSources=@import("passes/moisture.zig").sources;
   /// the sky dome behind everything
   pub const sky=@import("passes/sky.zig");
   /// the baked ground of every streamed chunk
@@ -150,6 +155,11 @@ pub const Scene=struct{
   /// points of light, most telling first (the renderer takes the first
   /// `maxLights`)
   lights:[]const vertex.Light,
+  /// what breathes moisture into the air this frame
+  moisture:[]const vertex.Moisture=&.{},
+  /// how far the world moved since the last frame (s; 0 while frozen): the
+  /// air's moisture is stepped on by it
+  step:f32=0,
   /// the HUD's quads, drawn last
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)

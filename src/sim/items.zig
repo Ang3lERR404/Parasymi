@@ -83,6 +83,8 @@ pub const Item=enum(u8){
   /// the seed the shattered radiant light gathered into and let fall: of
   /// a lineage not yet known, it never plants itself
   strangeSeed,
+  /// the bulb of a nebularbor, the mist tree
+  nebularbor,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -129,6 +131,7 @@ const infos=EnumArray(Item,Info).init(.{
   .vultrixi=.{.col=.{230,200,215,255}},
   .driftFlower=.{.col=.{240,150,200,255}},
   .strangeSeed=.{.col=.{235,240,255,255}},
+  .nebularbor=.{.col=.{180,215,235,255}},
 });
 /// one slot's worth: an item and how many of it
 pub const Stack=struct{

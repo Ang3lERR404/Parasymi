@@ -28,6 +28,8 @@
 //!                               weaves, `choose(s, g, r)` sets it
 //!   emit(s, out, ctr, tf)       extra visuals beyond its mesh (placed as it is:
 //!                               `place(s, ctr)`)
+//!   breath(s) ?Breath           what it breathes into the air: moisture
+//!                               into the mist and the cloud round it
 //!   describe(s, d, g, x, y)     one line of hover text
 //!   ground(kind) bool           which tiles it may stand on (default: any tile)
 //!   field(s) ?Field             a field of celestial energy it holds
@@ -145,6 +147,10 @@ pub const chosen=hooks.chosen;
 pub const choose=hooks.choose;
 /// a structure's extra visuals beyond its mesh
 pub const emit=hooks.emit;
+/// how much moisture a structure breathes into the air
+pub const Breath=hooks.Breath;
+/// what a structure breathes into the air, if anything
+pub const breath=hooks.breath;
 /// a structure's line of hover text
 pub const describe=hooks.describe;
 /// a kind's bulb in the HUD
@@ -191,6 +197,8 @@ pub const kinds=struct{
   pub const strangeSeed=@import("structures/strange_seed.zig");
   /// a polyp's stemless flower put down as a floating light
   pub const driftFlower=@import("structures/drift_flower.zig");
+  /// the mist tree, breathing moisture into the air
+  pub const nebularbor=@import("structures/nebularbor.zig");
 };
 /// the registry built from `kinds`: ids, tables, hook dispatch
 pub const reg=registry.Registry(kinds);

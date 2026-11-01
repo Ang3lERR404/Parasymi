@@ -100,6 +100,10 @@ pub const hand=[_]Recipe{
   // essence and ley crystals (the brief sets no cost)
   .{.out=.monfris,.in=&.{.{.item=.weftstone,.n=1},.{.item=.driftbraid,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.interweaving},
   .{.out=.vultrixi,.in=&.{.{.item=.gatheringCrown,.n=1},.{.item=.ganglion,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.sharedNerves},
+  // decision: the mist tree from what outlives the unforming (the brief
+  // sets no cost): the drift flower only the evolved arsthraxia lets fall,
+  // so it is woven only after; a monfris's (it is convergent)
+  .{.out=.nebularbor,.in=&.{.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2},.{.item=.driftFlower,.n=1},.{.item=.grit,.n=3}},.time=8},
 };
 /// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}
