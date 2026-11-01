@@ -207,6 +207,12 @@ const parts=struct{
   pub const constellateHeartBuilder=@import("meshes/constellate.zig").heartBuilder;
   /// a sketch: the constellate heart's whole story, every stage in turn
   pub const constellateHeart=@import("meshes/constellate.zig").heartWhole;
+  /// a sketch: a constellate tendril the gardener draws, floating
+  pub const constellateTendril=@import("meshes/constellate.zig").tendril;
+  /// a sketch: a constellate tendril along the ground
+  pub const constellateTendrilGround=@import("meshes/constellate.zig").tendrilGround;
+  /// a sketch: a constellate tendril arcing over
+  pub const constellateTendrilArc=@import("meshes/constellate.zig").tendrilArc;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;

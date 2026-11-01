@@ -127,6 +127,19 @@ const Shape=enum(u8){
   heartMade,
   /// the glowing spot the settled heart gathers energy in to make a part
   heartMadeGlow,
+  /// a tendril the gardener draws, braided of loose fragments flowing
+  /// along it, floating
+  tendril,
+  /// a tendril along the ground
+  tendrilGround,
+  /// a tendril arcing up and over
+  tendrilArc,
+  /// a part riding a floating tendril
+  tendrilRide,
+  /// a part riding a tendril along the ground
+  tendrilRideGround,
+  /// a part riding an arcing tendril
+  tendrilRideArc,
   /// the yielder's other petals, by number
   _,
 };
@@ -287,6 +300,12 @@ fn settling(b:*mg.Builder,stage:f32)Allocator.Error!void{
   try cluster(b,.{.shape=.heartMade,.reach=stage+0.2});
   try points(b,.{.shape=.heartMadeGlow,.reach=stage,.n=1});
 }
+/// a tendril at `height` (0 floating, 1 on the ground, 2 arcing): three
+/// strands of fragments braided along it, and a part riding it
+fn tendrilAt(b:*mg.Builder,height:u8)Allocator.Error!void{
+  try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.tendril)+height),.reach=0.14,.n=72});
+  try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.tendrilRide)+height),.reach=0.17*0.3});
+}
 /// the heart's whole story in one (stage 5): every web any stage has, the
 /// GPU telling which stage it is at by its clock
 fn story(b:*mg.Builder)Allocator.Error!void{
@@ -406,4 +425,20 @@ pub const heartBuilder=struct{
 pub const heartWhole=struct{
   /// builds the heart's whole story
   pub fn build(b:*mg.Builder)Allocator.Error!void{try story(b);}
+};
+/// mesh: CONSTELLATE TENDRIL. a segment the gardener draws, loose fragments
+/// braided and flowing along it, floating, a part riding it
+pub const tendril=struct{
+  /// builds the floating tendril
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try tendrilAt(b,0);}
+};
+/// mesh: CONSTELLATE TENDRIL, GROUND. the same, run along the ground
+pub const tendrilGround=struct{
+  /// builds the tendril on the ground
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try tendrilAt(b,1);}
+};
+/// mesh: CONSTELLATE TENDRIL, ARC. the same, arcing up and over
+pub const tendrilArc=struct{
+  /// builds the arcing tendril
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try tendrilAt(b,2);}
 };

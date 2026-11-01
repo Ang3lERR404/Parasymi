@@ -209,6 +209,26 @@ const float PLEXUS_MADE_FORM = 26.0;
 const float PLEXUS_MADE_FORMING = 16.0;
 const vec3 PLEXUS_MADE_SPOT = vec3(0.0, 1.0, 0.0);
 const float PLEXUS_MADE_SIZE = 0.8;
+// a tendril the gardener draws: loose fragments braided into a segment
+// along a path between two ends, always flowing along it like a stream,
+// carrying parts from one end to the other. Its webs: the tendril itself
+// at each height it can be set to (`PLEXUS_TENDRIL` + 0 floating, sagging a
+// little between its ends; 1 along the ground; 2 arcing up and over), and
+// a part riding along each (`PLEXUS_TENDRIL_RIDE` + the same). How many
+// strands it is braided of and how many fragments each holds, how long it
+// runs, how far the strands stand from its middle, how many turns they make
+// round each other along it, how fast the fragments flow along it (lengths
+// a second), how long a part takes to ride it (s), and how big a part is
+const int PLEXUS_TENDRIL = 52;
+const int PLEXUS_TENDRIL_RIDE = 55;
+const int PLEXUS_TENDRIL_STRANDS = 3;
+const int PLEXUS_TENDRIL_EACH = 24;
+const float PLEXUS_TENDRIL_LEN = 2.4;
+const float PLEXUS_TENDRIL_R = 0.05;
+const float PLEXUS_TENDRIL_TURNS = 2.2;
+const float PLEXUS_TENDRIL_FLOW = 0.06;
+const float PLEXUS_TENDRIL_RIDING = 8.0;
+const float PLEXUS_TENDRIL_PART = 0.3;
 const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 56.0;
 const float PLEXUS_HEART_DROP = 1.1;
@@ -787,6 +807,42 @@ vec4 plexusHeartMade(float id, float t, vec3 moved) {
   float env = smoothstep(a, a + 0.5, x) * plexusSettleKeep(t);
   return vec4(plexusMadeSpot(t) + rel * smoothstep(a, a + 1.5, x), env);
 }
+// where the middle of a tendril set to `height` (0 floating, 1 on the
+// ground, 2 arcing) is, `u` of the way from one end to the other at time
+// `t`: running from one end to the other, swaying a little side to side
+vec3 plexusTendrilPath(float u, int height, float t) {
+  float y = height == 0 ? 1.0 - 0.2 * sin(0.5 * TAU * u) : (height == 1 ? 0.06 : 0.3 + 1.4 * sin(0.5 * TAU * u));
+  float sway = (height == 1 ? 0.02 : 0.08) * sin(u * 3.0 + t * 0.4) * sin(0.5 * TAU * u);
+  return vec3(sway, y, (u - 0.5) * PLEXUS_TENDRIL_LEN);
+}
+// what of fragment `id` of a tendril set to `height` is at time `t`: where
+// it is (xyz) and how much of it there is (w). Strand id/EACH of three
+// braided round the tendril's middle, its fragments flowing on along it,
+// each strand's turn breathing in and out as the flow passes, thinning
+// away at either end where it meets what it joins
+vec4 plexusTendril(float id, int height, float t) {
+  float k = floor(id / float(PLEXUS_TENDRIL_EACH));
+  float j = id - k * float(PLEXUS_TENDRIL_EACH);
+  float u = fract(j / float(PLEXUS_TENDRIL_EACH) + t * PLEXUS_TENDRIL_FLOW + k * 0.013);
+  vec3 c = plexusTendrilPath(u, height, t);
+  vec3 dir = normalize(plexusTendrilPath(min(u + 0.01, 1.0), height, t) - plexusTendrilPath(max(u - 0.01, 0.0), height, t));
+  vec3 e1 = normalize(cross(dir, vec3(0.0, 1.0, 0.0)));
+  vec3 e2 = cross(e1, dir);
+  float ang = k / float(PLEXUS_TENDRIL_STRANDS) * TAU + u * PLEXUS_TENDRIL_TURNS * TAU - t * 0.8;
+  float r = PLEXUS_TENDRIL_R * (0.75 + 0.25 * sin(u * 20.0 - t * 2.0));
+  float env = smoothstep(0.0, 0.06, u) * (1.0 - smoothstep(0.94, 1.0, u));
+  return vec4(c + (cos(ang) * e1 + sin(ang) * e2) * r, env);
+}
+// what of the part riding a tendril set to `height`, point `id` (drifted
+// by `moved`) at time `t`: where it is (xyz) and how much of it there is
+// (w). A small petal carried along it over and over, from one end to the
+// other, riding just over it, turning slowly as it goes
+vec4 plexusTendrilRide(float id, int height, float t, vec3 moved) {
+  float s = fract(t / PLEXUS_TENDRIL_RIDING);
+  vec3 rel = turnAbout((plexusForm(id, PLEXUS_PETAL) - vec3(0.0, 1.0, 0.0)) * PLEXUS_TENDRIL_PART + moved * PLEXUS_TENDRIL_PART, vec3(0.0, 1.0, 0.0), t * 0.5);
+  float env = smoothstep(0.0, 0.08, s) * (1.0 - smoothstep(0.92, 1.0, s));
+  return vec4(plexusTendrilPath(s, height, t) + vec3(0.0, 0.12, 0.0) + rel, env);
+}
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
@@ -812,6 +868,8 @@ vec3 plexusAt(float id, int shape, float t) {
   if (shape == PLEXUS_HEART_CURRENT) return plexusHeartCurrent(id, t);
   if (shape == PLEXUS_HEART_MADE) return plexusHeartMade(id, t, moved).xyz;
   if (shape == PLEXUS_HEART_MADE_GLOW) return plexusMadeSpot(t);
+  if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) return plexusTendril(id, shape - PLEXUS_TENDRIL, t).xyz;
+  if (shape >= PLEXUS_TENDRIL_RIDE && shape < PLEXUS_TENDRIL_RIDE + 3) return plexusTendrilRide(id, shape - PLEXUS_TENDRIL_RIDE, t, moved).xyz;
   // a bloom, its petlets and what bursts from it: placed where they were
   // fastened, the heart's settling not carrying them down, then falling
   // free on their own
@@ -1075,10 +1133,15 @@ void main() {
     // are there, or of the glowing spot it gathers in)
     if (shape == PLEXUS_HEART_MADE) yield = min(min(plexusHeartMade(ids.x, t, vec3(0.0)).w, plexusHeartMade(ids.y, t, vec3(0.0)).w), plexusHeartMade(ids.z, t, vec3(0.0)).w);
     if (shape == PLEXUS_HEART_MADE_GLOW) yield = plexusMadeGlow(t);
+    // (or of a tendril's fragments, thinning at its ends, each line and
+    // pane as much as its faintest point, or of the part riding it)
+    if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) yield = min(min(plexusTendril(ids.x, shape - PLEXUS_TENDRIL, t).w, plexusTendril(ids.y, shape - PLEXUS_TENDRIL, t).w), plexusTendril(ids.z, shape - PLEXUS_TENDRIL, t).w);
+    if (shape >= PLEXUS_TENDRIL_RIDE && shape < PLEXUS_TENDRIL_RIDE + 3) yield = plexusTendrilRide(ids.x, shape - PLEXUS_TENDRIL_RIDE, t, vec3(0.0)).w;
     yield *= plexStoryShow;
     if (shape == PLEXUS_HEART_STEM) plexCrowd = mix(1.0, 0.35, plexusHeartMorph(t));
     if (shape == PLEXUS_HEART_ROSE || (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT)) plexCrowd = 0.45;
     if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) plexCrowd = 0.6;
+    if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) plexCrowd = 0.55;
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING || shape == PLEXUS_HEART_MADE_GLOW ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
     bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;
