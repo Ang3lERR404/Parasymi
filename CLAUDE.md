@@ -183,7 +183,11 @@ Code:
   `glfw.Key`/`Button` in game code.
 - All math via engine `core/math.zig` (`m`), colours via `core/color.zig`; never
   `std.math`, hand-rolled casts or hand-rolled linear algebra. A singular
-  matrix is a bug.
+  matrix is a bug. Use its helpers over writing them out: `Vec`/`Vice`/`Mat`
+  (never bare `@Vector` or small `[N]T`), `dist`, `unlerp`, `damp`/`dampV`/
+  `dampBy` (never `x+=(t-x)*@min(1,dt*k)`), `sumOf`, `meanOf`, `lenOf`,
+  `splatOf` ([docs/architecture.md](docs/architecture.md#math) has the
+  table); a pattern that repeats gets a new helper with a test.
 - Threads only via `jobs.each` on `w.io`, results identical to serial,
   with a test proving it. Never spawn threads or keep a pool (the audio
   device's render thread is zig-wsapi's own, fed through `audio.Output`;

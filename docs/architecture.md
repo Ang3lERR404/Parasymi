@@ -106,9 +106,32 @@ All math goes through engine `core/math.zig` (`m`). It has:
 - tiles: the `footprint` and `ring` iterators, and `Chunk.tileOf` to get
   back from a local index;
 - directions: `dirs`, `dirVec`, `dirYaw`;
+- types: `Vec(t,s)` (a SIMD vector, for lanes summed together), `Vice(t,s)`
+  (a plain row `[s]t`: GPU and save layouts, tables, runtime-indexed lanes),
+  `Mat(t,s,a)` (`a` columns of `Vec(t,s)`); `V3`, `V4`, `M4` are built on
+  them;
+- vectors of any width: `sumOf`, `meanOf` (the middle of many points),
+  `lenOf`, `splatOf`; for points `dist`, `len`, `dot`, `norm`, `lerpV`;
+- ramps: `lerp` and `unlerp` (lerp undone, held in 0..1);
 - vectors and matrices, `alignY`, `Frustum`;
-- motion and curves: `spring`, `springDamper`, `catmullRom`,
+- motion and curves: `damp`, `dampV`, `dampBy` (easing toward a target,
+  the same at any frame rate), `spring`, `springDamper`, `catmullRom`,
   `splineResample`.
+
+Use these, never the same thing written out by hand:
+
+| Instead of | Write |
+|---|---|
+| `@Vector(n,t)`, small `[n]t` | `m.Vec(t,n)`, `m.Vice(t,n)` |
+| `m.len(a-b)` | `m.dist(a,b)` |
+| `m.clamp01((x-a)/(b-a))` | `m.unlerp(a,b,x)` |
+| `x+=(t-x)*@min(1,dt*k)` | `x=m.damp(x,t,k,dt)` (`dampV` for points) |
+| `@as(m.Vec(t,n),@splat(x))` | `m.splatOf(t,n,x)` |
+| `@sqrt(m.sumOf(t,n,v*v))` | `m.lenOf(t,n,v)` |
+| `a[0]-b[0],a[1]-b[1]` by lanes | `a-b` on `Vec`s |
+
+When a new pattern repeats, add a helper here (with a test) rather than
+writing it out again.
 
 Colours go through engine `core/color.zig`.
 
