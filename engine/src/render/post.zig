@@ -84,6 +84,8 @@ pub const Spec=struct{
   depth:bool=false,
   /// only ever drawn into within one scope (multisampled targets)
   transient:bool=false,
+  /// copied out of to the CPU now and then (the field's probe)
+  readable:bool=false,
 };
 /// one image of the post chain, with a view per level and its size
 pub const Image=struct{
@@ -114,6 +116,7 @@ pub const Image=struct{
       .usage=.{
         .color_attachment=!sp.depth,.depth_stencil_attachment=sp.depth,
         .sampled=!sp.transient,.transient_attachment=sp.transient,
+        .transfer_src=sp.readable,
       },
       .sharing_mode=.exclusive,
       .initial_layout=.undefined,

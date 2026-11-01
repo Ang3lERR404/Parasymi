@@ -276,6 +276,8 @@ pub const Strings=struct{
     notUnderstood:S="",
     /// the hovered tile is out of reach
     tooFar:S="",
+    /// the moisture in the air over the hovered tile: its mist, its cloud
+    air:S="",
     /// a store holding nothing
     empty:S="",
     /// how a store's panel is opened

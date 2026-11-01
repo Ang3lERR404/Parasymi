@@ -1,7 +1,8 @@
 //! what is under the cursor, on a trellis beside it: a structure (its name
 //! and what it is doing), a plant (its name, how far grown and what it
 //! gives or draws) or a resource node; bare ground by the top-left, its kind
-//! and ley.
+//! and ley. Wherever moisture has been breathed into the air over it, a
+//! last line says how much: its mist and its cloud.
 const lib=@import("../../lib.zig");
 /// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
 const m=lib.engine.core.math;
@@ -49,6 +50,19 @@ const lineH:f32=24;
 const keep:f32=8;
 /// where "too far" sits on the name's line, from the card's right
 const farX:f32=96;
+/// less moisture than this in the air over a tile (mist and cloud
+/// together) is not worth a line
+const airShown:f32=0.05;
+/// the moisture in the air over the hovered tile, if there is enough to speak of
+fn wet(g:*const play.Game)?m.Vec(f32,2){
+  // what was read back over it
+  const a=g.air orelse return null;
+  return if(a[0]+a[1]>airShown)a else null;
+}
+/// the line saying how much moisture is in the air over the tile, at `x`,`y`
+fn air(d:*Draw,x:f32,y:f32,a:m.Vec(f32,2))Allocator.Error!void{
+  _=try d.print(x,y,s.textNote,s.dim,txt.s.hud.air,.{a[0],a[1]});
+}
 /// shown while something is hovered, but not over an open structure
 /// panel (which shows all of this itself) nor a HUD panel (which has its own).
 pub fn visible(g:*const play.Game)bool{return g.hover!=null and g.mode!=.structure and g.pointed==null;}
@@ -68,13 +82,15 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
     // what the node yields
     const item=resources.of(c.kind[t]).?.item;
     // where the card's first line goes
-    const at=try card(g,d,screenW,screenH,nodeW,1,near);
+    const at=try card(g,d,screenW,screenH,nodeW,if(wet(g)!=null)2 else 1,near);
     _=try d.print(at[0],at[1],s.textLabel,item.info().col,txt.s.hud.node,.{txt.item(item).name,c.res[t]});
+    if(wet(g))|a|try air(d,at[0],at[1]+lineH,a);
     return;
   }
-  try d.trellis(panelX,panelY,360,60,s.card,0.6);
+  try d.trellis(panelX,panelY,360,if(wet(g)!=null)60+lineH else 60,s.card,0.6);
   _=try d.print(textX,textTop,s.textLabel,s.white,txt.s.hud.tile,.{txt.tile(c.kind[t]),c.leyCap[t]});
   if(!near)_=try d.text(textX+248,textTop+2,s.textNote,s.dim,txt.s.hud.tooFar);
+  if(wet(g))|a|try air(d,textX,textTop+lineH+4,a);
 }
 /// a card `w` wide and `lines` lines high beside the cursor, kept on
 /// screen; returns where its first line goes. Out of reach, it says so.
@@ -92,10 +108,13 @@ fn card(g:*const play.Game,d:*Draw,screenW:f32,screenH:f32,w:f32,lines:f32,near:
 fn structure(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,sp:*const st.Structure,near:bool)Allocator.Error!void{
   // whether it opens as a store, and where the card's first line goes
   const opens=sp.def().store;
-  const at=try card(g,d,screenW,screenH,cardW,if(opens)3 else 2,near);
+  // how many lines it takes: its name, what it does, how it opens, the air
+  const lines:f32=2+@as(f32,if(opens)1 else 0)+@as(f32,if(wet(g)!=null)1 else 0);
+  const at=try card(g,d,screenW,screenH,cardW,lines,near);
   _=try d.text(at[0],at[1],s.textLabel,s.gold,txt.structure(sp.kind()));
   try st.describe(sp,d,&g.prog,at[0],at[1]+lineH);
   if(opens)_=try d.text(at[0],at[1]+2*lineH,s.textNote,if(near)s.gold else s.dim,txt.s.hud.openHint);
+  if(wet(g))|a|try air(d,at[0],at[1]+(lines-1)*lineH,a);
 }
 /// a plant's card: its name, a tendril of how far grown (with its stage),
 /// then what it yields and how healthy it is, or for a bloom whether it
@@ -110,9 +129,12 @@ fn plant(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,i:ck.PlantId,near:bool)All
   // a bloom waiting on its network, or a plant that draws radiance, says so
   const waits=(def.radiance>0 and !(known and rad.radiating.items[i.idx()])) or def.needsRadiance;
   // where the card's first line goes, and the current line's left and top
-  const at=try card(g,d,screenW,screenH,plantW,if(waits)4 else 3,near);
+  // how many lines it takes, the air's last
+  const lines:f32=@as(f32,if(waits)4 else 3)+@as(f32,if(wet(g)!=null)1 else 0);
+  const at=try card(g,d,screenW,screenH,plantW,lines,near);
   const x=at[0];
   var y=at[1];
+  if(wet(g))|a|try air(d,x,y+(lines-1)*lineH,a);
   _=try d.text(x,y,s.textLabel,s.white,txt.plant(p.sp).name);
   y+=lineH;
   try d.tendril(x,y+4,140,s.barH,s.growth,p.growth,0.5);

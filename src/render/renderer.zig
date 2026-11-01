@@ -160,6 +160,9 @@ pub const Scene=struct{
   /// how far the world moved since the last frame (s; 0 while frozen): the
   /// air's moisture is stepped on by it
   step:f32=0,
+  /// where (world x, z) the air's moisture is read back from (the engine's
+  /// `probed`): the hovered tile's middle, if any
+  probe:?m.Vice(f32,2)=null,
   /// the HUD's quads, drawn last
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)

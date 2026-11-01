@@ -239,6 +239,9 @@ pub const Game=struct{
   /// how far the world moved this frame (s; 0 while frozen): what the air's
   /// moisture is stepped on by
   moved:f32=0,
+  /// the moisture in the air over the hovered tile, as the GPU had it a
+  /// frame or two ago: its mist and its cloud (null: not read back yet)
+  air:?m.Vec(f32,2)=null,
   /// unspent time (s) carried to the next fixed tick
   acc:f64=0,
   /// how long the simulation took this frame (ms), eased

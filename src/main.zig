@@ -410,6 +410,7 @@ pub fn main(init:Init)!void{
     input.resized=false;
     r.capture=shoot;
     try r.draw(&scene,resized);
+    game.air=if(r.probed)|p|.{p[0],p[1]}else null;
     if(r.shot())|sh|{
       try snap(gpa,io,sh,&turn,&writing);
       // (what time taking it still costs is not the world's, so the next

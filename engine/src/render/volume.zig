@@ -149,7 +149,7 @@ pub const Volume=struct{
       .depth=false,.depthAttachment=false,.blend=true,.premultiplied=true,.cull=false,
     });
     v.overhead=try Image.init(c,overheadRes,overheadRes,.{.format=format});
-    for(&v.field)|*fd|fd.*=try Image.init(c,overheadRes,overheadRes,.{.format=format});
+    for(&v.field)|*fd|fd.*=try Image.init(c,overheadRes,overheadRes,.{.format=format,.readable=true});
     try v.images(c,w,h,depth);
   }
   /// a sampler filtering `filter`, addressing past the edges by `edge`
@@ -240,6 +240,39 @@ pub const Volume=struct{
     const next=v.field[1-v.fieldAt];
     sw.barrier(cmd,next.image,post.range(0),.color_attachment_optimal,.shader_read_only_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
     v.fieldAt=1-v.fieldAt;
+  }
+  /// the field's texel under world point (x, z) `at`
+  pub fn fieldTexel(at:m.Vice(f32,2))m.Vice(u32,2){
+    // where it lies on the field (rows run toward -z), wrapped onto it
+    const u=at[0]/overheadSize;
+    const w=-at[1]/overheadSize;
+    return.{@min(m.floorTo(u32,(u-@floor(u))*overheadRes),overheadRes-1),@min(m.floorTo(u32,(w-@floor(w))*overheadRes),overheadRes-1)};
+  }
+  /// copies the latest field's texel under world point `at` into `buf`
+  /// (`texelBytes` of it), for the host to read once the frame is done
+  pub fn probe(v:*const Volume,cmd:vk.CommandBufferProxy,at:m.Vice(f32,2),buf:vk.Buffer)void{
+    // the latest step's image, and the texel asked after
+    const cur=v.field[v.fieldAt];
+    const t=fieldTexel(at);
+    sw.barrier(cmd,cur.image,post.range(0),.shader_read_only_optimal,.transfer_src_optimal,.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true},.{.copy=true},.{.transfer_read=true});
+    cmd.copyImageToBuffer(cur.image,.transfer_src_optimal,buf,&.{.{
+      .buffer_offset=0,.buffer_row_length=0,.buffer_image_height=0,
+      .image_subresource=.{.aspect_mask=.{.color=true},.mip_level=0,.base_array_layer=0,.layer_count=1},
+      .image_offset=.{.x=@intCast(t[0]),.y=@intCast(t[1]),.z=0},
+      .image_extent=.{.width=1,.height=1,.depth=1},
+    }});
+    sw.barrier(cmd,cur.image,post.range(0),.transfer_src_optimal,.shader_read_only_optimal,.{.copy=true},.{.transfer_read=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
+    // the copy made visible to the host once the frame's fence is signalled
+    const done=[_]vk.MemoryBarrier2{.{.src_stage_mask=.{.copy=true},.src_access_mask=.{.transfer_write=true},.dst_stage_mask=.{.host=true},.dst_access_mask=.{.host_read=true}}};
+    cmd.pipelineBarrier2(&.{.memory_barrier_count=done.len,.p_memory_barriers=&done});
+  }
+  /// one field texel's four half floats, as `probe` copies them out
+  pub const texelBytes=8;
+  /// the four channels of a texel `probe` copied out
+  pub fn texelOf(bytes:*const[texelBytes]u8)m.Vec(f32,4){
+    // the texel's four half floats
+    const h:[4]f16=@bitCast(bytes.*);
+    return.{h[0],h[1],h[2],h[3]};
   }
   /// after the world: its depth `depth` handed to the shaders, and the
   /// volume passes' scope opened, the volume cleared to clear air (nothing

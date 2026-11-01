@@ -36,7 +36,7 @@ const pipeline=@import("../gfx/pipeline.zig");
 const postMod=@import("post.zig");
 /// light that moves: shadow cascades and points of light
 const light=@import("light.zig");
-/// the air: the overhead map, the volume and its composite
+/// the air: the overhead map, the field, the volume and its composite
 const Volume=@import("volume.zig").Volume;
 /// the post chain: the world's HDR image, its glow and the smoothing
 const Post=postMod.Post;
@@ -248,6 +248,11 @@ pub fn Renderer(comptime G:type)type{
       stage:[stamps]u32=undefined,
       /// buffers retired while this frame was in flight; freed when it comes round again.
       garbage:std.ArrayList(Buffer)=.empty,
+      /// where the field's texel under the scene's `probe` is copied out
+      /// to, and whether this frame copied one
+      probe:Buffer=.{},
+      /// (whether it copied one)
+      probing:bool=false,
     };
     /// the allocator the renderer and its lists are made with
     gpa:Allocator,
@@ -289,6 +294,10 @@ pub fn Renderer(comptime G:type)type{
     gpuMs:[stageCount]f32=@splat(0),
     /// the GPU's time for the whole frame (ms, eased)
     gpuTotal:f32=0,
+    /// the field (volume.zig) under the point the scene last asked after
+    /// (its optional `probe`, world x and z), as the GPU had it a frame or
+    /// two ago: null until one comes back
+    probed:?m.Vec(f32,4)=null,
     /// the game's own state (see `G.Ext`)
     ext:G.Ext,
     /// `aa` falls back to the most samples the GPU offers (see `antialias`)
@@ -322,6 +331,7 @@ pub fn Renderer(comptime G:type)type{
       r.volume=try Volume.init(c,r.sc.extent.width,r.sc.extent.height,r.sc.depthView);
       for(&r.frames)|*f|{
         f.lighting=try Buffer.init(c,@sizeOf(light.Lighting),.{.storage_buffer=true,.shader_device_address=true});
+        f.probe=try Buffer.init(c,Volume.texelBytes,.{.transfer_dst=true});
         f.pool=try c.device.createCommandPool(&.{.flags=.{.reset_command_buffer=true},.queue_family_index=c.family},null);
         f.fence=try c.device.createFence(&.{.flags=.{.signaled=true}},null);
         f.acquired=try c.device.createSemaphore(&.{},null);
@@ -427,6 +437,7 @@ pub fn Renderer(comptime G:type)type{
           if(comptime reg.has(id,"Frame"))reg.module(id).deinitFrame(&@field(f.pass,@tagName(id)),c);
         }
         f.lighting.deinit(c);
+        f.probe.deinit(c);
         c.device.destroyQueryPool(f.queries,null);
         c.device.destroySemaphore(f.acquired,null);
         c.device.destroyFence(f.fence,null);
@@ -505,6 +516,10 @@ pub fn Renderer(comptime G:type)type{
       try f.garbage.appendSlice(r.gpa,r.pending.items);
       r.pending.clearRetainingCapacity();
       r.readTimes(f);
+      if(f.probing){
+        r.probed=Volume.texelOf(f.probe.map[0..Volume.texelBytes]);
+        f.probing=false;
+      }
       if(resized){try r.recreate();return;}
       // the acquired swapchain image
       const acq=c.device.acquireNextImageKHR(r.sc.handle,m.maxInt(u64),f.acquired,.null_handle)catch|e|switch(e){
@@ -556,6 +571,10 @@ pub fn Renderer(comptime G:type)type{
         cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set,r.volume.readSet()},null);
         r.record(f,cmd,.field,&sc,&stats);
         r.volume.endField(cmd);
+        if(comptime @hasField(Scene,"probe"))if(scene.probe)|at|{
+          r.volume.probe(cmd,at,f.probe.buf);
+          f.probing=true;
+        };
       }
       r.beginWorld(cmd,scene.clear);
       r.record(f,cmd,.world,&sc,&stats);

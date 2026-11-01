@@ -250,6 +250,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     .lights=g.parts.lights.items,
     .moisture=g.parts.moisture.items,
     .step=g.moved,
+    .probe=if(g.hover)|h|.{m.f(h[0])+0.5,m.f(h[1])+0.5}else null,
     .ui=g.ui.v.items,
     .uiTime=@floatCast(@mod(g.uiTime,timeWrap)),
   };

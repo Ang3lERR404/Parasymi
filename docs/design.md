@@ -206,9 +206,10 @@ plant.
   round its foot and a cloud over its crown, more the further along its
   life (up to 1.6× a real tree's). The moisture is a field on the GPU
   (`passes/moisture.zig`) that drifts on the wind, spreads and dries; the
-  fog draws it. It does nothing yet: the weather begins here. It draws on
-  nothing, so it can never run the ground dry. Still to come: reading the
-  air's moisture on hover, and its roots drinking the ground's water.
+  fog draws it. Hovering any tile reads the air over it (`AIR MIST x CLOUD
+  y`, read back from the GPU: the engine's `probe`). It does nothing yet:
+  the weather begins here. It draws on nothing, so it can never run the
+  ground dry. Still to come: its roots drinking the ground's water.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined

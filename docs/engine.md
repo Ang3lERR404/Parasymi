@@ -128,7 +128,9 @@ A pass's `.target` is where it draws, in this order each frame:
   as the overhead map (a texel a unit, wrapping). Every frame its passes
   write the next step whole from the last, which they read through set 1
   (`volume.glsl` `field_map`); two images take turns. Every later pass reads
-  the new step. Skipped when no pass draws into it;
+  the new step. Skipped when no pass draws into it. A scene with a
+  `probe` (world x, z) has the field's texel there copied back to the CPU:
+  `Renderer.probed`, a frame or two old;
 - `world`: the HDR image;
 - `volume`: the air, at half size, reading the world's depth, the
   overhead map and the field (set 1, `volume.glsl`); rgb what the air sends to the eye, a
