@@ -150,6 +150,13 @@ A pass's `.target` is where it draws, in this order each frame:
 Parasymi's is `mg.gen` (`src/gfx/meshgen.zig`). Every mesh is built in its
 `Builder`. A sculpt meshes into it with `s.mesh(mg.gen, b, h, t, part)`.
 
+A builder makes a triangle soup (three vertices a triangle).
+`engine.gfx.weld.weld` turns runs of it into indexed meshes: corners that
+are the same vertex bit for bit are drawn from one, triangles keep their
+order, and runs given one group (growth keys) share their indices and
+line up vertex for vertex. Draw a `weld.Run` with
+`drawIndexed(count, …, first, base, …)`.
+
 ### Growth splines
 `engine.gfx.growth.Grower(M, leaf)`:
 - `M` is the mesher;

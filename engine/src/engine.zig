@@ -67,6 +67,8 @@ pub const gfx=struct{
   pub const vertex=@import("gfx/vertex.zig");
   /// the mesh builder and its primitives
   pub const meshgen=@import("gfx/meshgen.zig");
+  /// a triangle soup welded into an indexed mesh, drawn exactly the same
+  pub const weld=@import("gfx/weld.zig");
   /// SDF sculpting: forms melted into one surface
   pub const sculpt=@import("gfx/sculpt.zig");
   /// growth splines: how grown things unfurl over time
@@ -132,6 +134,7 @@ test{
   _=anim.rig;
   _=anim.clip;
   _=gfx.meshgen;
+  _=gfx.weld;
   _=gfx.sculpt;
   _=gfx.growth;
   _=world.chunk;

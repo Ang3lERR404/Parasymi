@@ -29,6 +29,10 @@ const jobs=engine.core.jobs;
 const Buffer=engine.gfx.buffer.Buffer;
 /// the Vulkan bindings
 const vk=engine.vk;
+/// the grown triangle soups welded into indexed meshes, drawn the same
+const weld=engine.gfx.weld;
+/// one mesh's welded run: its indices and where its vertices begin
+pub const Run=weld.Run;
 /// the engine's frame orchestration, given the garden below
 const er=engine.render.renderer;
 /// the garden's vertex and instance layouts
@@ -257,13 +261,20 @@ pub const Ext=struct{
   skins:Buffer=.{},
   /// beside `meshes`: where each vertex grows out of (`vertex.Grow`)
   grows:Buffer=.{},
-  /// (first vertex, count) per plant slot; slots a species does not use are empty
-  plantRanges:[plantMeshes]m.Vice(u32,2)=@splat(.{0,0}),
+  /// every mesh's triangles as indices into `meshes`, each run counting
+  /// from its own first vertex (`Run.base`): a vertex shared by many
+  /// triangles is shaded once
+  indices:Buffer=.{},
+  /// how many indices of `indices` simply count up from 0 (a tool's
+  /// meshes, drawn unwelded; 0 while they are welded)
+  identity:usize=0,
+  /// each plant slot's welded run; slots a species does not use are empty
+  plantRuns:[plantMeshes]Run=@splat(.{}),
   /// per plant slot, the byte offset from its mesh to the next growth key's
   /// (the plant shader blends toward it); 0 where a species has no keys
   plantMorph:[plantMeshes]u64=@splat(0),
-  /// (first vertex, count) per part slot
-  partRanges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0}),
+  /// each part slot's welded run
+  partRuns:[meshlib.slots]Run=@splat(.{}),
   /// per part slot, the byte offset from its mesh to its next key's (the
   /// part shader blends toward it); 0 where it has none
   partMorph:[meshlib.slots]u64=@splat(0),
@@ -308,6 +319,9 @@ const Growing=struct{
   partMorph:[meshlib.slots]u64=@splat(0),
   /// per part slot: whether any of it can be see-through
   partGlassy:[meshlib.slots]bool=@splat(false),
+  /// every grown mesh welded (in the arena): what is uploaded; its runs
+  /// are each plant slot's, then each part slot's
+  welded:weld.Welded=.{},
   /// `--plant`/`--structure`: those meshes alone; every other range stays
   /// empty, so draws of it draw nothing
   only:?Only=null,
@@ -348,7 +362,6 @@ const Growing=struct{
         const a=g.plantRanges[meshgen.plantSlot(id,@intCast(v),lod)];
         const z=g.plantRanges[meshgen.plantSlot(id,@intCast(v+1),lod)];
         if(a[1]!=z[1])@panic("growth keys differ in vertex count");
-        g.plantMorph[meshgen.plantSlot(id,@intCast(v),lod)]=@as(u64,z[0]-a[0])*@sizeOf(vertex.Mesh);
       };
       _=g.done.fetchAdd(1,.monotonic);
     };
@@ -368,11 +381,59 @@ const Growing=struct{
       if(z[1]==0)continue;
       if(a[1]!=z[1])@panic("part keys differ in vertex count");
       if(z[0]<a[0])@panic("a part's next key is built before it");
-      g.partMorph[meshlib.slot(id,@intCast(l))]=@as(u64,z[0]-a[0])*@sizeOf(vertex.Mesh);
     };
-    glassy(b.v.items,&g.partRanges,&g.partGlassy);
     _=try b.skinOf(b.v.items.len);
     _=try b.growOf(b.v.items.len);
+    try g.weldAll(shown);
+  }
+  /// weld every grown mesh, each chain of keys together, and find each
+  /// key's offset to the next and which parts can be see-through
+  fn weldAll(g:*Growing,shown:[]const meshlib.Id)Allocator.Error!void{
+    // the builder holding every grown vertex, and its arena
+    const b=&g.b;
+    const gpa=g.arena.allocator();
+    // every run: each plant slot's, then each part slot's
+    const ranges=g.plantRanges++g.partRanges;
+    // the group each run welds in: its own, or its chain of keys' first
+    var groups:[ranges.len]u32=undefined;
+    for(&groups,0..)|*gr,i|gr.*=@intCast(i);
+    for(species.ids)|id|if(meshgen.growthKey(id,0)!=null)for(0..meshgen.lods)|l|{
+      // the first key's slot, which every later key welds with
+      const first=meshgen.plantSlot(id,0,@intCast(l));
+      for(1..meshgen.variants(id))|v|groups[meshgen.plantSlot(id,@intCast(v),@intCast(l))]=@intCast(first);
+    };
+    // part chains, each key put with its next's group (a chain is built
+    // in order, so following each key to the end joins it whole)
+    for(shown)|id|if(meshlib.next(id))|nx|for(0..meshgen.lods)|l|{
+      // this key's run and the next one's, among all the runs
+      const a=plantMeshes+meshlib.slot(id,@intCast(l));
+      const z=plantMeshes+meshlib.slot(nx,@intCast(l));
+      if(ranges[z][1]==0)continue;
+      // every run of a's group joins z's
+      const from=groups[a];
+      const into=groups[z];
+      for(&groups)|*gr|if(gr.*==from){gr.*=into;};
+    };
+    g.welded=try weld.weld(gpa,.{.v=b.v.items,.skin=b.skin.items,.grow=b.grow.items},&ranges,&groups);
+    // each plant slot's run, then each part slot's
+    const runs=g.welded.runs;
+    for(species.ids)|id|if(meshgen.growthKey(id,0)!=null)for(0..meshgen.lods)|l|for(0..meshgen.variants(id)-1)|v|{
+      // this key's slot and the next one's
+      const a=meshgen.plantSlot(id,@intCast(v),@intCast(l));
+      const z=meshgen.plantSlot(id,@intCast(v+1),@intCast(l));
+      g.plantMorph[a]=@as(u64,runs[z].base-runs[a].base)*@sizeOf(vertex.Mesh);
+    };
+    for(shown)|id|if(meshlib.next(id))|nx|for(0..meshgen.lods)|l|{
+      // this key's run and the next one's
+      const a=meshlib.slot(id,@intCast(l));
+      const z=meshlib.slot(nx,@intCast(l));
+      if(ranges[plantMeshes+z][1]==0)continue;
+      g.partMorph[a]=@as(u64,runs[plantMeshes+z].base-runs[plantMeshes+a].base)*@sizeOf(vertex.Mesh);
+    };
+    // each part slot's own vertices, to look for what can be see-through
+    var own:[meshlib.slots]m.Vice(u32,2)=undefined;
+    for(&own,runs[plantMeshes..])|*o,r|o.*=.{r.base,r.verts};
+    glassy(g.welded.v.items,&own,&g.partGlassy);
   }
   /// wait for the growing task (asked to stop early) and free what it built
   fn end(g:*Growing,gpa:Allocator)void{
@@ -419,6 +480,7 @@ pub fn release(r:*Renderer)void{
   x.meshes.deinit(c);
   x.skins.deinit(c);
   x.grows.deinit(c);
+  x.indices.deinit(c);
 }
 /// how many of the meshes' units are grown, of how many
 pub fn meshProgress(r:*const Renderer)m.Vice(u32,2){
@@ -441,17 +503,20 @@ pub fn meshesReady(r:*Renderer)Error!bool{
     x.growing=null;
   }
   if(g.failed)return error.OutOfMemory;
-  // the builder holding every grown vertex
-  const b=&g.b;
-  x.plantRanges=g.plantRanges;
+  // every grown mesh, welded
+  const w=&g.welded;
+  x.plantRuns=w.runs[0..plantMeshes].*;
   x.plantMorph=g.plantMorph;
-  x.partRanges=g.partRanges;
+  x.partRuns=w.runs[plantMeshes..][0..meshlib.slots].*;
   x.partMorph=g.partMorph;
   x.partGlassy=g.partGlassy;
   // read by every plant and part draw, every frame: in device memory
-  x.meshes=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(b.v.items));
-  x.skins=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(b.skin.items));
-  x.grows=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(b.grow.items));
+  x.meshes=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(w.v.items));
+  x.skins=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(w.skin.items));
+  x.grows=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(w.grow.items));
+  x.indices=try Buffer.initWith(&r.ctx,.{.index_buffer=true},sliceAsBytes(w.indices.items));
+  x.identity=0;
+  std.log.info("meshes welded: {d} corners drawn from {d} vertices",.{w.indices.items.len,w.v.items.len});
   return true;
 }
 /// per part slot: whether any of its run of `verts` can be see-through
@@ -474,11 +539,11 @@ fn glassy(verts:[]const vertex.Mesh,ranges:*const[meshlib.slots]m.Vice(u32,2),ou
 pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots]m.Vice(u32,2),kept:usize)Error!void{
   // what the garden keeps
   const x=&r.ext;
-  x.plantRanges=@splat(.{0,0});
+  x.plantRuns=@splat(.{});
   x.plantMorph=@splat(0);
   x.partMorph=@splat(0);
   if(b.v.items.len==0){
-    x.partRanges=@splat(.{0,0});
+    x.partRuns=@splat(.{});
     x.partGlassy=@splat(false);
     return;
   }
@@ -486,8 +551,20 @@ pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots]m.Vice(u32,
   const n=b.v.items.len;
   _=try b.skinOf(n);
   _=try b.growOf(n);
-  x.partRanges=ranges;
-  glassy(b.v.items,&x.partRanges,&x.partGlassy);
+  // unwelded: each run's indices count up through its own vertices
+  for(&x.partRuns,ranges)|*run,rg|run.*=.{.first=rg[0],.count=rg[1],.base=0,.verts=rg[0]+rg[1]};
+  glassy(b.v.items,&ranges,&x.partGlassy);
+  if(x.identity<n){
+    // indices counting up from 0, with room to spare
+    const room=n+n/toolRoom;
+    const count=try r.gpa.alloc(u32,room);
+    defer r.gpa.free(count);
+    for(count,0..)|*c,i|c.*=@intCast(i);
+    try r.retire(x.indices);
+    x.indices=.{};
+    x.indices=try Buffer.initWith(&r.ctx,.{.index_buffer=true},sliceAsBytes(count));
+    x.identity=room;
+  }
   // the first vertex not already in the buffers as the tool last put it
   const from=@min(kept,x.toolVerts);
   x.toolVerts=n;

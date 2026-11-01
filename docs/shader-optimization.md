@@ -392,6 +392,29 @@ What it says:
    glowing role (a per-mesh flag, as `partGlassy`) skips the rest's vertex
    work entirely. Same picture.
 
+### Applied: indexed meshes (2026-11-01)
+Every grown mesh is welded once grown (`engine.gfx.weld`, called from the
+renderer's `Growing.weldAll`) and drawn with `drawIndexed`. Triangle order
+and corner order are kept, so blending and flat values come out as
+before; growth-key chains weld together so morphing still lines up. The
+tools' meshes (`setParts`) are drawn through indices that just count up.
+- 54.6M corners now draw from 27.7M vertices. Smooth meshes share ~5x
+  (nebularbor, wolf, plants); the constellate's faceted fragments ~2x.
+- GPU ms, same runs as the table above:
+
+| scene | before | after | plants | parts | plantsGlass | partsGlass | partsAir | shadows |
+|---|---|---|---|---|---|---|---|---|
+| demo msaa8 | 38.4 | 25.9 | 11.8 | 4.7 | 2.8 | 1.0 | 0.8 | 0.4 |
+| stress msaa8 | 52.5 | 21.6 | 8.0 | 0.6 | 6.6 | 0.2 | 0.1 | 2.3 |
+
+- What leads now: demo's plant fragment shader at msaa8 (method 6), then
+  the stress glass pass (method 2).
+- Memory: the vertex buffers are still large (27.7M vertices × 128
+  bytes with skin and growth beside each, ~3.5 GB). Most vertices are
+  unskinned yet carry 56 bytes of skin; keeping skins only for skinned
+  meshes (or packing normals and weights) would cut it a lot with the
+  same picture.
+
 Not art-safe (ask before): lower `min_sample_shading`, coarser LOD
 distances, cached far-cascade shadows (the sway would lag), impostors for
 far plants.

@@ -92,12 +92,15 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*ren
   cmd.bindPipeline(.graphics,r.pipe(p));
   cmd.pushConstants(r.layout(.world),pass.stages,0,@sizeOf(renderer.WorldPush),&f.push);
   cmd.bindVertexBuffers(0,&.{r.ext.meshes.buf,f.inst.buf,r.ext.skins.buf,r.ext.grows.buf},&.{0,0,0,0});
+  cmd.bindIndexBuffer(r.ext.indices.buf,0,.uint32);
   for(0..meshlib.slots)|i|{
     if(f.counts[i]==0 or ((p==.partsGlass or p==.partsAir) and !r.ext.partGlassy[i]))continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.partsShadow)renderer.caster(i)else i;
+    // its welded run
+    const run=r.ext.partRuns[mesh];
     cmd.bindVertexBuffers(4,&.{r.ext.meshes.buf},&.{r.ext.partMorph[mesh]});
-    cmd.draw(r.ext.partRanges[mesh][1],f.counts[i],r.ext.partRanges[mesh][0],f.first[i]);
+    cmd.drawIndexed(run.count,f.counts[i],run.first,@intCast(run.base),f.first[i]);
     stats.draws+=1;
   }
 }

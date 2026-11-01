@@ -45,6 +45,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sculpt.zig` — sculpting one seamless surface out of many forms: each form (an ellipsoid, a rounded cone, a rounded box, a tube through points) is a…
 - `swapchain.zig` — swapchain + matching depth buffer.
 - `vertex.zig` — the GPU layouts the engine itself defines: built meshes (with skin and growth records beside them), UI quads and points of light.
+- `weld.zig` — welding a triangle soup into an indexed mesh: a corner that is the very same vertex as one before it (position, normal, colour, tu, role…
 
 ## engine/src/platform/
 - `audio.zig` — sound out: the default WASAPI device pulling blocks from a `dsp` source.

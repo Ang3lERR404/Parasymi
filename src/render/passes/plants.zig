@@ -61,12 +61,15 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,scene:*con
   cmd.bindPipeline(.graphics,r.pipe(p));
   cmd.pushConstants(r.layout(.world),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
   cmd.bindVertexBuffers(0,&.{r.ext.meshes.buf,f.inst.buf},&.{0,0});
+  cmd.bindIndexBuffer(r.ext.indices.buf,0,.uint32);
   for(0..renderer.plantMeshes)|i|{
     if(f.counts[i]==0)continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.plantsShadow)renderer.caster(i)else i;
+    // its welded run
+    const run=r.ext.plantRuns[mesh];
     cmd.bindVertexBuffers(2,&.{r.ext.meshes.buf},&.{r.ext.plantMorph[mesh]});
-    cmd.draw(r.ext.plantRanges[mesh][1],f.counts[i],r.ext.plantRanges[mesh][0],f.first[i]);
+    cmd.drawIndexed(run.count,f.counts[i],run.first,@intCast(run.base),f.first[i]);
     stats.draws+=1;
   }
 }

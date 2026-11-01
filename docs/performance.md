@@ -20,7 +20,8 @@ queries time each pass (`Renderer.gpuMs`); F3 shows the total.
 That was 2026-10-25. By 2026-11-01 the richer garden had grown it to
 demo 22.2 (off) / 38.4 (msaa8) and stress 52.5 (msaa8): the vertex
 stage of triangle-soup meshes, run three times per plant (solid, glass,
-shadow). The breakdown and the methods ranked are in
+shadow). Welding the meshes into indexed ones brought it to demo 25.9 /
+stress 21.6 (msaa8). The breakdown and the methods ranked are in
 [shader-optimization.md](shader-optimization.md#round-two-2026-11-01-the-vertices-are-the-cost-now).
 
 Memory:
