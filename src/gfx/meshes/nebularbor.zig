@@ -75,7 +75,7 @@ fn limb(b:*mg.Builder,k:*growth.Skeleton,parent:growth.Id,u:f32,c:[]const V3,s:p
   // scratch for the weave's points and cross-sections
   var sp:[growth.res]V3=undefined;
   var sec:[growth.res]pk.Section=undefined;
-  try kit.weaveOn(b,k,id,s,.{.seed=seed},0.5,0.85,&sp,&sec);
+  try kit.weaveOn(b,k,id,s,.{.form=.limb,.seed=seed},0.5,0.85,&sp,&sec);
   return id;
 }
 /// a slender bough off `parent` at `u`, through `c`, tapering to a point:

@@ -1,6 +1,6 @@
 # convergence_kit
 
-`src/gfx/meshes/convergence_kit.zig` (629 lines). Imports: `meshgen` (`mg`),
+`src/gfx/meshes/convergence_kit.zig` (955 lines). Imports: `meshgen` (`mg`),
 `parasiteKit` (`pk`), `palette` (`pal`), `growth`, `vertex`, `sim/species`,
 `core/math`, `core/color`, `core/rng`.
 
@@ -13,15 +13,23 @@ It is shared by:
 - the confluence (a plant, grown through keys);
 - the convergent structures (on growth splines, the `*On` pieces).
 
-It is not one laid over the other (a braid below, a cage above). The two
-are **woven through each other at every scale**, so neither is ever seen
-alone:
+It is not one laid over the other. The two are **grown into each other**,
+so neither is ever seen alone:
 
-- **Stalk** (`weave`): the parasites' lattice, with every other strand a
-  symbiote's. Green strands run one way, each wandering a little; pale
-  strands run the other way, exact. Where it parts into a cage they cross
-  and **fuse into a violet knot**, neither one's colour. The shared core
-  is banded with both saps.
+- **Stalk** (`weave`), a blend the gardener chose of two looks (grafted
+  stems, a soft body):
+  - out of the soil rise **two stems**: a symbiote's green braided one,
+    wandering, carrying leaves on their own stalks; and a parasite's pale
+    smooth one, swelling at its exact nodes (its own skin thickening and
+    paling to pearl, lilac at the middle, never a ring stuck on);
+  - they wind round each other, apart between their grafts and touching
+    at each; wherever they touch they are **grown together in one smooth
+    callus** (green on the green side, pale on the pale, a violet seam
+    wandering between, lit lilac along its middle);
+  - at `fuse` they become **one soft see-through body** as wide as the
+    stalk's cage: two skins (pale flushed violet, warmed amber at the
+    foot), green strands and amber lanes winding up inside, a pale vein
+    up the middle, five pale ribs exact on the skin.
 - **Sap** (`sac`): amber and pale blue swirling round each other in arms,
   violet where they mingle; never stirred smooth.
 - **Counts**: the parasites' exact fives (`fold`), turned evenly and grown
@@ -31,12 +39,11 @@ alone:
     tightly rolled tip);
   - a **bloom** of a pale frondlet calyx holding warm living petals with
     stamens.
-- **Foot**: rooted both ways. A pale bulb with five exact pale roots, and
-  a green braided symbiote root between each two.
+- **Foot**: rooted both ways, **no bulb**. The stems flare gently into
+  the soil; from under them leave five exact pale roots, and a green
+  braided symbiote root between each two.
 
-Cage strands carry how far they've parted in tu.y, as the parasites' do.
-
-The driftbraid's look is the approved reference for this kit.
+The driftbraid's look is the reference for this kit.
 
 ## Colours
 
@@ -44,10 +51,10 @@ The driftbraid's look is the approved reference for this kit.
 |---|---|---|
 | `green`, `leafDark`, `leafLite`, `amber` | `pal.vine`, `pal.leafDark`/`pal.leafLite`, `pal.sap` | the symbiotes' half |
 | `pale`, `pearl`, `lilac`, `blue` | `pk.skin`, `pk.pearl`, `pk.lilac`, `pk.sac` | the parasites' half |
-| `violet` | rgb(0.58, 0.36, 0.9) | where they meet |
-| `knot` | rgb(0.8, 0.68, 0.98) | fused crossings |
+| `violet` | rgb(0.58, 0.36, 0.9) | where they meet: a callus's seam |
+| `knot` | rgb(0.8, 0.68, 0.98) | the lilac light along a seam |
+| `tissueLow` → `tissue` | warm amber → violet | the body's skin, foot to crown (`Weave.skin` overrides) |
 | `petalBase` → `petalTip` | warm orange → violet | living petals |
-| (private) `coreSym` / `corePar` | `pal.sapwoodDark` / `pk.core` | banded core |
 | `fold` | `pk.fold` (5) | counts |
 
 ## API
@@ -56,8 +63,9 @@ The driftbraid's look is the approved reference for this kit.
 
 | Item | Purpose |
 |---|---|
-| `Weave{n = fold, twist = pk.twist, sides = 4, wobble = 0.08, knot = 1.55, knotFrom = 0.3, bands = 5, seed, part = .stem}` | options: green strands wander by `wobble` (`mg.strandTurn`/`strandSwell`), pale never; `knot` size × strand radius where parted ≥ `knotFrom`; `bands` of sap up the core |
-| `weave(b, spine, ts, sec, w)` | core (banded `coreSym`↔`corePar`) + `n` green strands one way, `n` pale the other, paling where parted (green→`leafLite`, pale→`pearl`); strand tu.y = `pk.parting`; knots where pale strand j meets green j−k. **Knots dropped at coarsest LOD.** |
+| `Form` | `rooted` (out of the soil: stems, then the body), `limb` (off another weave: the body alone), `stems` (the stems the whole way, fused at the end into what they meet) |
+| `Weave{form = .rooted, fuse = 0.38, leaves = 5, seed, skin = {tissueLow, tissue}}` | what it grows as, how far along the stems fuse into the body, leaves on the green stem, the body's skin colours (the confluence passes paler: a plant's glass draws them stronger) |
+| `weave(b, spine, ts, sec, w)` | the stems and/or body along `spine`. Stems: as thick as half the stalk woven shut (its foot flare capped at 1.4× so it never reads as a bulb), grafts at 0.25, 0.75 and fused at 0.97 of their climb, each callus no longer than a share of the climb. Body: as wide as the stalk's cage (`open + strand`), rising thin out of the fusing callus |
 | `sections(stalk, out)` | fill `out` with `pk.section` along it |
 | `weaveOn(b, k, id, stalk, w, t0, t1, sp, sec)` | a weave along spline `id`, `k.along`-tagged; writes back the path and sections so callers can place what rides inside (sacs) |
 
@@ -87,9 +95,9 @@ The driftbraid's look is the approved reference for this kit.
 
 | Item | Purpose |
 |---|---|
-| `Foot{at, r, reach, rootR, t = 0, seed}` | bulb radius, root reach, root radius |
-| `foot(b, f)` | plain: `pk.nodule` bulb, `fold` pale exact roots + `fold` green braided roots between (each its own) |
-| `footOn(b, k, id, f)` | the same on spline `id`: bulb swells out of its start (30% of its time), every root a branch `.after = .with` |
+| `Foot{at, r, reach, rootR, t = 0, seed}` | root crown width (roots leave `crownOut` = 0.3 of it out), root reach, root radius |
+| `foot(b, f)` | plain: no bulb; `fold` pale exact roots + `fold` green braided roots between (each its own) |
+| `footOn(b, k, id, f)` | the same on spline `id`, every root a branch `.after = .with` |
 | `rootPath(at, a, from, reach, wobble, seed, c)` | a root from the bulb toward bearing `a`, low over the ground then down |
 | `taper(b, p, r, tip, t0, t1, col, part, sides)` | a tapering tube along `p`, never thinner than 2e-4 (keeps caps) |
 
@@ -121,16 +129,21 @@ blending requires.
 | `meshgen.zig` (form `.confluence`) | `confluence` — species `confluence` |
 | `weftstone.zig` | `sac`, `taper`, palette (`knot`, `pale`, `green`), `fold` |
 | `driftbraid.zig` (approved reference look) | `weaveOn`, `footOn`, `bloom`, `sac`, palette, `fold` |
-| `monfris.zig` | `weave`, `weaveOn`, `sections`, `bloom`, `sac`, `rootPath`, palette |
+| `monfris.zig` | `weave` (`.limb`), `weaveOn` (corners `.stems`), `sections`, `bloom`, `sac`, `rootPath`, palette |
 | `vultrixi.zig` | `sac`, palette (`petalBase`/`petalTip`, `pale`, `pearl`), `fold` |
+| `nebularbor.zig` | `weaveOn` (trunk rooted, limbs `.limb`), `footOn`, `bloom`, `sac` |
+| `polyp_convergent.zig` | `weaveOn`, `footOn`, `frondOn`, `bloom`, `sac` |
+| `arsthraxia_convergent.zig` | `weaveOn` (`.stems`), `footOn`, `frondOn`, `bloom`, `sac` |
+| `root_well.zig`, `tanglehold.zig` | `weaveOn` (`.stems`: a short foot under a basket), `footOn`, `sac` |
+| `storm_spire.zig` (samples) | `weaveOn`, `footOn`, `sac`, `taper` |
 
 ## GPU side
 
 - **Confluence**: 8 growth keys of one vertex layout, blended in plant.vert
   (binding 2, `FORMS_KEYED`); sway ×1.5; translucent violet petals.
-- **Cage strands**: tu.y = parting (as the parasites').
-- **Sacs**: part `.bloom`, `fade < 1`: see-through in the glass pass;
-  `sapGlisten`.
+- **Body and sacs**: part `.bloom`, `fade < 1` (the structure's `sap`):
+  see-through in the glass pass; `sapGlisten`. A plant's glass (the
+  confluence) draws the body's skin stronger, so it passes paler colours.
 - **Structure pieces**: `vertex.Grow` from `k.along`/`k.on`, grown in
   part.vert.
 
@@ -140,6 +153,11 @@ blending requires.
 - Exact fives for counts and layout. Symbiotic variation only in what each
   of the five carries (leaflets, petal sizes, green strand wander, green
   root lengths).
+- No root bulbs (`pk.nodule` at a foot): the gardener found them ugly.
+  Stems flare gently and roots leave from under them.
+- Stems out of the soil (`.rooted`, `.stems`); off another weave, the
+  body alone (`.limb`). A short stub under a basket is `.stems`, never a
+  squat body.
 - For the confluence: pass sizes, never counts, through `open`/`Grown`.
 - Check: `--plant=confluence --state=grow`,
   `--structure=weftstone|driftbraid|monfris|vultrixi --state=grow` (pairs

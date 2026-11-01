@@ -22,7 +22,7 @@ const engine=lib.engine;
 const m=engine.core.math;
 /// the mesh builder and its primitives
 const mg=lib.meshgen;
-/// colour conversions, for blending the root bulbs
+/// colour types, for the tether's strands
 const color=engine.core.color;
 /// the garden's growth timing: the skeleton the tree grows along
 const growth=lib.growth;
@@ -77,7 +77,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     kit.sections(trunkStalk,&sec);
     // where the weave's vertices begin
     const mk=b.mark();
-    try kit.weave(b,&sp,&ts,&sec,.{.seed=0x4EA1});
+    try kit.weave(b,&sp,&ts,&sec,.{.form=.limb,.seed=0x4EA1});
     try k.along(b,mk,trunk);
   }
   // where the sac's vertices begin
@@ -137,13 +137,10 @@ fn corner(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,i:usize)Allocator.Err
   // scratch for the weave's points and cross-sections
   var sp:[growth.res]V3=undefined;
   var sec:[growth.res]pk.Section=undefined;
-  try kit.weaveOn(b,k,id,cornerStalk,.{.seed=0x4EB0+%i*31},0,0.45,&sp,&sec);
+  try kit.weaveOn(b,k,id,cornerStalk,.{.form=.stems,.seed=0x4EB0+%i*31},0,0.45,&sp,&sec);
   // its roots, both ways, out of where it breaks the ground
+  // (no bulb: the corner's two stems flare into these roots)
   const u=k.nearest(id,foot);
-  // where the root bulb's vertices begin
-  const bulb=b.mark();
-  try pk.nodule(b,foot+v3(0,0.01,0),v3(0.09,0.045,0.09),0,kit.pale,color.mix(kit.pale,pk.core,0.4),kit.pearl);
-  try k.on(b,bulb,id,u,.{.from=foot});
   for(0..3)|j|{
     // this root's bearing, fanned round the corner's
     const ra=a0+(m.f(j)-1)*0.7;

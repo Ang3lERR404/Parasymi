@@ -1,14 +1,16 @@
 //! the lineages mixed: what grows where symbiote and parasite have become
 //! one body, shared by the confluence (a plant, grown through keys) and
 //! the convergent structures (grown on their growth splines, gfx/growth.zig:
-//! the `*On` pieces). Not one laid over the other (a braid below, a cage above) but
-//! woven through each other at every scale, so neither is ever seen alone:
-//! - a stalk (`weave`) is the parasites' lattice with every other strand a
-//!   symbiote's: green strands wound one way, each wandering a little off
-//!   its course as a living thing does, pale strands wound the other way,
-//!   exact; where it parts into a cage the two cross, and where they cross
-//!   they fuse into a violet knot, neither one's colour. The core they
-//!   share is banded with both saps;
+//! the `*On` pieces). Not one laid over the other but grown into each
+//! other, so neither is ever seen alone:
+//! - a stalk (`weave`) rises out of the soil as two stems, a symbiote's
+//!   green braided one, wandering and leafy, and a parasite's pale smooth
+//!   one swelling at its exact nodes; they wind round each other, are grown
+//!   together in a smooth callus wherever they touch (green one side, pale
+//!   the other, a violet seam between, neither one's colour) and fuse into
+//!   one soft see-through body: green strands and amber lanes winding up
+//!   inside it, a pale vein up its middle, five pale ribs exact on its
+//!   skin. A limb off another is the body alone (`Form`);
 //! - its sap (`sac`) is both at once, never stirred smooth: the
 //!   symbiotes' amber and the parasites' pale blue swirl round each other
 //!   in arms, violet where they mingle;
@@ -17,11 +19,10 @@
 //!   each a little different from the next: a frond of the lineage's
 //!   lilac bearing green leaflets (`frond`), a calyx of five pale
 //!   frondlets holding warm living petals (`bloom`);
-//! - it roots both ways (`foot`): a pale bulb half sunk in the soil, its
+//! - it roots both ways (`foot`), no bulb: under the stems' gentle flare,
 //!   five exact pale roots between the green braided roots of a symbiote.
-//! A cage's strands carry how far they have parted in tu.y, as the
-//! parasites' do. The confluence is grown through keys (sizes passed in,
-//! never counts, so every key keeps one vertex layout).
+//! The confluence is grown through keys (sizes passed in, never counts,
+//! so every key keeps one vertex layout).
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -81,140 +82,290 @@ pub const knot=color.rgb(0.8,0.68,0.98).toRgba8(255);
 pub const petalBase=color.rgb(0.96,0.56,0.24).toRgba8(255);
 /// the violet a living petal blushes toward at its tip
 pub const petalTip=color.rgb(0.76,0.44,0.98).toRgba8(255);
-/// the core they share, banded with both: the symbiotes' dark sapwood
-const coreSym=pal.sapwoodDark;
-/// the core's other band: the parasites' own core colour
-const corePar=pk.core;
 /// how many of everything: the parasites' count, exactly
 pub const fold=pk.fold;
 /// the most points a weave may have along it
 const max=m.maxSpline;
 // ---- the weave ----
-/// how a weave of both is wound: its strands, their twist and wander, its
-/// knots, its core's bands, and the part it is drawn as
-pub const Weave=struct{
-  /// strands each way: as many green as pale
-  n:u32=fold,
-  /// how far the strands wind round along the whole weave (radians)
-  twist:f32=pk.twist,
-  /// how many sides each strand's tube has
-  sides:u32=4,
-  /// how far a green strand wanders off its exact course (a pale one
-  /// never does)
-  wobble:f32=0.08,
-  /// a knot where two cross, a multiple of a strand's radius, only where
-  /// parted at least `knotFrom`
-  knot:f32=1.55,
-  /// how far parted (0..1) the cage must be before strands knot where they cross
-  knotFrom:f32=0.3,
-  /// bands of the two saps up the core
-  bands:f32=5,
-  /// the green strands' own seed, so each weave wanders its own way
-  seed:u64=0,
-  /// the part role the whole weave is drawn as
-  part:vertex.Part=.stem,
+/// what a weave of both grows as
+pub const Form=enum{
+  /// out of the soil: two stems, a symbiote's green braided one and a
+  /// parasite's pale smooth one, winding round each other, grown together
+  /// at their grafts and fused at `Weave.fuse` into one soft body
+  rooted,
+  /// off another weave: the soft body alone
+  limb,
+  /// the two stems the whole way, fused at its end into what it meets
+  stems,
 };
-/// a strand's angle round the weave `u` along it: the green (`way` 1)
-/// wandering a little, the pale (`way` -1) exact
-fn strandAngle(w:Weave,si:usize,way:f32,u:f32)f32{
-  // its exact angle: spaced evenly round, wound on with the twist
-  const a=m.ratio(si,w.n)*m.tau+way*w.twist*u;
-  return if(way>0)a+mg.strandTurn(w.seed+%si*mg.strandSalt,u,w.wobble)else a;
+/// how a weave of both grows: from the soil or off another, where its stems
+/// fuse into its body, how many leaves its green stem carries, its seed
+pub const Weave=struct{
+  /// what it grows as
+  form:Form=.rooted,
+  /// how far along it (0..1) the stems fuse into the body, when rooted
+  fuse:f32=0.38,
+  /// leaves on the green stem, each on its own stalk
+  leaves:u32=5,
+  /// its own seed, so each weave's green stem wanders and leafs its own way
+  seed:u64=0,
+  /// the body's skin at its foot and higher up (a plant's glass draws them
+  /// stronger, so the confluence passes paler)
+  skin:m.Vice(Rgba8,2)=.{tissueLow,tissue},
+};
+/// the soft body of both: the parasites' pale skin flushed with violet,
+/// see-through
+pub const tissue=color.rgb(0.66,0.46,0.95).toRgba8(255);
+/// the body's foot, warmed by the amber rising in it
+pub const tissueLow=color.rgb(0.92,0.6,0.38).toRgba8(255);
+/// where two stems have grown into each other: violet
+const scar=violet;
+/// how many points a stem or body is built of, fine, so its swellings are smooth
+const fine=48;
+/// a weave's section `u` along it (0..1), eased between its points
+fn sectionAt(sec:[]const Section,u:f32)Section{
+  // where it falls between the points, and how far between
+  const x=m.clamp01(u)*m.f(sec.len-1);
+  const lo=@min(m.floorTo(usize,x),sec.len-1);
+  const hi=@min(lo+1,sec.len-1);
+  const f=x-m.f(lo);
+  return.{
+    .core=m.lerp(sec[lo].core,sec[hi].core,f),.tight=m.lerp(sec[lo].tight,sec[hi].tight,f),
+    .open=m.lerp(sec[lo].open,sec[hi].open,f),.strand=m.lerp(sec[lo].strand,sec[hi].strand,f),
+  };
 }
-/// a strand's distance from the weave's axis where the cage is `open`: the
-/// green swelling a little as it wanders, the pale exactly `open`
-fn strandRadius(w:Weave,si:usize,way:f32,u:f32,open:f32)f32{
-  return if(way>0)open*mg.strandSwell(w.seed+%si*mg.strandSalt,u,w.wobble)else open;
+/// a value of `xs` `u` along them (0..1), eased between its points
+fn valueAt(xs:[]const f32,u:f32)f32{
+  const x=m.clamp01(u)*m.f(xs.len-1);
+  const lo=@min(m.floorTo(usize,x),xs.len-1);
+  const hi=@min(lo+1,xs.len-1);
+  return m.lerp(xs[lo],xs[hi],x-m.f(lo));
+}
+/// how far out a section reaches: its cage's outside
+fn outside(s:Section)f32{return s.open+s.strand;}
+/// the weave along `spine` (tu.x `ts`, cross-sections `sec` as a
+/// parasite's lattice, whose outside it fills): rooted, two stems grafted
+/// into one body; a limb, the body alone; or the stems the whole way
+pub fn weave(b:*mg.Builder,spine:[]const V3,ts:[]const f32,sec:[]const Section,w:Weave)Allocator.Error!void{
+  assert(spine.len>=2 and spine.len<=max and ts.len==spine.len and sec.len==spine.len);
+  switch(w.form){
+    .rooted=>{
+      try stems(b,spine,ts,sec,w.fuse,w);
+      try body(b,spine,ts,sec,w.fuse*0.9,.rising,w.skin);
+    },
+    .limb=>try body(b,spine,ts,sec,0,.flush,w.skin),
+    .stems=>try stems(b,spine,ts,sec,1,w),
+  }
+}
+/// where the green (`side` 1) or pale (`side` -1) stem lies off the
+/// middle `v` up their climb (0..1), `r` the reach there: opposite each
+/// other, winding loosely, apart most between the grafts, touching at
+/// each, close at the soil and meeting at the top; the green wandering a
+/// little, the pale exact. Returns its angle round and distance out.
+fn stemOff(side:f32,v:f32,r:f32,seed:u64)m.Vice(f32,2){
+  const a=0.4+(if(side>0)@as(f32,0)else m.pi)+2.1*v;
+  const s=@sin(m.pi*(2*v+0.5));
+  const sep=r*(0.22+0.78*s*s)*m.lerp(0.35,1,m.smooth(m.clamp01(v/0.12)))*(1-m.smooth(m.clamp01((v-0.86)/0.14)));
+  const wd:f32=if(side>0)r*0.09*@sin(v*9+m.f(seed%7))else 0;
+  return.{a,sep+wd};
+}
+/// where the stems have grown together (shares of their climb), before
+/// they fuse for good at its top
+const grafts=[_]f32{0.25,0.75,0.97};
+/// the two stems along the first `upTo` of `spine`, winding round it: the
+/// green braided, leafy; the pale smooth, swelling at its exact nodes; a
+/// callus wherever they have grown together. Each as thick as about half
+/// the stalk's reach there, so they flare into the soil as it does.
+fn stems(b:*mg.Builder,spine:[]const V3,ts:[]const f32,sec:[]const Section,upTo:f32,w:Weave)Allocator.Error!void{
+  // the stretch of the middle they climb, its tu.x and its reach, point by point
+  var mid:[fine]V3=undefined;
+  var tt:[fine]f32=undefined;
+  var reaches:[fine]f32=undefined;
+  for(&mid,&tt,&reaches,0..)|*p,*t,*r,i|{
+    const u=upTo*m.ratio(i,fine-1);
+    p.*=m.alongPath(spine,u);
+    t.*=valueAt(ts,u);
+    // how thick the stalk is woven shut there (its parting left out)
+    const s=sectionAt(sec,u);
+    r.*=s.tight+s.strand;
+  }
+  // decision: the stalk swells hard into the soil (a lattice's foot); two
+  // stems doing so read as a bulb, so theirs flare gently instead, a root
+  // flare under which the roots leave
+  {
+    const above=valueAt(&reaches,0.35);
+    for(&reaches,0..)|*r,i|r.*=@min(r.*,above*(1+0.4*(1-m.smooth(m.clamp01(m.ratio(i,fine-1)/0.12)))));
+  }
+  // a twist-free frame up it
+  var nv:[fine]V3=undefined;
+  var bv:[fine]V3=undefined;
+  mg.transport(&mid,&nv,&bv);
+  // each stem's course and radius
+  var gp:[fine]V3=undefined;
+  var pp:[fine]V3=undefined;
+  var rs:[fine]f32=undefined;
+  for(&gp,&pp,&rs,0..)|*g,*p,*r,i|{
+    const v=m.ratio(i,fine-1);
+    const go=stemOff(1,v,reaches[i]*1.1,w.seed);
+    const po=stemOff(-1,v,reaches[i]*1.1,w.seed);
+    g.*=round(mid[i],nv[i],bv[i],go[0],go[1]);
+    p.*=round(mid[i],nv[i],bv[i],po[0],po[1]);
+    r.*=reaches[i]*0.5;
+  }
+  // the green: braided, wandering
+  {
+    var gr:[fine]f32=undefined;
+    for(&gr,rs)|*q,r|q.*=r*1.05;
+    try mg.braid(b,&gp,&tt,&gr,4,2.4,pal.strandWobble*1.4,w.seed,pal.core,green);
+  }
+  // the pale: smooth, swelling at its exact nodes between the grafts, its
+  // own skin thickening and paling to pearl into each, lilac at the
+  // middle, and out again
+  {
+    var pr:[fine]f32=undefined;
+    var pc:[fine]Rgba8=undefined;
+    for(&pr,&pc,rs,0..)|*q,*c,r,i|{
+      const v=m.ratio(i,fine-1);
+      // how far into a node this point is (0 between, 1 at its middle)
+      var node:f32=0;
+      for([_]f32{0.12,0.45,0.58})|nu|node=@max(node,m.smooth(m.clamp01(1-@abs(v-nu)/0.045)));
+      q.*=r*(1+0.32*node);
+      c.*=color.mix(color.mix(pale,pearl,node),lilac,m.smooth(m.clamp01((node-0.75)/0.25))*0.6);
+    }
+    try b.tubeC(&pp,&tt,&pr,&pc,null,.stem,8);
+  }
+  // a callus wherever they have grown together, the last (where they fuse
+  // for good) the longest, none longer than a share of their climb
+  var climb:f32=0;
+  for(1..fine)|i|climb+=m.dist(mid[i],mid[i-1]);
+  for(grafts,0..)|v,j|{
+    const r=valueAt(&rs,v);
+    const g=m.alongPath(&gp,v);
+    const p=m.alongPath(&pp,v);
+    const last=j==grafts.len-1;
+    try graftUnion(b,.{
+      .at=m.lerpV(g,p,0.5)+(if(last)m.norm(m.alongPath(&mid,1)-m.alongPath(&mid,0.9))*m.splat3(r*1.1)else v3(0,0,0)),
+      .green=g,.pale=p,.r=r*(if(last)@as(f32,1.2)else 0.9),.h=@min(r*(if(last)@as(f32,4.3)else 2.9),climb*(if(last)@as(f32,0.16)else 0.12)),
+      .t=valueAt(&tt,v),.phase=m.f(j)*2.1+m.f(w.seed%5),
+    });
+  }
+  // the green stem's leaves, each on its own stalk, out from the middle
+  var rng=Rng.init(w.seed^0x1EAF);
+  for(0..w.leaves)|i|{
+    const v=m.lerp(0.18,0.9,(m.f(i)+rng.range(0.2,0.8))/m.f(@max(w.leaves,1)));
+    const at=m.alongPath(&gp,v);
+    const r=valueAt(&rs,v);
+    const c=m.alongPath(&mid,v);
+    const away=v3(at[0]-c[0],0,at[2]-c[2]);
+    const out=if(m.len(away)>1e-5)m.norm(away)else v3(1,0,0);
+    const len=@min(r*3.2,0.12);
+    try mg.natural(b,at+out*m.splat3(r*0.8),m.norm(out+v3(0,rng.range(0.2,0.6),0)),len,len*0.38,0.4,leafDark,leafLite,valueAt(&tt,v),.stalked);
+  }
+}
+/// where two stems have grown together, and how big the callus round it is
+const Union=struct{
+  /// its middle
+  at:V3,
+  /// the green stem's middle there
+  green:V3,
+  /// the pale stem's middle there
+  pale:V3,
+  /// how far it swells past the stems' middles, and how deep it is square to them
+  r:f32,
+  /// half its length up the stems
+  h:f32,
+  /// its growth tu.x
+  t:f32,
+  /// turns its seam's wander, so no two seams run alike
+  phase:f32,
+};
+/// a graft's union: one smooth callus round where the two stems have grown
+/// together, long up them and wide across the join, its ends sinking into
+/// both; green on the green stem's side, pale on the pale one's, and
+/// between them a violet seam wandering up it, lit lilac along its middle
+fn graftUnion(b:*mg.Builder,u:Union)Allocator.Error!void{
+  // the way across the join (flat, pale to green), square to it, and half the join's width
+  const d0=v3(u.green[0]-u.pale[0],0,u.green[2]-u.pale[2]);
+  const across=if(m.len(d0)>1e-4)m.norm(d0)else v3(1,0,0);
+  const side=m.cross(v3(0,1,0),across);
+  const half=m.len(d0)*0.5;
+  // built round the origin in its own frame, then turned onto the join
+  const mk=b.mark();
+  try mg.ellipsoid(b,.{.center=v3(0,0,0),.radii=v3(half+u.r,u.h,u.r*0.9),.col=scar,.part=.stem,.rings=14,.segs=18,.t=u.t});
+  for(b.v.items[mk..])|*vx|{
+    // its place and facing in its own frame
+    const q:V3=vx.pos;
+    const n:V3=vx.nrm;
+    vx.pos=u.at+across*m.splat3(q[0])+v3(0,q[1],0)+side*m.splat3(q[2]);
+    vx.nrm=across*m.splat3(n[0])+v3(0,n[1],0)+side*m.splat3(n[2]);
+    // how far to either side of the seam: -1 the pale's, 1 the green's,
+    // the seam wandering as it climbs
+    const s=q[0]/(half+u.r)+0.2*@sin(q[1]/u.h*4.2+u.phase)+0.08*@sin(q[2]/u.r*3+u.phase*2);
+    // how far into its own side, past the seam's width
+    const w=m.smooth(m.clamp01((@abs(s)-0.06)/0.3));
+    const seam=color.mix(knot,scar,m.smooth(m.clamp01(@abs(s)/0.06)));
+    vx.col=color.mix(seam,if(s>0)green else pale,w);
+  }
+}
+/// how a body begins: rising thin out of the callus its stems fuse in, or
+/// as full as the weave it grows off
+const Start=enum{
+  /// thin out of the fusing callus, swelling as it rises
+  rising,
+  /// full from its foot
+  flush,
+};
+/// the soft body along `spine` from `from` to its end, as full as the
+/// stalk's reach: two see-through skins, pale flushed violet, warmed amber
+/// at the foot; inside three green strands winding up, two amber lanes the
+/// other way and a pale vein up the middle; outside five pale ribs, exact
+fn body(b:*mg.Builder,spine:[]const V3,ts:[]const f32,sec:[]const Section,from:f32,start:Start,skin:m.Vice(Rgba8,2))Allocator.Error!void{
+  // its points, tu.x, radius and skin colour
+  var p:[fine]V3=undefined;
+  var tt:[fine]f32=undefined;
+  var rs:[fine]f32=undefined;
+  var cs:[fine]Rgba8=undefined;
+  for(&p,&tt,&rs,&cs,0..)|*q,*t,*r,*c,i|{
+    const v=m.ratio(i,fine-1);
+    const u=m.lerp(from,1,v);
+    q.*=m.alongPath(spine,u);
+    t.*=valueAt(ts,u);
+    r.*=@max(outside(sectionAt(sec,u)),sectionAt(sec,u).core*1.4)*(switch(start){.rising=>m.lerp(0.55,1,m.smooth(m.clamp01(v/0.14))),.flush=>1});
+    c.*=color.mix(skin[0],skin[1],m.smooth(m.clamp01(v*1.6)));
+  }
+  try b.tubeC(&p,&tt,&rs,&cs,null,.bloom,14);
+  // a second skin just inside the first, so the flesh reads as a body and
+  // not a pane: its rim doubled, its middle clouded
+  var inner:[fine]f32=undefined;
+  for(&inner,rs)|*q,r|q.*=r*0.88;
+  try b.tubeC(&p,&tt,&inner,&cs,null,.bloom,12);
+  // a twist-free frame up it
+  var nv:[fine]V3=undefined;
+  var bv:[fine]V3=undefined;
+  mg.transport(&p,&nv,&bv);
+  // one run of strands: how many, how far out and how thick (shares of
+  // the body's radius), how many turns, its colour, its turn at the foot
+  const Run=struct{n:usize,out:f32,turns:f32,r:f32,col:Rgba8,from:f32};
+  const runs=[_]Run{
+    .{.n=3,.out=0.5,.turns=1.6,.r=0.09,.col=green,.from=0},
+    .{.n=2,.out=0.3,.turns=-1.1,.r=0.07,.col=amber,.from=0.9},
+    .{.n=1,.out=0,.turns=0,.r=0.11,.col=color.mix(pale,lilac,0.5),.from=0},
+    .{.n=fold,.out=1.005,.turns=0,.r=0.042,.col=pale,.from=0.3},
+  };
+  for(runs)|run|for(0..run.n)|j|{
+    var q:[fine]V3=undefined;
+    var rr:[fine]f32=undefined;
+    for(&q,&rr,0..)|*x,*r,i|{
+      const v=m.ratio(i,fine-1);
+      const a=m.ratio(j,run.n)*m.tau+run.from+run.turns*m.tau*v+(if(run.n==3)0.15*@sin(v*8+m.f(j))else 0);
+      x.*=round(p[i],nv[i],bv[i],a,rs[i]*run.out);
+      r.*=rs[i]*run.r*(if(run.out>1)m.lerp(0.6,1.2,m.smooth(@sin(m.pi*v)))else 1);
+    }
+    try b.tubeR(&q,&tt,&rr,run.col,.stem,if(run.out>1)4 else 5);
+  };
 }
 /// the point `r` out from `at` at angle `a` round the frame `nv`, `bv`
 fn round(at:V3,nv:V3,bv:V3,a:f32,r:f32)V3{return at+(nv*m.splat3(@cos(a))+bv*m.splat3(@sin(a)))*m.splat3(r);}
-/// the weave along `spine` (tu.x `ts`, cross-sections `sec` as a
-/// parasite's lattice): a core banded with both saps, `w.n` green strands
-/// wound one way and as many pale ones the other, lifting off the core into
-/// a cage where parted (tu.y how far, so plant.vert parts it as it grows),
-/// and a violet knot wherever a green and a pale strand cross, parted.
-pub fn weave(b:*mg.Builder,spine:[]const V3,ts:[]const f32,sec:[]const Section,w:Weave)Allocator.Error!void{
-  // how many points run along the spine
-  const n=spine.len;
-  assert(n>=2 and n<=max and ts.len==n and sec.len==n);
-  // a twist-free frame along the spine: its normal and its binormal
-  var frameNormal:[max]V3=undefined;
-  var fb:[max]V3=undefined;
-  mg.transport(spine,frameNormal[0..n],fb[0..n]);
-  // each point's radius and colour, used first for the core, then for each strand
-  var rs:[max]f32=undefined;
-  var cs:[max]Rgba8=undefined;
-  for(rs[0..n],cs[0..n],sec,0..)|*r,*c,s,i|{
-    r.*=s.core;
-    c.*=color.mix(coreSym,corePar,0.5+0.5*@sin(m.ratio(i,n-1)*w.bands*m.tau));
-  }
-  try b.tubeC(spine,ts,rs[0..n],cs[0..n],null,w.part,8);
-  // how far each strand has parted at each point (its tu.y)
-  var us:[max]f32=undefined;
-  // one strand's path along the weave
-  var path:[max]V3=undefined;
-  for([_]f32{1,-1})|way|for(0..w.n)|si|{
-    for(path[0..n],rs[0..n],us[0..n],cs[0..n],sec,0..)|*p,*r,*u,*c,s,i|{
-      // how far along the weave this point is (0..1)
-      const k=m.ratio(i,n-1);
-      p.*=round(spine[i],frameNormal[i],fb[i],strandAngle(w,si,way,k),strandRadius(w,si,way,k,s.open));
-      r.*=s.strand;
-      u.*=pk.parting(s);
-      // each paler where it is parted, as young growth is
-      c.*=if(way>0)color.mix(green,leafLite,u.* * 0.45)else color.mix(pale,pearl,u.* * 0.6);
-    }
-    try b.tubeC(path[0..n],ts,rs[0..n],cs[0..n],us[0..n],w.part,w.sides);
-  };
-  // decision: knots are left out at the coarsest level of detail, where
-  // they are under a pixel
-  if(w.knot<=0 or b.lod+1>=mg.lods)return;
-  // pale strand j meets green strand j - k every pi / (n twist) along it
-  const every=m.pi/(m.f(w.n)*w.twist);
-  // which green strand the pale ones meet: `k` places back round the weave
-  var k:u32=1;
-  while(m.f(k)*every<1):(k+=1){
-    // where along the weave this crossing lies (0..1)
-    const u=m.f(k)*every;
-    // that place as a fractional point index
-    const x=u*m.f(n-1);
-    // the points just before and after it, and how far between
-    const lo=m.floorTo(usize,x);
-    // the point just after it
-    const hi=@min(lo+1,n-1);
-    // how far between the two it lies (0..1)
-    const f=x-m.f(lo);
-    // the weave's section there, lerped between the two
-    const s:Section=.{
-      .core=m.lerp(sec[lo].core,sec[hi].core,f),.tight=m.lerp(sec[lo].tight,sec[hi].tight,f),
-      .open=m.lerp(sec[lo].open,sec[hi].open,f),.strand=m.lerp(sec[lo].strand,sec[hi].strand,f),
-    };
-    // how far parted it is there; too little and no knot is tied
-    const pt=pk.parting(s);
-    if(pt<w.knotFrom)continue;
-    // the spine's point there, and its frame
-    const at=m.lerpV(spine[lo],spine[hi],f);
-    // the frame's normal there
-    const nv=m.norm(m.lerpV(frameNormal[lo],frameNormal[hi],f));
-    // the frame's binormal there
-    const bv=m.norm(m.lerpV(fb[lo],fb[hi],f));
-    for(0..w.n)|j|{
-      // the green strand pale strand `j` crosses here
-      const i=(j+w.n-k%w.n)%w.n;
-      // where the pale strand lies here
-      const pPale=round(at,nv,bv,strandAngle(w,j,-1,u),strandRadius(w,j,-1,u,s.open));
-      // where the green strand lies here
-      const pGreen=round(at,nv,bv,strandAngle(w,i,1,u),strandRadius(w,i,1,u,s.open));
-      // where the knot's vertices begin, so its parting can be set on them
-      const mk=b.mark();
-      // fused where they cross: drawn out a little along both
-      try mg.ellipsoid(b,.{
-        .center=(pPale+pGreen)*m.splat3(0.5),.radii=m.splat3(s.strand*w.knot),
-        .col=knot,.part=w.part,.rings=4,.segs=6,.t=m.lerp(ts[lo],ts[hi],f),
-      });
-      for(b.v.items[mk..])|*vx|vx.tu[1]=pt;
-    }
-  }
-}
 /// a stalk's sections (as the parasites': woven at its foot, parting into a
 /// cage over `s.from..s.to`, gathering again), one per point of `out`
 pub fn sections(s:pk.Stalk,out:[]Section)void{
@@ -485,25 +636,24 @@ pub fn bloom(b:*mg.Builder,f:Bloom)Allocator.Error!void{
 /// how a foot rooted both ways is laid: where, how big, how far its roots
 /// reach, how thick they are, its timing and its seed
 pub const Foot=struct{
-  /// where the bulb sits
+  /// where the weave rises out of the soil
   at:V3=v3(0,0,0),
-  /// the bulb's radius across
+  /// how wide its root crown spreads (its roots leave a third of it out)
   r:f32,
   /// how far its roots reach out
   reach:f32,
-  /// a root's radius at the bulb
+  /// a root's radius where it leaves the crown
   rootR:f32,
   /// its growth tu.x, when it forms
   t:f32=0,
   /// its own seed, so its green roots each run their own way
   seed:u64,
 };
-/// rooted both ways: a pale bulb half sunk in the soil, pearl where it
-/// swells toward the light; `FOLD` pale roots out of it, exactly even and
-/// alike, and between each two a symbiote's green braided root, each its
-/// own length and course, all reaching low over the ground and sinking in
+/// rooted both ways, no bulb: out of the crown where the weave's two stems
+/// flare into the soil, `fold` pale roots, exactly even and alike, and
+/// between each two a symbiote's green braided root, each its own length
+/// and course, all reaching low over the ground and sinking in
 pub fn foot(b:*mg.Builder,f:Foot)Allocator.Error!void{
-  try pk.nodule(b,f.at+v3(0,f.r*0.12,0),v3(f.r,f.r*0.5,f.r),f.t,pale,corePar,pearl);
   // the foot's own seeded rng, so its green roots are its own
   var rng=Rng.init(f.seed);
   for(0..fold)|i|{
@@ -513,11 +663,11 @@ pub fn foot(b:*mg.Builder,f:Foot)Allocator.Error!void{
       const a=m.ratio(i,fold)*m.tau;
       // its control points
       var c:[6]V3=undefined;
-      rootPath(f.at,a,f.r*0.6,f.reach,0.25,f.seed^0x9A1E,&c);
+      rootPath(f.at,a,f.r*crownOut,f.reach,0.25,f.seed^0x9A1E,&c);
       // its control points resampled smooth
       var p:[12]V3=undefined;
       m.splineResample(&c,&p);
-      try taper(b,&p,f.rootR*0.75,0.04,f.t,f.t+0.03,pearl,.stem,5);
+      try taper(b,&p,f.rootR,0.04,f.t,f.t+0.03,pearl,.stem,5);
     }
     // green: each its own
     {
@@ -525,7 +675,7 @@ pub fn foot(b:*mg.Builder,f:Foot)Allocator.Error!void{
       const a=(m.f(i)+0.5+rng.range(-0.18,0.18))/m.f(fold)*m.tau;
       // its control points
       var c:[6]V3=undefined;
-      rootPath(f.at,a,f.r*0.5,f.reach*rng.range(0.8,1.1),0.3,f.seed+%i*41,&c);
+      rootPath(f.at,a,f.r*crownOut,f.reach*rng.range(0.8,1.1),0.3,f.seed+%i*41,&c);
       // its control points resampled smooth
       var p:[12]V3=undefined;
       m.splineResample(&c,&p);
@@ -542,23 +692,22 @@ pub fn foot(b:*mg.Builder,f:Foot)Allocator.Error!void{
     }
   }
 }
-/// `foot` on a structure: the bulb swelling out of spline `id`'s start,
-/// every root a branch growing with it
+/// how far out of the crown its roots leave (a share of `Foot.r`): under
+/// the stems' flared feet, so they read as one root flare
+const crownOut:f32=0.3;
+/// `foot` on a structure: every root a branch growing with spline `id`
+/// out of its start
 pub fn footOn(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,f:Foot)Allocator.Error!void{
-  // where the bulb's vertices begin, so it swells out of the spline's start
-  const bulb=b.mark();
-  try pk.nodule(b,f.at+v3(0,f.r*0.12,0),v3(f.r,f.r*0.5,f.r),f.t,pale,corePar,pearl);
-  try k.on(b,bulb,id,0,.{.from=f.at,.span=k.get(id).time*0.3});
   // the foot's own seeded rng, so its green roots are its own
   var rng=Rng.init(f.seed);
   for(0..fold)|i|{
     // one root's control points, reused for the pale and then the green
     var c:[6]V3=undefined;
-    rootPath(f.at,m.ratio(i,fold)*m.tau,f.r*0.6,f.reach,0.25,f.seed^0x9A1E,&c);
+    rootPath(f.at,m.ratio(i,fold)*m.tau,f.r*crownOut,f.reach,0.25,f.seed^0x9A1E,&c);
     // the pale root's own branch, growing with the spline
     const paleRoot=k.branch(id,0,&c,.{.after=.with});
-    try k.tube(b,paleRoot,.{.r0=f.rootR*0.75,.tip=0.04,.col=pearl,.sides=5,.t0=f.t,.t1=f.t+0.03});
-    rootPath(f.at,(m.f(i)+0.5+rng.range(-0.18,0.18))/m.f(fold)*m.tau,f.r*0.5,f.reach*rng.range(0.8,1.1),0.3,f.seed+%i*41,&c);
+    try k.tube(b,paleRoot,.{.r0=f.rootR,.tip=0.04,.col=pearl,.sides=5,.t0=f.t,.t1=f.t+0.03});
+    rootPath(f.at,(m.f(i)+0.5+rng.range(-0.18,0.18))/m.f(fold)*m.tau,f.r*crownOut,f.reach*rng.range(0.8,1.1),0.3,f.seed+%i*41,&c);
     // the green root's own branch, growing with the spline
     const greenRoot=k.branch(id,0,&c,.{.after=.with});
     try k.braid(b,greenRoot,.{.girth=f.rootR*1.3,.tip=0.3,.wobble=pal.strandWobble,.seed=f.seed+%i*7,.core=pal.core,.strand=green,.t0=f.t+0.03,.t1=f.t});
@@ -726,17 +875,16 @@ pub fn confluence(b:*mg.Builder,g:species.Genome,seed:u64,gr:f32)Allocator.Error
         const r=@max((c.open-c.strand)*0.6,1e-3);
         try mg.ellipsoid(b,.{.center=m.alongPath(&sp,u),.radii=v3(r,r*1.15,r),.col=blue,.part=.bloom,.rings=6,.segs=9,.t=u*fuseT});
       }
-      try pk.nodule(b,base+v3(0,radius*0.15,0),v3(radius*1.05,radius*0.5,radius*1.05),0,pale,corePar,pearl);
       for(0..fold)|i|{
         // this pale root's heading: fanned round the trunk's outer side, exact
         const a=a0+m.pi+(m.ratio(i,fold)-0.5)*2.2;
         // its control points
         var c:[6]V3=undefined;
-        rootPath(base,a,radius*0.7,radius*3.4+0.05,0.2,seed^0x9A1E,&c);
+        rootPath(base,a,radius*0.35,radius*3.4+0.05,0.2,seed^0x9A1E,&c);
         // its control points resampled smooth
         var p:[12]V3=undefined;
         m.splineResample(&c,&p);
-        try taper(b,&p,radius*0.16,0.04,0,0.04,pearl,.stem,5);
+        try taper(b,&p,radius*0.22,0.04,0,0.04,pearl,.stem,5);
       }
     }
   }
@@ -759,7 +907,7 @@ pub fn confluence(b:*mg.Builder,g:species.Genome,seed:u64,gr:f32)Allocator.Error
     // its sections, point by point
     var sec:[steps]Section=undefined;
     sections(st,&sec);
-    try weave(b,&sp,&ts,&sec,.{.seed=seed^0xC0F});
+    try weave(b,&sp,&ts,&sec,.{.form=.limb,.seed=seed^0xC0F,.skin=.{color.mix(tissueLow,pearl,0.65),color.mix(tissue,pearl,0.65)}});
     // its yield: pods of both saps hanging from the weave just over where
     // the trunks fuse, small while it is young (every key has them all)
     // how far up the weave they hang, when they form there, and the genome sized to this key

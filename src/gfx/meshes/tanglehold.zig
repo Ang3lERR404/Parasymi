@@ -55,7 +55,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   // the stem's woven path and sections
   var sp:[growth.res]V3=undefined;
   var sec:[growth.res]pk.Section=undefined;
-  try kit.weaveOn(b,&k,stem,stemShape,.{.seed=0x7A12},0,0.3,&sp,&sec);
+  try kit.weaveOn(b,&k,stem,stemShape,.{.form=.stems,.seed=0x7A12},0,0.3,&sp,&sec);
   // the staves: out of the stem's top, arching up round the sac to the
   // knot; the last, which the crown opens out of
   var last:growth.Id=undefined;

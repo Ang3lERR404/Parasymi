@@ -334,9 +334,17 @@ whole.)
     (`weftstoneSpark`, part `spark`: white-hot core, violet edge, lights
     the fog). It starts as one tiny spark and grows to five long ones as
     the crystal forms.
-- **Driftbraid:** its look is the approved reference for convergent
-  structures.
-- **Monfris:** four corner weaves twining into one crowned trunk.
+- **The weave of both** (the convergence kit's stalk, chosen as a blend
+  of two looks): two stems out of the soil, a green braided one and a
+  pale smooth one swelling at its nodes, winding round each other and
+  grown together in smooth calluses (green one side, pale the other, a
+  violet seam between), fusing into one soft see-through body with green
+  strands, amber lanes and a pale vein inside it and pale ribs on its
+  skin. No root bulbs: the stems flare gently and the roots leave from
+  under them.
+- **Driftbraid:** the reference for convergent structures, on that weave.
+- **Monfris:** four corners of grafted stems twining into one crowned
+  body.
 
 ## Halo
 This is what plays while a halo forms from four blooms

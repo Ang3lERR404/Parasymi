@@ -133,7 +133,7 @@ fn stem(b:*mg.Builder,sk:*growth.Skeleton,first:?growth.Id,k:usize)Allocator.Err
   // the weave's path and sections (unused beyond it)
   var sp:[growth.res]V3=undefined;
   var sec:[growth.res]pk.Section=undefined;
-  try kit.weaveOn(b,sk,id,stemStalk,.{.seed=0x7C20+%k*7},0.05,0.6,&sp,&sec);
+  try kit.weaveOn(b,sk,id,stemStalk,.{.form=.stems,.seed=0x7C20+%k*7},0.05,0.6,&sp,&sec);
   return id;
 }
 /// inside the cage: the nerve rising up its middle from the trunk to the

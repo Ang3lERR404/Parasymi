@@ -67,7 +67,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   // the stem's woven path and sections
   var sp:[growth.res]V3=undefined;
   var sec:[growth.res]pk.Section=undefined;
-  try kit.weaveOn(b,&k,stem,stemShape,.{.seed=0x3E12},0,0.3,&sp,&sec);
+  try kit.weaveOn(b,&k,stem,stemShape,.{.form=.stems,.seed=0x3E12},0,0.3,&sp,&sec);
   // the staves, out and up from the stem's top to the lip
   var first:growth.Id=undefined;
   for(0..staves)|i|{
