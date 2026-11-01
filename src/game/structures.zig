@@ -201,6 +201,8 @@ pub const kinds=struct{
   pub const nebularbor=@import("structures/nebularbor.zig");
   /// the root well: a basket storing the rain, pouring it out through dry spells
   pub const rootWell=@import("structures/root_well.zig");
+  /// the tanglehold: storage of both lineages, twice a sap cache's
+  pub const tanglehold=@import("structures/tanglehold.zig");
 };
 /// the registry built from `kinds`: ids, tables, hook dispatch
 pub const reg=registry.Registry(kinds);
@@ -240,6 +242,9 @@ pub const Def=struct{
   /// keeps items in its slots: a click on it opens its panel, where they
   /// are lifted and put down as in the belly (hud/structure.zig)
   store:bool=false,
+  /// how many of its slots it keeps items in (at most `slots`; four
+  /// rows of them in its panel)
+  room:u8=16,
   /// floats over its tile instead of standing on it: it takes no room
   /// there, so it may float over a structure or a plant (never over
   /// another floating one)
@@ -314,8 +319,9 @@ pub fn kindOf(item:items.Item)?Kind{
   inline for(reg.ids)|k|if(defs.get(k).item==item)return k;
   return null;
 }
-/// how many stacks a structure's inventory holds
-pub const slots=16;
+/// the most stacks a structure's inventory holds (each kind keeps items in
+/// its `Def.room` of them)
+pub const slots=32;
 /// how quickly a structure's activity glow eases toward its target
 pub const activityEase:f32=3;
 /// how see-through structures' sap is at its thinnest, unless a def says otherwise

@@ -36,21 +36,25 @@ const Slot=lib.hudSlot.Slot;
 const items=lib.items;
 /// the keys and buttons down this frame
 const Input=lib.engine.platform.input.Input;
-/// its slots, this many across (the belly's grid sits to their right)
-const cols=4;
+/// its slots stand in this many rows, as many across as it needs
+/// (the belly's grid sits to their right)
+const rows=4;
 /// how far apart (pixels) its slots hang, as the belly's do
 const gap=s.slotGap;
-/// the width (pixels) of its slot grid
-const storeW=gap*cols;
-/// the height (pixels) of its slot grid, rows enough for every slot
-const storeH=gap*m.f((st.slots+cols-1)/cols);
+/// how many of its slots stand across, keeping `room` of them
+fn colsOf(room:usize)usize{return(room+rows-1)/rows;}
+/// the width (pixels) of its slot grid, keeping `room` slots
+fn storeW(room:usize)f32{return gap*m.f(colsOf(room));}
+/// the height (pixels) of its slot grid
+const storeH=gap*m.f(rows);
 comptime{assert(storeH<=belly.height);}
 /// the panel's margin either side (pixels)
 const margin:f32=76;
 /// the gap (pixels) between its grid and the belly's
 const between:f32=72;
-/// the panel's width (pixels): both grids, the gap and the margins
-const pw=margin+storeW+between+belly.width+margin;
+/// the panel's width (pixels), its store keeping `room` slots: both grids,
+/// the gap and the margins
+fn widthOf(room:usize)f32{return margin+storeW(room)+between+belly.width+margin;}
 /// the height (pixels) of its name and what it is doing, at the top
 const headerH:f32=116;
 /// the height (pixels) of the grids' labels
@@ -102,6 +106,9 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   const choices=st.recipes(sp.kind(),&g.prog);
   // the panel's height, and its top-left corner
   const ph=headerH+(if(choices.len>0)recipesH(choices.len)else 0)+labelH+belly.height+hintH;
+  // how many slots it keeps, and the panel's width
+  const room=sp.def().room;
+  const pw=widthOf(room);
   const px=(w-pw)/2;
   const py=(h-ph)/2-s.panelLift;
   try(Panel{.box=.{.x=px,.y=py,.w=pw,.h=ph},.col=s.panel,.seed=0.41}).draw(g,d,.{w,h});
@@ -114,12 +121,12 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
     y+=recipesH(choices.len);
   }
   // the belly grid's left edge
-  const bx=px+margin+storeW+between;
+  const bx=px+margin+storeW(room)+between;
   _=try d.text(px+margin,y,s.textHeading,s.gold,txt.s.hud.holds);
   _=try d.text(bx,y,s.textHeading,s.gold,txt.s.hud.bellyTitle);
   _=try d.print(bx+belly.width-100,y+6,s.textNote,s.dim,txt.s.hud.bellyFill,.{g.player.inv.fill()*100});
   y+=labelH;
-  try belly.grid(g,d,.store,&sp.inv.slot,cols,px+margin,y);
+  try belly.grid(g,d,.store,sp.inv.slot[0..room],colsOf(room),px+margin,y);
   try belly.grid(g,d,.slot,&g.player.inv.slot,belly.cols,bx,y);
   _=try d.text(px+margin,y+belly.height+18,s.textFine,s.dim,txt.s.hud.storeHint);
 }

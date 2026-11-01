@@ -108,6 +108,8 @@ pub const Structure=struct{
   }
   /// its kind's def
   pub fn def(s:*const Structure)Def{return defs.get(s.kind());}
+  /// the slots it keeps items in (`Def.room`), seen as a bag
+  pub fn bag(s:*Structure)items.Bag{return.{.slot=s.inv.slot[0..s.def().room]};}
   /// it as another holds on to it: its tile and whether it floats
   pub fn ref(s:*const Structure)Ref{return.{.x=s.x,.y=s.y,.floating=s.def().floating};}
   /// the first it was paired with, if any

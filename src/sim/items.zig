@@ -91,6 +91,8 @@ pub const Item=enum(u8){
   seedMossCreeper,
   /// the bulb of a root well
   rootWell,
+  /// the bulb of a tanglehold
+  tanglehold,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -125,6 +127,7 @@ const infos=EnumArray(Item,Info).init(.{
   .seedMireLily=.{.col=.{170,200,255,255}},
   .seedMossCreeper=.{.col=.{130,190,90,255}},
   .rootWell=.{.col=.{150,200,240,255}},
+  .tanglehold=.{.col=.{190,160,240,255}},
   .polyp=.{.col=.{235,205,230,255}},
   .diamond=.{.col=.{255,236,215,255}},
   .loomfern=.{.col=.{130,200,110,255}},

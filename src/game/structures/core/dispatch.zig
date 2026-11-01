@@ -136,7 +136,7 @@ pub fn insert(ss:*Structures,g:*const prog.Progression,id:Id,item:items.Item,n:u
   // how many it will take: `n`, or fewer if it wants fewer
   const k:u16=@intCast(@min(n,ss.wants(g,id,item)));
   if(k==0)return 0;
-  return ss.get(id).inv.add(item,k);
+  return ss.get(id).bag().add(item,k);
 }
 /// witness every pair of grown structures that `meets` the other (once
 /// each: a discovery found is never looked for again)

@@ -72,6 +72,9 @@ pub const hand=[_]Recipe{
   .{.out=.seedVesper,.in=&.{.{.item=.essence,.n=2},.{.item=.convergenceEssence,.n=1},.{.item=.fibre,.n=1}},.time=2.5,.needs=.seedSplicing},
   // decision: of what is still to be had after the unforming
   .{.out=.seedMireLily,.in=&.{.{.item=.convergenceEssence,.n=2},.{.item=.grit,.n=2}},.time=2.5,.needs=.mireBlooming},
+  // decision: open from the unforming on, when the sap caches die, so the
+  // garden is never left without a store
+  .{.out=.tanglehold,.in=&.{.{.item=.convergenceEssence,.n=2},.{.item=.grit,.n=4}},.time=3,.needs=.unforming},
   .{.out=.rootWell,.in=&.{.{.item=.convergenceEssence,.n=3},.{.item=.grit,.n=3},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.rootWells},
   .{.out=.seedMossCreeper,.in=&.{.{.item=.convergenceEssence,.n=2},.{.item=.grit,.n=1}},.time=2.5,.needs=.mossCreeping},
   .{.out=.conduit,.n=2,.in=&.{.{.item=.fibre,.n=2},.{.item=.grit,.n=1}},.time=1},

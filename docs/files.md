@@ -288,6 +288,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sap_cache.zig` — SAP CACHE: plain storage.
 - `sporecaster.zig` — SPORECASTER: a parasite that sends.
 - `strange_seed.zig` — STRANGE SEED: the seed the unforming gathered out of the shattered radiant light and let fall.
+- `tanglehold.zig` — TANGLEHOLD: plain storage of both lineages, taking the sap cache's place once the unforming has taken it, and holding twice as much.
 - `vultrixi.zig` — VULTRIXI: a gathering crown and a ganglion grown into one floating body that feeds a monfris.
 - `weftstone.zig` — WEFTSTONE: a loomfern and a lithophage grown into one floating body.
 
@@ -342,6 +343,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sporecaster.zig` — mesh: SPORECASTER.
 - `strange_seed.zig` — mesh: STRANGE SEED.
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with
+- `tanglehold.zig` — mesh: the tanglehold, of both lineages (convergence kit): the store that takes the sap cache's place once the unforming has taken it.
 - `turn_root.zig` — mesh: TURN ROOT.
 - `unform_shard.zig` — mesh: UNFORM SHARD.
 - `vultrixi.zig` — mesh: VULTRIXI.

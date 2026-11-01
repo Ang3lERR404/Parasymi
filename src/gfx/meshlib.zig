@@ -288,6 +288,8 @@ const parts=struct{
   pub const rootWell=@import("meshes/root_well.zig");
   /// the water a root well holds, see-through, drawn after the basket round it
   pub const rootWellWater=@import("meshes/root_well.zig").water;
+  /// the tanglehold: a sac of both saps caged in woven staves on a rooted foot
+  pub const tanglehold=@import("meshes/tanglehold.zig");
   // the halo: its polyp and the diamond it forms
   /// the polyp: woven of both lineages, its stem caging a sac of both saps, fronds and plumed tentacles crowning it
   pub const polyp=@import("meshes/polyp_convergent.zig").woven;

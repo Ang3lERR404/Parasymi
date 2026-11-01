@@ -421,6 +421,8 @@ pub const Strings=struct{
     digs:S="",
     /// a sap cache: holds anything, fed and taken from by hand
     cache:S="",
+    /// a tanglehold: how many of its slots are taken, of how many
+    hold:S="",
     /// a loomfern weaving fibre by itself, and what it holds
     loom:S="",
     /// a loomfern weaving fibre from essence, and what it holds

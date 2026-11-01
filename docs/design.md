@@ -299,6 +299,17 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
      braided rim; the water it holds a surface risen as high as it is
      full (`rootWellWater`, `surface`). Hovering it says how full, and
      whether it is holding or pouring.
+   - **Tanglehold** (`structures/tanglehold.zig`, built): the sap cache's
+     place once the unforming has taken it, and twice its room: plain
+     storage of both lineages, 32 slots (`Def.room`; every structure's
+     inventory holds up to `structures.slots`, 32, each kind keeping
+     items in its `room`, 16 by default; conduits and the panel fill
+     only that, `Structure.bag`). Its panel shows its slots in four rows,
+     as many across as it needs. Woven by a monfris from the unforming on
+     (2 convergence essence + 4 grit), so the garden is never without a
+     store. A sac of both saps caged in braided staves on a rooted foot,
+     a crown of young leaves where the staves meet; what it holds hangs
+     in the sac on a slow spiral, one glowing lump a stack.
 5. **The storm** (to come): a new plant, a weftstone kin charging ions to
    strike the rain clouds into storms; the weather fully formed.
 
