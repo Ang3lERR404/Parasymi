@@ -166,6 +166,8 @@ pub const sapCache=@import("gfx/meshes/sap_cache.zig");
 pub const rootWellMesh=@import("gfx/meshes/root_well.zig");
 /// the tanglehold's mesh: where its sac's heart is
 pub const tangleholdMesh=@import("gfx/meshes/tanglehold.zig");
+/// the storm spire's mesh: where its crown, offshoot tips and lanterns are
+pub const stormSpireMesh=@import("gfx/meshes/storm_spire.zig");
 /// mesh: the sporecaster, a parasite that sends
 pub const sporecaster=@import("gfx/meshes/sporecaster.zig");
 /// the structure kit: the shared grown pieces of structures

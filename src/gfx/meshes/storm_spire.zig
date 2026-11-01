@@ -1,16 +1,15 @@
-//! mesh: the storm spire, three looks to choose between side by side
-//! (`--samples=stormSpireTall,stormSpireStout,stormSpireCaged`): a kin of
-//! the weftstone (convergence kit) that charges the air and strikes the
-//! rain clouds into storms. A woven spire on a rooted foot, rings of vanes
-//! fanned round it (each two pale ribs and a bar strung with fine green
-//! threads, as the weftstone's), short offshoots out of it, and from the tip
-//! of each a fine thread rising high to a kite floating up where the cloud
-//! gathers. The looks differ in build (slender and tall, stout with broad
-//! vanes, a caged chamber at the crown) and in their kites (round sacs of
-//! both saps, diamonds of see-through membrane on spars, lanterns of woven
-//! strands round a glowing sac). Grown along one skeleton: foot and spire,
-//! the vane rings fanning out as the front passes them, the offshoots, the
-//! threads rising and the kites last.
+//! mesh: the storm spire (structures/storm_spire.zig), a kin of the
+//! weftstone (convergence kit) that charges the air and strikes the rain
+//! clouds into storms. A woven spire on a rooted foot, a chamber of both
+//! saps caged at its crown, rings of vanes fanned round it (each two pale
+//! ribs and a bar strung with fine green threads, as the weftstone's), five
+//! short offshoots out of it, and from the tip of each a fine thread rising
+//! to a lantern (woven strands round a small glowing sac) floating up where
+//! the rain cloud gathers. The gardener chose this look of three (the
+//! others' kites, round sacs and diamonds of membrane, are still `Kite`s
+//! here). Grown along one skeleton: foot and spire, the vane rings fanning
+//! out as the front passes them, the offshoots, the threads rising and the
+//! lanterns last. `bolt` is a bolt of its lightning.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -82,40 +81,47 @@ const vanePitch:f32=0.03;
 const threadCol=kit.lilac;
 /// a diamond kite's membrane: both saps thinned to a pale violet, see-through
 const membrane=color.rgb(0.8,0.7,1.0).toRgba8(150);
-/// the tall look: slender, four vane rings, three offshoots, round sac kites
-pub const tall=struct{
-  /// builds it
-  pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try spire(b,.{
-      .tall=2.4,.stalk=.{.girth=0.06,.part=2.4,.from=0.2,.to=0.85},
-      .rings=&.{0.42,0.6,0.76,0.9},.reach=0.5,.half=0.28,.vanes=kit.fold,
-      .shoots=&.{0.3,0.5,0.68},.shootLen=0.32,.kiteH=.{3.2,3.9},.kiteR=0.11,.kite=.sac,.seed=0x5701,
-    });
-  }
+/// the storm spire's look (the gardener's pick of three: the caged one,
+/// lantern kites): a woven chamber at its crown, three vane rings, five
+/// offshoots, their lanterns floating where the rain cloud gathers
+pub const look:Look=.{
+  .tall=2.0,.stalk=.{.girth=0.08,.part=2.2,.from=0.2,.to=0.85},
+  .rings=&.{0.38,0.56,0.72},.reach=0.55,.half=0.3,.vanes=kit.fold,
+  .shoots=&.{0.22,0.32,0.42,0.52,0.62},.shootLen=0.3,.kiteH=.{4.4,5.0},.kiteR=0.1,.kite=.lantern,.chamber=true,.seed=0x5703,
 };
-/// the stout look: short and thick, two broad vane rings, two offshoots, diamond kites
-pub const stout=struct{
-  /// builds it
-  pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try spire(b,.{
-      .tall=1.6,.stalk=.{.girth=0.12,.part=1.8,.from=0.15,.to=0.8},
-      .rings=&.{0.55,0.85},.reach=0.8,.half=0.4,.vanes=kit.fold,
-      .shoots=&.{0.32,0.45},.shootLen=0.4,.kiteH=.{3.0,3.5},.kiteR=0.18,.kite=.diamond,.seed=0x5702,
-    });
-  }
-};
-/// the caged look: a woven chamber at its crown, three vane rings, four
-/// offshoots, lantern kites
-pub const caged=struct{
-  /// builds it
-  pub fn build(b:*mg.Builder)Allocator.Error!void{
-    try spire(b,.{
-      .tall=2.0,.stalk=.{.girth=0.08,.part=2.2,.from=0.2,.to=0.85},
-      .rings=&.{0.38,0.56,0.72},.reach=0.55,.half=0.3,.vanes=kit.fold,
-      .shoots=&.{0.25,0.36,0.47,0.62},.shootLen=0.3,.kiteH=.{3.0,3.8},.kiteR=0.1,.kite=.lantern,.chamber=true,.seed=0x5703,
-    });
-  }
-};
+/// builds the storm spire whole
+pub fn build(b:*mg.Builder)Allocator.Error!void{try spire(b,look);}
+/// its crown's knot (structures/storm_spire.zig: where a strike leaves it)
+pub fn topAt()V3{return v3(0.03,look.tall,-0.02);}
+/// the spire's spline as the skeleton lays it: control points resampled
+fn trunkPts()[growth.res]V3{
+  // the top, the control points, and their resampled points
+  const top=topAt();
+  const c=[_]V3{v3(0,-0.1,0),v3(0,0.3,0),v3(top[0]*0.3,look.tall*0.4,top[2]*0.3),v3(top[0]*0.7,look.tall*0.75,top[2]*0.7),top};
+  var pts:[growth.res]V3=undefined;
+  m.splineResample(&c,&pts);
+  return pts;
+}
+/// offshoot `i`'s bearing round the spire
+fn shootBearing(i:usize)f32{return m.f(i)*2.39996+0.7;}
+/// the tip of offshoot `i`, where its thread leaves
+pub fn tipAt(i:usize)V3{
+  // the way out, and where it leaves the spire
+  const out=v3(@cos(shootBearing(i)),0,@sin(shootBearing(i)));
+  const pts=trunkPts();
+  const from=m.alongPath(&pts,look.shoots[i]);
+  return from+out*m.splat3(look.shootLen)+v3(0,look.shootLen*0.45,0);
+}
+/// where kite `i` floats, its thread's end under it
+pub fn kiteAt(i:usize)V3{
+  // the offshoot's tip, the way out, and how high this kite floats
+  const tip=tipAt(i);
+  const out=v3(@cos(shootBearing(i)),0,@sin(shootBearing(i)));
+  const h=m.lerp(look.kiteH[0],look.kiteH[1],m.ratio(i,@max(look.shoots.len,2)-1));
+  return v3(tip[0]+out[0]*look.tall*0.25,h,tip[2]+out[2]*look.tall*0.25);
+}
+/// how many offshoots fly kites
+pub const kites=look.shoots.len;
 /// a storm spire of look `l`, its foot at the origin
 fn spire(b:*mg.Builder,l:Look)Allocator.Error!void{
   // the skeleton every part is timed along
@@ -142,7 +148,7 @@ fn spire(b:*mg.Builder,l:Look)Allocator.Error!void{
   // the offshoots, each flying a kite on its thread
   for(l.shoots,0..)|u,i|{
     // its bearing, the way out, and where it leaves the spire
-    const a=m.f(i)*2.39996+0.7;
+    const a=shootBearing(i);
     const out=v3(@cos(a),0,@sin(a));
     const from=k.point(trunk,u);
     // the offshoot: out and up a little, ending in a knot
@@ -153,8 +159,7 @@ fn spire(b:*mg.Builder,l:Look)Allocator.Error!void{
     try pk.nodule(b,tip,m.splat3(l.stalk.girth*0.32),0.7,kit.pale,kit.lilac,kit.pearl);
     try k.on(b,knot,sh,1,.{.from=tip});
     // the thread: rising from the knot, drifting out on the air, to its kite
-    const h=m.lerp(l.kiteH[0],l.kiteH[1],m.ratio(i,@max(l.shoots.len,2)-1));
-    const kite=v3(tip[0]+out[0]*l.tall*0.25,h,tip[2]+out[2]*l.tall*0.25);
+    const kite=kiteAt(i);
     const th=k.branch(sh,1,&.{tip,m.lerpV(tip,kite,0.35)+out*m.splat3(0.15),m.lerpV(tip,kite,0.7)+out*m.splat3(0.08),kite-v3(0,l.kiteR,0)},.{.pace=2});
     try k.tube(b,th,.{.r0=0.004,.tip=0.7,.col=threadCol,.sides=4,.t0=0.75,.t1=0.95});
     // the kite at its end
@@ -279,9 +284,9 @@ fn kiteOf(b:*mg.Builder,l:Look,at:V3,a:f32)Allocator.Error!void{
     .lantern=>{
       // a small glowing sac, and woven strands round it, knotted top and bottom
       try kit.sac(b,.{.center=at,.radii=m.splat3(r*0.7),.t=0.97,.arms=2,.swirl=1.2,.phase=a});
-      for(0..6)|i|{
+      for(0..kit.fold)|i|{
         // this strand's bearing, and its points round the sac
-        const ba=m.ratio(i,6)*m.tau+a;
+        const ba=m.ratio(i,kit.fold)*m.tau+a;
         var c:[6]V3=undefined;
         for(&c,0..)|*q,j|{
           // how far round, bottom to top
@@ -296,3 +301,43 @@ fn kiteOf(b:*mg.Builder,l:Look,at:V3,a:f32)Allocator.Error!void{
     },
   }
 }
+/// mesh: one bolt of lightning, built straight up +Y over 0..1 (bent on
+/// the GPU along the curve it strikes, `Parts.emitCurve`): a jagged thread
+/// of light kinked at uneven steps, a fork off its middle, pointed at both
+/// ends (part `.spark`: white-hot at its core, violet at its edge, lighting
+/// the air round it); far thicker than a weftstone's spark, for it spans
+/// metres
+pub const bolt=struct{
+  /// lays the bolt up 0..1
+  pub fn build(b:*mg.Builder)Allocator.Error!void{
+    // how many kinks it runs through, and each one's place, stamp and radius
+    const n=17;
+    var p:[n]V3=undefined;
+    var ts:[n]f32=undefined;
+    var rs:[n]f32=undefined;
+    var rng=engine.core.rng.Rng.init(0xB017);
+    for(&p,&ts,&rs,0..)|*q,*t,*r,i|{
+      // how far along it this kink is (the ends fixed), and how far it kinks off its line
+      const f=if(i==0 or i==n-1)m.ratio(i,n-1)else m.ratio(i,n-1)+rng.range(-0.02,0.02);
+      const off:f32=if(i==0 or i==n-1)0 else 0.035;
+      q.*=v3(rng.range(-1,1)*off,f,rng.range(-1,1)*off);
+      t.*=f;
+      r.*=@max(0.012*@sqrt(@sin(m.pi*f)),2e-4);
+    }
+    try b.tubeR(&p,&ts,&rs,kit.pearl,.spark,5);
+    // forks off its middle and lower third, dying out
+    for([_]usize{6,11},[_]f32{1,-1})|at,s|{
+      var fp:[6]V3=undefined;
+      var ft:[6]f32=undefined;
+      var fr:[6]f32=undefined;
+      for(&fp,&ft,&fr,0..)|*q,*t,*r,j|{
+        // how far along the fork
+        const f=m.ratio(j,5);
+        q.*=p[at]+v3(s*0.09*f+rng.range(-0.01,0.01)*f,-0.12*f,0.03*f);
+        t.*=ts[at];
+        r.*=@max(0.007*(1-f),2e-4);
+      }
+      try b.tubeR(&fp,&ft,&fr,kit.pearl,.spark,4);
+    }
+  }
+};

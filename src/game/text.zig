@@ -179,6 +179,8 @@ pub const Strings=struct{
     flowerDrifts:S="",
     /// the first rain falls on the garden
     firstRain:S="",
+    /// the first storm struck
+    firstStorm:S="",
     /// the unforming learned, just before it begins
     unformingNear:S="",
     /// the unforming begun: the radiant plants shatter, the lineages die
@@ -423,6 +425,16 @@ pub const Strings=struct{
     cache:S="",
     /// a tanglehold: how many of its slots are taken, of how many
     hold:S="",
+    /// a storm spire: how charged (%), and what it is doing
+    storm:S="",
+    /// a storm spire charging under the rain
+    charging:S="",
+    /// a storm spire waiting for rain
+    waitingRain:S="",
+    /// a storm spire with no ley crystal to spend
+    noCrystal:S="",
+    /// a storm spire's storm raging
+    storming:S="",
     /// a loomfern weaving fibre by itself, and what it holds
     loom:S="",
     /// a loomfern weaving fibre from essence, and what it holds

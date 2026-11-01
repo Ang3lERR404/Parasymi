@@ -310,8 +310,20 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
      store. A sac of both saps caged in braided staves on a rooted foot,
      a crown of young leaves where the staves meet; what it holds hangs
      in the sac on a slow spiral, one glowing lump a stack.
-5. **The storm** (to come): a new plant, a weftstone kin charging ions to
-   strike the rain clouds into storms; the weather fully formed.
+5. **The storm** (`structures/storm_spire.zig`): the storm spire, a
+   weftstone kin of both lineages, woven by a monfris after STORM CALLING
+   (after the root wells, needs `firstRain`; 30 units of 3 convergence
+   essence + 2 ley crystals) from a weftstone, 4 convergence essence and 2
+   ley crystals. It holds up to 5 ley crystals. While rain falls on it
+   (`Chunk.rain` past 0.15) and it holds one, it charges over 45 s (dry,
+   its charge fades), its five lanterns, flown on threads up into the
+   cloud, beating brighter and faster. Full, it strikes: a bolt up the
+   spire and every thread into the cloud, the lanterns flashing, the
+   crystal spent. The storm lasts two minutes: it feeds the cloud over it
+   (0.06 a second, 3 units round), so the rain stays heavy, and bolts
+   strike the ground within 7 units of it, 18 a minute, each flash
+   lighting the fog. The first storm is a discovery (`firstStorm`); the
+   weather is fully formed.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined

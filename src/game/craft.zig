@@ -75,6 +75,8 @@ pub const hand=[_]Recipe{
   // decision: open from the unforming on, when the sap caches die, so the
   // garden is never left without a store
   .{.out=.tanglehold,.in=&.{.{.item=.convergenceEssence,.n=2},.{.item=.grit,.n=4}},.time=3,.needs=.unforming},
+  // decision: a weftstone's kin is woven from one, as the monfris is
+  .{.out=.stormSpire,.in=&.{.{.item=.weftstone,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.stormCalling},
   .{.out=.rootWell,.in=&.{.{.item=.convergenceEssence,.n=3},.{.item=.grit,.n=3},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.rootWells},
   .{.out=.seedMossCreeper,.in=&.{.{.item=.convergenceEssence,.n=2},.{.item=.grit,.n=1}},.time=2.5,.needs=.mossCreeping},
   .{.out=.conduit,.n=2,.in=&.{.{.item=.fibre,.n=2},.{.item=.grit,.n=1}},.time=1},
@@ -155,7 +157,7 @@ pub fn woven(item:items.Item)bool{
 }
 /// how many weaves the predicate answers `want` for (comptime)
 fn countWhere(comptime pred:fn(usize)bool,comptime want:bool)usize{
-  @setEvalBranchQuota(10_000);
+  @setEvalBranchQuota(40_000);
   // the count so far
   var n:usize=0;
   for(0..hand.len)|i|if(pred(i)==want){n+=1;};
@@ -164,7 +166,7 @@ fn countWhere(comptime pred:fn(usize)bool,comptime want:bool)usize{
 /// the indices into `hand` of every weave the predicate answers `want`
 /// for, in table order (comptime)
 fn recipesWhere(comptime pred:fn(usize)bool,comptime want:bool)[countWhere(pred,want)]u8{
-  @setEvalBranchQuota(10_000);
+  @setEvalBranchQuota(40_000);
   // the gathered indices, and how many are in so far
   var out:[countWhere(pred,want)]u8=undefined;
   var k:usize=0;

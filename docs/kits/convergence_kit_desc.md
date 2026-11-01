@@ -135,7 +135,7 @@ blending requires.
 | `polyp_convergent.zig` | `weaveOn`, `footOn`, `frondOn`, `bloom`, `sac` |
 | `arsthraxia_convergent.zig` | `weaveOn` (`.stems`), `footOn`, `frondOn`, `bloom`, `sac` |
 | `root_well.zig`, `tanglehold.zig` | `weaveOn` (`.stems`: a short foot under a basket), `footOn`, `sac` |
-| `storm_spire.zig` (samples) | `weaveOn`, `footOn`, `sac`, `taper` |
+| `storm_spire.zig` | `weaveOn`, `footOn`, `sac`, `taper`, `fold` |
 
 ## GPU side
 

@@ -203,6 +203,8 @@ pub const kinds=struct{
   pub const rootWell=@import("structures/root_well.zig");
   /// the tanglehold: storage of both lineages, twice a sap cache's
   pub const tanglehold=@import("structures/tanglehold.zig");
+  /// the storm spire: charges under the rain and strikes the cloud into storms
+  pub const stormSpire=@import("structures/storm_spire.zig");
 };
 /// the registry built from `kinds`: ids, tables, hook dispatch
 pub const reg=registry.Registry(kinds);

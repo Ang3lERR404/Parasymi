@@ -93,6 +93,8 @@ const techs=struct{
   pub const mossCreeping=@import("research/moss_creeping.zig");
   /// the root well, opened by the first rain
   pub const rootWells=@import("research/root_wells.zig");
+  /// the storm spire, opened by the first rain
+  pub const stormCalling=@import("research/storm_calling.zig");
 };
 /// the registry over `techs`: ids, `has` and `module` for the hooks
 const reg=registry.Registry(techs);
@@ -116,6 +118,8 @@ pub const Discovery=enum{
   /// the first rain falling on the garden (game/weather.zig)
   // decision: a new tag goes last, so a save's found set reads as before
   firstRain,
+  /// the first storm a storm spire strikes (structures/storm_spire.zig)
+  firstStorm,
 };
 /// a technology's id, one per module in `techs`
 pub const Id=reg.Id;
@@ -364,6 +368,9 @@ pub const Progression=struct{
       },
       .firstRain=>{
         g.say(txt.s.msg.firstRain,.{});
+      },
+      .firstStorm=>{
+        g.say(txt.s.msg.firstStorm,.{});
       },
     }
   }
