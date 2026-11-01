@@ -17,6 +17,12 @@ queries time each pass (`Renderer.gpuMs`); F3 shows the total.
 | demo | msaa8 | 7.2 |
 | stress | msaa8 | 11.1 |
 
+That was 2026-10-25. By 2026-11-01 the richer garden had grown it to
+demo 22.2 (off) / 38.4 (msaa8) and stress 52.5 (msaa8): the vertex
+stage of triangle-soup meshes, run three times per plant (solid, glass,
+shadow). The breakdown and the methods ranked are in
+[shader-optimization.md](shader-optimization.md#round-two-2026-11-01-the-vertices-are-the-cost-now).
+
 Memory:
 - Built-once meshes live in device memory (`Buffer.initWith`).
 - Per-frame buffers are host-visible.
@@ -73,6 +79,19 @@ Measured gains (release):
 
 The rest of the CPU frame is under 1 ms and hides behind the GPU (frames
 in flight). So profile before threading anything else.
+
+### CPU methods to reach for next
+While the GPU takes 20–50 ms, the CPU is hidden and speeding it up shows
+nothing. When it leads again:
+- **Measure with zones, not guesses**: Tracy (`ztracy`) or Superluminal
+  on Windows give a per-function timeline of every frame, threads
+  included.
+- **No allocation in the frame**: a per-frame arena reset each frame for
+  scratch lists; the general allocator only for what outlives it.
+- **Data laid out for the loop**: SoA for what a hot loop reads (as
+  chunks' tiles already are), small hot fields apart from cold ones.
+- **SIMD through `m.Vec`** on wide loops (the ecology tick, link
+  rebuilding), and `jobs.each` for anything still serial past 1 ms.
 
 ## Culling
 Chunks (`chunkRadius`), plants and parts are culled to the view frustum

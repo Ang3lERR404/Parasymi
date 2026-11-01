@@ -303,6 +303,99 @@ again unless the user raises it.
 - splitting part.frag's rare roles into their own pipeline (occupancy;
   measure in Nsight first).
 
+## Round two (2026-11-01): the vertices are the cost now
+
+The garden got much richer since round one (13-point veined leaves,
+grained stems, a meadow of grass, fuller structures, the nebularbor, the
+air round glows), and the frame grew with it. Same machine, release,
+`--inspect=player --shots=2 --orbit=8 --tod=0.45`, GPU ms:
+
+| scene | AA | total | plants | parts | plantsGlass | partsGlass | partsAir | plantsShadow |
+|---|---|---|---|---|---|---|---|---|
+| demo | off | 22.2 | 3.8 | 4.7 | 3.2 | 2.8 | 2.5 | 0.4 |
+| demo | msaa8 | 38.4 | 13.2 | 7.7 | 4.8 | 3.6 | 3.3 | 0.4 |
+| stress | msaa8 | 52.5 | 21.5 | 1.2 | 20.2 | 0.6 | 0.5 | 4.2 |
+| demo, plain frag | msaa8 | 20.7 | 2.7 | 3.9 | 2.5 | 2.6 | 3.3 | 0.3 |
+| stress, plain frag | msaa8 | 41.1 | 15.6 | 0.7 | 15.5 | 0.4 | 0.5 | 4.1 |
+
+("plain frag": plant.frag and part.frag's `main` knocked out to a flat
+colour, so what is left is the vertex stage and rasterizing.)
+
+What it says:
+- **Stress is vertex-bound.** With a plain fragment shader the plants
+  still cost 15.6 ms, and the glass pass the same again: the glass pass
+  runs every plant's whole vertex stage (growth, wind) a second time,
+  only to throw nearly every fragment away. The shadow pass runs it a
+  third time.
+- **Demo is mostly the plant fragment shader at msaa8** (13.2 vs 2.7 ms
+  plain): per-sample shading of a much heavier plant.frag. Per-sample
+  shading stays (the user's call, round one); what can shrink is the
+  shader itself.
+- **Why the vertex stage is so heavy:** every mesh is a triangle soup.
+  `Builder.put` appends three fresh vertices per triangle and the passes
+  `cmd.draw` with no index buffer, so the GPU's post-transform vertex
+  cache can never reuse a result. A smooth mesh shares each vertex
+  between ~6 triangles; drawn indexed, the vertex shader runs about
+  0.6–1 times per triangle instead of 3.
+
+### New methods, ranked (all art-safe unless marked)
+
+1. **Indexed meshes (biggest, exact).** Weld each mesh's identical
+   vertices (same position, normal, colour, tu, part, skin and growth
+   record, bit for bit) into one, keep an index buffer, `drawIndexed`.
+   Then reorder the triangles for the vertex cache (Forsyth's or
+   meshoptimizer's `optimizeVertexCache`) and the vertices for fetch
+   order (`optimizeVertexFetch`). The picture is bit for bit the same:
+   the same vertex gives the same output wherever it is shaded. Expected:
+   vertex-stage work down ~3x in every pass, including shadows, and the
+   vertex buffers ~3x smaller. The welding is a hash map over the
+   vertex's bytes at build time, on the mesh-growing task.
+   (meshoptimizer, A. Kapoulkine; T. Forsyth, "Linear-speed vertex cache
+   optimisation".)
+2. **The glass pass draws only what can be see-through.** Most of a
+   plant can never be translucent. Sort each mesh's triangles so those
+   whose part role or alpha can fall below `SOLID` come last, keep where
+   that run starts, and let the glass pass draw only it. Same picture:
+   the skipped triangles' fragments were all thrown away by early Z or
+   `keepPass`. Check first which plant alphas change at run time
+   (dissolving, the unforming) and keep those in the glassy run.
+   `meshlib.partGlassy` already does this per mesh for parts.
+3. **Cull shadow casters per cascade.** Every caster goes into all three
+   cascades (`renderer.caster`'s note). Testing each instance against
+   each cascade's box and drawing per cascade (or a per-view mask with
+   multiview) skips what a cascade cannot see. Same shadows.
+4. **Shade the vertices once a frame (compute pre-transform).** A compute
+   pass runs growth and wind for each visible instance once, writing
+   positions/normals to a buffer that solid, glass and shadow passes all
+   read. Exact if it runs the same code. Costs memory per instance (stress
+   is ~14k plants), so only after 1–3, and only if the vertex stage still
+   leads. (Wihlidal, "Optimizing the Graphics Pipeline with Compute", GDC
+   2016.)
+5. **Meshlets and mesh shaders (`VK_EXT_mesh_shader`).** Cut meshes into
+   ~64-vertex clusters, each with a bounding sphere and a normal cone;
+   a task shader drops clusters outside the view, facing away (where back
+   faces are culled anyway) or behind the depth of last frame. Same
+   picture, far fewer vertices shaded far away. A big build; the pipeline
+   layouts change (a layer boundary: the user's call). (NVIDIA, "Introduction
+   to Turing Mesh Shaders"; meshoptimizer's `buildMeshlets`; Kapoulkine's
+   niagara.)
+6. **Make plant.frag cheaper per sample.** Since it runs 8 times a pixel
+   at msaa8, every instruction counts 8x. Measure the new pieces one at a
+   time (veins, grain, sap bubbles, droplets, point lights), then apply
+   §3's rules: hoist what is per-instance into the vertex stage as `flat`
+   varyings, skip zero-weight work behind coherent branches. Count
+   instructions per shader with `spirv-cross`/`spirv-dis` before and
+   after, Just Cause 2 style.
+7. **partsAir (~3 ms in demo).** It redraws the parts with the AIR
+   variant; its fragment shader discards what does not glow
+   (`PART_IN(PARTS_LIGHT,…)`). Drawing only the meshes that hold a
+   glowing role (a per-mesh flag, as `partGlassy`) skips the rest's vertex
+   work entirely. Same picture.
+
+Not art-safe (ask before): lower `min_sample_shading`, coarser LOD
+distances, cached far-cascade shadows (the sway would lag), impostors for
+far plants.
+
 ## Sources
 
 - NVIDIA, Advanced API Performance: Shaders — developer.nvidia.com/blog/advanced-api-performance-shaders
@@ -316,3 +409,7 @@ again unless the user raises it.
 - NVIDIA, Transparency or Translucency Rendering — developer.nvidia.com/content/transparency-or-translucency-rendering
 - I. Castaño, Shadow Mapping Summary — ludicon.com/castano/blog
 - Vulkan tutorial, divergence audit — docs.vulkan.org/tutorial/latest/Advanced_Vulkan_Compute
+- A. Kapoulkine, meshoptimizer (vertex cache, fetch, meshlets) — github.com/zeux/meshoptimizer; niagara (mesh shader renderer) — github.com/zeux/niagara
+- T. Forsyth, Linear-Speed Vertex Cache Optimisation — tomforsyth1000.github.io/papers/fast_vert_cache_opt.html
+- G. Wihlidal, Optimizing the Graphics Pipeline with Compute (GDC 2016) — frostbite.com
+- NVIDIA, Introduction to Turing Mesh Shaders — developer.nvidia.com/blog/introduction-turing-mesh-shaders
