@@ -89,6 +89,8 @@ const techs=struct{
   pub const unforming=@import("research/unforming.zig");
   /// the mire lily, opened by the first rain
   pub const mireBlooming=@import("research/mire_blooming.zig");
+  /// the moss creeper, opened by the first rain
+  pub const mossCreeping=@import("research/moss_creeping.zig");
 };
 /// the registry over `techs`: ids, `has` and `module` for the hooks
 const reg=registry.Registry(techs);

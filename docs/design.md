@@ -267,6 +267,22 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
      lying on it and one bloom resting on it; drawn at the water's level
      (`Species.onWater`, `Chunk.pool`), its pads drifting and bobbing there
      (plant.vert `FORMS_AFLOAT`). Four grow along the demo grove's edge.
+   - **Moss creeper** (`species/moss_creeper.zig`, built): MOSS CREEPING
+     (after the unforming, needs `firstRain`; 20 units of 2 convergence
+     essence + 2 grit) lets germinators weave its seed (2 convergence
+     essence + 1 grit). Convergent, 1×1, drawing a little ley and ground
+     water, yielding convergence essence. Grown and healthy, about once
+     every 30 s (`Species.creeps`, on the garden's random stream) it turns
+     a soil tile within 2 tiles (`creepReach`) to moss, if the rain has
+     soaked it past half (`game/moss.zig` `creep`); the tile then holds
+     at least a moss's water (0.4) and a nebularbor may root there. Grown
+     moss is kept tile by tile (`Moss`, saved) and laid back onto every
+     chunk as it streams in (`Chunk.mossed`), since the world regrows
+     its ground from the seed. A groundcover (the `creeper` form,
+     meshgen/creepers.zig): a cushion of moss, runners creeping out over
+     the ground, a rosette of leaves and a tuft of moss rooting at each
+     node; it never bends from a root (`FORMS_LOW`). In the demo, one
+     grows on a patch of bare soil past the lilies.
 5. **The storm** (to come): a new plant, a weftstone kin charging ions to
    strike the rain clouds into storms; the weather fully formed.
 

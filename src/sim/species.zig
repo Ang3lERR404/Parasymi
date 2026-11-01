@@ -35,6 +35,8 @@ const parts=struct{
   pub const bloom=@import("species/bloom.zig");
   /// the first breed of the rain, drinking soaked ground into essence
   pub const mireLily=@import("species/mire_lily.zig");
+  /// a breed of the rain, spreading moss onto soaked soil
+  pub const mossCreeper=@import("species/moss_creeper.zig");
 };
 /// the registry over `parts`: their ids, count and definitions
 const reg=registry.Registry(parts);
@@ -90,6 +92,10 @@ pub const Form=enum(u8){
   /// (`leafLen` across) lying flat on the water, one bloom of `petals`
   /// resting on it (meshgen/lilies.zig); drawn at the water's level
   lily,
+  /// a groundcover lying low: a cushion of moss, `tendrils` runners
+  /// (`stemH` long) creeping out over the ground, a rosette of `leaves`
+  /// and a tuft of moss rooting at each node (meshgen/creepers.zig)
+  creeper,
 };
 /// procedural mesh parameters (see gfx/meshgen.zig).
 pub const Genome=struct{
@@ -211,6 +217,12 @@ pub const Species=struct{
   link:f32=0,
   /// it needs celestial energy: outside every field it halts and withers
   needsRadiance:bool=false,
+  /// it turns soaked soil to moss (game/moss.zig): grown and healthy, one
+  /// tile every this many seconds on average (0: never), within
+  /// `creepReach` tiles of it
+  creeps:f32=0,
+  /// (how far it reaches, tiles)
+  creepReach:u8=0,
   /// it floats on the water pooled over its tile: drawn at the water's
   /// level (its mesh's origin), not the ground's
   onWater:bool=false,
@@ -249,7 +261,7 @@ test"a body of one lineage's kit is grown only for that lineage"{
       .coil=>.parasitic,
       .confluence=>.convergent,
       .radiant,.star=>.radiant,
-      .herb,.drift,.lily=>null,
+      .herb,.drift,.lily,.creeper=>null,
     };
     if(of)|l|try testing.expectEqual(l,s.lineage);
   }

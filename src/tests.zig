@@ -10,6 +10,7 @@ test{
   _=lib.gen;
   _=lib.world;
   _=lib.weather;
+  _=lib.moss;
   _=lib.ecology;
   _=lib.items;
   _=lib.progression;

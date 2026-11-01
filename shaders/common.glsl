@@ -83,6 +83,7 @@ const float FORM_CONFLUENCE = 3.0;
 const float FORM_RADIANT = 4.0;
 const float FORM_STAR = 5.0;
 const float FORM_LILY = 6.0;
+const float FORM_CREEPER = 7.0;
 bool isForm(float f, float form) { return abs(f - form) < 0.5; }
 // sets of forms, one bit each (as the roles' sets): what forms do alike is
 // keyed off a set (formIn), so a new form joins a behaviour by joining it
@@ -93,9 +94,12 @@ bool formIn(uint set, float f) { return ((set >> uint(f + 0.5)) & 1u) != 0u; }
 // glowing with the light they carry (the celestial bloom, the vesper)
 const uint FORMS_FREE = FORM_BIT(FORM_RADIANT) | FORM_BIT(FORM_STAR);
 // lying afloat on the water (meshgen/lilies.zig, its origin the surface):
-// what lies on it drifts and bobs, never bending from a root (plant.vert),
-// and its pads keep their own green (plant.frag)
+// what lies on it drifts and bobs, never bending from a root (plant.vert)
 const uint FORMS_AFLOAT = FORM_BIT(FORM_LILY);
+// lying low, on the water or the ground (lilies, creepers): never bending
+// from a root, only their leaves lifting in the gusts (plant.vert), and
+// their leaves keep their own green (plant.frag)
+const uint FORMS_LOW = FORMS_AFLOAT | FORM_BIT(FORM_CREEPER);
 // the forms whose petals are a lantern of clear sap (meshgen `lantern`,
 // below LANTERN_TOP along the plant): it is drawn see-through and, being
 // clear, casts no shadow (plant.vert SHADOW and plant.frag agree on it)

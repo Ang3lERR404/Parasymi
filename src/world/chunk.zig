@@ -120,6 +120,9 @@ pub const Chunk=struct{
   /// how deep the rain stands pooled over each tile (m), read back with
   /// `wet` (not saved)
   pool:[tileCount]f32=@splat(0),
+  /// whether the garden's grown moss has been laid on it since it was
+  /// streamed in (game/moss.zig)
+  mossed:bool=false,
   /// gatherable resource left on the tile (0 = no node). The item is decided by `kind`.
   res:[tileCount]Res,
   /// occupant of each tile (see `Occ`).

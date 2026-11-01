@@ -30,6 +30,8 @@ pub const specimen=@import("game/specimen.zig");
 pub const unforming=@import("game/unforming.zig");
 /// the weather: the rain the air rains soaking back into the ground
 pub const weather=@import("game/weather.zig");
+/// moss grown in the garden by its creepers, kept and laid on each chunk
+pub const moss=@import("game/moss.zig");
 /// the loading screen: a night with a tendril growing across it
 pub const loading=@import("game/loading.zig");
 /// the gardener's folder, where every file of theirs lives

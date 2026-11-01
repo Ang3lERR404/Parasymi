@@ -219,9 +219,9 @@ void surface() {
   vec3 body = mix(vec3(lum), v_col, 0.5) * 0.78;
   body = mix(body, ROOT_BROWN, (1.0 - thin) * (1.0 - smoothstep(0.0, 0.55, v_t)) * 0.75);
   // but a symbiote's leaves (and sepals) are the lineage's own green, as
-  // on its structures (part.frag), and so are pads afloat on the water:
-  // unmuted, the light through them theirs
-  bool green = (aff > 0.5 || formIn(FORMS_AFLOAT, v_form)) && part == PART_LEAF;
+  // on its structures (part.frag), and so are a low plant's (pads afloat
+  // on the water, a creeper's moss): unmuted, the light through them theirs
+  bool green = (aff > 0.5 || formIn(FORMS_LOW, v_form)) && part == PART_LEAF;
   if (green) body = v_col;
   // a leaf's or petal's own surface: veins, the net between, edge and base
   float trans;

@@ -543,7 +543,7 @@ pub fn meshesReady(r:*Renderer)Error!bool{
 fn plantGlassy(id:species.Id,p:vertex.Part)bool{
   return switch(species.get(id).genome.form){
     .radiant,.star=>true,
-    .herb,.coil,.drift,.confluence,.lily=>p==.pod or p==.bloom or p==.resin,
+    .herb,.coil,.drift,.confluence,.lily,.creeper=>p==.pod or p==.bloom or p==.resin,
   };
 }
 /// per part slot: whether any of its run of `verts` can be see-through

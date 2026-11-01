@@ -148,6 +148,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/game/
 - `icon.zig` — item icons for the HUD: what sits in a belly slot, a hotbar pod or on the cursor.
 - `loading.zig` — the loading screen: a living night with the garden's name and a tendril growing across it as far as what is made goes, leaves opening along…
+- `moss.zig` — moss grown in the garden: soil a moss creeper has turned to moss where the rain soaked it, so a grove may root there.
 - `options.zig` — the gardener's settings (pause menu, OPTIONS): how the garden is drawn and shown, and how often it saves itself.
 - `orbit.zig` — `--inspect`: the camera fixed on one thing (the wolf, the nearest plant of a species or structure of a kind, or a tile), turning slowly…
 - `parts.zig` — per-frame collector of rigid part instances, grouped by library mesh.
@@ -198,6 +199,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `lithophagy.zig` — LITHOPHAGY: the parasites learn to feed on stone: lithophages, which draw the mineral nodes all round them into a crystal and sap it away as
 - `living_looms.zig` — LIVING LOOMS: the symbiotes lend their weaving to the garden: loomferns, which weave fibre by themselves, and gathering crowns, which root…
 - `mire_blooming.zig` — MIRE BLOOMING: once the first rain has fallen, germinators weave mire lily seeds, a breed of both lineages that roots in soaked ground.
+- `moss_creeping.zig` — MOSS CREEPING: once the first rain has fallen, germinators weave moss creeper seeds, a breed of both lineages that turns soaked soil to…
 - `root_communion.zig` — ROOT COMMUNION: symbiotic links reach a second ring of neighbours.
 - `sap_satellites.zig` — SAP SATELLITES: a minor study along Arsthraxia.
 - `seed_splicing.zig` — SEED SPLICING: germinators weave Vesper seeds, spliced from both lineages.
@@ -219,6 +221,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `hollowheart.zig` — HOLLOWHEART seed: a stout trunk carrying a broad crown, an amber heart glowing in its hollow and pulsing (a deep reservoir that feeds…
 - `lumenroot.zig` — LUMENROOT seed: a leafy sprout opening a cyan flower, motes of mana running from it to the little sprouts beside it (it shares with kin).
 - `mire_lily.zig` — MIRE LILY seed: a pale cupped lily on a short teal stem, broad pads lying round its foot, and rain falling into its cup (it lives on soaked…
+- `moss_creeper.zig` — MOSS CREEPER seed: a cushion of moss with runners creeping out from it along the ground, small leaves at their ends, and the soil under them
 - `thornleech.zig` — THORNLEECH seed: a pale twisted stalk with a bulb and fronds curling round it, a bead of red sap drawn into it from a green leaf beside it…
 - `vesper.zig` — VESPER seed: an evening star come down over the seed, held up on a thread of light: a gold core in a star of five dusk-violet rays, two…
 
@@ -353,6 +356,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/gfx/meshgen/
 - `blades.zig` — blades: a bent strip with a body, its vein on the cupped face.
+- `creepers.zig` — creepers: a moss creeper (the `creeper` form), lying low on the ground.
 - `drifts.zig` — the drifting plants: tendrils and lanterns.
 - `flowers.zig` — flowers, buds and leaves set along a path.
 - `laminae.zig` — laminae: leaves with a body, folding to a midrib.
@@ -400,6 +404,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `hollowheart.zig` — HOLLOWHEART: a 2x2 heart-tree.
 - `lumenroot.zig` — LUMENROOT: the first symbiote.
 - `mire_lily.zig` — MIRE LILY: the first breed the rain opens, of both lineages.
+- `moss_creeper.zig` — MOSS CREEPER: a breed the rain opens, of both lineages.
 - `thornleech.zig` — THORNLEECH: the first parasite, alien rather than hostile (a coil, built by gfx/meshes/parasite_kit.zig: a lattice cage of a stalk with its…
 - `vesper.zig` — VESPER BLOOM: a radiant hybrid, spliced where symbiote and parasite touch.
 

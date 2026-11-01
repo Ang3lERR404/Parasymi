@@ -131,6 +131,22 @@ fn grove(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
     const z=at[1]-1;
     _=try g.plants.placeEx(g.gpa,&g.world,x,z,.{.x=x,.y=z,.chunk=undefined,.tile=undefined,.sp=.mireLily,.seed=0.2+0.15*m.f(k),.growth=1});
   }
+  // a patch of bare soil beyond them, a grown moss creeper in its middle,
+  // left to turn it to moss as the grove's rain soaks it
+  var dz:i32=2;
+  while(dz<=6):(dz+=1){
+    var dx:i32=0;
+    while(dx<=6):(dx+=1){
+      // this tile of the patch
+      const c=g.world.chunkOfTile(at[0]+dx,at[1]-dz) orelse continue;
+      const t=ck.localIndex(at[0]+dx,at[1]-dz);
+      if(c.occ[t]!=.none)continue;
+      c.kind[t]=.soil;
+      c.res[t]=0;
+      c.dirty=true;
+    }
+  }
+  _=try g.plants.placeEx(g.gpa,&g.world,at[0]+3,at[1]-4,.{.x=at[0]+3,.y=at[1]-4,.chunk=undefined,.tile=undefined,.sp=.mossCreeper,.seed=0.4,.growth=1});
 }
 /// how many mire lilies grow along the demo grove's edge
 const groveLilies=4;

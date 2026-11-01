@@ -87,6 +87,8 @@ pub const Item=enum(u8){
   nebularbor,
   /// the seed a mire lily grows from
   seedMireLily,
+  /// the seed a moss creeper grows from
+  seedMossCreeper,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -119,6 +121,7 @@ const infos=EnumArray(Item,Info).init(.{
   .rootDigger=.{.col=.{190,140,90,255}},
   .seedBloom=.{.col=.{140,255,215,255}},
   .seedMireLily=.{.col=.{170,200,255,255}},
+  .seedMossCreeper=.{.col=.{130,190,90,255}},
   .polyp=.{.col=.{235,205,230,255}},
   .diamond=.{.col=.{255,236,215,255}},
   .loomfern=.{.col=.{130,200,110,255}},

@@ -42,6 +42,8 @@ const kinds=struct{
   pub const bloom=@import("seeds/bloom.zig");
   /// the mire lily's seed
   pub const mireLily=@import("seeds/mire_lily.zig");
+  /// the moss creeper's seed
+  pub const mossCreeper=@import("seeds/moss_creeper.zig");
 };
 /// the seed registry built from `kinds`: its ids and its modules
 const reg=registry.Registry(kinds);

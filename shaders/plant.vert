@@ -396,7 +396,7 @@ void main() {
   // slow and reaches the tip after the base. What hangs below the root (a
   // floater's filaments) swings the other way, so it trails downwind.
   float ang = windLean(t, wind, seed * TAU, h, sway) * h * h;
-  ang *= afloat ? 0.0 : smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
+  ang *= formIn(FORMS_LOW, ib.w) ? 0.0 : smoothstep(-0.1, 0.1, p.y) * 2.0 - 1.0;
   p = bendIn(p, wdir, ang);
   n = bendIn(n, wdir, ang);
   // plucked, it bends after the paws drawing its yield back, the same way

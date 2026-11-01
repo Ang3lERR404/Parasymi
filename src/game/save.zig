@@ -120,7 +120,7 @@ const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the stored layout's version: bumped whenever one changes
-const version:u32=27;
+const version:u32=28;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -273,6 +273,12 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
   while(it.next())|c|if(gathered(g.world.seed,c.*))try touched.append(gpa,c.*);
   try w.put(u32,@intCast(touched.items.len));
   for(touched.items)|c|try w.put(NodesRec,.{.at=c.at,.res=c.res});
+  // the moss the creepers grew, tile by tile
+  var mossed:std.ArrayList(m.Vice(i32,2))=.empty;
+  defer mossed.deinit(gpa);
+  try g.moss.list(gpa,&mossed);
+  try w.put(u32,@intCast(mossed.items.len));
+  for(mossed.items)|t|try w.put(m.Vice(i32,2),t);
   return w.buf.toOwnedSlice(gpa);
 }
 /// whether any of a chunk's nodes differ from what the generator made
@@ -359,6 +365,13 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
     // the chunk, made if it is not streamed in yet
     const c=try g.world.ensure(n.at);
     c.res=n.res;
+  }
+  // the moss the creepers grew, laid on its chunks as they stream in
+  const mossed=try r.get(u32);
+  for(0..mossed)|_|{
+    // the tile
+    const t=try r.get(m.Vice(i32,2));
+    try g.moss.grow(gpa,&g.world,t[0],t[1]);
   }
   g.prog.say(txt.s.msg.remembers,.{});
   return g;
