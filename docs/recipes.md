@@ -90,7 +90,9 @@ Tests catch: a sown species without a seed icon; cfg keys.
 ## A library mesh (part)
 1. `gfx/meshes/<name>.zig` with `build(b)` (or a companion struct in its
    owner's file). One line in `parts` in `gfx/meshlib.zig` (draw order).
-2. A new see-through role goes in `vertex.seeThrough`.
+2. A new see-through role goes in `vertex.seeThrough` (and, if plants
+   use it see-through, in `renderer.plantGlassy`): the glass passes draw
+   only those triangles.
 3. If a structure emits it, add it to that structure's `meshes`.
 
 ## A HUD panel

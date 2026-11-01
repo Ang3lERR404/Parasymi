@@ -415,6 +415,29 @@ tools' meshes (`setParts`) are drawn through indices that just count up.
   meshes (or packing normals and weights) would cut it a lot with the
   same picture.
 
+### Applied: the glass passes draw only what can be see-through (2026-11-01)
+The weld puts each mesh's see-through triangles last (`Soup.late`,
+`Run.early`), and the glass and air passes draw only that tail.
+- Plants: every part of a radiant or star plant; elsewhere pods, petals
+  (lanterns' and confluences' sap among them) and resin
+  (`renderer.plantGlassy`, mirroring plant.frag). A mesh with a placement
+  preview among its instances is drawn whole (`plants.Frame.ghosts`).
+- Parts: the roles `vertex.seeThrough` names, as the whole-mesh skip did.
+- The one change to the picture: inside a mesh, the see-through
+  triangles now draw after its solid ones in the solid pass too, so two
+  exactly coplanar triangles of one mesh could swap who wins (the z-fight
+  case). Seen-through triangles keep their own order, so blending is as
+  before.
+
+| scene msaa8 | before | after | plantsGlass | partsGlass | partsAir |
+|---|---|---|---|---|---|
+| demo | 25.9 | 22.8 | 2.8 -> 1.3 | 1.0 -> 0.15 | 0.8 -> <0.1 |
+| stress | 21.6 | 17.1 | 6.6 -> 1.5 | 0.2 -> <0.1 | 0.1 -> <0.1 |
+
+If plant.frag or part.frag gains a new see-through path, add it to
+`plantGlassy` or `vertex.seeThrough`, or it will vanish from the glass
+pass.
+
 Not art-safe (ask before): lower `min_sample_shading`, coarser LOD
 distances, cached far-cascade shadows (the sway would lag), impostors for
 far plants.

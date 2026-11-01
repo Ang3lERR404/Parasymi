@@ -97,10 +97,13 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*ren
     if(f.counts[i]==0 or ((p==.partsGlass or p==.partsAir) and !r.ext.partGlassy[i]))continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.partsShadow)renderer.caster(i)else i;
-    // its welded run
+    // its welded run, and how many of its indices this pass skips: the
+    // glass and air passes only its see-through tail
     const run=r.ext.partRuns[mesh];
+    const skip=if(p==.partsGlass or p==.partsAir)run.early else 0;
+    if(skip==run.count)continue;
     cmd.bindVertexBuffers(4,&.{r.ext.meshes.buf},&.{r.ext.partMorph[mesh]});
-    cmd.drawIndexed(run.count,f.counts[i],run.first,@intCast(run.base),f.first[i]);
+    cmd.drawIndexed(run.count-skip,f.counts[i],run.first+skip,@intCast(run.base),f.first[i]);
     stats.draws+=1;
   }
 }

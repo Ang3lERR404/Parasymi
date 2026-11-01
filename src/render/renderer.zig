@@ -414,7 +414,17 @@ const Growing=struct{
       const into=groups[z];
       for(&groups)|*gr|if(gr.*==from){gr.*=into;};
     };
-    g.welded=try weld.weld(gpa,.{.v=b.v.items,.skin=b.skin.items,.grow=b.grow.items},&ranges,&groups);
+    // the vertices that can be drawn see-through, their triangles put last
+    // so the glass passes draw only them
+    const late=try gpa.alloc(bool,b.v.items.len);
+    @memset(late,false);
+    for(species.ids)|id|for(0..meshgen.maxVariants)|v|for(0..meshgen.lods)|l|{
+      // this plant mesh's soup
+      const rg=g.plantRanges[meshgen.plantSlot(id,@intCast(v),@intCast(l))];
+      for(b.v.items[rg[0]..][0..rg[1]],late[rg[0]..][0..rg[1]])|x,*lt|lt.*=plantGlassy(id,@enumFromInt(x.part));
+    };
+    for(g.partRanges)|rg|for(b.v.items[rg[0]..][0..rg[1]],late[rg[0]..][0..rg[1]])|x,*lt|{lt.*=vertex.seeThrough(@enumFromInt(x.part));};
+    g.welded=try weld.weld(gpa,.{.v=b.v.items,.skin=b.skin.items,.grow=b.grow.items,.late=late},&ranges,&groups);
     // each plant slot's run, then each part slot's
     const runs=g.welded.runs;
     for(species.ids)|id|if(meshgen.growthKey(id,0)!=null)for(0..meshgen.lods)|l|for(0..meshgen.variants(id)-1)|v|{
@@ -518,6 +528,17 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   x.identity=0;
   std.log.info("meshes welded: {d} corners drawn from {d} vertices",.{w.indices.items.len,w.v.items.len});
   return true;
+}
+/// whether a vertex of role `p` in a plant of species `id` can be drawn
+/// see-through (plant.frag blends it below SOLID): every part of a radiant
+/// plant (its tissue is thin light), and elsewhere pods, petals (a
+/// lantern's and a confluence's sap among them) and resin. A placement
+/// preview is see-through whole: the glass pass draws all of its mesh.
+fn plantGlassy(id:species.Id,p:vertex.Part)bool{
+  return switch(species.get(id).genome.form){
+    .radiant,.star=>true,
+    .herb,.coil,.drift,.confluence=>p==.pod or p==.bloom or p==.resin,
+  };
 }
 /// per part slot: whether any of its run of `verts` can be see-through
 fn glassy(verts:[]const vertex.Mesh,ranges:*const[meshlib.slots]m.Vice(u32,2),out:*[meshlib.slots]bool)void{

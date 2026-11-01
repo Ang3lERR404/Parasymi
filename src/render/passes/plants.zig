@@ -38,6 +38,9 @@ pub const Frame=struct{
   first:[renderer.plantMeshes]u32=undefined,
   /// how many instances each mesh has
   counts:[renderer.plantMeshes]u32=@splat(0),
+  /// whether any of each mesh's instances is a placement preview (drawn
+  /// see-through whole, so the glass pass draws all of its mesh)
+  ghosts:[renderer.plantMeshes]bool=@splat(false),
 };
 /// makes one frame's buffer: room for every instance
 pub fn initFrame(c:*const Ctx)ctx.Error!Frame{
@@ -49,6 +52,13 @@ pub fn deinitFrame(f:*Frame,c:*const Ctx)void{f.inst.deinit(c);}
 pub fn prepare(r:*renderer.Renderer,f:*Frame,scene:*const renderer.Scene,stats:*renderer.Stats)void{
   _=r;
   stats.instances=pass.upload(vertex.PlantInstance,&f.inst,&scene.instances,&f.first,&f.counts,max);
+  for(&f.ghosts,scene.instances)|*gh,list|{
+    gh.*=false;
+    for(list)|in|if(in.c[1]>0.5){
+      gh.*=true;
+      break;
+    };
+  }
 }
 /// their solid fragments.
 pub fn record(r:*renderer.Renderer,f:*Frame,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
@@ -66,10 +76,13 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,scene:*con
     if(f.counts[i]==0)continue;
     // the mesh drawn: the caster's coarsest one in the shadow pass
     const mesh=if(p==.plantsShadow)renderer.caster(i)else i;
-    // its welded run
+    // its welded run, and how many of its indices this pass skips: the
+    // glass pass only its see-through tail, unless a preview is among them
     const run=r.ext.plantRuns[mesh];
+    const skip=if(p==.plantsGlass and !f.ghosts[i])run.early else 0;
+    if(skip==run.count)continue;
     cmd.bindVertexBuffers(2,&.{r.ext.meshes.buf},&.{r.ext.plantMorph[mesh]});
-    cmd.drawIndexed(run.count,f.counts[i],run.first,@intCast(run.base),f.first[i]);
+    cmd.drawIndexed(run.count-skip,f.counts[i],run.first+skip,@intCast(run.base),f.first[i]);
     stats.draws+=1;
   }
 }

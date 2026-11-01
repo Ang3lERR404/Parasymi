@@ -21,7 +21,8 @@ That was 2026-10-25. By 2026-11-01 the richer garden had grown it to
 demo 22.2 (off) / 38.4 (msaa8) and stress 52.5 (msaa8): the vertex
 stage of triangle-soup meshes, run three times per plant (solid, glass,
 shadow). Welding the meshes into indexed ones brought it to demo 25.9 /
-stress 21.6 (msaa8). The breakdown and the methods ranked are in
+stress 21.6 (msaa8); drawing only the see-through triangles in the glass
+passes, to demo 22.8 / stress 17.1. The breakdown and the methods ranked are in
 [shader-optimization.md](shader-optimization.md#round-two-2026-11-01-the-vertices-are-the-cost-now).
 
 Memory:
