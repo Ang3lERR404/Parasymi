@@ -43,7 +43,7 @@ pub const meshes=.{.haloFlash,.haloProjection,.haloRing};
 /// what a diamond is: one tile, floating as high as the blooms hang, at
 /// the heart of its ring, over whatever is under it; it draws itself
 /// (`bare`, forming on the GPU) and takes 8 s to gather when put down
-pub const def:st.Def=.{.item=.diamond,.lineage=.radiant,.size=1,.mesh=.haloDiamond,.floating=true,.hover=halo.hover,.bare=true,.grow=8,.unforms=true};
+pub const def:st.Def=.{.item=.diamond,.lineage=.radiant,.size=1,.mesh=.haloDiamond,.floating=true,.hover=halo.hover,.bare=true,.grow=8};
 /// how a diamond came to be
 pub const Born=enum(u8){
   /// woven and put down by hand: it gathers as it grows in

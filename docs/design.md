@@ -172,10 +172,10 @@ plant.
   spore and takes in what comes back. It lets go only what came by spore
   (`kept` counts per kind).
 - **Monfris** (weftstone + driftbraid, INTERWEAVING): 2×2. It weaves
-  everything convergent (`Recipe.convergent`, `Def.lineage`: the polyp, weftstone,
+  everything convergent (by `Def.lineage`: the polyp, weftstone,
   driftbraid, monfris, Vultrixi; the germinator weaves these too, so the
-  first monfris can be made), the arsthraxia once the unforming has
-  evolved it into a convergent structure (`Recipe.evolves`), and the
+  first monfris can be made, never the hands), the arsthraxia once the
+  unforming has evolved it into a convergent structure (`Def.evolves`), and the
   advanced tier only it weaves
   (`Recipe.advanced`, none yet); together `craft.loomFor`. Never the
   diamond or the vesper seed (radiant, with the celestial bloom), which are the
@@ -267,9 +267,10 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
   planting itself: a structure the wolf may pick up. Its lineage is still
   to be designed (the gardener's call).
 - **Everything else dies:** symbiotic and parasitic plants wither, and
-  every structure that is not convergent (`Def.unforms`: the base ones,
-  conduit, sap cache, germinator, root-digger; the lineage ones; and the
-  diamond, its shards coming loose) grows back down to nothing and is
+  every structure of another lineage (`Def.unforms()`, from `Def.lineage`:
+  the base ones, conduit, sap cache, germinator, root-digger, all
+  symbiotic; the lineage ones; and the radiant diamond, its shards coming
+  loose) grows back down to nothing and is
   gone (`Structure.fade`), over 8 s, each in 6 s. Only the convergent
   plants and structures (the confluence, the polyp, weftstone,
   driftbraid, monfris, Vultrixi) and the strange seed remain.

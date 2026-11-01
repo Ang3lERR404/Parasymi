@@ -18,7 +18,7 @@ const Parts=lib.parts.Parts;
 /// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
 /// what it is: lying on one tile, there at once, still
-pub const def:st.Def=.{.item=.strangeSeed,.size=1,.mesh=.strangeSeed,.still=true};
+pub const def:st.Def=.{.item=.strangeSeed,.lineage=null,.size=1,.mesh=.strangeSeed,.still=true};
 /// the soft light it holds, pulsing slowly
 pub fn emit(_:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
   try out.light(ctr+m.v3(0,0.1,0),m.v3(0.85,0.8,1)*m.splat3(0.6+0.2*@sin(tf*0.8)),3);

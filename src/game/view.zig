@@ -473,7 +473,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // its size (tiles)
     const size=m.f(def.size);
     y+=heave(size)*pose.lift;
-    try roots(g,m.footprintCentre(d.x,d.y,def.size,d.ground),size,m.dirYaw(d.dir)+pose.spin,pose,d.seed,def.affinity()<-0.5);
+    try roots(g,m.footprintCentre(d.x,d.y,def.size,d.ground),size,m.dirYaw(d.dir)+pose.spin,pose,d.seed,def.drawnAs()==.parasitic);
   }
   if(def.floating){
     // floaters hang in the air: a slow rise and fall and a lazy drift,
@@ -564,7 +564,7 @@ fn structures(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
     });
     try st.emit(s,&g.parts,ctr,tf);
     g.parts.around=null;
-    if(rooted and !pose.still())try roots(g,ctr,m.f(s.def().size),m.dirYaw(s.dir)+pose.spin,pose,s.seed,s.def().pale);
+    if(rooted and !pose.still())try roots(g,ctr,m.f(s.def().size),m.dirYaw(s.dir)+pose.spin,pose,s.seed,s.def().pale());
   }
 }
 /// how high a rooted thing `size` tiles across heaves itself as it turns

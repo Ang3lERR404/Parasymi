@@ -21,7 +21,7 @@ const Parts=lib.parts.Parts;
 const Color=lib.engine.ui.draw.Color;
 /// what it is: floating at a flower's height over its tile, there at
 /// once, drawing itself (it drifts in place)
-pub const def:st.Def=.{.item=.driftFlower,.size=1,.mesh=.driftFlower,.floating=true,.hover=hover,.bare=true};
+pub const def:st.Def=.{.item=.driftFlower,.lineage=.convergent,.size=1,.mesh=.driftFlower,.floating=true,.hover=hover,.bare=true};
 /// how high it floats
 const hover:f32=1.1;
 /// how far (tiles, between footprints) from an evolved arsthraxia it is

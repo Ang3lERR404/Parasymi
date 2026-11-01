@@ -1,4 +1,4 @@
-//! CELESTIAL BLOOM: the garden's power source. A floating symbiote that
+//! CELESTIAL BLOOM: the garden's power source. A floating radiant plant that
 //! yields nothing; it radiates. Mature, it holds a field of celestial
 //! energy around it (`radiance`), and it links with every other bloom
 //! within `link` tiles into one network: a growing bloom joined to a

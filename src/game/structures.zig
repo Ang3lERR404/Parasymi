@@ -36,7 +36,7 @@
 //!                               (by research), its growing in aside
 //!   icon(ic, col)               its bulb in the HUD: the seed (`ic.coat`) and a
 //!                               sprout or two showing what it does (`icon.zig`)
-//!   meets:Meeting               the other lineage's structure that, grown
+//!   meets:Meeting               another structure that, grown
 //!                               beside it, is a discovery (`Structures.meetings`)
 //!   adopts(s, kind, have) bool  whether it takes on one more child of `kind`
 //!                               beyond the `have` it has (`dependOn`;
@@ -248,18 +248,27 @@ pub const Def=struct{
   /// what it emits travels far from it (a sporecaster's spores): it is
   /// emitted however far it stands from the view
   far:bool=false,
+  /// the lineage it belongs to, the one place that says so: every kind
+  /// names it (null only while it is not yet known, as the strange seed's);
+  /// what the unforming does to it, whether a monfris or the hands weave
+  /// it and how pale its roots are all follow from it
+  lineage:?species.Lineage,
+  /// the lineage the unforming evolves it into instead of taking it (the
+  /// arsthraxia: symbiotic into convergent)
+  evolves:?species.Lineage=null,
+  /// whether the unforming takes it, grown back down to nothing and gone
+  /// (game/unforming.zig): every kind of a lineage but the convergent one,
+  /// unless it evolves
+  pub fn unforms(d:Def)bool{
+    const l=d.lineage orelse return false;
+    return d.evolves==null and l!=.convergent;
+  }
   /// a parasite's: the roots it turns on (R) are pale, not bark
-  pale:bool=false,
-  /// the lineage it belongs to (null: none named yet; the arsthraxia
-  /// evolves from symbiotic into convergent in the unforming)
-  lineage:?species.Lineage=null,
-  /// not convergent: the unforming takes it, grown
-  /// back down to nothing and gone (game/unforming.zig)
-  unforms:bool=false,
+  pub fn pale(d:Def)bool{return d.lineage==.parasitic;}
 };
 /// every kind's `def`, looked up by kind
 pub const defs=reg.table(Def,"def");
-/// a structure of the other lineage (`kind`) that, both grown within
+/// another structure (`kind`, most often of the other lineage) that, both grown within
 /// `meetCount` tiles of each other, is witnessed as the discovery `found`
 pub const Meeting=struct{kind:Kind,found:prog.Discovery};
 /// tiles apart (between footprints) that still count as side by side

@@ -160,16 +160,11 @@ pub fn momentOf(seed:f32,k:f32)f32{return delayOf(seed,spread)+k*shatterTime;}
 fn delayOf(seed:f32,over:f32)f32{
   return over*rng.unit(rng.hash2(0x0F0E,m.floorTo(i32,seed*100003),7));
 }
-/// whether a species is radiant (the celestial bloom, the vesper): it shatters
-pub fn radiant(sp:species.Id)bool{
-  return switch(species.get(sp).genome.form){
-    .radiant,.star=>true,
-    else=>false,
-  };
-}
-/// whether a species is of a lineage the event kills (symbiotic or parasitic, not radiant)
+/// whether a species is of the radiant lineage: it shatters
+pub fn radiant(sp:species.Id)bool{return species.get(sp).lineage==.radiant;}
+/// whether a species is of a lineage the event kills (symbiotic or parasitic)
 fn dies(sp:species.Id)bool{
-  return switch(species.get(sp).lineage){.symbiotic,.parasitic=>!radiant(sp),.convergent,.radiant=>false};
+  return switch(species.get(sp).lineage){.symbiotic,.parasitic=>true,.convergent,.radiant=>false};
 }
 /// one tick of the event: begun once its study is learned, it shatters the
 /// radiant plants, withers and unforms the lineages, gathers the seed and
@@ -304,7 +299,7 @@ fn unform(g:*Game)Allocator.Error!void{
     i-=1;
     // the structure
     const s=&g.structs.list.items[i];
-    if(!s.def().unforms)continue;
+    if(!s.def().unforms())continue;
     s.fade=m.clamp01((u.t-delayOf(s.seed,dieSpread))/dieTime);
     if(s.fade<1)continue;
     // gone

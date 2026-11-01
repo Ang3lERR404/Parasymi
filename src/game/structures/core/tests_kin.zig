@@ -223,12 +223,14 @@ test"a germinator weaves structure bulbs as well as seeds, and lets go only what
   // only a monfris weaves
   try testing.expectEqual(craft.hand.len-craft.advanced.len,recipes(.germinator,&g).len);
   for(recipes(.monfris,&g))|r|try testing.expect(craft.isLoom(r));
-  // a monfris weaves every weave of both lineages, and never a diamond
+  // a monfris weaves every convergent weave, never a radiant one (the
+  // diamond, the vesper seed), and the hands neither
   for(craft.hand,0..)|h,r|{
-    // whether the monfris offers this weave
+    // whether the monfris offers this weave, and whether the hands do
     const on=indexOfScalar(u8,recipes(.monfris,&g),@intCast(r))!=null;
-    if(h.convergent)try testing.expect(on);
-    if(h.out==.diamond or h.out==.seedVesper)try testing.expect(!on);
+    const byHand=indexOfScalar(u8,&craft.byHand,@intCast(r))!=null;
+    if(h.lineage()==.convergent)try testing.expect(on and !byHand);
+    if(h.lineage()==.radiant)try testing.expect(!on and !byHand);
   }
   // the arsthraxia is the monfris's only once the unforming has evolved it
   for(craft.hand,0..)|h,r|if(h.out==.arsthraxia){
@@ -329,13 +331,15 @@ test"partners: one way or both ways, re-pairing leaves the old one, uprooting cu
   _=ss.remove(&w,b);
   try testing.expect(ss.get(ss.at(&w,2,0).?).partner()==null);
 }
-test"every convergent structure is a monfris's to weave, and no radiant one is"{
+test"every woven convergent structure is a monfris's to weave, and no radiant one is"{
   // the weave tables
   const craft=lib.craft;
   for(reg.ids)|k|{
     // this kind's def, and its bulb's weave among the monfris's, if it is one
     const d=defs.get(k);
     const lin=d.lineage orelse continue;
+    // what is never woven (a drift flower: a polyp lets it drift) is no one's
+    if(!craft.woven(d.item))continue;
     const on=for(craft.loom)|r|{
       if(craft.hand[r].out==d.item)break true;
     }else false;

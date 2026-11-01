@@ -16,6 +16,22 @@ const testing=std.testing;
 const items=lib.items;
 /// the research tree, which gates some weaves
 const prog=lib.progression;
+/// the plants, whose lineage a seed's weave takes
+const species=lib.species;
+/// the structures, whose lineage a bulb's weave takes
+const st=lib.structures;
+/// the structure kind whose bulb `item` is, if it is one
+fn kindOf(item:items.Item)?st.Kind{
+  inline for(comptime std.enums.values(st.Kind))|k|if(st.defs.get(k).item==item)return k;
+  return null;
+}
+/// the lineage of `item`: a seed's species', a bulb's structure's; null
+/// for matter, or a structure whose lineage is not yet known
+pub fn lineageOf(item:items.Item)?species.Lineage{
+  if(item.plants())|sp|return species.get(sp).lineage;
+  const k=kindOf(item) orelse return null;
+  return st.defs.get(k).lineage;
+}
 /// one weave: what comes out, how many, what goes in and how long it takes
 pub const Recipe=struct{
   /// the item woven
@@ -28,21 +44,19 @@ pub const Recipe=struct{
   time:f32,
   /// research that must be known before this can be woven
   needs:?prog.Id=null,
-  /// only a germinator weaves it (seeds always are; so are the convergent
-  /// structures, the hands cannot bind two lineages into one)
-  germinator:bool=false,
   /// the advanced tier: only a monfris weaves it, never a germinator or
   /// the hands
   advanced:bool=false,
-  /// of both lineages: a monfris weaves it too (a germinator still does,
-  /// so the first monfris can be woven)
-  convergent:bool=false,
-  /// of one lineage until the unforming, which evolves it into both (the
-  /// arsthraxia): a monfris weaves it too from then on
-  evolves:bool=false,
   /// whether the research it needs (if any) is known
   pub fn unlocked(r:Recipe,g:*const prog.Progression)bool{
     return if(r.needs)|id|g.done.contains(id)else true;
+  }
+  /// the lineage of what it weaves (a seed's species', a bulb's structure's)
+  pub fn lineage(r:Recipe)?species.Lineage{return lineageOf(r.out);}
+  /// the lineage the unforming evolves what it weaves into, if any
+  pub fn evolves(r:Recipe)?species.Lineage{
+    const k=kindOf(r.out) orelse return null;
+    return st.defs.get(k).evolves;
   }
 };
 /// everything that can be woven, seeds among them (only a germinator weaves those;
@@ -60,14 +74,14 @@ pub const hand=[_]Recipe{
   .{.out=.sapCache,.in=&.{.{.item=.fibre,.n=4},.{.item=.grit,.n=4}},.time=2},
   // no essence: nothing yields it until the germinator has woven a seed
   .{.out=.germinator,.in=&.{.{.item=.fibre,.n=6},.{.item=.grit,.n=4},.{.item=.starlight,.n=2}},.time=3},
-  .{.out=.arsthraxia,.in=&.{.{.item=.fibre,.n=8},.{.item=.grit,.n=6},.{.item=.essence,.n=4},.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2}},.time=4,.evolves=true},
+  .{.out=.arsthraxia,.in=&.{.{.item=.fibre,.n=8},.{.item=.grit,.n=6},.{.item=.essence,.n=4},.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2}},.time=4},
   .{.out=.rootDigger,.in=&.{.{.item=.fibre,.n=3},.{.item=.grit,.n=2},.{.item=.leyShard,.n=1}},.time=2,.needs=.deepRooting},
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
-  .{.out=.polyp,.in=&.{.{.item=.fibre,.n=4},.{.item=.essence,.n=3},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=2}},.time=3,.convergent=true},
+  .{.out=.polyp,.in=&.{.{.item=.fibre,.n=4},.{.item=.essence,.n=3},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=2}},.time=3},
   // decision: a diamond is woven from what a halo is grown from, condensed
   // (the brief sets no cost); a germinator's alone, never a monfris's or
   // the hands' (the gardener's word)
-  .{.out=.diamond,.in=&.{.{.item=.starlight,.n=6},.{.item=.leyShard,.n=4},.{.item=.convergenceEssence,.n=3},.{.item=.fibre,.n=2}},.time=6,.needs=.celestialDefragmentation,.germinator=true},
+  .{.out=.diamond,.in=&.{.{.item=.starlight,.n=6},.{.item=.leyShard,.n=4},.{.item=.convergenceEssence,.n=3},.{.item=.fibre,.n=2}},.time=6,.needs=.celestialDefragmentation},
   // decision: costs for the lineages' structures are set here (the brief sets none)
   .{.out=.loomfern,.in=&.{.{.item=.fibre,.n=5},.{.item=.essence,.n=2},.{.item=.grit,.n=2}},.time=2.5,.needs=.livingLooms},
   .{.out=.lithophage,.in=&.{.{.item=.grit,.n=6},.{.item=.leyShard,.n=2},.{.item=.essence,.n=2},.{.item=.fibre,.n=2}},.time=3,.needs=.lithophagy},
@@ -79,19 +93,23 @@ pub const hand=[_]Recipe{
   // decision: the convergent structures are woven from the pair they grow
   // out of, bound by what the lineages' meeting condenses (the brief sets
   // no cost); last, so the weaves chosen in saved gardens keep their places
-  .{.out=.weftstone,.in=&.{.{.item=.loomfern,.n=1},.{.item=.lithophage,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.starlight,.n=2}},.time=4,.needs=.wovenStone,.germinator=true,.convergent=true},
-  .{.out=.driftbraid,.in=&.{.{.item=.braidedConduit,.n=1},.{.item=.sporecaster,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.essence,.n=2}},.time=4,.needs=.braidedDrift,.germinator=true,.convergent=true},
+  .{.out=.weftstone,.in=&.{.{.item=.loomfern,.n=1},.{.item=.lithophage,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.starlight,.n=2}},.time=4,.needs=.wovenStone},
+  .{.out=.driftbraid,.in=&.{.{.item=.braidedConduit,.n=1},.{.item=.sporecaster,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.essence,.n=2}},.time=4,.needs=.braidedDrift},
   // decision: the monfris from the two convergent structures it grows
   // out of, the Vultrixi from the pair it does, both bound by convergence
   // essence and ley crystals (the brief sets no cost)
-  .{.out=.monfris,.in=&.{.{.item=.weftstone,.n=1},.{.item=.driftbraid,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.interweaving,.germinator=true,.convergent=true},
-  .{.out=.vultrixi,.in=&.{.{.item=.gatheringCrown,.n=1},.{.item=.ganglion,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.sharedNerves,.germinator=true,.convergent=true},
+  .{.out=.monfris,.in=&.{.{.item=.weftstone,.n=1},.{.item=.driftbraid,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.interweaving},
+  .{.out=.vultrixi,.in=&.{.{.item=.gatheringCrown,.n=1},.{.item=.ganglion,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.sharedNerves},
 };
 /// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}
-/// whether the hands cannot weave it: a seed, one marked for a germinator,
-/// or the advanced tier
-pub fn germinatorOnly(idx:usize)bool{return isSeedRecipe(idx) or hand[idx].germinator or hand[idx].advanced;}
+/// whether the hands cannot weave it: a seed, the advanced tier, or what
+/// is convergent or radiant (the hands cannot bind two lineages into one,
+/// nor gather light)
+pub fn germinatorOnly(idx:usize)bool{
+  const lin=hand[idx].lineage();
+  return isSeedRecipe(idx) or hand[idx].advanced or lin==.convergent or lin==.radiant;
+}
 /// whether the weave at `idx` in `hand` is the advanced tier
 pub fn isAdvanced(idx:usize)bool{return hand[idx].advanced;}
 /// the recipes the wolf weaves by hand (indices into `hand`): all but what
@@ -105,14 +123,14 @@ pub const all=recipesWhere(isAdvanced,false);
 /// the advanced tier: what only a monfris weaves (indices into `hand`).
 pub const advanced=recipesWhere(isAdvanced,true);
 /// whether a monfris weaves the weave at `idx` in `hand`: the advanced
-/// tier, or anything of both lineages
-pub fn isLoom(idx:usize)bool{return hand[idx].advanced or hand[idx].convergent;}
+/// tier, or anything convergent
+pub fn isLoom(idx:usize)bool{return hand[idx].advanced or hand[idx].lineage()==.convergent;}
 /// what a monfris may be set to before the unforming: the advanced tier
 /// and every convergent seed and bulb (indices into `hand`).
 pub const loom=recipesWhere(isLoom,true);
 /// whether a monfris weaves the weave at `idx` once the unforming has
 /// evolved what it evolves
-pub fn isLoomEvolved(idx:usize)bool{return isLoom(idx) or hand[idx].evolves;}
+pub fn isLoomEvolved(idx:usize)bool{return isLoom(idx) or hand[idx].evolves()==.convergent;}
 /// what a monfris may be set to after the unforming: its weaves and what
 /// the unforming made convergent (indices into `hand`).
 pub const loomEvolved=recipesWhere(isLoomEvolved,true);

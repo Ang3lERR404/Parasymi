@@ -52,7 +52,7 @@ const v3=m.v3;
 pub const meshes=.{.bellyLump,.ganglionNerve};
 /// what a ganglion is: grown from its seed, one tile across, a pale low
 /// knot that stores and swaps sap, swaying a little
-pub const def:st.Def=.{.item=.ganglion,.size=1,.mesh=.ganglion,.store=true,.grow=4,.sway=0.4,.tall=0.45,.sap=0.3,.pale=true,.unforms=true};
+pub const def:st.Def=.{.item=.ganglion,.lineage=.parasitic,.size=1,.mesh=.ganglion,.store=true,.grow=4,.sway=0.4,.tall=0.45,.sap=0.3};
 /// the most things its bladder holds at once
 pub const holdMost=8;
 /// seconds between one hand-off and the next

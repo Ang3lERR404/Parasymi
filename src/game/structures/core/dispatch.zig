@@ -24,7 +24,7 @@ const Ctx=lib.structures.structure.Ctx;
 const Id=lib.structures.Id;
 /// tiles apart that still count as side by side, for a meeting
 const meetCount=lib.structures.meetCount;
-/// the other lineage's kind a structure meets, and what that reveals
+/// the kind a structure meets, and what that reveals
 const Meeting=lib.structures.Meeting;
 /// what one structure tells another
 const Msg=lib.structures.messages.Msg;

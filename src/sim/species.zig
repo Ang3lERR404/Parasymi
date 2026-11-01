@@ -7,6 +7,8 @@
 const lib=@import("../lib.zig");
 /// what can be held: the seed that plants a species, what it yields
 const items=lib.items;
+/// the test harness
+const testing=lib.std.testing;
 /// the engine package, reached through the hub
 const engine=lib.engine;
 /// colour types, for each genome's stem, leaf and bloom
@@ -21,7 +23,7 @@ const parts=struct{
   pub const lumenroot=@import("species/lumenroot.zig");
   /// the first parasite, draining its neighbours and the ley
   pub const thornleech=@import("species/thornleech.zig");
-  /// the evening star's flower, the first convergent hybrid
+  /// the evening star's flower, a radiant hybrid
   pub const vesper=@import("species/vesper.zig");
   /// a floater that drinks the night sky and condenses starlight
   pub const driftwisp=@import("species/driftwisp.zig");
@@ -48,8 +50,8 @@ pub const Lineage=enum(u8){
   parasitic,
   /// both at once: the first step toward the eventual merge of the two paths.
   convergent,
-  /// the sky's: gathered from light, never grown (the vesper; it shares
-  /// with symbiotes and drains parasites)
+  /// the sky's: gathered from light, never grown (the celestial bloom, the
+  /// vesper, the diamond)
   radiant,
   /// shader-side scalar: +1 symbiotic, -1 parasitic, 0 convergent or radiant.
   pub fn affinity(l:Lineage)f32{
@@ -202,8 +204,10 @@ pub const Species=struct{
   /// growth stages named on hover (0: unstaged; names in `game/text.zig`,
   /// the mesh itself grows continuously; see meshgen `keys`).
   stages:u8=0,
-  /// the shader-side lineage scalar it is drawn with (`look`, else its lineage's)
-  pub fn affinity(s:*const Species)f32{return(s.look orelse s.lineage).affinity();}
+  /// the lineage it is drawn as: `look`, else its own
+  pub fn drawnAs(s:*const Species)Lineage{return s.look orelse s.lineage;}
+  /// the shader-side lineage scalar it is drawn with
+  pub fn affinity(s:*const Species)f32{return s.drawnAs().affinity();}
   /// which stage a plant at `growth` shows (0 when unstaged).
   pub fn stage(s:*const Species,growth:f32)u32{
     if(s.stages==0)return 0;
@@ -220,4 +224,17 @@ pub inline fn get(id:Id)*const Species{return table.getPtrConst(id);}
 pub fn fromSeed(item:items.Item)?Id{
   inline for(ids)|id|if(table.get(id).seed)|s|if(s==item)return id;
   return null;
+}
+test"a body of one lineage's kit is grown only for that lineage"{
+  for(ids)|id|{
+    // the species, and the lineage its body belongs to, if only one
+    const s=table.get(id);
+    const of:?Lineage=switch(s.genome.form){
+      .coil=>.parasitic,
+      .confluence=>.convergent,
+      .radiant,.star=>.radiant,
+      .herb,.drift=>null,
+    };
+    if(of)|l|try testing.expectEqual(l,s.lineage);
+  }
 }

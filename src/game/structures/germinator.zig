@@ -53,8 +53,8 @@ pub const meshes=.{.germinatorCore,.germinatorCup,.germinatorPool,.germinatorSee
 /// what a germinator is: grown from its seed, two tiles across, a store,
 /// a swaying tree that stands still on its spot
 pub const def:st.Def=.{
-  .item=.germinator,.size=2,.mesh=.germinator,.preview=.germinatorWhole,.store=true,
-  .sway=0.55,.tall=mesh.tall,.grow=6,.still=true,.unforms=true,
+  .item=.germinator,.lineage=.symbiotic,.size=2,.mesh=.germinator,.preview=.germinatorWhole,.store=true,
+  .sway=0.55,.tall=mesh.tall,.grow=6,.still=true,
 };
 /// weave speed multiplier relative to hand-weaving
 const speed:f32=0.6;
