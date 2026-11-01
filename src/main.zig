@@ -158,6 +158,10 @@ pub fn main(init:Init)!void{
   // decision: alt mode is a flag beside the mode, not a mode, so
   // `--panel=overview` roams with it held on
   var overview=false;
+  // `--unforming`: the world event begins at once (its study learned), to
+  // watch it unattended
+  // decision: a test flag beside `--demo`, not a garden of its own
+  var unforming=false;
   for(args[1..])|a|{
     if(eql(u8,a,"--inspect"))inspect=.player;
     if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
@@ -169,6 +173,7 @@ pub fn main(init:Init)!void{
     if(eql(u8,a,"--demo"))demo=true;
     if(eql(u8,a,"--stress"))stress=true;
     if(eql(u8,a,"--load"))load=true;
+    if(eql(u8,a,"--unforming"))unforming=true;
     if(startsWith(u8,a,"--tod="))tod=try parseFloat(f32,a["--tod=".len..]);
     if(startsWith(u8,a,"--seed="))seed=try parseInt(u64,a["--seed=".len..],0);
     if(startsWith(u8,a,"--plant="))lone=.{.what=.{.plant=stringToEnum(species.Id,a["--plant=".len..]) orelse return error.BadPlant}};
@@ -281,6 +286,7 @@ pub fn main(init:Init)!void{
     if(stress)try setups.stress(&game,stressSide);
   }
   if(tod)|t|game.sky.tod=t;
+  if(unforming)game.prog.done.insert(.unforming);
   if(inspect)|f|{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});

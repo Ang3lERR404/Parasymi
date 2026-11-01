@@ -255,7 +255,8 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
   out, one after another over 6 s, each in 5 s (GPU: `PlantInstance.glitch`,
   plant.vert `unformAt`, plant.frag `unform`; `--plant=bloom --state=unform`).
 - **Their shards** fly up to one point 14 m over their middle and gather
-  into a STRANGE SEED, which falls (2.2 s) and lies on the ground, never
+  into a STRANGE SEED in a star of their light, which falls (2.2 s), a
+  burst of light where it lands, and lies on the ground, never
   planting itself: a structure the wolf may pick up. Its lineage is still
   to be designed (the gardener's call).
 - **Everything else dies:** symbiotic and parasitic plants wither, and
@@ -272,8 +273,10 @@ of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
 - **The stars shatter:** every starlight mote shatters at once as it
   begins (`Starfall.shatterAll`), and no star falls again: starlight is
   no longer to be had.
-- **The sky shifts for good** (1 s in, over 12 s; `Sky.shift`): it turns
-  the ley's violet, glowing, its sun and moon (and stars) gone. The glow
+- **The sky shifts for good** (1 s in, over 12 s; `Sky.shift`): the old
+  sky shatters like glass from the zenith down to the horizon, falling
+  away pane by pane to the ley's violet, glowing, its sun and moon (and
+  stars) gone with it (sky.frag). The glow
   turning rose by day and deep by night is the only tell of the time.
   The key light becomes the glow overhead, ley-tinted.
 - **The ley lines seal up** (over the middle of the shift; done 10 s in):

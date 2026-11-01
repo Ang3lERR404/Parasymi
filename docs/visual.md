@@ -374,13 +374,26 @@ The bloom post-process makes the glow round the glints.
 - Star motes (faceted core, ring, needle rays) turn, twinkle, hover and
   trail echoes while falling. At the unforming each shatters into 6
   crystal shards of its warm light, flung out and fading (1.4 s).
-- **Shifted** (after the unforming, `SHIFT` in common.glsl, the paws'
-  spare push slot): the ley's glow. No sun, moon or stars; veils of violet
-  light flowing slowly, warped through one another, their hue wandering;
-  a plexus drifting across the dome (the ley lines' own, laid on a plane
-  over the eye); a glowing band along the horizon; all pulsing as the ley
-  lines did. Rose violet by day, deep blue violet by night. The key light
-  and the ambient sky turn ley violet with it.
+- **Shifting** (the unforming, `SHIFT` in common.glsl, the paws' spare
+  push slot): the old sky shatters like glass from the zenith down. A ring
+  of bright cracks sweeps over the dome to the horizon (about 6 s), ragged
+  where the sky tears unevenly, finer cracks splintering each pane; behind
+  it each pane flares and falls away at its own moment, the ley's glow
+  flooding in, a seam of light all along the front. The sun, moon and
+  stars go with the panes they were on. The fog and horizon turn as the
+  front nears the horizon (sky.zig `fogFrom`, `fogSpan`).
+- **Shifted**: the ley's glow. No sun, moon or stars; veils of violet
+  light flowing slowly round the dome, warped through one another, their
+  hue wandering; a plexus drifting across it (points on a shell round the
+  eye, threads bowed along the dome); both drawn on the dome itself, so
+  they keep their size from the zenith to the horizon and the sky reads
+  round. A glowing band along the horizon; all pulsing as the ley lines
+  did. Rose violet by day, deep blue violet by night. The key light and
+  the ambient sky turn ley violet with it.
+- **The seed gathering** (`unforming.draw`): a star of gathered light
+  swells round it as the shards arrive, breathing, lighting the air round
+  it (so it reads from anywhere in the garden), shrinking back into the
+  seed as it falls; where it lands a burst of light is flung out (1.4 s).
 - A low camera pitch widens the view toward the horizon.
 
 ## Lighting (engine `render/light.zig`)

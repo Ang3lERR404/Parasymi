@@ -340,7 +340,7 @@ pub fn draw(g:*Game,tf:f32)Allocator.Error!void{
   const u=&g.unforming;
   if(u.phase==.waiting or g.specimen!=null)return;
   try drifts(g,tf);
-  if(u.phase==.landed)return;
+  if(u.phase==.landed)return landing(g);
   // where the seed gathers
   const sky=m.v3(u.at[0],u.at[1],u.at[2]);
   for(g.unformSources.items)|src|for(0..shardsEach)|j|{
@@ -352,7 +352,7 @@ pub fn draw(g:*Game,tf:f32)Allocator.Error!void{
     const swirl=m.v3(@cos(a),0,@sin(a))*m.splat3(1.2*@sin(m.pi*k));
     const e=k*k*(3-2*k);
     const at=src.at+(sky-src.at)*m.splat3(e)+swirl+m.v3(0,2.5*@sin(m.pi*k),0);
-    try g.parts.emit(.unformShard,m.chain(&.{m.translate(at),m.rotY(tf*3+a),m.rotX(tf*2.3+a),m.scale3(m.splat3(1-0.6*k))}),.{.glow=1.5,.phase=@mod(src.seed*13+m.f(j)*0.37,1),.flutter=k});
+    try g.parts.emit(.unformShard,m.chain(&.{m.translate(at),m.rotY(tf*3+a),m.rotX(tf*2.3+a),m.scale3(m.splat3(shardSize*(1-0.6*k)))}),.{.glow=2.4,.phase=@mod(src.seed*13+m.f(j)*0.37,1),.flutter=k});
   };
   // the seed, gathering in the sky or falling
   const ground=g.heightAt(m.floorTo(i32,u.at[0]),m.floorTo(i32,u.at[2]));
@@ -361,8 +361,42 @@ pub fn draw(g:*Game,tf:f32)Allocator.Error!void{
   const k=u.gathered();
   if(k<=0)return;
   try g.parts.emit(.strangeSeed,m.chain(&.{m.translate(at),m.rotY(tf*0.6),m.scale3(m.splat3(m.lerp(0.2,1,k)))}),.{.glow=1+k,.phase=0.5,.flutter=1-k});
-  try g.parts.light(at,m.v3(0.9,0.85,1.0)*m.splat3(1.5*k),8);
+  // the star of gathered light it forms in, swelling as the shards arrive
+  // and breathing, so it reads from anywhere in the garden; it shrinks back
+  // into the seed as it falls
+  const falling=if(u.phase==.falling)m.clamp01((u.t-shatterEnd)/fallTime)else 0;
+  const breath=1+0.15*@sin(tf*5);
+  const star=m.lerp(starFrom,starTo,k)*breath*(1-0.75*falling);
+  try g.parts.emit(.mote,m.chain(&.{m.translate(at),m.rotY(tf*0.9),m.rotZ(0.3*@sin(tf*0.7)),m.scale3(m.splat3(star))}),.{.glow=2.5,.phase=0.5});
+  try g.parts.light(at,seedLight*m.splat3(k*breath),seedReach);
 }
+/// a shard's size as it breaks away (it shrinks as it nears the seed)
+const shardSize:f32=1.6;
+/// the star of gathered light round the seed: its size as the first shards
+/// arrive, and once all have
+const starFrom:f32=1.5;
+/// (once all have)
+const starTo:f32=6;
+/// the seed's light in the sky, lighting the air round it
+const seedLight=m.V3{2.4,2.1,3.0};
+/// how far it reaches (m)
+const seedReach:f32=18;
+/// seconds the seed's landing flares
+const landTime:f32=1.4;
+/// the seed lands: a burst of light flung out where it struck, fading
+fn landing(g:*Game)Allocator.Error!void{
+  // the event, and how far through the flare it is
+  const u=&g.unforming;
+  const age=(u.t-shatterEnd-fallTime)/landTime;
+  if(age<0 or age>=1)return;
+  // where it struck
+  const ground=g.heightAt(m.floorTo(i32,u.at[0]),m.floorTo(i32,u.at[2]));
+  const at=m.v3(u.at[0],ground+0.3,u.at[2]);
+  try g.parts.emitBurst(.pluckBurst,at,landReach,age,.{.glow=3*(1-age),.tint=.{0.85,0.8,1.0,1}});
+  try g.parts.light(at,seedLight*m.splat3(2*(1-age)*(1-age)),seedReach);
+}
+/// how far the landing's burst is flung (m)
+const landReach:f32=3;
 /// the shattered ley nodes' shards drifting off weightless, tumbling apart
 /// and rising slowly, glowing violet, until each blinks out of reality
 fn drifts(g:*Game,tf:f32)Allocator.Error!void{

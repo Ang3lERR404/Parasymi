@@ -77,6 +77,7 @@ zig build run -Drelease=true      # ReleaseFast (-Doptimize is not accepted)
 zig build run -- --demo           # test garden + structures, fast-forwarded
 zig build run -- --stress         # 120×120 plant field
 zig build run -- --load           # newest saved garden
+zig build run -- --demo --unforming   # the world event begins at once (docs/testing.md)
 zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
 zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip

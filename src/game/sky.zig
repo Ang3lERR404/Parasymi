@@ -67,6 +67,12 @@ const leyDay=[3]f32{0.24,0.1,0.4};
 /// the shifted sky's key light circles this far off the zenith (its glow
 /// overhead, no sun to swing it)
 const leyLean:f32=0.3;
+/// the fog and the horizon turn to the ley's colour over this stretch of
+/// the shift (0..1), as the old sky's shattering sweeps down the dome to
+/// the horizon (sky.frag FRONT_FROM, FRONT_SPAN)
+const fogFrom:f32=0.15;
+/// how much of the shift that takes
+const fogSpan:f32=0.35;
 /// the sky's clock: the time of day, which lights, colours and names it
 pub const Sky=struct{
   /// time of day 0..1 (0 midnight, 0.5 noon)
@@ -103,8 +109,8 @@ pub const Sky=struct{
     const e=s.elevation();
     // how much the dusk glows, near the horizon
     const dusk=m.clamp01(1-@abs(e)/duskBand)*duskGlow;
-    // how far it has shifted
-    const sh=m.smooth(s.shift);
+    // how far it has shifted, at the horizon
+    const sh=m.smooth(m.clamp01((s.shift-fogFrom)/fogSpan));
     // the colour, built channel by channel
     var o:[3]f32=undefined;
     inline for(0..3)|i|o[i]=m.lerp(m.lerp(m.lerp(nightSky[i],m.lerp(daySky[i],veiledSky[i],veil),d),duskSky[i],dusk),m.lerp(leyNight[i],leyDay[i],d),sh);

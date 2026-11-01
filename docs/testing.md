@@ -131,6 +131,17 @@ stands, `--pitch=` degrees down (65 shows its chest and belly), e.g.
 zig build run -- --demo --inspect=eyes --shots=4 --orbit=8 --pitch=30
 ```
 
+## The unforming
+`--unforming` begins the world event at once (its study learned), so it
+can be watched unattended. With `--demo` the halo garden's blooms and
+vespers shatter and the seed gathers over them; first person shows the
+sky shattering, e.g.
+
+```
+zig build run -- --demo --unforming --inspect=eyes --pitch=-25 --shots=14 --orbit=14
+zig build run -- --demo --unforming --inspect=polyp --dist=40 --pitch=3 --shots=10 --orbit=20
+```
+
 ## A HUD panel
 `--panel=<belly|research|paused|options|keybinds|gardens|naming>` holds it open and
 keeps the HUD in `--inspect` shots (`--panel=overview` roams with alt mode
