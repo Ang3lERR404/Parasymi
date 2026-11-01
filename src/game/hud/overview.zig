@@ -68,14 +68,14 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   }
 }
 /// a weave's seed in a haloed husk at `at`, lit as far as `lit` (0..1)
-fn weave(d:*Draw,out:items.Item,at:[2]f32,lit:f32,t:f32,phase:f32)Allocator.Error!void{
+fn weave(d:*Draw,out:items.Item,at:m.Vice(f32,2),lit:f32,t:f32,phase:f32)Allocator.Error!void{
   try d.glow(at[0],at[1],huskR*1.6,s.researchActive);
   try d.husk(at[0],at[1],huskR,s.podEmpty,m.clamp01(lit),phase);
   try icon.draw(d,out,at,iconR,t,phase,0.3+0.7*m.clamp01(lit),255);
 }
 /// the most plentiful kinds of what `sp` holds (up to `most`), each in a
 /// husk with how many, side by side centred on `at`
-fn held(d:*Draw,sp:*const st.Structure,at:[2]f32,t:f32,phase:f32)Allocator.Error!void{
+fn held(d:*Draw,sp:*const st.Structure,at:m.Vice(f32,2),t:f32,phase:f32)Allocator.Error!void{
   // the kinds held and how many of each, most plentiful first
   var kinds:[most]items.Stack=undefined;
   var n:usize=0;
@@ -96,7 +96,7 @@ fn held(d:*Draw,sp:*const st.Structure,at:[2]f32,t:f32,phase:f32)Allocator.Error
   const x0=at[0]-gap*(m.f(n)-1)/2;
   for(kinds[0..n],0..)|k,j|{
     // this husk's centre
-    const c=[2]f32{x0+gap*m.f(j),at[1]};
+    const c=m.Vice(f32,2){x0+gap*m.f(j),at[1]};
     try d.husk(c[0],c[1],huskR,s.podEmpty,0.3,phase+m.f(j)*0.4);
     try icon.draw(d,k.item,c,iconR,t,phase+m.f(j)*0.4,0.6,255);
     try icon.count(d,c,iconR,k.n);

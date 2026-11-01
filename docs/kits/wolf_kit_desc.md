@@ -24,7 +24,7 @@ rounded edges, curved claws.
 | `Form{center, radii, ns = 0.7, ew = 0.7, col, part = .stem, t = 0.5, rings = 10, segs = 14}` / `form(b, f)` | a superellipsoid (a blob that can be anything from round to boxy) closed at its poles: `ns` squareness down its height, `ew` around it (1 round → 0 flat faces, sharp edges); rings/segs reduced per LOD (`b.around`) |
 | `Leaf{base, along, out, len, width, lift = 0.35, curl = 0.25, cup = 0.25, col, tip, t = 1}` / `leaf(b, l)` | a fur leaf: base flush with the surface, lifting off (`lift`), curling back at the tip (`curl`), cupped toward the body; lanceolate (narrow claw, broadest a third along, long point); a `mg.lamina` with a vein in the cup; tu.y base→tip (the shader moves tips, never the base); part `.leaf` |
 | `resinLobe(b, s:*const Sculpt, at, Shape, rings, steps, col, t)` | a lobe of resin laid over the hide (see below) |
-| — `Shape` (comptime) must provide | `outline(a) [2]f32` (x, y at unit radius for angle `a`), `height(k, a, x, y)` (k 0 crown .. 1 rim, falling to 0 with no slope at the rim), `crown` |
+| — `Shape` (comptime) must provide | `outline(a) m.Vice(f32,2)` (x, y at unit radius for angle `a`), `height(k, a, x, y)` (k 0 crown .. 1 rim, falling to 0 with no slope at the rim), `crown` |
 | `claw(b, base, dir, down, len, r, col)` | a curved tapering hook bending toward `down`, closed to a point; part `.thorn` |
 | `Digit{base, dir, down = -y, len, r, col, claw}` / `digit(b, d)` | a knuckle and two segments (`form`s, each lower and narrower) arching from `base` along `dir` to the ground, then its `claw` |
 

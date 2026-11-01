@@ -41,7 +41,7 @@ pub const flash=struct{
       const a0=m.ratio(i,n)*m.tau;
       const a1=m.ratio(i+1,n)*m.tau;
       // the cell's four corners as (angle, radius), wound round the quad
-      const q=[4][2]f32{.{a0,radii[j]},.{a1,radii[j]},.{a1,radii[j+1]},.{a0,radii[j+1]}};
+      const q=[4]m.Vice(f32,2){.{a0,radii[j]},.{a1,radii[j]},.{a1,radii[j+1]},.{a0,radii[j+1]}};
       for([_]usize{0,2,1,0,3,2})|c|try b.put(v3(@cos(q[c][0])*q[c][1],0,@sin(q[c][0])*q[c][1]),v3(0,1,0),col,q[c][1],0,.flash);
     };
   }
@@ -104,7 +104,7 @@ pub const ring=struct{
     const across=[_]f32{-1,-0.7,-0.4,-0.1,0.2,0.6,1};
     for(0..n)|i|for(0..across.len-1)|j|{
       // the cell's four corners as (share of a turn, across), wound round the quad
-      const q=[4][2]f32{.{m.ratio(i,n),across[j]},.{m.ratio(i+1,n),across[j]},.{m.ratio(i+1,n),across[j+1]},.{m.ratio(i,n),across[j+1]}};
+      const q=[4]m.Vice(f32,2){.{m.ratio(i,n),across[j]},.{m.ratio(i+1,n),across[j]},.{m.ratio(i+1,n),across[j+1]},.{m.ratio(i,n),across[j+1]}};
       for([_]usize{0,2,1,0,3,2})|c|{
         // this corner's angle (radians) and its distance from the centre
         const a=q[c][0]*m.tau;
@@ -131,7 +131,7 @@ pub const projection=struct{
     const l=12;
     for(0..n)|i|for(0..l)|j|{
       // the cell's four corners as (share of a turn, along), wound round the quad
-      const q=[4][2]f32{.{m.ratio(i,n),m.ratio(j,l)},.{m.ratio(i+1,n),m.ratio(j,l)},.{m.ratio(i+1,n),m.ratio(j+1,l)},.{m.ratio(i,n),m.ratio(j+1,l)}};
+      const q=[4]m.Vice(f32,2){.{m.ratio(i,n),m.ratio(j,l)},.{m.ratio(i+1,n),m.ratio(j,l)},.{m.ratio(i+1,n),m.ratio(j+1,l)},.{m.ratio(i,n),m.ratio(j+1,l)}};
       for([_]usize{0,2,1,0,3,2})|c|{
         // this corner's angle (radians) and how far up the cone it sits (0..1)
         const a=q[c][0]*m.tau;

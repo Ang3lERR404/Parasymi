@@ -80,7 +80,7 @@ pub const Structures=struct{
   }
   /// the anchor tile a structure of kind `k` takes for ground point `pt`:
   /// the tile under a floater, else the top-left of the footprint centred nearest it
-  fn anchor(pt:m.V3,k:Kind)[2]i32{
+  fn anchor(pt:m.V3,k:Kind)m.Vice(i32,2){
     // how far its footprint's centre is from its top-left tile's
     const half=if(defs.get(k).floating)0 else m.f(defs.get(k).size-1)*0.5;
     return m.tileAt(pt-m.v3(half,0,half));
@@ -104,7 +104,7 @@ pub const Structures=struct{
   /// where a structure of kind `k` stands when put down from the cursor,
   /// over tile `t` at ground point `pt`: a floater right at `pt`, off the
   /// grid; anything else on the footprint whose top-left is `t`
-  pub fn spot(k:Kind,t:[2]i32,pt:m.V3)m.V3{
+  pub fn spot(k:Kind,t:m.Vice(i32,2),pt:m.V3)m.V3{
     return if(defs.get(k).floating)m.v3(pt[0],0,pt[2])else m.footprintCentre(t[0],t[1],defs.get(k).size,0);
   }
   /// put a fresh structure of kind `k` down at `wx`,`wy` (a floater at the

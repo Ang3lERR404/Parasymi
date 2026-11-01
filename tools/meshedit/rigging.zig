@@ -66,13 +66,13 @@ const valueWords=[valueRows][]const u8{"joint across","joint up","joint depth","
 /// part `i` of `v` (a vector is read at a runtime part through an array)
 fn lane(v:V3,i:usize)f32{
   // the vector as an array
-  const a:[3]f32=v;
+  const a:m.Vice(f32,3)=v;
   return a[i];
 }
 /// `v` with part `i` set to `x`
 fn put(v:V3,i:usize,x:f32)V3{
   // the vector as an array, part `i` set
-  var a:[3]f32=v;
+  var a:m.Vice(f32,3)=v;
   a[i]=x;
   return a;
 }
@@ -112,7 +112,7 @@ pub fn gizmoAt(e:*const Editor,origin:V3)?gizmo.Gizmo{
   }};
 }
 /// a drag of the selected joint's held handle from `from` to `to` (px), `k` of it
-pub fn dragGizmo(e:*Editor,g:gizmo.Gizmo,view:gizmo.View,from:[2]f32,to:[2]f32,k:f32)void{
+pub fn dragGizmo(e:*Editor,g:gizmo.Gizmo,view:gizmo.View,from:m.Vice(f32,2),to:m.Vice(f32,2),k:f32)void{
   // the handle held, if any, and the selected bone
   const part=e.part orelse return;
   const b=&e.doc.bones.items[e.bsel];
@@ -292,7 +292,7 @@ pub fn draw(e:*Editor,d:*Draw,view:gizmo.View,origin:V3)Allocator.Error!void{
   }
 }
 /// each joint where it stands on screen (null behind the eye), for picking
-pub fn handles(e:*const Editor,view:gizmo.View,origin:V3,out:*std.ArrayList(?[2]f32),gpa:Allocator)Allocator.Error!void{
+pub fn handles(e:*const Editor,view:gizmo.View,origin:V3,out:*std.ArrayList(?m.Vice(f32,2)),gpa:Allocator)Allocator.Error!void{
   // the bones now
   var bones:[rig.maxBones]M4=undefined;
   const k=posed(e,origin,&bones);

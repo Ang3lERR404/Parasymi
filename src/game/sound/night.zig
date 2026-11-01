@@ -52,7 +52,7 @@ const newChords:f32=0.45;
 const bowVel:f32=1;
 /// where each section of the choir may sing (MIDI, lowest and highest):
 /// soprano E4..G5, alto A3..B4, tenor D3..E4, bass D2..G3
-const ranges=[sections][2]u8{.{64,79},.{57,71},.{50,64},.{38,55}};
+const ranges=[sections]m.Vice(u8,2){.{64,79},.{57,71},.{50,64},.{38,55}};
 /// where each section starts, before its first chord
 const starts=[sections]u8{73,66,57,50};
 /// how loud the choir sings through a phrase's bars: swelling to its third
@@ -227,7 +227,7 @@ pub const Night=struct{
 };
 /// the note in `range` nearest `last` that is a tone of `c` (only the pitch
 /// class `only`, if given), never `avoid`
-fn nearest(c:Chord,range:[2]u8,last:u8,only:?u8,avoid:?u8)u8{
+fn nearest(c:Chord,range:m.Vice(u8,2),last:u8,only:?u8,avoid:?u8)u8{
   // the best note found, and how far from `last` it is
   var best:u8=last;
   var dist:u8=255;

@@ -1,5 +1,7 @@
 //! handing items on from a structure to its neighbours.
 const lib=@import("../../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the chunks: the ground kinds a structure may stand on
@@ -103,7 +105,7 @@ pub const Ring=struct{
     };
   }
   /// the next tile round the ring, or null once it has closed
-  pub fn next(r:*Ring)?[2]i32{
+  pub fn next(r:*Ring)?m.Vice(i32,2){
     while(r.seg<8 and r.k>=r.len()){
       r.seg+=1;
       r.k=0;

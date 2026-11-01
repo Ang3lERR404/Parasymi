@@ -44,13 +44,13 @@ pub const Rgba8=extern struct{
   /// alpha, 0..255 (255: opaque)
   a:u8,
   /// from the UI's plain [4]u8 colours (ui/draw.zig, item infos), byte for byte
-  pub fn of(c:[4]u8)Rgba8{return.{.r=c[0],.g=c[1],.b=c[2],.a=c[3]};}
+  pub fn of(c:m.Vice(u8,4))Rgba8{return.{.r=c[0],.g=c[1],.b=c[2],.a=c[3]};}
   /// back to 0..1 floats for blending: red, green and blue (alpha discarded)
   pub fn toRgb(self:Rgba8)Rgb{
     return.{.r=m.f(self.r)*inv255,.g=m.f(self.g)*inv255,.b=m.f(self.b)*inv255};
   }
   /// all four bytes as 0..1 floats: red, green, blue, then alpha
-  pub fn toF4(self:Rgba8)[4]f32{
+  pub fn toF4(self:Rgba8)m.Vice(f32,4){
     return.{m.f(self.r)*inv255,m.f(self.g)*inv255,m.f(self.b)*inv255,m.f(self.a)*inv255};
   }
 };

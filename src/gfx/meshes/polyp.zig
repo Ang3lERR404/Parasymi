@@ -255,7 +255,7 @@ pub fn tentacle(b:*mg.Builder,k:*growth.Skeleton,column:growth.Id,o:Disc,a:f32,r
   const rim=o.top+out*m.splat3(o.dr*0.86)+o.up*m.splat3(o.dr*0.04);
   // its control points (the first left for the skeleton to root): up out
   // of the rim, over and out, then curling down at the tip
-  const shape=[_][3]f32{.{0,0,0},.{0.14,0.3,0},.{0.4,0.42,0.3},.{0.66,0.34,0.7},.{0.82,0.18,1},.{0.92,0.02,1.2}};
+  const shape=[_]m.Vice(f32,3){.{0,0,0},.{0.14,0.3,0},.{0.4,0.42,0.3},.{0.66,0.34,0.7},.{0.82,0.18,1},.{0.92,0.02,1.2}};
   var c:[7]V3=undefined;
   for(shape,c[1..])|q,*pt|pt.*=rim+out*m.splat3(q[0]*len)+o.up*m.splat3(q[1]*len)+across*m.splat3(q[2]*drift);
   // its branch on the skeleton, off the column's top

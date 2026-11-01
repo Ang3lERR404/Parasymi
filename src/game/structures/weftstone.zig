@@ -119,14 +119,14 @@ const airSize:f32=0.09;
 /// how brightly each glows,
 const airGlow:f32=0.45;
 /// and its colour: pale, cool air
-const airCol:[4]f32=.{0.78,0.86,1.0,1};
+const airCol:m.Vice(f32,4)=.{0.78,0.86,1.0,1};
 /// how brightly its tendrils glow
 const glow:f32=0.18;
 /// the tiles its tendrils may reach, as offsets, nearest first
 const tiles=blk:{
   // how many tiles the square holds, the list, and how many laid so far
   const n=(2*reachTiles+1)*(2*reachTiles+1);
-  var t:[n][2]i32=undefined;
+  var t:[n]m.Vice(i32,2)=undefined;
   var k:usize=0;
   // the row being laid
   var y:i32=-reachTiles;
@@ -152,7 +152,7 @@ const tiles=blk:{
   break:blk t;
 };
 /// the squared distance of an offset from its centre
-fn dist2(o:[2]i32)i32{return o[0]*o[0]+o[1]*o[1];}
+fn dist2(o:m.Vice(i32,2))i32{return o[0]*o[0]+o[1]*o[1];}
 /// what a weftstone remembers: its tendrils, the unit being drawn up, and
 /// the crystal ionizing
 pub const State=struct{

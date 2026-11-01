@@ -160,7 +160,7 @@ pub const Loading=struct{
       const open=m.smooth(m.clamp01((l.shown-k)/leafOpens));
       // the tendril's wave here, and the leaf's base on it
       const wave=@sin(k*waves+t*waveRate+barSeed*waveSeed)*barH*waveReach;
-      const base=[2]f32{bx+k*bw,by+barH/2+wave};
+      const base=m.Vice(f32,2){bx+k*bw,by+barH/2+wave};
       // swept forward, the way it grows, lifting as they open
       const ang=side*(m.tau/4.0-leafLean*(1-0.3*open));
       try d.leaf(base,ang,leafLen*(0.35+0.65*open),leafWide*(0.6+0.4*open),fade(if(open>0)s.leaf else bud,a),open,m.f(i)*0.37);
@@ -184,7 +184,7 @@ pub const Loading=struct{
   }
   /// a loading frame: nothing of the world (none of it is made yet) under
   /// the screen, a midnight sky behind it for the world passes
-  pub fn scene(l:*Loading,screen:[2]f32)Allocator.Error!renderer.Scene{
+  pub fn scene(l:*Loading,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     l.ui.clear(@floatCast(l.time));
     try l.draw(&l.ui,screen[0],screen[1]);
     // a camera at its rest, and a midnight sky

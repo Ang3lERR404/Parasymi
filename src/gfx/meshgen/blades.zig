@@ -203,7 +203,7 @@ pub const Stalk=enum{
   sessile,
 };
 /// how many teeth a small leaf's edge holds each side, at least and at most
-const naturalTeeth=[2]f32{4,6};
+const naturalTeeth=m.Vice(f32,2){4,6};
 /// a natural leaf in place of a plain blade (same reach, size, droop,
 /// colours and growth): its own twist, ripple, tip curl and teeth drawn
 /// from where it grows, so no two leaves are alike, on its own stalk or not

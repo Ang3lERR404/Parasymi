@@ -110,4 +110,4 @@ pub const markStem:Color=s.barkYoung;
 /// a mark's bud and its name
 pub const markBud:Color=s.bud;
 /// where the toolbar must end, above the timeline and the playhead's caption (px)
-pub fn barBottom(screen:[2]f32)f32{return screen[1]-tlBottom-tlH-36;}
+pub fn barBottom(screen:m.Vice(f32,2))f32{return screen[1]-tlBottom-tlH-36;}

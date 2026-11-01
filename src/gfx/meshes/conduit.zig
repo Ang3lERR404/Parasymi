@@ -82,7 +82,7 @@ const leafLift:f32=0.3;
 const twigLen:f32=0.03;
 /// the soil it heaps diving in: mounds (how far on, how wide) running on
 /// ahead of it, smaller as they go
-const ridge=[_][2]f32{.{0.012,0.072},.{0.07,0.058},.{0.12,0.04}};
+const ridge=[_]m.Vice(f32,2){.{0.012,0.072},.{0.07,0.058},.{0.12,0.04}};
 /// how one arch is laid: where it runs, how high and deep, how thick and
 /// how it is wound, leaved and seeded
 pub const Arch=struct{
@@ -115,7 +115,7 @@ pub const Arch=struct{
 };
 /// where along its tile (s 0..1) it runs over the ground: returns x and z;
 /// a gentle meander when straight, a quarter circle when turning
-pub fn plan(a:Arch,s:f32)[2]f32{
+pub fn plan(a:Arch,s:f32)m.Vice(f32,2){
   if(a.turn==0)return.{m.lerp(a.from,a.to,s),meander*@sin(m.tau*s)*@sin(m.pi*s)};
   // a quarter circle from the side edge's middle to the front edge's
   const t=m.pi+s*m.pi/2;
@@ -208,7 +208,7 @@ pub fn arch(b:*mg.Builder,k:*growth.Skeleton,a:Arch)Allocator.Error!growth.Id{
   var fb:[res]V3=undefined;
   mg.transport(&sp,&frameNormal,&fb);
   try weave(b,a,&sp,&ts,&rs,&frameNormal,&fb);
-  if(a.runners)for([_][2]f32{.{0.2,0.42},.{0.55,0.8}},[_]f32{1,-1})|span,side|try runner(b,&sp,&rs,span,side);
+  if(a.runners)for([_]m.Vice(f32,2){.{0.2,0.42},.{0.55,0.8}},[_]f32{1,-1})|span,side|try runner(b,&sp,&rs,span,side);
   try k.along(b,start,spine);
   for(a.leaves,0..)|n,ci|{
     // where this cluster sits along the root, spread over its middle
@@ -277,7 +277,7 @@ fn weave(b:*mg.Builder,a:Arch,sp:[]const V3,ts:[]const f32,rs:[]const f32,frameN
 }
 /// a branchlet peeling off the weave beside the root (side 1 its left,
 /// -1 its right) and winding back into it further on, pointed at both ends
-fn runner(b:*mg.Builder,sp:[]const V3,rs:[]const f32,span:[2]f32,side:f32)Allocator.Error!void{
+fn runner(b:*mg.Builder,sp:[]const V3,rs:[]const f32,span:m.Vice(f32,2),side:f32)Allocator.Error!void{
   // the branchlet's control points, bowing out and back
   var c:[6]V3=undefined;
   for(&c,0..)|*p,k|{

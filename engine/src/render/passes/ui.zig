@@ -3,6 +3,8 @@
 //! `uiTime:f32`.
 /// the standard library
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../../core/math.zig");
 /// a slice seen as its bytes, for copying the quads into the buffer
 const sliceAsBytes=std.mem.sliceAsBytes;
 /// the Vulkan bindings: the command buffer it records into
@@ -30,7 +32,7 @@ pub const desc:pass.Desc=.{
   .layout=.ui,.depth=false,.blend=true,.target=.screen,
 };
 /// screen size and time for the animated shapes
-pub const Push=extern struct{screen:[2]f32,time:f32,pad:f32=0};
+pub const Push=extern struct{screen:m.Vice(f32,2),time:f32,pad:f32=0};
 /// what each frame in flight holds: the buffer its quads are written into
 /// (`verts`)
 pub const Frame=struct{verts:Buffer=.{}};

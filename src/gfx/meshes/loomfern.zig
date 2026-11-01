@@ -96,7 +96,7 @@ pub fn frondCtrl(i:usize)[frondCtrlCount]V3{
   const reach=rng.range(0.9,1.1);
   const lift=rng.range(0.85,1.12);
   // the arch's shape: (out, up) at each control point, before reach and lift
-  const ks=[frondCtrlCount][2]f32{.{0.02,0},.{0.07,0.17},.{0.19,0.31},.{0.33,0.36},.{0.45,0.3},.{0.52,0.2},.{0.5,0.15}};
+  const ks=[frondCtrlCount]m.Vice(f32,2){.{0.02,0},.{0.07,0.17},.{0.19,0.31},.{0.33,0.36},.{0.45,0.3},.{0.52,0.2},.{0.5,0.15}};
   // the control points, laid along out and up from the crown
   var c:[frondCtrlCount]V3=undefined;
   for(&c,ks)|*p,k|p.*=crown+out*m.splat3(k[0]*reach)+up*m.splat3(k[1]*lift);

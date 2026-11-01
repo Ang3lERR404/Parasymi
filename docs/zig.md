@@ -48,7 +48,11 @@ Read this before writing any code. Where it and CLAUDE.md disagree, CLAUDE.md
 - **Error sets** as first-class types: `fn foo() MyErrorSet!T` documents exactly what can fail.
 - **Optional types** (`?T`) instead of null pointers — unadorned pointers cannot be null.
 - **Comptime**: `comptime T: type` for type-level generics, `comptime` blocks for compile-time computation, `@TypeOf`, `@This()`, `@field`, `@enumTypeFromInt`, etc.
-- **Vectors** (`@Vector(N, T)`) for SIMD.
+- **Vectors** (`@Vector(N, T)`) for SIMD. Here they are spelled through
+  `core/math.zig`: `m.Vec(t,s)` for vectors whose lanes are summed together,
+  `m.Vice(t,s)` for a plain row `[s]t` (GPU and save layouts, tables,
+  lanes picked by a runtime index), `m.Mat(t,s,a)` for `a` columns of
+  `Vec(t,s)`. Never a bare `@Vector` or small `[N]T`.
 - **Packed structs/unions** for bit-level layout.
 - **`anytype`** for ad-hoc polymorphism (use sparingly).
 

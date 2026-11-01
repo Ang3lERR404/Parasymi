@@ -43,7 +43,7 @@ pub fn softClip(x:f32)f32{
 }
 /// `x` placed in stereo at `p` (-1 left, 0 centre, 1 right), equal power so
 /// it stays as loud wherever it sits: .{left, right}
-pub fn pan(x:f32,p:f32)[2]f32{
+pub fn pan(x:f32,p:f32)m.Vice(f32,2){
   // the pan as an angle, 0 (all left) to a quarter turn (all right)
   const a=(m.clamp(p,-1,1)+1)*(m.pi/4.0);
   return.{x*@cos(a),x*@sin(a)};
@@ -257,7 +257,7 @@ pub const Biquad=struct{
     // how wide the response is, from the resonance
     const alpha=@sin(w)/(2*@max(q,0.01));
     // the input weights for this kind, not yet normalised
-    const b:[3]f32=switch(kind){
+    const b:m.Vice(f32,3)=switch(kind){
       .low=>.{(1-c)/2,1-c,(1-c)/2},
       .high=>.{(1+c)/2,-(1+c),(1+c)/2},
       // 0 dB at the centre
@@ -398,7 +398,7 @@ pub const Delay=struct{
 /// pitch (this one: the eight feedback lines)
 const hallLines=[8]usize{1931,2213,2591,2953,3361,3797,4159,4733};
 /// the four diffusers smearing what comes in before the lines hear it
-const hallDiffusers=[4]usize{142,107,379,277};
+const hallDiffusers=m.Vice(usize,4){142,107,379,277};
 /// how much each diffuser feeds round itself
 const hallDiffuse:f32=0.62;
 /// the longest pre-delay a hall holds (samples at 48 kHz)
@@ -426,9 +426,9 @@ pub const Hall=struct{
   /// the diffusers' rings
   diff:[4][hallDiffusers[2]*hallStretch+1]f32=@splat(@splat(0)),
   /// each diffuser's length (samples)
-  dlen:[4]usize,
+  dlen:m.Vice(usize,4),
   /// where each diffuser writes next
-  dat:[4]usize=@splat(0),
+  dat:m.Vice(usize,4)=@splat(0),
   /// the pre-delay's ring
   pre:[hallPreMax*hallStretch+1]f32=@splat(0),
   /// the pre-delay's length (samples)

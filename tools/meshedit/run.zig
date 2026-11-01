@@ -212,7 +212,7 @@ pub fn main(init:std.process.Init)!void{
   var b:meshgen.Builder=.{.gpa=gpa};
   defer b.deinit();
   // where in the builder each library slot's level of detail lies
-  var ranges:[meshlib.slots][2]u32=@splat(.{0,0});
+  var ranges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0});
   _=try loadFrame(&screenL,r,&input,&last,.forms,.{.done=1,.total=whole});
   // the quiet world the sculpt stands on
   var game=try Game.init(gpa,play.defaultSeed);
@@ -231,7 +231,7 @@ pub fn main(init:std.process.Init)!void{
   var ui:Draw=.{.gpa=gpa};
   defer ui.deinit();
   // each form's handle on screen, or null behind the eye
-  var handles:std.ArrayList(?[2]f32)=.empty;
+  var handles:std.ArrayList(?m.Vice(f32,2))=.empty;
   defer handles.deinit(gpa);
   // how many frames have run (for `--shot`)
   var frames:u32=0;
@@ -265,7 +265,7 @@ pub fn main(init:std.process.Init)!void{
       if(!coarse)try e.reloadParts();
       try e.doc.mesh(gpa,io,coarse,&b,e.lookup());
       // the whole surface, as every level of detail of the slot
-      const run:[2]u32=.{0,@intCast(b.mark())};
+      const run:m.Vice(u32,2)=.{0,@intCast(b.mark())};
       for(0..meshgen.lods)|l|ranges[meshlib.slot(slotId,@intCast(l))]=run;
       try renderer.setParts(r,&b,ranges,0);
       e.stale=false;
@@ -331,7 +331,7 @@ pub fn main(init:std.process.Init)!void{
 /// `--try=`'s turns: pitch, yaw and roll (degrees), commas between, the ones left out none
 fn turnsOf(text:[]const u8)error{BadTry}!m.V3{
   // the turns read so far, and the text's numbers one by one
-  var t:[3]f32=.{0,0,0};
+  var t:m.Vice(f32,3)=.{0,0,0};
   var it=splitScalar(u8,text,',');
   for(&t)|*x|x.*=parseFloat(f32,it.next() orelse break) catch return error.BadTry;
   return t;

@@ -77,9 +77,9 @@ pub const soleY:f32=-0.006;
 /// the sole's big pad, in the foot's frame
 pub const padAt=v3(0,soleY+0.002,0.035);
 /// where each of the four toes sits on the foot (x across, z forward)
-pub const toes=[4][2]f32{.{-0.027,0.098},.{-0.009,0.108},.{0.009,0.108},.{0.027,0.098}};
+pub const toes=[4]m.Vice(f32,2){.{-0.027,0.098},.{-0.009,0.108},.{0.009,0.108},.{0.027,0.098}};
 /// the fingers' radii at the knuckle, the middle joint and the tip
-const fingerR=[3]f32{0.0118,0.0105,0.0086};
+const fingerR=m.Vice(f32,3){0.0118,0.0105,0.0086};
 /// how softly the fingers melt into each other: barely
 const fingerK:f32=0.004;
 /// how tightly the skin passes across the fingers' joints
@@ -91,7 +91,7 @@ const dewRoot=v3(0,-0.026,0.044);
 const dewTip=v3(-0.006,-0.046,0.062);
 /// how far the ribcage stands over the waist: the waist's half-width and
 /// depth (the ribcage's lower edge is lifted after, its height kept at the top)
-const ribWaist=[2]f32{0.12,0.093};
+const ribWaist=m.Vice(f32,2){0.12,0.093};
 /// how far the ribcage's lower edge is lifted, its height kept at the top
 const ribLift:f32=0.012;
 /// how softly the ribcage melts into the waist

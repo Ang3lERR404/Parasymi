@@ -126,5 +126,5 @@ pub const Chunk=struct{
   /// its first tile's world y (z in the world)
   pub fn originY(c:*const Chunk)i32{return c.at.y*sizeTiles;}
   /// world tile (x, y) of local tile index `t` (inverse of `localIndex`).
-  pub fn tileOf(c:*const Chunk,t:usize)[2]i32{return grid.tileOf(c.at,t);}
+  pub fn tileOf(c:*const Chunk,t:usize)m.Vice(i32,2){return grid.tileOf(c.at,t);}
 };

@@ -84,7 +84,7 @@ pub const State=struct{
   /// seconds since its last hand-off
   t:f32=0,
   /// how far its nerve toward each side has grown (0..1), by world direction
-  reach:[4]f32=@splat(0),
+  reach:m.Vice(f32,4)=@splat(0),
   /// a pulse running out along each nerve (0 just sent .. 1 arrived, or
   /// none) and the item it carries
   pulse:[4]?f32=@splat(null),
@@ -245,7 +245,7 @@ test"a ganglion splits a conduit line, never back into it"{
   try testing.expect(try ss.place(gpa,&w,2,4,.sapCache,0,0));
   _=ss.insert(&g,ss.at(&w,0,2).?,.fibre,30);
   try bench.run(&ss,&w,&plants,&g,40);
-  for([_][2]i32{.{4,2},.{2,0},.{2,4}})|o|{
+  for([_]m.Vice(i32,2){.{4,2},.{2,0},.{2,4}})|o|{
     // how much fibre reached this cache
     const n=ss.get(ss.at(&w,o[0],o[1]).?).inv.count(.fibre);
     try testing.expect(n>=8 and n<=12);

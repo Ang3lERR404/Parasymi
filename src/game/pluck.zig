@@ -72,7 +72,7 @@ pub const Tug=struct{
   /// where it stands, as `Pluck.at`
   at:m.V3=@splat(0),
   /// the way it bends, on the ground (toward the wolf; unit length)
-  dir:[2]f32=.{0,0},
+  dir:m.Vice(f32,2)=.{0,0},
   /// how far it is bent (radians at its tip)
   x:f32=0,
   /// how fast it is bending
@@ -111,7 +111,7 @@ pub const Tug=struct{
   }
   /// the bend plant `id`, standing at `at`, is drawn with (as the plant
   /// instance takes it: heading across, along, angle); none for any other
-  pub fn of(t:Tug,id:PlantId,at:m.V3)[4]f32{
+  pub fn of(t:Tug,id:PlantId,at:m.V3)m.Vice(f32,4){
     const bent=t.id orelse return@splat(0);
     if(bent!=id or m.len(at-t.at)>1e-4)return@splat(0);
     return.{t.dir[0],t.dir[1],t.x,0};

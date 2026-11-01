@@ -62,11 +62,11 @@ const speed:f32=0.6;
 const stock=20;
 /// a weave's stages over its progress (0..1), each easing in over its
 /// first two and out over its last two: the cups pour,
-const pourTimes=[4]f32{0,0.04,0.26,0.34};
+const pourTimes=m.Vice(f32,4){0,0.04,0.26,0.34};
 /// the core spins (centrifuging),
-const spinTimes=[4]f32{0.14,0.36,0.84,0.96};
+const spinTimes=m.Vice(f32,4){0.14,0.36,0.84,0.96};
 /// the threads wind onto the seed (spindling)
-const windTimes=[4]f32{0.36,0.5,0.92,0.98};
+const windTimes=m.Vice(f32,4){0.36,0.5,0.92,0.98};
 /// the seed starts to grow on the spindle at this much of the weave
 const seedFrom:f32=0.36;
 /// and is fully grown by this much
@@ -86,9 +86,9 @@ const nod:f32=0.05;
 /// how fast that idle nod rocks (radians a second)
 const nodRate:f32=0.8;
 /// the essence standing in a cup: its lens's radius empty .. full (cup space)
-const poolW=[2]f32{0.02,0.055};
+const poolW=m.Vice(f32,2){0.02,0.055};
 /// and its height empty .. full (cup space)
-const poolY=[2]f32{0.03,0.075};
+const poolY=m.Vice(f32,2){0.03,0.075};
 /// where the streams land on the core's crown: this far out toward their cup
 const landAmount:f32=0.07;
 /// how far each essence's winding leans off the spindle (rad), so they cross
@@ -169,7 +169,7 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
 comptime{std.debug.assert(craft.all[0]==0);}
 /// a stage's strength at progress `p`: 0 before `e[0]`, rising to 1 by
 /// `e[1]`, held, falling to 0 from `e[2]` to `e[3]` (linear ramps)
-fn stage(p:f32,e:[4]f32)f32{
+fn stage(p:f32,e:m.Vice(f32,4))f32{
   if(p<=e[0] or p>=e[3])return 0;
   if(p<e[1])return(p-e[0])/(e[1]-e[0]);
   if(p>e[2])return(e[3]-p)/(e[3]-e[2]);
@@ -177,7 +177,7 @@ fn stage(p:f32,e:[4]f32)f32{
 }
 /// the area under `stage` from 0 to `p`: how far something running at its
 /// strength has gone
-fn stageArea(p:f32,e:[4]f32)f32{
+fn stageArea(p:f32,e:m.Vice(f32,4))f32{
   // how long the stage takes to rise, and to fall
   const rise=e[1]-e[0];
   const fall=e[3]-e[2];
@@ -201,7 +201,7 @@ fn turned(p:f32,time:f32,tf:f32)f32{
   return tf*calm+stageArea(p,spinTimes)/total*turns*m.tau;
 }
 /// an item's colour as four floats, for tinting a part
-fn colOf(item:items.Item)[4]f32{return color.Rgba8.of(item.info().col).toF4();}
+fn colOf(item:items.Item)m.Vice(f32,4){return color.Rgba8.of(item.info().col).toF4();}
 /// the tree's cups, core and what it weaves: placed on its mesh as it
 /// stands (`place`), swaying with it from its root. The cups and core
 /// form once the tree has grown (their meshes carry `mesh.form`, grown by

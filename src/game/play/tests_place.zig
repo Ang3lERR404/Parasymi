@@ -27,13 +27,13 @@ const testScreen=lib.play.testsMenu.testScreen;
 /// one simulation tick (s), each frame's step here
 const tickTime=lib.play.tickTime;
 /// headless: the mouse over the middle of tile `t`, as the camera sees it now
-fn aim(g:*const Game,in:*Input,t:[2]i32,sc:[2]f32)void{
+fn aim(g:*const Game,in:*Input,t:m.Vice(i32,2),sc:m.Vice(f32,2))void{
   // the tile's middle, projected to the screen (clip space)
   const q=m.mulV(g.cam.viewProj(),.{m.f(t[0])+0.5,g.heightAt(t[0],t[1]),m.f(t[1])+0.5,1});
   in.mouse=.{(q[0]/q[3]+1)/2*sc[0],(q[1]/q[3]+1)/2*sc[1]};
 }
 /// headless: one frame with `a` pressed (held down this frame only) over tile `t`
-fn pressAt(g:*Game,in:*Input,t:[2]i32,a:ctl.Action)!void{
+fn pressAt(g:*Game,in:*Input,t:m.Vice(i32,2),a:ctl.Action)!void{
   aim(g,in,t,testScreen);
   in.advance();
   ctl.hold(in,a,true);
@@ -64,7 +64,7 @@ test"R turns what is under the cursor (Shift back), Q picks its bulb, a click op
     c.occ[t]=.none;
   }
   // the tile the sap cache stands on
-  const at=[2]i32{x+2,z};
+  const at=m.Vice(i32,2){x+2,z};
   try testing.expect(try g.structs.place(gpa,&g.world,at[0],at[1],.sapCache,0,0));
   g.player.inv=.{};
   // R: a quarter clockwise, rooted, and not again until it has turned

@@ -112,7 +112,7 @@ pub const State=struct{
   /// null while there is no node beside it
   dig:?Dig=null,
   /// how far its digging root toward each side has reached (0..1)
-  reach:[4]f32=@splat(0),
+  reach:m.Vice(f32,4)=@splat(0),
 };
 /// it roots in living ground only.
 pub fn ground(k:ck.Kind)bool{return k==.soil or k==.moss;}
@@ -204,7 +204,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const on=working and dg.?.dir==dir and r>=1;
     const v=m.dirVec(dir);
     // the colour of what it draws, as bytes and as floats
-    const col:[4]u8=if(dg)|g|g.item.info().col else.{0,0,0,255};
+    const col:m.Vice(u8,4)=if(dg)|g|g.item.info().col else.{0,0,0,255};
     const c=color.Rgba8.of(col).toF4();
     try out.emit(.diggerRoot,m.chain(&.{m.translate(ctr),m.rotY(m.atan2(-m.f(v.z),m.f(v.x)))}),.{
       .glow=glow+glowActive*s.activity,.flutter=rootFlutter,.phase=s.seed+m.f(side)*0.1,.grown=r*s.grown,

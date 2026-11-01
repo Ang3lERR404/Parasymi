@@ -5,6 +5,8 @@
 //! letting go takes it back. What a click does stays the game's.
 /// the standard library
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// deep equality, to tell the button let go over from the one pressed
 const eqlDeep=std.meta.eql;
 /// a box in screen pixels: where the button sits and what the mouse lands on
@@ -13,7 +15,7 @@ const Box=@import("box.zig").Box;
 /// this frame, as the game reads them from its own bindings
 pub const Pointer=struct{
   /// the cursor (screen pixels)
-  at:[2]f32=.{0,0},
+  at:m.Vice(f32,2)=.{0,0},
   /// mouse1 is held down this frame
   down:bool=false,
   /// mouse1 went down this very frame

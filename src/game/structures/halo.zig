@@ -41,7 +41,7 @@ const txt=lib.txt;
 pub const reachTiles:i32=5;
 /// the points in order around the ring (east, south, west, north); arc k
 /// runs from point k to k+1
-pub const points=[4][2]i32{.{1,0},.{0,1},.{-1,0},.{0,-1}};
+pub const points=[4]m.Vice(i32,2){.{1,0},.{0,1},.{-1,0},.{0,-1}};
 /// a bloom holds a point when grown and healthier than this (0..1)
 const activeHealth:f32=0.5;
 /// seconds the blooms take to reach the centre
@@ -77,7 +77,7 @@ const lightEase:f32=0.4;
 /// none) has drawn a point riding with one of its blooms, and how far that
 /// bloom is still open: the CPU's twin of common.glsl `haloSpiral` and
 /// `haloFold`
-pub fn spiral(p:m.V3,halo:[4]f32)struct{at:m.V3,open:f32}{
+pub fn spiral(p:m.V3,halo:m.Vice(f32,4))struct{at:m.V3,open:f32}{
   if(halo[3]<0)return.{.at=p,.open=1};
   // how far along it is, and how far it has pulled in (rushing at the end)
   const k=m.clamp01(halo[3]);
@@ -94,7 +94,7 @@ pub fn spiral(p:m.V3,halo:[4]f32)struct{at:m.V3,open:f32}{
   return.{.at=at,.open=1-m.smooth(m.clamp01((k-(1-fold))/fold))};
 }
 /// the tile of the ring's point `k` round a centre at (x, y)
-pub fn pointAt(x:i32,y:i32,k:usize)[2]i32{
+pub fn pointAt(x:i32,y:i32,k:usize)m.Vice(i32,2){
   return.{x+points[k][0]*reachTiles,y+points[k][1]*reachTiles};
 }
 /// finds four grown blooms on the points of a ring round a tile no diamond
@@ -124,7 +124,7 @@ pub fn seek(ctx:st.Ctx)Allocator.Error!bool{
   return false;
 }
 /// whether a grown, unwithered celestial bloom stands at a tile
-pub fn active(p:*const Plants,w:*const World,at:[2]i32)bool{
+pub fn active(p:*const Plants,w:*const World,at:m.Vice(i32,2))bool{
   // the plant there, its index, and the plant list
   const id=p.at(w,at[0],at[1]) orelse return false;
   const i=id.idx();
@@ -133,7 +133,7 @@ pub fn active(p:*const Plants,w:*const World,at:[2]i32)bool{
 }
 /// ease each point's light toward whether a grown bloom holds it (1) or
 /// not (`dim`).
-pub fn relight(light:*[4]f32,p:*const Plants,w:*const World,x:i32,y:i32,dt:f32)void{
+pub fn relight(light:*m.Vice(f32,4),p:*const Plants,w:*const World,x:i32,y:i32,dt:f32)void{
   for(light,0..)|*l,k|{
     // where this point's light is heading
     const want:f32=if(active(p,w,pointAt(x,y,k)))1 else dim;
@@ -141,7 +141,7 @@ pub fn relight(light:*[4]f32,p:*const Plants,w:*const World,x:i32,y:i32,dt:f32)v
   }
 }
 /// how many points shine as with a bloom (brighter than halfway from `dim` to 1)
-pub fn lit(light:[4]f32)u32{
+pub fn lit(light:m.Vice(f32,4))u32{
   // the count so far
   var n:u32=0;
   for(light)|l|{if(l>(1+dim)/2)n+=1;}
@@ -150,9 +150,9 @@ pub fn lit(light:[4]f32)u32{
 /// the diamond at `at`, its projection and ring (over the ground at
 /// `ground`) and, just as it forms, the flash, for a halo `k` along (see
 /// the module notes). The diamond is still: it never sways.
-pub fn draw(out:*Parts,seed:f32,at:m.V3,ground:m.V3,k:f32,light:[4]f32)Allocator.Error!void{
+pub fn draw(out:*Parts,seed:f32,at:m.V3,ground:m.V3,k:f32,light:m.Vice(f32,4))Allocator.Error!void{
   // the halo passed to the GPU: its centre and how far along
-  const halo=[4]f32{at[0],at[1],at[2],k};
+  const halo=m.Vice(f32,4){at[0],at[1],at[2],k};
   try out.emit(.haloDiamond,m.chain(&.{m.translate(at),m.rotY(seed*m.tau)}),.{.phase=seed,.halo=halo});
   // the ring floats at a bloom's hover over the ground at the centre, the
   // diamond at its heart, so its rays run level out to it

@@ -80,7 +80,7 @@ pub const buffer=8;
 /// the most ley shards it takes in
 const stock=10;
 /// the eight tiles round it its roots reach into, a turn at a time
-const around=[8][2]i32{.{1,0},.{1,1},.{0,1},.{-1,1},.{-1,0},.{-1,-1},.{0,-1},.{1,-1}};
+const around=[8]m.Vice(i32,2){.{1,0},.{1,1},.{0,1},.{-1,1},.{-1,0},.{-1,-1},.{0,-1},.{1,-1}};
 /// how fast a root grows out to a node (share a second)
 const rootGrow:f32=0.35;
 /// how fast a root withers once its node is gone (share a second)
@@ -94,7 +94,7 @@ const moteSize:f32=0.35;
 /// how brightly that mote glows
 const moteGlow:f32=0.7;
 /// the grit in its cup: a lens this wide empty .. full
-const poolW=[2]f32{0.012,0.032};
+const poolW=m.Vice(f32,2){0.012,0.032};
 /// how brightly the grit in its cup glows
 const poolGlow:f32=0.35;
 /// how brightly the stream of sapped grit glows

@@ -97,7 +97,7 @@ pub const Spline=struct{
 };
 /// the window (when it begins, how long it takes, shares of the whole
 /// growth) of the last `tail` of a structure's growth
-pub fn tailWindow(tail:f32)[2]f32{return.{1-tail,tail};}
+pub fn tailWindow(tail:f32)m.Vice(f32,2){return.{1-tail,tail};}
 /// how far a piece forming over the last `tail` of its structure's growth
 /// has come when that growth is `g`: the same curve part.vert grows a
 /// tagged piece by, for one the structure places itself
@@ -405,7 +405,7 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
   /// everything built since `start` grows out of `from` over `window` of its
   /// structure's growth: a piece built as a mesh of its own (emitted by the
   /// structure) kept in step with the skeleton it stands on.
-  pub fn tag(b:*M.Builder,start:usize,from:V3,window:[2]f32)Allocator.Error!void{
+  pub fn tag(b:*M.Builder,start:usize,from:V3,window:m.Vice(f32,2))Allocator.Error!void{
     for(try b.growOf(start))|*g|g.*=.{.from=from,.at=.{window[0],window[1],0,0}};
   }
   };

@@ -25,7 +25,7 @@ const s=lib.style;
 /// every player-facing string, for an item's short name
 const txt=lib.txt;
 /// a point in icon units: x right, y up, origin at the slot's centre, 1 = its radius.
-pub const P=[2]f32;
+pub const P=m.Vice(f32,2);
 /// the seed sits low in the slot: its centre, where sprouts rise from its split tip at `topAt`
 const seedC:P=.{0,-0.38};
 /// how wide the seed coat is (icon units)
@@ -61,7 +61,7 @@ pub const Icon=struct{
   /// the draw batch it goes into
   d:*Draw,
   /// the slot's centre, in pixels
-  c:[2]f32,
+  c:m.Vice(f32,2),
   /// the slot's radius, in pixels
   r:f32,
   /// UI seconds, so the sprouts sway
@@ -81,7 +81,7 @@ pub const Icon=struct{
     return swayAmount*@sin(ic.t*swayRate+ic.phase*6)*h*h;
   }
   /// pixel position of icon point `p`, leaning with the breeze.
-  pub fn px(ic:Icon,p:P)[2]f32{
+  pub fn px(ic:Icon,p:P)m.Vice(f32,2){
     return.{ic.c[0]+(p[0]+ic.lean(p[1]))*ic.r,ic.c[1]-p[1]*ic.r};
   }
   /// the seed coat, split open at its tip.
@@ -198,7 +198,7 @@ pub fn curve(p:[4]P,k:f32)P{
 }
 /// draws `item` in a slot of radius `r` at `c`: a bulb's seed and sprouts,
 /// else its colour. `alpha` fades it; `phase` keeps neighbours apart.
-pub fn draw(d:*Draw,item:items.Item,c:[2]f32,r:f32,t:f32,phase:f32,lit:f32,alpha:u8)Allocator.Error!void{
+pub fn draw(d:*Draw,item:items.Item,c:m.Vice(f32,2),r:f32,t:f32,phase:f32,lit:f32,alpha:u8)Allocator.Error!void{
   // the icon, and the item's table entry (its colour)
   const ic:Icon=.{.d=d,.c=c,.r=r,.t=t,.phase=phase,.alpha=alpha};
   const info=item.info();
@@ -214,7 +214,7 @@ pub fn draw(d:*Draw,item:items.Item,c:[2]f32,r:f32,t:f32,phase:f32,lit:f32,alpha
   _=try d.text(c[0]-Draw.width(short,size)/2,c[1]-r*0.5,size,ic.col(s.dark),short);
 }
 /// how many, low on the right of a slot, over a shadow so it reads on any icon.
-pub fn count(d:*Draw,c:[2]f32,r:f32,n:u32)Allocator.Error!void{
+pub fn count(d:*Draw,c:m.Vice(f32,2),r:f32,n:u32)Allocator.Error!void{
   // the count's text size, scaled to the slot
   const size=s.textNote*r/24;
   // where it sits, low on the right

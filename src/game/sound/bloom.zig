@@ -55,7 +55,7 @@ const rootFall:f32=1.6;
 const root:f32=0.6;
 // ---- the breath: rushing up the stems with the surge of light ----
 /// where it starts, low among the roots, and where it ends, at the crown (Hz)
-const breathSweep=[2]f32{220,2600};
+const breathSweep=m.Vice(f32,2){220,2600};
 /// how long it rushes up (s)
 const breathLen:f32=0.75;
 /// how tightly it whistles (q)

@@ -108,7 +108,7 @@ pub const State=struct{
   kept:EnumArray(items.Item,u16)=.initFill(0),
 };
 /// the driftbraid standing at tile `at`, or null if none does
-fn braidAt(ss:*st.Structures,w:*const World,at:[2]i32)?st.Id{
+fn braidAt(ss:*st.Structures,w:*const World,at:m.Vice(i32,2))?st.Id{
   // what stands there
   const j=ss.at(w,at[0],at[1]) orelse return null;
   return if(ss.get(j).kind()==.driftbraid)j else null;

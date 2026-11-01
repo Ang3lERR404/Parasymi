@@ -52,18 +52,18 @@ const moonLift:f32=0.3;
 /// how far north the moon's light leans
 const moonLean:f32=-0.3;
 /// the sky's colours (linear): night
-const nightSky=[3]f32{0.008,0.01,0.028};
+const nightSky=m.Vice(f32,3){0.008,0.01,0.028};
 /// a plain day
-const daySky=[3]f32{0.16,0.22,0.32};
+const daySky=m.Vice(f32,3){0.16,0.22,0.32};
 /// a day veiled by the world event: a little violet
-const veiledSky=[3]f32{0.2,0.12,0.38};
+const veiledSky=m.Vice(f32,3){0.2,0.12,0.38};
 /// the dusk glow near the horizon
-const duskSky=[3]f32{0.32,0.13,0.08};
+const duskSky=m.Vice(f32,3){0.32,0.13,0.08};
 /// the shifted sky (after the unforming), the ley's glow: by night, a deep
 /// blue violet
-const leyNight=[3]f32{0.03,0.02,0.09};
+const leyNight=m.Vice(f32,3){0.03,0.02,0.09};
 /// by day, a rose violet
-const leyDay=[3]f32{0.24,0.1,0.4};
+const leyDay=m.Vice(f32,3){0.24,0.1,0.4};
 /// the shifted sky's key light circles this far off the zenith (its glow
 /// overhead, no sun to swing it)
 const leyLean:f32=0.3;
@@ -103,7 +103,7 @@ pub const Sky=struct{
   /// linear sky/fog colour, with dusk glow near the horizon.
   /// `veil` blends the day colour toward the celestial palette (0..1);
   /// the shift turns it all to the ley's glow, rose by day, deep by night
-  pub fn color(s:*const Sky,veil:f32)[3]f32{
+  pub fn color(s:*const Sky,veil:f32)m.Vice(f32,3){
     // daylight, and the sun's elevation
     const d=s.daylight();
     const e=s.elevation();
@@ -112,7 +112,7 @@ pub const Sky=struct{
     // how far it has shifted, at the horizon
     const sh=m.smooth(m.clamp01((s.shift-fogFrom)/fogSpan));
     // the colour, built channel by channel
-    var o:[3]f32=undefined;
+    var o:m.Vice(f32,3)=undefined;
     inline for(0..3)|i|o[i]=m.lerp(m.lerp(m.lerp(nightSky[i],m.lerp(daySky[i],veiledSky[i],veil),d),duskSky[i],dusk),m.lerp(leyNight[i],leyDay[i],d),sh);
     return o;
   }
@@ -187,7 +187,7 @@ const burnRate:f32=0.4;
 /// a mote within this (m) of the wolf may twinkle now and then
 const twinkleNear:f32=6;
 /// seconds between twinkles, least and most (a gap with none near passes silent)
-const twinkleGap=[2]f32{2.5,8};
+const twinkleGap=m.Vice(f32,2){2.5,8};
 /// a mote near the wolf twinkled, for what hears it (game/sound.zig)
 pub const Twinkle=struct{
   /// how near it was: 0 at `twinkleNear` .. 1 touching

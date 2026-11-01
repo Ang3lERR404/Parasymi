@@ -257,7 +257,7 @@ pub const Editor=struct{
     try e.key(ch);
   }
   /// a drag of the held handle from `from` to `to` (px), `k` of it
-  pub fn dragGizmo(e:*Editor,j:Joint,g:gizmo.Gizmo,rg:*const Rig,from:[2]f32,to:[2]f32,k:f32)Allocator.Error!void{
+  pub fn dragGizmo(e:*Editor,j:Joint,g:gizmo.Gizmo,rg:*const Rig,from:m.Vice(f32,2),to:m.Vice(f32,2),k:f32)Allocator.Error!void{
     // the handle held, if any
     const part=e.part orelse return;
     switch(part){
@@ -278,7 +278,7 @@ pub const Editor=struct{
   }
   /// the joint whose dot is under `mouse`; again on the selected one, the
   /// next under it
-  pub fn pickJoint(e:*const Editor,rg:*const Rig,mouse:[2]f32)?usize{
+  pub fn pickJoint(e:*const Editor,rg:*const Rig,mouse:m.Vice(f32,2))?usize{
     // the joint selected now
     const cur=jointOf(e.shown[e.sel]);
     // the nearest joint under the mouse, and how near
@@ -398,13 +398,13 @@ pub fn text(gpa:Allocator,c:*const clip.Clip)Allocator.Error![]u8{
   return out.toOwnedSlice();
 }
 /// whether (`x`,`y`) (px) is on the timeline, with a little slack round it
-pub fn inTimeline(screen:[2]f32,x:f32,y:f32)bool{
+pub fn inTimeline(screen:m.Vice(f32,2),x:f32,y:f32)bool{
   // the timeline's top edge (px)
   const ty=screen[1]-tlBottom-tlH;
   return y>=ty-8 and y<=ty+tlH+8 and x>=pad-8 and x<=screen[0]-pad+8;
 }
 /// whether (`x`,`y`) (px) is over the channel list
-pub fn overList(screen:[2]f32,x:f32,y:f32)bool{
+pub fn overList(screen:m.Vice(f32,2),x:f32,y:f32)bool{
   return x<pad+listW and y>=listY and y<screen[1]-tlBottom-tlH-pad;
 }
 /// every pose channel's index, in order: the wolf shows them all

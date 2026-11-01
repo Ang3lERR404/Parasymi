@@ -219,7 +219,7 @@ pub const Camera=struct{
     }
   }
   /// turn the eyes by `px` pixels of mouse (x turns, y looks up and down).
-  pub fn look(c:*Camera,px:[2]f32)void{
+  pub fn look(c:*Camera,px:m.Vice(f32,2))void{
     switch(c.view){
       .eyes=>|*y|{
         c.yaw=@mod(c.yaw-px[0]*lookSpeed,m.tau);
@@ -259,7 +259,7 @@ pub const Camera=struct{
   }
   /// steer a free view: turn by `turn` (radians), move by `move` (right,
   /// up, forward, world units), roll, and dolly along the view.
-  pub fn fly(c:*Camera,turn:[2]f32,move:m.V3,roll:f32,dolly:f32)void{
+  pub fn fly(c:*Camera,turn:m.Vice(f32,2),move:m.V3,roll:f32,dolly:f32)void{
     switch(c.view){
       .free=>|*f|{
         f.yaw+=turn[0];
@@ -296,7 +296,7 @@ pub const Camera=struct{
   pub fn tilt(c:*Camera,by:f32)void{c.pitch=m.clamp(c.pitch+by,minPitch,maxPitch);}
   /// drag round the target by `px` pixels (x turns, y tilts): the world is
   /// grabbed and turned with the cursor
-  pub fn orbit(c:*Camera,px:[2]f32)void{
+  pub fn orbit(c:*Camera,px:m.Vice(f32,2))void{
     c.yaw=@mod(c.yaw-px[0]*orbitSpeed,m.tau);
     c.tilt(px[1]*orbitSpeed);
   }
@@ -329,7 +329,7 @@ pub const Camera=struct{
   }
   /// where the world point `p` lands on a screen `w` by `h` pixels, or
   /// null behind the eye (the inverse of `ray`)
-  pub fn screenOf(c:*const Camera,p:m.V3,w:f32,h:f32)?[2]f32{
+  pub fn screenOf(c:*const Camera,p:m.V3,w:f32,h:f32)?m.Vice(f32,2){
     // the point in clip space, before the divide
     const q=m.mulV(c.viewProj(),.{p[0],p[1],p[2],1});
     if(q[3]<=1e-4)return null;

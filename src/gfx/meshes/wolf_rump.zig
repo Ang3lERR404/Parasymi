@@ -59,7 +59,7 @@ pub const rings=36;
 /// the steps round it
 pub const stepCount=72;
 /// outline at angle `a` (x outward, y up), unit radius
-fn outline(a:f32)[2]f32{
+fn outline(a:f32)m.Vice(f32,2){
   // the angle's cosine and sine: across and up
   const c=@cos(a);
   const s=@sin(a);
@@ -77,7 +77,7 @@ const Shape=struct{
   /// its crown's height: the dish's full depth
   pub const crown=depth;
   /// the outline point at angle `a`, unit radius
-  pub fn outline(a:f32)[2]f32{return rump.outline(a);}
+  pub fn outline(a:f32)m.Vice(f32,2){return rump.outline(a);}
   /// how high it stands off the hide at `k` (0 crown .. 1 rim) and angle `a`:
   /// a round dome, fuller below, easing to nothing at the rim
   pub fn height(k:f32,a:f32,_:f32,_:f32)f32{

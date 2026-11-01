@@ -77,13 +77,13 @@ const burstReach:f32=0.32;
 /// (how brightly its beads glow at first)
 const burstGlow:f32=1.6;
 /// floaters: how far they bob (metres), a slow rise and a quicker one
-const bobAmount=[2]f32{0.07,0.025};
+const bobAmount=m.Vice(f32,2){0.07,0.025};
 /// floaters: how fast each bob runs (radians a second)
-const bobRate=[2]f32{0.5,1.13};
+const bobRate=m.Vice(f32,2){0.5,1.13};
 /// floaters: how far they drift about their point (metres)
 const drift:f32=0.05;
 /// floaters: how fast they drift, across and along (radians a second)
-const driftRate=[2]f32{0.31,0.27};
+const driftRate=m.Vice(f32,2){0.31,0.27};
 /// a floater's shadow radius (metres), on the ground beneath it
 const shadowR:f32=0.42;
 /// how much the shadow shrinks for each metre the floater rises
@@ -119,9 +119,9 @@ const ghostLift:f32=0.02;
 /// placement preview: how much smaller a structure ghost is
 const ghostScale:f32=0.96;
 /// placement preview: the tint where it fits (red, green, blue, alpha)
-const ghostFits=[4]f32{0.6,1.4,0.8,0.7};
+const ghostFits=m.Vice(f32,4){0.6,1.4,0.8,0.7};
 /// placement preview: the tint where it cannot go
-const ghostBlocked=[4]f32{1.6,0.4,0.4,0.8};
+const ghostBlocked=m.Vice(f32,4){1.6,0.4,0.4,0.8};
 /// placement preview: how fast a structure ghost's glow pulses (radians a second)
 const ghostPulseRate:f32=5;
 /// a structure ghost's glow, pulsing about this
@@ -192,7 +192,7 @@ const rootFlutter:f32=0.35;
 /// the scene for this frame on a screen `screen` pixels across: the plants,
 /// threads, the wolf, nodes, structures, ghost and motes as parts, the best
 /// lights, the HUD, and the push constants for sky, fog, sun and view.
-pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
+pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   // how far round the camera target things are drawn (tiles), and the shader clock
   const reach=g.cam.reach(play.drawLimit);
   const tf:f32=@floatCast(@mod(g.time,timeWrap));
@@ -227,7 +227,7 @@ pub fn scene(g:*Game,screen:[2]f32)Allocator.Error!renderer.Scene{
   const sky=g.sky.color(veil);
   // the eye, the hovered tile (far off when none), and the sun's heading
   const eye=g.cam.viewEye();
-  const hv:[2]f32=if(g.hover)|h|.{m.f(h[0]),m.f(h[1])}else.{noHover,noHover};
+  const hv:m.Vice(f32,2)=if(g.hover)|h|.{m.f(h[0]),m.f(h[1])}else.{noHover,noHover};
   const ld=g.sky.lightDir();
   // the scene, its instance lists filled from the plants just gathered
   var out:renderer.Scene=.{
@@ -354,7 +354,7 @@ pub fn pluckPoint(g:*const Game,i:usize,from:m.V3)m.V3{
 }
 /// the forming halo drawing in the bloom at a tile, as the shaders take it
 /// (`vertex.noHalo` for none): they spiral it in (common.glsl `haloSpiral`).
-fn haloOf(g:*const Game,def:*const species.Species,x:i32,y:i32)[4]f32{
+fn haloOf(g:*const Game,def:*const species.Species,x:i32,y:i32)m.Vice(f32,4){
   if(def.radiance<=0)return vertex.noHalo;
   // the halo structure holding the bloom at this tile, if any
   const hd=st.hold(&g.structs,x,y) orelse return vertex.noHalo;
@@ -444,7 +444,7 @@ const Drawn=struct{
   /// how it is turning to that facing (R)
   turn:turn.Turn=.{},
   /// its bend after the paws plucking it (`pluck.Tug.of`)
-  tug:[4]f32=@splat(0),
+  tug:m.Vice(f32,4)=@splat(0),
   /// the yield it has ripened (units)
   essence:f32=0,
   /// seconds since its yield last came loose in the paws (`pluck.Tug.sinceOf`)

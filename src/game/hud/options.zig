@@ -117,7 +117,7 @@ pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
   }
 }
 /// a slider held: set to the stop under the cursor
-pub fn drag(g:*play.Game,p:Pick,b:Box,at:[2]f32)void{
+pub fn drag(g:*play.Game,p:Pick,b:Box,at:m.Vice(f32,2))void{
   switch(p){
     .setting=>|set|if(opt.kind(set)==.slider)opt.setStop(&g.opts,set,slider.stopAt(trackOf(b),at[0],opt.stops(set))),
     .less,.more,.back=>{},

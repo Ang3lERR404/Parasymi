@@ -147,7 +147,7 @@ fn bough(b:*mg.Builder,sk:*growth.Skeleton,stem:growth.Id,k:usize)Allocator.Erro
   // the bough's heading round the trunk (radians)
   const a=boughAngle(k);
   // (out from the axis, height) at each control point
-  const at=[_][2]f32{
+  const at=[_]m.Vice(f32,2){
     .{0.04,trunkH-0.02},.{0.17,0.72},.{0.32,0.87},.{0.39,1.04},
     .{0.43,1.26},.{0.47,1.47},.{0.47,1.6},.{tipOut,tipY},
   };
@@ -356,7 +356,7 @@ pub const vortex=struct{
   }
   /// the ribbon's cross-section: a plain circle, which the width and height
   /// stretch into an upright oval
-  fn ring(a:f32)[2]f32{return.{@cos(a),@sin(a)};}
+  fn ring(a:f32)m.Vice(f32,2){return.{@cos(a),@sin(a)};}
 };
 /// mesh: GERMINATOR THREAD. a thread of essence drawn off the whirl and
 /// wound in onto the seed: spiralling from the core's wall in to the

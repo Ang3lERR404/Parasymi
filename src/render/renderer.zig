@@ -108,26 +108,26 @@ pub const WorldPush=extern struct{
   /// the camera's view-projection matrix
   vp:m.M4,
   /// xyz the camera's eye, w the time (s)
-  eyeTime:[4]f32,
+  eyeTime:m.Vice(f32,4),
   /// rgb the fog and sky colour (linear), w the fog's density
-  fog:[4]f32,
+  fog:m.Vice(f32,4),
   /// x the veil 0..1, y ley sight 0/1, zw the hovered tile (x, z)
-  misc:[4]f32,
+  misc:m.Vice(f32,4),
   /// xyz the way toward the key light (sun or moon), w daylight 0..1
-  sun:[4]f32,
+  sun:m.Vice(f32,4),
   /// the wolf's paws for contact shadows: world x, y, z; the first's w its
   /// facing yaw (both paws face alike), the second's w how far the
   /// unforming has shifted the sky (common.glsl `SHIFT`)
-  feet:[2][4]f32,
+  feet:[2]m.Vice(f32,4),
   /// x,y: what the camera looks at (x, z); z,w: horizontal distance from it
   /// fog starts closing in and where the world is fully hidden
-  view:[4]f32,
+  view:m.Vice(f32,4),
   /// where the parts pass finds this frame's bones (a buffer address; 0 in
   /// every other pass)
-  bones:[2]u32=.{0,0},
+  bones:m.Vice(u32,2)=.{0,0},
   /// where every pass finds this frame's lighting (a buffer address, set by
   /// the renderer)
-  light:[2]u32=.{0,0},
+  light:m.Vice(u32,2)=.{0,0},
 };
 /// the push every pass takes: the world's
 pub const Push=WorldPush;
@@ -139,7 +139,7 @@ pub const Scene=struct{
   /// what each world pass is pushed
   push:WorldPush,
   /// the colour the frame clears to (linear)
-  clear:[3]f32,
+  clear:m.Vice(f32,3),
   /// plant instances grouped by mesh variant (see meshgen.plantSlot).
   instances:[plantMeshes][]const vertex.PlantInstance,
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
@@ -205,7 +205,7 @@ pub const Slot=struct{
   /// how many detail records it holds
   tiles:u32=0,
   /// the chunk's centre (x, z)
-  centre:[2]f32=.{0,0},
+  centre:m.Vice(f32,2)=.{0,0},
   /// whether this slot holds a chunk now (false once evicted)
   live:bool=false,
   /// whether its ground is drawn into the overhead map as it is now
@@ -239,12 +239,12 @@ pub const Ext=struct{
   /// beside `meshes`: where each vertex grows out of (`vertex.Grow`)
   grows:Buffer=.{},
   /// (first vertex, count) per plant slot; slots a species does not use are empty
-  plantRanges:[plantMeshes][2]u32=@splat(.{0,0}),
+  plantRanges:[plantMeshes]m.Vice(u32,2)=@splat(.{0,0}),
   /// per plant slot, the byte offset from its mesh to the next growth key's
   /// (the plant shader blends toward it); 0 where a species has no keys
   plantMorph:[plantMeshes]u64=@splat(0),
   /// (first vertex, count) per part slot
-  partRanges:[meshlib.slots][2]u32=@splat(.{0,0}),
+  partRanges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0}),
   /// per part slot, the byte offset from its mesh to its next key's (the
   /// part shader blends toward it); 0 where it has none
   partMorph:[meshlib.slots]u64=@splat(0),
@@ -280,11 +280,11 @@ const Growing=struct{
   /// whether growing ran out of memory
   failed:bool=false,
   /// (first vertex, count) per plant slot, as grown
-  plantRanges:[plantMeshes][2]u32=@splat(.{0,0}),
+  plantRanges:[plantMeshes]m.Vice(u32,2)=@splat(.{0,0}),
   /// per plant slot, the byte offset to the next growth key's mesh
   plantMorph:[plantMeshes]u64=@splat(0),
   /// (first vertex, count) per part slot, as grown
-  partRanges:[meshlib.slots][2]u32=@splat(.{0,0}),
+  partRanges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0}),
   /// per part slot, the byte offset to its next key's mesh
   partMorph:[meshlib.slots]u64=@splat(0),
   /// per part slot: whether any of it can be see-through
@@ -402,7 +402,7 @@ pub fn release(r:*Renderer)void{
   x.grows.deinit(c);
 }
 /// how many of the meshes' units are grown, of how many
-pub fn meshProgress(r:*const Renderer)[2]u32{
+pub fn meshProgress(r:*const Renderer)m.Vice(u32,2){
   // the growing state; none left means all is grown
   const g=r.ext.growing orelse return.{1,1};
   return.{g.done.load(.monotonic),g.units()};
@@ -436,7 +436,7 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   return true;
 }
 /// per part slot: whether any of its run of `verts` can be see-through
-fn glassy(verts:[]const vertex.Mesh,ranges:*const[meshlib.slots][2]u32,out:*[meshlib.slots]bool)void{
+fn glassy(verts:[]const vertex.Mesh,ranges:*const[meshlib.slots]m.Vice(u32,2),out:*[meshlib.slots]bool)void{
   for(out,ranges)|*gl,rg|{
     gl.*=false;
     for(verts[rg[0]..][0..rg[1]])|v|if(vertex.seeThrough(@enumFromInt(v.part))){
@@ -452,7 +452,7 @@ fn glassy(verts:[]const vertex.Mesh,ranges:*const[meshlib.slots][2]u32,out:*[mes
 /// buffers have room; else they are made anew with room to spare (the old
 /// go once no frame in flight reads them). With nothing in `b` they stay,
 /// drawn by no slot.
-pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots][2]u32,kept:usize)Error!void{
+pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots]m.Vice(u32,2),kept:usize)Error!void{
   // what the garden keeps
   const x=&r.ext;
   x.plantRanges=@splat(.{0,0});

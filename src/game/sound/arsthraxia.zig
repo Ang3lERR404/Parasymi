@@ -23,14 +23,14 @@ const vary=lib.sound.footstep.vary;
 // fade against each other as the whorls turn against each other
 /// each glass's note (MIDI): the outer whorl on A4, the inner cup on E5,
 /// the fifth and the second of the music's D Lydian
-const glassNote=[2]f32{69,76};
+const glassNote=m.Vice(f32,2){69,76};
 /// how fast each glass's two tones beat against each other (Hz): the outer
 /// whorl slow, the cup faster, as they turn (structures/arsthraxia.zig)
-const glassBeat=[2]f32{0.35,0.6};
+const glassBeat=m.Vice(f32,2){0.35,0.6};
 /// how much faster they beat while it is fed (a share more at full feed)
 const glassBeatFed:f32=0.5;
 /// each glass's level in the mix: the outer whorl fuller than the cup
-const glassLevel=[2]f32{1,0.6};
+const glassLevel=m.Vice(f32,2){1,0.6};
 /// a rubbed glass's partials: its harmonics, as shares of its pitch
 const glassPartials=[_]f32{1,2,3};
 /// each partial's level: nearly a pure tone
@@ -42,9 +42,9 @@ const rub:f32=0.5;
 /// how much the finger's pressure wavers the glass's loudness (a share)
 const pressure:f32=0.15;
 /// how slowly the finger's pressure wavers, drawn between these (Hz)
-const pressureHz=[2]f32{0.2,0.45};
+const pressureHz=m.Vice(f32,2){0.2,0.45};
 /// the low-pass over the glass, unfed and fully fed (Hz): brighter fed
-const glassSoftHz=[2]f32{1600,3200};
+const glassSoftHz=m.Vice(f32,2){1600,3200};
 /// the glass's level in the mix
 const glass:f32=0.5;
 // ---- the thrum: thought climbing the nerves, felt as a slow low pulse ----
@@ -67,22 +67,22 @@ const thrum:f32=0.7;
 /// how many wisps may whisper at once
 const wispCount=3;
 /// seconds between wisps, unfed
-const wispGap=[2]f32{0.6,1.6};
+const wispGap=m.Vice(f32,2){0.6,1.6};
 /// how much sooner they come at full feed (a share of the gap)
 const wispGapFed:f32=0.45;
 /// how long a wisp is drawn in for (s)
-const wispLen=[2]f32{0.7,1.3};
+const wispLen=m.Vice(f32,2){0.7,1.3};
 /// where a wisp's whisper starts, high and airy (Hz)
-const wispFrom=[2]f32{2600,3800};
+const wispFrom=m.Vice(f32,2){2600,3800};
 /// where it ends, drawn down into the core (Hz)
-const wispTo=[2]f32{650,1000};
+const wispTo=m.Vice(f32,2){650,1000};
 /// how tightly it whispers (q)
 const wispQ:f32=4;
 /// the wisps' level in the mix
 const wisp:f32=0.9;
 // ---- the core: a soft hum swelling as the unit condenses ----
 /// the core's two notes (MIDI): D3 and A3 under the glass
-const coreNote=[2]f32{50,57};
+const coreNote=m.Vice(f32,2){50,57};
 /// how slowly its pitch wavers (Hz) and how far (cents)
 const coreWaverHz:f32=0.3;
 /// how far its pitch wavers (cents)
@@ -209,7 +209,7 @@ pub const Research=struct{
   /// the core's two tones
   coreOsc:[2]dsp.Osc,
   /// the core's two resting pitches (Hz)
-  coreHz:[2]f32,
+  coreHz:m.Vice(f32,2),
   /// the core's slow waver
   coreWaver:dsp.Osc,
   /// the core's level, gliding with the unit's progress

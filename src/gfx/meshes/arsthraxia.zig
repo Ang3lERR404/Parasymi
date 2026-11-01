@@ -76,7 +76,7 @@ pub const petalStagger:f32=0.025;
 /// how far it has wound round it) at each control point. It flares out of
 /// the roots, twines tight with the others, parts into the cage and
 /// gathers again under the flower.
-pub const stemAt=[_][3]f32{
+pub const stemAt=[_]m.Vice(f32,3){
   .{0.0,0.0,0.0},.{0.12,0.13,0.15},.{0.35,0.085,0.95},.{0.6,0.075,1.95},
   .{0.84,0.09,2.9},.{1.02,0.21,3.45},.{1.17,0.26,3.75},.{1.32,0.2,4.0},
   .{1.44,0.08,4.15},.{height-0.04,0.02,4.2},

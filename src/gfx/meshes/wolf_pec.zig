@@ -59,7 +59,7 @@ const lowFull:f32=0.15;
 const foot:f32=0.3;
 /// where the areola and nipple sit (x, y from the crown: below it and only
 /// just inside it, so the two sit well apart across the chest)
-const nippleAt=[2]f32{0.005,-0.034};
+const nippleAt=m.Vice(f32,2){0.005,-0.034};
 /// the areola's radius and how far its disc rises
 const areolaR:f32=0.027;
 const areolaRise:f32=0.0035;
@@ -79,7 +79,7 @@ pub const rings=44;
 /// the steps round it
 pub const stepCount=96;
 /// outline point at angle `a` (x right, y up), unit radius
-fn outline(a:f32)[2]f32{
+fn outline(a:f32)m.Vice(f32,2){
   // the angle's cosine and sine: across and up
   const c=@cos(a);
   const s=@sin(a);
@@ -101,7 +101,7 @@ const Shape=struct{
   /// its crown's height: the dish's full depth
   pub const crown=depth;
   /// the outline point at angle `a`, unit radius
-  pub fn outline(a:f32)[2]f32{return pec.outline(a);}
+  pub fn outline(a:f32)m.Vice(f32,2){return pec.outline(a);}
   /// how high it stands off the hide at `k` (0 crown .. 1 rim), angle `a` and point
   /// `x`, `y`: the dish, with the areola's disc and the nipple's dome added on
   pub fn height(k:f32,a:f32,x:f32,y:f32)f32{

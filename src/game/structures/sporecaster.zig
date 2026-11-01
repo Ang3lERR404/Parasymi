@@ -106,7 +106,7 @@ pub const Spore=struct{
   /// how far along it is (0 at the pore it left .. 1 at the one it seeks)
   t:f32=0,
   /// the tile of the caster it seeks
-  to:[2]i32,
+  to:m.Vice(i32,2),
   /// the ground height under that caster
   toH:f32,
   /// whether it has turned home, carrying back what it could not deliver
@@ -121,14 +121,14 @@ pub const State=struct{
   t:f32=0,
 };
 /// the sporecaster on tile `at`, if one stands there.
-fn casterAt(ss:*st.Structures,w:*const World,at:[2]i32)?st.Id{
+fn casterAt(ss:*st.Structures,w:*const World,at:m.Vice(i32,2))?st.Id{
   // whatever structure stands there
   const j=ss.at(w,at[0],at[1]) orelse return null;
   return if(ss.get(j).kind()==.sporecaster)j else null;
 }
 /// the ground's height at tile `at`: from its chunk if loaded, else as the
 /// world would generate it
-pub fn groundAt(w:*const World,at:[2]i32)f32{
+pub fn groundAt(w:*const World,at:m.Vice(i32,2))f32{
   if(w.chunkOfTile(at[0],at[1]))|c|return c.height[ck.localIndex(at[0],at[1])];
   return gen.heightAt(w.seed,at[0],at[1]);
 }

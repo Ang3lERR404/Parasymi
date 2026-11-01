@@ -106,7 +106,7 @@ fn normal(th:f32,ph:f32)V3{
 fn gut(th:f32)f32{return share(-@cos(th)*(if(@cos(th)<0)upReach else down))[0];}
 /// `scale` times a smooth step of x over `from`..`from + span`, and its
 /// slope in x
-fn ramp(x:f32,from:f32,span:f32,scale:f32)[2]f32{
+fn ramp(x:f32,from:f32,span:f32,scale:f32)m.Vice(f32,2){
   // how far through the step `x` is (0..1 inside it)
   const u=(x-from)/span;
   if(u<=0 or u>=1)return.{scale*m.smooth(m.clamp01(u)),0};
@@ -120,7 +120,7 @@ const pin:f32=0.55;
 /// where it hangs from them. Above the middle the gut is its upper bone,
 /// which lifts nothing past where the waist holds it, so this easing never
 /// folds the swollen sac over itself.
-fn share(yr:f32)[2]f32{
+fn share(yr:f32)m.Vice(f32,2){
   // how far the hold toward the top has come in, and its slope
   const r=ramp(yr/upReach,pin,1-pin,1);
   return.{1-r[0],-r[1]/upReach};
@@ -131,14 +131,14 @@ fn share(yr:f32)[2]f32{
 /// the height (above and below the gut's centre) over which they part.
 const part:f32=0.04;
 /// how much of the gut a point `yr` above its centre is of the lower bone, and its slope
-fn lower(yr:f32)[2]f32{
+fn lower(yr:f32)m.Vice(f32,2){
   // how far across the parting the point is, and its slope
   const r=ramp(yr,-part,2*part,1);
   return.{1-r[0],-r[1]};
 }
 /// how far the full gut bones lift a point `yr` above the gut's centre
 /// (negative: drop it), the lower and the upper
-fn reach(yr:f32)[2]f32{
+fn reach(yr:f32)m.Vice(f32,2){
   return.{skel.gutGrow[1]*yr+skel.gutShift[1],skel.gutGrowTop[1]*yr+skel.gutShift[1]};
 }
 /// lays the belly: the sac, its net of vines with their leaves, and the belly

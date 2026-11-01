@@ -104,7 +104,7 @@ pub inline fn angleDiff(from:f32,to:f32)f32{return atan2(@sin(to-from),@cos(to-f
 /// the tile containing a world coordinate.
 pub inline fn tileOf(x:f32)i32{return@intFromFloat(@floor(x));}
 /// the tile (x, z) under a world position.
-pub inline fn tileAt(p:V3)[2]i32{return.{tileOf(p[0]),tileOf(p[2])};}
+pub inline fn tileAt(p:V3)Vice(i32,2){return.{tileOf(p[0]),tileOf(p[2])};}
 /// world-space centre of a size x size footprint anchored at tile (x, z).
 pub inline fn footprintCentre(x:i32,z:i32,size:u8,y:f32)V3{
   // half the footprint's width, from its corner to its centre
@@ -125,7 +125,7 @@ pub const Footprint=struct{
   /// how many tiles have been handed out so far
   k:u16=0,
   /// the next tile as .{x, z}, or null once all size x size are visited
-  pub fn next(fp:*Footprint)?[2]i32{
+  pub fn next(fp:*Footprint)?Vice(i32,2){
     // how many tiles the whole footprint holds
     const n=@as(u16,fp.size)*fp.size;
     if(fp.k>=n)return null;
@@ -145,10 +145,10 @@ pub const Ring=struct{
   /// the next offset's z, -r..r
   dz:i32,
   /// the next offset on the ring as .{dx, dz}, or null once it is walked
-  pub fn next(it:*Ring)?[2]i32{
+  pub fn next(it:*Ring)?Vice(i32,2){
     while(it.dz<=it.r){
       // the offset handed out this call
-      const o:[2]i32=.{it.dx,it.dz};
+      const o:Vice(i32,2)=.{it.dx,it.dz};
       // inner rows touch the ring only at their ends
       // whether this row is the ring's top or bottom, walked whole
       const edge=@abs(it.dz)==it.r;
@@ -721,7 +721,7 @@ test"footprints and rings visit each tile once"{
   // a 2x2 footprint anchored off the origin
   var fp=footprint(-1,4,2);
   // the tiles it should visit, in order
-  const want=[_][2]i32{.{-1,4},.{0,4},.{-1,5},.{0,5}};
+  const want=[_]Vice(i32,2){.{-1,4},.{0,4},.{-1,5},.{0,5}};
   for(want)|w|try testing.expectEqual(w,fp.next().?);
   try testing.expect(fp.next()==null);
   for(0..5)|ri|{

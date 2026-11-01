@@ -36,7 +36,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     const k0=m.ratio(i,n-1);
     const k1=m.ratio(i+1,n-1);
     // the cell's four corners as (along, across), wound round the quad
-    const q=[4][2]f32{.{k0,across[j]},.{k0,across[j+1]},.{k1,across[j+1]},.{k1,across[j]}};
+    const q=[4]m.Vice(f32,2){.{k0,across[j]},.{k0,across[j+1]},.{k1,across[j+1]},.{k1,across[j]}};
     for([_]usize{0,1,2,0,2,3})|c|try b.put(v3(q[c][1],q[c][0],0),v3(0,0,1),warm,q[c][0],q[c][1],.thread);
   };
 }

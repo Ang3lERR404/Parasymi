@@ -91,7 +91,7 @@ pub const Item=enum(u8){
 /// names are player-facing text (`game/text.zig`).
 pub const Info=struct{
   /// its colour: red, green, blue and alpha bytes
-  col:[4]u8,
+  col:m.Vice(u8,4),
 };
 /// every item stacks this high in a slot.
 pub const stack:u16=100;

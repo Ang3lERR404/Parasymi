@@ -5,49 +5,51 @@
 //! (gfx/pipeline.zig), and the GLSL `layout(location=..)` must match field order.
 /// colour types: the eight-bit rgba a mesh vertex carries
 const color=@import("../core/color.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// a point of light as the shaders read it from the frame's lighting record
 /// (render/light.zig `Lighting`): it lights what lies within its reach,
 /// brightest beside it, gone at the edge
 pub const Light=extern struct{
   /// xyz where it is, w how far it reaches (world units)
-  pos:[4]f32,
+  pos:m.Vice(f32,4),
   /// linear rgb times its strength; w unused
-  col:[4]f32,
+  col:m.Vice(f32,4),
 };
 /// one corner of a UI quad, a glyph or a drawn shape, as the UI shaders read it
 pub const Ui=extern struct{
   /// where the corner sits on screen, in pixels from the top-left
-  pos:[2]f32,
+  pos:m.Vice(f32,2),
   /// local coordinates inside the quad: glyph cells (0..6, 0..8) for text,
   /// pixels (0..size) for shapes
-  uv:[2]f32,
+  uv:m.Vice(f32,2),
   /// quad size in pixels (shapes need it for aspect-correct distance fields)
-  size:[2]f32,
+  size:m.Vice(f32,2),
   /// its colour: red, green, blue, alpha bytes
-  col:[4]u8,
+  col:m.Vice(u8,4),
   /// glyph: 5x7 bitmap packed row-major (bit 0 = top-left).
   /// shape: x = 0xffffffff, y = shape kind (see ui/draw.zig `Shape`)
-  bits:[2]u32,
+  bits:m.Vice(u32,2),
   /// shape parameters: x value/selection 0..1, y phase/seed
-  param:[2]f32,
+  param:m.Vice(f32,2),
   /// the screen rectangle it is cut to (left, top, right, bottom pixels):
   /// nothing of it shows outside, as a list scrolled past its ends
-  clip:[4]f32,
+  clip:m.Vice(f32,4),
 };
 /// one vertex of a built mesh: where it is, which way it faces, its colour,
 /// how far up the thing it sits and what part of it it belongs to
 pub const Mesh=extern struct{
   /// where it sits in mesh space
-  pos:[3]f32,
+  pos:m.Vice(f32,3),
   /// which way its surface faces (unit length)
-  nrm:[3]f32,
+  nrm:m.Vice(f32,3),
   /// its colour, eight bits a channel
   col:color.Rgba8,
   /// x: height along the thing 0..1 (a game drives growth and sway off it),
   /// y: position along a sheet (a leaf, a petal) 0..1, z: across a sheet,
   /// 1..3 edge to edge (its midrib at 2); on a tube's sides 4..5, how far
   /// round its ring; 0 elsewhere
-  tu:[3]f32,
+  tu:m.Vice(f32,3),
   /// its role (the game's enum, see gfx/meshgen.zig `Mesher`)
   part:u32,
 };
@@ -58,16 +60,16 @@ pub const Skin=extern struct{
   /// the four bone indices, one per byte, lowest first
   bones:u32=0,
   /// how much each of those bones pulls it (unorm bytes summing to one)
-  weights:[4]u8=.{0,0,0,0},
+  weights:m.Vice(u8,4)=.{0,0,0,0},
   /// how each of the four weights changes across the mesh (per unit of
   /// mesh space, its x, y and z): a skin swelling under a scaled bone
   /// (a filling belly) bends its normals by them, not by the blended bones
   /// alone. Zero where the weights hold still or are not known.
-  gx:[4]f32=@splat(0),
+  gx:m.Vice(f32,4)=@splat(0),
   /// as `gx`, along mesh y
-  gy:[4]f32=@splat(0),
+  gy:m.Vice(f32,4)=@splat(0),
   /// as `gx`, along mesh z
-  gz:[4]f32=@splat(0),
+  gz:m.Vice(f32,4)=@splat(0),
 };
 /// where a vertex grown along a growth spline grows out of and when, read
 /// beside the mesh buffer vertex for vertex. A game's shader keeps it shrunk into `from`
@@ -76,17 +78,17 @@ pub const Skin=extern struct{
 /// done (`at[3]`; equal: no thickening). `at[1]` 0: not on a spline.
 pub const Grow=extern struct{
   /// the point on its spline it is kept shrunk into until it grows (mesh space)
-  from:[3]f32=@splat(0),
+  from:m.Vice(f32,3)=@splat(0),
   /// its growth timing: starts, grows over, spline started, spline done
-  at:[4]f32=@splat(0),
+  at:m.Vice(f32,4)=@splat(0),
 };
 /// the leading fields of `Mesh`, read from a second growth key of the same
 /// mesh buffer (same stride) so a mesh can blend between keys.
 pub const MeshPose=extern struct{
   /// where it sits in this key's shape
-  pos:[3]f32,
+  pos:m.Vice(f32,3),
   /// which way it faces in this key's shape
-  nrm:[3]f32,
+  nrm:m.Vice(f32,3),
 };
 comptime{
   if(@offsetOf(MeshPose,"pos")!=@offsetOf(Mesh,"pos")or@offsetOf(MeshPose,"nrm")!=@offsetOf(Mesh,"nrm"))

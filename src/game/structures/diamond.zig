@@ -60,7 +60,7 @@ pub const State=struct{
   /// spiralling in
   t:f32=0,
   /// per point of its ring: how brightly the arcs beside it shine
-  light:[4]f32=@splat(halo.dim),
+  light:m.Vice(f32,4)=@splat(halo.dim),
 };
 /// counts on from its forming (up to the end of its flash) and lets its
 /// arcs brighten or dim with the blooms on its ring's points. Of a halo,

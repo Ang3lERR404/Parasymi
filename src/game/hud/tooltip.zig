@@ -1,6 +1,8 @@
 //! an item's full name, on a small trellis beside the cursor, while the
 //! mouse rests on a row showing one (a slot holding one, a recipe).
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator type every drawing call may fail with
@@ -18,7 +20,7 @@ const txt=lib.txt;
 /// the HUD, to ask a panel what its row shows
 const hud=lib.hud;
 /// how far (pixels) the card stands off the cursor, right and up
-const offset=[2]f32{20,10};
+const offset=m.Vice(f32,2){20,10};
 /// the card's inner margin (pixels)
 const margin:f32=12;
 /// the height of one line (pixels)

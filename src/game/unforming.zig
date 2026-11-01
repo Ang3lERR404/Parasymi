@@ -95,7 +95,7 @@ pub const Unforming=struct{
   /// seconds since it began
   t:f32=0,
   /// where the seed gathers, in the sky (world space)
-  at:[3]f32=.{0,0,0},
+  at:m.Vice(f32,3)=.{0,0,0},
   /// whether the ley lines have sealed (every chunk streamed in after is
   /// sealed as it comes, its nodes simply gone)
   sealed:bool=false,

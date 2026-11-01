@@ -112,7 +112,7 @@ pub const State=struct{
   carried:items.Item=.essence,
 };
 /// the offset (x, y), in tiles, of the `i`th tile of the square round it
-fn offset(i:usize)[2]i32{return.{@as(i32,@intCast(i%side))-reachTiles,@as(i32,@intCast(i/side))-reachTiles};}
+fn offset(i:usize)m.Vice(i32,2){return.{@as(i32,@intCast(i%side))-reachTiles,@as(i32,@intCast(i/side))-reachTiles};}
 /// the plant whose own tile (its corner, for one larger than a tile) is
 /// `i` round (x, y), if any: one root to each plant
 fn plantAt(ctx:st.Ctx,x:i32,y:i32,i:usize)?ck.PlantId{
@@ -126,7 +126,7 @@ fn plantAt(ctx:st.Ctx,x:i32,y:i32,i:usize)?ck.PlantId{
   return p;
 }
 /// which root mesh reaches the tile at offset `o` (one per distance out)
-fn rootFor(o:[2]i32)meshlib.Id{
+fn rootFor(o:m.Vice(i32,2))meshlib.Id{
   // the squared distance out to that tile
   const d2=o[0]*o[0]+o[1]*o[1];
   return switch(d2){

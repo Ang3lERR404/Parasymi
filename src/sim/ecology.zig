@@ -445,7 +445,7 @@ test"a mature confluence halves parasite drain within 3 tiles"{
   // the test allocator
   const gpa=testing.allocator;
   // the mana the root loses in each case
-  var loss:[3]f32=undefined;
+  var loss:m.Vice(f32,3)=undefined;
   // no confluence; a mature one 2 tiles from the leech; one 4 tiles away
   for([_]?i32{null,3,5},0..)|at,k|{
     // a small loaded world

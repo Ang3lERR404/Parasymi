@@ -37,7 +37,7 @@ pub const maxLights=32;
 /// the views the casters draw: one per cascade
 pub const views:u32=(1<<cascades)-1;
 /// casters pushed away from the light by a constant and with their slope
-pub const bias=[2]f32{1.25,1.75};
+pub const bias=m.Vice(f32,2){1.25,1.75};
 /// the shadow map's depth format, the same as every pass's
 pub const format=sw.depthFormat;
 /// how far toward the light beyond a slice's sphere casters are caught
@@ -62,9 +62,9 @@ pub const Lighting=extern struct{
   /// world to each cascade's clip space
   cascades:[cascades]m.M4,
   /// per cascade, the world size of one of its texels (one vec4's worth)
-  texel:[4]f32,
+  texel:m.Vice(f32,4),
   /// x points of light, y how far from the eye shadows reach, zw unused
-  info:[4]f32,
+  info:m.Vice(f32,4),
   /// the frame's points of light, the first `info[0]` of them lit
   lights:[maxLights]vertex.Light,
 };

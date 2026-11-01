@@ -288,8 +288,8 @@ pub fn main(init:std.process.Init)!void{
     defer parts.deinit();
     try sc.doc.mesh(gpa,io,false,&built,parts.lookup());
     // where in the builder each library slot's level of detail lies
-    var ranges:[meshlib.slots][2]u32=@splat(.{0,0});
-    const run:[2]u32=.{0,@intCast(built.mark())};
+    var ranges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0});
+    const run:m.Vice(u32,2)=.{0,@intCast(built.mark())};
     for(0..meshgen.lods)|l|ranges[meshlib.slot(sculptSlot,@intCast(l))]=run;
     try renderer.setParts(r,&built,ranges,0);
   }

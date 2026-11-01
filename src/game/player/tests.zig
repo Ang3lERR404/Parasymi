@@ -158,7 +158,7 @@ test"gathering, the wolf squats, grips the node and each unit sends a paw to the
   p.work=v3(0,0,gatherAt);
   // the time gone, and whether each paw has stowed a unit yet
   var t:f32=0;
-  var stowed=[2]bool{false,false};
+  var stowed=m.Vice(bool,2){false,false};
   while(t<3):(t+=testDt){
     p.gather=@mod(t,0.45)/0.45;
     p.animate(null,testDt);
@@ -262,7 +262,7 @@ test"walking, sprinting, turning back and stopping, no leg joint ever jumps and 
   // each leg's knee, hock and ball last frame (in the world), once there is one
   var last:?[2][3]V3=null;
   // the moves asked for in turn: which way (x, z) and how fast (m/s)
-  const moves=[_][3]f32{.{0,1,1.5},.{0,-1,1.5},.{1,0,1},.{-1,1,1},.{0,1,6.5},.{0,-1,6.5},.{0,0,0},.{1,1,6.5},.{-1,-1,6.5},.{0,0,0}};
+  const moves=[_]m.Vice(f32,3){.{0,1,1.5},.{0,-1,1.5},.{1,0,1},.{-1,1,1},.{0,1,6.5},.{0,-1,6.5},.{0,0,0},.{1,1,6.5},.{-1,-1,6.5},.{0,0,0}};
   for(moves)|mv|for(0..90)|_|{
     // the velocity wished for, eased toward, the body moved and turned to it
     const want=if(mv[2]>0)m.norm(v3(mv[0],0,mv[1]))*m.splat3(mv[2])else v3(0,0,0);

@@ -31,7 +31,7 @@ const leafHit:f32=36;
 /// one picker as a row lays it out
 pub const Picker=struct{
   /// the middle of its value's line (pixels)
-  center:[2]f32,
+  center:m.Vice(f32,2),
   /// what it is set to, as shown
   value:[]const u8,
   /// what a click on its left leaf picks (turning it back)

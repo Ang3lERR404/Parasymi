@@ -4,6 +4,8 @@
 //! seed riding it where the list is: the wheel scrolls it, the stem held
 //! drags it (its panel's `drag` hook calls `dragged`).
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator type every drawing call may fail with
@@ -73,4 +75,4 @@ pub const List=struct{
 };
 /// the stem held, the cursor at `at` over its box `b`: the list `l` of
 /// `total` rows dragged there
-pub fn dragged(l:*Scroll,total:usize,b:Box,at:[2]f32)void{l.drag(b.local(at)[1],total);}
+pub fn dragged(l:*Scroll,total:usize,b:Box,at:m.Vice(f32,2))void{l.drag(b.local(at)[1],total);}

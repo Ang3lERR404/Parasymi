@@ -24,7 +24,7 @@ const stemLen:f32=14;
 /// one toggle as a row lays it out
 pub const Toggle=struct{
   /// where its bud sits (pixels)
-  at:[2]f32,
+  at:m.Vice(f32,2),
   /// how far it is turned on (0 off .. 1 on), eased by its panel
   on:f32,
   /// whether the mouse (or the keys) are on its row

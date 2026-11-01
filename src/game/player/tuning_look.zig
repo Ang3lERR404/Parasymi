@@ -82,9 +82,9 @@ pub const bellyGlow:f32=0.35;
 /// how much more the belly sap glows once full
 pub const bellyGlowFull:f32=0.65;
 /// the paw beans' colour (rgba, 0..1)
-pub const beanTint=[4]f32{0.72,0.5,0.38,1};
+pub const beanTint=m.Vice(f32,4){0.72,0.5,0.38,1};
 /// the nose's colour (rgba, 0..1)
-pub const noseTint=[4]f32{0.3,0.22,0.2,1};
+pub const noseTint=m.Vice(f32,4){0.3,0.22,0.2,1};
 /// a planted foot's central pad flattens by this fraction
 pub const padFlatten:f32=0.1;
 /// how stiffly a pad squashes and springs back (spring frequency)
@@ -136,7 +136,7 @@ pub const lumps=[_]Lump{
 pub const lumpR:f32=0.055;
 /// the pectorals: dense gel on a spring each (left, right)
 /// (this one: each spring's stiffness)
-pub const pecK=[2]f32{60,55};
+pub const pecK=m.Vice(f32,2){60,55};
 /// how damped their springs are
 pub const pecC:f32=6;
 /// how heavy each pectoral is

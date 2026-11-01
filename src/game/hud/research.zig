@@ -299,11 +299,11 @@ fn leafTip(l:*const Layout,i:usize)V3{return l.base[i]+heading(l.ang[i])*m.splat
 /// slots to screen pixels: y up becomes y down.
 const Fit=struct{
   /// where the tree's origin falls on screen (pixels)
-  o:[2]f32,
+  o:m.Vice(f32,2),
   /// how many pixels one slot spans
   k:f32,
   /// a point of the tree on screen (pixels)
-  fn at(f:Fit,p:V3)[2]f32{return.{f.o[0]+p[0]*f.k,f.o[1]-p[1]*f.k};}
+  fn at(f:Fit,p:V3)m.Vice(f32,2){return.{f.o[0]+p[0]*f.k,f.o[1]-p[1]*f.k};}
   /// a heading of the tree on screen, y flipped
   fn angle(a:f32)f32{return-a;}
 };
@@ -426,7 +426,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   // each shown node's look: where it is hit, and what it grows into
   // the node under the mouse, and where each shown node is marked on screen
   const hover:?Id=if(hud.own(.research,g.pointed))|p|switch(p){.node=>|id|id}else null;
-  var mark:[nodeCount]?[2]f32=@splat(null);
+  var mark:[nodeCount]?m.Vice(f32,2)=@splat(null);
   for(0..nodeCount)|i|if(shown(&grown,i)){
     // the node, its status, and its heading
     const id:Id=@enumFromInt(i);

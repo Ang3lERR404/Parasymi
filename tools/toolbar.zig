@@ -126,7 +126,7 @@ pub fn Bar(comptime Act:type)type{
     seen:button.Pointer=.{},
     /// `items` laid down the window's right side from its top, a new
     /// column leftwards each time one would reach below `bottom` (px)
-    pub fn lay(b:*Self,items:[]const Entry,screen:[2]f32,bottom:f32)void{
+    pub fn lay(b:*Self,items:[]const Entry,screen:m.Vice(f32,2),bottom:f32)void{
       b.items=items[0..@min(items.len,cap)];
       // each button's column and top, each column's width and foot
       var col:usize=0;
@@ -159,12 +159,12 @@ pub fn Bar(comptime Act:type)type{
       for(b.items,0..)|_,i|b.boxes[i]=.{.x=b.cols[colOf[i]].x,.y=tops[i],.w=b.cols[colOf[i]].w,.h=buttonH};
     }
     /// whether `at` (px) is over the bar, where the scene doesn't answer
-    pub fn over(b:*const Self,at:[2]f32)bool{
+    pub fn over(b:*const Self,at:m.Vice(f32,2))bool{
       for(b.cols[0..b.colCount])|c|if(c.contains(at))return true;
       return false;
     }
     /// the live button under `at` (px), if any
-    fn under(b:*const Self,at:[2]f32,live:Set)?Act{
+    fn under(b:*const Self,at:m.Vice(f32,2),live:Set)?Act{
       for(b.items,0..)|it,i|if(live.contains(it.act) and b.boxes[i].contains(at))return it.act;
       return null;
     }

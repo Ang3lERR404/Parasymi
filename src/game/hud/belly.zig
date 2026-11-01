@@ -196,12 +196,12 @@ pub const Vine=struct{
     // how many pieces the grown part takes
     const n:usize=@intFromFloat(@ceil((end-v.x0)/seg));
     // the piece's start, and how far along the bark it has run (pixels)
-    var a:[2]f32=.{v.x0,v.at(v.x0)};
+    var a:m.Vice(f32,2)=.{v.x0,v.at(v.x0)};
     var arc:f32=0;
     for(0..n)|i|{
       // the piece's end, and how far along the whole vine it is (0..1)
       const x=@min(v.x0+seg*m.f(i+1),end);
-      const b:[2]f32=.{x,v.at(x)};
+      const b:m.Vice(f32,2)=.{x,v.at(x)};
       const k=(x-v.x0)/@max(v.x1-v.x0,1);
       // its radius at either end, thinning to the tip
       const ra=m.lerp(r0,r1,(a[0]-v.x0)/@max(v.x1-v.x0,1))*@sqrt(m.clamp01((end-a[0])/tip));
@@ -220,7 +220,7 @@ pub const Vine=struct{
       if(open<=0)continue;
       // how far it sways now, and where the pair grows from
       const sway=0.12*@sin(t*1.6+m.f(i)*1.9+v.seed*5);
-      const base:[2]f32=.{x,v.at(x)};
+      const base:m.Vice(f32,2)=.{x,v.at(x)};
       try d.leaf(base,-2.2+sway,leafLen*open,leafWid*open,s.leaf,open,v.seed+m.f(i));
       try d.leaf(base,-0.9-sway,leafLen*0.85*open,leafWid*open,s.leaf,open,v.seed+m.f(i)+0.5);
     }

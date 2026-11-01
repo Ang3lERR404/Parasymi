@@ -89,9 +89,9 @@ pub const View=struct{
   /// where the eye is (world)
   eye:V3,
   /// the window's size (px)
-  screen:[2]f32,
+  screen:m.Vice(f32,2),
   /// `p` (world) on screen, or null behind the eye
-  pub fn project(v:View,p:V3)?[2]f32{
+  pub fn project(v:View,p:V3)?m.Vice(f32,2){
     // the point in clip space
     const c=m.mulV(v.vp,.{p[0],p[1],p[2],1});
     if(c[3]<=1e-4)return null;
@@ -99,7 +99,7 @@ pub const View=struct{
   }
   /// where the ray through pixel `px` meets the plane through `at` across
   /// `n`, or null where it runs too nearly along the plane
-  fn onPlane(v:View,px:[2]f32,at:V3,n:V3)?V3{
+  fn onPlane(v:View,px:m.Vice(f32,2),at:V3,n:V3)?V3{
     // clip space back to the world
     const inv=m.inverse(v.vp);
     // the pixel in normalized device coordinates
@@ -139,7 +139,7 @@ pub const Gizmo=struct{
     return g.at+(u*m.splat3(@cos(t))+w*m.splat3(@sin(t)))*m.splat3(r);
   }
   /// the handle under `mouse`, if any
-  pub fn pick(g:Gizmo,v:View,mouse:[2]f32)?Part{
+  pub fn pick(g:Gizmo,v:View,mouse:m.Vice(f32,2))?Part{
     // the centre on screen, and the handles' reach
     const c=v.project(g.at) orelse return null;
     const r=g.reach(v);
@@ -173,7 +173,7 @@ pub const Gizmo=struct{
   }
   /// how far a drag from `from` to `to` (px) carries axis `k`: metres
   /// along it (moving, sizing) or radians about it (turning)
-  pub fn along(g:Gizmo,v:View,k:usize,from:[2]f32,to:[2]f32)f32{
+  pub fn along(g:Gizmo,v:View,k:usize,from:m.Vice(f32,2),to:m.Vice(f32,2))f32{
     // the handle's axis, and the centre on screen
     const a=g.axes[k] orelse return 0;
     const c=v.project(g.at) orelse return 0;
@@ -182,7 +182,7 @@ pub const Gizmo=struct{
         // the handle's reach, its tip on screen, and its line there (px)
         const r=g.reach(v);
         const tip=v.project(g.at+a*m.splat3(r)) orelse return 0;
-        const d=[2]f32{tip[0]-c[0],tip[1]-c[1]};
+        const d=m.Vice(f32,2){tip[0]-c[0],tip[1]-c[1]};
         // the handle's length on screen (px)
         const l=@sqrt(d[0]*d[0]+d[1]*d[1]);
         if(l<endOn)return 0;
@@ -208,7 +208,7 @@ pub const Gizmo=struct{
   }
   /// where a drag of the centre from `from` to `to` (px) carries it, across
   /// the view at its depth (world metres)
-  pub fn across(g:Gizmo,v:View,from:[2]f32,to:[2]f32)V3{
+  pub fn across(g:Gizmo,v:View,from:m.Vice(f32,2),to:m.Vice(f32,2))V3{
     // the way the eye looks at the gizmo, and the view's right and up there
     const fw=m.norm(g.at-v.eye);
     const right=m.norm(m.cross(fw,v3(0,1,0)));
@@ -263,9 +263,9 @@ pub const Gizmo=struct{
   }
 };
 /// the distance (px) between two points on screen
-fn dist2(a:[2]f32,b:[2]f32)f32{return m.len(v3(a[0]-b[0],a[1]-b[1],0));}
+fn dist2(a:m.Vice(f32,2),b:m.Vice(f32,2))f32{return m.len(v3(a[0]-b[0],a[1]-b[1],0));}
 /// from `p` to the segment `a`..`b` (px)
-fn segDist(p:[2]f32,a:[2]f32,b:[2]f32)f32{
+fn segDist(p:m.Vice(f32,2),a:m.Vice(f32,2),b:m.Vice(f32,2))f32{
   // the segment's run, and the point from its start
   const ab=v3(b[0]-a[0],b[1]-a[1],0);
   const ap=v3(p[0]-a[0],p[1]-a[1],0);

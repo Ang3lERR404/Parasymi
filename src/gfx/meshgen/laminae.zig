@@ -164,9 +164,9 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
   const nc=stride(columns+1,b.step(),&kc);
   for(0..nr-1)|ri|for(0..nc-1)|ci|{
     // the four corners of this quad: their rows, then their points round
-    const r=[4]usize{kr[ri],kr[ri],kr[ri+1],kr[ri+1]};
-    const c=[4]usize{kc[ci]%columns,kc[ci+1]%columns,kc[ci+1]%columns,kc[ci]%columns};
-    for([2][3]usize{.{0,1,2},.{0,2,3}})|tri|{
+    const r=m.Vice(usize,4){kr[ri],kr[ri],kr[ri+1],kr[ri+1]};
+    const c=m.Vice(usize,4){kc[ci]%columns,kc[ci+1]%columns,kc[ci+1]%columns,kc[ci]%columns};
+    for([2]m.Vice(usize,3){.{0,1,2},.{0,2,3}})|tri|{
       // one triangle's three points
       var p:[3]V3=undefined;
       // their summed normals, which way out it faces
@@ -177,7 +177,7 @@ pub fn lamina(b:*Builder,l:Lamina)Allocator.Error!void{
       }
       // front faces wind counter-clockwise seen from outside
       // its winding, flipped to run counter-clockwise from outside
-      const order=if(m.dot(m.cross(p[1]-p[0],p[2]-p[0]),n)<0)[3]usize{tri[0],tri[2],tri[1]}else tri;
+      const order=if(m.dot(m.cross(p[1]-p[0],p[2]-p[0]),n)<0)m.Vice(usize,3){tri[0],tri[2],tri[1]}else tri;
       for(order)|v|{
         try b.put(pts[r[v]][c[v]],ns[r[v]][c[v]],cs[r[v]][c[v]],l.t,m.ratio(r[v],rows-1),l.part);
         // where across the sheet it lies, for its veins (1 .. 3)

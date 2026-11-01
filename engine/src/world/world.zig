@@ -116,7 +116,7 @@ pub fn World(comptime L:type)type{
     fn cornerH(w:*const W,wx:i32,wy:i32)f32{
       // the four tiles' heights, summed
       var h:f32=0;
-      for([_][2]i32{.{-1,-1},.{0,-1},.{-1,0},.{0,0}})|d|h+=w.tileH(wx+d[0],wy+d[1]).h;
+      for([_]m.Vice(i32,2){.{-1,-1},.{0,-1},.{-1,0},.{0,0}})|d|h+=w.tileH(wx+d[0],wy+d[1]).h;
       return h/4;
     }
     /// the ground's height at (x, z) as it is drawn (render/terrain_mesh):

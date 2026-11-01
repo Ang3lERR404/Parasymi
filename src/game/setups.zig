@@ -133,7 +133,7 @@ fn loom(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
   for([_]prog.Id{.interweaving,.sharedNerves,.wovenStone})|id|g.prog.done.insert(id);
   // the monfris, and where it stands
   const j=try nearest(g,cx,cz,.monfris,0.5) orelse return;
-  const at=[2]i32{g.structs.get(j).x,g.structs.get(j).y};
+  const at=m.Vice(i32,2){g.structs.get(j).x,g.structs.get(j).y};
   // the weftstone's weave, among the monfris's
   const w=for(craft.loom)|w|{
     if(craft.hand[w].out==.weftstone)break w;
@@ -284,7 +284,7 @@ fn lineages(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
 ///                   braid (fed from its side) > cache
 fn braids(g:*Game,x:i32,z:i32)Allocator.Error!void{
   // each piece's place, kind and facing, from the first cache
-  const at=[_][2]i32{.{0,0},.{1,0},.{2,0},.{2,1},.{3,1}};
+  const at=[_]m.Vice(i32,2){.{0,0},.{1,0},.{2,0},.{2,1},.{3,1}};
   const kinds=[_]st.Kind{.sapCache,.braidedConduit,.braidedConduit,.braidedConduit,.sapCache};
   const dirs=[_]m.Dir{0,0,1,0,0};
   // the ring being searched, outward from (x, z)
@@ -306,7 +306,7 @@ fn braids(g:*Game,x:i32,z:i32)Allocator.Error!void{
 /// and which way it faces
 const Piece=struct{
   /// its tile, from the layout's first piece
-  at:[2]i32,
+  at:m.Vice(i32,2),
   /// what kind of structure it is
   k:st.Kind,
   /// which way it faces, 0..3

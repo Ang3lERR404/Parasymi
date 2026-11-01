@@ -47,7 +47,7 @@ pub const Focus=union(enum){
   /// the nearest structure of a kind (the wolf itself while there is none)
   structure:st.Kind,
   /// a tile, by its coordinates
-  tile:[2]i32,
+  tile:m.Vice(i32,2),
   /// reads a focus: `player`, `eyes`, a species or structure name, or `x,z`
   pub fn parse(s:[]const u8)error{BadFocus}!Focus{
     if(eql(u8,s,"player"))return.player;
@@ -180,7 +180,7 @@ test"a focus is the wolf, a species, a structure or a tile"{
   try testing.expect(try Focus.parse("diamond")==.structure);
   // a tile focus
   const t=try Focus.parse("-4,12");
-  try testing.expectEqual([2]i32{-4,12},t.tile);
+  try testing.expectEqual(m.Vice(i32,2){-4,12},t.tile);
   try testing.expectError(error.BadFocus,Focus.parse("nowhere"));
   // room for its name
   var buf:[24]u8=undefined;

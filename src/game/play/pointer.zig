@@ -11,6 +11,8 @@ const std=lib.std;
 const eqlDeep=std.meta.eql;
 /// the engine package
 const engine=lib.engine;
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=engine.core.math;
 /// the keys and buttons down this frame
 const Input=engine.platform.input.Input;
 /// the bindings: which action each key is
@@ -37,7 +39,7 @@ const arrows=[_]struct{ctl.Action,focus.Dir}{
 };
 /// this frame's pointer: the cursor at `cursor` and mouse1; the mouse moved
 /// takes the lead back from the keys
-pub fn point(g:*Game,in:*const Input,cursor:[2]f32)void{
+pub fn point(g:*Game,in:*const Input,cursor:m.Vice(f32,2))void{
   g.mouse=cursor;
   g.pointer=.{.at=cursor,.down=ctl.down(in,.use),.went=ctl.pressed(in,.use),.up=ctl.released(in,.use)};
   if(in.mouseDelta[0]!=0 or in.mouseDelta[1]!=0)g.keyFocus=null;

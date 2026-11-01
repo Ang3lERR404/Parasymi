@@ -17,7 +17,7 @@ const samples=lib.sound.sap.samples;
 /// gusts: seconds between new strengths, and how fast the wind swells or
 /// eases toward one (s); strengths lean soft by this power
 /// (this one: seconds between new strengths)
-const gustGap=[2]f32{2.5,7};
+const gustGap=m.Vice(f32,2){2.5,7};
 /// how long the wind takes to swell or ease toward one (s)
 const gustGlide:f32=1.6;
 /// how soft strengths lean (a power over 0..1)
@@ -26,12 +26,12 @@ const gustSoft:f32=1.6;
 /// (this one: the low-pass the hush is heard below, Hz)
 const hushHz:f32=380;
 /// its level calm and in a full gust
-const hushRange=[2]f32{0.35,1};
+const hushRange=m.Vice(f32,2){0.35,1};
 /// the whistle: narrow-banded noise (Hz range of its pitch, how narrow,
 /// level), rising this share in a full gust and gliding to a new pitch
 /// in this (s); heard only as the gust passes this strength
 /// (this one: the whistle's pitch range, Hz)
-const whistleHz=[2]f32{470,720};
+const whistleHz=m.Vice(f32,2){470,720};
 /// how narrow its band is (q)
 const whistleQ:f32=14;
 /// its level

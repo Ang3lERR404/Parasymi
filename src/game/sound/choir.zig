@@ -53,9 +53,9 @@ const sectionLevel=[sections]f32{1,0.8,0.8,0.95};
 /// how far apart a section's voices are tuned at most (cents either way)
 const spread:f32=11;
 /// how fast a voice's vibrato wavers, drawn between these (Hz)
-const vibratoHz=[2]f32{4.8,5.8};
+const vibratoHz=m.Vice(f32,2){4.8,5.8};
 /// how deep it wavers, drawn between these (cents)
-const vibratoCents=[2]f32{12,30};
+const vibratoCents=m.Vice(f32,2){12,30};
 /// how long the vibrato takes to grow in on a fresh note (s, ~63%)
 const vibratoGrow:f32=0.9;
 /// how far a voice's pitch wanders on its own (cents) and how slowly
@@ -70,7 +70,7 @@ const shimmer:f32=0.25;
 /// how slowly it wavers (Hz)
 const shimmerHz:f32=1.8;
 /// how long a voice takes to glide to its next note, drawn between these (s, ~63%)
-const glideS=[2]f32{0.09,0.2};
+const glideS=m.Vice(f32,2){0.09,0.2};
 /// how late a voice may move to its next note (s): a choir never moves as one
 const lagS:f32=0.12;
 /// how much breath there is in the voices

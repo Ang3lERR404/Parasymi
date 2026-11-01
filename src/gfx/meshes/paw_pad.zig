@@ -19,7 +19,7 @@ const v3=m.v3;
 /// builds the pad: three glowing sap lobes, two behind and one ahead,
 /// melting into one rounded triangle about a unit across.
 pub fn build(b:*mg.Builder)Allocator.Error!void{
-  for([_][2]f32{.{-0.38,-0.2},.{0.38,-0.2},.{0,0.32}})|c|{
+  for([_]m.Vice(f32,2){.{-0.38,-0.2},.{0.38,-0.2},.{0,0.32}})|c|{
     try mg.ellipsoid(b,.{.center=v3(c[0],0,c[1]),.radii=v3(0.62,1,0.56),.col=pal.sap,.part=.bloom,.rings=6,.segs=9,.t=0.5});
   }
 }

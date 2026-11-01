@@ -330,11 +330,11 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
           // the next side round, wrapping
           const k1=(k+1)%sides;
           // the quad's side indices and ring indices, corner by corner
-          const q=[4]usize{k,k1,k1,k};
-          const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
+          const q=m.Vice(usize,4){k,k1,k1,k};
+          const r=m.Vice(usize,4){keep[j],keep[j],keep[j+1],keep[j+1]};
           // how far round each corner lies (the closing side runs on to a
           // whole turn, so nothing reads back across the seam)
-          const roundAt=[4]f32{m.ratio(k,sides),m.ratio(k+1,sides),m.ratio(k+1,sides),m.ratio(k,sides)};
+          const roundAt=m.Vice(f32,4){m.ratio(k,sides),m.ratio(k+1,sides),m.ratio(k+1,sides),m.ratio(k,sides)};
           for([_]usize{0,1,2,0,2,3})|c|{
             try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],cols[r[c]],ts[r[c]],uOf(us,r[c]),part);
             b.v.items[b.v.items.len-1].tu[2]=tubeRound+roundAt[c];
@@ -425,7 +425,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
           // the band's quad: its inner pair, then its outer pair
           const q=[4]V3{domePoint(d,k,a0),domePoint(d,k1,a0),domePoint(d,k1,a1),domePoint(d,k,a1)};
           const n=[4]V3{domeNormal(d,k,a0),domeNormal(d,k1,a0),domeNormal(d,k1,a1),domeNormal(d,k,a1)};
-          const ts=[4]f32{t0,t0,t1,t1};
+          const ts=m.Vice(f32,4){t0,t0,t1,t1};
           // (the start's end faces the other way: wound the other way round)
           const order:[6]usize=if(d.start).{0,2,1,0,3,2}else.{0,1,2,0,2,3};
           for(order,0..)|c,o|{
@@ -549,7 +549,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
   /// 0..tau, roughly unit size, counter-clockwise when seen from the spine's
   /// start) scaled by `widths`/`heights`, upright toward `up`. Rings are
   /// shared and both ends capped, so it is watertight like `tubeR`.
-  pub fn loft(b:*Builder,spine:[]const V3,ts:[]const f32,widths:[]const f32,heights:[]const f32,up:V3,comptime shape:fn(f32)[2]f32,col:color.Rgba8,part:Part,fullSides:u32)Allocator.Error!void{
+  pub fn loft(b:*Builder,spine:[]const V3,ts:[]const f32,widths:[]const f32,heights:[]const f32,up:V3,comptime shape:fn(f32)m.Vice(f32,2),col:color.Rgba8,part:Part,fullSides:u32)Allocator.Error!void{
     assert(spine.len>=2 and spine.len<=maxSpine and fullSides<=maxLoft);
     // the sides it keeps at this level, never under six
     const sides=b.around(fullSides,6);
@@ -590,8 +590,8 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       // the next side round, wrapping
       const k1=(k+1)%sides;
       // the quad's side indices and ring indices, corner by corner
-      const q=[4]usize{k,k1,k1,k};
-      const r=[4]usize{keep[j],keep[j],keep[j+1],keep[j+1]};
+      const q=m.Vice(usize,4){k,k1,k1,k};
+      const r=m.Vice(usize,4){keep[j],keep[j],keep[j+1],keep[j+1]};
       for([_]usize{0,1,2,0,2,3})|c|try b.put(rings[r[c]][q[c]],norms[r[c]][q[c]],col,ts[r[c]],0,part);
     };
     if(b.tips==.round){
@@ -640,14 +640,14 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       const c0=kc[ci];
       const c1=kc[ci+1];
       // the quad's four point indices, round its corners
-      const q=[4]usize{r0*cols+c0,r0*cols+c1,r1*cols+c1,r1*cols+c0};
+      const q=m.Vice(usize,4){r0*cols+c0,r0*cols+c1,r1*cols+c1,r1*cols+c0};
       for([_]usize{0,1,2,0,2,3})|v|try b.put(pts[q[v]],nrms[q[v]],colsRgba[q[v]],t,us[q[v]],part);
     };
   }
   /// grown vine bands wrapping over an ellipsoid (centre `at`, `radii`) along
   /// its curvature: each band runs from (polar th0, azimuth ph0) to (th1, ph1).
   /// `side` mirrors it in x, so left and right forms are built, not mirrored.
-  pub fn bands(b:*Builder,at:V3,radii:V3,arcs:[]const[4]f32,side:f32,r:f32,wobble:f32,seed:u64,col:color.Rgba8)Allocator.Error!void{
+  pub fn bands(b:*Builder,at:V3,radii:V3,arcs:[]const m.Vice(f32,4),side:f32,r:f32,wobble:f32,seed:u64,col:color.Rgba8)Allocator.Error!void{
     for(arcs,0..)|arc,i|{
       // the band's six control points, laid over the surface
       var ctrl:[6]V3=undefined;
@@ -704,7 +704,7 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
       var q:[4]V3=undefined;
       var n:[4]V3=undefined;
       // which ring and segment step each corner takes
-      const corners=[4][2]u32{.{0,0},.{1,0},.{1,1},.{0,1}};
+      const corners=[4]m.Vice(u32,2){.{0,0},.{1,0},.{1,1},.{0,1}};
       for(corners,0..)|cn,k|{
         // the corner's polar and azimuth angles
         const th=m.ratio(ri+cn[0],ringCount)*m.pi;
@@ -760,7 +760,7 @@ test"a tube keeps fewer rings and sides at a coarser level of detail, its caps c
   // tu.x along it
   const ts=[_]f32{0,0.25,0.5,0.75,1};
   // the vertex count at full detail and at the next level
-  var counts:[2]usize=undefined;
+  var counts:m.Vice(usize,2)=undefined;
   for(&counts,0..)|*c,l|{
     // a builder at this level of detail
     var b:M.Builder=.{.gpa=testing.allocator,.lod=@intCast(l)};

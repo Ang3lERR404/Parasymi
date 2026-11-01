@@ -53,7 +53,7 @@ const overheadBottom:f32=-16;
 /// `at` (x, z) `overheadSize` along each way (its corner a whole number of
 /// `overheadSize`s from the world's origin, so every square lands on the
 /// whole map): a draw of anything within one, pushed as its `vp`
-pub fn overheadOf(at:[2]f32)m.M4{
+pub fn overheadOf(at:m.Vice(f32,2))m.M4{
   // the square's corner: `at` floored to whole squares
   const cx=@floor(at[0]/overheadSize)*overheadSize;
   const cz=@floor(at[1]/overheadSize)*overheadSize;
@@ -225,7 +225,7 @@ fn half(n:u32)u32{return @max((n+1)/2,1);}
 const testing=std.testing;
 test"the overhead map lands every square of the world on all of it, a texel a unit"{
   // a point, and the map's frame for the square it lies in
-  const p=[2]f32{-37.3,1012.6};
+  const p=m.Vice(f32,2){-37.3,1012.6};
   const a=overheadOf(p);
   const q=m.mulV(a,.{p[0],0.5,p[1],1});
   try testing.expect(@abs(q[0])<=1 and @abs(q[1])<=1 and q[2]>0 and q[2]<1);

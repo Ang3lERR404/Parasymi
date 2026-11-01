@@ -400,8 +400,8 @@ pub const Sculpt=struct{
   /// a skin from weights per bone: the four heaviest, summing to one
   pub fn pack(w:[]const f32)vertex.Skin{
     // the four heaviest bones and their weights, heaviest first
-    var idx:[4]u8=.{0,0,0,0};
-    var wt:[4]f32=.{0,0,0,0};
+    var idx:m.Vice(u8,4)=.{0,0,0,0};
+    var wt:m.Vice(f32,4)=.{0,0,0,0};
     for(w,0..)|x,b|{
       if(x<=wt[3])continue;
       // where `x` goes in the sorted four
@@ -504,7 +504,7 @@ pub const Sculpt=struct{
     const cells=8;
     const corners=cells+1;
     // how many blocks the box holds along x, y and z
-    var nb:[3]usize=undefined;
+    var nb:m.Vice(usize,3)=undefined;
     inline for(0..3)|c|nb[c]=@as(usize,@intFromFloat(@ceil((hi[c]-lo[c])/(h*cells))))+1;
     // the mark of a block or cell with nothing in it
     const noneId=m.maxInt(u32);
@@ -516,7 +516,7 @@ pub const Sculpt=struct{
     // and the vertex of each of its cells
     const Block=struct{
       /// which block it is, along x, y and z
-      at:[3]usize,
+      at:m.Vice(usize,3),
       /// the field at each of its corners
       vals:[corners*corners*corners]f32,
       /// each cell's vertex index, or `noneId` where the surface misses it
@@ -565,9 +565,9 @@ pub const Sculpt=struct{
     // a vertex as it is placed: where, which way it faces, its colour, skin and role
     const Vert=struct{p:V3,n:V3,col:color.Rgba8,skin:vertex.Skin,part:M.Part};
     // the eight corners of a cell, as steps along x, y and z
-    const corner=[8][3]usize{.{0,0,0},.{1,0,0},.{0,1,0},.{1,1,0},.{0,0,1},.{1,0,1},.{0,1,1},.{1,1,1}};
+    const corner=[8]m.Vice(usize,3){.{0,0,0},.{1,0,0},.{0,1,0},.{1,1,0},.{0,0,1},.{1,0,1},.{0,1,1},.{1,1,1}};
     // the cell's twelve edges, as pairs of its corners
-    const edges=[12][2]u8{.{0,1},.{2,3},.{4,5},.{6,7},.{0,2},.{1,3},.{4,6},.{5,7},.{0,4},.{1,5},.{2,6},.{3,7}};
+    const edges=[12]m.Vice(u8,2){.{0,1},.{2,3},.{4,5},.{6,7},.{0,2},.{1,3},.{4,6},.{5,7},.{0,4},.{1,5},.{2,6},.{3,7}};
     // each block's field, over the cores
     // the job that samples each block's field
     const Fill=struct{
@@ -679,11 +679,11 @@ pub const Sculpt=struct{
     const Look=struct{
       /// the vertex of cell `ci` (over the whole box), or null where there is
       /// none: outside the box, in an empty block, or a cell the surface misses
-      fn cellVert(bs:[]const Block,mp:[]const u32,n:[3]usize,ci:[3]isize)?u32{
+      fn cellVert(bs:[]const Block,mp:[]const u32,n:m.Vice(usize,3),ci:m.Vice(isize,3))?u32{
         for(ci)|c|if(c<0)return null;
         // the cell index as unsigned, and its block along x, y and z
-        const u=[3]usize{@intCast(ci[0]),@intCast(ci[1]),@intCast(ci[2])};
-        const bb=[3]usize{u[0]/cells,u[1]/cells,u[2]/cells};
+        const u=m.Vice(usize,3){@intCast(ci[0]),@intCast(ci[1]),@intCast(ci[2])};
+        const bb=m.Vice(usize,3){u[0]/cells,u[1]/cells,u[2]/cells};
         if(bb[0]>=n[0] or bb[1]>=n[1] or bb[2]>=n[2])return null;
         // the block's index in `bs`
         const bi=mp[(bb[2]*n[1]+bb[1])*n[0]+bb[0]];
@@ -701,9 +701,9 @@ pub const Sculpt=struct{
     var skins:std.ArrayList(vertex.Skin)=.empty;
     defer skins.deinit(gpa);
     // a step along x, y and z
-    const steps=[3][3]usize{.{1,0,0},.{0,1,0},.{0,0,1}};
+    const steps=[3]m.Vice(usize,3){.{1,0,0},.{0,1,0},.{0,0,1}};
     // the four cells round an edge, as steps along the two axes across it
-    const around=[4][2]isize{.{-1,-1},.{0,-1},.{0,0},.{-1,0}};
+    const around=[4]m.Vice(isize,2){.{-1,-1},.{0,-1},.{0,0},.{-1,0}};
     for(blocks.items)|*bl|{
       for(0..cells)|z|for(0..cells)|y|for(0..cells)|x|{
         // the field at the cell's low corner
@@ -713,13 +713,13 @@ pub const Sculpt=struct{
           const v1=bl.vals[((z+st[2])*corners+y+st[1])*corners+x+st[0]];
           if((v0<0)==(v1<0))continue;
           // the cell's index over the whole box
-          const g=[3]isize{@intCast(bl.at[0]*cells+x),@intCast(bl.at[1]*cells+y),@intCast(bl.at[2]*cells+z)};
+          const g=m.Vice(isize,3){@intCast(bl.at[0]*cells+x),@intCast(bl.at[1]*cells+y),@intCast(bl.at[2]*cells+z)};
           // the two axes across the edge
           // (the first and second axes across)
           const uAx=(axis+1)%3;
           const wAx=(axis+2)%3;
           // the four cells' vertices, and whether all four have one
-          var q:[4]u32=undefined;
+          var q:m.Vice(u32,4)=undefined;
           var ok=true;
           for(around,0..)|o,k|{
             // this cell round the edge
@@ -738,12 +738,12 @@ pub const Sculpt=struct{
           for(&quad,q)|*pp,vi|pp.*=verts[vi].p;
           // split along the shorter diagonal
           // the two triangles the quad is split into
-          const tris:[2][3]usize=if(m.len(quad[0]-quad[2])<=m.len(quad[1]-quad[3])).{.{0,1,2},.{0,2,3}}else.{.{0,1,3},.{1,2,3}};
+          const tris:[2]m.Vice(usize,3)=if(m.len(quad[0]-quad[2])<=m.len(quad[1]-quad[3])).{.{0,1,2},.{0,2,3}}else.{.{0,1,3},.{1,2,3}};
           for(tris)|tri|{
             // the triangle's face normal, as wound
             const fnrm=m.cross(quad[tri[1]]-quad[tri[0]],quad[tri[2]]-quad[tri[0]]);
             // its corners in the order that faces outward
-            const order=if(m.dot(fnrm,dir)>=0)[3]usize{tri[0],tri[1],tri[2]}else[3]usize{tri[0],tri[2],tri[1]};
+            const order=if(m.dot(fnrm,dir)>=0)m.Vice(usize,3){tri[0],tri[1],tri[2]}else m.Vice(usize,3){tri[0],tri[2],tri[1]};
             for(order)|k|{
               // the vertex being put
               const vv=verts[q[k]];
@@ -804,7 +804,7 @@ test"each vertex takes the role of the form it lies nearest"{
   try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0.1,0,0),.r=m.splat3(0.08)}},.bone=0,.col=col,.part=@intFromEnum(Role.bloom)});
   try s.mesh(M,&b,0.01,0.5,.leaf);
   // how many vertices took each role
-  var seen:[3]usize=@splat(0);
+  var seen:m.Vice(usize,3)=@splat(0);
   for(b.v.items)|v|{
     seen[v.part]+=1;
     try testing.expectEqual(v.part==@intFromEnum(Role.bloom),v.pos[0]>0);

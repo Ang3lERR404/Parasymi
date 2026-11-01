@@ -146,7 +146,7 @@ pub const State=union(enum){
   /// grows from nothing to grown, again and again
   grow,
   /// growth from one share to another, again and again
-  span:[2]f32,
+  span:m.Vice(f32,2),
   /// held at one share of growth (`mature`: grown)
   held:f32,
   /// a plant grown, its health failing to nothing, again and again (a
@@ -234,7 +234,7 @@ pub const Specimen=struct{
   /// active: seconds since its carried item came
   carryT:f32=0,
   /// the tile it stands on (found by `sow`)
-  at:[2]i32=.{0,0},
+  at:m.Vice(i32,2)=.{0,0},
   /// whether the wolf is drawn beside it (plucking it)
   pub fn wolf(s:*const Specimen)bool{return s.state==.pluck;}
   /// the meshes to build: the species' (and a floater's shadow; the wolf's
@@ -595,7 +595,7 @@ test"a state is a name, a share of growth or a span"{
   try testing.expect(try State.parse("grow")==.grow);
   try testing.expectEqual(@as(f32,1),(try State.parse("mature")).held);
   try testing.expectEqual(@as(f32,0.4),(try State.parse("0.4")).held);
-  try testing.expectEqual([2]f32{0.2,0.8},(try State.parse("0.2..0.8")).span);
+  try testing.expectEqual(m.Vice(f32,2){0.2,0.8},(try State.parse("0.2..0.8")).span);
   try testing.expectError(error.BadState,State.parse("sideways"));
   try testing.expect((try State.parse("unform")).suits(.{.plant=.bloom}));
   try testing.expect(!(try State.parse("unform")).suits(.{.plant=.lumenroot}));

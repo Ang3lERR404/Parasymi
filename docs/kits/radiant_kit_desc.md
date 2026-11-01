@@ -57,7 +57,7 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
 | `Root{n, depth, spread, sink, order:[2], col, shard, tip}` / `root(b, R, r, seed, rng)` | a grounded one's root of light: a taproot from the core's underside and `n` strands fanning down into the soil (threads, heart end held), a small `mineral.crystal` shard where each digs in; ring `.root` |
 | `motes(b, R, n, col, rng)` | motes of light, each its own fragment on its bearing, spiralling in and fading, over and over |
 | `halo(b, r, thick, tilt, order, col)` | a thin tilted ring of light, ring `.halo`, the last to close |
-| `cutSides` = 8, `Cut{rows:[][3]f32 (height, radius, twist in half sides), deepRows, deep, lite, part = .prism}` | a cut crystal's profile; a row of radius 0 is a point |
+| `cutSides` = 8, `Cut{rows:[]const m.Vice(f32,3) (height, radius, twist in half sides), deepRows, deep, lite, part = .prism}` | a cut crystal's profile; a row of radius 0 is a point |
 | `cut(b, c, rng)` | flat facets between rows (`mineral.facet`), staggered by twist, slightly uneven; every facet its own fragment, gathered **foot up**, each row in turn round it, within `cutShare` (0.8) of the order |
 | `shards(b, n, at, c, rng)` | small `mineral.crystal`s out of a cut's foot, leaning away, settling after its facets (order 0.8..1) |
 | `plant(b, genome, seed, variant)` | the celestial bloom (see below) |

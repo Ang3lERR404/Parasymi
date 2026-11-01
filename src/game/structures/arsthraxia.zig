@@ -85,9 +85,9 @@ const coreBob:f32=0.08;
 /// how fast it bobs (radians a second)
 const coreBobRate:f32=1.4;
 /// the energy condensing in it: its radius as a unit starts .. as it is done
-const coreRadius=[2]f32{0.05,0.19};
+const coreRadius=m.Vice(f32,2){0.05,0.19};
 /// its light as a unit starts .. as it is done
-const coreGlow=[2]f32{0.3,0.75};
+const coreGlow=m.Vice(f32,2){0.3,0.75};
 /// how much brighter it runs while fed (a share more)
 const fedGlow:f32=0.6;
 /// the burst of light added at a unit's flare
@@ -131,14 +131,14 @@ const fusedTurn:f32=0.3;
 /// the satellites' thought-buds, by how far open, closed first
 const budIds=[mesh.budKeys]lib.meshlib.Id{.arsthraxiaBud0,.arsthraxiaBud1,.arsthraxiaBud2,.arsthraxiaBud3};
 /// how brightly a bud's heart glows, closed and open
-const heartGlow=[2]f32{0.35,1.2};
+const heartGlow=m.Vice(f32,2){0.35,1.2};
 /// the warm light the core's buds throw round it together, at rest and
 /// split open
-const budGloop=[2]f32{0.25,0.9};
+const budGloop=m.Vice(f32,2){0.25,0.9};
 /// how far that light reaches (world units)
 const budReach:f32=2.2;
 /// the warm light an offshoot's bud throws, at rest and open
-const tipGloop=[2]f32{0.1,0.4};
+const tipGloop=m.Vice(f32,2){0.1,0.4};
 /// how far that light reaches
 const tipReach:f32=1.2;
 /// the wisps: their light, more while fed
@@ -174,7 +174,7 @@ pub const State=struct{
   /// eases toward 1 while the unit under way was fed
   fed:f32=0,
   /// how far its flower's outer whorl and inner cup have turned
-  turn:[2]f32=@splat(0),
+  turn:m.Vice(f32,2)=@splat(0),
   /// evolved by the unforming from the symbiotic lineage into the
   /// convergent one: drawn woven of both (meshes/arsthraxia_convergent.zig)
   evolved:bool=false,

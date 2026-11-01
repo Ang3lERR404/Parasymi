@@ -50,7 +50,7 @@ pub const Orbit=struct{
     return.{.target=at,.goal=at,.dist=dist,.goalDist=dist,.pitch=pitch};
   }
   /// drag round by `px` pixels, as the game's camera turns
-  pub fn turn(o:*Orbit,px:[2]f32)void{
+  pub fn turn(o:*Orbit,px:m.Vice(f32,2))void{
     o.yaw=@mod(o.yaw-px[0]*camera.orbitSpeed,m.tau);
     o.pitch=@mod(o.pitch+px[1]*camera.orbitSpeed,m.tau);
   }

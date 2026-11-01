@@ -41,7 +41,7 @@ pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*cons
   // no offset into a chunk's detail buffer
   const zero=[_]vk.DeviceSize{0};
   // what the camera looks at (x, z)
-  const focus=[2]f32{scene.push.view[0],scene.push.view[1]};
+  const focus=m.Vice(f32,2){scene.push.view[0],scene.push.view[1]};
   // the camera's view, for culling chunks out of it
   const view=m.Frustum.of(scene.push.vp);
   for(r.ext.slots.items)|s|{

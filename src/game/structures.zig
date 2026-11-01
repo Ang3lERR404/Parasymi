@@ -320,7 +320,7 @@ pub const Ref=struct{
   /// whether two refs name the same structure
   pub fn eql(a:Ref,b:Ref)bool{return a.x==b.x and a.y==b.y and a.floating==b.floating;}
   /// the tile it stands on, as x and y
-  pub fn tile(r:Ref)[2]i32{return.{r.x,r.y};}
+  pub fn tile(r:Ref)m.Vice(i32,2){return.{r.x,r.y};}
 };
 /// what `spawnChild` puts down: a structure of `kind` on tile `x`,`y`,
 /// facing `dir`, with its own `seed` for how it sways and varies

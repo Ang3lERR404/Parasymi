@@ -136,7 +136,7 @@ pub const Plants=struct{
   /// where a plant of species `sp` stands when put down from the cursor,
   /// over tile `t` at ground point `pt`: a floater right at `pt`, off the
   /// grid; a rooted one on the footprint whose top-left is `t`
-  pub fn spot(sp:species.Id,t:[2]i32,pt:m.V3)m.V3{
+  pub fn spot(sp:species.Id,t:m.Vice(i32,2),pt:m.V3)m.V3{
     // the species' definition
     const def=species.get(sp);
     return if(def.floating)m.v3(pt[0],0,pt[2])else m.footprintCentre(t[0],t[1],def.size,0);
@@ -144,7 +144,7 @@ pub const Plants=struct{
   /// the anchor tile a plant of species `sp` takes for ground point `pt`:
   /// the tile under a floater, the top-left of the footprint centred
   /// nearest it for a rooted one
-  fn anchor(pt:m.V3,sp:species.Id)[2]i32{
+  fn anchor(pt:m.V3,sp:species.Id)m.Vice(i32,2){
     // the species' definition, and how far its footprint's centre is from its top-left tile's
     const def=species.get(sp);
     const half=if(def.floating)0 else m.f(def.size-1)*0.5;
@@ -294,7 +294,7 @@ pub const Plants=struct{
     return.{.x=s.items(.x)[i],.y=s.items(.y)[i],.size=if(def.floating)1 else def.size};
   }
   /// world-space centre of a plant: its footprint's, or where it floats (x, z).
-  pub fn centre(p:*const Plants,i:usize)[2]f32{
+  pub fn centre(p:*const Plants,i:usize)m.Vice(f32,2){
     // where it stands
     const c=p.list.items(.at)[i];
     return.{c[0],c[2]};
@@ -437,7 +437,7 @@ test"links stay valid right after a remove, matching a rebuild"{
   defer p.deinit(gpa);
   // a 2x2 and a ring of 1x1s around it, plus a floater, all linked
   try testing.expect(try p.place(gpa,&w,2,2,.hollowheart,0.5));
-  for([_][2]i32{.{1,1},.{4,2},.{2,4},.{1,3},.{4,4},.{0,2}})|t|try testing.expect(try p.place(gpa,&w,t[0],t[1],.lumenroot,0.5));
+  for([_]m.Vice(i32,2){.{1,1},.{4,2},.{2,4},.{1,3},.{4,4},.{0,2}})|t|try testing.expect(try p.place(gpa,&w,t[0],t[1],.lumenroot,0.5));
   try testing.expect(try p.place(gpa,&w,3,3,.driftwisp,0.5));
   // remove from the middle, from the front and the last slot, checking each time
   for([_]usize{3,0,4})|victim|{

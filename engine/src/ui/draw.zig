@@ -21,11 +21,11 @@ const UiVertex=@import("../gfx/vertex.zig").Ui;
 /// a box in screen pixels, which drawing can be cut to
 const Box=@import("box.zig").Box;
 /// a clip rectangle (left, top, right, bottom pixels), as the shader reads it
-pub const Clip=[4]f32;
+pub const Clip=m.Vice(f32,4);
 /// no clip: everything shows, wherever it is drawn
 pub const noClip=Clip{-1e9,-1e9,1e9,1e9};
 /// a UI colour: four bytes, red, green, blue and alpha
-pub const Color=[4]u8;
+pub const Color=m.Vice(u8,4);
 /// which distance field a quad is shaded with; must match the shape switch
 /// in shaders/ui.frag
 pub const Shape=enum(u32){
@@ -139,28 +139,28 @@ pub const Draw=struct{
   }
   /// a `w` x `h` quad at (x0, y0), snapped to whole pixels, its uv running
   /// 0..uw by 0..uh, with the bits and parameters the shader reads
-  fn quad(d:*Draw,x0:f32,y0:f32,w:f32,h:f32,uw:f32,uh:f32,col:Color,bits:[2]u32,param:[2]f32)Allocator.Error!void{
+  fn quad(d:*Draw,x0:f32,y0:f32,w:f32,h:f32,uw:f32,uh:f32,col:Color,bits:m.Vice(u32,2),param:m.Vice(f32,2))Allocator.Error!void{
     // snapped to whole pixels so edges never land between texels and crawl
     const x=@round(x0);
     const y=@round(y0);
     // the corners, clockwise from the top left, and their uvs
-    const p=[4][2]f32{.{x,y},.{x+w,y},.{x+w,y+h},.{x,y+h}};
-    const uv=[4][2]f32{.{0,0},.{uw,0},.{uw,uh},.{0,uh}};
+    const p=[4]m.Vice(f32,2){.{x,y},.{x+w,y},.{x+w,y+h},.{x,y+h}};
+    const uv=[4]m.Vice(f32,2){.{0,0},.{uw,0},.{uw,uh},.{0,uh}};
     for([_]usize{0,1,2,0,2,3})|i|{
       try d.v.append(d.gpa,.{.pos=p[i],.uv=uv[i],.size=.{w,h},.col=col,.bits=bits,.param=param,.clip=d.clip});
     }
   }
   /// a quad laid along unit direction `u` from `a`: local x runs along it
   /// (len), y across (thick), both padded like `shape`.
-  fn along(d:*Draw,kind:Shape,a:[2]f32,u:[2]f32,len:f32,thick:f32,col:Color,param:[2]f32)Allocator.Error!void{
+  fn along(d:*Draw,kind:Shape,a:m.Vice(f32,2),u:m.Vice(f32,2),len:f32,thick:f32,col:Color,param:m.Vice(f32,2))Allocator.Error!void{
     // the margin round the shape, for wobble and glow
     const pad:f32=28;
     // the quad's size, margins and all
     const w=len+2*pad;
     const h=thick+2*pad;
     // the corners in the quad's own space, and where they land on screen
-    const uv=[4][2]f32{.{0,0},.{w,0},.{w,h},.{0,h}};
-    var p:[4][2]f32=undefined;
+    const uv=[4]m.Vice(f32,2){.{0,0},.{w,0},.{w,h},.{0,h}};
+    var p:[4]m.Vice(f32,2)=undefined;
     for(uv,&p)|q,*o|{
       // the corner's place along the direction, and across it
       const x=q[0]-pad;
@@ -172,7 +172,7 @@ pub const Draw=struct{
     }
   }
   /// shapes get a margin so wobble/glow can spill past the nominal bounds.
-  fn shape(d:*Draw,kind:Shape,x:f32,y:f32,w:f32,h:f32,col:Color,param:[2]f32)Allocator.Error!void{
+  fn shape(d:*Draw,kind:Shape,x:f32,y:f32,w:f32,h:f32,col:Color,param:m.Vice(f32,2))Allocator.Error!void{
     // the margin round the shape
     const pad:f32=28;
     try d.quad(x-pad,y-pad,w+2*pad,h+2*pad,w+2*pad,h+2*pad,col,.{shapeMark,@intFromEnum(kind)},param);
@@ -196,7 +196,7 @@ pub const Draw=struct{
   }
   /// a tendril from `a` along screen angle `ang` (0 right, y down), `len`
   /// long and `h` thick, grown to `value` of its length.
-  pub fn stem(d:*Draw,a:[2]f32,ang:f32,len:f32,h:f32,col:Color,value:f32,seed:f32)Allocator.Error!void{
+  pub fn stem(d:*Draw,a:m.Vice(f32,2),ang:f32,len:f32,h:f32,col:Color,value:f32,seed:f32)Allocator.Error!void{
     try d.along(.tendril,a,.{@cos(ang),@sin(ang)},len,h,col,.{m.clamp01(value),seed});
   }
   /// a soft halo of radius `r` round (cx, cy)
@@ -205,16 +205,16 @@ pub const Draw=struct{
   }
   /// a stem from `a` (radius r0) to `b` (radius r1 <= r0), round at both
   /// ends so consecutive segments join; `s0` is the arc length at `a`.
-  pub fn limb(d:*Draw,a:[2]f32,b:[2]f32,r0:f32,r1:f32,col:Color,s0:f32)Allocator.Error!void{
+  pub fn limb(d:*Draw,a:m.Vice(f32,2),b:m.Vice(f32,2),r0:f32,r1:f32,col:Color,s0:f32)Allocator.Error!void{
     // the run from `a` to `b`, its length and its direction
     const dx=b[0]-a[0];
     const dy=b[1]-a[1];
     const l=@sqrt(dx*dx+dy*dy);
-    const u:[2]f32=if(l>m.eps).{dx/l,dy/l}else.{1,0};
+    const u:m.Vice(f32,2)=if(l>m.eps).{dx/l,dy/l}else.{1,0};
     try d.along(.limb,a,u,l,2*r0,col,.{if(r0>m.eps)r1/r0 else 1,s0});
   }
   /// a leaf (or, closed, a bud) growing from `base` at screen angle `ang`.
-  pub fn leaf(d:*Draw,base:[2]f32,ang:f32,len:f32,wid:f32,col:Color,open:f32,seed:f32)Allocator.Error!void{
+  pub fn leaf(d:*Draw,base:m.Vice(f32,2),ang:f32,len:f32,wid:f32,col:Color,open:f32,seed:f32)Allocator.Error!void{
     try d.along(.leaf,base,.{@cos(ang),@sin(ang)},len,wid,col,.{m.clamp01(open),seed});
   }
   /// a seed `w` x `h` centred on (cx, cy), split open by `crack`.

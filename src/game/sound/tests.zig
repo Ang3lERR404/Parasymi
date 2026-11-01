@@ -140,7 +140,7 @@ test"now and then a settling has lighter gloops"{
 }
 test"a twinkle is a few soft high pings, louder the nearer, and ends"{
   // each twinkle's peak, near and far
-  var peaks:[2]f32=undefined;
+  var peaks:m.Vice(f32,2)=undefined;
   for([_]f32{0.1,1},&peaks)|near,*peak|{
     // the sounds, with the wind hushed
     var s:Sounds=.init(11,testRate);

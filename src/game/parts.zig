@@ -52,10 +52,10 @@ pub const Look=struct{
   /// how opaque it is, 0..1
   fade:f32=1,
   /// rgb tint + weight (weight 0 = no tint, 1 = full tint)
-  tint:[4]f32=.{1,1,1,0},
+  tint:m.Vice(f32,4)=.{1,1,1,0},
   /// how far a resin part's surface is pushed off its rest (mesh space);
   /// its base on the body stays put (see vertex.Part.resin)
-  give:[3]f32=.{0,0,0},
+  give:m.Vice(f32,3)=.{0,0,0},
   /// how far it bends in the garden's wind, as the plants do (0 rigid)
   /// over what height, rooted how far below its origin
   sway:f32=0,
@@ -68,13 +68,13 @@ pub const Look=struct{
   grown:f32=1,
   /// a forming halo it rides with (see `vertex.noHalo`)
   /// which of its ends that halo draws in (1 first, 2 last, 3 both)
-  halo:[4]f32=vertex.noHalo,
+  halo:m.Vice(f32,4)=vertex.noHalo,
   /// for a curve, which of its ends that halo draws in (1 first, 2 last, 3 both)
   ends:f32=0,
   /// essence carried through a conduit's core: how far along it (0..1, < 0 none)
   carry:f32=-1,
   /// the carried essence's colour (sRGB 0..1)
-  carryCol:[3]f32=.{0,0,0},
+  carryCol:m.Vice(f32,3)=.{0,0,0},
   /// a placement preview: drawn, but casts no shadow
   ghost:bool=false,
   /// how far it is blended into its mesh's next key (0..1; a bud opening

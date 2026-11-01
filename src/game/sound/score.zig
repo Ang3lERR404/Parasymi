@@ -1,6 +1,8 @@
 //! the day's music on paper: pulse, a Lydian scale, open chords, the drums' pattern and how its voices are tuned.
 /// the hub every game module is reached through
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 // ---- the day's music ----
 /// the pulse: eighth notes at this tempo (beats a minute), eight to a bar,
 /// four bars to a phrase
@@ -31,9 +33,9 @@ pub const melLo:u8=5;
 /// its highest step
 pub const melHi:u8=15;
 /// how likely a note is on a bar's first step, on a beat, off the beat
-pub const noteChance=[3]f32{0.9,0.6,0.3};
+pub const noteChance=m.Vice(f32,3){0.9,0.6,0.3};
 /// how loud a note is there (before it strays by `vary`)
-pub const noteVel=[3]f32{1,0.8,0.62};
+pub const noteVel=m.Vice(f32,3){1,0.8,0.62};
 /// a new motif instead of a variation of the last, a new progression
 /// instead of the last, and each step's chance to change in a variation
 /// (this one: the chance of a new motif)
@@ -100,7 +102,7 @@ pub const plunkFall:f32=1.1;
 /// the reference pitch (Hz)
 pub const plunkRefHz:f32=400;
 /// the shortest and longest it may ring (s)
-pub const plunkFallSpan=[2]f32{0.4,2.6};
+pub const plunkFallSpan=m.Vice(f32,2){0.4,2.6};
 /// how much faster each higher partial dies
 pub const plunkDamp:f32=0.9;
 /// a softer note is this much duller (its partials fall by this power)
@@ -149,12 +151,12 @@ pub const smallChance:f32=0.55;
 /// how often a phrase is calm: the deep taiko and one stroke a bar only
 pub const calmChance:f32=0.3;
 /// the timpani's two kettles (MIDI D2, A2)
-pub const kettles=[2]u8{38,45};
+pub const kettles=m.Vice(u8,2){38,45};
 /// how many strokes the roll makes a step, from how loud to how loud
 /// (this one: strokes a step)
 pub const rollPerStep=3;
 /// how loud the roll starts and ends
-pub const rollVel=[2]f32{0.25,0.95};
+pub const rollVel=m.Vice(f32,2){0.25,0.95};
 /// the roll's steps: the last bar's second half
 pub const rollFrom=phraseSteps-barSlots/2;
 /// the cymbal swells over this many steps before the phrase's first

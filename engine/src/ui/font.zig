@@ -2,6 +2,8 @@
 //! (MSB = leftmost column). Uppercase, digits and basic punctuation.
 /// the standard library
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// a letter in upper case
 const toUpper=std.ascii.toUpper;
 /// a glyph's width in pixels
@@ -73,7 +75,7 @@ const table=blk:{
   break:blk t;
 };
 /// packed bits for the shader: bit (row*5 + col), col 0 = leftmost.
-pub fn bits(ch:u8)[2]u32{
+pub fn bits(ch:u8)m.Vice(u32,2){
   // the letter, upper-cased, and its glyph ('?' past ASCII)
   const c=toUpper(ch);
   const glyph=table[if(c<128)c else'?'];
@@ -85,4 +87,4 @@ pub fn bits(ch:u8)[2]u32{
   return.{@truncate(v),@truncate(v>>32)};
 }
 /// every bit set: the shader draws a solid block, not a glyph
-pub const solid:[2]u32=.{0xffff_ffff,0xffff_ffff};
+pub const solid:m.Vice(u32,2)=.{0xffff_ffff,0xffff_ffff};

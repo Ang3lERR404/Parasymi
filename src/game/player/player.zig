@@ -216,7 +216,7 @@ pub const Player=struct{
   wrist:[2]Spring3=@splat(.{}),
   /// seconds left of each paw pressing a unit into the belly, which paw
   /// takes the next one, and the unit share last frame
-  stow:[2]f32=@splat(0),
+  stow:m.Vice(f32,2)=@splat(0),
   /// which paw stows the next unit (0 left, 1 right)
   nextStow:u1=0,
   /// the unit share last frame: a drop means a unit came loose
@@ -243,7 +243,7 @@ pub const Player=struct{
   /// Walks it toward `wish` (a direction on the ground, length up to 1) at walk or
   /// sprint speed, sliding along what it cannot climb, its height springing
   /// after the ground, and turns it toward its work, aim or way.
-  pub fn move(p:*Player,wish:[2]f32,sprint:bool,ground:*const World,dt:f32)void{
+  pub fn move(p:*Player,wish:m.Vice(f32,2),sprint:bool,ground:*const World,dt:f32)void{
     // the gait the belly allows, its top speed, and the velocity wished for
     const g=p.gait();
     const speed:f32=if(sprint)sprintSpeed*g.sprint else walkSpeed*g.walk;

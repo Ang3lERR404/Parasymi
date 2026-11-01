@@ -5,6 +5,8 @@
 //! business (`game/controls.zig`, read from `controls.cfg`).
 /// the standard library
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// the log, for a cursor capture that fails
 const log=std.log;
 /// a set of enum tags, packed in bits
@@ -96,9 +98,9 @@ pub const Input=struct{
   /// the mouse buttons held last frame
   bprev:Buttons=.initEmpty(),
   /// the cursor's position (window pixels)
-  mouse:[2]f32=.{0,0},
+  mouse:m.Vice(f32,2)=.{0,0},
   /// how far the cursor moved since last frame (window pixels)
-  mouseDelta:[2]f32=.{0,0},
+  mouseDelta:m.Vice(f32,2)=.{0,0},
   /// how far the wheel turned this frame (notches; positive is away)
   scroll:f32=0,
   /// the wheel's turning gathered since the last `update`
@@ -142,9 +144,9 @@ pub const Input=struct{
     for(comptime values(Button))|b|in.bcur.setPresent(b,in.win.getMouseButton(b)==.press);
     // the cursor's position, as GLFW gives it and as floats
     const mp=in.win.getCursorPos();
-    const m:[2]f32=.{@floatCast(mp[0]),@floatCast(mp[1])};
-    in.mouseDelta=.{m[0]-in.mouse[0],m[1]-in.mouse[1]};
-    in.mouse=m;
+    const at:m.Vice(f32,2)=.{@floatCast(mp[0]),@floatCast(mp[1])};
+    in.mouseDelta=.{at[0]-in.mouse[0],at[1]-in.mouse[1]};
+    in.mouse=at;
     in.scroll=in.scrollAcc;
     in.scrollAcc=0;
     in.typedBuf=in.typingBuf;

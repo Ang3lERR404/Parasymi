@@ -152,7 +152,7 @@ pub const Editor=struct{
   /// the forms, in order
   pub fn pieces(e:*Editor)[]Piece{return e.doc.pieces.items;}
   /// whether `at` (px) is on the sculpt's path, top left, which a click renames
-  pub fn overName(e:*const Editor,at:[2]f32)bool{
+  pub fn overName(e:*const Editor,at:m.Vice(f32,2))bool{
     // the path's box (px)
     const box:Box=.{.x=pad-6,.y=pad-6,.w=Draw.width(e.path,meshedit.settings.text)+12,.h=toolbar.lineH+4};
     return box.contains(at);
@@ -410,13 +410,13 @@ pub const Editor=struct{
     }};
   }
   /// a drag of the gizmo's held handle from `from` to `to` (px), `k` of it
-  pub fn dragGizmo(e:*Editor,g:gizmo.Gizmo,view:gizmo.View,from:[2]f32,to:[2]f32,k:f32)void{
+  pub fn dragGizmo(e:*Editor,g:gizmo.Gizmo,view:gizmo.View,from:m.Vice(f32,2),to:m.Vice(f32,2),k:f32)void{
     // the handle held, if any
     const part=e.part orelse return;
     switch(part){
       .free=>{
         // the drag across the view, in the sculpt, `k` of it
-        const by:[3]f32=g.across(view,from,to)*m.splat3(k);
+        const by:m.Vice(f32,3)=g.across(view,from,to)*m.splat3(k);
         for(0..3)|i|e.nudge(pos+i,by[i]);
         e.ch=pos;
       },

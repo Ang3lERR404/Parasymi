@@ -43,7 +43,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,_:f32)bool{
   if(!ctx.g.done.contains(.unforming))return false;
   // the flower, and where it floats
   const self=ctx.ss.get(i);
-  const here=[2]i32{self.x,self.y};
+  const here=m.Vice(i32,2){self.x,self.y};
   for(ctx.ss.list.items,0..)|*o,k|{
     if(o.kind()!=.arsthraxia or o.grown<1)continue;
     // how far off the arsthraxia is (between footprints)

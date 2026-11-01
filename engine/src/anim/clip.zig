@@ -539,7 +539,7 @@ test"every f32 of a struct is a channel, named by its path"{
     /// three channels, `p.x` to `p.z`
     p:m.V3=.{2,3,4},
     /// two legs of three channels each, `legs.0.b` to `legs.1.c.1`
-    legs:[2]struct{b:f32=5,c:[2]f32=.{6,7}}=@splat(.{}),
+    legs:[2]struct{b:f32=5,c:m.Vice(f32,2)=.{6,7}}=@splat(.{}),
   };
   // the struct's channels
   const C=Channels(S);

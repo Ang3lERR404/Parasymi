@@ -97,7 +97,7 @@ pub fn fire(p:Pick)hud.Fire{return switch(p){.scroll=>.press,.garden,.act,.back=
 /// the stem is the mouse's; the keys scroll by moving down the rows
 pub fn focusable(p:Pick)bool{return p!=.scroll;}
 /// the stem held: the list dragged to where the cursor is along it
-pub fn drag(g:*play.Game,p:Pick,b:hud.Box,at:[2]f32)void{
+pub fn drag(g:*play.Game,p:Pick,b:hud.Box,at:m.Vice(f32,2))void{
   if(p==.scroll)scroll.dragged(&g.gardenList,g.gardens.items.len+1,b,at);
 }
 /// `c` with its alpha scaled by `a`

@@ -75,7 +75,7 @@ pub fn gather(g:*Game,c:*ck.Chunk,t:usize,dt:f32)bool{
   return c.res[t]>0;
 }
 /// put the selected hotbar item into the world: sow a seed or grow a bulb.
-pub fn put(g:*Game,h:[2]i32)Allocator.Error!void{
+pub fn put(g:*Game,h:m.Vice(i32,2))Allocator.Error!void{
   // the hotbar's chosen item; none, and nothing is put
   const item=g.selected() orelse return;
   // anything but a seed or a bulb stays in the belly
@@ -104,7 +104,7 @@ pub fn put(g:*Game,h:[2]i32)Allocator.Error!void{
 }
 /// whether the chosen hotbar item may go down at this tile: a seed where
 /// its plant fits, a bulb where its structure does
-pub fn canPut(g:*const Game,h:[2]i32)bool{
+pub fn canPut(g:*const Game,h:m.Vice(i32,2))bool{
   // the hotbar's chosen item; none, and nothing can be put
   const item=g.selected() orelse return false;
   if(item.plants())|sp|return g.plants.canPlaceNear(&g.world,Plants.spot(sp,h,g.hoverAt),sp);
@@ -141,7 +141,7 @@ pub fn feed(g:*Game,j:st.Id)void{
 /// something over straight away does (into the belly, or back if it is
 /// full), one that keeps items opens its panel, one that is paired is
 /// configured, any other is fed from the belly.
-pub fn interact(g:*Game,h:[2]i32,j:st.Id)void{
+pub fn interact(g:*Game,h:m.Vice(i32,2),j:st.Id)void{
   // the structure clicked
   const s=g.structs.get(j);
   if(st.handOver(s))|it|{
@@ -162,7 +162,7 @@ pub fn interact(g:*Game,h:[2]i32,j:st.Id)void{
 /// thing uproots itself on its roots and digs back in facing its new way,
 /// a floater only turns (sim/turn.zig). Not again until it has finished.
 /// Returns whether anything stands there.
-pub fn turnAt(g:*Game,h:[2]i32,back:bool)bool{
+pub fn turnAt(g:*Game,h:m.Vice(i32,2),back:bool)bool{
   // a quarter turn one way or three quarters the other
   const by:m.Dir=if(back)3 else 1;
   if(g.structs.at(&g.world,h[0],h[1]))|j|{
@@ -190,7 +190,7 @@ pub fn turnAt(g:*Game,h:[2]i32,back:bool)bool{
 /// the hotbar slot holding it is chosen; else, from the belly, it goes on
 /// the chosen slot if that is empty, else the first empty one, else over
 /// the chosen one. Returns whether anything stands there.
-pub fn pick(g:*Game,h:[2]i32)bool{
+pub fn pick(g:*Game,h:m.Vice(i32,2))bool{
   // what to pick up and which way it faced: a structure's bulb or a plant's seed
   const item:items.Item,const dir:m.Dir=if(g.structs.at(&g.world,h[0],h[1]))|j|blk:{
     // the structure standing there
@@ -252,7 +252,7 @@ pub fn unbuild(g:*Game,j:st.Id)void{
 }
 /// start plucking a mature plant's yield by paw (`pluckOn` carries it on).
 /// Plants never set seed (a germinator weaves them).
-pub fn harvest(g:*Game,h:[2]i32)void{
+pub fn harvest(g:*Game,h:m.Vice(i32,2))void{
   // the plant standing there, its row, the plant list's columns, its species
   const id=g.plantAt(h) orelse return;
   const i=id.idx();
@@ -324,7 +324,7 @@ pub fn pluckOn(g:*Game,dt:f32)?f32{
 /// pull a plant up: a sown plant always comes back as its seed, ready to be
 /// sown again, so it stays in the ground while the belly has no room for it.
 /// One that was never sown (a confluence) gives nothing back.
-pub fn uproot(g:*Game,h:[2]i32)void{
+pub fn uproot(g:*Game,h:m.Vice(i32,2))void{
   // the plant standing there; none, and nothing is uprooted
   const id=g.plantAt(h) orelse return;
   if(species.get(g.plants.list.items(.sp)[id.idx()]).seed)|seed|{

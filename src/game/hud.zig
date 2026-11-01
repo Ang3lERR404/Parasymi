@@ -130,7 +130,7 @@ pub fn focusable(p:Pick)bool{
 }
 /// mouse1 held after going down on `p`, laid out in `b`, the cursor at
 /// `at`: its panel's `drag` hook, if any
-pub fn drag(g:*play.Game,p:Pick,b:Box,at:[2]f32)void{
+pub fn drag(g:*play.Game,p:Pick,b:Box,at:m.Vice(f32,2))void{
   switch(p){
     .panel=>{},
     .row=>|r|switch(r){
@@ -198,7 +198,7 @@ pub const Rows=struct{
   /// adds the area `b` for `p`, on top of those already added
   pub fn add(r:*Rows,b:Box,p:Pick)Allocator.Error!void{try r.list.append(r.gpa,.{.box=b,.pick=p});}
   /// the topmost area under `pos` (screen pixels), if any.
-  pub fn at(r:*const Rows,pos:[2]f32)?Pick{
+  pub fn at(r:*const Rows,pos:m.Vice(f32,2))?Pick{
     // the area being looked at, walking back from the topmost
     var i=r.list.items.len;
     while(i>0){
@@ -280,7 +280,7 @@ pub fn bullet(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,open:f32,seed:f32)Allocator.
 /// draws the whole HUD for this frame into `g.ui`: clears the batch and the
 /// clickable rows, then draws each visible panel in turn on a screen
 /// `screen` pixels wide and high.
-pub fn build(g:*play.Game,screen:[2]f32)Allocator.Error!void{
+pub fn build(g:*play.Game,screen:m.Vice(f32,2))Allocator.Error!void{
   // the draw batch the panels draw into
   const d=&g.ui;
   d.clear(@floatCast(g.uiTime));

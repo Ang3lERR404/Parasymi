@@ -248,7 +248,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,_:f32)Allocator.Error!void
       // arch), and its colour
       const by=if(b.feeds&bit(l.came)!=0)l.came else first;
       const carry=if(l.item!=null and r==by)(if(l.t>=1)waitAt else l.t)else-1;
-      const col=if(l.item)|it|color.Rgba8.of(it.info().col).toF4()else[4]f32{0,0,0,0};
+      const col=if(l.item)|it|color.Rgba8.of(it.info().col).toF4()else m.Vice(f32,4){0,0,0,0};
       try out.emit(laneMesh[r][k],place,.{.glow=glow,.phase=s.seed+m.f(k)*0.17,.grown=s.grown,.carry=carry,.carryCol=.{col[0],col[1],col[2]}});
     }
   }

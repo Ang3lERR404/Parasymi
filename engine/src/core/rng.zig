@@ -63,7 +63,7 @@ pub const Rng=struct{
 test"hash2 is roughly uniform across buckets"{
   // 10000 samples into 4 buckets; each should be ~2500 ± 10%
   // how many hashes fell in each of four buckets
-  var buckets:[4]u32=.{0,0,0,0};
+  var buckets:m.Vice(u32,4)=.{0,0,0,0};
   // the lattice point walked over, row by row, and how many were hashed
   var x:i32=0;
   var y:i32=0;
@@ -101,7 +101,7 @@ test"Rng.below stays in range and covers it"{
   var r=Rng.init(7);
   try testing.expectEqual(@as(u32,0),r.below(1));
   // how often each of 0, 1 and 2 was drawn
-  var seen:[3]u32=.{0,0,0};
+  var seen:m.Vice(u32,3)=.{0,0,0};
   for(0..3000)|_|seen[r.below(3)]+=1;
   for(seen)|c|try testing.expect(c>850 and c<1150);
   // a power of two leaves nothing to reject

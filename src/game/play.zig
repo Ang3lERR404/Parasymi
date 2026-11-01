@@ -3,6 +3,8 @@
 //! drawn (view.zig). Nothing is pooled globally: items live in the player and
 //! in structures, essence and seeds live in plants until harvested.
 const lib=@import("../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator type a frame may fail with
@@ -41,7 +43,7 @@ pub const tickTime=1.0/60.0;
 /// tests); a played game grows from a fresh seed each start
 pub const defaultSeed:u64=0x5EED_0F_11FE;
 /// the window's size when it opens
-pub const windowSize=[2]u16{1600,900};
+pub const windowSize=m.Vice(u16,2){1600,900};
 /// how many rings of chunks are streamed round the gardener
 pub const streamRadius=4;
 /// the chunks resident round the gardener once streamed (a square of rings)

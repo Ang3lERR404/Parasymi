@@ -463,7 +463,7 @@ pub fn Renderer(comptime G:type)type{
       try r.volume.resize(c,r.sc.extent.width,r.sc.extent.height,r.sc.depthView);
     }
     /// the screen's size, in pixels
-    pub fn extent(r:*const R)[2]f32{
+    pub fn extent(r:*const R)m.Vice(f32,2){
       return.{m.f(r.sc.extent.width),m.f(r.sc.extent.height)};
     }
     /// draw one frame of `scene` (remaking the swapchain instead when
@@ -651,7 +651,7 @@ pub fn Renderer(comptime G:type)type{
     /// open the world's rendering scope: the HDR image and the depth buffer
     /// (with MSAA, multisampled ones resolved into the HDR image and the
     /// swapchain's depth, its first sample), the depth kept for the air.
-    fn beginWorld(r:*R,cmd:vk.CommandBufferProxy,clear:[3]f32)void{
+    fn beginWorld(r:*R,cmd:vk.CommandBufferProxy,clear:m.Vice(f32,3))void{
       r.post.beginWorld(cmd);
       // whether the world draws multisampled
       const ms=r.post.multisampled();

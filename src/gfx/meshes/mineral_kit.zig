@@ -32,7 +32,7 @@ pub fn facet(b:*mg.Builder,p:[3]V3,inside:V3,col:[3]color.Rgba8,t:f32,part:verte
   // whether it points inward, and the corner order that turns it outward
   const flip=m.dot(n,m.centroid(p[0],p[1],p[2])-inside)<0;
   if(flip)n=-n;
-  const order=if(flip)[3]usize{0,2,1}else[3]usize{0,1,2};
+  const order=if(flip)m.Vice(usize,3){0,2,1}else m.Vice(usize,3){0,1,2};
   for(order)|i|try b.put(p[i],n,col[i],t,0,part);
 }
 /// how one crystal grows: where from, which way, how long and thick, and
@@ -183,7 +183,7 @@ pub fn stone(b:*mg.Builder,at:V3,r:f32,flat:f32,col:color.Rgba8,lite:color.Rgba8
     // the next side round
     const k=(j+1)%sides;
     // the band's quad, below then above (a triangle at the foot and crown)
-    const q=[4][2]usize{.{i,j},.{i,k},.{i+1,k},.{i+1,j}};
+    const q=[4]m.Vice(usize,2){.{i,j},.{i,k},.{i+1,k},.{i+1,j}};
     for([_]usize{0,2,1,0,3,2},0..)|c,o|{
       if(i==0 and o<3)continue;
       if(i+1==rings and o>=3)continue;

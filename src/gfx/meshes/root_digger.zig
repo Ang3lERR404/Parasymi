@@ -59,7 +59,7 @@ const twine:f32=2.3;
 const clutchPace:f32=1.3;
 /// soil heaped where each clutch root breaks the ground: mounds, each
 /// (how far out past it, how wide)
-const mounds=[_][2]f32{.{0,0.05},.{0.045,0.036}};
+const mounds=[_]m.Vice(f32,2){.{0,0.05},.{0.045,0.036}};
 /// how many clods tumble about those mounds
 const clods=3;
 /// clutch root `i`'s control points: out under the soil from the stem's
@@ -73,7 +73,7 @@ fn clutchCtrl(i:usize)[9]V3{
   const a0=(m.f(i)+rng.range(-0.12,0.12))/clutchCount*m.tau+0.4;
   const out=rng.range(0.9,1.1);
   // (bearing past a0, out from the axis, height)
-  const ks=[9][3]f32{
+  const ks=[9]m.Vice(f32,3){
     .{0,0.02,-0.05},.{0.05,0.14,-0.05},.{0.1,breakOut*out,-0.012},.{0.5,0.21*out,0.055},
     .{1.0,0.13,0.14},.{1.45,0.12,0.22},.{1.85,podR[0]+0.035,podAt[1]+0.005},
     .{2.15,0.112,podAt[1]+0.09},.{twine,0.07,podAt[1]+0.115},

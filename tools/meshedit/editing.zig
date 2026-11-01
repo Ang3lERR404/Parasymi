@@ -67,7 +67,7 @@ const Act=buttons.Act;
 /// screen (null behind the eye), the gizmo seen through `view` with the
 /// sculpt at `origin`. While a form is being named the keys type its name
 /// (enter or escape done), the mouse still answering.
-pub fn handle(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,origin:V3)Allocator.Error!void{
+pub fn handle(e:*Editor,in:*const Input,handles:[]const?m.Vice(f32,2),view:gizmo.View,origin:V3)Allocator.Error!void{
   // whether shift is held (fine drags)
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
   // whether a name was being typed as the frame began
@@ -219,7 +219,7 @@ fn formAct(e:*Editor,a:Act,shift:bool)Allocator.Error!void{
 /// one frame's mouse: a press on a form row selects it, on a value row
 /// selects it and drags it, on the gizmo drags its handle, on a handle in
 /// view selects its form; any press ends naming
-fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,origin:V3,shift:bool)Allocator.Error!void{
+fn answerMouse(e:*Editor,in:*const Input,handles:[]const?m.Vice(f32,2),view:gizmo.View,origin:V3,shift:bool)Allocator.Error!void{
   if(in.pressed(.{.button=.left})){
     e.naming=null;
     e.renaming=null;
@@ -286,7 +286,7 @@ fn answerMouse(e:*Editor,in:*const Input,handles:[]const?[2]f32,view:gizmo.View,
   }
   if(e.drag==.gizmo and (in.mouseDelta[0]!=0 or in.mouseDelta[1]!=0))if(g)|gz|{
     // where the mouse was last frame (px)
-    const from=[2]f32{mx-in.mouseDelta[0],my-in.mouseDelta[1]};
+    const from=m.Vice(f32,2){mx-in.mouseDelta[0],my-in.mouseDelta[1]};
     if(inRig)rigging.dragGizmo(e,gz,view,from,in.mouse,k)else e.dragGizmo(gz,view,from,in.mouse,k);
   };
   if(e.drag!=.gizmo)e.part=null;

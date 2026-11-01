@@ -146,7 +146,7 @@ const Shape=enum(u8){
 /// one vertex of the web: what it belongs to and where on it
 const Vert=struct{
   /// the ids of its points (repeated where it has fewer than three)
-  ids:[3]u8,
+  ids:m.Vice(u8,3),
   /// what it is
   kind:Kind,
   /// what shape its web holds
@@ -157,7 +157,7 @@ const Vert=struct{
   /// a point's direction out from its middle (else unused)
   out:V3=v3(0,1,0),
   /// along a line and across it, or a pane corner's weights
-  tu:[2]f32=.{0,0},
+  tu:m.Vice(f32,2)=.{0,0},
 };
 /// put one vertex of the web, as `Vert` describes it
 fn put(b:*mg.Builder,v:Vert)Allocator.Error!void{
@@ -202,12 +202,12 @@ fn cluster(b:*mg.Builder,w:Web)Allocator.Error!void{
 }
 /// one ribbon of line, cut along its length and turned to the eye on the
 /// GPU, between the points `ids` name
-fn ribbon(b:*mg.Builder,ids:[3]u8,kind:Kind,shape:Shape,at:V3)Allocator.Error!void{
+fn ribbon(b:*mg.Builder,ids:m.Vice(u8,3),kind:Kind,shape:Shape,at:V3)Allocator.Error!void{
   for(0..lineSteps)|k|{
     // where this piece begins and ends along it
     const s0=m.ratio(k,lineSteps);
     const s1=m.ratio(k+1,lineSteps);
-    for([_][2]f32{.{s0,-1},.{s1,-1},.{s1,1},.{s0,-1},.{s1,1},.{s0,1}})|c|try put(b,.{.ids=ids,.kind=kind,.shape=shape,.at=at,.tu=c});
+    for([_]m.Vice(f32,2){.{s0,-1},.{s1,-1},.{s1,1},.{s0,-1},.{s1,1},.{s0,1}})|c|try put(b,.{.ids=ids,.kind=kind,.shape=shape,.at=at,.tu=c});
   }
 }
 /// one layer of the web (`layer` 0 the first lights', 1 the companions'):
@@ -225,13 +225,13 @@ fn web(b:*mg.Builder,w:Web,layer:f32)Allocator.Error!void{
   for(0..w.n)|i|for(i+1..w.n)|j|for(j+1..w.n)|k|{
     if(!w.together(i,j) or !w.together(j,k))continue;
     // its three points
-    const ids=[3]u8{@intCast(i),@intCast(j),@intCast(k)};
+    const ids=m.Vice(u8,3){@intCast(i),@intCast(j),@intCast(k)};
     // its corners' weights: all of the first, all of the second, all of the third
-    const a=[2]f32{1,0};
-    const bb=[2]f32{0,1};
-    const c=[2]f32{0,0};
-    for([_][2]f32{a,bb,c})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,1,layer),.tu=q});
-    for([_][2]f32{a,c,bb})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,-1,layer),.tu=q});
+    const a=m.Vice(f32,2){1,0};
+    const bb=m.Vice(f32,2){0,1};
+    const c=m.Vice(f32,2){0,0};
+    for([_]m.Vice(f32,2){a,bb,c})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,1,layer),.tu=q});
+    for([_]m.Vice(f32,2){a,c,bb})|q|try put(b,.{.ids=ids,.kind=.pane,.shape=w.shape,.at=v3(w.reach,-1,layer),.tu=q});
   };
 }
 /// a yielder: five petals snapped to a flower head, which becomes its core,
@@ -329,7 +329,7 @@ fn heart(b:*mg.Builder,stage:f32)Allocator.Error!void{
   try cluster(b,.{.shape=.heartFilament,.reach=stage+0.12,.n=24,.group=8});
   for(0..4)|k|for([_]f32{0,1})|layer|{
     // bud k's joint ring, and the bud's web
-    const joint=[4]u8{9,18,27,27};
+    const joint=m.Vice(u8,4){9,18,27,27};
     const budWeb:u8=@intCast(@intFromEnum(Shape.heartBud)+k);
     for(0..3)|c|try ribbon(b,.{@intCast(joint[k]+c),0,budWeb},.bond,.heartStem,v3(stage+0.5,0,layer));
   };

@@ -15,15 +15,15 @@ const silent=lib.sound.silent;
 const vary=lib.sound.footstep.vary;
 // ---- the sap settling (first person) ----
 /// how long a settling lasts (s)
-const settleLen=[2]f32{2.4,3.8};
+const settleLen=m.Vice(f32,2){2.4,3.8};
 /// seconds between settlings while the wolf stands and while it walks; the
 /// first comes this soon after the view enters the eyes
 /// (this one: the gap while it stands, s)
-pub const gapStill=[2]f32{3.5,8};
+pub const gapStill=m.Vice(f32,2){3.5,8};
 /// the gap while it walks (s)
-pub const gapWalk=[2]f32{9,18};
+pub const gapWalk=m.Vice(f32,2){9,18};
 /// how soon the first comes after the view enters the eyes (s)
-pub const gapFirst=[2]f32{1.2,3};
+pub const gapFirst=m.Vice(f32,2){1.2,3};
 /// the wolf stands once no step has landed for this long (s)
 pub const stillAfter:f32=1.2;
 /// the groan: a low reedy hum (Hz) sagging this share as it settles,
@@ -39,7 +39,7 @@ const waverHz:f32=2.3;
 /// how far it wavers (a share)
 const waver:f32=0.025;
 /// the throat's centre, closing from the first to the second (Hz)
-const throatHz=[2]f32{260,150};
+const throatHz=m.Vice(f32,2){260,150};
 /// how much the throat rings (q)
 const throatQ:f32=3.5;
 /// how much breath is in it (a share of noise)
@@ -53,7 +53,7 @@ pub const retune=32;
 /// a kind of gloop: how many (fewest, most), when (shares of the
 /// settling), its pitch (Hz), its fall (s) and level
 /// (fields: `n` fewest and most, `at` when, `hz` pitch, `fall` s, `level`)
-const GloopKind=struct{n:[2]u32,at:[2]f32,hz:[2]f32,fall:[2]f32,level:f32};
+const GloopKind=struct{n:m.Vice(u32,2),at:m.Vice(f32,2),hz:m.Vice(f32,2),fall:m.Vice(f32,2),level:f32};
 /// the deep ones every settling has, and the lighter, smaller ones that
 /// come with only this share of settlings
 /// (this one: the deep ones)
@@ -78,7 +78,7 @@ const sap:f32=0.07;
 /// how fast it fades in and out with the view (s)
 pub const sapFade:f32=0.35;
 /// seconds in `span` as samples
-pub fn samples(r:*rng.Rng,span:[2]f32,rate:f32)u32{return m.floorTo(u32,r.range(span[0],span[1])*rate);}
+pub fn samples(r:*rng.Rng,span:m.Vice(f32,2),rate:f32)u32{return m.floorTo(u32,r.range(span[0],span[1])*rate);}
 /// one thick bubble rising through the sap
 const Gloop=struct{
   /// its sine

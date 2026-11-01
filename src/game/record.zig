@@ -13,6 +13,8 @@
 //! (u32) and the field framed; a union its tag name's hash and the payload
 //! framed. Framed: its length (u32), then its bytes.
 const lib=@import("../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator lists and the output grow with
@@ -270,12 +272,12 @@ fn again(comptime V:type,comptime T:type,v:V,start:T)!T{
 test"a record keeps what still matches and the defaults for the rest"{
   // the old enum, and the old record (each field with a default)
   const Kind=enum{moss,soil,sand};
-  const Old=struct{a:u32=1,b:f32=2,k:Kind=.sand,gone:u8=9,opt:?u16=null,arr:[3]u8=.{1,2,3}};
+  const Old=struct{a:u32=1,b:f32=2,k:Kind=.sand,gone:u8=9,opt:?u16=null,arr:m.Vice(u8,3)=.{1,2,3}};
   // `a` became a u8 (kept at its default), `gone` went, `c` came, the
   // array shrank, the enum's tags moved
   // the new enum, its tags moved, and the new record, changed as said
   const Kind2=enum{sand,moss};
-  const New=struct{c:u16=7,b:f32=0,a:u8=5,k:Kind2=.moss,opt:?u16=3,arr:[2]u8=.{0,0}};
+  const New=struct{c:u16=7,b:f32=0,a:u8=5,k:Kind2=.moss,opt:?u16=3,arr:m.Vice(u8,2)=.{0,0}};
   // the old record written and read into the new one
   const got=try again(Old,New,.{.a=40,.b=2.5,.k=.sand,.opt=null},.{});
   try testing.expectEqual(New{.c=7,.b=2.5,.a=5,.k=.sand,.opt=null,.arr=.{1,2}},got);
@@ -284,7 +286,7 @@ test"unions by tag name, lists grown back, nested records"{
   // the test allocator
   const gpa=testing.allocator;
   // a nested record: a count and a vector
-  const Inner=struct{n:u16=0,v:@Vector(3,f32)=@splat(0)};
+  const Inner=struct{n:u16=0,v:m.Vec(f32,3)=@splat(0)};
   // a union with no payload, one record, or a list of them
   const U=union(enum){none,one:Inner,many:ArrayList(Inner)};
   // the list stored inside the union

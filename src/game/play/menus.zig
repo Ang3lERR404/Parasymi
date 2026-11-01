@@ -206,7 +206,7 @@ pub fn fly(g:*Game,in:*const Input,dt:f32)void{
     .follow,.returning,.eyes=>return,
   };
   // the look this frame (radians); the frame the cursor is taken its jump is not a look
-  var look:[2]f32=.{0,0};
+  var look:m.Vice(f32,2)=.{0,0};
   if(ctl.pressed(in,.use)and!f.captured){
     in.capture(true);
     f.captured=true;

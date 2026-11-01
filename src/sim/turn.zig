@@ -22,15 +22,15 @@ const never:f64=-1e9;
 /// the rooted turn's beats, each a window of shares of `time`: the roots
 /// come up, the body rises, steps round, sinks while the roots dig back in;
 /// when the roots come up
-const pull=[2]f32{0,0.24};
+const pull=m.Vice(f32,2){0,0.24};
 /// when the body rises
-const riseHeight=[2]f32{0.1,0.32};
+const riseHeight=m.Vice(f32,2){0.1,0.32};
 /// when it steps round to its new facing
-const step=[2]f32{0.32,0.68};
+const step=m.Vice(f32,2){0.32,0.68};
 /// when the body sinks back down
-const sinkAmount=[2]f32{0.68,0.92};
+const sinkAmount=m.Vice(f32,2){0.68,0.92};
 /// when the roots dig back in
-const digAmount=[2]f32{0.74,1};
+const digAmount=m.Vice(f32,2){0.74,1};
 /// how far it rocks as it heaves itself free and settles (radians), and
 /// how many times
 const rock:f32=0.07;
@@ -60,14 +60,14 @@ pub const Pose=struct{
   /// how far its roots are out of the ground (0 dug in .. 1 out)
   out:f32=0,
   /// its rocking: a lean about x and about z (radians)
-  rock:[2]f32=.{0,0},
+  rock:m.Vice(f32,2)=.{0,0},
   /// 0..1 through its turn
   k:f32=1,
   /// whether it is done moving
   pub fn still(p:Pose)bool{return p.k>=1;}
 };
 /// how far through beat `b` (a window of shares) a turn `k` through it is, eased 0..1
-fn beat(k:f32,b:[2]f32)f32{return m.smooth(m.clamp01((k-b[0])/(b[1]-b[0])));}
+fn beat(k:f32,b:m.Vice(f32,2))f32{return m.smooth(m.clamp01((k-b[0])/(b[1]-b[0])));}
 /// the pose of `t`, now facing `to`
 pub fn pose(t:Turn,to:m.Dir,now:f64,rooted:bool)Pose{
   // how far through its turn it is

@@ -144,12 +144,12 @@ fn fill(r:*Ring,seed:u64,c:*const ck.Chunk)void{
 /// the share of each kind of ground at half-tile point (px, py): every tile
 /// within `blendReach` counted by a smooth falloff from its centre, so kinds
 /// melt across tiles in soft curves (terrain.frag frays the border further)
-fn kindsAt(r:*const Ring,px:i32,py:i32)[4]f32{
+fn kindsAt(r:*const Ring,px:i32,py:i32)m.Vice(f32,4){
   // the point in tiles
   const x=m.f(px)/2;
   const y=m.f(py)/2;
   // each kind's weight so far, and the total
-  var mat:[4]f32=@splat(0);
+  var mat:m.Vice(f32,4)=@splat(0);
   var sum:f32=0;
   // the tiles that may reach it
   const r0x:i32=@intFromFloat(@floor(x-blendReach));
@@ -214,11 +214,11 @@ fn lineDepth(r:*Ring,seed:u64,c:*const ck.Chunk)void{
 /// its centre at 2lx+1): shared by the tiles that meet there
 fn point(r:*const Ring,px:i32,py:i32)Shared{
   // the tiles meeting at this point, and how many
-  var ts:[4]usize=undefined;
+  var ts:m.Vice(usize,4)=undefined;
   var n:usize=0;
   // the tiles either side of this point, across and down
-  const xs=[2]i32{@divFloor(px-1,2),@divFloor(px,2)};
-  const ys=[2]i32{@divFloor(py-1,2),@divFloor(py,2)};
+  const xs=m.Vice(i32,2){@divFloor(px-1,2),@divFloor(px,2)};
+  const ys=m.Vice(i32,2){@divFloor(py-1,2),@divFloor(py,2)};
   // an odd coordinate is inside one tile, an even one between two
   // how many tiles meet across, and down
   const nx:usize=if(@mod(px,2)==1)1 else 2;
@@ -247,7 +247,7 @@ const Shared=struct{
   depth:f32,
   /// how much of each kind of ground (soil, moss, stone, ley) is here, from
   /// the tiles round about (`kindsAt`)
-  mat:[4]f32,
+  mat:m.Vice(f32,4),
 };
 /// a shared point among the tiles `ts`: their average height, colour and ley
 fn shared(r:*const Ring,ts:[]const usize)Shared{
@@ -279,9 +279,9 @@ const Put=struct{
   /// its colour
   c:color.Rgba8,
   /// kind, ley, top, depth into a ley line
-  info:[4]u8,
+  info:m.Vice(u8,4),
   /// the share of each kind of ground there
-  mat:[4]u8,
+  mat:m.Vice(u8,4),
 };
 /// appends one ground vertex
 fn put(out:*std.ArrayList(TV),gpa:Allocator,v:Put)Allocator.Error!void{
@@ -335,18 +335,18 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
     const wy=oy+ly;
     // its ley as a byte, and the info every vertex of it carries
     const ley=m.unorm8(c.leyCap[t]/gen.leyMax);
-    const info:[4]u8=.{@intFromEnum(k),ley,topSurface,0};
+    const info:m.Vice(u8,4)=.{@intFromEnum(k),ley,topSurface,0};
     // the tile: a fan of four triangles from its centre (at the tile's own
     // height) to its corners (shared with its neighbours), lit by the
     // ground's smooth slope.
     // the tile's corner and centre points: heights, colours, normals and ley
-    var gh:[3][3]f32=undefined;
+    var gh:[3]m.Vice(f32,3)=undefined;
     var gc:[3][3]color.Rgba8=undefined;
     var gn:[3][3]V3=undefined;
-    var gl:[3][3]u8=undefined;
-    var gd:[3][3]u8=undefined;
-    var gm:[3][3][4]u8=undefined;
-    for([_][2]usize{.{0,0},.{2,0},.{0,2},.{2,2},.{1,1}})|g|{
+    var gl:[3]m.Vice(u8,3)=undefined;
+    var gd:[3]m.Vice(u8,3)=undefined;
+    var gm:[3][3]m.Vice(u8,4)=undefined;
+    for([_]m.Vice(usize,2){.{0,0},.{2,0},.{0,2},.{2,2},.{1,1}})|g|{
       // which corner or centre this is, across and down
       const gx=g[0];
       const gy=g[1];
@@ -371,9 +371,9 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
     const x0=m.f(wx);
     const z0=m.f(wy);
     // its corners, round the fan
-    const corners=[_][2]usize{.{0,0},.{0,2},.{2,2},.{2,0}};
+    const corners=[_]m.Vice(usize,2){.{0,0},.{0,2},.{2,2},.{2,0}};
     for(0..4)|j|{
-      for([_][2]usize{.{1,1},corners[j],corners[(j+1)%4]})|cn|{
+      for([_]m.Vice(usize,2){.{1,1},corners[j],corners[(j+1)%4]})|cn|{
         // this vertex: the centre or a corner, at its height
         const at=v3(x0+0.5*m.f(cn[0]),gh[cn[1]][cn[0]],z0+0.5*m.f(cn[1]));
         try put(out,gpa,.{.p=at,.n=gn[cn[1]][cn[0]],.c=gc[cn[1]][cn[0]],.info=.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]},.mat=gm[cn[1]][cn[0]]});

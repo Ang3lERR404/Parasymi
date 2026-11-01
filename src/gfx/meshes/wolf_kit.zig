@@ -79,7 +79,7 @@ pub fn form(b:*mg.Builder,f0:Form)Allocator.Error!void{
     const ph0=m.tau*m.ratio(j,f.segs);
     const ph1=m.tau*m.ratio(j+1,f.segs);
     // the quad's four corners as height and round angles
-    const q=[4][2]f32{.{th0,ph0},.{th0,ph1},.{th1,ph1},.{th1,ph0}};
+    const q=[4]m.Vice(f32,2){.{th0,ph0},.{th0,ph1},.{th1,ph1},.{th1,ph0}};
     // each corner's point, and its outward facing
     var p:[4]V3=undefined;
     var n:[4]V3=undefined;
@@ -283,7 +283,7 @@ pub fn resinLobe(b:*mg.Builder,s:*const Sculpt,at:M4,comptime Shape:type,comptim
       const jl=if(j==0)steps-1 else j-1;
       const jr=if(j==steps)1 else j+1;
       // the point's four neighbours: in, out, and to either side
-      const nb=[4]usize{(i-1)*columns+j,(i+1)*columns+j,i*columns+jl,i*columns+jr};
+      const nb=m.Vice(usize,4){(i-1)*columns+j,(i+1)*columns+j,i*columns+jl,i*columns+jr};
       // the neighbours summed: their points and facings
       var ps=v3(0,0,0);
       var ns=v3(0,0,0);
@@ -383,7 +383,7 @@ pub fn resinLobe(b:*mg.Builder,s:*const Sculpt,at:M4,comptime Shape:type,comptim
     var v:usize=0;
     for(0..nr-1)|ri|for(0..nc-1)|ci|{
       // the quad's four corners as kept ring and column
-      const quad=[4][2]usize{.{kr[ri],kc[ci]},.{kr[ri],kc[ci+1]},.{kr[ri+1],kc[ci+1]},.{kr[ri+1],kc[ci]}};
+      const quad=[4]m.Vice(usize,2){.{kr[ri],kc[ci]},.{kr[ri],kc[ci+1]},.{kr[ri+1],kc[ci+1]},.{kr[ri+1],kc[ci]}};
       for([_]usize{0,1,2,0,2,3})|c|{
         // this corner's ring and kept column
         const i=quad[c][0];

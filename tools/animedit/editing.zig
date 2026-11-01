@@ -64,7 +64,7 @@ const barBottom=animedit.settings.barBottom;
 /// one frame's keys and mouse (`over` the list or the timeline), the
 /// wolf's joints as `rg` sees them. While a mark is being named the keys
 /// type its name (enter or escape done), the mouse still answering.
-pub fn handle(e:*Editor,in:*const Input,screen:[2]f32,dt:f32,rg:*const Rig)Allocator.Error!void{
+pub fn handle(e:*Editor,in:*const Input,screen:m.Vice(f32,2),dt:f32,rg:*const Rig)Allocator.Error!void{
   // whether shift is held (fine drags)
   const shift=in.down(.{.key=.left_shift}) or in.down(.{.key=.right_shift});
   // whether a name was being typed as the frame began
@@ -137,7 +137,7 @@ pub fn act(e:*Editor,a:Act,in:*const Input)Allocator.Error!void{
 /// one frame's mouse: a press on the timeline scrubs, on a row selects it
 /// and drags its value, on the gizmo drags its handle, on a joint selects
 /// it; any press ends naming
-fn answerMouse(e:*Editor,in:*const Input,screen:[2]f32,rg:*const Rig,shift:bool)Allocator.Error!void{
+fn answerMouse(e:*Editor,in:*const Input,screen:m.Vice(f32,2),rg:*const Rig,shift:bool)Allocator.Error!void{
   if(in.pressed(.{.button=.left}))e.naming=null;
   // how many rows of the list fit the window
   const rows=e.fits(screen);
@@ -183,7 +183,7 @@ fn answerMouse(e:*Editor,in:*const Input,screen:[2]f32,rg:*const Rig,shift:bool)
     },
     .gizmo=>if(gz)|z|if(in.mouseDelta[0]!=0 or in.mouseDelta[1]!=0){
       // where the mouse was last frame (px)
-      const from=[2]f32{mx-in.mouseDelta[0],my-in.mouseDelta[1]};
+      const from=m.Vice(f32,2){mx-in.mouseDelta[0],my-in.mouseDelta[1]};
       try e.dragGizmo(z.j,z.g,rg,from,in.mouse,if(shift)fine else 1);
     },
   }

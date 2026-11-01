@@ -362,7 +362,7 @@ pub fn slot(id:Id,lod:u32)usize{return@as(usize,@intFromEnum(id))*mg.lods+lod;}
 pub const sculptSlots=[_]Id{.sculpt0,.sculpt1,.sculpt2,.sculpt3,.sculpt4,.sculpt5,.sculpt6,.sculpt7};
 /// build one mesh at one level of detail into `b` (leaving `b.lod` there),
 /// recording its (first vertex, count).
-pub fn buildOne(b:*mg.Builder,id:Id,lod:u32,ranges:*[slots][2]u32)Allocator.Error!void{
+pub fn buildOne(b:*mg.Builder,id:Id,lod:u32,ranges:*[slots]m.Vice(u32,2))Allocator.Error!void{
   b.lod=lod;
   // where this mesh's vertices begin
   const first=b.mark();

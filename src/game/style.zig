@@ -1,7 +1,11 @@
 //! shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes. Muted greens/browns base,
 //! amber accents.
+/// the import hub
+const lib=@import("../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// a UI colour: red, green, blue and alpha bytes
-const C=[4]u8;
+const C=m.Vice(u8,4);
 /// the type scale (text size multipliers), largest first: a banner across the screen
 pub const textBanner:f32=3.5;
 /// a panel's title

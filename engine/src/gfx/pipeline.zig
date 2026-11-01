@@ -3,6 +3,8 @@
 //! single source of truth for its GPU layout.
 /// the standard library
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// an all-zero value, for the stencil states nobody uses
 const zeroes=std.mem.zeroes;
 /// the Vulkan bindings: pipeline records, formats and flags
@@ -20,12 +22,12 @@ const swapchain=@import("swapchain.zig");
 fn formatOf(comptime T:type)vk.Format{
   return switch(T){
     f32=>.r32_sfloat,
-    [2]f32=>.r32g32_sfloat,
-    [3]f32=>.r32g32b32_sfloat,
-    [4]f32=>.r32g32b32a32_sfloat,
+    m.Vice(f32,2)=>.r32g32_sfloat,
+    m.Vice(f32,3)=>.r32g32b32_sfloat,
+    m.Vice(f32,4)=>.r32g32b32a32_sfloat,
     u32=>.r32_uint,
-    [2]u32=>.r32g32_uint,
-    [4]u8,color.Rgba8=>.r8g8b8a8_unorm,
+    m.Vice(u32,2)=>.r32g32_uint,
+    m.Vice(u8,4),color.Rgba8=>.r8g8b8a8_unorm,
     else=>@compileError("no vertex format for "++@typeName(T)),
   };
 }
@@ -91,7 +93,7 @@ pub const Desc=struct{
   /// every layer they name
   viewMask:u32=0,
   /// pushes depth away by a constant and with the slope (shadow casters)
-  depthBias:?[2]f32=null,
+  depthBias:?m.Vice(f32,2)=null,
 };
 /// `sets`: descriptor set layouts the pipelines also bind (0..)
 /// a pipeline layout with one push constant range of `pushSize` bytes, seen

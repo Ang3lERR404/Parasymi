@@ -34,11 +34,11 @@ pub const Column=struct{
 /// big with `gap` between them
 pub const Grid=struct{
   /// the first cell's top left corner (pixels)
-  at:[2]f32,
+  at:m.Vice(f32,2),
   /// one cell's width and height (pixels)
-  cell:[2]f32,
+  cell:m.Vice(f32,2),
   /// the room between cells across and down (pixels)
-  gap:[2]f32=.{0,0},
+  gap:m.Vice(f32,2)=.{0,0},
   /// how many cells a row holds
   cols:usize,
   /// cell `i` (0 the top left)
@@ -49,7 +49,7 @@ pub const Grid=struct{
     return.{.x=g.at[0]+m.f(c)*(g.cell[0]+g.gap[0]),.y=g.at[1]+m.f(r)*(g.cell[1]+g.gap[1]),.w=g.cell[0],.h=g.cell[1]};
   }
   /// how much room `n` cells take, as .{w, h} (no gap after the last)
-  pub fn size(g:Grid,n:usize)[2]f32{
+  pub fn size(g:Grid,n:usize)m.Vice(f32,2){
     // how many columns and rows they fill
     const c=@min(n,g.cols);
     const r=(n+g.cols-1)/g.cols;
@@ -57,7 +57,7 @@ pub const Grid=struct{
   }
 };
 /// a `w` by `h` box in the middle of a screen `screen` pixels wide and high
-pub fn centred(screen:[2]f32,w:f32,h:f32)Box{
+pub fn centred(screen:m.Vice(f32,2),w:f32,h:f32)Box{
   return.{.x=(screen[0]-w)/2,.y=(screen[1]-h)/2,.w=w,.h=h};
 }
 /// `b` drawn in by `dx` at its left and right and `dy` at its top and bottom
@@ -78,9 +78,9 @@ test"a grid fills its rows left to right, and knows how much room cells take"{
   try testing.expectEqual(Box{.x=100,.y=50,.w=40,.h=30},g.box(0));
   try testing.expectEqual(Box{.x=200,.y=50,.w=40,.h=30},g.box(2));
   try testing.expectEqual(Box{.x=150,.y=90,.w=40,.h=30},g.box(4));
-  try testing.expectEqual([2]f32{140,70},g.size(5));
-  try testing.expectEqual([2]f32{90,30},g.size(2));
-  try testing.expectEqual([2]f32{0,0},g.size(0));
+  try testing.expectEqual(m.Vice(f32,2){140,70},g.size(5));
+  try testing.expectEqual(m.Vice(f32,2){90,30},g.size(2));
+  try testing.expectEqual(m.Vice(f32,2){0,0},g.size(0));
 }
 test"a box sits in the middle of the screen, and draws in by its insets"{
   try testing.expectEqual(Box{.x=350,.y=250,.w=100,.h=100},centred(.{800,600},100,100));

@@ -133,7 +133,7 @@ pub const gaits=[3]Gait{
   .{.walk=0.86,.sprint=0.8,.stride=0.76,.lift=0.6,.sway=3.6,.roll=3.2,.sink=1.8,.bob=1.5,.lean=0.11},
 };
 /// where the heavy and full stages begin, as shares of fullness
-pub const stageAt=[2]f32{1.0/3.0,2.0/3.0};
+pub const stageAt=m.Vice(f32,2){1.0/3.0,2.0/3.0};
 /// how much fullness each stage blends over about its threshold
 pub const stageBlend:f32=0.08;
 /// the belly-rest idle: standing still this long with the belly at least

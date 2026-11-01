@@ -8,6 +8,8 @@
 //! or the right-hand side. Which characters it may hold is its owner's to say.
 /// the standard library
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// walks UTF-8 text a character at a time, for what is pasted
 const Utf8View=std.unicode.Utf8View;
 /// moves bytes toward the front, for what follows a taken-out selection
@@ -103,7 +105,7 @@ pub fn TextInput(comptime cap:usize,comptime accept:fn(u21)?u8)type{
     /// the text typed so far
     pub fn slice(t:*const Self)[]const u8{return t.buf[0..t.len];}
     /// the selection's ends, first then last (equal when there is none)
-    pub fn selection(t:*const Self)[2]usize{
+    pub fn selection(t:*const Self)m.Vice(usize,2){
       // the end it was begun from
       const a=t.anchor orelse t.caret;
       return.{@min(a,t.caret),@max(a,t.caret)};

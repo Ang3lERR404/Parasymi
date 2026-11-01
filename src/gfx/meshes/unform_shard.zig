@@ -3,6 +3,8 @@
 //! sliver of cut crystal, faintly violet. The event places, spins and
 //! shrinks it as it flies (game/unforming.zig).
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator error the builder may fail with
@@ -16,7 +18,7 @@ const pal=lib.palette;
 /// colour conversions
 const color=lib.engine.core.color;
 /// the shard's rows, foot to tip: height, radius, twist
-const rows=[_][3]f32{.{-0.03,0,0},.{-0.005,0.018,0},.{0.03,0,0.5}};
+const rows=[_]m.Vice(f32,3){.{-0.03,0,0},.{-0.005,0.018,0},.{0.03,0,0.5}};
 /// builds the shard about the origin
 pub fn build(b:*mg.Builder)Allocator.Error!void{
   // its own random stream, the same every build

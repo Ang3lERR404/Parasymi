@@ -1,5 +1,7 @@
 //! time of day (a sun or moon pod) and how full the wolf's sap belly is.
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator type every drawing call may fail with
@@ -39,7 +41,7 @@ pub fn draw(g:*play.Game,d:*Draw,_:f32,_:f32)Allocator.Error!void{
   const day=g.sky.daylight();
   const orb=if(day>0.5)s.sun else s.moon;
   // the pod's colour, faded for its glow
-  const glow=[4]u8{orb[0],orb[1],orb[2],glowAlpha};
+  const glow=m.Vice(u8,4){orb[0],orb[1],orb[2],glowAlpha};
   try d.glow(orbX,orbY,glowR,glow);
   try d.pod(orbX,orbY,orbR,orb,0.4+0.6*(if(day>0.5)day else 1-day),0.3);
   _=try d.text(orbX+32,30,s.textHeading,s.white,g.sky.name());

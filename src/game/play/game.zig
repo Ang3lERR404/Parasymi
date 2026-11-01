@@ -184,10 +184,10 @@ pub const Game=struct{
   held:?Held=null,
   /// the tile of the structure whose panel is open (mode `.structure`); a
   /// tile, not an id, since ids move when a structure is removed
-  open:[2]i32=.{0,0},
+  open:m.Vice(i32,2)=.{0,0},
   /// the cursor, in screen pixels (tooltips and what is carried follow it);
   /// looking out of the wolf's eyes, the middle of the screen
-  mouse:[2]f32=.{0,0},
+  mouse:m.Vice(f32,2)=.{0,0},
   /// the cursor and the use button (mouse1) this frame, for the HUD's
   /// buttons to say whether they are hovered, pressed or held
   pointer:lib.engine.ui.button.Pointer=.{},
@@ -210,13 +210,13 @@ pub const Game=struct{
   placeDir:m.Dir=0,
   /// remove, held: the tile last removed from (it is not removed from
   /// again until the cursor leaves it)
-  removed:?[2]i32=null,
+  removed:?m.Vice(i32,2)=null,
   /// the wait (s) before remove, held, removes the next tile
   removeCd:f32=0,
   /// the debug card is shown
   debug:bool=false,
   /// the tile under the cursor, if any (under a floater the cursor touches, its tile)
-  hover:?[2]i32=null,
+  hover:?m.Vice(i32,2)=null,
   /// the ground point under the cursor (y 0), or where a touched floater stands:
   /// a floater is put down right here, off the grid
   hoverAt:m.V3=@splat(0),
@@ -329,7 +329,7 @@ pub const Game=struct{
   }
   /// what the cursor points at: `hover`, `hoverAt` and `hoverFloat` (none
   /// while `off`, as when inspecting)
-  pub fn aim(g:*Game,cursor:[2]f32,screen:[2]f32,off:bool)void{
+  pub fn aim(g:*Game,cursor:m.Vice(f32,2),screen:m.Vice(f32,2),off:bool)void{
     g.hover=null;
     g.hoverFloat=null;
     if(off)return;
@@ -387,7 +387,7 @@ pub const Game=struct{
   };
   /// the plant at tile `h`: the floater the cursor touches when `h` is the
   /// hovered tile, else whatever stands or floats there
-  pub fn plantAt(g:*const Game,h:[2]i32)?PlantId{
+  pub fn plantAt(g:*const Game,h:m.Vice(i32,2))?PlantId{
     if(g.hoverFloat)|f|if(g.hover)|hv|if(hv[0]==h[0] and hv[1]==h[1])return f;
     return g.plants.at(&g.world,h[0],h[1]);
   }

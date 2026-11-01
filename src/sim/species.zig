@@ -127,7 +127,7 @@ pub const Genome=struct{
   vines:u8=0,
   /// offshoots: side stems off the main stem, each ending in a bud or a
   /// small bloom (looks only); each variant grows between the two
-  shoots:[2]u8=.{1,3},
+  shoots:m.Vice(u8,2)=.{1,3},
   /// tendrils are grown vines too: they coil as they reach for the ground;
   /// how tightly they coil
   tendrilCurl:f32=0.4,

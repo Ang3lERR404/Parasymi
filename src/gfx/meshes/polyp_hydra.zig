@@ -351,7 +351,7 @@ pub fn hanging(b:*mg.Builder,k:*growth.Skeleton,head:growth.Id,o:Hang,rng:*Rng)A
   const across=m.norm(m.cross(o.up,o.out));
   const drift=rng.range(-0.25,0.25)*o.len;
   // its shape: up and out, over, then hanging far down, drifting aside
-  const shape=[_][3]f32{.{0,0,0},.{0.08,0.12,0},.{0.22,0.24,0.1},.{0.38,0.22,0.3},.{0.5,0.06,0.55},.{0.56,-0.14,0.78},.{0.58,-0.34,0.92},.{0.57,-0.5,1}};
+  const shape=[_]m.Vice(f32,3){.{0,0,0},.{0.08,0.12,0},.{0.22,0.24,0.1},.{0.38,0.22,0.3},.{0.5,0.06,0.55},.{0.56,-0.14,0.78},.{0.58,-0.34,0.92},.{0.57,-0.5,1}};
   // its control points (the first left for the skeleton to root)
   var c:[9]V3=undefined;
   for(shape,c[1..])|q,*pt|pt.*=o.root+o.out*m.splat3(q[0]*o.len)+o.up*m.splat3(q[1]*o.len)+across*m.splat3(q[2]*drift);

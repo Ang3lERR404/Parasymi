@@ -93,7 +93,7 @@ const jointOf=animedit.rigging.jointOf;
 const joints=animedit.rigging.joints;
 /// how many rows of the channel list fit between the help and the timeline
 /// (at least one)
-pub fn fits(_:*const Editor,screen:[2]f32)usize{
+pub fn fits(_:*const Editor,screen:m.Vice(f32,2))usize{
   // the height the list may fill (px)
   const h=screen[1]-listY-tlBottom-tlH-3*pad;
   return@intFromFloat(@max(1,@floor(h/row)));
@@ -101,7 +101,7 @@ pub fn fits(_:*const Editor,screen:[2]f32)usize{
 /// draws the editor over the scene: the wolf's joints and the selected
 /// one's gizmo, the clip's path and note, the toolbar and the help, the
 /// channel list with each value, and the timeline with its keys and playhead
-pub fn draw(e:*Editor,d:*Draw,screen:[2]f32,rg:*const Rig)Allocator.Error!void{
+pub fn draw(e:*Editor,d:*Draw,screen:m.Vice(f32,2),rg:*const Rig)Allocator.Error!void{
   // the window's width and height (px)
   const screenW=screen[0];
   const screenH=screen[1];

@@ -69,7 +69,7 @@ pub const State=struct{
   moveT:f32=0,
   /// how far the root toward each neighbouring tile has grown (0..1),
   /// indexed by world direction; the front one never grows
-  reach:[4]f32=.{0,0,0,0},
+  reach:m.Vice(f32,4)=.{0,0,0,0},
   /// which side root harvests next, so neighbours take turns
   turn:u8=0,
   /// the edges roots come in at (bit per edge counted from the way it
@@ -214,7 +214,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,_:f32)Allocator.Error!void
   const by=if(c.feeds&bit(c.came)!=0)c.came else@as(m.Dir,@intCast(@ctz(c.feeds)));
   // how far along the item is (waiting at the front once there), and its colour
   const along=if(c.moveT>=1)waitAt else c.moveT;
-  const col=if(c.held)|it|color.Rgba8.of(it.info().col).toF4()else[4]f32{0,0,0,0};
+  const col=if(c.held)|it|color.Rgba8.of(it.info().col).toF4()else m.Vice(f32,4){0,0,0,0};
   for(archMeshes,0..)|id,r|{
     if(c.feeds&bit(@intCast(r))==0)continue;
     // how far along this arch the item runs (-1: it runs in another)

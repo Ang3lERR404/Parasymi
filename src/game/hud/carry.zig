@@ -1,6 +1,8 @@
 //! what the cursor carries: the lifted stack (or hotbar item) hangs just
 //! off the pointer, glowing, until a click puts it down.
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator type every drawing call may fail with
@@ -30,7 +32,7 @@ pub fn visible(g:*const play.Game)bool{return g.mode.live() and g.carried()!=nul
 pub fn draw(g:*play.Game,d:*Draw,_:f32,_:f32)Allocator.Error!void{
   // what is carried, where it hangs, and its colour
   const item=g.carried().?;
-  const c=[2]f32{g.mouse[0]+offset,g.mouse[1]+offset};
+  const c=m.Vice(f32,2){g.mouse[0]+offset,g.mouse[1]+offset};
   const col=item.info().col;
   try d.glow(c[0],c[1],glowR,.{col[0],col[1],col[2],glowAlpha});
   try icon.draw(d,item,c,r,g.uiT(),phase,1,255);

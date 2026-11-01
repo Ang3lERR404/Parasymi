@@ -66,7 +66,7 @@ pub fn sampleFlags(n:u32)vk.SampleCountFlags{
 /// (with a soft knee below it) and how strongly it is added
 pub const Push=extern struct{
   /// one texel of the image being read
-  texel:[2]f32,
+  texel:m.Vice(f32,2),
   /// the brightness the glow starts at (0 on all but the first step down)
   threshold:f32=1.0,
   /// how strongly the glow is laid back over the scene
@@ -333,7 +333,7 @@ pub const Post=struct{
   }
   /// the world scope's colour attachment: the HDR image, or with MSAA the
   /// multisampled one, averaged into the HDR image as the scope ends
-  pub fn worldColor(p:*const Post,clear:[3]f32)vk.RenderingAttachmentInfo{
+  pub fn worldColor(p:*const Post,clear:m.Vice(f32,3))vk.RenderingAttachmentInfo{
     // the clear colour, opaque
     const cv:vk.ClearValue=.{.color=.{.float_32=.{clear[0],clear[1],clear[2],1}}};
     if(p.multisampled())return.{

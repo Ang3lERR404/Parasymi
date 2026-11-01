@@ -180,7 +180,7 @@ const NodesRec=struct{
 /// and the seed the world regrows from
 const Header=extern struct{
   /// always `magic`
-  magic:[4]u8,
+  magic:m.Vice(u8,4),
   /// the build's `version`
   version:u32,
   /// the build's `layoutFingerprint`
@@ -367,7 +367,7 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
 fn ensureFootprint(g:*Game,x:i32,y:i32,size:u8)Allocator.Error!void{
   // how far the footprint's far corner is
   const far=@as(i32,size)-1;
-  for([_][2]i32{.{x,y},.{x+far,y},.{x,y+far},.{x+far,y+far}})|t|{
+  for([_]m.Vice(i32,2){.{x,y},.{x+far,y},.{x,y+far},.{x+far,y+far}})|t|{
     _=try g.world.ensure(ck.Coord.ofTile(t[0],t[1]));
   }
 }

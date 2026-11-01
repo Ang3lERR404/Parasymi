@@ -1,6 +1,8 @@
 //! PNG encoding of 8-bit pixels (screenshots): RGB, every row Sub-filtered,
 //! one zlib stream in one IDAT chunk.
 const std=@import("std");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("math.zig");
 /// the allocator type the encoder takes
 const Allocator=std.mem.Allocator;
 /// the stream writer chunks are written through
@@ -51,14 +53,14 @@ pub fn encode(gpa:Allocator,w:u32,h:u32,px:[]const u8,layout:Layout)Error![]u8{
   const raw=try gpa.alloc(u8,row*h);
   defer gpa.free(raw);
   // where red, green and blue sit within a source pixel
-  const order:[3]usize=switch(layout){.rgba=>.{0,1,2},.bgra=>.{2,1,0}};
+  const order:m.Vice(usize,3)=switch(layout){.rgba=>.{0,1,2},.bgra=>.{2,1,0}};
   for(0..h)|y|{
     // this row's filtered bytes, and its source pixels
     const out=raw[y*row..][0..row];
     const in=px[y*w*4..][0..w*4];
     out[0]=sub;
     // the pixel before's bytes, which each byte is stored less
-    var prev:[3]u8=.{0,0,0};
+    var prev:m.Vice(u8,3)=.{0,0,0};
     for(0..w)|x|for(0..3)|k|{
       // this channel's byte
       const v=in[x*4+order[k]];
@@ -94,7 +96,7 @@ pub fn encode(gpa:Allocator,w:u32,h:u32,px:[]const u8,layout:Layout)Error![]u8{
 }
 /// writes one chunk to `out`: its length, its four-letter `kind`, its
 /// `data`, then the checksum of kind and data
-fn chunk(out:*Writer,kind:*const[4]u8,data:[]const u8)Writer.Error!void{
+fn chunk(out:*Writer,kind:*const m.Vice(u8,4),data:[]const u8)Writer.Error!void{
   try out.writeInt(u32,@intCast(data.len),.big);
   try out.writeAll(kind);
   try out.writeAll(data);

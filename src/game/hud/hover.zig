@@ -3,6 +3,8 @@
 //! gives or draws) or a resource node; bare ground by the top-left, its kind
 //! and ley.
 const lib=@import("../../lib.zig");
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=lib.engine.core.math;
 /// the standard library, reached through the hub
 const std=lib.std;
 /// the allocator type every drawing call may fail with
@@ -32,7 +34,7 @@ const textX:f32=32;
 /// where its text's top sits (pixels from the top)
 const textTop:f32=116;
 /// the card beside the cursor: how far off it (pixels, right and down)
-const offset=[2]f32{24,20};
+const offset=m.Vice(f32,2){24,20};
 /// the card's width for a structure, whose line of work is wider (pixels)
 const cardW:f32=400;
 /// the card's width for a plant (pixels)
@@ -76,7 +78,7 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
 }
 /// a card `w` wide and `lines` lines high beside the cursor, kept on
 /// screen; returns where its first line goes. Out of reach, it says so.
-fn card(g:*const play.Game,d:*Draw,screenW:f32,screenH:f32,w:f32,lines:f32,near:bool)Allocator.Error![2]f32{
+fn card(g:*const play.Game,d:*Draw,screenW:f32,screenH:f32,w:f32,lines:f32,near:bool)Allocator.Error!m.Vice(f32,2){
   // the card's height, and its corner kept on screen
   const ch=lineH*lines+2*margin;
   const x=@max(@min(g.mouse[0]+offset[0],screenW-w-keep),keep);

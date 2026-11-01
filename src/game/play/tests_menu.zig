@@ -39,7 +39,7 @@ const tickTime=lib.play.tickTime;
 /// the window's size when it opens
 const windowSize=lib.play.windowSize;
 /// tests draw to a window of the default size
-pub const testScreen=[2]f32{m.f(windowSize[0]),m.f(windowSize[1])};
+pub const testScreen=m.Vice(f32,2){m.f(windowSize[0]),m.f(windowSize[1])};
 test"the wolf stays put without input"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
@@ -62,11 +62,11 @@ test"the wolf stays put without input"{
 /// headless clicks on the HUD
 pub const click=struct{
   /// press the left button over the middle of the first row picking `want`
-  pub fn on(gg:*Game,i:*Input,want:hud.Pick,sc:[2]f32)!void{return press(gg,i,want,sc,.use);}
+  pub fn on(gg:*Game,i:*Input,want:hud.Pick,sc:m.Vice(f32,2))!void{return press(gg,i,want,sc,.use);}
   /// press `a` with the mouse over the middle of the first row picking
   /// `want`, a frame down and (for `use`, whose buttons click as it is let
   /// go) a frame let go
-  pub fn press(gg:*Game,i:*Input,want:hud.Pick,sc:[2]f32,a:ctl.Action)!void{
+  pub fn press(gg:*Game,i:*Input,want:hud.Pick,sc:m.Vice(f32,2),a:ctl.Action)!void{
     try hud.build(gg,sc);
     for(gg.rows.all())|r|{
       if(!eqlDeep(r.pick,want))continue;
@@ -83,7 +83,7 @@ pub const click=struct{
   }
   /// press the key (or button) of `a` for a frame, the HUD drawn first,
   /// and let it go
-  pub fn key(gg:*Game,i:*Input,a:ctl.Action,sc:[2]f32)!void{
+  pub fn key(gg:*Game,i:*Input,a:ctl.Action,sc:m.Vice(f32,2))!void{
     try hud.build(gg,sc);
     i.advance();
     ctl.hold(i,a,true);

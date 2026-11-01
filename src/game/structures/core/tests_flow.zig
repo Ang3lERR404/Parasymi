@@ -89,13 +89,13 @@ test"a footprint's ring holds every tile that many steps out, once, beside ones 
   for(m.dirs)|d|{
     // the step that way
     const v=m.dirVec(d);
-    try testing.expectEqual([2]i32{v.x,v.z},one.next().?);
+    try testing.expectEqual(m.Vice(i32,2){v.x,v.z},one.next().?);
   }
   try testing.expect(one.next()==null);
   for([_]i32{1,2})|n|for([_]i32{1,2,3})|d|{
     // ring `d` round an `n`×`n` footprint, the tiles seen and their count
     var r:Ring=.{.x0=0,.y0=0,.x1=n-1,.y1=n-1,.d=d};
-    var seen:[64][2]i32=undefined;
+    var seen:[64]m.Vice(i32,2)=undefined;
     var c:usize=0;
     while(r.next())|t|:(c+=1){
       // the tile's steps out from the footprint, across and down

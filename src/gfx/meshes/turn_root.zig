@@ -33,7 +33,7 @@ const girth:f32=0.032;
 /// it swells to `girth` over this share of its length, from a point
 const swell:f32=0.12;
 /// where its three rootlets fork off, as shares of its length
-const forks=[3]f32{0.45,0.62,0.78};
+const forks=m.Vice(f32,3){0.45,0.62,0.78};
 /// how long each rootlet runs, as a share of the root's length
 const forkLen:f32=0.16;
 /// how far out a rootlet bows from the root at its widest (world units)

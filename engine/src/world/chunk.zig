@@ -1,6 +1,8 @@
 //! the grid every world is cut into: square chunks of tiles, addressed by
 //! chunk coordinate, each tile by its index inside its chunk. What a tile
 //! holds is the game's (its `Chunk`, see world/world.zig).
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=@import("../core/math.zig");
 /// a chunk's side, in tiles
 pub const sizeTiles=32;
 /// how many tiles one chunk holds
@@ -27,6 +29,6 @@ pub inline fn localIndex(wx:i32,wy:i32)usize{
 }
 /// world tile (x, y) of local tile index `t` in the chunk at `at` (inverse
 /// of `localIndex`).
-pub fn tileOf(at:Coord,t:usize)[2]i32{
+pub fn tileOf(at:Coord,t:usize)m.Vice(i32,2){
   return.{at.x*sizeTiles+@as(i32,@intCast(t%sizeTiles)),at.y*sizeTiles+@as(i32,@intCast(t/sizeTiles))};
 }

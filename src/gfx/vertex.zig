@@ -4,6 +4,8 @@
 const lib=@import("../lib.zig");
 /// the engine package, reached through the hub
 const engine=lib.engine;
+/// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
+const m=engine.core.math;
 /// colour types: the four-byte vertex colour
 const color=engine.core.color;
 /// the engine's own vertex layouts, re-exported below
@@ -16,17 +18,17 @@ pub const Ui=ev.Ui;
 /// its colour and what kind of tile it belongs to
 pub const Terrain=extern struct{
   /// its position in world space
-  pos:[3]f32,
+  pos:m.Vice(f32,3),
   /// its normal, unit length
-  nrm:[3]f32,
+  nrm:m.Vice(f32,3),
   /// its colour, before the shader's lighting
   col:color.Rgba8,
   /// x: tile kind, y: ley intensity, z: is-top-face, w: depth into a ley line
-  info:[4]u8,
+  info:m.Vice(u8,4),
   /// how much of each kind of ground is here (soil, moss, stone, ley; the
   /// tiles meeting at it share it out), which terrain.frag melts together
   /// along wandering, noisy borders
-  mat:[4]u8,
+  mat:m.Vice(u8,4),
 };
 /// shading role of a vertex; shaders key secondary motion and glow off it
 /// (common.glsl's `PART_*` numbers match these tags in order)
@@ -104,32 +106,32 @@ pub const MeshPose=ev.MeshPose;
 /// has grown, filled, flowered and leaned toward a lineage
 pub const PlantInstance=extern struct{
   /// where it is rooted, in world space
-  pos:[3]f32,
+  pos:m.Vice(f32,3),
   /// growth 0..1, mana fill 0..1, seed 0..1, lineage affinity -1..1
-  a:[4]f32,
+  a:m.Vice(f32,4),
   /// flow, health, sway amplitude, genome form (species.Form)
-  b:[4]f32,
+  b:m.Vice(f32,4),
   /// x: blend toward the next growth key (0..1); y: 1 for a placement
   /// preview (ghost); z: 1 when that preview fits; w the yaw it is turned
   /// to (R), on top of its own
-  c:[4]f32=.{0,0,0,0},
+  c:m.Vice(f32,4)=.{0,0,0,0},
   /// a forming halo drawing it in (see `noHalo`)
-  h:[4]f32=noHalo,
+  h:m.Vice(f32,4)=noHalo,
   /// its bend after the gardener's paws plucking it: xy the way it bends
   /// on the ground (unit length), z how far (radians at its tip), w unused
-  tug:[4]f32=.{0,0,0,0},
+  tug:m.Vice(f32,4)=.{0,0,0,0},
   /// its yield ripening on it: x how ripe, 0..1 (its essence over its
   /// cap), y how many pods it ripens in, z a radiant pod's radius (mesh
   /// space), w seconds since its yield last came loose in the paws
-  ripe:[4]f32=.{0,0,0,noPluck},
+  ripe:m.Vice(f32,4)=.{0,0,0,noPluck},
   /// the colour of what it yields (sRGB 0..1), w unused
-  yield:[4]f32=.{1,1,1,0},
+  yield:m.Vice(f32,4)=.{1,1,1,0},
   /// its unforming (game/unforming.zig): x how far it has shattered, 0
   /// its first glitch .. 1 gone (< 0 none); yzw unused
-  glitch:[4]f32=noGlitch,
+  glitch:m.Vice(f32,4)=noGlitch,
 };
 /// `PlantInstance.glitch` for a plant the unforming has not touched
-pub const noGlitch=[4]f32{-1,0,0,0};
+pub const noGlitch=m.Vice(f32,4){-1,0,0,0};
 /// `PlantInstance.ripe.w` for a plant never plucked (long since)
 pub const noPluck:f32=1e4;
 /// one tile's worth of ground detail, read per instance by detail.vert,
@@ -137,49 +139,49 @@ pub const noPluck:f32=1e4;
 /// from it: the ground itself stays one baked mesh, the detail is the GPU's.
 pub const DetailTile=extern struct{
   /// the tile's corner x, its centre height, its corner z
-  at:[3]f32,
+  at:m.Vice(f32,3),
   /// the heights of its corners: (x0,z0), (x0,z1), (x1,z1), (x1,z0)
-  corners:[4]f32,
+  corners:m.Vice(f32,4),
   /// the tile's ground colour, which its blades take on
   col:color.Rgba8,
   /// tile kind, ley 0..255, unused, unused
-  info:[4]u8,
+  info:m.Vice(u8,4),
   /// how much of each kind of ground (soil, moss, stone, ley) lies at its
   /// corner (x0,z0), as the ground beneath shares it out: grass grows as
   /// thick as the ground it stands on is grassy, so it thins across borders
-  k00:[4]u8,
+  k00:m.Vice(u8,4),
   /// (at its corner (x0,z1))
-  k01:[4]u8,
+  k01:m.Vice(u8,4),
   /// (at its corner (x1,z1))
-  k11:[4]u8,
+  k11:m.Vice(u8,4),
   /// (at its corner (x1,z0))
-  k10:[4]u8,
+  k10:m.Vice(u8,4),
   /// (at its centre)
-  kc:[4]u8,
+  kc:m.Vice(u8,4),
 };
 /// a rigid procedural part (creature limb, resource node, mote, structure piece).
 pub const PartInstance=extern struct{
   /// model matrix columns: the first
-  c0:[4]f32,
+  c0:m.Vice(f32,4),
   /// the second
-  c1:[4]f32,
+  c1:m.Vice(f32,4),
   /// the third
-  c2:[4]f32,
+  c2:m.Vice(f32,4),
   /// the fourth, its translation
-  c3:[4]f32,
+  c3:m.Vice(f32,4),
   /// x glow, y flutter (leaf secondary motion), z phase 0..1, w alpha-ish fade
-  p:[4]f32,
+  p:m.Vice(f32,4),
   /// rgb colour multiply, w blend amount
-  tint:[4]f32,
+  tint:m.Vice(f32,4),
   /// x how far along a conduit's core the essence it carries has come
   /// (0..1, < 0 none; its colour in `e.yzw` when placed by the matrix);
   /// yzw give: how far a resin part's surface is pushed (mesh space), its base held
-  q:[4]f32,
+  q:m.Vice(f32,4),
   /// x sway: how far it bends from its root in the garden's wind (0 rigid);
   /// y the height over which it bends; z how far below the origin it is
   /// rooted (a part hovering above its stalk bends with it); w how far a
   /// growing structure has come along (1 grown)
-  w:[4]f32,
+  w:m.Vice(f32,4),
   /// x how part.vert places it: 0 by the matrix; 1 along a curve (a bloom
   /// thread: c0..c3 xyz its control points, tint.xyz the side its x lies
   /// toward, y how far along it reaches (0: all of it), w its rest length;
@@ -190,14 +192,14 @@ pub const PartInstance=extern struct{
   /// (sRGB 0..1); 3 skinned (y the first of its bones in the
   /// frame's bone buffer; each vertex by its `Skin`); 4 a burst flung out
   /// from where a yield came loose (y how far through its life, 0..1)
-  e:[4]f32=.{0,0,0,0},
+  e:m.Vice(f32,4)=.{0,0,0,0},
   /// a forming halo it belongs to (see `noHalo`)
-  h:[4]f32=noHalo,
+  h:m.Vice(f32,4)=noHalo,
   /// `partGhost`, ...: what it is beyond its mesh
   flags:u32=0,
   /// x how far it is blended into its mesh's next key (0..1, the library's
   /// `next`: a bud opening); yzw unused
-  k:[4]f32=.{0,0,0,0},
+  k:m.Vice(f32,4)=.{0,0,0,0},
 };
 /// `PartInstance.flags`: a placement preview (casts no shadow); part.vert
 /// reads it as `PART_GHOST`
@@ -207,4 +209,4 @@ pub const partGhost:u32=1;
 /// sits), w how far it has come (0 the blooms leave their corners .. 1 they
 /// meet; past 1, `halo.form`s since). common.glsl `haloSpiral` draws the
 /// blooms in along it. This, w < 0, is none.
-pub const noHalo=[4]f32{0,0,0,-1};
+pub const noHalo=m.Vice(f32,4){0,0,0,-1};

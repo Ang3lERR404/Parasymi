@@ -49,11 +49,11 @@ pub const Slot=struct{
   /// its sway's phase
   phase:f32=0,
   /// a slot `w` by `h` centred on `c`
-  pub fn around(c:[2]f32,w:f32,h:f32,pick:hud.Pick,husk:f32)Slot{
+  pub fn around(c:m.Vice(f32,2),w:f32,h:f32,pick:hud.Pick,husk:f32)Slot{
     return.{.box=Box.around(c,w,h),.pick=pick,.husk=husk};
   }
   /// the middle of its box (pixels)
-  pub fn center(sl:Slot)[2]f32{return sl.box.center();}
+  pub fn center(sl:Slot)m.Vice(f32,2){return sl.box.center();}
   /// its husk's radius at full growth
   pub fn radius(sl:Slot)f32{return sl.husk*sl.box.side();}
   /// registers its box and draws it; true once it has grown enough to show

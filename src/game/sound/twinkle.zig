@@ -17,11 +17,11 @@ const vary=lib.sound.footstep.vary;
 /// pings in one twinkle (fewest, most), seconds between them, and the
 /// first ping's pitch (Hz); each next steps up or down by one of `stepRatios`
 /// (this one: how many pings)
-pub const pingRange=[2]u32{2,4};
+pub const pingRange=m.Vice(u32,2){2,4};
 /// seconds between pings
-const pingGap=[2]f32{0.05,0.13};
+const pingGap=m.Vice(f32,2){0.05,0.13};
 /// the first ping's pitch (Hz)
-const pingHz=[2]f32{2100,3400};
+const pingHz=m.Vice(f32,2){2100,3400};
 /// the ratios a ping's pitch may step by to the next: up or down a little
 const stepRatios=[_]f32{1.122,1.189,1.335,0.891,0.841};
 /// a ping's glassy partials (shares of its pitch, a little stretched so it
@@ -43,7 +43,7 @@ const shimmer:f32=0.25;
 /// (this one: the low-pass that softens it, Hz)
 const twinkleSoftHz:f32=7000;
 /// its loudness for a far mote and for a touching one
-const twinkle=[2]f32{0.006,0.03};
+const twinkle=m.Vice(f32,2){0.006,0.03};
 /// twinkles that may sound at once
 pub const twinkles=2;
 /// a ping this far faded is gone (it is already far quieter than a step)

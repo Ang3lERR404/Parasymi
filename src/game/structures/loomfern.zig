@@ -94,11 +94,11 @@ const laidLean:f32=1.15;
 /// a laid sheaf's size, of the spindle's
 const laidSize:f32=0.85;
 /// the essence in its calyx: a lens this wide empty .. full
-const poolW=[2]f32{0.012,0.03};
+const poolW=m.Vice(f32,2){0.012,0.03};
 /// how brightly the sheaves glow
 const glow:f32=0.15;
 /// how brightly a thread glows unfed, and fed
-const threadGlow=[2]f32{0.1,0.45};
+const threadGlow=m.Vice(f32,2){0.1,0.45};
 /// how brightly the essence in its calyx glows
 const poolGlow:f32=0.3;
 /// what a loomfern remembers: its weave's progress, the essence still in

@@ -98,7 +98,7 @@ pub const State=struct{
   /// the kind it brings (from its place among the tethered)
   kind:?items.Item=null,
   /// the tile of the structure its tendril reaches (null: none)
-  src:?[2]i32=null,
+  src:?m.Vice(i32,2)=null,
   /// that structure's size, tiles
   srcSize:u8=1,
   /// the ground height under it
@@ -146,7 +146,7 @@ fn assigned(ss:*st.Structures,i:st.Id,j:st.Id)?items.Item{
   return if(rank<r.in.len)r.in[rank].item else null;
 }
 /// empty tiles between tile `p` and structure `s`'s footprint
-fn gap(p:[2]i32,s:*const st.Structure)i32{
+fn gap(p:m.Vice(i32,2),s:*const st.Structure)i32{
   // its size, and the gaps across and along (-1 inside it)
   const n:i32=s.def().size;
   const dx=@max(s.x-p[0]-1,p[0]-(s.x+n),-1);
@@ -157,7 +157,7 @@ fn gap(p:[2]i32,s:*const st.Structure)i32{
 fn source(ss:*st.Structures,i:st.Id,kind:items.Item)?st.Id{
   // the Vultrixi itself, and its tile
   const self=ss.get(i);
-  const here=[2]i32{self.x,self.y};
+  const here=m.Vice(i32,2){self.x,self.y};
   // the nearest found so far, and how near (start: just past reach)
   var best:?st.Id=null;
   var near:i32=reachTiles+1;
@@ -248,11 +248,11 @@ pub const Relay=struct{
   /// how far along this hop (0..1)
   t:f32=0,
   /// the next Vultrixi's tile, or null to hand it over here
-  next:?[2]i32=null,
+  next:?m.Vice(i32,2)=null,
   /// the tile of the structure it is bound for
-  dest:[2]i32,
+  dest:m.Vice(i32,2),
   /// the tile of the structure it was pulled from (never handed back there)
-  from:[2]i32,
+  from:m.Vice(i32,2),
 };
 /// whether `o` is an untethered, grown Vultrixi within `linkTiles` of `s`
 fn linked(s:*const st.Structure,o:*const st.Structure)bool{
@@ -266,7 +266,7 @@ fn linked(s:*const st.Structure,o:*const st.Structure)bool{
 fn wanting(ctx:st.Ctx,i:st.Id,item:items.Item,except:?st.Id)?st.Id{
   // the Vultrixi, its tile, and the nearest found so far
   const self=ctx.ss.get(i);
-  const here=[2]i32{self.x,self.y};
+  const here=m.Vice(i32,2){self.x,self.y};
   var best:?st.Id=null;
   var near:i32=reachTiles+1;
   for(ctx.ss.list.items,0..)|*o,k|{
@@ -354,7 +354,7 @@ fn relayTick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
     // its way on from there, never back where it came from
     const way=route(ctx,nid,r.item,ctx.ss.at(ctx.w,r.from[0],r.from[1])) orelse return true;
     // the Vultrixi it hops to after that, if any
-    const after=if(way.first==nid)null else [2]i32{ctx.ss.get(way.first).x,ctx.ss.get(way.first).y};
+    const after=if(way.first==nid)null else m.Vice(i32,2){ctx.ss.get(way.first).x,ctx.ss.get(way.first).y};
     // the structure's tile
     const dt2=ctx.ss.get(way.dest);
     ns.relay=.{.item=r.item,.next=after,.dest=.{dt2.x,dt2.y},.from=r.from};
@@ -363,7 +363,7 @@ fn relayTick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   }
   // carrying nothing: the nearest structure in reach with something
   // wanted along its links
-  const here=[2]i32{self.x,self.y};
+  const here=m.Vice(i32,2){self.x,self.y};
   // the best source so far, how near, and the way its item goes
   var best:?st.Id=null;
   var near:i32=reachTiles+1;
@@ -406,7 +406,7 @@ fn relayTick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(!s.inv.take(item,1))return true;
   // where it goes: the first hop's tile (none: handed over here), and the structure's
   const w=way.?;
-  const after=if(w.first==i)null else [2]i32{ctx.ss.get(w.first).x,ctx.ss.get(w.first).y};
+  const after=if(w.first==i)null else m.Vice(i32,2){ctx.ss.get(w.first).x,ctx.ss.get(w.first).y};
   const d=ctx.ss.get(w.dest);
   vs.relay=.{.item=item,.next=after,.dest=.{d.x,d.y},.from=.{s.x,s.y}};
   return true;
@@ -551,7 +551,7 @@ const iconPearl:Color=.{220,212,238,255};
 // ---- tests ----
 /// tethers the Vultrixi floating at `v` to the monfris at `loom`, as the
 /// gardener would: configuring one, then the other
-fn tether(ss:*st.Structures,w:*World,g:*prog.Progression,v:[2]i32,loom:[2]i32)void{
+fn tether(ss:*st.Structures,w:*World,g:*prog.Progression,v:m.Vice(i32,2),loom:m.Vice(i32,2))void{
   st.configure(ss,ss.floaterAt(v[0],v[1]).?,g);
   st.configure(ss,ss.at(w,loom[0],loom[1]).?,g);
 }

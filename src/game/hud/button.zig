@@ -77,7 +77,7 @@ fn faded(c:Color,a:f32)Color{
 /// one button as a panel lays it out
 pub const Button=struct{
   /// the middle of its label's line (pixels)
-  center:[2]f32,
+  center:m.Vice(f32,2),
   /// what it says
   label:[]const u8,
   /// what a click on it picks

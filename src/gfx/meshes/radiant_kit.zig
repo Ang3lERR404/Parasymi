@@ -177,7 +177,7 @@ pub const Whorl=struct{
   /// how deeply a petal is cupped across
   cup:f32,
   /// the assembly orders its first and last petal settle at
-  order:[2]f32,
+  order:m.Vice(f32,2),
   /// turned half a petal on from the whorl inside it
   offset:bool=false,
   /// the petals' colour at their claws
@@ -241,7 +241,7 @@ pub const Leaves=struct{
   /// how far a leaf droops to its tip (as a blade's)
   droop:f32,
   /// the assembly orders its first and last leaf settle at
-  order:[2]f32,
+  order:m.Vice(f32,2),
   /// the leaves' colour at their bases
   col:Rgba8,
   /// the colour they turn to at their tips
@@ -278,7 +278,7 @@ pub const Root=struct{
   /// how deep under the soil they reach
   sink:f32,
   /// the assembly orders its first and last strand settle at
-  order:[2]f32,
+  order:m.Vice(f32,2),
   /// the strands' light
   col:Rgba8,
   /// the shards where they dig in: at their foot, and paling to their point
@@ -354,7 +354,7 @@ pub const Cut=struct{
   /// rows from its bottom point to its top one: height, radius, twist (in
   /// half sides; a row half a side on from the next staggers the facets
   /// between them); a point is a row of radius 0
-  rows:[]const[3]f32,
+  rows:[]const m.Vice(f32,3),
   /// rows below this are `deep`, the rest `lite`
   deepRows:usize,
   /// the colour of its deep lower rows

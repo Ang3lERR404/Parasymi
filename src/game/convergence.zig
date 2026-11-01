@@ -136,12 +136,12 @@ fn contained(p:*const Plants,a:usize,b:usize)bool{
 }
 /// the free ground for a confluence nearest both parents, within the
 /// symbiote's containment reach so it holds the pair once grown.
-fn spot(w:*const World,p:*const Plants,a:Rect,b:Rect)?[2]i32{
+fn spot(w:*const World,p:*const Plants,a:Rect,b:Rect)?m.Vice(i32,2){
   // a confluence's size, and how far its hold reaches
   const size=species.get(hybrid).size;
   const r:i32=species.get(hybrid).contain;
   // the best spot so far, and its score (lower: nearer both parents)
-  var best:?[2]i32=null;
+  var best:?m.Vice(i32,2)=null;
   var score:i32=m.maxInt(i32);
   // the row being tried
   var y=a.y-r-size+1;
@@ -164,7 +164,7 @@ fn spot(w:*const World,p:*const Plants,a:Rect,b:Rect)?[2]i32{
 /// the plants at either end of a chain of conduits starting at `s`: the one
 /// it pulls from and the one the last conduit faces, if they are a mature
 /// symbiote and a mature parasite (returned in that order).
-fn chain(w:*const World,p:*const Plants,ss:*st.Structures,s:*const st.Structure)?[2]usize{
+fn chain(w:*const World,p:*const Plants,ss:*st.Structures,s:*const st.Structure)?m.Vice(usize,2){
   // the way the first conduit faces, and the plant behind it it pulls from
   const v=m.dirVec(s.dir);
   const from=p.at(w,s.x-v.x,s.y-v.z) orelse return null;
