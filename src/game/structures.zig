@@ -325,6 +325,17 @@ pub const Ref=struct{
 /// what `spawnChild` puts down: a structure of `kind` on tile `x`,`y`,
 /// facing `dir`, with its own `seed` for how it sways and varies
 pub const Spawn=struct{x:i32,y:i32,kind:Kind,dir:m.Dir=0,seed:f32=0};
+/// a root's (or nerve's, or tendril's) reach `r` (0..1) one frame on: it
+/// grows `grow` toward 1 while what it reaches for is `there`, and withers
+/// `wither` back toward 0 once it is gone
+pub fn reaching(r:f32,there:bool,grow:f32,wither:f32)f32{return if(there)@min(1,r+grow)else@max(0,r-wither);}
+test"a reach grows while its plant is there and withers once it is gone"{
+  // the test helpers
+  const testing=lib.std.testing;
+  try testing.expectEqual(@as(f32,0.75),reaching(0.5,true,0.25,0.1));
+  try testing.expectEqual(@as(f32,1),reaching(0.9,true,0.25,0.1));
+  try testing.expectEqual(@as(f32,0),reaching(0.05,false,0.25,0.1));
+}
 test{
   _=messages;
   _=structure;

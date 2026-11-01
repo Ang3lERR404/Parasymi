@@ -82,7 +82,7 @@ pub const Night=struct{
   /// its own random numbers
   r:rng.Rng,
   /// the bowed notes sounding; null is free
-  bows:[bowCount]?Bow=@splat(null),
+  bows:dsp.Pool(Bow,bowCount)=.{},
   /// the choir
   choir:Choir,
   /// the note each section sang last (MIDI, soprano first)
@@ -144,7 +144,7 @@ pub const Night=struct{
   /// the day's rest: every voice cleared, the choir silenced, the next
   /// night starting a phrase from its first bar
   pub fn rest(n:*Night)void{
-    n.bows=@splat(null);
+    n.bows.clear();
     n.choir=.init(starts,&n.r,n.rate);
     n.sung=starts;
     n.bar=0;
@@ -163,9 +163,7 @@ pub const Night=struct{
       // samples until the next bar, and the stretch of `buf` played through them
       const k:u32=@intCast(@min(n.left,buf.len-i));
       const part=buf[i..][0..k];
-      for(&n.bows)|*v|if(v.*)|*b|{
-        if(!b.render(part))v.*=null;
-      };
+      n.bows.render(part);
       n.choir.render(part);
       n.left-=k;
       i+=k;
@@ -190,19 +188,18 @@ pub const Night=struct{
   }
   /// the strings let their chord go and bow `c`
   pub fn bowChord(n:*Night,c:Chord)void{
-    for(&n.bows)|*v|if(v.*)|*b|b.release();
+    for(&n.bows.slots)|*v|if(v.*)|*b|b.release();
     for(c)|note|if(note!=0){
-      n.bows[n.freeBow()]=.init(note,vary(&n.r,bowVel),&n.r,n.rate);
+      n.bows.slots[n.bows.free() orelse n.quietest()]=.init(note,vary(&n.r,bowVel),&n.r,n.rate);
     };
     n.bowed+=1;
   }
-  /// a bow to play on: the first free one, else the quietest let go
-  fn freeBow(n:*Night)usize{
-    for(n.bows,0..)|v,i|if(v==null)return i;
+  /// the bow to take when none is free: the quietest let go
+  fn quietest(n:*Night)usize{
     // the quietest found so far, and how loud it is
     var best:usize=0;
     var low:f32=2;
-    for(n.bows,0..)|v,i|if(v)|b|if(!b.swell.held and b.swell.level<low){
+    for(n.bows.slots,0..)|v,i|if(v)|b|if(!b.swell.held and b.swell.level<low){
       best=i;
       low=b.swell.level;
     };

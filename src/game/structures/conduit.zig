@@ -111,7 +111,7 @@ fn growRoots(ctx:st.Ctx,self:*st.Structure,dt:f32)void{
     const v=m.dirVec(d);
     const there=ctx.plants.at(ctx.w,self.x+v.x,self.y+v.z)!=null;
     const r=&c.reach[d];
-    r.*=if(there)@min(1,r.*+dt*rootGrow)else@max(0,r.*-dt*rootWither);
+    r.*=st.reaching(r.*,there,dt*rootGrow,dt*rootWither);
   }
   c.reach[self.dir]=0;
 }

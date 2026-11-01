@@ -122,7 +122,7 @@ const Voice=struct{
       .hz=hz,
       .target=hz,
       .next=hz,
-      .glide=1-@exp(-1/(r.range(glideS[0],glideS[1])*rate)),
+      .glide=1-dsp.fall(r.range(glideS[0],glideS[1]),rate),
     };
   }
   /// its next sample, its vibrato grown in as far as `grown` (0..1)
@@ -174,7 +174,7 @@ const Part=struct{
       .gains=undefined,
       .noise=.init(r.next()),
       .swell=.init(0,swellS,rate),
-      .grow=@exp(-1/(vibratoGrow*rate)),
+      .grow=dsp.fall(vibratoGrow,rate),
       .level=sectionLevel[i],
       .lagMax=m.floorTo(u32,lagS*rate),
     };

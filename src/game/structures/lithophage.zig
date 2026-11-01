@@ -148,7 +148,7 @@ fn growRoots(w:*World,self:*st.Structure,dt:f32)void{
   for(&l.reach,0..)|*r,k|{
     // whether a node lies on that tile
     const there=nodeAt(w,self.x,self.y,k)!=null;
-    r.*=if(there)@min(1,r.*+dt*rootGrow)else@max(0,r.*-dt*rootWither);
+    r.*=st.reaching(r.*,there,dt*rootGrow,dt*rootWither);
   }
 }
 /// grows its roots, then either saps its whole crystal into its cup a grit

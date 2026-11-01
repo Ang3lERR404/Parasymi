@@ -86,22 +86,14 @@ pub const Music=struct{
   rate:f32,
   /// its own random numbers
   r:rng.Rng,
-  /// the plunks ringing; null is free
-  plunks:[plunks]?Plunk=@splat(null),
-  /// the taiko sounding; null is free
-  taikos:[score.taikos]?Taiko=@splat(null),
-  /// the timpani strokes sounding; null is free
-  timps:[score.timps]?Timpani=@splat(null),
-  /// the cymbals sounding; null is free
-  cymbals:[score.cymbals]?Cymbal=@splat(null),
-  /// the plunk taken when none is free (round the pool: the oldest)
-  nextPlunk:usize=0,
-  /// the taiko slot the next hit takes
-  nextTaiko:usize=0,
-  /// the timpani slot the next stroke takes
-  nextTimp:usize=0,
-  /// the cymbal slot the next takes
-  nextCymbal:usize=0,
+  /// the plunks ringing: a free one, else the oldest
+  plunks:dsp.Pool(Plunk,plunks)=.{},
+  /// the taiko sounding: each hit takes the next in turn
+  taikos:dsp.Pool(Taiko,score.taikos)=.{},
+  /// the timpani strokes sounding: each takes the next in turn
+  timps:dsp.Pool(Timpani,score.timps)=.{},
+  /// the cymbals sounding: each takes the next in turn
+  cymbals:dsp.Pool(Cymbal,score.cymbals)=.{},
   /// this phrase is calm: the deep taiko and one stroke a bar only
   calm:bool=false,
   /// the music's level, gliding after the daylight
@@ -166,10 +158,10 @@ pub const Music=struct{
   /// the night's rest: every voice cleared, the next day starting a
   /// phrase from its first step
   pub fn rest(mu:*Music)void{
-    mu.plunks=@splat(null);
-    mu.taikos=@splat(null);
-    mu.timps=@splat(null);
-    mu.cymbals=@splat(null);
+    mu.plunks.clear();
+    mu.taikos.clear();
+    mu.timps.clear();
+    mu.cymbals.clear();
     mu.step=0;
     mu.left=0;
     mu.resting=true;
@@ -186,18 +178,10 @@ pub const Music=struct{
       // samples until the next step, and the stretch of `buf` played through them
       const n:u32=@intCast(@min(mu.left,buf.len-i));
       const part=buf[i..][0..n];
-      for(&mu.plunks)|*v|if(v.*)|*p|{
-        if(!p.render(part))v.*=null;
-      };
-      for(&mu.taikos)|*v|if(v.*)|*d|{
-        if(!d.render(part))v.*=null;
-      };
-      for(&mu.timps)|*v|if(v.*)|*d|{
-        if(!d.render(part))v.*=null;
-      };
-      for(&mu.cymbals)|*v|if(v.*)|*d|{
-        if(!d.render(part))v.*=null;
-      };
+      mu.plunks.render(part);
+      mu.taikos.render(part);
+      mu.timps.render(part);
+      mu.cymbals.render(part);
       mu.left-=n;
       i+=n;
     }
@@ -290,7 +274,7 @@ pub const Music=struct{
   }
   /// strikes `note` (MIDI) at velocity `vel` on a free plunk
   pub fn plunk(mu:*Music,note:u8,vel:f32)void{
-    mu.plunks[mu.freePlunk()]=.init(note,vel,&mu.r,mu.rate);
+    mu.plunks.add(.init(note,vel,&mu.r,mu.rate));
     mu.struck+=1;
   }
   /// the drums on step `s` of its bar: the deep taiko on a bar's first,
@@ -320,27 +304,17 @@ pub const Music=struct{
   }
   /// strikes a taiko pitched at `hz`, ringing `ring` seconds, at velocity `vel`
   pub fn taiko(mu:*Music,hz:f32,ring:f32,vel:f32)void{
-    mu.taikos[mu.nextTaiko]=.init(hz,ring,vel,&mu.r,mu.rate);
-    mu.nextTaiko=(mu.nextTaiko+1)%score.taikos;
+    mu.taikos.cycle(.init(hz,ring,vel,&mu.r,mu.rate));
     mu.drummed+=1;
   }
   /// strikes a timpani kettle (MIDI `note`) at velocity `vel` after `wait` samples
   pub fn timp(mu:*Music,note:u8,vel:f32,wait:u32)void{
-    mu.timps[mu.nextTimp]=.init(note,vel,wait,&mu.r,mu.rate);
-    mu.nextTimp=(mu.nextTimp+1)%score.timps;
+    mu.timps.cycle(.init(note,vel,wait,&mu.r,mu.rate));
     mu.rolled+=1;
   }
   /// a cymbal swelling for `swell` samples to its crash (0: a crash now)
   pub fn crash(mu:*Music,swell:u32)void{
-    mu.cymbals[mu.nextCymbal]=.init(score.crashVel,swell,&mu.r,mu.rate);
-    mu.nextCymbal=(mu.nextCymbal+1)%score.cymbals;
+    mu.cymbals.cycle(.init(score.crashVel,swell,&mu.r,mu.rate));
     mu.crashed+=1;
-  }
-  /// a plunk to play on: the first free one, or else the next in turn
-  /// round the pool (the oldest)
-  pub fn freePlunk(mu:*Music)usize{
-    for(mu.plunks,0..)|v,i|if(v==null)return i;
-    defer mu.nextPlunk=(mu.nextPlunk+1)%plunks;
-    return mu.nextPlunk;
   }
 };

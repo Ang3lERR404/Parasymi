@@ -53,7 +53,7 @@ fn hear(f:Footfall,seed:u64)struct{peak:f32,rms:f32,len:f32}{
   var peak:f32=0;
   var sum:f32=0;
   var n:u32=0;
-  while(s.steps[0]!=null and n<48000){
+  while(s.steps.slots[0]!=null and n<48000){
     @memset(&buf,0);
     s.render(&buf);
     for(buf)|x|{
@@ -81,15 +81,15 @@ test"steps vary, a busy pool steals the oldest, and it ends silent"{
   var s:Sounds=.init(9,testRate);
   s.wind.level=0;
   for(0..voiceCount+2)|_|s.apply(.{.step=.{.weight=0.5,.pace=0.5}});
-  for(s.steps)|v|try testing.expect(v!=null);
-  try testing.expect(s.steps[0].?.gain!=s.steps[1].?.gain);
+  for(s.steps.slots)|v|try testing.expect(v!=null);
+  try testing.expect(s.steps.slots[0].?.gain!=s.steps.slots[1].?.gain);
   // a block of samples
   var buf:[480]f32=undefined;
   for(0..200)|_|{
     @memset(&buf,0);
     s.render(&buf);
   }
-  for(s.steps)|v|try testing.expect(v==null);
+  for(s.steps.slots)|v|try testing.expect(v==null);
   for(buf)|x|try testing.expectEqual(@as(f32,0),x);
 }
 test"the sap settles only in the eyes, softly, and fades out with the view"{
@@ -146,18 +146,18 @@ test"a twinkle is a few soft high pings, louder the nearer, and ends"{
     var s:Sounds=.init(11,testRate);
     s.wind.level=0;
     s.apply(.{.twinkle=.{.near=near}});
-    try testing.expect(s.twinkles[0].?.n>=pingRange[0] and s.twinkles[0].?.n<=pingRange[1]);
+    try testing.expect(s.twinkles.slots[0].?.n>=pingRange[0] and s.twinkles.slots[0].?.n<=pingRange[1]);
     // a block of samples
     var buf:[480]f32=undefined;
     peak.*=0;
     // samples heard
     var n:u32=0;
-    while(s.twinkles[0]!=null and n<4*48000):(n+=buf.len){
+    while(s.twinkles.slots[0]!=null and n<4*48000):(n+=buf.len){
       @memset(&buf,0);
       s.render(&buf);
       for(buf)|x|peak.*=@max(peak.*,@abs(x));
     }
-    try testing.expect(s.twinkles[0]==null);
+    try testing.expect(s.twinkles.slots[0]==null);
     // how long it sounded (s)
     const len=m.f(n)/testRate;
     try testing.expect(len>0.5 and len<3.5);
@@ -359,15 +359,15 @@ test"the arsthraxia fades away when its work stops, and a unit done blooms and r
   try testing.expect(s.research!=null);
   // a unit done: the bloom rings while the voice hums on
   s.apply(.{.arsthraxia=.{.progress=0.99,.fed=0,.complete=true}});
-  try testing.expect(s.blooms[0]!=null);
+  try testing.expect(s.blooms.slots[0]!=null);
   // the work stops: within twenty seconds both are gone
   s.apply(.{.arsthraxia=.{.progress=0,.fed=0,.complete=false}});
   // how many blocks it took
   var blocks:u32=0;
-  while(blocks<2000 and !(s.research==null and s.blooms[0]==null)){
+  while(blocks<2000 and !(s.research==null and s.blooms.slots[0]==null)){
     @memset(&buf,0);
     s.render(&buf);
     blocks+=1;
   }
-  try testing.expect(s.research==null and s.blooms[0]==null);
+  try testing.expect(s.research==null and s.blooms.slots[0]==null);
 }

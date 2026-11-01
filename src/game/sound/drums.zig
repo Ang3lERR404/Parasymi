@@ -71,10 +71,10 @@ pub const Taiko=struct{
       .base=undefined,
       .amp=undefined,
       .fall=undefined,
-      .bentFall=@exp(-1/(bendFall*rate)),
+      .bentFall=dsp.fall(bendFall,rate),
       .noise=.init(r.next()),
       .dark=.init(thwackHz,rate),
-      .hitFall=@exp(-1/(thwackFall*rate)),
+      .hitFall=dsp.fall(thwackFall,rate),
       .gain=vel*taiko,
     };
     // this drum's pitch, a hair off its neighbours'
@@ -84,7 +84,7 @@ pub const Taiko=struct{
       t.modes[k]=.{.rate=rate,.freq=t.base[k]};
       // a harder stroke wakes the higher modes more
       t.amp[k]=skinLevel[k]*m.pow(f32,vel,0.5*m.f(k));
-      t.fall[k]=@exp(-1/(ring/(1+skinDamp*m.f(k))*rate));
+      t.fall[k]=dsp.fall(ring/(1+skinDamp*m.f(k)),rate);
     }
     return t;
   }
@@ -160,14 +160,14 @@ pub const Timpani=struct{
       .fall=undefined,
       .noise=.init(r.next()),
       .dark=.init(feltHz,rate),
-      .hitFall=@exp(-1/(feltFall*rate)),
+      .hitFall=dsp.fall(feltFall,rate),
       .wait=wait,
       .gain=vel*timpani,
     };
     for(0..kettleModes)|k|{
       t.modes[k]=.init(hz*kettleRatio[k],rate);
       t.amp[k]=kettleLevel[k]*m.pow(f32,vel,0.4*m.f(k));
-      t.fall[k]=@exp(-1/(kettleRing/(1+kettleDamp*m.f(k))*rate));
+      t.fall[k]=dsp.fall(kettleRing/(1+kettleDamp*m.f(k)),rate);
     }
     return t;
   }
@@ -239,7 +239,7 @@ pub const Cymbal=struct{
       .hissHp=.init(.high,hissHigh,0.7,rate),
       .swell=len,
       .swellLen=len,
-      .ringFall=@exp(-1/(vary(r,crashRing)*rate)),
+      .ringFall=dsp.fall(vary(r,crashRing),rate),
       .gain=vel*cymbal,
     };
     for(&c.metal,0..)|*o,k|o.*=.{.rate=rate,.shape=.square,.freq=vary(r,metalHz[k])};

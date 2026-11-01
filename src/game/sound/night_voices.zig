@@ -27,7 +27,7 @@ const Swell=struct{
   fall:f32,
   /// a swell taking about `attack` seconds to rise and `release` to fall
   fn init(attack:f32,release:f32,rate:f32)Swell{
-    return.{.rise=@exp(-1/(attack*rate)),.fall=@exp(-1/(release*rate))};
+    return.{.rise=dsp.fall(attack,rate),.fall=dsp.fall(release,rate)};
   }
   /// its next level
   fn next(w:*Swell)f32{

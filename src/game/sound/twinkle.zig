@@ -112,7 +112,7 @@ pub const Twinkle=struct{
       var fall:[partials.len]f32=undefined;
       inline for(0..partials.len)|k|{
         osc[k]=.{.rate=rate,.freq=hz*partials[k],.phase=r.float()};
-        fall[k]=@exp(-1/(vary(r,partialFall[k])*rate));
+        fall[k]=dsp.fall(vary(r,partialFall[k]),rate);
       }
       p.*=.{
         .osc=osc,

@@ -203,7 +203,7 @@ pub const Research=struct{
   /// the low-pass that rounds the thrum
   thrumSoft:dsp.OnePole,
   /// the wisps whispering now; null is free
-  wisps:[wispCount]?Wisp=@splat(null),
+  wisps:dsp.Pool(Wisp,wispCount)=.{},
   /// samples until the next wisp
   wispWait:u32,
   /// the core's two tones
@@ -283,7 +283,7 @@ pub const Research=struct{
       if(rs.thrumPhase>=1)rs.thrumPhase-=1;
       // the wisps whispering
       var ws:f32=0;
-      for(&rs.wisps)|*v|if(v.*)|*w|{
+      for(&rs.wisps.slots)|*v|if(v.*)|*w|{
         if(w.tick(n,rs.rate))|y|ws+=y else v.*=null;
       };
       // the core's two tones, wavering together
@@ -305,10 +305,7 @@ pub const Research=struct{
       rs.wispWait-=1;
       return;
     }
-    for(&rs.wisps)|*v|if(v.*==null){
-      v.*=.init(&rs.r,rs.rate);
-      break;
-    };
+    rs.wisps.addFree(.init(&rs.r,rs.rate));
     rs.wispWait=m.floorTo(u32,m.f(samples(&rs.r,wispGap,rs.rate))*(1-wispGapFed*fed));
   }
 };

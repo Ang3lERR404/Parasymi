@@ -130,7 +130,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   for(&d.reach,0..)|*r,k|{
     // whether the node lies this way
     const there=if(found)|f|f.dir==k else false;
-    r.*=if(there)@min(1,r.*+dt*rootGrow/mesh.root.reachDistance)else@max(0,r.*-dt*rootWither);
+    r.*=st.reaching(r.*,there,dt*rootGrow/mesh.root.reachDistance,dt*rootWither);
   }
   if(found==null){
     d.dig=null;

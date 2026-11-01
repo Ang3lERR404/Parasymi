@@ -84,7 +84,7 @@ pub const Plunk=struct{
       .level=undefined,
       .noise=.init(r.next()),
       .hammer=.init(.band,@min(hz*hammerAt,hammerHz),1.2,rate),
-      .knockFall=@exp(-1/(hammerFall*rate)),
+      .knockFall=dsp.fall(hammerFall,rate),
       .soft=.init(plunkSoftHz,rate),
       .attack=m.floorTo(u32,plunkAttack*rate)+1,
       .gain=vel*plunk,
@@ -94,7 +94,7 @@ pub const Plunk=struct{
       const n=m.f(k+1);
       const f=hz*n*@sqrt(1+stretch*n*n);
       p.parts[k]=.init(f,rate);
-      p.fall[k]=@exp(-1/(ring/(1+plunkDamp*m.f(k))*rate));
+      p.fall[k]=dsp.fall(ring/(1+plunkDamp*m.f(k)),rate);
       // above Nyquist a partial is left out, not folded back
       const heard:f32=if(f<0.45*rate)1 else 0;
       p.level[k]=harmonicLevel[k]*m.pow(f32,vel,dull*m.f(k))*heard;

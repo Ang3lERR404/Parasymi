@@ -34,6 +34,9 @@ pub fn dbToGain(db:f32)f32{return m.pow(f32,10,db/dbPerDecade);}
 pub fn gainToDb(g:f32)f32{return dbPerDecade*@log10(g);}
 /// a MIDI note number (fractional for bends) to Hz
 pub fn noteToHz(note:f32)f32{return a4Hz*m.pow(f32,2,(note-a4Note)/notesPerOctave);}
+/// what a level keeps each sample to fade to 1/e over `seconds` at `rate`:
+/// `level*=fall(ring,rate)` every sample rings for about `ring` seconds
+pub fn fall(seconds:f32,rate:f32)f32{return@exp(-1/(seconds*rate));}
 /// a smooth saturator close to tanh: linear near 0, ±1 past ±3, so a loud
 /// mix bends instead of clipping hard
 pub fn softClip(x:f32)f32{
@@ -546,9 +549,86 @@ pub const Voice=struct{
     for(out)|*s|s.*+=v.filter.tick(v.osc.next())*v.env.next()*v.gain.next();
   }
 };
+// ---- a pool of voices ----
+/// up to `n` voices of `t` sounding at once; null slots are free. A `t`
+/// that `render`s has `render(*t,[]f32)bool`, false once it has ended
+pub fn Pool(comptime t:type,comptime n:usize)type{
+  return struct{
+    /// this pool's own type
+    const Self=@This();
+    /// the voices, each sounding or free (null)
+    slots:[n]?t=@splat(null),
+    /// the slot taken next in turn round the pool (the oldest started)
+    turn:usize=0,
+    /// the first free slot, if any
+    pub fn free(p:*const Self)?usize{
+      for(p.slots,0..)|v,i|if(v==null)return i;
+      return null;
+    }
+    /// the slot next in turn round the pool, moving the turn on
+    pub fn next(p:*Self)usize{
+      defer p.turn=(p.turn+1)%n;
+      return p.turn;
+    }
+    /// `v` sounds on the first free slot, or else on the next in turn
+    pub fn add(p:*Self,v:t)void{p.slots[p.free() orelse p.next()]=v;}
+    /// `v` sounds on the next slot in turn, free or not: the newest always
+    /// takes the oldest's place
+    pub fn cycle(p:*Self,v:t)void{p.slots[p.next()]=v;}
+    /// `v` sounds on the first free slot; with none free it is dropped
+    pub fn addFree(p:*Self,v:t)void{
+      if(p.free())|i|p.slots[i]=v;
+    }
+    /// every voice silenced
+    pub fn clear(p:*Self)void{p.slots=@splat(null);}
+    /// every sounding voice mixed into `out`, those that have ended freed
+    pub fn render(p:*Self,out:[]f32)void{
+      for(&p.slots)|*s|if(s.*)|*v|{
+        if(!v.render(out))s.*=null;
+      };
+    }
+  };
+}
 // ---- tests ----
 /// the sample rate the tests run at (Hz)
 const testRate:f32=48000;
+test"a pool fills free slots, then the oldest; voices that end are freed"{
+  // a voice that sounds for `left` blocks, adding its `id` to each sample
+  const Beep=struct{
+    /// what it adds to each sample, to tell voices apart
+    id:f32,
+    /// blocks until it ends
+    left:u32,
+    /// adds its id to each sample; false once its blocks are spent
+    fn render(b:*@This(),out:[]f32)bool{
+      for(out)|*s|s.*+=b.id;
+      b.left-=1;
+      return b.left>0;
+    }
+  };
+  var p:Pool(Beep,2)=.{};
+  p.add(.{.id=1,.left=1});
+  p.add(.{.id=2,.left=3});
+  // full: the next in turn, the oldest, is taken
+  p.add(.{.id=4,.left=3});
+  try testing.expectEqual(@as(f32,4),p.slots[0].?.id);
+  var out=[_]f32{0};
+  p.render(&out);
+  try testing.expectEqual(@as(f32,6),out[0]);
+  // one free slot again after the second's turn ends: addFree takes it
+  p.slots[1]=null;
+  p.addFree(.{.id=8,.left=1});
+  try testing.expectEqual(@as(f32,8),p.slots[1].?.id);
+  p.addFree(.{.id=16,.left=1});
+  try testing.expectEqual(@as(f32,4),p.slots[0].?.id);
+  // cycle takes the next in turn even with a slot free
+  p.clear();
+  p.cycle(.{.id=1,.left=1});
+  try testing.expect(p.slots[0]==null and p.slots[1]!=null);
+}
+test"a fall fades to 1/e over its seconds"{
+  try testing.expectApproxEqAbs(@exp(@as(f32,-1)),m.pow(f32,fall(0.5,100),50),1e-4);
+}
 test"conversions"{
   try testing.expectApproxEqAbs(@as(f32,0.501),dbToGain(-6),0.001);
   try testing.expectApproxEqAbs(@as(f32,-6),gainToDb(dbToGain(-6)),0.001);

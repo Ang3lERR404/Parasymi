@@ -174,7 +174,7 @@ pub const Settle=struct{
       .base=w.r.range(kind.hz[0],kind.hz[1])*w.low,
       .start=if(i<n)m.floorTo(u32,w.r.range(kind.at[0],kind.at[1])*m.f(w.len))else m.maxInt(u32),
       .attack=m.floorTo(u32,gloopAttack*w.rate)+1,
-      .fall=@exp(-1/(w.r.range(kind.fall[0],kind.fall[1])*w.rate)),
+      .fall=dsp.fall(w.r.range(kind.fall[0],kind.fall[1]),w.rate),
       .level=kind.level,
     };
   }

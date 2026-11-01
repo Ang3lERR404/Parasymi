@@ -116,15 +116,105 @@ pub const Spore=struct{
 /// it sent the last
 pub const State=struct{
   /// each spore in the air, or null for a free place
-  spores:[airMost]?Spore=@splat(null),
+  spores:Air=@splat(null),
   /// seconds since it sent its last spore
   t:f32=0,
 };
-/// the sporecaster on tile `at`, if one stands there.
-fn casterAt(ss:*st.Structures,w:*const World,at:m.Vice(i32,2))?st.Id{
+/// what a sporecaster or a driftbraid keeps aloft: each place a spore in
+/// flight, or null for a free one
+pub const Air=[airMost]?Spore;
+/// the structure of `kind` on tile `at`, if one stands there
+fn seekerAt(ss:*st.Structures,w:*const World,at:m.Vice(i32,2),kind:st.Kind)?st.Id{
   // whatever structure stands there
   const j=ss.at(w,at[0],at[1]) orelse return null;
-  return if(ss.get(j).kind()==.sporecaster)j else null;
+  return if(ss.get(j).kind()==kind)j else null;
+}
+/// drifts each of `self`'s spores in `air` on: home (back into it), or
+/// toward the `kind` it seeks, landing what fits there and turning home once
+/// that one is gone. Returns whether any spore is in the air
+pub fn drift(ctx:st.Ctx,self:*st.Structure,air:*Air,kind:st.Kind,dt:f32)bool{
+  // whether any spore is in the air
+  var busy=false;
+  for(air)|*slot|{
+    // the spore in this place
+    const sp=&(slot.* orelse continue);
+    busy=true;
+    // how far its crossing is, tiles (at least one)
+    const far=@max(m.len(m.v3(m.f(sp.to[0]-self.x),0,m.f(sp.to[1]-self.y))),1);
+    if(sp.home){
+      sp.t-=dt*speed/far;
+      if(sp.t>0)continue;
+      _=self.inv.add(sp.item,sp.n);
+      slot.*=null;
+      continue;
+    }
+    if(sp.t<1){
+      sp.t=@min(1,sp.t+dt*speed/far);
+      continue;
+    }
+    // over the one it seeks: in, if it is still there and has room
+    const j=seekerAt(ctx.ss,ctx.w,sp.to,kind)orelse{
+      sp.home=true;
+      continue;
+    };
+    // how many the one below took in
+    const took=switch(ctx.ss.send(ctx,j,.{.arrived=.{.item=sp.item,.n=sp.n}})){
+      .took=>|k|k,
+      .ignored,.done=>0,
+    };
+    sp.n-=@intCast(took);
+    if(sp.n==0)slot.*=null;
+  }
+  return busy;
+}
+/// `n` of `item` taken out of `self` and sent off on the first free place in
+/// `air` toward tile `to`; false, with nothing taken, while every one is aloft
+pub fn launchSpore(self:*st.Structure,air:*Air,w:*const World,item:items.Item,n:u8,to:m.Vice(i32,2))bool{
+  for(air)|*slot|{
+    if(slot.*!=null)continue;
+    _=self.inv.take(item,n);
+    slot.*=.{.item=item,.n=n,.to=to,.toH=groundAt(w,to)};
+    return true;
+  }
+  return false;
+}
+/// every spore in `air` back home at once, what it carries in `s`'s slots
+pub fn bringHome(s:*st.Structure,air:*Air)void{
+  for(air)|*slot|if(slot.*)|sp|{
+    _=s.inv.add(sp.item,sp.n);
+    slot.*=null;
+  };
+}
+/// how many spores are in the air
+pub fn aloft(air:*const Air)u32{
+  // the count so far
+  var n:u32=0;
+  for(air)|sp|{if(sp!=null)n+=1;}
+  return n;
+}
+/// the spores in `air` drifting from `pore` (in the world) to the pore each
+/// seeks, `poreAt` over that one's tile (or home), each its tip leading and
+/// a bead of what it carries inside; one waiting over a full one hangs there,
+/// bobbing
+pub fn emitSpores(s:*const st.Structure,out:*Parts,air:*const Air,pore:V3,poreAt:V3,tf:f32)Allocator.Error!void{
+  for(air,0..)|slot,k|{
+    // the spore in this place
+    const sp=slot orelse continue;
+    // the pore it seeks, and its own phase
+    const dest=m.footprintCentre(sp.to[0],sp.to[1],1,sp.toH)+poreAt;
+    const ph=s.seed+m.f(k)*0.37;
+    // where it is now, and a little further along its way
+    const at=flight(pore,dest,sp.t,ph,tf);
+    const ahead=flight(pore,dest,if(sp.home)sp.t-0.02 else sp.t+0.02,ph,tf);
+    // how far it hangs below its way while it waits
+    const hang=if(!sp.home and sp.t>=1)v3(0,hangDepth+0.05*@sin(tf*2+m.f(k)),0)else v3(0,0,0);
+    // the way its tip leads, and the colour of what it carries
+    const dir=if(m.dist(ahead,at)>m.eps)m.norm(ahead-at)else v3(0,1,0);
+    const col=color.Rgba8.of(sp.item.info().col).toF4();
+    try out.emit(.sporeCarrier,m.chain(&.{m.translate(at+hang),m.alignY(dir),m.scale3(m.splat3(sporeSize))}),.{
+      .glow=sporeGlow,.phase=ph,.fade=sporeFade,.tint=.{col[0],col[1],col[2],0},.flutter=0.5,
+    });
+  }
 }
 /// the ground's height at tile `at`: from its chunk if loaded, else as the
 /// world would generate it
@@ -151,66 +241,26 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // a caster that sends hands nothing to its neighbours: it sends it all
   if(self.partner()==null)_=st.handOff(ctx,i);
   // whether any spore is in the air
-  var busy=false;
-  for(&sc.spores)|*slot|{
-    // the spore in this place
-    const sp=&(slot.* orelse continue);
-    busy=true;
-    // how far its crossing is, tiles (at least one)
-    const far=@max(m.len(m.v3(m.f(sp.to[0]-self.x),0,m.f(sp.to[1]-self.y))),1);
-    if(sp.home){
-      sp.t-=dt*speed/far;
-      if(sp.t>0)continue;
-      _=self.inv.add(sp.item,sp.n);
-      slot.*=null;
-      continue;
-    }
-    if(sp.t<1){
-      sp.t=@min(1,sp.t+dt*speed/far);
-      continue;
-    }
-    // over the caster it seeks: in, if it is still there and has room
-    const j=casterAt(ctx.ss,ctx.w,sp.to)orelse{
-      sp.home=true;
-      continue;
-    };
-    // how many the caster below took in
-    const took=switch(ctx.ss.send(ctx,j,.{.arrived=.{.item=sp.item,.n=sp.n}})){
-      .took=>|k|k,
-      .ignored,.done=>0,
-    };
-    sp.n-=@intCast(took);
-    if(sp.n==0)slot.*=null;
-  }
+  const busy=drift(ctx,self,&sc.spores,.sporecaster,dt);
   if(ctx.ss.getPartner(i)==null)return busy;
   // the tile of the caster it sends to
   const to=self.partner().?.tile();
   if(self.inv.total()==0)return busy;
   sc.t+=dt;
   if(sc.t<launch)return true;
-  for(&sc.spores)|*slot|{
-    if(slot.*!=null)continue;
-    // the kind it holds most of, a load of it
-    var best:?items.Stack=null;
-    for(self.inv.slot)|s|if(s)|it|if(best==null or it.n>best.?.n){
-      best=it;
-    };
-    // that stack, and how many of it this spore carries
-    const it=best orelse break;
-    const n:u8=@intCast(@min(it.n,load));
-    _=self.inv.take(it.item,n);
-    slot.*=.{.item=it.item,.n=n,.to=to,.toH=groundAt(ctx.w,to)};
-    sc.t=0;
-    break;
-  }
+  // the kind it holds most of, a load of it
+  var best:?items.Stack=null;
+  for(self.inv.slot)|s|if(s)|it|if(best==null or it.n>best.?.n){
+    best=it;
+  };
+  // that stack, and how many of it this spore carries
+  const it=best orelse return true;
+  if(launchSpore(self,&sc.spores,ctx.w,it.item,@intCast(@min(it.n,load)),to))sc.t=0;
   return true;
 }
 /// uprooted: what its spores carry comes back into its slots with them.
 pub fn release(s:*st.Structure)?items.Item{
-  for(&s.state.sporecaster.spores)|*slot|if(slot.*)|sp|{
-    _=s.inv.add(sp.item,sp.n);
-    slot.*=null;
-  };
+  bringHome(s,&s.state.sporecaster.spores);
   return null;
 }
 /// anything, while it has room (up to `holdMost` in all).
@@ -231,22 +281,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const sc=&s.state.sporecaster;
   const base=s.place(ctr);
   const pore=m.mulPoint(base,mesh.poreAt);
-  for(sc.spores,0..)|slot,k|{
-    // the spore in this place
-    const sp=slot orelse continue;
-    // the pore it seeks, where it is now, and a little further along its way
-    const dest=m.footprintCentre(sp.to[0],sp.to[1],1,sp.toH)+mesh.poreAt;
-    const at=flight(pore,dest,sp.t,s.seed+m.f(k)*0.37,tf);
-    const ahead=flight(pore,dest,if(sp.home)sp.t-0.02 else sp.t+0.02,s.seed+m.f(k)*0.37,tf);
-    // a spore waiting over a full caster hangs there, bobbing
-    const hang=if(!sp.home and sp.t>=1)v3(0,hangDepth+0.05*@sin(tf*2+m.f(k)),0)else v3(0,0,0);
-    // the way its tip leads, and the colour of what it carries
-    const dir=if(m.dist(ahead,at)>m.eps)m.norm(ahead-at)else v3(0,1,0);
-    const col=color.Rgba8.of(sp.item.info().col).toF4();
-    try out.emit(.sporeCarrier,m.chain(&.{m.translate(at+hang),m.alignY(dir),m.scale3(m.splat3(sporeSize))}),.{
-      .glow=sporeGlow,.phase=s.seed+m.f(k)*0.37,.fade=sporeFade,.tint=.{col[0],col[1],col[2],0},.flutter=0.5,
-    });
-  }
+  try emitSpores(s,out,&sc.spores,pore,mesh.poreAt,tf);
   if(s.grown<1)return;
   // how many stacks it holds, and which of them is being drawn
   const n=s.inv.used();
@@ -289,8 +324,7 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   // its remembered state
   const sc=&s.state.sporecaster;
   // how many spores are in the air
-  var air:u32=0;
-  for(sc.spores)|sp|{if(sp!=null)air+=1;}
+  const air=aloft(&sc.spores);
   if(s.partner())|p|{
     // the tile it sends to
     const to=p.tile();

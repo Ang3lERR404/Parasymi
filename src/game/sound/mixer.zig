@@ -76,10 +76,8 @@ pub const Sounds=struct{
   rate:f32,
   /// the random numbers every new sound draws from
   r:rng.Rng,
-  /// the footsteps' voices; null is free
-  steps:[voiceCount]?Step=@splat(null),
-  /// the voice taken when none is free (round the pool: the oldest)
-  steal:usize=0,
+  /// the footsteps' voices: a free one, else the oldest
+  steps:dsp.Pool(Step,voiceCount)=.{},
   /// whether the view is in the wolf's eyes
   eyes:bool=false,
   /// how much of the settling is heard (1 in the eyes)
@@ -94,10 +92,8 @@ pub const Sounds=struct{
   weight:f32=0,
   /// the wind, always breathing
   wind:Wind,
-  /// a new twinkle takes the oldest's place when both are sounding
-  twinkles:[twinkles]?Twinkle=@splat(null),
-  /// the twinkle slot the next one takes
-  nextTwinkle:usize=0,
+  /// the twinkles: a new one takes the oldest's place
+  twinkles:dsp.Pool(Twinkle,twinkles)=.{},
   /// the daytime piano, always running (silent by night)
   music:Music,
   /// the night's music, always running (silent by day)
@@ -107,9 +103,7 @@ pub const Sounds=struct{
   /// the arsthraxia's working voice, while it works or fades away
   research:?Research=null,
   /// the blooms ringing out: a unit may be done before the last has rung away
-  blooms:[2]?Bloom=@splat(null),
-  /// the bloom slot the next one takes
-  nextBloom:usize=0,
+  blooms:dsp.Pool(Bloom,2)=.{},
   /// how far along the arsthraxia's work is (0..1)
   resProgress:f32=0,
   /// how well the arsthraxia is fed (0..1)
@@ -132,7 +126,7 @@ pub const Sounds=struct{
   pub fn apply(s:*Sounds,cmd:Cmd)void{
     switch(cmd){
       .step=>|f|{
-        s.steps[s.free()]=.init(f,&s.r,s.rate);
+        s.steps.add(.init(f,&s.r,s.rate));
         s.sinceStep=0;
         s.weight=f.weight;
       },
@@ -142,8 +136,7 @@ pub const Sounds=struct{
         s.fade.target=if(e)1 else 0;
       },
       .twinkle=>|t|{
-        s.twinkles[s.nextTwinkle]=.init(m.clamp01(t.near),&s.r,s.rate);
-        s.nextTwinkle=(s.nextTwinkle+1)%twinkles;
+        s.twinkles.cycle(.init(m.clamp01(t.near),&s.r,s.rate));
       },
       .daylight=>|d|{
         s.music.daylight(d);
@@ -152,10 +145,7 @@ pub const Sounds=struct{
       .arsthraxia=>|a|{
         s.resProgress=a.progress;
         s.resFed=a.fed;
-        if(a.complete and !s.resDone){
-          s.blooms[s.nextBloom]=.init(&s.r,s.rate);
-          s.nextBloom=(s.nextBloom+1)%s.blooms.len;
-        }
+        if(a.complete and !s.resDone)s.blooms.cycle(.init(&s.r,s.rate));
         s.resDone=a.complete;
         if(a.progress>0 and a.progress<1){
           if(s.research)|*rs|rs.go()else s.research=.init(&s.r,s.rate);
@@ -168,19 +158,13 @@ pub const Sounds=struct{
   /// the next `out.len` samples: every sounding voice mixed in, those
   /// that have ended freed, and the whole softly clipped
   pub fn render(s:*Sounds,out:[]f32)void{
-    for(&s.steps)|*v|if(v.*)|*st|{
-      if(!st.render(out))v.*=null;
-    };
-    for(&s.twinkles)|*v|if(v.*)|*t|{
-      if(!t.render(out))v.*=null;
-    };
+    s.steps.render(out);
+    s.twinkles.render(out);
     s.sap(out);
     if(s.research)|*rs|{
       if(!rs.render(out,s.resProgress,s.resFed))s.research=null;
     }
-    for(&s.blooms)|*v|if(v.*)|*bl|{
-      if(!bl.render(out))v.*=null;
-    };
+    s.blooms.render(out);
     s.wind.render(out);
     s.musics(out);
     for(out)|*x|x.*=dsp.softClip(x.*);
@@ -219,12 +203,5 @@ pub const Sounds=struct{
       for(out[off..][0..k],buf[0..k])|*o,x|o.*+=x+hallWet*s.hall.tick(x);
       off+=k;
     }
-  }
-  /// a footstep voice to play on: the first free one, or else the next in
-  /// turn round the pool (the oldest)
-  pub fn free(s:*Sounds)usize{
-    for(s.steps,0..)|v,i|if(v==null)return i;
-    defer s.steal=(s.steal+1)%voiceCount;
-    return s.steal;
   }
 };

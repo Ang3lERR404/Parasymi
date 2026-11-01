@@ -24,8 +24,6 @@ const testing=std.testing;
 const m=lib.engine.core.math;
 /// colour conversions, for tinting a spore by what it carries
 const color=lib.engine.core.color;
-/// the chunks: tile layout and ground kinds
-const ck=lib.ck;
 /// the garden's world of chunks
 const World=lib.world.World;
 /// what can be held: item kinds and stacks of them
@@ -72,18 +70,6 @@ pub const holdMost=40;
 const load=caster.load;
 /// seconds between one spore and the next
 const launch=caster.launch;
-/// how many of its spores may be in the air at once
-const airMost=caster.airMost;
-/// tiles a second a spore drifts
-const speed=caster.speed;
-/// how see-through a spore is
-const sporeFade:f32=0.35;
-/// how brightly a spore glows
-const sporeGlow:f32=0.6;
-/// a spore's size, of its mesh
-const sporeSize:f32=1.7;
-/// a spore waiting over a full driftbraid hangs this high over its pore
-const hangDepth:f32=0.35;
 /// what it holds hangs in its sac, in a ring: how far out, as a share of
 /// the sac's radius
 const ringRadius:f32=0.45;
@@ -101,18 +87,12 @@ const glow:f32=0.2;
 /// how much of what it holds came by spore
 pub const State=struct{
   /// its spores in the air, each slot empty or one in flight
-  spores:[airMost]?caster.Spore=@splat(null),
+  spores:caster.Air=@splat(null),
   /// seconds since its last spore left
   t:f32=0,
   /// how many of each kind it holds came by spore
   kept:EnumArray(items.Item,u16)=.initFill(0),
 };
-/// the driftbraid standing at tile `at`, or null if none does
-fn braidAt(ss:*st.Structures,w:*const World,at:m.Vice(i32,2))?st.Id{
-  // what stands there
-  const j=ss.at(w,at[0],at[1]) orelse return null;
-  return if(ss.get(j).kind()==.driftbraid)j else null;
-}
 /// pair it (`pairStep`): the first configured waits, the next trades with
 /// it, both ways (each leaving whatever it traded with before). Configured
 /// twice over, it stops trading.
@@ -158,38 +138,8 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // whether anything is aloft
   const self=ctx.ss.get(i);
   const db=&self.state.driftbraid;
-  var busy=false;
-  for(&db.spores)|*slot|{
-    // the spore in this slot (an empty one is passed over)
-    const sp=&(slot.* orelse continue);
-    busy=true;
-    // how far its flight is, in tiles (at least one)
-    const far=@max(m.len(m.v3(m.f(sp.to[0]-self.x),0,m.f(sp.to[1]-self.y))),1);
-    if(sp.home){
-      sp.t-=dt*speed/far;
-      if(sp.t>0)continue;
-      // back home it is what it was fed again
-      _=self.inv.add(sp.item,sp.n);
-      slot.*=null;
-      continue;
-    }
-    if(sp.t<1){
-      sp.t=@min(1,sp.t+dt*speed/far);
-      continue;
-    }
-    // the driftbraid it flies to; gone, it turns home
-    const j=braidAt(ctx.ss,ctx.w,sp.to)orelse{
-      sp.home=true;
-      continue;
-    };
-    // how many it took of what the spore carries
-    const took=switch(ctx.ss.send(ctx,j,.{.arrived=.{.item=sp.item,.n=sp.n}})){
-      .took=>|k|k,
-      .ignored,.done=>0,
-    };
-    sp.n-=@intCast(took);
-    if(sp.n==0)slot.*=null;
-  }
+  // back home a spore's load is what it was fed again
+  var busy=caster.drift(ctx,self,&db.spores,.driftbraid,dt);
   if(ctx.ss.getPartner(i)==null)return busy;
   // the tile of the one it trades with
   const to=self.partner().?.tile();
@@ -210,25 +160,17 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
     };
     // the kind sent (nothing fed: nothing to send)
     const item=best orelse break:sc;
-    for(&db.spores)|*slot|{
-      if(slot.*!=null)continue;
-      // how many go in this spore: a load, or all it has
-      const n:u8=@intCast(@min(most,load));
-      _=self.inv.take(item,n);
-      slot.*=.{.item=item,.n=n,.to=to,.toH=caster.groundAt(ctx.w,to)};
+    // a load in one spore, or all it has
+    if(caster.launchSpore(self,&db.spores,ctx.w,item,@intCast(@min(most,load)),to)){
       db.t=0;
       busy=true;
-      break;
     }
   }
   return busy;
 }
 /// uprooted: what its spores carry comes back into its slots with them.
 pub fn release(s:*st.Structure)?items.Item{
-  for(&s.state.driftbraid.spores)|*slot|if(slot.*)|sp|{
-    _=s.inv.add(sp.item,sp.n);
-    slot.*=null;
-  };
+  caster.bringHome(s,&s.state.driftbraid.spores);
   return null;
 }
 /// anything, while it has room.
@@ -259,24 +201,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const db=&s.state.driftbraid;
   const base=s.place(ctr);
   const pore=m.mulPoint(base,mesh.poreAt);
-  for(db.spores,0..)|slot,k|{
-    // the spore in this slot (an empty one is passed over)
-    const sp=slot orelse continue;
-    // where it flies to (the other's pore), and its own phase
-    const dest=m.footprintCentre(sp.to[0],sp.to[1],1,sp.toH)+mesh.poreAt;
-    const ph=s.seed+m.f(k)*0.37;
-    // where it is on its flight, and a little further along
-    const at=caster.flight(pore,dest,sp.t,ph,tf);
-    const ahead=caster.flight(pore,dest,if(sp.home)sp.t-0.02 else sp.t+0.02,ph,tf);
-    // a spore waiting over a full driftbraid hangs there, bobbing
-    const hang=if(!sp.home and sp.t>=1)v3(0,hangDepth+0.05*@sin(tf*2+m.f(k)),0)else v3(0,0,0);
-    // the way its tip leads, and the colour of what it carries
-    const dir=if(m.dist(ahead,at)>m.eps)m.norm(ahead-at)else v3(0,1,0);
-    const col=color.Rgba8.of(sp.item.info().col).toF4();
-    try out.emit(.sporeCarrier,m.chain(&.{m.translate(at+hang),m.alignY(dir),m.scale3(m.splat3(sporeSize))}),.{
-      .glow=sporeGlow,.phase=ph,.fade=sporeFade,.tint=.{col[0],col[1],col[2],0},.flutter=0.5,
-    });
-  }
+  try caster.emitSpores(s,out,&db.spores,pore,mesh.poreAt,tf);
   if(s.grown<1)return;
   // how many stacks it holds, and which of them is being drawn
   const n=s.inv.used();
@@ -300,8 +225,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
   // its state, and how many spores it has aloft
   const db=&s.state.driftbraid;
-  var air:u32=0;
-  for(db.spores)|sp|{if(sp!=null)air+=1;}
+  const air=caster.aloft(&db.spores);
   // how many of what it holds came by spore
   var got:u32=0;
   for(db.kept.values)|n|got+=n;

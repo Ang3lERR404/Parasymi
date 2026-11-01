@@ -152,7 +152,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
     const o=offset(k);
     const len=@sqrt(m.f(m.sumOf(i32,2,o*o)));
     const there=plantAt(ctx,self.x,self.y,k)!=null;
-    r.*=if(there)@min(1,r.*+dt*rootGrow/@max(len,1))else@max(0,r.*-dt*rootWither);
+    r.*=st.reaching(r.*,there,dt*rootGrow/@max(len,1),dt*rootWither);
     if(r.*>=1)roots+=1;
   }
   if(c.from)|_|{

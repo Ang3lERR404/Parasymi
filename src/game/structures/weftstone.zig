@@ -209,8 +209,8 @@ fn latch(w:*World,self:*st.Structure,dt:f32)void{
     if(node)|nd|{
       n+=1;
       gnd.*=nd.c.height[nd.t];
-      r.*=@min(1,r.*+dt*reachDistance);
-    }else r.*=@max(0,r.*-dt*wither);
+    }
+    r.*=st.reaching(r.*,node!=null,dt*reachDistance,dt*wither);
   }
 }
 /// latches its tendrils, draws a unit up the next latched one in turn

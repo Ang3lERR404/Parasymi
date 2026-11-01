@@ -111,7 +111,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   for(m.dirs)|d|{
     // this side's nerve reach
     const r=&gs.reach[d];
-    r.*=if(feeds(ctx,self,d)!=null)@min(1,r.*+dt*nerveGrow)else@max(0,r.*-dt*nerveWither);
+    r.*=st.reaching(r.*,feeds(ctx,self,d)!=null,dt*nerveGrow,dt*nerveWither);
     if(gs.pulse[d])|*p|{
       p.*+=dt*pulseRate;
       if(p.*>=1)gs.pulse[d]=null;

@@ -133,6 +133,15 @@ Use these, never the same thing written out by hand:
 When a new pattern repeats, add a helper here (with a test) rather than
 writing it out again.
 
+The same holds outside the maths:
+
+| Instead of | Write |
+|---|---|
+| `[n]?Voice` with a free-slot search, a turn counter and a render-and-drop loop | `dsp.Pool(Voice,n)`: `add` (free, else the oldest), `cycle` (always the next in turn), `addFree`, `render`, `clear` |
+| `@exp(-1/(seconds*rate))` | `dsp.fall(seconds,rate)` |
+| `r=if(there)@min(1,r+grow)else@max(0,r-wither)` | `r=st.reaching(r,there,grow,wither)` |
+| a spore flight, launch, homecoming, count or drawing of its own | the sporecaster's `drift`, `launchSpore`, `bringHome`, `aloft`, `emitSpores` over a `caster.Air` |
+
 Colours go through engine `core/color.zig`.
 
 Inverting a matrix: use `m.inverseRigid` or `m.inverseAffine`; `m.inverse`

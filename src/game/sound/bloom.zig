@@ -111,7 +111,7 @@ pub const Bloom=struct{
       var fall:[bellPartials.len]f32=undefined;
       for(bellPartials,bellFall,0..)|p,fs,k|{
         osc[k]=.init(hz*p,rate);
-        fall[k]=@exp(-1/(fs*short*r.range(0.85,1.15)*rate));
+        fall[k]=dsp.fall(fs*short*r.range(0.85,1.15),rate);
       }
       b.*=.{.osc=osc,.fall=fall,.start=m.floorTo(u32,m.f(i)*bellStagger*rate),.level=lv};
     }
@@ -120,7 +120,7 @@ pub const Bloom=struct{
       .bells=bs,
       .bellSoft=.init(bellSoftHz,rate),
       .root=.init(dsp.noteToHz(rootNote),rate),
-      .rootKeep=@exp(-1/(rootFall*rate)),
+      .rootKeep=dsp.fall(rootFall,rate),
       .noise=.init(r.next()),
       .breath=.init(.band,breathSweep[0],breathQ,rate),
       .gain=vary(r,bloom),
