@@ -304,6 +304,8 @@ const parts=struct{
   pub const driftbraidStrangler=@import("meshes/convergence_looks.zig").strangler;
   /// a look for the kit: one soft see-through body, veins of both inside, tentacles hanging
   pub const driftbraidTissue=@import("meshes/convergence_looks.zig").tissueLook;
+  /// a look for the kit: the two above blended, grafted stems fusing into one soft body
+  pub const driftbraidBlend=@import("meshes/convergence_looks.zig").blend;
   // the halo: its polyp and the diamond it forms
   /// the polyp: woven of both lineages, its stem caging a sac of both saps, fronds and plumed tentacles crowning it
   pub const polyp=@import("meshes/polyp_convergent.zig").woven;
