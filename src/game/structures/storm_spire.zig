@@ -60,7 +60,7 @@ const fadeRate:f32=0.002;
 const stormTime:f32=120;
 /// how much cloud it feeds over itself a second through a storm, and how far
 /// round (the moisture field's cloud: past `MOISTURE_RAIN_AT`, 1.4, it rains)
-const stormCloud:f32=0.06;
+const stormCloud:f32=1.5;
 /// (how far round, units)
 const stormReach:f32=3;
 /// how long the strike's bolts show (s)
@@ -142,7 +142,8 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   ss.wet=rain>=rainNeeded;
   ss.struck+=dt;
   ss.storm=@max(ss.storm-dt,0);
-  const charge,const strikes=charged(ss.charge,rain,self.inv.count(.leyCrystal)>0,dt);
+  // (never in its own storm: it strikes once a storm)
+  const charge,const strikes=charged(ss.charge,rain,self.inv.count(.leyCrystal)>0 and ss.storm<=0,dt);
   ss.charge=charge;
   if(strikes){
     _=self.inv.take(.leyCrystal,1);

@@ -324,8 +324,10 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
    air its own way, `stormLantern`, `stormThread`), beat brighter and
    faster. Full, it strikes: a bolt up the
    spire and every thread into the cloud, the lanterns flashing, the
-   crystal spent. The storm lasts two minutes: it feeds the cloud over it
-   (0.06 a second, 3 units round), so the rain stays heavy, and bolts
+   crystal spent; it never charges in its own storm. The storm lasts two
+   minutes: it feeds the cloud over it
+   (1.5 a second over 3 units round: past the rain line in about ten
+   seconds), so the rain stays heavy, and bolts
    strike the ground within 7 units of it, 18 a minute, each flash
    lighting the fog. The first storm is a discovery (`firstStorm`); the
    weather is fully formed. In the demo one stands between the lilies,
