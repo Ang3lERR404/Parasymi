@@ -20,12 +20,15 @@ pub fn Vec(comptime t:type,comptime s:usize)type{return @Vector(s,t);}
 /// a plain row of `s` boxes of `t`: an exact layout (GPU, saves), a table
 /// of numbers, or lanes picked by an index only known at runtime
 pub fn Vice(comptime t:type,comptime s:usize)type{return [s]t;}
+/// a matrix as `a` columns, each a `Vec` of `s` lanes of `t` (column-major,
+/// as the GPU reads it)
+pub fn Mat(comptime t:type,comptime s:usize,comptime a:usize)type{return [a]Vec(t,s);}
 /// a point or direction in space: x east, y up, z south, in tiles
 pub const V3=Vec(f32,3);
 /// four lanes: a point with its w, a colour with alpha, a matrix column
 pub const V4=Vec(f32,4);
 /// a 4x4 matrix as four columns (column-major, as the GPU reads it)
-pub const M4=[4]V4;
+pub const M4=Mat(f32,4,4);
 // ---- constants ----
 /// below this, a vector is treated as zero (for normalisation).
 pub const eps:f32=1e-8;
