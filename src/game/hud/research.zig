@@ -87,6 +87,13 @@ const leafAngle=m.rad(56);
 const bendAmount:f32=0.4;
 /// a branch is at least this long, so even a bare one reaches out
 const branchMin:f32=2.5;
+/// a branch whose tip would crowd a node already grown grows this much
+/// longer (slots), up to `crowdTries` times, until it is this far clear
+const crowdStep:f32=0.5;
+/// (how many times)
+const crowdTries=6;
+/// (how far clear, slots)
+const crowdDist:f32=0.6;
 /// a leaf's stalk length (slots)
 const petiole:f32=0.16;
 /// a fully open leaf's length (slots)
@@ -267,17 +274,51 @@ const Layout=struct{
 };
 /// the whole tree at time `t`; `amp` scales the wind (0: still).
 fn layout(t:f32,amp:f32)Layout{
-  // the layout being filled
+  // the layout being filled, and the same tree still (where a branch's
+  // length is found, so it never changes as the tree sways)
   var l:Layout=undefined;
+  var still:Layout=undefined;
   l.stems[0]=.build(m.splat3(0),upAngle,stemLen(0),bendAmount,amp*sway(0,t)*trunkSway);
+  still.stems[0]=.build(m.splat3(0),upAngle,stemLen(0),bendAmount,0);
   place(&l,null,t,amp);
+  place(&still,null,0,0);
+  // which nodes are placed so far, and which branches grown
+  var placed:[nodeCount]bool=@splat(false);
+  var grown:[nodeCount]bool=@splat(false);
+  for(0..nodeCount)|j|placed[j]=plan.host[j]==null;
   for(plan.order[0..plan.branches])|b|{
-    // the branch's index
+    // the branch's index, and its length: a slot past its children, longer
+    // while its tip would crowd a node already grown
     const i:usize=@intFromEnum(b);
-    l.stems[1+i]=.build(l.base[i],l.ang[i],stemLen(1+i),bendAmount,amp*sway(1+i,t));
+    var len=stemLen(1+i);
+    for(0..crowdTries)|_|{
+      still.stems[1+i]=.build(still.base[i],still.ang[i],len,bendAmount,0);
+      if(!crowds(&still,i,&placed,&grown))break;
+      len+=crowdStep;
+    }
+    l.stems[1+i]=.build(l.base[i],l.ang[i],len,bendAmount,amp*sway(1+i,t));
     place(&l,b,t,amp);
+    place(&still,b,0,0);
+    grown[i]=true;
+    for(0..nodeCount)|j|if(plan.host[j]==b){placed[j]=true;};
   }
   return l;
+}
+/// where node `j` stands in still layout `still`: a grown branch's tip, a
+/// leaf's middle
+fn middleOf(still:*const Layout,j:usize)V3{
+  return if(isBranch(j))still.stems[1+j].point(still.stems[1+j].len)else still.base[j]+heading(still.ang[j])*m.splat3(petiole+leafLen/2);
+}
+/// whether branch `i`'s tip in still layout `still` crowds a node already
+/// there (`placed`; a branch only once `grown`)
+fn crowds(still:*const Layout,i:usize,placed:*const[nodeCount]bool,grown:*const[nodeCount]bool)bool{
+  // its tip
+  const tip=still.stems[1+i].point(still.stems[1+i].len);
+  for(0..nodeCount)|j|{
+    if(j==i or !placed[j] or (isBranch(j) and !grown[j]))continue;
+    if(m.dist(tip,middleOf(still,j))<crowdDist)return true;
+  }
+  return false;
 }
 /// lays out the nodes growing on host `h` (null: the trunk) along its stem,
 /// each turned off to its side, leaves fluttering with time `t`.

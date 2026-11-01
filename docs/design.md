@@ -283,6 +283,22 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
      the ground, a rosette of leaves and a tuft of moss rooting at each
      node; it never bends from a root (`FORMS_LOW`). In the demo, one
      grows on a patch of bare soil past the lilies.
+   - **Root well** (`structures/root_well.zig`, built): ROOT WELLS (after
+     the unforming, needs `firstRain`; 20 units of 2 convergence essence
+     + 1 ley crystal) lets a germinator or monfris weave its bulb (3
+     convergence essence, 3 grit, a ley crystal). Convergent, 1×1. It
+     stores the rain above the ground: while it rains over it
+     (`Chunk.rain`, read back with the field) it fills, 2 a second in a
+     downpour, up to 60 (the field's water: a unit is a tile soaked
+     through); once the ground under it dries past soaked it pours 0.8 a
+     second round its foot, 2 units across (`Breath.water`, a spring into
+     the field's ground water), until the ground is soaked again or it is
+     empty. So the ground round it stays soaked through the dry spells,
+     for the lilies and creepers. A woven basket of both lineages on a
+     rooted foot, a see-through lining inside its staves, leaves round its
+     braided rim; the water it holds a surface risen as high as it is
+     full (`rootWellWater`, `surface`). Hovering it says how full, and
+     whether it is holding or pouring.
 5. **The storm** (to come): a new plant, a weftstone kin charging ions to
    strike the rain clouds into storms; the weather fully formed.
 
@@ -404,7 +420,10 @@ coordinates, no sizes.
   longest prereq chain; a `needs` discovery counts 1), then by declaration
   order. Leaves and branches each alternate sides.
 - **Stems** are one slot longer than their children (branches ≥
-  `branchMin`) and bend toward the light.
+  `branchMin`) and bend toward the light. A branch whose tip would land
+  on a node already grown grows half a slot longer at a time until it is
+  clear (`crowds`, worked out on the still tree so it never jumps as the
+  sapling sways).
 - **Fitting:** the fully grown, still tree is fitted to the panel (`fit`,
   slot ≤ `maxSlot` px), so nothing moves. The sapling starts small at the
   soil and fills the panel as research is done.

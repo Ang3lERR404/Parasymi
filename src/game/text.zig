@@ -465,6 +465,12 @@ pub const Strings=struct{
     vultRelays:S="",
     /// a nebularbor drinking and breathing: water drunk, into the mist and into its cloud, a minute
     breathes:S="",
+    /// a root well: how full it is (%), and what it is doing
+    rootWell:S="",
+    /// a root well pouring what it holds round its foot
+    pouring:S="",
+    /// a root well holding what it caught (the ground round it soaked)
+    holding:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",
     /// a weftstone ionizing a ley crystal

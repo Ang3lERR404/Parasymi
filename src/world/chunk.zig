@@ -120,6 +120,9 @@ pub const Chunk=struct{
   /// how deep the rain stands pooled over each tile (m), read back with
   /// `wet` (not saved)
   pool:[tileCount]f32=@splat(0),
+  /// how hard it rains over each tile (0..1 of a downpour), read back with
+  /// `wet` (not saved)
+  rain:[tileCount]f32=@splat(0),
   /// whether the garden's grown moss has been laid on it since it was
   /// streamed in (game/moss.zig)
   mossed:bool=false,

@@ -117,7 +117,7 @@ pub fn emit(s:*const Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
 /// how much moisture a structure breathes into the air: within `reach`
 /// (units) of its centre (moved by `off`, world x and z), `low` a second
 /// into the mist on the ground and `high` into the cloud over it
-pub const Breath=struct{reach:f32,low:f32,high:f32,off:m.Vice(f32,2)=.{0,0}};
+pub const Breath=struct{reach:f32,low:f32,high:f32,off:m.Vice(f32,2)=.{0,0},water:f32=0};
 /// what structure `s` breathes into the air, if anything (its `breath` hook)
 pub fn breath(s:*const Structure)?Breath{
   return switch(s.kind()){

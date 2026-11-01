@@ -201,6 +201,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `mire_blooming.zig` — MIRE BLOOMING: once the first rain has fallen, germinators weave mire lily seeds, a breed of both lineages that roots in soaked ground.
 - `moss_creeping.zig` — MOSS CREEPING: once the first rain has fallen, germinators weave moss creeper seeds, a breed of both lineages that turns soaked soil to…
 - `root_communion.zig` — ROOT COMMUNION: symbiotic links reach a second ring of neighbours.
+- `root_wells.zig` — ROOT WELLS: once the first rain has fallen, root wells may be woven: baskets of both lineages that store the rain above the ground and pour…
 - `sap_satellites.zig` — SAP SATELLITES: a minor study along Arsthraxia.
 - `seed_splicing.zig` — SEED SPLICING: germinators weave Vesper seeds, spliced from both lineages.
 - `shared_nerves.zig` — SHARED NERVES: what a gathering crown and a ganglion make between them, grown side by side: Vultrixi, floaters tethered to a monfris that…
@@ -283,6 +284,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `nebularbor.zig` — NEBULARBOR: the mist tree, of both lineages, the first thing to breathe moisture into the garden's air.
 - `polyp.zig` — POLYP: woven of both lineages, it feeds on the light of grown celestial blooms within `feedReach` tiles, and on it grows flowers of both…
 - `root_digger.zig` — ROOT-DIGGER: the first gathering automation.
+- `root_well.zig` — ROOT WELL: a breed the first rain opens, of both lineages: a woven basket on a rooted foot, its rim of leaves catching the rain, that…
 - `sap_cache.zig` — SAP CACHE: plain storage.
 - `sporecaster.zig` — SPORECASTER: a parasite that sends.
 - `strange_seed.zig` — STRANGE SEED: the seed the unforming gathered out of the shattered radiant light and let fall.
@@ -333,6 +335,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `polyp_hydra.zig` — mesh: POLYP.
 - `radiant_kit.zig` — the radiant (celestial) lineage's body, shared by its plants (`plant`, the celestial bloom, the `radiant` form; `star`, the vesper, the…
 - `root_digger.zig` — mesh: ROOT-DIGGER.
+- `root_well.zig` — mesh: the root well, of both lineages (convergence kit).
 - `sap_cache.zig` — mesh: SAP CACHE.
 - `sculpt.zig` — mesh: SCULPT.
 - `shadow.zig` — mesh: SHADOW.

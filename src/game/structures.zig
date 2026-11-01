@@ -199,6 +199,8 @@ pub const kinds=struct{
   pub const driftFlower=@import("structures/drift_flower.zig");
   /// the mist tree, breathing moisture into the air
   pub const nebularbor=@import("structures/nebularbor.zig");
+  /// the root well: a basket storing the rain, pouring it out through dry spells
+  pub const rootWell=@import("structures/root_well.zig");
 };
 /// the registry built from `kinds`: ids, tables, hook dispatch
 pub const reg=registry.Registry(kinds);

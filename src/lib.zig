@@ -162,6 +162,8 @@ pub const polypHydra=@import("gfx/meshes/polyp_hydra.zig");
 pub const rootDigger=@import("gfx/meshes/root_digger.zig");
 /// mesh: the sap cache, a gourd of resin that stores anything
 pub const sapCache=@import("gfx/meshes/sap_cache.zig");
+/// the root well's mesh: where the water it holds lies
+pub const rootWellMesh=@import("gfx/meshes/root_well.zig");
 /// mesh: the sporecaster, a parasite that sends
 pub const sporecaster=@import("gfx/meshes/sporecaster.zig");
 /// the structure kit: the shared grown pieces of structures

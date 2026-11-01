@@ -71,6 +71,7 @@ pub const Weather=struct{
         const f=Volume.texelIn(field,.{m.f(wx)+0.5,m.f(wz)+0.5});
         // (past 1 the field's alpha is water pooled on wet-through ground)
         c.wet[t]=@min(f[3],1);
+        c.rain[t]=f[2];
         c.pool[t]=@max(f[3]-1,0)*poolDepth;
         c.water[t]=soaked(c.water[t],c.waterCap[t],c.wet[t],dt);
         if(f[2]>firstRain)raining=true;

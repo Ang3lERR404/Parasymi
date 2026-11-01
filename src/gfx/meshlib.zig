@@ -284,6 +284,10 @@ const parts=struct{
   pub const nebularborWeeping=@import("meshes/nebularbor.zig").weeping;
   /// a look it was blended from, to compare: the cloud-bearer, forking limbs crowned flat as an umbrella
   pub const nebularborCloud=@import("meshes/nebularbor.zig").cloud;
+  /// the root well: a woven basket of both lineages on a rooted foot, leaves round its rim
+  pub const rootWell=@import("meshes/root_well.zig");
+  /// the water a root well holds, see-through, drawn after the basket round it
+  pub const rootWellWater=@import("meshes/root_well.zig").water;
   // the halo: its polyp and the diamond it forms
   /// the polyp: woven of both lineages, its stem caging a sac of both saps, fronds and plumed tentacles crowning it
   pub const polyp=@import("meshes/polyp_convergent.zig").woven;
