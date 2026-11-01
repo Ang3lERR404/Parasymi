@@ -30,6 +30,8 @@ const Allocator=std.mem.Allocator;
 const testing=std.testing;
 /// all the maths: easing and conversions
 const m=lib.engine.core.math;
+/// the seeded hashes each tree's place off the grid comes from
+const rng=lib.engine.core.rng;
 /// chunk sizes and tile kinds
 const ck=lib.ck;
 /// the structures registry: `Def`, `Structure`, the hooks' context
@@ -61,13 +63,23 @@ const slowing:f32=15.28;
 const glow:f32=0.25;
 /// (how much its leaves flutter)
 const flutter:f32=0.6;
-/// how far round its centre it breathes (units): its crown and a little more
-const reach:f32=2.4;
+/// how far round its centre it breathes (units): its crown, over 5x5 tiles
+const reach:f32=2.5;
+/// how far its crown spreads from its trunk (units): over 5x5 tiles, though
+/// it roots in 3x3; crowns may overlap, and anything may stand under one
+pub const crown:f32=2.5;
+/// how far from the middle of its ground its trunk may stand (units): every
+/// tree's own, from the world's seed and where it stands, so trees never
+/// line up on the grid; still within its 3x3
+const nudgeMost:f32=0.6;
+/// how much of a mesh's reach the culling sphere takes: its crown wide and
+/// high over everything round it
+const meshReach:f32=4.6;
 /// how much it breathes a second as a real tree drinking all it wants:
 /// into the mist on the ground, and into the cloud over it
 const mistRate:f32=3.2;
 /// (into the cloud)
-const cloudRate:f32=2.4;
+const cloudRate:f32=0.0125;
 /// the share of that it breathes whatever it drinks: its own trickle
 const trickle:f32=0.08;
 /// a sapling just put down drinks this share of what it will
@@ -86,11 +98,38 @@ pub const floor:f32=0.4;
 /// how fast a tile it drinks from comes back toward its water (a share of
 /// what is missing, a second)
 const refill:f32=1.0/600.0;
-/// what a nebularbor remembers: how much it drank, the last it drank
+/// a grove (trees whose crowns overlap): how much more cloud its leaves
+/// breathe for each real tree whose crown wholly overlaps its own, and the
+/// most that count
+/// (how much more cloud for each)
+const groveGain:f32=4;
+/// (the most that count)
+const groveMost:f32=5;
+/// what a nebularbor remembers: how much it drank, the last it drank, and
+/// the grove it stands in
 pub const State=struct{
   /// water a second its roots drew up, the last time they drank
   drunk:f32=0,
+  /// the nebularbors whose crowns overlap its own, each as much as it is a
+  /// real tree (a sapling counts for little) and as far as their crowns
+  /// overlap
+  grove:f32=0,
+  /// how far its trunk stands off the middle of its ground (world x, z;
+  /// `nudgeOf`), found once it is first linked
+  nudge:m.Vice(f32,2)=.{0,0},
 };
+/// how far a tree on tile (`x`, `y`) of a world grown from `seed` stands off
+/// the middle of its ground (world x, z): a hash of the three, within
+/// `nudgeMost`
+pub fn nudgeOf(seed:u64,x:i32,y:i32)m.Vice(f32,2){
+  // a bearing and a distance, each from its own hash
+  const a=rng.unit(rng.hash2(seed,x,y))*m.tau;
+  const r=nudgeMost*@sqrt(rng.unit(rng.hash2(seed^0x4E55,x,y)));
+  return.{@cos(a)*r,@sin(a)*r};
+}
+/// how much two crowns `d` apart (units) overlap: wholly on the same spot,
+/// not at all once they only touch
+pub fn overlap(d:f32)f32{return m.clamp01(1-d/(2*crown));}
 /// how far along its drawn life it is, `grown` into its life: quickly at
 /// first, ever more slowly, a real tree at `realAt`
 pub fn drawn(grown:f32)f32{return 1-m.pow(f32,1-m.clamp01(grown),slowing);}
@@ -101,6 +140,10 @@ pub fn efficiency(grown:f32)f32{return 1+ageGain*m.unlerp(realDrawn,1,drawn(grow
 /// how much of a real tree's breath it breathes, `grown` into its life,
 /// drinking `drunk` water a second: its trickle, and what it drinks
 pub fn share(grown:f32,drunk:f32)f32{return trickle+(1-trickle)*drunk/thirst*efficiency(grown);}
+/// how many times its own cloud a tree breathes standing among `grove`
+/// others: alone, its leaves breathe only a little cloud; in a grove they
+/// breathe together, much more
+pub fn groveCloud(grove:f32)f32{return 1+groveGain*@min(grove,groveMost);}
 /// it roots in moss alone.
 pub fn ground(k:ck.Kind)bool{return k==.moss;}
 /// what its roots draw this tick (`dt` s, `want` in all) from the tiles
@@ -117,6 +160,27 @@ pub fn drink(water:[]f32,cap:[]const f32,want:f32,dt:f32)f32{
     got+=take;
   }
   return got;
+}
+/// it takes its place off the grid and finds the grove it stands in: every
+/// other nebularbor whose crown overlaps its own, each counted as much as
+/// it is a real tree and as far as their crowns overlap
+pub fn link(ctx:st.Ctx,i:st.Id)void{
+  // the tree, where its trunk stands, and the grove found so far
+  const self=ctx.ss.get(i);
+  self.state.nebularbor.nudge=nudgeOf(ctx.w.seed,self.x,self.y);
+  const at=trunkAt(self);
+  var grove:f32=0;
+  for(ctx.ss.list.items,0..)|*t,j|{
+    if(j==i.idx() or t.kind()!=.nebularbor)continue;
+    grove+=thirsty(t.grown)*overlap(m.lenOf(f32,2,at-trunkAt(t)));
+  }
+  self.state.nebularbor.grove=grove;
+}
+/// where tree `s`'s trunk stands (world x, z): the middle of its ground, nudged
+fn trunkAt(s:*const st.Structure)m.Vec(f32,2){
+  // half its ground across, from its corner tile to its middle
+  const half=m.f(def.size)/2;
+  return.{m.f(s.x)+half+s.state.nebularbor.nudge[0],m.f(s.y)+half+s.state.nebularbor.nudge[1]};
 }
 /// its roots drink from the ground under it and a tile round it, more the
 /// further along its life. Busy while it drinks.
@@ -145,15 +209,18 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   self.state.nebularbor.drunk=if(dt>0)got/dt else 0;
   return got>0;
 }
-/// it breathes into the air round it: its trickle and what it drinks
+/// it breathes into the air round it: its trickle and what it drinks; its
+/// leaves breathe cloud, much more in a grove
 pub fn breath(s:*const st.Structure)?st.Breath{
   // how much of a real tree's breath it breathes now
   const k=share(s.grown,s.state.nebularbor.drunk);
-  return.{.reach=reach,.low=mistRate*k,.high=cloudRate*k};
+  return.{.reach=reach,.low=mistRate*k,.high=cloudRate*k*groveCloud(s.state.nebularbor.grove),.off=s.state.nebularbor.nudge};
 }
 /// itself, as far along its life as it has come
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,_:f32)Allocator.Error!void{
-  try out.emit(def.mesh,s.place(ctr),.{.glow=glow,.flutter=flutter,.phase=s.seed,.fade=def.sap,.sway=def.sway,.tall=def.tall,.grown=drawn(s.grown)});
+  // where its trunk stands, nudged off the middle of its ground
+  const n=s.state.nebularbor.nudge;
+  try out.emitReaching(def.mesh,m.mul(m.translate(m.v3(n[0],0,n[1])),s.place(ctr)),.{.glow=glow,.flutter=flutter,.phase=s.seed,.fade=def.sap,.sway=def.sway,.tall=def.tall,.grown=drawn(s.grown)},meshReach);
 }
 /// its line in the panel: how much it drinks and breathes a minute, into
 /// the mist and into its cloud
@@ -161,6 +228,27 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
   // what it breathes now
   const b=breath(s).?;
   _=try d.print(x,y,style.textBody,style.white,txt.s.describe.breathes,.{s.state.nebularbor.drunk*60,m.floorTo(u32,b.low*60),m.floorTo(u32,b.high*60)});
+}
+test"every tree stands off its middle its own way, within its ground, the same each time"{
+  // trees on a row of tiles, in one world
+  var far:f32=0;
+  for(0..40)|x|{
+    const n=nudgeOf(0x5eed,@intCast(x),7);
+    try testing.expect(m.lenOf(f32,2,n)<=nudgeMost+1e-5);
+    try testing.expectEqual(n,nudgeOf(0x5eed,@intCast(x),7));
+    far=@max(far,m.lenOf(f32,2,n));
+  }
+  try testing.expect(far>nudgeMost*0.5);
+}
+test"crowns overlap wholly on one spot, less apart, not at all once they only touch"{
+  try testing.expectEqual(@as(f32,1),overlap(0));
+  try testing.expect(overlap(3)>0 and overlap(3)<1);
+  try testing.expectEqual(@as(f32,0),overlap(2*crown));
+}
+test"a tree alone breathes a little cloud, a grove's trees much more, up to a limit"{
+  try testing.expectEqual(@as(f32,1),groveCloud(0));
+  try testing.expect(groveCloud(3)>=4*groveCloud(0));
+  try testing.expectEqual(groveCloud(groveMost),groveCloud(groveMost+4));
 }
 test"a nebularbor grows quickly, then ever more slowly, a real tree at eight days"{
   try testing.expectApproxEqAbs(realDrawn,drawn(realAt),0.01);

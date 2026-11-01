@@ -73,6 +73,7 @@ pub fn demo(g:*Game,seconds:f32)Allocator.Error!void{
   var t:f32=0;
   while(t<seconds):(t+=play.tickTime)try g.step();
   try haloGarden(g,cx,cz);
+  try grove(g,cx,cz);
   // the germinator, its seeds woven, set to a bulb woven from five things,
   // fed for a while: all its cups pour
   if(g.structs.at(&g.world,cx-2,cz+5))|j|{
@@ -89,6 +90,37 @@ pub fn demo(g:*Game,seconds:f32)Allocator.Error!void{
   _=g.player.inv.add(.seedLumenroot,5);
   _=g.player.inv.add(.conduit,6);
   _=g.player.inv.add(.rootDigger,2);
+}
+/// how many nebularbors the demo's grove holds, and how far into their
+/// lives they are (real trees, a little aged)
+const groveTrees=4;
+/// (how far into their lives)
+const groveGrown:f32=0.25;
+/// a grove of nebularbors on the nearest moss east of the garden, side by
+/// side, whose leaves together breathe a cloud heavy enough to rain (one
+/// alone never does)
+fn grove(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
+  // the first tree, on the nearest moss it fits on
+  var first:?st.Id=null;
+  var r:i32=0;
+  outer:while(r<40):(r+=1){
+    // the walk round that ring
+    var it=m.ring(r);
+    while(it.next())|o|{
+      if(!g.structs.canPlace(&g.world,cx+14+o[0],cz+o[1],.nebularbor))continue;
+      first=try nearest(g,cx+14+o[0],cz+o[1],.nebularbor,0.3);
+      break:outer;
+    }
+  }
+  const f=first orelse return;
+  // where it stands; the rest crowd round it
+  const at=m.Vice(i32,2){g.structs.get(f).x,g.structs.get(f).y};
+  g.structs.get(f).grown=groveGrown;
+  for(1..groveTrees)|k|{
+    // the next tree, as near the first as it fits
+    const j=try nearest(g,at[0]+@as(i32,@intCast(k%2))*3,at[1]+@as(i32,@intCast(k/2))*3,.nebularbor,0.3+0.2*m.f(k)) orelse continue;
+    g.structs.get(j).grown=groveGrown;
+  }
 }
 /// a symbiote and a parasite two tiles apart, left to converge (a
 /// confluence's stages are viewed with `--plant=confluence`).

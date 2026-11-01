@@ -41,9 +41,17 @@ const V3=m.V3;
 /// makes a vector from three numbers
 const v3=m.v3;
 /// the trunk's great weave: thick, caged over its upper stretch
-const trunkStalk:pk.Stalk=.{.girth=0.17,.part=1.8,.from=0.5,.to=0.9,.foot=0.5};
+const trunkStalk:pk.Stalk=.{.girth=0.21,.part=1.8,.from=0.5,.to=0.9,.foot=0.5};
 /// a bough or limb: slim, opening a little along its middle
-const limbStalk:pk.Stalk=.{.girth=0.055,.part=1.5,.from=0.3,.to=0.75,.foot=0.3};
+const limbStalk:pk.Stalk=.{.girth=0.07,.part=1.5,.from=0.3,.to=0.75,.foot=0.3};
+/// how far the umbrella's limbs and twigs reach out and climb, as shares of
+/// the cloud-bearer's: the nebularbor's crown spreads over 5x5 tiles though
+/// its trunk roots in 3x3, so it stands over what grows round it
+const spread:f32=1.8;
+/// (how much higher they climb)
+const climb:f32=1.3;
+/// how much longer an umbrella tuft's leaves grow than the cloud-bearer's
+const tuftLong:f32=1.25;
 /// how many limbs, forks, boughs: the lineages' fivefold
 const fold=kit.fold;
 /// points along a hanging strand
@@ -128,7 +136,7 @@ fn curtain(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,n:usize,from:f32,to:f32
 }
 /// a tuft of upright leaves crowning spline `id`'s tip, spread like an
 /// umbrella's ribs: `n` long natural leaves, every one its own lean
-fn tuft(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,n:usize,seed:u64)Allocator.Error!void{
+fn tuft(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,n:usize,long:f32,seed:u64)Allocator.Error!void{
   // the tuft's own stream, so its leaves are its own
   var rng=Rng.init(seed);
   // the twig's tip, and the way out from the trunk there, flat
@@ -142,7 +150,7 @@ fn tuft(b:*mg.Builder,k:*growth.Skeleton,id:growth.Id,n:usize,seed:u64)Allocator
     const lean=rng.range(0.45,1.25);
     // its way: leaning out round the tip, a little more toward the rim
     const dir=m.norm(v3(@sin(lean)*@cos(az),@cos(lean),@sin(lean)*@sin(az))+out*m.splat3(0.25));
-    try mg.natural(b,at,dir,rng.range(0.3,0.42),0.07,0.35,kit.leafDark,kit.leafLite,1,.sessile);
+    try mg.natural(b,at,dir,rng.range(0.3,0.42)*long,0.07*long,0.35,kit.leafDark,kit.leafLite,1,.sessile);
   }
   try k.on(b,mk,id,1,.{.from=at});
 }
@@ -180,15 +188,17 @@ fn weepingCrown(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,top:V3)Allocato
 /// the cloud-bearer's crown on `trunk`, whose top is `top`: five limbs
 /// climbing out, each with a sac and a flower of both where it forks, its
 /// two twigs each crowned with a tuft, the tufts spreading flat as an
-/// umbrella; `hang` strands of the dew-bearer's off each twig (none: none)
-fn umbrellaCrown(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,top:V3,hang:usize)Allocator.Error!void{
+/// umbrella; `hang` strands of the dew-bearer's off each twig (none: none);
+/// `wide` and `high` times the cloud-bearer's reach and climb, its tufts'
+/// leaves `long` times as long
+fn umbrellaCrown(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,top:V3,hang:usize,wide:f32,high:f32,long:f32)Allocator.Error!void{
   for(0..fold)|i|{
     // this limb's bearing, and the way out along it, flat
     const a=(m.f(i)+0.1)/m.f(fold)*m.tau;
     const out=v3(@cos(a),0,@sin(a));
     // its control points: out of the trunk's top, climbing as it spreads
     var c:[5]V3=undefined;
-    for(&c,[_]f32{0,0.2,0.4,0.56,0.66},[_]f32{0,0.22,0.48,0.66,0.74})|*q,r,h|q.*=top+out*m.splat3(r)+v3(0,h,0);
+    for(&c,[_]f32{0,0.2,0.4,0.56,0.66},[_]f32{0,0.22,0.48,0.66,0.74})|*q,r,h|q.*=top+out*m.splat3(r*wide)+v3(0,h*high,0);
     const id=try limb(b,k,trunk,0.98,&c,limbStalk,0x3C01+%i*53,0);
     // where it forks
     const fork=k.point(id,1);
@@ -199,15 +209,18 @@ fn umbrellaCrown(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,top:V3,hang:us
     const fl=b.mark();
     try kit.bloom(b,.{.heart=fork+v3(0,0.11,0),.len=0.085,.spin=a,.petals=6,.seed=0x3C02+%i});
     try k.on(b,fl,id,1,.{.from=fork,.delay=0.15});
-    for([_]f32{-1,1},0..)|sgn,j|{
+    // its twigs, a little either side of it (a wide crown one more, straight
+    // on, so it stays full)
+    const twigs:[]const f32=if(wide>1)&.{-1,0,1}else &.{-1,1};
+    for(twigs,0..)|sgn,j|{
       // this twig's bearing, a little either side of its limb's
       const a2=a+sgn*0.42;
       const out2=v3(@cos(a2),0,@sin(a2));
       // its control points: on out and up to the umbrella's rim
       var tc:[4]V3=undefined;
-      for(&tc,[_]f32{0,0.24,0.46,0.6},[_]f32{0,0.17,0.3,0.36})|*q,r,h|q.*=fork+out2*m.splat3(r)+v3(0,h,0);
-      const tw=try bough(b,k,id,1,&tc,0.035,0x3C03+%i*17+%j,0.05);
-      try tuft(b,k,tw,22,0x3C04+%i*29+%j*7);
+      for(&tc,[_]f32{0,0.24,0.46,0.6},[_]f32{0,0.17,0.3,0.36})|*q,r,h|q.*=fork+out2*m.splat3(r*wide)+v3(0,h*high,0);
+      const tw=try bough(b,k,id,1,&tc,0.035*@sqrt(wide),0x3C03+%i*17+%j,0.05);
+      try tuft(b,k,tw,22,long,0x3C04+%i*29+%j*7);
       if(hang>0)try curtain(b,k,tw,hang,0.35,0.95,0.85,0x3C05+%i*37+%j*11);
     }
   }
@@ -236,7 +249,7 @@ pub const cloud=struct{
     // the trunk's top, short and stout under its umbrella
     const top=v3(0.03,1.65,0.02);
     const trunk=try trunkUp(b,&k,top,0x3C00);
-    try umbrellaCrown(b,&k,trunk,top,0);
+    try umbrellaCrown(b,&k,trunk,top,0,1,1,1);
     k.finish(b);
   }
 };
@@ -259,10 +272,10 @@ const oldAge:f32=0.25;
 pub fn build(b:*mg.Builder)Allocator.Error!void{
   // the skeleton every part is timed along
   var k=growth.Skeleton.begin(b);
-  // the trunk's top, under its umbrella
-  const top=v3(0.03,1.75,0.02);
+  // the trunk's top, under its umbrella: high over everything round it
+  const top=v3(0.05,3.0,0.03);
   const trunk=try trunkUp(b,&k,top,0x4B00);
-  try umbrellaCrown(b,&k,trunk,top,3);
+  try umbrellaCrown(b,&k,trunk,top,3,spread,climb,tuftLong);
   // when it is a real tree: everything grown so far is done
   const grown=k.latest(b);
   try young(b,&k,trunk,grown);
@@ -311,7 +324,7 @@ fn offshoot(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,i:usize,grown:f32)A
   const when=offshootAt(i/2,grown);
   const id=k.late(trunk,ya[0],&c,when[0],grown*oldAge*0.3);
   try k.braid(b,id,.{.girth=0.03,.tip=0.25,.strands=fold,.twist=3,.wobble=pal.strandWobble,.seed=0x5A00+%i,.core=kit.pale,.strand=kit.green,.t0=0.6,.t1=0.9});
-  try tuft(b,k,id,12,0x5A10+%i*13);
+  try tuft(b,k,id,12,1,0x5A10+%i*13);
   try curtain(b,k,id,2,0.5,0.95,0.35,0x5A20+%i*17);
 }
 /// its foot hardening with age: woven strands, a green one round a pale

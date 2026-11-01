@@ -539,7 +539,7 @@ fn structures(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
   for(g.structs.list.items)|*s|{
     // its centre
     const ctr=structCentre(g,s);
-    if(st.breath(s))|b|try g.parts.breathe(.{ctr[0],ctr[2]},b.reach,b.low,b.high);
+    if(st.breath(s))|b|try g.parts.breathe(.{ctr[0]+b.off[0],ctr[2]+b.off[1]},b.reach,b.low,b.high);
     if(@abs(ctr[0]-g.cam.target[0])>reach or @abs(ctr[2]-g.cam.target[2])>reach){
       // what it sends far off is drawn wherever it is (each piece culled
       // to the view on its own)

@@ -4,6 +4,7 @@
 const float MOISTURE_MAX_STEP = 0.1;
 // a frame's step `dt` (s) as the field takes it
 float moistureStep(float dt) { return clamp(dt, 0.0, MOISTURE_MAX_STEP); }
-// how thick cloud must grow before it rains (moisture.frag); the air draws
-// cloud this thick as heavy as it comes (air.glsl)
-const float MOISTURE_RAIN_AT = 1.6;
+// how thick cloud must grow before it rains (moisture.frag): more than one
+// nebularbor's leaves breathe, a grove's; the air draws cloud this thick as
+// heavy as it comes (air.glsl)
+const float MOISTURE_RAIN_AT = 1.4;

@@ -73,7 +73,7 @@ float low(vec3 p, float ground) { return LOW_AIR * exp(-max(p.y - ground, 0.0) /
 const float BREATH_MIST = 0.3;
 const float BREATH_HUG = 0.8;
 const float BREATH_CLOUD = 0.9;
-const float CLOUD_AT = 3.7;
+const float CLOUD_AT = 5.3;
 const float CLOUD_HALF = 0.75;
 const float CLOUD_CELL = 0.9;
 // heavy cloud (gathered thick, near raining: MOISTURE_RAIN_AT, moisture.glsl):

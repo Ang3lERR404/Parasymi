@@ -67,7 +67,7 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
 - **Breathed moisture:** what the nebularbor breathes, kept on the GPU as
   a moisture field over the world (`passes/moisture.zig`, the engine's
   field): a mist lying low round its foot, torn into the same wisps, and a
-  cloud gathering in a billowing band over its crown (3–4.5 over the
+  cloud gathering in a billowing band over its crown (4.5–6 over the
   ground), both drifting off on the wind, spreading and slowly drying.
   Cloud gathered heavy swells deeper, fills in between its billows and
   hangs grey, its belly darker the thicker it is (it swallows a share of

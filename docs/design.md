@@ -195,7 +195,7 @@ plant.
     reach whatever something along the links wants; the item hops link
     to link (nearest first) to the Vultrixi nearest a structure that
     wants it, which hands it over. Never back to where it came from.
-- **Nebularbor** (the mist tree, `structures/nebularbor.zig`): 3×3, moss
+- **Nebularbor** (the mist tree, `structures/nebularbor.zig`): roots 3×3 (its trunk nudged off the grid by the world seed, `nudgeOf`), crown 5×5 and taller than everything round it; moss
   only, woven by a monfris from 4 convergence essence, 2 ley crystals, a
   drift flower and 3 grit (so only after the unforming). It never stops
   growing: its life (`grow` 24000 s, 80 days) is drawn along a curve
@@ -221,13 +221,20 @@ plant.
 ## Weather (`game/weather.zig`, `passes/moisture.zig`)
 A water loop the gardener builds up in stages: ground water, drunk and
 breathed by the nebularbor, gathers into cloud, which rains it back.
-1. **Clouds gather:** cloud thicker than 0.5 holds together, wholly at
-   1.4: it spreads 85% less and lasts 2.5× longer, so it pools heavy.
-2. **Rain falls on its own** where cloud grows past 1.6 (one grown
-   nebularbor's cloud does, in a steady shower; more trees rain harder).
-   It rains until the cloud is rained out to 0.8, harder the thicker it
-   is, each shower building and easing over a few seconds and drawing
-   the cloud down. The rain rides with its cloud, downwind of the tree.
+1. **Clouds gather, slowly, from a grove's leaves.** A nebularbor's
+   crown spreads over 5×5 tiles though it roots in 3×3; crowns may
+   overlap and anything may stand under one. A grove is trees whose
+   crowns overlap: each tree's leaves breathe 4× more cloud for every
+   real tree whose crown wholly overlaps its own (`groveCloud`), so a
+   lone tree only ever makes a light haze. Cloud lingers (it barely
+   drifts or spreads, drying over 40 minutes); past 0.6 it holds
+   together, wholly at 1.0, a tipping point only a grove passes: held, it
+   drifts and spreads far less and lasts 10× longer, piling up heavy.
+2. **Rain falls on its own** where cloud grows past 1.4 (a grove of four
+   young trees first rains after about three minutes, then in showers
+   every few minutes). It rains until the cloud is rained out to 0.7,
+   harder the thicker it is, each shower building and easing and drawing
+   the cloud down; the rain feeds the grove's own roots.
 3. **Rain refills the ground:** where it rains the ground grows wet
    (soaked through in 40 s of a downpour, drying to a third in 5
    minutes). Once a second the game reads the whole field back (the

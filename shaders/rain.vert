@@ -29,7 +29,7 @@ const int LAYERS = 2;
 // the cloud's belly the drops fall from (over the ground) and how fast they
 // fall (units/s); how long a streak is, how wide, how far the wind leans it
 // (a share of its pace); how long a splash spreads (s) and how wide it grows
-const float BELLY = 3.2;
+const float BELLY = 4.7;
 const float FALL = 9.0;
 const float STREAK = 0.6;
 const float WIDTH = 0.013;

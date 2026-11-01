@@ -160,12 +160,18 @@ pub const Parts=struct{
   /// a mesh placed by its matrix: skipped when out of view (a sphere a few
   /// times its scale), at the level of detail for its distance.
   pub fn emit(p:*Parts,id:meshlib.Id,matIn:m.M4,lookIn:Look)Allocator.Error!void{
+    try p.emitReaching(id,matIn,lookIn,bound);
+  }
+  /// a mesh placed by its matrix that reaches `reach` times its scale from
+  /// its origin (a great tree, wider and taller than `bound`): skipped only
+  /// when all of that is out of view
+  pub fn emitReaching(p:*Parts,id:meshlib.Id,matIn:m.M4,lookIn:Look,reach:f32)Allocator.Error!void{
     // the matrix, carried by the turning structure if one is set
     const mat=if(p.around)|a|m.mul(a,matIn)else matIn;
     // where it stands, and its largest axis scale
     const at=m.v3(mat[3][0],mat[3][1],mat[3][2]);
     const scale=@max(m.len(m.v3(mat[0][0],mat[0][1],mat[0][2])),@max(m.len(m.v3(mat[1][0],mat[1][1],mat[1][2])),m.len(m.v3(mat[2][0],mat[2][1],mat[2][2]))));
-    if(!p.sees(at,bound*scale+boundPad))return;
+    if(!p.sees(at,reach*scale+boundPad))return;
     try p.add(id,at,instance(mat,lookIn));
   }
   /// files an instance under its mesh's slot for the level of detail its

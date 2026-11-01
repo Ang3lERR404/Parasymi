@@ -12,30 +12,33 @@ layout(location = 0) out vec4 o;
 // how fast each kind drifts along the wind (a share of the wind's own
 // pace, units/s): the mist slowly over the ground, the cloud faster aloft
 const float LOW_DRIFT = 0.25;
-const float HIGH_DRIFT = 0.6;
+const float HIGH_DRIFT = 0.02;
 // how fast each spreads into its neighbours (the share of the difference
 // closed a second)
 const float LOW_SPREAD = 1.2;
-const float HIGH_SPREAD = 0.6;
+const float HIGH_SPREAD = 0.025;
 // how long each takes to dry away to a third (s)
 const float LOW_DRY = 45.0;
-const float HIGH_DRY = 120.0;
-// cloud gathering: from how thick it starts to hold together, and how thick
-// it wholly holds; held, it spreads this share less and lasts this many
-// times longer, so it pools into heavy cloud instead of thinning away
-const float GATHER_FROM = 0.5;
-const float GATHER_TO = 1.4;
-const float GATHER_HOLD = 0.85;
-const float GATHER_KEEP = 1.5;
+const float HIGH_DRY = 2400.0;
+// cloud gathering, the tipping point a grove's leaves breathe past and one
+// tree's never do: from how thick cloud starts to hold together, and how
+// thick it wholly holds; held, it spreads this share less, drifts this share
+// slower and lasts this many times longer, so it keeps nearly all it is
+// given and slowly piles up heavy instead of thinning away
+const float GATHER_FROM = 0.6;
+const float GATHER_TO = 1.0;
+const float GATHER_HOLD = 0.95;
+const float GATHER_STILL = 0.85;
+const float GATHER_KEEP = 10.0;
 // rain: how thick cloud must grow before it rains (MOISTURE_RAIN_AT,
 // moisture.glsl), how thin it is rained out to before it stops, how much
 // rain its thinnest keeps falling (a share of a downpour), how quickly a
 // shower builds and eases (a second), and how much cloud a downpour rains
 // out a second
-const float RAIN_STOP = 0.8;
+const float RAIN_STOP = 0.7;
 const float RAIN_FLOOR = 0.25;
 const float RAIN_EASE = 0.35;
-const float RAIN_DRAW = 0.05;
+const float RAIN_DRAW = 0.3;
 // the ground under the rain: how long a downpour takes to soak it through,
 // and how long it takes to dry to a third once the rain stops (s)
 const float WET_SOAK = 40.0;
@@ -57,15 +60,16 @@ void main() {
   // far it carries each kind this step
   vec2 w = gardenWind(t, vec2(uv.x, -uv.y) * OVERHEAD_SIZE).xy;
   vec2 along = vec2(w.x, -w.y) * texel * dt;
+  // how much the cloud here holds together: thick, it drifts slower,
+  // spreads less and lasts
+  float held = smoothstep(GATHER_FROM, GATHER_TO, texture(field_map, uv).g);
   vec2 lowAt = uv - along * LOW_DRIFT;
-  vec2 highAt = uv - along * HIGH_DRIFT;
+  vec2 highAt = uv - along * HIGH_DRIFT * (1.0 - GATHER_STILL * held);
   // each kind fetched from upwind (the rain rides with its cloud), then the
   // mist and the cloud's neighbours' mean round them
   vec3 c = at(lowAt, highAt);
   vec2 dx = vec2(texel.x, 0.0), dy = vec2(0.0, texel.y);
   vec3 n = 0.25 * (at(lowAt + dx, highAt + dx) + at(lowAt - dx, highAt - dx) + at(lowAt + dy, highAt + dy) + at(lowAt - dy, highAt - dy));
-  // how much the cloud here holds together: thick, it spreads less and lasts
-  float held = smoothstep(GATHER_FROM, GATHER_TO, c.g);
   vec2 spread = vec2(LOW_SPREAD, HIGH_SPREAD * (1.0 - GATHER_HOLD * held));
   c.rg += (n.rg - c.rg) * clamp(spread * dt, 0.0, 1.0);
   c.rg *= exp(-dt / vec2(LOW_DRY, HIGH_DRY * (1.0 + GATHER_KEEP * held)));
