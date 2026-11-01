@@ -98,9 +98,9 @@ pub const Input=struct{
   /// the mouse buttons held last frame
   bprev:Buttons=.initEmpty(),
   /// the cursor's position (window pixels)
-  mouse:m.Vice(f32,2)=.{0,0},
+  mouse:m.Vec(f32,2)=.{0,0},
   /// how far the cursor moved since last frame (window pixels)
-  mouseDelta:m.Vice(f32,2)=.{0,0},
+  mouseDelta:m.Vec(f32,2)=.{0,0},
   /// how far the wheel turned this frame (notches; positive is away)
   scroll:f32=0,
   /// the wheel's turning gathered since the last `update`
@@ -144,8 +144,8 @@ pub const Input=struct{
     for(comptime values(Button))|b|in.bcur.setPresent(b,in.win.getMouseButton(b)==.press);
     // the cursor's position, as GLFW gives it and as floats
     const mp=in.win.getCursorPos();
-    const at:m.Vice(f32,2)=.{@floatCast(mp[0]),@floatCast(mp[1])};
-    in.mouseDelta=.{at[0]-in.mouse[0],at[1]-in.mouse[1]};
+    const at:m.Vec(f32,2)=.{@floatCast(mp[0]),@floatCast(mp[1])};
+    in.mouseDelta=at-in.mouse;
     in.mouse=at;
     in.scroll=in.scrollAcc;
     in.scrollAcc=0;

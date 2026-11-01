@@ -219,7 +219,7 @@ pub const Radiance=struct{
       // walks the square of tiles round it
       var it=m.footprint(-reach,-reach,@intCast(2*reach+1));
       while(it.next())|d|{
-        if(m.f(d[0]*d[0]+d[1]*d[1])>rad*rad)continue;
+        if(m.f(m.sumOf(i32,2,d*d))>rad*rad)continue;
         // the plant on this tile, if any
         const j=p.at(w,xs[i]+d[0],ys[i]+d[1]) orelse continue;
         r.powered.items[j.idx()]=true;

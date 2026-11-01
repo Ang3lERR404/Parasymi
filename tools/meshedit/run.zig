@@ -231,7 +231,7 @@ pub fn main(init:std.process.Init)!void{
   var ui:Draw=.{.gpa=gpa};
   defer ui.deinit();
   // each form's handle on screen, or null behind the eye
-  var handles:std.ArrayList(?m.Vice(f32,2))=.empty;
+  var handles:std.ArrayList(?m.Vec(f32,2))=.empty;
   defer handles.deinit(gpa);
   // how many frames have run (for `--shot`)
   var frames:u32=0;

@@ -125,7 +125,7 @@ pub const Footprint=struct{
   /// how many tiles have been handed out so far
   k:u16=0,
   /// the next tile as .{x, z}, or null once all size x size are visited
-  pub fn next(fp:*Footprint)?Vice(i32,2){
+  pub fn next(fp:*Footprint)?Vec(i32,2){
     // how many tiles the whole footprint holds
     const n=@as(u16,fp.size)*fp.size;
     if(fp.k>=n)return null;
@@ -145,10 +145,10 @@ pub const Ring=struct{
   /// the next offset's z, -r..r
   dz:i32,
   /// the next offset on the ring as .{dx, dz}, or null once it is walked
-  pub fn next(it:*Ring)?Vice(i32,2){
+  pub fn next(it:*Ring)?Vec(i32,2){
     while(it.dz<=it.r){
       // the offset handed out this call
-      const o:Vice(i32,2)=.{it.dx,it.dz};
+      const o:Vec(i32,2)=.{it.dx,it.dz};
       // inner rows touch the ring only at their ends
       // whether this row is the ring's top or bottom, walked whole
       const edge=@abs(it.dz)==it.r;
@@ -192,6 +192,9 @@ pub inline fn splat3(s:f32)V3{return@splat(s);}
 pub inline fn splat4(s:f32)V4{return@splat(s);}
 /// the dot product: how far `a` and `b` lean the same way
 pub inline fn dot(a:V3,b:V3)f32{return@reduce(.Add,a*b);}
+/// every lane of `a` added up, for a `Vec` of any width: `sumOf(f32,2,d*d)`
+/// is a 2D point's squared length
+pub inline fn sumOf(comptime t:type,comptime s:usize,a:Vec(t,s))t{return@reduce(.Add,a);}
 /// a vector's length
 pub inline fn len(a:V3)f32{return@sqrt(dot(a,a));}
 /// the vector turned unit length; one too short to point anywhere is left as is

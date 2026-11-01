@@ -82,7 +82,7 @@ const valuesY=meshedit.settings.valuesY;
 /// draws the editor over the scene: the mesh's path, cells and note, the
 /// toolbar and the help, the form list, the selected form's values, every
 /// other form's handle where it stands, and the selected form's gizmo
-pub fn draw(e:*Editor,d:*Draw,screen:m.Vice(f32,2),handles:[]const?m.Vice(f32,2),view:gizmo.View,origin:V3)Allocator.Error!void{
+pub fn draw(e:*Editor,d:*Draw,screen:m.Vice(f32,2),handles:[]const?m.Vec(f32,2),view:gizmo.View,origin:V3)Allocator.Error!void{
   // buffers for the path line and the cells line
   var pb:[160]u8=undefined;
   var cb:[64]u8=undefined;

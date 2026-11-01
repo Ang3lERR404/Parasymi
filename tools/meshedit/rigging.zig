@@ -292,7 +292,7 @@ pub fn draw(e:*Editor,d:*Draw,view:gizmo.View,origin:V3)Allocator.Error!void{
   }
 }
 /// each joint where it stands on screen (null behind the eye), for picking
-pub fn handles(e:*const Editor,view:gizmo.View,origin:V3,out:*std.ArrayList(?m.Vice(f32,2)),gpa:Allocator)Allocator.Error!void{
+pub fn handles(e:*const Editor,view:gizmo.View,origin:V3,out:*std.ArrayList(?m.Vec(f32,2)),gpa:Allocator)Allocator.Error!void{
   // the bones now
   var bones:[rig.maxBones]M4=undefined;
   const k=posed(e,origin,&bones);

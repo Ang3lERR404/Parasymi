@@ -112,7 +112,7 @@ pub const State=struct{
   carried:items.Item=.essence,
 };
 /// the offset (x, y), in tiles, of the `i`th tile of the square round it
-fn offset(i:usize)m.Vice(i32,2){return.{@as(i32,@intCast(i%side))-reachTiles,@as(i32,@intCast(i/side))-reachTiles};}
+fn offset(i:usize)m.Vec(i32,2){return.{@as(i32,@intCast(i%side))-reachTiles,@as(i32,@intCast(i/side))-reachTiles};}
 /// the plant whose own tile (its corner, for one larger than a tile) is
 /// `i` round (x, y), if any: one root to each plant
 fn plantAt(ctx:st.Ctx,x:i32,y:i32,i:usize)?ck.PlantId{
@@ -126,9 +126,9 @@ fn plantAt(ctx:st.Ctx,x:i32,y:i32,i:usize)?ck.PlantId{
   return p;
 }
 /// which root mesh reaches the tile at offset `o` (one per distance out)
-fn rootFor(o:m.Vice(i32,2))meshlib.Id{
+fn rootFor(o:m.Vec(i32,2))meshlib.Id{
   // the squared distance out to that tile
-  const d2=o[0]*o[0]+o[1]*o[1];
+  const d2=m.sumOf(i32,2,o*o);
   return switch(d2){
     1=>.crownRoot1,
     2=>.crownRoot2,
@@ -150,7 +150,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   for(&c.reach,0..)|*r,k|{
     // the tile's offset, how far out it is, and whether a plant stands there
     const o=offset(k);
-    const len=@sqrt(m.f(o[0]*o[0]+o[1]*o[1]));
+    const len=@sqrt(m.f(m.sumOf(i32,2,o*o)));
     const there=plantAt(ctx,self.x,self.y,k)!=null;
     r.*=if(there)@min(1,r.*+dt*rootGrow/@max(len,1))else@max(0,r.*-dt*rootWither);
     if(r.*>=1)roots+=1;

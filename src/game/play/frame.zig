@@ -53,7 +53,7 @@ const keyZoomRate:f32=6;
 /// looking, panels and hotbar keys, HUD clicks, movement, what the cursor
 /// does to the tile it is on, weaving, the wolf's move and pose, the
 /// starfall, and streaming the world round the wolf.
-pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vice(f32,2))Error!void{
+pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   g.uiTime+=dt;
   g.frameMs+=(dt*m.msPerS-g.frameMs)*timingEase;
   g.cam.aspect=screen[0]/@max(screen[1],1);
@@ -105,8 +105,10 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vice(f32,2))Error!void{
     in.capture(looking);
     g.looking=looking;
   }else if(looking)g.cam.look(in.mouseDelta);
+  // half of each side, to find the screen's middle
+  const half:m.Vec(f32,2)=@splat(0.5);
   // where the cursor is: the screen's middle while looking, else the mouse
-  const cursor=if(looking)m.Vice(f32,2){screen[0]/2,screen[1]/2}else in.mouse;
+  const cursor=if(looking)screen*half else in.mouse;
   // panels and selection
   if(!inspecting){
     if(ctl.pressed(in,.belly))g.mode=if(g.mode==.belly).roam else.belly;
@@ -159,9 +161,9 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vice(f32,2))Error!void{
   }
   // the camera's turn, the wish turned by it, and its length (kept at most 1)
   const yaw=g.cam.yaw;
-  var wish=m.Vice(f32,2){@cos(yaw)*mx-@sin(yaw)*mz,-@sin(yaw)*mx-@cos(yaw)*mz};
-  const wl=@sqrt(wish[0]*wish[0]+wish[1]*wish[1]);
-  if(wl>1)wish=.{wish[0]/wl,wish[1]/wl};
+  var wish=m.Vec(f32,2){@cos(yaw)*mx-@sin(yaw)*mz,-@sin(yaw)*mx-@cos(yaw)*mz};
+  const wl=@sqrt(m.sumOf(f32,2,wish*wish));
+  if(wl>1)wish/=@as(m.Vec(f32,2),@splat(wl));
   // the camera orbits round the wolf while dragged; the wheel zooms, all
   // the way in into its eyes, and the zoom keys as a wheel turned while held
   if(!inspecting){
