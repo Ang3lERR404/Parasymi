@@ -341,6 +341,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sculpt.zig` — mesh: SCULPT.
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
+- `storm_spire.zig` — mesh: the storm spire, three looks to choose between side by side (`--samples=stormSpireTall,stormSpireStout,stormSpireCaged`): a kin of…
 - `strange_seed.zig` — mesh: STRANGE SEED.
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with
 - `tanglehold.zig` — mesh: the tanglehold, of both lineages (convergence kit): the store that takes the sap cache's place once the unforming has taken it.
