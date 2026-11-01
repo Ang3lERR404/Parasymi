@@ -53,7 +53,13 @@ every control point), resampled to `growth.res` points
     bundles.
   - `sk.on(b, mark, id, u, .{.from, .delay, .span})`: one piece grown out
     of one point once the front reaches `u`. For a leaf, petal, cup,
-    stamens. Stagger a whorl with `.delay`.
+    stamens. Stagger a whorl with `.delay`. `.fall = .{at, span}` makes
+    it let go later in the growth: it drops and shrinks to nothing (a young
+    leaf a tree outgrows).
+- **Late growth** (a thing's old age, after the rest): `sk.latest(b)` is
+  when everything built so far is done; `sk.late(parent, u, ctrl, at,
+  time)` is a spline that starts at the moment `at` and takes `time`,
+  whatever its parent's pace. Time them as shares past `latest`.
 
 ### 3. Finish
 End with `sk.finish(b)`. It turns times into shares of the growth. A debug
@@ -96,6 +102,12 @@ part.vert (engine growth.glsl `growOut`) does the growing:
   (`PartInstance.w.w`, `Look.grown`) reaches it, then grows it out.
 - It stays thin (`SPROUT_THIN`) until its spline is done.
 - Foliage tips lag (`LEAF_LAG`).
+- A falling piece (`at.z` the negated moment it lets go, `at.w` how long)
+  drops (`FALL_DROP`) and shrinks away.
+- **A life that never quite ends** (the nebularbor): the structure is
+  `bare` and emits its mesh itself, `.grown` its life drawn along a curve
+  that slows forever (`nebularbor.drawn`); its skeleton holds its whole
+  life, old age last.
 
 `b.xform` carries `from` along.
 

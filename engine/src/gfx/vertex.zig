@@ -79,7 +79,9 @@ pub const Skin=extern struct{
 pub const Grow=extern struct{
   /// the point on its spline it is kept shrunk into until it grows (mesh space)
   from:m.Vice(f32,3)=@splat(0),
-  /// its growth timing: starts, grows over, spline started, spline done
+  /// its growth timing: starts, grows over, spline started, spline done;
+  /// a piece hung on a spline that falls later (a young leaf): starts,
+  /// grows over, the negated moment it starts falling, how long it falls
   at:m.Vice(f32,4)=@splat(0),
 };
 /// the leading fields of `Mesh`, read from a second growth key of the same

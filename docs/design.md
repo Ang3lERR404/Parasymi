@@ -197,15 +197,18 @@ plant.
     wants it, which hands it over. Never back to where it came from.
 - **Nebularbor** (the mist tree, `structures/nebularbor.zig`): 3×3, moss
   only, woven by a monfris from 4 convergence essence, 2 ley crystals, a
-  drift flower and 3 grit (so only after the unforming). It grows in over
-  8 days (2400 s) and has no work: it breathes moisture into the air
-  (`breath` hook), a mist round its foot and a cloud over its crown, more
-  as it grows and, once grown, up to 1.6× as it ages. The moisture is a
-  field on the GPU (`passes/moisture.zig`) that drifts on the wind,
-  spreads and dries; the fog draws it. It does nothing yet: the weather
-  begins here. It draws on nothing, so it can never run the ground dry.
-  Still to come: open-ended growth (offshoots, leaves falling or becoming
-  branches, never quite done) and reading the air's moisture on hover.
+  drift flower and 3 grit (so only after the unforming). It never stops
+  growing: its life (`grow` 24000 s, 80 days) is drawn along a curve
+  that slows forever (`drawn`), a sapling putting out young leaves, a real
+  tree at 8 days, then old age: its last young leaves fall one by one and
+  an offshoot grows where each was, and woven strands harden its foot. It
+  has no work: it breathes moisture into the air (`breath` hook), a mist
+  round its foot and a cloud over its crown, more the further along its
+  life (up to 1.6× a real tree's). The moisture is a field on the GPU
+  (`passes/moisture.zig`) that drifts on the wind, spreads and dries; the
+  fog draws it. It does nothing yet: the weather begins here. It draws on
+  nothing, so it can never run the ground dry. Still to come: reading the
+  air's moisture on hover, and its roots drinking the ground's water.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined

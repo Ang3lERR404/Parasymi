@@ -186,7 +186,7 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
       for(k.s[0..k.n])|sp|end=@max(end,sp.start+sp.time*(1+sp.front));
       // the growth records of everything built on it
       const gs:[]vertex.Grow=if(k.first<b.grow.items.len)b.grow.items[k.first..]else&.{};
-      for(gs)|g|end=@max(end,g.at[0]+g.at[1]);
+      for(gs)|g|end=@max(end,@max(g.at[0]+g.at[1],-g.at[2]+g.at[3]));
       end/=1-k.tail;
       for(k.s[0..k.n])|*sp|{
         sp.start/=end;
@@ -275,6 +275,10 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
       delay:f32=0,
       /// where it grows out of, if not the point on the spline
       from:?V3=null,
+      /// when it falls away (a young leaf), in the skeleton's time: the
+      /// moment it lets go and how long it takes to drop and shrink to
+      /// nothing (null: it stays)
+      fall:?m.Vice(f32,2)=null,
     };
     /// everything built since `start` is one piece on spline `id` at `u` (a
     /// leaf, a cup, a pod): it grows out of that point (or `o.from`) once the
@@ -285,7 +289,38 @@ pub fn Grower(comptime M:type,comptime leaf:LeafFn(M.Builder))type{
       const t0=k.when(id,u)+o.delay;
       const span=o.span orelse k.s[id.idx()].time*k.s[id.idx()].front;
       const from=o.from orelse k.point(id,u);
-      for(try b.growOf(start))|*g|g.*=.{.from=from,.at=.{t0,span,0,0}};
+      // when it falls, as the shader reads it (none: kept)
+      const fall:m.Vice(f32,2)=if(o.fall)|f|.{-@max(f[0],minTime),f[1]}else.{0,0};
+      for(try b.growOf(start))|*g|g.*=.{.from=from,.at=.{t0,span,fall[0],fall[1]}};
+    }
+    /// the latest moment anything on it so far is still growing (or
+    /// falling), in its own time: what a late piece is timed after
+    pub fn latest(k:*const Skeleton,b:*const M.Builder)f32{
+      // the latest found yet
+      var e:f32=minTime;
+      for(k.s[0..k.n])|sp|e=@max(e,sp.start+sp.time*(1+sp.front));
+      // the growth records of everything built on it
+      const gs:[]const vertex.Grow=if(k.first<b.grow.items.len)b.grow.items[k.first..]else&.{};
+      for(gs)|g|e=@max(e,@max(g.at[0]+g.at[1],-g.at[2]+g.at[3]));
+      return e;
+    }
+    /// a spline off `parent` at `u` through `ctrl`, starting at the moment
+    /// `at` of the skeleton's own time and taking `time` to grow (a piece
+    /// grown late, after the rest)
+    pub fn late(k:*Skeleton,parent:Id,u:f32,ctrl:[]const V3,at:f32,time:f32)Id{
+      // its control points, the first moved onto the parent, resampled to measure it
+      var c:[m.maxSpline]V3=undefined;
+      @memcpy(c[0..ctrl.len],ctrl);
+      c[0]=k.point(parent,u);
+      var pts:[res]V3=undefined;
+      m.splineResample(c[0..ctrl.len],&pts);
+      // its length
+      var len:f32=0;
+      for(1..res)|i|len+=m.dist(pts[i],pts[i-1]);
+      len=@max(len,1e-4);
+      // decision: timed `with` its parent, its wait spread over its length
+      // as `Branch.delay` is, so it starts at `at` whatever the parent's pace
+      return k.add(parent,u,c[0..ctrl.len],.{.after=.with,.delay=(at-k.s[@intFromEnum(parent)].start)/len,.pace=time/len});
     }
     // ---- building along it: the usual primitives, grown on the spline ----
     /// a tapering tube built the length of a spline

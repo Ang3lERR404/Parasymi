@@ -240,8 +240,22 @@ pub const cloud=struct{
     k.finish(b);
   }
 };
-/// builds the nebularbor whole: the trunk, its foot, the umbrella, three
-/// strands hanging off every twig
+/// how many young leaves the sapling puts out up its stem
+const youngLeaves=2*fold;
+/// how far up the stem the young leaves sit (shares of the trunk)
+const youngFrom:f32=0.08;
+/// (the highest)
+const youngTo:f32=0.42;
+/// how much longer its old age takes than its growing up: what it grows
+/// after it is a real tree, as a share of all it grew before
+const oldAge:f32=0.25;
+/// builds the nebularbor's whole life on one skeleton (its structure
+/// draws it ever more grown, slowing forever: structures/nebularbor.zig):
+/// a sapling's stem putting out young leaves, rising into the trunk; the
+/// umbrella spreading; the first young leaves falling as it does; the
+/// curtains; a real tree. Then, slowly, old age: the last young leaves fall
+/// one by one and an offshoot grows out where each was, crowned with its
+/// own tuft and strands, and woven strands wrap its foot, hardening it.
 pub fn build(b:*mg.Builder)Allocator.Error!void{
   // the skeleton every part is timed along
   var k=growth.Skeleton.begin(b);
@@ -249,5 +263,76 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   const top=v3(0.03,1.75,0.02);
   const trunk=try trunkUp(b,&k,top,0x4B00);
   try umbrellaCrown(b,&k,trunk,top,3);
+  // when it is a real tree: everything grown so far is done
+  const grown=k.latest(b);
+  try young(b,&k,trunk,grown);
+  try harden(b,&k,trunk,grown);
   k.finish(b);
+}
+/// where young leaf `i` sits up the stem (a share of the trunk) and its
+/// bearing round it (the golden angle, so none shades the next)
+fn youngAt(i:usize)m.Vice(f32,2){return.{m.lerp(youngFrom,youngTo,m.ratio(i,youngLeaves-1)),m.f(i)*2.39996};}
+/// the sapling's young leaves up its stem, each on its own stalk: the
+/// lower half fall as the crown spreads; the rest hold until it is a real
+/// tree (`grown`), then fall one by one, an offshoot growing out where
+/// each was
+fn young(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,grown:f32)Allocator.Error!void{
+  for(0..youngLeaves)|i|{
+    // where it sits, its bearing, and the way out from the stem there
+    const ya=youngAt(i);
+    const out=v3(@cos(ya[1]),0,@sin(ya[1]));
+    const at=k.point(trunk,ya[0])+out*m.splat3(trunkStalk.girth*0.9);
+    // whether it holds until old age, becoming an offshoot
+    const holds=i%2==1;
+    // when it lets go, and how long it falls
+    const fall:m.Vice(f32,2)=if(holds)offshootAt(i/2,grown)else.{grown*(0.5+0.04*m.f(i)),grown*0.06};
+    const mk=b.mark();
+    try mg.natural(b,at,m.norm(out+v3(0,0.55,0)),0.24,0.085,0.35,kit.leafDark,kit.leafLite,0.2,.stalked);
+    try k.on(b,mk,trunk,ya[0],.{.from=at,.fall=fall});
+    if(holds)try offshoot(b,k,trunk,i,grown);
+  }
+}
+/// when offshoot `j` starts to grow, and the leaf there falls (in the
+/// skeleton's time), and how long the fall takes: one after another
+/// through its old age
+fn offshootAt(j:usize,grown:f32)m.Vice(f32,2){return.{grown*(1+oldAge*0.08+oldAge*0.12*m.f(j)),grown*oldAge*0.2};}
+/// an offshoot out of the stem where young leaf `i` was, late in its
+/// life: a slender bough arching up and out, crowned with a small tuft,
+/// two strands hanging from it
+fn offshoot(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,i:usize,grown:f32)Allocator.Error!void{
+  // where it leaves the stem, its bearing, and the way out
+  const ya=youngAt(i);
+  const out=v3(@cos(ya[1]),0,@sin(ya[1]));
+  const from=k.point(trunk,ya[0]);
+  // its control points: out of the stem, arching up and out
+  var c:[4]V3=undefined;
+  for(&c,[_]f32{0,0.25,0.5,0.64},[_]f32{0,0.1,0.28,0.38})|*q,r,h|q.*=from+out*m.splat3(r)+v3(0,h,0);
+  // when it grows, and how long it takes
+  const when=offshootAt(i/2,grown);
+  const id=k.late(trunk,ya[0],&c,when[0],grown*oldAge*0.3);
+  try k.braid(b,id,.{.girth=0.03,.tip=0.25,.strands=fold,.twist=3,.wobble=pal.strandWobble,.seed=0x5A00+%i,.core=kit.pale,.strand=kit.green,.t0=0.6,.t1=0.9});
+  try tuft(b,k,id,12,0x5A10+%i*13);
+  try curtain(b,k,id,2,0.5,0.95,0.35,0x5A20+%i*17);
+}
+/// its foot hardening with age: woven strands, a green one round a pale
+/// core each, winding up round the base of the trunk one after another
+/// once it is a real tree, thickening it
+fn harden(b:*mg.Builder,k:*growth.Skeleton,trunk:growth.Id,grown:f32)Allocator.Error!void{
+  for(0..fold)|i|{
+    // where it starts round the trunk (radians)
+    const a0=m.ratio(i,fold)*m.tau;
+    // its control points: from inside the foot, winding up round the trunk
+    var c:[8]V3=undefined;
+    for(&c,0..)|*q,j|{
+      // how far up its winding, the trunk's point there, and its bearing
+      const f=m.ratio(j,7);
+      const u=m.lerp(0.01,0.4,f);
+      const a=a0+f*1.4*m.pi;
+      // out from the trunk's core to just over its surface (none at the start)
+      const r=if(j==0)0 else trunkStalk.girth*m.lerp(1.5,0.95,f);
+      q.*=k.point(trunk,u)+v3(@cos(a)*r,0,@sin(a)*r);
+    }
+    const id=k.late(trunk,0.01,&c,grown*(1+oldAge*0.05*m.f(i)),grown*oldAge*0.6);
+    try k.braid(b,id,.{.girth=0.04,.tip=0.4,.strands=3,.twist=2,.wobble=pal.strandWobble,.seed=0x5B00+%i,.core=kit.pale,.strand=kit.green,.t0=0.6,.t1=0.9});
+  }
 }
