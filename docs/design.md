@@ -172,13 +172,13 @@ plant.
   spore and takes in what comes back. It lets go only what came by spore
   (`kept` counts per kind).
 - **Monfris** (weftstone + driftbraid, INTERWEAVING): 2×2. It weaves
-  everything convergent (`Recipe.convergent`: weftstone,
+  everything convergent (`Recipe.convergent`, `Def.lineage`: the polyp, weftstone,
   driftbraid, monfris, Vultrixi; the germinator weaves these too, so the
   first monfris can be made), the arsthraxia once the unforming has
   evolved it into a convergent structure (`Recipe.evolves`), and the
   advanced tier only it weaves
   (`Recipe.advanced`, none yet); together `craft.loomFor`. Never the
-  diamond or the vesper seed (radiant), which are the
+  diamond or the vesper seed (radiant, with the celestial bloom), which are the
   germinator's. It never lets go of what its weave eats (a
   weftstone while it weaves a monfris). Fed by at most 6 Vultrixi
   (`monfris.tethers`, because a weave of its has at most 6 kinds), by
@@ -258,7 +258,7 @@ Radiance is a field of light that some plants need to live.
 ## The unforming (`game/unforming.zig`): the first world event
 Begun the moment THE UNFORMING (after Celestial Defragmentation; 30 units
 of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
-- **Radiant plants** (bloom, vesper) glitch, shatter like glass and blink
+- **Radiant plants** (`Lineage.radiant`: bloom, vesper) glitch, shatter like glass and blink
   out, one after another over 6 s, each in 5 s (GPU: `PlantInstance.glitch`,
   plant.vert `unformAt`, plant.frag `unform`; `--plant=bloom --state=unform`).
 - **Their shards** fly up to one point 14 m over their middle and gather

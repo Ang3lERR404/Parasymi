@@ -62,7 +62,7 @@ pub const meets:st.Meeting=.{.kind=.driftbraid,.found=.weftAndDrift};
 pub const meshes=.{.itemPod,.lithophageCrystal,.weftstoneTendril,.weftstoneSpark};
 /// what a weftstone is: grown from its seed, one tile across, a floating
 /// store, tall, swaying a little
-pub const def:st.Def=.{.item=.weftstone,.size=1,.mesh=.weftstone,.store=true,.grow=7,.sway=0.3,.tall=1.2,.sap=0.3,.floating=true};
+pub const def:st.Def=.{.item=.weftstone,.lineage=.convergent,.size=1,.mesh=.weftstone,.store=true,.grow=7,.sway=0.3,.tall=1.2,.sap=0.3,.floating=true};
 /// how far its tendrils reach, in tiles, every way
 pub const reachTiles=2;
 /// how many nodes it latches onto at once

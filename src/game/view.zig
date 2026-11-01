@@ -473,7 +473,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // its size (tiles)
     const size=m.f(def.size);
     y+=heave(size)*pose.lift;
-    try roots(g,m.footprintCentre(d.x,d.y,def.size,d.ground),size,m.dirYaw(d.dir)+pose.spin,pose,d.seed,def.lineage.affinity()<-0.5);
+    try roots(g,m.footprintCentre(d.x,d.y,def.size,d.ground),size,m.dirYaw(d.dir)+pose.spin,pose,d.seed,def.affinity()<-0.5);
   }
   if(def.floating){
     // floaters hang in the air: a slow rise and fall and a lazy drift,
@@ -495,7 +495,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   };
   try g.inst[meshgen.plantSlot(d.sp,key.v,lod)].append(g.gpa,.{
     .pos=.{at[0],y,at[2]},
-    .a=.{d.growth,d.mana/def.manaCap,d.seed,def.lineage.affinity()},
+    .a=.{d.growth,d.mana/def.manaCap,d.seed,def.affinity()},
     .b=.{d.flow,d.health,def.sway,m.f(@intFromEnum(def.genome.form))},
     .c=.{key.f,if(d.ghost)1 else 0,if(d.fits)1 else 0,m.dirYaw(d.dir)+pose.spin},
     .h=halo,

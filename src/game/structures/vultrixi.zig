@@ -69,7 +69,7 @@ const v3=m.v3;
 pub const meshes=.{.itemPod,.monfrisTether,.weftstoneTendril};
 /// what a Vultrixi is: grown from its seed, one tile across, floating,
 /// tall, swaying a little, and drawn from afar
-pub const def:st.Def=.{.item=.vultrixi,.size=1,.mesh=.vultrixi,.grow=6,.sway=0.3,.tall=1.3,.sap=0.3,.floating=true,.far=true};
+pub const def:st.Def=.{.item=.vultrixi,.lineage=.convergent,.size=1,.mesh=.vultrixi,.grow=6,.sway=0.3,.tall=1.3,.sap=0.3,.floating=true,.far=true};
 /// how far its tendril reaches (tiles between it and a structure's edge)
 pub const reachTiles=6;
 /// seconds its tendril takes to reach a structure
@@ -567,7 +567,7 @@ test"Vultrixi tether to a monfris, six at most, each bringing one kind of its we
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
-  g.done.insert(craft.hand[craft.loom[0]].needs.?);
+  if(craft.hand[craft.loom[0]].needs)|id|g.done.insert(id);
   try testing.expect(try ss.place(gpa,&w,6,6,.monfris,0,0));
   for(0..7)|k|try testing.expect(try ss.place(gpa,&w,@intCast(k+1),2,.vultrixi,0,0));
   for(0..7)|k|tether(&ss,&w,&g,.{@intCast(k+1),2},.{6,6});
@@ -594,7 +594,7 @@ test"a Vultrixi pulls what a structure lets go into its monfris, which weaves it
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
-  g.done.insert(craft.hand[craft.loom[0]].needs.?);
+  if(craft.hand[craft.loom[0]].needs)|id|g.done.insert(id);
   try testing.expect(try ss.place(gpa,&w,8,8,.monfris,0,0));
   // the monfris, and the weave it is set to
   const loom=ss.at(&w,8,8).?;

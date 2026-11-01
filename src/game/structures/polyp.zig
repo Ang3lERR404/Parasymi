@@ -36,7 +36,7 @@ const halo=lib.haloStructure;
 pub const meshes=.{.driftFlower};
 /// what a polyp is: grown from its bulb, one tile across, swaying gently,
 /// standing a tile tall, rich in sap
-pub const def:st.Def=.{.item=.polyp,.size=1,.mesh=.polyp,.sway=0.4,.tall=1,.grow=6,.sap=0.6};
+pub const def:st.Def=.{.item=.polyp,.lineage=.convergent,.size=1,.mesh=.polyp,.sway=0.4,.tall=1,.grow=6,.sap=0.6};
 /// how far (tiles, either way) it reaches for blooms to feed on
 pub const feedReach:i32=4;
 /// seconds of one bloom's light it takes to grow a flower

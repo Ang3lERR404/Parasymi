@@ -329,3 +329,17 @@ test"partners: one way or both ways, re-pairing leaves the old one, uprooting cu
   _=ss.remove(&w,b);
   try testing.expect(ss.get(ss.at(&w,2,0).?).partner()==null);
 }
+test"every convergent structure is a monfris's to weave, and no radiant one is"{
+  // the weave tables
+  const craft=lib.craft;
+  for(reg.ids)|k|{
+    // this kind's def, and its bulb's weave among the monfris's, if it is one
+    const d=defs.get(k);
+    const lin=d.lineage orelse continue;
+    const on=for(craft.loom)|r|{
+      if(craft.hand[r].out==d.item)break true;
+    }else false;
+    if(lin==.convergent)try testing.expect(on);
+    if(lin==.radiant)try testing.expect(!on);
+  }
+}

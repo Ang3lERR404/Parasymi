@@ -12,10 +12,11 @@ const species=lib.species;
 const engine=lib.engine;
 /// colour types, for its genome's pearl colours
 const color=engine.core.color;
-/// the celestial bloom: a floating radiant symbiote, holding a field of
+/// the celestial bloom: a floating radiant plant, holding a field of
 /// light 3.5 tiles round and linking with blooms within 10
 pub const def:species.Species=.{
-  .lineage=.symbiotic,.seed=.seedBloom,.floating=true,
+  // decision: radiant, drawn as it always was, with the symbiotes' sap
+  .lineage=.radiant,.look=.symbiotic,.seed=.seedBloom,.floating=true,
   // no item, no output: it radiates instead (the sky feeds it, as it does
   // every floater; it never condenses essence)
   .matureTime=30,.manaCap=10,.leyDraw=0.5,.share=0,.drain=0,.yield=0,

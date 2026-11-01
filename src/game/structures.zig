@@ -65,6 +65,8 @@ const registry=engine.core.registry;
 const ck=lib.ck;
 /// what can be held: item kinds and stacks of them
 const items=lib.items;
+/// the plants' registry, for the lineage a structure belongs to
+const species=lib.species;
 /// the mesh library a structure's mesh is chosen from
 const meshlib=lib.meshlib;
 /// what the gardener has understood: research and discoveries
@@ -248,7 +250,10 @@ pub const Def=struct{
   far:bool=false,
   /// a parasite's: the roots it turns on (R) are pale, not bark
   pale:bool=false,
-  /// of the symbiotic or parasitic lineage: the unforming takes it, grown
+  /// the lineage it belongs to (null: none named yet; the arsthraxia
+  /// evolves from symbiotic into convergent in the unforming)
+  lineage:?species.Lineage=null,
+  /// not convergent: the unforming takes it, grown
   /// back down to nothing and gone (game/unforming.zig)
   unforms:bool=false,
 };

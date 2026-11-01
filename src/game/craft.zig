@@ -63,7 +63,7 @@ pub const hand=[_]Recipe{
   .{.out=.arsthraxia,.in=&.{.{.item=.fibre,.n=8},.{.item=.grit,.n=6},.{.item=.essence,.n=4},.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2}},.time=4,.evolves=true},
   .{.out=.rootDigger,.in=&.{.{.item=.fibre,.n=3},.{.item=.grit,.n=2},.{.item=.leyShard,.n=1}},.time=2,.needs=.deepRooting},
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
-  .{.out=.polyp,.in=&.{.{.item=.fibre,.n=4},.{.item=.essence,.n=3},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=2}},.time=3},
+  .{.out=.polyp,.in=&.{.{.item=.fibre,.n=4},.{.item=.essence,.n=3},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=2}},.time=3,.convergent=true},
   // decision: a diamond is woven from what a halo is grown from, condensed
   // (the brief sets no cost); a germinator's alone, never a monfris's or
   // the hands' (the gardener's word)

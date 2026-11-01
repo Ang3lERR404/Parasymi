@@ -152,6 +152,9 @@ pub const Genome=struct{
 pub const Species=struct{
   /// which path it walks
   lineage:Lineage,
+  /// the lineage whose sap and finish it is drawn with, if not its own (the
+  /// celestial bloom keeps the symbiotes' look though it is radiant)
+  look:?Lineage=null,
   /// the item that plants this species; null when it cannot be sown and only
   /// grows where its parents meet. Plants never set seed: seeds are woven
   /// by a germinator, and an uprooted plant comes back as its seed.
@@ -199,6 +202,8 @@ pub const Species=struct{
   /// growth stages named on hover (0: unstaged; names in `game/text.zig`,
   /// the mesh itself grows continuously; see meshgen `keys`).
   stages:u8=0,
+  /// the shader-side lineage scalar it is drawn with (`look`, else its lineage's)
+  pub fn affinity(s:*const Species)f32{return(s.look orelse s.lineage).affinity();}
   /// which stage a plant at `growth` shows (0 when unstaged).
   pub fn stage(s:*const Species,growth:f32)u32{
     if(s.stages==0)return 0;

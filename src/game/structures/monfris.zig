@@ -60,7 +60,7 @@ const v3=m.v3;
 pub const meshes=.{.bellyLump,.itemPod};
 /// what a monfris is: grown from its seed over ten seconds, two tiles
 /// across, a store, a tall tree swaying only a little
-pub const def:st.Def=.{.item=.monfris,.size=2,.mesh=.monfris,.store=true,.grow=10,.sway=0.2,.tall=1.7,.sap=0.3};
+pub const def:st.Def=.{.item=.monfris,.lineage=.convergent,.size=2,.mesh=.monfris,.store=true,.grow=10,.sway=0.2,.tall=1.7,.sap=0.3};
 /// most Vultrixi tethered to one monfris (a weave of its needs at most
 /// this many kinds)
 pub const tethers=6;

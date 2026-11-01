@@ -65,7 +65,7 @@ pub const pairs:st.Pairs=.{.way=.bothWays};
 /// what a driftbraid is: one tile, keeping what it holds in slots,
 /// growing in over 7 s, swaying gently; its spores are drawn however far
 /// they drift (`far`)
-pub const def:st.Def=.{.item=.driftbraid,.size=1,.mesh=.driftbraid,.store=true,.grow=7,.sway=0.4,.tall=0.9,.sap=0.3,.far=true};
+pub const def:st.Def=.{.item=.driftbraid,.lineage=.convergent,.size=1,.mesh=.driftbraid,.store=true,.grow=7,.sway=0.4,.tall=0.9,.sap=0.3,.far=true};
 /// the most it holds, fed and received together
 pub const holdMost=40;
 /// how many of one kind a spore carries, as a sporecaster's
