@@ -39,6 +39,8 @@ const m=engine.core.math;
 const mg=lib.meshgen;
 /// the vertex colours the ids ride in
 const color=engine.core.color;
+/// the convergence kit: the flowers of both lineages in the hyena's mane
+const kit=lib.convergenceKit;
 /// a point or direction in space
 const V3=m.V3;
 /// makes a vector from three numbers
@@ -140,6 +142,9 @@ const Shape=enum(u8){
   tendrilRideGround,
   /// a part riding an arcing tendril
   tendrilRideArc,
+  /// act 2's gardener, a hyena of stars: one limb of him, which in the
+  /// reach's whole part (`limbs`)
+  hyena,
   /// the yielder's other petals, by number
   _,
 };
@@ -253,6 +258,46 @@ fn yielder(b:*mg.Builder)Allocator.Error!void{
   try cluster(b,.{.shape=.yieldFragment,.reach=0.3,.n=9,.group=3});
   try points(b,.{.shape=.yieldLight,.reach=0,.n=2});
   try points(b,.{.shape=.yieldGathering,.reach=0,.n=1});
+}
+/// one limb of the hyena of stars, its own web (part.vert `PLEXUS_HYENA_A`…
+/// lays it, in the same order): how many points it holds, how far its lines
+/// reach, and the limb it hangs from with which of that one's points its
+/// bonds fasten to (none: it only lies against the rest)
+const Limb=struct{
+  /// how many points
+  n:usize,
+  /// how far its lines reach
+  reach:f32,
+  /// the limb it hangs from, and the point of it its bonds reach
+  from:?struct{u8,u8}=null,
+};
+/// the hyena's limbs: torso, neck, head, muzzle, two ears, mane, then each
+/// arm (upper, fore, hand, left then right), each leg (thigh, shin, foot,
+/// left then right), tail
+const limbs=[_]Limb{
+  .{.n=40,.reach=0.17},.{.n=18,.reach=0.13,.from=.{0,0}},.{.n=30,.reach=0.13,.from=.{1,17}},.{.n=18,.reach=0.11,.from=.{2,29}},
+  .{.n=10,.reach=0.09},.{.n=10,.reach=0.09},.{.n=20,.reach=0.1},
+  .{.n=18,.reach=0.12,.from=.{0,2}},.{.n=16,.reach=0.11,.from=.{7,17}},.{.n=8,.reach=0.08,.from=.{8,15}},
+  .{.n=18,.reach=0.12,.from=.{0,3}},.{.n=16,.reach=0.11,.from=.{10,17}},.{.n=8,.reach=0.08,.from=.{11,15}},
+  .{.n=22,.reach=0.13,.from=.{0,39}},.{.n=18,.reach=0.11,.from=.{13,21}},.{.n=10,.reach=0.08,.from=.{14,17}},
+  .{.n=22,.reach=0.13,.from=.{0,38}},.{.n=18,.reach=0.11,.from=.{16,21}},.{.n=10,.reach=0.08,.from=.{17,17}},
+  .{.n=14,.reach=0.1,.from=.{0,37}},
+};
+/// where the flowers of both lineages sit in his mane
+const maneFlowers=[_]V3{v3(0.05,1.89,-0.04),v3(-0.06,1.85,-0.09),v3(0.01,1.7,-0.15)};
+/// act 2's gardener: a hyena of stars, a living constellation standing
+/// upright as he hovers, his legs hanging; every limb its own web of paired
+/// lights, bonds fastening each to the one it hangs from, all beating from
+/// his chest; a few flowers of both lineages in his mane
+fn hyena(b:*mg.Builder)Allocator.Error!void{
+  for(limbs,0..)|l,k|{
+    // which limb it is, riding in the reach's whole part
+    const seg=m.f(k);
+    try cluster(b,.{.shape=.hyena,.reach=seg+l.reach,.n=l.n});
+    const from=l.from orelse continue;
+    for([_]f32{0,1})|layer|for([_]u8{0,1})|own|try ribbon(b,.{own,from[1],from[0]},.bond,.hyena,v3(seg+0.5,0,layer));
+  }
+  for(maneFlowers,0..)|at,k|try kit.bloom(b,.{.heart=at,.len=0.07,.spin=m.f(k)*1.3,.seed=0x4E7A+k});
 }
 /// a sprig: a stem, a branch stem fastened at its middle joint, a leaf at
 /// its lowest joint and another at its highest, bonds from each joint's
@@ -441,4 +486,9 @@ pub const tendrilGround=struct{
 pub const tendrilArc=struct{
   /// builds the arcing tendril
   pub fn build(b:*mg.Builder)Allocator.Error!void{try tendrilAt(b,2);}
+};
+/// mesh: CONSTELLATE HYENA. act 2's gardener, a hyena of stars hovering
+pub const hyenaMesh=struct{
+  /// builds him
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try hyena(b);}
 };

@@ -229,6 +229,38 @@ const float PLEXUS_TENDRIL_TURNS = 2.2;
 const float PLEXUS_TENDRIL_FLOW = 0.06;
 const float PLEXUS_TENDRIL_RIDING = 8.0;
 const float PLEXUS_TENDRIL_PART = 0.3;
+// act 2's gardener, a hyena of stars (meshes/constellate.zig `limbs`, the
+// same order): upright as he hovers, legs hanging, every limb its own web
+// whose points wind round it from one end to the other on the golden
+// angle, rounding in at both ends. Each limb's ends (mesh space) with its
+// radius there, how many points it holds, and how flat it is front to back.
+// The point of his torso his beat starts from (his chest), and how far a
+// limb's points drift
+const int PLEXUS_HYENA = 58;
+const int PLEXUS_HYENA_TORSO = 0;
+const float PLEXUS_HYENA_CHEST = 6.0;
+const float PLEXUS_HYENA_DRIFT = 0.012;
+const vec4 PLEXUS_HYENA_A[20] = vec4[20](
+  vec4(0.0, 1.42, 0.02, 0.16), vec4(0.0, 1.46, 0.0, 0.085), vec4(0.0, 1.74, -0.08, 0.1), vec4(0.0, 1.72, 0.08, 0.07),
+  vec4(0.07, 1.8, -0.01, 0.05), vec4(-0.07, 1.8, -0.01, 0.05), vec4(0.0, 1.86, -0.05, 0.03),
+  vec4(0.2, 1.4, 0.0, 0.06), vec4(0.25, 1.13, 0.04, 0.048), vec4(0.27, 0.9, 0.12, 0.035),
+  vec4(-0.2, 1.4, 0.0, 0.06), vec4(-0.25, 1.13, 0.04, 0.048), vec4(-0.27, 0.9, 0.12, 0.035),
+  vec4(0.09, 0.98, 0.0, 0.08), vec4(0.11, 0.66, 0.06, 0.055), vec4(0.11, 0.38, -0.02, 0.035),
+  vec4(-0.09, 0.98, 0.0, 0.08), vec4(-0.11, 0.66, 0.06, 0.055), vec4(-0.11, 0.38, -0.02, 0.035),
+  vec4(0.0, 1.0, -0.12, 0.04));
+const vec4 PLEXUS_HYENA_B[20] = vec4[20](
+  vec4(0.0, 0.98, 0.0, 0.13), vec4(0.0, 1.66, 0.04, 0.075), vec4(0.0, 1.74, 0.09, 0.11), vec4(0.0, 1.64, 0.31, 0.045),
+  vec4(0.11, 1.9, -0.03, 0.05), vec4(-0.11, 1.9, -0.03, 0.05), vec4(0.0, 1.2, -0.17, 0.025),
+  vec4(0.25, 1.13, 0.04, 0.048), vec4(0.27, 0.9, 0.12, 0.035), vec4(0.27, 0.82, 0.15, 0.025),
+  vec4(-0.25, 1.13, 0.04, 0.048), vec4(-0.27, 0.9, 0.12, 0.035), vec4(-0.27, 0.82, 0.15, 0.025),
+  vec4(0.11, 0.66, 0.06, 0.06), vec4(0.11, 0.38, -0.02, 0.035), vec4(0.11, 0.27, 0.07, 0.025),
+  vec4(-0.11, 0.66, 0.06, 0.06), vec4(-0.11, 0.38, -0.02, 0.035), vec4(-0.11, 0.27, 0.07, 0.025),
+  vec4(0.0, 0.78, -0.27, 0.03));
+const float PLEXUS_HYENA_N[20] = float[20](40.0, 18.0, 30.0, 18.0, 10.0, 10.0, 20.0, 18.0, 16.0, 8.0, 18.0, 16.0, 8.0, 22.0, 18.0, 10.0, 22.0, 18.0, 10.0, 14.0);
+// how dim each limb's web shines where it crowds close (its torso and head
+// would glare into one white blur)
+const float PLEXUS_HYENA_CROWD[20] = float[20](0.18, 0.4, 0.25, 0.4, 0.6, 0.6, 0.45, 0.6, 0.6, 0.7, 0.6, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5, 0.6, 0.7, 0.5);
+const float PLEXUS_HYENA_FLAT[20] = float[20](0.72, 1.0, 0.95, 1.0, 0.6, 0.6, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0);
 const float PLEXUS_ROSE_FOOT = 1.45;
 const float PLEXUS_HEART_SETTLE = 56.0;
 const float PLEXUS_HEART_DROP = 1.1;
@@ -254,6 +286,8 @@ float plexLocal = 0.0;
 float plexStoryShow = 1.0;
 // how many times the story has begun again (which part the heart makes)
 float plexStoryRound = 0.0;
+// which of the hyena's limbs the web being placed is
+float plexSeg = 0.0;
 // how far into its stage the heart is at time `t` (s): on the story's clock,
 // or looping the stage alone every `loop` s
 float plexusStageClock(float t, float loop) { return plexStory > 0.5 ? plexLocal : mod(t, loop); }
@@ -846,18 +880,39 @@ vec4 plexusTendrilRide(float id, int height, float t, vec3 moved) {
 // which point is the heart of a web of `shape`, where its beat starts: the
 // spindle's middle, a petal's base, a leaf's stalk, a bud's base, a flower
 // head's middle
-float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : 0.0; }
+float plexusHeart(int shape) { return shape == PLEXUS_CLUSTER ? float(PLEXUS_HEART) : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_CHEST : 0.0); }
+// where point `id` of the hyena's limb `seg` rests: wound round the limb
+// from its first end to its last on the golden angle, its radius rounding
+// in at both ends, flattened front to back as the limb is
+vec3 plexusHyena(float id, float seg) {
+  int s = int(seg);
+  vec4 a = PLEXUS_HYENA_A[s];
+  vec4 b = PLEXUS_HYENA_B[s];
+  float u = (id + 0.5) / PLEXUS_HYENA_N[s];
+  vec3 ax = b.xyz - a.xyz;
+  vec3 d = normalize(ax);
+  vec3 side = normalize(cross(d, abs(d.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+  vec3 up = cross(side, d);
+  float ang = id * 2.39996;
+  float r = mix(a.w, b.w, u) * sqrt(max(sin(0.5 * TAU * mix(0.04, 0.96, u)), 0.0));
+  vec3 off = (side * cos(ang) + up * sin(ang)) * r;
+  off.z *= PLEXUS_HYENA_FLAT[s];
+  return a.xyz + ax * u + off + (hash33(vec3(id, seg, 4.3)) - 0.5) * 0.01;
+}
 // where it is at time `t`: drifting round its rest, each axis on two slow
 // waves of its own (a part only a little, keeping its form); a yielder's
 // petal then carried round with it, what it yields on its own way
 vec3 plexusAt(float id, int shape, float t) {
   if (shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING) return plexusYield(id, shape, t).xyz;
-  vec3 f = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 11.3, 2.9)));
-  vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(id, 5.7, 19.1)));
-  vec3 ph = hash33(vec3(id, 23.9, 1.3)) * TAU;
+  // (each of the hyena's limbs drifts its own way)
+  float hid = shape == PLEXUS_HYENA ? id + plexSeg * 61.0 : id;
+  vec3 f = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(hid, 11.3, 2.9)));
+  vec3 g = mix(vec3(PLEXUS_SLOW), vec3(PLEXUS_QUICK), hash33(vec3(hid, 5.7, 19.1)));
+  vec3 ph = hash33(vec3(hid, 23.9, 1.3)) * TAU;
   vec3 d = 0.6 * sin(t * f + ph) + 0.4 * sin(t * g * 1.7 + ph.yzx * 2.0);
-  float drift = shape == PLEXUS_CLUSTER ? PLEXUS_DRIFT : PLEXUS_PART_DRIFT;
+  float drift = shape == PLEXUS_CLUSTER ? PLEXUS_DRIFT : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_DRIFT : PLEXUS_PART_DRIFT);
   vec3 moved = drift * d * vec3(1.0, 0.6, 1.0);
+  if (shape == PLEXUS_HYENA) return plexusHyena(id, plexSeg) + moved;
   if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
   if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) return plexusSprig(id, shape, moved);
   if (shape == PLEXUS_HEART_STEM) return plexusHeartStem(id, t, moved);
@@ -888,7 +943,7 @@ float plexusLink(vec3 a, vec3 b, float reach) { return 1.0 - smoothstep(reach * 
 // -1 its companion): circling the other round where the point has drifted
 // to, each pair about an axis and at a pace of its own
 vec3 plexusLight(float id, int shape, float t, float twin) {
-  vec3 h = hash33(vec3(id, 41.7, 13.3));
+  vec3 h = hash33(vec3(shape == PLEXUS_HYENA ? id + plexSeg * 61.0 : id, 41.7, 13.3));
   vec3 axis = normalize(h - 0.5 + vec3(0.0, 0.6, 0.0));
   vec3 side = normalize(cross(axis, abs(axis.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   float spin = t * mix(PLEXUS_PAIR_SLOW, PLEXUS_PAIR_QUICK, h.z) + h.x * TAU;
@@ -1059,8 +1114,10 @@ void main() {
     plexKind = mod(code, 4.0);
     // what shape the web holds (alpha's high part)
     int shape = int(code / 4.0);
-    // the reach (pos.x), its whole part the heart's stage
-    plexStage = floor(pos.x);
+    // the reach (pos.x), its whole part the heart's stage (for the hyena,
+    // which of his limbs)
+    plexStage = shape == PLEXUS_HYENA ? 0.0 : floor(pos.x);
+    plexSeg = floor(pos.x);
     // (the whole story: which stage it is at now, how far into it, and how
     // much shows as it fades out at the end and in at the start)
     if (plexStage > 4.5) {
@@ -1088,10 +1145,17 @@ void main() {
     // another (of shape ids.z): a yielder's core to each petal's base, the
     // point it gathers to each tip; a sprig's stem joint to what fastens
     // there
-    if (plexKind > 2.5) B = plexusLight(ids.y, int(ids.z), t, twin);
+    if (plexKind > 2.5 && shape != PLEXUS_HYENA) B = plexusLight(ids.y, int(ids.z), t, twin);
+    // (the hyena's bonds join a limb to the one it hangs from: ids.z which)
+    if (plexKind > 2.5 && shape == PLEXUS_HYENA) {
+      float own = plexSeg;
+      plexSeg = ids.z;
+      B = plexusLight(ids.y, shape, t, twin);
+      plexSeg = own;
+    }
     // a build's webs all beat from one heart: a yielder's from its core's,
     // a sprig's from its stem's foot
-    int hs = shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
+    int hs = shape == PLEXUS_HYENA ? PLEXUS_HYENA : shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
     // (a bloom burst free from a settling heart beats on its own, from its
     // base, and so does each of its petlets)
     bool bloomPart = (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) || (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND);
@@ -1108,7 +1172,11 @@ void main() {
     // in the chain reaction the heart's webs reach as far as it has grown
     // (all through the story, built at its risen size)
     if ((plexStage > 2.5 || plexStory > 0.5) && ((shape >= PLEXUS_HEART_STEM && shape < PLEXUS_HEART_SEED) || shape == PLEXUS_HEART_ROSE)) reach *= plexusHeartSize(t) / 0.7;
+    // (the hyena's beat starts in his chest, whichever limb this is)
+    float limb = plexSeg;
+    if (shape == PLEXUS_HYENA) plexSeg = float(PLEXUS_HYENA_TORSO);
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
+    plexSeg = limb;
     // how much there is of what a yielder yields, as it grows and is let go
     // (or of a heart's filament as it drips down)
     float yield = shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING ? plexusYield(ids.x, shape, t).w : 1.0;
@@ -1142,6 +1210,7 @@ void main() {
     if (shape == PLEXUS_HEART_ROSE || (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT)) plexCrowd = 0.45;
     if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) plexCrowd = 0.6;
     if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) plexCrowd = 0.55;
+    if (shape == PLEXUS_HYENA) plexCrowd = PLEXUS_HYENA_CROWD[int(plexSeg)];
     plexMote = shape == PLEXUS_YIELD_LIGHT ? 1.0 : (shape == PLEXUS_YIELD_GATHERING || shape == PLEXUS_HEART_MADE_GLOW ? 2.0 : 0.0);
     // a stem's joints, where things fasten, hold larger lights
     bool stemmed = shape == PLEXUS_STEM || shape == PLEXUS_SPRIG_STEM || shape == PLEXUS_SPRIG_BRANCH || shape == PLEXUS_HEART_STEM;

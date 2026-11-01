@@ -213,6 +213,8 @@ const parts=struct{
   pub const constellateTendrilGround=@import("meshes/constellate.zig").tendrilGround;
   /// a sketch: a constellate tendril arcing over
   pub const constellateTendrilArc=@import("meshes/constellate.zig").tendrilArc;
+  /// a sketch: act 2's gardener, a hyena of stars hovering
+  pub const constellateHyena=@import("meshes/constellate.zig").hyenaMesh;
   // (light: blends over the satellites spinning round it)
   /// the core of condensing light, a ball a unit across
   pub const arsthraxiaCore=@import("meshes/arsthraxia.zig").core;
