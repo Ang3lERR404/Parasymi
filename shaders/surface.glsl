@@ -133,6 +133,25 @@ Sheet leafSheet(vec2 sh) {
   float net = netShows > 0.0 ? sheetNet(q) * netShows : 0.0;
   return Sheet(max(mid, lat), net, smoothstep(0.72, 1.0, a), along, across);
 }
+// how many veins run out from a floating pad's middle
+const float PAD_VEINS = 26.0;
+// a pad's surface (meshgen/lilies.zig: `sh.x` how far out from its middle,
+// 0..1, `sh.y` how far round from its notch, -1..-3): veins running out
+// from its middle, forking once on the way, fading before the rim, the
+// fine net between them, its rim and a paler heart
+Sheet padSheet(vec2 sh) {
+  float far = sh.x, round = (-1.0 - sh.y) * 0.5;
+  float veins = PAD_VEINS * (far > 0.45 ? 2.0 : 1.0);
+  float phase = round * veins;
+  float fp = fwidth(phase);
+  float d = abs(fract(phase + 0.5) - 0.5);
+  float w = mix(0.09, 0.05, far);
+  float vein = (1.0 - smoothstep(w, w + fp * 1.5, d)) * smoothstep(0.06, 0.16, far) * (1.0 - smoothstep(0.82, 0.97, far)) * (1.0 - smoothstep(0.3, 0.7, fp));
+  vec2 q = vec2(round * 90.0, far * 14.0);
+  float netShows = 1.0 - smoothstep(0.3, 0.8, length(fwidth(q)));
+  float net = netShows > 0.0 ? sheetNet(q) * netShows : 0.0;
+  return Sheet(vein, net, smoothstep(0.85, 1.0, far), far, round);
+}
 // a petal's surface: fine streaks running out from its claw, wavering,
 // fading toward its tip, and its edge
 Sheet petalSheet(vec2 sh) {
@@ -170,6 +189,16 @@ float grainOf(int part, vec2 sh, float t) {
 }
 vec3 sheetColour(vec3 body, int part, vec2 sh, float t, out float trans) {
   trans = 1.0;
+  if (sh.y < -0.5 && part == PART_LEAF) {
+    // a pad afloat: its veins run out from its middle
+    Sheet s = padSheet(sh);
+    body = mix(body, body * vec3(1.25, 1.28, 0.95) + 0.012, s.vein * 0.5);
+    body *= 1.0 - 0.08 * s.net;
+    body = mix(body, body * vec3(1.15, 1.0, 0.8), s.edge * 0.5);
+    body *= mix(1.15, 1.0, smoothstep(0.0, 0.2, s.along));
+    trans = (1.0 - 0.5 * s.vein) * (1.0 - 0.3 * s.net);
+    return body;
+  }
   if (sh.y < 0.5) return body;
   if (sh.y > 3.5) return body;
   if (part == PART_LEAF || part == PART_EAR) {

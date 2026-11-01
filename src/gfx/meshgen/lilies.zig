@@ -179,6 +179,8 @@ fn pad(b:*Builder,mid:V3,dir:V3,r:f32,col:color.Rgba8,rim:color.Rgba8,t:f32)Allo
   // the way across the pad, and its face (up)
   const side=m.norm(m.cross(v3(0,1,0),dir));
   const up=v3(0,1,0);
+  // where its vertices begin, for its veins (below)
+  const first=b.mark();
   for([_]f32{-1,1})|s|{
     // each row's middle, the way across it, its face, half-width, dish and colour
     var sp:[padRows]V3=undefined;
@@ -203,5 +205,15 @@ fn pad(b:*Builder,mid:V3,dir:V3,r:f32,col:color.Rgba8,rim:color.Rgba8,t:f32)Allo
       cs[i]=color.mix(col,rim,@abs(x)*0.6);
     }
     try mg.lamina(b,.{.spine=&sp,.side=&sd,.face=&fc,.width=&wd,.dish=&ds,.broad=r*0.5,.col=&cs,.t=t,.part=.leaf});
+  }
+  // its veins run out from its middle: each vertex carries how far out it
+  // lies (tu.y, 0 middle .. 1 rim) and how far round from the notch
+  // (tu.z, -1 .. -3; surface.glsl `padSheet`)
+  for(b.v.items[first..])|*v|{
+    // its place from the middle, back toward the notch and across
+    const d=v3(v.pos[0],0,v.pos[2])-v3(mid[0],0,mid[2]);
+    const round=@mod(m.atan2(m.dot(d,side),-m.dot(d,dir)),m.tau)/m.tau;
+    v.tu[1]=m.clamp01(m.len(d)/r);
+    v.tu[2]=-1-2*round;
   }
 }
