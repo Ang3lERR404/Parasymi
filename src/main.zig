@@ -164,6 +164,10 @@ pub fn main(init:Init)!void{
   // watch it unattended
   // decision: a test flag beside `--demo`, not a garden of its own
   var unforming=false;
+  // `--act2`: the garden begins in the star hyena's act, the strange seed
+  // in his keeping
+  // decision: a test flag until the wolf's rooting begins act 2 in play
+  var act2=false;
   for(args[1..])|a|{
     if(eql(u8,a,"--inspect"))inspect=.player;
     if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
@@ -176,6 +180,7 @@ pub fn main(init:Init)!void{
     if(eql(u8,a,"--stress"))stress=true;
     if(eql(u8,a,"--load"))load=true;
     if(eql(u8,a,"--unforming"))unforming=true;
+    if(eql(u8,a,"--act2"))act2=true;
     if(startsWith(u8,a,"--tod="))tod=try parseFloat(f32,a["--tod=".len..]);
     if(startsWith(u8,a,"--speed="))speed=try parseFloat(f64,a["--speed=".len..]);
     if(startsWith(u8,a,"--seed="))seed=try parseInt(u64,a["--seed=".len..],0);
@@ -291,6 +296,11 @@ pub fn main(init:Init)!void{
   if(tod)|t|game.sky.tod=t;
   game.speed=speed;
   if(unforming)game.prog.done.insert(.unforming);
+  if(act2){
+    game.act=.hyena;
+    _=game.player.inv.add(.strangeSeed,1);
+    game.bar[0]=.strangeSeed;
+  }
   if(inspect)|f|{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});
@@ -322,7 +332,7 @@ pub fn main(init:Init)!void{
     // the swapchain's size this frame (px)
     const screen=r.extent();
     try game.update(&input,@floatCast(dt),screen);
-    for(game.player.footfalls())|ff|if(ff)|f|if(sounds)|o|{
+    for(game.player.footfalls())|ff|if(ff)|f|if(sounds)|o|if(lib.act.steps(game.act)){
       o.send(.{.step=f})catch|e|log.warn("footstep: {t}",.{e});
     };
     if(game.stars.twinkled())|t|if(sounds)|o|{

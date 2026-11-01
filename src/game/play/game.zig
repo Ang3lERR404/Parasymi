@@ -270,6 +270,8 @@ pub const Game=struct{
   specimen:?Specimen=null,
   /// the first world event: where it stands (saved)
   unforming:lib.unforming.Unforming=.{},
+  /// which act the garden is in: who the gardener is (game/act.zig)
+  act:lib.act.Act=.wolf,
   /// the radiant plants as they were when it began, for their shards'
   /// flight (not saved)
   unformSources:std.ArrayList(lib.unforming.Source)=.empty,

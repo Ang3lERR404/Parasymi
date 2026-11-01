@@ -176,7 +176,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     var keyed:f32=0;
     if(ctl.down(in,.zoomIn))keyed+=keyZoomRate*dt;
     if(ctl.down(in,.zoomOut))keyed-=keyZoomRate*dt;
-    if(in.scroll+keyed!=0)g.cam.zoom(in.scroll+keyed,g.player.eyes());
+    if(in.scroll+keyed!=0)g.cam.zoom(in.scroll+keyed,lib.act.eyes(g.act,&g.player,@floatCast(g.time)));
   }
   // interaction with the hovered tile (none while inspecting)
   g.aim(cursor,screen,inspecting);
@@ -296,7 +296,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   g.player.gaze=if(g.cam.inEyes())g.cam.gaze()else null;
   g.player.move(wish,ctl.down(in,.run),&g.world,dt);
   g.player.animate(&g.world,dt);
-  g.cam.see(g.player.eyes());
+  g.cam.see(lib.act.eyes(g.act,&g.player,@floatCast(g.time)));
   // the point the camera follows, above the wolf's feet
   const follow=g.player.pos+m.v3(0,followHeight,0);
   g.cam.target=m.dampV(g.cam.target,follow,followLerp,dt);

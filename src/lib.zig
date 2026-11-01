@@ -28,6 +28,8 @@ pub const player=@import("game/player.zig");
 pub const specimen=@import("game/specimen.zig");
 /// the first world event: the radiant plants shatter, the lineages die, a seed falls
 pub const unforming=@import("game/unforming.zig");
+/// the garden's two acts: the wolf's, then the star hyena's
+pub const act=@import("game/act.zig");
 /// the weather: the rain the air rains soaking back into the ground
 pub const weather=@import("game/weather.zig");
 /// moss grown in the garden by its creepers, kept and laid on each chunk
@@ -132,6 +134,8 @@ pub const braidedConduit=@import("gfx/meshes/braided_conduit.zig");
 pub const conduit=@import("gfx/meshes/conduit.zig");
 /// the convergence kit: the shared pieces of grown-together bodies
 pub const convergenceKit=@import("gfx/meshes/convergence_kit.zig");
+/// the constellate sketches: the star hyena's limbs, bones and pose among them
+pub const constellate=@import("gfx/meshes/constellate.zig");
 /// mesh: the driftbraid, a braided conduit and sporecaster grown into one
 pub const driftbraid=@import("gfx/meshes/driftbraid.zig");
 /// mesh: the ganglion, a parasite's nerve knot

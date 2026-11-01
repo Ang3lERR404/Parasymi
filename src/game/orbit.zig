@@ -101,7 +101,7 @@ pub const Orbit=struct{
     const c=&g.cam;
     if(o.focus==.eyes){
       c.yaw=yaw;
-      c.view=.{.eyes=.{.pos=g.player.eyes(),.pitch=-o.pitch,.k=1}};
+      c.view=.{.eyes=.{.pos=lib.act.eyes(g.act,&g.player,@floatCast(g.time)),.pitch=-o.pitch,.k=1}};
       g.sinceSave=0;
       g.hover=null;
       return o.due();

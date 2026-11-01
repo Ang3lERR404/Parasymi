@@ -209,7 +209,14 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   const alone=g.specimen!=null;
   // where the wolf's paws are, for their contact shadows (none when alone)
   // (but for one the wolf plucks)
-  const feet=if(alone and !g.specimen.?.wolf())noFeet else try g.player.rig(&g.parts,g.headless());
+  // (in the hyena's act the gardener hovers: no paws touch down)
+  const feet=if(alone and !g.specimen.?.wolf())noFeet else switch(g.act){
+    .wolf=>try g.player.rig(&g.parts,g.headless()),
+    .hyena=>blk:{
+      try lib.act.draw(&g.player,&g.parts,@floatCast(g.time),g.headless());
+      break:blk noFeet;
+    },
+  };
   if(!alone or g.specimen.?.what==.structure){
     try nodes(g,@intFromFloat(reach));
     try structures(g,reach,tf);
