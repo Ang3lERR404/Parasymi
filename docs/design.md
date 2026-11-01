@@ -549,4 +549,4 @@ it differs from what is in effect.
 4. ~~One "wow" visual moment (sky shift at convergence)~~
 
 Target: a stranger plays 2 hours and says "I want to see what happens
-next." "Celestial / beyond comprehension" is the next phase's look.
+next."
