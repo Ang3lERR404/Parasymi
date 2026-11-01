@@ -69,6 +69,16 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
   field): a mist lying low round its foot, torn into the same wisps, and a
   cloud gathering in a billowing band over its crown (3–4.5 over the
   ground), both drifting off on the wind, spreading and slowly drying.
+  Cloud gathered heavy swells deeper, fills in between its billows and
+  hangs grey, its belly darker the thicker it is (it swallows a share of
+  the light it stops). Under raining cloud, grey sheets of rain haze fall
+  to the ground.
+- **Rain** (`passes/rain.zig`, rain.vert/.frag): drops grown on the GPU
+  over a grid fixed to the world round the view, falling from the cloud's
+  belly wherever the field rains, as many as the rain is heavy, leaning on
+  the wind; thin pale streaks lit by the sky, each splashing a ring that
+  spreads and fades where it lands. Ground the rain has soaked is darker
+  and a little bluer, its grass too (terrain.frag), drying slowly.
 - **Light shafts:** the key light is looked up in its shadow map at every
   step, so what shades the ground shades the air: light falls through the
   gaps between plants and structures, and glows toward the sun (forward

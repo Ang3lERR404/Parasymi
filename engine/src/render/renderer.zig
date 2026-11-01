@@ -38,6 +38,8 @@ const postMod=@import("post.zig");
 const light=@import("light.zig");
 /// the air: the overhead map, the field, the volume and its composite
 const Volume=@import("volume.zig").Volume;
+/// what the field is kept in (volume.zig)
+const fieldFormat=@import("volume.zig").fieldFormat;
 /// the post chain: the world's HDR image, its glow and the smoothing
 const Post=postMod.Post;
 /// the HDR image's format, which world passes draw into
@@ -155,7 +157,7 @@ pub const pass=struct{
       .vert=vs,.frag=fs,
       .bindings=d.bindings,.attrs=d.attrs,
       .layout=layout,
-      .colorFormat=switch(d.target){.shadow=>.undefined,.overhead,.field,.world,.volume=>hdrFormat,.screen=>screen},
+      .colorFormat=switch(d.target){.shadow=>.undefined,.field=>fieldFormat,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
       .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,
       .samples=postMod.sampleFlags(if(d.target==.world)samples else 1),.perSample=d.perSample,
       .viewMask=if(d.target==.shadow)light.views else 0,
@@ -253,6 +255,11 @@ pub fn Renderer(comptime G:type)type{
       probe:Buffer=.{},
       /// (whether it copied one)
       probing:bool=false,
+      /// where the whole field is copied out to when the scene asks
+      /// (`readField`), and whether this frame copied it
+      whole:Buffer=.{},
+      /// (whether it copied it)
+      wholing:bool=false,
     };
     /// the allocator the renderer and its lists are made with
     gpa:Allocator,
@@ -298,6 +305,12 @@ pub fn Renderer(comptime G:type)type{
     /// (its optional `probe`, world x and z), as the GPU had it a frame or
     /// two ago: null until one comes back
     probed:?m.Vec(f32,4)=null,
+    /// the whole field as the GPU last had it when the scene asked
+    /// (`readField`), a frame or two old (`Volume.texelIn` reads it): empty
+    /// until one comes back
+    field:[]u8=&.{},
+    /// how many times `field` has come back: a new count, a new field
+    fieldReads:u32=0,
     /// the game's own state (see `G.Ext`)
     ext:G.Ext,
     /// `aa` falls back to the most samples the GPU offers (see `antialias`)
@@ -332,6 +345,7 @@ pub fn Renderer(comptime G:type)type{
       for(&r.frames)|*f|{
         f.lighting=try Buffer.init(c,@sizeOf(light.Lighting),.{.storage_buffer=true,.shader_device_address=true});
         f.probe=try Buffer.init(c,Volume.texelBytes,.{.transfer_dst=true});
+        if(comptime @hasField(Scene,"readField"))f.whole=try Buffer.init(c,Volume.fieldBytes,.{.transfer_dst=true});
         f.pool=try c.device.createCommandPool(&.{.flags=.{.reset_command_buffer=true},.queue_family_index=c.family},null);
         f.fence=try c.device.createFence(&.{.flags=.{.signaled=true}},null);
         f.acquired=try c.device.createSemaphore(&.{},null);
@@ -438,12 +452,15 @@ pub fn Renderer(comptime G:type)type{
         }
         f.lighting.deinit(c);
         f.probe.deinit(c);
+        f.whole.deinit(c);
         c.device.destroyQueryPool(f.queries,null);
         c.device.destroySemaphore(f.acquired,null);
         c.device.destroyFence(f.fence,null);
         c.device.destroyCommandPool(f.pool,null);
       }
       r.shotBuf.deinit(c);
+      r.gpa.free(r.field);
+      r.field=&.{};
       for(r.pipes)|p|c.device.destroyPipeline(p,null);
       for(r.layouts)|l|c.device.destroyPipelineLayout(l,null);
       r.post.deinit(c);
@@ -520,6 +537,12 @@ pub fn Renderer(comptime G:type)type{
         r.probed=Volume.texelOf(f.probe.map[0..Volume.texelBytes]);
         f.probing=false;
       }
+      if(f.wholing){
+        if(r.field.len==0)r.field=try r.gpa.alloc(u8,Volume.fieldBytes);
+        @memcpy(r.field,f.whole.map[0..Volume.fieldBytes]);
+        r.fieldReads+%=1;
+        f.wholing=false;
+      }
       if(resized){try r.recreate();return;}
       // the acquired swapchain image
       const acq=c.device.acquireNextImageKHR(r.sc.handle,m.maxInt(u64),f.acquired,.null_handle)catch|e|switch(e){
@@ -574,6 +597,10 @@ pub fn Renderer(comptime G:type)type{
         if(comptime @hasField(Scene,"probe"))if(scene.probe)|at|{
           r.volume.probe(cmd,at,f.probe.buf);
           f.probing=true;
+        };
+        if(comptime @hasField(Scene,"readField"))if(scene.readField){
+          r.volume.readAll(cmd,f.whole.buf);
+          f.wholing=true;
         };
       }
       r.beginWorld(cmd,scene.clear);

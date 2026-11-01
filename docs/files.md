@@ -86,7 +86,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `fog.vert` — one full-screen triangle for the fog, handing on the inverse view-projection (worked out once a vertex, not once a texel).
 - `ground.glsl` — the ground's own stuff, worked out per pixel: soil, moss, stone and ley ground melted into each other along wandering, frayed borders…
 - `moisture.frag` — the moisture field's next step at each texel (render/passes/moisture.zig): the last step drifted along the garden's wind, spread into its…
-- `moisture.glsl` — what the moisture field's passes share (render/passes/moisture.zig): how long a step may be.
+- `moisture.glsl` — what the moisture field's readers share (render/passes/moisture.zig): how long a step may be, how thick cloud must grow before it rains.
 - `moisture.vert` — one full-screen triangle over the whole moisture field, so moisture.frag steps every texel of it on, handing on how long the step is.
 - `moisture_source.frag` — one breathing disc's share at a texel of the moisture field: most at its middle, none at its edge, added onto what is there.
 - `moisture_source.vert` — one thing breathing moisture laid onto the moisture field (render/passes/moisture.zig): a soft disc round where it stands, carrying what it…
@@ -94,6 +94,8 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `part.vert` — places library parts (matrix, curve, star mote, skinned) and moves them: growth splines, wind, breath, carried essence, gathering.
 - `plant.frag` — plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
 - `plant.vert` — plants by form: growth, wind, parasite cages and crowns, lantern filaments, confluence keys, radiant gathering and falling.
+- `rain.frag` — one raindrop (rain.vert): a pale streak soft at its edges and fading toward its tail, or the thin ring of its splash fading as it spreads…
+- `rain.vert` — rain grown on the GPU from the moisture field (render/passes/rain.zig): a drop over every spot near the view, falling from the cloud's…
 - `sky.frag` — the sky dome: gradient by night and day, sun, moon and stars; at the unforming the old sky shatters like glass from the zenith down, a ring…
 - `sky.vert` — one full-screen triangle at the far plane, turned back into view directions.
 - `surface.glsl` — fragment-stage helpers for plant and part materials: what needs screen-space derivatives or discards.
@@ -284,6 +286,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `text.zig` — every player-facing string, loaded once at startup from `filePath` (`parasymi.cfg`) and never read again.
 - `unforming.zig` — THE UNFORMING: the garden's first world event, begun the moment the study of that name is learned.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
+- `weather.zig` — WEATHER: the rain the garden's air rains soaking back into its ground.
 
 ## src/gfx/
 - `growth.zig` — the garden's growth splines: the engine's (engine gfx/growth.zig: the hidden skeleton a grown structure is built on and grows along) for the
@@ -369,6 +372,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `moisture.zig` — moisture: the water in the garden's air, kept on the GPU as the engine's field (render/volume.zig, a texel a unit over the world…
 - `parts.zig` — parts: library meshes (the wolf, nodes, motes, structures), one instanced draw per mesh with a per-instance transform (or, for beams, motes…
 - `plants.zig` — plants: every species' grown mesh variants, instanced; animation lives in plant.vert.
+- `rain.zig` — rain: drops grown on the GPU over every spot near the view, falling wherever the moisture field rains (render/passes/moisture.zig, its…
 - `sky.zig` — sky: the dome behind everything, drawn first as one full-screen triangle without depth (the world draws over it).
 - `terrain.zig` — terrain: one draw per resident chunk mesh (built by renderer.syncWorld).
 

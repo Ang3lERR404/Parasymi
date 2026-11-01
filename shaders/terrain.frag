@@ -1,11 +1,14 @@
 #version 450
 //! terrain shading: the ground's kinds melted together with their own
 //! surfaces (ground.glsl), ley sight and its plexus, the ley lines
-//! sealing (the unforming), shadows, fog. With OVERHEAD, the ground seen
+//! sealing (the unforming), rain soaking it darker, shadows, fog. With OVERHEAD, the ground seen
 //! from above for the fog: the glow it sends into the air, and its height.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "ground.glsl"
+#ifndef OVERHEAD
+#include "volume.glsl"
+#endif
 
 layout(location = 0) centroid in vec3 v_pos;
 layout(location = 1) centroid in vec3 v_nrm;
@@ -37,6 +40,10 @@ const float GRAIN_FADE = 0.035;
 // seen from above, a ley line's plexus as the air takes it: its threads too
 // fine to tell apart, an even glow this strong over the line
 const float PLEXUS_AIR = 0.35;
+// ground soaked through by rain (the moisture field's alpha): how much
+// darker it is, and how much bluer its darkening leans
+const float WET_DARK = 0.42;
+const vec3 WET_TINT = vec3(0.92, 0.96, 1.0);
 
 void main() {
   vec3 n = normalize(v_nrm);
@@ -98,6 +105,11 @@ void main() {
     vec3 grad = sign(det) * (dFdx(g.height) * r1 + dFdy(g.height) * r2);
     n = normalize(abs(det) * n - grad * GROUND_BUMP * fine);
   }
+#ifndef OVERHEAD
+  // the rain soaking it (and its grass) darker
+  float wet = texture(field_map, overheadUv(v_pos)).a;
+  albedo *= mix(vec3(1.0), WET_TINT * (1.0 - WET_DARK), wet);
+#endif
   float sh = keyShadow(v_pos, n);
   vec3 c = shadeLit(mix(albedo, srgb2lin(SEALED_SOIL), closed), n, v_pos, sh) + glow;
   // hovered tile

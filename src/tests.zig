@@ -9,6 +9,7 @@ test{
   _=lib.controls;
   _=lib.gen;
   _=lib.world;
+  _=lib.weather;
   _=lib.ecology;
   _=lib.items;
   _=lib.progression;

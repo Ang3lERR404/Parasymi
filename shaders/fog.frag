@@ -115,9 +115,11 @@ void main() {
     float s = s0 + span * k;
     vec3 p = eye + dir * s;
     vec4 under = groundAt(mix(uvA, uvB, k), ring);
-    float rho = haze(p.y) + low(p, under.a) + mist(p, under.a, t) + breathed(p, under.a, t);
+    vec2 br = breathed(p, under.a, t);
+    float rho = haze(p.y) + low(p, under.a) + mist(p, under.a, t) + br.x;
     vec3 glow = under.rgb * (0.5 + leyPulse(p, t)) * LEY_AIR * exp(-max(p.y - under.a, 0.0) / LEY_RISE) * ALBEDO;
-    vec3 light = amb + key * airLit(L, p, s) + glow;
+    // (heavy cloud and rain swallow their share of what they stop: grey)
+    vec3 light = (amb + key * airLit(L, p, s) + glow) * (1.0 - br.y / max(rho, 1e-6));
     gather(rho * ds, light, scat, trans);
     stepTrans[i] = trans;
   } else for (int i = 0; i < STEPS; i++) stepTrans[i] = trans;

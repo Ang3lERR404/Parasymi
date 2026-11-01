@@ -177,6 +177,8 @@ pub const Strings=struct{
     researchNamed:S="",
     /// the discovery of a polyp's first flower let drift
     flowerDrifts:S="",
+    /// the first rain falls on the garden
+    firstRain:S="",
     /// the unforming learned, just before it begins
     unformingNear:S="",
     /// the unforming begun: the radiant plants shatter, the lineages die

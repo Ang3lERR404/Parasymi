@@ -2,12 +2,18 @@
 //! field (render/volume.zig, a texel a unit over the world, wrapping), one
 //! step a frame. `field` carries the last step on (moisture.frag): each
 //! texel drifts along the wind, spreads into its neighbours and slowly
-//! dries; then `sources` lays in what everything breathing moisture breathed
-//! since (moisture_source.vert/.frag), each a soft disc. Two kinds: the low
-//! mist (red), lying on the ground, and the cloud (green), gathering high
-//! over what breathes it. Each step is as long as the world moved this
-//! frame (`Scene.step`; none while frozen). The fog reads it (air.glsl),
-//! so the mist and the cloud are drawn in the air.
+//! dries; thick cloud gathers, holding together, and past a thickness
+//! rains itself out, the rain soaking the ground under it; then `sources`
+//! lays in what everything breathing moisture breathed since
+//! (moisture_source.vert/.frag), each a soft disc. Four channels: the low
+//! mist (red), lying on the ground; the cloud (green), gathering high over
+//! what breathes it; the rain falling from it (blue, a share of a
+//! downpour), riding with its cloud; the ground's wetness (alpha), staying
+//! where it is. Each step is as long as the world moved this frame
+//! (`Scene.step`; none while frozen). The fog reads it (air.glsl), so the
+//! mist, the cloud and the rain are drawn in the air; the rain pass draws
+//! its drops, the ground darkens where it is wet, and the game reads it
+//! back to soak the ground's water (game/weather.zig).
 const lib=@import("../../lib.zig");
 /// the Vulkan bindings
 const vk=lib.engine.vk;

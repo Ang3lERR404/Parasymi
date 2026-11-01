@@ -125,12 +125,16 @@ A pass's `.target` is where it draws, in this order each frame:
   is kept from frame to frame, so a pass redraws only a few pieces a frame,
   each pushed `volume.overheadOf` as its `vp`;
 - `field`: the game's own state kept over the world on the GPU, laid out
-  as the overhead map (a texel a unit, wrapping). Every frame its passes
+  as the overhead map (a texel a unit, wrapping), in 32-bit floats (so a
+  slow change a frame is never lost to rounding). Every frame its passes
   write the next step whole from the last, which they read through set 1
   (`volume.glsl` `field_map`); two images take turns. Every later pass reads
   the new step. Skipped when no pass draws into it. A scene with a
   `probe` (world x, z) has the field's texel there copied back to the CPU:
-  `Renderer.probed`, a frame or two old;
+  `Renderer.probed`, a frame or two old; a scene whose `readField` is set
+  has the whole field copied back: `Renderer.field` (read a point of it
+  with `Volume.texelIn`), its count `fieldReads` going up by one each time
+  one comes back;
 - `world`: the HDR image;
 - `volume`: the air, at half size, reading the world's depth, the
   overhead map and the field (set 1, `volume.glsl`); rgb what the air sends to the eye, a

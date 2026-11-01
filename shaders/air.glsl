@@ -1,4 +1,5 @@
-//! how dense the garden's air is anywhere: the haze over everything, the low air among the plants, the mist lying low and pooled in the hollows; read by the fog's march and by what glows in it.
+//! how dense the garden's air is anywhere: the haze over everything, the low air among the plants, the mist lying low and pooled in the hollows, what is breathed into it (mist, cloud gathering heavy and grey, rain falling from it); read by the fog's march and by what glows in it.
+#include "moisture.glsl"
 // The including shader includes common.glsl and volume.glsl first (the
 // overhead map holds the ground's height under every point).
 
@@ -75,26 +76,59 @@ const float BREATH_CLOUD = 0.9;
 const float CLOUD_AT = 3.7;
 const float CLOUD_HALF = 0.75;
 const float CLOUD_CELL = 0.9;
-// the breathed mist and cloud's density at `p`, the ground `ground` under
-// it: the mist lying low and torn into the same wisps as the garden's own,
-// the cloud a billowing band over the ground, thickest at its middle
-float breathed(vec3 p, float ground, float t) {
-  vec2 f = texture(field_map, overheadUv(p)).rg;
-  if (f.r + f.g < 1e-4) return 0.0;
+// heavy cloud (gathered thick, near raining: MOISTURE_RAIN_AT, moisture.glsl):
+// from how thick a cloud starts to look heavy, how much deeper its band
+// swells (a share of CLOUD_HALF), how much more of it fills in between the
+// billows, and how much of the light it stops it swallows instead of
+// scattering, so it hangs grey and dark-bellied
+const float HEAVY_FROM = 0.6;
+const float HEAVY_SWELL = 0.5;
+const float HEAVY_FILL = 0.25;
+const float HEAVY_GREY = 0.6;
+// how much darker a cloud's belly is than its top (the light it stops shadowing
+// what lies under it), at its thickest
+const float CLOUD_BELLY = 0.35;
+// rain under a cloud: how much fog a downpour makes, falling in sheets (noise
+// cells per unit across, stretched this many times tall, falling this fast,
+// units/s), and how much of the light it stops it swallows
+const float RAIN_HAZE = 0.05;
+const float RAIN_SHEET = 0.7;
+const float RAIN_TALL = 8.0;
+const float RAIN_FALL = 7.0;
+const float RAIN_GREY = 0.5;
+// the breathed mist, cloud and rain's density at `p`, the ground `ground`
+// under it, and how much of that is dark (swallows the light it stops): the
+// mist lying low and torn into the same wisps as the garden's own, the cloud
+// a billowing band over the ground, thickest at its middle, swelling and
+// darkening as it gathers heavy, the rain falling from it in grey sheets
+vec2 breathed(vec3 p, float ground, float t) {
+  vec4 f = texture(field_map, overheadUv(p));
+  if (f.r + f.g + f.b < 1e-4) return vec2(0.0);
   float h = p.y - ground;
   float mistD = f.r * BREATH_MIST * exp(-max(h, 0.0) / BREATH_HUG) * (0.45 + 0.55 * wisps(p, t));
-  // how far into the band, 0 at its middle, 1 at its edge, and its billows
-  float into = abs(h - CLOUD_AT) / CLOUD_HALF;
+  // how heavy the cloud is, how far into its band (0 at its middle, 1 at its
+  // edge), and its billows
+  float heavy = smoothstep(HEAVY_FROM, MOISTURE_RAIN_AT, f.g);
+  float into = abs(h - CLOUD_AT) / (CLOUD_HALF * (1.0 + HEAVY_SWELL * heavy));
   vec2 w = vec2(cos(WIND_HEADING), sin(WIND_HEADING)) * MIST_DRIFT * 2.0 * t;
   vec3 q = (p - vec3(w.x, 0.0, w.y)) * CLOUD_CELL;
   float billow = 0.6 * noise3(q) + 0.4 * noise3(q * 2.1 + vec3(3.7, 8.1, 1.9));
   float shape = 1.0 - smoothstep(0.35 + 0.5 * billow, 1.0, into);
-  float cloudD = f.g * BREATH_CLOUD * shape * smoothstep(0.35, 0.7, billow);
-  return mistD + cloudD;
+  float cloudD = f.g * BREATH_CLOUD * shape * smoothstep(0.35 - HEAVY_FILL * heavy, 0.7, billow);
+  // the rain: from the cloud's belly down to the ground, in falling sheets
+  float rainD = 0.0;
+  if (f.b > 1e-3) {
+    float under = smoothstep(CLOUD_AT + CLOUD_HALF, CLOUD_AT - CLOUD_HALF, h) * smoothstep(-0.2, 0.3, h);
+    vec3 s = (p + vec3(0.0, RAIN_FALL * t, 0.0)) * RAIN_SHEET * vec3(1.0, 1.0 / RAIN_TALL, 1.0);
+    rainD = f.b * RAIN_HAZE * under * (0.35 + 0.65 * noise3(s));
+  }
+  // (how grey: heavy all through, and darker toward its belly the thicker it is)
+  float grey = HEAVY_GREY * heavy + CLOUD_BELLY * min(f.g, 1.0) * smoothstep(CLOUD_AT + CLOUD_HALF, CLOUD_AT - CLOUD_HALF, h);
+  return vec2(mistD + cloudD + rainD, cloudD * min(grey, 0.9) + rainD * RAIN_GREY);
 }
 // how dense the air is at `p` at time `t`: its haze, low air and mist, and
 // what is breathed into it
 float airDensity(vec3 p, float t) {
   float ground = texture(overhead_map, overheadUv(p)).a;
-  return haze(p.y) + low(p, ground) + mist(p, ground, t) + breathed(p, ground, t);
+  return haze(p.y) + low(p, ground) + mist(p, ground, t) + breathed(p, ground, t).x;
 }

@@ -57,7 +57,7 @@ their end 1.5 s, then start again.
 ### Held states
 Held states skip the world's tick. (So a nebularbor held breathes only
 its trickle: its roots drink in its tick. Use `active` to see its mist
-and cloud.)
+and cloud, and from about ten seconds in its cloud gathering heavy and raining.)
 
 - A plant gets growth, mana, flow, health and radiating written.
 - A structure runs only its `link` hooks (`Structures.link`: a conduit's

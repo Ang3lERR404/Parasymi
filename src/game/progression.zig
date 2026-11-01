@@ -107,6 +107,9 @@ pub const Discovery=enum{
   weftAndDrift,
   /// a polyp's first flower let drift: opens the study of the unforming
   driftFlower,
+  /// the first rain falling on the garden (game/weather.zig)
+  // decision: a new tag goes last, so a save's found set reads as before
+  firstRain,
 };
 /// a technology's id, one per module in `techs`
 pub const Id=reg.Id;
@@ -352,6 +355,9 @@ pub const Progression=struct{
       .driftFlower=>{
         g.say(txt.s.msg.flowerDrifts,.{});
         g.say(txt.s.msg.researchNamed,.{txt.research(.unforming).name});
+      },
+      .firstRain=>{
+        g.say(txt.s.msg.firstRain,.{});
       },
     }
   }

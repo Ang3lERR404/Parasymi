@@ -21,6 +21,7 @@ const shaders=[_][]const u8{
   "fog.vert","fog.frag",
   "moisture.vert","moisture.frag",
   "moisture_source.vert","moisture_source.frag",
+  "rain.vert","rain.frag",
 };
 /// shaders compiled a second time from the same source with a define,
 /// imported under their own name: (name, source, define). The glass
@@ -46,7 +47,7 @@ const names=shaders++blk:{
   break:blk n;
 };
 /// what the game's shaders include
-const includes=[_][]const u8{"common.glsl","surface.glsl","ground.glsl","air.glsl"};
+const includes=[_][]const u8{"common.glsl","surface.glsl","ground.glsl","air.glsl","moisture.glsl"};
 /// builds the garden: compiles every shader, makes the game, `animedit`,
 /// `meshedit` and `audiocheck`, and the `test` step that runs the game's,
 /// the engine's and the mesh editor's tests

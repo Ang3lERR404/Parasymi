@@ -54,14 +54,14 @@ const farX:f32=96;
 /// together) is not worth a line
 const airShown:f32=0.05;
 /// the moisture in the air over the hovered tile, if there is enough to speak of
-fn wet(g:*const play.Game)?m.Vec(f32,2){
+fn wet(g:*const play.Game)?m.Vec(f32,3){
   // what was read back over it
   const a=g.air orelse return null;
   return if(a[0]+a[1]>airShown)a else null;
 }
 /// the line saying how much moisture is in the air over the tile, at `x`,`y`
-fn air(d:*Draw,x:f32,y:f32,a:m.Vec(f32,2))Allocator.Error!void{
-  _=try d.print(x,y,s.textNote,s.dim,txt.s.hud.air,.{a[0],a[1]});
+fn air(d:*Draw,x:f32,y:f32,a:m.Vec(f32,3))Allocator.Error!void{
+  _=try d.print(x,y,s.textNote,s.dim,txt.s.hud.air,.{a[0],a[1],a[2]*100});
 }
 /// shown while something is hovered, but not over an open structure
 /// panel (which shows all of this itself) nor a HUD panel (which has its own).

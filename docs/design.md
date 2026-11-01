@@ -215,8 +215,29 @@ plant.
     trickle alone.
   - The moisture is a field on the GPU (`passes/moisture.zig`) that drifts
     on the wind, spreads and dries; the fog draws it. Hovering any tile
-    reads the air over it (`AIR MIST x CLOUD y`, read back from the GPU:
-    the engine's `probe`). It does nothing yet: the weather begins here.
+    reads the air over it (`AIR MIST x CLOUD y RAIN z%`, read back from
+    the GPU: the engine's `probe`). The weather begins here.
+
+## Weather (`game/weather.zig`, `passes/moisture.zig`)
+A water loop the gardener builds up in stages: ground water, drunk and
+breathed by the nebularbor, gathers into cloud, which rains it back.
+1. **Clouds gather:** cloud thicker than 0.5 holds together, wholly at
+   1.4: it spreads 85% less and lasts 2.5× longer, so it pools heavy.
+2. **Rain falls on its own** where cloud grows past 1.6 (one grown
+   nebularbor's cloud does, in a steady shower; more trees rain harder).
+   It rains until the cloud is rained out to 0.8, harder the thicker it
+   is, each shower building and easing over a few seconds and drawing
+   the cloud down. The rain rides with its cloud, downwind of the tree.
+3. **Rain refills the ground:** where it rains the ground grows wet
+   (soaked through in 40 s of a downpour, drying to a third in 5
+   minutes). Once a second the game reads the whole field back (the
+   engine's `field`) and soaks every loaded tile's water back up toward
+   all it holds, as fast as the ground over it is wet (a third of what is
+   missing left after a minute wet through; never past its cap).
+4. **The first rain** over the loaded garden is a discovery (`firstRain`);
+   the new convergent breeds it opens are still to be designed.
+5. **The storm** (to come): a new plant, a weftstone kin charging ions to
+   strike the rain clouds into storms; the weather fully formed.
 
 ## Confluence (`game/convergence.zig`)
 When a mature symbiote and a mature parasite are within 2 tiles (or joined

@@ -394,6 +394,7 @@ pub fn main(init:Init)!void{
     game.renderStats=r.stats;
     if(panel)|p|game.mode=p;
     if(overview)game.overview=true;
+    game.weather.tick(game.moved);
     // what the renderer draws this frame
     var scene=try view.scene(&game,screen);
     if(inspect!=null and panel==null){
@@ -410,7 +411,8 @@ pub fn main(init:Init)!void{
     input.resized=false;
     r.capture=shoot;
     try r.draw(&scene,resized);
-    game.air=if(r.probed)|p|.{p[0],p[1]}else null;
+    game.air=if(r.probed)|p|.{p[0],p[1],p[2]}else null;
+    if(game.weather.soak(&game.world,r.field,r.fieldReads))game.prog.discover(.firstRain);
     if(r.shot())|sh|{
       try snap(gpa,io,sh,&turn,&writing);
       // (what time taking it still costs is not the world's, so the next

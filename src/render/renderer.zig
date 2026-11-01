@@ -98,6 +98,8 @@ pub const passes=struct{
   pub const plantsGlass=@import("passes/plants.zig").glass;
   /// the parts' see-through fragments, blended over the solids
   pub const partsGlass=@import("passes/parts.zig").glass;
+  /// the rain falling wherever the moisture field rains, over everything
+  pub const rain=@import("passes/rain.zig");
   /// the air over everything, marched after the world into its volume
   pub const fog=@import("passes/fog.zig");
   /// the air round what glows, lit after the fog's march
@@ -163,6 +165,10 @@ pub const Scene=struct{
   /// where (world x, z) the air's moisture is read back from (the engine's
   /// `probed`): the hovered tile's middle, if any
   probe:?m.Vice(f32,2)=null,
+  /// whether the whole moisture field is read back this frame (the
+  /// engine's `field`): the game asks now and then, to soak the ground
+  /// where it rained
+  readField:bool=false,
   /// the HUD's quads, drawn last
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)

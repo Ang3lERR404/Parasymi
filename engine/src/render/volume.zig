@@ -18,7 +18,9 @@
 //! the game's `.field` passes write the next step of it every frame from
 //! the last, which they read through set 1 (volume.glsl `field_map`); every
 //! later pass reads the step just written. Two images take turns, one
-//! written while the other is read.
+//! written while the other is read. It is kept in 32-bit floats, so a slow
+//! change a frame is never lost to rounding. A point of it (`probe`) or the
+//! whole of it (`readAll`) can be copied back for the host to read.
 //!
 //! The overhead map is fixed to the world and wraps: one texel a world
 //! unit, `overheadSize` units across, world (x, z) at uv (x, -z) /
@@ -47,6 +49,9 @@ const post=@import("post.zig");
 const Image=post.Image;
 /// what the volume and the overhead map are drawn in: 16-bit float rgba
 pub const format=post.hdrFormat;
+/// what the field is kept in: 32-bit float rgba, fine enough that a slow
+/// change a frame (drying over minutes) is never lost to rounding
+pub const fieldFormat=vk.Format.r32g32b32a32_sfloat;
 /// texels along each side of the overhead map, one a world unit
 pub const overheadRes=512;
 /// how far across the overhead map reaches before it wraps (world units;
@@ -149,7 +154,7 @@ pub const Volume=struct{
       .depth=false,.depthAttachment=false,.blend=true,.premultiplied=true,.cull=false,
     });
     v.overhead=try Image.init(c,overheadRes,overheadRes,.{.format=format});
-    for(&v.field)|*fd|fd.*=try Image.init(c,overheadRes,overheadRes,.{.format=format,.readable=true});
+    for(&v.field)|*fd|fd.*=try Image.init(c,overheadRes,overheadRes,.{.format=fieldFormat,.readable=true});
     try v.images(c,w,h,depth);
   }
   /// a sampler filtering `filter`, addressing past the edges by `edge`
@@ -207,7 +212,7 @@ pub const Volume=struct{
   /// done first.
   pub fn beginOverhead(v:*Volume,cmd:vk.CommandBufferProxy)void{
     sw.barrier(cmd,v.overhead.image,post.range(0),if(v.drawn).shader_read_only_optimal else.undefined,.color_attachment_optimal,.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true},.{.color_attachment_output=true},.{.color_attachment_write=true,.color_attachment_read=true});
-    scope(cmd,v.overhead.views[0],v.overhead.extent,if(v.drawn).load else.clear);
+    scope(cmd,v.overhead.views[0],v.overhead.extent,if(v.drawn).load else.clear,clearAir);
     v.drawn=true;
   }
   /// close it and hand the map to the shaders that read it
@@ -223,7 +228,7 @@ pub const Volume=struct{
       // the latest, cleared and handed to the shaders
       const cur=v.field[v.fieldAt];
       sw.barrier(cmd,cur.image,post.range(0),.undefined,.color_attachment_optimal,.{.top_of_pipe=true},.{},.{.color_attachment_output=true},.{.color_attachment_write=true});
-      scope(cmd,cur.views[0],cur.extent,.clear);
+      scope(cmd,cur.views[0],cur.extent,.clear,nothing);
       cmd.endRendering();
       sw.barrier(cmd,cur.image,post.range(0),.color_attachment_optimal,.shader_read_only_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
       v.fieldDrawn=true;
@@ -231,7 +236,7 @@ pub const Volume=struct{
     // the image the next step goes into (what read it last is done first)
     const next=v.field[1-v.fieldAt];
     sw.barrier(cmd,next.image,post.range(0),.undefined,.color_attachment_optimal,.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true},.{.color_attachment_output=true},.{.color_attachment_write=true,.color_attachment_read=true});
-    scope(cmd,next.views[0],next.extent,.clear);
+    scope(cmd,next.views[0],next.extent,.clear,nothing);
   }
   /// close it: the step just written handed to the shaders, and made the latest
   pub fn endField(v:*Volume,cmd:vk.CommandBufferProxy)void{
@@ -251,28 +256,47 @@ pub const Volume=struct{
   /// copies the latest field's texel under world point `at` into `buf`
   /// (`texelBytes` of it), for the host to read once the frame is done
   pub fn probe(v:*const Volume,cmd:vk.CommandBufferProxy,at:m.Vice(f32,2),buf:vk.Buffer)void{
-    // the latest step's image, and the texel asked after
-    const cur=v.field[v.fieldAt];
+    // the texel asked after
     const t=fieldTexel(at);
+    v.copyOut(cmd,buf,.{.x=@intCast(t[0]),.y=@intCast(t[1]),.z=0},.{.width=1,.height=1,.depth=1});
+  }
+  /// copies the whole latest field into `buf` (`fieldBytes` of it, row by
+  /// row as the field is laid out), for the host to read once the frame is
+  /// done (`texelIn`)
+  pub fn readAll(v:*const Volume,cmd:vk.CommandBufferProxy,buf:vk.Buffer)void{
+    v.copyOut(cmd,buf,.{.x=0,.y=0,.z=0},.{.width=overheadRes,.height=overheadRes,.depth=1});
+  }
+  /// copies the `size` texels of the latest field from `from` into `buf`,
+  /// made visible to the host once the frame's fence is signalled
+  fn copyOut(v:*const Volume,cmd:vk.CommandBufferProxy,buf:vk.Buffer,from:vk.Offset3D,size:vk.Extent3D)void{
+    // the latest step's image
+    const cur=v.field[v.fieldAt];
     sw.barrier(cmd,cur.image,post.range(0),.shader_read_only_optimal,.transfer_src_optimal,.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true},.{.copy=true},.{.transfer_read=true});
     cmd.copyImageToBuffer(cur.image,.transfer_src_optimal,buf,&.{.{
       .buffer_offset=0,.buffer_row_length=0,.buffer_image_height=0,
       .image_subresource=.{.aspect_mask=.{.color=true},.mip_level=0,.base_array_layer=0,.layer_count=1},
-      .image_offset=.{.x=@intCast(t[0]),.y=@intCast(t[1]),.z=0},
-      .image_extent=.{.width=1,.height=1,.depth=1},
+      .image_offset=from,.image_extent=size,
     }});
     sw.barrier(cmd,cur.image,post.range(0),.transfer_src_optimal,.shader_read_only_optimal,.{.copy=true},.{.transfer_read=true},.{.fragment_shader=true,.vertex_shader=true},.{.shader_sampled_read=true});
     // the copy made visible to the host once the frame's fence is signalled
     const done=[_]vk.MemoryBarrier2{.{.src_stage_mask=.{.copy=true},.src_access_mask=.{.transfer_write=true},.dst_stage_mask=.{.host=true},.dst_access_mask=.{.host_read=true}}};
     cmd.pipelineBarrier2(&.{.memory_barrier_count=done.len,.p_memory_barriers=&done});
   }
-  /// one field texel's four half floats, as `probe` copies them out
-  pub const texelBytes=8;
+  /// one field texel's four floats, as `probe` copies them out
+  pub const texelBytes=16;
   /// the four channels of a texel `probe` copied out
   pub fn texelOf(bytes:*const[texelBytes]u8)m.Vec(f32,4){
-    // the texel's four half floats
-    const h:[4]f16=@bitCast(bytes.*);
-    return.{h[0],h[1],h[2],h[3]};
+    return @bitCast(bytes.*);
+  }
+  /// the bytes of the whole field as `readAll` copies it out
+  pub const fieldBytes=overheadRes*overheadRes*texelBytes;
+  /// the four channels of the field under world point `at` in `all`, a
+  /// whole field `readAll` copied out
+  pub fn texelIn(all:[]const u8,at:m.Vice(f32,2))m.Vec(f32,4){
+    // the texel, and where its bytes start
+    const t=fieldTexel(at);
+    const i=(@as(usize,t[1])*overheadRes+t[0])*texelBytes;
+    return texelOf(all[i..][0..texelBytes]);
   }
   /// after the world: its depth `depth` handed to the shaders, and the
   /// volume passes' scope opened, the volume cleared to clear air (nothing
@@ -282,7 +306,7 @@ pub const Volume=struct{
       .{.late_fragment_tests=true,.color_attachment_output=true},.{.depth_stencil_attachment_write=true,.color_attachment_write=true},
       .{.fragment_shader=true},.{.shader_sampled_read=true});
     sw.barrier(cmd,v.fog.image,post.range(0),.undefined,.color_attachment_optimal,.{.fragment_shader=true},.{.shader_sampled_read=true},.{.color_attachment_output=true},.{.color_attachment_write=true});
-    scope(cmd,v.fog.views[0],v.fog.extent,.clear);
+    scope(cmd,v.fog.views[0],v.fog.extent,.clear,clearAir);
   }
   /// close the volume passes' scope, then lay the volume over the world's
   /// HDR image `hdr` (left as a colour attachment)
@@ -291,7 +315,7 @@ pub const Volume=struct{
     sw.barrier(cmd,v.fog.image,post.range(0),.color_attachment_optimal,.shader_read_only_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.fragment_shader=true},.{.shader_sampled_read=true});
     // what the world wrote (or resolved) into it is done before it is blended over
     sw.barrier(cmd,hdr.image,post.range(0),.color_attachment_optimal,.color_attachment_optimal,.{.color_attachment_output=true},.{.color_attachment_write=true},.{.color_attachment_output=true},.{.color_attachment_write=true,.color_attachment_read=true});
-    scope(cmd,hdr.views[0],hdr.extent,.load);
+    scope(cmd,hdr.views[0],hdr.extent,.load,clearAir);
     cmd.bindPipeline(.graphics,v.pipe);
     cmd.bindDescriptorSets(.graphics,v.layout,0,&.{v.composeSet},null);
     cmd.draw(3,1,0,0);
@@ -317,10 +341,27 @@ test"the overhead map lands every square of the world on all of it, a texel a un
   const r=m.mulV(a,.{p[0]+1,0.5,p[1],1});
   try testing.expectApproxEqAbs((r[0]-q[0])*overheadRes/2,1,1e-3);
 }
+test"a whole field read back gives each texel under its world point"{
+  // a field of nothing but one texel, and a world point over that texel
+  const all=try testing.allocator.alloc(u8,Volume.fieldBytes);
+  defer testing.allocator.free(all);
+  @memset(all,0);
+  const at=m.Vice(f32,2){-37.3,1012.6};
+  const t=Volume.fieldTexel(at);
+  const i=(@as(usize,t[1])*overheadRes+t[0])*Volume.texelBytes;
+  const h=[4]f32{0.5,1.25,2,0.75};
+  @memcpy(all[i..][0..Volume.texelBytes],&@as([Volume.texelBytes]u8,@bitCast(h)));
+  try testing.expectEqual(m.Vec(f32,4){0.5,1.25,2,0.75},Volume.texelIn(all,at));
+  try testing.expectEqual(m.Vec(f32,4){0,0,0,0},Volume.texelIn(all,.{at[0]+3,at[1]}));
+}
+/// clear air: black, alpha 1 (wholly showing through); what the volume and
+/// the overhead map start from
+const clearAir=m.Vice(f32,4){0,0,0,1};
+/// nothing in any channel: what the field starts from
+const nothing=m.Vice(f32,4){0,0,0,0};
 /// begin rendering into all of `view` (`size`), its old contents kept or
-/// cleared to clear air (black, alpha 1: wholly showing through); the
-/// viewport and scissor set to match
-fn scope(cmd:vk.CommandBufferProxy,view:vk.ImageView,size:vk.Extent2D,load:vk.AttachmentLoadOp)void{
+/// cleared to `clear`; the viewport and scissor set to match
+fn scope(cmd:vk.CommandBufferProxy,view:vk.ImageView,size:vk.Extent2D,load:vk.AttachmentLoadOp,clear:m.Vice(f32,4))void{
   // the attachment drawn into
   const color=[_]vk.RenderingAttachmentInfo{.{
     .image_view=view,
@@ -329,7 +370,7 @@ fn scope(cmd:vk.CommandBufferProxy,view:vk.ImageView,size:vk.Extent2D,load:vk.At
     .resolve_image_layout=.undefined,
     .load_op=load,
     .store_op=.store,
-    .clear_value=.{.color=.{.float_32=.{0,0,0,1}}},
+    .clear_value=.{.color=.{.float_32=clear}},
   }};
   // the whole of the target
   const area:vk.Rect2D=.{.offset=.{.x=0,.y=0},.extent=size};
