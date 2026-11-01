@@ -322,11 +322,11 @@ const limbs=[_]Limb{
   .{.n=12,.reach=0.09,.parent=19,.bond=19,.joint=v3(-0.12,0.47,-0.04),.drift=.{.pitch=0.12,.rate=0.45,.phase=1.7}},
   .{.n=10,.reach=0.08,.parent=20,.bond=11,.joint=v3(-0.12,0.3,0),.drift=.{.pitch=0.2,.rate=0.45,.phase=1.1}},
   .{.n=18,.reach=0.11,.parent=1,.bond=25,.joint=v3(0,0.98,-0.13),.drift=.{.pitch=0.08,.yaw=0.35,.rate=0.8}},
-  .{.n=16,.reach=0.09,.parent=0,.joint=v3(0.075,1.42,0.11)},
-  .{.n=16,.reach=0.09,.parent=0,.joint=v3(-0.075,1.42,0.11)},
-  .{.n=24,.reach=0.12,.parent=1,.joint=v3(0,1.1,0.1),.drift=.{.pitch=0.02,.rate=0.9}},
-  .{.n=16,.reach=0.1,.parent=1,.joint=v3(0.08,0.99,-0.08),.drift=.{.pitch=0.03,.rate=0.45,.phase=0.5}},
-  .{.n=16,.reach=0.1,.parent=1,.joint=v3(-0.08,0.99,-0.08),.drift=.{.pitch=0.03,.rate=0.45,.phase=2.9}},
+  .{.n=24,.reach=0.11,.parent=0,.joint=v3(0.1,1.43,0.12)},
+  .{.n=24,.reach=0.11,.parent=0,.joint=v3(-0.1,1.43,0.12)},
+  .{.n=26,.reach=0.13,.parent=1,.joint=v3(0,1.1,0.1),.drift=.{.pitch=0.02,.rate=0.9}},
+  .{.n=24,.reach=0.12,.parent=1,.joint=v3(0.1,0.99,-0.09),.drift=.{.pitch=0.03,.rate=0.45,.phase=0.5}},
+  .{.n=24,.reach=0.12,.parent=1,.joint=v3(-0.1,0.99,-0.09),.drift=.{.pitch=0.03,.rate=0.45,.phase=2.9}},
 };
 /// the flowers of both lineages in his mane: where each sits and the limb
 /// it rides (the head, the mane)
