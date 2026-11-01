@@ -171,11 +171,15 @@ plant.
   both ways by configuring one, then the other. It sends what it is fed by
   spore and takes in what comes back. It lets go only what came by spore
   (`kept` counts per kind).
-- **Monfris** (weftstone + driftbraid, INTERWEAVING): 2×2. It weaves only
-  the advanced tier (`Recipe.advanced`, `craft.advanced`; the germinator's
-  `craft.all` leaves it out). For now that is the diamond, from ley
-  crystals. Fed by at most 6 Vultrixi (`monfris.tethers`, because an
-  advanced weave has at most 6 kinds), by hand, or by conduits.
+- **Monfris** (weftstone + driftbraid, INTERWEAVING): 2×2. It weaves
+  everything convergent (`Recipe.convergent`: the vesper seed, weftstone,
+  driftbraid, monfris, Vultrixi; the germinator weaves these too, so the
+  first monfris can be made) and the advanced tier only it weaves
+  (`Recipe.advanced`, none yet); together `craft.loom`. Never the diamond,
+  which is the germinator's. It never lets go of what its weave eats (a
+  weftstone while it weaves a monfris). Fed by at most 6 Vultrixi
+  (`monfris.tethers`, because a weave of its has at most 6 kinds), by
+  hand, or by conduits.
 - **Vultrixi** (gathering crown + ganglion, SHARED NERVES): floating.
   Configure it, then a monfris, to tether it (it becomes the monfris's
   child).

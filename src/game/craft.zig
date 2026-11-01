@@ -34,6 +34,9 @@ pub const Recipe=struct{
   /// the advanced tier: only a monfris weaves it, never a germinator or
   /// the hands
   advanced:bool=false,
+  /// of both lineages: a monfris weaves it too (a germinator still does,
+  /// so the first monfris can be woven)
+  convergent:bool=false,
   /// whether the research it needs (if any) is known
   pub fn unlocked(r:Recipe,g:*const prog.Progression)bool{
     return if(r.needs)|id|g.done.contains(id)else true;
@@ -49,7 +52,7 @@ pub const hand=[_]Recipe{
   .{.out=.seedBloom,.in=&.{.{.item=.starlight,.n=3},.{.item=.leyShard,.n=1},.{.item=.essence,.n=2}},.time=3},
   .{.out=.seedHollowheart,.in=&.{.{.item=.essence,.n=4},.{.item=.fibre,.n=3},.{.item=.grit,.n=2}},.time=3,.needs=.canopyWeaving},
   // decision: the hybrid is spliced from both lineages' essence and what their meeting condenses
-  .{.out=.seedVesper,.in=&.{.{.item=.essence,.n=2},.{.item=.convergenceEssence,.n=1},.{.item=.fibre,.n=1}},.time=2.5,.needs=.seedSplicing},
+  .{.out=.seedVesper,.in=&.{.{.item=.essence,.n=2},.{.item=.convergenceEssence,.n=1},.{.item=.fibre,.n=1}},.time=2.5,.needs=.seedSplicing,.convergent=true},
   .{.out=.conduit,.n=2,.in=&.{.{.item=.fibre,.n=2},.{.item=.grit,.n=1}},.time=1},
   .{.out=.sapCache,.in=&.{.{.item=.fibre,.n=4},.{.item=.grit,.n=4}},.time=2},
   // no essence: nothing yields it until the germinator has woven a seed
@@ -59,8 +62,9 @@ pub const hand=[_]Recipe{
   // decision: ungated, from what a bloom is grown from plus fibre (the brief sets no cost)
   .{.out=.polyp,.in=&.{.{.item=.fibre,.n=4},.{.item=.essence,.n=3},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=2}},.time=3},
   // decision: a diamond is woven from what a halo is grown from, condensed
-  // (the brief sets no cost); the advanced tier's, from ley crystals
-  .{.out=.diamond,.in=&.{.{.item=.starlight,.n=6},.{.item=.leyCrystal,.n=3},.{.item=.convergenceEssence,.n=3},.{.item=.fibre,.n=2}},.time=6,.needs=.celestialDefragmentation,.advanced=true},
+  // (the brief sets no cost); a germinator's alone, never a monfris's or
+  // the hands' (the gardener's word)
+  .{.out=.diamond,.in=&.{.{.item=.starlight,.n=6},.{.item=.leyShard,.n=4},.{.item=.convergenceEssence,.n=3},.{.item=.fibre,.n=2}},.time=6,.needs=.celestialDefragmentation,.germinator=true},
   // decision: costs for the lineages' structures are set here (the brief sets none)
   .{.out=.loomfern,.in=&.{.{.item=.fibre,.n=5},.{.item=.essence,.n=2},.{.item=.grit,.n=2}},.time=2.5,.needs=.livingLooms},
   .{.out=.lithophage,.in=&.{.{.item=.grit,.n=6},.{.item=.leyShard,.n=2},.{.item=.essence,.n=2},.{.item=.fibre,.n=2}},.time=3,.needs=.lithophagy},
@@ -72,13 +76,13 @@ pub const hand=[_]Recipe{
   // decision: the convergent structures are woven from the pair they grow
   // out of, bound by what the lineages' meeting condenses (the brief sets
   // no cost); last, so the weaves chosen in saved gardens keep their places
-  .{.out=.weftstone,.in=&.{.{.item=.loomfern,.n=1},.{.item=.lithophage,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.starlight,.n=2}},.time=4,.needs=.wovenStone,.germinator=true},
-  .{.out=.driftbraid,.in=&.{.{.item=.braidedConduit,.n=1},.{.item=.sporecaster,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.essence,.n=2}},.time=4,.needs=.braidedDrift,.germinator=true},
+  .{.out=.weftstone,.in=&.{.{.item=.loomfern,.n=1},.{.item=.lithophage,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.starlight,.n=2}},.time=4,.needs=.wovenStone,.germinator=true,.convergent=true},
+  .{.out=.driftbraid,.in=&.{.{.item=.braidedConduit,.n=1},.{.item=.sporecaster,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.essence,.n=2}},.time=4,.needs=.braidedDrift,.germinator=true,.convergent=true},
   // decision: the monfris from the two convergent structures it grows
   // out of, the Vultrixi from the pair it does, both bound by convergence
   // essence and ley crystals (the brief sets no cost)
-  .{.out=.monfris,.in=&.{.{.item=.weftstone,.n=1},.{.item=.driftbraid,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.interweaving,.germinator=true},
-  .{.out=.vultrixi,.in=&.{.{.item=.gatheringCrown,.n=1},.{.item=.ganglion,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.sharedNerves,.germinator=true},
+  .{.out=.monfris,.in=&.{.{.item=.weftstone,.n=1},.{.item=.driftbraid,.n=1},.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2}},.time=6,.needs=.interweaving,.germinator=true,.convergent=true},
+  .{.out=.vultrixi,.in=&.{.{.item=.gatheringCrown,.n=1},.{.item=.ganglion,.n=1},.{.item=.convergenceEssence,.n=2},.{.item=.leyCrystal,.n=1}},.time=4,.needs=.sharedNerves,.germinator=true,.convergent=true},
 };
 /// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}
@@ -95,8 +99,14 @@ pub const seeds=recipesWhere(isSeedRecipe,true);
 /// every weave but the advanced tier: what a germinator may be set to
 /// (indices into `hand`).
 pub const all=recipesWhere(isAdvanced,false);
-/// the advanced tier: what a monfris may be set to (indices into `hand`).
+/// the advanced tier: what only a monfris weaves (indices into `hand`).
 pub const advanced=recipesWhere(isAdvanced,true);
+/// whether a monfris weaves the weave at `idx` in `hand`: the advanced
+/// tier, or anything of both lineages
+pub fn isLoom(idx:usize)bool{return hand[idx].advanced or hand[idx].convergent;}
+/// what a monfris may be set to: the advanced tier and every convergent
+/// seed and bulb (indices into `hand`).
+pub const loom=recipesWhere(isLoom,true);
 /// whether some weave makes `item` (what a germinator lets go of).
 pub fn woven(item:items.Item)bool{
   for(hand)|r|if(r.out==item)return true;

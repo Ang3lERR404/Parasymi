@@ -127,15 +127,20 @@ fn convergent(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
   }
   try loom(g,cx,cz+16);
 }
-/// a monfris weaving a diamond, fed by four Vultrixi, each pulling one
+/// a monfris weaving a weftstone, fed by four Vultrixi, each pulling one
 /// of its kinds out of a sap cache beside it
 fn loom(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
-  for([_]prog.Id{.interweaving,.sharedNerves,.celestialDefragmentation})|id|g.prog.done.insert(id);
+  for([_]prog.Id{.interweaving,.sharedNerves,.wovenStone})|id|g.prog.done.insert(id);
   // the monfris, and where it stands
   const j=try nearest(g,cx,cz,.monfris,0.5) orelse return;
   const at=[2]i32{g.structs.get(j).x,g.structs.get(j).y};
+  // the weftstone's weave, among the monfris's
+  const w=for(craft.loom)|w|{
+    if(craft.hand[w].out==.weftstone)break w;
+  }else unreachable;
+  st.choose(g.structs.get(j),&g.prog,w);
   // the weave it is set to
-  const r=craft.hand[g.structs.get(j).state.monfris.recipe];
+  const r=craft.hand[w];
   for(r.in,0..)|ing,k|{
     // which side this ingredient's cache goes, and where
     const side:i32=if(k%2==0)-1 else 1;

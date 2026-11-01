@@ -112,7 +112,7 @@ pub const sky=@import("game/sky.zig");
 pub const sound=@import("game/sound.zig");
 /// the halo a diamond projects, which polyp and diamond both hold
 pub const haloStructure=@import("game/structures/halo.zig");
-/// the monfris structure: the tree that weaves the advanced tier
+/// the monfris structure: the tree that weaves what is of both lineages
 pub const monfrisStructure=@import("game/structures/monfris.zig");
 /// the sporecaster structure: sends what it is fed to its pair as spores
 pub const sporecasterStructure=@import("game/structures/sporecaster.zig");

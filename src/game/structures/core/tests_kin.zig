@@ -40,6 +40,8 @@ const kindByName=lib.structures.structure.kindByName;
 const kinds=lib.structures.kinds;
 /// what a kind's panel offers to weave
 const recipes=lib.structures.hooks.recipes;
+/// finds a value in a slice, for finding a weave among a kind's
+const indexOfScalar=std.mem.indexOfScalar;
 /// the structures registry: every kind's id
 const reg=lib.structures.reg;
 test"every kind's structure is stored as a record and read back the same"{
@@ -220,7 +222,14 @@ test"a germinator weaves structure bulbs as well as seeds, and lets go only what
   // every weave is on offer, the bulbs too, but the advanced tier, which
   // only a monfris weaves
   try testing.expectEqual(craft.hand.len-craft.advanced.len,recipes(.germinator).len);
-  for(recipes(.monfris))|r|try testing.expect(craft.hand[r].advanced);
+  for(recipes(.monfris))|r|try testing.expect(craft.isLoom(r));
+  // a monfris weaves every weave of both lineages, and never a diamond
+  for(craft.hand,0..)|h,r|{
+    // whether the monfris offers this weave
+    const on=indexOfScalar(u8,recipes(.monfris),@intCast(r))!=null;
+    if(h.convergent)try testing.expect(on);
+    if(h.out==.diamond)try testing.expect(!on);
+  }
   // the recipe that weaves a conduit bulb
   const conduit=for(recipes(.germinator))|r|{
     if(craft.hand[r].out==.conduit)break r;

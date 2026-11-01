@@ -567,14 +567,14 @@ test"Vultrixi tether to a monfris, six at most, each bringing one kind of its we
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
-  g.done.insert(.celestialDefragmentation);
+  g.done.insert(craft.hand[craft.loom[0]].needs.?);
   try testing.expect(try ss.place(gpa,&w,6,6,.monfris,0,0));
   for(0..7)|k|try testing.expect(try ss.place(gpa,&w,@intCast(k+1),2,.vultrixi,0,0));
   for(0..7)|k|tether(&ss,&w,&g,.{@intCast(k+1),2},.{6,6});
   try testing.expectEqual(@as(u32,monfris.tethers),ss.childCount(ss.at(&w,6,6).?));
   try testing.expect(ss.get(ss.floaterAt(7,2).?).parent==null);
   try bench.run(&ss,&w,&plants,&g,0.1);
-  // the diamond's four kinds go to the first four, in order; the rest idle
+  // its weave's kinds go to the first, in order; the rest idle
   const r=craft.hand[ss.get(ss.at(&w,6,6).?).state.monfris.recipe];
   for(0..6)|k|{
     // the kind this Vultrixi brings
@@ -594,7 +594,7 @@ test"a Vultrixi pulls what a structure lets go into its monfris, which weaves it
   var ss:st.Structures=.{};
   defer ss.deinit(gpa);
   var g:prog.Progression=.{};
-  g.done.insert(.celestialDefragmentation);
+  g.done.insert(craft.hand[craft.loom[0]].needs.?);
   try testing.expect(try ss.place(gpa,&w,8,8,.monfris,0,0));
   // the monfris, and the weave it is set to
   const loom=ss.at(&w,8,8).?;
@@ -612,7 +612,7 @@ test"a Vultrixi pulls what a structure lets go into its monfris, which weaves it
   try testing.expect(try ss.place(gpa,&w,13,1,.germinator,0,0));
   _=ss.insert(&g,ss.at(&w,13,1).?,.fibre,6);
   try bench.run(&ss,&w,&plants,&g,40);
-  try testing.expect(ss.get(loom).inv.count(.diamond)>=1);
+  try testing.expect(ss.get(loom).inv.count(r.out)>=1);
   try testing.expectEqual(@as(u32,6),ss.get(ss.at(&w,13,1).?).inv.count(.fibre));
 }
 test"untethered Vultrixi relay what one pulls along their links to a structure that wants it"{

@@ -181,7 +181,7 @@ pub const kinds=struct{
   pub const weftstone=@import("structures/weftstone.zig");
   /// a braided conduit and a sporecaster grown into one, trading both ways
   pub const driftbraid=@import("structures/driftbraid.zig");
-  /// a 2x2 tree that weaves the advanced tier
+  /// a 2x2 tree that weaves what is of both lineages
   pub const monfris=@import("structures/monfris.zig");
   /// a floating body tethered to feed a monfris
   pub const vultrixi=@import("structures/vultrixi.zig");

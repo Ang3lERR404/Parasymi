@@ -24,8 +24,9 @@ Paths are under `src/` unless shown otherwise. Look a file up in
    and its colour in `infos`.
 5. **Recipe**: a row in `game/craft.zig`.
    - `.needs` = its research.
-   - `.germinator = true` for convergent ones.
-   - `.advanced` for a monfris weave.
+   - `.germinator = true` for convergent ones, and `.convergent = true`
+     so a monfris weaves them too.
+   - `.advanced` for a weave only a monfris makes.
 6. **Research** that opens it (see below), or `.needs` an existing one.
 7. **Strings** in `src/cfg/parasymi.cfg`:
    - `[item] <kind>.name/.short`;

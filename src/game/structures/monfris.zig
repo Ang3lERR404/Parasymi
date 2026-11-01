@@ -1,8 +1,9 @@
 //! MONFRIS: a weftstone and a driftbraid grown into one 2x2 tree that
-//! weaves the advanced tier (`craft.advanced`), which nothing else can:
-//! its panel picks the weave, as a germinator's does. It is fed by the
+//! weaves everything of both lineages, the convergent seeds and bulbs, and
+//! the advanced tier, which nothing else can (`craft.loom`): its panel
+//! picks the weave, as a germinator's does. It is fed by the
 //! Vultrixi tethered to it, at most `tethers`, each bringing it one kind of
-//! what that weave needs (so an advanced weave has at most six kinds), or
+//! what that weave needs (so a weave of its has at most six kinds), or
 //! by hand from its panel; what it weaves it hands to the structures
 //! beside it, or keeps for the gardener.
 // decision: what it is fed by conduits it takes too (a conduit hands in
@@ -12,7 +13,7 @@ const lib=@import("../../lib.zig");
 const std=lib.std;
 /// the allocator type every drawing call may fail with
 const Allocator=std.mem.Allocator;
-/// finds a value in a slice, for checking a weave is of the advanced tier
+/// finds a value in a slice, for checking a weave is one of its own
 const indexOfScalar=std.mem.indexOfScalar;
 /// the test harness: allocator and expectations
 const testing=std.testing;
@@ -59,8 +60,8 @@ pub const meshes=.{.bellyLump,.itemPod};
 /// what a monfris is: grown from its seed over ten seconds, two tiles
 /// across, a store, a tall tree swaying only a little
 pub const def:st.Def=.{.item=.monfris,.size=2,.mesh=.monfris,.store=true,.grow=10,.sway=0.2,.tall=1.7,.sap=0.3};
-/// most Vultrixi tethered to one monfris (an advanced weave needs at
-/// most this many kinds)
+/// most Vultrixi tethered to one monfris (a weave of its needs at most
+/// this many kinds)
 pub const tethers=6;
 /// how many weaves' worth of each ingredient it stocks
 const stock=2;
@@ -84,14 +85,14 @@ const formingSize:f32=0.55;
 /// how brightly that forming weave glows
 const formingGlow:f32=0.8;
 comptime{
-  // every advanced weave fits the tethers it may have
-  for(craft.advanced)|r|std.debug.assert(craft.hand[r].in.len<=tethers);
+  // every weave of its fits the tethers it may have
+  for(craft.loom)|r|std.debug.assert(craft.hand[r].in.len<=tethers);
 }
 /// what a monfris remembers: the weave it is set to, its crafter, and how
 /// many Vultrixi feed it
 pub const State=struct{
-  /// which advanced weave (index into craft.hand) it weaves
-  recipe:u8=craft.advanced[0],
+  /// which of its weaves (index into craft.hand) it weaves
+  recipe:u8=craft.loom[0],
   /// the crafter working through its weaves
   weave:craft.Crafter=.{},
   /// how many Vultrixi are tethered to it (counted each tick)
@@ -105,6 +106,8 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   const self=ctx.ss.get(i);
   const h=&self.state.monfris;
   h.tethered=@intCast(ctx.ss.childCount(i));
+  // a garden saved while it wove a weave no longer its own starts on its first
+  if(indexOfScalar(u8,&craft.loom,h.recipe)==null)h.recipe=craft.loom[0];
   // the weave it is set to
   const r=craft.hand[h.recipe];
   if(!h.weave.busy() and r.unlocked(ctx.g) and craft.Crafter.can(self.inv.bag(),r))_=h.weave.push(self.inv.bag(),h.recipe);
@@ -118,17 +121,32 @@ pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32
   }
   return 0;
 }
-/// whether an advanced weave makes `item` (what it lets go of).
+/// whether a weave of its makes `item`.
 fn made(item:items.Item)bool{
-  for(craft.advanced)|r|if(craft.hand[r].out==item)return true;
+  for(craft.loom)|r|if(craft.hand[r].out==item)return true;
   return false;
 }
-/// what it gives first: the first woven thing it holds.
-pub fn output(s:*const st.Structure)?items.Item{return s.firstHeld(made);}
-/// it gives only what it has woven, while it holds some.
-pub fn gives(s:*const st.Structure,item:items.Item)bool{return made(item) and s.inv.count(item)>0;}
-/// its panel offers the advanced tier.
-pub fn recipes()[]const u8{return&craft.advanced;}
+/// whether its chosen weave eats `item` (a woven thing it is fed to weave
+/// on with, as a weftstone for a monfris, stays).
+fn eats(s:*const st.Structure,item:items.Item)bool{
+  for(craft.hand[s.state.monfris.recipe].in)|ing|if(ing.item==item)return true;
+  return false;
+}
+/// what it gives first: the first woven thing it holds that its weave
+/// does not eat.
+pub fn output(s:*const st.Structure)?items.Item{
+  for(s.inv.slot)|slot|{
+    // the stack in this slot
+    const it=slot orelse continue;
+    if(gives(s,it.item))return it.item;
+  }
+  return null;
+}
+/// it gives only what it has woven, while it holds some, and its weave
+/// does not eat it.
+pub fn gives(s:*const st.Structure,item:items.Item)bool{return made(item) and !eats(s,item) and s.inv.count(item)>0;}
+/// its panel offers the convergent weaves and the advanced tier.
+pub fn recipes()[]const u8{return&craft.loom;}
 /// the weave it is set to, for its panel to mark.
 pub fn chosen(s:*const st.Structure)?u8{return s.state.monfris.recipe;}
 /// set what it weaves, if the gardener understands it (a weave under way
@@ -137,7 +155,7 @@ pub fn choose(s:*st.Structure,g:*prog.Progression,r:u8)void{
   // the name of what that weave makes
   const out=txt.item(craft.hand[r].out).name;
   if(!craft.hand[r].unlocked(g))return g.say(txt.s.msg.notUnderstood,.{out});
-  if(indexOfScalar(u8,&craft.advanced,r)==null or s.state.monfris.recipe==r)return;
+  if(indexOfScalar(u8,&craft.loom,r)==null or s.state.monfris.recipe==r)return;
   s.state.monfris.recipe=r;
   g.say(txt.s.msg.monfrisWeaves,.{out});
 }
