@@ -231,6 +231,19 @@ A flower whose petals float free, gathered by its core.
 - Dim when the network is dark.
 - Sent from the more grown bloom as it finishes.
 
+### Wild birds of paradise (`meshes/bird_of_paradise.zig`, `game/wild.zig`)
+Real by day, magical by night. A clump of blue-green paddle leaves on
+long stalks; flower stalks as tall end in a beak, a sideways sheath, green
+at its heel flushing wine red to its point. Out of it rise crests of
+flame-orange sepals (gold at their tips), one flower after another, each
+with a blue tongue reaching forward over the beak and a white stigma at
+its tip. Crest and tongue are `.bloom`: by night they glow and each grown
+clump throws a warm orange light round its crest (into the fog too).
+Three clumps: young (4 leaves, 1 flower), plain (6, 2), old (8, 3). Grown
+on a skeleton: leaves rise and unfurl one after another, then the stalks
+climb, the beak forms and the crests open in turn. They sway as low
+structures do.
+
 ## Structures
 `structureKit` structures speak the plants' language: woven root mats,
 leafy vines, real petals, pods of resin sap (`Def.sap`, no light of their

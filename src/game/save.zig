@@ -120,7 +120,7 @@ const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the stored layout's version: bumped whenever one changes
-const version:u32=32;
+const version:u32=33;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -176,6 +176,13 @@ const NodesRec=struct{
   /// what is left in each of its tiles' nodes
   res:[ck.tileCount]ck.Res,
 };
+/// one wild flower and the tile it grows on
+const WildRec=struct{
+  /// its tile
+  at:m.Vice(i32,2),
+  /// the flower
+  flower:lib.wild.Flower,
+};
 /// what opens every save: the magic, the version, the layout fingerprint
 /// and the seed the world regrows from
 const Header=extern struct{
@@ -193,7 +200,7 @@ const layoutFingerprint=blk:{
   // the hash so far, folded with each stored size
   var h:u64=0xA5;
   for([_]usize{
-    @sizeOf(PlantRec),@sizeOf(NodesRec),
+    @sizeOf(PlantRec),@sizeOf(NodesRec),@sizeOf(WildRec),
     @sizeOf(prog.Progression),@sizeOf(craft.Crafter),@sizeOf(Belly),
     @sizeOf(Rng),species.count,
   })|n|h=h*%0x100000001B3^n;
@@ -283,6 +290,10 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
   try g.moss.list(gpa,&mossed);
   try w.put(u32,@intCast(mossed.items.len));
   for(mossed.items)|t|try w.put(m.Vice(i32,2),t);
+  // the wild flowers, tile by tile
+  try w.put(u32,@intCast(g.wild.count()));
+  var wi=g.wild.flowers.iterator();
+  while(wi.next())|e|try w.put(WildRec,.{.at=lib.wild.unkey(e.key_ptr.*),.flower=e.value_ptr.*});
   return w.buf.toOwnedSlice(gpa);
 }
 /// whether any of a chunk's nodes differ from what the generator made
@@ -381,6 +392,13 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
     // the tile
     const t=try r.get(m.Vice(i32,2));
     try g.moss.grow(gpa,&g.world,t[0],t[1]);
+  }
+  // the wild flowers
+  const wilds=try r.get(u32);
+  for(0..wilds)|_|{
+    // the flower and its tile
+    const f=try r.get(WildRec);
+    try g.wild.put(gpa,f.at[0],f.at[1],f.flower);
   }
   g.prog.say(txt.s.msg.remembers,.{});
   return g;

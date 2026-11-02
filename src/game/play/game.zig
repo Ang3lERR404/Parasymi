@@ -251,6 +251,8 @@ pub const Game=struct{
   weather:lib.weather.Weather=.{},
   /// the moss the garden's creepers have grown, laid on every chunk
   moss:lib.moss.Moss=.{},
+  /// the wild flowers sprung up by the pools
+  wild:lib.wild.Wild=.{},
   /// unspent time (s) carried to the next fixed tick
   acc:f64=0,
   /// how long the simulation took this frame (ms), eased
@@ -325,6 +327,7 @@ pub const Game=struct{
     g.leyDrifts.deinit(g.gpa);
     g.tendrils.deinit(g.gpa);
     g.moss.deinit(g.gpa);
+    g.wild.deinit(g.gpa);
     for(&g.inst)|*l|l.deinit(g.gpa);
     g.far.deinit(g.gpa);
     g.parts.deinit();
@@ -441,6 +444,7 @@ pub const Game=struct{
     try g.converge.tick(g.gpa,&g.world,&g.plants,&g.structs,&g.prog);
     try lib.moss.creep(g,tickTime);
     g.moss.apply(&g.world);
+    try lib.wild.tick(g,tickTime);
     g.prog.absorb(ev,tickTime);
     try st.Structures.tickWith(g.structCtx(ev),tickTime);
     _=try lib.haloStructure.seek(g.structCtx(ev));

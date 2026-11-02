@@ -241,6 +241,12 @@ const parts=struct{
   /// a thread drawn from one end and wound in at the other
   pub const loomfernThread=@import("meshes/loomfern.zig").thread;
   /// the gathering crown's first root, out to a node
+  /// a wild bird of paradise by the pools (game/wild.zig), and its young and old clumps
+  pub const birdOfParadise=@import("meshes/bird_of_paradise.zig");
+  /// (its young clump)
+  pub const birdOfParadiseYoung=@import("meshes/bird_of_paradise.zig").young;
+  /// (its old clump)
+  pub const birdOfParadiseOld=@import("meshes/bird_of_paradise.zig").old;
   pub const crownRoot1=@import("meshes/gathering_crown.zig").Root(0);
   /// its second root
   pub const crownRoot2=@import("meshes/gathering_crown.zig").Root(1);

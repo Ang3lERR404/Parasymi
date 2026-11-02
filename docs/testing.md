@@ -32,7 +32,10 @@ Use it whenever any of these change:
   when used with it.
 - **A water plant** (`Species.onWater`, the mire lily) gets a pond: a
   spring (`Parts.spring`) pours gently onto its tile until the water
-  stands 0.2 m deep, so it floats (give it 30 s or more of `--orbit`).
+  stands 0.2 m deep (for 90 s of the world's clock at most: on a slope
+  it never fills, and left pouring it would flood the land), so it floats
+  (give it 30 s or more of `--orbit`). Wild birds of paradise spring up
+  round its edge (`--speed=6`, a release build, a few minutes).
 
 ## States
 `--state=` picks what it shows (default `grow`). A state that does not

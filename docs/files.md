@@ -311,6 +311,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `unforming.zig` — THE UNFORMING: the garden's first world event, begun the moment the study of that name is learned.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 - `weather.zig` — WEATHER: the rain the garden's air rains soaking back into its ground.
+- `wild.zig` — wild flowers: birds of paradise springing up of themselves on the wet ground round where rain has pooled, a tile apart, and growing there…
 
 ## src/gfx/
 - `growth.zig` — the garden's growth splines: the engine's (engine gfx/growth.zig: the hidden skeleton a grown structure is built on and grows along) for the
@@ -319,6 +320,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `arsthraxia.zig` — mesh: ARSTHRAXIA.
 - `arsthraxia_convergent.zig` — mesh: ARSTHRAXIA, WOVEN.
 - `belly_lump.zig` — mesh: BELLY LUMP.
+- `bird_of_paradise.zig` — mesh: BIRD OF PARADISE.
 - `bloom_thread.zig` — mesh: BLOOM THREAD.
 - `braided_conduit.zig` — mesh: BRAIDED CONDUIT.
 - `conduit.zig` — mesh: CONDUIT.

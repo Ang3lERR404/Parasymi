@@ -11,6 +11,7 @@ test{
   _=lib.world;
   _=lib.weather;
   _=lib.moss;
+  _=lib.wild;
   _=lib.ecology;
   _=lib.items;
   _=lib.progression;

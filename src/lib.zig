@@ -38,6 +38,8 @@ pub const tendril=@import("game/tendril.zig");
 pub const weather=@import("game/weather.zig");
 /// moss grown in the garden by its creepers, kept and laid on each chunk
 pub const moss=@import("game/moss.zig");
+/// wild flowers sprung up by the pools, kept tile by tile
+pub const wild=@import("game/wild.zig");
 /// the loading screen: a night with a tendril growing across it
 pub const loading=@import("game/loading.zig");
 /// the gardener's folder, where every file of theirs lives

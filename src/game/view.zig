@@ -225,6 +225,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     try nodes(g,@intFromFloat(reach));
     try structures(g,reach,tf);
   }
+  try wild(g,reach);
   if(alone)try g.specimen.?.drawSamples(g);
   try lib.unforming.draw(g,tf);
   if(!alone)try lib.tendril.draw(g,&g.parts);
@@ -651,6 +652,41 @@ fn ghost(g:*Game,tf:f32)Allocator.Error!void{
   // its tint: fits or blocked
   const tint=if(ok)ghostFits else ghostBlocked;
   try g.parts.emit(def.preview orelse def.mesh,m.chain(&.{m.translate(ctr),m.rotY(m.dirYaw(g.placeDir)),m.scale3(m.splat3(ghostScale))}),.{.glow=ghostGlow+ghostPulse*@sin(tf*ghostPulseRate),.tint=tint,.ghost=true});
+}
+/// how far the wild flowers bend in the wind, and the height they bend over
+const wildSway:f32=0.6;
+/// (the height they bend over)
+const wildTall:f32=0.7;
+/// how brightly their crests and tongues glow at the deepest night
+const wildGlow:f32=0.9;
+/// the warm light a grown one throws round its crest by night (linear), how
+/// high over its foot it shines from and how far it reaches
+const wildLight=m.v3(1,0.45,0.12)*m.splat3(0.35);
+/// (how high over its foot)
+const wildLightAt:f32=0.68;
+/// (how far it reaches)
+const wildReach:f32=1.6;
+/// the wild flowers within `reach` of the camera focus (game/wild.zig):
+/// each its clump, grown as far as it has come, swaying, turned its own
+/// way; by night their crests and tongues glow and throw a warm light
+fn wild(g:*Game,reach:f32)Allocator.Error!void{
+  // how dark it is: the glow grows with it
+  const night=1-g.sky.daylight();
+  var it=g.wild.flowers.iterator();
+  while(it.next())|e|{
+    // its tile, and its middle on the ground
+    const t=lib.wild.unkey(e.key_ptr.*);
+    const f=e.value_ptr.*;
+    const c=g.world.chunkOfTile(t[0],t[1]) orelse continue;
+    const at=m.tileCentre(t[0],t[1],c.height[ck.localIndex(t[0],t[1])]);
+    if(@abs(at[0]-g.cam.target[0])>reach or @abs(at[2]-g.cam.target[2])>reach)continue;
+    // how far grown, how brightly it glows, and its mesh
+    const grown=lib.wild.Wild.grown(f,g.time);
+    const lit=wildGlow*night*grown;
+    const mesh:lib.meshlib.Id=switch(f.kind){.young=>.birdOfParadiseYoung,.plain=>.birdOfParadise,.old=>.birdOfParadiseOld};
+    try g.parts.emit(mesh,m.chain(&.{m.translate(at),m.rotY(f.turn*m.tau)}),.{.glow=lit,.phase=f.turn,.sway=wildSway,.tall=wildTall,.grown=grown});
+    if(lit>0.05)try g.parts.light(at+m.v3(0,wildLightAt,0),wildLight*m.splat3(lit),wildReach);
+  }
 }
 /// resource nodes within `nr` tiles of the camera focus.
 fn nodes(g:*Game,nr:i32)Allocator.Error!void{

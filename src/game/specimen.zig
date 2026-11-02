@@ -82,6 +82,10 @@ const regrow:f32=4;
 const pondDeep:f32=0.2;
 const pondReach:f32=2.5;
 const pondPour:f32=3;
+/// how long the spring pours at most (s of the world's clock): on a slope
+/// the water runs off and its tile may never fill, and pools last an hour,
+/// so a spring left pouring floods the land round it
+const pondFor:f32=90;
 /// held, a plant never grows on its own
 const never:f32=1e9;
 /// a sculpt's clip is timed by the game's clock wrapped this often (s),
@@ -246,7 +250,13 @@ pub const Specimen=struct{
   /// plucking it), or what the structure draws and the resource nodes round it
   pub fn only(s:*const Specimen,arena:Allocator)Allocator.Error!renderer.Only{
     switch(s.what){
-      .plant=>|sp|return.{.species=sp,.parts=if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale}},
+      .plant=>|sp|{
+        // what it draws with, and (a water plant's pond grows them) the wild flowers
+        var list:std.ArrayList(meshlib.Id)=.empty;
+        try list.appendSlice(arena,if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale});
+        if(species.get(sp).onWater)try list.appendSlice(arena,&lib.wild.meshes);
+        return.{.species=sp,.parts=list.items};
+      },
       .structure=>|k|{
         // the meshes, gathered
         var list:std.ArrayList(meshlib.Id)=.empty;
@@ -464,9 +474,9 @@ pub const Specimen=struct{
   /// the `i`th sculpt standing at `at`, its bones where its clip has them now
   /// a plant that floats on water (`Species.onWater`) shown alone: a
   /// spring pours rain onto the ground round its tile until the water
-  /// stands `pondDeep` over it, so it floats on a pond
+  /// stands `pondDeep` over it (for `pondFor` at most), so it floats on a pond
   fn pond(g:*Game,sp:species.Id,at:m.Vice(i32,2))Allocator.Error!void{
-    if(!species.get(sp).onWater)return;
+    if(!species.get(sp).onWater or g.time>pondFor)return;
     // the chunk under it, and how deep the water stands there now
     const c=g.world.chunkOfTile(at[0],at[1]) orelse return;
     if(c.pool[ck.localIndex(at[0],at[1])]>=pondDeep)return;

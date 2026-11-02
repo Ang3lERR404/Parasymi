@@ -51,7 +51,7 @@ const float WET_DRY = 300.0;
 // difference in level closed a second, between neighbours), and how long
 // it takes to dry away to a third
 const float POOL_FLOW = 1.0;
-const float POOL_DRY = 600.0;
+const float POOL_DRY = 3600.0;
 
 // the pool at `uv` as the last step left it (pool units) and its level
 // (world units): the ground's height there with the water on it

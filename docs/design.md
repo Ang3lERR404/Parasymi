@@ -247,8 +247,14 @@ breathed by the nebularbor, gathers into cloud, which rains it back.
    **It pools:** rain on ground already wet through stands on it as water
    (the field's alpha past 1) and runs downhill, levelling out in the
    dips and valleys (moisture.frag, on the GPU, no water made or lost on
-   the way); pooled, it dries away over 10 minutes, keeping the ground
+   the way); pooled, it dries away over an hour, keeping the ground
    under it wet through. The pools pass draws it (`passes/pools.zig`).
+   **Wild flowers:** birds of paradise spring up of themselves on the
+   soaked ground at a pool's edge (`game/wild.zig`, a chance every 5 s per
+   fit tile, a tile apart), grow over 150 s and stay when the pool dries,
+   marking where water stood. Purely for looks: no lineage, no yield;
+   anything planted or grown on their tile takes it, and water rising
+   0.3 m over one drowns it. Saved.
 4. **The first rain** over the loaded garden is a discovery (`firstRain`).
    The breeds it opens (the gardener's picks, to be built on the pools):
    a moss creeper (spreads moss onto wet soil, so groves can grow), a
