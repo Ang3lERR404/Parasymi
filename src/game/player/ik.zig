@@ -105,7 +105,7 @@ fn softReach(d:f32)f32{
   if(d<=from)return d;
   return from+(most-from)*(1-@exp(-(d-from)/(most-from)));
 }
-/// the leg reaching its foot, plantigrade, each bone its own: the
+/// the leg reaching its foot, digitigrade, each bone its own: the
 /// metatarsal stands back up from the ball at its own angle (`hockFor`),
 /// thigh and shin reach the hock by the law of cosines with the knee
 /// forward and the shin folding back, and the foot is laid along the

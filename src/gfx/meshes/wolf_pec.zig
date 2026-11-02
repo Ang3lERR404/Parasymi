@@ -40,19 +40,19 @@ const V3=m.V3;
 const v3=m.v3;
 /// each lobe's centre on the chest (x for the right one), in the chest
 /// bone's frame; the two meet at the sternum
-pub const centre=v3(0.078,0.09,0.088);
+pub const centre=v3(0.086,0.085,0.088);
 /// half-widths of the outline: top edge (wider) and bottom edge
-const wTop:f32=0.116;
+const wTop:f32=0.132;
 /// the bottom edge's half-width
-const wBot:f32=0.096;
+const wBot:f32=0.11;
 /// half-heights above and below the centre (the top edge is flatter)
-const hTop:f32=0.082;
+const hTop:f32=0.094;
 /// the half-height below the centre
-const hBot:f32=0.096;
+const hBot:f32=0.11;
 /// how far the lower edge sweeps toward the sternum (-x on the right lobe)
 const sweep:f32=0.024;
 /// crown height of the dish above the chest
-const depth:f32=0.078;
+const depth:f32=0.094;
 /// the lower half carries a little more mass
 const lowFull:f32=0.15;
 /// the outer share of the radius over which it eases into the hide
@@ -142,7 +142,54 @@ pub fn lobe(b:*mg.Builder,side:f32)Allocator.Error!void{
   });
   try kit.resinLobe(b,&s,at,Shape,rings,stepCount,pal.sap,0.6);
 }
-/// mesh: WOLF PECTORAL, LEFT. the left lobe, the right one mirrored
-pub const left=struct{pub fn build(b:*mg.Builder)Allocator.Error!void{try lobe(b,-1);}};
-/// mesh: WOLF PECTORAL, RIGHT. the right lobe
-pub const right=struct{pub fn build(b:*mg.Builder)Allocator.Error!void{try lobe(b,1);}};
+/// where round the lobe's top the chest fur grows (angles of its outline,
+/// from the outer edge over the top to the sternum)
+const furAt=[_]f32{0.35,0.75,1.15,1.55,1.95,2.35};
+/// how far out from the crown the fur roots (share of the radius): on the
+/// upper slope, where the resin is low and its spring barely moves it
+const furOut:f32=0.8;
+/// the chest fur, as the gardener drew it: leaves rooted along the top of
+/// the lobe on side `side`, lying down over its upper slope like hair,
+/// each weighted as the hide under it is
+fn fur(b:*mg.Builder,side:f32)Allocator.Error!void{
+  // the bind pose, the hide under the lobe and the lobe's place, as `lobe` lays it
+  const w=skel.bind();
+  var s=try body.sculptedOf(b.gpa,&w,&underAt);
+  defer s.deinit();
+  const at=m.chain(&.{
+    w[@intFromEnum(skel.Bone.chest)],m.translate(centre*v3(side,1,1)),
+    m.scale3(v3(side,1,1)),
+    m.rotY(yawOut),m.rotX(tiltDown),m.rotZ(rollAngle),
+  });
+  // the lobe's own random stream, each leaf its own yet the same every build
+  var rng=pal.rngFor("wolf_pec_fur");
+  for(furAt)|a|{
+    // the outline here, and the point on the lobe's slope where the leaf roots
+    const o=outline(a);
+    const k=furOut;
+    const hit=try s.project(m.mulPoint(at,v3(o[0]*k,o[1]*k,0)));
+    const base=hit.p+hit.n*m.splat3(Shape.height(k,a,o[0]*k,o[1]*k)+0.002);
+    // a point further up the lobe's slope toward its crown, on its face:
+    // the leaf lies along the resin toward it, so it rests on the slope
+    const k2=furOut-0.3;
+    const up=try s.project(m.mulPoint(at,v3(o[0]*k2,o[1]*k2,0)));
+    const toward=up.p+up.n*m.splat3(Shape.height(k2,a,o[0]*k2,o[1]*k2)+0.006);
+    const along=m.norm(toward-base);
+    // the face's outward way there, square to the way it lies
+    const out=m.norm(m.cross(m.cross(along,hit.n),along));
+    // where its vertices begin
+    const start=b.mark();
+    try kit.leaf(b,.{
+      .base=base,.along=along,.out=if(m.dot(out,hit.n)<0)-out else out,
+      .len=0.06*rng.range(0.9,1.1),.width=0.028,.lift=0.12,.curl=0.1,.cup=0.3,
+      .col=pal.wolfLeafDark,.tip=pal.wolfLeafLite,.t=0.9,
+    });
+    // the skin of the hide at its root, which the whole leaf takes
+    const skin=try s.weigh(hit.p);
+    for(try b.skinOf(start))|*q|q.*=skin;
+  }
+}
+/// mesh: WOLF PECTORAL, LEFT. the left lobe, the right one mirrored, its chest fur on it
+pub const left=struct{pub fn build(b:*mg.Builder)Allocator.Error!void{try lobe(b,-1);try fur(b,-1);}};
+/// mesh: WOLF PECTORAL, RIGHT. the right lobe, its chest fur on it
+pub const right=struct{pub fn build(b:*mg.Builder)Allocator.Error!void{try lobe(b,1);try fur(b,1);}};

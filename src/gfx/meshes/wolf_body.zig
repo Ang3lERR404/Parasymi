@@ -69,19 +69,20 @@ pub const nose=v3(0,0.038,0.174);
 pub const noseTilt:f32=0.45;
 /// where each paw's beans sit (hand, fingertip and foot frames, x for the
 /// right side). The palm's pad, in the hand's frame
-pub const palmAt=v3(-0.025,-0.05,0.0);
+pub const palmAt=v3(-0.032,-0.052,0.0);
 /// each fingertip's bean, in its tip's frame
-pub const tipPad=v3(-0.0088,-0.016,0);
+pub const tipPad=v3(-0.0135,-0.018,0);
 /// how far under the foot's frame the sole lies
 pub const soleY:f32=-0.006;
 /// the sole's big pad, in the foot's frame
-pub const padAt=v3(0,soleY+0.002,0.03);
-/// where each of the four toes sits on the big flat paw (x across, z forward)
-pub const toes=[4]m.Vice(f32,2){.{-0.045,0.125},.{-0.016,0.14},.{0.016,0.14},.{0.045,0.125}};
+pub const padAt=v3(0,soleY+0.002,0.04);
+/// where each of the four toes sits on the big paw (x across, z forward)
+pub const toes=[4]m.Vice(f32,2){.{-0.04,0.108},.{-0.014,0.12},.{0.014,0.12},.{0.04,0.108}};
 /// the fingers' radii at the knuckle, the middle joint and the tip
-const fingerR=m.Vice(f32,3){0.0118,0.0105,0.0086};
-/// how softly the fingers melt into each other: barely
-const fingerK:f32=0.004;
+const fingerR=m.Vice(f32,3){0.0175,0.0165,0.014};
+/// how softly the fingers melt into each other: a little, so the paw
+/// reads as a big soft mitten (as the gardener drew it), each digit still its own
+const fingerK:f32=0.007;
 /// how tightly the skin passes across the fingers' joints
 const fingerSoft:f32=0.006;
 /// the dewclaw thumb's root, high on the paw's leading edge (hand frame,
@@ -157,14 +158,16 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   try s.add(.{.shape=cone(v3(0,0.0,0.07),v3(0,-0.075,0.06),0.09,0.014),.at=w[bi(.pelvis)],.bone=bi(.pelvis),.col=pal.sap,.ink=panelInk});
   // the neck: a thick column, the throat under it, a cord of muscle down
   // each side from behind the jaw to the collarbone
-  try a.f(.neck,cone(v3(0,-0.05,-0.012),v3(0,0.09,0.015),0.075,0.059),hide,0.05);
-  for([_]f32{-1,1})|x|try a.f(.neck,cone(v3(x*0.04,0.075,0.0),v3(x*0.022,-0.035,0.05),0.02,0.017),muscle,0.025);
-  try a.f(.neck,ell(v3(0,0.03,0.03),v3(0.045,0.06,0.038)),hide,0.04);
+  // (slender, as the gardener drew it, so the head stands clear of the shoulders)
+  try a.f(.neck,cone(v3(0,-0.05,-0.012),v3(0,0.09,0.015),0.06,0.047),hide,0.05);
+  for([_]f32{-1,1})|x|try a.f(.neck,cone(v3(x*0.032,0.075,0.0),v3(x*0.018,-0.035,0.042),0.016,0.014),muscle,0.022);
+  try a.f(.neck,ell(v3(0,0.03,0.026),v3(0.036,0.05,0.032)),hide,0.035);
   // the head
   try a.f(.head,ell(v3(0,0.036,-0.024),v3(0.07,0.07,0.084)),hide,0.04);
   for([_]f32{-1,1})|x|{
-    // cheekbones flaring out below and behind the eyes; the jaw muscle
-    try a.f(.head,ell(v3(x*0.05,0.008,0.036),v3(0.03,0.024,0.04)),hide,0.025);
+    // cheekbones flaring out below and behind the eyes, full and shaped
+    // (the gardener's), their tufts of leaves set on them; the jaw muscle
+    try a.f(.head,ell(v3(x*0.054,0.006,0.032),v3(0.036,0.028,0.045)),hide,0.022);
     try a.f(.head,ell(v3(x*0.05,-0.016,0.0),v3(0.026,0.036,0.036)),hide,0.03);
     // the brow ridge, a shelf over each eye
     try a.turned(.head,m.rotY(x*0.35),ell(v3(x*0.022,0.056,0.058),v3(0.027,0.011,0.02)),hide,0.022);
@@ -179,10 +182,16 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   try s.add(.{.shape=cone(v3(0,0.012,0.042),v3(0,0.03,0.148),0.04,0.021),.at=w[bi(.head)],.stretch=v3(1.12,1,1),.bone=bi(.head),.col=muzzle,.k=0.03});
   try a.f(.head,ell(v3(0,0.034,0.158),v3(0.023,0.018,0.018)),muzzle,0.014);
   try a.f(.head,ell(v3(0,-0.001,0.105),v3(0.033,0.017,0.05)),muzzle,0.02);
+  // the whisker pads: a soft swell either side of the muzzle above the
+  // lip, so the muzzle reads shaped and boxy at its end, not a cone
+  for([_]f32{-1,1})|x|try a.f(.head,ell(v3(x*0.021,0.004,0.13),v3(0.022,0.019,0.03)),muzzle,0.012);
   // the lower jaw, tucked up under the muzzle, and the chin
   const j=skel.jawAt;
   try a.f(.jaw,cone(v3(0,-0.032,0.012)-j,v3(0,-0.014,0.135)-j,0.03,0.015),muzzle,0.012);
   try a.f(.jaw,ell(v3(0,-0.026,0.112)-j,v3(0.02,0.012,0.028)),muzzle,0.012);
+  // the lower lip: a soft full roll at the front of the jaw, under the
+  // whisker pads, as the gardener drew it (a little pout)
+  try a.f(.jaw,ell(v3(0,-0.016,0.13)-j,v3(0.019,0.008,0.012)),muzzle,0.006);
   // the lip line, the dark rim of each socket
   try s.add(.{.shape=cone(v3(0,-0.012,0.158),v3(0,-0.006,0.05),0.002,0.002),.stretch=v3(9,1,1),.at=w[bi(.head)],.bone=bi(.head),.col=lip,.ink=0.0015});
   for([_]f32{-1,1})|x|{
@@ -198,9 +207,10 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
     // which way out this side is: -1 left, 1 right
     const x=skel.sign(si);
     // the deltoid in three heads (front, side, rear) capping the shoulder
-    try a.f(sd.arm,ell(v3(0,-0.035,0),v3(0.082,0.092,0.082)),muscle,meatMelt*1.6);
-    try a.f(sd.arm,ell(v3(x*0.014,-0.06,0.034),v3(0.054,0.074,0.044)),muscle,meatMelt);
-    try a.f(sd.arm,ell(v3(x*0.014,-0.06,-0.034),v3(0.054,0.074,0.044)),muscle,meatMelt);
+    // (big and rounded, as the gardener drew them)
+    try a.f(sd.arm,ell(v3(x*0.006,-0.035,0),v3(0.098,0.1,0.094)),muscle,meatMelt*1.6);
+    try a.f(sd.arm,ell(v3(x*0.02,-0.065,0.04),v3(0.064,0.084,0.052)),muscle,meatMelt);
+    try a.f(sd.arm,ell(v3(x*0.02,-0.065,-0.04),v3(0.064,0.084,0.052)),muscle,meatMelt);
     try a.f(sd.arm,cone(v3(0,-0.02,0),v3(0,-skel.upperArm,0),0.06,0.047),hide,0.03);
     try a.f(sd.arm,ell(v3(0,-0.11,0.036),v3(0.054,0.08,0.05)),muscle,meatMelt);
     try a.f(sd.arm,ell(v3(0,-0.135,-0.036),v3(0.056,0.088,0.05)),muscle,meatMelt);
@@ -212,32 +222,32 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
     // the paw: a thick palm, the knuckles across its end, four thick
     // fingers each bending at its two joints (barely melted into each
     // other, so they stay apart), and a dewclaw thumb high on its edge
-    try a.f(sd.hand,ell(v3(0,-0.045,0),v3(0.025,0.05,0.05)),dark,0.022);
+    try a.f(sd.hand,ell(v3(0,-0.048,0),v3(0.032,0.058,0.06)),dark,0.024);
     for(skel.knuckles)|z|try a.f(sd.hand,ell(v3(0,-skel.knuckleY+0.004,z),v3(0.0145,0.014,0.0135)),dark,0.012);
     for(sd.fingers,sd.tips,0..)|fb,tb,i|{
       try s.add(.{.shape=cone(v3(0,0.002,0),v3(0,-skel.proximal[i],0),fingerR[0],fingerR[1]),.at=w[bi(fb)],.bone=bi(fb),.col=dark,.k=fingerK,.soft=fingerSoft});
       try s.add(.{.shape=cone(v3(0,0,0),v3(0,-skel.distal[i],0),fingerR[1],fingerR[2]),.at=w[bi(tb)],.bone=bi(tb),.col=dark,.k=fingerK,.soft=fingerSoft});
     }
     try a.f(sd.hand,cone(dewRoot,dewTip*v3(x,1,1),0.0095,0.0075),dark,0.01);
-    // legs, heavy and plantigrade as the gardener drew them: great thighs
-    // (quadriceps before, hamstring behind, a mass on the outside swelling
-    // into the hip), the kneecap; a thick shin with the calf on its back;
-    // the ankle standing straight on a big flat paw, heel behind and toes
-    // spread before, so the leg reads as one column down to the ground
-    try a.f(sd.thigh,cone(v3(0,0.0,0),v3(0,-skel.thighLength,0),0.12,0.092),hide,0.05);
-    try a.f(sd.thigh,ell(v3(0,-0.13,0.05),v3(0.1,0.15,0.085)),muscle,meatMelt*1.4);
-    try a.f(sd.thigh,ell(v3(0,-0.13,-0.05),v3(0.092,0.14,0.08)),muscle,meatMelt*1.4);
-    try a.f(sd.thigh,ell(v3(x*0.065,-0.07,0),v3(0.1,0.15,0.1)),muscle,meatMelt*2);
+    // legs, heavy and stylized as the gardener drew them, digitigrade:
+    // great thighs (quadriceps before, hamstring behind, a mass on the
+    // outside swelling into the hip), the kneecap; a thick shin with the
+    // calf on its back; a stout metatarsal down to a big paw on its toes
+    try a.f(sd.thigh,cone(v3(0,0.0,0),v3(0,-skel.thighLength,0),0.115,0.085),hide,0.05);
+    try a.f(sd.thigh,ell(v3(0,-0.1,0.045),v3(0.095,0.12,0.08)),muscle,meatMelt*1.4);
+    try a.f(sd.thigh,ell(v3(0,-0.1,-0.045),v3(0.088,0.115,0.075)),muscle,meatMelt*1.4);
+    try a.f(sd.thigh,ell(v3(x*0.06,-0.06,0),v3(0.095,0.12,0.095)),muscle,meatMelt*2);
     // the teardrop of the inner quadriceps just above the knee
-    try a.f(sd.thigh,ell(v3(-x*0.036,-0.23,0.045),v3(0.05,0.06,0.05)),muscle,meatMelt);
-    try a.f(sd.thigh,ell(v3(0,-skel.thighLength,0.06),v3(0.05,0.05,0.035)),hide,0.025);
-    try a.f(sd.shin,cone(v3(0,0,0),v3(0,-skel.shinLength,0),0.088,0.072),hide,0.045);
+    try a.f(sd.thigh,ell(v3(-x*0.032,-0.17,0.04),v3(0.045,0.055,0.045)),muscle,meatMelt);
+    try a.f(sd.thigh,ell(v3(0,-skel.thighLength,0.05),v3(0.045,0.046,0.032)),hide,0.025);
+    try a.f(sd.shin,cone(v3(0,0,0),v3(0,-skel.shinLength,0),0.075,0.05),hide,0.04);
     // the calf in two heads, inner and outer, high on the shin's back
-    for([_]f32{-1,1})|hx|try a.f(sd.shin,ell(v3(hx*0.027,-0.1,-0.05),v3(0.05,0.11,0.06)),muscle,meatMelt);
-    try a.f(sd.meta,cone(v3(0,0.02,0),v3(0,-skel.metaLength,0.0),0.074,0.07),hide,0.04);
-    // the paw: a broad flat sole from the heel to the toes, the heel's mound behind
-    try a.f(sd.foot,ell(v3(0,0.034,0.035),v3(0.066,0.04,0.105)),dark,0.035);
-    try a.f(sd.foot,ell(v3(0,0.045,-0.035),v3(0.058,0.05,0.05)),dark,0.035);
+    for([_]f32{-1,1})|hx|try a.f(sd.shin,ell(v3(hx*0.024,-0.08,-0.045),v3(0.045,0.095,0.055)),muscle,meatMelt);
+    try a.f(sd.meta,ell(v3(0,0,-0.02),v3(0.045,0.045,0.038)),hide,0.025);
+    try a.f(sd.meta,cone(v3(0,0,0),v3(0,-skel.metaLength,0),0.052,0.04),dark,0.035);
+    // the paw: big and broad on its toes, a mound behind the ball
+    try a.f(sd.foot,ell(v3(0,0.018,0.04),v3(0.055,0.026,0.08)),dark,0.035);
+    try a.f(sd.foot,ell(v3(0,0.03,-0.008),v3(0.045,0.032,0.04)),dark,0.03);
   }
   // the tail, growing out of the rear and tapering to its tip
   const radii=[_]f32{0.056,0.048,0.04,0.03,0.011};
@@ -387,17 +397,18 @@ fn line(w:*const[skel.count]M4,bone:Bone,from:V3,to:V3,out:V3)Lay{
   return lay;
 }
 /// where the sash leaves the -x side, under the pectoral (chest frame)
-const sashFrom=v3(-0.135,0.01,0.03);
-/// where it reaches the other hip (pelvis frame)
-const sashTo=v3(0.13,0.0,0.035);
-/// the sash's lay: points on a straight line across the body from
-/// `sashFrom` to `sashTo`, each cast out of the body from deep behind it,
-/// leaning out toward its own side so the ends find the flanks
+const sashFrom=v3(-0.135,0.005,0.03);
+/// where it reaches under the other pectoral (chest frame); between the
+/// two it swags over the belly (wolf_belly lays that stretch)
+const sashTo=v3(0.135,0.005,0.03);
+/// the sash's lay: points on a straight line across the body under the
+/// pectorals from `sashFrom` to `sashTo`, each cast out of the body from
+/// deep behind it, leaning out toward its own side so the ends find the flanks
 fn sash(w:*const[skel.count]M4)Lay{
   // the lay being filled, and its two ends in the bind pose
   var lay:Lay=undefined;
   const a=m.mulPoint(w[bi(.chest)],sashFrom);
-  const z=m.mulPoint(w[bi(.pelvis)],sashTo);
+  const z=m.mulPoint(w[bi(.chest)],sashTo);
   for(0..vine)|i|{
     // how far across this point is, 0..1, and the point on the line
     const k=m.ratio(i,vine-1);
@@ -442,8 +453,8 @@ fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.E
     try vineOver(b,s,&wind(w,&.{.{.bone=.neck,.y0=-0.06,.y1=skel.headAt[1]*0.8}},m.f(vi)*m.pi+2.2,1.6),0.009,pal.wolfVine);
   }
   // the sash: a vine wound round the -x upper arm (on the left seen from
-  // the front, as the gardener drew it), then slung across the front from
-  // under that pectoral to the other hip
+  // the front, as the gardener drew it), then run under the pectorals from
+  // one side to the other (over the belly it swags down, wolf_belly)
   try vineOver(b,s,&wind(w,&.{.{.bone=skel.sides[0].arm,.y0=-0.05,.y1=-0.15}},0.4,m.tau*1.15),0.0095,pal.wolfVine);
   try vineOver(b,s,&sash(w),0.0105,pal.wolfVine);
   // the tail: three strands braided along it
@@ -533,10 +544,12 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
       try furLeaf(b,s,m.mulPoint(neck,v3(@sin(a)*0.1,y,@cos(a)*0.1)),dir(neck,v3(@sin(a)*0.3,-1,-0.5)),(0.075+0.006*m.f(ri))*rng.range(0.85,1.1),0.019,0.38,0.5);
     }
   }
-  // along each cheekbone, angling back and up
+  // the cheek tufts: leaves fanned out off each cheekbone, back and out
+  // and a little down, standing clear of the face like the jagged cheek
+  // fur the gardener drew
   for([_]f32{-1,1})|x|{
-    for([_]f32{0.0,0.022,0.044},0..)|z,i|{
-      try furLeaf(b,s,m.mulPoint(head,v3(x*0.09,0.0,z)),dir(head,v3(0,0.35,-1)),0.03+0.007*m.f(2-i),0.012,0.7,0.25);
+    for([_]f32{0.044,0.026,0.008,-0.01},0..)|z,i|{
+      try furLeaf(b,s,m.mulPoint(head,v3(x*0.095,0.004-0.01*m.f(i%2),z)),dir(head,v3(x*0.6,-0.25+0.15*m.f(i),-1)),(0.04+0.008*m.f(i))*rng.range(0.92,1.08),0.017,0.85,0.3);
     }
   }
   // a tuft over each shoulder
@@ -640,6 +653,13 @@ fn finery(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4,rng:*engin
         const a=m.ratio(j,cuffLeaves)*m.tau+m.f(ring)*0.4+rng.range(-0.1,0.1);
         try furLeaf(b,s,m.mulPoint(fore,v3(@sin(a)*0.08,y,@cos(a)*0.08)),dir(fore,v3(@sin(a)*0.35,1,@cos(a)*0.35)),(0.075-0.012*f)*rng.range(0.9,1.1),0.03,0.75,0.45);
       }
+    }
+    // the kneecap's tuft: leaves fanned down over the knee from just above it
+    const knee=w[bi(sd.thigh)];
+    for(0..5)|j|{
+      // how far across the fan this leaf is (-1..1)
+      const u=m.ratio(j,4)*2-1;
+      try furLeaf(b,s,m.mulPoint(knee,v3(u*0.03,-skel.thighLength+0.035,0.07)),dir(knee,v3(u*0.5,-1,0.15)),0.06*(1-0.2*@abs(u))*rng.range(0.92,1.08),0.026,0.6,0.4);
     }
     // the thigh's tuft, as drawn seen from the front: on the left (-x) a
     // flame on the outer front, on the right (+x) a lotus on the front,

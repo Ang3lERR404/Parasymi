@@ -68,6 +68,10 @@ pub fn crossing()V3{
 }
 /// points along the sash where it crosses the belly
 const sashPoints=25;
+/// where on the sac the sash is at `k` (0 under the -x pectoral .. 1
+/// under the +x one): its angle up the sac and round it, swagging lowest
+/// over the middle of the belly
+fn sashAt(k:f32)m.Vice(f32,2){return.{(0.84-0.26*@sin(m.pi*k))*m.pi,m.lerp(0.97,0.03,k)*m.pi};}
 /// the wolf's kit, whose fur leaves lie along the sash
 const kit=lib.wolfKit;
 /// part roles, to tell the sash's leaves apart
@@ -176,17 +180,18 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   }
   // decision: no net of vines over it: the belly is the wolf's own amber
   // belly as the gardener drew it, bare sap swelling out of the panel;
-  // only the sash crosses it, from high on the -x side down to the +x
-  // hip (where the body's sash runs on), leaves along it
+  // only the sash crosses it: from under the -x pectoral it swags down
+  // over the belly and back up under the +x one (where the body's sash
+  // runs on, under the pectorals), leaves along it
   var path:[sashPoints]V3=undefined;
   var vts:[sashPoints]f32=undefined;
   var rs:[sashPoints]f32=undefined;
   for(&path,&vts,&rs,0..)|*p,*t,*r,j|{
     // how far along the sash this point is, 0..1, and where on the sac
     const k=m.ratio(j,sashPoints-1);
-    const th=m.lerp(0.78,0.22,k)*m.pi;
-    p.*=surface(th,m.lerp(0.97,0.06,k)*m.pi,1.035);
-    t.*=gut(th);
+    const sp=sashAt(k);
+    p.*=surface(sp[0],sp[1],1.035);
+    t.*=gut(sp[0]);
     // full thickness across the sac, tapering only where it tucks in at its ends
     r.*=@max(0.0105*@sqrt(@sin(m.pi*m.lerp(0.06,0.94,k))),0.0005);
   }
@@ -194,9 +199,8 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   for([_]usize{4,8,12,16,20})|j|{
     // which side of the sash this leaf leans, and how far up the sac it grows
     const lean:f32=if(j%8==0)1 else-1;
-    const k=m.ratio(j,sashPoints-1);
-    const th=m.lerp(0.78,0.22,k)*m.pi;
-    const out=normal(th,m.lerp(0.97,0.06,k)*m.pi);
+    const sp=sashAt(m.ratio(j,sashPoints-1));
+    const out=normal(sp[0],sp[1]);
     const along=m.norm(path[j+1]-path[j-1]);
     try kit.leaf(b,.{
       .base=path[j],.along=m.norm(along+m.cross(out,along)*m.splat3(0.6*lean)),.out=out,

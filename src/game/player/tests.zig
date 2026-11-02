@@ -74,27 +74,32 @@ test"belly contents lag a sprint, overshoot a stop, then settle"{
   for(p.rump)|q|try testing.expect(m.len(q.pos)<=rumpMax+testEps);
 }
 test"the leg reaches its resting foot in its resting pose"{
-  // the bones at the rest pose
-  const w=skel.fk(.{});
+  // the rest pose, and its bones
+  const rest:skel.Pose=.{};
+  const w=skel.fk(rest);
   for(skel.sides,0..)|sd,s|{
     // this side's resting foot, and the leg solved to reach it
     const foot=m.origin(w[@intFromEnum(sd.foot)]);
     const l=solveLeg(.{.d=foot-v3(skel.sign(s)*skel.hipX,skel.hipY,0)});
-    try testing.expectApproxEqAbs(skel.restThigh,l.root.x,1e-3);
+    const r=rest.legs[s];
+    try testing.expectApproxEqAbs(r.root.x,l.root.x,1e-3);
+    try testing.expectApproxEqAbs(r.root.y,l.root.y,1e-3);
+    try testing.expectApproxEqAbs(r.root.z,l.root.z,1e-3);
     try testing.expectApproxEqAbs(skel.restKnee,l.mid,1e-3);
     try testing.expectApproxEqAbs(skel.restHock,l.low.x,1e-3);
+    try testing.expectApproxEqAbs(r.roll,l.roll,1e-3);
   }
 }
-test"each leg bone is its own: a foot set forward and up the slope is reached, its sole laid along it"{
+test"each leg bone is its own: a foot set forward and down is reached, its sole laid along the slope"{
   // the bones at the rest pose, and a slope rising ahead and to the left
   const w=skel.fk(.{});
   const slope=m.norm(v3(0.25,1,-0.3));
-  // the pose with each leg solved onto its foot, moved forward and up the slope
+  // the pose with each leg solved onto its foot, moved forward and down
   var q:skel.Pose=.{};
   // where each foot is wanted
   var want:[2]V3=undefined;
   for(skel.sides,0..)|sd,s|{
-    want[s]=m.origin(w[@intFromEnum(sd.foot)])+v3(0,0.04,0.1);
+    want[s]=m.origin(w[@intFromEnum(sd.foot)])+v3(0,-0.02,0.08);
     q.legs[s]=solveLeg(.{.d=want[s]-v3(skel.sign(s)*skel.hipX,skel.hipY,0),.ground=slope});
   }
   // the bones so posed: each ball where it is wanted, each sole facing the slope

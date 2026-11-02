@@ -579,9 +579,14 @@ from a distance-to-edge function, so they stay crisp at any size) in
 - **Torso:** the ribcage is broad but melts into a waist only a little
   narrower (`rib*`, `lat*` in `wolfBody`). No barrel rim over the waist,
   front or back.
-- **Build, as the gardener drew it:** heavy and low-slung: wide hips,
-  great thighs swelling out past them, thick column legs on big flat
-  paws (heel behind, four toes spread before).
+- **Build, as the gardener drew it:** heavy and stylized: big rounded
+  deltoids, large pectorals with leaves of chest fur lying over their
+  tops (in `wolfPec`), a slender neck, wide hips, great thighs swelling
+  out past them, stout digitigrade legs on big paws, and mitten hands:
+  thick, long fingers melted a little together, each digit still its own.
+- **Head, shaped:** full cheekbones with tufts of leaves fanned back off
+  them, whisker pads either side of the muzzle so it reads boxy at its
+  end, and a soft full lower lip (a little pout).
 - **Muscle:** the limbs carry heavy, distinct muscle: three-headed
   deltoids, bicep/tricep, brachioradialis, quadriceps with an inner
   teardrop, two-headed calves, neck cords, obliques. They are melted only
@@ -612,10 +617,11 @@ from a distance-to-edge function, so they stay crisp at any size) in
   eye (the left one seen from the front), a collar of leaves round the
   neck with a layered bib on the sternum, thick cuffs of leaves thatching
   each forearm up from a clean line at the wrist, a flame tuft on the -x
-  thigh and a lotus of petals on the +x one.
-- A sash: a vine wound round the -x upper arm and slung across the front
-  from under that pectoral to the other hip; where it crosses the belly
-  it lies over it with leaves along it (`wolfBelly`), swelling with it.
+  thigh and a lotus of petals on the +x one, a tuft fanned down over
+  each kneecap.
+- A sash: a vine wound round the -x upper arm, run under one pectoral,
+  swagging down over the belly with leaves along it (`wolfBelly`,
+  swelling with it) and back up under the other.
 - The claws are leaf tips: green (`pal.wolfClaw`).
 - Digits and claws (`wolfKit.digit`).
 - Eyes set in carved sockets under the brow.
@@ -714,11 +720,11 @@ A plant's yield shows on it, where the paws pluck it:
 ### Motion
 - **Feet** are planted in the world and swung on arcs when the gait's
   phase says so (or, standing, when a foot is left behind).
-- **Legs:** plantigrade (standing on the whole paw), heavy columns as the
-  gardener drew them, every bone its own (`solveLeg`): the short ankle
-  stands back up from the paw at its rest angle, swung part way with the
-  reach and folded mid-swing; thigh and shin reach it, the knee forward,
-  the shin folding back. The hip is rolled out to the leg's plane before
+- **Legs:** digitigrade (walking on the toes, as dogs do), every bone its
+  own (`solveLeg`): the metatarsal stands back up from the ball at its
+  rest angle, swung part way with the reach and folded mid-swing; thigh
+  and shin reach the hock, the knee forward, the shin folding back. The
+  hip is rolled out to the leg's plane before
   it swings in it (composed in that order and read back as one turn), so
   the foot lands exactly; near straight the reach is softened
   (`softReach`) so the knee eases straight instead of snapping.
