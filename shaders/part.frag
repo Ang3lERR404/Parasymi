@@ -35,6 +35,23 @@ const vec3 PRISM_DAY = vec3(1.0, 0.96, 0.9);
 const vec3 PRISM_FILM = vec3(1.0, 0.82, 0.6);
 const float PRISM_SPEC_POW = 120.0;
 const float PRISM_FRESNEL_POW = 3.0;
+// the strange seed's crystal husk: how much of its own colour it keeps, how
+// clear it is face-on, its cracks' glow (the web's pale blue), how large
+// its crack pattern is (per unit of mesh space) and how thin a seam
+const float HUSK_TINT = 0.08;
+const float HUSK_CLEAR = 0.1;
+const vec3 HUSK_CRACK = vec3(0.55, 0.85, 1.6);
+const float HUSK_CRACK_SCALE = 22.0;
+const float HUSK_CRACK_W = 0.035;
+// smooth value noise over a husk, its cracks laid along where it crosses
+// the middle
+float huskNoise(vec3 p) {
+  vec3 i = floor(p), f = fract(p);
+  vec3 u = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(hash33(i).x, hash33(i + vec3(1, 0, 0)).x, u.x), mix(hash33(i + vec3(0, 1, 0)).x, hash33(i + vec3(1, 1, 0)).x, u.x), u.y),
+    mix(mix(hash33(i + vec3(0, 0, 1)).x, hash33(i + vec3(1, 0, 1)).x, u.x), mix(hash33(i + vec3(0, 1, 1)).x, hash33(i + vec3(1, 1, 1)).x, u.x), u.y), u.z);
+}
 // how tightly sap's colour gathers to its edge (1 - n.v)^this: a narrow
 // band, so face-on it reads deep and clear and its light is the glisten's
 const float SAP_EDGE_POW = 5.0;
@@ -442,6 +459,29 @@ void surface() {
     float r = clamp(v_t, 0.0, 1.0);
     float a = v_fade * pow(1.0 - r, GROUND_SHADOW_FALLOFF);
     o = vec4(applyFog(GROUND_SHADOW, v_pos), a);
+    return;
+  }
+  if (part == PART_HUSK) {
+    // a crystal husk (the strange seed's): clear glass, faintly its own
+    // colour, each facet catching an iridescent film as it turns edge-on
+    // and the sun glinting off it; cracks run over it, glowing with the
+    // light of the web inside (thin seams where a noise in its own space
+    // crosses nothing). Only its near side is drawn.
+    if (dot(raw, V) < 0.0) discard;
+    float ndv = clamp(dot(n, V), 0.0, 1.0);
+    float fres = pow(1.0 - ndv, PRISM_FRESNEL_POW);
+    vec3 facet = hash33(floor(n * 7.0) + 3.0);
+    vec3 film = mix(filmHue(0.08 + 0.9 * ndv + facet.x * 0.35), PRISM_FILM, 0.35);
+    vec3 lit = byDay(NIGHT_LIT, PRISM_DAY);
+    PointLit pl = pointLights(v_pos, n, n, false);
+    c = v_col * HUSK_TINT + film * lit * (0.08 + 0.7 * fres) + film * pl.plain * 0.4;
+    vec3 H = normalize(SUN + V);
+    c += lit * pow(max(dot(n, H), 0.0), PRISM_SPEC_POW) * 1.6 * step(0.0, dot(n, SUN)) * sh;
+    float seam = abs(huskNoise(v_obj * HUSK_CRACK_SCALE) - 0.5) + 0.5 * abs(huskNoise(v_obj * HUSK_CRACK_SCALE * 2.3 + 7.0) - 0.5);
+    float crack = 1.0 - smoothstep(0.0, HUSK_CRACK_W, seam);
+    c += HUSK_CRACK * crack * (0.8 + 0.6 * sin(pc.eye_time.w * 1.3));
+    alpha = clamp(HUSK_CLEAR + 0.6 * fres + crack, 0.0, 1.0);
+    o = vec4(applyFog(c, v_pos), alpha);
     return;
   }
   if (part == PART_RESIN) {

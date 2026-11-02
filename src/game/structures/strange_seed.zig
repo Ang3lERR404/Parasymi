@@ -5,8 +5,8 @@
 //! hand, it is planted: it conjures loose constellate fragments out of
 //! itself one at a time, each rising slowly out of it to drift loose round
 //! and over it, lines and panes forming between those that come near (the
-//! constellate web, `strangeSeedWeb`, placed on the GPU), until `most`
-//! drift there.
+//! constellate web, `strangeSeedWeb`, placed on the GPU), until `most`,
+//! enough for a core and four petals, drift there.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -38,11 +38,11 @@ const Color=lib.engine.ui.draw.Color;
 pub const meshes=.{.strangeSeedWeb};
 /// what it is: lying on one tile, there at once, still
 pub const def:st.Def=.{.item=.strangeSeed,.lineage=null,.size=1,.mesh=.strangeSeed,.still=true};
-/// the most loose fragments it conjures (the web's points, part.vert
-/// `PLEXUS_POINTS`)
-pub const most:f32=30;
-/// how long it takes to conjure one (s): all of them in ten minutes
-pub const every:f32=20;
+/// the most loose fragments it conjures: enough for a core and four petals
+/// (part.vert `PLEXUS_SEED_FRAGMENTS`)
+pub const most:f32=lib.constellate.seedFragments;
+/// how long it takes to conjure one (s): all of them in twelve and a half minutes
+pub const every:f32=15;
 /// what a strange seed remembers: whether it is planted, and how many
 /// fragments it has conjured
 pub const State=struct{

@@ -145,9 +145,12 @@ const Shape=enum(u8){
   /// act 2's gardener, a hyena of stars: one limb of him, which in the
   /// reach's whole part (`limbs`)
   hyena,
-  /// a planted strange seed's loose fragments, rising out of it in turn
-  /// (how many it has conjured rides in its instance's growth)
+  /// a planted strange seed's loose fragments, three points to each,
+  /// slipping out of it in turn (how many it has conjured rides in its
+  /// instance's growth)
   seedWeb,
+  /// the web inside a strange seed's crystal husk, turning slowly
+  seedHeart,
   /// the yielder's other petals, by number
   _,
 };
@@ -584,11 +587,20 @@ pub const hyenaMesh=struct{
   /// his bones as a sample (`meshlib.Pose`): hovering, every limb drifting
   pub const pose=hyenaPose;
 };
+/// how many fragments a planted strange seed conjures: enough for a core
+/// and four petals (part.vert `PLEXUS_SEED_FRAGMENTS`)
+pub const seedFragments=50;
 /// mesh: STRANGE SEED WEB. the loose fragments a planted strange seed
-/// conjures (game/structures/strange_seed.zig), each rising out of it in
-/// turn to drift loose round and over it, joined where they come near
+/// conjures (game/structures/strange_seed.zig), each a small glass triangle
+/// of three points slipping out through a crack in its husk in turn to
+/// drift loose round and over it
 pub const seedWeb=struct{
   /// builds every fragment it may ever conjure; part.vert shows as many
   /// as it has
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.seedWeb,.reach=0.38});}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.seedWeb,.reach=0.12,.n=3*seedFragments,.group=3});}
 };
+/// the web inside a strange seed's crystal husk (meshes/strange_seed.zig):
+/// a small spindle of paired lights filling it, turning slowly
+pub fn seedHeartWeb(b:*mg.Builder)Allocator.Error!void{
+  try cluster(b,.{.shape=.seedHeart,.reach=0.07,.n=16});
+}

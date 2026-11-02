@@ -445,8 +445,11 @@ camera in his eyes. He works with the convergent lineage and the
 constellate one alone.
 - **The strange seed, planted:** put down by his hand (the `sown` hook) it
   is planted; put down by the wolf's it only lies there. Planted, it
-  conjures a loose constellate fragment out of itself every 20 s, up to
-  30: each rises out of its light, spiralling, to drift loose round and
+  conjures a loose constellate fragment (a small glass triangle of three
+  points) every 15 s, up to 50, enough for a core and four petals: each
+  slips out through a crack in its crystal husk (a see-through `husk`
+  part, a small web turning inside it), spiralling, to drift loose round
+  and
   over it, lines and panes forming between those that come near, reaching
   further as more gather (`strangeSeedWeb`, part.vert `plexusSeedWeb`;
   how many in the instance's growth). Hover says how many.

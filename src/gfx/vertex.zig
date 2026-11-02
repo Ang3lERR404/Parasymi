@@ -85,12 +85,15 @@ pub const Part=enum(u32){
   /// a spark of lightning: light itself, white-hot along its core, violet
   /// at its edge, flickering (tu.x 0..1 along it)
   spark,
+  /// a crystal husk: clear glass, an iridescent film at its edges, glowing
+  /// cracks over it where the light inside shows through (part.frag)
+  husk,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve,.stone=>false,
   };
 }

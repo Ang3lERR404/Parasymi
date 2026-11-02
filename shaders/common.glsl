@@ -63,6 +63,7 @@ const float SHEEN_POWER = 40.0;
 #define PART_PLEXUS 18    // the constellate web: points, lines, panes of light
 #define PART_STONE 19     // weathered stone: grained, flecked, lichened
 #define PART_SPARK 20     // a spark of lightning: white-hot core, violet edge
+#define PART_HUSK 21      // a crystal husk: clear glass, glowing cracks
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))
