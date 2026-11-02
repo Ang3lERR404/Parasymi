@@ -572,8 +572,10 @@ from a distance-to-edge function, so they stay crisp at any size) in
 
 ## Wolf (`game/player.zig` rig)
 ### Colour and build
-- Muted greens and browns. Amber only on belly, eyes, inner ears, beans,
-  pectorals and rear.
+- Three colours, as the gardener drew it: a hide of dark red-brown bark
+  (`pal.wolfBark`, its muscles a shade warmer), leaves, vines and claws of
+  bright living green, and amber sap. Amber only on belly, the panel down
+  the front, eyes, inner ears, beans, pectorals and rear.
 - **Torso:** the ribcage is broad but melts into a waist only a little
   narrower (`rib*`, `lat*` in `wolfBody`). No barrel rim over the waist,
   front or back.
@@ -612,6 +614,10 @@ bone) tucked up under it; ears (`wolfEars`, skinned to ear bones).
 ### Resin sap
 (`.resin`, sprung `give`.) Pectorals (`wolfPec`) on the chest; the rear
 (`wolfRump`) on the pelvis, its lower edge partly following the thighs.
+The sap panel down the front: the bark is inked amber from the sternum
+between the pectorals, broad over the belly and out to the hips, drawn to
+a point at the groin (ink forms in `wolfBody`), glazed by a thin resin
+sheet laid over it (`wolfPanel`); the belly's sac swells over it.
 
 ### Gathering (`Player.pry`, `armsToWrists`, `solveArm`)
 - **A deep squat** (`squat*`): hips drop, body leans in, feet step out,

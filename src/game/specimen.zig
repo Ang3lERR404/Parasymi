@@ -253,7 +253,7 @@ pub const Specimen=struct{
       .plant=>|sp|{
         // what it draws with, and (a water plant's pond grows them) the wild flowers
         var list:std.ArrayList(meshlib.Id)=.empty;
-        try list.appendSlice(arena,if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale});
+        try list.appendSlice(arena,if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.wolfPanel,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale});
         if(species.get(sp).onWater)try list.appendSlice(arena,&lib.wild.meshes);
         return.{.species=sp,.parts=list.items};
       },

@@ -49,14 +49,14 @@ const Bone=skel.Bone;
 const Form=sculpt.Form;
 /// the hide's cells at full detail (each level of detail doubles them)
 pub const cell:f32=0.005;
-/// the hide: a muted olive-brown, halfway between the wolf's core and its vine
-const hide=color.mix(pal.wolfCore,pal.wolfVine,0.45);
-/// the muscles' tone: nearer the vine
-const muscle=color.mix(pal.wolfCore,pal.wolfVine,0.7);
-/// the hands' and feet's darker brown
-const dark=color.mix(pal.wolfCore,color.rgb(0.1,0.08,0.05).toRgba8(255),0.35);
-/// the muzzle's paler tone
-const muzzle=color.mix(pal.wolfCore,pal.wolfVine,0.55);
+/// the hide: dark red-brown bark
+const hide=pal.wolfBark;
+/// the muscles' tone: the bark a shade warmer
+const muscle=pal.wolfBarkLite;
+/// the hands' and feet's bark: a little darker, toward the core
+const dark=color.mix(pal.wolfBark,pal.wolfCore,0.4);
+/// the muzzle's tone: the hide's own bark
+const muzzle=pal.wolfBark;
 /// near-black, for the lip line and the sockets' rims
 const lip=color.rgb(0.08,0.06,0.05).toRgba8(255);
 /// each eye's centre in the head's frame (x for the right one)
@@ -105,6 +105,8 @@ const latLift:f32=0.02;
 /// how softly the limbs' muscles melt into each other and the bone under
 /// them: small, so each reads as its own mass with a groove between
 const meatMelt:f32=0.014;
+/// how softly the sap down the front fades into the bark at its edge (metres)
+const panelInk:f32=0.006;
 /// bone `b`'s index, its slot in the frames and the skin
 fn bi(b:Bone)u8{return@intFromEnum(b);}
 /// an ellipsoid shape centred at `c` with radii `r`
@@ -145,6 +147,14 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
     try a.turned(.chest,m.rotZ(x*0.35),ell(v3(x*0.077,0.188,-0.03),v3(0.088,0.046,0.064)),muscle,0.03);
     try a.turned(.chest,m.chain(&.{m.translate(v3(x*0.088,0.05+latLift,-0.055)),m.rotZ(x*0.3)}),ell(v3(0,0,0),v3(0.048,0.11-latLift,latDepth)),muscle,latMelt);
   }
+  // the sap showing through the bark down the front (under the glaze of
+  // wolf_panel): broad over the belly, narrowing up to the sternum between
+  // the pectorals and drawn to a point at the groin; ink only, so the
+  // body's shape is untouched
+  try s.add(.{.shape=ell(v3(0,0.08,0.08),v3(0.15,0.14,0.075)),.at=w[bi(.pelvis)],.bone=bi(.pelvis),.col=pal.sap,.ink=panelInk});
+  try s.add(.{.shape=ell(v3(0,0.06,0.08),v3(0.09,0.12,0.065)),.at=w[bi(.waist)],.bone=bi(.waist),.col=pal.sap,.ink=panelInk});
+  try s.add(.{.shape=ell(v3(0,0.0,0.09),v3(0.045,0.08,0.055)),.at=w[bi(.chest)],.bone=bi(.chest),.col=pal.sap,.ink=panelInk});
+  try s.add(.{.shape=cone(v3(0,0.0,0.07),v3(0,-0.075,0.06),0.09,0.014),.at=w[bi(.pelvis)],.bone=bi(.pelvis),.col=pal.sap,.ink=panelInk});
   // the neck: a thick column, the throat under it, a cord of muscle down
   // each side from behind the jaw to the collarbone
   try a.f(.neck,cone(v3(0,-0.05,-0.012),v3(0,0.09,0.015),0.075,0.059),hide,0.05);

@@ -33,6 +33,8 @@ const parts=struct{
   /// both its ears, skinned to their bones
   pub const wolfEars=@import("meshes/wolf_ears.zig");
   // drawn before the belly so the translucent sac blends over them
+  /// the sheet of sap welling through the bark down its front
+  pub const wolfPanel=@import("meshes/wolf_panel.zig");
   /// a lump of something heavy the wolf carries, seen through its belly
   pub const bellyLump=@import("meshes/belly_lump.zig");
   /// the sac of sap on the wolf's gut, translucent over what it holds

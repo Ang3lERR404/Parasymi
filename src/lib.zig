@@ -196,6 +196,8 @@ pub const wolfKit=@import("gfx/meshes/wolf_kit.zig");
 pub const wolfPec=@import("gfx/meshes/wolf_pec.zig");
 /// mesh: the wolf's rump, a lobe of solid sap on each hip
 pub const wolfRump=@import("gfx/meshes/wolf_rump.zig");
+/// mesh: the wolf's sap panel, a sheet of sap down its front
+pub const wolfPanel=@import("gfx/meshes/wolf_panel.zig");
 /// the ground's mesh, built from each chunk's tiles
 pub const terrainMesh=@import("render/terrain_mesh.zig");
 /// the fixed-tick ecology: mana, sharing, draining, growth and death

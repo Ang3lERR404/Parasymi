@@ -135,7 +135,7 @@ fn ear(b:*mg.Builder)Allocator.Error!void{
     const i=r*colCount+c;
     pts[i]=inner(k,u);
     nrms[i]=gridNormal(inner,k,u,-1);
-    cols[i]=color.mix(pal.wolfCore,pal.wolfVine,m.clamp01(k));
+    cols[i]=color.mix(pal.wolfCore,pal.wolfBark,m.clamp01(k));
     us[i]=m.clamp01(k);
   };
   try mg.patch(b,rowCount,colCount,&pts,&nrms,&cols,&us,1,.ear);
@@ -147,7 +147,7 @@ fn ear(b:*mg.Builder)Allocator.Error!void{
     const i=r*colCount+c;
     pts[i]=outer(k,u);
     nrms[i]=gridNormal(outer,k,u,-1);
-    cols[i]=color.mix(pal.wolfCore,pal.wolfVine,0.4*m.clamp01(k));
+    cols[i]=color.mix(pal.wolfBark,pal.wolfBarkLite,m.clamp01(k));
   };
   try mg.patch(b,rowCount,colCount,&pts,&nrms,&cols,&us,1,.stem);
   // the rolled rim joining face and back, up one edge, over the tip and
@@ -170,5 +170,5 @@ fn ear(b:*mg.Builder)Allocator.Error!void{
     rs[j]=thick(k)*0.3+0.0012;
   }
   // over the tip the two edges meet: pull them together there
-  try b.tubeR(&rim,&ts,&rs,pal.wolfVine,.stem,5);
+  try b.tubeR(&rim,&ts,&rs,pal.wolfBark,.stem,5);
 }

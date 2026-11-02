@@ -34,5 +34,6 @@ test{
   _=lib.skeleton;
   _=lib.wolfBelly;
   _=lib.wolfRump;
+  _=lib.wolfPanel;
   _=lib.radiantKit;
 }

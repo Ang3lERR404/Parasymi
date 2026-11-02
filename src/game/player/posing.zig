@@ -427,6 +427,8 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
   const hide:u64=if(headless)headBones else 0;
   try out.emitSkinned(.wolfBody,base,mid,.{.glow=bodyGlow,.flutter=bodyFlutter,.phase=0.1,.hide=hide});
   try out.emitSkinned(.wolfEars,base,mid,.{.glow=earGlow,.phase=0.5,.fade=earOpacity,.hide=hide});
+  // the sheet of sap down its front, under the belly's sac
+  try out.emitSkinned(.wolfPanel,base,mid,.{.phase=0.3,.fade=pecOpacity});
   if(!headless)try out.emit(.pawBean,m.chain(&.{at(&w,.head),translate(bodyMesh.nose),m.rotX(-bodyMesh.noseTilt),scale(v3(0.015,0.0105,0.011))}),.{.glow=noseGlow,.fade=beanOpacity,.tint=noseTint});
   // the belly: a sap sac that inflates with the inventory, drops and sags
   // as it fills, with the heavier things inside showing through as shadows

@@ -33,20 +33,26 @@ pub const sapwoodDark=color.rgb(0.36,0.25,0.13).toRgba8(255);
 pub const soil=color.rgb(0.40,0.29,0.18).toRgba8(255);
 /// the darker clods of that heaped soil
 pub const soilDark=color.rgb(0.31,0.22,0.14).toRgba8(255);
-/// the vine-wolf keeps to muted, low-saturation greens and browns so its only
-/// accents are amber sap: the belly, the eyes and the inner ears. Its woody core:
-pub const wolfCore=color.rgb(0.23,0.20,0.14).toRgba8(255);
-/// the wolf's vines: a dusty grey-green
-pub const wolfVine=color.rgb(0.34,0.38,0.26).toRgba8(255);
-/// the wolf's leaves in shade: muted dark green
-pub const wolfLeafDark=color.rgb(0.22,0.29,0.19).toRgba8(255);
-/// the wolf's leaves in light: muted pale green
-pub const wolfLeafLite=color.rgb(0.37,0.42,0.29).toRgba8(255);
+/// the vine-wolf is three colours, as the gardener drew it: a hide of dark
+/// red-brown bark, leaves and vines of bright living green, and amber sap
+/// welling through the bark (the chest, the belly's panel, the eyes, the
+/// inner ears, the beans). Its woody core: the darkest of its bark
+pub const wolfCore=color.rgb(0.13,0.042,0.028).toRgba8(255);
+/// the wolf's hide: dark red-brown bark
+pub const wolfBark=color.rgb(0.17,0.056,0.036).toRgba8(255);
+/// the bark over its muscles: a shade warmer, so each mass reads
+pub const wolfBarkLite=color.rgb(0.2,0.068,0.042).toRgba8(255);
+/// the wolf's vines: a fresh living green
+pub const wolfVine=color.rgb(0.07,0.3,0.035).toRgba8(255);
+/// the wolf's leaves in shade: a deep, saturated green
+pub const wolfLeafDark=color.rgb(0.045,0.26,0.025).toRgba8(255);
+/// the wolf's leaves in light: a bright living green
+pub const wolfLeafLite=color.rgb(0.13,0.5,0.06).toRgba8(255);
 /// the wolf's body strands are woven by something alive, not a lathe: how
 /// far each strand wanders off its true line, as a share of its radius
 pub const strandWobble:f32=0.03;
-/// the wolf's claws: old bone, a pale warm grey
-pub const wolfClaw=color.rgb(0.58,0.54,0.44).toRgba8(255);
+/// the wolf's claws: leaf tips, a green between its leaves' shade and light
+pub const wolfClaw=color.rgb(0.08,0.38,0.04).toRgba8(255);
 /// the same mesh always grows the same way: a random stream seeded from the
 /// mesh's `name` at compile time, so each build of it is identical.
 pub fn rngFor(comptime name:[]const u8)Rng{
