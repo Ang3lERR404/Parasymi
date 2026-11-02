@@ -444,7 +444,8 @@ run through and its seed in his keeping), the gardener is the star hyena,
 a living constellation (constellate webs on 28 bones, `--samples=constellateHyena`)
 who never walks but hovers, leaning into his motion, his steps silent, the
 camera in his eyes. He works with the convergent lineage and the
-constellate one alone.
+constellate one alone. What the gardener decided for this act, and why:
+[act2.md](act2.md).
 - **The strange seed, planted:** a crystal husk (a see-through `husk`
   part, clear glass with glowing cracks) with a small web turning inside
   it. Put down by his hand (the `sown` hook) it is planted; put down by
@@ -475,8 +476,9 @@ constellate one alone.
 - **Tendrils (the flow, `game/tendril.zig`):** holding V he
   sweeps the cursor from one structure to another (or back to himself);
   the wheel, while he draws, sets how high the tile under the cursor
-  floats (on the ground up to 3 m), and each tile swept after starts at
-  that height, so a path rises and falls tile by tile. Let go, it costs a fragment for every two tiles and braids from
+  floats (on the ground up to 3 m, never below it), and each tile swept
+  after starts at that height, so a path rises and falls tile by tile.
+  Let go, it costs a fragment for every two tiles and braids from
   start to end (0.6 s a tile). Braided, whatever its start hands over (a
   seed's fragment, a yielder's, a heart's made part) rides it one at a
   time to its end, which takes it in (a heart its fragments, the gardener
@@ -485,8 +487,8 @@ constellate one alone.
   through every tile's height, sagging a little toward its middle where it
   floats. Gone when either end is. Saved (version 32).
 - **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
-  belly panel showing each gardener's own) build a constellate core or a
-  constellate petal from ten fragments each.
+  belly panel showing each gardener's own) build a constellate core,
+  petal, leaf, bud or stem from ten fragments each.
 - **The yielder:** a core put down stands alone (and is seen alone before
   it is put down, `constellateYieldCore`). A petal put down on its own
   (`petal` structure) floats over its tile until a core short of petals

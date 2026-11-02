@@ -29,6 +29,8 @@ idioms and what not to do), every session.
 | adding a structure, species, research, item, mesh, panel, pass, input, string | [docs/recipes.md](docs/recipes.md) (every place to wire it) |
 | gameplay, structures' behaviour, research, saves | [docs/design.md](docs/design.md) |
 | the unforming (the first world event, step by step) | [docs/unforming.md](docs/unforming.md) |
+| act 2: the star hyena, the constellate lineage, what the gardener decided | [docs/act2.md](docs/act2.md) |
+| the constellate tendril's exact look | [docs/tendril.md](docs/tendril.md) |
 | how anything looks or moves | [docs/visual.md](docs/visual.md) |
 | the constellate tendril (the plexus web, its braid, exact numbers) | [docs/tendril.md](docs/tendril.md) |
 | a structure mesh / anything that grows | [docs/growth.md](docs/growth.md) |
