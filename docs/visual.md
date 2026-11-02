@@ -715,7 +715,11 @@ A plant's yield shows on it, where the paws pluck it:
   (upper half: as wide, its top kept where it hangs). So the swollen sac
   never folds (tested).
 - tu.x = the gut's share of each vertex.
-- The belly button pops out.
+- A crease runs down its middle, there even empty, deeper as it fills; a
+  second folds across it only as it fills.
+- The belly button is the sac's own surface (part.vert `bellyCarve`, the
+  grid gathered round it): a pit, a knot and a puckered rim, sunk in when
+  empty; as the belly swells the creases part round it and it pops out.
 - **Normals:** `vertex.Skin` carries each weight's slope (`gx/gy/gz`).
   part.vert bends skinned normals by the true Jacobian (how the surface
   actually stretches and turns there), not by the blended bones alone.

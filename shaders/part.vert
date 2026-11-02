@@ -1189,6 +1189,37 @@ vec3 catmullTan(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
   return 0.5 * ((c - a) + 2.0 * (2.0 * a - 5.0 * b + 4.0 * c - d) * f + 3.0 * (3.0 * b - a - 3.0 * c + d) * f * f);
 }
 
+// the belly's carving at `d` from where its creases cross (its button, in
+// the bind pose), `fill` how full it is: how far out along the sac's
+// normal its surface goes (negative: in). A crease down its middle, there
+// even when empty and deepening as it fills, fading toward the ribs; one
+// across it, folding in only as it fills; and the button, the sac's own
+// surface: a pit with a rounded knot in it and a puckered rim round it.
+// Empty it is sunk in; as the belly swells the pit fills, the creases
+// part round it and the knot pops out past the sac's surface.
+float bellyCarve(vec3 d, float fill) {
+  const float DOWN_W = 0.012;   // the crease down the middle: its width
+  const float ACROSS_W = 0.017; // the crease across it
+  const float RIM_R = 0.03;     // the rim: how far out from the button
+  const float RIM_W = 0.008;    // and how wide
+  // the button: how far from it, which way round it, and how far popped
+  float r = length(d);
+  float a = r > 1e-5 ? atan(d.y, d.x) : 0.0;
+  float rise = smoothstep(0.0, 1.0, fill);
+  float down = mix(0.022, 0.03, fill);
+  float across = 0.024 * fill;
+  float cv = down * exp(-d.x * d.x / (DOWN_W * DOWN_W)) * smoothstep(-0.02, 0.05, d.z) * (1.0 - smoothstep(0.12, 0.21, d.y));
+  float ch = across * exp(-d.y * d.y / (ACROSS_W * ACROSS_W)) * smoothstep(-0.08, 0.02, d.z);
+  // the two creases joined softly (the deeper sets how they share), parting
+  // round the button as it pops
+  float crease = (cv + ch - cv * ch / max(max(down, across), 1e-4)) * (1.0 - rise * exp(-r * r / (0.03 * 0.03)));
+  float knotW = mix(0.008, 0.013, rise);
+  float knot = mix(0.012, 0.03, rise) * exp(-r * r / (knotW * knotW));
+  float pit = mix(0.02, 0.003, rise) * exp(-r * r / (0.021 * 0.021));
+  float rim = 0.005 * (1.0 + 0.45 * cos(7.0 * a)) * exp(-(r - RIM_R) * (r - RIM_R) / (RIM_W * RIM_W));
+  return knot - pit + rim - crease;
+}
+
 void main() {
   float t = pc.eye_time.w;
   int mode = int(ie.x + 0.5);
@@ -1207,32 +1238,22 @@ void main() {
   // base, tips last
   float lag = PART_IN(FOLIAGE, part) ? LEAF_LAG * gat.y * tu.y : 0.0;
   p = growOut(p, gfrom, gat, iw.w, lag);
-  // the belly (tu.y 3, its button 4; fill in iq.y): as it fills, creases
-  // fold into it down its middle and across it, deepening the fuller it
-  // is (in the bind pose, before the gut swells it, so they swell with
-  // it; iq.zw the y and z where they cross, at its button). A smooth
-  // field pushed in along the sac's normal, the normal turned by its
-  // slope so the folds catch the light. The button surfaces from inside
-  // the sap and pops out past it.
-  if (tu.y > 2.5 && tu.y < 4.5) {
-    const float CREASE = 0.024;  // depth when full
-    const float DOWN_W = 0.019;  // the crease down the middle: its width
-    const float ACROSS_W = 0.017; // the crease across it
-    const float POP = 0.03;
+  // the belly (tu.y 3; fill in iq.y): carved by `bellyCarve` (its centre
+  // crease, the one across it as it fills, its button), in the bind pose
+  // before the gut swells it, so all swell with it (iq.zw the y and z
+  // where the creases cross, at its button). A smooth field pushed along
+  // the sac's normal, the normal turned by its slope (measured either
+  // side) so the folds and the button catch the light.
+  if (tu.y > 2.5 && tu.y < 3.5) {
+    const float STEP = 0.0004; // how far either side the slope is measured
     float fill = clamp(iq.y, 0.0, 1.0);
     vec3 d = p - vec3(0.0, iq.z, iq.w);
-    // down the front, fading toward the ribs; across the front and sides
-    float gv = exp(-d.x * d.x / (DOWN_W * DOWN_W)) * smoothstep(-0.02, 0.05, d.z) * (1.0 - smoothstep(0.06, 0.13, d.y));
-    float gh = exp(-d.y * d.y / (ACROSS_W * ACROSS_W)) * smoothstep(-0.08, 0.02, d.z);
-    float g = gv + gh - gv * gh;
-    vec3 slope = vec3(-2.0 * d.x / (DOWN_W * DOWN_W) * gv * (1.0 - gh), -2.0 * d.y / (ACROSS_W * ACROSS_W) * gh * (1.0 - gv), 0.0);
-    float depth = CREASE * fill;
-    if (tu.y > 3.5) {
-      p.z += POP * pow(fill, 1.5) - depth;
-    } else {
-      p -= nrm * depth * g;
-      nm = normalize(nrm + depth * (slope - nrm * dot(slope, nrm)));
-    }
+    vec3 ex = vec3(STEP, 0.0, 0.0);
+    vec3 ey = vec3(0.0, STEP, 0.0);
+    vec3 ez = vec3(0.0, 0.0, STEP);
+    vec3 slope = vec3(bellyCarve(d + ex, fill) - bellyCarve(d - ex, fill), bellyCarve(d + ey, fill) - bellyCarve(d - ey, fill), bellyCarve(d + ez, fill) - bellyCarve(d - ez, fill)) / (2.0 * STEP);
+    p += nrm * bellyCarve(d, fill);
+    nm = normalize(nrm - (slope - nrm * dot(slope, nrm)));
   }
   // a conduit's living core (part 13, tu.x 0 where it comes up out of the
   // soil .. 1 where it goes back down): essence carried through it (iq.x

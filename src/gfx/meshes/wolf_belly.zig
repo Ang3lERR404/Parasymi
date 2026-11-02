@@ -4,16 +4,18 @@
 //! its near side (the only side drawn) never folds away. Bare amber, the
 //! wolf's own belly swelling out of the sap panel (as the gardener drew
 //! it), the sash's vine crossing it with leaves along it; a belly button
-//! sits sunk in the sap at the front.
+//! at the front, melted into the sac.
 //!
 //! tu.x on every vertex is how much of the gut it is (1 low and in front,
 //! 0 toward the ribs): that share of it moves with the skeleton's gut bone,
 //! which swells, rounds out toward a ball, drops and pushes forward as the
-//! belly fills, while its top stays with the spine. The sac carries tu.y = `belly`: as it fills the shader folds creases into it, one
-//! down its middle and one across it, deepening the fuller it is (crossing
-//! at the belly button, `crossing`). The belly button is sap like the sac,
-//! a knot with a puckered ring round it, its vertices tu.y = `navelMark`: the
-//! shader raises it from inside the sap to the surface, and on out.
+//! belly fills, while its top stays with the spine. The sac carries tu.y =
+//! `belly`: the shader carves it, a crease down its middle there even when
+//! empty, one across it folding in as it fills (crossing at the belly
+//! button, `crossing`), and the button itself, the sac's own surface: a pit
+//! with a knot in it and a puckered rim, the knot rising out as it fills.
+//! The grid gathers its rows and columns round the button (`gathered`) so
+//! all that is carved finely.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -55,12 +57,15 @@ pub const rz:f32=skel.gutR[2];
 const taper:f32=0.12;
 /// the tu.y that marks the sac, which the shader creases as it fills
 pub const belly:f32=3;
-/// the tu.y that marks the belly button (a marker, not a depth)
-pub const navelMark:f32=4;
 /// how far round from the bottom the belly button sits (radians)
 const navelTh:f32=m.pi*0.47;
-/// how far out the knot sits, as a share of the sac's radius there (under 1: sunk in the sap)
-const navelLift:f32=0.86;
+/// how much closer the sac's grid gathers its rows and columns round the
+/// belly button (0 even .. under 1: there, steps this share shorter)
+const gather:f32=0.72;
+/// a grid step `u` (0..1) warped to gather round `at` (0..1): a smooth map
+/// rising everywhere, its ends kept when `at` is a half (and, round the
+/// sac, a whole turn still a whole turn wherever `at` is)
+fn gathered(u:f32,at:f32)f32{return u-gather*@sin(m.tau*(u-at))/m.tau;}
 /// where the creases cross (the belly button, on the sac's surface), in
 /// the bind pose (wolf space)
 pub fn crossing()V3{
@@ -77,9 +82,9 @@ const kit=lib.wolfKit;
 /// part roles, to tell the sash's leaves apart
 const vertex=lib.vertex;
 /// the sac's grid: rings from bottom to top
-const rings=30;
+const rings=48;
 /// the sac's grid: steps round it
-const sides=40;
+const sides=72;
 /// a point on the sac at `th` (0 bottom .. pi top) and `ph` around (0 the
 /// right side, pi/2 the front), `lift` times out from its surface, in the
 /// waist's frame
@@ -157,15 +162,20 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   const ringCount=rings+1;
   const c=sides+1;
   // the grid's points, normals, colours and heights
-  var pts:[ringCount*c]V3=undefined;
-  var nrm:[ringCount*c]V3=undefined;
-  var cols:[ringCount*c]color.Rgba8=undefined;
-  var us:[ringCount*c]f32=undefined;
+  const pts=try b.gpa.alloc(V3,ringCount*c);
+  defer b.gpa.free(pts);
+  const nrm=try b.gpa.alloc(V3,ringCount*c);
+  defer b.gpa.free(nrm);
+  const cols=try b.gpa.alloc(color.Rgba8,ringCount*c);
+  defer b.gpa.free(cols);
+  const us=try b.gpa.alloc(f32,ringCount*c);
+  defer b.gpa.free(us);
   for(0..ringCount)|i|for(0..c)|j|{
-    // this ring's angle up the sac, 0 bottom .. pi top
-    const th=m.ratio(i,rings)*m.pi;
-    // round the other way, so the sheet faces out
-    const ph=(1-m.ratio(j,sides))*m.tau;
+    // this ring's angle up the sac, 0 bottom .. pi top, gathered round the
+    // belly button's height
+    const th=gathered(m.ratio(i,rings),0.5)*m.pi;
+    // round the other way, so the sheet faces out, gathered round the front
+    const ph=(1-gathered(m.ratio(j,sides),0.75))*m.tau;
     // this point's place in the grid
     const at=i*c+j;
     pts[at]=surface(th,ph,1);
@@ -173,7 +183,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     cols[at]=pal.sap;
     us[at]=0;
   };
-  try mg.patch(b,ringCount,c,&pts,&nrm,&cols,&us,0,.bloom);
+  try mg.patch(b,ringCount,c,pts,nrm,cols,us,0,.bloom);
   // tu.x: how much of the gut each vertex is
   for(b.v.items[start..])|*vx|{
     vx.tu[0]=share(vx.pos[1]-centre[1])[0];
@@ -212,32 +222,8 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   for(b.v.items[start..])|*vx|if(vx.part!=@intFromEnum(vertex.Part.leaf)){
     vx.tu[1]=belly;
   };
-  // the belly button: a small knot of sap sunk in the sac at the front of
-  // the gut, a puckered ring of sap around it, all one with the sac
-  // how far round from the bottom the belly button sits
-  const nth=navelTh;
-  // the knot's centre, sunk in the sap at the front, and the way out there
-  const at=surface(nth,m.halfPi,navelLift);
-  const out=normal(nth,m.halfPi);
-  // where the belly button's vertices begin
-  const navel=b.mark();
-  // the belly button's colour: sap, like the sac
-  const knot=pal.sap;
-  try mg.ellipsoid(b,.{.center=at,.radii=v3(0.0068,0.008,0.0056),.col=knot,.part=.bloom,.rings=8,.segs=12,.t=1});
-  // the puckered ring's points round the knot, and their heights (all 1)
-  var ring:[13]V3=undefined;
-  var rts:[13]f32=undefined;
-  // the ring's two directions across the sac's face: sideways and up it
-  const side=v3(1,0,0);
-  const up=m.norm(m.cross(out,side));
-  for(&ring,&rts,0..)|*p,*t,j|{
-    // this point's angle round the ring
-    const a=m.ratio(j,12)*m.tau;
-    p.*=at-out*m.splat3(0.0025)+(side*m.splat3(@cos(a))+up*m.splat3(@sin(a)))*m.splat3(0.0105);
-    t.*=1;
-  }
-  try b.tube(&ring,&rts,0.003,0.003,knot,.bloom,8);
-  for(b.v.items[navel..])|*vx|vx.tu[1]=navelMark;
+  // decision: the belly button is no knot of its own but the sac's surface
+  // carved by the shader (pit, knot, puckered rim), so it melts into it
   // into the waist's place in the bind pose: the gut with the gut bones,
   // the rest with the spine, the hips below it and the ribs above. The
   // weights change with height alone, and the gut swells the sac to three
@@ -248,8 +234,8 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     // the vertex's height, and how much of it is the gut
     const y=vx.pos[1];
     const g=vx.tu[0];
-    // how fast that gut share changes going up (none for the belly button)
-    const dg=if(vx.tu[1]==navelMark)0 else share(y-centre[1])[1];
+    // how fast that gut share changes going up
+    const dg=share(y-centre[1])[1];
     // how much of the gut is its lower bone, and its slope
     const lo=lower(y-centre[1]);
     // each bone's weight for this vertex, and how fast it changes going up
@@ -285,6 +271,19 @@ test"the belly is full below and narrows toward the ribs"{
   try testing.expect(mid>0.1);
   try testing.expect(high<mid*0.6);
   try testing.expect(gut(m.pi*0.25)>0.95 and gut(m.pi*0.95)<0.05);
+}
+test"the gathered grid rises everywhere and keeps its ends"{
+  try testing.expectApproxEqAbs(0,gathered(0,0.5),1e-6);
+  try testing.expectApproxEqAbs(1,gathered(1,0.5),1e-6);
+  try testing.expectApproxEqAbs(1,gathered(1,0.75)-gathered(0,0.75),1e-6);
+  // the last step's place, to see each one rises past it
+  var last:f32=-1;
+  for(0..101)|k|{
+    // this step's place, gathered round the front
+    const g=gathered(m.ratio(k,100),0.75);
+    try testing.expect(g>last);
+    last=g;
+  }
 }
 test"the gut's shares change up the sac as their slopes say"{
   // the small step each slope is checked over
