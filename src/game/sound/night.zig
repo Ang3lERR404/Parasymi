@@ -124,7 +124,7 @@ pub const Night=struct{
   pub fn daylight(n:*Night,d:f32)void{n.fade.target=if(d<nightUnder)m.clamp01(1-d)else 0;}
   /// mixes the next `out.len` samples into `out`, a chunk at a time; once
   /// faded out by day it rests, silent
-  pub fn render(n:*Night,out:[]f32)void{
+  pub fn render(n:*Night,out:[]dsp.Frame)void{
     if(n.fade.target==0 and n.fade.value<silent){
       if(!n.resting)n.rest();
       return;
@@ -135,7 +135,7 @@ pub const Night=struct{
     while(off<out.len){
       // this chunk's length, and its own zeroed buffer
       const k=@min(chunkFrames,out.len-off);
-      var buf:[chunkFrames]f32=@splat(0);
+      var buf:[chunkFrames]dsp.Frame=@splat(@splat(0));
       n.chunk(buf[0..k]);
       for(out[off..][0..k],buf[0..k])|*o,x|o.*+=x;
       off+=k;
@@ -152,7 +152,7 @@ pub const Night=struct{
     n.resting=true;
   }
   /// plays `buf` (zeroed) out, starting each bar as it comes
-  pub fn chunk(n:*Night,buf:[]f32)void{
+  pub fn chunk(n:*Night,buf:[]dsp.Frame)void{
     // how far into `buf` the bars have played
     var i:usize=0;
     while(i<buf.len){
@@ -168,7 +168,7 @@ pub const Night=struct{
       n.left-=k;
       i+=k;
     }
-    for(buf)|*s|s.*=n.level*n.fade.next()*s.*;
+    for(buf)|*s|s.*=dsp.mid(n.level*n.fade.next())*s.*;
   }
   /// the bar about to play: a phrase's first may change the chords and
   /// whether the choir sings; the strings bow the bar's chord (letting the

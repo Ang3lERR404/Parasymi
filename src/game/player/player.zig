@@ -111,9 +111,10 @@ const Foot=struct{
 };
 /// a paw coming down, for what hears it (game/sound.zig): how heavy the
 /// wolf is (the belly's stage, 0 light .. 1 full) and how fast it goes
-/// (0 standing .. 1 sprinting)
-/// (fields: `weight` 0 light .. 1 full, `pace` 0 standing .. 1 sprinting)
-pub const Footfall=struct{weight:f32,pace:f32};
+/// (0 standing .. 1 sprinting), and where it came down (heard from there)
+/// (fields: `weight` 0 light .. 1 full, `pace` 0 standing .. 1 sprinting,
+/// `at` the paw's place in the world)
+pub const Footfall=struct{weight:f32,pace:f32,at:m.V3=@splat(0)};
 /// what the paws gather from: a resource node, wrenched out of the ground
 /// a unit at a time (each sent to the belly as the next is gripped), or a
 /// plant's ripe yield, drawn off it by paw (each sent as it comes loose)

@@ -191,7 +191,9 @@ const twinkleGap=m.Vice(f32,2){2.5,8};
 /// a mote near the wolf twinkled, for what hears it (game/sound.zig)
 pub const Twinkle=struct{
   /// how near it was: 0 at `twinkleNear` .. 1 touching
-  near:f32
+  near:f32,
+  /// where it was (heard from there)
+  at:m.V3=@splat(0),
 };
 /// the starlight falling round the wolf: its motes, and what has twinkled
 pub const Starfall=struct{
@@ -286,8 +288,17 @@ pub const Starfall=struct{
     sf.quiet=sf.rng.range(twinkleGap[0],twinkleGap[1]);
     // the nearest mote, counted further off as it burns away
     var nearest:f32=twinkleNear;
-    for(sf.motes.items)|mo|if(!mo.shattering()){nearest=@min(nearest,m.dist(mo.pos,around)*mo.life+twinkleNear*(1-mo.life));};
-    if(nearest<twinkleNear)sf.twinkle=.{.near=1-nearest/twinkleNear};
+    // and where it is
+    var at=around;
+    for(sf.motes.items)|mo|if(!mo.shattering()){
+      // how far off it counts
+      const d=m.dist(mo.pos,around)*mo.life+twinkleNear*(1-mo.life);
+      if(d<nearest){
+        nearest=d;
+        at=mo.pos;
+      }
+    };
+    if(nearest<twinkleNear)sf.twinkle=.{.near=1-nearest/twinkleNear,.at=at};
   }
 };
 test"the unforming shatters every mote at once, and no star falls again"{

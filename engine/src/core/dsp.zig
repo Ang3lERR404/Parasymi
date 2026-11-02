@@ -4,6 +4,10 @@
 //! `rate` (Hz) each unit keeps; nothing here touches a device, so a sound is
 //! built by chaining units (`Voice` shows how) and the platform's output
 //! pulls blocks of samples from it.
+//! Sound is heard in stereo: a source mixes `Frame`s (left, right). A mono
+//! sound is placed between the speakers (`spot`, `pan`), and an `Ear` turns
+//! a place in the world into a place between them; the filters also run on
+//! whole frames (`StereoPole`, `StereoBiquad`), each side its own.
 /// the standard library
 const std=@import("std");
 /// the engine's maths: clamp, pow, tau, lerp
@@ -44,13 +48,48 @@ pub fn softClip(x:f32)f32{
   const c=m.clamp(x,-clipKnee,clipKnee);
   return c*(27+c*c)/(27+9*c*c);
 }
-/// `x` placed in stereo at `p` (-1 left, 0 centre, 1 right), equal power so
-/// it stays as loud wherever it sits: .{left, right}
-pub fn pan(x:f32,p:f32)m.Vice(f32,2){
+// ---- stereo ----
+/// one moment of sound in stereo: .{left, right}
+pub const Frame=m.Vec(f32,2);
+/// the speakers' gains for a sound sitting at `p` (-1 left, 0 centre, 1
+/// right): equal power, so it is as loud wherever it sits, and 1 each side
+/// in the centre, so a centred sound is heard as a mono one was
+pub fn spot(p:f32)Frame{
   // the pan as an angle, 0 (all left) to a quarter turn (all right)
   const a=(m.clamp(p,-1,1)+1)*(m.pi/4.0);
-  return.{x*@cos(a),x*@sin(a)};
+  return.{@cos(a)*m.sqrt2,@sin(a)*m.sqrt2};
 }
+/// `x` heard through the speakers' gains `g` (a `spot`): the cheap way, for
+/// a sound whose place was worked out once
+pub fn put(g:Frame,x:f32)Frame{return g*m.splatOf(f32,2,x);}
+/// `x` placed in stereo at `p` (-1 left, 0 centre, 1 right)
+pub fn pan(x:f32,p:f32)Frame{return put(spot(p),x);}
+/// `x` heard in the middle: both sides alike
+pub fn mid(x:f32)Frame{return m.splatOf(f32,2,x);}
+/// what is nearer the ear than this (m, level) is heard nearer the middle
+const earNear:f32=1.5;
+/// where sounds are heard from: the listener's place and the way its right
+/// hand points, so a sound's place in the world becomes its place between
+/// the speakers
+pub const Ear=struct{
+  /// where it hears from
+  at:m.V3=@splat(0),
+  /// the way its right hand points (level, of unit length)
+  side:m.V3=.{1,0,0},
+  /// how far left (-1) or right (1) a sound at `p` is heard: how far it
+  /// lies across the ear over how far off it is, both along the ground, so
+  /// what is beside it sits hard to one side and what is under, before or
+  /// right by it near the middle
+  pub fn pan(e:Ear,p:m.V3)f32{
+    // the way to it, along the ground
+    const d=p-e.at;
+    const level=m.v3(d[0],0,d[2]);
+    return m.clamp(m.dot(level,e.side)/@max(m.len(level),earNear),-1,1);
+  }
+};
+/// `a` in every lane of a `t`: itself for a mono sample, both sides of a
+/// `Frame`
+fn lanes(comptime t:type,a:f32)t{return if(t==f32)a else@splat(a);}
 /// the fractional part of a phase (wraps 0..1)
 inline fn wrap(t:f32)f32{return t-@floor(t);}
 // ---- sources ----
@@ -176,27 +215,36 @@ pub const Crackle=struct{
   }
 };
 // ---- filters ----
-/// the cheapest filter: one pole, 6 dB/octave. `low` darkens, `high` thins;
-/// call one of them per sample, not both.
-pub const OnePole=struct{
-  /// how far the state moves toward the input each sample (0..1; lower is darker)
-  a:f32,
-  /// the filtered signal so far
-  z:f32=0,
-  /// a filter whose -3 dB point sits at `cutoff` Hz
-  pub fn init(cutoff:f32,rate:f32)OnePole{return.{.a=coeff(cutoff,rate)};}
-  /// the coefficient whose -3 dB point sits at `cutoff` Hz
-  pub fn coeff(cutoff:f32,rate:f32)f32{
-    return 1-@exp(-m.tau*m.clamp(cutoff,0,maxCutoff*rate)/rate);
-  }
-  /// the low-passed sample: the state drawn `a` of the way toward `x`
-  pub fn low(p:*OnePole,x:f32)f32{
-    p.z+=p.a*(x-p.z);
-    return p.z;
-  }
-  /// the high-passed sample: what the low pass leaves out
-  pub fn high(p:*OnePole,x:f32)f32{return x-p.low(x);}
-};
+/// the cheapest filter: one pole, 6 dB/octave, over samples of `t` (`f32`,
+/// or a `Frame`, each side filtered on its own). `low` darkens, `high`
+/// thins; call one of them per sample, not both.
+pub fn OnePoleOf(comptime t:type)type{
+  return struct{
+    /// this filter's own type
+    const Self=@This();
+    /// how far the state moves toward the input each sample (0..1; lower is darker)
+    a:f32,
+    /// the filtered signal so far
+    z:t=lanes(t,0),
+    /// a filter whose -3 dB point sits at `cutoff` Hz
+    pub fn init(cutoff:f32,rate:f32)Self{return.{.a=coeff(cutoff,rate)};}
+    /// the coefficient whose -3 dB point sits at `cutoff` Hz
+    pub fn coeff(cutoff:f32,rate:f32)f32{
+      return 1-@exp(-m.tau*m.clamp(cutoff,0,maxCutoff*rate)/rate);
+    }
+    /// the low-passed sample: the state drawn `a` of the way toward `x`
+    pub fn low(p:*Self,x:t)t{
+      p.z+=lanes(t,p.a)*(x-p.z);
+      return p.z;
+    }
+    /// the high-passed sample: what the low pass leaves out
+    pub fn high(p:*Self,x:t)t{return x-p.low(x);}
+  };
+}
+/// a one-pole filter over mono samples
+pub const OnePole=OnePoleOf(f32);
+/// a one-pole filter over stereo frames
+pub const StereoPole=OnePoleOf(Frame);
 /// a value that glides to its `target` instead of jumping, so a gain or
 /// cutoff changed between blocks doesn't click ("zipper noise")
 pub const Smooth=struct{
@@ -228,62 +276,71 @@ pub const BiquadKind=enum{
   notch
 };
 /// the workhorse two-pole filter, 12 dB/octave (RBJ cookbook, transposed
-/// direct form II). `q` is the resonance: 0.707 is flat, higher rings at
-/// the cutoff.
-pub const Biquad=struct{
-  /// how much of this sample's input passes
-  b0:f32,
-  /// how much of the input one sample ago passes
-  b1:f32,
-  /// how much of the input two samples ago passes
-  b2:f32,
-  /// how much of the output one sample ago feeds back (subtracted)
-  a1:f32,
-  /// how much of the output two samples ago feeds back (subtracted)
-  a2:f32,
-  /// the filter's first carried state
-  z1:f32=0,
-  /// its second carried state
-  z2:f32=0,
-  /// a filter of `kind` at `cutoff` Hz with resonance `q`
-  pub fn init(kind:BiquadKind,cutoff:f32,q:f32,rate:f32)Biquad{
-    // a filter passing everything, about to be tuned
-    var f:Biquad=.{.b0=1,.b1=0,.b2=0,.a1=0,.a2=0};
-    f.tune(kind,cutoff,q,rate);
-    return f;
-  }
-  /// new coefficients, keeping the state so a sweep doesn't click
-  pub fn tune(f:*Biquad,kind:BiquadKind,cutoff:f32,q:f32,rate:f32)void{
-    // the cutoff as an angle per sample (radians), and its cosine
-    const w=m.tau*m.clamp(cutoff,1,maxCutoff*rate)/rate;
-    const c=@cos(w);
-    // how wide the response is, from the resonance
-    const alpha=@sin(w)/(2*@max(q,0.01));
-    // the input weights for this kind, not yet normalised
-    const b:m.Vice(f32,3)=switch(kind){
-      .low=>.{(1-c)/2,1-c,(1-c)/2},
-      .high=>.{(1+c)/2,-(1+c),(1+c)/2},
-      // 0 dB at the centre
-      .band=>.{alpha,0,-alpha},
-      .notch=>.{1,-2*c,1},
-    };
-    // the output weight everything is divided by
-    const a0=1+alpha;
-    f.b0=b[0]/a0;
-    f.b1=b[1]/a0;
-    f.b2=b[2]/a0;
-    f.a1=-2*c/a0;
-    f.a2=(1-alpha)/a0;
-  }
-  /// the filtered sample for input `x`, the state carried on
-  pub fn tick(f:*Biquad,x:f32)f32{
-    // the output, from this input and the carried state
-    const y=f.b0*x+f.z1;
-    f.z1=f.b1*x-f.a1*y+f.z2;
-    f.z2=f.b2*x-f.a2*y;
-    return y;
-  }
-};
+/// direct form II), over samples of `t` (`f32`, or a `Frame`, each side
+/// filtered on its own). `q` is the resonance: 0.707 is flat, higher rings
+/// at the cutoff.
+pub fn BiquadOf(comptime t:type)type{
+  return struct{
+    /// this filter's own type
+    const Self=@This();
+    /// how much of this sample's input passes
+    b0:f32,
+    /// how much of the input one sample ago passes
+    b1:f32,
+    /// how much of the input two samples ago passes
+    b2:f32,
+    /// how much of the output one sample ago feeds back (subtracted)
+    a1:f32,
+    /// how much of the output two samples ago feeds back (subtracted)
+    a2:f32,
+    /// the filter's first carried state
+    z1:t=lanes(t,0),
+    /// its second carried state
+    z2:t=lanes(t,0),
+    /// a filter of `kind` at `cutoff` Hz with resonance `q`
+    pub fn init(kind:BiquadKind,cutoff:f32,q:f32,rate:f32)Self{
+      // a filter passing everything, about to be tuned
+      var f:Self=.{.b0=1,.b1=0,.b2=0,.a1=0,.a2=0};
+      f.tune(kind,cutoff,q,rate);
+      return f;
+    }
+    /// new coefficients, keeping the state so a sweep doesn't click
+    pub fn tune(f:*Self,kind:BiquadKind,cutoff:f32,q:f32,rate:f32)void{
+      // the cutoff as an angle per sample (radians), and its cosine
+      const w=m.tau*m.clamp(cutoff,1,maxCutoff*rate)/rate;
+      const c=@cos(w);
+      // how wide the response is, from the resonance
+      const alpha=@sin(w)/(2*@max(q,0.01));
+      // the input weights for this kind, not yet normalised
+      const b:m.Vice(f32,3)=switch(kind){
+        .low=>.{(1-c)/2,1-c,(1-c)/2},
+        .high=>.{(1+c)/2,-(1+c),(1+c)/2},
+        // 0 dB at the centre
+        .band=>.{alpha,0,-alpha},
+        .notch=>.{1,-2*c,1},
+      };
+      // the output weight everything is divided by
+      const a0=1+alpha;
+      f.b0=b[0]/a0;
+      f.b1=b[1]/a0;
+      f.b2=b[2]/a0;
+      f.a1=-2*c/a0;
+      f.a2=(1-alpha)/a0;
+    }
+    /// the filtered sample for input `x`, the state carried on
+    pub fn tick(f:*Self,x:t)t{
+      // the output, from this input and the carried state
+      const y=lanes(t,f.b0)*x+f.z1;
+      f.z1=lanes(t,f.b1)*x-lanes(t,f.a1)*y+f.z2;
+      f.z2=lanes(t,f.b2)*x-lanes(t,f.a2)*y;
+      return y;
+    }
+  };
+}
+/// a biquad over mono samples
+pub const Biquad=BiquadOf(f32);
+/// a biquad over stereo frames
+pub const StereoBiquad=BiquadOf(Frame);
 // ---- envelope ----
 /// attack, decay, sustain, release: the loudness shape of one note, 0..1.
 /// `on` starts it, `off` lets it fade; it is `.idle` once silent.
@@ -455,12 +512,16 @@ pub const Hall=struct{
     for(0..4)|i|h.dlen[i]=@max(m.floorTo(usize,m.f(hallDiffusers[i])*k),1);
     return h;
   }
-  /// what the hall sends back for `x` this sample (the wet sound alone)
-  pub fn tick(h:*Hall,x:f32)f32{
+  /// what the hall sends back for `x` this sample (the wet sound alone):
+  /// both sides heard in, two different blends of its lines sent back, so
+  /// its tail spreads wide round the listener
+  // decision: the hall hears the middle of what comes in (the dry sound
+  // keeps its place); its stereo is in what it sends back
+  pub fn tick(h:*Hall,x:Frame)Frame{
     // the pre-delayed input
     const back=(h.preAt+h.pre.len-h.preLen)%h.pre.len;
     var y=h.pre[back];
-    h.pre[h.preAt]=x;
+    h.pre[h.preAt]=m.sumOf(f32,2,x)*0.5;
     h.preAt=(h.preAt+1)%h.pre.len;
     // smeared through the diffusers (Schroeder all-passes)
     inline for(0..4)|i|{
@@ -488,14 +549,16 @@ pub const Hall=struct{
     }
     // the Hadamard's scale: one over the square root of eight
     const norm:f32=0.35355339;
-    // what is heard: the lines summed, alternately signed
-    var out:f32=0;
+    // what is heard: the lines summed, alternately signed on the left and
+    // signed in pairs on the right (two rows of a Hadamard: no line heard
+    // the same on both sides, so the sides are unlike)
+    var out:Frame=@splat(0);
     inline for(0..8)|i|{
-      out+=if(i%2==0)o[i]else-o[i];
+      out+=.{if(i%2==0)o[i]else-o[i],if(i/2%2==0)o[i]else-o[i]};
       h.lines[i][h.at[i]]=h.damp[i].low(w[i]*norm*h.keep[i])+y*0.5;
       h.at[i]=(h.at[i]+1)%h.lines[i].len;
     }
-    return out*0.35;
+    return out*mid(0.35);
   }
 };
 // ---- a voice ----
@@ -510,6 +573,8 @@ pub const Voice=struct{
   env:Adsr,
   /// the overall loudness, gliding to new settings
   gain:Smooth,
+  /// where it sits between the speakers: their gains (a `spot`)
+  place:Frame=spot(0),
   /// a silent voice of `shape` at `rate` samples a second
   pub fn init(rate:f32,shape:Shape)Voice{
     return.{
@@ -533,25 +598,28 @@ pub const Voice=struct{
     /// let the note go
     stop,
     /// glide to this loudness
-    gain:f32
+    gain:f32,
+    /// sit here between the speakers (-1 left, 0 centre, 1 right)
+    pan:f32
   };
-  /// does what `cmd` says: play, stop, or change the loudness
+  /// does what `cmd` says: play, stop, change the loudness or the place
   pub fn apply(v:*Voice,cmd:Cmd)void{
     switch(cmd){
       .play=>|hz|v.play(hz),
       .stop=>v.stop(),
       .gain=>|g|v.gain.target=g,
+      .pan=>|p|v.place=spot(p),
     }
   }
-  /// fills `out` (mono), mixing into what is there so voices sum
-  pub fn render(v:*Voice,out:[]f32)void{
+  /// fills `out`, mixing into what is there so voices sum
+  pub fn render(v:*Voice,out:[]Frame)void{
     if(v.env.stage==.idle)return;
-    for(out)|*s|s.*+=v.filter.tick(v.osc.next())*v.env.next()*v.gain.next();
+    for(out)|*s|s.*+=put(v.place,v.filter.tick(v.osc.next())*v.env.next()*v.gain.next());
   }
 };
 // ---- a pool of voices ----
 /// up to `n` voices of `t` sounding at once; null slots are free. A `t`
-/// that `render`s has `render(*t,[]f32)bool`, false once it has ended
+/// that `render`s has `render(*t,[]Frame)bool`, false once it has ended
 pub fn Pool(comptime t:type,comptime n:usize)type{
   return struct{
     /// this pool's own type
@@ -582,7 +650,7 @@ pub fn Pool(comptime t:type,comptime n:usize)type{
     /// every voice silenced
     pub fn clear(p:*Self)void{p.slots=@splat(null);}
     /// every sounding voice mixed into `out`, those that have ended freed
-    pub fn render(p:*Self,out:[]f32)void{
+    pub fn render(p:*Self,out:[]Frame)void{
       for(&p.slots)|*s|if(s.*)|*v|{
         if(!v.render(out))s.*=null;
       };
@@ -600,8 +668,8 @@ test"a pool fills free slots, then the oldest; voices that end are freed"{
     /// blocks until it ends
     left:u32,
     /// adds its id to each sample; false once its blocks are spent
-    fn render(b:*@This(),out:[]f32)bool{
-      for(out)|*s|s.*+=b.id;
+    fn render(b:*@This(),out:[]Frame)bool{
+      for(out)|*s|s.*+=mid(b.id);
       b.left-=1;
       return b.left>0;
     }
@@ -612,9 +680,9 @@ test"a pool fills free slots, then the oldest; voices that end are freed"{
   // full: the next in turn, the oldest, is taken
   p.add(.{.id=4,.left=3});
   try testing.expectEqual(@as(f32,4),p.slots[0].?.id);
-  var out=[_]f32{0};
+  var out=[_]Frame{@splat(0)};
   p.render(&out);
-  try testing.expectEqual(@as(f32,6),out[0]);
+  try testing.expectEqual(@as(f32,6),out[0][0]);
   // one free slot again after the second's turn ends: addFree takes it
   p.slots[1]=null;
   p.addFree(.{.id=8,.left=1});
@@ -636,9 +704,44 @@ test"conversions"{
   try testing.expectApproxEqAbs(@as(f32,880),noteToHz(81),0.01);
   try testing.expectEqual(@as(f32,1),softClip(10));
   try testing.expectApproxEqAbs(@as(f32,0.1),softClip(0.1),0.001);
-  // a sound panned to the centre
+}
+test"a sound panned is as loud wherever it sits, and in the centre as a mono one"{
+  // a sound in the centre, to the left, hard right
   const c=pan(1,0);
-  try testing.expectApproxEqAbs(@as(f32,1),c[0]*c[0]+c[1]*c[1],0.001);
+  try testing.expectApproxEqAbs(@as(f32,1),c[0],0.001);
+  try testing.expectApproxEqAbs(@as(f32,1),c[1],0.001);
+  for([_]f32{-1,-0.4,0.3,1})|p|{
+    // the sound placed there
+    const s=pan(1,p);
+    try testing.expectApproxEqAbs(@as(f32,2),s[0]*s[0]+s[1]*s[1],0.001);
+    try testing.expect((s[0]>s[1])==(p<0));
+  }
+  try testing.expectApproxEqAbs(@as(f32,0),pan(1,1)[0],0.001);
+  // an ear facing north (its right hand east)
+  const e:Ear=.{.at=.{0,2,0},.side=.{1,0,0}};
+  try testing.expectApproxEqAbs(@as(f32,1),e.pan(.{10,0,0}),0.001);
+  try testing.expectApproxEqAbs(@as(f32,-1),e.pan(.{-10,5,0}),0.001);
+  try testing.expectApproxEqAbs(@as(f32,0),e.pan(.{0,0,-8}),0.001);
+  // right by it, and under it: near the middle
+  try testing.expect(@abs(e.pan(.{0.3,0,0}))<0.25);
+  try testing.expectEqual(@as(f32,0),e.pan(.{0,0,0}));
+}
+test"stereo filters treat each side as a mono filter would"{
+  // a mono and a stereo low pass, and a mono and a stereo band pass
+  var lo:OnePole=.init(300,testRate);
+  var slo:StereoPole=.init(300,testRate);
+  var bq:Biquad=.init(.band,800,2,testRate);
+  var sbq:StereoBiquad=.init(.band,800,2,testRate);
+  // noise, fed to the mono ones and the right side; the left side silent
+  var n:Noise=.init(5);
+  for(0..2000)|_|{
+    // this sample
+    const x=n.next();
+    const y=slo.low(.{0,x});
+    try testing.expectEqual(@as(f32,0),y[0]);
+    try testing.expectApproxEqAbs(lo.low(x),y[1],1e-6);
+    try testing.expectApproxEqAbs(bq.tick(x),sbq.tick(.{0,x})[1],1e-6);
+  }
 }
 test"sine at a quarter of the rate walks 0, 1, 0, -1"{
   // a sine at a quarter of the rate: four samples a cycle
@@ -780,35 +883,47 @@ test"a voice sounds while held and falls silent after release"{
   // a saw voice
   var v:Voice=.init(testRate,.saw);
   // a block of samples, silent to start
-  var buf:[480]f32=@splat(0);
+  var buf:[480]Frame=@splat(@splat(0));
   v.render(&buf);
-  try testing.expectEqual(@as(f32,0),buf[100]);
+  try testing.expectEqual(@as(f32,0),buf[100][0]);
+  v.apply(.{.pan=-1});
   v.play(220);
   v.render(&buf);
-  // the loudest sample in the block
-  var peak:f32=0;
+  // the loudest sample in the block, each side
+  var peak:Frame=@splat(0);
   for(buf)|s|peak=@max(peak,@abs(s));
-  try testing.expect(peak>0.05);
+  try testing.expect(peak[0]>0.05);
+  // panned hard left: nothing on the right
+  try testing.expect(peak[1]<1e-6);
   v.stop();
   for(0..100)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     v.render(&buf);
   }
   try testing.expectEqual(Adsr.Stage.idle,v.env.stage);
 }
-test"a hall answers an impulse late, keeps ringing for seconds, darkens and dies away"{
+test"a hall answers an impulse late, keeps ringing for seconds, darkens, dies away, and spreads wide"{
   // a hall ringing three seconds after 20 ms
   var h=Hall.init(3,0.02,5000,48000);
   // its answer to one click, block by block of a tenth of a second
   var first:?usize=null;
   var energy:[60]f32=@splat(0);
+  // each side's energy, and what the two share, over its whole tail
+  var side:Frame=@splat(0);
+  var shared:f32=0;
   for(0..48000*6)|i|{
-    // the hall's answer this sample
-    const y=h.tick(if(i==0)1 else 0);
-    try testing.expect(y==y and @abs(y)<4);
+    // the hall's answer this sample, each side, and one side of it
+    const f=h.tick(mid(if(i==0)1 else 0));
+    const y=f[0];
+    try testing.expect(y==y and @abs(y)<4 and @abs(f[1])<4);
     if(first==null and @abs(y)>1e-6)first=i;
     energy[i/4800]+=y*y;
+    side+=f*f;
+    shared+=f[0]*f[1];
   }
+  // both sides ring about as much, and unlike each other
+  try testing.expect(side[1]>side[0]*0.5 and side[1]<side[0]*2);
+  try testing.expect(@abs(shared)/@sqrt(side[0]*side[1])<0.3);
   // nothing before the pre-delay
   try testing.expect(first.?>=960);
   // still heard a second and a half on, about 30 dB down by three seconds,

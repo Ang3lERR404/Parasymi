@@ -336,6 +336,8 @@ pub fn main(init:Init)!void{
     // the swapchain's size this frame (px)
     const screen=r.extent();
     try game.update(&input,@floatCast(dt),screen);
+    // the sounds are heard from the view, told first so this frame's are placed from it
+    if(sounds)|o|o.send(.{.ear=.{.at=game.cam.viewEye(),.side=game.cam.side()}})catch|e|log.warn("ear: {t}",.{e});
     for(game.player.footfalls())|ff|if(ff)|f|if(sounds)|o|if(lib.act.steps(game.act)){
       o.send(.{.step=f})catch|e|log.warn("footstep: {t}",.{e});
     };

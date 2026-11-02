@@ -138,7 +138,7 @@ pub const Music=struct{
   pub fn daylight(mu:*Music,d:f32)void{mu.fade.target=if(d>musicFrom)m.clamp01(d)else 0;}
   /// mixes the next `out.len` samples into `out`, a chunk at a time; once
   /// faded out by night it rests, silent
-  pub fn render(mu:*Music,out:[]f32)void{
+  pub fn render(mu:*Music,out:[]dsp.Frame)void{
     if(mu.fade.target==0 and mu.fade.value<silent){
       if(!mu.resting)mu.rest();
       return;
@@ -149,7 +149,7 @@ pub const Music=struct{
     while(off<out.len){
       // this chunk's length, and its own zeroed buffer
       const n=@min(chunkFrames,out.len-off);
-      var buf:[chunkFrames]f32=@splat(0);
+      var buf:[chunkFrames]dsp.Frame=@splat(@splat(0));
       mu.chunk(buf[0..n]);
       for(out[off..][0..n],buf[0..n])|*o,x|o.*+=x;
       off+=n;
@@ -167,7 +167,7 @@ pub const Music=struct{
     mu.resting=true;
   }
   /// plays `buf` (zeroed) out, striking each step as it comes
-  pub fn chunk(mu:*Music,buf:[]f32)void{
+  pub fn chunk(mu:*Music,buf:[]dsp.Frame)void{
     // how far into `buf` the steps have played
     var i:usize=0;
     while(i<buf.len){
@@ -185,7 +185,7 @@ pub const Music=struct{
       mu.left-=n;
       i+=n;
     }
-    for(buf)|*s|s.*=mu.level*mu.fade.next()*s.*;
+    for(buf)|*s|s.*=dsp.mid(mu.level*mu.fade.next())*s.*;
   }
   /// strikes the step about to play: the melody's note (on a bar's first
   /// step, the nearest chord tone), the left hand's root, its octave and
@@ -283,12 +283,12 @@ pub const Music=struct{
   /// end the cymbal swells (crashing on the next one's first step) and the
   /// timpani roll up into it, landing on the low kettle
   pub fn drumStep(mu:*Music,s:u32)void{
-    if(s==0)mu.taiko(score.boomHz,score.boomRing,1);
+    if(s==0)mu.taiko(score.boomHz,score.boomRing,1,score.boomPan);
     // how hard the taiko and the small taiko strike here (0: not at all)
     const big=score.taikoBeat[s];
     const small=score.smallBeat[s];
-    if(big>0 and (!mu.calm or s==6))mu.taiko(score.taikoHz,score.taikoRing,vary(&mu.r,big));
-    if(small>0 and !mu.calm and mu.r.float()<score.smallChance)mu.taiko(score.smallHz,score.smallRing,vary(&mu.r,small));
+    if(big>0 and (!mu.calm or s==6))mu.taiko(score.taikoHz,score.taikoRing,vary(&mu.r,big),score.taikoPan);
+    if(small>0 and !mu.calm and mu.r.float()<score.smallChance)mu.taiko(score.smallHz,score.smallRing,vary(&mu.r,small),score.smallPan);
     if(mu.step==0 and mu.rolled>0)mu.timp(score.kettles[0],1,0);
     if(mu.step==phraseSteps-score.swellSteps)mu.crash(m.floorTo(u32,m.f(score.swellSteps)*m.f(mu.stepLen)));
     if(mu.step>=score.rollFrom){
@@ -302,19 +302,23 @@ pub const Music=struct{
       }
     }
   }
-  /// strikes a taiko pitched at `hz`, ringing `ring` seconds, at velocity `vel`
-  pub fn taiko(mu:*Music,hz:f32,ring:f32,vel:f32)void{
-    mu.taikos.cycle(.init(hz,ring,vel,&mu.r,mu.rate));
+  /// strikes a taiko pitched at `hz`, ringing `ring` seconds, at velocity
+  /// `vel`, standing at `pan`
+  pub fn taiko(mu:*Music,hz:f32,ring:f32,vel:f32,pan:f32)void{
+    mu.taikos.cycle(.init(hz,ring,vel,pan,&mu.r,mu.rate));
     mu.drummed+=1;
   }
-  /// strikes a timpani kettle (MIDI `note`) at velocity `vel` after `wait` samples
+  /// strikes a timpani kettle (MIDI `note`) at velocity `vel` after `wait`
+  /// samples, where that kettle stands
   pub fn timp(mu:*Music,note:u8,vel:f32,wait:u32)void{
-    mu.timps.cycle(.init(note,vel,wait,&mu.r,mu.rate));
+    // where its kettle stands: the low one further out
+    const pan=score.kettlePan[if(note==score.kettles[0])0 else 1];
+    mu.timps.cycle(.init(note,vel,wait,pan,&mu.r,mu.rate));
     mu.rolled+=1;
   }
   /// a cymbal swelling for `swell` samples to its crash (0: a crash now)
   pub fn crash(mu:*Music,swell:u32)void{
-    mu.cymbals.cycle(.init(score.crashVel,swell,&mu.r,mu.rate));
+    mu.cymbals.cycle(.init(score.crashVel,swell,score.cymbalPan,&mu.r,mu.rate));
     mu.crashed+=1;
   }
 };

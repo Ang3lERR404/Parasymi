@@ -50,6 +50,11 @@ const formantBw=[sections][5]f32{
 /// each section's place in the blend: the inner voices a little under
 /// the outer ones
 const sectionLevel=[sections]f32{1,0.8,0.8,0.95};
+/// where each section stands between the speakers (pan): sopranos, altos,
+/// tenors and basses from left to right, as a choir stands
+const sectionPan=[sections]f32{-0.55,-0.2,0.2,0.55};
+/// how far either side of its place a section's two halves stand (pan)
+const halfApart:f32=0.15;
 /// how far apart a section's voices are tuned at most (cents either way)
 const spread:f32=11;
 /// how fast a voice's vibrato wavers, drawn between these (Hz)
@@ -141,12 +146,15 @@ const Voice=struct{
     return v.osc.next()*loud;
   }
 };
-/// one section: its voices, the vowel shaped out of them, how loud it is
+/// one section: its voices in two halves standing side by side, the vowel
+/// shaped out of each, how loud it is
 const Part=struct{
-  /// its voices
+  /// its voices (the even ones its left half, the odd its right)
   voices:[voices]Voice,
-  /// its five formants
-  formants:[5]dsp.Biquad,
+  /// its five formants, each half's own
+  formants:[5]dsp.StereoBiquad,
+  /// where its left and its right half stand between the speakers
+  seats:[2]dsp.Frame,
   /// how loud each formant is
   gains:[5]f32,
   /// the breath's noise
@@ -171,6 +179,7 @@ const Part=struct{
     var p:Part=.{
       .voices=undefined,
       .formants=undefined,
+      .seats=.{dsp.spot(sectionPan[i]-halfApart),dsp.spot(sectionPan[i]+halfApart)},
       .gains=undefined,
       .noise=.init(r.next()),
       .swell=.init(0,swellS,rate),
@@ -208,17 +217,18 @@ const Part=struct{
   }
   /// fall silent, slowly
   fn hush(p:*Part)void{p.swell.target=0;}
-  /// its next sample
-  fn tick(p:*Part)f32{
+  /// its next sample, each half from where it stands
+  fn tick(p:*Part)dsp.Frame{
     p.grown=1-(1-p.grown)*p.grow;
-    // the voices summed, with a breath through them
-    var x:f32=0;
-    inline for(0..voices)|k|x+=p.voices[k].tick(p.grown);
-    x=x/voices+breath*p.noise.next();
-    // the vowel shaped out of them
-    var y:f32=0;
-    inline for(0..5)|k|y+=p.formants[k].tick(x)*p.gains[k];
-    return y*p.swell.next()*p.level;
+    // each half's voices summed, with a breath through each (its own, so
+    // the halves breathe unlike; as loud in all as the one breath was)
+    var x:dsp.Frame=@splat(0);
+    inline for(0..voices)|k|x[k%2]+=p.voices[k].tick(p.grown);
+    x=x*dsp.mid(1.0/m.f(voices))+dsp.Frame{p.noise.next(),p.noise.next()}*dsp.mid(breath/m.sqrt2);
+    // the vowel shaped out of each half
+    var y:dsp.Frame=@splat(0);
+    inline for(0..5)|k|y+=p.formants[k].tick(x)*dsp.mid(p.gains[k]);
+    return(dsp.put(p.seats[0],y[0])+dsp.put(p.seats[1],y[1]))*dsp.mid(p.swell.next()*p.level);
   }
 };
 /// the whole choir: four sections, each singing its own note of a chord
@@ -246,12 +256,12 @@ pub const Choir=struct{
     return true;
   }
   /// mixes the choir into `out`
-  pub fn render(c:*Choir,out:[]f32)void{
+  pub fn render(c:*Choir,out:[]dsp.Frame)void{
     for(out)|*s|{
       // the sections summed
-      var y:f32=0;
+      var y:dsp.Frame=@splat(0);
       inline for(0..sections)|k|y+=c.parts[k].tick();
-      s.*+=y*choir;
+      s.*+=y*dsp.mid(choir);
     }
   }
 };

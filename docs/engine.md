@@ -22,12 +22,21 @@ adds on top.
 - Engine: math, color, rng, noise, registry, jobs, text, png, and `dsp`
   (audio building blocks, no device): `Osc`, `Noise`, `Crackle`,
   `OnePole`, `Biquad`, `Smooth`, `Adsr`, `Delay`, `Hall` (a large stone
-  hall reverb, fixed rings, no allocation), `Voice`.
+  hall reverb, fixed rings, no allocation, its tail sent back wide), `Voice`.
+  Sound is stereo: sources mix `Frame`s (left, right). `spot(p)` gives the
+  speakers' gains for a sound at pan `p` (equal power, 1 each side in the
+  middle, so a centred sound is as loud as a mono one was), `put` and
+  `pan` place a sample with them, `mid` centres one. An `Ear` (where the
+  listener is and which way is its right) turns a place in the world into
+  a pan. `StereoPole` and `StereoBiquad` filter both sides at once, each
+  its own, and `Pool` voices render into frames.
 - Game: nothing.
 
 ### platform
 - Engine: input, display, and `audio`.
-- `audio` is `Output(S)`: the default WASAPI device. It pulls mono blocks
+- `audio` is `Output(S)`: the default WASAPI device. It pulls stereo blocks
+  (left to the first channel, right to the second, both halved together on
+  a mono device, any further channels silent)
   from a source that declares `Cmd`, `apply` and `render`, on
   zig-wsapi's render thread. The game `send`s commands through a
   lock-free `Mailbox` (a drop box both sides use without waiting on each

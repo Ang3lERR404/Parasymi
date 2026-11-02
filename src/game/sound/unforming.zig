@@ -24,6 +24,29 @@ const retune=lib.sound.sap.retune;
 const lydian=[_]f32{0,2,4,6,7,9,11};
 /// the note (MIDI) a step of D Lydian `k` up from `from` is
 fn lydianNote(from:f32,k:u32)f32{return from+12*m.f(k/lydian.len)+lydian[k%lydian.len];}
+// decision: the event is all round the wolf, so its glass is heard from
+// everywhere (each break, pane and glint a place of its own) while what
+// is one thing (the drone, the seed's fall and landing) holds the middle
+/// how far to either side a break is heard (pan), and its glints round it
+const crackSide:f32=0.7;
+/// (its glints, round it)
+const crackAround:f32=0.15;
+/// how far to either side the sky's panes rain (pan)
+const rainSide:f32=0.85;
+/// how wide the arrivals ring round the star (pan), each the golden share
+/// of the way round from the last so none sits on another
+const arriveSide:f32=0.6;
+/// the golden share, stepping each arrival round
+const golden:f32=0.618034;
+/// how wide the landing's glass chord opens (pan, lowest to highest)
+const landSpread:f32=1;
+/// how far apart each drone note and its beating twin sit (pan): the beat
+/// heard drifting between the speakers
+const droneApart:f32=0.35;
+/// how far apart the seam's tone and its twin sit (pan)
+const sealApart:f32=0.3;
+/// where the ash's two streams of grains crumble (pan)
+const crumbleSide:f32=0.5;
 // ---- a glint: a tiny glass bell, the grain all the glass is made of ----
 /// a glint's partials (shares of its pitch, stretched as glass rings) and levels
 const glintPartials=[_]f32{1,2.76};
@@ -49,9 +72,11 @@ const Glint=struct{
   rate:f32,
   /// its loudness
   level:f32,
+  /// where it rings between the speakers
+  place:dsp.Frame,
   /// a glint of note `note` (MIDI) ringing `ring` seconds (~63%) at
-  /// `level`, `delay` seconds from now
-  fn init(note:f32,ring:f32,level:f32,delay:f32,rate:f32)Glint{
+  /// `level`, `delay` seconds from now, at `pan`
+  fn init(note:f32,ring:f32,level:f32,delay:f32,pan:f32,rate:f32)Glint{
     // its pitch, and its partials
     const hz=dsp.noteToHz(note);
     var osc:[glintPartials.len]dsp.Sine=undefined;
@@ -60,10 +85,10 @@ const Glint=struct{
       osc[k]=.init(hz*p,rate);
       fall[k]=dsp.fall(ring/(1+2*m.f(k)),rate);
     }
-    return.{.osc=osc,.fall=fall,.wait=m.floorTo(u32,delay*rate),.rate=rate,.level=level};
+    return.{.osc=osc,.fall=fall,.wait=m.floorTo(u32,delay*rate),.rate=rate,.level=level,.place=dsp.spot(pan)};
   }
   /// mixes it into `out`; false once rung out
-  pub fn render(g:*Glint,out:[]f32)bool{
+  pub fn render(g:*Glint,out:[]dsp.Frame)bool{
     for(out)|*s|{
       if(g.wait>0){
         g.wait-=1;
@@ -76,7 +101,7 @@ const Glint=struct{
         y+=o.next()*l*a.*;
         a.*=f*a.*;
       }
-      s.*+=y*strike*g.level;
+      s.*+=dsp.put(g.place,y*strike*g.level);
       g.at+|=1;
       if(g.amp[0]<glintSilent)return false;
     }
@@ -112,10 +137,12 @@ const Crack=struct{
   amp:f32=1,
   /// how much it keeps a sample
   keep:f32,
+  /// where it breaks between the speakers
+  place:dsp.Frame,
   /// mixes it into `out`; false once gone
-  pub fn render(c:*Crack,out:[]f32)bool{
+  pub fn render(c:*Crack,out:[]dsp.Frame)bool{
     for(out)|*s|{
-      s.*+=c.thin.high(c.noise.next())*c.amp*crackSnap;
+      s.*+=dsp.put(c.place,c.thin.high(c.noise.next())*c.amp*crackSnap);
       c.amp*=c.keep;
     }
     return c.amp>silent;
@@ -239,8 +266,8 @@ const Land=struct{
     }
     return.{.osc=osc,.fall=fall,.thump=.{.rate=rate,.freq=thumpSweep[0]},.thumpKeep=dsp.fall(thumpFall,rate),.rate=rate};
   }
-  /// mixes it into `out`; false once rung out
-  fn render(l:*Land,out:[]f32)bool{
+  /// mixes it into `out`, in the middle; false once rung out
+  fn render(l:*Land,out:[]dsp.Frame)bool{
     for(out)|*s|{
       // a soft swell in, so it blooms rather than strikes
       const t=m.f(l.at)/l.rate;
@@ -251,7 +278,7 @@ const Land=struct{
         a.*=f*a.*;
       }
       l.thump.freq=m.lerp(thumpSweep[1],thumpSweep[0],l.thumpAmp);
-      s.*+=y*swell*landBell+l.thump.next()*l.thumpAmp*landThump;
+      s.*+=dsp.mid(y*swell*landBell+l.thump.next()*l.thumpAmp*landThump);
       l.thumpAmp*=l.thumpKeep;
       l.at+|=1;
     }
@@ -276,18 +303,24 @@ pub const Unformed=struct{
   drone:[droneNote.len]dsp.Sine,
   /// (their twins)
   droneTwin:[droneNote.len]dsp.Sine,
-  /// what darkens the drone
-  droneSoft:dsp.OnePole,
+  /// what darkens the drone (each side)
+  droneSoft:dsp.StereoPole,
+  /// where the drone's notes and their twins sit, left and right of the middle
+  droneSides:[2]dsp.Frame,
   /// samples until the next glint of the rain
   rainWait:u32=0,
   /// the seam's tone and its twin, gliding down
   seal:dsp.Osc,
   /// (its twin)
   sealTwin:dsp.Osc,
-  /// the ash's grains, and the band they ring in
-  crumble:dsp.Crackle,
-  /// (the band)
-  crumbleBand:dsp.Biquad,
+  /// where the seam's tone and its twin sit, left and right of the middle
+  sealSides:[2]dsp.Frame,
+  /// the ash's grains in two streams, left and right, and the band they ring in
+  crumble:[2]dsp.Crackle,
+  /// (the band, each stream)
+  crumbleBand:dsp.StereoBiquad,
+  /// where the two streams crumble
+  crumbleSides:[2]dsp.Frame,
   /// the fall's air, its swept band, and its tone
   air:dsp.Noise,
   /// (the swept band)
@@ -317,10 +350,13 @@ pub const Unformed=struct{
       .drone=d,
       .droneTwin=tw,
       .droneSoft=.init(droneDark,rate),
+      .droneSides=.{dsp.spot(-droneApart),dsp.spot(droneApart)},
       .seal=.{.rate=rate,.freq=dsp.noteToHz(sealNotes[0])},
       .sealTwin=.{.rate=rate,.freq=dsp.noteToHz(sealNotes[0])+sealBeat},
-      .crumble=.init(seed^0xA54,crumbleGrain,rate),
+      .sealSides=.{dsp.spot(-sealApart),dsp.spot(sealApart)},
+      .crumble=.{.init(seed^0xA54,crumbleGrain,rate),.init(seed^0xA55,crumbleGrain,rate)},
       .crumbleBand=.init(.band,crumbleHz,crumbleQ,rate),
+      .crumbleSides=.{dsp.spot(-crumbleSide),dsp.spot(crumbleSide)},
       .air=.init(seed^0xF411),
       .fallBand=.init(.band,fallSweep[0],fallQ,rate),
       .fallTone=.{.rate=rate,.freq=dsp.noteToHz(fallNotes[0])},
@@ -334,29 +370,35 @@ pub const Unformed=struct{
     u.wither.target=h.wither;
     for(0..h.cracks)|_|u.crack();
     for(0..h.arrivals)|_|{
-      u.glints.cycle(.init(lydianNote(arriveFrom,u.arrived%arriveSteps),arriveRing,arriveLevel,0,u.rate));
+      // where round the star it rings
+      const round=m.f(u.arrived)*golden;
+      u.glints.cycle(.init(lydianNote(arriveFrom,u.arrived%arriveSteps),arriveRing,arriveLevel,0,((round-@floor(round))*2-1)*arriveSide,u.rate));
       u.arrived+=1;
     }
   }
-  /// glass breaking: a snap and a scatter of glints, high in D Lydian
+  /// glass breaking somewhere round the wolf: a snap and a scatter of
+  /// glints round it, high in D Lydian
   fn crack(u:*Unformed)void{
-    u.cracks.cycle(.{.noise=.init(u.r.next()),.thin=.init(crackHz,u.rate),.keep=dsp.fall(crackFall,u.rate)});
+    // where it breaks
+    const at=u.r.range(-crackSide,crackSide);
+    u.cracks.cycle(.{.noise=.init(u.r.next()),.thin=.init(crackHz,u.rate),.keep=dsp.fall(crackFall,u.rate),.place=dsp.spot(at)});
     // how many glints it scatters
     const n=crackGlints[0]+u.r.below(crackGlints[1]-crackGlints[0]+1);
-    for(0..n)|_|u.glints.cycle(.init(lydianNote(crackFrom,u.r.below(crackSteps)),u.r.range(0.15,0.5),crackGlint*u.r.range(0.5,1),u.r.range(0,crackSpread),u.rate));
+    for(0..n)|_|u.glints.cycle(.init(lydianNote(crackFrom,u.r.below(crackSteps)),u.r.range(0.15,0.5),crackGlint*u.r.range(0.5,1),u.r.range(0,crackSpread),at+u.r.range(-crackAround,crackAround),u.rate));
   }
   /// mixes the next `out.len` samples into `out`, its clock running on;
   /// false once all of it has rung away
-  pub fn render(u:*Unformed,out:[]f32)bool{
+  pub fn render(u:*Unformed,out:[]dsp.Frame)bool{
     for(out,0..)|*s,i|{
       // the clock, and how much the drone is heard (swelling in, fading after the landing)
       const t=u.clock;
       const dr=m.smooth(m.clamp01(t/droneRise))*(1-m.smooth(m.clamp01((t-ev.landAt)/droneFade)));
-      var y:f32=0;
+      var y:dsp.Frame=@splat(0);
       if(dr>0){
-        var d:f32=0;
-        for(&u.drone,&u.droneTwin,droneLevel)|*a,*b,l|d+=(a.next()+b.next())*0.5*l;
-        y+=u.droneSoft.low(d)*dr*drone;
+        // each note to one side of the middle, its twin to the other
+        var d:dsp.Frame=@splat(0);
+        for(&u.drone,&u.droneTwin,droneLevel)|*a,*b,l|d+=dsp.put(u.droneSides[0],a.next()*0.5*l)+dsp.put(u.droneSides[1],b.next()*0.5*l);
+        y+=u.droneSoft.low(d)*dsp.mid(dr*drone);
       }
       // the seam humming shut as the ley lines seal, sinking
       const sk=(t-ev.sealStart)/(ev.sealEnd-ev.sealStart);
@@ -364,18 +406,22 @@ pub const Unformed=struct{
         const note=m.lerp(sealNotes[0],sealNotes[1],sk);
         u.seal.freq=dsp.noteToHz(note);
         u.sealTwin.freq=u.seal.freq+sealBeat;
-        y+=(u.seal.next()+u.sealTwin.next())*0.5*m.pow(f32,@sin(m.pi*sk),0.7)*sealLoud;
+        y+=(dsp.put(u.sealSides[0],u.seal.next())+dsp.put(u.sealSides[1],u.sealTwin.next()))*dsp.mid(0.5*m.pow(f32,@sin(m.pi*sk),0.7)*sealLoud);
       }
       // ash crumbling, as much as is withering
-      u.crumble.density=u.wither.next()*crumbleMost;
-      y+=u.crumbleBand.tick(u.crumble.next())*crumble;
+      // (half of it each stream)
+      const wd=u.wither.next()*crumbleMost*0.5;
+      u.crumble[0].density=wd;
+      u.crumble[1].density=wd;
+      const ash=u.crumbleBand.tick(.{u.crumble[0].next(),u.crumble[1].next()});
+      y+=(dsp.put(u.crumbleSides[0],ash[0])+dsp.put(u.crumbleSides[1],ash[1]))*dsp.mid(crumble);
       // the seed whistling down, louder as it nears
       const fk=(t-ev.shatterEnd)/ev.fallTime;
       if(fk>0 and fk<1){
         if(i%retune==0)u.fallBand.tune(.band,fallSweep[0]*m.pow(f32,fallSweep[1]/fallSweep[0],fk),fallQ,u.rate);
         u.fallTone.freq=dsp.noteToHz(m.lerp(fallNotes[0],fallNotes[1],fk*fk));
         const env=m.pow(f32,fk,1.5)*m.smooth(m.clamp01((1-fk)*20));
-        y+=(u.fallBand.tick(u.air.next())*fallAir+u.fallTone.next()*fallTone)*env;
+        y+=dsp.mid((u.fallBand.tick(u.air.next())*fallAir+u.fallTone.next()*fallTone)*env);
       }
       s.*+=y;
       u.clock+=1/u.rate;
@@ -386,7 +432,7 @@ pub const Unformed=struct{
       // how many samples this block holds
       const n:u32=@intCast(out.len);
       if(u.rainWait<=n){
-        u.glints.addFree(.init(lydianNote(rainFrom,u.r.below(rainSteps)),u.r.range(rainRing[0],rainRing[1]),u.r.range(rainLevel[0],rainLevel[1]),0,u.rate));
+        u.glints.addFree(.init(lydianNote(rainFrom,u.r.below(rainSteps)),u.r.range(rainRing[0],rainRing[1]),u.r.range(rainLevel[0],rainLevel[1]),0,u.r.range(-rainSide,rainSide),u.rate));
         // the next one's wait, as thick as the shattering is now
         const per=rainMost*@sin(m.pi*k)+1;
         u.rainWait=m.floorTo(u32,-@log(@max(u.r.float(),1e-4))/per*u.rate);
@@ -396,7 +442,7 @@ pub const Unformed=struct{
     if(!u.landed and u.clock>=ev.landAt){
       u.landed=true;
       u.land=.init(u.rate);
-      for(landChord,0..)|note,j|u.glints.cycle(.init(note,landChordRing,landChordLevel,m.f(j)*landStagger,u.rate));
+      for(landChord,0..)|note,j|u.glints.cycle(.init(note,landChordRing,landChordLevel,m.f(j)*landStagger,(m.f(j)/m.f(landChord.len-1)-0.5)*landSpread,u.rate));
     }
     if(u.land)|*l|{
       if(!l.render(out))u.land=null;
@@ -425,7 +471,7 @@ test"the unforming sounds in every stretch, softly, swells to its landing and ri
   // the event heard from its first moment, told a frame at a time
   var u:Unformed=.init(0,7,testRate);
   // a frame's samples, and the loudness (rms) and peak of each second
-  var buf:[800]f32=undefined;
+  var buf:[800]dsp.Frame=undefined;
   var rms:[64]f32=@splat(0);
   var peak:[64]f32=@splat(0);
   // the frame, and whether it still sounds
@@ -438,11 +484,11 @@ test"the unforming sounds in every stretch, softly, swells to its landing and ri
     const second:usize=@intCast(frame/60);
     const tick=frame%60==0;
     u.apply(.{.t=t,.wither=if(t>1 and t<14)0.8 else 0,.cracks=if(tick and t<10)1 else 0,.arrivals=if(tick and t>8 and t<ev.shatterEnd)3 else 0});
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     alive=u.render(&buf);
     for(buf)|x|{
-      rms[second]+=x*x;
-      peak[second]=@max(peak[second],@abs(x));
+      rms[second]+=m.sumOf(f32,2,x*x)*0.5;
+      peak[second]=@max(peak[second],@abs(x[0]),@abs(x[1]));
     }
   }
   for(&rms)|*r|r.*=@sqrt(r.*/testRate);

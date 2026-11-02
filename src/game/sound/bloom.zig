@@ -76,15 +76,22 @@ const Bell=struct{
   start:u32,
   /// its level in the chord
   level:f32,
+  /// where it rings between the speakers
+  place:dsp.Frame,
 };
-/// a unit's bloom: bells, root and breath, ringing out
+/// how wide the chord opens round the flower (pan, its lowest bell to its
+/// highest): blooming upward from left to right
+const bellSpread:f32=0.6;
+/// a unit's bloom: bells, root and breath, ringing out where the flower is heard
 pub const Bloom=struct{
   /// samples per second
   rate:f32,
   /// the chord's bells
   bells:[bellNote.len]Bell,
   /// the low-pass softening the bells
-  bellSoft:dsp.OnePole,
+  bellSoft:dsp.StereoPole,
+  /// where the root and the breath are heard: at the flower
+  heart:dsp.Frame,
   /// the root's sine
   root:dsp.Sine,
   /// how much of the root's level it keeps a sample, falling
@@ -99,8 +106,9 @@ pub const Bloom=struct{
   at:u32=0,
   /// its loudness, varied a little each time
   gain:f32,
-  /// a fresh bloom, its bells' rings and its loudness drawn from `r`
-  pub fn init(r:*rng.Rng,rate:f32)Bloom{
+  /// a fresh bloom where the flower is heard (`pan`), its bells' rings and
+  /// its loudness drawn from `r`
+  pub fn init(pan:f32,r:*rng.Rng,rate:f32)Bloom{
     // the bells, filled in below
     var bs:[bellNote.len]Bell=undefined;
     for(&bs,bellNote,bellLevel,0..)|*b,note,lv,i|{
@@ -113,12 +121,15 @@ pub const Bloom=struct{
         osc[k]=.init(hz*p,rate);
         fall[k]=dsp.fall(fs*short*r.range(0.85,1.15),rate);
       }
-      b.*=.{.osc=osc,.fall=fall,.start=m.floorTo(u32,m.f(i)*bellStagger*rate),.level=lv};
+      // how far up the chord it is (-0.5 lowest .. 0.5 highest)
+      const up=m.f(i)/m.f(bellNote.len-1)-0.5;
+      b.*=.{.osc=osc,.fall=fall,.start=m.floorTo(u32,m.f(i)*bellStagger*rate),.level=lv,.place=dsp.spot(pan+up*bellSpread)};
     }
     return.{
       .rate=rate,
       .bells=bs,
       .bellSoft=.init(bellSoftHz,rate),
+      .heart=dsp.spot(pan),
       .root=.init(dsp.noteToHz(rootNote),rate),
       .rootKeep=dsp.fall(rootFall,rate),
       .noise=.init(r.next()),
@@ -129,26 +140,28 @@ pub const Bloom=struct{
   /// mixes the next `out.len` samples into `out`: the bells ringing in one
   /// above the next, the root swelling under them, the breath rushing up;
   /// returns false once all of it has rung out
-  pub fn render(b:*Bloom,out:[]f32)bool{
+  pub fn render(b:*Bloom,out:[]dsp.Frame)bool{
     for(out)|*s|{
       // seconds since it began
       const t=m.f(b.at)/b.rate;
-      // the bells summed, and whether any still rings
-      var bl:f32=0;
+      // the bells summed, each in its place, and whether any still rings
+      var bl:dsp.Frame=@splat(0);
       var alive=false;
       for(&b.bells)|*bell|{
         if(b.at<bell.start){
           alive=true;
           continue;
         }
-        // how far into its soft strike it is (0..1)
+        // how far into its soft strike it is (0..1), and this bell's partials summed
         const strike=m.clamp01(m.f(b.at-bell.start)/(bellAttack*b.rate));
+        var one:f32=0;
         for(&bell.osc,&bell.amp,bell.fall,bellPartialLevel)|*o,*a,fl,pl|{
           if(a.*<bellSilent)continue;
           alive=true;
-          bl+=o.next()*pl*bell.level*strike*a.*;
+          one+=o.next()*pl*bell.level*strike*a.*;
           a.*=fl*a.*;
         }
+        bl+=dsp.put(bell.place,one);
       }
       // the root: swelling in, then ringing away
       const rise=m.smooth(m.clamp01(t/rootRise));
@@ -162,7 +175,7 @@ pub const Bloom=struct{
         const env=@sin(m.pi*m.pow(f32,x,0.6));
         br=b.breath.tick(b.noise.next())*env*env;
       }
-      s.*+=(b.bellSoft.low(bl)*bells+rt*root+br*breath)*b.gain;
+      s.*+=(b.bellSoft.low(bl)*dsp.mid(bells)+dsp.put(b.heart,rt*root+br*breath))*dsp.mid(b.gain);
       b.at+|=1;
       if(!alive and t>breathLen and b.rootAmp<silent)return false;
     }

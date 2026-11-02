@@ -63,8 +63,11 @@ pub const Taiko=struct{
   hitFall:f32,
   /// its loudness for its velocity
   gain:f32,
-  /// a drum pitched at `hz`, ringing `ring` seconds, struck at velocity `vel` (0..1)
-  pub fn init(hz:f32,ring:f32,vel:f32,r:*rng.Rng,rate:f32)Taiko{
+  /// where it stands between the speakers
+  place:dsp.Frame,
+  /// a drum pitched at `hz`, ringing `ring` seconds, struck at velocity
+  /// `vel` (0..1), standing at `pan`
+  pub fn init(hz:f32,ring:f32,vel:f32,pan:f32,r:*rng.Rng,rate:f32)Taiko{
     // the hit, its modes tuned below
     var t:Taiko=.{
       .modes=undefined,
@@ -76,6 +79,7 @@ pub const Taiko=struct{
       .dark=.init(thwackHz,rate),
       .hitFall=dsp.fall(thwackFall,rate),
       .gain=vel*taiko,
+      .place=dsp.spot(pan),
     };
     // this drum's pitch, a hair off its neighbours'
     const f=vary(r,hz);
@@ -89,7 +93,7 @@ pub const Taiko=struct{
     return t;
   }
   /// mixes the hit into `out`; false once it has rung out
-  pub fn render(t:*Taiko,out:[]f32)bool{
+  pub fn render(t:*Taiko,out:[]dsp.Frame)bool{
     for(out)|*s|{
       t.bent*=t.bentFall;
       // the pitch ratio the stroke still bends it by
@@ -103,7 +107,7 @@ pub const Taiko=struct{
       }
       t.hit*=t.hitFall;
       y+=t.dark.low(t.noise.next())*thwack*t.hit;
-      s.*+=dsp.softClip(y*drive)*t.gain;
+      s.*+=dsp.put(t.place,dsp.softClip(y*drive)*t.gain);
     }
     return t.amp[0]>silent;
   }
@@ -149,8 +153,11 @@ pub const Timpani=struct{
   wait:u32,
   /// its loudness for its velocity
   gain:f32,
-  /// MIDI `note` struck at velocity `vel` (0..1) after `wait` samples
-  pub fn init(note:u8,vel:f32,wait:u32,r:*rng.Rng,rate:f32)Timpani{
+  /// where its kettle stands between the speakers
+  place:dsp.Frame,
+  /// MIDI `note` struck at velocity `vel` (0..1) after `wait` samples, its
+  /// kettle standing at `pan`
+  pub fn init(note:u8,vel:f32,wait:u32,pan:f32,r:*rng.Rng,rate:f32)Timpani{
     // the note's pitch (Hz)
     const hz=dsp.noteToHz(m.f(note));
     // the stroke, its modes tuned below
@@ -163,6 +170,7 @@ pub const Timpani=struct{
       .hitFall=dsp.fall(feltFall,rate),
       .wait=wait,
       .gain=vel*timpani,
+      .place=dsp.spot(pan),
     };
     for(0..kettleModes)|k|{
       t.modes[k]=.init(hz*kettleRatio[k],rate);
@@ -172,7 +180,7 @@ pub const Timpani=struct{
     return t;
   }
   /// mixes the stroke into `out`; false once it has rung out
-  pub fn render(t:*Timpani,out:[]f32)bool{
+  pub fn render(t:*Timpani,out:[]dsp.Frame)bool{
     for(out)|*s|{
       if(t.wait>0){
         t.wait-=1;
@@ -186,7 +194,7 @@ pub const Timpani=struct{
       }
       t.hit*=t.hitFall;
       y+=t.dark.low(t.noise.next())*felt*t.hit;
-      s.*+=y*t.gain;
+      s.*+=dsp.put(t.place,y*t.gain);
     }
     return t.wait>0 or t.amp[0]>silent;
   }
@@ -208,16 +216,24 @@ const swellFrom:f32=0.02;
 const crashRing:f32=1.6;
 /// the cymbal's loudness
 const cymbal:f32=0.02;
-/// one cymbal: a roll swelling up out of nothing to a crash, ringing away
+/// how far either side of where it hangs its metal rings (pan)
+const cymbalWidth=lib.sound.score.cymbalWidth;
+/// one cymbal: a roll swelling up out of nothing to a crash, ringing away,
+/// its metal wide: half its partials and one stream of hiss to one side of
+/// where it hangs, the rest to the other
 pub const Cymbal=struct{
-  /// the metal's square partials
+  /// the metal's square partials (the even ones its left half, the odd its right)
   metal:[metalParts]dsp.Osc,
-  /// the noise of its hiss
+  /// the noise of its left half's hiss
   noise:dsp.Noise,
-  /// what keeps only the metal's top
-  metalHp:dsp.Biquad,
-  /// what keeps only the hiss's top
-  hissHp:dsp.Biquad,
+  /// the noise of its right half's hiss
+  noiseRight:dsp.Noise,
+  /// what keeps only the metal's top, each half
+  metalHp:dsp.StereoBiquad,
+  /// what keeps only the hiss's top, each half
+  hissHp:dsp.StereoBiquad,
+  /// where its left and its right half ring between the speakers
+  sides:[2]dsp.Frame,
   /// samples still to swell before the crash (0: it has crashed)
   swell:u32,
   /// samples the whole swell takes
@@ -229,14 +245,16 @@ pub const Cymbal=struct{
   /// its loudness for its velocity
   gain:f32,
   /// a roll swelling for `len` samples to a crash at velocity `vel` (0:
-  /// a crash at once)
-  pub fn init(vel:f32,len:u32,r:*rng.Rng,rate:f32)Cymbal{
+  /// a crash at once), hanging at `pan`
+  pub fn init(vel:f32,len:u32,pan:f32,r:*rng.Rng,rate:f32)Cymbal{
     // the cymbal, its partials tuned below
     var c:Cymbal=.{
       .metal=undefined,
       .noise=.init(r.next()),
+      .noiseRight=.init(r.next()),
       .metalHp=.init(.high,metalHigh,0.7,rate),
       .hissHp=.init(.high,hissHigh,0.7,rate),
+      .sides=.{dsp.spot(pan-cymbalWidth),dsp.spot(pan+cymbalWidth)},
       .swell=len,
       .swellLen=len,
       .ringFall=dsp.fall(vary(r,crashRing),rate),
@@ -246,7 +264,7 @@ pub const Cymbal=struct{
     return c;
   }
   /// mixes the cymbal into `out`; false once it has rung out
-  pub fn render(c:*Cymbal,out:[]f32)bool{
+  pub fn render(c:*Cymbal,out:[]dsp.Frame)bool{
     for(out)|*s|{
       // how loud it is now: swelling (rising ever faster), or ringing away
       var lv:f32=undefined;
@@ -259,11 +277,12 @@ pub const Cymbal=struct{
         c.ring*=c.ringFall;
         lv=c.ring;
       }
-      // the metal summed, and the hiss
-      var y:f32=0;
-      inline for(0..metalParts)|k|y+=c.metal[k].next();
-      y=c.metalHp.tick(y/metalParts)+c.hissHp.tick(c.noise.next())*hiss;
-      s.*+=y*lv*c.gain;
+      // each half's metal summed, then each half's top and its hiss (each
+      // partial and stream heard in one place, so as loud in all as one was)
+      var halves:dsp.Frame=@splat(0);
+      inline for(0..metalParts)|k|halves[k%2]+=c.metal[k].next();
+      const y=c.metalHp.tick(halves*dsp.mid(1/m.f(metalParts)))+c.hissHp.tick(.{c.noise.next(),c.noiseRight.next()})*dsp.mid(hiss/m.sqrt2);
+      s.*+=(dsp.put(c.sides[0],y[0])+dsp.put(c.sides[1],y[1]))*dsp.mid(lv*c.gain);
     }
     return c.swell>0 or c.ring>silent;
   }

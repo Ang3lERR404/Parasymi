@@ -98,6 +98,15 @@ const fadeS:f32=0.8;
 const res:f32=0.022;
 /// how much louder it grows while fed (a share at full feed)
 const resFed:f32=0.25;
+/// heard where it stands, its parts round it (pan): the outer whorl's glass
+/// this far to its left and the cup's to its right, the wisps drawn in
+/// from up to this far either side, thrum and core at its heart
+/// (this one: how far apart the glasses sit)
+const glassApart:f32=0.2;
+/// how far either side the wisps come from
+const wispSpread:f32=0.35;
+/// how long it takes to follow as the ear turns (s)
+const panGlide:f32=0.15;
 /// one glass: two tones a hair apart, each a nearly pure tone, sung by friction
 const Glass=struct{
   /// the first tone's partials
@@ -146,7 +155,7 @@ const Glass=struct{
     return(y*0.5+g.rub.tick(n)*rub)*press;
   }
 };
-/// one wisp: a whisper of breath drawn down into the core
+/// one wisp: a whisper of breath drawn down into the core from one side
 const Wisp=struct{
   /// its band of noise, swept down
   band:dsp.Biquad,
@@ -158,7 +167,11 @@ const Wisp=struct{
   len:u32,
   /// samples played so far
   at:u32=0,
-  /// a fresh wisp, its sweep and length drawn from `r`
+  /// how far to the side of the flower it comes from (pan)
+  off:f32,
+  /// where it is heard between the speakers, kept up as the ear turns
+  place:dsp.Frame=dsp.spot(0),
+  /// a fresh wisp, its sweep, length and side drawn from `r`
   fn init(r:*rng.Rng,rate:f32)Wisp{
     // where it starts
     const from=r.range(wispFrom[0],wispFrom[1]);
@@ -167,6 +180,7 @@ const Wisp=struct{
       .from=from,
       .to=r.range(wispTo[0],wispTo[1]),
       .len=samples(r,wispLen,rate),
+      .off=r.range(-wispSpread,wispSpread),
     };
   }
   /// its next sample from noise `n`; null once it has been drawn in
@@ -182,7 +196,8 @@ const Wisp=struct{
   }
 };
 /// the working voice: the glass, the thrum, the wisps and the core, its
-/// core swelling with the unit's progress and all of it brighter as it is fed
+/// core swelling with the unit's progress and all of it brighter as it is
+/// fed; heard where the flower stands, following as the ear turns
 pub const Research=struct{
   /// samples per second
   rate:f32,
@@ -192,8 +207,9 @@ pub const Research=struct{
   noise:dsp.Noise,
   /// the outer whorl's glass and the inner cup's
   glasses:[2]Glass,
-  /// the low-pass over the glass, brighter fed
-  glassSoft:dsp.OnePole,
+  /// the low-pass over the glasses (the outer one's in the left lane, the
+  /// cup's in the right), brighter fed
+  glassSoft:dsp.StereoPole,
   /// where the thrum stands in its pulse, 0..1
   thrumPhase:f32=0,
   /// the thrum's tone
@@ -216,12 +232,22 @@ pub const Research=struct{
   coreSwell:dsp.Smooth,
   /// the whole voice's level: in while it works, fading when it stops
   level:dsp.Smooth,
+  /// where the flower is heard (pan), gliding as the ear turns
+  pan:dsp.Smooth,
+  /// the speakers' gains for its heart, the outer glass and the cup, kept
+  /// up with `pan` at each retune
+  heart:dsp.Frame,
+  /// (the outer glass's)
+  outer:dsp.Frame,
+  /// (the cup's)
+  cup:dsp.Frame,
   /// samples played so far (wraps), for when to retune the glass's low-pass
   at:u32=0,
   /// this voice's loudness, varied a little each time
   gain:f32,
-  /// a fresh voice humming in, its glasses, wisps and loudness drawn from `r`
-  pub fn init(r:*rng.Rng,rate:f32)Research{
+  /// a fresh voice humming in where the flower is heard (`pan`), its
+  /// glasses, wisps and loudness drawn from `r`
+  pub fn init(pan:f32,r:*rng.Rng,rate:f32)Research{
     // its own random numbers, drawn first
     var own:rng.Rng=.init(r.next());
     // the two glasses, each its whorl's own
@@ -247,6 +273,10 @@ pub const Research=struct{
       .coreWaver=.{.rate=rate,.freq=coreWaverHz},
       .coreSwell=.init(coreFrom,fadeS,rate),
       .level=lv,
+      .pan=.init(pan,panGlide,rate),
+      .heart=dsp.spot(pan),
+      .outer=dsp.spot(pan-glassApart),
+      .cup=dsp.spot(pan+glassApart),
       .gain=vary(r,res),
     };
   }
@@ -256,24 +286,31 @@ pub const Research=struct{
   pub fn go(rs:*Research)void{rs.level.target=1;}
   /// mixes the next `out.len` samples into `out`, the core swelling with
   /// the unit's `progress` (0..1), all of it brighter, quicker and a little
-  /// louder as it is `fed` (0..1); returns false once it has faded away
-  pub fn render(rs:*Research,out:[]f32,progress:f32,fed:f32)bool{
+  /// louder as it is `fed` (0..1), heard gliding toward `pan`; returns
+  /// false once it has faded away
+  pub fn render(rs:*Research,out:[]dsp.Frame,progress:f32,fed:f32,pan:f32)bool{
     // how fast the glass beats, how bright it is, and how loud the core is, for this feed and progress
     const speed=1+glassBeatFed*fed;
     const bright=m.lerp(glassSoftHz[0],glassSoftHz[1],fed);
     rs.coreSwell.target=m.lerp(coreFrom,1,m.smooth(m.clamp01(progress)));
+    rs.pan.target=pan;
     // how far the thrum's pitch moves on one sample
     const thStep=thrumRate/rs.rate;
     // the thrum's resting pitch
     const thHz=dsp.noteToHz(thrumNote);
     for(out)|*s|{
-      if(rs.at%retune==0)rs.glassSoft.a=dsp.OnePole.coeff(bright,rs.rate);
+      // where it is heard this sample
+      const p=rs.pan.next();
+      if(rs.at%retune==0){
+        rs.glassSoft.a=dsp.StereoPole.coeff(bright,rs.rate);
+        rs.place(p);
+      }
       rs.at+%=1;
-      rs.spawn(fed);
+      rs.spawn(fed,p);
       // one noise sample for the friction and the wisps
       const n=rs.noise.next();
-      // the glass: both whorls singing
-      const gl=rs.glassSoft.low(rs.glasses[0].tick(speed,n)*glassLevel[0]+rs.glasses[1].tick(speed,n)*glassLevel[1]);
+      // the glass: both whorls singing, each softened on its own
+      const gl=rs.glassSoft.low(.{rs.glasses[0].tick(speed,n)*glassLevel[0],rs.glasses[1].tick(speed,n)*glassLevel[1]});
       // the thrum: a narrow pulse each time thought passes up, rising as it climbs
       const pulse=m.pow(f32,0.5+0.5*@sin(m.tau*rs.thrumPhase),thrumSharp);
       rs.thrumOsc.freq=thHz*(1+thrumBend*rs.thrumPhase);
@@ -281,10 +318,10 @@ pub const Research=struct{
       const th=rs.thrumSoft.low(rs.thrumOsc.next()+rs.thrumUp.next()*thrumOctave)*pulse;
       rs.thrumPhase+=thStep;
       if(rs.thrumPhase>=1)rs.thrumPhase-=1;
-      // the wisps whispering
-      var ws:f32=0;
+      // the wisps whispering, each from its side
+      var ws:dsp.Frame=@splat(0);
       for(&rs.wisps.slots)|*v|if(v.*)|*w|{
-        if(w.tick(n,rs.rate))|y|ws+=y else v.*=null;
+        if(w.tick(n,rs.rate))|y|ws+=dsp.put(w.place,y)else v.*=null;
       };
       // the core's two tones, wavering together
       const wv=m.pow(f32,2,coreWaver/1200*rs.coreWaver.next());
@@ -293,19 +330,31 @@ pub const Research=struct{
         rs.coreOsc[k].freq=rs.coreHz[k]*wv;
         cr+=rs.coreOsc[k].next();
       }
-      // all of it mixed at the voice's level
-      const y=gl*glass+th*thrum+ws*wisp+cr*core*rs.coreSwell.next();
-      s.*+=y*rs.gain*rs.level.next()*(1+resFed*fed);
+      // all of it mixed at the voice's level: the glasses either side, thrum and core at its heart
+      const y=(dsp.put(rs.outer,gl[0])+dsp.put(rs.cup,gl[1]))*dsp.mid(glass)+dsp.put(rs.heart,th*thrum+cr*core*rs.coreSwell.next())+ws*dsp.mid(wisp);
+      s.*+=y*dsp.mid(rs.gain*rs.level.next()*(1+resFed*fed));
     }
     return rs.level.target>0 or rs.level.value>fadeSilent;
   }
-  /// counts down to the next wisp and starts it on a free slot (sooner fed)
-  fn spawn(rs:*Research,fed:f32)void{
+  /// its parts' gains for the flower heard at `p`: its heart, the glasses
+  /// either side, each wisp from its own side
+  fn place(rs:*Research,p:f32)void{
+    rs.heart=dsp.spot(p);
+    rs.outer=dsp.spot(p-glassApart);
+    rs.cup=dsp.spot(p+glassApart);
+    for(&rs.wisps.slots)|*v|if(v.*)|*w|{w.place=dsp.spot(p+w.off);};
+  }
+  /// counts down to the next wisp and starts it on a free slot (sooner
+  /// fed), heard from its side of the flower at `p`
+  fn spawn(rs:*Research,fed:f32,p:f32)void{
     if(rs.wispWait>0){
       rs.wispWait-=1;
       return;
     }
-    rs.wisps.addFree(.init(&rs.r,rs.rate));
+    // the new wisp, heard from its side at once
+    var w:Wisp=.init(&rs.r,rs.rate);
+    w.place=dsp.spot(p+w.off);
+    rs.wisps.addFree(w);
     rs.wispWait=m.floorTo(u32,m.f(samples(&rs.r,wispGap,rs.rate))*(1-wispGapFed*fed));
   }
 };

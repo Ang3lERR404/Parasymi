@@ -256,7 +256,7 @@ pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{
       if(f.planted()){
         f.at[1]=to[1];
         fell=true;
-        p.fell[s]=.{.weight=p.stage()/2,.pace=m.clamp01(spd/(sprintSpeed*p.gait().sprint))};
+        p.fell[s]=.{.weight=p.stage()/2,.pace=m.clamp01(spd/(sprintSpeed*p.gait().sprint)),.at=f.at};
       }
     }
     // its pad squashes as it plants, springing back as it lifts

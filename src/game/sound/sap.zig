@@ -73,6 +73,9 @@ const gloopAttack:f32=0.006;
 /// fades in and out with the view (s)
 /// (this one: the low-pass that muffles it, Hz)
 const sapSoftHz:f32=650;
+/// how far to either side a gloop may rise (pan): here and there inside
+/// the wolf, round the groan in the middle of it
+const gloopSpread:f32=0.35;
 /// the settling's loudness
 const sap:f32=0.07;
 /// how fast it fades in and out with the view (s)
@@ -97,16 +100,18 @@ const Gloop=struct{
   amp:f32=1,
   /// samples since it started
   age:u32=0,
-  /// its next sample at the settling's sample `at`: silent before its
-  /// start, rising through its attack, then fading as its pitch lifts
-  fn tick(g:*Gloop,at:u32)f32{
-    if(at<g.start or g.amp<silent)return 0;
+  /// where in the wolf it rises, between the speakers
+  place:dsp.Frame,
+  /// its next sample at the settling's sample `at`, in its place: silent
+  /// before its start, rising through its attack, then fading as its pitch lifts
+  fn tick(g:*Gloop,at:u32)dsp.Frame{
+    if(at<g.start or g.amp<silent)return@splat(0);
     // how far through its attack it is, 0..1
     const rise=m.clamp01(m.f(g.age)/m.f(g.attack));
     if(g.age>=g.attack)g.amp*=g.fall;
     g.age+|=1;
     g.osc.freq=g.base*(1+gloopRise*(1-g.amp));
-    return g.osc.next()*rise*g.amp*g.level;
+    return dsp.put(g.place,g.osc.next()*rise*g.amp*g.level);
   }
 };
 /// one settling of the sap playing out
@@ -122,7 +127,7 @@ pub const Settle=struct{
   /// the closing throat the hum is voiced through
   throat:dsp.Biquad,
   /// the low-pass muffling it all, heard from inside
-  soft:dsp.OnePole,
+  soft:dsp.StereoPole,
   /// the gloops rising through it
   gloops:[gloopCount]Gloop,
   /// the hum's pitch before it sags, and the belly's lowering
@@ -176,10 +181,11 @@ pub const Settle=struct{
       .attack=m.floorTo(u32,gloopAttack*w.rate)+1,
       .fall=dsp.fall(w.r.range(kind.fall[0],kind.fall[1]),w.rate),
       .level=kind.level,
+      .place=dsp.spot(w.r.range(-gloopSpread,gloopSpread)),
     };
   }
   /// mixes the settling into `out`, faded with the view; false once ended
-  pub fn render(st:*Settle,out:[]f32,fade:*dsp.Smooth)bool{
+  pub fn render(st:*Settle,out:[]dsp.Frame,fade:*dsp.Smooth)bool{
     for(out)|*s|{
       if(st.at>=st.len)return false;
       // how far through the settling it is, 0..1
@@ -191,9 +197,9 @@ pub const Settle=struct{
       // the groan: the hum and breath through the throat, swelling and sinking
       const groan=st.throat.tick(st.hum.next()+breathAmount*st.noise.next())*groanLevel*sw*sw;
       // the gloops summed
-      var gl:f32=0;
+      var gl:dsp.Frame=@splat(0);
       for(&st.gloops)|*g|gl+=g.tick(st.at);
-      s.*+=st.soft.low(groan+gl)*st.gain*fade.next();
+      s.*+=st.soft.low(dsp.mid(groan)+gl)*dsp.mid(st.gain*fade.next());
       st.at+=1;
     }
     return st.at<st.len;

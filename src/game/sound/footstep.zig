@@ -102,11 +102,14 @@ pub const Step=struct{
   density:f32,
   /// the step's loudness, varied a little
   gain:f32,
+  /// where it is heard between the speakers: under the paw that fell
+  place:dsp.Frame,
   /// the pad's level for the wolf's weight
   padGain:f32,
-  /// a fresh step for footfall `f`: lower and fuller the heavier the wolf,
-  /// louder and shorter the faster, every part varied a little by `r`
-  pub fn init(f:Footfall,r:*rng.Rng,rate:f32)Step{
+  /// a fresh step for footfall `f`, heard at `pan` (-1 left .. 1 right):
+  /// lower and fuller the heavier the wolf, louder and shorter the faster,
+  /// every part varied a little by `r`
+  pub fn init(f:Footfall,pan:f32,r:*rng.Rng,rate:f32)Step{
     // how long this step falls for (s), and the flutter low-pass's coefficient
     const fall=vary(r,fallTime)*m.lerp(1,fallFast,f.pace);
     const a=dsp.OnePole.coeff(flutterHz,rate);
@@ -127,10 +130,11 @@ pub const Step=struct{
       .density=crunchDensity*(1+crunchHeavy*f.weight),
       .gain=vary(r,m.lerp(quiet,loud,f.pace)),
       .padGain=m.lerp(padLight,padFull,f.weight),
+      .place=dsp.spot(pan),
     };
   }
   /// mixes the step into `out`; false once it has ended
-  pub fn render(st:*Step,out:[]f32)bool{
+  pub fn render(st:*Step,out:[]dsp.Frame)bool{
     for(out)|*s|{
       // how far into its attack the step is, 0..1
       const rise=m.clamp01(m.f(st.at)/m.f(st.attack));
@@ -152,7 +156,7 @@ pub const Step=struct{
       const leaves=st.rustle.tick(n)*rustle*flut*env;
       const bits=st.bits.tick(st.crunch.next())*crunch;
       const pad=st.pad.tick(n)*st.padGain*rise*st.thump;
-      s.*+=st.soft.low(leaves+bits+pad)*st.gain;
+      s.*+=dsp.put(st.place,st.soft.low(leaves+bits+pad)*st.gain);
     }
     return st.at<st.attack or st.body>silent;
   }

@@ -48,6 +48,9 @@ const twinkle=m.Vice(f32,2){0.006,0.03};
 pub const twinkles=2;
 /// a ping this far faded is gone (it is already far quieter than a step)
 const pingSilent:f32=1e-3;
+/// how far either way of the mote each ping may ring (pan): a scatter of
+/// glints round one point of light
+const pingScatter:f32=0.2;
 /// one ping: a tiny bell
 const Ping=struct{
   /// each partial's sine
@@ -62,12 +65,14 @@ const Ping=struct{
   attack:u32,
   /// how loud it is (0: a ping not used)
   level:f32,
+  /// where it rings between the speakers
+  place:dsp.Frame,
   /// samples since it started
   age:u32=0,
-  /// its next sample at the twinkle's sample `at`: silent before its
-  /// start, rising through its attack, its partials ringing away
-  fn tick(p:*Ping,at:u32)f32{
-    if(at<p.start)return 0;
+  /// its next sample at the twinkle's sample `at`, in its place: silent
+  /// before its start, rising through its attack, its partials ringing away
+  fn tick(p:*Ping,at:u32)dsp.Frame{
+    if(at<p.start)return@splat(0);
     // how far through its attack it is, 0..1
     const rise=m.clamp01(m.f(p.age)/m.f(p.attack));
     p.age+|=1;
@@ -77,7 +82,7 @@ const Ping=struct{
       if(p.age>p.attack)p.amp[k]*=p.fall[k];
       y+=p.osc[k].next()*p.amp[k]*partialLevel[k];
     }
-    return y*rise*p.level;
+    return dsp.put(p.place,y*rise*p.level);
   }
   /// whether it has rung out
   fn done(p:*const Ping)bool{return p.age>p.attack and p.amp[0]<pingSilent;}
@@ -91,14 +96,15 @@ pub const Twinkle=struct{
   /// the slow shimmer's wave
   shimmer:dsp.Osc,
   /// the low-pass softening it
-  soft:dsp.OnePole,
+  soft:dsp.StereoPole,
   /// samples played so far
   at:u32=0,
   /// its loudness, for how near the mote is
   gain:f32,
-  /// a fresh twinkle for a mote `near` (0 far .. 1 touching): its pings'
-  /// count, pitches and spacing drawn from `r`
-  pub fn init(near:f32,r:*rng.Rng,rate:f32)Twinkle{
+  /// a fresh twinkle for a mote `near` (0 far .. 1 touching) heard at
+  /// `pan` (-1 left .. 1 right): its pings' count, pitches, spacing and
+  /// scatter round it drawn from `r`
+  pub fn init(near:f32,pan:f32,r:*rng.Rng,rate:f32)Twinkle{
     // how many pings sound
     const n=pingRange[0]+r.below(pingRange[1]-pingRange[0]+1);
     // the pings, filled in below
@@ -121,6 +127,7 @@ pub const Twinkle=struct{
         .attack=m.floorTo(u32,pingAttack*rate)+1,
         // each later ping a little softer
         .level=if(i<n)vary(r,1)/m.f(i+1)else 0,
+        .place=dsp.spot(pan+r.range(-pingScatter,pingScatter)),
       };
       start+=samples(r,pingGap,rate);
       hz*=stepRatios[r.below(stepRatios.len)];
@@ -134,13 +141,13 @@ pub const Twinkle=struct{
     };
   }
   /// mixes the twinkle into `out`; false once it has ended
-  pub fn render(t:*Twinkle,out:[]f32)bool{
+  pub fn render(t:*Twinkle,out:[]dsp.Frame)bool{
     for(out)|*s|{
-      // the pings summed this sample
-      var y:f32=0;
+      // the pings summed this sample, each in its place
+      var y:dsp.Frame=@splat(0);
       for(t.pings[0..t.n])|*p|y+=p.tick(t.at);
       t.at+|=1;
-      s.*+=t.soft.low(y)*(1-shimmer+shimmer*t.shimmer.next())*t.gain;
+      s.*+=t.soft.low(y)*dsp.mid((1-shimmer+shimmer*t.shimmer.next())*t.gain);
     }
     for(t.pings[0..t.n])|p|if(!p.done())return true;
     return false;

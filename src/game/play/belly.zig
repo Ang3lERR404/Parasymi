@@ -37,7 +37,7 @@ pub fn arsthraxiaState(g:*const Game)?lib.sound.Sounds.Cmd{
     // its state
     const a=&s.state.arsthraxia;
     if(!a.lab.active and a.flare<=0)return null;
-    return.{.arsthraxia=.{.progress=a.lab.t,.fed=a.fed,.complete=a.flare>0.9}};
+    return.{.arsthraxia=.{.progress=a.lab.t,.fed=a.fed,.complete=a.flare>0.9,.at=s.at}};
   }
   return null;
 }

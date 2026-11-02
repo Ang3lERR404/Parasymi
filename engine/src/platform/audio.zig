@@ -1,4 +1,4 @@
-//! sound out: the default WASAPI device pulling blocks from a `dsp` source.
+//! sound out: the default WASAPI device pulling stereo blocks from a `dsp` source.
 //! The pull runs on zig-wsapi's render thread (the device's, so the engine
 //! spawns none) against a real-time deadline: the source renders, it never
 //! allocates, locks or waits. The game never touches a playing source; it
@@ -10,6 +10,10 @@ const std=@import("std");
 const wasapi=@import("wasapi");
 /// the engine's maths: clamp
 const m=@import("../core/math.zig");
+/// the engine's sound pieces: the stereo frame a source mixes
+const dsp=@import("../core/dsp.zig");
+/// one moment of sound: left and right
+const Frame=dsp.Frame;
 /// the test helpers
 const testing=std.testing;
 /// the allocator type `open` takes
@@ -76,8 +80,11 @@ pub const Error=wasapi.errors.OpenError||Io.Cancelable||error{
 /// the default output device playing a source `S`, which declares
 ///   `Cmd`                         what the game may tell it
 ///   `apply(s:*S, cmd:Cmd) void`   act on one, between blocks
-///   `render(s:*S, out:[]f32) void` mix one mono block into `out` (zeroed)
-/// Every output channel hears the mono block, clamped to -1..1.
+///   `render(s:*S, out:[]dsp.Frame) void` mix one stereo block into `out` (zeroed)
+/// The first two channels hear its left and right, clamped to -1..1; a
+/// mono device hears the two halved together.
+// decision: any further channels (centre, LFE, rears) stay silent: the
+// mix is made for two speakers, and copying it to all would bury the image
 pub fn Output(comptime S:type)type{
   return struct{
     /// this output's own type
@@ -89,7 +96,7 @@ pub fn Output(comptime S:type)type{
     /// the open device stream (set by `open`)
     stream:*wasapi.Stream=undefined,
     /// the scratch block the source renders into
-    block:[block]f32=undefined,
+    block:[block]Frame=undefined,
     /// opens the default device and starts pulling from `src` (built for
     /// `opts.rate`); `close` stops it
     pub fn open(gpa:Allocator,io:Io,src:S,opts:Options)Error!*Self{
@@ -125,7 +132,7 @@ pub fn Output(comptime S:type)type{
     /// how many frames the device had to play without a block in time
     pub fn underruns(o:*Self)u64{return o.stream.underruns();}
     /// the render thread's pull: commands first, then the source block by
-    /// block into every channel
+    /// block into the left and right channels
     fn fill(ctx:*anyopaque,planes:[]const[]f32,frames:u32)void{
       // the output this thread was handed
       const o:*Self=@ptrCast(@alignCast(ctx));
@@ -135,10 +142,19 @@ pub fn Output(comptime S:type)type{
       while(done<frames){
         // this block: the rest, or one full block
         const out=o.block[0..@min(frames-done,block)];
-        @memset(out,0);
+        @memset(out,@splat(0));
         o.src.render(out);
-        for(out)|*s|s.*=m.clamp(s.*,-1,1);
-        for(planes)|p|@memcpy(p[done..][0..out.len],out);
+        for(out,0..)|f,i|{
+          // this frame's sides, held within -1..1
+          const l=m.clamp(f[0],-1,1);
+          const r=m.clamp(f[1],-1,1);
+          if(planes.len==1)planes[0][done+i]=(l+r)*0.5;
+          if(planes.len>=2){
+            planes[0][done+i]=l;
+            planes[1][done+i]=r;
+          }
+        }
+        if(planes.len>2)for(planes[2..])|p|@memset(p[done..][0..out.len],0);
         done+=out.len;
       }
     }
@@ -158,31 +174,36 @@ test"mailbox keeps order and refuses when full"{
     try testing.expectEqual(@as(?u32,@intCast(i)),q.pop());
   }
 }
-/// a source that counts what it was told and renders a constant
+/// a source that renders a constant frame it is told
 const Probe=struct{
-  /// it takes a level to render
-  pub const Cmd=f32;
-  /// the level each sample gets
-  level:f32=0,
-  /// sets the level
+  /// it takes a frame to render
+  pub const Cmd=Frame;
+  /// the frame each sample gets
+  level:Frame=@splat(0),
+  /// sets the frame
   pub fn apply(p:*Probe,c:Cmd)void{p.level=c;}
-  /// adds the level to every sample of `out`
-  pub fn render(p:*Probe,out:[]f32)void{
+  /// adds the frame to every sample of `out`
+  pub fn render(p:*Probe,out:[]Frame)void{
     for(out)|*s|s.*+=p.level;
   }
 };
-test"fill applies commands, then renders every channel, clamped"{
+test"fill applies commands, then renders left and right, clamped; mono halves them; the rest silent"{
   // an output over the probe, with no device opened
   const O=Output(Probe);
-  // the output, its level about to be set
+  // the output, its frame about to be set
   var o:O=.{.src=.{}};
-  try o.send(2);
-  // the left and right planes, longer than one block so it takes two
+  try o.send(.{2,-0.5});
+  // the left, right and a centre plane, longer than one block so it takes two
   var l:[block+7]f32=undefined;
   var r:[block+7]f32=undefined;
-  O.fill(&o,&.{l[0..],r[0..]},l.len);
-  for(l,r)|a,b|{
+  var c:[block+7]f32=@splat(9);
+  O.fill(&o,&.{l[0..],r[0..],c[0..]},l.len);
+  for(l,r,c)|a,b,x|{
     try testing.expectEqual(@as(f32,1),a);
-    try testing.expectEqual(@as(f32,1),b);
+    try testing.expectEqual(@as(f32,-0.5),b);
+    try testing.expectEqual(@as(f32,0),x);
   }
+  // a mono device hears both sides halved together
+  O.fill(&o,&.{l[0..]},l.len);
+  for(l)|a|try testing.expectEqual(@as(f32,0.25),a);
 }

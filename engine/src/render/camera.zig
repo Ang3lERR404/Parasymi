@@ -197,6 +197,18 @@ pub const Camera=struct{
       .eyes=>|y|m.lerpV(c.eye(),y.pos,m.smooth(y.k)),
     };
   }
+  /// the way the view's right hand points along the ground (what it hears
+  /// to its right); while easing back from flying free, blended between the
+  /// two, so a little shorter half way
+  pub fn side(c:*const Camera)m.V3{
+    // the orbiting view's right hand (the eyes turn with its yaw)
+    const around=m.v3(@cos(c.yaw),0,-@sin(c.yaw));
+    return switch(c.view){
+      .follow,.eyes=>around,
+      .free=>|f|f.right(),
+      .returning=>|r|m.lerpV(around,r.from.right(),1-m.smooth(m.clamp01(r.t/returnTime))),
+    };
+  }
   /// looking out of the eyes (or easing in), not on the way back out.
   pub fn inEyes(c:*const Camera)bool{
     return switch(c.view){
@@ -429,4 +441,14 @@ test"a point along a pixel's ray lands back on that pixel, and one behind the ey
   const q=c.screenOf(p,1600,900).?;
   try testing.expect(@abs(q[0]-400)<0.05 and @abs(q[1]-300)<0.05);
   try testing.expectEqual(null,c.screenOf(c.eye()-r.d*m.splat3(3),1600,900));
+}
+test"what lies to the view's right hand is drawn on the right of the screen"{
+  // a camera following a point, turned part way round
+  var c:Camera=.{.target=m.v3(3,1,-2)};
+  c.orbit(.{300,0});
+  // where the target and a point to its right land on the screen
+  const t=c.screenOf(c.target,1600,900).?;
+  const q=c.screenOf(c.target+c.side()*m.splat3(2),1600,900).?;
+  try testing.expect(q[0]>t[0]+10);
+  try testing.expectApproxEqAbs(@as(f32,1),m.len(c.side()),1e-5);
 }

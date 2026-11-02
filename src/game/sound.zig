@@ -2,6 +2,19 @@
 //! opens it on `platform.audio.Output`). The game sends it what happened
 //! (`Cmd`) and each sound plays out on a free voice of its pool, nothing
 //! allocated while it plays.
+//! - all of it is heard in stereo, from the view (told each frame as an
+//!   `ear`): a step under the paw that fell, a twinkle where its mote is and
+//!   the arsthraxia where it stands (following as the view turns), each
+//!   left or right as it lies; the sap's gloops rise here and there inside
+//!   the wolf round its groan; the wind's hush is two streams of air, its
+//!   whistle drifting from side to side gust by gust; the piano spreads low
+//!   to high from left to right, the drums stand on a stage (taiko by the
+//!   middle, timpani left, the cymbal's metal wide on the right), the
+//!   strings sit high to the left and low to the right, each player in its
+//!   own seat, the choir stands sopranos to basses left to right, each
+//!   section in two halves; the hall's tail spreads wide round both; the
+//!   unforming's glass breaks and rains from all round, its drone and seam
+//!   beating between the speakers, its seed falling and landing in the middle.
 //! - a footstep is a soft crunchy rustle: leaf litter shuffled under a paw
 //!   (band-passed noise fluttering like leaves), dry bits crushed in it (a
 //!   crackle, thick at the footfall and thinning as it fades) and a muffled

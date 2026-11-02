@@ -41,6 +41,29 @@ const whistleFrom=lib.sound.wind.whistleFrom;
 const chordTone=lib.sound.score.chordTone;
 /// the sample rate the tests render at (samples a second)
 const testRate:f32=48000;
+/// one moment of sound: left and right
+const Frame=engine.core.dsp.Frame;
+/// a frame's louder side
+fn loud(x:Frame)f32{return@max(@abs(x[0]),@abs(x[1]));}
+/// a frame's power, its two sides averaged
+fn power(x:Frame)f32{return m.sumOf(f32,2,x*x)*0.5;}
+/// what the sounds sent each side over `blocks` blocks: each side's energy
+/// and what the two share (their sum of products)
+fn sides(s:*Sounds,blocks:u32)struct{l:f32,r:f32,shared:f32}{
+  // a block of samples, and the sums
+  var buf:[480]Frame=undefined;
+  var e:Frame=@splat(0);
+  var shared:f32=0;
+  for(0..blocks)|_|{
+    @memset(&buf,@splat(0));
+    s.render(&buf);
+    for(buf)|x|{
+      e+=x*x;
+      shared+=x[0]*x[1];
+    }
+  }
+  return.{.l=e[0],.r=e[1],.shared=shared};
+}
 /// one step rendered alone: its peak, its loudness (rms) and how long it
 /// sounds (s)
 fn hear(f:Footfall,seed:u64)struct{peak:f32,rms:f32,len:f32}{
@@ -49,16 +72,16 @@ fn hear(f:Footfall,seed:u64)struct{peak:f32,rms:f32,len:f32}{
   s.wind.level=0;
   s.apply(.{.step=f});
   // a block of samples, the step's peak, its sum of squares, and samples heard
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   var peak:f32=0;
   var sum:f32=0;
   var n:u32=0;
   while(s.steps.slots[0]!=null and n<48000){
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
     for(buf)|x|{
-      peak=@max(peak,@abs(x));
-      sum+=x*x;
+      peak=@max(peak,loud(x));
+      sum+=power(x);
     }
     n+=buf.len;
   }
@@ -84,25 +107,25 @@ test"steps vary, a busy pool steals the oldest, and it ends silent"{
   for(s.steps.slots)|v|try testing.expect(v!=null);
   try testing.expect(s.steps.slots[0].?.gain!=s.steps.slots[1].?.gain);
   // a block of samples
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   for(0..200)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
   }
   for(s.steps.slots)|v|try testing.expect(v==null);
-  for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+  for(buf)|x|try testing.expectEqual(@as(f32,0),loud(x));
 }
 test"the sap settles only in the eyes, softly, and fades out with the view"{
   // the sounds, with the wind hushed
   var s:Sounds=.init(3,testRate);
   s.wind.level=0;
   // a block of samples
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   // a minute out of the eyes: nothing
   for(0..6000)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
-    for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+    for(buf)|x|try testing.expectEqual(@as(f32,0),loud(x));
   }
   s.apply(.{.eyes=true});
   // the loudest sample heard, settlings started, and whether one was sounding
@@ -110,9 +133,9 @@ test"the sap settles only in the eyes, softly, and fades out with the view"{
   var settles:u32=0;
   var was=false;
   for(0..3000)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
-    for(buf)|x|peak=@max(peak,@abs(x));
+    for(buf)|x|peak=@max(peak,loud(x));
     if(s.settle!=null and !was)settles+=1;
     was=s.settle!=null;
   }
@@ -121,11 +144,11 @@ test"the sap settles only in the eyes, softly, and fades out with the view"{
   try testing.expect(peak>0.01 and peak<0.3);
   s.apply(.{.eyes=false});
   for(0..400)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
   }
   try testing.expect(s.settle==null);
-  for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+  for(buf)|x|try testing.expectEqual(@as(f32,0),loud(x));
 }
 test"now and then a settling has lighter gloops"{
   // the random numbers, and how many settlings brought light gloops
@@ -148,14 +171,14 @@ test"a twinkle is a few soft high pings, louder the nearer, and ends"{
     s.apply(.{.twinkle=.{.near=near}});
     try testing.expect(s.twinkles.slots[0].?.n>=pingRange[0] and s.twinkles.slots[0].?.n<=pingRange[1]);
     // a block of samples
-    var buf:[480]f32=undefined;
+    var buf:[480]Frame=undefined;
     peak.*=0;
     // samples heard
     var n:u32=0;
     while(s.twinkles.slots[0]!=null and n<4*48000):(n+=buf.len){
-      @memset(&buf,0);
+      @memset(&buf,@splat(0));
       s.render(&buf);
-      for(buf)|x|peak.*=@max(peak.*,@abs(x));
+      for(buf)|x|peak.*=@max(peak.*,loud(x));
     }
     try testing.expect(s.twinkles.slots[0]==null);
     // how long it sounded (s)
@@ -168,7 +191,7 @@ test"the wind is gentle, swells in gusts and whistles only in some"{
   // the sounds, wind and all
   var s:Sounds=.init(5,testRate);
   // a block of a tenth of a second
-  var buf:[4800]f32=undefined;
+  var buf:[4800]Frame=undefined;
   // the loudest sample, the quietest and loudest blocks, and blocks that whistled
   var peak:f32=0;
   var lo:f32=1;
@@ -176,13 +199,13 @@ test"the wind is gentle, swells in gusts and whistles only in some"{
   var whistled:u32=0;
   // a minute, a tenth of a second at a time
   for(0..600)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
     // this block's sum of squares
     var sum:f32=0;
     for(buf)|x|{
-      peak=@max(peak,@abs(x));
-      sum+=x*x;
+      peak=@max(peak,loud(x));
+      sum+=power(x);
     }
     // this block's loudness (rms)
     const rms=@sqrt(sum/m.f(buf.len));
@@ -200,12 +223,12 @@ test"the music is silent at night and plays softly by day, on a steady pulse"{
   s.wind.level=0;
   s.night.level=0;
   // a block of samples
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   // ten seconds of night: nothing
   for(0..1000)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
-    for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+    for(buf)|x|try testing.expectEqual(@as(f32,0),loud(x));
   }
   try testing.expectEqual(@as(u32,0),s.music.struck);
   s.apply(.{.daylight=1});
@@ -215,9 +238,9 @@ test"the music is silent at night and plays softly by day, on a steady pulse"{
   // how many seconds of day to hear
   const secs=120;
   for(0..secs*100)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
-    for(buf)|x|peak=@max(peak,@abs(x));
+    for(buf)|x|peak=@max(peak,loud(x));
   }
   try testing.expect(peak>0.02 and peak<0.35);
   // steps of the pulse that passed: notes on many of them, a drum on some bars
@@ -233,12 +256,12 @@ test"the music is silent at night and plays softly by day, on a steady pulse"{
   // dusk: it fades out and rests
   s.apply(.{.daylight=0});
   for(0..3000)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
   }
   try testing.expect(s.music.resting);
   // (only the hall's last whisper is left)
-  for(buf)|x|try testing.expect(@abs(x)<1e-6);
+  for(buf)|x|try testing.expect(loud(x)<1e-6);
 }
 test"a phrase's second half varies its first, and melody stays in range"{
   // the random numbers, and the music under test
@@ -266,13 +289,13 @@ test"the night's music is silent by day and plays softly by night: the choir and
   s.wind.level=0;
   s.music.level=0;
   // a block of samples
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   // ten seconds of day: nothing
   s.apply(.{.daylight=1});
   for(0..1000)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
-    for(buf)|x|try testing.expectEqual(@as(f32,0),x);
+    for(buf)|x|try testing.expectEqual(@as(f32,0),loud(x));
   }
   try testing.expectEqual(@as(u32,0),s.night.bowed);
   s.apply(.{.daylight=0});
@@ -282,12 +305,12 @@ test"the night's music is silent by day and plays softly by night: the choir and
   // two minutes of night
   const secs=120;
   for(0..secs*100)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
     for(buf)|x|{
-      try testing.expect(x==x and @abs(x)<10);
-      peak=@max(peak,@abs(x));
-      sum+=x*x;
+      try testing.expect(loud(x)==loud(x) and loud(x)<10);
+      peak=@max(peak,loud(x));
+      sum+=power(x);
     }
   }
   // how loud it is on the whole
@@ -300,12 +323,12 @@ test"the night's music is silent by day and plays softly by night: the choir and
   // dawn: it fades out and rests
   s.apply(.{.daylight=1});
   for(0..4000)|_|{
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
   }
   try testing.expect(s.night.resting);
   // (only the hall's last whisper is left)
-  for(buf)|x|try testing.expect(@abs(x)<1e-6);
+  for(buf)|x|try testing.expect(loud(x)<1e-6);
 }
 /// the arsthraxia heard alone for `secs` seconds at `progress` and `fed`:
 /// its peak and loudness (rms)
@@ -316,23 +339,23 @@ fn study(progress:f32,fed:f32,secs:f32)struct{peak:f32,rms:f32}{
   s.apply(.{.daylight=0.5});
   s.apply(.{.arsthraxia=.{.progress=progress,.fed=fed,.complete=false}});
   // a block of samples, the peak, the sum of squares, and samples heard
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   var peak:f32=0;
   var sum:f32=0;
   var n:u32=0;
   // the first second it hums in, unheard
   while(m.f(n)<testRate){
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
     n+=buf.len;
   }
   n=0;
   while(m.f(n)<secs*testRate){
-    @memset(&buf,0);
-    if(s.research)|*rs|_=rs.render(&buf,progress,fed);
+    @memset(&buf,@splat(0));
+    if(s.research)|*rs|_=rs.render(&buf,progress,fed,0);
     for(buf)|x|{
-      peak=@max(peak,@abs(x));
-      sum+=x*x;
+      peak=@max(peak,loud(x));
+      sum+=power(x);
     }
     n+=buf.len;
   }
@@ -354,7 +377,7 @@ test"the arsthraxia fades away when its work stops, and a unit done blooms and r
   var s:Sounds=.init(9,testRate);
   s.wind.level=0;
   s.apply(.{.arsthraxia=.{.progress=0.5,.fed=0,.complete=false}});
-  var buf:[480]f32=undefined;
+  var buf:[480]Frame=undefined;
   for(0..100)|_|s.render(&buf);
   try testing.expect(s.research!=null);
   // a unit done: the bloom rings while the voice hums on
@@ -365,9 +388,75 @@ test"the arsthraxia fades away when its work stops, and a unit done blooms and r
   // how many blocks it took
   var blocks:u32=0;
   while(blocks<2000 and !(s.research==null and s.blooms.slots[0]==null)){
-    @memset(&buf,0);
+    @memset(&buf,@splat(0));
     s.render(&buf);
     blocks+=1;
   }
   try testing.expect(s.research==null and s.blooms.slots[0]==null);
+}
+test"what happens to the ear's right is heard on the right, and to its left on the left"{
+  // the ear at the middle, its right hand east; a step, a twinkle and the
+  // arsthraxia each heard on one side then the other
+  for([_]f32{-6,6})|x|{
+    // where the sound is, and which side should hear it more
+    const at=m.v3(x,0,-2);
+    const right=x>0;
+    // a step
+    var s:Sounds=.init(31,testRate);
+    s.wind.level=0;
+    s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
+    s.apply(.{.step=.{.weight=0.5,.pace=0.5,.at=at}});
+    const st=sides(&s,60);
+    try testing.expect((st.r>st.l*2)==right and (st.l>st.r*2)==!right);
+    // a twinkle
+    s=.init(32,testRate);
+    s.wind.level=0;
+    s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
+    s.apply(.{.twinkle=.{.near=1,.at=at}});
+    const tw=sides(&s,100);
+    try testing.expect((tw.r>tw.l*2)==right and (tw.l>tw.r*2)==!right);
+    // the arsthraxia at work, by day and night alike (both musics hushed)
+    s=.init(33,testRate);
+    s.wind.level=0;
+    s.music.level=0;
+    s.night.level=0;
+    s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
+    s.apply(.{.arsthraxia=.{.progress=0.5,.fed=0.5,.complete=false,.at=at}});
+    const ar=sides(&s,300);
+    try testing.expect((ar.r>ar.l*1.5)==right and (ar.l>ar.r*1.5)==!right);
+  }
+}
+test"the arsthraxia follows as the ear turns"{
+  // the sounds, with the wind and both musics hushed
+  var s:Sounds=.init(34,testRate);
+  s.wind.level=0;
+  s.music.level=0;
+  s.night.level=0;
+  // the flower to the east, the ear facing north: heard on the right
+  s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
+  s.apply(.{.arsthraxia=.{.progress=0.5,.fed=0,.complete=false,.at=.{8,0,0}}});
+  const before=sides(&s,300);
+  try testing.expect(before.r>before.l*1.5);
+  // the ear turned to face south: now on the left
+  s.apply(.{.ear=.{.at=.{0,1,0},.side=.{-1,0,0}}});
+  _=sides(&s,50);
+  const after=sides(&s,300);
+  try testing.expect(after.l>after.r*1.5);
+}
+test"the music, the night and the wind are wide: both sides heard, unlike each other"{
+  // the day's music, the night's, and the wind alone
+  for([_]f32{1,0,-1})|d|{
+    var s:Sounds=.init(35,testRate);
+    if(d>=0){
+      s.wind.level=0;
+      s.apply(.{.daylight=d});
+    }
+    // past their first swell
+    _=sides(&s,1500);
+    const w=sides(&s,3000);
+    try testing.expect(w.l>0 and w.r>w.l*0.5 and w.r<w.l*2);
+    // how alike the two sides are (1 the same, 0 unrelated)
+    const alike=w.shared/@sqrt(w.l*w.r);
+    try testing.expect(alike<0.9);
+  }
 }

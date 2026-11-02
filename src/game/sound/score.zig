@@ -170,6 +170,22 @@ pub const taikos=8;
 pub const timps=16;
 /// cymbals
 pub const cymbals=2;
+/// where the drums stand between the speakers (pan): the deep taiko in
+/// the middle, the taiko a little left of it, the small ones right, the
+/// timpani's two kettles left behind them (low one further out) and the
+/// cymbal right, its metal spread this wide either side of where it hangs
+/// (this one: the deep taiko)
+pub const boomPan:f32=0;
+/// the taiko
+pub const taikoPan:f32=-0.25;
+/// the small taiko
+pub const smallPan:f32=0.35;
+/// the timpani's kettles, low and high
+pub const kettlePan=m.Vice(f32,2){-0.45,-0.3};
+/// the cymbal
+pub const cymbalPan:f32=0.3;
+/// how far either side of where it hangs its metal rings
+pub const cymbalWidth:f32=0.35;
 /// how fast the music follows the daylight (s); it plays only past this
 /// (this one: the glide, s)
 pub const musicGlide:f32=3;

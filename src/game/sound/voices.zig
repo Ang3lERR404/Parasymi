@@ -45,6 +45,16 @@ const plunkSoftHz=lib.sound.score.plunkSoftHz;
 const silent=lib.sound.silent;
 /// how much each partial is stretched sharp
 const stretch=lib.sound.score.stretch;
+/// the piano heard from its bench: its strings across the speakers, low to
+/// the left and high to the right, the middle of the keyboard (MIDI, D4)
+/// in the middle
+const keyMid:f32=62;
+/// how many semitones from the middle reach the widest a note sits
+const keySpan:f32=30;
+/// how wide the strings reach (pan): a piano, not the whole room
+const keyWidth:f32=0.5;
+/// where MIDI `note` sits between the speakers (pan)
+pub fn keyPan(note:f32)f32{return m.clamp((note-keyMid)/keySpan,-1,1)*keyWidth;}
 /// one piano note: a plunk of a felt-hammered string
 pub const Plunk=struct{
   /// the string's partials, and the second string last
@@ -71,8 +81,10 @@ pub const Plunk=struct{
   attack:u32,
   /// its loudness for its velocity
   gain:f32,
+  /// where its string sits between the speakers
+  place:dsp.Frame,
   /// a fresh note: MIDI `note` struck at velocity `vel` (0..1), softer
-  /// notes duller, higher ones ringing shorter
+  /// notes duller, higher ones ringing shorter, sitting where its string does
   pub fn init(note:u8,vel:f32,r:*rng.Rng,rate:f32)Plunk{
     // the note's pitch (Hz), and how long it rings (s)
     const hz=dsp.noteToHz(m.f(note));
@@ -88,6 +100,7 @@ pub const Plunk=struct{
       .soft=.init(plunkSoftHz,rate),
       .attack=m.floorTo(u32,plunkAttack*rate)+1,
       .gain=vel*plunk,
+      .place=dsp.spot(keyPan(m.f(note))),
     };
     for(0..harmonics)|k|{
       // the partial's number, from 1, and its stretched pitch
@@ -105,7 +118,7 @@ pub const Plunk=struct{
     return p;
   }
   /// mixes the note into `out`; false once it has ended
-  pub fn render(p:*Plunk,out:[]f32)bool{
+  pub fn render(p:*Plunk,out:[]dsp.Frame)bool{
     for(out)|*s|{
       // how far through its attack it is, 0..1
       const rise=m.clamp01(m.f(p.at)/m.f(p.attack));
@@ -118,7 +131,7 @@ pub const Plunk=struct{
       }
       p.knock*=p.knockFall;
       y+=p.hammer.tick(p.noise.next())*hammer*p.knock;
-      s.*+=p.soft.low(y*rise)*p.gain;
+      s.*+=dsp.put(p.place,p.soft.low(y*rise)*p.gain);
     }
     return p.amp[0]>silent;
   }

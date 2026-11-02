@@ -1,4 +1,5 @@
-//! the source the device pulls from: every sound's voices mixed into one stream.
+//! the source the device pulls from: every sound's voices mixed into one
+//! stereo stream, each heard from where it is (the ear the game tells it).
 /// the hub every game module is reached through
 const lib=@import("../../lib.zig");
 /// the generic engine package
@@ -62,7 +63,7 @@ const samples=lib.sound.sap.samples;
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
 pub const Sounds=struct{
   /// a paw landed; the view entered or left the wolf's eyes; a mote near
-  /// the wolf twinkled; the daylight changed (0 night .. 1 day)
+  /// the wolf twinkled; the daylight changed (0 night .. 1 day); the ear moved
   pub const Cmd=union(enum){
     /// a paw came down
     step:Footfall,
@@ -73,10 +74,13 @@ pub const Sounds=struct{
     /// the daylight changed (0 night .. 1 day)
     daylight:f32,
     /// the arsthraxia's working: how far along (`progress`, 0..1), how well
-    /// fed (`fed`, 0..1), and whether it has just completed (`complete`)
-    arsthraxia:struct{progress:f32,fed:f32,complete:bool},
+    /// fed (`fed`, 0..1), whether it has just completed (`complete`) and
+    /// where it stands (`at`, heard from there)
+    arsthraxia:struct{progress:f32,fed:f32,complete:bool,at:m.V3=@splat(0)},
     /// the unforming, this frame: its clock, what broke and what withers
     unforming:lib.unforming.Heard,
+    /// where the sounds are heard from now (the view), and which way is right
+    ear:dsp.Ear,
   };
   /// samples per second the sounds are made at
   rate:f32,
@@ -118,6 +122,10 @@ pub const Sounds=struct{
   resDone:bool=false,
   /// the unforming heard, from its first moment until it has rung away
   unformed:?Unformed=null,
+  /// where the sounds are heard from: what places each between the speakers
+  ear:dsp.Ear=.{},
+  /// where the arsthraxia stands
+  resAt:m.V3=@splat(0),
   /// every sound ready to play, seeded from `seed`, at `rate` samples a second
   pub fn init(seed:u64,rate:f32)Sounds{
     // the random numbers, and the wind and music drawn from them
@@ -134,7 +142,7 @@ pub const Sounds=struct{
   pub fn apply(s:*Sounds,cmd:Cmd)void{
     switch(cmd){
       .step=>|f|{
-        s.steps.add(.init(f,&s.r,s.rate));
+        s.steps.add(.init(f,s.ear.pan(f.at),&s.r,s.rate));
         s.sinceStep=0;
         s.weight=f.weight;
       },
@@ -144,7 +152,7 @@ pub const Sounds=struct{
         s.fade.target=if(e)1 else 0;
       },
       .twinkle=>|t|{
-        s.twinkles.cycle(.init(m.clamp01(t.near),&s.r,s.rate));
+        s.twinkles.cycle(.init(m.clamp01(t.near),s.ear.pan(t.at),&s.r,s.rate));
       },
       .daylight=>|d|{
         s.music.daylight(d);
@@ -153,10 +161,11 @@ pub const Sounds=struct{
       .arsthraxia=>|a|{
         s.resProgress=a.progress;
         s.resFed=a.fed;
-        if(a.complete and !s.resDone)s.blooms.cycle(.init(&s.r,s.rate));
+        s.resAt=a.at;
+        if(a.complete and !s.resDone)s.blooms.cycle(.init(s.ear.pan(a.at),&s.r,s.rate));
         s.resDone=a.complete;
         if(a.progress>0 and a.progress<1){
-          if(s.research)|*rs|rs.go()else s.research=.init(&s.r,s.rate);
+          if(s.research)|*rs|rs.go()else s.research=.init(s.ear.pan(a.at),&s.r,s.rate);
         }else if(a.progress==0 and !a.complete){
           if(s.research)|*rs|rs.stop();
         }
@@ -165,16 +174,17 @@ pub const Sounds=struct{
         if(s.unformed==null)s.unformed=.init(h.t,s.r.next(),s.rate);
         s.unformed.?.apply(h);
       },
+      .ear=>|e|s.ear=e,
     }
   }
-  /// the next `out.len` samples: every sounding voice mixed in, those
-  /// that have ended freed, and the whole softly clipped
-  pub fn render(s:*Sounds,out:[]f32)void{
+  /// the next `out.len` frames: every sounding voice mixed in, those
+  /// that have ended freed, and the whole softly clipped, each side
+  pub fn render(s:*Sounds,out:[]dsp.Frame)void{
     s.steps.render(out);
     s.twinkles.render(out);
     s.sap(out);
     if(s.research)|*rs|{
-      if(!rs.render(out,s.resProgress,s.resFed))s.research=null;
+      if(!rs.render(out,s.resProgress,s.resFed,s.ear.pan(s.resAt)))s.research=null;
     }
     s.blooms.render(out);
     if(s.unformed)|*u|{
@@ -182,12 +192,12 @@ pub const Sounds=struct{
     }
     s.wind.render(out);
     s.musics(out);
-    for(out)|*x|x.*=dsp.softClip(x.*);
+    for(out)|*x|x.*=.{dsp.softClip(x[0]),dsp.softClip(x[1])};
   }
   /// the sap settling now and then while in the eyes: counts the samples
   /// since a step, starts the next settling once its wait is up (sooner
   /// while the wolf stands), and mixes it into `out`, faded with the view
-  pub fn sap(s:*Sounds,out:[]f32)void{
+  pub fn sap(s:*Sounds,out:[]dsp.Frame)void{
     // how many samples this block holds
     const n:u32=@intCast(out.len);
     s.sinceStep+|=n;
@@ -205,19 +215,19 @@ pub const Sounds=struct{
     }
   }
   /// the day's and the night's music, mixed into `out` with the hall they
-  /// ring in, a block at a time
-  pub fn musics(s:*Sounds,out:[]f32)void{
+  /// ring in (its tail spread wide round them), a block at a time
+  pub fn musics(s:*Sounds,out:[]dsp.Frame)void{
     // how far into `out` the blocks have reached
     var off:usize=0;
     while(off<out.len){
       // this block's length, and the music alone in it
       const k=@min(hallBlock,out.len-off);
-      var buf:[hallBlock]f32=@splat(0);
+      var buf:[hallBlock]dsp.Frame=@splat(@splat(0));
       s.music.render(buf[0..k]);
       s.night.render(buf[0..k]);
       // how much of it the unforming leaves
       const left=if(s.unformed)|*u|m.lerp(1,hushed,u.hush())else 1;
-      for(out[off..][0..k],buf[0..k])|*o,x|o.*+=(x+hallWet*s.hall.tick(x))*left;
+      for(out[off..][0..k],buf[0..k])|*o,x|o.*+=(x+dsp.mid(hallWet)*s.hall.tick(x))*dsp.mid(left);
       off+=k;
     }
   }

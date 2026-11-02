@@ -48,7 +48,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `weld.zig` — welding a triangle soup into an indexed mesh: a corner that is the very same vertex as one before it (position, normal, colour, tu, role…
 
 ## engine/src/platform/
-- `audio.zig` — sound out: the default WASAPI device pulling blocks from a `dsp` source.
+- `audio.zig` — sound out: the default WASAPI device pulling stereo blocks from a `dsp` source.
 - `display.zig` — fullscreen toggling: borderless on the primary monitor at its native mode, returning to the exact windowed position and size it left.
 - `input.zig` — per-frame input snapshot with edge detection, fed by GLFW.
 
@@ -240,7 +240,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `choir.zig` — the night's choir: sopranos, altos, tenors and basses, eight voices each, singing "ahh" through slow chords.
 - `drums.zig` — the day's drums, played big: taiko struck with heavy sticks, tuned timpani rolled into the phrase, a cymbal swelling to a crash.
 - `footstep.zig` — a footstep: leaf litter rustled and crushed under a paw over a muffled pad.
-- `mixer.zig` — the source the device pulls from: every sound's voices mixed into one stream.
+- `mixer.zig` — the source the device pulls from: every sound's voices mixed into one stereo stream, each heard from where it is (the ear the game tells…
 - `music.zig` — the day's music playing: Lydian phrases of a full piano over open chords, driven by taiko, timpani rolls and cymbal swells, fading with the…
 - `night.zig` — the night's music: a choir of four sections singing "ahh" through slow open chords, strings swelling under it.
 - `night_voices.zig` — the night's strings: a soft ensemble bowing each note of a chord, swelling in and dying away.
