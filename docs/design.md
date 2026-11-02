@@ -395,6 +395,7 @@ Radiance is a field of light that some plants need to live.
 ## The unforming (`game/unforming.zig`): the first world event
 Begun the moment THE UNFORMING (after Celestial Defragmentation; 30 units
 of 3 convergence essence + 3 starlight + 1 ley crystal) is learned.
+The whole event, second by second: [unforming.md](unforming.md).
 - **Radiant plants** (`Lineage.radiant`: bloom, vesper) glitch, shatter like glass and blink
   out, one after another over 6 s, each in 5 s (GPU: `PlantInstance.glitch`,
   plant.vert `unformAt`, plant.frag `unform`; `--plant=bloom --state=unform`).

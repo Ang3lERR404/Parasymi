@@ -28,6 +28,7 @@ idioms and what not to do), every session.
 | the engine package, what is generic, how the game plugs in | [docs/engine.md](docs/engine.md) |
 | adding a structure, species, research, item, mesh, panel, pass, input, string | [docs/recipes.md](docs/recipes.md) (every place to wire it) |
 | gameplay, structures' behaviour, research, saves | [docs/design.md](docs/design.md) |
+| the unforming (the first world event, step by step) | [docs/unforming.md](docs/unforming.md) |
 | how anything looks or moves | [docs/visual.md](docs/visual.md) |
 | a structure mesh / anything that grows | [docs/growth.md](docs/growth.md) |
 | a mesh kit (structure, parasite, convergence, radiant, mineral, sculpt, wolf) | [docs/kits/README.md](docs/kits/README.md) + its `_desc.md` |
