@@ -594,8 +594,9 @@ const tailRings=11;
 const tailLeaves=9;
 /// the leaves the gardener drew over the hide besides its fur: a lock
 /// falling over the -x eye, a collar round the neck with a bib on the
-/// chest, leaves along the sash, thick cuffs over the forearms and a tuft
-/// on each thigh (a flame on the right, a lotus on the left)
+/// chest, thick cuffs over the forearms and a tuft on each thigh (a flame
+/// on the -x one, a lotus on the +x one; the sash's leaves lie on the
+/// belly, wolf_belly)
 fn finery(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4,rng:*engine.core.rng.Rng)Allocator.Error!void{
   // the skull's, the neck's and the chest's frames
   const head=w[bi(.head)];
@@ -623,15 +624,6 @@ fn finery(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4,rng:*engin
   })|row|for(row.xs)|x|{
     try furLeaf(b,s,m.mulPoint(chest,v3(x,row.y,0.12)),dir(chest,v3(x*3,-1,0.25)),row.len*rng.range(0.92,1.08),0.03,0.5,0.35);
   };
-  // leaves along the sash, lying along it toward the hip
-  const from=m.mulPoint(chest,sashFrom);
-  const to=m.mulPoint(w[bi(.pelvis)],sashTo);
-  for([_]f32{0.08,0.3,0.5,0.7,0.88},0..)|k,i|{
-    // the sash's point here, and which side of it the leaf leans
-    const p=m.lerpV(from,to,k);
-    const lean:f32=if(i%2==0)1 else-1;
-    try furLeaf(b,s,p+v3(0,0.006*lean,0.05),m.norm(to-from)+v3(0,0.5*lean,0),0.05*rng.range(0.9,1.1),0.022,0.55,0.4);
-  }
   for(skel.sides,0..)|sd,si|{
     // which way out this side is: -1 left, 1 right
     const x=skel.sign(si);

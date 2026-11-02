@@ -614,7 +614,8 @@ from a distance-to-edge function, so they stay crisp at any size) in
   each forearm up from a clean line at the wrist, a flame tuft on the -x
   thigh and a lotus of petals on the +x one.
 - A sash: a vine wound round the -x upper arm and slung across the front
-  from under that pectoral to the other hip, leaves along it.
+  from under that pectoral to the other hip; where it crosses the belly
+  it lies over it with leaves along it (`wolfBelly`), swelling with it.
 - The claws are leaf tips: green (`pal.wolfClaw`).
 - Digits and claws (`wolfKit.digit`).
 - Eyes set in carved sockets under the brow.

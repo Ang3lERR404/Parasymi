@@ -3,7 +3,8 @@
 //! back sunk in the body so only the swell shows. Convex everywhere, so
 //! its near side (the only side drawn) never folds away. Bare amber, the
 //! wolf's own belly swelling out of the sap panel (as the gardener drew
-//! it); a belly button sits sunk in the sap at the front.
+//! it), the sash's vine crossing it with leaves along it; a belly button
+//! sits sunk in the sap at the front.
 //!
 //! tu.x on every vertex is how much of the gut it is (1 low and in front,
 //! 0 toward the ribs): that share of it moves with the skeleton's gut bone,
@@ -65,6 +66,12 @@ const navelLift:f32=0.86;
 pub fn crossing()V3{
   return v3(0,skel.hipY+skel.waistAt[1],skel.waistAt[2])+surface(navelTh,m.halfPi,1);
 }
+/// points along the sash where it crosses the belly
+const sashPoints=25;
+/// the wolf's kit, whose fur leaves lie along the sash
+const kit=lib.wolfKit;
+/// part roles, to tell the sash's leaves apart
+const vertex=lib.vertex;
 /// the sac's grid: rings from bottom to top
 const rings=30;
 /// the sac's grid: steps round it
@@ -136,7 +143,7 @@ fn lower(yr:f32)m.Vice(f32,2){
 fn reach(yr:f32)m.Vice(f32,2){
   return.{skel.gutGrow[1]*yr+skel.gutShift[1],skel.gutGrowTop[1]*yr+skel.gutShift[1]};
 }
-/// lays the belly: the sac and the belly
+/// lays the belly: the sac, the sash across it with its leaves, and the belly
 /// button, then weights every vertex to the gut and the spine and moves it all
 /// into the waist's place in the bind pose
 pub fn build(b:*mg.Builder)Allocator.Error!void{
@@ -168,8 +175,39 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     vx.tu[0]=share(vx.pos[1]-centre[1])[0];
   }
   // decision: no net of vines over it: the belly is the wolf's own amber
-  // belly as the gardener drew it, bare sap swelling out of the panel
-  for(b.v.items[start..])|*vx|vx.tu[1]=belly;
+  // belly as the gardener drew it, bare sap swelling out of the panel;
+  // only the sash crosses it, from high on the -x side down to the +x
+  // hip (where the body's sash runs on), leaves along it
+  var path:[sashPoints]V3=undefined;
+  var vts:[sashPoints]f32=undefined;
+  var rs:[sashPoints]f32=undefined;
+  for(&path,&vts,&rs,0..)|*p,*t,*r,j|{
+    // how far along the sash this point is, 0..1, and where on the sac
+    const k=m.ratio(j,sashPoints-1);
+    const th=m.lerp(0.78,0.22,k)*m.pi;
+    p.*=surface(th,m.lerp(0.97,0.06,k)*m.pi,1.035);
+    t.*=gut(th);
+    // full thickness across the sac, tapering only where it tucks in at its ends
+    r.*=@max(0.0105*@sqrt(@sin(m.pi*m.lerp(0.06,0.94,k))),0.0005);
+  }
+  try b.tubeR(&path,&vts,&rs,pal.wolfVine,.stem,5);
+  for([_]usize{4,8,12,16,20})|j|{
+    // which side of the sash this leaf leans, and how far up the sac it grows
+    const lean:f32=if(j%8==0)1 else-1;
+    const k=m.ratio(j,sashPoints-1);
+    const th=m.lerp(0.78,0.22,k)*m.pi;
+    const out=normal(th,m.lerp(0.97,0.06,k)*m.pi);
+    const along=m.norm(path[j+1]-path[j-1]);
+    try kit.leaf(b,.{
+      .base=path[j],.along=m.norm(along+m.cross(out,along)*m.splat3(0.6*lean)),.out=out,
+      .len=0.05,.width=0.02,.lift=0.5,.curl=0.4,.cup=0.3,
+      .col=pal.wolfLeafDark,.tip=pal.wolfLeafLite,.t=vts[j],
+    });
+  }
+  // (the leaves keep theirs: it is how far along them, for their stir)
+  for(b.v.items[start..])|*vx|if(vx.part!=@intFromEnum(vertex.Part.leaf)){
+    vx.tu[1]=belly;
+  };
   // the belly button: a small knot of sap sunk in the sac at the front of
   // the gut, a puckered ring of sap around it, all one with the sac
   // how far round from the bottom the belly button sits
