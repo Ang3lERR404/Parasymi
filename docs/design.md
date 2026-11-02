@@ -453,6 +453,12 @@ constellate one alone.
   `plexusSeedWeb`; how many drift in the instance's growth). A click
   (`handOver`) takes one into his keeping. Hover says how many drift and
   how many are still to come.
+- **Parts:** every constellate part is a placeable structure with combo
+  rules: core, petal, leaf, bud and stem, each built of ten fragments, put
+  down floating over its tile (`constellate_part.zig` shares how). Combos
+  so far: four petals onto a core (the yielder). Still to come: leaves and
+  stems fastening at a stem's joints (a sprig), four buds on a stem
+  beginning the heart.
 - **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
   belly panel showing each gardener's own) build a constellate core or a
   constellate petal from ten fragments each.

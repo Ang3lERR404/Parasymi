@@ -120,6 +120,9 @@ pub const hand=[_]Recipe{
   // and four petals (act 2's first yielder)
   .{.out=.constellateCore,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
   .{.out=.constellatePetal,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
+  .{.out=.constellateLeaf,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
+  .{.out=.constellateBud,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
+  .{.out=.constellateStem,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
 };
 /// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}

@@ -103,6 +103,12 @@ pub const Item=enum(u8){
   constellateCore,
   /// a constellate petal of light built of fragments, to snap onto a core
   constellatePetal,
+  /// a constellate leaf of light built of fragments
+  constellateLeaf,
+  /// a constellate bud of light built of fragments
+  constellateBud,
+  /// a constellate stem of light built of fragments, what other parts fasten to
+  constellateStem,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -158,6 +164,9 @@ const infos=EnumArray(Item,Info).init(.{
   .fragment=.{.col=.{150,200,255,255}},
   .constellateCore=.{.col=.{120,170,255,255}},
   .constellatePetal=.{.col=.{170,220,255,255}},
+  .constellateLeaf=.{.col=.{140,215,235,255}},
+  .constellateBud=.{.col=.{180,190,255,255}},
+  .constellateStem=.{.col=.{130,180,240,255}},
 });
 /// one slot's worth: an item and how many of it
 pub const Stack=struct{

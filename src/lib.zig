@@ -30,6 +30,8 @@ pub const specimen=@import("game/specimen.zig");
 pub const unforming=@import("game/unforming.zig");
 /// the garden's two acts: the wolf's, then the star hyena's
 pub const act=@import("game/act.zig");
+/// what every constellate part put down shares: floating over its tile
+pub const constellatePart=@import("game/structures/constellate_part.zig");
 /// the weather: the rain the air rains soaking back into the ground
 pub const weather=@import("game/weather.zig");
 /// moss grown in the garden by its creepers, kept and laid on each chunk

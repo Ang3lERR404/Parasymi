@@ -21,6 +21,8 @@ const txt=lib.txt;
 const prog=lib.progression;
 /// the HUD's shared sizes and colours
 const style=lib.style;
+/// what every constellate part put down shares: its bob, its bulb's colours
+const part=lib.constellatePart;
 /// the tools a bulb icon is drawn with
 const iconKit=lib.icon;
 /// the scene's list of moving parts it draws itself into
@@ -42,10 +44,6 @@ pub const drifting:f32=6;
 /// higher than where it floats alone (part.vert `PLEXUS_YIELD_OUT`, and
 /// `PLEXUS_YIELD_MIDDLE` less a lone petal's foot)
 const rim=m.v3(0.5,0.43,0);
-/// how far it bobs as it floats (m), and how fast (rad/s)
-const bob:f32=0.04;
-/// how fast it bobs (rad/s)
-const bobRate:f32=0.9;
 /// what a petal put down remembers: the core it drifts to (none: it waits),
 /// where that core stands, and how far over it has come
 pub const State=struct{
@@ -104,7 +102,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   const at=if(q.to==null)from else m.lerpV(from,there,e);
   // facing out from the core as it comes over
   const face=if(q.to==null)s.seed*m.tau else m.atan2(out1[0],out1[2]);
-  const y=bob*@sin(tf*bobRate+s.seed*9)*(1-e);
+  const y=part.bob*@sin(tf*part.bobRate+s.seed*9)*(1-e);
   try out.emit(.constellatePetal,m.chain(&.{m.translate(at+m.v3(0,y,0)),m.rotY(face)}),.{.phase=s.seed,.fade=1-0.6*e*e});
 }
 /// its line in the panel: drifting over to a core, or waiting for one
@@ -113,14 +111,10 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
 }
 /// its bulb: one petal of light, glowing
 pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
-  try ic.glow(.{0,0.5},0.35,iconGlow);
-  try ic.leaf(.{0,0.25},m.halfPi,0.5,0.18,iconPetal,1);
+  try ic.glow(.{0,0.5},0.35,part.iconGlow);
+  try ic.leaf(.{0,0.25},m.halfPi,0.5,0.18,part.iconLight,1);
   try ic.coat(col);
 }
-/// the icon's glow: deep blue, soft
-const iconGlow:Color=.{60,110,255,80};
-/// the icon's petal: pale sea-glass blue
-const iconPetal:Color=.{150,210,255,220};
 test"a petal drifts over in `drifting` seconds and no further"{
   try testing.expectApproxEqAbs(@as(f32,0.5),drift(0,drifting/2),1e-5);
   try testing.expectEqual(@as(f32,1),drift(0.9,drifting));

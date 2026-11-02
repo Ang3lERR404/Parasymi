@@ -497,6 +497,8 @@ pub const Strings=struct{
     petalWaiting:S="",
     /// a constellate petal drifting over to the core it merges with
     petalDrifting:S="",
+    /// a constellate part put down that nothing has taken in yet
+    partFloats:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",
     /// a weftstone ionizing a ley crystal

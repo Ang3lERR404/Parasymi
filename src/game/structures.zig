@@ -204,6 +204,12 @@ pub const kinds=struct{
   pub const yielder=@import("structures/yielder.zig");
   /// a constellate petal put down alone, drifting to a core nearby
   pub const petal=@import("structures/petal.zig");
+  /// a constellate leaf put down alone, floating
+  pub const leaf=@import("structures/leaf.zig");
+  /// a constellate bud put down alone, floating
+  pub const bud=@import("structures/bud.zig");
+  /// a constellate stem put down alone, floating: what other parts fasten to
+  pub const stem=@import("structures/stem.zig");
   /// a polyp's stemless flower put down as a floating light
   pub const driftFlower=@import("structures/drift_flower.zig");
   /// the mist tree, breathing moisture into the air
