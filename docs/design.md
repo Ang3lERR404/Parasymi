@@ -437,8 +437,9 @@ The whole event, second by second: [unforming.md](unforming.md).
 
 ## Act 2: the star hyena
 A garden has two acts (`game/act.zig`, `Game.act`, saved). The second
-comes only after the unforming: once the wolf roots himself into the
-garden's tree (not yet in the game; `--act2` begins there, the unforming
+comes only after the unforming: once the wolf, with the convergent
+lineage alone, has made the world rain and storm, he roots himself into
+the garden's tree (not yet in the game; `--act2` begins there, the unforming
 run through and its seed in his keeping), the gardener is the star hyena,
 a living constellation (constellate webs on 28 bones, `--samples=constellateHyena`)
 who never walks but hovers, leaning into his motion, his steps silent, the

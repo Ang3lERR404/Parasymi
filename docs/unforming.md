@@ -9,6 +9,24 @@ Code: `src/game/unforming.zig` (the event), `src/game/research/unforming.zig`
 (the study that starts it). Summary in [design.md](design.md#the-unforming-gameunformingzig-the-first-world-event);
 looks in [visual.md](visual.md#sky); watching it in [testing.md](testing.md#the-unforming).
 
+## The story (the gardener's account)
+- A study unlocks once the **polyp** is planted. The polyp is convergent,
+  woven by a **monfris** (or a germinator; never by hand).
+- Learning it kills every **symbiotic** and **parasitic** plant.
+- Every **radiant** plant glitches in and out of reality, then is gone.
+- At the middle point of where they stood, a **seed** forms. It leads to
+  the new lineage: the **constellate**.
+- **Look up during it:** the sky shatters, the plexus spreading across the
+  whole of it. The sun and moon disappear, and the world takes on an
+  otherworldly glow.
+- The **ley lines** seal up. The **ley shards** shatter into fine pieces,
+  then disappear from reality too.
+- The **stars** that fall at night shatter as they hit the ground and stop
+  falling altogether.
+- Afterwards only the **convergent** lineage is left. With it alone the
+  wolf has to make the world **rain** and **storm**; only then does he
+  root himself into the garden's tree, and act 2 begins.
+
 ## How it is reached
 1. **Four blooms** round an empty tile form a halo, and a **diamond** is
    born over it. That opens CELESTIAL DEFRAGMENTATION.
@@ -81,8 +99,10 @@ The phases (`Phase`) are `waiting` → `shattering` → `falling` → `landed`.
   90 s.
 - Weather research (root wells, moss creeping, mire blooming) needs the
   unforming and the first rain.
-- **Act 2**: once the wolf roots into the garden's tree (not yet in the
-  game), the star hyena takes over.
+- **Act 2**: once the wolf, with the convergent lineage alone, has made
+  the world rain (`firstRain`) and storm (`firstStorm`, the storm spire),
+  he roots himself into the garden's tree and the star hyena takes over.
+  The rooting is not yet in the game.
 
 ## Where it is drawn
 All dense work is on the GPU:
