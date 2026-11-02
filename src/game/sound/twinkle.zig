@@ -101,10 +101,13 @@ pub const Twinkle=struct{
   at:u32=0,
   /// its loudness, for how near the mote is
   gain:f32,
-  /// a fresh twinkle for a mote `near` (0 far .. 1 touching) heard at
-  /// `pan` (-1 left .. 1 right): its pings' count, pitches, spacing and
-  /// scatter round it drawn from `r`
-  pub fn init(near:f32,pan:f32,r:*rng.Rng,rate:f32)Twinkle{
+  /// how it is heard: from its mote, as high, behind or hidden as that is
+  sp:dsp.Spatial,
+  /// a fresh twinkle for a mote `near` (0 far .. 1 touching) heard as `h`:
+  /// its pings' count, pitches, spacing and scatter round it drawn from `r`
+  pub fn init(near:f32,h:dsp.Heard,r:*rng.Rng,rate:f32)Twinkle{
+    // where it is heard
+    const pan=h.pan;
     // how many pings sound
     const n=pingRange[0]+r.below(pingRange[1]-pingRange[0]+1);
     // the pings, filled in below
@@ -138,16 +141,23 @@ pub const Twinkle=struct{
       .shimmer=.{.rate=rate,.freq=vary(r,shimmerHz)},
       .soft=.init(twinkleSoftHz,rate),
       .gain=m.lerp(twinkle[0],twinkle[1],near),
+      // decision: its loudness already falls with how near the mote is,
+      // so distance only darkens it and sends it to the echo
+      .sp=.init(.{.pan=h.pan,.cutoff=h.cutoff,.notch=h.notch,.send=h.send,.gain=h.shade,.shade=h.shade},rate),
     };
   }
-  /// mixes the twinkle into `out`; false once it has ended
-  pub fn render(t:*Twinkle,out:[]dsp.Frame)bool{
-    for(out)|*s|{
+  /// mixes the twinkle into `out`, what reaches the place's echo into
+  /// `send`; false once it has ended
+  pub fn render(t:*Twinkle,out:[]dsp.Frame,send:[]f32)bool{
+    for(out,send)|*s,*e|{
       // the pings summed this sample, each in its place
       var y:dsp.Frame=@splat(0);
       for(t.pings[0..t.n])|*p|y+=p.tick(t.at);
       t.at+|=1;
-      s.*+=t.soft.low(y)*dsp.mid((1-shimmer+shimmer*t.shimmer.next())*t.gain);
+      // the twinkle as it reaches the ear
+      const h=t.sp.tick(t.soft.low(y)*dsp.mid((1-shimmer+shimmer*t.shimmer.next())*t.gain));
+      s.*+=h.dry;
+      e.*+=h.send;
     }
     for(t.pings[0..t.n])|p|if(!p.done())return true;
     return false;

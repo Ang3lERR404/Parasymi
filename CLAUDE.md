@@ -52,9 +52,8 @@ When a change alters what one of these says, update it in the same commit.
   substitute, never a stand-in called done. If it can't be done as
   described, research another way that delivers exactly that. Ambiguous →
   ask. "Off", "weak", "generic", "too X" is the acceptance criterion.
-- **Scope guard**: no multiplayer, PBR/IBL, further post-processing
-  or Linux/macOS without explicit direction; flag and stop if a task drifts
-  there.
+- **Scope guard**: no multiplayer, PBR/IBL or Linux/macOS without
+  explicit direction; flag and stop if a task drifts there.
 - **Decision authority**: a layer boundary or build/run interface change →
   stop and ask; otherwise decide and note with `// decision:`.
 - **Plant rule**: everything grown has a proper growing animation, is moved

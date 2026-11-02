@@ -455,6 +455,12 @@ pub const Game=struct{
   }
   /// one frame of play (`frame.update`)
   pub const update=lib.play.frame.update;
+  /// where the game is heard from (`hearing.ear`)
+  pub const ear=lib.play.hearing.ear;
+  /// the echo of the place it is heard from (`hearing.space`)
+  pub const space=lib.play.hearing.space;
+  /// how much the ground hides a sound somewhere (`hearing.muffle`)
+  pub const muffle=lib.play.hearing.muffle;
   /// what the arsthraxia's sound plays now (`belly.arsthraxiaState`)
   pub const arsthraxiaState=lib.play.belly.arsthraxiaState;
   /// the view is in the wolf's eyes, its head hidden (`belly.headless`)

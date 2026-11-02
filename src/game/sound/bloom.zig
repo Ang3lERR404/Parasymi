@@ -92,6 +92,9 @@ pub const Bloom=struct{
   bellSoft:dsp.StereoPole,
   /// where the root and the breath are heard: at the flower
   heart:dsp.Frame,
+  /// how all of it is heard: from the flower, as far, behind, high or
+  /// hidden as that is
+  sp:dsp.Spatial,
   /// the root's sine
   root:dsp.Sine,
   /// how much of the root's level it keeps a sample, falling
@@ -106,9 +109,11 @@ pub const Bloom=struct{
   at:u32=0,
   /// its loudness, varied a little each time
   gain:f32,
-  /// a fresh bloom where the flower is heard (`pan`), its bells' rings and
-  /// its loudness drawn from `r`
-  pub fn init(pan:f32,r:*rng.Rng,rate:f32)Bloom{
+  /// a fresh bloom heard from the flower as `h`, its bells' rings and its
+  /// loudness drawn from `r`
+  pub fn init(h:dsp.Heard,r:*rng.Rng,rate:f32)Bloom{
+    // its side
+    const pan=h.pan;
     // the bells, filled in below
     var bs:[bellNote.len]Bell=undefined;
     for(&bs,bellNote,bellLevel,0..)|*b,note,lv,i|{
@@ -130,6 +135,7 @@ pub const Bloom=struct{
       .bells=bs,
       .bellSoft=.init(bellSoftHz,rate),
       .heart=dsp.spot(pan),
+      .sp=.init(h,rate),
       .root=.init(dsp.noteToHz(rootNote),rate),
       .rootKeep=dsp.fall(rootFall,rate),
       .noise=.init(r.next()),
@@ -140,8 +146,8 @@ pub const Bloom=struct{
   /// mixes the next `out.len` samples into `out`: the bells ringing in one
   /// above the next, the root swelling under them, the breath rushing up;
   /// returns false once all of it has rung out
-  pub fn render(b:*Bloom,out:[]dsp.Frame)bool{
-    for(out)|*s|{
+  pub fn render(b:*Bloom,out:[]dsp.Frame,send:[]f32)bool{
+    for(out,send)|*s,*e|{
       // seconds since it began
       const t=m.f(b.at)/b.rate;
       // the bells summed, each in its place, and whether any still rings
@@ -175,7 +181,10 @@ pub const Bloom=struct{
         const env=@sin(m.pi*m.pow(f32,x,0.6));
         br=b.breath.tick(b.noise.next())*env*env;
       }
-      s.*+=(b.bellSoft.low(bl)*dsp.mid(bells)+dsp.put(b.heart,rt*root+br*breath))*dsp.mid(b.gain);
+      // all of it as it reaches the ear
+      const h=b.sp.tick((b.bellSoft.low(bl)*dsp.mid(bells)+dsp.put(b.heart,rt*root+br*breath))*dsp.mid(b.gain));
+      s.*+=h.dry;
+      e.*+=h.send;
       b.at+|=1;
       if(!alive and t>breathLen and b.rootAmp<silent)return false;
     }

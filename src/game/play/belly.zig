@@ -26,6 +26,8 @@ const headClear=lib.play.headClear;
 const Held=lib.play.Held;
 /// a stack put down within one inventory goes as far as it fits
 const stackAny=lib.play.stackAny;
+/// how high over its ground the arsthraxia's flower is heard (m): its crown
+const flowerHeard:f32=1.5;
 /// UI time wraps after this many seconds
 const uiWrap=lib.play.uiWrap;
 /// what the arsthraxia's sound should play now: its study's progress, how
@@ -37,7 +39,9 @@ pub fn arsthraxiaState(g:*const Game)?lib.sound.Sounds.Cmd{
     // its state
     const a=&s.state.arsthraxia;
     if(!a.lab.active and a.flare<=0)return null;
-    return.{.arsthraxia=.{.progress=a.lab.t,.fed=a.fed,.complete=a.flare>0.9,.at=s.at}};
+    // where its flower is heard from: over the ground it stands on
+    const at=m.v3(s.at[0],g.heightAt(s.x,s.y)+flowerHeard,s.at[2]);
+    return.{.arsthraxia=.{.progress=a.lab.t,.fed=a.fed,.complete=a.flare>0.9,.at=at,.muffle=g.muffle(at)}};
   }
   return null;
 }

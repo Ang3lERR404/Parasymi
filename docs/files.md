@@ -160,6 +160,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `belly.zig` — what the wolf carries: the hotbar, the belly and an opened structure's slots.
 - `frame.zig` — one frame of play: input read into actions, the camera, the HUD's picks.
 - `game.zig` — the game: what it owns, starting and ending it, and the fixed-tick step.
+- `hearing.zig` — where the garden is heard from and how: the ear (the view's), the echo of the place it stands in (the ground rising round it, structures…
 - `menus.zig` — the pause menu, the saved gardens, naming a garden, inspecting and flying.
 - `pointer.zig` — the HUD under the mouse, the keys and the pad: a row clicks as mouse1 goes down on it, or (a button) as mouse1 is let go over the row it…
 - `tests_belly.zig` — play tested: a germinator's panel, carrying and discarding stacks.

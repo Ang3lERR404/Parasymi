@@ -58,6 +58,14 @@ const hallDamp:f32=4500;
 const hallWet:f32=0.6;
 /// samples the music is rendered at a time before the hall
 const hallBlock=256;
+/// frames rendered at a time, each block's echo sent as it plays
+const airBlock=512;
+/// how soon the place's echo answers (s): near things answer near
+const airPre:f32=0.012;
+/// how long the echo takes to become a new place's (s, ~63%)
+const airGlide:f32=0.8;
+/// how far (a share) the echo glides before it is retuned
+const airRetune:f32=0.02;
 /// a span of seconds drawn as samples
 const samples=lib.sound.sap.samples;
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
@@ -65,22 +73,24 @@ pub const Sounds=struct{
   /// a paw landed; the view entered or left the wolf's eyes; a mote near
   /// the wolf twinkled; the daylight changed (0 night .. 1 day); the ear moved
   pub const Cmd=union(enum){
-    /// a paw came down
-    step:Footfall,
+    /// a paw came down, `muffle` (0..1) of the way to it hidden
+    step:struct{fall:Footfall,muffle:f32=0},
     /// the view entered (true) or left (false) the wolf's eyes
     eyes:bool,
-    /// a mote of starlight near the wolf twinkled
-    twinkle:lib.sky.Twinkle,
+    /// a mote of starlight near the wolf twinkled, `muffle` (0..1) of the way to it hidden
+    twinkle:struct{mote:lib.sky.Twinkle,muffle:f32=0},
     /// the daylight changed (0 night .. 1 day)
     daylight:f32,
     /// the arsthraxia's working: how far along (`progress`, 0..1), how well
     /// fed (`fed`, 0..1), whether it has just completed (`complete`) and
-    /// where it stands (`at`, heard from there)
-    arsthraxia:struct{progress:f32,fed:f32,complete:bool,at:m.V3=@splat(0)},
+    /// where it stands (`at`, heard from there, `muffle` of the way to it hidden)
+    arsthraxia:struct{progress:f32,fed:f32,complete:bool,at:m.V3=@splat(0),muffle:f32=0},
     /// the unforming, this frame: its clock, what broke and what withers
     unforming:lib.unforming.Heard,
     /// where the sounds are heard from now (the view), and which way is right
     ear:dsp.Ear,
+    /// the echo of the place they are heard in now
+    space:dsp.Space,
   };
   /// samples per second the sounds are made at
   rate:f32,
@@ -126,6 +136,19 @@ pub const Sounds=struct{
   ear:dsp.Ear=.{},
   /// where the arsthraxia stands
   resAt:m.V3=@splat(0),
+  /// how much of the way to it is hidden
+  resMuffle:f32=0,
+  /// the place's echo all that is heard in the world rings in
+  air:dsp.Hall,
+  /// the echo the place has now, gliding to the one it is told
+  /// (this one: how long it rings, s)
+  airRing:dsp.Smooth,
+  /// (how much of it is heard)
+  airWet:dsp.Smooth,
+  /// (what darkens it, Hz)
+  airDamp:dsp.Smooth,
+  /// the ringing and darkening the echo was last tuned to
+  airTuned:m.Vice(f32,2),
   /// every sound ready to play, seeded from `seed`, at `rate` samples a second
   pub fn init(seed:u64,rate:f32)Sounds{
     // the random numbers, and the wind and music drawn from them
@@ -133,7 +156,15 @@ pub const Sounds=struct{
     const wind:Wind=.init(&r,rate);
     const music:Music=.init(&r,rate);
     const night:Night=.init(&r,rate);
-    return.{.rate=rate,.r=r,.fade=.init(0,sapFade,rate),.wind=wind,.music=music,.night=night,.hall=.init(hallRt60,hallPre,hallDamp,rate)};
+    // the place's echo to start with
+    const sp:dsp.Space=.{};
+    return.{.rate=rate,.r=r,.fade=.init(0,sapFade,rate),.wind=wind,.music=music,.night=night,.hall=.init(hallRt60,hallPre,hallDamp,rate),
+      .air=.init(sp.rt60,airPre,sp.dampHz,rate),
+      .airRing=.init(sp.rt60,airGlide,rate),
+      .airWet=.init(sp.wet,airGlide,rate),
+      .airDamp=.init(sp.dampHz,airGlide,rate),
+      .airTuned=.{sp.rt60,sp.dampHz},
+    };
   }
   /// what happened, heard: a step takes a voice, the eyes fade the
   /// settling in or out, a twinkle takes a slot, daylight sets the day's
@@ -141,8 +172,10 @@ pub const Sounds=struct{
   /// and the arsthraxia's work starts, follows or fades its voice and rings its bloom
   pub fn apply(s:*Sounds,cmd:Cmd)void{
     switch(cmd){
-      .step=>|f|{
-        s.steps.add(.init(f,s.ear.pan(f.at),&s.r,s.rate));
+      .step=>|st|{
+        // the paw that fell
+        const f=st.fall;
+        s.steps.add(.init(f,s.ear.hear(f.at,st.muffle),&s.r,s.rate));
         s.sinceStep=0;
         s.weight=f.weight;
       },
@@ -151,8 +184,10 @@ pub const Sounds=struct{
         s.eyes=e;
         s.fade.target=if(e)1 else 0;
       },
-      .twinkle=>|t|{
-        s.twinkles.cycle(.init(m.clamp01(t.near),s.ear.pan(t.at),&s.r,s.rate));
+      .twinkle=>|tw|{
+        // the mote that twinkled
+        const t=tw.mote;
+        s.twinkles.cycle(.init(m.clamp01(t.near),s.ear.hear(t.at,tw.muffle),&s.r,s.rate));
       },
       .daylight=>|d|{
         s.music.daylight(d);
@@ -162,10 +197,11 @@ pub const Sounds=struct{
         s.resProgress=a.progress;
         s.resFed=a.fed;
         s.resAt=a.at;
-        if(a.complete and !s.resDone)s.blooms.cycle(.init(s.ear.pan(a.at),&s.r,s.rate));
+        s.resMuffle=a.muffle;
+        if(a.complete and !s.resDone)s.blooms.cycle(.init(s.ear.hear(a.at,a.muffle),&s.r,s.rate));
         s.resDone=a.complete;
         if(a.progress>0 and a.progress<1){
-          if(s.research)|*rs|rs.go()else s.research=.init(s.ear.pan(a.at),&s.r,s.rate);
+          if(s.research)|*rs|rs.go()else s.research=.init(s.ear.hear(a.at,a.muffle),&s.r,s.rate);
         }else if(a.progress==0 and !a.complete){
           if(s.research)|*rs|rs.stop();
         }
@@ -175,24 +211,60 @@ pub const Sounds=struct{
         s.unformed.?.apply(h);
       },
       .ear=>|e|s.ear=e,
+      .space=>|sp|{
+        s.airRing.target=sp.rt60;
+        s.airWet.target=sp.wet;
+        s.airDamp.target=sp.dampHz;
+      },
     }
   }
   /// the next `out.len` frames: every sounding voice mixed in, those
   /// that have ended freed, and the whole softly clipped, each side
   pub fn render(s:*Sounds,out:[]dsp.Frame)void{
-    s.steps.render(out);
-    s.twinkles.render(out);
+    // how far into `out` the blocks have reached
+    var off:usize=0;
+    while(off<out.len){
+      // this block's length
+      const k=@min(airBlock,out.len-off);
+      s.block(out[off..][0..k]);
+      off+=k;
+    }
+  }
+  /// one block of `render` (at most `airBlock` frames): what is heard in
+  /// the world sends to the place's echo as it plays
+  fn block(s:*Sounds,out:[]dsp.Frame)void{
+    // what reaches the place's echo this block
+    var sendBuf:[airBlock]f32=@splat(0);
+    const send=sendBuf[0..out.len];
+    s.steps.renderSent(out,send);
+    s.twinkles.renderSent(out,send);
     s.sap(out);
     if(s.research)|*rs|{
-      if(!rs.render(out,s.resProgress,s.resFed,s.ear.pan(s.resAt)))s.research=null;
+      if(!rs.render(out,send,s.resProgress,s.resFed,s.ear.hear(s.resAt,s.resMuffle)))s.research=null;
     }
-    s.blooms.render(out);
+    s.blooms.renderSent(out,send);
+    s.echo(out,send);
     if(s.unformed)|*u|{
       if(!u.render(out))s.unformed=null;
     }
     s.wind.render(out);
     s.musics(out);
     for(out)|*x|x.*=.{dsp.softClip(x[0]),dsp.softClip(x[1])};
+  }
+  /// the place's echo of what `send` holds, mixed into `out`, gliding to the
+  /// echo the place has now
+  pub fn echo(s:*Sounds,out:[]dsp.Frame,send:[]const f32)void{
+    for(out,send)|*o,x|{
+      _=s.airRing.next();
+      _=s.airDamp.next();
+      o.*+=s.air.tick(dsp.mid(x))*dsp.mid(s.airWet.next());
+    }
+    // retuned once it has glided far enough from the last
+    const now=m.Vice(f32,2){s.airRing.value,s.airDamp.value};
+    if(@abs(now[0]-s.airTuned[0])>airRetune*now[0] or @abs(now[1]-s.airTuned[1])>airRetune*now[1]){
+      s.air.ring(now[0],now[1],s.rate);
+      s.airTuned=now;
+    }
   }
   /// the sap settling now and then while in the eyes: counts the samples
   /// since a step, starts the next settling once its wait is up (sooner

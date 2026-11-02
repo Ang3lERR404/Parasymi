@@ -241,13 +241,18 @@ pub const Research=struct{
   outer:dsp.Frame,
   /// (the cup's)
   cup:dsp.Frame,
+  /// how all of it is heard: from the flower, as far, behind, high or
+  /// hidden as that is, following as it or the ear moves
+  sp:dsp.Spatial,
   /// samples played so far (wraps), for when to retune the glass's low-pass
   at:u32=0,
   /// this voice's loudness, varied a little each time
   gain:f32,
-  /// a fresh voice humming in where the flower is heard (`pan`), its
-  /// glasses, wisps and loudness drawn from `r`
-  pub fn init(pan:f32,r:*rng.Rng,rate:f32)Research{
+  /// a fresh voice humming in, heard from the flower as `h`, its glasses,
+  /// wisps and loudness drawn from `r`
+  pub fn init(h:dsp.Heard,r:*rng.Rng,rate:f32)Research{
+    // its side
+    const pan=h.pan;
     // its own random numbers, drawn first
     var own:rng.Rng=.init(r.next());
     // the two glasses, each its whorl's own
@@ -277,6 +282,7 @@ pub const Research=struct{
       .heart=dsp.spot(pan),
       .outer=dsp.spot(pan-glassApart),
       .cup=dsp.spot(pan+glassApart),
+      .sp=.init(h,rate),
       .gain=vary(r,res),
     };
   }
@@ -286,19 +292,20 @@ pub const Research=struct{
   pub fn go(rs:*Research)void{rs.level.target=1;}
   /// mixes the next `out.len` samples into `out`, the core swelling with
   /// the unit's `progress` (0..1), all of it brighter, quicker and a little
-  /// louder as it is `fed` (0..1), heard gliding toward `pan`; returns
-  /// false once it has faded away
-  pub fn render(rs:*Research,out:[]dsp.Frame,progress:f32,fed:f32,pan:f32)bool{
+  /// louder as it is `fed` (0..1), heard gliding toward `h`, what reaches
+  /// the place's echo into `send`; returns false once it has faded away
+  pub fn render(rs:*Research,out:[]dsp.Frame,send:[]f32,progress:f32,fed:f32,h:dsp.Heard)bool{
     // how fast the glass beats, how bright it is, and how loud the core is, for this feed and progress
     const speed=1+glassBeatFed*fed;
     const bright=m.lerp(glassSoftHz[0],glassSoftHz[1],fed);
     rs.coreSwell.target=m.lerp(coreFrom,1,m.smooth(m.clamp01(progress)));
-    rs.pan.target=pan;
+    rs.pan.target=h.pan;
+    rs.sp.follow(h);
     // how far the thrum's pitch moves on one sample
     const thStep=thrumRate/rs.rate;
     // the thrum's resting pitch
     const thHz=dsp.noteToHz(thrumNote);
-    for(out)|*s|{
+    for(out,send)|*s,*e|{
       // where it is heard this sample
       const p=rs.pan.next();
       if(rs.at%retune==0){
@@ -332,7 +339,10 @@ pub const Research=struct{
       }
       // all of it mixed at the voice's level: the glasses either side, thrum and core at its heart
       const y=(dsp.put(rs.outer,gl[0])+dsp.put(rs.cup,gl[1]))*dsp.mid(glass)+dsp.put(rs.heart,th*thrum+cr*core*rs.coreSwell.next())+ws*dsp.mid(wisp);
-      s.*+=y*dsp.mid(rs.gain*rs.level.next()*(1+resFed*fed));
+      // as it reaches the ear
+      const heard=rs.sp.tick(y*dsp.mid(rs.gain*rs.level.next()*(1+resFed*fed)));
+      s.*+=heard.dry;
+      e.*+=heard.send;
     }
     return rs.level.target>0 or rs.level.value>fadeSilent;
   }

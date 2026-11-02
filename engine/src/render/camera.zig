@@ -197,6 +197,19 @@ pub const Camera=struct{
       .eyes=>|y|m.lerpV(c.eye(),y.pos,m.smooth(y.k)),
     };
   }
+  /// where the view hears from: what it follows (a third-person game's
+  /// ears are its player's, turned as the view turns), the eyes it looks
+  /// out of, or wherever it flies
+  // decision: not the orbit eye: from up there everything would be heard
+  // far off and below, the wolf's own steps most of all
+  pub fn hearing(c:*const Camera)m.V3{
+    return switch(c.view){
+      .follow=>c.target,
+      .free=>|f|f.pos,
+      .returning=>|r|m.lerpV(c.target,r.from.pos,1-m.smooth(m.clamp01(r.t/returnTime))),
+      .eyes=>|y|m.lerpV(c.target,y.pos,m.smooth(y.k)),
+    };
+  }
   /// the way the view's right hand points along the ground (what it hears
   /// to its right); while easing back from flying free, blended between the
   /// two, so a little shorter half way

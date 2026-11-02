@@ -27,6 +27,8 @@ pub const frame=@import("play/frame.zig");
 pub const belly=@import("play/belly.zig");
 /// the menus: pause, options, saved gardens, the name prompt
 pub const menus=@import("play/menus.zig");
+/// where the garden is heard from: the ear, the place's echo, what hides a sound
+pub const hearing=@import("play/hearing.zig");
 /// the HUD by mouse, keys and pad: clicks, drags, focus, typing
 pub const pointer=@import("play/pointer.zig");
 /// the menus' tests
@@ -207,6 +209,7 @@ test{
   _=frame;
   _=belly;
   _=menus;
+  _=hearing;
   _=testsMenu;
   _=testsBelly;
   _=testsPlace;

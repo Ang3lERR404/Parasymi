@@ -140,7 +140,7 @@ The same holds outside the maths:
 | `[n]?Voice` with a free-slot search, a turn counter and a render-and-drop loop | `dsp.Pool(Voice,n)`: `add` (free, else the oldest), `cycle` (always the next in turn), `addFree`, `render`, `clear` |
 | `@exp(-1/(seconds*rate))` | `dsp.fall(seconds,rate)` |
 | a sound's pan worked out per sample, or `.{x,x}` | `dsp.spot(p)` once, then `dsp.put(gains,x)`; `dsp.mid(x)` for the middle |
-| a sound's pan from where it is in the world | `ear.pan(at)` (the mixer's `dsp.Ear`, told each frame from the camera) |
+| a sound's pan from where it is in the world | `ear.hear(at,muffle)` into a `dsp.Spatial` (the mixer's `dsp.Ear`, told each frame from the camera; `muffle` from `game.muffle(at)`) |
 | `r=if(there)@min(1,r+grow)else@max(0,r-wither)` | `r=st.reaching(r,there,grow,wither)` |
 | a spore flight, launch, homecoming, count or drawing of its own | the sporecaster's `drift`, `launchSpore`, `bringHome`, `aloft`, `emitSpores` over a `caster.Air` |
 

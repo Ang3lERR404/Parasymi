@@ -337,12 +337,15 @@ pub fn main(init:Init)!void{
     const screen=r.extent();
     try game.update(&input,@floatCast(dt),screen);
     // the sounds are heard from the view, told first so this frame's are placed from it
-    if(sounds)|o|o.send(.{.ear=.{.at=game.cam.viewEye(),.side=game.cam.side()}})catch|e|log.warn("ear: {t}",.{e});
+    if(sounds)|o|{
+      o.send(.{.ear=game.ear()})catch|e|log.warn("ear: {t}",.{e});
+      o.send(.{.space=game.space()})catch|e|log.warn("space: {t}",.{e});
+    }
     for(game.player.footfalls())|ff|if(ff)|f|if(sounds)|o|if(lib.act.steps(game.act)){
-      o.send(.{.step=f})catch|e|log.warn("footstep: {t}",.{e});
+      o.send(.{.step=.{.fall=f,.muffle=game.muffle(f.at)}})catch|e|log.warn("footstep: {t}",.{e});
     };
     if(game.stars.twinkled())|t|if(sounds)|o|{
-      o.send(.{.twinkle=t})catch|e|log.warn("twinkle: {t}",.{e});
+      o.send(.{.twinkle=.{.mote=t,.muffle=game.muffle(t.at)}})catch|e|log.warn("twinkle: {t}",.{e});
     };
     // the day's music follows the daylight
     if(@abs(game.sky.daylight()-toldDay)>dayTold)if(sounds)|o|{

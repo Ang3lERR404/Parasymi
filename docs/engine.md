@@ -30,6 +30,15 @@ adds on top.
   listener is and which way is its right) turns a place in the world into
   a pan. `StereoPole` and `StereoBiquad` filter both sides at once, each
   its own, and `Pool` voices render into frames.
+  Heard in space: `Ear.hear(at,muffle)` gives a `Heard` (side; loudness
+  falling 6 dB a doubling past 2 m; the air darkening it with distance;
+  the head's shade behind; `muffle`, how much of the way is hidden,
+  darkening and quieting it; the ear's notch carved higher the higher it
+  is, and the ground darkening what is under; how much reaches the
+  place's echo). A `Spatial` plays a sound so (`mono`, or `tick` for one
+  already placed), gliding as it moves (`follow`), and sends a share to
+  the echo (`Pool.renderSent`). A `Space` is a place's echo (ring, wet,
+  damping); `Hall.ring` retunes a hall without losing what it holds.
 - Game: nothing.
 
 ### platform

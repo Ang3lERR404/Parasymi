@@ -70,7 +70,7 @@ fn hear(f:Footfall,seed:u64)struct{peak:f32,rms:f32,len:f32}{
   // the sounds, with the wind hushed so the step is heard alone
   var s:Sounds=.init(seed,testRate);
   s.wind.level=0;
-  s.apply(.{.step=f});
+  s.apply(.{.step=.{.fall=f}});
   // a block of samples, the step's peak, its sum of squares, and samples heard
   var buf:[480]Frame=undefined;
   var peak:f32=0;
@@ -103,7 +103,7 @@ test"steps vary, a busy pool steals the oldest, and it ends silent"{
   // the sounds, with the wind hushed
   var s:Sounds=.init(9,testRate);
   s.wind.level=0;
-  for(0..voiceCount+2)|_|s.apply(.{.step=.{.weight=0.5,.pace=0.5}});
+  for(0..voiceCount+2)|_|s.apply(.{.step=.{.fall=.{.weight=0.5,.pace=0.5}}});
   for(s.steps.slots)|v|try testing.expect(v!=null);
   try testing.expect(s.steps.slots[0].?.gain!=s.steps.slots[1].?.gain);
   // a block of samples
@@ -113,7 +113,8 @@ test"steps vary, a busy pool steals the oldest, and it ends silent"{
     s.render(&buf);
   }
   for(s.steps.slots)|v|try testing.expect(v==null);
-  for(buf)|x|try testing.expectEqual(@as(f32,0),loud(x));
+  // (only the place's echo's last whisper is left)
+  for(buf)|x|try testing.expect(loud(x)<1e-6);
 }
 test"the sap settles only in the eyes, softly, and fades out with the view"{
   // the sounds, with the wind hushed
@@ -168,7 +169,7 @@ test"a twinkle is a few soft high pings, louder the nearer, and ends"{
     // the sounds, with the wind hushed
     var s:Sounds=.init(11,testRate);
     s.wind.level=0;
-    s.apply(.{.twinkle=.{.near=near}});
+    s.apply(.{.twinkle=.{.mote=.{.near=near}}});
     try testing.expect(s.twinkles.slots[0].?.n>=pingRange[0] and s.twinkles.slots[0].?.n<=pingRange[1]);
     // a block of samples
     var buf:[480]Frame=undefined;
@@ -338,8 +339,10 @@ fn study(progress:f32,fed:f32,secs:f32)struct{peak:f32,rms:f32}{
   s.wind.level=0;
   s.apply(.{.daylight=0.5});
   s.apply(.{.arsthraxia=.{.progress=progress,.fed=fed,.complete=false}});
-  // a block of samples, the peak, the sum of squares, and samples heard
+  // a block of samples (and what it sends to the echo, unheard here), the
+  // peak, the sum of squares, and samples heard
   var buf:[480]Frame=undefined;
+  var send:[480]f32=@splat(0);
   var peak:f32=0;
   var sum:f32=0;
   var n:u32=0;
@@ -352,7 +355,7 @@ fn study(progress:f32,fed:f32,secs:f32)struct{peak:f32,rms:f32}{
   n=0;
   while(m.f(n)<secs*testRate){
     @memset(&buf,@splat(0));
-    if(s.research)|*rs|_=rs.render(&buf,progress,fed,0);
+    if(s.research)|*rs|_=rs.render(&buf,&send,progress,fed,.{});
     for(buf)|x|{
       peak=@max(peak,loud(x));
       sum+=power(x);
@@ -405,14 +408,14 @@ test"what happens to the ear's right is heard on the right, and to its left on t
     var s:Sounds=.init(31,testRate);
     s.wind.level=0;
     s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
-    s.apply(.{.step=.{.weight=0.5,.pace=0.5,.at=at}});
+    s.apply(.{.step=.{.fall=.{.weight=0.5,.pace=0.5,.at=at}}});
     const st=sides(&s,60);
     try testing.expect((st.r>st.l*2)==right and (st.l>st.r*2)==!right);
     // a twinkle
     s=.init(32,testRate);
     s.wind.level=0;
     s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
-    s.apply(.{.twinkle=.{.near=1,.at=at}});
+    s.apply(.{.twinkle=.{.mote=.{.near=1,.at=at}}});
     const tw=sides(&s,100);
     try testing.expect((tw.r>tw.l*2)==right and (tw.l>tw.r*2)==!right);
     // the arsthraxia at work, by day and night alike (both musics hushed)

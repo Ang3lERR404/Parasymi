@@ -86,7 +86,163 @@ pub const Ear=struct{
     const level=m.v3(d[0],0,d[2]);
     return m.clamp(m.dot(level,e.side)/@max(m.len(level),earNear),-1,1);
   }
+  /// the way it faces, along the ground: a quarter turn left of its right hand
+  pub fn ahead(e:Ear)m.V3{return.{e.side[2],0,-e.side[0]};}
+  /// how a sound at `p` reaches it, `muffle` (0 open .. 1 hidden) of the
+  /// way lying behind what stands between them: its side, how loud it
+  /// still is for how far off it is, how dark (the air's darkening with
+  /// distance, the head's shade behind it, whatever is between), the notch
+  /// the ear's folds carve higher the higher it is, and how much of it
+  /// reaches the place's echo
+  pub fn hear(e:Ear,p:m.V3,muffle:f32)Heard{
+    // the way to it, its distance, and the same along the ground
+    const d=p-e.at;
+    const far=m.len(d);
+    const level=m.v3(d[0],0,d[2]);
+    const across=@max(m.len(level),earNear);
+    // how far behind (0 beside or before .. 1 right behind) and how far
+    // above (-1 under .. 1 over) it is
+    const behind=m.clamp01(-m.dot(level,e.ahead())/across);
+    const up=m.clamp(d[1]/@max(far,earNear),-1,1);
+    // what still reaches the ear for its distance, and how much is shaded
+    const dist=nearM/@max(far,nearM);
+    const hidden=m.clamp01(muffle);
+    // how much the head's shade and what is between leave of it
+    const shade=m.lerp(1,behindQuiet,behind)*m.lerp(1,muffledQuiet,hidden);
+    // the air's darkening, the head's shade, what is between, and the ground's under it
+    const cutoff=airHz/(1+far/airM)*m.lerp(1,behindDark,behind)*m.lerp(1,muffledDark,hidden)*(1-underDark*@max(-up,0));
+    return.{
+      .pan=e.pan(p),
+      .gain=dist*shade,
+      .shade=shade,
+      .cutoff=cutoff,
+      .notch=m.lerp(notchHz[0],notchHz[1],(up+1)/2),
+      .send=@sqrt(dist),
+    };
+  }
 };
+// ---- hearing in space ----
+/// within this distance (m) a sound is heard at its full loudness; past
+/// it, it falls 6 dB each time the distance doubles
+const nearM:f32=2;
+/// the air keeps sound this bright at the ear (Hz), its brightness halved
+/// this far off (m)
+/// (this one: at the ear)
+const airHz:f32=18000;
+/// (halved this far off)
+const airM:f32=60;
+/// right behind the head the highs are shaded to this share, and the
+/// whole to this loudness
+/// (this one: the highs)
+const behindDark:f32=0.3;
+/// (the whole)
+const behindQuiet:f32=0.8;
+/// hidden behind something, the highs are left at this share, and the
+/// whole at this loudness
+/// (this one: the highs)
+const muffledDark:f32=0.07;
+/// (the whole)
+const muffledQuiet:f32=0.45;
+/// right under the ear, the ground takes this share off its highs
+const underDark:f32=0.35;
+/// the ear's folds carve a notch this high for a sound right under it and
+/// right over it (Hz), this narrow, taking this share out
+/// (this one: under and over, Hz)
+const notchHz=m.Vice(f32,2){5500,10000};
+/// (how narrow)
+const notchQ:f32=1.8;
+/// (how much it takes out)
+const notchDepth:f32=0.6;
+/// how a sound reaches the ear from where it is (`Ear.hear`)
+pub const Heard=struct{
+  /// its side (-1 left .. 1 right)
+  pan:f32=0,
+  /// how loud it still is (1 near): its distance and its shade together
+  gain:f32=1,
+  /// how much of it the head's shade and what is between leave, whatever its distance
+  shade:f32=1,
+  /// how bright it still is: its highs darkened above this (Hz)
+  cutoff:f32=airHz,
+  /// where the ear's notch sits (Hz): higher the higher the sound
+  notch:f32=notchHz[0],
+  /// how much of it reaches the place's echo
+  send:f32=1,
+};
+/// what a `Spatial` sends on: the sound as it reaches the ear (dry), and
+/// what of it goes into the place's echo (a mono send)
+pub const Reached=struct{dry:Frame,send:f32};
+/// samples between a `Spatial`'s retunings while it moves
+const spatialRetune=32;
+/// how long a moving sound's hearing takes to follow it (s, ~63%)
+const spatialGlide:f32=0.08;
+/// a sound heard in the world: placed to its side, as loud as its distance
+/// leaves it, darkened by the air, the head's shade and what is between,
+/// the ear's notch carved for its height, and a share sent to the echo;
+/// `follow` glides it to a new hearing as it or the ear moves
+pub const Spatial=struct{
+  /// samples a second
+  rate:f32,
+  /// the hearing it glides toward
+  want:Heard,
+  /// the hearing it has now
+  now:Heard,
+  /// how far it glides toward `want` each retune (0..1)
+  glide:f32,
+  /// the speakers' gains for its side now
+  gains:Frame,
+  /// the darkening
+  dark:StereoBiquad,
+  /// the band the ear's notch takes out
+  fold:StereoBiquad,
+  /// samples played (wraps), for when to retune
+  at:u32=0,
+  /// heard as `h` from the start, at `rate` samples a second
+  pub fn init(h:Heard,rate:f32)Spatial{
+    return.{
+      .rate=rate,
+      .want=h,
+      .now=h,
+      .glide=1-fall(spatialGlide,rate/spatialRetune),
+      .gains=spot(h.pan),
+      .dark=.init(.low,h.cutoff,0.707,rate),
+      .fold=.init(.band,h.notch,notchQ,rate),
+    };
+  }
+  /// glides on toward hearing `h`
+  pub fn follow(sp:*Spatial,h:Heard)void{sp.want=h;}
+  /// `x`, already placed between the speakers (or `mono` for one that is
+  /// not), as it reaches the ear and what goes to the echo
+  pub fn tick(sp:*Spatial,x:Frame)Reached{
+    if(sp.at%spatialRetune==0)sp.retune();
+    sp.at+%=1;
+    // darkened, its notch carved
+    const y=sp.dark.tick(x);
+    const z=y-sp.fold.tick(y)*mid(notchDepth);
+    return.{.dry=z*mid(sp.now.gain),.send=m.sumOf(f32,2,z)*0.5*sp.now.send};
+  }
+  /// a mono sample `x`, placed to the sound's side and heard
+  pub fn mono(sp:*Spatial,x:f32)Reached{return sp.tick(put(sp.gains,x));}
+  /// a step of the glide toward `want`, the filters and gains tuned to it
+  fn retune(sp:*Spatial)void{
+    // the share of the way it moves now
+    const k=sp.glide;
+    sp.now=.{
+      .pan=m.lerp(sp.now.pan,sp.want.pan,k),
+      .gain=m.lerp(sp.now.gain,sp.want.gain,k),
+      .cutoff=m.lerp(sp.now.cutoff,sp.want.cutoff,k),
+      .notch=m.lerp(sp.now.notch,sp.want.notch,k),
+      .shade=m.lerp(sp.now.shade,sp.want.shade,k),
+      .send=m.lerp(sp.now.send,sp.want.send,k),
+    };
+    sp.gains=spot(sp.now.pan);
+    sp.dark.tune(.low,sp.now.cutoff,0.707,sp.rate);
+    sp.fold.tune(.band,sp.now.notch,notchQ,sp.rate);
+  }
+};
+/// the echo of the place the ear is in: how long it rings (s, to -60 dB),
+/// how much of it is heard, and what darkens it (Hz)
+/// (fields: `rt60` s, `wet` 0..1, `dampHz`)
+pub const Space=struct{rt60:f32=0.6,wet:f32=0.1,dampHz:f32=4000};
 /// `a` in every lane of a `t`: itself for a mono sample, both sides of a
 /// `Frame`
 fn lanes(comptime t:type,a:f32)t{return if(t==f32)a else@splat(a);}
@@ -512,6 +668,14 @@ pub const Hall=struct{
     for(0..4)|i|h.dlen[i]=@max(m.floorTo(usize,m.f(hallDiffusers[i])*k),1);
     return h;
   }
+  /// rings `rt60` seconds from now on, its tail darkened above `dampHz`,
+  /// without losing what it holds (a place's echo changing as the ear moves)
+  pub fn ring(h:*Hall,rt60:f32,dampHz:f32,rate:f32)void{
+    for(0..8)|i|{
+      h.keep[i]=m.pow(f32,10,-3*m.f(h.len[i])/(@max(rt60,0.1)*rate));
+      h.damp[i].a=OnePole.coeff(dampHz,rate);
+    }
+  }
   /// what the hall sends back for `x` this sample (the wet sound alone):
   /// both sides heard in, two different blends of its lines sent back, so
   /// its tail spreads wide round the listener
@@ -655,6 +819,14 @@ pub fn Pool(comptime t:type,comptime n:usize)type{
         if(!v.render(out))s.*=null;
       };
     }
+    /// every sounding voice heard in the world mixed into `out`, what it
+    /// sends to the place's echo into `send` (a `t` with
+    /// `render(*t,[]Frame,[]f32)bool`), those that have ended freed
+    pub fn renderSent(p:*Self,out:[]Frame,send:[]f32)void{
+      for(&p.slots)|*s|if(s.*)|*v|{
+        if(!v.render(out,send))s.*=null;
+      };
+    }
   };
 }
 // ---- tests ----
@@ -725,6 +897,75 @@ test"a sound panned is as loud wherever it sits, and in the centre as a mono one
   // right by it, and under it: near the middle
   try testing.expect(@abs(e.pan(.{0.3,0,0}))<0.25);
   try testing.expectEqual(@as(f32,0),e.pan(.{0,0,0}));
+}
+test"heard in space: quieter and darker far off, shaded behind, muffled when hidden, notched higher overhead"{
+  // an ear facing north (its right hand east)
+  const e:Ear=.{.at=.{0,1,0},.side=.{1,0,0}};
+  try testing.expectApproxEqAbs(@as(f32,0),e.ahead()[0],1e-6);
+  try testing.expectApproxEqAbs(@as(f32,-1),e.ahead()[2],1e-6);
+  // near, before it; far before it; behind it; hidden; overhead
+  const near=e.hear(.{0,1,-1},0);
+  const far=e.hear(.{0,1,-40},0);
+  const back=e.hear(.{0,1,10},0);
+  const front=e.hear(.{0,1,-10},0);
+  const hid=e.hear(.{0,1,-10},1);
+  const over=e.hear(.{0,9,-1},0);
+  const under=e.hear(.{0,-7,-1},0);
+  try testing.expectApproxEqAbs(@as(f32,1),near.gain,1e-6);
+  try testing.expectApproxEqAbs(@as(f32,0.05),far.gain,1e-3);
+  try testing.expect(far.cutoff<near.cutoff and far.send>far.gain);
+  try testing.expect(back.cutoff<front.cutoff*0.5 and back.gain<front.gain);
+  try testing.expect(hid.cutoff<front.cutoff*0.1 and hid.gain<front.gain*0.5);
+  try testing.expect(over.notch>under.notch+3000);
+  try testing.expect(under.cutoff<over.cutoff);
+}
+test"a spatial sound is quieter and darker as heard far off, and glides when it moves"{
+  // a near and a far hearing of the same noise, and its loudness and its highs in each
+  var n:Noise=.init(4);
+  var a:Spatial=.init(.{},testRate);
+  var b:Spatial=.init(.{.gain=0.2,.cutoff=800},testRate);
+  var hiA:OnePole=.init(4000,testRate);
+  var hiB:OnePole=.init(4000,testRate);
+  var e:Frame=@splat(0);
+  var hi:Frame=@splat(0);
+  for(0..9600)|_|{
+    // this sample, and each hearing of it
+    const x=n.next();
+    const ya=a.mono(x).dry[0];
+    const yb=b.mono(x).dry[0];
+    e+=.{ya*ya,yb*yb};
+    // what lies over 4 kHz in each
+    const ha=hiA.high(ya);
+    const hb=hiB.high(yb);
+    hi+=.{ha*ha,hb*hb};
+  }
+  try testing.expect(e[1]<e[0]*0.05);
+  try testing.expect(hi[1]/e[1]<0.2*hi[0]/e[0]);
+  // moved hard right: the right side takes over within half a second, gliding there
+  a.follow(.{.pan=1});
+  for(0..2400)|_|_=a.mono(n.next());
+  try testing.expect(a.gains[0]>0.05 and a.gains[0]<1);
+  for(0..21600)|_|_=a.mono(n.next());
+  try testing.expect(a.gains[1]>1.3 and a.gains[0]<0.05);
+}
+test"a hall rung shorter keeps what it holds and dies sooner"{
+  // two halls, the same click in each, one rung shorter after it
+  var a=Hall.init(3,0.01,5000,testRate);
+  var b=Hall.init(3,0.01,5000,testRate);
+  // their tails' energy past a second
+  var ea:f32=0;
+  var eb:f32=0;
+  for(0..48000*2)|i|{
+    if(i==2400)b.ring(0.5,5000,testRate);
+    // this sample of each
+    const ya=a.tick(mid(if(i==0)1 else 0))[0];
+    const yb=b.tick(mid(if(i==0)1 else 0))[0];
+    if(i>48000){
+      ea+=ya*ya;
+      eb+=yb*yb;
+    }
+  }
+  try testing.expect(eb<ea*0.01);
 }
 test"stereo filters treat each side as a mono filter would"{
   // a mono and a stereo low pass, and a mono and a stereo band pass

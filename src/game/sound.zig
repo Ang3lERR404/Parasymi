@@ -3,9 +3,14 @@
 //! (`Cmd`) and each sound plays out on a free voice of its pool, nothing
 //! allocated while it plays.
 //! - all of it is heard in stereo, from the view (told each frame as an
-//!   `ear`): a step under the paw that fell, a twinkle where its mote is and
-//!   the arsthraxia where it stands (following as the view turns), each
-//!   left or right as it lies; the sap's gloops rise here and there inside
+//!   `ear`: the wolf it follows, turned as the view turns, or the eyes it
+//!   looks out of): a step under the paw that fell, a twinkle where its mote
+//!   is and the arsthraxia where it stands (following as the view turns),
+//!   each left or right as it lies, quieter and darker the farther off,
+//!   shaded behind, notched higher the higher it is, muffled when a hill
+//!   hides it, and ringing in the echo of the place the ear is in (short and
+//!   faint in an open meadow, long and full in a hollow, fuller among
+//!   structures; told each frame as a `space`); the sap's gloops rise here and there inside
 //!   the wolf round its groan; the wind's hush is two streams of air, its
 //!   whistle drifting from side to side gust by gust; the piano spreads low
 //!   to high from left to right, the drums stand on a stage (taiko by the
