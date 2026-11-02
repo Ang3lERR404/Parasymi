@@ -200,20 +200,27 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
     try s.add(.{.shape=ell(v3(0,0,0.004),v3(0.021,0.016,0.02)),.at=socket,.bone=bi(.head),.col=dark,.k=0.008,.carve=true});
     try s.add(.{.shape=ell(v3(0,0,0.004),v3(0.021,0.016,0.02)),.at=socket,.bone=bi(.head),.col=lip,.ink=0.006});
   }
-  // arms: a deltoid capping the shoulder, a squared arm under it with the
-  // bicep before and the tricep behind; the forearm swelling below the
-  // elbow and tapering to the wrist; the back of the hand
+  // arms: a deltoid capping the shoulder; the upper arm grown as two
+  // branches, as the gardener drew it, a thick one down from the shoulder
+  // and a slimmer one from under the chest, apart with a hole between
+  // them and joining into one at the elbow; the forearm swelling below
+  // the elbow and tapering to the wrist; the back of the hand
   for(skel.sides,0..)|sd,si|{
     // which way out this side is: -1 left, 1 right
     const x=skel.sign(si);
     // the deltoid in three heads (front, side, rear) capping the shoulder
-    // (big and rounded, as the gardener drew them)
+    // (big and rounded, as the gardener drew them), ending high so the
+    // branches part below it
     try a.f(sd.arm,ell(v3(x*0.006,-0.035,0),v3(0.098,0.1,0.094)),muscle,meatMelt*1.6);
-    try a.f(sd.arm,ell(v3(x*0.02,-0.065,0.04),v3(0.064,0.084,0.052)),muscle,meatMelt);
-    try a.f(sd.arm,ell(v3(x*0.02,-0.065,-0.04),v3(0.064,0.084,0.052)),muscle,meatMelt);
-    try a.f(sd.arm,cone(v3(0,-0.02,0),v3(0,-skel.upperArm,0),0.06,0.047),hide,0.03);
-    try a.f(sd.arm,ell(v3(0,-0.11,0.036),v3(0.054,0.08,0.05)),muscle,meatMelt);
-    try a.f(sd.arm,ell(v3(0,-0.135,-0.036),v3(0.056,0.088,0.05)),muscle,meatMelt);
+    try a.f(sd.arm,ell(v3(x*0.02,-0.055,0.04),v3(0.062,0.062,0.05)),muscle,meatMelt);
+    try a.f(sd.arm,ell(v3(x*0.02,-0.055,-0.04),v3(0.062,0.062,0.05)),muscle,meatMelt);
+    // the two branches of the upper arm: the outer from the shoulder, the
+    // inner on the body's side, parting under the deltoid and joining into
+    // the one forearm at the elbow
+    try a.f(sd.arm,cone(v3(x*0.035,-0.03,0),v3(0,-skel.upperArm,0),0.036,0.04),hide,0.02);
+    try a.f(sd.arm,cone(v3(-x*0.055,-0.04,0),v3(-x*0.008,-skel.upperArm+0.02,0),0.026,0.03),hide,0.01);
+    // the hole between them, cut clean through front to back
+    try s.add(.{.shape=ell(v3(-x*0.01,-0.135,0),v3(0.019,0.062,0.08)),.at=w[bi(sd.arm)],.bone=bi(sd.arm),.col=hide,.k=0.008,.carve=true});
     try a.f(sd.forearm,ell(v3(0,0.0,-0.022),v3(0.032,0.034,0.028)),hide,0.02);
     try a.f(sd.forearm,cone(v3(0,0,0),v3(0,-skel.forearmLength,0),0.05,0.03),hide,0.03);
     try a.f(sd.forearm,ell(v3(0,-0.068,0.018),v3(0.05,0.075,0.044)),muscle,meatMelt);
@@ -431,7 +438,7 @@ fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.E
     for(0..2)|vi|{
       // where round the limb this vine starts: the two opposite
       const a0=m.f(vi)*m.pi+x*0.6;
-      try vineOver(b,s,&wind(w,&.{.{.bone=sd.arm,.y0=-0.06,.y1=-skel.upperArm},.{.bone=sd.forearm,.y0=0,.y1=-0.2}},a0,2.4),0.0085,pal.wolfVine);
+      try vineOver(b,s,&wind(w,&.{.{.bone=sd.forearm,.y0=0,.y1=-0.2}},a0,1.6),0.0085,pal.wolfVine);
       try vineOver(b,s,&wind(w,&.{.{.bone=sd.thigh,.y0=-0.03,.y1=-skel.thighLength},.{.bone=sd.shin,.y0=0,.y1=-0.22}},a0,2.8),0.01,pal.wolfVine);
     }
     // a tendon of vine down the back of the metatarsal to the heel, and
@@ -455,7 +462,7 @@ fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.E
   // the sash: a vine wound round the -x upper arm (on the left seen from
   // the front, as the gardener drew it), then run under the pectorals from
   // one side to the other (over the belly it swags down, wolf_belly)
-  try vineOver(b,s,&wind(w,&.{.{.bone=skel.sides[0].arm,.y0=-0.05,.y1=-0.15}},0.4,m.tau*1.15),0.0095,pal.wolfVine);
+  try vineOver(b,s,&wind(w,&.{.{.bone=skel.sides[0].arm,.y0=-0.02,.y1=-0.08}},0.4,m.tau*1.15),0.0095,pal.wolfVine);
   try vineOver(b,s,&sash(w),0.0105,pal.wolfVine);
   // the tail: three strands braided along it
   const tail=[_]Seg{

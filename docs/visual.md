@@ -580,7 +580,9 @@ from a distance-to-edge function, so they stay crisp at any size) in
   narrower (`rib*`, `lat*` in `wolfBody`). No barrel rim over the waist,
   front or back.
 - **Build, as the gardener drew it:** heavy and stylized: big rounded
-  deltoids, large pectorals with leaves of chest fur lying over their
+  deltoids, the upper arm grown as two branches (one from the shoulder,
+  one on the body's side) with an almond hole cut clean through between
+  them, joining into the one forearm at the elbow; large pectorals with leaves of chest fur lying over their
   tops (in `wolfPec`), a slender neck, wide hips, great thighs swelling
   out past them, stout digitigrade legs on big paws, and mitten hands:
   thick, long fingers melted a little together, each digit still its own.
