@@ -30,6 +30,7 @@ idioms and what not to do), every session.
 | gameplay, structures' behaviour, research, saves | [docs/design.md](docs/design.md) |
 | the unforming (the first world event, step by step) | [docs/unforming.md](docs/unforming.md) |
 | how anything looks or moves | [docs/visual.md](docs/visual.md) |
+| the constellate tendril (the plexus web, its braid, exact numbers) | [docs/tendril.md](docs/tendril.md) |
 | a structure mesh / anything that grows | [docs/growth.md](docs/growth.md) |
 | a mesh kit (structure, parasite, convergence, radiant, mineral, sculpt, wolf) | [docs/kits/README.md](docs/kits/README.md) + its `_desc.md` |
 | checking one plant/structure in game | [docs/testing.md](docs/testing.md) |

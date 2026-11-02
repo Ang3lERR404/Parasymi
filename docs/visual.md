@@ -96,6 +96,9 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
   flashes, the halo, energy, the constellate's glowing edges and points
   each cast a soft haze into the fog round them, brighter in the mist,
   faint in clear air (`partsAir`, docs/architecture.md).
+- **The constellate tendril:** a braid of fragments flowing along it like
+  a stream; how the plexus web makes it, with every number, is in
+  [tendril.md](tendril.md).
 
 ## Plants
 ### All plants
