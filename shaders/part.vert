@@ -129,6 +129,9 @@ const float PLEXUS_PART_DRIFT = 0.025;
 // dies away, 1/s), and how far behind the one before each petal follows (s)
 const int PLEXUS_YIELD_CORE = 5;
 const int PLEXUS_YIELD_PETAL = 6;
+// how many petals make a yielder whole (game/structures/yielder.zig
+// `petalsWhole`)
+const int PLEXUS_YIELD_PETALS = 4;
 const int PLEXUS_YIELD_FRAGMENT = 11;
 const int PLEXUS_YIELD_LIGHT = 12;
 const int PLEXUS_YIELD_GATHERING = 13;
@@ -341,6 +344,14 @@ float plexStoryShow = 1.0;
 float plexStoryRound = 0.0;
 // which of the hyena's limbs the web being placed is
 float plexSeg = 0.0;
+// how many of a yielder's petals are snapped on (a share of them all: 1
+// whole; the instance's growth)
+float plexYieldOn = 1.0;
+// whether a yielder is whole, all its petals on (else it neither gathers
+// nor yields)
+float plexusYieldWhole() { return step(0.999, plexYieldOn); }
+// whether a yielder's petal `k` is snapped on
+float plexusPetalOn(float k) { return step(k + 0.5, plexYieldOn * float(PLEXUS_YIELD_PETALS)); }
 // how many fragments a planted strange seed has conjured, the one rising
 // now in part
 float plexSeedCount = 0.0;
@@ -515,8 +526,8 @@ float plexusShut(float t) {
 // rise and turn in, and their tips are drawn to one point over the core;
 // each petal a moment behind the one before, so they move as a ripple
 vec3 plexusPetal(vec3 q, int k, float t) {
-  float shut = plexusShut(t - float(k) * PLEXUS_YIELD_LAG);
-  float a = float(k) / 5.0 * TAU + t * PLEXUS_YIELD_SPIN;
+  float shut = plexusShut(t - float(k) * PLEXUS_YIELD_LAG) * plexusYieldWhole();
+  float a = float(k) / float(PLEXUS_YIELD_PETALS) * TAU + t * PLEXUS_YIELD_SPIN;
   vec3 outward = vec3(cos(a), 0.0, sin(a));
   vec3 across = vec3(-sin(a), 0.0, cos(a));
   float lean = mix(PLEXUS_YIELD_LEAN, PLEXUS_YIELD_SHUT, shut);
@@ -1019,7 +1030,7 @@ vec3 plexusAt(float id, int shape, float t) {
   if (shape == PLEXUS_HYENA) return plexusHyena(id, plexSeg) + moved;
   if (shape == PLEXUS_SEED_WEB) return plexusSeedWeb(id, moved, t);
   if (shape == PLEXUS_SEED_HEART) return plexusSeedHeart(id, moved, t);
-  if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + 5) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
+  if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + PLEXUS_YIELD_PETALS) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
   if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) return plexusSprig(id, shape, moved);
   if (shape == PLEXUS_HEART_STEM) return plexusHeartStem(id, t, moved);
   if (shape == PLEXUS_HEART_ROSE) return plexusHeartRose(id, t, moved);
@@ -1226,6 +1237,8 @@ void main() {
     // which of his limbs)
     plexStage = shape == PLEXUS_HYENA ? 0.0 : floor(pos.x);
     plexSeg = floor(pos.x);
+    // (a yielder: how many of its petals are on, from its growth)
+    if (shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING) plexYieldOn = iw.w;
     // (the whole story: which stage it is at now, how far into it, and how
     // much shows as it fades out at the end and in at the start)
     if (plexStage > 4.5) {
@@ -1299,6 +1312,11 @@ void main() {
     // how much there is of what a yielder yields, as it grows and is let go
     // (or of a heart's filament as it drips down)
     float yield = shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING ? plexusYield(ids.x, shape, t).w : 1.0;
+    // (a yielder's petal shows once it is snapped on, its bond with it;
+    // it gathers and yields only whole)
+    if (shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING) yield *= plexusYieldWhole();
+    if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + PLEXUS_YIELD_PETALS) yield *= plexusPetalOn(float(shape - PLEXUS_YIELD_PETAL));
+    if (plexKind > 2.5 && (shape == PLEXUS_YIELD_CORE || shape == PLEXUS_YIELD_GATHERING)) yield *= plexusPetalOn(ids.z - float(PLEXUS_YIELD_PETAL));
     if (shape == PLEXUS_HEART_FILAMENT) yield = smoothstep(0.0, 0.1, plexusHeartGrow(floor(ids.x / 8.0), t));
     // (or of a petlet's points as their fragments arrive, a line or pane
     // there once all its points are, a grand petal as it opens, a

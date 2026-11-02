@@ -485,10 +485,14 @@ pub const Strings=struct{
     pouring:S="",
     /// a root well holding what it caught (the ground round it soaked)
     holding:S="",
-    /// a strange seed planted: how many loose fragments it has conjured, of the most
+    /// a strange seed planted: how many fragments drift round it, how many are still to come
     seedFragments:S="",
     /// a strange seed lying where it fell, never planted
     seedLies:S="",
+    /// a yielder still being built: how many petals are snapped on, of the four
+    yielderPetals:S="",
+    /// a whole yielder at work: how many fragments it holds
+    yielderWhole:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",
     /// a weftstone ionizing a ley crystal

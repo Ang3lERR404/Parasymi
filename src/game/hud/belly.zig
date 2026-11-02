@@ -115,7 +115,7 @@ pub fn shows(g:*const play.Game,p:Pick)?items.Item{
 /// sap, the belly's slot grid and the weave list below it.
 pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   // how many rows the weave list takes, and the grid's and the list's heights
-  const weaveRows=(craft.byHand.len+1)/2;
+  const weaveRows=(craft.handsOf(g.act).len+1)/2;
   const slotsH=gap*m.f(rows);
   const weaveH=42+weaveRowH*m.f(weaveRows);
   // the panel's height, and its top-left corner
@@ -278,7 +278,7 @@ fn weaves(g:*play.Game,d:*Draw,px:f32,wy:f32)Allocator.Error!void{
   }
   // the width (pixels) of one column of the list
   const colW=(pw-60)/2;
-  for(craft.byHand,0..)|i,k|{
+  for(craft.handsOf(g.act),0..)|i,k|{
     // the recipe, and its line's left and top
     const r=craft.hand[i];
     const colx=px+70+m.f(k%2)*colW;

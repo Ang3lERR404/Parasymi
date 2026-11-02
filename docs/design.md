@@ -443,19 +443,27 @@ a living constellation (constellate webs on 28 bones, `--samples=constellateHyen
 who never walks but hovers, leaning into his motion, his steps silent, the
 camera in his eyes. He works with the convergent lineage and the
 constellate one alone.
-- **The strange seed, planted:** put down by his hand (the `sown` hook) it
-  is planted; put down by the wolf's it only lies there. Planted, it
-  conjures a loose constellate fragment (a small glass triangle of three
-  points) every 15 s, up to 50, enough for a core and four petals: each
-  slips out through a crack in its crystal husk (a see-through `husk`
-  part, a small web turning inside it), spiralling, to drift loose round
-  and
-  over it, lines and panes forming between those that come near, reaching
-  further as more gather (`strangeSeedWeb`, part.vert `plexusSeedWeb`;
-  how many in the instance's growth). Hover says how many.
-- **Next:** what the loose fragments are for: snapping them into parts,
-  yielders feeding the heart, the heart making parts, tendrils carrying
-  them (one loop).
+- **The strange seed, planted:** a crystal husk (a see-through `husk`
+  part, clear glass with glowing cracks) with a small web turning inside
+  it. Put down by his hand (the `sown` hook) it is planted; put down by
+  the wolf's it only lies there. Planted, it conjures 50 fragments, one
+  every 15 s, enough for a core and four petals: each a small glass
+  triangle of three points that slips out through a crack and spirals up
+  to drift loose round and over it (`strangeSeedWeb`, part.vert
+  `plexusSeedWeb`; how many drift in the instance's growth). A click
+  (`handOver`) takes one into his keeping. Hover says how many drift and
+  how many are still to come.
+- **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
+  belly panel showing each gardener's own) build a constellate core or a
+  constellate petal from ten fragments each.
+- **The yielder:** a core put down stands alone; each petal fed to it
+  (`wants` petals) snaps on round its rim, bonded to it, until four stand
+  there (part.vert `plexYieldOn` from its growth: only the petals on
+  show). Whole, its petals turn round the core and every 6 s spring shut,
+  their tips gathering one point of light over it, let go as a mote and a
+  new fragment; it keeps up to 20 fragments, a click takes one.
+- **Next:** what the yielder's fragments and light feed: the heart, the
+  heart making parts, tendrils carrying them (one loop).
 ## Research panel (T, `hud/research.zig`)
 The research tree is drawn as a sapling growing in soil. It is laid out
 from the prerequisites alone, so it never needs placing or adjusting.

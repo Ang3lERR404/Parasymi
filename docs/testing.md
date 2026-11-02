@@ -164,6 +164,7 @@ the star hyena is the gardener, the strange seed in his keeping. With
 
 ```
 zig build run -- --act2 --structure=strangeSeed --state=active --period=2000 --speed=30 --inspect=strangeSeed --shots=4 --orbit=40 --dist=3.2 --pitch=10
+zig build run -- --act2 --structure=yielder --state=active --period=2000 --inspect=yielder --shots=3 --orbit=30 --dist=3 --pitch=12
 ```
 
 ## A HUD panel

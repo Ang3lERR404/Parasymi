@@ -294,6 +294,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `tanglehold.zig` — TANGLEHOLD: plain storage of both lineages, taking the sap cache's place once the unforming has taken it, and holding twice as much.
 - `vultrixi.zig` — VULTRIXI: a gathering crown and a ganglion grown into one floating body that feeds a monfris.
 - `weftstone.zig` — WEFTSTONE: a loomfern and a lithophage grown into one floating body.
+- `yielder.zig` — YIELDER: the constellate lineage's first build, made in act 2 by the star hyena's hands.
 
 ## src/game/
 - `style.zig` — shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes.

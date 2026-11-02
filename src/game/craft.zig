@@ -47,6 +47,9 @@ pub const Recipe=struct{
   /// the advanced tier: only a monfris weaves it, never a germinator or
   /// the hands
   advanced:bool=false,
+  /// whose hands weave it: the wolf's (and the looms'), or the star hyena's
+  /// in act 2 (only his)
+  by:lib.act.Act=.wolf,
   /// whether the research it needs (if any) is known
   pub fn unlocked(r:Recipe,g:*const prog.Progression)bool{
     return if(r.needs)|id|g.done.contains(id)else true;
@@ -113,6 +116,10 @@ pub const hand=[_]Recipe{
   // sets no cost): the drift flower only the evolved arsthraxia lets fall,
   // so it is woven only after; a monfris's (it is convergent)
   .{.out=.nebularbor,.in=&.{.{.item=.convergenceEssence,.n=4},.{.item=.leyCrystal,.n=2},.{.item=.driftFlower,.n=1},.{.item=.grit,.n=3}},.time=8},
+  // decision: ten fragments to a part, so a planted seed's fifty build a core
+  // and four petals (act 2's first yielder)
+  .{.out=.constellateCore,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
+  .{.out=.constellatePetal,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
 };
 /// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}
@@ -126,13 +133,30 @@ pub fn germinatorOnly(idx:usize)bool{
 /// whether the weave at `idx` in `hand` is the advanced tier
 pub fn isAdvanced(idx:usize)bool{return hand[idx].advanced;}
 /// the recipes the wolf weaves by hand (indices into `hand`): all but what
-/// only a germinator weaves.
-pub const byHand=recipesWhere(germinatorOnly,false);
+/// only a germinator weaves, or the hyena.
+pub const byHand=recipesWhere(notWolfs,false);
+/// whether the weave at `idx` in `hand` is not the wolf's to weave by hand:
+/// a germinator's, or the hyena's
+pub fn notWolfs(idx:usize)bool{return germinatorOnly(idx) or hand[idx].by!=.wolf;}
+/// whether the weave at `idx` in `hand` is the star hyena's
+pub fn isHyenas(idx:usize)bool{return hand[idx].by==.hyena;}
+/// the recipes the star hyena weaves by hand in act 2 (indices into `hand`)
+pub const byHyena=recipesWhere(isHyenas,true);
+/// the recipes act `a`'s gardener weaves by hand (indices into `hand`)
+pub fn handsOf(a:lib.act.Act)[]const u8{
+  return switch(a){
+    .wolf=>&byHand,
+    .hyena=>&byHyena,
+  };
+}
+/// whether a germinator never weaves the weave at `idx`: the advanced tier,
+/// or the hyena's
+pub fn notGerminators(idx:usize)bool{return isAdvanced(idx) or hand[idx].by!=.wolf;}
 /// the seed weaves (indices into `hand`).
 pub const seeds=recipesWhere(isSeedRecipe,true);
 /// every weave but the advanced tier: what a germinator may be set to
 /// (indices into `hand`).
-pub const all=recipesWhere(isAdvanced,false);
+pub const all=recipesWhere(notGerminators,false);
 /// the advanced tier: what only a monfris weaves (indices into `hand`).
 pub const advanced=recipesWhere(isAdvanced,true);
 /// whether a monfris weaves the weave at `idx` in `hand`: the advanced

@@ -221,7 +221,7 @@ test"a germinator weaves structure bulbs as well as seeds, and lets go only what
   const craft=lib.craft;
   // every weave is on offer, the bulbs too, but the advanced tier, which
   // only a monfris weaves
-  try testing.expectEqual(craft.hand.len-craft.advanced.len,recipes(.germinator,&g).len);
+  try testing.expectEqual(craft.hand.len-craft.advanced.len-craft.byHyena.len,recipes(.germinator,&g).len);
   for(recipes(.monfris,&g))|r|try testing.expect(craft.isLoom(r));
   // a monfris weaves every convergent weave, never a radiant one (the
   // diamond, the vesper seed), and the hands neither

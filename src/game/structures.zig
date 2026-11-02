@@ -200,6 +200,8 @@ pub const kinds=struct{
   pub const vultrixi=@import("structures/vultrixi.zig");
   /// the seed the unforming let fall, lying where it landed
   pub const strangeSeed=@import("structures/strange_seed.zig");
+  /// a constellate core with four petals snapped on, yielding fragments
+  pub const yielder=@import("structures/yielder.zig");
   /// a polyp's stemless flower put down as a floating light
   pub const driftFlower=@import("structures/drift_flower.zig");
   /// the mist tree, breathing moisture into the air

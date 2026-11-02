@@ -95,6 +95,14 @@ pub const Item=enum(u8){
   tanglehold,
   /// the bulb of a storm spire
   stormSpire,
+  /// a loose constellate fragment, a small glass triangle of light a
+  /// planted strange seed conjures; built into constellate parts
+  fragment,
+  /// a constellate core, a flower head of light built of fragments: put
+  /// down, petals snap onto it
+  constellateCore,
+  /// a constellate petal of light built of fragments, to snap onto a core
+  constellatePetal,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -147,6 +155,9 @@ const infos=EnumArray(Item,Info).init(.{
   .driftFlower=.{.col=.{240,150,200,255}},
   .strangeSeed=.{.col=.{235,240,255,255}},
   .nebularbor=.{.col=.{180,215,235,255}},
+  .fragment=.{.col=.{150,200,255,255}},
+  .constellateCore=.{.col=.{120,170,255,255}},
+  .constellatePetal=.{.col=.{170,220,255,255}},
 });
 /// one slot's worth: an item and how many of it
 pub const Stack=struct{

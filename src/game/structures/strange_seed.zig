@@ -24,6 +24,8 @@ const txt=lib.txt;
 const prog=lib.progression;
 /// the HUD's shared sizes and colours
 const style=lib.style;
+/// what can be held: the fragment it hands over
+const items=lib.items;
 /// which act the garden is in: who put it down
 const Act=lib.act.Act;
 /// the tools a bulb icon is drawn with
@@ -43,14 +45,18 @@ pub const def:st.Def=.{.item=.strangeSeed,.lineage=null,.size=1,.mesh=.strangeSe
 pub const most:f32=lib.constellate.seedFragments;
 /// how long it takes to conjure one (s): all of them in twelve and a half minutes
 pub const every:f32=15;
-/// what a strange seed remembers: whether it is planted, and how many
-/// fragments it has conjured
+/// what a strange seed remembers: whether it is planted, how many
+/// fragments it has conjured, and how many of those have been taken
 pub const State=struct{
   /// planted by the star hyena's hand (else it only lies there)
   planted:bool=false,
   /// how many loose fragments it has conjured (0 .. `most`; the one
-  /// rising now in part)
+  /// slipping out now in part)
   fragments:f32=0,
+  /// how many of them the gardener has taken
+  taken:u16=0,
+  /// how many drift round it now, whole or slipping out
+  pub fn drifting(q:State)f32{return q.fragments-m.f(q.taken);}
 };
 /// put down by the gardener's hand in act `a`: planted in the hyena's,
 /// beginning again from no fragments; in the wolf's it only lies there
@@ -71,21 +77,29 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   s.fragments=conjure(had,s.planted,dt);
   return s.fragments>had;
 }
+/// a click on it takes one whole fragment drifting round it, if one is
+pub fn handOver(s:*st.Structure)?items.Item{
+  // what it remembers
+  const q=&s.state.strangeSeed;
+  if(q.drifting()<1)return null;
+  q.taken+=1;
+  return .fragment;
+}
 /// the soft light it holds, pulsing slowly, and, planted, the web of the
-/// fragments it has conjured, each rising out of it in turn
+/// fragments drifting round it, the next slipping out
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
-  try out.light(ctr+m.v3(0,0.1,0),m.v3(0.85,0.8,1)*m.splat3(0.6+0.2*@sin(tf*0.8)),3);
+  try out.light(ctr+m.v3(0,0.15,0),m.v3(0.55,0.75,1)*m.splat3(0.6+0.2*@sin(tf*0.8)),3);
   // what it remembers
   const q=s.state.strangeSeed;
-  if(!q.planted or q.fragments<=0)return;
-  try out.emit(.strangeSeedWeb,s.place(ctr),.{.phase=s.seed,.grown=q.fragments/most});
+  if(!q.planted or q.drifting()<=0)return;
+  try out.emit(.strangeSeedWeb,s.place(ctr),.{.phase=s.seed,.grown=q.drifting()/most});
 }
-/// its line in the panel: planted, how many fragments it has conjured;
-/// else that it lies where it fell
+/// its line in the panel: planted, how many fragments drift round it and
+/// how many are still to come; else that it lies where it fell
 pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{
   // what it remembers
   const q=s.state.strangeSeed;
-  if(q.planted)_=try d.print(x,y,style.textBody,style.white,txt.s.describe.seedFragments,.{m.floorTo(u32,q.fragments),m.floorTo(u32,most)})
+  if(q.planted)_=try d.print(x,y,style.textBody,style.white,txt.s.describe.seedFragments,.{m.floorTo(u32,q.drifting()),m.floorTo(u32,most-q.fragments)})
   else _=try d.print(x,y,style.textBody,style.white,txt.s.describe.seedLies,.{});
 }
 /// its icon: the cut seed, faceted, glowing from inside
@@ -111,4 +125,11 @@ test"a strange seed conjures fragments only once the hyena plants it, up to the 
   try testing.expect(!s.state.strangeSeed.planted);
   sown(&s,.hyena);
   try testing.expect(s.state.strangeSeed.planted and s.state.strangeSeed.fragments==0);
+}
+test"a click takes a whole fragment drifting round a planted seed, never one still slipping out"{
+  // a planted seed with one and a half fragments out
+  var s=st.Structure{.x=0,.y=0,.seed=0,.state=.{.strangeSeed=.{.planted=true,.fragments=1.5}}};
+  try testing.expectEqual(@as(?items.Item,.fragment),handOver(&s));
+  try testing.expectEqual(@as(?items.Item,null),handOver(&s));
+  try testing.expectEqual(@as(u16,1),s.state.strangeSeed.taken);
 }

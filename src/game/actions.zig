@@ -121,6 +121,8 @@ pub fn canPut(g:*const Game,h:m.Vice(i32,2))bool{
 pub fn weaveByHand(g:*Game,i:usize)void{
   // seeds (and what binds the lineages) come only from a germinator
   if(craft.germinatorOnly(i))return;
+  // (and only what the gardener's own hands weave: the wolf's or the hyena's)
+  if(craft.hand[i].by!=g.act)return;
   // the recipe asked for
   const r=craft.hand[i];
   if(!r.unlocked(&g.prog))return g.prog.say(txt.s.msg.notUnderstood,.{txt.item(r.out).name});
