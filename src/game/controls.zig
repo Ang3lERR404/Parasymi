@@ -81,6 +81,9 @@ pub const Action=enum{
   take,
   /// set up a paired or configurable structure
   configure,
+  /// held: sweep the cursor from one structure to another to draw a
+  /// constellate tendril between them (act 2)
+  tendril,
   /// turn what stands under the cursor, else the next thing put down
   rotate,
   /// held with rotate: turn the other way (counter-clockwise)

@@ -7,8 +7,9 @@ flows along its length like a stream. The gardener approved this look
 - The sketch: `--samples=constellateTendril,constellateTendrilGround,constellateTendrilArc`
   (`src/gfx/meshes/constellate.zig` `tendrilAt`, `shaders/part.vert`
   `plexusTendril`, `plexusTendrilPath`, `plexusTendrilRide`).
-- The garden's version, one tile at a time along a drawn path:
-  `tendrilLegMesh` and `plexusTendrilLeg` (the same braid on a curve).
+- The garden's version, one flow along a whole drawn path:
+  `tendrilFlowMesh` and `plexusTendrilGarden` (the same braid on any
+  path).
 
 Nothing about it is stored as a shape. The mesh only holds *which* lights
 and lines could exist. The GPU places every light each frame and decides
@@ -184,9 +185,33 @@ the same as its shape.
    `zig build run -Drelease=true -- --samples=<yours> --inspect=player --shots=4 --orbit=16 --dist=5 --pitch=18 --tod=0.85`,
    then read the PNGs in `shots/`.
 
-The garden's tiles (`plexusTendrilLeg`) are the same braid with
-everything measured along the *whole* tendril (`s = plexLegAt + u`), so
-tile after tile joins seamlessly. Each tile is 11 slices of 3 lights,
-10 to a tile plus one shared with the next. The tile bends along a
-Catmull-Rom curve through its instance's four control points, and the
-flow runs at `0.06 * 2.4` tiles a second, the sketch's speed.
+## 7. The garden's tendril (one flow along a drawn path)
+
+`plexusTendrilGarden` is the same braid with everything measured in
+metres along the *whole* drawn path, so it is one stream from start to
+end, never tile by tile:
+
+- **The path on the GPU.** game/tendril.zig lays the path's tiles out
+  (each tile's centre floating `high` over the ground, sagging
+  `0.2 * min(high, 1) * sin(π along)` over the whole length; on the ground
+  0.06) and puts the points as this frame's bones (`Parts.pose`): each a
+  point in its first column, how far along the path it lies in its w.
+  The instance (`Parts.emitPath`) carries where they start, how many and
+  the path's length in `ie.yzw`. `plexFlowAt(s)` finds the span and runs
+  the Catmull-Rom curve through the points.
+- **The lights.** A slice of 3 lights every 0.1 m (10 a metre, the
+  sketch's spacing), `ceil(len * 10)` slices. Slice `j` sits at
+  `mod(j + (t * 0.06 + k * 0.013) * 2.4 * 10, slices) / slices * len`:
+  the sketch's flow speed, strand offset, twist (2.2 turns per 2.4 m),
+  breathing and sway, all per metre. The ends thin over 0.144 m (6% of
+  the sketch's 2.4).
+- **Chunks.** Ids are a byte, so the mesh holds one chunk of 90 lights
+  plus the next 9 (band 9: each light joins only lights 9 on in the
+  list, plenty for reach 0.14). A tendril is drawn as many chunk
+  instances as its lights need (`flutter` = which chunk); each light,
+  line and pane is drawn only by the chunk owning its first id
+  (`plexFlowOwns`), so chunks join seamlessly. Ids past the last slice
+  wrap to the first, so the stream also joins round its wrap.
+- **One heart.** Every chunk beats from the tendril's first light.
+- **Riding.** What it carries is drawn at 0.3, 0.12 over the path,
+  turning 0.5 rad/s, fading over the first and last 8% of its ride.

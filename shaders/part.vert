@@ -934,6 +934,79 @@ vec3 plexusTendrilPath(float u, int height, float t) {
   float sway = (height == 1 ? 0.02 : 0.08) * sin(u * 3.0 + t * 0.4) * sin(0.5 * TAU * u);
   return vec3(sway, y, (u - 0.5) * PLEXUS_TENDRIL_LEN);
 }
+// a garden's tendril (meshes/constellate.zig `tendrilFlowMesh`,
+// game/tendril.zig), the tendril sketch's braid laid along its whole path
+// as one flow: three strands wound round each other, a slice of three
+// lights every tenth of a metre, all of them flowing on along the path from
+// its start to its end like a stream and round again, measured in metres
+// along the whole of it. Its path is this frame's bones from the
+// instance's ie.y (each a point of it in its first column, xyz, and how far
+// along the path that point lies, w), ie.z of them, ie.w metres long. The
+// mesh holds one chunk of PLEXUS_FLOW_LIGHTS lights (and the next few, so
+// lines join across to the next chunk): the instance's flutter says which
+// chunk, so a tendril is drawn as many chunks as its length needs, each
+// light of it shown by the one chunk that owns it. Its strands twist,
+// breathe and sway, it thins away at either end as the sketch does, and is
+// braided as far as the instance's growth says
+const int PLEXUS_TENDRIL_GARDEN = 61;
+const int PLEXUS_FLOW_LIGHTS = 90;
+const float PLEXUS_FLOW_PER = 10.0;
+const float PLEXUS_FLOW_THIN = 0.144;
+// the path being placed: where its points start in this frame's bones, how
+// many there are, how long it is (m), how far braided (0..1), which chunk
+// of it this is, and how high it floats
+int plexFlowBase = 0;
+int plexFlowN = 2;
+float plexFlowLen = 1.0;
+float plexFlowFill = 1.0;
+float plexFlowChunk = 0.0;
+float plexFlowHigh = 1.0;
+// point `i` of the path being placed (held at its ends), and how far along
+// it lies (w)
+vec4 plexFlowPoint(int i) {
+  Bones B = Bones(pc.bones);
+  return B.m[plexFlowBase + clamp(i, 0, plexFlowN - 1)][0];
+}
+vec3 catmull(vec3 a, vec3 b, vec3 c, vec3 d, float f);
+// where the path being placed runs `s` metres along it: the Catmull-Rom
+// curve through its points
+vec3 plexFlowAt(float s) {
+  int i = 0;
+  for (int k = 1; k < plexFlowN - 1; k++) if (plexFlowPoint(k).w <= s) i = k;
+  vec4 a = plexFlowPoint(i);
+  vec4 b = plexFlowPoint(i + 1);
+  float f = clamp((s - a.w) / max(b.w - a.w, 1e-4), 0.0, 1.0);
+  return catmull(plexFlowPoint(i - 1).xyz, a.xyz, b.xyz, plexFlowPoint(i + 2).xyz, f);
+}
+// how many slices of three lights the tendril being placed holds
+float plexFlowSlots() { return max(ceil(plexFlowLen * PLEXUS_FLOW_PER), 1.0); }
+// where light `id` of the chunk being placed is at time `t` (xyz) and how
+// much of it there is (w): its slice flowing on along the whole path at the
+// sketch's pace (PLEXUS_TENDRIL_FLOW of the sketch's length a second), its
+// strand wound round the others, the whole swaying, thinning at the
+// tendril's ends, shown once braided that far
+vec4 plexusTendrilGarden(float id, float t) {
+  float g = plexFlowChunk * float(PLEXUS_FLOW_LIGHTS) + id;
+  float k = mod(g, 3.0);
+  float j = floor(g / 3.0);
+  float slots = plexFlowSlots();
+  float s = mod(j + (t * PLEXUS_TENDRIL_FLOW + k * 0.013) * PLEXUS_TENDRIL_LEN * PLEXUS_FLOW_PER, slots) / slots * plexFlowLen;
+  float along = s / plexFlowLen;
+  vec3 c = plexFlowAt(s);
+  vec3 dir = normalize(plexFlowAt(min(s + 0.03, plexFlowLen)) - plexFlowAt(max(s - 0.03, 0.0)) + vec3(1e-5, 0.0, 0.0));
+  vec3 e1 = normalize(cross(dir, vec3(0.0, 1.0, 0.0)) + vec3(0.0, 0.0, 1e-5));
+  vec3 e2 = cross(e1, dir);
+  c += e1 * (plexFlowHigh < 0.1 ? 0.02 : 0.08) * sin(s * 3.0 / PLEXUS_TENDRIL_LEN + t * 0.4) * sin(0.5 * TAU * along);
+  float ang = k / float(PLEXUS_TENDRIL_STRANDS) * TAU + s / PLEXUS_TENDRIL_LEN * PLEXUS_TENDRIL_TURNS * TAU - t * 0.8;
+  float r = PLEXUS_TENDRIL_R * (0.75 + 0.25 * sin(s / PLEXUS_TENDRIL_LEN * 20.0 - t * 2.0));
+  float env = smoothstep(0.0, PLEXUS_FLOW_THIN, s) * (1.0 - smoothstep(plexFlowLen - PLEXUS_FLOW_THIN, plexFlowLen, s));
+  float braided = 1.0 - smoothstep(plexFlowFill * plexFlowLen - 0.1, plexFlowFill * plexFlowLen, s);
+  return vec4(c + (cos(ang) * e1 + sin(ang) * e2) * r, env * braided);
+}
+// whether what joins lights `lo` (the first of them) onward belongs to the
+// chunk being placed: the chunk owns its own lights, the next chunk's few
+// it only reaches across to, and none past the tendril's last
+bool plexFlowOwns(float lo) { return lo < float(PLEXUS_FLOW_LIGHTS) && plexFlowChunk * float(PLEXUS_FLOW_LIGHTS) + lo < 3.0 * plexFlowSlots(); }
 // what of fragment `id` of a tendril set to `height` is at time `t`: where
 // it is (xyz) and how much of it there is (w). Strand id/EACH of three
 // braided round the tendril's middle, its fragments flowing on along it,
@@ -1046,6 +1119,7 @@ vec3 plexusAt(float id, int shape, float t) {
   float drift = shape == PLEXUS_CLUSTER || shape == PLEXUS_SEED_WEB ? PLEXUS_DRIFT : (shape == PLEXUS_HYENA ? PLEXUS_HYENA_DRIFT : PLEXUS_PART_DRIFT);
   vec3 moved = drift * d * vec3(1.0, 0.6, 1.0);
   if (shape == PLEXUS_HYENA) return plexusHyena(id, plexSeg) + moved;
+  if (shape == PLEXUS_TENDRIL_GARDEN) return plexusTendrilGarden(id, t).xyz;
   if (shape == PLEXUS_SEED_WEB) return plexusSeedWeb(id, moved, t);
   if (shape == PLEXUS_SEED_HEART) return plexusSeedHeart(id, moved, t);
   if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + PLEXUS_YIELD_PETALS) return plexusPetal(plexusForm(id, PLEXUS_PETAL) + moved, shape - PLEXUS_YIELD_PETAL, t);
@@ -1078,7 +1152,7 @@ float plexusLink(vec3 a, vec3 b, float reach) { return 1.0 - smoothstep(reach * 
 // -1 its companion): circling the other round where the point has drifted
 // to, each pair about an axis and at a pace of its own
 vec3 plexusLight(float id, int shape, float t, float twin) {
-  vec3 h = hash33(vec3(shape == PLEXUS_HYENA ? id + plexSeg * 61.0 : id, 41.7, 13.3));
+  vec3 h = hash33(vec3(shape == PLEXUS_HYENA || shape == PLEXUS_TENDRIL_GARDEN ? id + plexSeg * 61.0 : id, 41.7, 13.3));
   vec3 axis = normalize(h - 0.5 + vec3(0.0, 0.6, 0.0));
   vec3 side = normalize(cross(axis, abs(axis.y) < 0.9 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
   float spin = t * mix(PLEXUS_PAIR_SLOW, PLEXUS_PAIR_QUICK, h.z) + h.x * TAU;
@@ -1287,6 +1361,19 @@ void main() {
     float reach = fract(pos.x);
     // (how many fragments a strange seed has conjured)
     if (shape == PLEXUS_SEED_WEB) plexSeedCount = iw.w * float(PLEXUS_SEED_FRAGMENTS);
+    // (a chunk of a garden's tendril: its path this frame's bones, placed
+    // in the world as it is, braided as far as its growth; its lights'
+    // pairs each circling their own way, chunk by chunk)
+    if (shape == PLEXUS_TENDRIL_GARDEN) {
+      plexFlowBase = int(ie.y + 0.5);
+      plexFlowN = int(ie.z + 0.5);
+      plexFlowLen = max(ie.w, 1e-3);
+      plexFlowFill = iw.w;
+      plexFlowChunk = ip.y;
+      plexFlowHigh = iw.y;
+      plexSeg = ip.y;
+      M = mat4(1.0);
+    }
     float twin = plexKind < 0.5 ? pos.y : 1.0 - 2.0 * pos.z;
     plexLayer = step(twin, 0.0);
     vec3 A = plexusLight(ids.x, shape, t, twin);
@@ -1306,7 +1393,7 @@ void main() {
     }
     // a build's webs all beat from one heart: a yielder's from its core's,
     // a sprig's from its stem's foot
-    int hs = shape == PLEXUS_HYENA || shape == PLEXUS_SEED_WEB || shape == PLEXUS_SEED_HEART ? shape : shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
+    int hs = shape == PLEXUS_HYENA || shape == PLEXUS_SEED_WEB || shape == PLEXUS_SEED_HEART || shape == PLEXUS_TENDRIL_GARDEN ? shape : shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING ? PLEXUS_YIELD_CORE : (shape >= PLEXUS_HEART_STEM ? PLEXUS_HEART_STEM : (shape >= PLEXUS_SPRIG_STEM ? PLEXUS_SPRIG_STEM : shape));
     // (a bloom burst free from a settling heart beats on its own, from its
     // base, and so does each of its petlets)
     bool bloomPart = (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) || (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND);
@@ -1327,6 +1414,9 @@ void main() {
     float limb = plexSeg;
     if (shape == PLEXUS_HYENA) plexSeg = float(PLEXUS_HYENA_TORSO);
     vec3 H = plexusAt(plexusHeart(hs), hs, t);
+    // (a garden's tendril beats from its very first light, as the sketch
+    // does, whichever chunk this is)
+    if (shape == PLEXUS_TENDRIL_GARDEN) H = plexusTendrilGarden(-plexFlowChunk * float(PLEXUS_FLOW_LIGHTS), t).xyz;
     plexSeg = limb;
     // (posed by his bones, each limb riding its own: a bond's far end and
     // his chest are carried by theirs, then brought into this limb's)
@@ -1377,6 +1467,10 @@ void main() {
     // pane as much as its faintest point, or of the part riding it)
     if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) yield = min(min(plexusTendril(ids.x, shape - PLEXUS_TENDRIL, t).w, plexusTendril(ids.y, shape - PLEXUS_TENDRIL, t).w), plexusTendril(ids.z, shape - PLEXUS_TENDRIL, t).w);
     if (shape >= PLEXUS_TENDRIL_RIDE && shape < PLEXUS_TENDRIL_RIDE + 3) yield = plexusTendrilRide(ids.x, shape - PLEXUS_TENDRIL_RIDE, t, vec3(0.0)).w;
+    if (shape == PLEXUS_TENDRIL_GARDEN) yield = min(min(plexusTendrilGarden(ids.x, t).w, plexusTendrilGarden(ids.y, t).w), plexusTendrilGarden(ids.z, t).w);
+    // (each light, line and pane of a garden's tendril drawn by the one
+    // chunk that owns it)
+    if (shape == PLEXUS_TENDRIL_GARDEN && !plexFlowOwns(min(min(ids.x, ids.y), ids.z))) yield = 0.0;
     // (or of a strange seed's fragments, each as it rises out of it, each
     // line and pane once all its points have come)
     if (shape == PLEXUS_SEED_WEB) yield = min(min(plexusSeedShow(ids.x), plexusSeedShow(ids.y)), plexusSeedShow(ids.z));
@@ -1384,7 +1478,7 @@ void main() {
     if (shape == PLEXUS_HEART_STEM) plexCrowd = mix(1.0, 0.35, plexusHeartMorph(t));
     if (shape == PLEXUS_HEART_ROSE || (shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT)) plexCrowd = 0.45;
     if (shape >= PLEXUS_HEART_PETLET && shape < PLEXUS_HEART_GRAND) plexCrowd = 0.6;
-    if (shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) plexCrowd = 0.55;
+    if ((shape >= PLEXUS_TENDRIL && shape < PLEXUS_TENDRIL_RIDE) || shape == PLEXUS_TENDRIL_GARDEN) plexCrowd = 0.55;
     if (shape == PLEXUS_HYENA) plexCrowd = PLEXUS_HYENA_CROWD[int(plexSeg)];
     if (shape == PLEXUS_HYENA) plexPaneCrowd = min(plexCrowd * 1.5, 1.0);
     // (the web inside a seed's husk crowds closest of all)

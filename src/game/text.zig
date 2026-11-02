@@ -113,6 +113,10 @@ pub const Strings=struct{
     nightHint:S="",
     /// the belly can hold no more
     bellyFull:S="",
+    /// a tendril drawn to nothing
+    tendrilNowhere:S="",
+    /// a tendril the gardener has too few fragments to braid: how many it takes
+    tendrilFragments:S="",
     /// none of the item (`{0}`) is left to put down
     noItem:S="",
     /// the item (`{0}`) needs a study not yet known

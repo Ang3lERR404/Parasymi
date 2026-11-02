@@ -100,6 +100,9 @@ const dayTold:f32=0.01;
 /// `--demo` fast-forwards its garden this many seconds
 /// field this many tiles on a side
 const demoForward=25;
+/// how long act 2's demo garden runs on before play (s): the heart through
+/// its story to a builder
+const demoAct2=200;
 /// `--stress` sows a field this many tiles on a side
 const stressSide=120;
 /// most streamed chunks meshed in one frame (`renderer.meshMs` also caps it)
@@ -292,13 +295,14 @@ pub fn main(init:Init)!void{
       relist(gpa,io,&game);
       if(game.gardens.items.len>0)_=try restore(gpa,io,&game,r,game.gardens.items[0].name);
     }
-    if(demo)try setups.demo(&game,demoForward);
+    if(demo and !act2)try setups.demo(&game,demoForward);
     if(stress)try setups.stress(&game,stressSide);
   }
   if(tod)|t|game.sky.tod=t;
   game.speed=speed;
   if(unforming)game.prog.done.insert(.unforming);
   if(act2 and lone==null)try lib.act.begin(&game);
+  if(act2 and demo)try setups.act2(&game,demoAct2);
   if(inspect)|f|{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});

@@ -151,6 +151,9 @@ const Shape=enum(u8){
   seedWeb,
   /// the web inside a strange seed's crystal husk, turning slowly
   seedHeart,
+  /// a chunk of a garden's tendril, flowing along the whole path its
+  /// instance points to, braided as far as its growth says
+  tendrilGarden,
   /// the yielder's other petals, by number
   _,
 };
@@ -186,7 +189,11 @@ const Web=struct{
   /// its points join only within runs of this many (0: all of them)
   group:usize=0,
   /// whether points `i` and `j` may join
-  fn together(w:Web,i:usize,j:usize)bool{return w.group==0 or i/w.group==j/w.group;}
+  /// its points join only those at most this far on in the list (0: any;
+  /// a braid's lights, listed along it, join only their neighbours)
+  band:usize=0,
+  /// whether points `i` and `j` (`i` first) may join
+  fn together(w:Web,i:usize,j:usize)bool{return (w.group==0 or i/w.group==j/w.group) and (w.band==0 or j-i<=w.band);}
 };
 /// one web's points, each a pair of lights circling each other: two balls,
 /// their vertices keeping only their direction out and which of the pair
@@ -234,7 +241,7 @@ fn web(b:*mg.Builder,w:Web,layer:f32)Allocator.Error!void{
   };
   // each pane: two faces, wound opposite ways so one faces either side
   for(0..w.n)|i|for(i+1..w.n)|j|for(j+1..w.n)|k|{
-    if(!w.together(i,j) or !w.together(j,k))continue;
+    if(!w.together(i,j) or !w.together(j,k) or !w.together(i,k))continue;
     // its three points
     const ids=m.Vice(u8,3){@intCast(i),@intCast(j),@intCast(k)};
     // its corners' weights: all of the first, all of the second, all of the third
@@ -620,4 +627,20 @@ pub const yieldCoreMesh=struct{
 pub const heartDriven=struct{
   /// builds the heart's whole story, driven
   pub fn build(b:*mg.Builder)Allocator.Error!void{try story(b,6);}
+};
+/// how many lights a chunk of a garden's tendril owns: thirty slices of
+/// three, three metres of it (part.vert `PLEXUS_FLOW_LIGHTS`)
+const flowLights=90;
+/// how far on in the list a light of the tendril joins others: three slices
+/// on, the next chunk's first few too, so the chunks join seamlessly
+const flowBand=9;
+/// mesh: CONSTELLATE TENDRIL, A GARDEN'S. a garden's tendril
+/// (game/tendril.zig) is one flow along its whole path, the tendril
+/// sketch's braid of three strands of lights streaming from its start to
+/// its end; drawn in chunks of `flowLights` (each reaching across to the
+/// next chunk's first lights), every light placed on the GPU by how far
+/// along the whole path it has flowed (part.vert `plexusTendrilGarden`)
+pub const tendrilFlowMesh=struct{
+  /// builds one chunk's braid
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.tendrilGarden,.reach=0.14,.n=flowLights+flowBand,.band=flowBand});}
 };

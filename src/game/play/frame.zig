@@ -176,7 +176,10 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     var keyed:f32=0;
     if(ctl.down(in,.zoomIn))keyed+=keyZoomRate*dt;
     if(ctl.down(in,.zoomOut))keyed-=keyZoomRate*dt;
-    if(in.scroll+keyed!=0)g.cam.zoom(in.scroll+keyed,lib.act.eyes(g.act,&g.player,@floatCast(g.time)));
+    // (while a tendril is being drawn, the wheel sets how high it floats)
+    if(g.tendrils.draft!=null){
+      if(in.scroll+keyed!=0)lib.tendril.raise(g,in.scroll+keyed);
+    }else if(in.scroll+keyed!=0)g.cam.zoom(in.scroll+keyed,lib.act.eyes(g.act,&g.player,@floatCast(g.time)));
   }
   // interaction with the hovered tile (none while inspecting)
   g.aim(cursor,screen,inspecting);
@@ -194,6 +197,9 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     g.fullWarned=false;
     g.removed=null;
   }
+  // in the hyena's act, tendril held sweeps a path from one structure to
+  // another, a tendril between them once let go
+  if(g.act==.hyena and !inspecting)try lib.tendril.drag(g,ctl.down(in,.tendril) and uiHit==null,g.hover);
   // whether the hovered tile is within reach
   const near=if(g.hover)|h|g.player.inReach(h[0],h[1])else false;
   // R turns what is under the cursor (within reach), else the next thing

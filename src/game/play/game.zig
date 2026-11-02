@@ -272,6 +272,8 @@ pub const Game=struct{
   unforming:lib.unforming.Unforming=.{},
   /// which act the garden is in: who the gardener is (game/act.zig)
   act:lib.act.Act=.wolf,
+  /// the constellate tendrils drawn in the garden, and the one being drawn
+  tendrils:lib.tendril.Tendrils=.{},
   /// the radiant plants as they were when it began, for their shards'
   /// flight (not saved)
   unformSources:std.ArrayList(lib.unforming.Source)=.empty,
@@ -321,6 +323,7 @@ pub const Game=struct{
     g.gardens.deinit(g.gpa);
     g.unformSources.deinit(g.gpa);
     g.leyDrifts.deinit(g.gpa);
+    g.tendrils.deinit(g.gpa);
     g.moss.deinit(g.gpa);
     for(&g.inst)|*l|l.deinit(g.gpa);
     g.far.deinit(g.gpa);
@@ -441,6 +444,7 @@ pub const Game=struct{
     g.prog.absorb(ev,tickTime);
     try st.Structures.tickWith(g.structCtx(ev),tickTime);
     _=try lib.haloStructure.seek(g.structCtx(ev));
+    lib.tendril.tick(g,tickTime);
     try lib.unforming.tick(g,tickTime);
     if(g.specimen)|*sp|try sp.after(g,tickTime);
     g.ticks+=1;

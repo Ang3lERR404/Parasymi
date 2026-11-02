@@ -223,6 +223,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   }
   if(alone)try g.specimen.?.drawSamples(g);
   try lib.unforming.draw(g,tf);
+  if(!alone)try lib.tendril.draw(g,&g.parts);
   if(!alone){
     try ghost(g,tf);
     try motes(g);

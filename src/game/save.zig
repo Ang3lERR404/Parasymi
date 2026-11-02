@@ -120,7 +120,7 @@ const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the stored layout's version: bumped whenever one changes
-const version:u32=30;
+const version:u32=31;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -250,6 +250,9 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
   try w.put(prog.Progression,g.prog);
   try w.put(lib.unforming.Unforming,g.unforming);
   try w.put(u8,@intFromEnum(g.act));
+  // the tendrils drawn
+  try w.put(u32,@intCast(g.tendrils.list.items.len));
+  for(g.tendrils.list.items)|t|try w.put(lib.tendril.Tendril,t);
   // everything it grew
   // the plant list's columns
   const s=g.plants.list.slice();
@@ -320,6 +323,10 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
   g.prog=try r.get(prog.Progression);
   g.unforming=try r.get(lib.unforming.Unforming);
   g.act=lib.act.Act.of(try r.get(u8)) orelse return error.CorruptSave;
+  // the tendrils drawn
+  const tendrils=try r.get(u32);
+  g.tendrils.list.clearRetainingCapacity();
+  for(0..tendrils)|_|try g.tendrils.list.append(g.gpa,try r.get(lib.tendril.Tendril));
   g.cam.target=g.player.pos;
   // how many plants are stored
   const plants=try r.get(u32);

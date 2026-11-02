@@ -217,6 +217,8 @@ const parts=struct{
   pub const constellateTendrilGround=@import("meshes/constellate.zig").tendrilGround;
   /// a sketch: a constellate tendril arcing over
   pub const constellateTendrilArc=@import("meshes/constellate.zig").tendrilArc;
+  /// a chunk of a garden's constellate tendril, flowing along its whole path
+  pub const constellateTendrilFlow=@import("meshes/constellate.zig").tendrilFlowMesh;
   /// a sketch: act 2's gardener, a hyena of stars hovering
   pub const constellateHyena=@import("meshes/constellate.zig").hyenaMesh;
   // (light: blends over the satellites spinning round it)

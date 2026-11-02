@@ -457,3 +457,59 @@ pub fn stress(g:*Game,side:i32)Allocator.Error!void{
     }
   }
 }
+/// act 2's garden (`--act2 --demo`), run on to show every constellate combo
+/// at work: a planted strange seed with its fragments out; a core with four
+/// petals put down round it (a yielder); a stem with four buds round it (a
+/// heart), four petals put down by it once it has bloomed, run on until it
+/// has settled into a builder and fed fragments; tendrils from the seed and
+/// the yielder to the heart. Placed on the gardener's behalf, then the
+/// garden runs on `seconds` (petals put down partway)
+pub fn act2(g:*Game,seconds:f32)play.Error!void{
+  // the tile the gardener stands on
+  const c=m.tileAt(g.player.pos);
+  // put kind `k` down at `dx`,`dz` from the gardener, as by hand
+  const put=struct{
+    /// put it down; whether it fit
+    fn f(gg:*Game,cc:m.Vice(i32,2),dx:i32,dz:i32,k:st.Kind)Allocator.Error!bool{
+      if(!try gg.structs.place(gg.gpa,&gg.world,cc[0]+dx,cc[1]+dz,k,0,gg.rng.float()))return false;
+      st.sown(gg.structs.get(.of(gg.structs.list.items.len-1)),gg.act);
+      return true;
+    }
+  }.f;
+  _=try put(g,c,3,0,.strangeSeed);
+  _=try put(g,c,3,6,.yielder);
+  for([_]m.Vice(i32,2){.{5,6},.{1,6},.{3,8},.{3,4}})|o|_=try put(g,c,o[0],o[1],.petal);
+  _=try put(g,c,12,3,.stem);
+  for([_]m.Vice(i32,2){.{14,3},.{10,3},.{12,5},.{12,1}})|o|_=try put(g,c,o[0],o[1],.bud);
+  // the garden runs on; once the heart has bloomed, petals by it
+  var t:f32=0;
+  var petals=false;
+  while(t<seconds):(t+=play.tickTime){
+    if(!petals and t>40){
+      for([_]m.Vice(i32,2){.{14,5},.{10,5},.{14,1},.{10,1}})|o|_=try put(g,c,o[0],o[1],.petal);
+      petals=true;
+    }
+    try g.step();
+  }
+  // the heart fed, and tendrils to it from the seed and the yielder
+  const heart=g.structs.at(&g.world,c[0]+12,c[1]+3) orelse return;
+  _=g.structs.insert(&g.prog,heart,.fragment,20);
+  try tendril(g,.{c[0]+3,c[1]},.{c[0]+12,c[1]+3},lib.tendril.lift);
+  try tendril(g,.{c[0]+3,c[1]+6},.{c[0]+12,c[1]+3},0);
+}
+/// a tendril from what stands at `a` to what stands at `b`, its path along
+/// x then z, floating `high` over the ground (0 on it), braided whole
+fn tendril(g:*Game,a:m.Vice(i32,2),b:m.Vice(i32,2),high:f32)Allocator.Error!void{
+  const from=g.structs.at(&g.world,a[0],a[1]) orelse return;
+  const to=g.structs.at(&g.world,b[0],b[1]) orelse return;
+  var t=lib.tendril.Tendril{.from=g.structs.get(from).ref(),.to=g.structs.get(to).ref(),.n=0,.high=high,.fill=1};
+  // the walk from a to b
+  var p=a;
+  while(t.n<lib.tendril.most):(t.n+=1){
+    t.path[t.n]=p;
+    if(p[0]==b[0] and p[1]==b[1])break;
+    if(p[0]!=b[0])p[0]+=if(b[0]>p[0])1 else -1 else p[1]+=if(b[1]>p[1])1 else -1;
+  }
+  t.n+=1;
+  try g.tendrils.list.append(g.gpa,t);
+}

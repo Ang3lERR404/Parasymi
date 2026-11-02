@@ -305,6 +305,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `style.zig` — shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes.
+- `tendril.zig` — the flow: constellate tendrils (act 2).
 - `text.zig` — every player-facing string, loaded once at startup from `filePath` (`parasymi.cfg`) and never read again.
 - `unforming.zig` — THE UNFORMING: the garden's first world event, begun the moment the study of that name is learned.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).

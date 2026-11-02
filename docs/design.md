@@ -471,7 +471,18 @@ constellate one alone.
   drift to its first bloom; its chain reaction runs and it settles into a
   builder: fed ten fragments (by hand, or by a tendril) it forms a part
   on top of its rose (petal, leaf, bud, core, stem in turn), resting
-  there until a click takes it. Still to come: tendrils.
+  there until a click takes it.
+- **Tendrils (the flow, `game/tendril.zig`):** holding V he
+  sweeps the cursor from one structure to another (or back to himself);
+  the wheel, while he draws, sets how high it floats (on the ground up to
+  3 m). Let go, it costs a fragment for every two tiles and braids from
+  start to end (0.6 s a tile). Braided, whatever its start hands over (a
+  seed's fragment, a yielder's, a heart's made part) rides it one at a
+  time to its end, which takes it in (a heart its fragments, the gardener
+  anything). It is one flow along its whole path, the tendril sketch's
+  braid exactly ([tendril.md](tendril.md)); it sags once over its whole
+  length when floating. Gone when either end is. Saved (version 31).
+  Not yet: the sketch's arcing height.
 - **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
   belly panel showing each gardener's own) build a constellate core or a
   constellate petal from ten fragments each.
@@ -485,8 +496,8 @@ constellate one alone.
   show). Whole, its petals turn round the core and every 6 s spring shut,
   their tips gathering one point of light over it, let go as a mote and a
   new fragment; it keeps up to 20 fragments, a click takes one.
-- **Next:** what the yielder's fragments and light feed: the heart, the
-  heart making parts, tendrils carrying them (one loop).
+- **Next:** the wolf's rooting into the tree (how act 2 begins in play);
+  the arcing tendril; animation as parts drift and merge.
 ## Research panel (T, `hud/research.zig`)
 The research tree is drawn as a sapling growing in soil. It is laid out
 from the prerequisites alone, so it never needs placing or adjusting.

@@ -225,6 +225,17 @@ pub const Parts=struct{
     if(!p.sees(at,bound+boundPad))return;
     try p.add(id,at,skinned(at,base,lookIn));
   }
+  /// a mesh part.vert lays along a path all of its own: `n` points put by
+  /// `pose` from `base` (each a point in its first column and how far
+  /// along the path it lies, its w), `len` long; `at` within `r` bounds it
+  /// all (to cull it and pick its level of detail)
+  pub fn emitPath(p:*Parts,id:meshlib.Id,base:u32,n:u32,len:f32,at:m.V3,r:f32,lookIn:Look)Allocator.Error!void{
+    if(!p.sees(at,r+boundPad))return;
+    // the instance, its matrix unused: the path places it
+    var inst=instance(m.identity,lookIn);
+    inst.e=.{0,m.f(base),m.f(n),len};
+    try p.add(id,at,inst);
+  }
   /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
   /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
   pub fn emitMote(p:*Parts,at:m.V3,phase:f32,life:f32,echo:f32,glow:f32)Allocator.Error!void{
