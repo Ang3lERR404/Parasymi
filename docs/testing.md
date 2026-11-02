@@ -159,7 +159,8 @@ zig build run -- --demo --unforming --inspect=polyp --dist=40 --pitch=3 --shots=
 ```
 `--act2` begins the garden in act 2 after running the unforming through
 (`--act2 --demo`: a planted seed, a yielder, a settled heart and two
-tendrils, one floating and one on the ground, run 200 s on):
+tendrils, one rising over its middle and falling again, one on the
+ground, run 200 s on):
 the star hyena is the gardener, the strange seed in his keeping. With
 `--structure=strangeSeed --state=active` it stands planted alone (a long
 `--period=` keeps it from being put down afresh), e.g.

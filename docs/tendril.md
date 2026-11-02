@@ -192,9 +192,9 @@ metres along the *whole* drawn path, so it is one stream from start to
 end, never tile by tile:
 
 - **The path on the GPU.** game/tendril.zig lays the path's tiles out
-  (each tile's centre floating `high` over the ground, sagging
-  `0.2 * min(high, 1) * sin(π along)` over the whole length; on the ground
-  0.06) and puts the points as this frame's bones (`Parts.pose`): each a
+  (each tile's centre floating its own height over the ground, set by the
+  wheel as it is drawn, sagging `0.2 * min(high, 1) * sin(π along)` toward
+  the path's middle; on the ground 0.06) and puts the points as this frame's bones (`Parts.pose`): each a
   point in its first column, how far along the path it lies in its w.
   The instance (`Parts.emitPath`) carries where they start, how many and
   the path's length in `ie.yzw`. `plexFlowAt(s)` finds the span and runs

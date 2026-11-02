@@ -496,13 +496,19 @@ pub fn act2(g:*Game,seconds:f32)play.Error!void{
   _=g.structs.insert(&g.prog,heart,.fragment,20);
   try tendril(g,.{c[0]+3,c[1]},.{c[0]+12,c[1]+3},lib.tendril.lift);
   try tendril(g,.{c[0]+3,c[1]+6},.{c[0]+12,c[1]+3},0);
+  // (and the floating one rising over its middle and falling again, each
+  // tile at its own height)
+  if(g.tendrils.list.items.len>0){
+    const rise=&g.tendrils.list.items[0];
+    for(0..rise.n)|k|rise.highs[k]=0.6+1.6*@sin(m.pi*m.f(k)/m.f(rise.n-1));
+  }
 }
 /// a tendril from what stands at `a` to what stands at `b`, its path along
-/// x then z, floating `high` over the ground (0 on it), braided whole
+/// x then z, every tile floating `high` over the ground (0 on it), braided whole
 fn tendril(g:*Game,a:m.Vice(i32,2),b:m.Vice(i32,2),high:f32)Allocator.Error!void{
   const from=g.structs.at(&g.world,a[0],a[1]) orelse return;
   const to=g.structs.at(&g.world,b[0],b[1]) orelse return;
-  var t=lib.tendril.Tendril{.from=g.structs.get(from).ref(),.to=g.structs.get(to).ref(),.n=0,.high=high,.fill=1};
+  var t=lib.tendril.Tendril{.from=g.structs.get(from).ref(),.to=g.structs.get(to).ref(),.n=0,.highs=@splat(high),.fill=1};
   // the walk from a to b
   var p=a;
   while(t.n<lib.tendril.most):(t.n+=1){

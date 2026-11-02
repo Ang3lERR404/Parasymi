@@ -69,8 +69,8 @@ the top left.
 ### Other keys
 - **F** harvest/feed, **Shift+F** take, **C** configure.
 - **V** held (act 2): sweep the cursor from one structure to another, a
-  tendril between them once let go; the wheel meanwhile sets how high it
-  floats.
+  tendril between them once let go; the wheel meanwhile sets how high the
+  tile under the cursor floats, and the tiles swept after it.
 - **1–9 / 0 / - / = / Backspace** pick hotbar slots only. Research nodes
   and weave recipes are clicked in their panels.
 - **Tab** belly (weave), **T** research, **F3** debug.

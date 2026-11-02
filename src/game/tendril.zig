@@ -4,7 +4,10 @@
 //! fragments flow in from his keeping (one for every two tiles) and braid
 //! it from its start to its end, three strands winding round each other,
 //! always flowing on along it like a stream; the wheel, while he draws,
-//! sets how high it floats (on the ground up to `highest`). Braided, it
+//! sets how high the tile under the cursor floats (on the ground up to
+//! `highest`), each tile swept after it starting there, so the path can
+//! rise and fall tile by tile, the whole curve running smoothly through
+//! every tile's height. Braided, it
 //! carries: whatever its start hands over (a seed's fragment, a yielder's,
 //! the part a heart has made) rides along it, one at a time, to its end,
 //! which takes it in (a heart its fragments; the gardener anything). It is
@@ -39,8 +42,8 @@ pub const most=32;
 pub const braidPerTile:f32=0.6;
 /// how fast what it carries rides along it (tiles a second)
 pub const speed:f32=1.5;
-/// how high over the ground a tendril floats at its ends unless the wheel
-/// says otherwise (m; the tendril sketch's)
+/// how high over the ground a tendril's tiles float unless the wheel says
+/// otherwise (m; the tendril sketch's)
 pub const lift:f32=1.0;
 /// the highest it can be set to float (m)
 pub const highest:f32=3.0;
@@ -75,8 +78,8 @@ pub const Tendril=struct{
   path:[most]Tile=undefined,
   /// how many of them
   n:u8,
-  /// how high over the ground it floats (m; 0 on the ground)
-  high:f32=lift,
+  /// how high over the ground each of its tiles floats (m; 0 on the ground)
+  highs:[most]f32=@splat(lift),
   /// how far braided, start to end (0..1)
   fill:f32=0,
   /// what rides it now
@@ -92,6 +95,8 @@ pub const Draft=struct{
   path:[most]Tile=undefined,
   /// how many
   n:u8=0,
+  /// how high over the ground each floats (m)
+  highs:[most]f32=@splat(lift),
 };
 /// every tendril in the garden, and the one being drawn
 pub const Tendrils=struct{
@@ -99,7 +104,8 @@ pub const Tendrils=struct{
   list:ArrayList(Tendril)=.empty,
   /// the one the gardener draws now, if any
   draft:?Draft=null,
-  /// how high the next one floats (m), set by the wheel while drawing
+  /// how high the next tile swept floats (m), set by the wheel while
+  /// drawing
   high:f32=lift,
   /// free the list
   pub fn deinit(ts:*Tendrils,gpa:Allocator)void{ts.list.deinit(gpa);}
@@ -108,11 +114,12 @@ pub const Tendrils=struct{
 fn same(a:Tile,b:Tile)bool{return a[0]==b[0] and a[1]==b[1];}
 /// how many fragments braiding a path of `n` tiles takes: one for every two
 pub fn cost(n:u8)u16{return @intCast((n+1)/2);}
-/// the wheel turned `notches` while drawing: the tendril floats higher (+)
-/// or lower, down to the ground
+/// the wheel turned `notches` while drawing: the tile under the cursor (and
+/// every one swept after it) floats higher (+) or lower, down to the ground
 pub fn raise(g:*Game,notches:f32)void{
   const ts=&g.tendrils;
   ts.high=@min(@max(ts.high+notches*notch,0),highest);
+  if(ts.draft)|*d|d.highs[d.n-1]=ts.high;
 }
 /// one frame of drawing: while `held`, the cursor's tile `hover` (begun on
 /// a structure) is swept into the draft; let go, the draft becomes a
@@ -126,12 +133,14 @@ pub fn drag(g:*Game,held:bool,hover:?Tile)Allocator.Error!void{
       // a new tile, swept in
       if(same(d.path[d.n-1],h) or d.n==most)return;
       d.path[d.n]=h;
+      d.highs[d.n]=ts.high;
       d.n+=1;
       return;
     }
     if(g.structs.at(&g.world,h[0],h[1])==null)return;
     var d=Draft{};
     d.path[0]=h;
+    d.highs[0]=ts.high;
     d.n=1;
     ts.draft=d;
     return;
@@ -147,7 +156,7 @@ pub fn drag(g:*Game,held:bool,hover:?Tile)Allocator.Error!void{
   if(toId==null and !same(end,mine))return g.prog.say(txt.s.msg.tendrilNowhere,.{});
   if(toId)|j|if(j==fromId)return;
   if(!g.player.inv.take(.fragment,cost(d.n)))return g.prog.say(txt.s.msg.tendrilFragments,.{cost(d.n)});
-  var t=Tendril{.from=g.structs.get(fromId).ref(),.to=if(toId)|j|g.structs.get(j).ref()else null,.n=d.n,.high=ts.high};
+  var t=Tendril{.from=g.structs.get(fromId).ref(),.to=if(toId)|j|g.structs.get(j).ref()else null,.n=d.n,.highs=d.highs};
   t.path=d.path;
   try ts.list.append(g.gpa,t);
 }
@@ -219,12 +228,13 @@ const Laid=struct{
     return m.catmullRom(l.point(k-1),l.point(k),l.point(k+1),l.point(k+2),f);
   }
 };
-/// the tiles `p` of a path floating `high` over the ground laid out in the
-/// world: each tile's centre that high (on the ground, just over it),
-/// sagging toward its middle the higher it floats (the tendril sketch's)
-fn lay(g:*const Game,p:[]const Tile,high:f32)Laid{
+/// the tiles `p` of a path, each floating its own of `highs` over the
+/// ground, laid out in the world: each tile's centre that high (on the
+/// ground, just over it), sagging toward the path's middle the higher it
+/// floats (the tendril sketch's)
+fn lay(g:*const Game,p:[]const Tile,highs:[]const f32)Laid{
   var l=Laid{.n=p.len};
-  for(p,0..)|c,k|{
+  for(p,highs,0..)|c,high,k|{
     // how far along the path it lies (0 start .. 1 end)
     const along=m.f(k)/m.f(@max(p.len-1,1));
     const y=if(high<=0)low else high-sag*@min(high,1)*@sin(m.pi*along);
@@ -238,8 +248,8 @@ fn lay(g:*const Game,p:[]const Tile,high:f32)Laid{
 pub fn draw(g:*Game,out:*Parts)Allocator.Error!void{
   for(g.tendrils.list.items)|*t|{
     // its path, laid out
-    const l=lay(g,t.tiles(),t.high);
-    try flow(out,&l,t.high,t.fill,false);
+    const l=lay(g,t.tiles(),t.highs[0..t.n]);
+    try flow(out,&l,t.highs[0..t.n],t.fill,false);
     const it=t.cargo orelse continue;
     // where along its path it rides, just over it, turning slowly as it
     // goes and fading in and out at either end (the sketch's rider)
@@ -250,14 +260,18 @@ pub fn draw(g:*Game,out:*Parts)Allocator.Error!void{
   const ts=&g.tendrils;
   if(ts.draft)|d|if(d.n>1){
     // the path swept so far, at the height it will float
-    const l=lay(g,d.path[0..d.n],ts.high);
-    try flow(out,&l,ts.high,1,true);
+    const l=lay(g,d.path[0..d.n],d.highs[0..d.n]);
+    try flow(out,&l,d.highs[0..d.n],1,true);
   };
 }
-/// one tendril along `l` floating `high`, braided as far as `fill`, a
+/// one tendril along `l`, its tiles floating `highs`, braided as far as `fill`, a
 /// ghost if `ghost`: its path put as this frame's bones, then as many
 /// chunks of its braid as its length needs, each flowing along the whole
-fn flow(out:*Parts,l:*const Laid,high:f32,fill:f32,ghost:bool)Allocator.Error!void{
+fn flow(out:*Parts,l:*const Laid,highs:[]const f32,fill:f32,ghost:bool)Allocator.Error!void{
+  // how high its highest tile floats (on the ground all along, it sways
+  // less)
+  var high:f32=0;
+  for(highs)|h|high=@max(high,h);
   // its points as bones: each a point and how far along it lies
   var bones:[most]m.M4=undefined;
   for(0..l.n)|k|{
