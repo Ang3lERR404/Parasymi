@@ -191,6 +191,8 @@ const parts=struct{
   pub const constellateFlower=@import("meshes/constellate.zig").flower;
   /// a sketch: a constellate yielder, petals snapped to a flower head
   pub const constellateYield=@import("meshes/constellate.zig").yield;
+  /// a yielder's core alone, as it is seen before it is put down
+  pub const constellateYieldCore=@import("meshes/constellate.zig").yieldCoreMesh;
   /// a sketch: a constellate stem, the part others fasten to
   pub const constellateStem=@import("meshes/constellate.zig").stem;
   /// a sketch: a constellate sprig, a branch and two leaves on a stem

@@ -606,3 +606,9 @@ pub const seedWeb=struct{
 pub fn seedHeartWeb(b:*mg.Builder)Allocator.Error!void{
   try cluster(b,.{.shape=.seedHeart,.reach=0.07,.n=16});
 }
+/// mesh: CONSTELLATE CORE. a yielder's core alone, a flower head of light,
+/// as it is seen before it is put down
+pub const yieldCoreMesh=struct{
+  /// builds the core's web alone
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.yieldCore,.reach=0.21});}
+};

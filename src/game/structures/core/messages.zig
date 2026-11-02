@@ -22,6 +22,12 @@ pub const Msg=union(enum){
   /// `n` of `item` came in from afar (spores landing); by default it is
   /// taken in as `insert` does
   arrived:struct{item:items.Item,n:u16},
+  /// a constellate petal put down nearby asks to drift over (a yielder
+  /// still short of petals answers `done`)
+  petalComing,
+  /// a constellate petal has drifted over and merges (a yielder short of
+  /// petals takes it on: `done`)
+  petalSnapped,
 };
 /// what a structure makes of a `Msg`
 pub const Reply=union(enum){

@@ -209,7 +209,7 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
       a.graft=0;
       return.done;
     },
-    .lit,.arrived=>return.ignored,
+    .lit,.arrived,.petalComing,.petalSnapped=>return.ignored,
   }
 }
 /// condenses the study a little (a flare when a unit is done), turns its

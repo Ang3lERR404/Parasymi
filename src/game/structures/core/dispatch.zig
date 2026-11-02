@@ -78,7 +78,7 @@ pub fn send(ss:*Structures,ctx:Ctx,to:Id,msg:Msg)Reply{
   };
   if(r!=.ignored)return r;
   return switch(msg){
-    .lit,.unform,.graft=>.ignored,
+    .lit,.unform,.graft,.petalComing,.petalSnapped=>.ignored,
     .arrived=>|a|.{.took=ss.insert(ctx.g,to,a.item,a.n)},
   };
 }

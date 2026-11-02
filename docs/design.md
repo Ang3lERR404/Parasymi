@@ -447,7 +447,7 @@ constellate one alone.
   part, clear glass with glowing cracks) with a small web turning inside
   it. Put down by his hand (the `sown` hook) it is planted; put down by
   the wolf's it only lies there. Planted, it conjures 50 fragments, one
-  every 15 s, enough for a core and four petals: each a small glass
+  every 3 s, enough for a core and four petals: each a small glass
   triangle of three points that slips out through a crack and spirals up
   to drift loose round and over it (`strangeSeedWeb`, part.vert
   `plexusSeedWeb`; how many drift in the instance's growth). A click
@@ -456,8 +456,12 @@ constellate one alone.
 - **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
   belly panel showing each gardener's own) build a constellate core or a
   constellate petal from ten fragments each.
-- **The yielder:** a core put down stands alone; each petal fed to it
-  (`wants` petals) snaps on round its rim, bonded to it, until four stand
+- **The yielder:** a core put down stands alone (and is seen alone before
+  it is put down, `constellateYieldCore`). A petal put down on its own
+  (`petal` structure) floats over its tile until a core short of petals
+  stands within 4 tiles, then drifts over in 6 s and merges (messages
+  `petalComing`, `petalSnapped`):
+  it snaps on round the rim, bonded to it, until four stand
   there (part.vert `plexYieldOn` from its growth: only the petals on
   show). Whole, its petals turn round the core and every 6 s spring shut,
   their tips gathering one point of light over it, let go as a mote and a

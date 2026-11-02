@@ -493,6 +493,10 @@ pub const Strings=struct{
     yielderPetals:S="",
     /// a whole yielder at work: how many fragments it holds
     yielderWhole:S="",
+    /// a constellate petal put down with no core near enough
+    petalWaiting:S="",
+    /// a constellate petal drifting over to the core it merges with
+    petalDrifting:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",
     /// a weftstone ionizing a ley crystal

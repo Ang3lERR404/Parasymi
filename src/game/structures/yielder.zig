@@ -1,7 +1,8 @@
 //! YIELDER: the constellate lineage's first build, made in act 2 by the
 //! star hyena's hands. A constellate core (a flower head of light, built of
-//! ten fragments) put down stands alone, a web; each constellate petal fed
-//! to it snaps on round its rim, bonded to it, until four stand there. Then
+//! ten fragments) put down stands alone, a web. Constellate petals put down
+//! near it (game/structures/petal.zig) drift over and merge with it, each
+//! snapping on round its rim, bonded to it, until four stand there. Then
 //! it is whole: its petals turn slowly round the core and, every few
 //! seconds, spring shut, their tips gathering the air's energy into one
 //! point over the core, let go as a mote of light and one new fragment,
@@ -18,7 +19,7 @@ const testing=std.testing;
 const m=lib.engine.core.math;
 /// the structures registry: `Def`, `Structure`, the hooks' context
 const st=lib.structures;
-/// what can be held: petals in, fragments out
+/// what can be held: the fragments it yields
 const items=lib.items;
 /// every player-facing string
 const txt=lib.txt;
@@ -37,8 +38,9 @@ const Color=lib.engine.ui.draw.Color;
 /// the library meshes it draws: its web, by its own `emit`
 pub const meshes=.{.constellateYield};
 /// what a yielder is: one tile, of a lineage not yet named, drawn by its
-/// own `emit` (its petals show as they snap on), still
-pub const def:st.Def=.{.item=.constellateCore,.lineage=null,.size=1,.mesh=.constellateYield,.bare=true,.still=true};
+/// own `emit` (its petals show as they snap on), still; seen before it is
+/// put down as the core alone
+pub const def:st.Def=.{.item=.constellateCore,.lineage=null,.size=1,.mesh=.constellateYieldCore,.bare=true,.still=true};
 /// how many petals make it whole (part.vert `PLEXUS_YIELD_PETALS`)
 pub const petalsWhole:u8=4;
 /// how often, whole, it yields a fragment (s; part.vert `PLEXUS_YIELD_CYCLE`)
@@ -55,33 +57,37 @@ pub const State=struct{
   /// whether all its petals are on
   pub fn whole(q:State)bool{return q.petals>=petalsWhole;}
 };
-/// it takes petals until it is whole, nothing else
-pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32{
-  if(item!=.constellatePetal)return 0;
-  return (petalsWhole-|s.state.yielder.petals)-|s.inv.count(.constellatePetal);
-}
-/// one step of a yielder `q` holding `inv` (of `n` slots) over `dt` s: the petals fed to
-/// it snap on, and, whole, it yields a fragment every `cycle` s while it
-/// keeps fewer than `keeps`. Returns whether it worked.
+/// one step of a yielder `q` holding `inv` (of `n` slots) over `dt` s:
+/// whole, it yields a fragment every `cycle` s while it keeps fewer than
+/// `keeps`. Returns whether it worked.
 pub fn step(comptime n:usize,q:*State,inv:*items.Inventory(n),dt:f32)bool{
-  // snapping on what it was fed
-  var snapped=false;
-  while(!q.whole() and inv.take(.constellatePetal,1)){
-    q.petals+=1;
-    snapped=true;
-  }
-  if(!q.whole())return snapped;
+  if(!q.whole())return false;
   q.since+=dt;
   if(q.since<cycle)return true;
   q.since-=cycle;
   if(inv.count(.fragment)<keeps)_=inv.add(.fragment,1);
   return true;
 }
-/// its petals snap on; whole, it gathers and yields
+/// whole, it gathers and yields
 pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // the yielder
   const s=ctx.ss.get(i);
   return step(st.slots,&s.state.yielder,&s.inv,dt);
+}
+/// a petal nearby may drift over while it is short of petals, and one that
+/// has drifted over snaps on
+pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
+  // what it remembers
+  const q=&ctx.ss.get(i).state.yielder;
+  switch(msg){
+    .petalComing=>return if(q.whole()).ignored else.done,
+    .petalSnapped=>{
+      if(q.whole())return.ignored;
+      q.petals+=1;
+      return.done;
+    },
+    .lit,.unform,.graft,.arrived=>return.ignored,
+  }
 }
 /// whole, a click takes one fragment it has yielded
 pub fn handOver(s:*st.Structure)?items.Item{
@@ -118,20 +124,40 @@ const iconGlow:Color=.{60,110,255,80};
 const iconPetal:Color=.{150,210,255,220};
 /// the icon's core: near white
 const iconCore:Color=.{220,240,255,255};
-test"a yielder takes four petals, then yields a fragment each cycle, keeping at most its fill"{
-  // a yielder, and what it holds
-  var q=State{};
+test"a yielder yields only whole, a fragment each cycle, keeping at most its fill"{
+  // a yielder short of a petal, and what it holds
+  var q=State{.petals=petalsWhole-1};
   var inv=items.Inventory(4){};
-  _=inv.add(.constellatePetal,3);
-  _=step(4,&q,&inv,1);
-  try testing.expect(!q.whole() and q.petals==3);
-  // a fourth: whole, and yielding
-  _=inv.add(.constellatePetal,1);
-  _=step(4,&q,&inv,1);
-  try testing.expect(q.whole());
+  try testing.expect(!step(4,&q,&inv,cycle*3));
+  try testing.expectEqual(@as(u32,0),inv.count(.fragment));
+  // the last on: whole, and yielding
+  q.petals+=1;
   _=step(4,&q,&inv,cycle);
   try testing.expectEqual(@as(u32,1),inv.count(.fragment));
   // never past what it keeps
   for(0..100)|_|_=step(4,&q,&inv,cycle);
   try testing.expectEqual(keeps,inv.count(.fragment));
+}
+test"a petal put down near a core drifts over and merges, one too far waits"{
+  // a fresh game, its world streamed in round the gardener
+  const gpa=testing.allocator;
+  var g=try lib.play.Game.init(gpa,lib.play.defaultSeed);
+  defer g.deinit();
+  try g.world.stream(g.focus(),2,1000);
+  // a core, a petal two tiles off and one far beyond reach
+  const c=m.tileAt(g.player.pos);
+  try testing.expect(try g.structs.place(gpa,&g.world,c[0]+3,c[1],.yielder,0,0.1));
+  try testing.expect(try g.structs.place(gpa,&g.world,c[0]+5,c[1],.petal,0,0.2));
+  try testing.expect(try g.structs.place(gpa,&g.world,c[0]+3,c[1]+12,.petal,0,0.3));
+  // the seconds run
+  var t:f32=0;
+  while(t<lib.structures.kinds.petal.drifting+1):(t+=lib.play.tickTime)try g.step();
+  // the near one merged and gone, the far one still waiting
+  var petals:u32=0;
+  for(g.structs.list.items)|*s|switch(s.kind()){
+    .yielder=>try testing.expectEqual(@as(u8,1),s.state.yielder.petals),
+    .petal=>petals+=1,
+    else=>{},
+  };
+  try testing.expectEqual(@as(u32,1),petals);
 }

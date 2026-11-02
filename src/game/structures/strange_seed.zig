@@ -43,8 +43,8 @@ pub const def:st.Def=.{.item=.strangeSeed,.lineage=null,.size=1,.mesh=.strangeSe
 /// the most loose fragments it conjures: enough for a core and four petals
 /// (part.vert `PLEXUS_SEED_FRAGMENTS`)
 pub const most:f32=lib.constellate.seedFragments;
-/// how long it takes to conjure one (s): all of them in twelve and a half minutes
-pub const every:f32=15;
+/// how long it takes to conjure one (s): all of them in two and a half minutes
+pub const every:f32=3;
 /// what a strange seed remembers: whether it is planted, how many
 /// fragments it has conjured, and how many of those have been taken
 pub const State=struct{
