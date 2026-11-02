@@ -203,7 +203,7 @@ pub const State=union(enum){
       .grow,.span,.held=>true,
       .turn,.look=>what!=.samples and what!=.sculpt,
       .wither,.flow,.drain,.dark,.live,.pluck,.ripen=>what==.plant,
-      .unform=>switch(what){.plant=>|sp|lib.unforming.radiant(sp),.structure,.samples,.sculpt=>false},
+      .unform=>switch(what){.plant=>|sp|lib.unforming.radiant(sp) or lib.unforming.dies(sp),.structure,.samples,.sculpt=>false},
       .active=>what==.structure,
     };
   }
@@ -402,7 +402,7 @@ pub const Specimen=struct{
           }
         }
         // unforming: the event held where it is this far through its shattering
-        if(s.state==.unform)g.unforming=.{.phase=.shattering,.t=lib.unforming.momentOf(seed,s.share())};
+        if(s.state==.unform)g.unforming=.{.phase=.shattering,.t=if(lib.unforming.radiant(sp))lib.unforming.momentOf(seed,s.share())else lib.unforming.witherMoment(seed,s.share())};
         // the plants lit by radiance; it alone, lit as its look says
         const rad=&g.eco.radiance.radiating;
         try rad.resize(g.gpa,g.plants.len());
@@ -628,7 +628,8 @@ test"a state is a name, a share of growth or a span"{
   try testing.expectEqual(m.Vice(f32,2){0.2,0.8},(try State.parse("0.2..0.8")).span);
   try testing.expectError(error.BadState,State.parse("sideways"));
   try testing.expect((try State.parse("unform")).suits(.{.plant=.bloom}));
-  try testing.expect(!(try State.parse("unform")).suits(.{.plant=.lumenroot}));
+  try testing.expect((try State.parse("unform")).suits(.{.plant=.lumenroot}));
+  try testing.expect(!(try State.parse("unform")).suits(.{.plant=.confluence}));
   try testing.expect((try State.parse("active")).suits(.{.structure=.germinator}));
   try testing.expect(!(try State.parse("wither")).suits(.{.structure=.germinator}));
 }

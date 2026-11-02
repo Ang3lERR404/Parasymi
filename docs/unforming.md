@@ -46,16 +46,16 @@ than all at once.
 
 | t (s) | What happens |
 |---|---|
-| 0 | Every starlight mote shatters (6 warm shards each, 1.4 s) and no star falls again. Every structure is sent `Msg.unform`: the arsthraxia evolves. |
+| 0 | Every starlight mote shatters (6 warm shards each, 1.4 s) and no star falls again. Every structure is sent `Msg.unform`: the arsthraxia evolves. A low D swells in under it all and the music gives way. |
 | 0 – 6 | Radiant plants (bloom, vesper) begin to glitch, one after another. |
-| +5 each | Each one glitches, shatters like glass and blinks out over 5 s. At 60% through, it sends 4 shards up. |
-| 0 – 14 | Symbiotic and parasitic plants wither, and the lineages' structures grow back down to nothing, each over 6 s (starting within the first 8 s). What they held is lost. |
+| +5 each | Each one glitches over 5 s: bands of it slip sideways and it blinks, cracks of its own light run over it cell by cell, and past halfway it breaks along them into large shards of its own film's colour that drift out and up, turning, and shrink away. At 60% through it sends 4 shards up, each trailing a ribbon of that colour; a glass snap and scatter of glints is heard. |
+| 0 – 14 | Symbiotic and parasitic plants wither, each over 6 s (starting within the first 8 s): they dry out grey, bow over and curl, then crumble from the top down into flakes of ash, an ember along each edge as it breaks, lifting off downwind; dry crumbling is heard. The lineages' structures grow back down to nothing. What they held is lost. |
 | 1 – 13 | The sky shatters from the zenith to the horizon, pane by pane, and the ley's violet glow floods in. |
-| ~2.8 – 10 | The ley lines seal from their edges in, a bright seam closing, leaving scars of bare soil. |
-| 10 | Sealed. Every ley shard node breaks into 7 violet shards that drift up weightless. |
-| up to 13.4 | The shards fly up (2.4 s each, swirling) to a point 14 m over the middle of where the radiant plants stood. A star of gathered light swells there as they arrive. |
-| 13.4 – 15.6 | The **strange seed** falls (2.2 s, faster as it goes), its star shrinking back into it. |
-| 15.6 | It lands, with a burst of light (1.4 s): **OUT OF THE SHATTERED LIGHT, A SEED FALLS. IT DOES NOT TAKE ROOT** |
+| ~2.8 – 10 | The ley lines seal from their edges in, a bright seam closing, leaving scars of bare soil; a seam is heard humming shut, sinking an octave. |
+| 10 | Sealed. Every ley shard node breaks (glass heard) into 7 violet crystals that drift up weightless; each at its own moment cracks and melts into a burst of violet motes. |
+| up to 13.4 | The shards fly up (2.4 s each, swirling, ribbons behind them) to a point 14 m over the middle of where the radiant plants stood. A star of gathered light swells there as they arrive: a web of pale blue points and threads (as the sky's plexus) round a heart of light, turning slowly, flaring as each shard lands, each landing ringing a Lydian step higher. |
+| 13.4 – 15.6 | The **strange seed** falls (2.2 s, faster as it goes), its star shrinking back into it, a comet's tail of light behind it; it whistles down. |
+| 15.6 | It lands: a ring of light rolls out over the ground from it (2.4 s, the halo's flash), motes flung up, and a deep soft bell blooms with a thump under it and a glass chord ringing up over it: **OUT OF THE SHATTERED LIGHT, A SEED FALLS. IT DOES NOT TAKE ROOT**. The drone fades over the next 9 s. |
 | 40 | The last drifting ley shard blinks out. The event's clock stops. |
 
 The phases (`Phase`) are `waiting` → `shattering` → `falling` → `landed`.
@@ -74,7 +74,9 @@ The phases (`Phase`) are `waiting` → `shattering` → `falling` → `landed`.
   nested blooms floating over its calyx on thin tethers.
 - **The sky, for good:** no sun, moon or stars. Violet veils and a
   drifting plexus on the dome, rose by day and deep blue by night. The key
-  light becomes the ley-tinted glow overhead.
+  light becomes the glow overhead, a pale lavender by day so the garden
+  keeps its colours under it, its shade violet; the air sheds half its
+  haze (view.zig `shiftClear`), so it stays clear rather than purple.
 - **The ley, for good:** sealed to soil (`gen.sealOf`); chunks streamed in
   later are sealed as they arrive (`Chunk.sealed`), their nodes simply gone.
 - **No longer to be had:** starlight and ley shards.
@@ -106,15 +108,39 @@ The phases (`Phase`) are `waiting` → `shattering` → `falling` → `landed`.
 
 ## Where it is drawn
 All dense work is on the GPU:
-- radiant plants glitching: `PlantInstance.glitch`, plant.vert `unformAt`,
-  plant.frag `unform`;
+- radiant plants glitching and breaking: `PlantInstance.glitch.x`,
+  plant.vert `unformAt`, plant.frag `unform`. The shards are cells of a 3D
+  Voronoi (common.glsl `shardCell`) laid in the mesh as built (`v_rest`);
+  a triangle whose corners lie in two cells is cut away (`split`), so
+  shards never smear across the gap;
+- the old lineages withering to ash: `PlantInstance.glitch.y`
+  (`Unforming.witherOf`), plant.vert `crumbleAt` (finer cells, lifted
+  downwind; drawn as points in the shadow pass, so a flake casts none),
+  plant.frag `wither`;
 - the sky and the closing ley lines: sky.frag, terrain.frag, common.glsl
   `SHIFT` (`SEAL_FROM`/`SEAL_SPAN` must match `sealFrom`/`sealSpan` in
   `unforming.zig`).
 
-Each frame `unforming.draw` emits the flying shards (`unformShard`), the
-seed and its star of light, the landing burst and the drifting ley
-shards, each lighting the air round it.
+Each frame `unforming.draw` emits the flying shards (`unformShard`, in
+their plant's film colour) with their ribbons (`unformTrail`, a `.trail`
+part laid along each shard's own path by `emitCurve`), the seed, its star
+(`unformStar`, a web of `.trail` light) and heart, the comet tail, the
+landing ring (`haloFlash`) and motes, and the drifting ley crystals and
+their melting, each lighting the air round it.
+
+## How it sounds
+`sound/unforming.zig` (`Unformed`), all soft and in the music's D Lydian.
+The game sends `unforming.heard` each frame while it runs (main.zig): its
+clock, how much is withering, and the cracks and arrivals since last
+heard; the sound keeps its own clock between frames. A drone (D2, A2, D3,
+faint G#3, each beating against a twin) swells in over 3 s and fades 9 s
+after the landing, the music hushed to 30% under it; glass glints rain
+while the sky shatters, thickest midway; the seam glides D3 to D2 as the
+ley seals; crackle in a high band as ash crumbles; each crack a noise
+snap and 4 to 7 glints; each arrival a glint a Lydian step above the
+last; the fall a band of air swept down 3.2 kHz to 280 Hz with a tone
+gliding under it; the landing a D2 bell (five partials), a sinking
+thump and the D5 F#5 A5 C#6 G#6 chord ringing up.
 
 ## Saves
 `Unforming` (phase, time, where the seed gathers, whether the ley has

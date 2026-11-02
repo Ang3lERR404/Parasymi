@@ -248,6 +248,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `score.zig` — the day's music on paper: pulse, a Lydian scale, open chords, the drums' pattern and how its voices are tuned.
 - `tests.zig` — the garden's sounds rendered offline and measured.
 - `twinkle.zig` — a mote of starlight twinkling: a few glassy pings dying in a shimmer.
+- `unforming.zig` — the unforming heard: a low D swelling under it all, glass raining as the sky shatters, a seam humming shut, ash crumbling, a crack as each…
 - `voices.zig` — the day's piano: a felt-hammered string struck and ringing.
 - `wind.zig` — the wind over the garden: a hush in slow gusts, whistling in the strong ones.
 
@@ -358,7 +359,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with
 - `tanglehold.zig` — mesh: the tanglehold, of both lineages (convergence kit): the store that takes the sap cache's place once the unforming has taken it.
 - `turn_root.zig` — mesh: TURN ROOT.
-- `unform_shard.zig` — mesh: UNFORM SHARD.
+- `unform_shard.zig` — meshes: UNFORM SHARD, TRAIL and STAR.
 - `vultrixi.zig` — mesh: VULTRIXI.
 - `weftstone.zig` — mesh: WEFTSTONE.
 - `wolf_belly.zig` — mesh: WOLF BELLY.

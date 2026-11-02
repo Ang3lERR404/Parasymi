@@ -329,6 +329,23 @@ void surface() {
     o = vec4(applyFog(c, v_pos), a);
     return;
   }
+  if (part == PART_TRAIL) {
+    // a trail of light (v_t 0 its tail .. 1 its head; v_obj.x across it,
+    // -1..1): a thin bright core in a soft glow, its colour going pale at
+    // the head, fading out toward the tail; light itself, brighter than
+    // white, so the glow takes it up (v_glow how bright, v_fade how much
+    // is left of it)
+    float x = v_obj.x;
+    float head = clamp(v_t, 0.0, 1.0);
+    float core = exp(-x * x * 30.0);
+    float halo = exp(-x * x * 3.0);
+    float along = pow(head, 1.6) * smoothstep(1.0, 0.94, head);
+    vec3 col = mix(v_col, vec3(1.0), 0.5 * core * head);
+    c = col * (halo * 0.9 + core * 2.2) * along * v_glow;
+    float a = clamp(halo * 0.5 + core * 0.6, 0.0, 1.0) * along * clamp(v_fade, 0.0, 1.0);
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
   if (part == PART_FLASH) {
     // the flash where the blooms became one: a disc of light thrown out
     // from the diamond (v_t its radius 0..1), its rim a bright ring that

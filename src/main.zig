@@ -323,6 +323,8 @@ pub fn main(init:Init)!void{
   var toldDay:f32=-1;
   // and whether the arsthraxia was last heard humming, so its silence is told once
   var arsHumming=false;
+  // and the unforming's moment when last heard (< 0 never)
+  var unformHeard:f32=-1;
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
@@ -356,6 +358,11 @@ pub fn main(init:Init)!void{
         arsHumming=false;
       }
     }
+    // the unforming heard while it runs: its clock, what broke, what withers
+    if(lib.unforming.running(&game.unforming) and game.specimen==null)if(sounds)|o|{
+      o.send(.{.unforming=lib.unforming.heard(&game,unformHeard)})catch|e|log.warn("unforming: {t}",.{e});
+      unformHeard=game.unforming.t;
+    };
     // out of the wolf's eyes its sap is heard settling
     if(game.cam.inEyes()!=inEyes)if(sounds)|o|{
       o.send(.{.eyes=!inEyes})catch|e|log.warn("eyes: {t}",.{e});

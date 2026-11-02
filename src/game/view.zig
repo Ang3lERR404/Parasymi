@@ -62,6 +62,10 @@ const noFeet=[2]m.V3{m.splat3(noHover),m.splat3(noHover)};
 const fogReach:f32=32*ck.sizeTiles/8;
 /// fog starts to close in at this share of the drawn reach
 const fogNear:f32=0.7;
+/// how much of the haze the air sheds once the sky has shifted (the
+/// unforming): the ley's light shines through clear air, so the garden
+/// keeps its colours under it rather than drowning in violet
+const shiftClear:f32=0.55;
 /// a plant's bounding sphere: this much (tiles) plus its footprint
 const plantBound:f32=1.2;
 /// the share of the way up a plant its bounding sphere is centred
@@ -242,7 +246,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     .push=.{
       .vp=g.cam.viewProj(),
       .eyeTime=.{eye[0],eye[1],eye[2],tf},
-      .fog=.{sky[0],sky[1],sky[2],1.0/(fogReach+g.cam.dist)},
+      .fog=.{sky[0],sky[1],sky[2],(1-shiftClear*g.sky.shift)/(fogReach+g.cam.dist)},
       .misc=.{veil,if(g.prog.done.contains(.leySight))1 else 0,hv[0],hv[1]},
       .sun=.{ld[0],ld[1],ld[2],g.sky.daylight()},
       .view=.{g.cam.target[0],g.cam.target[2],reach*fogNear,reach},
@@ -310,7 +314,7 @@ fn burst(g:*Game)Allocator.Error!void{
 }
 /// a thin film's hue as the shaders take it (common.glsl `filmHue`): one
 /// turn of the rainbow per unit of `x`
-fn filmHue(x:f32)m.V3{
+pub fn filmHue(x:f32)m.V3{
   return.{
     0.5+0.5*@cos(m.tau*x),
     0.5+0.5*@cos(m.tau*(0.33+x)),
@@ -520,7 +524,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // its yield ripening on it, in its pods, and what it is
     .ripe=.{if(d.growth>=1)m.clamp01(d.essence/def.manaCap)else 0,m.f(def.genome.pods),def.genome.podR,d.since},
     .yield=color.Rgba8.of(def.yields.info().col).toF4(),
-    .glitch=if(!d.ghost and lib.unforming.radiant(d.sp)).{g.unforming.glitchOf(d.seed),0,0,0}else vertex.noGlitch,
+    .glitch=if(d.ghost)vertex.noGlitch else if(lib.unforming.radiant(d.sp)).{g.unforming.glitchOf(d.seed),0,0,0}else if(lib.unforming.dies(d.sp)).{-1,g.unforming.witherOf(d.seed),0,0}else vertex.noGlitch,
   });
   // a celestial bloom is the garden's light: its core sheds it round
   // about, pearl tinted by its film, pulsing slowly, brighter as it

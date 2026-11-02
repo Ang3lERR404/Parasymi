@@ -22,7 +22,7 @@ layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre,
 layout(location = 10) in vec4 it;   // its bend after the gardener's paws plucking it: the way on the ground (xy), how far (z, radians at its tip)
 layout(location = 11) in vec4 ir;   // its yield ripening: how ripe 0..1, its pods, a radiant pod's radius, seconds since its yield last came loose
 layout(location = 12) in vec4 iy;   // the colour of what it yields (sRGB)
-layout(location = 13) in vec4 ig;   // its unforming: how far it has shattered 0..1 (< 0 none)
+layout(location = 13) in vec4 ig;   // its unforming: how far it has shattered 0..1 (< 0 none), how far it has withered 0..1
 layout(location = 14) in vec3 pos_next;
 layout(location = 15) in vec3 nrm_next;
 
@@ -41,6 +41,9 @@ layout(location = 11) out vec2 v_pod;         // a pod: how far it has swelled 0
 layout(location = 12) flat out vec4 v_yield;  // the colour of what it yields (linear), how ripe the plant is 0..1
 layout(location = 13) flat out float v_glitch; // how far the unforming has shattered it 0..1 (< 0 none)
 layout(location = 14) out vec2 v_sheet;       // a leaf or petal: along it 0..1, across it 1..3 (0: not a sheet)
+layout(location = 15) out vec3 v_rest;        // the point in its mesh as built (what the unforming cuts it along)
+layout(location = 16) flat out vec4 v_cell;   // the shard or flake of ash this triangle is (xyz), how far it has withered (w)
+layout(location = 17) out vec3 v_cellS;       // the same shard, interpolated: it differs from v_cell where a triangle crosses two (cut away)
 
 // how far a bloom a forming halo draws in has folded back toward a bud
 const float HALO_BUD = 0.12;
@@ -136,28 +139,86 @@ float shiverLeft(float since) { return since >= 0.0 ? exp(-since * SHIVER_FADE) 
 // a quiver at time `t`, `ph` its phase: a smooth wobble in all three ways
 vec3 quiver(float t, float ph) { return vec3(sin(t * SHIVER_RATE + ph), 0.6 * sin(t * SHIVER_RATE * 1.31 + ph * 1.7), cos(t * SHIVER_RATE * 0.87 + ph * 2.3)); }
 
-// the unforming (game/unforming.zig): a radiant plant glitches, shatters
-// like glass and blinks out of reality as `g` runs 0..1. Slices of it tear
-// sideways and blocks jump out of place, a step at a time; then its shards
-// break away outward and up, opening at its facets as glass does. Every
-// move is a field of the world point (its seed and the step), so shared
-// vertices move alike until the facets themselves part.
+// the unforming (game/unforming.zig): a radiant plant glitches, cracks and
+// shatters like glass as `g` runs 0..1. First bands of it slip sideways a
+// step at a time; cracks of light run over it (plant.frag `unform`) along
+// a shatter's cells laid in its mesh as built (`rest`, SHARD_CELLS to a
+// metre), and from BREAK it comes apart along them: each shard drifts out
+// and up whole, turning slowly, and shrinks to nothing at its own moment.
+// The vertices of one shard move alike; a triangle across two shards is
+// cut along their edge in plant.frag. `s` is the plant's scale from mesh
+// to world, `cell` the shard the point is in.
 const float GLITCH_RATE = 14.0;
-vec3 unformAt(vec3 wp, vec3 n, vec3 base, float g, float seed, float t) {
+// a step `d` in the mesh as built carried to the world: scaled by `s` and
+// turned the way it faces (`face`; its bend is left out, near enough)
+vec3 toWorld(vec3 d, float s, mat2 face) {
+  d.xz = face * d.xz;
+  return d * s;
+}
+const float SHARD_CELLS = 2.6;
+const float BREAK = 0.55;
+// how far (m) a shard drifts out and rises by the time it is gone
+const float SHARD_OUT = 0.7;
+const float SHARD_RISE = 1.1;
+vec3 unformAt(vec3 wp, vec3 rest, vec3 base, float g, float seed, float t, float s, mat2 face, out vec3 cell) {
+  cell = vec3(0.0);
   if (g < 0.0) return wp;
   float step = floor(t * GLITCH_RATE + seed * 37.0);
-  // horizontal slices torn sideways, more of them as it goes
-  float slice = floor(wp.y * 16.0);
-  vec3 hs = hash33(vec3(slice, step, seed * 91.0));
-  if (hs.x < 0.15 + 0.5 * g) wp.xz += (hs.yz - 0.5) * 0.3 * g;
-  // blocks jumping out of place for a step
-  vec3 hb = hash33(floor(wp * 9.0) + step * 1.37);
-  if (hb.x > 0.92 - 0.4 * g) wp += (hb - 0.5) * 0.12 * (0.3 + g);
-  // shattering: shards break away outward and up
-  float sh = smoothstep(0.55, 1.0, g);
-  vec3 hp = hash33(floor((wp - base) * 6.0) + seed * 13.0);
-  wp += (normalize(n + vec3(0.0, 0.6, 0.0)) * (0.3 + hp.x) + (hp - 0.5) * 0.6) * sh * sh * 1.2;
-  return wp;
+  // bands of it slipping sideways for a step, more of them as it nears
+  // breaking, none once broken
+  float slip = 1.0 - smoothstep(BREAK, BREAK + 0.08, g);
+  vec3 hs = hash33(vec3(floor(rest.y * 9.0), step, seed * 91.0));
+  if (hs.x < 0.1 + 0.55 * g) wp.xz += (hs.yz - 0.5) * 0.24 * (0.35 + g) * slip;
+  // the shard it is in, and where that shard's middle is (its point in the
+  // mesh as built, carried to the world as this point is)
+  vec3 q = rest * SHARD_CELLS + seed * 17.0;
+  cell = shardCell(q).xyz;
+  float broke = smoothstep(BREAK, 1.0, g);
+  if (broke <= 0.0) return wp;
+  vec3 mid = wp + toWorld((cell + hash33(cell) - q) / SHARD_CELLS, s, face);
+  vec3 hp = hash33(cell + seed * 13.0);
+  // out from the plant's middle and up, weightless, easing out
+  vec2 away = mid.xz - base.xz;
+  vec2 out2 = length(away) > 1e-4 ? normalize(away) : vec2(1.0, 0.0);
+  float e = 1.0 - (1.0 - broke) * (1.0 - broke);
+  vec3 drift = vec3(out2.x, 0.0, out2.y) * SHARD_OUT * (0.5 + hp.x) + vec3(0.0, SHARD_RISE * (0.6 + 0.8 * hp.y), 0.0);
+  // turning slowly about its own middle, and shrinking away at its moment
+  vec3 ax = normalize(hp - 0.5 + vec3(0.0, 0.01, 0.0));
+  float gone = mix(0.72, 1.0, hp.z);
+  float shrink = smoothstep(BREAK + 0.5 * (gone - BREAK), gone, g);
+  vec3 off = turnAbout(wp - mid, ax, broke * (1.0 + 2.0 * hp.x)) * (1.0 - shrink);
+  return mid + off + drift * e;
+}
+// the unforming withers the old lineages (ig.y 0..1): they bow over, their
+// leaves and petals curling down (plant body), then crumble from the top
+// down into flakes of ash (ASH_CELLS to a metre of the mesh as built) that
+// lift off downwind, turning and shrinking away. `a` (crumbleOf) is how
+// far a flake has gone, 0 still on the plant .. 1 gone.
+const float ASH_CELLS = 9.0;
+const float CRUMBLE_FROM = 0.45;
+// how far it bows (rad at its tip) and its sheets curl (m at their tips)
+const float DROOP = 0.9;
+const float CURL = 0.12;
+float crumbleOf(float h, float w, float jitter) {
+  float front = 1.25 - 1.55 * smoothstep(CRUMBLE_FROM, 1.0, w);
+  return clamp((h + 0.25 * jitter - front) / 0.35, 0.0, 1.0);
+}
+vec3 crumbleAt(vec3 wp, vec3 rest, float h, float w, float seed, float t, vec2 wdir, float s, mat2 face, out vec3 cell) {
+  vec3 q = rest * ASH_CELLS + seed * 23.0;
+  cell = shardCell(q).xyz;
+  vec3 hp = hash33(cell + seed * 5.0);
+  float a = crumbleOf(h, w, hp.x);
+  if (a <= 0.0) return wp;
+  vec3 mid = wp + toWorld((cell + hash33(cell) - q) / ASH_CELLS, s, face);
+#ifdef SHADOW
+  // a flake come loose casts no shadow (the shadow pass cuts nothing away):
+  // it is drawn as a point
+  return mid;
+#endif
+  vec3 off = turnAbout(wp - mid, normalize(hp - 0.5 + vec3(0.01)), a * 5.0) * (1.0 - smoothstep(0.25, 1.0, a));
+  vec3 lift = vec3(wdir.x, 0.0, wdir.y) * a * a * (0.7 + 0.6 * hp.z) + vec3(0.0, a * (0.3 + 0.5 * hp.y), 0.0) + (hp - 0.5) * a * 0.35;
+  lift.xz += vec2(sin(t * 3.1 + hp.x * 9.0), cos(t * 2.7 + hp.y * 9.0)) * 0.05 * a;
+  return mid + off + lift;
 }
 
 void main() {
@@ -278,7 +339,11 @@ void main() {
     // plucked, it is drawn after the paws, springing back once let go
     // (its root's soil end stays dug in)
     p.xz += it.xy * it.z * TUG_SLIDE * (rooted ? 1.0 - held : 1.0);
-    vec3 wp = unformAt(base + p, n, base, ig.x, seed, t);
+    vec3 cell;
+    vec3 wp = unformAt(base + p, pos, base, ig.x, seed, t, 1.0, faced * turn, cell);
+    v_rest = pos;
+    v_cell = vec4(cell, 0.0);
+    v_cellS = cell;
     v_pos = wp;
     v_nrm = n;
     v_col = srgb2lin(col.rgb);
@@ -385,6 +450,14 @@ void main() {
 
   // wilt when unhealthy
   p.y *= mix(WILT, 1.0, health);
+  // withering (the unforming): its leaves and petals curl down at their
+  // tips and the whole bows over its own way, tip most
+  float wither = clamp(ig.y, 0.0, 1.0);
+  if (wither > 0.0) {
+    if (sheet) p.y -= CURL * wither * tu.y * tu.y;
+    float bow = seed * TAU * 3.0;
+    p = bendIn(p, vec2(cos(bow), sin(bow)), DROOP * smoothstep(0.0, 0.7, wither) * h * h);
+  }
 
   // per-instance variation, turned the way it faces (R)
   float yaw = seed * TAU + ic.w;
@@ -406,7 +479,12 @@ void main() {
   n = bendIn(n, it.xy, tug);
   // a confluence's growth keys already carry its size
   float s = (keyed ? 1.0 : mix(SEEDLING, 1.0, g)) * (SIZE_MIN + SIZE_SPREAD * fract(seed * 7.13));
-  vec3 wp = unformAt(base + p * s, n, base, ig.x, seed, t);
+  vec3 cell;
+  vec3 wp = unformAt(base + p * s, pos, base, ig.x, seed, t, s, rot(yaw), cell);
+  if (wither > 0.0) wp = crumbleAt(wp, pos, h, wither, seed, t, wdir, s, rot(yaw), cell);
+  v_rest = pos;
+  v_cell = vec4(cell, wither);
+  v_cellS = cell;
 
   v_pos = wp;
   v_nrm = n;

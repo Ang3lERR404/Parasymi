@@ -43,6 +43,10 @@ const Twinkle=lib.sound.twinkle.Twinkle;
 const voiceCount=lib.sound.voiceCount;
 /// the wind over the garden
 const Wind=lib.sound.wind.Wind;
+/// the unforming heard
+const Unformed=lib.sound.unforming.Unformed;
+/// how much of the music is left while the unforming sounds at its fullest
+const hushed:f32=0.3;
 /// how long the hall rings (s, to -60 dB)
 const hallRt60:f32=4.2;
 /// how long before it answers (s): a large space
@@ -70,7 +74,9 @@ pub const Sounds=struct{
     daylight:f32,
     /// the arsthraxia's working: how far along (`progress`, 0..1), how well
     /// fed (`fed`, 0..1), and whether it has just completed (`complete`)
-    arsthraxia:struct{progress:f32,fed:f32,complete:bool}
+    arsthraxia:struct{progress:f32,fed:f32,complete:bool},
+    /// the unforming, this frame: its clock, what broke and what withers
+    unforming:lib.unforming.Heard,
   };
   /// samples per second the sounds are made at
   rate:f32,
@@ -110,6 +116,8 @@ pub const Sounds=struct{
   resFed:f32=0,
   /// whether its last word was a unit done, so one unit blooms once
   resDone:bool=false,
+  /// the unforming heard, from its first moment until it has rung away
+  unformed:?Unformed=null,
   /// every sound ready to play, seeded from `seed`, at `rate` samples a second
   pub fn init(seed:u64,rate:f32)Sounds{
     // the random numbers, and the wind and music drawn from them
@@ -152,7 +160,11 @@ pub const Sounds=struct{
         }else if(a.progress==0 and !a.complete){
           if(s.research)|*rs|rs.stop();
         }
-      }
+      },
+      .unforming=>|h|{
+        if(s.unformed==null)s.unformed=.init(h.t,s.r.next(),s.rate);
+        s.unformed.?.apply(h);
+      },
     }
   }
   /// the next `out.len` samples: every sounding voice mixed in, those
@@ -165,6 +177,9 @@ pub const Sounds=struct{
       if(!rs.render(out,s.resProgress,s.resFed))s.research=null;
     }
     s.blooms.render(out);
+    if(s.unformed)|*u|{
+      if(!u.render(out))s.unformed=null;
+    }
     s.wind.render(out);
     s.musics(out);
     for(out)|*x|x.*=dsp.softClip(x.*);
@@ -200,7 +215,9 @@ pub const Sounds=struct{
       var buf:[hallBlock]f32=@splat(0);
       s.music.render(buf[0..k]);
       s.night.render(buf[0..k]);
-      for(out[off..][0..k],buf[0..k])|*o,x|o.*+=x+hallWet*s.hall.tick(x);
+      // how much of it the unforming leaves
+      const left=if(s.unformed)|*u|m.lerp(1,hushed,u.hush())else 1;
+      for(out[off..][0..k],buf[0..k])|*o,x|o.*+=(x+hallWet*s.hall.tick(x))*left;
       off+=k;
     }
   }

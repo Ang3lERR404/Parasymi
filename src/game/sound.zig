@@ -43,6 +43,15 @@
 //!   condenses. Fed, it is brighter, quicker and a little louder. When a
 //!   unit is done a soft bell chord in the music's key blooms upward over a
 //!   warm low note, and a breath rushes up its stems with the surge of light.
+//! - the unforming (the first world event), all in D Lydian and soft: a low
+//!   D swells under it, beating slowly, and the music gives way to it;
+//!   glass rains as the sky shatters, as thick as the front sweeping down;
+//!   each radiant plant breaks with a snap and a scatter of glints, the
+//!   stars and the ley nodes likewise; the ley lines hum shut, a seam
+//!   sinking an octave; dry ash crumbles as the old lineages wither; each
+//!   shard reaching the star rings a step higher; the seed whistles down
+//!   and lands with a deep soft bell, a thump under it and a glass chord
+//!   ringing up over it, the drone fading after.
 /// the hub every game module is reached through
 const lib=@import("../lib.zig");
 /// the footstep: a soft crunchy rustle under a paw
@@ -73,6 +82,8 @@ pub const mixer=@import("sound/mixer.zig");
 pub const arsthraxia=@import("sound/arsthraxia.zig");
 /// the arsthraxia's unit done: a bell chord blooming and a breath rushing up
 pub const bloom=@import("sound/bloom.zig");
+/// the unforming heard: drone, glass, seam, ash, whistle and landing bell
+pub const unforming=@import("sound/unforming.zig");
 /// the sounds' headless tests
 pub const tests=@import("sound/tests.zig");
 /// the source the audio device pulls from
@@ -99,5 +110,6 @@ test{
   _=mixer;
   _=arsthraxia;
   _=bloom;
+  _=unforming;
   _=tests;
 }

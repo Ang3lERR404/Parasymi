@@ -1573,6 +1573,14 @@ void main() {
       float spindle = ip.y > 0.5 ? 0.7 : mix(0.3, 1.0, pow(sin(0.5 * TAU * clamp(tu.x, 0.0, 1.0)), 0.6));
       w = vec4(C + right * p.x * BEAM_HALF_WIDTH * spindle, 1.0);
       wn = toEye;
+    } else if (part == PART_TRAIL) {
+      // a trail of light: a ribbon turned to the eye, `ip.y` metres across
+      // at its head (tu.x 1), narrowing to a thread at its tail
+      vec3 toEye = normalize(pc.eye_time.xyz - C);
+      vec3 right = normalize(cross(T, toEye) + vec3(1e-5, 0.0, 0.0));
+      float head = clamp(tu.x, 0.0, 1.0);
+      w = vec4(C + right * p.x * ip.y * 0.5 * mix(0.12, 1.0, head * head), 1.0);
+      wn = toEye;
     } else {
       vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
       vec3 N = cross(B, T);
@@ -1660,13 +1668,16 @@ void main() {
   v_col = (mode == PLACE_CURVE || part == PART_HALO) ? c : mix(c, c * tint.rgb, tint.w);
   // essence is the colour of what it is (sRGB; along a curve in iq.yzw)
   if (part == PART_ESSENCE) v_col = c * srgb2lin(clamp(mode == PLACE_CURVE ? iq.yzw : tint.rgb, 0.0, 1.0));
+  // a trail is the colour it carries (sRGB; along a curve in iq.yzw,
+  // placed by its matrix in ie.yzw)
+  if (part == PART_TRAIL) v_col = srgb2lin(clamp(mode == PLACE_CURVE ? iq.yzw : ie.yzw, 0.0, 1.0));
   // sap pulses travel along the part
   float pulse = 0.65 + 0.35 * sin(t * PULSE_RATE - tu.x * 8.0 + ip.z * TAU);
   v_glow = ip.x * ((part == PART_BLOOM || part == PART_THREAD) ? 1.0 : DIM_GLOW) * pulse * twinkle;
   // a flash, a halo's projection and research energy shine as bright as
   // their glow, never pulsing, as does a spark (it flickers on its own);
   // a prism has no light of its own
-  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY || part == PART_SPARK) v_glow = ip.x;
+  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY || part == PART_SPARK || part == PART_TRAIL) v_glow = ip.x;
   // the ring: an arc is as bright as the points at its ends (tint holds
   // the four points' light, east, south, west, north; tu.x its angle)
   if (part == PART_HALO) {
@@ -1721,6 +1732,8 @@ void main() {
   v_obj = p;
   // a constellate line: how far across it (-1 to 1), for its glow
   if (part == PART_PLEXUS) v_obj = vec3(tu.y, 0.0, 0.0);
+  // a trail of light: how far across it (-1 to 1; 0 a point), for its glow
+  if (part == PART_TRAIL) v_obj = vec3(tu.y, 0.0, 0.0);
   v_phase = ip.z;
   v_aux = ip.y;
   // the halo's ring and the rays making it appear as its diamond forms

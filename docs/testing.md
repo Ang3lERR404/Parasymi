@@ -54,7 +54,7 @@ their end 1.5 s, then start again.
 | `turn` | both | grown, turned a quarter (R) every `turn.time` + 1 s: a rooted one pulls its roots out, steps round, digs back in; a floater turns in the air |
 | `pluck` | plant | grown and ripe, plucked by the wolf (drawn, for once) as harvest does it in play: it steps up, each pluck bends the plant after its paws, the yield bursts out round them, the plant shivers and springs back, a pod empties to its nub, a bead goes to the belly; ripened full afresh 1.5 s after each harvest |
 | `ripen` | plant | grown, its yield ripening 0 → full, looped: the pods swelling in turn, the plant taking on the yield's colour |
-| `unform` | radiant plant | grown, glitching, shattering like glass and blinking out as the unforming takes it, looped (`PlantInstance.glitch`) |
+| `unform` | radiant or dying plant | grown, then as the unforming takes it, looped: a radiant one glitches, cracks with light and breaks into shards; a symbiotic or parasitic one withers and crumbles to ash (`PlantInstance.glitch`) |
 | `active` | structure | grown and working its real `tick`: every 0.4 s handed one of the next thing it `wants` (a carrier: into it from behind, let go 2 s later), what it made (an `output` it does not want) taken away; put down afresh each loop. Emitted pieces (cups, pours, roots to nodes, lids, crystals) as in play |
 
 ### Held states
@@ -156,7 +156,14 @@ sky shattering, e.g.
 ```
 zig build run -- --demo --unforming --inspect=eyes --pitch=-25 --shots=14 --orbit=14
 zig build run -- --demo --unforming --inspect=polyp --dist=40 --pitch=3 --shots=10 --orbit=20
+zig build run -- --plant=bloom --state=unform --period=6 --inspect=bloom --shots=6 --orbit=6 --dist=2.6 --pitch=15 --tod=0.5
+zig build run -- --plant=lumenroot --state=unform --period=6 --inspect=lumenroot --shots=6 --orbit=6 --dist=2 --pitch=15 --tod=0.5
 ```
+The star the seed gathers in hangs 14 m over the radiant plants' middle:
+to see it, orbit that ground point from far and low (`--inspect=x,z
+--dist=55 --pitch=1`; a negative pitch turns the camera over).
+Its sound is checked headless (`sound/unforming.zig`'s test: it sounds in
+every stretch, softly, the landing loudest, and rings away).
 `--act2` begins the garden in act 2 after running the unforming through
 (`--act2 --demo`: a planted seed, a yielder, a settled heart and two
 tendrils, one rising over its middle and falling again, one on the

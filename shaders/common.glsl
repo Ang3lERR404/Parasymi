@@ -64,13 +64,14 @@ const float SHEEN_POWER = 40.0;
 #define PART_STONE 19     // weathered stone: grained, flecked, lichened
 #define PART_SPARK 20     // a spark of lightning: white-hot core, violet edge
 #define PART_HUSK 21      // a crystal husk: clear glass, glowing cracks
+#define PART_TRAIL 22     // a trail of light along a curve, bright at its head
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))
 #define PART_IN(set, p) ((((set) >> uint(p)) & 1u) != 0u)
 // the roles that are light itself: they cast no shadow (part.vert SHADOW)
 // and are not lit by the key light (part.frag)
-const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY) | PART_BIT(PART_PLEXUS) | PART_BIT(PART_SPARK);
+const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY) | PART_BIT(PART_PLEXUS) | PART_BIT(PART_SPARK) | PART_BIT(PART_TRAIL);
 // the roles that are a plant's leaves and petals (plant.vert, plant.frag):
 // they unfurl as it grows, lift in the gusts, always read as thin and show
 // no fibres
@@ -275,6 +276,30 @@ vec3 hash33(vec3 p) {
   return fract((p.xxy + p.yxx) * p.zyx);
 }
 
+// a shatter's cells (Voronoi in 3D): the lattice cell holding the jittered
+// point nearest `p` (xyz; that point lies at xyz + hash33(xyz)), and how far
+// `p` lies in from the edge it shares with the next nearest (w, F2 - F1).
+// What breaks into shards or flakes (the unforming) is cut along these.
+vec4 shardCell(vec3 p) {
+  vec3 i = floor(p);
+  vec3 f = p - i;
+  float d1 = 8.0, d2 = 8.0;
+  vec3 best = i;
+  for (int z = -1; z <= 1; z++)
+    for (int y = -1; y <= 1; y++)
+      for (int x = -1; x <= 1; x++) {
+        vec3 o = vec3(float(x), float(y), float(z));
+        vec3 d = o + hash33(i + o) - f;
+        float dd = dot(d, d);
+        if (dd < d1) {
+          d2 = d1;
+          d1 = dd;
+          best = i + o;
+        } else if (dd < d2) d2 = dd;
+      }
+  return vec4(best, sqrt(d2) - sqrt(d1));
+}
+
 // a hard-edged highlight: 1 where the direction `r` falls within a disc of
 // radius `size` (1 - cos of it) about the light's direction `l`, its edge a
 // sharp step (SPOT_EDGE of the radius), never a soft falloff
@@ -345,21 +370,23 @@ vec3 srgb2lin(vec3 c) { return pow(c, vec3(GAMMA)); }
 const float MOON_STRENGTH = 0.35;
 const float SUN_STRENGTH = 1.1;
 // the shifted sky's light (the ley's glow overhead): a deep violet by night,
-// a rose violet by day, softer than the sun (the whole sky glows)
-const vec3 LEYLIGHT_NIGHT = vec3(0.16, 0.11, 0.36);
-const vec3 LEYLIGHT_DAY = vec3(0.78, 0.55, 1.0);
+// by day a pale lavender, nearly white, so what it lights keeps its own
+// colours and stands out from its violet shade (the whole sky glows)
+const vec3 LEYLIGHT_NIGHT = vec3(0.2, 0.16, 0.42);
+const vec3 LEYLIGHT_DAY = vec3(0.95, 0.86, 1.0);
 // the key light's colour and strength (the sun by day, the moon by night;
 // once shifted, the ley's glow)
-vec3 keyLight() { return mix(byDay(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH), byDay(LEYLIGHT_NIGHT, LEYLIGHT_DAY * 0.8), SHIFT); }
+vec3 keyLight() { return mix(byDay(MOONLIGHT * MOON_STRENGTH, SUNLIGHT * SUN_STRENGTH), byDay(LEYLIGHT_NIGHT, LEYLIGHT_DAY), SHIFT); }
 
 // the ambient light: the sky's by day (veiled, toward violet), by night, the
 // ground's bounce (dimmed to this share by night), and how strong it all is
 const vec3 SKY_DAY = vec3(0.35, 0.40, 0.50);
 const vec3 SKY_VEILED = vec3(0.45, 0.30, 0.65);
 const vec3 SKY_NIGHT = vec3(0.07, 0.09, 0.18);
-// the shifted sky's: the ley's glow all round, by night and by day
+// the shifted sky's: the ley's glow all round, by night and by day (a
+// soft violet fill by day, below the key light, so shade reads)
 const vec3 SKY_LEY_NIGHT = vec3(0.1, 0.06, 0.22);
-const vec3 SKY_LEY_DAY = vec3(0.45, 0.3, 0.7);
+const vec3 SKY_LEY_DAY = vec3(0.34, 0.28, 0.5);
 const vec3 GROUND_BOUNCE = vec3(0.12, 0.10, 0.08);
 const float GROUND_NIGHT = 0.3;
 const float AMBIENT = 0.55;

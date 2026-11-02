@@ -88,12 +88,16 @@ pub const Part=enum(u32){
   /// a crystal husk: clear glass, an iridescent film at its edges, glowing
   /// cracks over it where the light inside shows through (part.frag)
   husk,
+  /// a trail of light along a curve (tu.x 0 its tail .. 1 its head): a
+  /// ribbon turned to the eye, narrow and faint at its tail, bright and
+  /// full at its head, the colour it carries (part.vert, part.frag)
+  trail,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve,.stone=>false,
   };
 }
@@ -130,7 +134,8 @@ pub const PlantInstance=extern struct{
   /// the colour of what it yields (sRGB 0..1), w unused
   yield:m.Vice(f32,4)=.{1,1,1,0},
   /// its unforming (game/unforming.zig): x how far it has shattered, 0
-  /// its first glitch .. 1 gone (< 0 none); yzw unused
+  /// its first glitch .. 1 gone (< 0 none); y how far it has withered to
+  /// ash, 0 untouched .. 1 gone; zw unused
   glitch:m.Vice(f32,4)=noGlitch,
 };
 /// `PlantInstance.glitch` for a plant the unforming has not touched

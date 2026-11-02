@@ -317,6 +317,10 @@ const parts=struct{
   pub const strangeSeedWeb=@import("meshes/constellate.zig").seedWeb;
   /// a shard of a shattering radiant plant, flying up to the seed
   pub const unformShard=@import("meshes/unform_shard.zig");
+  /// the trail of light a shard flying up to the seed leaves, and the seed's falling
+  pub const unformTrail=@import("meshes/unform_shard.zig").trail;
+  /// the star of gathered light the strange seed forms in: a web of light
+  pub const unformStar=@import("meshes/unform_shard.zig").star;
   /// an earlier look for the polyp, to compare: a slender hydra crowned with feathers and plumed tentacles, offshoots up its stem
   pub const polypHydra=@import("meshes/polyp_hydra.zig");
   /// an earlier look for the polyp, to compare: a colony of feathery polyps on one fleshy mound

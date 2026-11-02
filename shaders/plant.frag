@@ -28,6 +28,9 @@ layout(location = 11) in vec2 v_pod;   // a pod: how far swelled (< 0 not one), 
 layout(location = 13) flat in float v_glitch; // how far the unforming has shattered it 0..1 (< 0 none)
 layout(location = 12) flat in vec4 v_yield; // the colour of what it yields (linear), how ripe 0..1
 layout(location = 14) in vec2 v_sheet;      // a leaf or petal: along it 0..1, across it 1..3 (0: not a sheet)
+layout(location = 15) in vec3 v_rest;       // the point in its mesh as built (what the unforming cuts it along)
+layout(location = 16) flat in vec4 v_cell;  // the shard or flake this triangle is (xyz), how far it has withered (w)
+layout(location = 17) in vec3 v_cellS;      // the same, interpolated: it differs from v_cell where the triangle crosses two shards
 layout(location = 0) out vec4 o;
 
 // what the sap carries at night (moonlight; by day plain white)
@@ -291,24 +294,78 @@ void surface() {
   o = vec4(applyFog(c, v_pos), alpha);
 }
 
-// the unforming (plant.vert `unformAt`): the whole plant blinks out for a
-// step, more often as it goes; blocks of it are gone, more and more, until
-// nothing is left; a glitching block splits into cyan or magenta, and what
-// is left catches a cold white light
+// whether this triangle's corners lie in more than one shard or flake (its
+// own, interpolated, strays from its first corner's): pulled apart, it
+// would smear across the gap, so it is cut away
+bool split() { return dot(v_cellS - v_cell.xyz, v_cellS - v_cell.xyz) > 1e-6; }
+// the unforming (plant.vert `unformAt`, the same constants): a radiant
+// plant's light goes out of it as it glitches; the whole blinks out for a
+// step now and then, and a slipping band splits faintly into its film's
+// colours. Cracks of its own light run over it, cell after cell of the
+// shatter, thin and bright; once it breaks each shard keeps only the
+// triangles wholly its own (one across two is cut away), its edges lit and
+// its body its own colour, dimming, never white.
+const float GLITCH_RATE = 14.0;
+const float SHARD_CELLS = 2.6;
+const float BREAK = 0.55;
+// the cracks' light, of the plant's own colour (times it)
+const float CRACK_GLOW = 2.4;
 void unform() {
   float g = v_glitch;
   if (g < 0.0) return;
-  float step = floor(pc.eye_time.w * 14.0 + v_inst.y * 37.0);
-  if (hash33(vec3(step, v_inst.y * 53.0, 3.0)).x < 0.08 + 0.45 * g * g) discard;
-  if (hash33(floor(v_pos * 14.0) + 11.0).x < g * g * 1.05) discard;
-  vec3 hf = hash33(floor(v_pos * 9.0) + step * 1.37);
-  vec3 split = hf.y > 0.5 ? vec3(0.4, 1.0, 1.0) : vec3(1.0, 0.35, 1.0);
-  if (hf.x > 0.85 - 0.3 * g) o.rgb = mix(o.rgb, split * 1.6, 0.7);
-  o.rgb += vec3(0.9, 0.9, 1.0) * g * 0.4;
+  float seed = v_inst.y;
+  float t = pc.eye_time.w;
+  float step = floor(t * GLITCH_RATE + seed * 37.0);
+  if (g < BREAK && hash33(vec3(step, seed * 53.0, 3.0)).x < 0.03 + 0.2 * g) discard;
+  vec4 sc = shardCell(v_rest * SHARD_CELLS + seed * 17.0);
+  float broke = smoothstep(BREAK, 1.0, g);
+  if (broke > 0.0 && split()) discard;
+  // its own colour: what it is, through its film
+  vec3 own = mix(v_col, filmHue(seed * 3.0 + dot(sc.xyz, vec3(0.13, 0.07, 0.11))), 0.45);
+  // the light going out of it
+  o.rgb *= mix(1.0, 0.3, smoothstep(0.15, 0.9, g));
+  // a slipping band splits into its film's colours for a step
+  vec3 hs = hash33(vec3(floor(v_rest.y * 9.0), step, seed * 91.0));
+  if (g < BREAK && hs.x < 0.1 + 0.55 * g) o.rgb = mix(o.rgb, filmHue(hs.y + seed) * 0.9, 0.35);
+  // cracks reach each cell at its own moment, spreading over it
+  vec3 hc = hash33(sc.xyz + seed * 7.0);
+  float cracked = smoothstep(0.1 + 0.35 * hc.x, 0.2 + 0.35 * hc.x, g);
+  float width = mix(0.035, 0.09, broke);
+  float crack = (1.0 - smoothstep(0.0, width, sc.w)) * cracked;
+  float fade = 1.0 - smoothstep(0.8, 1.0, g);
+  o.rgb += own * crack * CRACK_GLOW * (1.0 - 0.5 * broke) * fade;
+  o.a = max(o.a, crack * 0.85 * fade);
+}
+// withering (plant.vert `crumbleAt`, the same constants): its colour dries
+// out to grey-brown and then to ash; where a flake comes loose it is cut
+// along its own cell, its edge lit a dull ember for a moment as it breaks
+const float ASH_CELLS = 9.0;
+const float CRUMBLE_FROM = 0.45;
+const vec3 ASH = vec3(0.16, 0.15, 0.14);
+const vec3 EMBER = vec3(0.9, 0.35, 0.1);
+float crumbleOf(float h, float w, float jitter) {
+  float front = 1.25 - 1.55 * smoothstep(CRUMBLE_FROM, 1.0, w);
+  return clamp((h + 0.25 * jitter - front) / 0.35, 0.0, 1.0);
+}
+void wither() {
+  float w = v_cell.w;
+  if (w <= 0.0) return;
+  float seed = v_inst.y;
+  vec4 sc = shardCell(v_rest * ASH_CELLS + seed * 23.0);
+  float a = crumbleOf(v_t, w, hash33(sc.xyz + seed * 5.0).x);
+  if (a > 0.0 && split()) discard;
+  // dried out, then ash
+  float lum = dot(o.rgb, LUMA);
+  o.rgb = mix(o.rgb, vec3(lum) * vec3(1.05, 0.95, 0.82), smoothstep(0.05, 0.5, w));
+  o.rgb = mix(o.rgb, ASH * (0.35 + 0.65 * DAYLIGHT) * (0.7 + 0.6 * lum), max(smoothstep(0.4, 0.9, w), smoothstep(0.0, 0.2, a)));
+  // the ember along a flake's edge as it comes loose
+  float edge = 1.0 - smoothstep(0.0, 0.07, sc.w);
+  o.rgb += EMBER * edge * smoothstep(0.0, 0.1, a) * (1.0 - smoothstep(0.15, 0.5, a)) * 0.8;
 }
 
 void main() {
   surface();
   unform();
+  wither();
   keepPass(o.a);
 }

@@ -422,10 +422,19 @@ The bloom post-process makes the glow round the glints.
   round. A glowing band along the horizon; all pulsing as the ley lines
   did. Rose violet by day, deep blue violet by night. The key light and
   the ambient sky turn ley violet with it.
-- **The seed gathering** (`unforming.draw`): a star of gathered light
-  swells round it as the shards arrive, breathing, lighting the air round
-  it (so it reads from anywhere in the garden), shrinking back into the
-  seed as it falls; where it lands a burst of light is flung out (1.4 s).
+- **The seed gathering** (`unforming.draw`): the shards fly up in their
+  plant's film colour, each trailing a ribbon of it (`.trail`: a strip
+  turned to the eye, a thread at its tail, full and pale-cored at its
+  head). The star they gather in is a web of pale blue light, points on
+  two shells joined to their nearest by threads (`unformStar`), round a
+  heart of light; it swells as they arrive and flares with each, turning
+  slowly, lighting the air round it (so it reads from anywhere in the
+  garden), and shrinks back into the seed as it falls, a comet's tail
+  running up behind. Where it lands a ring of light rolls out over the
+  ground (the halo's flash, 2.4 s) and motes are flung up.
+- **Shifted light**: the glow overhead keys the garden a pale lavender by
+  day, near white, so plants keep their colours; the sky's fill is a
+  softer violet below it, so shade reads; the air sheds half its haze.
 - A low camera pitch widens the view toward the horizon.
 
 ## Lighting (engine `render/light.zig`)
