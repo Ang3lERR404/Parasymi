@@ -352,6 +352,14 @@ float plexYieldOn = 1.0;
 float plexusYieldWhole() { return step(0.999, plexYieldOn); }
 // whether a yielder's petal `k` is snapped on
 float plexusPetalOn(float k) { return step(k + 0.5, plexYieldOn * float(PLEXUS_YIELD_PETALS)); }
+// what is fastened at a stem's joints, one bit each (lowest leaf, middle
+// branch, highest leaf; the instance's growth times seven: all of a sample's)
+float plexSprigMask = 7.0;
+// whether the sprig web of `shape` (its branch or a leaf) is fastened on
+float plexusSprigOn(int shape) {
+  float bit = shape == PLEXUS_SPRIG_LEAF ? 0.0 : (shape == PLEXUS_SPRIG_BRANCH ? 1.0 : 2.0);
+  return mod(floor(plexSprigMask / exp2(bit)), 2.0);
+}
 // how many fragments a planted strange seed has conjured, the one rising
 // now in part
 float plexSeedCount = 0.0;
@@ -1239,6 +1247,8 @@ void main() {
     plexSeg = floor(pos.x);
     // (a yielder: how many of its petals are on, from its growth)
     if (shape >= PLEXUS_YIELD_CORE && shape <= PLEXUS_YIELD_GATHERING) plexYieldOn = iw.w;
+    // (a stem: what is fastened at its joints, from its growth)
+    if (shape >= PLEXUS_SPRIG_STEM && shape <= PLEXUS_SPRIG_LEAF_HIGH) plexSprigMask = floor(iw.w * 7.0 + 0.5);
     // (the whole story: which stage it is at now, how far into it, and how
     // much shows as it fades out at the end and in at the start)
     if (plexStage > 4.5) {
@@ -1317,6 +1327,9 @@ void main() {
     if (shape >= PLEXUS_YIELD_FRAGMENT && shape <= PLEXUS_YIELD_GATHERING) yield *= plexusYieldWhole();
     if (shape >= PLEXUS_YIELD_PETAL && shape < PLEXUS_YIELD_PETAL + PLEXUS_YIELD_PETALS) yield *= plexusPetalOn(float(shape - PLEXUS_YIELD_PETAL));
     if (plexKind > 2.5 && (shape == PLEXUS_YIELD_CORE || shape == PLEXUS_YIELD_GATHERING)) yield *= plexusPetalOn(ids.z - float(PLEXUS_YIELD_PETAL));
+    // (a sprig's branch and leaves show once fastened, their bonds with them)
+    if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) yield *= plexusSprigOn(shape);
+    if (plexKind > 2.5 && shape == PLEXUS_SPRIG_STEM) yield *= plexusSprigOn(int(ids.z));
     if (shape == PLEXUS_HEART_FILAMENT) yield = smoothstep(0.0, 0.1, plexusHeartGrow(floor(ids.x / 8.0), t));
     // (or of a petlet's points as their fragments arrive, a line or pane
     // there once all its points are, a grand petal as it opens, a

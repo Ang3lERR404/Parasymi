@@ -28,6 +28,12 @@ pub const Msg=union(enum){
   /// a constellate petal has drifted over and merges (a yielder short of
   /// petals takes it on: `done`)
   petalSnapped,
+  /// a constellate part put down nearby asks to drift over to a stem's
+  /// joint (a stem with that joint free answers `joint`)
+  fastenComing:Fasten,
+  /// a constellate part has drifted over and fastens at a joint (a stem
+  /// with a joint free for it takes it: `joint`)
+  fastened:Fasten,
 };
 /// what a structure makes of a `Msg`
 pub const Reply=union(enum){
@@ -37,6 +43,9 @@ pub const Reply=union(enum){
   done,
   /// how many of what `arrived` it took in
   took:u16,
+  /// the joint of a stem a part drifts to or fastened at (0 lowest, 1
+  /// middle, 2 highest)
+  joint:u8,
 };
 /// how a kind pairs (its `pairs`): with a structure of kind `with` (its
 /// own if null), one way (its partner is where it sends) or both ways
@@ -72,4 +81,12 @@ pub const PairStep=enum{
   cut,
   /// the one waiting is paired with it
   paired,
+};
+/// what fastens at a constellate stem's joint: a leaf (its lowest or
+/// highest), or another stem as its branch (its middle)
+pub const Fasten=enum{
+  /// a leaf
+  leaf,
+  /// a stem, as a branch
+  branch,
 };

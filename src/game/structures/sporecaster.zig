@@ -160,7 +160,7 @@ pub fn drift(ctx:st.Ctx,self:*st.Structure,air:*Air,kind:st.Kind,dt:f32)bool{
     // how many the one below took in
     const took=switch(ctx.ss.send(ctx,j,.{.arrived=.{.item=sp.item,.n=sp.n}})){
       .took=>|k|k,
-      .ignored,.done=>0,
+      .ignored,.done,.joint=>0,
     };
     sp.n-=@intCast(took);
     if(sp.n==0)slot.*=null;

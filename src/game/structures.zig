@@ -100,6 +100,8 @@ pub const testsKin=@import("structures/core/tests_kin.zig");
 pub const bench=@import("structures/core/bench.zig");
 /// what one structure tells another
 pub const Msg=messages.Msg;
+/// what fastens at a constellate stem's joint
+pub const Fasten=messages.Fasten;
 /// what a structure makes of a `Msg`
 pub const Reply=messages.Reply;
 /// how a kind pairs: with whom, which way, how many at once

@@ -86,7 +86,7 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
       q.petals+=1;
       return.done;
     },
-    .lit,.unform,.graft,.arrived=>return.ignored,
+    .lit,.unform,.graft,.arrived,.fastenComing,.fastened=>return.ignored,
   }
 }
 /// whole, a click takes one fragment it has yielded

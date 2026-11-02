@@ -113,7 +113,7 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
       ctx.ss.get(i).state.diamond.light=@splat(1);
       return.done;
     },
-    .arrived,.unform,.graft,.petalComing,.petalSnapped=>return.ignored,
+    .arrived,.unform,.graft,.petalComing,.petalSnapped,.fastenComing,.fastened=>return.ignored,
   }
 }
 /// its field of celestial energy, `halo.diamondR` round it, once grown;

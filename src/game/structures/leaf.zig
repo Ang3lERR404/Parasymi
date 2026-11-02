@@ -1,7 +1,8 @@
 //! CONSTELLATE LEAF: a leaf of light (a stalk running on as a midrib, folded, pointed) the star hyena builds of fragments and puts
 //! down on its own (act 2). It floats over its tile, bobbing, a web
 //! holding its shape (game/structures/constellate_part.zig), until a combo
-//! takes it in: fastened at a stem's lowest or highest joint (not yet in the game).
+//! takes it in: a stem within reach with its lowest or highest joint free,
+//! which it drifts over to and fastens at.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -27,9 +28,20 @@ const Color=lib.engine.ui.draw.Color;
 pub const meshes=.{.constellateLeaf};
 /// what a leaf put down is: one tile, drawn by its own `emit`, still
 pub const def:st.Def=.{.item=.constellateLeaf,.lineage=null,.size=1,.mesh=.constellateLeaf,.bare=true,.still=true};
-/// it, floating over its tile
+/// what a leaf put down remembers: the stem it drifts to, if any
+pub const State=struct{
+  /// its drift over to a stem's joint
+  drift:part.Drift=.{},
+};
+/// it drifts over to a stem's free lowest or highest joint and fastens there
+pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
+  return part.fasten(ctx,i,&ctx.ss.get(i).state.leaf.drift,.leaf,dt);
+}
+/// it, floating over its tile, or drifting over to its stem's joint
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
-  try part.float(s,out,ctr,tf,.constellateLeaf);
+  // its drift
+  const d=s.state.leaf.drift;
+  if(d.to==null)try part.float(s,out,ctr,tf,.constellateLeaf)else try part.driftTo(s,out,ctr,tf,.constellateLeaf,d);
 }
 /// its line in the panel: floating, waiting to be joined
 pub fn describe(_:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:f32)Allocator.Error!void{

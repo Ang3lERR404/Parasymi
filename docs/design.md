@@ -456,8 +456,13 @@ constellate one alone.
 - **Parts:** every constellate part is a placeable structure with combo
   rules: core, petal, leaf, bud and stem, each built of ten fragments, put
   down floating over its tile (`constellate_part.zig` shares how). Combos
-  so far: four petals onto a core (the yielder). Still to come: leaves and
-  stems fastening at a stem's joints (a sprig), four buds on a stem
+  so far: four petals onto a core (the yielder); the sprig: a stem has
+  three joints (every third ring), leaves put down within 4 tiles drift
+  to its lowest then highest, a bare stem put down after it to its middle
+  as its branch, each fastening in 6 s (messages `fastenComing`,
+  `fastened`, reply `joint`; the stem drawn as `constellateSprig` showing
+  only what is fastened). Still to come:
+  four buds on a stem
   beginning the heart.
 - **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
   belly panel showing each gardener's own) build a constellate core or a
