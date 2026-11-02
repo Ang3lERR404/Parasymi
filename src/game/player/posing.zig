@@ -73,10 +73,6 @@ const headBones=lib.player.tuningLook.headBones;
 const hipRoll=lib.player.tuning.hipRoll;
 /// how far the pelvis turns with the stride (radians)
 const hipTurn=lib.player.tuning.hipTurn;
-/// the belly lumps' glow
-const lumpGlow=lib.player.tuningLook.lumpGlow;
-/// how large each belly lump is (m)
-const lumpR=lib.player.tuningLook.lumpR;
 /// the nose's glow
 const noseGlow=lib.player.tuningLook.noseGlow;
 /// the nose's colour
@@ -109,8 +105,6 @@ const restOn=lib.player.tuning.restOn;
 const restPronate=lib.player.tuning.restPronate;
 /// the rear's opacity
 const rumpOpacity=lib.player.tuningLook.rumpOpacity;
-/// the belly sap's opacity at its centre
-const sapOpacity=lib.player.tuningLook.sapOpacity;
 /// how much more a full, stretched sac lets show through
 const sapStretch=lib.player.tuning.sapStretch;
 /// how far the pelvis sinks at full stride (m)
@@ -163,8 +157,6 @@ const tailStiff=lib.player.tuningLook.tailStiff;
 const tailKeep=lib.player.tuningLook.tailKeep;
 /// the bind pose, inverted, the skin matrices start from
 const bindInv=lib.player.ik.bindInv;
-/// the belly's lumps
-const lumps=lib.player.tuningLook.lumps;
 /// how far through its pull and wrench a unit's pry is (0..1)
 const pryPull=lib.player.ik.pryPull;
 /// an arm reaching its wrist (inverse kinematics)
@@ -430,19 +422,11 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
   // the sheet of sap down its front, under the belly's sac
   try out.emitSkinned(.wolfPanel,base,mid,.{.phase=0.3,.fade=pecOpacity});
   if(!headless)try out.emit(.pawBean,m.chain(&.{at(&w,.head),translate(bodyMesh.nose),m.rotX(-bodyMesh.noseTilt),scale(v3(0.015,0.0105,0.011))}),.{.glow=noseGlow,.fade=beanOpacity,.tint=noseTint});
-  // the belly: a sap sac that inflates with the inventory, drops and sags
-  // as it fills, with the heavier things inside showing through as shadows
-  // how full the belly is, and the gut bone it hangs from
+  // the belly: the wolf's own amber belly, swelling with the inventory,
+  // dropping and sagging as it fills; dense sap like the chest, so what it
+  // holds no longer shows through (as the gardener drew it)
+  // how full the belly is
   const b=p.fullness;
-  const gut=at(&w,.gut);
-  // how many stacks it holds: one lump shows for each, up to five
-  var held:usize=0;
-  for(p.inv.slot)|slot|if(slot!=null){
-    held+=1;
-  };
-  for(p.lump[0..@min(held,lumps.len)])|l|{
-    try out.emit(.bellyLump,m.chain(&.{gut,translate(l.pos),scale(m.splat3(lumpR))}),.{.glow=lumpGlow,.phase=0.3});
-  }
   // a plucked bead, its yield's colour, cupped in each paw that carries
   // one in from the plant, until the paw presses it into the belly
   if(p.bead)|it|for(0..2)|s|if(p.stowLeft(s)>0.5){
@@ -455,7 +439,7 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
   // where the belly's folds cross
   const cross=bellyMesh.crossing();
   try out.emitSkinned(.wolfBelly,base,mid,.{
-    .glow=bellyGlow+bellyGlowFull*b,.phase=0.3,.fade=sapOpacity-sapStretch*b,.give=.{b,cross[1],cross[2]},
+    .glow=bellyGlow+bellyGlowFull*b,.phase=0.3,.fade=pecOpacity-sapStretch*b,.give=.{b,cross[1],cross[2]},
   });
   // the pectorals and the rear: resin, its surface given by its spring
   // (and, on the chest, a slow idle) while its base holds

@@ -75,9 +75,9 @@ pub const tipPad=v3(-0.0088,-0.016,0);
 /// how far under the foot's frame the sole lies
 pub const soleY:f32=-0.006;
 /// the sole's big pad, in the foot's frame
-pub const padAt=v3(0,soleY+0.002,0.035);
-/// where each of the four toes sits on the foot (x across, z forward)
-pub const toes=[4]m.Vice(f32,2){.{-0.027,0.098},.{-0.009,0.108},.{0.009,0.108},.{0.027,0.098}};
+pub const padAt=v3(0,soleY+0.002,0.03);
+/// where each of the four toes sits on the big flat paw (x across, z forward)
+pub const toes=[4]m.Vice(f32,2){.{-0.045,0.125},.{-0.016,0.14},.{0.016,0.14},.{0.045,0.125}};
 /// the fingers' radii at the knuckle, the middle joint and the tip
 const fingerR=m.Vice(f32,3){0.0118,0.0105,0.0086};
 /// how softly the fingers melt into each other: barely
@@ -133,7 +133,7 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   // the helper, bound to this sculpt and pose
   const a:Add=.{.s=s,.w=w};
   // hips: the pelvis's mass (the resin rear sits on its back)
-  try a.f(.pelvis,ell(v3(0,0.045,-0.008),v3(0.14,0.1,0.105)),hide,0.04);
+  try a.f(.pelvis,ell(v3(0,0.035,-0.008),v3(0.215,0.13,0.13)),hide,0.06);
   // the waist drawn in between hips and ribs, only a little: the
   // ribcage's lower edge eases into it rather than standing over it
   try a.f(.waist,ell(v3(0,0.045,-0.006),v3(ribWaist[0],0.105,ribWaist[1])),hide,0.05);
@@ -219,23 +219,25 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
       try s.add(.{.shape=cone(v3(0,0,0),v3(0,-skel.distal[i],0),fingerR[1],fingerR[2]),.at=w[bi(tb)],.bone=bi(tb),.col=dark,.k=fingerK,.soft=fingerSoft});
     }
     try a.f(sd.hand,cone(dewRoot,dewTip*v3(x,1,1),0.0095,0.0075),dark,0.01);
-    // legs: the thigh's power (quadriceps before, hamstring behind), the
-    // kneecap; the shin with the calf swelling on its back; the hock and
-    // the long metatarsal down to the ball; the long flat foot
-    try a.f(sd.thigh,cone(v3(0,0.0,0),v3(0,-skel.thighLength,0),0.08,0.063),hide,0.04);
-    try a.f(sd.thigh,ell(v3(0,-0.1,0.036),v3(0.07,0.106,0.062)),muscle,meatMelt);
-    try a.f(sd.thigh,ell(v3(0,-0.1,-0.038),v3(0.064,0.1,0.058)),muscle,meatMelt);
-    try a.f(sd.thigh,ell(v3(x*0.032,-0.06,0),v3(0.056,0.095,0.062)),muscle,meatMelt*1.2);
+    // legs, heavy and plantigrade as the gardener drew them: great thighs
+    // (quadriceps before, hamstring behind, a mass on the outside swelling
+    // into the hip), the kneecap; a thick shin with the calf on its back;
+    // the ankle standing straight on a big flat paw, heel behind and toes
+    // spread before, so the leg reads as one column down to the ground
+    try a.f(sd.thigh,cone(v3(0,0.0,0),v3(0,-skel.thighLength,0),0.12,0.092),hide,0.05);
+    try a.f(sd.thigh,ell(v3(0,-0.13,0.05),v3(0.1,0.15,0.085)),muscle,meatMelt*1.4);
+    try a.f(sd.thigh,ell(v3(0,-0.13,-0.05),v3(0.092,0.14,0.08)),muscle,meatMelt*1.4);
+    try a.f(sd.thigh,ell(v3(x*0.065,-0.07,0),v3(0.1,0.15,0.1)),muscle,meatMelt*2);
     // the teardrop of the inner quadriceps just above the knee
-    try a.f(sd.thigh,ell(v3(-x*0.026,-0.17,0.034),v3(0.036,0.046,0.036)),muscle,meatMelt);
-    try a.f(sd.thigh,ell(v3(0,-skel.thighLength,0.042),v3(0.038,0.04,0.028)),hide,0.02);
-    try a.f(sd.shin,cone(v3(0,0,0),v3(0,-skel.shinLength,0),0.06,0.04),hide,0.035);
+    try a.f(sd.thigh,ell(v3(-x*0.036,-0.23,0.045),v3(0.05,0.06,0.05)),muscle,meatMelt);
+    try a.f(sd.thigh,ell(v3(0,-skel.thighLength,0.06),v3(0.05,0.05,0.035)),hide,0.025);
+    try a.f(sd.shin,cone(v3(0,0,0),v3(0,-skel.shinLength,0),0.088,0.072),hide,0.045);
     // the calf in two heads, inner and outer, high on the shin's back
-    for([_]f32{-1,1})|hx|try a.f(sd.shin,ell(v3(hx*0.019,-0.075,-0.038),v3(0.036,0.08,0.046)),muscle,meatMelt);
-    try a.f(sd.meta,ell(v3(0,0,-0.018),v3(0.034,0.034,0.03)),hide,0.02);
-    try a.f(sd.meta,cone(v3(0,0,0),v3(0,-skel.metaLength,0),0.04,0.029),dark,0.03);
-    try a.f(sd.foot,ell(v3(0,0.013,0.03),v3(0.035,0.019,0.06)),dark,0.03);
-    try a.f(sd.foot,ell(v3(0,0.022,-0.008),v3(0.029,0.024,0.032)),dark,0.025);
+    for([_]f32{-1,1})|hx|try a.f(sd.shin,ell(v3(hx*0.027,-0.1,-0.05),v3(0.05,0.11,0.06)),muscle,meatMelt);
+    try a.f(sd.meta,cone(v3(0,0.02,0),v3(0,-skel.metaLength,0.0),0.074,0.07),hide,0.04);
+    // the paw: a broad flat sole from the heel to the toes, the heel's mound behind
+    try a.f(sd.foot,ell(v3(0,0.034,0.035),v3(0.066,0.04,0.105)),dark,0.035);
+    try a.f(sd.foot,ell(v3(0,0.045,-0.035),v3(0.058,0.05,0.05)),dark,0.035);
   }
   // the tail, growing out of the rear and tapering to its tip
   const radii=[_]f32{0.056,0.048,0.04,0.03,0.011};
@@ -716,7 +718,7 @@ fn digits(b:*mg.Builder,w:*const[skel.count]M4)Allocator.Error!void{
     for(toes)|t|{
       try kit.digit(b,.{
         .base=v3(t[0]*0.9,0.012,t[1]-0.026),.dir=m.norm(v3(t[0]*2.5,-0.1,1)),
-        .len=0.034,.r=0.0105,.col=pal.wolfCore,.claw=pal.wolfClaw,
+        .len=0.045,.r=0.016,.col=pal.wolfCore,.claw=pal.wolfClaw,
       });
     }
     b.xform(start,w[bi(sd.foot)]);

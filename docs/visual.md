@@ -579,6 +579,9 @@ from a distance-to-edge function, so they stay crisp at any size) in
 - **Torso:** the ribcage is broad but melts into a waist only a little
   narrower (`rib*`, `lat*` in `wolfBody`). No barrel rim over the waist,
   front or back.
+- **Build, as the gardener drew it:** heavy and low-slung: wide hips,
+  great thighs swelling out past them, thick column legs on big flat
+  paws (heel behind, four toes spread before).
 - **Muscle:** the limbs carry heavy, distinct muscle: three-headed
   deltoids, bicep/tricep, brachioradialis, quadriceps with an inner
   teardrop, two-headed calves, neck cords, obliques. They are melted only
@@ -694,13 +697,15 @@ A plant's yield shows on it, where the paws pluck it:
 - Eased in on a slow spring; gone once he moves, works or gathers.
 
 ### Belly (`wolfBelly`)
-- A convex egg sac on the gut.
+- The wolf's own round amber belly, as the gardener drew it: a convex
+  egg on the gut, bare (no vines over it), dense sap like the chest
+  (`pecOpacity`), swelling out of the sap panel; what it holds no longer
+  shows through.
 - **Filling** scales and drops two bones: `gut` (lower half) and `gutTop`
   (upper half: as wide, its top kept where it hangs). So the swollen sac
   never folds (tested).
 - tu.x = the gut's share of each vertex.
 - The belly button pops out.
-- Up to 5 lumps inside (in the gut bone's frame).
 - **Normals:** `vertex.Skin` carries each weight's slope (`gx/gy/gz`).
   part.vert bends skinned normals by the true Jacobian (how the surface
   actually stretches and turns there), not by the blended bones alone.
@@ -708,10 +713,14 @@ A plant's yield shows on it, where the paws pluck it:
 ### Motion
 - **Feet** are planted in the world and swung on arcs when the gait's
   phase says so (or, standing, when a foot is left behind).
-- **Legs:** digitigrade (walking on the toes, as dogs do), every bone its
-  own (`solveLeg`): the metatarsal stands back up from the ball at its
-  rest angle, swung part way with the reach and folded mid-swing; thigh
-  and shin reach the hock, the knee forward, the shin folding back.
+- **Legs:** plantigrade (standing on the whole paw), heavy columns as the
+  gardener drew them, every bone its own (`solveLeg`): the short ankle
+  stands back up from the paw at its rest angle, swung part way with the
+  reach and folded mid-swing; thigh and shin reach it, the knee forward,
+  the shin folding back. The hip is rolled out to the leg's plane before
+  it swings in it (composed in that order and read back as one turn), so
+  the foot lands exactly; near straight the reach is softened
+  (`softReach`) so the knee eases straight instead of snapping.
 - **Feet hug the ground:** each foot feels the slope under it
   (`Foot.nrm`, eased) and its sole is tipped and rolled flat along it
   (`Limb.roll`); the hips drop so a foot down a slope or off a step still

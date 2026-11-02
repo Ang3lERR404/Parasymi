@@ -5,7 +5,7 @@
 //! - feet are planted in the world and stay there through their stance;
 //!   each swings on an arc to where it will be needed, the gait's phase
 //!   choosing when, or, standing, whenever a foot is left behind;
-//! - the digitigrade legs reach them by inverse kinematics;
+//! - the plantigrade legs reach them by inverse kinematics;
 //! - the pelvis bobs low at each footfall, sways over the planted foot,
 //!   rolls and turns with the stride, and the chest turns against it;
 //! - arms, lean, head and ears follow on springs, so motion carries,

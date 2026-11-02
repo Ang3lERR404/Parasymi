@@ -171,7 +171,7 @@ pub fn parent(b:Bone)?Bone{
   };
 }
 /// lengths and joint places (metres); the hips stand this high off the ground
-pub const hipY:f32=0.7;
+pub const hipY:f32=0.697;
 /// where the waist joins, up from the pelvis
 pub const waistAt=v3(0,0.1,0);
 /// where the chest joins, up from the waist
@@ -187,7 +187,7 @@ pub const jawAt=v3(0,-0.012,0.012);
 /// would hold), its back held to the body so it swells forward, and drops
 pub const gutAt=v3(0,-0.035,0.058);
 /// the empty sac's radii: across, down and forward
-pub const gutR=v3(0.11,0.095,0.086);
+pub const gutR=v3(0.13,0.115,0.1);
 /// how wide the sac grows when full, a ball this far across
 pub const gutFull:f32=0.3;
 /// how far the sac drops per unit of fill
@@ -223,13 +223,14 @@ pub const proximal=[fingerCount]f32{0.03,0.036,0.036,0.03};
 /// each fingertip segment's length
 pub const distal=[fingerCount]f32{0.026,0.03,0.03,0.026};
 /// how far out from the middle each hip joint sits
-pub const hipX:f32=0.105;
+pub const hipX:f32=0.12;
 /// the thigh's length, hip to knee
-pub const thighLength:f32=0.22;
+pub const thighLength:f32=0.32;
 /// the shin's length, knee to hock
-pub const shinLength:f32=0.26;
-/// the metatarsal's length, hock to ball
-pub const metaLength:f32=0.335;
+pub const shinLength:f32=0.32;
+/// the ankle's height, from the shin down to the flat foot (the leg is
+/// plantigrade, as the gardener drew it: it stands on the whole paw)
+pub const metaLength:f32=0.07;
 /// where the tail leaves the pelvis, up and back
 pub const tailAt=v3(0,0.12,-0.13);
 /// each tail segment's length
@@ -301,17 +302,17 @@ pub const Pose=struct{
 pub const bindArmOut:f32=0.42;
 /// an arm at rest on side `s`: swung out clear of the body, the elbow a little bent
 fn restArm(s:usize)Limb{return.{.root=.{.z=sign(s)*bindArmOut},.mid=0.25,.low=.{}};}
-/// a digitigrade leg at rest: the thigh a little forward, the shin folded
-/// back to a high hock, the metatarsal forward to the ball, the foot level.
+/// a plantigrade leg at rest, standing on the whole paw: the thigh a little
+/// forward, the knee softly bent, the ankle upright over the flat foot.
 /// The thigh's rest swing (radians)
-pub const restThigh:f32=-0.25;
+pub const restThigh:f32=-0.2;
 /// the knee's rest fold (radians)
-pub const restKnee:f32=0.87;
+pub const restKnee:f32=0.4;
 /// the hock's rest turn, the metatarsal swung forward (radians)
-pub const restHock:f32=-1.23;
+pub const restHock:f32=-0.2;
 /// the legs stand a little apart
 pub const legOut:f32=0.05;
-/// a leg at rest on side `s`: digitigrade, set a little apart, the foot turned back level
+/// a leg at rest on side `s`: plantigrade, set a little apart, the foot turned back level
 fn restLeg(s:usize)Limb{return.{.root=.{.x=restThigh,.z=sign(s)*legOut},.mid=restKnee,.low=.{.x=restHock},.foot=-(restThigh+restKnee+restHock)};}
 /// each bone's frame in wolf space for `p` (its joint at the origin)
 pub fn fk(p:Pose)[count]M4{

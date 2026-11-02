@@ -92,7 +92,20 @@ pub fn overreach(d:V3,fold:f32)f32{
   const most=(skel.thighLength+skel.shinLength)*lib.player.tuning.reachShare;
   return@max(@sqrt(h.y*h.y+h.z*h.z)-most,0);
 }
-/// the leg reaching its foot, digitigrade, each bone its own: the
+/// from what share of thigh and shin together the reach is softened
+const softFrom:f32=0.983;
+/// the hock's reach `d` softened as thigh and shin near straight: unchanged
+/// below `softFrom` of their length, then easing toward full length and
+/// never reaching it, so the knee straightens smoothly instead of snapping
+/// (a straight two-bone chain's bend changes without bound at its end)
+fn softReach(d:f32)f32{
+  // the whole length, and where the softening starts
+  const most=skel.thighLength+skel.shinLength;
+  const from=most*softFrom;
+  if(d<=from)return d;
+  return from+(most-from)*(1-@exp(-(d-from)/(most-from)));
+}
+/// the leg reaching its foot, plantigrade, each bone its own: the
 /// metatarsal stands back up from the ball at its own angle (`hockFor`),
 /// thigh and shin reach the hock by the law of cosines with the knee
 /// forward and the shin folding back, and the foot is laid along the
@@ -101,7 +114,7 @@ pub fn overreach(d:V3,fold:f32)f32{
 pub fn solveLeg(r:Reach)skel.Limb{
   // the hock wanted, and thigh and shin reaching it
   const h=hockFor(r.d,r.fold);
-  const ik=rig.twoBone(skel.thighLength,skel.shinLength,@sqrt(h.y*h.y+h.z*h.z));
+  const ik=rig.twoBone(skel.thighLength,skel.shinLength,softReach(@sqrt(h.y*h.y+h.z*h.z)));
   // the way toward the hock, as a limb's turn about X
   const bh=m.atan2(-h.z,-h.y);
   // the turns of thigh and shin, each from the pelvis's down
@@ -111,7 +124,10 @@ pub fn solveLeg(r:Reach)skel.Limb{
   const slopePitch=m.atan2(r.ground[2],r.ground[1]);
   const slopeRoll=m.atan2(-r.ground[0],r.ground[1]);
   return.{
-    .root=.{.x=th,.z=h.ab},
+    // rolled out to the leg's plane first, then swung in it: a turn (Y*X*Z)
+    // swings first and rolls after, so the two are composed in the
+    // solve's order and read back as one turn, and the foot lands exactly
+    .root=rig.turnOf(m.mul(m.rotZ(h.ab),m.rotX(th))),
     .mid=shin-th,
     .low=.{.x=h.mu-shin},
     .foot=-h.mu-r.pelvis.x+r.hang+slopePitch,
@@ -166,4 +182,17 @@ pub fn pryPull(k:f32)f32{
   if(k<pullEnd)return 0.75*m.smooth(k/pullEnd);
   if(k<wrenchEnd)return 0.75+0.25*m.smooth((k-pullEnd)/(wrenchEnd-pullEnd));
   return 1-m.smooth((k-wrenchEnd)/(1-wrenchEnd));
+}
+test"the leg's reach softens only near straight, rising smoothly and never past full length"{
+  // the leg's whole length, and the reach a step before it
+  const most=skel.thighLength+skel.shinLength;
+  var last=softReach(0);
+  try lib.std.testing.expectEqual(@as(f32,0.5*most),softReach(0.5*most));
+  for(1..400)|i|{
+    // a reach from nothing to well past full length, and it softened
+    const d=m.ratio(i,399)*most*1.5;
+    const s=softReach(d);
+    try lib.std.testing.expect(s>=last and s-last<=d-m.ratio(i-1,399)*most*1.5+1e-6 and s<=most);
+    last=s;
+  }
 }

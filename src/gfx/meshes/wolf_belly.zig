@@ -1,15 +1,14 @@
 //! mesh: WOLF BELLY. a sac of sap on the gut, skinned to the spine: an egg
 //! rounded and full below, drawing in smoothly toward the ribs above, its
 //! back sunk in the body so only the swell shows. Convex everywhere, so
-//! its near side (the only side drawn) never folds away. A net of grown
-//! vines wraps it (tapering at both ends, leaves along them) and a belly
-//! button sits sunk in the sap at the front.
+//! its near side (the only side drawn) never folds away. Bare amber, the
+//! wolf's own belly swelling out of the sap panel (as the gardener drew
+//! it); a belly button sits sunk in the sap at the front.
 //!
 //! tu.x on every vertex is how much of the gut it is (1 low and in front,
 //! 0 toward the ribs): that share of it moves with the skeleton's gut bone,
 //! which swells, rounds out toward a ball, drops and pushes forward as the
-//! belly fills, while its top stays with the spine. The sac and its net
-//! carry tu.y = `belly`: as it fills the shader folds creases into it, one
+//! belly fills, while its top stays with the spine. The sac carries tu.y = `belly`: as it fills the shader folds creases into it, one
 //! down its middle and one across it, deepening the fuller it is (crossing
 //! at the belly button, `crossing`). The belly button is sap like the sac,
 //! a knot with a puckered ring round it, its vertices tu.y = `navelMark`: the
@@ -29,12 +28,8 @@ const m=engine.core.math;
 const mg=lib.meshgen;
 /// the garden's shared colours (sap, the wolf's vine and leaves)
 const pal=lib.palette;
-/// the wolf's kit, whose fur leaves lie along the net
-const kit=lib.wolfKit;
 /// colours, one per vertex of the sac
 const color=engine.core.color;
-/// part roles, to tell the net's leaves apart
-const vertex=lib.vertex;
 /// the wolf's bones, and the gut's size and growth
 const skel=lib.skeleton;
 /// the sculpt kit, whose `packWith` turns bone weights and their slopes into a skin
@@ -141,7 +136,7 @@ fn lower(yr:f32)m.Vice(f32,2){
 fn reach(yr:f32)m.Vice(f32,2){
   return.{skel.gutGrow[1]*yr+skel.gutShift[1],skel.gutGrowTop[1]*yr+skel.gutShift[1]};
 }
-/// lays the belly: the sac, its net of vines with their leaves, and the belly
+/// lays the belly: the sac and the belly
 /// button, then weights every vertex to the gut and the spine and moves it all
 /// into the waist's place in the bind pose
 pub fn build(b:*mg.Builder)Allocator.Error!void{
@@ -172,43 +167,9 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   for(b.v.items[start..])|*vx|{
     vx.tu[0]=share(vx.pos[1]-centre[1])[0];
   }
-  // the net: grown vines from under the gut up over it, twisting, the
-  // front ones running on toward the ribs; tapering at both ends, leaves
-  // lying along them
-  for(0..6)|vi|{
-    // where round the sac this vine starts
-    const a0=m.ratio(vi,6)*m.tau+0.3;
-    // whether it runs up the front, and how far up the sac it climbs
-    const front=@sin(a0)>0.3;
-    const top:f32=if(front)0.88 else 0.66;
-    // the vine's points, their gut shares (tu.x) and their radii
-    var path:[22]V3=undefined;
-    var vts:[22]f32=undefined;
-    var rs:[22]f32=undefined;
-    for(&path,&vts,&rs,0..)|*p,*t,*r,j|{
-      // how far along the vine this point is, 0..1
-      const k=m.ratio(j,21);
-      // how far up the sac this point is (radians from the bottom)
-      const th=m.lerp(0.12,top,k)*m.pi;
-      p.*=surface(th,a0+k*0.9,1.04);
-      t.*=gut(th);
-      r.*=@max(0.0072*@sqrt(@sin(m.pi*k)),0.0005);
-    }
-    try b.tubeR(&path,&vts,&rs,pal.wolfVine,.stem,5);
-    for([_]usize{7,14})|j|{
-      // how far up the sac this leaf grows
-      const th=m.lerp(0.12,top,m.ratio(j,21))*m.pi;
-      try kit.leaf(b,.{
-        .base=path[j],.along=m.norm(path[j-1]-path[j+1]),.out=normal(th,a0+m.ratio(j,21)*0.9),
-        .len=0.045,.width=0.014,.lift=0.35,.curl=0.4,.cup=0.3,
-        .col=pal.wolfLeafDark,.tip=pal.wolfLeafLite,.t=vts[j],
-      });
-    }
-  }
-  // (the leaves keep theirs: it is how far along them, for their stir)
-  for(b.v.items[start..])|*vx|if(vx.part!=@intFromEnum(vertex.Part.leaf)){
-    vx.tu[1]=belly;
-  };
+  // decision: no net of vines over it: the belly is the wolf's own amber
+  // belly as the gardener drew it, bare sap swelling out of the panel
+  for(b.v.items[start..])|*vx|vx.tu[1]=belly;
   // the belly button: a small knot of sap sunk in the sac at the front of
   // the gut, a puckered ring of sap around it, all one with the sac
   // how far round from the bottom the belly button sits

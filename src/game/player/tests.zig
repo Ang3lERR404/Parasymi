@@ -85,16 +85,16 @@ test"the leg reaches its resting foot in its resting pose"{
     try testing.expectApproxEqAbs(skel.restHock,l.low.x,1e-3);
   }
 }
-test"each leg bone is its own: a foot set forward and down is reached, its sole laid along the slope"{
+test"each leg bone is its own: a foot set forward and up the slope is reached, its sole laid along it"{
   // the bones at the rest pose, and a slope rising ahead and to the left
   const w=skel.fk(.{});
   const slope=m.norm(v3(0.25,1,-0.3));
-  // the pose with each leg solved onto its foot, moved forward and down
+  // the pose with each leg solved onto its foot, moved forward and up the slope
   var q:skel.Pose=.{};
   // where each foot is wanted
   var want:[2]V3=undefined;
   for(skel.sides,0..)|sd,s|{
-    want[s]=m.origin(w[@intFromEnum(sd.foot)])+v3(0,-0.04,0.12);
+    want[s]=m.origin(w[@intFromEnum(sd.foot)])+v3(0,0.04,0.1);
     q.legs[s]=solveLeg(.{.d=want[s]-v3(skel.sign(s)*skel.hipX,skel.hipY,0),.ground=slope});
   }
   // the bones so posed: each ball where it is wanted, each sole facing the slope
@@ -102,7 +102,7 @@ test"each leg bone is its own: a foot set forward and down is reached, its sole 
   for(skel.sides,0..)|sd,s|{
     // the foot bone's frame
     const f=pw[@intFromEnum(sd.foot)];
-    try testing.expect(m.dist(m.origin(f),want[s])<2e-3);
+    try testing.expect(m.dist(m.origin(f),want[s])<1e-4);
     try testing.expect(m.dot(m.norm(v3(f[1][0],f[1][1],f[1][2])),slope)>0.99);
   }
 }
