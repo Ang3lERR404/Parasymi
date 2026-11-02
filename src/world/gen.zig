@@ -120,9 +120,116 @@ fn levelled(seed:u64,wx:i32,wy:i32,own:f32)f32{
   const near=@max(@max(rawStep(seed,wx-1,wy),rawStep(seed,wx+1,wy)),@max(rawStep(seed,wx,wy-1),rawStep(seed,wx,wy+1)));
   return @min(own,near);
 }
-/// the tile at world (wx, wy) for `seed`: its terraced height, kind, ley and
-/// any resource node; the same for the same seed and tile, whatever is loaded
-pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
+/// how far (tiles) a terrace's edge eases into the land round it: a tile
+/// stands on the levelled terraces within this reach of it, the nearer
+/// counted more, so one terrace rolls into the next in a soft S over a few
+/// tiles instead of a hard one-tile ramp; the heart of a wide terrace
+/// stays level
+const easeReach:f32=2.5;
+/// how many whole tiles each way the ease looks
+const easeSpan=2;
+/// one tile the ease counts: how far off it lies, and its weight
+const Ease=struct{
+  /// its offset in tiles, across and down
+  d:m.Vice(i32,2),
+  /// how much it counts, falling smoothly to nothing at the reach
+  w:f32,
+};
+/// every tile within the ease's reach, with its weight
+const ease=blk:{
+  // the tiles found so far, and how many
+  var es:[(2*easeSpan+1)*(2*easeSpan+1)]Ease=undefined;
+  var n:usize=0;
+  var dy:i32=-easeSpan;
+  while(dy<=easeSpan):(dy+=1){
+    // the column offset being looked at
+    var dx:i32=-easeSpan;
+    while(dx<=easeSpan):(dx+=1){
+      // how far it lies, as a share of the reach (squared)
+      const d2=m.f(dx*dx+dy*dy)/(easeReach*easeReach);
+      if(d2>=1)continue;
+      es[n]=.{.d=.{dx,dy},.w=(1-d2)*(1-d2)};
+      n+=1;
+    }
+  }
+  break:blk es[0..n].*;
+};
+/// all the ease's weights together
+const easeTotal=blk:{
+  // the running sum
+  var s:f32=0;
+  for(ease)|e|s+=e.w;
+  break:blk s;
+};
+/// the eased terrace (in steps) of one tile, from `src.step(dx, dy)`: the
+/// levelled terrace of the tile `dx, dy` off it
+fn eased(comptime t:type,src:t)f32{
+  // the weighted terraces so far
+  var sum:f32=0;
+  for(ease)|e|sum+=e.w*src.step(e.d[0],e.d[1]);
+  return sum/easeTotal;
+}
+/// the levelled terraces round one tile, each worked out from the noise
+const Lone=struct{
+  /// the world's seed
+  seed:u64,
+  /// the tile, across
+  wx:i32,
+  /// the tile, down
+  wy:i32,
+  /// the levelled terrace `dx, dy` tiles off it
+  fn step(s:Lone,dx:i32,dy:i32)f32{
+    // that tile
+    const x=s.wx+dx;
+    const y=s.wy+dy;
+    return levelled(s.seed,x,y,rawStep(s.seed,x,y));
+  }
+};
+/// the levelled terraces of a chunk's tiles and `easeSpan` beyond it, each
+/// tile's noise read once (`generate` eases a whole chunk from it)
+const Field=struct{
+  /// how many tiles across it is
+  const w=ck.sizeTiles+2*easeSpan;
+  /// how many tiles across its noise steps are: one more each side, for the levelling
+  const rw=w+2;
+  /// each tile's levelled terrace, row by row
+  lv:[w*w]f32=undefined,
+  /// reads the field round the chunk whose first tile is (ox, oy)
+  fn fill(f:*Field,seed:u64,ox:i32,oy:i32)void{
+    // every noise step the field needs
+    var raw:[rw*rw]f32=undefined;
+    for(0..rw)|y|for(0..rw)|x|{
+      raw[y*rw+x]=rawStep(seed,ox-easeSpan-1+@as(i32,@intCast(x)),oy-easeSpan-1+@as(i32,@intCast(y)));
+    };
+    for(0..w)|y|for(0..w)|x|{
+      // this tile among the noise steps, and the highest of its four neighbours'
+      const i=(y+1)*rw+x+1;
+      const near=@max(@max(raw[i-1],raw[i+1]),@max(raw[i-rw],raw[i+rw]));
+      f.lv[y*w+x]=@min(raw[i],near);
+    };
+  }
+};
+/// one chunk tile's levelled terraces round it, read from its field
+const InField=struct{
+  /// the field
+  f:*const Field,
+  /// the tile in its chunk, across
+  lx:i32,
+  /// the tile in its chunk, down
+  ly:i32,
+  /// the levelled terrace `dx, dy` tiles off it
+  fn step(s:InField,dx:i32,dy:i32)f32{return s.f.lv[@intCast((s.ly+dy+easeSpan)*Field.w+s.lx+dx+easeSpan)];}
+};
+/// the tile at world (wx, wy) for `seed`: its eased terraced height, kind,
+/// ley and any resource node; the same for the same seed and tile,
+/// whatever is loaded
+pub fn sample(seed:u64,wx:i32,wy:i32)Sample{return sampleOn(seed,wx,wy,eased(Lone,.{.seed=seed,.wx=wx,.wy=wy}));}
+/// the tile at world (wx, wy) as `sample` makes it but for its height (the
+/// lowest ground): its kind, ley, node and water, without easing the
+/// terraces round it
+pub fn plain(seed:u64,wx:i32,wy:i32)Sample{return sampleOn(seed,wx,wy,0);}
+/// the tile at world (wx, wy) standing on terrace `level` (in steps, eased)
+fn sampleOn(seed:u64,wx:i32,wy:i32,level:f32)Sample{
   // the tile's place as numbers
   const x=m.f(wx);
   const y=m.f(wy);
@@ -138,8 +245,7 @@ pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
   const wet=noise.fbm(seed+%2,x/wetL,y/wetL,wetOct);
   // how strong a ley vein runs here
   const vein=noise.ridged(seed+%3,wx2/veinL,wy2/veinL,veinOct);
-  // which terrace the tile stands on, and its height there
-  const level=levelled(seed,wx,wy,stepOf(continent));
+  // its height on its terrace
   const height=level*terrace+intra*hills;
   // its ground kind: stone up high, ley on veins, moss where wet, else soil
   const kind:ck.Kind=if(e>stone).stone
@@ -163,11 +269,14 @@ pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
 pub fn heightAt(seed:u64,wx:i32,wy:i32)f32{return sample(seed,wx,wy).height;}
 /// fills every tile of chunk `c` from the generator, all of them empty
 pub fn generate(seed:u64,c:*ck.Chunk)void{
+  // the levelled terraces round the chunk, read once
+  var f:Field=.{};
+  f.fill(seed,c.originX(),c.originY());
   for(0..ck.tileCount)|i|{
     // this tile's place in the world
     const wx,const wy=c.tileOf(i);
-    // what the generator makes of it
-    const s=sample(seed,wx,wy);
+    // what the generator makes of it, eased from the field
+    const s=sampleOn(seed,wx,wy,eased(InField,.{.f=&f,.lx=wx-c.originX(),.ly=wy-c.originY()}));
     c.height[i]=s.height;
     c.kind[i]=s.kind;
     c.ley[i]=s.ley;
@@ -206,4 +315,37 @@ test"no lone tile juts up above its four neighbours"{
     }
   }
   try testing.expect(raw>0);
+}
+test"a chunk eases its terraces just as single tiles do"{
+  // a chunk off the origin, generated whole
+  var c=ck.blank(.{.x=2,.y=-5});
+  generate(1234,&c);
+  for(0..ck.tileCount)|i|{
+    // the tile, and the generator's sample of it alone
+    const wx,const wy=c.tileOf(i);
+    try testing.expectEqual(sample(1234,wx,wy).height,c.height[i]);
+  }
+}
+test"terraces ease into one another, never a hard step between tiles"{
+  // the steepest rise between neighbours: eased, and as the levelled terraces stand
+  var steep:f32=0;
+  var hard:f32=0;
+  var y:i32=-80;
+  while(y<80):(y+=1){
+    // the column being read
+    var x:i32=-80;
+    while(x<80):(x+=1){
+      // this tile's terrace and the next one's across and down, eased and levelled
+      const at=eased(Lone,.{.seed=1234,.wx=x,.wy=y});
+      const lv=Lone.step(.{.seed=1234,.wx=x,.wy=y},0,0);
+      inline for(.{.{1,0},.{0,1}})|d|{
+        const next=eased(Lone,.{.seed=1234,.wx=x+d[0],.wy=y+d[1]});
+        steep=@max(steep,@abs(next-at));
+        hard=@max(hard,@abs(Lone.step(.{.seed=1234,.wx=x,.wy=y},d[0],d[1])-lv));
+      }
+    }
+  }
+  // the land does climb whole terraces, which the ease spreads over a few tiles
+  try testing.expect(hard>=1);
+  try testing.expect(steep<=0.5*hard);
 }

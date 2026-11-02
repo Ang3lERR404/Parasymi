@@ -302,7 +302,7 @@ fn gathered(seed:u64,c:*const ck.Chunk)bool{
     // the tile's place in the world
     const wx,const wy=c.tileOf(t);
     // what the generator made there
-    const s=gen.sample(seed,wx,wy);
+    const s=gen.plain(seed,wx,wy);
     if(s.res!=c.res[t])return true;
   }
   return false;

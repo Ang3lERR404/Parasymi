@@ -21,6 +21,10 @@ lowland).
 - **Shape:** each tile is a fan of four triangles, its centre at the
   tile's height. Corners are shared (height, colour and ley averaged), with
   smooth normals.
+- **Terraces ease into each other** (`gen.eased`): a tile's height is the
+  terraces within 2.5 tiles of it, the nearer counted more, so one terrace
+  rolls into the next in a soft S over about four tiles (at most ~0.12 m a
+  tile) instead of a one-tile ramp; the heart of a wide terrace stays level.
 - **Kinds melt together** (`shaders/ground.glsl`, per pixel): each vertex
   carries how much soil, moss, stone and ley lies round it (every tile
   within 2 tiles, by a smooth falloff, `kindsAt`). The shader pushes each

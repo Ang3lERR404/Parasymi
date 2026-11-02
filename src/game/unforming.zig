@@ -290,7 +290,7 @@ fn seal(g:*Game)Allocator.Error!void{
       if(c.kind[t]!=.ley)continue;
       // the tile's place, and what it becomes
       const wx,const wz=c.tileOf(t);
-      const s=gen.sealOf(gen.sample(g.world.seed,wx,wz));
+      const s=gen.sealOf(gen.plain(g.world.seed,wx,wz));
       if(first and c.res[t]>0)try g.leyDrifts.append(g.gpa,.{
         .at=m.tileCentre(wx,wz,c.height[t]),
         .full=m.f(c.res[t])/gen.resFull,

@@ -133,7 +133,7 @@ fn fill(r:*Ring,seed:u64,c:*const ck.Chunk)void{
       const inRing=fx>=-1 and fx<=ck.sizeTiles and fy>=-1 and fy<=ck.sizeTiles;
       // the generator's sample of it otherwise (sealed as this chunk is)
       const k=if(inRing)r.kind[r.at(fx,fy)]else blk:{
-        const raw=gen.sample(seed,ox+fx,oy+fy);
+        const raw=gen.plain(seed,ox+fx,oy+fy);
         break:blk(if(c.sealed)gen.sealOf(raw)else raw).kind;
       };
       r.far[@intCast((fy+blendMargin)*Ring.fw+fx+blendMargin)]=k;
@@ -188,7 +188,7 @@ fn lineDepth(r:*Ring,seed:u64,c:*const ck.Chunk)void{
     const lx=@as(i32,@intCast(x))-1-lineReach;
     const ly=@as(i32,@intCast(y))-1-lineReach;
     const inRing=lx>=-1 and lx<=ck.sizeTiles and ly>=-1 and ly<=ck.sizeTiles;
-    on[y*ew+x]=if(inRing)r.kind[r.at(lx,ly)]==.ley else gen.sample(seed,c.originX()+lx,c.originY()+ly).kind==.ley;
+    on[y*ew+x]=if(inRing)r.kind[r.at(lx,ly)]==.ley else gen.plain(seed,c.originX()+lx,c.originY()+ly).kind==.ley;
   };
   for(0..Ring.w)|y|for(0..Ring.w)|x|{
     // this tile among those looked through
