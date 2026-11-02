@@ -1,4 +1,4 @@
-//! play tested: turning, picking, opening, removing and putting down.
+//! play tested: turning, picking, opening, removing and putting down; the gamepad walking, stepping the hotbar and using.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -114,4 +114,39 @@ test"R turns what is under the cursor (Shift back), Q picks its bulb, a click op
   const put=g.structs.at(&g.world,at[0],at[1]) orelse return error.TestUnexpectedResult;
   try testing.expectEqual(@as(m.Dir,3),g.structs.get(put).dir);
   try testing.expectEqual(@as(u32,1),g.player.inv.count(.sapCache));
+}
+test"the left stick walks the wolf, the d-pad steps round the hotbar, the right trigger is use"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  // where the wolf starts
+  const from=g.player.pos;
+  in.tilt(.left,.{0,1});
+  for(0..30)|_|{
+    in.advance();
+    try g.update(&in,tickTime,testScreen);
+  }
+  in.tilt(.left,.{0,0});
+  try testing.expect(m.dist(from,g.player.pos)>0.3);
+  // from the first slot back round to the last, and on again to the first
+  g.hot=0;
+  in.advance();
+  in.hold(.{.pad=.dpad_left},true);
+  try g.update(&in,tickTime,testScreen);
+  try testing.expectEqual(ctl.slots.len-1,g.hot);
+  in.advance();
+  in.hold(.{.pad=.dpad_left},false);
+  in.hold(.{.pad=.dpad_right},true);
+  try g.update(&in,tickTime,testScreen);
+  try testing.expectEqual(@as(usize,0),g.hot);
+  in.hold(.{.pad=.dpad_right},false);
+  // the right trigger pulled is use held
+  in.hold(.{.trigger=.right_trigger},true);
+  try testing.expect(ctl.down(&in,.use));
 }

@@ -123,6 +123,10 @@ pub const Action=enum{
   slot12,
   /// hotbar slot 13
   slot13,
+  /// the hotbar slot to the left of the chosen one (from the first, the last)
+  slotPrev,
+  /// the hotbar slot to the right of the chosen one (from the last, the first)
+  slotNext,
   /// with alt: toggle the free camera
   freeCam,
   /// in the free camera: fly faster while held

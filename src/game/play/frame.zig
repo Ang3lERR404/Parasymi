@@ -48,6 +48,15 @@ const streamRadius=lib.play.streamRadius;
 const timingEase=lib.play.timingEase;
 /// how many wheel notches a second a held zoom key turns
 const keyZoomRate:f32=6;
+/// how fast the right stick, leant all the way, steers the cursor (screen
+/// heights a second)
+const padCursor:f32=1.1;
+/// how fast the right stick, leant all the way, looks out of the wolf's
+/// eyes (the mouse's pixels a second: about 130° a second)
+pub const padLook:f32=900;
+/// how fast the right stick, leant all the way with orbit held, orbits the
+/// camera (the mouse's pixels a second: about 120° a second)
+const padOrbit:f32=350;
 /// one frame of play, `dt` seconds on a screen `screen` pixels across:
 /// system keys, the menus while frozen, then (live) the sky, camera and
 /// looking, panels and hotbar keys, HUD clicks, movement, what the cursor
@@ -105,14 +114,24 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   // the cursor; what is used is what the middle of the screen is on
   // whether this frame looks out of the wolf's eyes
   const looking=g.cam.inEyes() and g.mode==.roam;
+  // the right stick, leaning more gently near its middle for fine aim
+  // (+y up the screen, so turned for the screen's pixels, which run down)
+  const rs=in.stick(.right);
+  const fine=rs*m.splatOf(f32,2,m.lenOf(f32,2,rs))*m.Vec(f32,2){1,-1};
+  // whether the camera orbits this frame (out of the eyes, orbit held)
+  const orbiting=!inspecting and ctl.down(in,.orbit) and !g.cam.inEyes();
   if(looking!=g.looking){
     in.capture(looking);
     g.looking=looking;
-  }else if(looking)g.cam.look(in.mouseDelta);
+  }else if(looking)g.cam.look(in.mouseDelta+fine*m.splatOf(f32,2,padLook*dt));
   // half of each side, to find the screen's middle
   const half=m.splatOf(f32,2,0.5);
-  // where the cursor is: the screen's middle while looking, else the mouse
-  const cursor=if(looking)screen*half else in.mouse;
+  // where the cursor is: the screen's middle while looking, else the mouse,
+  // steered by the right stick (not while it orbits the camera)
+  // decision: the right stick steers the system's cursor itself, so every
+  // panel, hover card and click the mouse reaches the pad reaches too
+  const steered=!looking and !orbiting and !inspecting and (fine[0]!=0 or fine[1]!=0);
+  const cursor=if(looking)screen*half else if(steered)in.steer(fine*m.splatOf(f32,2,padCursor*screen[1]*dt))else in.mouse;
   // panels and selection
   if(!inspecting){
     if(ctl.pressed(in,.belly))g.mode=if(g.mode==.belly).roam else.belly;
@@ -124,6 +143,11 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   if(!inspecting)for(ctl.slots,0..)|a,i|{
     if(ctl.pressed(in,a))g.hot=i;
   };
+  // or step along it, round from one end to the other
+  if(!inspecting){
+    if(ctl.repeated(in,.slotPrev))g.hot=(g.hot+ctl.slots.len-1)%ctl.slots.len;
+    if(ctl.repeated(in,.slotNext))g.hot=(g.hot+1)%ctl.slots.len;
+  }
   // a click lands on the HUD panel under the mouse before the world: rows
   // choose research, weave a recipe, lift or put down an item; a panel's
   // backdrop just absorbs it
@@ -162,6 +186,10 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     if(ctl.down(in,.moveRight))mx+=1;
     if(ctl.down(in,.moveForward))mz+=1;
     if(ctl.down(in,.moveBack))mz-=1;
+    // the left stick walks as far as it leans (a little, slowly)
+    const ls=in.stick(.left);
+    mx+=ls[0];
+    mz+=ls[1];
   }
   // the camera's turn, the wish turned by it, and its length (kept at most 1)
   const yaw=g.cam.yaw;
@@ -171,7 +199,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   // the camera orbits round the wolf while dragged; the wheel zooms, all
   // the way in into its eyes, and the zoom keys as a wheel turned while held
   if(!inspecting){
-    if(ctl.down(in,.orbit)and!g.cam.inEyes())g.cam.orbit(in.mouseDelta);
+    if(orbiting)g.cam.orbit(in.mouseDelta+fine*m.splatOf(f32,2,padOrbit*dt));
     // the notches the zoom keys turn this frame, in (+) or out
     var keyed:f32=0;
     if(ctl.down(in,.zoomIn))keyed+=keyZoomRate*dt;

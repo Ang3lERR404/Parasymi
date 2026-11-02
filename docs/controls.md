@@ -81,6 +81,25 @@ the top left.
 - **F6** saves (into the garden being played; one never named asks its
   name first). **F9** loads (its last save). **F11** fullscreen.
 
+### Gamepad
+The first pad plugged in plays the whole game (`engine/src/platform/input.zig`;
+the bindings in `controls.cfg`, rebindable in KEYBINDS like any key):
+
+- **Left stick** walks as far as it leans (flies, in the free camera);
+  **LS pressed** runs.
+- **Right stick** steers the cursor itself (the system's, `Input.steer`),
+  gently near its middle, so every panel, hover card and click the mouse
+  reaches the pad reaches too. With **LB** held it orbits the camera
+  instead; in first person and the free camera it looks.
+- **RT** use (plant, open, click a panel row), **LT** remove, **X**
+  interact, **Y** pick, **RB** turn, **A** held draws a tendril (act 2).
+- **D-pad up/down** zoom, **left/right** step along the hotbar (round
+  from one end to the other).
+- **BACK** belly, **RS pressed** research, **B / START** back or pause.
+- The sticks are not bound; the triggers bind as buttons
+  (`pad_left_trigger`), held past halfway. A stick leaning less than
+  `deadzone` (0.2) is still.
+
 ## Belly and hotbar
 - Hotbar slots start empty.
 - **Sorting by hand in the belly:** a click lifts a stack onto the cursor;

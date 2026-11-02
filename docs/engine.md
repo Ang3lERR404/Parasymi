@@ -79,8 +79,9 @@ adds on top.
   `scroll` (where a list is wanted, how far it has eased, what shows),
   `slider` (stops along a track) and `focus` (the nearest box each way,
   or the next).
-- Platform input also reads the first gamepad's buttons (`pad_*` binds),
-  keys the system repeats while held, and the clipboard.
+- Platform input also reads the first gamepad's buttons and triggers
+  (`pad_*` binds), its sticks (`stick`, deadzoned; `steer` moves the
+  cursor by one), keys the system repeats while held, and the clipboard.
 - Game: how they look (`hud/button.zig`, `hud/field.zig`, `hud/slot.zig`,
   `hud/panel.zig`, `hud/scroll.zig`, `hud/toggle.zig`, `hud/slider.zig`,
   `hud/picker.zig`).

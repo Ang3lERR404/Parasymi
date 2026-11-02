@@ -164,7 +164,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `pointer.zig` — the HUD under the mouse, the keys and the pad: a row clicks as mouse1 goes down on it, or (a button) as mouse1 is let go over the row it…
 - `tests_belly.zig` — play tested: a germinator's panel, carrying and discarding stacks.
 - `tests_menu.zig` — play tested: standing still, clicking the HUD, the menus and saving.
-- `tests_place.zig` — play tested: turning, picking, opening, removing and putting down.
+- `tests_place.zig` — play tested: turning, picking, opening, removing and putting down; the gamepad walking, stepping the hotbar and using.
 
 ## src/game/
 - `player.zig` — the player: an anthropomorphic wolf woven from vines, leaves and sap.

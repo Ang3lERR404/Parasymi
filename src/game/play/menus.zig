@@ -24,6 +24,9 @@ const gardenEase=lib.play.gardenEase;
 const gardenNotch=lib.play.gardenNotch;
 /// keybinds menu: how many rows a wheel notch scrolls
 const bindNotch=lib.play.bindNotch;
+/// how fast the right stick, leant all the way, looks round in the free
+/// camera (the mouse's pixels a second, as out of the wolf's eyes)
+const padLook=lib.play.frame.padLook;
 /// every action, one keybinds row each, in order
 const actions=lib.std.enums.values(ctl.Action);
 /// the HUD under the mouse, the keys and the pad
@@ -213,6 +216,10 @@ pub fn fly(g:*Game,in:*const Input,dt:f32)void{
   }else if(f.captured or ctl.down(in,.use)){
     look=.{-in.mouseDelta[0]*camera.lookSpeed,-in.mouseDelta[1]*camera.lookSpeed};
   }
+  // the right stick looks too, gently near its middle (+y up: looks up)
+  const rs=in.stick(.right);
+  const turn=rs*m.splatOf(f32,2,m.lenOf(f32,2,rs)*padLook*camera.lookSpeed*dt);
+  look=.{look[0]-turn[0],look[1]+turn[1]};
   // how far it flies this frame (metres)
   const speed=camera.flySpeed*dt*@as(f32,if(ctl.down(in,.flyFast))flyFastSpeed else 1);
   // the move this frame: right, up, forward
@@ -221,6 +228,10 @@ pub fn fly(g:*Game,in:*const Input,dt:f32)void{
   if(ctl.down(in,.moveBack))move[2]-=speed;
   if(ctl.down(in,.moveRight))move[0]+=speed;
   if(ctl.down(in,.moveLeft))move[0]-=speed;
+  // the left stick flies as far as it leans
+  const ls=in.stick(.left);
+  move[0]+=ls[0]*speed;
+  move[2]+=ls[1]*speed;
   if(ctl.down(in,.rise))move[1]+=if(ctl.down(in,.alt))-speed else speed;
   // how far it rolls this frame (radians)
   var roll:f32=0;

@@ -1,5 +1,6 @@
 //! per-frame input snapshot with edge detection, fed by GLFW. Keys, mouse
-//! buttons and the first gamepad's buttons are polled; held keys the system
+//! buttons and the first gamepad's buttons, triggers (bound as buttons) and
+//! sticks are polled; a stick can steer the cursor (`steer`); held keys the system
 //! repeats, the wheel and typing come by callback. Keys and
 //! buttons are asked about as a `Bind`; what each one does is the game's
 //! business (`game/controls.zig`, read from `controls.cfg`).
@@ -38,6 +39,26 @@ pub const PadButton=glfw.Gamepad.Button;
 /// a gamepad button's name in a binding is this prefix and the button's
 /// (`pad_a`, `pad_dpad_up`)
 pub const pad="pad_";
+/// a gamepad's trigger, bound as a button (`pad_left_trigger`): held while
+/// pulled past `triggerPull`
+pub const Trigger=enum{
+  /// the left trigger (LT, L2)
+  left_trigger,
+  /// the right trigger (RT, R2)
+  right_trigger,
+};
+/// how far a trigger is pulled (0 at rest, 1 all the way) before it counts as held
+pub const triggerPull:f32=0.5;
+/// one of a gamepad's two analogue sticks
+pub const Stick=enum{
+  /// the left stick
+  left,
+  /// the right stick
+  right,
+};
+/// how far a stick leans (0..1) before it counts at all: a resting stick
+/// that never quite centres stays still
+pub const deadzone:f32=0.2;
 /// one physical key, mouse button or gamepad button.
 pub const Bind=union(enum){
   /// a key on the keyboard
@@ -46,10 +67,13 @@ pub const Bind=union(enum){
   button:Button,
   /// a button on the gamepad
   pad:PadButton,
+  /// a trigger on the gamepad, pulled as a button
+  trigger:Trigger,
   /// the bind named `name`, or null for no such key or button.
   pub fn parse(name:[]const u8)?Bind{
     if(startsWith(u8,name,mouse))if(stringToEnum(Button,name[mouse.len..]))|b|return.{.button=b};
     if(startsWith(u8,name,pad))if(stringToEnum(PadButton,name[pad.len..]))|b|return.{.pad=b};
+    if(startsWith(u8,name,pad))if(stringToEnum(Trigger,name[pad.len..]))|t|return.{.trigger=t};
     if(eql(u8,name,@tagName(Key.unknown)))return null;
     return if(stringToEnum(Key,name))|k|.{.key=k}else null;
   }
@@ -60,11 +84,20 @@ pub const Bind=union(enum){
       .key=>|k|try w.writeAll(@tagName(k)),
       .button=>|k|try w.print(mouse++"{t}",.{k}),
       .pad=>|k|try w.print(pad++"{t}",.{k}),
+      .trigger=>|k|try w.print(pad++"{t}",.{k}),
     }
   }
-  /// whether `b` is a gamepad's button (else the keyboard's or the mouse's)
-  pub fn onPad(b:Bind)bool{return b==.pad;}
+  /// whether `b` is a gamepad's button or trigger (else the keyboard's or the mouse's)
+  pub fn onPad(b:Bind)bool{return b==.pad or b==.trigger;}
 };
+/// a stick's raw lean (each axis -1..1) shaped for play: nothing within
+/// `deadzone`, rising from there to 1 at the rim, never longer than 1
+pub fn shape(raw:m.Vec(f32,2))m.Vec(f32,2){
+  // how far it leans, and how much of that counts
+  const l=m.lenOf(f32,2,raw);
+  if(l<=deadzone)return.{0,0};
+  return raw*m.splatOf(f32,2,m.unlerp(deadzone,1,l)/l);
+}
 /// which keys are held, one bit a key
 const Keys=EnumSet(Key);
 /// most characters typed in one frame that are kept
@@ -73,6 +106,17 @@ pub const maxTyped=16;
 const Buttons=EnumSet(Button);
 /// which gamepad buttons are held, one bit a button
 const PadButtons=EnumSet(PadButton);
+/// which gamepad triggers are pulled, one bit a trigger
+const Triggers=EnumSet(Trigger);
+/// what the first gamepad plugged in holds this frame
+const PadRead=struct{
+  /// its buttons held
+  buttons:PadButtons=.initEmpty(),
+  /// its triggers pulled past `triggerPull`
+  triggers:Triggers=.initEmpty(),
+  /// its sticks' leans, shaped (`shape`); +x right, +y away (up)
+  sticks:[2]m.Vec(f32,2)=.{.{0,0},.{0,0}},
+};
 /// a clipboard of a test's own: the text put on it
 pub const Clip=struct{
   /// the text's bytes; only the first `len` are real
@@ -123,6 +167,12 @@ pub const Input=struct{
   pcur:PadButtons=.initEmpty(),
   /// the gamepad's buttons held last frame
   pprev:PadButtons=.initEmpty(),
+  /// the gamepad's triggers pulled this frame
+  tcur:Triggers=.initEmpty(),
+  /// the gamepad's triggers pulled last frame
+  tprev:Triggers=.initEmpty(),
+  /// the gamepad's sticks this frame, shaped: +x right, +y away (up)
+  sticks:[2]m.Vec(f32,2)=.{.{0,0},.{0,0}},
   /// headless tests: a clipboard of their own instead of the window's
   ownClip:?*Clip=null,
   /// must be called once the Input has its final address.
@@ -155,22 +205,49 @@ pub const Input=struct{
     in.rep=in.repAcc;
     in.repAcc=.initEmpty();
     in.pprev=in.pcur;
-    in.pcur=padHeld();
+    in.tprev=in.tcur;
+    // the first gamepad's buttons, triggers and sticks
+    const p=padRead();
+    in.pcur=p.buttons;
+    in.tcur=p.triggers;
+    in.sticks=p.sticks;
   }
-  /// the buttons held on the first gamepad plugged in (none without one)
-  fn padHeld()PadButtons{
-    // the buttons held, filled from the first gamepad found
-    var held=PadButtons.initEmpty();
+  /// what the first gamepad plugged in holds (nothing without one)
+  fn padRead()PadRead{
+    // what it holds, filled from the first gamepad found
+    var r=PadRead{};
     for(0..glfw.Joystick.maximum_supported)|i|{
       // this joystick, and it as a gamepad, if it is one
       const j:glfw.Joystick=@enumFromInt(@as(c_int,@intCast(i)));
       const gp=j.asGamepad() orelse continue;
       // its state; one that will not read is passed over
       const st=gp.getState() catch continue;
-      for(comptime values(PadButton))|b|held.setPresent(b,st.buttons[@intFromEnum(b)]==.press);
-      return held;
+      for(comptime values(PadButton))|b|r.buttons.setPresent(b,st.buttons[@intFromEnum(b)]==.press);
+      // (a trigger reads -1 at rest, 1 pulled all the way)
+      r.triggers.setPresent(.left_trigger,(st.axes[@intFromEnum(glfw.Gamepad.Axis.left_trigger)]+1)/2>triggerPull);
+      r.triggers.setPresent(.right_trigger,(st.axes[@intFromEnum(glfw.Gamepad.Axis.right_trigger)]+1)/2>triggerPull);
+      // (GLFW's sticks read +y toward the gardener; turned so +y is away)
+      const ax=st.axes;
+      r.sticks[@intFromEnum(Stick.left)]=shape(.{ax[@intFromEnum(glfw.Gamepad.Axis.left_x)],-ax[@intFromEnum(glfw.Gamepad.Axis.left_y)]});
+      r.sticks[@intFromEnum(Stick.right)]=shape(.{ax[@intFromEnum(glfw.Gamepad.Axis.right_x)],-ax[@intFromEnum(glfw.Gamepad.Axis.right_y)]});
+      return r;
     }
-    return held;
+    return r;
+  }
+  /// how stick `s` leans this frame, shaped (`shape`): +x right, +y away (up)
+  pub fn stick(in:*const Input,s:Stick)m.Vec(f32,2){return in.sticks[@intFromEnum(s)];}
+  /// headless tests: lean stick `s` so (already shaped) as of this frame.
+  pub fn tilt(in:*Input,s:Stick,v:m.Vec(f32,2))void{in.sticks[@intFromEnum(s)]=v;}
+  /// the cursor moved by `by` window pixels (kept inside the window) and
+  /// the system's cursor set there, so a stick can steer it as a mouse
+  /// does; the next `update` reads the move as the mouse's. Gives where it is.
+  pub fn steer(in:*const Input,by:m.Vec(f32,2))m.Vec(f32,2){
+    // the window's size, and where the cursor goes inside it
+    const sz=in.win.getSize();
+    const hi:m.Vec(f32,2)=.{m.f(sz[0]-1),m.f(sz[1]-1)};
+    const at=@min(@max(in.mouse+by,m.Vec(f32,2){0,0}),hi);
+    glfw.setCursorPos(in.win,at[0],at[1]);
+    return at;
   }
   /// the characters typed this frame
   pub fn typed(in:*const Input)[]const u21{return in.typedBuf[0..in.typedLen];}
@@ -182,6 +259,7 @@ pub const Input=struct{
       .key=>|k|in.cur.contains(k),
       .button=>|k|in.bcur.contains(k),
       .pad=>|k|in.pcur.contains(k),
+      .trigger=>|k|in.tcur.contains(k),
     };
   }
   /// did `b` go down this frame?
@@ -190,6 +268,7 @@ pub const Input=struct{
       .key=>|k|in.cur.contains(k)and!in.prev.contains(k),
       .button=>|k|in.bcur.contains(k)and!in.bprev.contains(k),
       .pad=>|k|in.pcur.contains(k)and!in.pprev.contains(k),
+      .trigger=>|k|in.tcur.contains(k)and!in.tprev.contains(k),
     };
   }
   /// was `b` let go this frame?
@@ -198,13 +277,14 @@ pub const Input=struct{
       .key=>|k|in.prev.contains(k)and!in.cur.contains(k),
       .button=>|k|in.bprev.contains(k)and!in.bcur.contains(k),
       .pad=>|k|in.pprev.contains(k)and!in.pcur.contains(k),
+      .trigger=>|k|in.tprev.contains(k)and!in.tcur.contains(k),
     };
   }
   /// did `b` go down this frame, or (a key held long enough) repeat?
   pub fn repeated(in:*const Input,b:Bind)bool{
     return in.pressed(b) or switch(b){
       .key=>|k|in.rep.contains(k),
-      .button,.pad=>false,
+      .button,.pad,.trigger=>false,
     };
   }
   /// the first key, mouse button or gamepad button that went down this
@@ -213,6 +293,7 @@ pub const Input=struct{
     for(comptime values(Key))|k|if(k!=.unknown and in.pressed(.{.key=k}))return.{.key=k};
     for(comptime values(Button))|k|if(in.pressed(.{.button=k}))return.{.button=k};
     for(comptime values(PadButton))|k|if(in.pressed(.{.pad=k}))return.{.pad=k};
+    for(comptime values(Trigger))|k|if(in.pressed(.{.trigger=k}))return.{.trigger=k};
     return null;
   }
   /// headless tests: hold `b` down (or let it go) as of this frame.
@@ -221,6 +302,7 @@ pub const Input=struct{
       .key=>|k|in.cur.setPresent(k,on),
       .button=>|k|in.bcur.setPresent(k,on),
       .pad=>|k|in.pcur.setPresent(k,on),
+      .trigger=>|k|in.tcur.setPresent(k,on),
     }
   }
   /// headless tests: start the next frame from this one, as `update` does.
@@ -228,6 +310,7 @@ pub const Input=struct{
     in.prev=in.cur;
     in.bprev=in.bcur;
     in.pprev=in.pcur;
+    in.tprev=in.tcur;
     in.rep=.initEmpty();
   }
   /// headless tests: key `k` repeats this frame, as if held long.
@@ -295,8 +378,10 @@ test"binds parse by key and mouse button name"{
   try testing.expectEqual(Bind{.pad=.dpad_up},Bind.parse("pad_dpad_up").?);
   try testing.expectEqual(Bind{.pad=.a},Bind.parse("pad_a").?);
   try testing.expectEqual(null,Bind.parse("pad_z"));
+  try testing.expectEqual(Bind{.trigger=.right_trigger},Bind.parse("pad_right_trigger").?);
+  try testing.expect(Bind.parse("pad_left_trigger").?.onPad());
   // each written name parses back to the bind it was written from
-  for([_]Bind{.{.key=.left_shift},.{.key=.F5},.{.button=.right},.{.pad=.dpad_up}})|b|{
+  for([_]Bind{.{.key=.left_shift},.{.key=.F5},.{.button=.right},.{.pad=.dpad_up},.{.trigger=.left_trigger}})|b|{
     // room for the name, and the writer that fills it
     var buf:[32]u8=undefined;
     var w:Writer=.fixed(&buf);
@@ -324,4 +409,19 @@ test"a bind goes down, repeats while held long, and is let go"{
   try testing.expect(in.repeated(.{.key=.left})and!in.pressed(.{.key=.left}));
   in.setClipboard("moss");
   try testing.expectEqualStrings("moss",in.clipboard());
+  // a trigger pulled goes down and is let go as a button
+  in.hold(.{.trigger=.right_trigger},true);
+  try testing.expect(in.pressed(.{.trigger=.right_trigger}));
+  try testing.expectEqual(Bind{.trigger=.right_trigger},in.anyPressed().?);
+  in.advance();
+  in.hold(.{.trigger=.right_trigger},false);
+  try testing.expect(in.released(.{.trigger=.right_trigger}));
+}
+test"a stick rests within its deadzone and reaches 1 at the rim"{
+  try testing.expectEqual(m.Vec(f32,2){0,0},shape(.{0.1,-0.1}));
+  try testing.expectApproxEqAbs(@as(f32,1),shape(.{0,1})[1],1e-6);
+  try testing.expectApproxEqAbs(@as(f32,-1),shape(.{-1,0})[0],1e-6);
+  // a corner never leans past 1, halfway out leans less than half
+  try testing.expect(m.lenOf(f32,2,shape(.{1,1}))<=1+1e-6);
+  try testing.expect(shape(.{0.5,0})[0]<0.5 and shape(.{0.5,0})[0]>0);
 }
