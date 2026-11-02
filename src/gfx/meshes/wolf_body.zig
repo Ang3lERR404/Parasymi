@@ -67,6 +67,11 @@ const eyeR:f32=0.0125;
 pub const nose=v3(0,0.038,0.174);
 /// how far the nose pad's face tips up from facing forward (radians)
 pub const noseTilt:f32=0.45;
+/// the plump lower lip of sap, at the front of the jaw (jaw frame), and
+/// its size: wide, low and full (a little pout)
+pub const lowerLip=v3(0,-0.027,0.141)-skel.jawAt;
+/// the lower lip's half-sizes across, up and forward
+pub const lowerLipSize=v3(0.019,0.0085,0.011);
 /// where each paw's beans sit (hand, fingertip and foot frames, x for the
 /// right side). The palm's pad, in the hand's frame
 pub const palmAt=v3(-0.032,-0.052,0.0);
@@ -189,9 +194,9 @@ fn sculptBody(s:*sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
   const j=skel.jawAt;
   try a.f(.jaw,cone(v3(0,-0.032,0.012)-j,v3(0,-0.014,0.135)-j,0.03,0.015),muzzle,0.012);
   try a.f(.jaw,ell(v3(0,-0.026,0.112)-j,v3(0.02,0.012,0.028)),muzzle,0.012);
-  // the lower lip: a soft full roll at the front of the jaw, under the
-  // whisker pads, as the gardener drew it (a little pout)
-  try a.f(.jaw,ell(v3(0,-0.016,0.13)-j,v3(0.019,0.008,0.012)),muzzle,0.006);
+  // the lower lip's bed at the front of the jaw: the plump lip itself is
+  // sap, a bean laid over it (posing, `lowerLip`), as the gardener drew it
+  try a.f(.jaw,ell(v3(0,-0.025,0.134)-j,v3(0.015,0.007,0.01)),muzzle,0.006);
   // the lip line, the dark rim of each socket
   try s.add(.{.shape=cone(v3(0,-0.012,0.158),v3(0,-0.006,0.05),0.002,0.002),.stretch=v3(9,1,1),.at=w[bi(.head)],.bone=bi(.head),.col=lip,.ink=0.0015});
   for([_]f32{-1,1})|x|{

@@ -588,7 +588,8 @@ from a distance-to-edge function, so they stay crisp at any size) in
   thick, long fingers melted a little together, each digit still its own.
 - **Head, shaped:** full cheekbones with tufts of leaves fanned back off
   them, whisker pads either side of the muzzle so it reads boxy at its
-  end, and a soft full lower lip (a little pout).
+  end, and a plump lower lip of amber sap (a little pout): a sap bean on
+  the jaw (`wolfBody.lowerLip`, emitted in posing), dense like the chest.
 - **Muscle:** the limbs carry heavy, distinct muscle: three-headed
   deltoids, bicep/tricep, brachioradialis, quadriceps with an inner
   teardrop, two-headed calves, neck cords, obliques. They are melted only

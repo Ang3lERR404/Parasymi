@@ -422,6 +422,8 @@ pub fn rig(p:*const Player,out:*Parts,headless:bool)Allocator.Error![2]V3{
   // the sheet of sap down its front, under the belly's sac
   try out.emitSkinned(.wolfPanel,base,mid,.{.phase=0.3,.fade=pecOpacity});
   if(!headless)try out.emit(.pawBean,m.chain(&.{at(&w,.head),translate(bodyMesh.nose),m.rotX(-bodyMesh.noseTilt),scale(v3(0.015,0.0105,0.011))}),.{.glow=noseGlow,.fade=beanOpacity,.tint=noseTint});
+  // the plump lower lip, riding the jaw: amber sap, dense like the chest's
+  if(!headless)try out.emit(.pawBean,m.chain(&.{at(&w,.jaw),translate(bodyMesh.lowerLip),scale(bodyMesh.lowerLipSize)}),.{.glow=beanGlow,.fade=pecOpacity});
   // the belly: the wolf's own amber belly, swelling with the inventory,
   // dropping and sagging as it fills; dense sap like the chest, so what it
   // holds no longer shows through (as the gardener drew it)
