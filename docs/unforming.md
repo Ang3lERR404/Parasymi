@@ -21,8 +21,8 @@ looks in [visual.md](visual.md#sky); watching it in [testing.md](testing.md#the-
   otherworldly glow.
 - The **ley lines** seal up. The **ley shards** shatter into fine pieces,
   then disappear from reality too.
-- The **stars** that fall at night shatter as they hit the ground and stop
-  falling altogether.
+- The **stars** that fall at night shatter, all at once as it begins, and
+  stop falling altogether.
 - Afterwards only the **convergent** lineage is left. With it alone the
   wolf has to make the world **rain** and **storm**; only then does he
   root himself into the garden's tree, and act 2 begins.
