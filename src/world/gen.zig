@@ -97,18 +97,41 @@ pub fn sealOf(s:Sample)Sample{
   if(s.kind!=.ley)return s;
   return.{.height=s.height,.kind=.soil,.ley=s.sealed,.res=0,.sealed=s.sealed,.water=s.water};
 }
+/// where the domain warp pushes tile (wx, wy): it keeps coastlines and
+/// ridges organic instead of blobby
+fn warped(seed:u64,wx:i32,wy:i32)m.Vec(f32,2){
+  // the tile's place as numbers
+  const x=m.f(wx);
+  const y=m.f(wy);
+  return.{x+warp*noise.fbm(seed+%11,x/warpL,y/warpL,warpOct),y+warp*noise.fbm(seed+%12,x/warpL,y/warpL,warpOct)};
+}
+/// the continent's elevation at warped place `p`
+fn continentOf(seed:u64,p:m.Vec(f32,2))f32{return noise.fbm(seed,p[0]/continentL,p[1]/continentL,continentOct);}
+/// the terrace a continent elevation `c` stands on, as the noise alone has it
+fn stepOf(c:f32)f32{return @floor(@max(c-lowLevel,0)*levels)+1;}
+/// the terrace tile (wx, wy) stands on, as the noise alone has it
+fn rawStep(seed:u64,wx:i32,wy:i32)f32{return stepOf(continentOf(seed,warped(seed,wx,wy)));}
+/// the terrace a tile of noise step `own` stands on: never above the highest
+/// of its four neighbours, so no lone 1x1 column juts up out of the ground
+/// (a tile so lowered is level with that neighbour, which is never lowered
+/// below it, so the levelled land has no lone column either)
+fn levelled(seed:u64,wx:i32,wy:i32,own:f32)f32{
+  // the highest of the four neighbours' noise steps
+  const near=@max(@max(rawStep(seed,wx-1,wy),rawStep(seed,wx+1,wy)),@max(rawStep(seed,wx,wy-1),rawStep(seed,wx,wy+1)));
+  return @min(own,near);
+}
 /// the tile at world (wx, wy) for `seed`: its terraced height, kind, ley and
 /// any resource node; the same for the same seed and tile, whatever is loaded
 pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
   // the tile's place as numbers
   const x=m.f(wx);
   const y=m.f(wy);
-  // domain warp keeps coastlines and ridges organic instead of blobby.
   // the tile's place pushed by the domain warp
-  const wx2=x+warp*noise.fbm(seed+%11,x/warpL,y/warpL,warpOct);
-  const wy2=y+warp*noise.fbm(seed+%12,x/warpL,y/warpL,warpOct);
+  const p=warped(seed,wx,wy);
+  const wx2=p[0];
+  const wy2=p[1];
   // the continent's elevation, the hills on it, and the two together
-  const continent=noise.fbm(seed,wx2/continentL,wy2/continentL,continentOct);
+  const continent=continentOf(seed,p);
   const hills=hillAmount*noise.fbm(seed+%1,x/hillL,y/hillL,hillOct);
   const e=continent+hills;
   // how wet the ground is
@@ -116,7 +139,7 @@ pub fn sample(seed:u64,wx:i32,wy:i32)Sample{
   // how strong a ley vein runs here
   const vein=noise.ridged(seed+%3,wx2/veinL,wy2/veinL,veinOct);
   // which terrace the tile stands on, and its height there
-  const level:f32=@floor(@max(continent-lowLevel,0)*levels)+1;
+  const level=levelled(seed,wx,wy,stepOf(continent));
   const height=level*terrace+intra*hills;
   // its ground kind: stone up high, ley on veins, moss where wet, else soil
   const kind:ck.Kind=if(e>stone).stone
@@ -163,4 +186,24 @@ test"generation is deterministic"{
   generate(1234,&b);
   try testing.expectEqualSlices(f32,&a.height,&b.height);
   try testing.expectEqualSlices(ck.Kind,&a.kind,&b.kind);
+}
+test"no lone tile juts up above its four neighbours"{
+  // the lone columns the noise alone would raise, so the test is known to bite
+  var raw:usize=0;
+  // a wide stretch of land, its terraces read tile by tile
+  var y:i32=-120;
+  while(y<120):(y+=1){
+    // the column being read
+    var x:i32=-120;
+    while(x<120):(x+=1){
+      // the tile's terrace and its four neighbours'
+      const own=stepOf(continentOf(1234,warped(1234,x,y)));
+      const at=levelled(1234,x,y,own);
+      const near=@max(@max(levelled(1234,x-1,y,rawStep(1234,x-1,y)),levelled(1234,x+1,y,rawStep(1234,x+1,y))),@max(levelled(1234,x,y-1,rawStep(1234,x,y-1)),levelled(1234,x,y+1,rawStep(1234,x,y+1))));
+      try testing.expect(at<=near);
+      const rawNear=@max(@max(rawStep(1234,x-1,y),rawStep(1234,x+1,y)),@max(rawStep(1234,x,y-1),rawStep(1234,x,y+1)));
+      if(own>rawNear)raw+=1;
+    }
+  }
+  try testing.expect(raw>0);
 }
