@@ -384,6 +384,29 @@ fn line(w:*const[skel.count]M4,bone:Bone,from:V3,to:V3,out:V3)Lay{
   }
   return lay;
 }
+/// where the sash leaves the -x side, under the pectoral (chest frame)
+const sashFrom=v3(-0.135,0.01,0.03);
+/// where it reaches the other hip (pelvis frame)
+const sashTo=v3(0.13,0.0,0.035);
+/// the sash's lay: points on a straight line across the body from
+/// `sashFrom` to `sashTo`, each cast out of the body from deep behind it,
+/// leaning out toward its own side so the ends find the flanks
+fn sash(w:*const[skel.count]M4)Lay{
+  // the lay being filled, and its two ends in the bind pose
+  var lay:Lay=undefined;
+  const a=m.mulPoint(w[bi(.chest)],sashFrom);
+  const z=m.mulPoint(w[bi(.pelvis)],sashTo);
+  for(0..vine)|i|{
+    // how far across this point is, 0..1, and the point on the line
+    const k=m.ratio(i,vine-1);
+    const p=m.lerpV(a,z,k);
+    // forward and out to its side
+    const out=m.norm(v3(p[0]*5,0,1));
+    lay.axis[i]=p-out*m.splat3(0.12);
+    lay.out[i]=out;
+  }
+  return lay;
+}
 /// lays the vines grown over the hide: winding down the limbs, tendons on the
 /// hocks and forearms, woven round the torso, spiralling up the neck, braided down the tail
 fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Error!void{
@@ -416,6 +439,11 @@ fn vines(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.E
   for(0..2)|vi|{
     try vineOver(b,s,&wind(w,&.{.{.bone=.neck,.y0=-0.06,.y1=skel.headAt[1]*0.8}},m.f(vi)*m.pi+2.2,1.6),0.009,pal.wolfVine);
   }
+  // the sash: a vine wound round the -x upper arm (on the left seen from
+  // the front, as the gardener drew it), then slung across the front from
+  // under that pectoral to the other hip
+  try vineOver(b,s,&wind(w,&.{.{.bone=skel.sides[0].arm,.y0=-0.05,.y1=-0.15}},0.4,m.tau*1.15),0.0095,pal.wolfVine);
+  try vineOver(b,s,&sash(w),0.0105,pal.wolfVine);
   // the tail: three strands braided along it
   const tail=[_]Seg{
     .{.bone=.tail0,.y0=0.02,.y1=skel.tailSeg},.{.bone=.tail1,.y0=0,.y1=skel.tailSeg},
@@ -519,17 +547,22 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
       try furLeaf(b,s,m.mulPoint(arm,v3(@sin(a)*0.05,0.06,@cos(a)*0.05)),dir(arm,v3(@sin(a),-0.6,@cos(a))),0.085*rng.range(0.85,1.1),0.026,0.45,0.45);
     }
   }
-  // rings of fur down the tail, longer toward the tip, and the tuft there
-  for(0..6)|ring|{
-    // how far down the tail this ring sits, in segments
-    const along=1.2+0.45*m.f(ring);
+  // the tail: a great flame of leaves, as the gardener drew it, thatched
+  // from its root to its tip, each ring's leaves lying over the next's
+  // roots, longest past the middle where the flame is broadest
+  for(0..tailRings)|ring|{
+    // how far down the tail this ring sits (0..1), and in segments
+    const f=m.ratio(ring,tailRings-1);
+    const along=0.25+3.3*f;
     // the segment it sits on, and that segment's frame
     const seg=@min(@as(usize,@intFromFloat(along)),3);
     const tb=w[bi(.tail0)+seg];
-    for(0..3)|j|{
+    // the flame's breadth here: swelling past the middle, drawn in to the tip
+    const swell=@sin(m.pi*m.pow(f32,f,0.75));
+    for(0..tailLeaves)|j|{
       // this leaf's angle round the tail, each ring turned from the last
-      const a=m.f(j)/3*m.tau+m.f(ring)*1.05;
-      try furLeaf(b,s,m.mulPoint(tb,v3(@sin(a)*0.08,(along-m.f(seg))*skel.tailSeg,@cos(a)*0.08)),dir(tb,v3(0,1,0)),0.06+0.012*m.f(ring),0.02,0.45,0.4);
+      const a=m.ratio(j,tailLeaves)*m.tau+m.f(ring)*0.45+rng.range(-0.12,0.12);
+      try furLeaf(b,s,m.mulPoint(tb,v3(@sin(a)*0.08,(along-m.f(seg))*skel.tailSeg,@cos(a)*0.08)),dir(tb,v3(0,1,0)),(0.09+0.15*swell)*rng.range(0.9,1.1),0.034+0.03*swell,0.35+0.5*swell,0.5);
     }
   }
   // the tail tip's frame
@@ -544,14 +577,118 @@ fn fur(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4)Allocator.Err
     const out=v3(@cos(a),0.0,@sin(a));
     try kit.leaf(b,.{
       .base=out*m.splat3(0.008),.along=m.norm(v3(0,1,0)+out*m.splat3(0.35)),.out=out,
-      .len=(if(inner)@as(f32,0.08)else 0.12)*rng.range(0.85,1.1),.width=if(inner)0.024 else 0.03,
+      .len=(if(inner)@as(f32,0.1)else 0.15)*rng.range(0.85,1.1),.width=if(inner)0.028 else 0.036,
       .lift=if(inner)0.25 else 0.4,.curl=0.35,.cup=0.3,
       .col=pal.wolfLeafDark,.tip=pal.wolfLeafLite,
     });
   }
   b.xform(start,tip);
   try rigid(b,start,.tail3);
+  try finery(b,s,w,&rng);
 }
+/// rings of leaves thatching the tail, root to tip
+const tailRings=11;
+/// leaves in each ring
+const tailLeaves=9;
+/// the leaves the gardener drew over the hide besides its fur: a lock
+/// falling over the -x eye, a collar round the neck with a bib on the
+/// chest, leaves along the sash, thick cuffs over the forearms and a tuft
+/// on each thigh (a flame on the right, a lotus on the left)
+fn finery(b:*mg.Builder,s:*const sculpt.Sculpt,w:*const[skel.count]M4,rng:*engine.core.rng.Rng)Allocator.Error!void{
+  // the skull's, the neck's and the chest's frames
+  const head=w[bi(.head)];
+  const neck=w[bi(.neck)];
+  const chest=w[bi(.chest)];
+  // the lock over the -x eye (the left seen from the front, as drawn):
+  // leaves rooted on the brow above it, falling forward and down across
+  // it, standing off the face
+  for([_]V3{v3(-0.02,0.09,0.05),v3(-0.04,0.085,0.04),v3(-0.055,0.075,0.03),v3(-0.03,0.075,0.065)},0..)|at,i|{
+    try furLeaf(b,s,m.mulPoint(head,at),dir(head,v3(-0.15-0.1*m.f(i%2),-1,0.55)),(0.08+0.006*m.f(i))*rng.range(0.92,1.08),0.026,0.95,0.55);
+  }
+  // the collar: a ring of leaves round the base of the neck, falling over
+  // the shoulders and back
+  for(0..collarLeaves)|i|{
+    // this leaf's angle round the neck (0 forward)
+    const a=m.ratio(i,collarLeaves)*m.tau+rng.range(-0.05,0.05);
+    try furLeaf(b,s,m.mulPoint(neck,v3(@sin(a)*0.1,-0.045,@cos(a)*0.1)),dir(neck,v3(@sin(a)*0.7,-1,@cos(a)*0.7)),0.085*rng.range(0.9,1.1),0.034,0.7,0.4);
+  }
+  // the bib: layered leaves on the top of the chest between the
+  // pectorals, the lower row longer, all falling down the sternum
+  for([_]struct{y:f32,xs:[]const f32,len:f32}{
+    .{.y=0.215,.xs=&.{-0.045,-0.015,0.015,0.045},.len=0.06},
+    .{.y=0.185,.xs=&.{-0.03,0.0,0.03},.len=0.07},
+    .{.y=0.155,.xs=&.{-0.012,0.012},.len=0.075},
+  })|row|for(row.xs)|x|{
+    try furLeaf(b,s,m.mulPoint(chest,v3(x,row.y,0.12)),dir(chest,v3(x*3,-1,0.25)),row.len*rng.range(0.92,1.08),0.03,0.5,0.35);
+  };
+  // leaves along the sash, lying along it toward the hip
+  const from=m.mulPoint(chest,sashFrom);
+  const to=m.mulPoint(w[bi(.pelvis)],sashTo);
+  for([_]f32{0.08,0.3,0.5,0.7,0.88},0..)|k,i|{
+    // the sash's point here, and which side of it the leaf leans
+    const p=m.lerpV(from,to,k);
+    const lean:f32=if(i%2==0)1 else-1;
+    try furLeaf(b,s,p+v3(0,0.006*lean,0.05),m.norm(to-from)+v3(0,0.5*lean,0),0.05*rng.range(0.9,1.1),0.022,0.55,0.4);
+  }
+  for(skel.sides,0..)|sd,si|{
+    // which way out this side is: -1 left, 1 right
+    const x=skel.sign(si);
+    // the cuff: rings of leaves thatching the forearm from the wrist to
+    // below the elbow, rooted low and lying up the arm, the lowest
+    // ring's roots leaving a clean line at the wrist
+    const fore=w[bi(sd.forearm)];
+    for(0..cuffRings)|ring|{
+      // how far up the forearm this ring roots (0 the wrist .. 1 below the elbow)
+      const f=m.ratio(ring,cuffRings-1);
+      const y=-skel.forearmLength*m.lerp(0.95,0.3,f);
+      for(0..cuffLeaves)|j|{
+        // this leaf's angle round the forearm, each ring turned from the last
+        const a=m.ratio(j,cuffLeaves)*m.tau+m.f(ring)*0.4+rng.range(-0.1,0.1);
+        try furLeaf(b,s,m.mulPoint(fore,v3(@sin(a)*0.08,y,@cos(a)*0.08)),dir(fore,v3(@sin(a)*0.35,1,@cos(a)*0.35)),(0.075-0.012*f)*rng.range(0.9,1.1),0.03,0.75,0.45);
+      }
+    }
+    // the thigh's tuft, as drawn seen from the front: on the left (-x) a
+    // flame on the outer front, on the right (+x) a lotus on the front,
+    // leaves fanned up out of one root
+    const thigh=w[bi(sd.thigh)];
+    const lotus=x>0;
+    // the tuft's root on the thigh, the way it faces and how many leaves
+    const root=if(lotus)v3(0.0,-0.13,0.09)else v3(x*0.05,-0.09,0.075);
+    const face=m.norm(root*v3(1,0,1));
+    // the way across the thigh's face there
+    const side=m.norm(m.cross(face,v3(0,1,0)));
+    if(!lotus)for(0..6)|j|{
+      // the flame: leaves fanned up the thigh out of one root
+      const u=m.ratio(j,5)*2-1;
+      const up=v3(0,1,0)+side*m.splat3(u*0.6);
+      try furLeaf(b,s,m.mulPoint(thigh,root+side*m.splat3(u*0.02)),dir(thigh,up),0.085*(1-0.25*@abs(u))*rng.range(0.92,1.08),0.03,0.7,0.45);
+    };
+    if(lotus){
+      // the lotus: a ring of petals round its root, each standing almost
+      // off the thigh so together they cup outward, the upper ones longest
+      for(0..lotusPetals)|j|{
+        // this petal's angle round the root (0 up the thigh)
+        const t=m.ratio(j,lotusPetals)*m.tau;
+        const way=v3(0,@cos(t),0)+side*m.splat3(@sin(t));
+        try furLeaf(b,s,m.mulPoint(thigh,root+way*m.splat3(0.008)),dir(thigh,way),(0.045+0.015*@max(@cos(t),0))*rng.range(0.92,1.08),0.03,1.15,-0.15);
+      }
+      for(0..3)|j|{
+        // the inner bud: three short petals standing in its middle
+        const t=m.ratio(j,3)*m.tau+0.5;
+        const way=v3(0,@cos(t),0)+side*m.splat3(@sin(t));
+        try furLeaf(b,s,m.mulPoint(thigh,root+way*m.splat3(0.003)),dir(thigh,way),0.035,0.022,1.45,0.1);
+      }
+    }
+  }
+}
+/// petals round the thigh's lotus
+const lotusPetals=8;
+/// leaves round the collar
+const collarLeaves=14;
+/// rings of leaves in each forearm's cuff
+const cuffRings=5;
+/// leaves in each ring of a cuff
+const cuffLeaves=8;
 /// the claws of the fingers (sculpted into the hide) and the dewclaw, and
 /// the feet's toes: knuckled forms of planes arching to curved claws
 fn digits(b:*mg.Builder,w:*const[skel.count]M4)Allocator.Error!void{

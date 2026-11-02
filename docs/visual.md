@@ -603,7 +603,16 @@ from a distance-to-edge function, so they stay crisp at any size) in
 - Vines cast onto it from bone axes (`wind`/`line`, so they never jump
   across).
 - Fur leaves (`wolfKit.leaf`) as hair: over the crown with a forelock and
-  nape mane, along the cheekbones, shoulder tufts, tail rings and tip.
+  nape mane, along the cheekbones, shoulder tufts, and the tail thatched
+  root to tip into a great flame of leaves, broadest past its middle.
+- What the gardener drew over it (`finery`): a lock falling over the -x
+  eye (the left one seen from the front), a collar of leaves round the
+  neck with a layered bib on the sternum, thick cuffs of leaves thatching
+  each forearm up from a clean line at the wrist, a flame tuft on the -x
+  thigh and a lotus of petals on the +x one.
+- A sash: a vine wound round the -x upper arm and slung across the front
+  from under that pectoral to the other hip, leaves along it.
+- The claws are leaf tips: green (`pal.wolfClaw`).
 - Digits and claws (`wolfKit.digit`).
 - Eyes set in carved sockets under the brow.
 
