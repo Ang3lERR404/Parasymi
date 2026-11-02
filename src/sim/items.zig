@@ -109,6 +109,8 @@ pub const Item=enum(u8){
   constellateBud,
   /// a constellate stem of light built of fragments, what other parts fasten to
   constellateStem,
+  /// a constellate heart taken up whole (put down, it plays its story afresh)
+  constellateHeart,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the species item `i` plants, if it is a seed
@@ -167,6 +169,7 @@ const infos=EnumArray(Item,Info).init(.{
   .constellateLeaf=.{.col=.{140,215,235,255}},
   .constellateBud=.{.col=.{180,190,255,255}},
   .constellateStem=.{.col=.{130,180,240,255}},
+  .constellateHeart=.{.col=.{200,225,255,255}},
 });
 /// one slot's worth: an item and how many of it
 pub const Stack=struct{

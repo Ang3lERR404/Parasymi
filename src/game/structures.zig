@@ -212,6 +212,8 @@ pub const kinds=struct{
   pub const bud=@import("structures/bud.zig");
   /// a constellate stem put down alone, floating: what other parts fasten to
   pub const stem=@import("structures/stem.zig");
+  /// a bare stem four buds have fastened on: the heart, which builds parts
+  pub const heart=@import("structures/heart.zig");
   /// a polyp's stemless flower put down as a floating light
   pub const driftFlower=@import("structures/drift_flower.zig");
   /// the mist tree, breathing moisture into the air

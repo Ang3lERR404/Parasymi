@@ -2,6 +2,8 @@
 const lib=@import("../../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
+/// a check that what must hold does (a bug if not)
+const assert=std.debug.assert;
 /// the allocator type placing a structure may fail with
 const Allocator=std.mem.Allocator;
 /// the engine package
@@ -178,6 +180,17 @@ pub const Structures=struct{
   pub fn relink(ss:*Structures)void{
     @memset(ss.kin.items,.{});
     for(0..ss.list.items.len)|i|if(ss.getParent(Id.of(i)))|p|ss.join(Id.of(i),p);
+  }
+  /// structure `id` becomes one of kind `k` where it stands, its state
+  /// fresh, keeping its place, its inventory and its kin (a stem whose
+  /// fourth bud fastens becomes the heart). Both kinds must be the same
+  /// size and both stand on the ground or both float.
+  pub fn become(ss:*Structures,gpa:Allocator,id:Id,k:Kind)void{
+    // the structure
+    const s=ss.get(id);
+    assert(defs.get(k).size==s.def().size and defs.get(k).floating==s.def().floating);
+    s.deinit(gpa);
+    s.state=freshState(k);
   }
   /// a structure the gardener has just put down starts as a sprout.
   pub fn sprout(ss:*Structures,id:Id)void{

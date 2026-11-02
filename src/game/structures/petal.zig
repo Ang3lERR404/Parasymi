@@ -1,7 +1,8 @@
 //! CONSTELLATE PETAL: a petal of light the star hyena builds of fragments
 //! and puts down on its own (act 2). It floats over its tile, swaying, a
 //! web holding a petal's shape, until a yielder's core short of petals
-//! stands within `reach` tiles; then it drifts slowly over to it, turning
+//! (or a heart bloomed and waiting for petals on its first bloom) stands
+//! within `reach` tiles; then it drifts slowly over to it, turning
 //! to face out from its rim, and merges with it, the core taking it on as
 //! one of its four (game/structures/yielder.zig), and is gone from here.
 const lib=@import("../../lib.zig");
@@ -77,7 +78,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   }
   const here=m.Vice(i32,2){self.x,self.y};
   for(ctx.ss.list.items,0..)|*o,k|{
-    if(o.kind()!=.yielder)continue;
+    if(o.kind()!=.yielder and o.kind()!=.heart)continue;
     if(@max(@abs(o.x-here[0]),@abs(o.y-here[1]))>reach)continue;
     if(ctx.ss.send(ctx,.of(k),.petalComing)!=.done)continue;
     // drifting to it (fetched again: the reply may not move the list, but

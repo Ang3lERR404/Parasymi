@@ -446,12 +446,13 @@ fn tendrilAt(b:*mg.Builder,height:u8)Allocator.Error!void{
   try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.tendril)+height),.reach=0.14,.n=72});
   try cluster(b,.{.shape=@enumFromInt(@intFromEnum(Shape.tendrilRide)+height),.reach=0.17*0.3});
 }
-/// the heart's whole story in one (stage 5): every web any stage has, the
+/// the heart's whole story in one (`stage` 5 looping alone, 6 a garden's own,
+/// driven by the game): every web any stage has, the
 /// GPU telling which stage it is at by its clock
-fn story(b:*mg.Builder)Allocator.Error!void{
-  try grown(b,5);
-  try cluster(b,.{.shape=.heartSeed,.reach=5.2,.n=144,.group=3});
-  try settling(b,5);
+fn story(b:*mg.Builder,stage:f32)Allocator.Error!void{
+  try grown(b,stage);
+  try cluster(b,.{.shape=.heartSeed,.reach=stage+0.2,.n=144,.group=3});
+  try settling(b,stage);
 }
 /// the heart at `stage` (0 bound, 1 rising, 2 blooming, 3 its chain
 /// reaction, 4 settling into a builder, 5 all of them in turn; it rides
@@ -564,7 +565,7 @@ pub const heartBuilder=struct{
 /// again
 pub const heartWhole=struct{
   /// builds the heart's whole story
-  pub fn build(b:*mg.Builder)Allocator.Error!void{try story(b);}
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try story(b,5);}
 };
 /// mesh: CONSTELLATE TENDRIL. a segment the gardener draws, loose fragments
 /// braided and flowing along it, floating, a part riding it
@@ -611,4 +612,12 @@ pub fn seedHeartWeb(b:*mg.Builder)Allocator.Error!void{
 pub const yieldCoreMesh=struct{
   /// builds the core's web alone
   pub fn build(b:*mg.Builder)Allocator.Error!void{try cluster(b,.{.shape=.yieldCore,.reach=0.21});}
+};
+/// mesh: CONSTELLATE HEART, A GARDEN'S OWN. the heart's whole story, its
+/// clock, the part it makes and the buds it shows the game's (stage 6,
+/// part.vert `plexDriven`): a stem gathering buds, then the heart they
+/// begin (game/structures/heart.zig)
+pub const heartDriven=struct{
+  /// builds the heart's whole story, driven
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try story(b,6);}
 };

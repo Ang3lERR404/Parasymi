@@ -499,6 +499,14 @@ pub const Strings=struct{
     petalDrifting:S="",
     /// a constellate part put down that nothing has taken in yet
     partFloats:S="",
+    /// a heart bloomed, waiting for petals on its first bloom: how many are on
+    heartPetals:S="",
+    /// a heart still playing its story toward settling
+    heartForming:S="",
+    /// a heart settled into a builder: the fragments it holds, the part it makes next
+    heartBuilds:S="",
+    /// a heart with a part whole on top of its rose: which
+    heartReady:S="",
     /// a weftstone drawing nodes up, its grit, ley and crystals
     weftDraws:S="",
     /// a weftstone ionizing a ley crystal

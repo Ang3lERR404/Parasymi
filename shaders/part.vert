@@ -342,6 +342,16 @@ float plexLocal = 0.0;
 float plexStoryShow = 1.0;
 // how many times the story has begun again (which part the heart makes)
 float plexStoryRound = 0.0;
+// whether the heart being placed is a garden's own (stage 6 in its mesh),
+// its story driven by the game rather than looping: its clock (s since it
+// began) in the instance's growth, its settling held open for good; the
+// part it makes driven too: how far into making it (s on the settling's
+// scale, 0 none; iq.x), which part (iq.y), and how many of its buds show
+// while it is still a stem gathering them (iq.z)
+float plexDriven = 0.0;
+float plexMadeAt = 0.0;
+float plexMadeKind = 0.0;
+float plexBuds = 4.0;
 // which of the hyena's limbs the web being placed is
 float plexSeg = 0.0;
 // how many of a yielder's petals are snapped on (a share of them all: 1
@@ -635,7 +645,7 @@ float plexusHeartSize(float t) {
 // how far into its settling the heart is at time `t` (s), and how much of
 // it still holds (it all goes back quickly at the end, to begin again)
 float plexusSettleAt(float t) { return plexStory > 0.5 && plexStage < 3.5 ? -100.0 : plexusStageClock(t, PLEXUS_HEART_SETTLE); }
-float plexusSettleKeep(float t) { return 1.0 - smoothstep(PLEXUS_HEART_SETTLE - 4.0, PLEXUS_HEART_SETTLE - 1.0, plexusSettleAt(t)); }
+float plexusSettleKeep(float t) { return plexDriven > 0.5 ? 1.0 : 1.0 - smoothstep(PLEXUS_HEART_SETTLE - 4.0, PLEXUS_HEART_SETTLE - 1.0, plexusSettleAt(t)); }
 // when the heart's bloom `k` bursts free (s into the settling)
 float plexusSettleLet(int k) { return 3.0 + 0.6 * float(k); }
 // how far the heart's bloom `k` has drifted down to the ground at time `t`
@@ -891,7 +901,7 @@ vec3 plexusHeartCurrent(float id, float t) {
 // `plexusForm`), a new one each time its settling begins again
 int plexusMadeKind(float t) {
   const int kinds[5] = int[5](PLEXUS_PETAL, PLEXUS_LEAF, PLEXUS_BUD, PLEXUS_FLOWER, PLEXUS_STEM);
-  float turn = plexStory > 0.5 ? plexStoryRound : floor(t / PLEXUS_HEART_SETTLE);
+  float turn = plexDriven > 0.5 ? plexMadeKind : (plexStory > 0.5 ? plexStoryRound : floor(t / PLEXUS_HEART_SETTLE));
   return kinds[int(mod(turn, 5.0))];
 }
 // where the glowing spot the heart gathers energy in is at time `t`: on
@@ -901,7 +911,7 @@ vec3 plexusMadeSpot(float t) { return plexusHeartLift(vec3(0.0, PLEXUS_ROSE_FOOT
 // has settled, spent as the part it makes is done
 float plexusMadeGlow(float t) {
   if (plexStage < 3.5) return 0.0;
-  float x = plexusSettleAt(t);
+  float x = plexDriven > 0.5 ? plexMadeAt : plexusSettleAt(t);
   return smoothstep(PLEXUS_MADE_GATHER, PLEXUS_MADE_FORM + 1.0, x) * (1.0 - smoothstep(PLEXUS_MADE_FORM + PLEXUS_MADE_FORMING - 1.0, PLEXUS_MADE_FORM + PLEXUS_MADE_FORMING + 1.0, x)) * plexusSettleKeep(t);
 }
 // what of the part the settled heart makes, point `id` (drifted by `moved`)
@@ -910,7 +920,7 @@ float plexusMadeGlow(float t) {
 // place in the part; whole, it rests there on top of the rose until taken
 vec4 plexusHeartMade(float id, float t, vec3 moved) {
   if (plexStage < 3.5) return vec4(0.0);
-  float x = plexusSettleAt(t);
+  float x = plexDriven > 0.5 ? plexMadeAt : plexusSettleAt(t);
   vec3 rel = (plexusForm(id, plexusMadeKind(t)) - vec3(0.0, 1.0, 0.0)) * PLEXUS_MADE_SIZE + moved;
   float a = PLEXUS_MADE_FORM + PLEXUS_MADE_FORMING * id / float(PLEXUS_POINTS);
   float env = smoothstep(a, a + 0.5, x) * plexusSettleKeep(t);
@@ -1251,16 +1261,24 @@ void main() {
     if (shape >= PLEXUS_SPRIG_STEM && shape <= PLEXUS_SPRIG_LEAF_HIGH) plexSprigMask = floor(iw.w * 7.0 + 0.5);
     // (the whole story: which stage it is at now, how far into it, and how
     // much shows as it fades out at the end and in at the start)
+    // (a garden's own heart: its clock, its part and its buds the game's;
+    // held in its settling for good, never fading or beginning again)
+    if (plexStage > 5.5) {
+      plexDriven = 1.0;
+      plexMadeAt = iq.x;
+      plexMadeKind = iq.y;
+      plexBuds = iq.z;
+    }
     if (plexStage > 4.5) {
       float total = 0.0;
       for (int k = 0; k < 5; k++) total += PLEXUS_STORY[k];
-      float x = mod(t, total);
+      float x = plexDriven > 0.5 ? iw.w : mod(t, total);
       plexStory = 1.0;
-      plexStoryShow = smoothstep(0.0, PLEXUS_STORY_FADE, x) * (1.0 - smoothstep(total - PLEXUS_STORY_FADE, total, x));
+      plexStoryShow = plexDriven > 0.5 ? 1.0 : smoothstep(0.0, PLEXUS_STORY_FADE, x) * (1.0 - smoothstep(total - PLEXUS_STORY_FADE, total, x));
       plexStage = 4.0;
       float start = 0.0;
       for (int k = 0; k < 5; k++) {
-        if (x < start + PLEXUS_STORY[k]) { plexStage = float(k); break; }
+        if (x < start + PLEXUS_STORY[k] || k == 4) { plexStage = float(k); break; }
         start += PLEXUS_STORY[k];
       }
       plexLocal = x - start;
@@ -1331,6 +1349,10 @@ void main() {
     if (shape >= PLEXUS_SPRIG_BRANCH && shape <= PLEXUS_SPRIG_LEAF_HIGH) yield *= plexusSprigOn(shape);
     if (plexKind > 2.5 && shape == PLEXUS_SPRIG_STEM) yield *= plexusSprigOn(int(ids.z));
     if (shape == PLEXUS_HEART_FILAMENT) yield = smoothstep(0.0, 0.1, plexusHeartGrow(floor(ids.x / 8.0), t));
+    // (a garden's stem still gathering buds shows only those fastened, and
+    // their bonds)
+    if (plexDriven > 0.5 && shape >= PLEXUS_HEART_BUD && shape < PLEXUS_HEART_FILAMENT) yield *= step(float(shape - PLEXUS_HEART_BUD) + 0.5, plexBuds);
+    if (plexDriven > 0.5 && plexKind > 2.5 && shape == PLEXUS_HEART_STEM && ids.z >= float(PLEXUS_HEART_BUD) && ids.z < float(PLEXUS_HEART_FILAMENT)) yield *= step(ids.z - float(PLEXUS_HEART_BUD) + 0.5, plexBuds);
     // (or of a petlet's points as their fragments arrive, a line or pane
     // there once all its points are, a grand petal as it opens, a
     // fragment on its way)

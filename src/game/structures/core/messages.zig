@@ -83,10 +83,13 @@ pub const PairStep=enum{
   paired,
 };
 /// what fastens at a constellate stem's joint: a leaf (its lowest or
-/// highest), or another stem as its branch (its middle)
+/// highest), another stem as its branch (its middle), or a bud (all three,
+/// two at its highest; on a bare stem only)
 pub const Fasten=enum{
   /// a leaf
   leaf,
   /// a stem, as a branch
   branch,
+  /// a bud, four of them on a bare stem beginning the heart
+  bud,
 };

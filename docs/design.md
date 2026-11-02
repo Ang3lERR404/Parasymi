@@ -462,9 +462,15 @@ constellate one alone.
   to its lowest then highest, a bare stem put down after it to its middle
   as its branch, each fastening in 6 s (messages `fastenComing`,
   `fastened`, reply `joint`; the stem drawn as `constellateSprig` showing
-  only what is fastened). Still to come:
-  four buds on a stem
-  beginning the heart.
+  only what is fastened). The heart: buds put down near a bare stem
+  drift to its joints (two at its highest); with the fourth it becomes
+  the heart (`Structures.become`), playing the heart sketch's story on its
+  own clock (`constellateHeartDriven`, part.vert `plexDriven`): bound,
+  rising, blooming; it then waits for four petals put down nearby, which
+  drift to its first bloom; its chain reaction runs and it settles into a
+  builder: fed ten fragments (by hand, or by a tendril) it forms a part
+  on top of its rose (petal, leaf, bud, core, stem in turn), resting
+  there until a click takes it. Still to come: tendrils.
 - **Building:** his own hands (recipes `by=.hyena`, `craft.byHyena`, the
   belly panel showing each gardener's own) build a constellate core or a
   constellate petal from ten fragments each.
