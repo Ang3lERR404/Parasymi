@@ -60,8 +60,12 @@ pub const tableHead=16;
 /// frames in flight, each with its own top level's instances (the
 /// renderer's `frames`)
 pub const frames=2;
-/// a caught set grows to this much more than was asked, so it grows rarely
-const grow:u64=2;
+/// a buffer grown (caught sets, levels, scratch) takes this share more than
+/// was asked (1/4), so it grows rarely without doubling: doubled, a big
+/// garden's caught vertices, levels and scratch outgrew the device
+const growShare:u64=4;
+/// `n` with a quarter's room to spare
+fn grow(n:u64)u64{return n+n/growShare;}
 /// the least vertices a caught set holds
 const leastRoom:u64=1<<18;
 /// a built acceleration structure: its buffer, handle and size
@@ -195,11 +199,11 @@ pub const Rays=struct{
   }
   /// make room for every vertex asked for this frame, once every pass is
   /// prepared and before any is captured (waits for the GPU when the room
-  /// must grow: rarely, it grows to twice what was asked)
+  /// must grow: rarely, it grows a quarter past what was asked)
   pub fn fit(r:*Rays,c:*const Ctx)ctx.Error!void{
     if(r.used<=r.room and r.room>0)return;
     c.device.deviceWaitIdle()catch|e|return ctx.fold(e);
-    r.room=@max(r.used*grow,leastRoom);
+    r.room=@max(grow(r.used),leastRoom);
     for(&r.caught)|*b|{
       b.deinit(c);
       b.*=try Buffer.initRoom(c,.{.storage_buffer=true,.shader_device_address=true,.acceleration_structure_build_input_read_only_khr=true},r.room*stride,&.{});
@@ -276,10 +280,10 @@ pub const Rays=struct{
       c.device.deviceWaitIdle()catch|e|return ctx.fold(e);
       if(r.scratch.size<need){
         r.scratch.deinit(c);
-        r.scratch=try Buffer.initRoom(c,.{.storage_buffer=true,.shader_device_address=true},need*grow,&.{});
+        r.scratch=try Buffer.initRoom(c,.{.storage_buffer=true,.shader_device_address=true},grow(need),&.{});
       }
       for(0..levels)|i|if(sizes[i].acceleration_structure_size>r.low[i].buf.size){
-        try r.low[i].make(c,.bottom_level_khr,sizes[i].acceleration_structure_size*grow);
+        try r.low[i].make(c,.bottom_level_khr,grow(sizes[i].acceleration_structure_size));
         r.builtKey[i]=null;
       };
     }
