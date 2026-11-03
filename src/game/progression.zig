@@ -152,6 +152,10 @@ pub const Research=struct{
   /// a big step (new structures, species, a world event): grows as a branch
   /// of the research sapling; anything else is a leaf (hud/research.zig).
   branch:bool=false,
+  /// the lineage it belongs to, which its node on the research tree is
+  /// drawn as; null takes it from what it lets be woven, else from its
+  /// first prerequisite (hud/research.zig)
+  lineage:?species.Lineage=null,
 };
 /// every technology's `def`, looked up by id
 pub const tree=reg.table(Research,"def");

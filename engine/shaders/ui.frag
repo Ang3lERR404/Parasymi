@@ -99,6 +99,48 @@ const uint SHAPE_GRAIN = 6u;
 const uint SHAPE_GEM = 7u;
 const uint SHAPE_NIGHT = 8u;
 const uint SHAPE_HUSK = 9u;
+const uint SHAPE_DUSK = 10u;
+const uint SHAPE_BLOSSOM = 11u;
+const uint SHAPE_GALL = 12u;
+const uint SHAPE_SHARD = 13u;
+const uint SHAPE_KNOT = 14u;
+// the research tree's painting: the dark it hangs in, the soil under it, the
+// moon low behind (a share of the screen across and down), its pale light
+const vec3 DUSK_HIGH = vec3(0.003, 0.0028, 0.006);
+const vec3 DUSK_LOW = vec3(0.010, 0.008, 0.013);
+const vec3 DUSK_EARTH = vec3(0.016, 0.010, 0.006);
+const vec3 DUSK_DEEP = vec3(0.003, 0.002, 0.0015);
+const vec3 DUSK_MOSS = vec3(0.035, 0.07, 0.025);
+// the warm light pooled over the soil where the tree stands (linear)
+const vec3 DUSK_WARM = vec3(0.020, 0.011, 0.005);
+// the grain laid over the painting, against banding (linear)
+const float DUSK_GRAIN = 0.0016;
+const vec2 DUSK_MOON = vec2(0.2, 0.2);
+const vec3 DUSK_MOON_LIGHT = vec3(0.80, 0.84, 0.95);
+// what drifts down through it: petals, small flowers, seeds on fluff,
+// leaves and pollen, in a far layer and a near one (cell sizes, px; how
+// fast each falls, px a second; the share of cells holding one)
+const float DRIFT_FAR = 64.0;
+const float DRIFT_NEAR = 118.0;
+const float DRIFT_FAR_FALL = 9.0;
+const float DRIFT_NEAR_FALL = 17.0;
+const float DRIFT_SHARE = 0.34;
+const vec3 DRIFT_PETAL = vec3(0.93, 0.70, 0.78);
+const vec3 DRIFT_LILAC = vec3(0.72, 0.62, 0.92);
+const vec3 DRIFT_LEAF = vec3(0.36, 0.58, 0.26);
+const vec3 DRIFT_SEED = vec3(0.45, 0.32, 0.20);
+const vec3 DRIFT_FLUFF = vec3(0.92, 0.92, 0.88);
+// the stamens every opened flower shows (filaments, anthers)
+const vec3 STAMEN = vec3(0.92, 0.78, 0.36);
+const vec3 ANTHER = vec3(1.0, 0.88, 0.45);
+// a symbiotic node: its sepals' and leaves' green
+const vec3 BLOSSOM_LEAF = vec3(0.30, 0.56, 0.24);
+// a parasitic node: its thorns' bone, its mouth's glow
+const vec3 GALL_THORN = vec3(0.86, 0.80, 0.70);
+const vec3 GALL_MAW = vec3(0.95, 0.35, 0.65);
+// a convergent node: its two strands, one of each lineage
+const vec3 KNOT_SYM = vec3(0.40, 0.72, 0.32);
+const vec3 KNOT_PAR = vec3(0.62, 0.30, 0.66);
 
 // integer hash of a lattice point: exact at any magnitude (a sin()-based hash
 // loses precision as time grows and shows up as crawling speckle)
@@ -583,6 +625,322 @@ vec4 night(vec2 px, float seed) {
   return vec4(col, v_col.a);
 }
 
+// the stamens of an opened flower round `c`: `n` filaments out to radius
+// `r`, each tipped with an anther; returns colour (rgb) and cover (a)
+vec4 stamens(vec2 c, float r, float n, float seed) {
+  float cover = 0.0;
+  vec3 col = STAMEN;
+  for (int k = 0; k < 8; k++) {
+    if (float(k) >= n) break;
+    float ang = float(k) * TAU / n + seed * 5.0;
+    vec2 end = vec2(cos(ang), sin(ang)) * r;
+    float df = sdStem(c, vec2(0.0), end, max(r * 0.07, 0.5), max(r * 0.05, 0.4));
+    float da = length(c - end) - max(r * 0.2, 0.9);
+    cover = max(cover, smoothstep(0.7, -0.7, df));
+    float ac = smoothstep(0.7, -0.7, da);
+    col = mix(col, ANTHER, ac);
+    cover = max(cover, ac);
+  }
+  return vec4(col, cover);
+}
+
+// one thing drifting down through the painting, if cell `cell` (of a layer
+// `C` px across, in its falling space `q`) holds one: a petal, a small
+// flower with its stamens, a seed on its fluff, a leaf, or a mote of pollen;
+// each sways and tumbles as it falls
+vec4 drifter(vec2 q, vec2 cell, float C, float seed) {
+  if (hash(cell + seed * 31.0) > DRIFT_SHARE) return vec4(0.0);
+  float t = pc.time;
+  float h1 = hash(cell + 3.7), h2 = hash(cell + 9.1), h3 = hash(cell + 17.3);
+  float kind = floor(hash(cell + 23.9) * 4.999);
+  vec2 at = (cell + 0.5 + (vec2(h1, h2) - 0.5) * 0.3) * C;
+  at.x += sin(t * (0.5 + h2 * 0.5) + h1 * TAU) * C * 0.12;
+  float R = C * mix(0.11, 0.19, h3);
+  vec2 p = rot(q - at, t * (h1 - 0.5) * 1.6 + h2 * TAU);
+  vec3 col = vec3(0.0);
+  float a = 0.0;
+  if (kind < 1.0) {
+    // a petal
+    float d = sdGlyphLeaf(p, vec2(-R, 0.0), vec2(1.0, 0.0), 2.0 * R, R * 0.55);
+    a = smoothstep(0.8, -0.8, d);
+    col = mix(DRIFT_PETAL, DRIFT_LILAC, h1) * (0.75 + 0.3 * smoothstep(-R, R, p.y));
+  } else if (kind < 2.0) {
+    // a small whole flower, stamens and all
+    float ang = atan(p.y, p.x);
+    float d = length(p) - R * (0.5 + 0.5 * pow(abs(cos(2.5 * ang)), 0.6));
+    a = smoothstep(0.8, -0.8, d);
+    col = mix(vec3(0.96, 0.92, 0.94), DRIFT_PETAL, h2) * (0.8 + 0.2 * length(p) / R);
+    vec4 st = stamens(p, R * 0.32, 6.0, h1);
+    col = mix(col, st.rgb, st.a);
+  } else if (kind < 3.0) {
+    // a seed on its fluff, as a dandelion's: the seed hanging below on a
+    // fine beak, a soft round puff of many fine rays above it
+    vec2 hub = vec2(0.0, -R * 0.15);
+    float ds = length((p - vec2(0.0, R * 0.95)) * vec2(2.2, 1.0)) - R * 0.2;
+    float beak = sdStem(p, hub, vec2(0.0, R * 0.8), max(R * 0.03, 0.4), max(R * 0.03, 0.4));
+    float rho = length(p - hub);
+    float ang = atan(p.x, -(p.y - hub.y));
+    float off = abs(fract(ang * 22.0 / TAU + 0.5) - 0.5) * TAU / 22.0 * rho;
+    float within = step(abs(ang), 2.2) * smoothstep(R * 0.85, R * 0.6, rho);
+    float ray = smoothstep(0.7, 0.1, off) * within;
+    float haze = within * 0.18 * smoothstep(0.0, R * 0.4, rho);
+    float sc = smoothstep(0.8, -0.8, ds);
+    float bc = smoothstep(0.6, -0.6, beak);
+    col = mix(DRIFT_FLUFF, DRIFT_SEED, max(sc, bc * 0.6));
+    a = max(max(sc, bc * 0.7), max(ray * 0.6, haze));
+  } else if (kind < 4.0) {
+    // a leaf, its midrib down the middle
+    float d = sdGlyphLeaf(p, vec2(-R * 1.1, 0.0), vec2(1.0, 0.0), 2.2 * R, R * 0.5);
+    a = smoothstep(0.8, -0.8, d);
+    col = leafShade(p, vec2(-R * 1.1, 0.0), vec2(1.0, 0.0), R * 0.5, mix(DRIFT_LEAF, DRIFT_LEAF * vec3(1.3, 1.0, 0.6), h1));
+    col *= 1.0 - 0.3 * smoothstep(1.0, 0.0, abs(p.y));
+  } else {
+    // a mote of pollen, glowing and twinkling
+    float r = length(p);
+    float tw = 0.6 + 0.4 * sin(t * (1.5 + h2 * 2.0) + h1 * 40.0);
+    a = (smoothstep(R * 0.22, R * 0.1, r) + exp(-r / (R * 0.35)) * 0.35) * tw;
+    col = ANTHER;
+  }
+  return vec4(col, clamp(a, 0.0, 1.0));
+}
+
+// the research tree's backdrop over the whole screen, a flat painting of the
+// main menu's stage: the dark laid in broad strokes, lighter toward the soil,
+// the moon low behind; below the soil line (`soil`, px down the screen) the
+// earth in strata and pebbles, a tufted moss lip along it, a warm light pooled
+// over it;
+// petals, small flowers, seeds on fluff, leaves and pollen drifting down,
+// far and near, fading in from the top and away at the ground.
+vec4 dusk(vec2 px, float soil, float seed) {
+  float t = pc.time;
+  vec2 S = v_size - 2.0 * PAD;
+  vec2 p = px - PAD;
+  float depth = p.y - soil;
+  float stroke = vnoise(p * vec2(0.0035, 0.011) + seed * 5.0);
+  vec3 col = mix(DUSK_HIGH, DUSK_LOW, smoothstep(0.0, max(soil, 1.0), p.y)) * (0.85 + 0.3 * stroke);
+  // the warm light pooled over the soil where the tree stands, as over the
+  // sleeping wolf, broken by the strokes
+  vec2 pool = (p - vec2(S.x * 0.5, soil - S.y * 0.28)) / (S.y * vec2(0.75, 0.5));
+  col += DUSK_WARM * exp(-dot(pool, pool)) * (0.8 + 0.4 * stroke);
+  // the moon, mottled, and its halo
+  vec2 mp = p - DUSK_MOON * S;
+  float md = length(mp);
+  float mr = S.y * 0.03;
+  float mottle = 0.8 + 0.2 * vnoise(mp / mr * 2.5 + 7.0);
+  col += DUSK_MOON_LIGHT * (smoothstep(mr + 1.5, mr - 1.5, md) * 0.3 * mottle + exp(-md / (S.y * 0.1)) * 0.025);
+  if (depth > 0.0) {
+    float strata = vnoise(vec2(p.x * 0.004, depth * 0.03) + seed * 3.0);
+    vec3 earth = mix(DUSK_EARTH, DUSK_DEEP, smoothstep(0.0, S.y * 0.7, depth)) * (0.75 + 0.45 * strata);
+    vec2 pcell = floor(p / 26.0);
+    if (hash(pcell + 51.0) > 0.8) {
+      vec2 pat = (pcell + 0.5 + (vec2(hash(pcell + 2.0), hash(pcell + 5.0)) - 0.5) * 0.5) * 26.0;
+      float dp = length((p - pat) * vec2(1.0, 1.4)) - (3.0 + 4.0 * hash(pcell + 8.0));
+      earth = mix(earth, earth * 1.6 + 0.004, smoothstep(0.8, -0.8, dp));
+    }
+    col = earth;
+  }
+  // the moss lip, tufted along the soil line
+  float tuft = 3.0 + 7.0 * vnoise(vec2(p.x * 0.07, seed)) + 3.0 * pow(abs(sin(p.x * 0.31 + seed)), 6.0);
+  float moss = smoothstep(-tuft - 1.0, -tuft + 1.0, depth) * smoothstep(6.0, 2.0, depth);
+  col = mix(col, DUSK_MOSS * (0.7 + 0.4 * vnoise(p * 0.2)), moss);
+  // what drifts down: the far layer dimmer, then the near
+  float fade = smoothstep(0.0, S.y * 0.12, p.y) * smoothstep(8.0, -30.0, depth);
+  for (int l = 0; l < 2; l++) {
+    float C = l == 0 ? DRIFT_FAR : DRIFT_NEAR;
+    vec2 q = p - vec2(0.0, t * (l == 0 ? DRIFT_FAR_FALL : DRIFT_NEAR_FALL));
+    vec4 d = drifter(q, floor(q / C), C, seed + float(l) * 7.0);
+    col = mix(col, d.rgb * (l == 0 ? 0.5 : 0.95), d.a * fade);
+  }
+  // a whisper of grain, so the dark's slow gradients never band
+  col += (hash(p + floor(t * 30.0) * 17.0) - 0.5) * DUSK_GRAIN;
+  return vec4(max(col, 0.0), v_col.a);
+}
+
+// a symbiotic study, a flower of the sharers: two leaves down either side
+// and five petals tinted its colour that, closed (open 0), cup upward into
+// a bud held in green sepals, and as `open` runs to 1 part and spread round
+// a heart of stamens. It sways a little on the breeze.
+vec4 blossom(vec2 px, float open, float seed) {
+  float t = pc.time;
+  float R = (v_size.x - 2.0 * PAD) * 0.5;
+  vec2 c = rot(px - v_size * 0.5, sin(t * 1.1 + seed * 6.0) * 0.06);
+  float o = smoothstep(0.0, 1.0, open);
+  vec3 col = vec3(0.0);
+  float a = 0.0;
+  for (int k = 0; k < 2; k++) {
+    vec2 u = normalize(vec2(k == 0 ? -0.9 : 0.9, 0.5));
+    vec2 base = vec2(0.0, R * 0.2);
+    float wid = R * 0.26;
+    float lc = smoothstep(0.8, -0.8, sdGlyphLeaf(c, base, u, R * 1.0, wid));
+    col = mix(col, leafShade(c, base, u, wid, BLOSSOM_LEAF), lc);
+    a = max(a, lc);
+  }
+  // the petals, back ones first, each rimmed darker where it overlaps
+  float spread = mix(0.22, 1.2566, o);
+  vec2 heart = vec2(0.0, mix(R * 0.1, 0.0, o));
+  for (int k = 0; k < 5; k++) {
+    float j = float(k) - 2.0;
+    float ang = -PI * 0.5 + j * spread + (hash(vec2(float(k), seed * 9.0)) - 0.5) * 0.15 * o;
+    vec2 u = vec2(cos(ang), sin(ang));
+    float len = R * mix(0.62, 0.92, o);
+    float wid = R * mix(0.2, 0.34, o);
+    float d = sdGlyphLeaf(c, heart, u, len, wid);
+    float pc0 = smoothstep(0.8, -0.8, d);
+    float along = clamp(dot(c - heart, u) / len, 0.0, 1.0);
+    vec3 pcol = mix(BLOSSOM_LEAF, v_col.rgb, 0.3 + 0.7 * o) * (0.72 + 0.4 * along);
+    pcol *= 1.0 - 0.3 * smoothstep(-2.0, 0.0, d);
+    col = mix(col, pcol, pc0);
+    a = max(a, pc0);
+  }
+  // sepals holding the bud, falling back as it opens
+  for (int k = 0; k < 2; k++) {
+    vec2 u = normalize(vec2(k == 0 ? -0.45 : 0.45, -1.0));
+    float wid = R * 0.14;
+    float sc = smoothstep(0.8, -0.8, sdGlyphLeaf(c, vec2(0.0, R * 0.25), u, R * 0.5 * (1.0 - 0.7 * o), wid));
+    col = mix(col, leafShade(c, vec2(0.0, R * 0.25), u, wid, BLOSSOM_LEAF * 0.9), sc);
+    a = max(a, sc);
+  }
+  // its heart of stamens, hidden while it is a bud
+  float show = smoothstep(0.35, 0.6, o);
+  float hd = length(c) - R * 0.15;
+  col = mix(col, STAMEN * 0.7, smoothstep(0.8, -0.8, hd) * show);
+  vec4 st = stamens(c, R * 0.34, 7.0, seed);
+  col = mix(col, st.rgb, st.a * show);
+  return vec4(col, a * v_col.a);
+}
+
+// a parasitic study, a gall of the takers: a swollen bladder tinted its
+// colour, veined and breathing, ringed with hooked thorns (sharp, laid
+// flatter while it sleeps); across it a lipped mouth that parts as `open`
+// runs to 1, a hungry glow and a row of teeth inside.
+vec4 gall(vec2 px, float open, float seed) {
+  float t = pc.time;
+  float R = (v_size.x - 2.0 * PAD) * 0.5;
+  vec2 c = px - v_size * 0.5;
+  float ang = atan(c.y, c.x);
+  float Rb = R * 0.62 * (1.0 + 0.05 * sin(t * 1.6 + seed * 6.0));
+  float d = length(c * vec2(1.0, 1.1)) - Rb - (ringNoise(ang, 1.6, seed, t * 0.5) - 0.5) * R * 0.12;
+  vec3 col = vec3(0.0);
+  float a = 0.0;
+  for (int k = 0; k < 7; k++) {
+    float ta = float(k) * TAU / 7.0 + seed * 3.0;
+    vec2 u = vec2(cos(ta), sin(ta));
+    vec2 base = u * Rb * 0.85;
+    float len = R * mix(0.22, 0.42, open) * (0.8 + 0.4 * hash(vec2(float(k), seed * 9.0)));
+    vec2 mid = base + u * len * 0.55;
+    vec2 tip = mid + rot(u, mix(0.9, 0.5, open)) * len * 0.5;
+    float dt = min(sdStem(c, base, mid, R * 0.08, R * 0.045), sdStem(c, mid, tip, R * 0.045, 0.0));
+    float tc = smoothstep(0.8, -0.8, dt);
+    col = mix(col, GALL_THORN * (0.7 + 0.3 * clamp(dot(c - base, u) / len, 0.0, 1.0)), tc);
+    a = max(a, tc);
+  }
+  vec2 q = c / Rb;
+  vec3 n = normalize(vec3(q, sqrt(max(0.0, 1.0 - min(dot(q, q), 1.0)))));
+  float shade = 0.45 + 0.55 * max(dot(n, normalize(vec3(-0.5, -0.6, 0.65))), 0.0);
+  float veins = smoothstep(0.92, 1.0, 1.0 - abs(vnoise(q * 3.0 + seed * 7.0) * 2.0 - 1.0));
+  vec3 body = v_col.rgb * shade * (0.85 + 0.35 * veins);
+  float fill = smoothstep(1.0, -1.0, d);
+  // the mouth: a slit across, parting
+  float w = Rb * 0.72;
+  float across = clamp(c.x / w, -1.0, 1.0);
+  float gap = R * 0.2 * open * sqrt(max(0.0, 1.0 - across * across)) * step(abs(c.x), w);
+  float y = c.y - R * 0.08;
+  float maw = smoothstep(0.8, -0.8, abs(y) - gap) * step(0.01, gap);
+  float teeth = step(abs(y), gap) * step(gap - abs(y), R * 0.07 * (1.0 - abs(fract(c.x / (R * 0.13)) * 2.0 - 1.0)));
+  vec3 inside = GALL_MAW * (0.55 + 0.45 * sin(t * 3.0 + seed * 4.0)) * (1.0 - abs(y) / max(gap, 1e-3) * 0.5);
+  body = mix(body, inside, maw);
+  body = mix(body, GALL_THORN, teeth * maw);
+  float seam = smoothstep(1.2, 0.0, abs(abs(y) - gap)) * step(abs(c.x), w) * (1.0 - 0.6 * abs(across));
+  body *= 1.0 - 0.6 * seam;
+  body = mix(body, body * 0.55, smoothstep(-2.5, 0.0, d));
+  col = mix(col, body, fill);
+  a = max(a, fill);
+  return vec4(col, a * v_col.a);
+}
+
+// a radiant study, light gathered and never grown: crystal fragments drift
+// round a core of light and, as `open` runs to 1, settle one by one into a
+// cluster about it, points outward; gathered, the core burns and each
+// facet catches fire in turn.
+vec4 shard(vec2 px, float open, float seed) {
+  float t = pc.time;
+  float R = (v_size.x - 2.0 * PAD) * 0.5;
+  vec2 c = px - v_size * 0.5;
+  vec3 col = vec3(0.0);
+  float a = 0.0;
+  for (int k = 0; k < 7; k++) {
+    float h = hash(vec2(float(k), seed * 13.0));
+    float from = float(k) / 7.0 * 0.75;
+    float settle = smoothstep(from, from + 0.25, open);
+    float home = float(k) * TAU / 7.0 - PI * 0.5;
+    float orbit = t * (0.25 + 0.35 * h) + h * TAU;
+    vec2 at = mix(vec2(cos(orbit), sin(orbit)) * R * (0.7 + 0.15 * h), vec2(cos(home), sin(home)) * R * 0.28, settle);
+    float dir = mix(orbit + h * 3.0 + t * 0.7, home, settle);
+    vec2 u = vec2(cos(dir), sin(dir));
+    float len = R * mix(0.2, 0.5 + 0.15 * h, settle);
+    float wid = R * mix(0.08, 0.13, settle);
+    vec2 r = c - at;
+    float x = dot(r, u);
+    float y = dot(r, vec2(-u.y, u.x));
+    float dk = (abs(y) / wid + (x > 0.0 ? x / len : -x / (len * 0.3)) - 1.0) * wid;
+    float cover = smoothstep(0.8, -0.8, dk);
+    vec3 spec = 0.6 + 0.4 * cos(TAU * (h + t * 0.05 + vec3(0.0, 0.33, 0.67)));
+    float fire = pow(0.5 + 0.5 * sin(t * 1.7 + h * TAU), 4.0) * settle;
+    vec3 scol = v_col.rgb * (y > 0.0 ? 1.0 : 0.62) + spec * fire * 0.45;
+    scol += GEM_EDGE * smoothstep(1.0, 0.0, abs(y)) * 0.3 + GEM_EDGE * smoothstep(1.0, 0.0, -dk) * 0.25;
+    col = mix(col, scol, cover);
+    a = max(a, cover * mix(0.55, 1.0, settle));
+  }
+  float core = exp(-length(c) / (R * mix(0.1, 0.22, open))) * mix(0.35, 1.0, open);
+  col += (v_col.rgb * 1.1 + 0.35) * core;
+  a = max(a, min(core, 1.0));
+  return vec4(col, clamp(a, 0.0, 1.0) * v_col.a);
+}
+
+// a convergent study, where the lineages meet: a green strand and a violet
+// one braid round each other in a ring, over and under, grown round from
+// the top as `open` runs to 1; once the ring closes a bloom of its colour
+// opens in its heart, stamens and all. The ring turns slowly.
+vec4 knot(vec2 px, float open, float seed) {
+  float t = pc.time;
+  float R = (v_size.x - 2.0 * PAD) * 0.5;
+  vec2 c = rot(px - v_size * 0.5, t * 0.15 + seed * 6.0);
+  float rho = length(c);
+  float th = atan(c.y, c.x);
+  float along = fract((th + PI * 0.5) / TAU);
+  float reach = mix(0.12, 1.0, open);
+  float grown = smoothstep(reach + 0.001, reach - 0.03, along);
+  float ring = R * 0.6;
+  float amp = R * 0.13;
+  // the strands thin toward their growing tips, whole once the ring closes
+  float tipK = open >= 0.999 ? 1.0 : mix(0.4, 1.0, smoothstep(reach, reach - 0.12, along));
+  float w = R * 0.085 * tipK;
+  float sA = ring + amp * sin(th * 3.0);
+  float sB = ring - amp * sin(th * 3.0);
+  float cA = smoothstep(0.8, -0.8, abs(rho - sA) - w) * grown;
+  float cB = smoothstep(0.8, -0.8, abs(rho - sB) - w) * grown;
+  float xa = clamp((rho - sA) / max(w, 0.5), -1.0, 1.0);
+  float xb = clamp((rho - sB) / max(w, 0.5), -1.0, 1.0);
+  vec3 colA = KNOT_SYM * (0.6 + 0.4 * sqrt(max(0.0, 1.0 - xa * xa)));
+  vec3 colB = KNOT_PAR * (0.6 + 0.4 * sqrt(max(0.0, 1.0 - xb * xb)));
+  vec3 col = vec3(0.0);
+  if (cos(th * 3.0) > 0.0) {
+    col = mix(mix(col, colB, cB), colA, cA);
+  } else {
+    col = mix(mix(col, colA, cA), colB, cB);
+  }
+  float a = max(cA, cB);
+  float bloom = smoothstep(0.7, 1.0, open);
+  float pd = rho - R * 0.32 * bloom * (0.55 + 0.45 * abs(cos(2.0 * th)));
+  float pcov = smoothstep(0.8, -0.8, pd) * step(0.01, bloom);
+  col = mix(col, v_col.rgb * (0.75 + 0.35 * rho / max(R * 0.32, 1.0)), pcov);
+  a = max(a, pcov);
+  vec4 st = stamens(c, R * 0.15 * bloom, 5.0, seed);
+  col = mix(col, st.rgb, st.a * step(0.01, bloom));
+  a = max(a, st.a * step(0.01, bloom));
+  return vec4(col, a * v_col.a);
+}
+
 // is glyph cell q set? (5x7 bitmap, row-major, bit 0 top-left)
 bool lit(ivec2 q) {
   if (q.x < 0 || q.y < 0 || q.x >= 5 || q.y >= 7) return false;
@@ -698,6 +1056,11 @@ void main() {
       case SHAPE_LEAF: c = leaf(v_uv, v_param.x, v_param.y); break;
       case SHAPE_GRAIN: c = seedCoat(v_uv, v_param.x, v_param.y); break;
       case SHAPE_GEM: c = gem(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_DUSK: c = dusk(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_BLOSSOM: c = blossom(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_GALL: c = gall(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_SHARD: c = shard(v_uv, v_param.x, v_param.y); break;
+      case SHAPE_KNOT: c = knot(v_uv, v_param.x, v_param.y); break;
       default: c = night(v_uv, v_param.y); break; // SHAPE_NIGHT
     }
     if (c.a < SHAPE_CLEAR) discard;

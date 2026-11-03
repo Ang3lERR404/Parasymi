@@ -75,14 +75,16 @@ Tests catch: a sown species without a seed icon; cfg keys.
    - `.perUnit`, `.units`, `.unitTime`;
    - `.prereq`, with the host first;
    - `.branch` for a big step;
-   - `.needs` for a discovery.
+   - `.needs` for a discovery;
+   - `.lineage` only when what it lets be woven (or, failing that, its
+     host) would draw its node as the wrong lineage.
 
    Hooks as needed: `apply`, `unlocks`, `completed`, `veil`, `reveals`,
    `study`.
 2. **Register it**: one line in `techs` in `game/progression.zig`.
 3. **Strings**: `[research] <id>.name/.desc`.
-4. **No layout work**: the sapling places it. If the layout test fails,
-   fix the rules in `hud/research.zig`, never the node.
+4. **No layout work**: the research tree places it. If the layout test
+   fails, fix the rules in `hud/research.zig`, never the node.
 
 ## An item (not a seed or bulb)
 1. A tag at the end of `items.Item`, its colour in `infos`.

@@ -199,7 +199,7 @@ pub const Mode=enum{
   /// a structure's panel is open (clicked in the garden, `Game.open`): its
   /// slots beside the belly's, and what it may be set to weave
   structure,
-  /// the research list is open (T)
+  /// the world is frozen and the research tree fills the screen (T)
   research,
   /// the world is frozen and the pause menu is open (Esc)
   paused,
@@ -220,8 +220,9 @@ pub const Mode=enum{
   /// a dark stage, the garden grown behind it but not yet entered
   title,
   /// the world keeps moving underneath (everything but the main menu, the
-  /// pause menu, the panels opened from them and the name prompt)
-  pub fn live(md:Mode)bool{return md!=.title and md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming;}
+  /// pause menu, the panels opened from them, the name prompt and the
+  /// research tree)
+  pub fn live(md:Mode)bool{return md!=.title and md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming and md!=.research;}
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode)bool{return md==.belly or md==.structure;}
 };

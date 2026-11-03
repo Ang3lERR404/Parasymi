@@ -534,50 +534,25 @@ constellate one alone. What the gardener decided for this act, and why:
   new fragment; it keeps up to 20 fragments, a click takes one.
 - **Next:** the wolf's rooting into the tree (how act 2 begins in play);
   animation as parts drift and merge.
-## Research panel (T, `hud/research.zig`)
-The research tree is drawn as a sapling growing in soil. It is laid out
-from the prerequisites alone, so it never needs placing or adjusting.
+## The research tree (T, `hud/research.zig`)
+Research is a living tree over the whole screen, the world paused behind
+it. It starts as a sprout and every study known grows it, crown and roots
+alike. It is laid out from the prerequisites alone, so it never needs
+placing or adjusting. The whole design (shape, growth, looks, the view)
+is in [research-tree.md](research-tree.md).
 
 ### Adding research
 One file in `research/` + one line in `techs`. Set `.branch = true` on a
-big step (new structures, species, an event); anything else is a leaf. No
-coordinates, no sizes.
-
-### Layout rules
-- **Host:** a node grows on the nearest branch up its *first*
-  prerequisite chain, else on the trunk. So list the prerequisite it
-  belongs to first.
-- **Order along a host:** children sit one slot apart, by depth (the
-  longest prereq chain; a `needs` discovery counts 1), then by declaration
-  order. Leaves and branches each alternate sides.
-- **Stems** are one slot longer than their children (branches ≥
-  `branchMin`) and bend toward the light. A branch whose tip would land
-  on a node already grown grows half a slot longer at a time until it is
-  clear (`crowds`, worked out on the still tree so it never jumps as the
-  sapling sways).
-- **Fitting:** the fully grown, still tree is fitted to the panel (`fit`,
-  slot ≤ `maxSlot` px), so nothing moves. The sapling starts small at the
-  soil and fills the panel as research is done.
-
-### How nodes look
-- **Known:** a grown leaf or branch with a violet bloom at its tip.
-- **Open:** a gold bud that glows. While it is being studied, a leaf
-  unfurls, or a branch shoot extends, with progress.
-- **Locked:** a dim dormant bud where its host has grown; else hidden.
-- **Trunk:** reaches `trunkLead` past its highest open/known node (eased,
-  `play.Game.sapling`), and thickens with the square root of how many are
-  known.
-
-### Motion and pointing
-Wind sways stems from the base (children follow); leaves flutter.
-Hovering a node (`Game.pointed`) shows its card: cost, progress, or what
-it is DORMANT on. With nothing hovered, the studied one's card shows.
-Click selects.
+big step (new structures, species, an event): it draws larger. Its node
+is drawn as its lineage, taken from what it lets be woven or from its
+host; set `.lineage` only when neither says it right. No coordinates, no
+sizes.
 
 ### The layout test
-The test asserts hosts come before what grows on them, and no two nodes
-crowd (> 0.5 slot). If it fails after adding research, fix the layout
-rules there. Never hand-place a node.
+The test asserts hosts come before what grows from them (one ring
+further out), every tip stands above the soil and every root below it,
+and no two nodes crowd. If it fails after adding research, fix the
+layout rules. Never hand-place a node.
 
 ## Saves, options and the gardener's folder
 ### The gardener's folder (`game/home.zig`)

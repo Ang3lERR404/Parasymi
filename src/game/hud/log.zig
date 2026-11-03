@@ -22,6 +22,9 @@ const startY:f32=160;
 const fadeDur:f32=8;
 /// how old (s) a message may be before it is no longer drawn
 const maxAge:f32=12;
+/// shown everywhere but over the research tree, which fills the screen
+/// with its own hint and cards
+pub fn visible(g:*const play.Game)bool{return g.mode!=.research;}
 /// draws the recent messages upward from the bottom left, newest lowest,
 /// each fading with age, and the control hint along the very bottom.
 pub fn draw(g:*play.Game,d:*Draw,_:f32,h:f32)Allocator.Error!void{

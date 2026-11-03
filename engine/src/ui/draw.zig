@@ -55,6 +55,23 @@ pub const Shape=enum(u32){
   /// a slot: a ribbed husk hanging by its stalk under a calyx; param.x =
   /// how much sap light fills it, param.y = seed
   husk,
+  /// a painted backdrop over the whole screen: the dark, the moon low
+  /// behind, the earth under a soil line at param.x (pixels down the
+  /// screen), petals, flowers, seeds, leaves and pollen drifting down;
+  /// param.y = seed
+  dusk,
+  /// a flower of the sharers: a bud in sepals opening into five petals
+  /// round its stamens; param.x = how open, param.y = seed
+  blossom,
+  /// a gall of the takers: a thorned bladder whose mouth parts; param.x =
+  /// how open, param.y = seed
+  gall,
+  /// light gathered: crystal fragments settling round a core; param.x =
+  /// how gathered, param.y = seed
+  shard,
+  /// where the lineages meet: two strands braiding a ring round a bloom;
+  /// param.x = how far braided, param.y = seed
+  knot,
 };
 /// the first of a quad's two bit words when it holds a shape, not a glyph
 const shapeMark:u32=0xffff_ffff;
@@ -224,6 +241,27 @@ pub const Draw=struct{
   /// the night over the whole `w` x `h` screen (opaque at full alpha)
   pub fn night(d:*Draw,w:f32,h:f32,col:Color,seed:f32)Allocator.Error!void{
     try d.shape(.night,0,0,w,h,col,.{0,seed});
+  }
+  /// the painted backdrop over the whole `w` x `h` screen, its soil line
+  /// `soil` pixels down it (opaque at full alpha)
+  pub fn dusk(d:*Draw,w:f32,h:f32,soil:f32,col:Color,seed:f32)Allocator.Error!void{
+    try d.shape(.dusk,0,0,w,h,col,.{soil,seed});
+  }
+  /// a flower of radius `r` at (cx, cy), petals `col`, opened by `open` (0..1)
+  pub fn blossom(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,open:f32,seed:f32)Allocator.Error!void{
+    try d.shape(.blossom,cx-r,cy-r,2*r,2*r,col,.{m.clamp01(open),seed});
+  }
+  /// a gall of radius `r` at (cx, cy), its bladder `col`, its mouth opened by `open`
+  pub fn gall(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,open:f32,seed:f32)Allocator.Error!void{
+    try d.shape(.gall,cx-r,cy-r,2*r,2*r,col,.{m.clamp01(open),seed});
+  }
+  /// crystal of radius `r` at (cx, cy), its light `col`, gathered by `open`
+  pub fn shard(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,open:f32,seed:f32)Allocator.Error!void{
+    try d.shape(.shard,cx-r,cy-r,2*r,2*r,col,.{m.clamp01(open),seed});
+  }
+  /// a braided ring of radius `r` at (cx, cy), its bloom `col`, braided by `open`
+  pub fn knot(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,open:f32,seed:f32)Allocator.Error!void{
+    try d.shape(.knot,cx-r,cy-r,2*r,2*r,col,.{m.clamp01(open),seed});
   }
   /// a cut gem of radius `r` at (cx, cy), its fire `fire` (0..1)
   pub fn gem(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,fire:f32,phase:f32)Allocator.Error!void{

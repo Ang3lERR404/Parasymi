@@ -17,6 +17,7 @@ pub const def:prog.Research=.{
   .units=15,.unitTime=6,
   .prereq=&.{.leySight},
   .needs=.overdrive,
+  .lineage=.radiant,
 };
 /// overdrive harms half as hard
 pub fn apply(md:*ecology.Mods)void{md.overdriveHarm*=0.5;}

@@ -13,6 +13,7 @@ pub const def:prog.Research=.{
   },
   .units=20,
   .unitTime=5,
+  .lineage=.parasitic,
 };
 /// what it changes in the living world: parasites drain at twice the rate
 pub fn apply(m:*ecology.Mods)void{m.drainMult=2;}

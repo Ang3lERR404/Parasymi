@@ -17,6 +17,7 @@ pub const def:prog.Research=.{
   .units=15,
   .unitTime=8,
   .needs=.convergence,
+  .lineage=.convergent,
 };
 /// the species whose yield shows in the HUD once this is known: the confluence
 pub const reveals=[_]species.Id{.confluence};

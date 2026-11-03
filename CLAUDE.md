@@ -28,6 +28,7 @@ idioms and what not to do), every session.
 | the engine package, what is generic, how the game plugs in | [docs/engine.md](docs/engine.md) |
 | adding a structure, species, research, item, mesh, panel, pass, input, string | [docs/recipes.md](docs/recipes.md) (every place to wire it) |
 | gameplay, structures' behaviour, research, saves | [docs/design.md](docs/design.md) |
+| the research tree (its shape, growth, looks, the view) | [docs/research-tree.md](docs/research-tree.md) |
 | the light grid: radiant plants, what makes, carries, uses and guards light, its numbers | [docs/radiant-plants.md](docs/radiant-plants.md) |
 | the unforming (the first world event, step by step) | [docs/unforming.md](docs/unforming.md) |
 | act 2: the star hyena, the constellate lineage, what the gardener decided | [docs/act2.md](docs/act2.md) |

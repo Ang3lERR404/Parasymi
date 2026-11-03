@@ -784,6 +784,29 @@ from a distance-to-edge function, so they stay crisp at any size) in
 - Also: stems (`Draw.limb`), leaves/buds (`Draw.leaf`), gems (`Draw.gem`),
   soft glow.
 
+### The research tree (`hud/research.zig`; the whole design in [research-tree.md](research-tree.md))
+- **Backdrop** (`Draw.dusk`): a flat painting of the main menu's stage,
+  near black, laid in broad strokes, a warm light pooled over the soil,
+  the moon low behind and mottled. Under a tufted moss line the earth
+  darkens in strata with pebbles. Petals, small flowers with stamens,
+  dandelion seeds on their fluff, leaves and pollen drift down in a far
+  layer and a near one, fading at the top and at the ground. A whisper of
+  grain keeps its dark gradients from banding.
+- **Tree**: bark limbs (`Draw.limb`) curving from their hosts, twisting a
+  little, green turning brown as they thicken; the trunk flares into its
+  roots just under the soil; roots darker, mirroring the crown.
+- **Nodes, one look per lineage**: symbiotic, a flower (`Draw.blossom`):
+  a bud in sepals opening into five petals round its stamens. Parasitic,
+  a gall (`Draw.gall`): a veined bladder ringed with hooked thorns, its
+  mouth parting on a glow and teeth. Radiant, light gathered
+  (`Draw.shard`): crystal fragments settling round a core, catching fire.
+  Convergent, a braided ring (`Draw.knot`): a green strand and a violet
+  one over and under, a bloom opening in its heart once it closes.
+- **States**: an open study, a faint shoot to where its tip will be and a
+  closed bud there, pulsing gold; studied, the limb grows out along the
+  shoot and the node opens with progress; known, full; dormant, dimmed in
+  mist.
+
 ## Item icons (`game/icon.zig`)
 - **A structure's bulb** is a split seed with a sprout or two showing what
   it does. It comes from its `icon` hook, drawn with the `Icon` kit:

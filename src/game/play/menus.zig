@@ -45,7 +45,7 @@ const TitleRow=lib.play.TitleRow;
 /// chooses a garden, or saves or loads it. The arrows, tab and the pad
 /// move between the rows and confirm chooses; keys still work for the
 /// pause rows; the name prompt takes the typing; a keybind listening
-/// takes the next key.
+/// takes the next key; the research tree is moved round and zoomed.
 pub fn menu(g:*Game,in:*const Input,dt:f32)void{
   if(g.mode==.keybinds)if(g.rebinding)|a|return listen(g,in,a);
   pointer.point(g,in,in.mouse);
@@ -64,6 +64,10 @@ pub fn menu(g:*Game,in:*const Input,dt:f32)void{
   if(g.mode==.gardens)g.scroll(in,dt);
   if(g.mode==.keybinds)g.keybinds(in,dt);
   if(g.mode==.options)hud.panels.options.tick(g,dt);
+  // the research tree: its key closes it again, else it is moved round
+  if(g.mode==.research){
+    if(ctl.pressed(in,.research)){g.mode=.roam;}else hud.panels.research.tick(g,in,hit,dt);
+  }
 }
 /// does what pause row `row` says: resume, open the options or the saved
 /// gardens, toggle fullscreen, or ask main to save and leave.

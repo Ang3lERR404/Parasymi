@@ -108,8 +108,20 @@ pub const leaf:C=.{105,185,105,235};
 pub const bud:C=.{235,195,115,245};
 /// a dormant bud, still waiting
 pub const budDormant:C=.{95,95,105,200};
-/// the soil the sapling stands in
-pub const soil:C=.{70,48,32,150};
+/// the research tree's roots, darker than its bark for living in the earth
+pub const rootBark:C=.{62,46,34,255};
+/// the research tree's painted backdrop: opaque, its own colours in the shader
+pub const dusk:C=.{255,255,255,255};
+/// the mist a dormant study waits in
+pub const mist:C=.{150,150,175,60};
+/// a symbiotic study's petals: soft rose
+pub const symbioticBloom:C=.{240,170,190,255};
+/// a parasitic study's gall: deep wine
+pub const parasiticGall:C=.{120,40,80,255};
+/// a radiant study's light: pale gold
+pub const radiantLight:C=.{255,235,175,255};
+/// a convergent study's bloom in its braided ring: lilac
+pub const convergentBloom:C=.{200,170,240,255};
 /// sun orb (warm amber)
 pub const sun:C=.{255,210,120,255};
 /// moon orb (cool blue)
