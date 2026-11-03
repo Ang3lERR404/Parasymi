@@ -64,6 +64,21 @@ const vec3 GROUND_SHADOW = vec3(0.015, 0.015, 0.025);
 const float GROUND_SHADOW_FALLOFF = 1.6;
 // a flash's burst: a warm white
 const vec3 FLASH_WHITE = vec3(1.0, 0.97, 0.9);
+// a shaft of light (a solcyriphon's beam, a heliocyra's strip): its warm
+// gold, how much of the pearl's film turns through it, how bright its
+// haze, its swells, its flare where a beam lands, its core and its motes,
+// and how long a mote's cell is (m)
+const vec3 SHAFT_GOLD = vec3(1.0, 0.8, 0.48);
+const float SHAFT_FILM = 0.22;
+const float SHAFT_HAZE = 0.35;
+// how bright a strip's band is across its width (a tile wide, so it
+// reads as a road of light, not a wire)
+const float STRIP_BAND = 0.8;
+const float SHAFT_SWELL = 0.9;
+const float SHAFT_LAND = 1.2;
+const float SHAFT_CORE = 2.0;
+const float SHAFT_MOTE = 2.2;
+const float SHAFT_MOTE_CELL = 0.35;
 // research energy: deep violet, white-gold at its heart; its core's
 // filaments (how many arms, how far they wind in from the rim, how fast),
 // its rings closing in (how many, how fast), a wisp's pulses (how many
@@ -326,6 +341,48 @@ void surface() {
     float ends = smoothstep(0.0, 0.08, v_t) * smoothstep(1.0, 0.92, v_t);
     c = col * (0.6 + 2.4 * core) * flick * v_glow;
     float a = clamp((0.25 + 0.75 * core) * flick, 0.0, 1.0) * ends * clamp(v_fade, 0.0, 1.0);
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+  if (part == PART_SHAFT) {
+    // a shaft of light (v_t 0 where it leaves .. 1 where it ends, v_u
+    // across it -1..1, v_aux + v_t * v_fade metres from where it was
+    // made). Falling (a solcyriphon's night beam, v_sheet.y 0): a white
+    // gold core in a soft glow, light pouring down it in slow swells,
+    // motes of light sinking through it, flaring where it lands. Laid over
+    // the ground (a heliocyra's strip, v_sheet.y 1): a band a tile wide,
+    // soft at its edges, a bright thread down its middle, light running
+    // out along it in swells. Light itself, brighter than white so the
+    // glow takes it up; v_glow how strong (a dark strip a faint trace).
+    float t = pc.eye_time.w;
+    float u = v_u;
+    float x = v_aux + v_t * max(v_fade, 0.1);
+    float lit = v_glow;
+    bool laid = v_sheet.y > 0.5;
+    vec3 gold = mix(SHAFT_GOLD, filmHue(x * 0.08 - t * 0.03 + v_phase), SHAFT_FILM);
+    float core = exp(-u * u * (laid ? 60.0 : 22.0));
+    float haze = laid ? smoothstep(1.0, 0.55, abs(u)) : exp(-u * u * 2.6);
+    float swell = pow(0.5 + 0.5 * sin(x * (laid ? 1.6 : 2.2) - t * (laid ? 2.4 : 3.2) + v_phase * TAU), 3.0);
+    // motes: one to a cell along it, drifting the way the light runs, each
+    // at its own place across it and twinkling (neighbouring cells too)
+    float mo = 0.0;
+    float drift = (x - t * (laid ? 0.7 : 1.1)) / SHAFT_MOTE_CELL;
+    for (int k = -1; k <= 1; k++) {
+      float id = floor(drift) + float(k);
+      vec3 h = hash33(vec3(id, v_phase * 5.17, 3.0));
+      float dx = (drift - id - h.x) * SHAFT_MOTE_CELL;
+      float du = (u - (h.y * 1.6 - 0.8)) * (laid ? 0.5 : 0.25);
+      float d2 = dx * dx + du * du;
+      mo += exp(-d2 / 0.0008) * (0.55 + 0.45 * sin(t * (3.0 + 4.0 * h.z) + h.x * TAU));
+    }
+    // where it leaves fades in, where it ends fades out (a beam flares as
+    // it lands); a strip, laid in pieces, only at its whole length's ends
+    // (v_obj.x that length, from half a tile out)
+    float ends = smoothstep(0.0, 0.06, v_t) * smoothstep(1.0, 0.985, v_t);
+    if (laid) ends = smoothstep(0.45, 0.85, x) * (1.0 - smoothstep(v_obj.x + 0.1, v_obj.x + 0.5, x));
+    float land = laid ? 0.0 : smoothstep(0.8, 1.0, v_t);
+    c = (gold * (haze * (laid ? STRIP_BAND : SHAFT_HAZE) + swell * haze * SHAFT_SWELL + land * haze * SHAFT_LAND) + mix(gold, vec3(1.0), 0.6) * (core * SHAFT_CORE + mo * SHAFT_MOTE)) * lit;
+    float a = clamp(haze * (laid ? 0.5 : 0.22) + core * 0.6 + mo * 0.8 + swell * haze * 0.15, 0.0, 1.0) * ends * clamp(lit * 1.5, 0.15, 1.0);
     o = vec4(applyFog(c, v_pos), a);
     return;
   }

@@ -21,7 +21,7 @@ layout(location = 8) in vec4 ic;    // blend toward the next growth key, ghost (
 layout(location = 9) in vec4 ih;    // a forming halo drawing it in: its centre, how far along (< 0 none)
 layout(location = 10) in vec4 it;   // its bend after the gardener's paws plucking it: the way on the ground (xy), how far (z, radians at its tip)
 layout(location = 11) in vec4 ir;   // its yield ripening: how ripe 0..1, its pods, a radiant pod's radius, seconds since its yield last came loose
-layout(location = 12) in vec4 iy;   // the colour of what it yields (sRGB)
+layout(location = 12) in vec4 iy;   // the colour of what it yields (sRGB); w its form's own state (FORMS_SHARED, FLUTTER, GUARDING)
 layout(location = 13) in vec4 ig;   // its unforming: how far it has shattered 0..1 (< 0 none), how far it has withered 0..1
 layout(location = 14) in vec3 pos_next;
 layout(location = 15) in vec3 nrm_next;
@@ -50,12 +50,98 @@ const float HALO_BUD = 0.12;
 // a radiant plant's turning: each ring's pace (rad/s, alternating ways),
 // by its radiant_kit.Ring: core, inner, middle, outer whorl, motes, halo,
 // leaves, the beads of its yield (with the core), a grounded one's root
-// (dug in: it never turns; a ring past the table turns as the last)
-const float SPIN[9] = float[9](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02, 0.03, 0.0);
+// (dug in: it never turns), crystal facets, trailing threads, a veil, a
+// wound thread (held round its plant: it never turns), a net
+const float SPIN[14] = float[14](0.03, 0.05, -0.035, 0.025, 0.1, 0.04, -0.02, 0.03, 0.0, -0.04, 0.015, 0.02, 0.0, 0.008);
 // the light each ring carries (v_glow): the core and its threads fullest,
 // a vesper's floating leaves living tissue that carries little, its root
-// a little dimmer than its heart
-const float GLOW[9] = float[9](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 1.0, 0.8);
+// a little dimmer than its heart, a veil's thin tissue less, a net's
+// threads a little less than the thread wound round a plant
+const float GLOW[14] = float[14](1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.3, 1.0, 0.8, 1.0, 0.9, 0.5, 1.0, 0.5);
+// the rings a shader picks out by number (radiant_kit.Ring; must match)
+const float RING_FACETS = 9.0;
+const float RING_TRAILING = 10.0;
+const float RING_VEIL = 11.0;
+const float RING_WOUND = 12.0;
+const float RING_NET = 13.0;
+// a folding one (the solcyriphon, FORMS_NIGHT_FOLD) folds for the night
+// as the dark (1 - DAYLIGHT) deepens from NIGHT_FOLD_FROM to NIGHT_FOLD_TO:
+// its inner and outer petals close up tight by FOLD_INNER and FOLD_OUTER
+// (rad), lying a little wider (DAY_OPEN) by day; its heart shrinks to
+// HEART_SHRINK of its size and burns HEART_BURN brighter; its trailing
+// threads, swaying TRAIL_SWAY (m, at their tips) by day, draw up into
+// coils under the lens, TRAIL_TOP below it to TRAIL_TUCK at their tips,
+// in to TRAIL_IN of how far out they hang, twisting TRAIL_TWIST (rad); by
+// day its motes spread out to MOTE_SPREAD (m) and sink MOTE_SINK (m), the
+// light it spreads round itself
+const float NIGHT_FOLD_FROM = 0.15;
+const float NIGHT_FOLD_TO = 0.85;
+const float FOLD_INNER = 0.42;
+const float FOLD_OUTER = 0.8;
+const float DAY_OPEN = 0.04;
+const float HEART_SHRINK = 0.62;
+const float HEART_BURN = 1.6;
+const float TRAIL_SWAY = 0.09;
+const float TRAIL_TOP = 0.07;
+const float TRAIL_TUCK = 0.36;
+const float TRAIL_IN = 0.45;
+const float TRAIL_TWIST = 4.0;
+const float MOTE_SPREAD = 2.4;
+const float MOTE_SINK = 1.8;
+// a bouquet (the astrocyme, FORMS_SHARED) as radiant_kit lays it
+// (`bouquetAt`, the same numbers; must match): its flowers, the highest's
+// height (m), the lowest's as a share of it, the turn from one to the
+// next (rad), how far out the lowest hangs (m) and how much nearer the
+// highest. Each flower opens as its store fills past its share: gathering
+// it closes into a bud (BOUQUET_BUD rad) and opens; empty, its petals hang
+// open (BOUQUET_HANG rad) and drift BOUQUET_DRIFT (m) loose round it,
+// circling slowly, its light down to BOUQUET_DIM
+const float BOUQUET_FLOWERS = 6.0;
+const float BOUQUET_HIGH = 1.1;
+const float BOUQUET_LOW = 0.38;
+const float BOUQUET_TURN = 2.2;
+const float BOUQUET_OUT = 0.24;
+const float BOUQUET_TAPER = 0.35;
+const float BOUQUET_BUD = 0.9;
+const float BOUQUET_HANG = 0.45;
+const float BOUQUET_DRIFT = 0.09;
+const float BOUQUET_DIM = 0.3;
+// the light a bouquet's or a heliotrope's petals carry, against the heart's:
+// many petals close together, so each carries less, and their colour shows
+const float SMALL_PETALS = 0.45;
+// where flower `k` hangs (radiant_kit `bouquetAt`)
+vec3 bouquetAt(float k) {
+  float s = k / (BOUQUET_FLOWERS - 1.0);
+  float a = k * BOUQUET_TURN;
+  float r = BOUQUET_OUT * (1.0 - BOUQUET_TAPER * s);
+  return vec3(cos(a) * r, BOUQUET_HIGH * mix(BOUQUET_LOW, 1.0, s), sin(a) * r);
+}
+// a heliotrope (the heliocyra, FORMS_FLUTTER): its head's petals flutter
+// HELIO_FLUTTER (m, at their tips) at HELIO_FLUTTER_RATE (rad/s); its head
+// swings HELIO_SWAY (rad) either way about its foot, slowly; its crystal
+// burns from HELIO_DIM to HELIO_BRIGHT as its strip carries more
+const float HELIO_FLUTTER = 0.014;
+const float HELIO_FLUTTER_RATE = 1.3;
+const float HELIO_SWAY = 0.06;
+const float HELIO_DIM = 0.6;
+const float HELIO_BRIGHT = 1.8;
+// a guard (the halcyra, FORMS_GUARDING): its heart hangs VEIL_HIGH over
+// its tile (its stemH); beside a plant it leans VEIL_LEAN (rad) over it,
+// its wound thread built for a plant VEIL_REACH off and carried on to
+// where the plant truly stands (iy.w); its veil breathes VEIL_BREATH of
+// its width at its rim at VEIL_BREATH_RATE (rad/s), its crystal petals
+// rock VEIL_ROCK (rad) into the light; its sparkles fly out from
+// VEIL_SPARK_FROM to VEIL_SPARK_TO (m) and fall VEIL_SPARK_FALL (m)
+// (radiant_kit `veilLean`, `veilReach`; must match)
+const float VEIL_HIGH = 0.5;
+const float VEIL_LEAN = 0.5;
+const float VEIL_REACH = 1.0;
+const float VEIL_BREATH = 0.07;
+const float VEIL_BREATH_RATE = 1.1;
+const float VEIL_ROCK = 0.14;
+const float VEIL_SPARK_FROM = 0.15;
+const float VEIL_SPARK_TO = 0.7;
+const float VEIL_SPARK_FALL = 0.3;
 // a grounded radiant plant's root strikes down out of its heart as it
 // gathers: its soil end starts ROOT_STRIKE up, under the heart (the
 // vesper's heart height less its core's underside), its heart end held
@@ -121,6 +207,23 @@ const uint FORMS_CROWNED = FORM_BIT(FORM_COIL);
 const uint FORMS_PARTING = FORM_BIT(FORM_COIL);
 // filaments hanging from a float, rippling like a jelly's
 const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
+// the light grid's plants, each its own way (radiant_kit): folding up for
+// the night by how dark it is, its threads drawn in, its heart burning
+// small and bright (the solcyriphon)
+const uint FORMS_NIGHT_FOLD = FORM_BIT(FORM_LENS);
+// flowers that each hold one share of a store (tu.z which; iy.w how full),
+// opening one after another as it fills (the astrocyme)
+const uint FORMS_SHARED = FORM_BIT(FORM_BOUQUET);
+// held to the way it is turned (and drawn turned to), never turned its
+// own way by its seed (the heliocyra faces the way it casts; the halcyra
+// leans toward the plant it guards)
+const uint FORMS_FACING = FORM_BIT(FORM_HELIOTROPE) | FORM_BIT(FORM_VEIL);
+// a head on a neck: its petals flutter (tu.z how far out), its head
+// swings a little, its crystal burns with what it casts (iy.w)
+const uint FORMS_FLUTTER = FORM_BIT(FORM_HELIOTROPE);
+// a guard: beside a plant (iy.w how far off it stands) it leans over it,
+// its thread wound round it; alone (iy.w 0) its thread opens into a net
+const uint FORMS_GUARDING = FORM_BIT(FORM_VEIL);
 // afloat (common.glsl FORMS_AFLOAT): how far what lies on the water drifts
 // on the wind (m), how far it bobs on slow ripples (m), how deep under the
 // surface the stems still follow it (m)
@@ -260,6 +363,30 @@ void main() {
     float order = f.order, bearing = f.bearing, ring = f.ring, held = f.held;
     bool leaves = abs(ring - 6.0) < 0.5;
     bool rooted = abs(ring - 8.0) < 0.5;
+    // the light grid's own pieces (radiant_kit.Ring)
+    bool facets = abs(ring - RING_FACETS) < 0.5;
+    bool trailing = abs(ring - RING_TRAILING) < 0.5;
+    bool veil = abs(ring - RING_VEIL) < 0.5;
+    bool wound = abs(ring - RING_WOUND) < 0.5;
+    bool netted = abs(ring - RING_NET) < 0.5;
+    // what its form does its own way (the FORMS_ sets above)
+    bool folding = formIn(FORMS_NIGHT_FOLD, ib.w);
+    bool storing = formIn(FORMS_SHARED, ib.w);
+    bool facing = formIn(FORMS_FACING, ib.w);
+    bool flutters = formIn(FORMS_FLUTTER, ib.w);
+    bool guarding = formIn(FORMS_GUARDING, ib.w);
+    // how far a folding one has folded for the night (by how dark it is),
+    // and its form's own state (iy.w: a store's fill, a strip's light, a
+    // guard's reach to the plant it guards)
+    float shut = folding ? smoothstep(NIGHT_FOLD_FROM, NIGHT_FOLD_TO, 1.0 - DAYLIGHT) : 0.0;
+    float own = iy.w;
+    // a guard beside no plant spreads its net; beside one it leans over it
+    bool alone = own <= 0.0;
+    // the light it carries, by its ring before its form adds its own
+    int ri = clamp(int(ring), 0, 13);
+    float glow = GLOW[ri];
+    // whether this piece is put away, unseen (a guard's thread the other way)
+    bool unseen = false;
     // a bead of its yield (ring 7) swells from a nub about its own centre
     // (ir.z its radius) as it ripens, breathing once ripe; just taken, it
     // quivers
@@ -270,7 +397,9 @@ void main() {
       p += quiver(t, bearing * 5.0) * SHIVER * 0.5 * shiver;
       v_pod = vec2(sw, exp(-max(ir.w, 0.0) / WOUND_FADE) * (1.0 - sw));
     }
-    bool petals = (ring > 0.5 && ring < 3.5) || leaves;
+    // (a bouquet's petals and a heliotrope's move about their own hearts, below)
+    bool whorled = ring > 0.5 && ring < 3.5;
+    bool petals = (whorled && !storing && !flutters) || leaves;
     bool motes = abs(ring - 4.0) < 0.5;
     bool falling = formIn(FORMS_FALLING, ib.w);
     // out of radiance it comes loose (health falls as it withers)
@@ -286,6 +415,8 @@ void main() {
       // hanging open
       float wide = leaves ? 1.0 : ring;
       float fold = away * 0.9 + 0.07 * (wide / 3.0) * sin(t * 0.35 + ph) - loose * LOOSE_HANG;
+      // a folding one lies a little wider by day and closes up tight for the night
+      if (folding) fold += mix(-DAY_OPEN, ring < 1.5 ? FOLD_INNER : FOLD_OUTER, shut);
       vec3 ax = vec3(-dir.y, 0.0, dir.x);
       float ang = fold * held;
       p = turnAbout(p, ax, ang);
@@ -296,14 +427,86 @@ void main() {
       p.y += 0.025 * sin(t * 0.55 + ph * 1.3) * held;
     }
     if (ring > 0.5 && !rooted) p.y -= loose * LOOSE_SINK * held;
+    if (folding) {
+      // by night its heart burns smaller and brighter
+      if (ring < 0.5) {
+        p *= mix(1.0, HEART_SHRINK, shut);
+        glow *= 1.0 + HEART_BURN * shut;
+      }
+      // its threads: by day drifting loose, slow waves running down them
+      // (held: how far down a thread); by night drawn up in coils under the lens
+      if (trailing) {
+        float wph = t * 0.9 - held * 5.0 + bearing * 3.0 + seed * TAU;
+        vec3 loosed = p + vec3(sin(wph), 0.0, cos(wph * 0.83)) * TRAIL_SWAY * held;
+        vec3 coiled = vec3(p.x * mix(1.0, TRAIL_IN, held), -mix(TRAIL_TOP, TRAIL_TUCK, held), p.z * mix(1.0, TRAIL_IN, held));
+        coiled.xz = rot(held * TRAIL_TWIST) * coiled.xz;
+        p = mix(loosed, coiled, shut);
+      }
+    }
+    // a bouquet's flower (tu.z which, from 1) opens as its store fills
+    // past its share, the lowest first; gathering its petals in, it closes
+    // into a bud and opens; empty, they hang open and drift loose round it,
+    // circling it slowly, and its light dims
+    if (storing && tu.z > 0.5) {
+      float k = floor(tu.z + 0.5) - 1.0;
+      float bloom = smoothstep(0.0, 1.0, clamp(own * BOUQUET_FLOWERS - k, 0.0, 1.0));
+      float apart = 1.0 - bloom;
+      glow *= mix(BOUQUET_DIM, 1.0, bloom) * (whorled ? SMALL_PETALS : 1.0);
+      if (whorled) {
+        vec3 heart = bouquetAt(k);
+        vec3 l = p - heart;
+        vec3 ax = vec3(-dir.y, 0.0, dir.x);
+        float ang = (sin(3.14159 * bloom) * BOUQUET_BUD - apart * BOUQUET_HANG + 0.05 * sin(t * 0.35 + ph)) * held;
+        l = turnAbout(l, ax, ang);
+        n = turnAbout(n, ax, ang);
+        l.xz += dir * apart * (BOUQUET_DRIFT + 0.03 * sin(t * 0.4 + ph)) * held;
+        l.y += apart * (0.03 * sin(t * 0.5 + ph * 1.3) - 0.02) * held;
+        mat2 circ = rot(apart * (t * 0.15 + ph));
+        l.xz = circ * l.xz;
+        n.xz = circ * n.xz;
+        p = heart + l;
+      }
+    }
+    // a heliotrope's petals flutter at their tips (tu.z how far out on its
+    // head); its crystal burns with the strip it casts
+    if (flutters) {
+      if (whorled) {
+        p += n * HELIO_FLUTTER * tu.z * tu.z * sin(t * HELIO_FLUTTER_RATE + ph) * held;
+        glow *= SMALL_PETALS;
+      }
+      if (ring < 0.5) glow *= mix(HELIO_DIM, HELIO_BRIGHT, clamp(own, 0.0, 1.0));
+    }
+    // a guard's veil breathes like a jellyfish's bell, most at its rim; its
+    // crystal petals rock into the light
+    if (guarding) {
+      vec3 heart = vec3(0.0, VEIL_HIGH, 0.0);
+      if (veil) p.xz *= 1.0 + VEIL_BREATH * sin(t * VEIL_BREATH_RATE + seed * TAU) * smoothstep(0.02, 0.25, length(p.xz));
+      if (facets) {
+        vec3 ax = vec3(-dir.y, 0.0, dir.x);
+        float ang = VEIL_ROCK * sin(t * 0.6 + ph);
+        p = heart + turnAbout(p - heart, ax, ang);
+        n = turnAbout(n, ax, ang);
+      }
+    }
     // each mote spirals in from beyond the outer whorl to the core and
-    // fades as it is taken up, then begins again (c 0..1 of the way)
+    // fades as it is taken up, then begins again (c 0..1 of the way); a
+    // folding one's are its light spread out round it by day, drifting out
+    // and down from it; a guard's are sparkles scattered off its crystals
     float c = fract(t * MOTE_RATE + order + seed);
     if (motes) {
-      float r = mix(0.75, -0.12, c);
-      p.xz += dir * r;
-      p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
-      p.xz = rot(c * 2.2) * p.xz;
+      if (folding) {
+        p.xz += dir * mix(0.0, MOTE_SPREAD, c);
+        p.y -= MOTE_SINK * c * c;
+        p.xz = rot(c * 0.8) * p.xz;
+      } else if (guarding) {
+        p.xz += dir * mix(VEIL_SPARK_FROM, VEIL_SPARK_TO, c);
+        p.y -= VEIL_SPARK_FALL * c + 0.03 * sin(t * 2.0 + ph);
+      } else {
+        float r = mix(0.75, -0.12, c);
+        p.xz += dir * r;
+        p.y += mix(-0.2, 0.05, c) + 0.04 * sin(t * 1.1 + ph);
+        p.xz = rot(c * 2.2) * p.xz;
+      }
     }
     // arriving from afar along its bearing, rising in from below (or, an
     // evening star's, falling from high above), turning round the core as
@@ -313,19 +516,41 @@ void main() {
     if (falling && ring < 0.5) from = vec3(0.0, FALL_FROM, 0.0);
     float turns = falling ? FALL_TURN : ARRIVE_TURN;
     // its root strikes straight down out of the heart into the soil
+    // (from as high as its kit says, tu.z, or the vesper's)
     if (rooted) {
-      from = vec3(-p.x, ROOT_STRIKE, -p.z) * held;
+      from = vec3(-p.x, tu.z > 0.0 ? tu.z : ROOT_STRIKE, -p.z) * held;
       turns = 0.0;
     }
     p = gatherIn(p, from, away, 0.0, turns);
     n = gatherTurn(n, away, turns);
-    // each ring turns at its own slow pace, alternating ways
-    int ri = clamp(int(ring), 0, 8);
+    // each ring turns at its own slow pace, alternating ways, from where
+    // its seed turned it (one held to its facing is not turned by its
+    // seed; a heliotrope's head only swings a little, its root still)
     float spin = SPIN[ri];
-    mat2 turn = rot(t * spin + seed * TAU);
+    float yaw = t * spin + (facing ? 0.0 : seed * TAU);
+    if (flutters) yaw = rooted ? 0.0 : HELIO_SWAY * sin(t * 0.21 + seed * TAU);
+    mat2 turn = rot(yaw);
     p.xz = turn * p.xz;
     n.xz = turn * n.xz;
     p *= 1.0 + 0.02 * sin(t * 0.6 + seed * TAU);
+    if (guarding) {
+      // beside a plant it leans over it (toward +x, the way it is drawn
+      // facing it), about its foot, its root only from its heart end; its
+      // thread is carried on to where the plant stands (own: how far off),
+      // and its net put away into its heart. Alone, the net is spread and
+      // the wound thread put away.
+      vec3 heart = vec3(0.0, VEIL_HIGH, 0.0);
+      if (!alone && !wound && !netted) {
+        float lean = VEIL_LEAN * (rooted ? 1.0 - held : 1.0);
+        p = turnAbout(p, vec3(0.0, 0.0, -1.0), lean);
+        n = turnAbout(n, vec3(0.0, 0.0, -1.0), lean);
+      }
+      if (wound) p.x += (max(own, VEIL_REACH) - VEIL_REACH) * smoothstep(VEIL_REACH * 0.5, VEIL_REACH * 0.85, p.x);
+      if ((wound && alone) || (netted && !alone)) {
+        p = heart;
+        unseen = true;
+      }
+    }
     // and as it is turned (R)
     mat2 faced = rot(ic.w);
     p.xz = faced * p.xz;
@@ -354,8 +579,12 @@ void main() {
     v_sap = vec2(fill, 0.5 + 0.5 * sin(t * 1.1 - order * 5.0 + seed * 6.0));
     v_t = order;
     // how far each fragment has settled (it fades in as it arrives)
+    // (a folding one's motes go out with the day; a guard's sparkles flicker)
     v_young = motes ? settle * smoothstep(0.0, 0.15, c) * (1.0 - smoothstep(0.75, 1.0, c)) : settle;
-    v_glow = GLOW[ri];
+    if (motes && folding) v_young *= 1.0 - shut;
+    if (motes && guarding) v_young *= 0.55 + 0.45 * sin(t * 9.0 + ph * 7.0);
+    if (unseen) v_young = 0.0;
+    v_glow = glow;
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = project(wp);
 #ifdef SHADOW

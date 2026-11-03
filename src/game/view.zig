@@ -154,6 +154,12 @@ const bloomFilm:f32=0.35;
 const bloomPulse:f32=0.15;
 /// how fast it pulses (radians a second)
 const bloomPulseRate:f32=1.1;
+/// a relay standing on the ground (an astrocyme, a heliocyra) sheds this
+/// share of a floating bloom's light, from its heart (low in the mist, a
+/// whole bloom's would drown the ground round it in light)
+const groundedLight:f32=0.2;
+/// an empty astrocyme sheds this share of what it does full
+const groundedEmpty:f32=0.3;
 /// a bloom sheds light only once it has assembled this far
 const bloomLitFrom:f32=0.6;
 /// a star mote's light: its reach (metres)
@@ -210,6 +216,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   try plants(g,reach,tf);
   try burst(g);
   try threads(g,tf);
+  try shafts(g,tf);
   // a specimen stands alone: no wolf, ghosts or motes, and a plant no
   // nodes or structures (their meshes were never built)
   const alone=g.specimen!=null;
@@ -289,7 +296,10 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
     // where the plant's footprint centres, across the ground
     const ctr=g.plants.centre(i);
     if(@abs(ctr[0]-g.cam.target[0])>reach or @abs(ctr[1]-g.cam.target[2])>reach)continue;
+    // what its form shows of its own state, and the way a guard leans
+    const own=ownOf(g,i);
     try plant(g,.{
+      .own=own.k,.face=own.face,
       .sp=s.items(.sp)[i],.x=s.items(.x)[i],.y=s.items(.y)[i],.at=s.items(.at)[i],.ground=groundOf(s.items(.sp)[i],s.items(.chunk)[i],s.items(.tile)[i]),
       .growth=s.items(.growth)[i],.mana=s.items(.mana)[i],.seed=s.items(.seed)[i],
       .flow=s.items(.flow)[i],.health=s.items(.health)[i],
@@ -301,6 +311,36 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
       .radiating=i<carried.len and carried[i]>0,
     },tf);
   }
+}
+/// what a light grid plant's form shows of its own state (plant.vert, the
+/// instance's `yield[3]`), and the way it is drawn facing if not its own
+const Own=struct{
+  /// an astrocyme's fill 0..1, a heliocyra's strip's light 0..1 (of what
+  /// it takes from a field, more for a beam's), a halcyra's reach to the
+  /// plant it guards (m; 0 alone)
+  k:f32=0,
+  /// a halcyra beside a plant: the yaw that turns it toward it
+  face:?f32=null,
+};
+/// what plant `i`'s form shows of its own state, from the light grid
+fn ownOf(g:*const Game,i:usize)Own{
+  // the plants' columns, its kind and the grid
+  const s=g.plants.list.slice();
+  const def=species.get(s.items(.sp)[i]);
+  const l=&g.eco.light;
+  if(def.store>0)return.{.k=m.clamp01(s.items(.stored)[i]/def.store)};
+  if(def.strip>0){
+    for(l.strips.items)|st0|if(st0.from.idx()==i)return.{.k=st0.glow/lib.light.stripTake};
+    return.{};
+  }
+  if(def.guards>0 and i<l.ward.items.len){
+    // the plant it guards beside it, if any, and the way to it across the ground
+    const w=l.ward.items[i];
+    if(w==.none or w.idx()>=g.plants.len())return.{};
+    const d=s.items(.at)[w.idx()]-s.items(.at)[i];
+    return.{.k=m.len(m.v3(d[0],0,d[2])),.face=m.atan2(-d[2],d[0])};
+  }
+  return.{};
 }
 /// the burst where a plucked plant's yield came loose, while it lasts:
 /// motes and drops of what it yields flung out round the paws, glowing
@@ -427,6 +467,111 @@ fn threads(g:*Game,tf:f32)Allocator.Error!void{
     });
   }
 }
+/// a night beam: how wide it is either side of its middle where it lands
+/// (m), how bright at full night, and the light it throws where it lands
+/// (strength, reach) and halfway down it (strength, reach)
+const beamHalf:f32=0.17;
+/// (how bright at full night)
+const beamGlow:f32=1.0;
+/// (the light where it lands: its strength)
+const beamLand:f32=2.2;
+/// (and its reach, m)
+const beamLandReach:f32=4.5;
+/// (the light halfway down it: its strength)
+const beamMid:f32=1.2;
+/// (and its reach, m)
+const beamMidReach:f32=3.5;
+/// the beam's gold, the light it throws (linear)
+const beamCol=m.V3{1.0,0.78,0.45};
+/// how far below a solcyriphon's heart its beam leaves (m: under its lens)
+const beamFromBelow:f32=0.08;
+/// a strip: how high it lies over the ground (m), how bright for each glow
+/// it carries (a dark one a faint trace), the most it shines, and its light
+/// along it (strength for each unit of brightness, reach, one every so many tiles)
+const stripLift:f32=0.07;
+/// (how bright for each glow it carries, of what it takes from a field)
+const stripGlow:f32=1.0;
+/// (a dark strip's faint trace)
+const stripDark:f32=0.08;
+/// (the most it shines, fed a whole beam)
+const stripMost:f32=2.2;
+/// (its light: strength for each unit of brightness)
+const stripLight:f32=0.8;
+/// (its light's reach, m)
+const stripReach:f32=2.4;
+/// (one light every so many tiles along it)
+const stripEvery=3;
+/// how far out from its tile's middle a heliocyra's crystal hangs (m) and
+/// how high (a share over its kind's stemH): where its strip leaves
+const stripFromOut:f32=0.12;
+/// the light grid's shafts of light, lighting the air round them (part
+/// `.shaft`): every solcyriphon's night beam, falling straight down from
+/// under its lens onto the relay that takes it or the ground under it,
+/// as strong as the night is deep, a light where it lands; every
+/// heliocyra's strip, leaving its crystal and laid a tile wide over the
+/// ground the way it faces, tile by tile over the ground's rise and fall,
+/// as bright as the light it carries
+fn shafts(g:*Game,tf:f32)Allocator.Error!void{
+  // the plants' columns, and the grid
+  const s=g.plants.list.slice();
+  const l=&g.eco.light;
+  for(l.beams.items)|bm|{
+    // the solcyriphon, where its beam leaves and where it ends
+    const i=bm.from.idx();
+    if(i>=g.plants.len() or bm.k<=0)continue;
+    const top=end(g,i,tf)-m.v3(0,beamFromBelow,0);
+    const ground=g.heightAt(bm.x,bm.y);
+    const to=if(bm.into)|r|(nodeEnd(g,r,tf) orelse m.v3(top[0],ground,top[2]))else m.v3(top[0],ground,top[2]);
+    // the four control points, straight down, and its length
+    const span=to-top;
+    const ctrl=[4]m.V3{top,top+span*m.splat3(1.0/3.0),top+span*m.splat3(2.0/3.0),to};
+    try g.parts.emitCurve(.lightBeam,ctrl,m.v3(1,0,0),1,1,.{.glow=beamGlow*bm.k,.flutter=beamHalf,.phase=s.items(.seed)[i],.fade=0});
+    try g.parts.light(to+m.v3(0,0.3,0),beamCol*m.splat3(beamLand*bm.k),beamLandReach);
+    try g.parts.light(m.lerpV(top,to,0.5),beamCol*m.splat3(beamMid*bm.k),beamMidReach);
+  }
+  for(l.strips.items)|sp|{
+    // the heliocyra, its kind, the way it faces and the step along it
+    const i=sp.from.idx();
+    if(i>=g.plants.len() or sp.len==0)continue;
+    const def=species.get(s.items(.sp)[i]);
+    const step=m.dirVec(s.items(.dir)[i]);
+    const way=m.v3(m.f(step.x),0,m.f(step.z));
+    const side=m.v3(-way[2],0,way[0]);
+    // its tile, its middle, how brightly it shines, and its seed
+    const x=s.items(.x)[i];
+    const y=s.items(.y)[i];
+    const mid=m.tileCentre(x,y,g.heightAt(x,y));
+    const bright=if(sp.glow>0)@min(stripMost,stripGlow*sp.glow/lib.light.stripTake)else stripDark;
+    const seed=s.items(.seed)[i];
+    // the ground's height `t` tiles along it (its own tile 0)
+    const H=struct{
+      /// the ground's height at tile `t` along from `xx`,`yy` stepping `dv`
+      fn at(gg:*const Game,xx:i32,yy:i32,dv:m.DirVec,t:i32)f32{return gg.heightAt(xx+dv.x*t,yy+dv.z*t);}
+    };
+    // the length it runs (m, from half a tile out)
+    const len=m.f(sp.len);
+    // it leaves its crystal and comes down to the ground at its own tile's edge
+    const from=mid+way*m.splat3(stripFromOut)+m.v3(0,def.genome.stemH,0);
+    const land=mid+way*m.splat3(0.5)+m.v3(0,(H.at(g,x,y,step,0)+H.at(g,x,y,step,1))*0.5-mid[1]+stripLift,0);
+    try g.parts.emitCurve(.lightBeam,.{from,m.lerpV(from,land,0.33)+way*m.splat3(0.1),m.lerpV(from,land,0.75)-m.v3(0,0.05,0),land},side,1,1,.{.glow=bright*0.8,.flutter=0.05,.phase=seed});
+    for(0..sp.len)|j|{
+      // this tile along it, its edges' and middle's heights
+      const t:i32=@intCast(j+1);
+      const h=H.at(g,x,y,step,t);
+      const e0=(H.at(g,x,y,step,t-1)+h)*0.5;
+      const e1=(H.at(g,x,y,step,t+1)+h)*0.5;
+      // how far along its start lies, and the four control points over it
+      const a=0.5+m.f(j);
+      const Along=struct{
+        /// the point `d` tiles along from `c` the way `w` heads, `hh` high
+        fn p(c:m.V3,w:m.V3,d:f32,hh:f32)m.V3{return m.v3(c[0]+w[0]*d,hh+stripLift,c[2]+w[2]*d);}
+      };
+      const ctrl=[4]m.V3{Along.p(mid,way,a,e0),Along.p(mid,way,a+1.0/3.0,h),Along.p(mid,way,a+2.0/3.0,h),Along.p(mid,way,a+1,e1)};
+      try g.parts.emitCurve(.lightStrip,ctrl,side,1,1,.{.glow=bright,.flutter=len,.phase=seed,.fade=a});
+      if(j%stripEvery==1)try g.parts.light(ctrl[1]+m.v3(0,0.25,0),beamCol*m.splat3(stripLight*bright),stripReach);
+    }
+  }
+}
 /// a node's core this frame: a relay plant's over its tile (a forming halo
 /// moves it on the GPU), a structure's relay where it hangs; null for a
 /// link worked out before the plant or structure it names was taken away
@@ -489,6 +634,10 @@ const Drawn=struct{
   essence:f32=0,
   /// seconds since its yield last came loose in the paws (`pluck.Tug.sinceOf`)
   since:f32=vertex.noPluck,
+  /// what its form shows of its own state (`Own.k`)
+  own:f32=0,
+  /// the yaw it is drawn facing instead of its own (`Own.face`)
+  face:?f32=null,
 };
 /// a plant of kind `sp` drawn standing at `at` (its ground `at`'s height)
 /// with no plant in the garden behind it, `growth` grown, `seed` its own:
@@ -502,9 +651,12 @@ pub fn stagePlant(g:*Game,sp:species.Id,at:m.V3,growth:f32,seed:f32,tf:f32)Alloc
 fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   // its kind, its foot, and its bounding sphere's reach
   const def=species.get(d.sp);
+
   const foot=m.v3(d.at[0],d.ground,d.at[2]);
   const reach=plantBound+m.f(def.size);
-  if(!g.parts.sees(foot+m.v3(0,reach*plantBoundUp,0),reach))return;
+  // (a floater's sphere is centred where it hangs: one hung high, the
+  // solcyriphon, would be culled seen level with it)
+  if(!g.parts.sees(foot+m.v3(0,if(def.floating)def.hover else reach*plantBoundUp,0),reach))return;
   // the level of detail its distance from the eye calls for
   const lod=meshgen.lodAt(m.dist(foot,g.parts.eye));
   // where it stands, across and up
@@ -539,16 +691,19 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   const key=meshgen.growthKey(d.sp,d.growth) orelse meshgen.Key{
     .v=@intCast(rng.hash2(0x7A11,d.x,d.y)%meshgen.variantCount),.f=0,
   };
+  // the colour of what it yields, its form's own state beside it
+  var yield=color.Rgba8.of(def.yields.info().col).toF4();
+  yield[3]=d.own;
   try g.inst[meshgen.plantSlot(d.sp,key.v,lod)].append(g.gpa,.{
     .pos=.{at[0],y,at[2]},
     .a=.{d.growth,d.mana/def.manaCap,d.seed,def.affinity()},
     .b=.{d.flow,d.health,def.sway,m.f(@intFromEnum(def.genome.form))},
-    .c=.{key.f,if(d.ghost)1 else 0,if(d.fits)1 else 0,m.dirYaw(d.dir)+pose.spin},
+    .c=.{key.f,if(d.ghost)1 else 0,if(d.fits)1 else 0,d.face orelse m.dirYaw(d.dir)+pose.spin},
     .h=halo,
     .tug=d.tug,
     // its yield ripening on it, in its pods, and what it is
     .ripe=.{if(d.growth>=1)m.clamp01(d.essence/def.manaCap)else 0,m.f(def.genome.pods),def.genome.podR,d.since},
-    .yield=color.Rgba8.of(def.yields.info().col).toF4(),
+    .yield=yield,
     .glitch=if(d.ghost)vertex.noGlitch else if(lib.unforming.radiant(d.sp)).{g.unforming.glitchOf(d.seed),0,0,0}else if(lib.unforming.dies(d.sp)).{-1,g.unforming.witherOf(d.seed),0,0}else vertex.noGlitch,
   });
   // a celestial bloom is the garden's light: its core sheds it round
@@ -558,12 +713,12 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   if(def.lightNode() and !d.ghost){
     // how far it has assembled, where a forming halo draws its light, and its pulse
     const assembled=m.smooth(m.unlerp(bloomLitFrom,1,d.growth));
-    const drawn=haloMod.spiral(m.v3(at[0],y+bloomCore,at[2]),halo);
+    const drawn=haloMod.spiral(m.v3(at[0],y+(if(def.floating)bloomCore else def.genome.stemH),at[2]),halo);
     const pulse=1+bloomPulse*@sin(tf*bloomPulseRate+d.seed*m.tau);
     // how far the unforming has shattered it (its light goes out with it)
     const shattered=m.clamp01(g.unforming.glitchOf(d.seed));
     // how strong its light is now
-    const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark);
+    const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark)*(if(def.floating)@as(f32,1)else groundedLight)*(if(def.store>0)m.lerp(groundedEmpty,1,d.own)else 1);
     if(strength>0){
       // its light's tint, pearl blended toward its film's hue
       const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*0.03),bloomFilm);

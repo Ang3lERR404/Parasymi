@@ -92,12 +92,16 @@ pub const Part=enum(u32){
   /// ribbon turned to the eye, narrow and faint at its tail, bright and
   /// full at its head, the colour it carries (part.vert, part.frag)
   trail,
+  /// a shaft of light along a curve (tu.x 0 where it leaves .. 1 where it
+  /// ends, tu.y across): a solcyriphon's night beam falling, turned to the
+  /// eye (tu.z 0), or a heliocyra's strip laid flat over the ground (tu.z 1)
+  shaft,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail,.shaft=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve,.stone=>false,
   };
 }

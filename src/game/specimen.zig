@@ -181,6 +181,9 @@ pub const State=union(enum){
   /// a plant grown, its yield ripening from nothing to full in its pods,
   /// again and again
   ripen,
+  /// a light store grown (an astrocyme), filling from empty to full and
+  /// giving it all back, again and again
+  fill,
   /// a radiant plant grown, glitching, shattering and blinking out as the
   /// unforming takes it, again and again (game/unforming.zig)
   unform,
@@ -189,8 +192,8 @@ pub const State=union(enum){
   /// a name, a share of growth (`0.4`) or a span (`0.2..0.8`)
   pub fn parse(s:[]const u8)error{BadState}!State{
     if(eql(u8,s,"mature") or eql(u8,s,"idle"))return.{.held=1};
-    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck,ripen,unform},s))|k|return switch(k){
-      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,.ripen=>.ripen,.unform=>.unform,
+    if(stringToEnum(enum{grow,wither,flow,drain,dark,live,active,turn,pluck,ripen,unform,fill},s))|k|return switch(k){
+      .grow=>.grow,.wither=>.wither,.flow=>.flow,.drain=>.drain,.dark=>.dark,.live=>.live,.active=>.active,.turn=>.turn,.pluck=>.pluck,.ripen=>.ripen,.unform=>.unform,.fill=>.fill,
     };
     if(indexOf(u8,s,".."))|dots|{
       // where the dots are, and the shares either side of them
@@ -206,7 +209,7 @@ pub const State=union(enum){
     return switch(s){
       .grow,.span,.held=>true,
       .turn,.look=>what!=.samples and what!=.sculpt,
-      .wither,.flow,.drain,.dark,.live,.pluck,.ripen=>what==.plant,
+      .wither,.flow,.drain,.dark,.live,.pluck,.ripen,.fill=>what==.plant,
       .unform=>switch(what){.plant=>|sp|lib.unforming.radiant(sp) or lib.unforming.dies(sp),.structure,.samples,.sculpt=>false},
       .active=>what==.structure,
     };
@@ -225,7 +228,9 @@ pub const Look=struct{
   /// how ripe its yield, 0..1 of its cap (its pods swell with it)
   ripe:f32=0,
   /// whether its radiance network is lit
-  radiating:bool=true
+  radiating:bool=true,
+  /// how full a light store is, 0..1 of what it holds
+  stored:f32=0,
 };
 /// one plant or structure alone: what it is, how it is shown, its clock
 /// and the tile it stands on
@@ -253,7 +258,7 @@ pub const Specimen=struct{
       .plant=>|sp|{
         // what it draws with, and (a water plant's pond grows them) the wild flowers
         var list:std.ArrayList(meshlib.Id)=.empty;
-        try list.appendSlice(arena,if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.wolfPanel,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale});
+        try list.appendSlice(arena,if(s.wolf())&.{.shadow,.turnRoot,.turnRootPale,.wolfBody,.wolfEars,.wolfPanel,.bellyLump,.itemPod,.pluckBurst,.wolfBelly,.wolfPecL,.wolfPecR,.wolfRumpL,.wolfRumpR,.pawPad,.pawBean}else&.{.shadow,.turnRoot,.turnRootPale,.lightBeam,.lightStrip});
         if(species.get(sp).onWater)try list.appendSlice(arena,&lib.wild.meshes);
         return.{.species=sp,.parts=list.items};
       },
@@ -398,6 +403,7 @@ pub const Specimen=struct{
         p.items(.flow)[0]=l.flow;
         p.items(.health)[0]=l.health;
         p.items(.span)[0]=never;
+        p.items(.stored)[0]=l.stored*def.store;
         // its yield, as ripe as its look (plucked, ripened full below)
         if(s.state!=.pluck)p.items(.essence)[0]=l.ripe*def.manaCap;
         // plucked: once the last pluck is done and its end held, ripened
@@ -585,6 +591,7 @@ pub const Specimen=struct{
       .drain=>.{.mana=1-k},
       .dark=>.{.radiating=false},
       .ripen=>.{.ripe=k},
+      .fill=>.{.stored=1-@abs(1-2*k)},
       .live=>.{.growth=0},
       .look=>|l|l,
       .active,.turn,.pluck,.unform=>.{},

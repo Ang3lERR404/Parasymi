@@ -58,6 +58,23 @@ const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE);
 // film (OWN_HUE_FILM of it): the vesper's dusk violet and evening gold
 const uint FORMS_OWN_HUE = FORM_BIT(FORM_STAR);
 const float OWN_HUE_FILM = 0.45;
+// a radiant plant's cut crystal (part `.prism`): its fire's hue turns
+// across its facets (CRYSTAL_FIRE, per unit of normal); the key light
+// mirrored in a facet is a hard spot (CRYSTAL_SPOT, 1 - cos of its
+// radius) CRYSTAL_SPOT_GAIN bright; facets wink (in cells of
+// CRYSTAL_WINK_CELLS a metre, at CRYSTAL_WINK_RATE rad/s, sharpened by
+// CRYSTAL_WINK_SHARP) CRYSTAL_WINK_GAIN bright
+const vec3 CRYSTAL_FIRE = vec3(1.7, 2.3, 1.1);
+const float CRYSTAL_SPOT = 0.02;
+const float CRYSTAL_SPOT_GAIN = 3.0;
+const float CRYSTAL_WINK_CELLS = 14.0;
+const float CRYSTAL_WINK_RATE = 2.6;
+const float CRYSTAL_WINK_SHARP = 24.0;
+const float CRYSTAL_WINK_GAIN = 1.4;
+// a halcyra's veil (radiant_kit.Ring `veil`; must match): how clear it is
+// face-on, a bell of glass
+const float RING_VEIL = 11.0;
+const float VEIL_CLEAR = 0.12;
 // a placement preview: green where it fits, red where it cannot be sown,
 // breathing at this rate (rad/s)
 const vec3 GHOST_FITS = vec3(0.55, 1.0, 0.7);
@@ -157,9 +174,26 @@ void surface() {
     c += col * (0.35 + 0.9 * fres) * (0.7 + 0.5 * v_sap.y) * core * 1.4 * glow;
     c += col * max(dot(-n, SUN), 0.0) * 0.4;
     c += mix(col, vec3(1.0), 0.4) * sapBubbles(v_obj, V, pc.eye_time.w) * 0.5 * glow;
+    // its cut crystal (a solcyriphon's lens, a heliocyra's heart, a
+    // halcyra's crystal petals): clear, each flat facet flashing the key
+    // light and every point of light near it as a hard spot split into
+    // fire, and winking as it turns, scattering the light off as sparkles
+    if (part == PART_PRISM) {
+      vec3 R = reflect(-V, n);
+      PointLit pl = pointLights(v_pos, n, R, true);
+      vec3 fire = spectral(fract(dot(n, CRYSTAL_FIRE) + pc.eye_time.w * 0.05 + seed));
+      vec3 flash = keyLight() * hardSpot(R, SUN, CRYSTAL_SPOT) * CRYSTAL_SPOT_GAIN * sh + pl.mirrored;
+      c += flash * mix(vec3(1.0), fire, 0.6);
+      float wink = pow(0.5 + 0.5 * sin(pc.eye_time.w * CRYSTAL_WINK_RATE + dot(floor(v_obj * CRYSTAL_WINK_CELLS), vec3(12.9, 78.2, 37.7))), CRYSTAL_WINK_SHARP);
+      c += mix(vec3(1.0), fire, 0.7) * wink * CRYSTAL_WINK_GAIN * glow;
+    }
     // petals are thin: see-through face-on, their edges bright (living
-    // leaves denser)
+    // leaves denser; a veil sheerer still, a bell of glass; a crystal clear
+    // but for its flashes)
+    float ring = floor(v_sheet.x + 0.01);
     float a = (part == PART_LEAF ? mix(mix(0.85, 0.3, v_glow), 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
+    if (abs(ring - RING_VEIL) < 0.5) a = mix(VEIL_CLEAR, 0.8, fres) * v_young;
+    if (part == PART_PRISM) a = clamp(mix(0.45, 0.9, fres) + dot(c, vec3(0.1)), 0.0, 1.0) * v_young;
     if (v_ghost.x > 0.5) a *= 0.5;
     o = vec4(applyFog(c, v_pos), a);
     return;

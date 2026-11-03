@@ -365,6 +365,10 @@ const parts=struct{
   pub const haloFlash=@import("meshes/halo.zig").flash;
   /// soft rays sent between two celestial blooms
   pub const bloomThread=@import("meshes/bloom_thread.zig");
+  /// a solcyriphon's night beam, falling from its lens onto what is under it
+  pub const lightBeam=@import("meshes/light_shaft.zig").beam;
+  /// a heliocyra's strip of light, laid over the ground the way it faces
+  pub const lightStrip=@import("meshes/light_shaft.zig").strip;
   /// a spark of lightning jumping in a weftstone's chamber as it ionizes
   pub const weftstoneSpark=@import("meshes/weftstone.zig").spark;
 };

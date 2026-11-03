@@ -65,13 +65,14 @@ const float SHEEN_POWER = 40.0;
 #define PART_SPARK 20     // a spark of lightning: white-hot core, violet edge
 #define PART_HUSK 21      // a crystal husk: clear glass, glowing cracks
 #define PART_TRAIL 22     // a trail of light along a curve, bright at its head
+#define PART_SHAFT 23     // a shaft of light: a beam falling, a strip laid on the ground
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))
 #define PART_IN(set, p) ((((set) >> uint(p)) & 1u) != 0u)
 // the roles that are light itself: they cast no shadow (part.vert SHADOW)
 // and are not lit by the key light (part.frag)
-const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY) | PART_BIT(PART_PLEXUS) | PART_BIT(PART_SPARK) | PART_BIT(PART_TRAIL);
+const uint PARTS_LIGHT = PART_BIT(PART_THREAD) | PART_BIT(PART_FLASH) | PART_BIT(PART_HALO) | PART_BIT(PART_PROJECTION) | PART_BIT(PART_ENERGY) | PART_BIT(PART_PLEXUS) | PART_BIT(PART_SPARK) | PART_BIT(PART_TRAIL) | PART_BIT(PART_SHAFT);
 // the roles that are a plant's leaves and petals (plant.vert, plant.frag):
 // they unfurl as it grows, lift in the gusts, always read as thin and show
 // no fibres
