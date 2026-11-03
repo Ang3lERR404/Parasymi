@@ -25,6 +25,8 @@ const testing=std.testing;
 const fields=std.meta.fields;
 /// the runtime cfg reader
 const ctext=lib.engine.core.text;
+/// all the maths: clamping a step
+const m=lib.engine.core.math;
 /// every player-facing string, for how each setting is shown
 const txt=lib.txt;
 /// the renderer's anti-aliasing modes
@@ -35,6 +37,8 @@ const home=lib.home;
 // player, not to one garden, and loading a save keeps them.
 /// the settings file's name, inside home
 pub const filePath="options.cfg";
+/// the most the written file takes (bytes)
+const fileMost=512;
 /// the file is a few lines; anything this large is not one
 const maxFile:usize=1<<12;
 /// the gardener's settings, as held while playing
@@ -47,9 +51,17 @@ pub const Options=struct{
   fullscreen:bool=false,
   /// minutes between autosaves (one of `autosaveMinutes`; 0: never)
   autosave:u8=5,
+  /// how far the garden is drawn: rings of chunks streamed in and drawn
+  /// round the gardener (one of `renderRings`)
+  renderDistance:u8=4,
+  /// how many rings of chunks are streamed in and drawn round the gardener
+  pub fn rings(o:*const Options)i32{return renderRings[ringsIndex(o.renderDistance)];}
 };
 /// the autosave intervals offered, in minutes (in `txt.s.hud.autosave` order)
 pub const autosaveMinutes=[_]u8{0,1,2,5,10,15,30,60};
+/// the render distances offered, in rings of chunks (in
+/// `txt.s.hud.renderDistance` order: each a chunk of 32 tiles further)
+pub const renderRings=[_]u8{2,3,4,5,6,8};
 /// the options panel's rows, in `txt.s.hud.optionLabels` order
 pub const Setting=enum{
   /// how edges are smoothed
@@ -59,7 +71,9 @@ pub const Setting=enum{
   /// filling the screen
   fullscreen,
   /// how often the garden saves itself
-  autosave
+  autosave,
+  /// how far the garden is drawn
+  renderDistance,
 };
 /// how many settings there are
 pub const settingCount=fields(Setting).len;
@@ -77,7 +91,7 @@ pub fn kind(set:Setting)Kind{
   return switch(set){
     .antialias=>.picker,
     .vsync,.fullscreen=>.toggle,
-    .autosave=>.slider,
+    .autosave,.renderDistance=>.slider,
   };
 }
 /// whether the toggle `set` is on (false for any other kind)
@@ -85,13 +99,14 @@ pub fn isOn(o:*const Options,set:Setting)bool{
   return switch(set){
     .vsync=>o.vsync,
     .fullscreen=>o.fullscreen,
-    .antialias,.autosave=>false,
+    .antialias,.autosave,.renderDistance=>false,
   };
 }
 /// how many stops the slider `set` has (1 for any other kind)
 pub fn stops(set:Setting)usize{
   return switch(set){
     .autosave=>autosaveMinutes.len,
+    .renderDistance=>renderRings.len,
     .antialias,.vsync,.fullscreen=>1,
   };
 }
@@ -99,6 +114,7 @@ pub fn stops(set:Setting)usize{
 pub fn stopOf(o:*const Options,set:Setting)usize{
   return switch(set){
     .autosave=>autosaveIndex(o.autosave),
+    .renderDistance=>ringsIndex(o.renderDistance),
     .antialias,.vsync,.fullscreen=>0,
   };
 }
@@ -107,8 +123,14 @@ pub fn stopOf(o:*const Options,set:Setting)usize{
 pub fn setStop(o:*Options,set:Setting,i:usize)void{
   switch(set){
     .autosave=>o.autosave=autosaveMinutes[@min(i,autosaveMinutes.len-1)],
+    .renderDistance=>o.renderDistance=renderRings[@min(i,renderRings.len-1)],
     .antialias,.vsync,.fullscreen=>{},
   }
+}
+/// where `want` rings are in `renderRings` (else the next further one there)
+fn ringsIndex(want:u8)usize{
+  for(renderRings,0..)|r,i|if(r>=want)return i;
+  return renderRings.len-1;
 }
 /// where `minutes` is in `autosaveMinutes` (else the next longer one there)
 fn autosaveIndex(minutes:u8)usize{
@@ -137,6 +159,11 @@ pub fn step(o:*Options,set:Setting,dir:i32,most:u32)void{
       const n:i32=autosaveMinutes.len;
       o.autosave=autosaveMinutes[@intCast(@mod(@as(i32,@intCast(autosaveIndex(o.autosave)))+dir,n))];
     },
+    .renderDistance=>{
+      // how many distances are offered (no wrapping: nearest and furthest stay)
+      const n:i32=renderRings.len;
+      o.renderDistance=renderRings[@intCast(m.clamp(@as(i32,@intCast(ringsIndex(o.renderDistance)))+dir,0,n-1))];
+    },
   }
 }
 /// what `set` is now, as shown
@@ -146,6 +173,7 @@ pub fn shown(o:*const Options,set:Setting)[]const u8{
     .vsync=>txt.nth(txt.s.hud.toggle,@intFromBool(o.vsync)),
     .fullscreen=>txt.nth(txt.s.hud.toggle,@intFromBool(o.fullscreen)),
     .autosave=>txt.nth(txt.s.hud.autosave,autosaveIndex(o.autosave)),
+    .renderDistance=>txt.nth(txt.s.hud.renderDistance,ringsIndex(o.renderDistance)),
   };
 }
 /// the file as written: each setting by name (any may be missing)
@@ -160,6 +188,8 @@ const Source=struct{
     fullscreen:?[]const u8=null,
     /// `autosave = <minutes>`
     autosave:?[]const u8=null,
+    /// `renderDistance = <rings>`
+    renderDistance:?[]const u8=null,
   }=.{},
 };
 /// a switch that is on, as written
@@ -185,14 +215,16 @@ pub fn parse(text:[]const u8)Options{
   if(f.vsync)|v|o.vsync=!eql(u8,v,off);
   if(f.fullscreen)|v|o.fullscreen=eql(u8,v,on);
   if(f.autosave)|v|if(parseInt(u8,v,10))|n|{o.autosave=autosaveMinutes[autosaveIndex(n)];}else|_|{};
+  if(f.renderDistance)|v|if(parseInt(u8,v,10))|n|{o.renderDistance=renderRings[ringsIndex(n)];}else|_|{};
   return o;
 }
 /// writes `o` as cfg source.
 pub fn format(o:*const Options,w:*Writer)Writer.Error!void{
   try w.print("# Parasymi options: written by the game (pause menu, OPTIONS)\n" ++
     "# autosave: minutes between autosaves (0: never)\n" ++
-    "[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\nautosave = {d}\n",.{
-    o.aa,if(o.vsync)on else off,if(o.fullscreen)on else off,o.autosave,
+    "# renderDistance: rings of 32-tile chunks drawn round you\n" ++
+    "[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\nautosave = {d}\nrenderDistance = {d}\n",.{
+    o.aa,if(o.vsync)on else off,if(o.fullscreen)on else off,o.autosave,o.renderDistance,
   });
 }
 /// reads `filePath`; the defaults if it cannot be read, written out if there
@@ -217,16 +249,16 @@ pub const Error=error{OptionsUnwritable};
 /// writes `o` to `filePath` in home
 pub fn save(o:*const Options,io:Io)Error!void{
   // room for the file, and the writer that fills it
-  var buf:[256]u8=undefined;
+  var buf:[fileMost]u8=undefined;
   var w:Writer=.fixed(&buf);
   format(o,&w) catch return error.OptionsUnwritable;
   home.dir().writeFile(io,.{.sub_path=filePath,.data=w.buffered()}) catch return error.OptionsUnwritable;
 }
 test"options round-trip through their file; unknown values keep the defaults"{
   // a set of options off the defaults, written out
-  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15};
+  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6};
   // room for the file, and the writer that fills it
-  var buf:[256]u8=undefined;
+  var buf:[fileMost]u8=undefined;
   var w:Writer=.fixed(&buf);
   try format(&o,&w);
   try testing.expectEqual(o,parse(w.buffered()));
@@ -234,6 +266,21 @@ test"options round-trip through their file; unknown values keep the defaults"{
   try testing.expectEqual(Options{},parse(""));
   // an interval not offered snaps to the next longer one
   try testing.expectEqual(@as(u8,10),parse("[options]\nautosave = 7\n").autosave);
+  // a render distance not offered snaps to the next further one
+  try testing.expectEqual(@as(u8,8),parse("[options]\nrenderDistance = 7\n").renderDistance);
+}
+test"the render distance steps between its stops without wrapping"{
+  // the defaults: four rings
+  var o:Options=.{};
+  try testing.expectEqual(@as(i32,4),o.rings());
+  step(&o,.renderDistance,1,4);
+  try testing.expectEqual(@as(i32,5),o.rings());
+  setStop(&o,.renderDistance,99);
+  step(&o,.renderDistance,1,4);
+  try testing.expectEqual(@as(i32,8),o.rings());
+  setStop(&o,.renderDistance,0);
+  step(&o,.renderDistance,-1,4);
+  try testing.expectEqual(@as(i32,2),o.rings());
 }
 test"anti-aliasing turns both ways and skips what the GPU cannot take"{
   // options with anti-aliasing off

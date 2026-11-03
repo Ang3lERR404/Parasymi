@@ -622,9 +622,13 @@ Each start grows a fresh world (the seed is logged and kept in its saves).
 `--seed=` repeats one; test gardens use `play.defaultSeed`.
 
 ### Options (`game/options.zig`, `hud/options.zig`)
-AA, vsync, fullscreen and autosave, stored in `options.cfg`. It is written
-when one changes and kept across save loads. Main applies `Game.opts` when
-it differs from what is in effect.
+AA, vsync, fullscreen, autosave and render distance, stored in
+`options.cfg`. It is written when one changes and kept across save loads.
+Main applies `Game.opts` when it differs from what is in effect. Render
+distance is how many rings of 32-tile chunks are streamed in and drawn
+round the gardener (`Options.rings`: 2, 3, 4, 5, 6 or 8; 4 by default,
+112 m), read each frame by the streaming (`play/frame.zig`) and the draw
+reach (`view.zig`, `play.drawLimitOf`).
 
 ## Roadmap
 **Done:**

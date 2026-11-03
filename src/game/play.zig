@@ -52,7 +52,10 @@ pub const streamRadius=4;
 pub const streamChunks=(2*streamRadius+1)*(2*streamRadius+1);
 /// nothing is drawn further than this from the camera target (inside the
 /// streamed radius, so a low camera never runs off the generated world)
-pub const drawLimit:f32=(streamRadius-0.5)*ck.sizeTiles;
+pub const drawLimit:f32=drawLimitOf(streamRadius);
+/// how far things are drawn from the camera target with `rings` of chunks
+/// streamed round the gardener (the options' render distance)
+pub fn drawLimitOf(rings:i32)f32{return(m.f(rings)-0.5)*ck.sizeTiles;}
 /// at most this many chunks are streamed in the first call (generous: the
 /// whole first view)
 pub const streamInit=1<<10;

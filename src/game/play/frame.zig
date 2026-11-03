@@ -42,8 +42,6 @@ const pointer=lib.play.pointer;
 const Game=lib.play.game.Game;
 /// how many chunks stream in each frame
 const streamFrame=lib.play.streamFrame;
-/// how many rings of chunks are streamed round the gardener
-const streamRadius=lib.play.streamRadius;
 /// how quickly the shown timings follow the measured ones
 const timingEase=lib.play.timingEase;
 /// how many wheel notches a second a held zoom key turns
@@ -368,8 +366,9 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     actions.catchStarlight(g,dt);
   }
   // stream the world around the player; chunks holding what we grew stay
-  try g.world.stream(g.focus(),streamRadius,streamFrame);
-  try g.world.far(g.focus(),streamRadius,&g.far);
+  // (as many rings as the options' render distance says)
+  try g.world.stream(g.focus(),g.opts.rings(),streamFrame);
+  try g.world.far(g.focus(),g.opts.rings(),&g.far);
   for(g.far.items)|c|try g.world.unload(c);
 }
 /// the plucked plant bends after the paws as they draw its yield back

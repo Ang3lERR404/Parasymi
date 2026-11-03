@@ -212,7 +212,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   // at the main menu the wolf sleeps on its stage instead
   if(g.atTitle())return lib.title.scene(g,screen);
   // how far round the camera target things are drawn (tiles), and the shader clock
-  const reach=g.cam.reach(play.drawLimit);
+  const reach=g.cam.reach(play.drawLimitOf(g.opts.rings()));
   const tf:f32=@floatCast(@mod(g.time,timeWrap));
   // parts first: plants add parts of their own (shadows under floaters).
   // Everything is culled to what the camera sees and drawn at the level of

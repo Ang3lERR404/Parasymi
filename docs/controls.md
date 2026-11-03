@@ -139,7 +139,7 @@ Rows are clicked or keyed: **Q** = save and quit, **O** = options,
 
 ### Options panel
 Toggles (a bud that blooms when on), pickers (a value between two leaves)
-and the autosave slider (a seed riding a stem of stops). LMB turns a
+and the sliders (autosave, render distance) (a seed riding a stem of stops). LMB turns a
 setting, RMB turns it back; a picker's leaves turn it their way; the
 slider is dragged along. **Left/Right** turn the setting the keys are on.
 Esc/BACK returns to the pause menu.

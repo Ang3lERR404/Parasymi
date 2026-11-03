@@ -359,6 +359,8 @@ pub const Strings=struct{
     toggle:S="",
     /// a list, every autosave interval (`options.autosaveMinutes` order)
     autosave:S="",
+    /// a list, every render distance (`options.renderRings` order)
+    renderDistance:S="",
     /// the options panel's way back
     optionsBack:S="",
     /// the keybinds panel's title
