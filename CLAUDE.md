@@ -67,10 +67,18 @@ When a change alters what one of these says, update it in the same commit.
   step instead of "next I would…"; stop only for a blocking decision.
 - **Working**: commit `devel` after every verified change (builds,
   tests pass) without asking, and push once 10 commits are waiting
-  unpushed; never commit `parasymi.sav`; report broken
+  unpushed, after the sweep below; never commit `parasymi.sav`; report broken
   work, don't commit it. Verify visual work in the running game
   (`--plant`/`--structure` + `--inspect` shots, read the PNGs) and say what
   was not checked.
+- **Pre-push sweep**: every 10 commits, before pushing, scan the whole
+  codebase: (1) hoist repeating magic numbers to named constants at the
+  top of their file, merged into one new or existing tuning file when
+  they start to conflict (the engine's and the game's kept apart);
+  (2) optimise code to run at its best without changing behaviour or
+  the look (verify as usual); (3) round the code out into dedicated
+  "class" modules (a struct type with its methods) where it is most
+  likely to be reused. Commit the sweep (verified), then push.
 - **Reports**: a short list of changes; a real deviation or blocker as one
   bullet.
 
