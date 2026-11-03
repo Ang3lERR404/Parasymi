@@ -257,6 +257,11 @@ shattering at the unforming.
   winking.
 - Grounded relays (astrocyme, heliocyra) shed a fifth of a bloom's light,
   from their heart (an empty astrocyme less).
+- By day the radiant plants hold their light lower, so the bright mist is
+  never washed white round them: their tissue carries 0.45 of its night
+  glow (plant.frag `RADIANT_BY_DAY`), and a relay's light and a strip's
+  shed 0.3 of theirs (view.zig `lightByDay`), both easing with the
+  daylight; at night they are whole.
 
 ### Shafts of light (`lightBeam`, `lightStrip`, part `.shaft`)
 Light itself: no shadow, and it lights the fog round it (`PARTS_LIGHT`).

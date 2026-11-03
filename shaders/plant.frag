@@ -56,6 +56,8 @@ const float GREEN_THROUGH = 0.45;
 const uint FORMS_SAP_BLOOM = FORM_BIT(FORM_CONFLUENCE);
 // radiant forms that keep more of their own colour under the iridescent
 // film (OWN_HUE_FILM of it): the vesper's dusk violet and evening gold
+// how much of its night light a radiant plant's tissue carries by full day
+const float RADIANT_BY_DAY = 0.45;
 const uint FORMS_OWN_HUE = FORM_BIT(FORM_STAR);
 const float OWN_HUE_FILM = 0.45;
 // a radiant plant's cut crystal (part `.prism`): its fire's hue turns
@@ -159,7 +161,9 @@ void surface() {
     // less light (v_glow: a vesper's living leaves) keeps more of its own
     // colour and body; withering out of radiance, the light goes out of it.
     float core = part == PART_BLOOM ? 1.3 : 1.1;
-    float glow = v_glow * mix(0.25, 1.0, health) * (1.0 + 0.3 * ripe);
+    // (by day its light is held lower: against the bright mist a night's
+    // glow would wash it out white, RADIANT_BY_DAY)
+    float glow = v_glow * mix(0.25, 1.0, health) * (1.0 + 0.3 * ripe) * mix(1.0, RADIANT_BY_DAY, DAYLIGHT);
     vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + seed * 3.0 + pc.eye_time.w * 0.03);
     float filmy = (formIn(FORMS_OWN_HUE, v_form) ? OWN_HUE_FILM : 1.0) * mix(0.3, 1.0, v_glow);
     // a bead of its yield: a dim seed of light empty, the yield's colour

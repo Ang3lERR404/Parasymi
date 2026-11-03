@@ -162,6 +162,10 @@ const bloomPulseRate:f32=1.1;
 const groundedLight:f32=0.2;
 /// an empty astrocyme sheds this share of what it does full
 const groundedEmpty:f32=0.3;
+/// by full day a relay's light, and a strip's, sheds this share of what it
+/// does by night: in the day's mist a night's light would wash the garden
+/// white round it
+const lightByDay:f32=0.3;
 /// a bloom sheds light only once it has assembled this far
 const bloomLitFrom:f32=0.6;
 /// a star mote's light: its reach (metres)
@@ -578,7 +582,7 @@ fn shafts(g:*Game,tf:f32)Allocator.Error!void{
       };
       const ctrl=[4]m.V3{Along.p(mid,way,a,e0),Along.p(mid,way,a+1.0/3.0,h),Along.p(mid,way,a+2.0/3.0,h),Along.p(mid,way,a+1,e1)};
       try g.parts.emitCurve(.lightStrip,ctrl,side,1,1,.{.glow=bright,.flutter=len,.phase=seed,.fade=a});
-      if(j%stripEvery==1)try g.parts.light(ctrl[1]+m.v3(0,0.25,0),beamCol*m.splat3(stripLight*bright),stripReach);
+      if(j%stripEvery==1)try g.parts.light(ctrl[1]+m.v3(0,0.25,0),beamCol*m.splat3(stripLight*bright*m.lerp(1,lightByDay,g.sky.daylight())),stripReach);
     }
   }
 }
@@ -728,7 +732,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // how far the unforming has shattered it (its light goes out with it)
     const shattered=m.clamp01(g.unforming.glitchOf(d.seed));
     // how strong its light is now
-    const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark)*(if(def.floating)@as(f32,1)else groundedLight)*(if(def.store>0)m.lerp(groundedEmpty,1,d.own)else 1);
+    const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark)*(if(def.floating)@as(f32,1)else groundedLight)*(if(def.store>0)m.lerp(groundedEmpty,1,d.own)else 1)*m.lerp(1,lightByDay,g.sky.daylight());
     if(strength>0){
       // its light's tint, pearl blended toward its film's hue
       const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*0.03),bloomFilm);
