@@ -38,6 +38,8 @@ const vertex=lib.vertex;
 const st=lib.structures;
 /// the halo structure, whose forming spiral draws blooms in
 const haloMod=lib.haloStructure;
+/// the sign a powered structure wears: its crown and ley-blue
+const lightCrown=lib.lightCrown;
 /// resource nodes: their meshes and glows
 const resources=lib.resources;
 /// the gardener's actions, for whether a preview fits
@@ -608,6 +610,11 @@ fn structures(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
       m.rotY(pose.spin),m.rotX(pose.rock[0]),m.rotZ(pose.rock[1]),m.translate(-ctr),
     });
     defer g.parts.around=null;
+    // in light, all it draws carries its shine: its leaves turn ley-blue
+    // and its crown gathers over it (game/light_crown.zig)
+    g.parts.ley=lightCrown.ley(s,ctr);
+    defer g.parts.ley=null;
+    try lightCrown.wear(s,&g.parts,ctr);
     // unforming, it is drawn grown back down as far as it has gone
     if(!s.def().bare)try g.parts.emit(s.def().mesh,m.mul(s.place(ctr),m.scale3(m.v3(breathe,2-breathe,breathe))),.{
       .glow=glow+glowActive*a,.flutter=flutterAmount,.phase=s.seed,.fade=s.def().sap,

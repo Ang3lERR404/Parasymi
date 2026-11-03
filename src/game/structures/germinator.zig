@@ -56,7 +56,7 @@ pub const def:st.Def=.{
   .item=.germinator,.lineage=.symbiotic,.size=2,.mesh=.germinator,.preview=.germinatorWhole,.store=true,
   .sway=0.55,.tall=mesh.tall,.grow=6,.still=true,
   // it weaves faster in light, its leaves turning ley-blue (docs/radiant-plants.md)
-  .light=.boost,.draws=2,
+  .light=.boost,.draws=2,.crown=1.85,.ley=.leaves,
 };
 /// weave speed multiplier relative to hand-weaving
 const speed:f32=0.6;

@@ -87,6 +87,19 @@ pub const Look=struct{
   /// its eyes)
   hide:u64=0,
 };
+/// a powered structure's light as its parts carry it to the GPU
+/// (`PartInstance.k.yzw`): its leaves turn ley-blue from its top down, as
+/// far as its light reaches, and its crown gathers by it
+pub const Ley=struct{
+  /// its shine, 0 dark .. 1 in whole light
+  amount:f32,
+  /// the world height its ley-blue starts down from (its top)
+  top:f32,
+  /// how far down from there it reaches in whole light (m)
+  span:f32,
+  /// its fronds turn too, not its leaves alone (`vertex.partLeyFronds`)
+  fronds:bool=false,
+};
 /// the scene's moving parts for one frame: instances gathered per library
 /// mesh and level of detail, the bones and lights they bring, and the eye
 /// they are culled for
@@ -113,6 +126,9 @@ pub const Parts=struct{
   /// while set, everything emitted (and every light) is carried by it: a
   /// structure turning (R) takes all it draws along with its body
   around:?m.M4=null,
+  /// while set, everything emitted carries a structure's light (its ley-blue
+  /// and its crown's gathering, part.vert): every part of it shows it
+  ley:?Ley=null,
   /// an empty collector, growing with `gpa`
   pub fn init(gpa:Allocator)Parts{return.{.gpa=gpa};}
   /// frees every list
@@ -187,7 +203,13 @@ pub const Parts=struct{
   fn add(p:*Parts,id:meshlib.Id,at:m.V3,inst:PartInstance)Allocator.Error!void{
     // the level of detail its distance calls for
     const lod=mg.lodAt(m.dist(at,p.eye));
-    try p.lists[meshlib.slot(id,lod)].append(p.gpa,inst);
+    // the instance, carrying the light of the structure it belongs to, if any
+    var it=inst;
+    if(p.ley)|l|{
+      it.k=.{inst.k[0],l.amount,l.top,l.span};
+      if(l.fronds)it.flags|=vertex.partLeyFronds;
+    }
+    try p.lists[meshlib.slot(id,lod)].append(p.gpa,it);
   }
   /// a mesh built straight up +Y over 0..1, bent on the GPU along the
   /// Catmull-Rom curve through `ctrl`, its x laid toward `side`; `len` is

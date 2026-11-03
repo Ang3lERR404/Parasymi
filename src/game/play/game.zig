@@ -472,6 +472,8 @@ pub const Game=struct{
     // each structure that takes light has its share of it
     for(g.structs.list.items)|*it|it.lit=0;
     for(g.userIds.items,g.eco.light.userLit.items)|id,v|g.structs.get(id).lit=v;
+    // a specimen held in light (`--lit=`) has that share, whatever the grid gives
+    if(g.specimen)|sp|if(sp.lit)|v|for(g.structs.list.items)|*it|{it.lit=v;};
     lib.beamGround.tick(g,tickTime);
     try g.converge.tick(g.gpa,&g.world,&g.plants,&g.structs,&g.prog);
     try lib.moss.creep(g,tickTime);

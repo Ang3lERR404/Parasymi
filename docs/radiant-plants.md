@@ -78,6 +78,15 @@ Every boosted structure wears the same sign:
 - **Ley-blue leaves:** the brighter its light, the more of its leaves
   turn the magical blue of the ley lines, from the crown downward.
 
+Settled in the build ([visual.md](visual.md#the-sign-of-light)): four
+crown designs (diadem, circlet, orrery, lotus), picked by the structure's
+seed. Crowned and blue: germinator, root-digger, loomfern, gathering
+crown, sap cache, arsthraxia (until it evolves), sporecaster (having no
+leaves, its fronds turn). Blue only: conduits and braided conduits. The
+lithophage waits for its rebuild. A structure that only looks lit (`.looks`:
+the sap cache, the conduits) draws no light, and is lit wherever light
+reaches it.
+
 ## The structures, one by one
 - **Germinator:** a boost: it weaves faster in light (it comes before
   any light, so it can never need it). The first to wear the sign.

@@ -170,6 +170,10 @@ pub const palette=@import("gfx/meshes/palette.zig");
 pub const parasiteKit=@import("gfx/meshes/parasite_kit.zig");
 /// the radiant kit: gathered light fragments, never grown
 pub const radiantKit=@import("gfx/meshes/radiant_kit.zig");
+/// mesh: the halo crowns a powered structure wears, of radiant fragments
+pub const lightCrownMesh=@import("gfx/meshes/light_crown.zig");
+/// the sign a powered structure wears in light: its halo crown and ley-blue leaves
+pub const lightCrown=@import("game/light_crown.zig");
 /// the polyp's colony mesh: its shared mound and buds, for the mixed looks
 pub const polypMesh=@import("gfx/meshes/polyp.zig");
 /// the hydra look for the polyp: its hanging tentacles and bodies, for the mixed looks

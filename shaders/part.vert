@@ -48,6 +48,8 @@ layout(location = 25) in vec3 knrm;
 
 // iflags: a placement preview (vertex.PART_GHOST)
 const uint PART_GHOST = 1u;
+// iflags: its fronds turn ley-blue too (vertex.partLeyFronds)
+const uint PART_LEY_FRONDS = 2u;
 
 // this frame's bones (renderer Scene.bones): each carries a vertex from
 // where it was built to where it is now
@@ -96,6 +98,30 @@ const float PRISM_PACE = 0.4;
 const float PRISM_SPAN = 0.6;
 const float PRISM_REACH = 0.45;
 const float PRISM_TURN = 3.0;
+// a powered structure's halo crown (game/light_crown.zig, ik.y its shine):
+// whole by CROWN_FULL of its light; its fragments settle CROWN_PACE apart by
+// order, each over CROWN_SPAN, coming in from CROWN_REACH out and CROWN_RISE
+// up along their bearing (mesh space), shrunk by CROWN_SHRINK and turning
+// CROWN_TURN radians as they come; gathered, its rings turn CROWN_SPIN
+// rad/s (each the other way from the one inside), breathe a little apart
+// and back, and the whole bobs
+const float CROWN_FULL = 0.3;
+const float CROWN_PACE = 0.55;
+const float CROWN_SPAN = 0.45;
+const float CROWN_REACH = 2.6;
+const float CROWN_RISE = 0.9;
+const float CROWN_SHRINK = 0.4;
+const float CROWN_TURN = 2.2;
+const float CROWN_SPIN = 0.22;
+const float CROWN_BREATHE = 0.05;
+const float CROWN_BOB = 0.05;
+// ley-blue leaves (a structure in light, ik.yzw): how soft the front of the
+// blue is (a share of its height), how much it wavers leaf by leaf, the
+// blue they turn (LEY, as a leaf's colour) and how much light it holds
+const float LEY_EDGE = 0.18;
+const float LEY_WAVER = 0.07;
+const vec3 LEY_LEAF = LEY * vec3(0.26, 0.27, 0.36);
+const float LEY_GLOW = 0.06;
 // a flash spreads out from this share of its size to this many times it
 const float FLASH_FROM = 0.1;
 const float FLASH_TO = 3.2;
@@ -1310,6 +1336,26 @@ void main() {
     p = gatherIn(p, nrm * PRISM_REACH, away, 1.0, PRISM_TURN);
     nm = gatherTurn(nm, away, PRISM_TURN);
   }
+  // a halo crown, the radiant way: each rigid fragment flies in from out
+  // along its bearing, turning round the crown as it comes, settling in its
+  // turn as its structure's light rises (ik.y), and flies off again, the
+  // last to come the first to go, as it falls dark. Gathered, its rings
+  // turn slowly, each against the one inside it, drift a little apart and
+  // back, and the whole bobs, held by light alone
+  float crownAway = 0.0;
+  if (part == PART_CROWN) {
+    Fragment fr = fragmentOf(tu.xy, col.a);
+    crownAway = gatherAway(fr.order, CROWN_PACE, CROWN_SPAN, smoothstep(0.0, CROWN_FULL, ik.y));
+    float way = fr.ring < 0.5 ? 0.3 : (mod(fr.ring, 2.0) < 0.5 ? -1.0 : 1.0);
+    mat2 spin = rot(way * t * CROWN_SPIN + ip.z * TAU);
+    p.xz = spin * p.xz;
+    nm.xz = spin * nm.xz;
+    p.xz *= 1.0 + CROWN_BREATHE * sin(t * 0.7 + fr.bearing + ip.z * TAU) * step(0.5, fr.ring);
+    p.y += CROWN_BOB * sin(t * 0.9 + ip.z * TAU);
+    vec2 out2 = spin * vec2(cos(fr.bearing), sin(fr.bearing));
+    p = gatherIn(p, vec3(out2.x, CROWN_RISE, out2.y) * CROWN_REACH, crownAway, CROWN_SHRINK, CROWN_TURN);
+    nm = gatherTurn(nm, crownAway, CROWN_TURN);
+  }
   // the flash where the blooms met: a disc of light (tu.x its radius
   // 0..1) thrown outward from the diamond, fast then slowing (age 0..1)
   if (part == PART_FLASH) p.xz *= mix(FLASH_FROM, FLASH_TO, 1.0 - pow(1.0 - clamp(ip.y, 0.0, 1.0), 3.0));
@@ -1769,6 +1815,25 @@ void main() {
     v_col = mix(v_col, THOUGHT, lit * 0.85);
     v_glow = rise * 0.45 + surge * 1.1 + study * 0.03;
   }
+  // a structure in light (ik.y its shine): its leaves (and a leafless
+  // one's fronds) turn the ley lines' blue from its top (ik.z) down, as far
+  // down its height (ik.w) as its light is bright, the front soft and
+  // wavering leaf to leaf; the blue keeps each leaf's own light and dark,
+  // matte as ever, and holds a breath of light pulsing as the ley does. A
+  // smooth field of world height, so shared vertices turn alike
+  bool leyOn = PART_IN(FOLIAGE, part) || (part == PART_TENDRIL && (iflags & PART_LEY_FRONDS) != 0u);
+  if (ik.y > 0.0 && leyOn) {
+    float down = clamp((ik.z - w.y) / max(ik.w, 0.05), 0.0, 1.0);
+    float waver = LEY_WAVER * sin(w.x * 9.0 + w.z * 7.0 + w.y * 5.0);
+    float reach = ik.y * (1.0 + LEY_EDGE);
+    float blue = smoothstep(reach, reach - LEY_EDGE, down + waver);
+    float lum = dot(v_col, vec3(0.2126, 0.7152, 0.0722));
+    v_col = mix(v_col, LEY_LEAF * clamp(lum * 7.0, 0.45, 1.6), blue);
+    v_glow += blue * LEY_GLOW * (0.6 + 0.4 * leyPulse(w.xyz, t)) * ik.y;
+  }
+  // a crown's fragment holds light as its structure's does (ip.x), fading
+  // in as it settles
+  if (part == PART_CROWN) v_glow = ip.x * (0.8 + 0.2 * sin(t * 1.3 + tu.x * 9.0 + ip.z * TAU));
   v_part = float(part);
   v_t = tu.x;
   // a beam carries its length instead, so its rays and motes keep their size
@@ -1776,6 +1841,8 @@ void main() {
   // the halo's ring and its projection carry their radius (their scale)
   if (part == PART_HALO || part == PART_PROJECTION) v_fade = length(c0.xyz);
   if (drawn && part == PART_SHADOW) v_fade *= 1.0 - haloFold(ih.w);
+  // a crown's fragment shows as it settles, gone while it is far out
+  if (part == PART_CROWN) v_fade = 1.0 - smoothstep(0.0, 0.85, crownAway);
   v_u = tu.y;
   v_sheet = vec2(tu.y, tu.z);
   // the constellate web carries how far its beat runs to reach here, what

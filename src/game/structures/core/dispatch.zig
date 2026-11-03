@@ -18,6 +18,8 @@ const Plants=lib.plants.Plants;
 const prog=lib.progression;
 /// how quickly a structure's activity glow eases toward its target
 const activityEase=lib.structures.activityEase;
+/// how fast a structure's shine follows its light
+const shineEase=lib.structures.shineEase;
 /// everything a structure's behaviour may touch
 const Ctx=lib.structures.structure.Ctx;
 /// a placed structure's slot in the list
@@ -188,6 +190,9 @@ pub fn tickWith(ctx:Ctx,dt:f32)Allocator.Error!void{
     }
     // the structure, fetched after linking (a link may move the list)
     const g0=ss.get(id);
+    // its shine follows its light, slowly (none once it takes none, or
+    // while the unforming takes it): its crown and ley-blue follow that
+    g0.shine=m.damp(g0.shine,if(g0.fade>0 or lib.structures.lightUse(g0)==.none)0 else g0.lit,shineEase,dt);
     // unforming, it works no more, and grows back down as it goes
     if(g0.fade>0){
       g0.grown=@min(g0.grown,1-g0.fade);

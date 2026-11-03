@@ -523,12 +523,13 @@ pub const Light=struct{
     }
   }
   /// the share pick `pk` gets: how strongly it is reached, times what its
-  /// node kept over what its users wanted
+  /// node kept over what its users wanted (where none of them draws, only
+  /// looking lit, a lit node's light is theirs as far as it reaches them)
   fn got(l:*const Light,pk:Pick)f32{
     if(pk.node==none)return 0;
     // the node it draws from
     const nd=l.nodes.items[pk.node];
-    if(nd.demand<=0)return 0;
+    if(nd.demand<=0)return if(nd.carried>0)pk.strength else 0;
     return pk.strength*nd.kept/nd.demand;
   }
   /// halcyras guard: one put down beside a plant guards that one alone,
@@ -645,6 +646,17 @@ test"a relay carries no more than it may: too many users share what reaches it"{
   try b.run(gpa,0);
   // the bloom carries its most (4) for six users: each has at most two thirds
   for(v)|x|try testing.expect(b.l.lit.items[x.idx()]<=4.0/6.0+1e-4 and b.l.lit.items[x.idx()]>0);
+}
+test"what only looks lit is lit where light reaches it, though it draws none"{
+  // the test allocator, and a small garden
+  const gpa=testing.allocator;
+  var b=try Bench.init(gpa);
+  defer b.deinit(gpa);
+  // a solcyriphon, and two users drawing nothing: one in its field, one far out
+  _=try b.put(gpa,2,2,.solcyriphon);
+  try b.l.update(gpa,&b.p,&b.w,&.{},&.{.{.at=m.v3(3.5,0,2.5),.draw=0},.{.at=m.v3(14.5,0,14.5),.draw=0}},0,1.0/60.0);
+  try testing.expect(b.l.userLit.items[0]>0.9);
+  try testing.expectEqual(@as(f32,0),b.l.userLit.items[1]);
 }
 test"by night the beam pours into the relay under it, or overdrives the plant under it"{
   // the test allocator, and a small garden

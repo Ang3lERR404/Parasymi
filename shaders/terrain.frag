@@ -18,8 +18,8 @@ layout(location = 3) in vec4 v_info;
 layout(location = 4) in vec4 v_mat;
 layout(location = 0) out vec4 o;
 
-// ley sight: the currents' colour (plain, veiled), and the plexus's pale tint
-const vec3 LEY = vec3(0.45, 0.3, 1.0);
+// ley sight: the currents' colour (plain: common.glsl `LEY`; veiled), and
+// the plexus's pale tint
 const vec3 LEY_VEILED = vec3(1.0, 0.7, 1.0);
 const vec3 PLEXUS_PALE = vec3(0.9, 0.85, 1.0);
 // a ley line sealing: the bare soil it closes to (terrain_mesh.zig's soil, sRGB),
