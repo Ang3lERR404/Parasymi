@@ -66,6 +66,9 @@ pub const pow=math.pow;
 pub const maxInt=math.maxInt;
 /// infinity, as a float of the given type
 pub const inf=math.inf;
+/// `x` rounded up to the next whole multiple of `a` (a power of two, or any
+/// step above 0): where a GPU wants an offset or size aligned
+pub fn alignUp(x:u64,a:u64)u64{return(x+a-1)/a*a;}
 /// int→f32. Takes anytype on purpose: callers pass i32, u8, u16, u32, usize.
 /// This is the one sanctioned anytype in the file.
 pub inline fn f(x:anytype)f32{return@floatFromInt(x);}
@@ -610,6 +613,12 @@ test"the mean of many points is their middle, at any width"{
   try testing.expectEqual(Vec(i32,2){0,1},meanOf(i32,2,&tiles));
   // one point alone is its own mean
   try testing.expectEqual(V4{1,2,3,4},meanOf(f32,4,&.{V4{1,2,3,4}}));
+}
+test"alignUp rounds up to the step, keeping what already sits on it"{
+  try testing.expectEqual(@as(u64,256),alignUp(1,256));
+  try testing.expectEqual(@as(u64,256),alignUp(256,256));
+  try testing.expectEqual(@as(u64,0),alignUp(0,128));
+  try testing.expectEqual(@as(u64,30),alignUp(25,6));
 }
 test"unlerp undoes lerp and holds within 0..1"{
   try testing.expectApproxEqAbs(@as(f32,0.25),unlerp(2,6,lerp(2,6,0.25)),1e-6);

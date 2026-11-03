@@ -13,7 +13,7 @@ const pass=renderer.pass;
 const renderer=lib.renderer;
 /// the fog pipeline: no vertices, no depth, into the volume
 pub const desc:pass.Desc=.{
-  .vert=@embedFile("fog.vert"),.frag=@embedFile("fog.frag"),
+  .vert=@embedFile("fog.vert"),.frag=@embedFile("fog.frag"),.rayFrag=@embedFile("fog_ray.frag"),
   .bindings=&.{},.attrs=&.{},
   .depth=false,.target=.volume,
 };

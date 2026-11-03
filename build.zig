@@ -30,8 +30,21 @@ const shaders=[_][]const u8{
 /// shadow variants place what casts into each cascade of the key light's
 /// shadow map, the cube ones into each face of a point of light's shadow
 /// cube; the overhead ones draw the ground from above for the fog;
-/// the air ones light the fog round what glows.
+/// the air ones light the fog round what glows; the ray ones trace their
+/// shadows as rays where the GPU can (RAY), and the capture ones write out
+/// the casters for them (CAPTURE).
 const variants=[_][3][]const u8{
+  .{"plant_ray.frag","plant.frag","RAY"},
+  .{"plant_glass_ray.frag","plant.frag","GLASS,RAY"},
+  .{"plant_head_ray.frag","plant.frag","HEAD,RAY"},
+  .{"part_ray.frag","part.frag","RAY"},
+  .{"part_glass_ray.frag","part.frag","GLASS,RAY"},
+  .{"part_head_ray.frag","part.frag","HEAD,RAY"},
+  .{"terrain_ray.frag","terrain.frag","RAY"},
+  .{"pools_ray.frag","pools.frag","RAY"},
+  .{"fog_ray.frag","fog.frag","RAY"},
+  .{"plant_capture.vert","plant.vert","CAPTURE"},
+  .{"part_capture.vert","part.vert","CAPTURE"},
   .{"plant_glass.frag","plant.frag","GLASS"},
   .{"plant_head.frag","plant.frag","HEAD"},
   .{"part_glass.frag","part.frag","GLASS"},

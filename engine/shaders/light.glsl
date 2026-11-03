@@ -2,9 +2,14 @@
 // The including shader declares first: the extensions GL_EXT_buffer_reference
 // and GL_EXT_buffer_reference_uvec2 (and, when built with SHADOW, or with
 // CUBE and SHADOW both, drawing a shadow cube's casters,
-// GL_EXT_multiview); push constants `pc` holding `mat4 vp`, `vec4 eye_time`
-// (xyz the eye) and `uvec2 light` (the record's address, set by the
-// renderer); and `SUN`, the unit direction toward the key light.
+// GL_EXT_multiview; built with RAY, GL_EXT_ray_query); push constants `pc`
+// holding `mat4 vp`, `vec4 eye_time` (xyz the eye) and `uvec2 light` (the
+// record's address, set by the renderer); and `SUN`, the unit direction
+// toward the key light. Built with RAY, every shadow below is traced as
+// rays through what casts it this frame (render/rays.zig) while the record
+// says so (`info.z`), else read from the maps as ever. Built with CAPTURE
+// (which brings SHADOW, without its views), a caster's vertex shader writes
+// out where it places each vertex instead (`capture`).
 
 // this frame's light (render/light.zig `Lighting`): the key light's shadow
 // cascades and the points of light a game makes
@@ -24,7 +29,7 @@ struct Cube {
 layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer Lighting {
   mat4 cascade[CASCADES]; // world to each cascade's clip space
   float texel[4];         // the world size of each cascade's texels
-  vec4 info;              // x points of light, y how far from the eye shadows reach
+  vec4 info;              // x points of light, y how far from the eye shadows reach, z 1 traced as rays, w the world's samples a pixel
   PointLight lights[MAX_LIGHTS];
   Cube cubes[MAX_CUBES];
 };
@@ -45,7 +50,9 @@ layout(set = 0, binding = 2) uniform samplerCubeArrayShadow cube_map;
 // where a world point lands on screen (or, drawing shadow casters, in the
 // cascade this view draws, or the face of the shadow cube)
 vec4 project(vec3 w) {
-#ifdef CUBE
+#ifdef CAPTURE
+  return vec4(w, 1.0);
+#elif defined(CUBE)
   return CubeFace(pc.light).face * vec4(w, 1.0);
 #elif defined(SHADOW)
   return Lighting(pc.light).cascade[gl_ViewIndex] * vec4(w, 1.0);
@@ -55,6 +62,29 @@ vec4 project(vec3 w) {
 }
 // a vertex placed here is clipped away (what casts no shadow)
 const vec4 UNSEEN = vec4(0.0, 0.0, 2.0, 1.0);
+#ifdef CAPTURE
+// catching the casters for the rays (render/rays.zig): `pc.light` points at
+// the capture pass's table instead: where each set's vertices go, and for
+// each instance (by gl_InstanceIndex) where its vertices start, less its
+// mesh's first vertex, so gl_VertexIndex lands each in its place
+layout(buffer_reference, std430, buffer_reference_align = 16) writeonly buffer Caught { vec4 p[]; };
+layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer Capture {
+  uvec2 both;   // what every light's rays meet
+  uvec2 points; // what only the points of light's rays meet
+  uint start[];
+};
+// this vertex, placed at `w`, written out: into the set every light's rays
+// meet if it casts the key light's shadow (`key`), else into the points of
+// light's own if it casts theirs (`point`). Where it casts none it is
+// written as NaN, which leaves its triangles out of the build.
+void capture(vec3 w, bool key, bool point) {
+  Capture C = Capture(pc.light);
+  uint at = C.start[gl_InstanceIndex] + uint(gl_VertexIndex);
+  vec4 none = vec4(uintBitsToFloat(0x7fc00000u));
+  Caught(C.both).p[at] = key ? vec4(w, 1.0) : none;
+  Caught(C.points).p[at] = point && !key ? vec4(w, 1.0) : none;
+}
+#endif
 
 // the shadow filter's taps: a Poisson disc of sixteen, the first eight of
 // them (every other one) searching for what casts the shadow
@@ -81,6 +111,121 @@ const float CASCADE_BLEND_FROM = 0.82;
 const float CASCADE_BLEND_TO = 0.97;
 // the share of the shadows' reach past which they fade out
 const float SHADOW_FADE = 0.8;
+
+// the shadow filter's taps turned by a hash of the place `wpos`: steady in
+// the world, never banding (a map's taps, and a traced shadow's rays)
+mat2 tapTurn(vec3 wpos) {
+  uvec3 cell = uvec3(ivec3(floor(wpos * 512.0)));
+  uint h = cell.x * 73856093u ^ cell.y * 19349663u ^ cell.z * 83492791u;
+  h = (h ^ (h >> 16)) * 0x7feb352du;
+  h = (h ^ (h >> 15)) * 0x846ca68bu;
+  h ^= h >> 16;
+  float ang = 6.2831853 * float(h) * (1.0 / 4294967296.0);
+  return mat2(cos(ang), sin(ang), -sin(ang), cos(ang));
+}
+
+#ifdef RAY
+// what casts shadows this frame, as rays meet it (render/rays.zig): what
+// casts every light's shadow is met by both kinds of ray, what casts only
+// the points of light's (a radiant plant's petals) by theirs alone
+layout(set = 0, binding = 3) uniform accelerationStructureEXT casters;
+const uint RAYS_KEY = 1u;
+const uint RAYS_POINT = 2u;
+// how far toward the key light its rays are followed (beyond anything
+// that grows or floats, however low it stands)
+const float RAY_REACH = 300.0;
+// how far a surface point is lifted off its surface toward its light
+// before its rays leave (m), and how much more for each metre from the eye
+// (the vertex shaders place what is drawn and what is caught alike, so a
+// hair is enough: nothing shadows itself)
+const float RAY_LIFT = 0.006;
+const float RAY_LIFT_FAR = 0.0006;
+// the order the key light's rays are sent in (taps of POISSON): four round
+// the rim first; where all four agree the point is wholly lit or wholly in
+// shadow, else the other twelve follow for its soft edge
+const int RAY_ORDER[16] = int[16](0, 1, 7, 4, 2, 3, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15);
+const int RAY_FIRST = 4;
+// a point of light's breadth (m): its shadow's edge softens by its rays to
+// four points across it, sharp where what casts touches what it falls on
+const float POINT_RADIUS = 0.05;
+const int POINT_RAYS = 4;
+// whether anything casting for rays of `mask` lies along unit `d` from `o`
+// within `len`
+bool blocked(vec3 o, vec3 d, float len, uint mask) {
+  rayQueryEXT q;
+  rayQueryInitializeEXT(q, casters, gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT, mask, o, 0.0, d, len);
+  while (rayQueryProceedEXT(q)) {}
+  return rayQueryGetIntersectionTypeEXT(q, true) != gl_RayQueryCommittedIntersectionNoneEXT;
+}
+// a frame round unit `w`: two ways across it
+mat2x3 across(vec3 w) {
+  vec3 t = normalize(cross(w, abs(w.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0)));
+  return mat2x3(t, cross(w, t));
+}
+// how many invocations shade each pixel, and which this is: a pass shaded
+// per sample (built with SAMPLED) runs once a sample under MSAA, and the
+// pixel's samples are averaged as it is resolved, so they share its rays
+// between them, each sending its own few (the eye sees the pixel's whole
+// share, at a sample's cost)
+int sharers() {
+#ifdef SAMPLED
+  return max(int(Lighting(pc.light).info.w + 0.5), 1);
+#else
+  return 1;
+#endif
+}
+int sharer() {
+#ifdef SAMPLED
+  return gl_SampleID;
+#else
+  return 0;
+#endif
+}
+// how much of the key light reaches a surface at `wpos` (`nl` its normal
+// turned toward the light), `dist` from the eye, traced: rays toward the
+// light spread over its breadth (LIGHT_SPREAD, as the map's soft edge),
+// turned by the place as the map's taps are, so the soft edge is as steady.
+// A pixel's sixteen are dealt out among its samples; where a sample's first
+// rays all agree it is wholly lit or wholly in shadow and sends no more.
+float keyTraced(vec3 wpos, vec3 nl, float dist) {
+  vec3 o = wpos + (nl + SUN) * (RAY_LIFT + RAY_LIFT_FAR * dist);
+  mat2x3 tb = across(SUN);
+  mat2 turn = tapTurn(wpos);
+  int all = max(16 / sharers(), 1);
+  int first = min(max(RAY_FIRST / sharers(), 2), all);
+  int from = sharer() * all;
+  float lit = 0.0;
+  for (int k = 0; k < all; k++) {
+    if (k == first && (lit < 0.5 || lit > float(first) - 0.5)) return lit / float(first);
+    vec2 q = turn * POISSON[RAY_ORDER[(from + k) & 15]] * LIGHT_SPREAD;
+    if (!blocked(o, normalize(SUN + tb * q), RAY_REACH, RAYS_KEY)) lit += 1.0;
+  }
+  return lit / float(all);
+}
+// how much of a point of light holding shadow `s` reaches `o`, traced:
+// rays to points across its breadth (POINT_RADIUS), each stopping short of
+// its near plane as its cube's faces do (what it glows inside never hides
+// it); `wpos` turns them as the place does. A pixel's four are dealt out
+// among its samples, as the key light's are.
+float pointTraced(Lighting L, int s, vec3 o, vec3 wpos) {
+  vec3 c = L.cubes[s].at.xyz;
+  float near = L.cubes[s].lit.z;
+  vec3 to = c - o;
+  float l = length(to);
+  if (l <= near) return 1.0;
+  mat2x3 tb = across(to / l);
+  mat2 turn = tapTurn(wpos);
+  int all = max(POINT_RAYS / sharers(), 1);
+  int from = sharer() * all;
+  float lit = 0.0;
+  for (int k = 0; k < all; k++) {
+    vec3 d = c + tb * (turn * POISSON[RAY_ORDER[(from + k) & 15]] * POINT_RADIUS) - o;
+    float dl = length(d);
+    if (!blocked(o, d / dl, dl - near, RAYS_POINT)) lit += 1.0;
+  }
+  return lit / float(all);
+}
+#endif
 
 // how much of the key light reaches `wpos` through cascade `i` (1 lit, 0
 // in shadow); `edge` how far out across the cascade it lies (0 centre .. 1
@@ -112,13 +257,7 @@ float cascadeLit(Lighting L, int i, vec3 wpos, vec3 nl, float slope, out float e
   vec3 nc = vec3(dot(cross(r1, r2), nl), dot(cross(r2, r0), nl), dot(cross(r0, r1), nl));
   vec2 dzduv = -2.0 * nc.xy / (sign(nc.z) * max(abs(nc.z), 0.25 * length(nc)));
   // the taps turned by a hash of the place: steady in the world, never banding
-  uvec3 cell = uvec3(ivec3(floor(wpos * 512.0)));
-  uint h = cell.x * 73856093u ^ cell.y * 19349663u ^ cell.z * 83492791u;
-  h = (h ^ (h >> 16)) * 0x7feb352du;
-  h = (h ^ (h >> 15)) * 0x846ca68bu;
-  h ^= h >> 16;
-  float ang = 6.2831853 * float(h) * (1.0 / 4294967296.0);
-  mat2 turn = mat2(cos(ang), sin(ang), -sin(ang), cos(ang));
+  mat2 turn = tapTurn(wpos);
   // what stands between: the mean depth of the blockers round about (all
   // sixteen taps and the point itself, so a thin caster is not missed)
   float sum = 0.0, count = 0.0;
@@ -154,6 +293,9 @@ float keyShadow(vec3 wpos, vec3 n) {
   float ndl = dot(n, SUN);
   vec3 nl = ndl >= 0.0 ? n : -n;
   float slope = sqrt(clamp(1.0 - ndl * ndl, 0.0, 1.0));
+#ifdef RAY
+  if (L.info.z > 0.5) return mix(keyTraced(wpos, nl, dist), 1.0, smoothstep(far * SHADOW_FADE, far, dist));
+#endif
   float lit = 1.0;
   for (int i = 0; i < CASCADES; i++) {
     float edge;
@@ -179,6 +321,11 @@ const float AIR_BIAS = 0.0004;
 float airLit(Lighting L, vec3 wpos, float dist) {
   float far = L.info.y;
   if (dist >= far) return 1.0;
+#ifdef RAY
+  // traced: one ray toward the light (the march's many steps, each its own
+  // dithered place, soften it as the map's filtered tap does)
+  if (L.info.z > 0.5) return mix(blocked(wpos, SUN, RAY_REACH, RAYS_KEY) ? 0.0 : 1.0, 1.0, smoothstep(far * SHADOW_FADE, far, dist));
+#endif
   for (int i = 0; i < CASCADES; i++) {
     vec4 q = L.cascade[i] * vec4(wpos, 1.0);
     if (max(abs(q.x), abs(q.y)) >= CASCADE_BLEND_TO || q.z >= 1.0) continue;
@@ -205,6 +352,13 @@ float cubeLit(Lighting L, int s, vec3 wpos) {
   float along = max(ad.x, max(ad.y, ad.z));
   float near = L.cubes[s].lit.z;
   if (along >= at.w) return 1.0;
+#ifdef RAY
+  // traced: one ray toward the light, stopping short of its near plane
+  if (L.info.z > 0.5) {
+    float l = length(d);
+    return l <= near ? 1.0 : blocked(wpos, -d / l, l - near, RAYS_POINT) ? 0.0 : 1.0;
+  }
+#endif
   float texel = 2.0 * along / float(textureSize(cube_map, 0).x);
   float z = cubeDepth(near, at.w, max(along - CUBE_BIAS * texel, near));
   return texture(cube_map, vec4(d, float(s)), z);
@@ -221,6 +375,9 @@ float pointShadow(Lighting L, int i, vec3 wpos, vec3 n, vec3 d) {
   float shown = L.cubes[s].lit.y;
   if (shown <= 0.0) return 1.0;
   vec3 nl = dot(n, d) >= 0.0 ? n : -n;
+#ifdef RAY
+  if (L.info.z > 0.5) return mix(1.0, pointTraced(L, s, wpos + nl * (RAY_LIFT + RAY_LIFT_FAR * length(wpos - pc.eye_time.xyz)), wpos), shown);
+#endif
   float texel = 2.0 * length(d) / float(textureSize(cube_map, 0).x);
   return mix(1.0, cubeLit(L, s, wpos + nl * CUBE_NORMAL_BIAS * texel), shown);
 }

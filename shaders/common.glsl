@@ -1,14 +1,24 @@
 //! shared by every world pass: push constants, the sky's shift, garden wind, growth, gathering, halo spiral, the plexus and shading (shadows and points of light from the engine's light.glsl).
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference_uvec2 : require
+#ifdef RAY
+// shadows traced as rays through what casts them (light.glsl RAY)
+#extension GL_EXT_ray_query : require
+#endif
 #ifdef CUBE
 // a point of light's shadow cube is cast into as the key light's map is,
 // each face a view (light.glsl `project`)
 #define SHADOW
 #endif
+#ifdef CAPTURE
+// the casters caught for the rays decide what casts as the shadow passes
+// do, writing it out instead of drawing it (light.glsl `capture`)
+#define SHADOW
+#else
 #ifdef SHADOW
 // a shadow caster draws into every cascade at once, one view each
 #extension GL_EXT_multiview : require
+#endif
 #endif
 layout(push_constant) uniform Push {
   mat4 vp;

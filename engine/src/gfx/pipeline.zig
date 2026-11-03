@@ -94,6 +94,9 @@ pub const Desc=struct{
   viewMask:u32=0,
   /// pushes depth away by a constant and with the slope (shadow casters)
   depthBias:?m.Vice(f32,2)=null,
+  /// whether nothing is rasterized at all: only the vertex shader runs,
+  /// writing out what it places (the casters for ray tracing, render/rays.zig)
+  discard:bool=false,
 };
 /// `sets`: descriptor set layouts the pipelines also bind (0..)
 /// a pipeline layout with one push constant range of `pushSize` bytes, seen
@@ -134,7 +137,7 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
   // filled, counter-clockwise front faces, back faces culled if asked, depth bias for casters
   const rs:vk.PipelineRasterizationStateCreateInfo=.{
     .depth_clamp_enable=.false,
-    .rasterizer_discard_enable=.false,
+    .rasterizer_discard_enable=if(d.discard).true else.false,
     .polygon_mode=.fill,
     .cull_mode=if(d.cull).{.back=true}else.{},
     .front_face=.counter_clockwise,
@@ -203,7 +206,8 @@ pub fn create(c:*const Ctx,d:Desc)ctx.Error!vk.Pipeline{
   var p:vk.Pipeline=undefined;
   _=c.device.createGraphicsPipelines(.null_handle,&.{.{
     .p_next=&rendering,
-    .stage_count=stages.len,
+    // (nothing rasterized: the vertex shader alone)
+    .stage_count=if(d.discard)1 else stages.len,
     .p_stages=&stages,
     .p_vertex_input_state=&vin,
     .p_input_assembly_state=&ia,

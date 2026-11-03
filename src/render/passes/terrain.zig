@@ -14,7 +14,7 @@ const renderer=lib.renderer;
 const m=lib.engine.core.math;
 /// the ground pipeline: terrain.vert and terrain.frag
 pub const desc:pass.Desc=.{
-  .vert=@embedFile("terrain.vert"),.frag=@embedFile("terrain.frag"),
+  .vert=@embedFile("terrain.vert"),.frag=@embedFile("terrain.frag"),.rayFrag=@embedFile("terrain_ray.frag"),
   .bindings=&.{pipeline.binding(vertex.Terrain,0,.vertex)},
   .attrs=&pipeline.attrs(vertex.Terrain,0,0),
 };

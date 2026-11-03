@@ -1,6 +1,9 @@
-#version 450
+#version 460
 //! plant material: woven body, sap through young tissue, see-through petals, the radiant film, lanterns.
 #extension GL_GOOGLE_include_directive : require
+// shaded once a sample (passes/plants.zig `perSample`): a pixel's traced
+// shadow rays are shared among its samples (light.glsl `sharers`)
+#define SAMPLED
 #include "common.glsl"
 #include "surface.glsl"
 

@@ -52,7 +52,7 @@ const bindings=&[_]vk.VertexInputBindingDescription{
 const attrs=&(pipeline.attrs(vertex.Mesh,0,0)++pipeline.attrs(vertex.PartInstance,1,5)++pipeline.attrs(vertex.Skin,2,17)++pipeline.attrs(vertex.Grow,3,22)++pipeline.attrs(vertex.MeshPose,4,24));
 /// the solid parts pipeline: part.vert places each instance, part.frag shades it
 pub const desc:pass.Desc=.{
-  .vert=@embedFile("part.vert"),.frag=@embedFile("part.frag"),
+  .vert=@embedFile("part.vert"),.frag=@embedFile("part.frag"),.rayFrag=@embedFile("part_ray.frag"),
   .bindings=bindings,.attrs=attrs,.perSample=true,
 };
 /// this frame's instances and bones, and where each mesh's run of instances
@@ -197,7 +197,7 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,stats:*ren
 pub const head=struct{
   /// the head pipeline: part.vert as ever, part_head.frag
   pub const desc:pass.Desc=.{
-    .vert=@embedFile("part.vert"),.frag=@embedFile("part_head.frag"),
+    .vert=@embedFile("part.vert"),.frag=@embedFile("part_head.frag"),.rayFrag=@embedFile("part_head_ray.frag"),
     .bindings=bindings,.attrs=attrs,.perSample=true,
   };
   /// draws every mesh's always-solid head
@@ -211,7 +211,7 @@ pub const head=struct{
 pub const glass=struct{
   /// the see-through parts pipeline: blended, writing no depth
   pub const desc:pass.Desc=.{
-    .vert=@embedFile("part.vert"),.frag=@embedFile("part_glass.frag"),
+    .vert=@embedFile("part.vert"),.frag=@embedFile("part_glass.frag"),.rayFrag=@embedFile("part_glass_ray.frag"),
     .bindings=bindings,.attrs=attrs,
     .blend=true,.depthWrite=false,.nearer=true,.perSample=true,
   };
@@ -251,6 +251,65 @@ pub const air=struct{
   /// draws the runs with anything see-through (every glow is), lighting the air
   pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
     draw(r,&r.frames[r.fi].pass.parts,cmd,stats,.partsAir,null);
+  }
+};
+/// the parts caught for the rays where shadows are traced (engine
+/// rays.zig): the same instances, each at the level of detail it is drawn
+/// at, the wolf skinned and structures swaying and growing as drawn,
+/// written out vertex by vertex (part.vert under CAPTURE)
+pub const capture=struct{
+  /// the capture pipeline: part_capture.vert, nothing rasterized
+  pub const desc:pass.Desc=.{
+    .vert=@embedFile("part_capture.vert"),.frag=lib.engine.shadowFrag,
+    .bindings=bindings,.attrs=attrs,.target=.capture,
+  };
+  /// this frame's table (light.glsl `Capture`) and where each mesh's run
+  /// of instances is caught
+  pub const Frame=Caught;
+  /// (its fields)
+  const Caught=struct{
+    /// where each set's vertices go, then each instance's first slot less
+    /// its mesh's first vertex, by its place among the instances
+    table:Buffer=.{},
+    /// the slot each mesh's first instance is caught from
+    at:[meshlib.slots]u64=@splat(0),
+  };
+  /// makes one frame's table, where rays can be traced
+  pub fn initFrame(c:*const Ctx)ctx.Error!Caught{
+    if(!c.rayTracing)return.{};
+    return.{.table=try Buffer.init(c,lib.engine.render.rays.tableHead+max*@sizeOf(u32),.{.storage_buffer=true,.shader_device_address=true})};
+  }
+  /// frees one frame's table
+  pub fn deinitFrame(f:*Caught,c:*const Ctx)void{f.table.deinit(c);}
+  /// room for every instance's vertices this frame, while shadows are
+  /// traced, and each instance's place in the table
+  pub fn prepare(r:*renderer.Renderer,f:*Caught,_:*const renderer.Scene,_:*renderer.Stats)void{
+    if(!r.tracing())return;
+    // the parts' own frame: its runs of instances
+    const pf=&r.frames[r.fi].pass.parts;
+    renderer.caught(r,&f.table,&f.at,&pf.first,&pf.counts,&r.ext.partRuns,&.{renderer.partLevel.level});
+  }
+  /// draws every instance once more, nothing rasterized, writing out each
+  /// vertex where it is placed, and hands each to the rays
+  pub fn record(r:*renderer.Renderer,f:*Caught,cmd:vk.CommandBufferProxy,_:*const renderer.Scene,stats:*renderer.Stats)void{
+    // (nothing to catch until the meshes are in)
+    if(stats.parts==0 or r.ext.meshes.buf==.null_handle)return;
+    // the parts' own frame, and its push (the bones in it) pointed at the table
+    const pf=&r.frames[r.fi].pass.parts;
+    const push=renderer.tabled(r,&f.table,pf.push);
+    cmd.bindPipeline(.graphics,r.pipe(.partsCapture));
+    cmd.pushConstants(r.layout(.world),pass.stages,0,@sizeOf(renderer.WorldPush),&push);
+    cmd.bindVertexBuffers(0,&.{r.ext.meshes.buf,pf.inst.buf,r.ext.skins.buf,r.ext.grows.buf},&.{0,0,0,0});
+    cmd.bindIndexBuffer(r.ext.indices.buf,0,.uint32);
+    for(0..meshlib.slots)|i|{
+      // the mesh's welded run, all of it drawn as it is drawn in the world
+      const run=r.ext.partRuns[renderer.caughtMesh(i)];
+      if(pf.counts[i]==0 or run.count==0)continue;
+      cmd.bindVertexBuffers(4,&.{r.ext.meshes.buf},&.{r.ext.partMorph[renderer.caughtMesh(i)]});
+      cmd.drawIndexed(run.count,pf.counts[i],run.first,@intCast(run.base),pf.first[i]);
+      stats.draws+=1;
+      renderer.handed(r,f.at[i],pf.counts[i],run,&.{renderer.partLevel});
+    }
   }
 };
 /// the parts as a point of light holding a shadow cube sees them, into each

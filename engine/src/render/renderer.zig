@@ -38,6 +38,8 @@ const postMod=@import("post.zig");
 const light=@import("light.zig");
 /// points of light that cast shadows: their cubes and which lights hold them
 const cube=@import("cube.zig");
+/// shadows traced as rays: what casts them, caught and built each frame
+const raysMod=@import("rays.zig");
 /// the air: the overhead map, the field, the volume and its composite
 const Volume=@import("volume.zig").Volume;
 /// what the field is kept in (volume.zig)
@@ -97,7 +99,14 @@ pub const pass=struct{
     /// alone, reading the world's depth (volume.glsl)
     volume,
     /// the screen, after the world and its glow are composed
-    screen
+    screen,
+    /// where shadows are traced as rays (rays.zig): nothing drawn into,
+    /// nothing rasterized, first of all. The pass's vertex shader (built
+    /// with CAPTURE) writes out where it places each vertex of each caster
+    /// (light.glsl `capture`), its push's `light` pointing at its table;
+    /// it hands the renderer each instance caught (`Renderer.rays`, `add`).
+    /// Made only where the GPU can trace rays, recorded only while it does.
+    capture
   };
   /// how a pass is drawn: its shaders, vertex layout, push block, depth and
   /// blend choices, and what it draws into
@@ -106,6 +115,10 @@ pub const pass=struct{
     vert:[]const u8,
     /// (the fragment shader's SPIR-V, the same way)
     frag:[]const u8,
+    /// the same fragment shader built with RAY (light.glsl: its shadows
+    /// traced as rays while the renderer traces them), taken in place of
+    /// `frag` where the GPU can trace rays; null: `frag` everywhere
+    rayFrag:?[]const u8=null,
     /// the vertex buffers it reads and how each steps
     bindings:[]const vk.VertexInputBindingDescription,
     /// the fields it reads from them, by location
@@ -159,15 +172,17 @@ pub const pass=struct{
     // the pass's vertex shader
     const vs=try c.shader(d.vert);
     defer c.device.destroyShaderModule(vs,null);
-    // the pass's fragment shader
-    const fs=try c.shader(d.frag);
+    // the pass's fragment shader: its ray-traced build where rays can be
+    const fs=if(d.rayFrag!=null and c.rayTracing)try c.shader(d.rayFrag.?)else try c.shader(d.frag);
     defer c.device.destroyShaderModule(fs,null);
+    // whether it only writes out what its vertex shader places
+    const caught=d.target==.capture;
     return pipeline.create(c,.{
       .vert=vs,.frag=fs,
       .bindings=d.bindings,.attrs=d.attrs,
       .layout=layout,
-      .colorFormat=switch(d.target){.shadow,.cube=>.undefined,.field=>fieldFormat,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
-      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.cube or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,
+      .colorFormat=switch(d.target){.shadow,.cube,.capture=>.undefined,.field=>fieldFormat,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
+      .depth=d.depth and !caught,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.cube or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,.discard=caught,
       .samples=postMod.sampleFlags(if(d.target==.world)samples else 1),.perSample=d.perSample,
       .viewMask=switch(d.target){.shadow=>light.views,.cube=>cube.views,else=>0},
       .depthBias=switch(d.target){.shadow=>light.bias,.cube=>cube.bias,else=>null},
@@ -228,14 +243,17 @@ pub fn Renderer(comptime G:type)type{
     pub const Stats=G.Stats;
     /// what the GPU's time is told apart by: each pass (`Pass` order; a
     /// `cube` pass's time is the shadow cubes' together), then the glow,
-    /// the composite and every shadow cube drawn (`glow`, `compose`, `cubed`)
-    pub const stageCount=reg.count+3;
+    /// the composite, every shadow cube drawn and the traced shadows' build
+    /// (`glow`, `compose`, `cubed`, `built`)
+    pub const stageCount=reg.count+4;
     /// (the glow's stage)
     pub const glow=reg.count;
     /// (the composite's stage)
     pub const compose=reg.count+1;
     /// (the shadow cubes' stage: every `cube` pass into every cube held)
     pub const cubed=reg.count+2;
+    /// (the traced shadows' build: what was caught, built into rays.zig's levels)
+    pub const built=reg.count+3;
     /// time stamps a frame writes: one before it, one after each stage
     const stamps=stageCount+1;
     /// what one frame in flight holds: its command buffer, sync, pass
@@ -304,6 +322,12 @@ pub fn Renderer(comptime G:type)type{
     clock:?f64=null,
     /// the air: the overhead map, the volume and its composite
     volume:Volume=.{},
+    /// what shadows are traced through as rays, caught and built each
+    /// frame (null where the GPU cannot trace rays)
+    rays:?raysMod.Rays=null,
+    /// whether shadows are traced as rays while the GPU can (`setRays`);
+    /// else, or where it cannot, they are drawn into the maps
+    trace:bool=true,
     /// whether presenting waits for the display's refresh
     vsync:bool,
     /// each frame in flight's resources
@@ -372,6 +396,10 @@ pub fn Renderer(comptime G:type)type{
       r.shadow=try light.Shadow.init(c);
       r.cubes=try cube.Cubes.init(c,r.cubes.res);
       r.shadow.bindCubes(c,&r.cubes);
+      if(c.rayTracing){
+        r.rays=try raysMod.Rays.init(c,r.gpa);
+        r.shadow.bindRays(c,r.rays.?.handle());
+      }
       r.volume=try Volume.init(c,r.sc.extent.width,r.sc.extent.height,r.sc.depthView);
       for(&r.frames)|*f|{
         f.lighting=try Buffer.init(c,@sizeOf(light.Lighting),.{.storage_buffer=true,.shader_device_address=true});
@@ -400,7 +428,8 @@ pub fn Renderer(comptime G:type)type{
       inline for(reg.ids)|id|{
         // this pass's description
         const d=reg.module(id).desc;
-        if(!worldOnly or d.target==.world){
+        // (a capture pass only where rays can be traced)
+        if((!worldOnly or d.target==.world) and (d.target!=.capture or r.ctx.rayTracing)){
           r.pipes[@intFromEnum(id)]=try pass.create(&r.ctx,d,r.layout(d.layout),r.sc.format.format,n);
         }
       }
@@ -462,6 +491,11 @@ pub fn Renderer(comptime G:type)type{
       r.cubes=try cube.Cubes.init(c,size);
       r.shadow.bindCubes(c,&r.cubes);
     }
+    /// trace shadows as rays (where the GPU can) or draw them into the
+    /// maps, from the next frame on
+    pub fn setRays(r:*R,on:bool)void{r.trace=on;}
+    /// whether this frame's shadows are traced as rays
+    pub fn tracing(r:*const R)bool{return r.trace and r.rays!=null;}
     /// wait for the display's refresh or not; remakes the swapchain
     pub fn setVsync(r:*R,on:bool)Error!void{
       if(on==r.vsync)return;
@@ -491,6 +525,8 @@ pub fn Renderer(comptime G:type)type{
       std.log.info("gpu glow {d:.3}",.{r.gpuMs[glow]});
       std.log.info("gpu compose {d:.3}",.{r.gpuMs[compose]});
       std.log.info("gpu cubes {d:.3}",.{r.gpuMs[cubed]});
+      std.log.info("gpu rays {d:.3}",.{r.gpuMs[built]});
+      if(r.rays)|*ra|std.log.info("rays: {d} triangles cast every light's shadows, {d} only the points'; levels refitted {d}, built {d}",.{ra.trisOf(.both),ra.trisOf(.points),ra.refitted,ra.rebuilt});
       std.log.info("gpu total {d:.3}",.{r.gpuTotal});
     }
     /// free every GPU object the renderer made (null handles are skipped).
@@ -524,6 +560,8 @@ pub fn Renderer(comptime G:type)type{
       r.post.deinit(c);
       r.volume.deinit(c);
       r.cubes.deinit(c);
+      if(r.rays)|*ra|ra.deinit(c);
+      r.rays=null;
       r.shadow.deinit(c);
       r.sc.deinit(c,r.gpa,false);
     }
@@ -637,18 +675,32 @@ pub fn Renderer(comptime G:type)type{
       stats.gpuMs=r.gpuTotal;
       // a copy of the scene, its push constants pointed at the lighting
       var sc=scene.*;
-      stats.lights=r.lightUp(f,&sc);
+      // whether this frame's shadows are traced as rays (the maps are
+      // then cleared but nothing is drawn into them)
+      const traced=r.tracing();
+      if(r.rays)|*ra|ra.begin();
+      stats.lights=r.lightUp(f,&sc,traced);
       inline for(reg.ids)|id|{
         if(comptime reg.has(id,"prepare"))reg.module(id).prepare(r,&@field(f.pass,@tagName(id)),&sc,&stats);
       }
+      if(comptime targets(.capture))if(traced){
+        // the rays' casters as drawn this frame, caught and built
+        const ra=&r.rays.?;
+        try ra.fit(c);
+        ra.open(cmd);
+        r.record(f,cmd,.capture,&sc,&stats);
+        ra.close(cmd);
+        try ra.build(c,cmd,r.fi);
+        stamp(cmd,f,built);
+      };
       r.cubes.ready(cmd);
       r.shadow.begin(cmd);
-      r.record(f,cmd,.shadow,&sc,&stats);
+      if(!traced)r.record(f,cmd,.shadow,&sc,&stats);
       r.shadow.end(cmd);
-      if(comptime targets(.cube)){
+      if(comptime targets(.cube))if(!traced){
         r.recordCubes(f,cmd,&sc,&stats);
         stamp(cmd,f,cubed);
-      }
+      };
       r.volume.beginOverhead(cmd);
       cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set},null);
       r.record(f,cmd,.overhead,&sc,&stats);
@@ -771,8 +823,9 @@ pub fn Renderer(comptime G:type)type{
     }
     /// write this frame's lighting (the cascades fitted to the view, the
     /// points of light) and point the scene's push constants at it; how many
-    /// points it holds
-    fn lightUp(r:*R,f:*Frame,scene:*Scene)u32{
+    /// points it holds. `traced`: this frame's shadows are traced as rays
+    /// (the record says so, and no cube is drawn: none has a sphere)
+    fn lightUp(r:*R,f:*Frame,scene:*Scene,traced:bool)u32{
       // the push constants, which carry the eye, view and sun
       const p=&scene.push;
       // the eye, and the point looked at on the ground
@@ -787,7 +840,7 @@ pub fn Renderer(comptime G:type)type{
       // the lighting record
       var l:light.Lighting=.{
         .cascades=cas.mats,.texel=undefined,
-        .info=.{m.f(n),cas.reach,0,0},
+        .info=.{m.f(n),cas.reach,if(traced)1 else 0,m.f(r.post.aa.samples())},
         .lights=undefined,
         .cubes=@splat(cube.none),
       };
@@ -807,7 +860,7 @@ pub fn Renderer(comptime G:type)type{
         const li=s.light orelse continue;
         q.*=cube.record(l.lights[li],li,cube.Casters.shownOf(s));
         l.lights[li].col[3]=m.f(i+1);
-        sphere.*=l.lights[li].pos;
+        if(!traced)sphere.*=l.lights[li].pos;
       }
       f.lighting.write(0,asBytes(&l));
       // where the record sits on the GPU, split into two words for the push

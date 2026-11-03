@@ -363,6 +363,8 @@ pub const Strings=struct{
     renderDistance:S="",
     /// a list, every level of the points of light's shadows (`options.LightShadows` order)
     lightShadows:S="",
+    /// ray tracing's value where the GPU cannot trace rays
+    noRays:S="",
     /// the options panel's way back
     optionsBack:S="",
     /// the keybinds panel's title

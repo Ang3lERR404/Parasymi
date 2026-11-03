@@ -103,7 +103,7 @@ fn turn(g:*play.Game,set:opt.Setting,dir:i32)void{
     opt.setStop(&g.opts,set,@intCast(@max(i+dir,0)));
     return;
   }
-  opt.step(&g.opts,set,dir,g.mostSamples);
+  opt.step(&g.opts,set,dir,g.gpu);
 }
 /// a click turns a setting on, the other button turns it back (a slider
 /// is set where it is clicked, by `drag`); a leaf turns it its way; BACK
@@ -148,7 +148,7 @@ pub fn tick(g:*play.Game,dt:f32)void{
     // this row's setting, and where its value is
     const set:opt.Setting=@enumFromInt(i);
     const want:f32=switch(opt.kind(set)){
-      .toggle=>if(opt.isOn(&g.opts,set))1 else 0,
+      .toggle=>if(opt.isOn(&g.opts,set,g.gpu))1 else 0,
       .slider=>track.at(opt.stopOf(&g.opts,set),opt.stops(set)),
       .picker=>0,
     };
@@ -192,7 +192,7 @@ fn row(g:*play.Game,d:*Draw,set:opt.Setting,b:Box,t:f32)Allocator.Error!void{
   try g.rows.add(b,pick);
   _=try d.text(b.x+padX/2,y,s.textLabel,if(over)s.gold else s.white,txt.nth(txt.s.hud.optionLabels,i));
   // the value as shown, and how far it has eased
-  const val=opt.shown(&g.opts,set);
+  const val=opt.shown(&g.opts,set,g.gpu);
   const shown=@max(g.settingShown[i],0);
   switch(opt.kind(set)){
     .picker=>try(Picker{.center=.{vx,y},.value=val,.less=hud.row(.options,.{.less=set}),.more=hud.row(.options,.{.more=set}),.over=over,.phase=m.f(i)*0.3}).draw(g,d,t),

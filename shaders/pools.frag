@@ -1,4 +1,4 @@
-#version 450
+#version 460
 //! pooled rain (pools.vert): still deep-blue water over the ground, clear in the shallows and murky where deep, mirroring the sky and the key light, stirred by the wind and ringed by the rain falling on it, its shore soft; seen through the fog.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"

@@ -151,8 +151,9 @@ pub const Game=struct{
   /// how open a toggle's bud is, where a slider's seed rides (-1: not yet
   /// shown, so it starts where it is)
   settingShown:[options.settingCount]f32=@splat(-1),
-  /// the most MSAA samples the GPU takes (main sets it from the renderer)
-  mostSamples:u32=8,
+  /// what the GPU can take: its most MSAA samples, whether it traces rays
+  /// (main sets it from the renderer)
+  gpu:options.Gpu=.{},
   /// the garden being played, as saved (null until it is saved or loaded)
   slot:?save.Name=null,
   /// seconds played since the garden was last saved (autosave counts these)

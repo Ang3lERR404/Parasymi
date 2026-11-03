@@ -57,6 +57,9 @@ pub const Options=struct{
   /// how many points of light near the camera cast shadows into the air,
   /// and how finely (the full look by default)
   lightShadows:LightShadows=.full,
+  /// whether shadows are traced as rays where the GPU can (else, or where
+  /// it cannot, drawn into shadow maps): on by default
+  rayTracing:bool=true,
   /// how many rings of chunks are streamed in and drawn round the gardener
   pub fn rings(o:*const Options)i32{return renderRings[ringsIndex(o.renderDistance)];}
 };
@@ -101,6 +104,16 @@ pub const Setting=enum{
   renderDistance,
   /// how many points of light cast shadows, and how finely
   lightShadows,
+  /// whether shadows are traced as rays
+  rayTracing,
+};
+/// what the GPU can take, which some settings are held to (main asks the
+/// renderer)
+pub const Gpu=struct{
+  /// the most MSAA samples
+  samples:u32=8,
+  /// whether it can trace rays (else RAY TRACING shows it cannot)
+  rays:bool=true,
 };
 /// how many settings there are
 pub const settingCount=fields(Setting).len;
@@ -117,15 +130,17 @@ pub const Kind=enum{
 pub fn kind(set:Setting)Kind{
   return switch(set){
     .antialias,.lightShadows=>.picker,
-    .vsync,.fullscreen=>.toggle,
+    .vsync,.fullscreen,.rayTracing=>.toggle,
     .autosave,.renderDistance=>.slider,
   };
 }
-/// whether the toggle `set` is on (false for any other kind)
-pub fn isOn(o:*const Options,set:Setting)bool{
+/// whether the toggle `set` is on on `gpu` (false for any other kind; ray
+/// tracing off where the GPU cannot)
+pub fn isOn(o:*const Options,set:Setting,gpu:Gpu)bool{
   return switch(set){
     .vsync=>o.vsync,
     .fullscreen=>o.fullscreen,
+    .rayTracing=>o.rayTracing and gpu.rays,
     .antialias,.autosave,.renderDistance,.lightShadows=>false,
   };
 }
@@ -134,7 +149,7 @@ pub fn stops(set:Setting)usize{
   return switch(set){
     .autosave=>autosaveMinutes.len,
     .renderDistance=>renderRings.len,
-    .antialias,.vsync,.fullscreen,.lightShadows=>1,
+    .antialias,.vsync,.fullscreen,.lightShadows,.rayTracing=>1,
   };
 }
 /// which stop the slider `set` is at (0 for any other kind)
@@ -142,7 +157,7 @@ pub fn stopOf(o:*const Options,set:Setting)usize{
   return switch(set){
     .autosave=>autosaveIndex(o.autosave),
     .renderDistance=>ringsIndex(o.renderDistance),
-    .antialias,.vsync,.fullscreen,.lightShadows=>0,
+    .antialias,.vsync,.fullscreen,.lightShadows,.rayTracing=>0,
   };
 }
 /// the slider `set` moved to stop `i` (kept to its stops; any other kind
@@ -151,7 +166,7 @@ pub fn setStop(o:*Options,set:Setting,i:usize)void{
   switch(set){
     .autosave=>o.autosave=autosaveMinutes[@min(i,autosaveMinutes.len-1)],
     .renderDistance=>o.renderDistance=renderRings[@min(i,renderRings.len-1)],
-    .antialias,.vsync,.fullscreen,.lightShadows=>{},
+    .antialias,.vsync,.fullscreen,.lightShadows,.rayTracing=>{},
   }
 }
 /// where `want` rings are in `renderRings` (else the next further one there)
@@ -165,8 +180,11 @@ fn autosaveIndex(minutes:u8)usize{
   return autosaveMinutes.len-1;
 }
 /// turn `set` one way (`dir` +1) or back (-1), wrapping round; anti-aliasing
-/// skips MSAA with more than `most` samples (what the GPU can take)
-pub fn step(o:*Options,set:Setting,dir:i32,most:u32)void{
+/// skips MSAA with more samples than `gpu` takes, and ray tracing stays as
+/// it is where the GPU cannot trace rays
+pub fn step(o:*Options,set:Setting,dir:i32,gpu:Gpu)void{
+  // the most samples the GPU takes
+  const most=gpu.samples;
   switch(set){
     .antialias=>{
       // how many modes there are, and the one being tried
@@ -196,11 +214,14 @@ pub fn step(o:*Options,set:Setting,dir:i32,most:u32)void{
       const n:i32=@intCast(fields(LightShadows).len);
       o.lightShadows=@enumFromInt(@mod(@as(i32,@intFromEnum(o.lightShadows))+dir,n));
     },
+    .rayTracing=>if(gpu.rays){o.rayTracing=!o.rayTracing;},
   }
 }
-/// what `set` is now, as shown
-pub fn shown(o:*const Options,set:Setting)[]const u8{
+/// what `set` is now on `gpu`, as shown (ray tracing says so where the GPU
+/// cannot)
+pub fn shown(o:*const Options,set:Setting,gpu:Gpu)[]const u8{
   return switch(set){
+    .rayTracing=>if(gpu.rays)txt.nth(txt.s.hud.toggle,@intFromBool(o.rayTracing))else txt.s.hud.noRays,
     .antialias=>txt.nth(txt.s.hud.antialias,@intFromEnum(o.aa)),
     .vsync=>txt.nth(txt.s.hud.toggle,@intFromBool(o.vsync)),
     .fullscreen=>txt.nth(txt.s.hud.toggle,@intFromBool(o.fullscreen)),
@@ -225,6 +246,8 @@ const Source=struct{
     renderDistance:?[]const u8=null,
     /// `lightShadows = off|few|more|full`
     lightShadows:?[]const u8=null,
+    /// `rayTracing = on|off`
+    rayTracing:?[]const u8=null,
   }=.{},
 };
 /// a switch that is on, as written
@@ -252,6 +275,7 @@ pub fn parse(text:[]const u8)Options{
   if(f.autosave)|v|if(parseInt(u8,v,10))|n|{o.autosave=autosaveMinutes[autosaveIndex(n)];}else|_|{};
   if(f.renderDistance)|v|if(parseInt(u8,v,10))|n|{o.renderDistance=renderRings[ringsIndex(n)];}else|_|{};
   if(f.lightShadows)|v|o.lightShadows=stringToEnum(LightShadows,v) orelse o.lightShadows;
+  if(f.rayTracing)|v|o.rayTracing=!eql(u8,v,off);
   return o;
 }
 /// writes `o` as cfg source.
@@ -262,7 +286,7 @@ pub fn format(o:*const Options,w:*Writer)Writer.Error!void{
     "[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\nautosave = {d}\nrenderDistance = {d}\n",.{
     o.aa,if(o.vsync)on else off,if(o.fullscreen)on else off,o.autosave,o.renderDistance,
   });
-  try w.print("lightShadows = {t}\n",.{o.lightShadows});
+  try w.print("lightShadows = {t}\nrayTracing = {s}\n",.{o.lightShadows,if(o.rayTracing)on else off});
 }
 /// reads `filePath`; the defaults if it cannot be read, written out if there
 /// is none.
@@ -293,7 +317,7 @@ pub fn save(o:*const Options,io:Io)Error!void{
 }
 test"options round-trip through their file; unknown values keep the defaults"{
   // a set of options off the defaults, written out
-  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6,.lightShadows=.few};
+  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6,.lightShadows=.few,.rayTracing=false};
   // room for the file, and the writer that fills it
   var buf:[fileMost]u8=undefined;
   var w:Writer=.fixed(&buf);
@@ -310,41 +334,41 @@ test"the render distance steps between its stops without wrapping"{
   // the defaults: four rings
   var o:Options=.{};
   try testing.expectEqual(@as(i32,4),o.rings());
-  step(&o,.renderDistance,1,4);
+  step(&o,.renderDistance,1,.{.samples=4});
   try testing.expectEqual(@as(i32,5),o.rings());
   setStop(&o,.renderDistance,99);
-  step(&o,.renderDistance,1,4);
+  step(&o,.renderDistance,1,.{.samples=4});
   try testing.expectEqual(@as(i32,8),o.rings());
   setStop(&o,.renderDistance,0);
-  step(&o,.renderDistance,-1,4);
+  step(&o,.renderDistance,-1,.{.samples=4});
   try testing.expectEqual(@as(i32,2),o.rings());
 }
 test"anti-aliasing turns both ways and skips what the GPU cannot take"{
   // options with anti-aliasing off
   var o:Options=.{.aa=.off};
-  step(&o,.antialias,1,4);
+  step(&o,.antialias,1,.{.samples=4});
   try testing.expectEqual(Antialias.fxaa,o.aa);
-  step(&o,.antialias,-1,4);
-  step(&o,.antialias,-1,4);
+  step(&o,.antialias,-1,.{.samples=4});
+  step(&o,.antialias,-1,.{.samples=4});
   // msaa8 is beyond 4 samples: wraps back to msaa4
   try testing.expectEqual(Antialias.msaa4,o.aa);
-  step(&o,.antialias,1,4);
+  step(&o,.antialias,1,.{.samples=4});
   try testing.expectEqual(Antialias.off,o.aa);
-  step(&o,.vsync,1,4);
+  step(&o,.vsync,1,.{.samples=4});
   try testing.expect(!o.vsync);
   // autosave: 5 minutes by default, wrapping round to never
   try testing.expectEqual(@as(u8,5),o.autosave);
-  step(&o,.autosave,-1,4);
+  step(&o,.autosave,-1,.{.samples=4});
   try testing.expectEqual(@as(u8,2),o.autosave);
   o.autosave=60;
-  step(&o,.autosave,1,4);
+  step(&o,.autosave,1,.{.samples=4});
   try testing.expectEqual(@as(u8,0),o.autosave);
   // the points of light's shadows: the full look by default, wrapping round to none
   try testing.expectEqual(LightShadows.full,o.lightShadows);
-  step(&o,.lightShadows,1,4);
+  step(&o,.lightShadows,1,.{.samples=4});
   try testing.expectEqual(LightShadows.off,o.lightShadows);
   try testing.expectEqual(@as(usize,0),o.lightShadows.lights());
-  step(&o,.lightShadows,-1,4);
+  step(&o,.lightShadows,-1,.{.samples=4});
   try testing.expectEqual(@as(usize,4),o.lightShadows.lights());
 }
 test"each setting is a toggle, a picker or a slider; a slider is set by its stops"{
@@ -353,11 +377,27 @@ test"each setting is a toggle, a picker or a slider; a slider is set by its stop
   try testing.expectEqual(Kind.toggle,kind(.vsync));
   try testing.expectEqual(Kind.picker,kind(.antialias));
   try testing.expectEqual(Kind.slider,kind(.autosave));
-  try testing.expect(isOn(&o,.vsync)and!isOn(&o,.fullscreen));
+  try testing.expect(isOn(&o,.vsync,.{})and!isOn(&o,.fullscreen,.{}));
   try testing.expectEqual(autosaveMinutes.len,stops(.autosave));
   try testing.expectEqual(@as(usize,3),stopOf(&o,.autosave));
   setStop(&o,.autosave,1);
   try testing.expectEqual(@as(u8,1),o.autosave);
   setStop(&o,.autosave,99);
   try testing.expectEqual(@as(u8,60),o.autosave);
+}
+test"ray tracing is on by default where the GPU can, and stays off where it cannot"{
+  // the defaults, on a GPU that traces rays and on one that cannot
+  var o:Options=.{};
+  const can:Gpu=.{};
+  const cannot:Gpu=.{.rays=false};
+  try testing.expectEqual(Kind.toggle,kind(.rayTracing));
+  try testing.expect(isOn(&o,.rayTracing,can));
+  try testing.expect(!isOn(&o,.rayTracing,cannot));
+  // where it cannot, turning it does nothing
+  step(&o,.rayTracing,1,cannot);
+  try testing.expect(o.rayTracing);
+  step(&o,.rayTracing,1,can);
+  try testing.expect(!o.rayTracing and !isOn(&o,.rayTracing,can));
+  try testing.expect(!parse("[options]\nrayTracing = off\n").rayTracing);
+  try testing.expect(parse("[options]\n").rayTracing);
 }

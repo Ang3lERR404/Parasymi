@@ -20,7 +20,7 @@ const m=lib.engine.core.math;
 const ck=lib.ck;
 /// the detail pipeline: detail.vert grows each record, terrain.frag shades it
 pub const desc:pass.Desc=.{
-  .vert=@embedFile("detail.vert"),.frag=@embedFile("terrain.frag"),
+  .vert=@embedFile("detail.vert"),.frag=@embedFile("terrain.frag"),.rayFrag=@embedFile("terrain_ray.frag"),
   .bindings=&.{pipeline.binding(vertex.DetailTile,0,.instance)},
   .attrs=&pipeline.attrs(vertex.DetailTile,0,0),
 };

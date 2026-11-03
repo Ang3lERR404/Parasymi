@@ -31,6 +31,8 @@ const faces=cubeMod.faces;
 const maxFaces=cubeMod.maxCubes*faces;
 /// all the maths: distances
 const m=lib.engine.core.math;
+/// shadows traced as rays: which set a caster is caught into, the table's head
+const raysMod=lib.engine.render.rays;
 // binding 2: the same mesh buffer, offset to the next growth key, so a
 // confluence blends toward it (see the renderer's `Ext.plantMorph`)
 /// where each vertex stream comes from: mesh, instance, next growth key
@@ -39,7 +41,7 @@ const bindings=&[_]vk.VertexInputBindingDescription{pipeline.binding(vertex.Mesh
 const attrs=&(pipeline.attrs(vertex.Mesh,0,0)++pipeline.attrs(vertex.PlantInstance,1,5)++pipeline.attrs(vertex.MeshPose,2,14));
 /// the solid plants pipeline: plant.vert grows and sways each, plant.frag shades it
 pub const desc:pass.Desc=.{
-  .vert=@embedFile("plant.vert"),.frag=@embedFile("plant.frag"),
+  .vert=@embedFile("plant.vert"),.frag=@embedFile("plant.frag"),.rayFrag=@embedFile("plant_ray.frag"),
   .bindings=bindings,.attrs=attrs,.perSample=true,
 };
 /// this frame's instances, and where each mesh's run of them starts and how
@@ -152,7 +154,7 @@ fn draw(r:*renderer.Renderer,f:*const Frame,cmd:vk.CommandBufferProxy,scene:*con
 pub const head=struct{
   /// the head pipeline: plant.vert as ever, plant_head.frag
   pub const desc:pass.Desc=.{
-    .vert=@embedFile("plant.vert"),.frag=@embedFile("plant_head.frag"),
+    .vert=@embedFile("plant.vert"),.frag=@embedFile("plant_head.frag"),.rayFrag=@embedFile("plant_head_ray.frag"),
     .bindings=bindings,.attrs=attrs,.perSample=true,
   };
   /// draws every mesh's always-solid head
@@ -166,7 +168,7 @@ pub const head=struct{
 pub const glass=struct{
   /// the see-through plants pipeline: blended, writing no depth
   pub const desc:pass.Desc=.{
-    .vert=@embedFile("plant.vert"),.frag=@embedFile("plant_glass.frag"),
+    .vert=@embedFile("plant.vert"),.frag=@embedFile("plant_glass.frag"),.rayFrag=@embedFile("plant_glass_ray.frag"),
     .bindings=bindings,.attrs=attrs,
     .blend=true,.depthWrite=false,.nearer=true,.perSample=true,
   };
@@ -187,6 +189,66 @@ pub const shadow=struct{
   /// draws every caster into the shadow map
   pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
     draw(r,&r.frames[r.fi].pass.plants,cmd,scene,stats,.plantsShadow);
+  }
+};
+/// the plants caught for the rays where shadows are traced (engine
+/// rays.zig): the same instances, each at the level of detail it is drawn
+/// at, swaying and growing as drawn, written out vertex by vertex (plant.vert
+/// under CAPTURE); a radiant plant also into the points of light's own set
+pub const capture=struct{
+  /// the capture pipeline: plant_capture.vert, nothing rasterized
+  pub const desc:pass.Desc=.{
+    .vert=@embedFile("plant_capture.vert"),.frag=lib.engine.shadowFrag,
+    .bindings=bindings,.attrs=attrs,.target=.capture,
+  };
+  /// this frame's table (light.glsl `Capture`) and where each mesh's run
+  /// of instances is caught
+  pub const Frame=Caught;
+  /// (its fields)
+  const Caught=struct{
+    /// where each set's vertices go, then each instance's first slot less
+    /// its mesh's first vertex, by its place among the instances
+    table:Buffer=.{},
+    /// the slot each mesh's first instance is caught from (the rest follow
+    /// it, a mesh's worth of vertices apart)
+    at:[renderer.plantMeshes]u64=@splat(0),
+  };
+  /// makes one frame's table, where rays can be traced
+  pub fn initFrame(c:*const Ctx)ctx.Error!Caught{
+    if(!c.rayTracing)return.{};
+    return.{.table=try Buffer.init(c,raysMod.tableHead+max*@sizeOf(u32),.{.storage_buffer=true,.shader_device_address=true})};
+  }
+  /// frees one frame's table
+  pub fn deinitFrame(f:*Caught,c:*const Ctx)void{f.table.deinit(c);}
+  /// room for every instance's vertices this frame, while shadows are
+  /// traced, and each instance's place in the table
+  pub fn prepare(r:*renderer.Renderer,f:*Caught,_:*const renderer.Scene,_:*renderer.Stats)void{
+    if(!r.tracing())return;
+    // the plants' own frame: its runs of instances
+    const pf=&r.frames[r.fi].pass.plants;
+    renderer.caught(r,&f.table,&f.at,&pf.first,&pf.counts,&r.ext.plantRuns,&.{renderer.plantLevel.level,renderer.pointLevel.level});
+  }
+  /// draws every instance once more, nothing rasterized, writing out each
+  /// vertex where it is placed, and hands each to the rays
+  pub fn record(r:*renderer.Renderer,f:*Caught,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+    // (nothing to catch until the meshes are in)
+    if(stats.instances==0 or r.ext.meshes.buf==.null_handle)return;
+    // the plants' own frame, and the push pointed at the table
+    const pf=&r.frames[r.fi].pass.plants;
+    const push=renderer.tabled(r,&f.table,scene.push);
+    cmd.bindPipeline(.graphics,r.pipe(.plantsCapture));
+    cmd.pushConstants(r.layout(.world),pass.stages,0,@sizeOf(renderer.WorldPush),&push);
+    cmd.bindVertexBuffers(0,&.{r.ext.meshes.buf,pf.inst.buf},&.{0,0});
+    cmd.bindIndexBuffer(r.ext.indices.buf,0,.uint32);
+    for(0..renderer.plantMeshes)|i|{
+      // the mesh's welded run, all of it drawn as it is drawn in the world
+      const run=r.ext.plantRuns[renderer.caughtMesh(i)];
+      if(pf.counts[i]==0 or run.count==0)continue;
+      cmd.bindVertexBuffers(2,&.{r.ext.meshes.buf},&.{r.ext.plantMorph[renderer.caughtMesh(i)]});
+      cmd.drawIndexed(run.count,pf.counts[i],run.first,@intCast(run.base),pf.first[i]);
+      stats.draws+=1;
+      renderer.handed(r,f.at[i],pf.counts[i],run,if(renderer.pointCaster(i))&.{renderer.plantLevel,renderer.pointLevel}else&.{renderer.plantLevel});
+    }
   }
 };
 /// the plants as a point of light holding a shadow cube sees them, into each

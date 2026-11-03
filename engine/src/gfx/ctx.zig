@@ -48,6 +48,9 @@ pub fn fold(e:anyerror)Error{
 const validate=builtin.mode==.Debug;
 /// the Khronos validation layer's name
 const validationLayer="VK_LAYER_KHRONOS_validation";
+/// the device extensions ray tracing asks for: acceleration structures
+/// (which need deferred host operations beside them) and ray queries
+const traceExts=[_][*:0]const u8{vk.extensions.khr_acceleration_structure.name,vk.extensions.khr_deferred_host_operations.name,vk.extensions.khr_ray_query.name};
 /// the Vulkan context: instance, device, the window's surface and the one
 /// queue that draws and presents, made once and handed to every GPU call
 pub const Ctx=struct{
@@ -77,6 +80,14 @@ pub const Ctx=struct{
   queue:vk.Queue,
   /// whether pipelines may shade every sample (MSAA edges a shader decides)
   sampleShading:bool,
+  /// whether the GPU can trace rays from any shader through what stands in
+  /// the world (acceleration structures and ray queries, with vertex
+  /// shaders writing out what they place: render/rays.zig); without it
+  /// every shadow is drawn into maps as ever
+  rayTracing:bool,
+  /// with `rayTracing`: how finely the scratch an acceleration structure is
+  /// built in must be aligned (bytes)
+  scratchAlign:u32,
   /// `app`: the game's name, as the driver is told it
   /// bring Vulkan up on `window`: instance, validation (debug builds), surface,
   /// GPU and device; any failure is folded into `Error`
@@ -143,20 +154,31 @@ pub const Ctx=struct{
     const prio=[_]f32{1};
     // the one queue asked for, in the drawing family
     const qci=[_]vk.DeviceQueueCreateInfo{.{.queue_family_index=c.family,.queue_count=1,.p_queue_priorities=&prio}};
+    // decision: ray tracing is asked for only where the GPU has all of it
+    // (the gardener's call, crossing the context's boundary): acceleration
+    // structures, ray queries from any shader, and vertex shaders that may
+    // write to buffers (the casters written out as drawn, render/rays.zig).
+    // Without it nothing changes: every shadow is drawn into maps.
+    c.rayTracing=try c.canTrace(gpa);
+    // what ray tracing asks for, chained on only when the GPU has it
+    var fq:vk.PhysicalDeviceRayQueryFeaturesKHR=.{.ray_query=.true};
+    var fa:vk.PhysicalDeviceAccelerationStructureFeaturesKHR=.{.p_next=&fq,.acceleration_structure=.true};
     // the Vulkan 1.3 features used: dynamic rendering, sync2, demote to helper
-    var f13:vk.PhysicalDeviceVulkan13Features=.{.dynamic_rendering=.true,.synchronization_2=.true,.shader_demote_to_helper_invocation=.true};
+    var f13:vk.PhysicalDeviceVulkan13Features=.{.p_next=if(c.rayTracing)@ptrCast(&fa)else null,.dynamic_rendering=.true,.synchronization_2=.true,.shader_demote_to_helper_invocation=.true};
     // skinned meshes read their bones through a buffer's address (core in 1.2)
     var f12:vk.PhysicalDeviceVulkan12Features=.{.p_next=&f13,.buffer_device_address=.true};
     // the shadow map's cascades are drawn in one pass, one view each (core in 1.1)
     var f11:vk.PhysicalDeviceVulkan11Features=.{.p_next=&f12,.multiview=.true};
-    // the device extensions asked for: only the swapchain
-    const devExts=[_][*:0]const u8{vk.extensions.khr_swapchain.name};
+    // the device extensions asked for: the swapchain, and with ray tracing
+    // its three
+    const devExts=[_][*:0]const u8{vk.extensions.khr_swapchain.name}++traceExts;
     c.sampleShading=c.instance.getPhysicalDeviceFeatures(c.pdev).sample_rate_shading==.true;
     // (a vertex may be clipped away by a distance of its own: what a
     // skinned mesh hides, see part.vert; every desktop GPU has it), and
     // the points of light's shadow cubes are read as one cube array
-    // (render/cube.zig; every desktop GPU has that too)
-    const f10:vk.PhysicalDeviceFeatures=.{.sample_rate_shading=if(c.sampleShading).true else.false,.shader_clip_distance=.true,.image_cube_array=.true};
+    // (render/cube.zig; every desktop GPU has that too); with ray tracing
+    // a vertex shader writes out where it placed each vertex
+    const f10:vk.PhysicalDeviceFeatures=.{.sample_rate_shading=if(c.sampleShading).true else.false,.shader_clip_distance=.true,.image_cube_array=.true,.vertex_pipeline_stores_and_atomics=if(c.rayTracing).true else.false};
     c.vkd=try gpa.create(vk.DeviceWrapper);
     errdefer gpa.destroy(c.vkd);
     // the new logical device
@@ -165,13 +187,41 @@ pub const Ctx=struct{
       .p_enabled_features=&f10,
       .queue_create_info_count=qci.len,
       .p_queue_create_infos=&qci,
-      .enabled_extension_count=devExts.len,
+      .enabled_extension_count=if(c.rayTracing)devExts.len else 1,
       .pp_enabled_extension_names=&devExts,
     },null);
     c.vkd.*=vk.DeviceWrapper.load(dev,c.vki.dispatch.vkGetDeviceProcAddr.?);
     c.device=vk.DeviceProxy.init(dev,c.vkd);
     c.queue=c.device.getDeviceQueue(c.family,0);
-    log.info("gpu: {s}",.{sliceTo(&c.props.device_name,0)});
+    log.info("gpu: {s}{s}",.{sliceTo(&c.props.device_name,0),if(c.rayTracing)" (ray tracing)"else""});
+  }
+  /// whether the chosen GPU has everything ray tracing asks for (its
+  /// extensions, acceleration structures, ray queries, vertex shaders
+  /// writing to buffers), noting the scratch alignment its builds need
+  fn canTrace(c:*Ctx,gpa:Allocator)!bool{
+    c.scratchAlign=0;
+    // every extension the GPU offers
+    const have=try c.instance.enumerateDeviceExtensionPropertiesAlloc(c.pdev,null,gpa);
+    defer gpa.free(have);
+    for(traceExts)|want|{
+      // whether this one is among them
+      const found=for(have)|h|{if(eql(u8,sliceTo(&h.extension_name,0),span(want)))break true;}else false;
+      if(!found)return false;
+    }
+    // the features asked after, chained
+    var fq:vk.PhysicalDeviceRayQueryFeaturesKHR=.{};
+    var fa:vk.PhysicalDeviceAccelerationStructureFeaturesKHR=.{.p_next=&fq};
+    var f2:vk.PhysicalDeviceFeatures2=.{.p_next=&fa,.features=.{}};
+    c.instance.getPhysicalDeviceFeatures2(c.pdev,&f2);
+    if(fa.acceleration_structure!=.true or fq.ray_query!=.true or f2.features.vertex_pipeline_stores_and_atomics!=.true)return false;
+    // the acceleration structures' limits: the scratch alignment
+    var pa:vk.PhysicalDeviceAccelerationStructurePropertiesKHR=undefined;
+    pa.s_type=.physical_device_acceleration_structure_properties_khr;
+    pa.p_next=null;
+    var p2:vk.PhysicalDeviceProperties2=.{.p_next=&pa,.properties=undefined};
+    c.instance.getPhysicalDeviceProperties2(c.pdev,&p2);
+    c.scratchAlign=@max(pa.min_acceleration_structure_scratch_offset_alignment,1);
+    return true;
   }
   /// destroy the device, surface, messenger and instance, then free the wrappers
   pub fn deinit(c:*Ctx,gpa:Allocator)void{

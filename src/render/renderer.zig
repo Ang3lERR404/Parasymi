@@ -39,6 +39,10 @@ const weld=engine.gfx.weld;
 pub const Run=weld.Run;
 /// the engine's frame orchestration, given the garden below
 const er=engine.render.renderer;
+/// shadows traced as rays: which set a caster is caught into, the table's head
+const raysMod=engine.render.rays;
+/// where an instance left uncaught is said
+const log=std.log;
 /// the garden's vertex and instance layouts
 const vertex=lib.vertex;
 /// the garden's plant meshes, grown from their genomes
@@ -123,6 +127,12 @@ pub const passes=struct{
   pub const fog=@import("passes/fog.zig");
   /// the air round what glows, lit after the fog's march
   pub const partsAir=@import("passes/parts.zig").air;
+  // what casts shadows caught for the rays, first of all where they are
+  // traced (after every pass above has prepared its instances)
+  /// the plants as drawn, written out for the rays
+  pub const plantsCapture=@import("passes/plants.zig").capture;
+  /// the parts as drawn, written out for the rays
+  pub const partsCapture=@import("passes/parts.zig").capture;
   /// the HUD, over the finished picture
   pub const ui=er.ui;
 };
@@ -221,6 +231,30 @@ pub fn carry(prev:Stats)Stats{return.{.meshed=prev.meshed};}
 /// mesh's levels side by side). A shadow needs no fine detail, and every
 /// caster is drawn into every cascade.
 pub fn caster(slot:usize)usize{return slot-slot%meshgen.lods+meshgen.lods-1;}
+/// where a caster is caught for the rays (rays.zig): which bottom level,
+/// as which set of casters
+pub const Into=struct{
+  /// the bottom level
+  level:usize,
+  /// what it casts for: every light, or only the points of light
+  set:raysMod.Caster,
+};
+/// the plants, casting every light's shadows, in a level of their own (they
+/// stay from frame to frame, so it is refitted)
+pub const plantLevel:Into=.{.level=0,.set=.both};
+/// a radiant plant's petals, leaves and veil, casting only the points of light's
+pub const pointLevel:Into=.{.level=1,.set=.points};
+/// the parts (the wolf, structures and what comes and goes: motes, bursts)
+/// in a level of their own, so their coming and going never rebuilds the plants'
+pub const partLevel:Into=.{.level=2,.set=.both};
+// decision: the rays meet each caster at the level of detail the shadow
+// maps draw it at (its coarsest): what is drawn at its own level casted
+// alike in shots (the leaves' blotches are their own shadows, not the
+// levels differing) but held eleven times the triangles and quadrupled
+// the frame
+/// the mesh an instance drawn from `slot` is caught with for the rays
+/// (rays.zig): as the shadow maps draw it, its caster
+pub fn caughtMesh(slot:usize)usize{return caster(slot);}
 /// how far from its origin a caster reaching `size` (its mesh's farthest
 /// vertex, `Ext.plantReach`/`partReach`) may lean into a light, grown as
 /// large as a plant grows and swayed as far as the wind takes it
@@ -713,7 +747,7 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   // made empty first and filled step by step
   const bufs=[_]*Buffer{&x.meshes,&x.skins,&x.grows,&x.indices};
   if(g.sent==0)for(bufs,lists,0..)|b,l,k|{
-    b.*=try Buffer.initRoom(&r.ctx,if(k==3).{.index_buffer=true}else.{.vertex_buffer=true},l.len,&.{});
+    b.*=try Buffer.initRoom(&r.ctx,if(k==3)indexUsage(r)else.{.vertex_buffer=true},l.len,&.{});
   };
   // this step's share of each list, while any is left to send
   if(g.sent<uploadSteps){
@@ -761,6 +795,22 @@ fn plantGlassy(id:species.Id,p:vertex.Part)bool{
     .radiant,.star,.lens,.bouquet,.heliotrope,.veil=>true,
     .herb,.coil,.drift,.confluence,.lily,.creeper=>p==.pod or p==.bloom or p==.resin,
   };
+}
+/// whether a plant drawn from `slot` may cast only the points of light's
+/// shadows somewhere (rays.zig's second set): a radiant plant's petals,
+/// leaves and veil stand round the light at its heart (plant.vert CAPTURE)
+pub fn pointCaster(slot:usize)bool{
+  // the species the slot belongs to
+  const id:species.Id=@enumFromInt(slot/(meshgen.maxVariants*meshgen.lods));
+  return switch(species.get(id).genome.form){
+    .radiant,.star,.lens,.bouquet,.heliotrope,.veil=>true,
+    .herb,.coil,.drift,.confluence,.lily,.creeper=>false,
+  };
+}
+/// the usage the meshes' indices are made with: drawn, and where rays are
+/// traced also built into what casts (rays.zig reads them by address)
+fn indexUsage(r:*const Renderer)vk.BufferUsageFlags{
+  return.{.index_buffer=true,.shader_device_address=r.ctx.rayTracing,.acceleration_structure_build_input_read_only_khr=r.ctx.rayTracing};
 }
 /// per run of `runs` (its vertices among `verts`), how far its farthest
 /// vertex lies from its origin
@@ -814,7 +864,7 @@ pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots]m.Vice(u32,
     for(count,0..)|*c,i|c.*=@intCast(i);
     try r.retire(x.indices);
     x.indices=.{};
-    x.indices=try Buffer.initWith(&r.ctx,.{.index_buffer=true},sliceAsBytes(count));
+    x.indices=try Buffer.initWith(&r.ctx,indexUsage(r),sliceAsBytes(count));
     x.identity=room;
   }
   // the first vertex not already in the buffers as the tool last put it
@@ -952,4 +1002,53 @@ fn upload(r:*Renderer,c:*ck.Chunk,verts:[]const vertex.Terrain,tiles:[]const ver
   };
   c.dirty=false;
   r.stats.meshed+=1;
+}
+/// a capture pass's table filled for this frame: each mesh's run of
+/// instances (`first`, `counts`, drawn from `runs`) given room among the
+/// caught vertices (its first slot into `at`), and each instance its
+/// slot less its mesh's first vertex, by its place among the instances
+pub fn caught(r:*Renderer,table:*Buffer,at:[]u64,first:[]const u32,counts:[]const u32,runs:[]const Run,levels:[]const usize)void{
+  // the rays catching them, told how many instances each mesh has (a
+  // frame the same as the last is refitted)
+  const ra=&r.rays.?;
+  for(levels)|l|ra.mark(l,sliceAsBytes(counts));
+  for(counts,first,at,0..)|n,f0,*a,i|{
+    // the run its instances are caught with
+    const run=runs[caughtMesh(i)];
+    if(n==0 or run.count==0)continue;
+    a.*=ra.reserve(@as(u64,n)*run.verts);
+    for(0..n)|k|{
+      // this instance's slot, less its mesh's first vertex (wrapping: gl_VertexIndex adds it back)
+      const entry:u32=@as(u32,@intCast(a.*+k*run.verts))-%run.base;
+      table.write(raysMod.tableHead+(f0+k)*@sizeOf(u32),asBytes(&entry));
+    }
+  }
+}
+/// `push` pointed at `table` (its `light`), the table's head written: where
+/// each set's caught vertices lie
+pub fn tabled(r:*Renderer,table:*Buffer,push:WorldPush)WorldPush{
+  // the rays, the context, and both sets' addresses
+  const ra=&r.rays.?;
+  const c=&r.ctx;
+  const head=[_]u64{ra.caughtAt(c,.both),ra.caughtAt(c,.points)};
+  table.write(0,asBytes(&head));
+  // the push, its light the table
+  var p=push;
+  const at=table.address(c);
+  p.light=.{@truncate(at),@truncate(at>>32)};
+  return p;
+}
+/// each of a mesh's `n` instances caught from `slot` on (a mesh's worth of
+/// vertices apart) handed to the rays, into each level of `into`
+pub fn handed(r:*Renderer,slot:u64,n:u32,run:Run,into:[]const Into)void{
+  // the rays, and where the mesh's indices lie on the device
+  const ra=&r.rays.?;
+  const c=&r.ctx;
+  const index=r.ext.indices.address(c)+@as(u64,run.first)*@sizeOf(u32);
+  for(0..n)|k|{
+    for(into)|t|ra.add(c,t.level,t.set,slot+k*run.verts,run.verts,index,run.count/3)catch|e|{
+      log.warn("rays: an instance left uncaught: {t}",.{e});
+      return;
+    };
+  }
 }

@@ -131,7 +131,8 @@ pub fn main(init:Init)!void{
   // the gardener's sculpts and their clips, read once (sculpts.zig)
   try lib.sculpts.load(gpa,io);
   defer lib.sculpts.unload();
-  // the gardener's settings; `--novsync` overrides theirs for this run
+  // the gardener's settings; `--novsync` and `--rt=on|off` override theirs
+  // for this run
   var opts=try options.load(gpa,io);
   // `--demo`, `--stress` and `--load`: which garden to start in
   var demo=false;
@@ -184,6 +185,8 @@ pub fn main(init:Init)!void{
     if(startsWith(u8,a,"--dist="))turn.dist=try parseFloat(f32,a["--dist=".len..]);
     if(startsWith(u8,a,"--pitch="))turn.pitch=m.rad(try parseFloat(f32,a["--pitch=".len..]));
     if(eql(u8,a,"--novsync"))opts.vsync=false;
+    if(eql(u8,a,"--rt=on"))opts.rayTracing=true;
+    if(eql(u8,a,"--rt=off"))opts.rayTracing=false;
     if(eql(u8,a,"--demo"))demo=true;
     if(eql(u8,a,"--stress"))stress=true;
     if(eql(u8,a,"--load"))load=true;
@@ -250,6 +253,7 @@ pub fn main(init:Init)!void{
   defer r.deinit();
   opts.aa=r.antialiasing();
   try r.pointShadows(opts.lightShadows.lights(),opts.lightShadows.res());
+  r.setRays(opts.rayTracing);
   // the loading screen shows while every mesh grows (on a thread of its
   // own), the world wakes and its ground is meshed. Until the world is
   // woken its chunks are counted as many as stream in round the gardener.
@@ -283,7 +287,7 @@ pub fn main(init:Init)!void{
   // is split over the pool
   game.world.io=io;
   game.opts=opts;
-  game.mostSamples=r.maxSamples();
+  game.gpu=.{.samples=r.maxSamples(),.rays=r.ctx.rayTracing};
   // the garden's sound; without a device it plays on in silence
   const sounds:?*Sounds=Sounds.open(gpa,io,.init(world,sound.rate),.{.name=txt.s.window.title,.rate=sound.rate})catch|e|none:{
     log.warn("no sound: {t}",.{e});
@@ -524,6 +528,7 @@ fn apply(io:Io,game:*Game,r:*Renderer,display:*Display,applied:*Options)!void{
   try r.antialias(o.aa);
   o.aa=r.antialiasing();
   try r.pointShadows(o.lightShadows.lights(),o.lightShadows.res());
+  r.setRays(o.rayTracing);
   try r.setVsync(o.vsync);
   // whether the window is fullscreen now
   const full=display.mode==.fullscreen;
@@ -589,7 +594,7 @@ fn restore(gpa:Allocator,io:Io,game:*Game,r:*Renderer,name:save.Name)!bool{
   try renderer.dropWorld(r);
   // the settings belong to the gardener, not the garden
   loaded.opts=game.opts;
-  loaded.mostSamples=game.mostSamples;
+  loaded.gpu=game.gpu;
   loaded.world.io=io;
   game.deinit();
   game.*=loaded;

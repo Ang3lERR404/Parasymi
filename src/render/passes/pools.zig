@@ -13,7 +13,7 @@ const renderer=lib.renderer;
 /// the pools' pipeline: no vertex buffers, blended over the solids, testing
 /// depth but writing none
 pub const desc:pass.Desc=.{
-  .vert=@embedFile("pools.vert"),.frag=@embedFile("pools.frag"),
+  .vert=@embedFile("pools.vert"),.frag=@embedFile("pools.frag"),.rayFrag=@embedFile("pools_ray.frag"),
   .bindings=&.{},.attrs=&.{},
   .depthWrite=false,.blend=true,
 };

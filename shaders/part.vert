@@ -1948,7 +1948,13 @@ void main() {
   // what is light itself casts no shadow (a star mote, PARTS_LIGHT: a beam,
   // a halo's flash, ring and rays), nor does the soft shadow under a floater
   // or a placement preview
-  if (mode == PLACE_MOTE || mode == PLACE_BURST || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u) gl_Position = UNSEEN;
+  bool casts = !(mode == PLACE_MOTE || mode == PLACE_BURST || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u);
+#ifdef CAPTURE
+  // caught for the rays: what casts, casts for every light (as the cubes have it)
+  capture(w.xyz, casts, casts);
+#else
+  if (!casts) gl_Position = UNSEEN;
+#endif
 #endif
 }
 

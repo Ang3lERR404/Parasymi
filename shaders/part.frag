@@ -1,6 +1,11 @@
-#version 450
+#version 460
 //! material of library parts (structures, the wolf, nodes, beams, motes): fibre, sap, resin, essence, light.
 #extension GL_GOOGLE_include_directive : require
+#ifndef AIR
+// shaded once a sample (passes/parts.zig `perSample`; not the air): a
+// pixel's traced shadow rays are shared among its samples (light.glsl `sharers`)
+#define SAMPLED
+#endif
 #include "common.glsl"
 #include "surface.glsl"
 #include "ground.glsl"

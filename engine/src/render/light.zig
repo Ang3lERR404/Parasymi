@@ -67,7 +67,10 @@ pub const Lighting=extern struct{
   cascades:[cascades]m.M4,
   /// per cascade, the world size of one of its texels (one vec4's worth)
   texel:m.Vice(f32,4),
-  /// x points of light, y how far from the eye shadows reach, zw unused
+  /// x points of light, y how far from the eye shadows reach, z 1 where
+  /// shadows are traced as rays this frame (render/rays.zig) instead of
+  /// read from the maps, w the world's samples a pixel (a pass shaded per
+  /// sample shares a pixel's rays among them)
   info:m.Vice(f32,4),
   /// the frame's points of light, the first `info[0]` of them lit (a
   /// light holding a shadow cube says which in its `col[3]`)
@@ -248,15 +251,20 @@ pub const Shadow=struct{
     },null);
     // the set's bindings: the map through each sampler, then the points of
     // light's shadow cubes (pointed at by `bindCubes`), read by both stages
+    // (and, where the GPU traces rays, what casts shadows as rays meet it:
+    // render/rays.zig, pointed at by `bindRays`)
     const bindings=[_]vk.DescriptorSetLayoutBinding{
       .{.binding=0,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
       .{.binding=1,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
       .{.binding=2,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
+      .{.binding=3,.descriptor_type=.acceleration_structure_khr,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
     };
-    s.setLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=bindings.len,.p_bindings=&bindings},null);
+    // how many of them: the last only where rays are traced
+    const used:u32=if(c.rayTracing)bindings.len else bindings.len-1;
+    s.setLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=used,.p_bindings=&bindings},null);
     // room for those descriptors
-    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=bindings.len}};
-    s.pool=try c.device.createDescriptorPool(&.{.max_sets=1,.pool_size_count=sizes.len,.p_pool_sizes=&sizes},null);
+    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=3},.{.type=.acceleration_structure_khr,.descriptor_count=1}};
+    s.pool=try c.device.createDescriptorPool(&.{.max_sets=1,.pool_size_count=if(c.rayTracing)sizes.len else 1,.p_pool_sizes=&sizes},null);
     try c.device.allocateDescriptorSets(&.{.descriptor_pool=s.pool,.descriptor_set_count=1,.p_set_layouts=@ptrCast(&s.setLayout)},@ptrCast(&s.set));
     // what the set's binding points at: the map's view, through the sampler
     const info=[_]vk.DescriptorImageInfo{.{.sampler=s.sampler,.image_view=s.view,.image_layout=.shader_read_only_optimal}};
@@ -277,6 +285,18 @@ pub const Shadow=struct{
     // the write that points the binding there
     const writes=[_]vk.WriteDescriptorSet{
       .{.dst_set=s.set,.dst_binding=2,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=&info,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
+    };
+    c.device.updateDescriptorSets(&writes,null);
+  }
+  /// point the set's fourth binding at the top level the shaders trace
+  /// shadows through (render/rays.zig; made once, where rays are traced)
+  pub fn bindRays(s:*const Shadow,c:*const Ctx,top:vk.AccelerationStructureKHR)void{
+    // the one structure, as the write carries it
+    const one=[_]vk.AccelerationStructureKHR{top};
+    const as:vk.WriteDescriptorSetAccelerationStructureKHR=.{.acceleration_structure_count=1,.p_acceleration_structures=&one};
+    // the write that points the binding there
+    const writes=[_]vk.WriteDescriptorSet{
+      .{.p_next=&as,.dst_set=s.set,.dst_binding=3,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.acceleration_structure_khr,.p_image_info=undefined,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
     };
     c.device.updateDescriptorSets(&writes,null);
   }

@@ -91,6 +91,8 @@ pub const render=struct{
   pub const light=@import("render/light.zig");
   /// points of light that cast shadows: their cubes and which lights hold them
   pub const cube=@import("render/cube.zig");
+  /// shadows traced as rays: what casts them, caught and built each frame
+  pub const rays=@import("render/rays.zig");
   /// the air: the overhead map, the volume and its composite
   pub const volume=@import("render/volume.zig");
   /// the camera: orbit, first person and free
@@ -144,6 +146,7 @@ test{
   _=render.camera;
   _=render.light;
   _=render.cube;
+  _=render.rays;
   _=render.volume;
   _=ui.draw;
   _=ui.box;

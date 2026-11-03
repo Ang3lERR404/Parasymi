@@ -598,7 +598,11 @@ void main() {
     v_glow = glow;
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = project(wp);
-#ifdef CUBE
+#ifdef CAPTURE
+    // caught for the rays: what casts the key light's shadow and what casts
+    // only the points of light's, both as below
+    capture(wp, leaves && settle >= 0.5, (whorled || leaves || veil) && !unseen && settle >= 0.5);
+#elif defined(CUBE)
     // decision: in a point of light's shadow cube a radiant plant's petals,
     // leaves and veil (once settled) stand round the light at its heart, so
     // its glow fans out between them in rays (the gardener's ask); its
@@ -752,7 +756,12 @@ void main() {
   gl_Position = project(wp);
 #ifdef SHADOW
   // a placement preview casts no shadow, nor does a floater's clear lantern
-  if (ic.y > 0.5 || isLantern(ib.w, int(part), h)) gl_Position = UNSEEN;
+  bool casts = !(ic.y > 0.5 || isLantern(ib.w, int(part), h));
+#ifdef CAPTURE
+  capture(wp, casts, casts);
+#else
+  if (!casts) gl_Position = UNSEEN;
+#endif
 #endif
 }
 

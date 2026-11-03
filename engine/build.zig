@@ -7,6 +7,8 @@
 const std=@import("std");
 /// the build graph's types: steps, modules, lazy paths
 const Build=std.Build;
+/// cuts a list of defines at its commas
+const splitScalar=std.mem.splitScalar;
 /// the engine's own shaders, embedded in its module
 const shaders=[_][]const u8{
   "post.vert","bloom_down.frag","bloom_up.frag","composite.frag","fxaa.frag",
@@ -16,6 +18,7 @@ const shaders=[_][]const u8{
 pub const includes=[_][]const u8{"post.glsl","light.glsl","growth.glsl","volume.glsl"};
 /// one shader to compile: `name` it is imported as, the `source` file it is
 /// compiled from (`name` when null) and a `define` to compile it with
+/// (several split by commas: "GLASS,RAY")
 pub const Shader=struct{name:[]const u8,source:?[]const u8=null,define:?[]const u8=null};
 /// glslc: the `glslc` option, else the Vulkan SDK's, else whichever is on
 /// PATH. Returns the path (or bare name) the shader steps run.
@@ -42,7 +45,12 @@ pub fn compile(b:*Build,glslcPath:[]const u8,dir:Build.LazyPath,includeDirs:[]co
   const cmd=b.addSystemCommand(&.{glslcPath,"--target-env=vulkan1.3","-O"});
   for(includeDirs)|d|cmd.addPrefixedDirectoryArg("-I",d);
   for(inputs)|f|cmd.addFileInput(f);
-  if(s.define)|d|cmd.addArg(b.fmt("-D{s}",.{d}));
+  // each define, several split at commas ("GLASS,RAY")
+  if(s.define)|d|{
+    // the defines, one at a time
+    var it=splitScalar(u8,d,',');
+    while(it.next())|one|cmd.addArg(b.fmt("-D{s}",.{one}));
+  }
   // glslc reads the stage from the source's extension
   cmd.addFileArg(dir.path(b,s.source orelse s.name));
   cmd.addArg("-o");
