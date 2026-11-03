@@ -47,7 +47,7 @@ What the night beam does depends on what it strikes:
   turns into a ley line.
 - **Bare ground of any other kind:** nothing (to settle).
 
-### Its look (the gardener's pick)
+### Its look (the gardener's pick; built as `radiantKit.solcyriphon`)
 A lens, a flower facing up, and a touch of jellyfish:
 - **Lens:** a flat ring of facets round a glowing heart.
 - **Flower:** petals rising round the lens, open to the sky.
@@ -142,7 +142,7 @@ Named for a cyme, a flower cluster that blooms in order, one flower after
 another, as it fills.
 - Fills whenever its relays have light to spare, and gives it back
   whenever the structures near it are short, day or night.
-- **Look: a spiral bouquet.** Several flowers fan up from one point,
+- **Look: a spiral bouquet** (built as `radiantKit.astrocyme`). Several flowers fan up from one point,
   winding round a thread of light at rising heights; each flower is one
   share of what it holds. Empty, each flower's petals drift loose round
   it; filling, one flower at a time, from the bottom up, gathers its
@@ -158,7 +158,7 @@ Fields are round; rows want lines. It is turned like a conduit, and:
   shapers chain into paths of light.
 - **Under a solcyriphon at night**, it takes the falling beam and turns
   it sideways into a strip, far stronger than a field's.
-- **Look: a heliotrope** with a cut crystal heart: a flower head on a
+- **Look: a heliotrope** (built as `radiantKit.heliocyra`) with a cut crystal heart: a flower head on a
   neck of light, turning to face the way it sends its strip as a
   sunflower follows the sun; the strip leaves the crystal.
 
@@ -170,7 +170,7 @@ Named for halcyon: calm, sheltered.
 - **Whom it guards:** put down right beside a plant, it guards that one
   alone. Put down with no plant next to it, it guards every plant within
   a few tiles instead.
-- **Look: veil, shield and shepherd in one.** A small radiant flower,
+- **Look: veil, shield and shepherd in one** (built as `radiantKit.halcyra`). A small radiant flower,
   hooded by a see-through veil like a jellyfish's bell, broad crystal
   petals at the veil's edge tilting into the beam and scattering it off
   as sparkles. Beside a plant it leans over it, its thread of light

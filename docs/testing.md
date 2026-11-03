@@ -57,6 +57,7 @@ their end 1.5 s, then start again.
 | `turn` | both | grown, turned a quarter (R) every `turn.time` + 1 s: a rooted one pulls its roots out, steps round, digs back in; a floater turns in the air |
 | `pluck` | plant | grown and ripe, plucked by the wolf (drawn, for once) as harvest does it in play: it steps up, each pluck bends the plant after its paws, the yield bursts out round them, the plant shivers and springs back, a pod empties to its nub, a bead goes to the belly; ripened full afresh 1.5 s after each harvest |
 | `ripen` | plant | grown, its yield ripening 0 → full, looped: the pods swelling in turn, the plant taking on the yield's colour |
+| `fill` | plant | grown, a light store (the astrocyme) filling empty → full → empty, looped: its flowers opening bottom up, coming apart top down (`stored`) |
 | `unform` | radiant or dying plant | grown, then as the unforming takes it, looped: a radiant one glitches, cracks with light and breaks into shards; a symbiotic or parasitic one withers and crumbles to ash (`PlantInstance.glitch`) |
 | `active` | structure | grown and working its real `tick`: every 0.4 s handed one of the next thing it `wants` (a carrier: into it from behind, let go 2 s later), what it made (an `output` it does not want) taken away; put down afresh each loop. Emitted pieces (cups, pours, roots to nodes, lids, crystals) as in play |
 
