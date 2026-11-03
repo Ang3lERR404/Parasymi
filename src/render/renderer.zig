@@ -296,18 +296,20 @@ pub const Ext=struct{
   /// how many vertices of `meshes` a tool last put in (`setParts`; 0: none)
   toolVerts:usize=0,
 };
-/// every built-once mesh (plant species + part library), grown as a task of their own
-/// of its own while the loading screen shows, one mesh at one level of
-/// detail at a time (`done` of `units`); `meshesReady` takes them in once
-/// it is through.
+/// every built-once mesh (plant species + part library), grown as a task of
+/// its own while the loading screen shows: each mesh at each level of
+/// detail is a piece of its own, built into a builder of its own over the
+/// pool, then all are welded over it (`done` of `units`); `meshesReady`
+/// takes them in once it is through.
 const Growing=struct{
-  /// the builder's vertices are scratch: one arena, freed in one go once uploaded
+  /// the builders' vertices are scratch: one arena, freed in one go once
+  /// uploaded (lock-free: the pool's threads all grow in it)
   arena:ArenaAllocator,
-  /// the builder the growing task pours every mesh into
-  b:meshgen.Builder=undefined,
   /// the growing running apart on the I/O, and that I/O, or null when growing ran here
   apart:?struct{io:Io,future:Io.Future(void)}=null,
-  /// how many units are grown so far
+  /// the I/O whose pool the pieces are built and welded on (null: here)
+  io:?Io=null,
+  /// how many units are grown so far: pieces built, then runs welded
   done:Atomic(u32)=.init(0),
   /// set once the growing is through
   finished:Atomic(bool)=.init(false),
@@ -315,91 +317,185 @@ const Growing=struct{
   stop:Atomic(bool)=.init(false),
   /// whether growing ran out of memory
   failed:bool=false,
-  /// (first vertex, count) per plant slot, as grown
+  /// how many of the upload's steps are sent (`meshesReady`)
+  sent:u32=0,
+  /// every piece, in the order a single builder would have built them
+  pieces:[]Piece=&.{},
+  /// (first vertex, count) per plant slot, within its piece's builder
   plantRanges:[plantMeshes]m.Vice(u32,2)=@splat(.{0,0}),
+  /// the piece each plant slot was built in
+  plantPiece:[plantMeshes]u32=@splat(0),
   /// per plant slot, the byte offset to the next growth key's mesh
   plantMorph:[plantMeshes]u64=@splat(0),
-  /// (first vertex, count) per part slot, as grown
+  /// (first vertex, count) per part slot, within its piece's builder
   partRanges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0}),
+  /// the piece each part slot was built in
+  partPiece:[meshlib.slots]u32=@splat(0),
   /// per part slot, the byte offset to its next key's mesh
   partMorph:[meshlib.slots]u64=@splat(0),
   /// per part slot: whether any of it can be see-through
   partGlassy:[meshlib.slots]bool=@splat(false),
-  /// every grown mesh welded (in the arena): what is uploaded; its runs
+  /// every grown mesh welded (the arena's own allocator's, freed by `end`):
+  /// what is uploaded; its runs
   /// are each plant slot's, then each part slot's
   welded:weld.Welded=.{},
   /// `--plant`/`--structure`: those meshes alone; every other range stays
   /// empty, so draws of it draw nothing
   only:?Only=null,
+  /// one mesh at one level of detail: a species' variants, or a library
+  /// mesh; the soup it built, and which of its vertices draw see-through
+  const Piece=struct{
+    /// what it builds: a species' variants, or a library mesh
+    of:union(enum){
+      /// every variant of this species
+      plant:species.Id,
+      /// this library mesh
+      part:meshlib.Id,
+    },
+    /// the level of detail it is built at
+    lod:u32,
+    /// the vertices it built, three a triangle
+    v:[]vertex.Mesh=&.{},
+    /// each vertex's skin weights
+    skin:[]vertex.Skin=&.{},
+    /// each vertex's growth record
+    grow:[]vertex.Grow=&.{},
+    /// which of its vertices can be drawn see-through (their triangles last)
+    late:[]bool=&.{},
+  };
   /// each species' variants at one level of detail, then each library mesh
-  /// at one level of detail
+  /// at one level of detail, then every run welded, then each upload step
   fn units(g:*const Growing)u32{
     // how many meshes: the one species and the parts shown, or all of them
     const n=if(g.only)|o|@as(usize,if(o.species!=null)1 else 0)+o.parts.len else species.ids.len+meshlib.count;
-    return@intCast(n*meshgen.lods);
+    return@intCast(n*meshgen.lods+plantMeshes+meshlib.slots+uploadSteps);
   }
-  /// the growing task.s body: grows everything, then marks it finished (or failed)
+  /// the growing task's body: grows everything, then marks it finished (or failed)
   fn run(g:*Growing)void{
     g.failed=std.meta.isError(g.all());
     g.finished.store(true,.release);
   }
-  /// grows every species' variants, then every library mesh, at each level
-  /// of detail, in order; returns early when asked to stop
+  /// lists the pieces in the order one builder would build them (each
+  /// species at each level, then each level's library meshes), builds them
+  /// over the pool, checks the keys line up, and welds them
   fn all(g:*Growing)Allocator.Error!void{
-    // the builder everything pours into
-    const b=&g.b;
-    for(species.ids)|id|for(0..meshgen.lods)|l|{
-      if(g.stop.load(.monotonic))return;
-      if(g.only)|o|if(o.species!=id)continue;
-      // this level of detail
-      const lod:u32=@intCast(l);
-      b.lod=lod;
-      // how many variants this species has
-      const n=meshgen.variants(id);
-      for(0..n)|v|{
-        // where this variant's vertices begin
-        const first:u32=@intCast(b.v.items.len);
-        try meshgen.plant(b,id,@intCast(v));
-        g.plantRanges[meshgen.plantSlot(id,@intCast(v),lod)]=.{first,@as(u32,@intCast(b.v.items.len))-first};
-      }
-      // growth keys blend vertex for vertex into the next key
-      if(meshgen.growthKey(id,0)!=null)for(0..n-1)|v|{
-        // this key's range and the next key's
-        const a=g.plantRanges[meshgen.plantSlot(id,@intCast(v),lod)];
-        const z=g.plantRanges[meshgen.plantSlot(id,@intCast(v+1),lod)];
-        if(a[1]!=z[1])@panic("growth keys differ in vertex count");
-      };
-      _=g.done.fetchAdd(1,.monotonic);
-    };
+    // the arena every piece grows in
+    const gpa=g.arena.allocator();
     // the library meshes to build: those shown alone, or all of them
     const shown:[]const meshlib.Id=if(g.only)|o|o.parts else meshlib.ids;
-    for(0..meshgen.lods)|l|for(shown)|id|{
-      if(g.stop.load(.monotonic))return;
-      try meshlib.buildOne(b,id,@intCast(l),&g.partRanges);
-      _=g.done.fetchAdd(1,.monotonic);
+    // the pieces, in order
+    var list:std.ArrayList(Piece)=.empty;
+    for(species.ids)|id|for(0..meshgen.lods)|l|{
+      if(g.only)|o|if(o.species!=id)continue;
+      try list.append(gpa,.{.of=.{.plant=id},.lod=@intCast(l)});
     };
-    b.lod=0;
-    // keys blend vertex for vertex into the next key, built after them
-    for(shown)|id|if(meshlib.next(id))|nx|for(0..meshgen.lods)|l|{
+    for(0..meshgen.lods)|l|for(shown)|id|try list.append(gpa,.{.of=.{.part=id},.lod=@intCast(l)});
+    g.pieces=list.items;
+    // the next piece to take, and whether building one ran out of memory
+    var next=Atomic(usize).init(0);
+    var failed=Atomic(bool).init(false);
+    jobs.each(g.io,g.pieces.len,1,Build,.{.g=g,.next=&next,.failed=&failed},Build.all);
+    if(failed.load(.monotonic))return error.OutOfMemory;
+    if(g.stop.load(.monotonic))return;
+    // growth keys blend vertex for vertex into the next key, built after them
+    for(species.ids)|id|if(meshgen.growthKey(id,0)!=null)for(0..meshgen.lods)|l|for(0..meshgen.variants(id)-1)|v|{
       // this key's range and the next key's
-      const a=g.partRanges[meshlib.slot(id,@intCast(l))];
-      const z=g.partRanges[meshlib.slot(nx,@intCast(l))];
+      const a=g.plantRanges[meshgen.plantSlot(id,@intCast(v),@intCast(l))];
+      const z=g.plantRanges[meshgen.plantSlot(id,@intCast(v+1),@intCast(l))];
+      if(a[1]!=z[1])@panic("growth keys differ in vertex count");
+    };
+    for(shown)|id|if(meshlib.next(id))|nx|for(0..meshgen.lods)|l|{
+      // this key's slot and the next key's, and their ranges
+      const sa=meshlib.slot(id,@intCast(l));
+      const sz=meshlib.slot(nx,@intCast(l));
+      const a=g.partRanges[sa];
+      const z=g.partRanges[sz];
       if(z[1]==0)continue;
       if(a[1]!=z[1])@panic("part keys differ in vertex count");
-      if(z[0]<a[0])@panic("a part's next key is built before it");
+      if(g.partPiece[sz]<g.partPiece[sa])@panic("a part's next key is built before it");
     };
-    _=try b.skinOf(b.v.items.len);
-    _=try b.growOf(b.v.items.len);
     try g.weldAll(shown);
   }
-  /// weld every grown mesh, each chain of keys together, and find each
-  /// key's offset to the next and which parts can be see-through
+  /// building the pieces, shared by the pool's threads: each takes the next
+  /// piece till none is left
+  const Build=struct{
+    /// the growing state
+    g:*Growing,
+    /// the next piece to take
+    next:*Atomic(usize),
+    /// set when a piece ran out of memory
+    failed:*Atomic(bool),
+    /// builds pieces as they are taken (pieces differ widely in size, so
+    /// they are not split evenly ahead)
+    fn all(s:Build,lo:usize,hi:usize)void{
+      _=lo;
+      _=hi;
+      while(!s.g.stop.load(.monotonic)){
+        // the next piece, none: done
+        const i=s.next.fetchAdd(1,.monotonic);
+        if(i>=s.g.pieces.len)return;
+        s.g.build(@intCast(i))catch{
+          return;
+        };
+        _=s.g.done.fetchAdd(1,.monotonic);
+      }
+    }
+  };
+  /// builds piece `i` into a builder of its own, in an arena of its own,
+  /// recording each slot's range in it; keeps its vertices, skin and growth
+  /// lists (filled out to every vertex) and which of its vertices draw
+  /// see-through, copied out at their size, and frees the rest at once
+  fn build(g:*Growing,i:u32)Allocator.Error!void{
+    // the piece, the arena its building's scratch lives in (freed as soon
+    // as it is built: a shared one kept every piece's scratch to the end,
+    // tens of gigabytes), and its builder
+    const p=&g.pieces[i];
+    var scratch=ArenaAllocator.init(g.arena.child_allocator);
+    defer scratch.deinit();
+    var built:meshgen.Builder=.{.gpa=scratch.allocator(),.lod=p.lod,.io=g.io};
+    const b=&built;
+    switch(p.of){
+      .plant=>|id|for(0..meshgen.variants(id))|v|{
+        // this variant's slot, and where its vertices begin
+        const s=meshgen.plantSlot(id,@intCast(v),p.lod);
+        const first:u32=@intCast(b.v.items.len);
+        try meshgen.plant(b,id,@intCast(v));
+        g.plantRanges[s]=.{first,@as(u32,@intCast(b.v.items.len))-first};
+        g.plantPiece[s]=i;
+      },
+      .part=>|id|{
+        try meshlib.buildOne(b,id,p.lod,&g.partRanges);
+        g.partPiece[meshlib.slot(id,p.lod)]=i;
+      },
+    }
+    // what is kept till the weld, at its size, freed once welded; skin
+    // and growth lists only where a vertex has any (most meshes have none)
+    const keep=g.arena.child_allocator;
+    if(b.skin.items.len>0)_=try b.skinOf(b.v.items.len);
+    if(b.grow.items.len>0)_=try b.growOf(b.v.items.len);
+    p.v=try keep.dupe(vertex.Mesh,b.v.items);
+    p.skin=try keep.dupe(vertex.Skin,b.skin.items);
+    p.grow=try keep.dupe(vertex.Grow,b.grow.items);
+    p.late=try keep.alloc(bool,b.v.items.len);
+    for(b.v.items,p.late)|x,*lt|lt.*=switch(p.of){
+      .plant=>|id|plantGlassy(id,@enumFromInt(x.part)),
+      .part=>vertex.seeThrough(@enumFromInt(x.part)),
+    };
+  }
+  /// weld every piece, each chain of keys together, and find each key's
+  /// offset to the next and which parts can be see-through
   fn weldAll(g:*Growing,shown:[]const meshlib.Id)Allocator.Error!void{
-    // the builder holding every grown vertex, and its arena
-    const b=&g.b;
-    const gpa=g.arena.allocator();
-    // every run: each plant slot's, then each part slot's
-    const ranges=g.plantRanges++g.partRanges;
+    // the allocator the welding's lists are made in: the arena's own, so
+    // its scratch is freed as it goes (kept in the arena, tens of gigabytes)
+    const gpa=g.arena.child_allocator;
+    // every piece as a soup of its own
+    const soups=try gpa.alloc(weld.Soup,g.pieces.len);
+    defer gpa.free(soups);
+    for(soups,g.pieces)|*s,p|s.*=.{.v=p.v,.skin=p.skin,.grow=p.grow,.late=p.late};
+    // every run: each plant slot's, then each part slot's, in its piece
+    var ranges:[plantMeshes+meshlib.slots]weld.Range=undefined;
+    for(ranges[0..plantMeshes],g.plantRanges,g.plantPiece)|*r,rg,p|r.*=.{.soup=p,.first=rg[0],.count=rg[1]};
+    for(ranges[plantMeshes..],g.partRanges,g.partPiece)|*r,rg,p|r.*=.{.soup=p,.first=rg[0],.count=rg[1]};
     // the group each run welds in: its own, or its chain of keys' first
     var groups:[ranges.len]u32=undefined;
     for(&groups,0..)|*gr,i|gr.*=@intCast(i);
@@ -414,23 +510,15 @@ const Growing=struct{
       // this key's run and the next one's, among all the runs
       const a=plantMeshes+meshlib.slot(id,@intCast(l));
       const z=plantMeshes+meshlib.slot(nx,@intCast(l));
-      if(ranges[z][1]==0)continue;
+      if(ranges[z].count==0)continue;
       // every run of a's group joins z's
       const from=groups[a];
       const into=groups[z];
       for(&groups)|*gr|if(gr.*==from){gr.*=into;};
     };
-    // the vertices that can be drawn see-through, their triangles put last
-    // so the glass passes draw only them
-    const late=try gpa.alloc(bool,b.v.items.len);
-    @memset(late,false);
-    for(species.ids)|id|for(0..meshgen.maxVariants)|v|for(0..meshgen.lods)|l|{
-      // this plant mesh's soup
-      const rg=g.plantRanges[meshgen.plantSlot(id,@intCast(v),@intCast(l))];
-      for(b.v.items[rg[0]..][0..rg[1]],late[rg[0]..][0..rg[1]])|x,*lt|lt.*=plantGlassy(id,@enumFromInt(x.part));
-    };
-    for(g.partRanges)|rg|for(b.v.items[rg[0]..][0..rg[1]],late[rg[0]..][0..rg[1]])|x,*lt|{lt.*=vertex.seeThrough(@enumFromInt(x.part));};
-    g.welded=try weld.weld(gpa,.{.v=b.v.items,.skin=b.skin.items,.grow=b.grow.items,.late=late},&ranges,&groups);
+    g.welded=try weld.weld(gpa,g.io,soups,&ranges,&groups,&g.done);
+    // the pieces' soups are welded: freed before the upload
+    g.freePieces();
     // each plant slot's run, then each part slot's
     const runs=g.welded.runs;
     for(species.ids)|id|if(meshgen.growthKey(id,0)!=null)for(0..meshgen.lods)|l|for(0..meshgen.variants(id)-1)|v|{
@@ -443,7 +531,7 @@ const Growing=struct{
       // this key's run and the next one's
       const a=meshlib.slot(id,@intCast(l));
       const z=meshlib.slot(nx,@intCast(l));
-      if(ranges[plantMeshes+z][1]==0)continue;
+      if(ranges[plantMeshes+z].count==0)continue;
       g.partMorph[a]=@as(u64,runs[plantMeshes+z].base-runs[plantMeshes+a].base)*@sizeOf(vertex.Mesh);
     };
     // each part slot's own vertices, to look for what can be see-through
@@ -451,10 +539,24 @@ const Growing=struct{
     for(&own,runs[plantMeshes..])|*o,r|o.*=.{r.base,r.verts};
     glassy(g.welded.v.items,&own,&g.partGlassy);
   }
+  /// free every piece's soup (kept outside the arena, so it can go early)
+  fn freePieces(g:*Growing)void{
+    // where the soups were kept
+    const keep=g.arena.child_allocator;
+    for(g.pieces)|*p|{
+      keep.free(p.v);
+      keep.free(p.skin);
+      keep.free(p.grow);
+      keep.free(p.late);
+      p.*=.{.of=p.of,.lod=p.lod};
+    }
+  }
   /// wait for the growing task (asked to stop early) and free what it built
   fn end(g:*Growing,gpa:Allocator)void{
     g.stop.store(true,.monotonic);
     if(g.apart)|*a|a.future.await(a.io);
+    g.freePieces();
+    g.welded.deinit(g.arena.child_allocator);
     g.arena.deinit();
     gpa.destroy(g);
   }
@@ -464,12 +566,12 @@ const Growing=struct{
 pub fn start(r:*Renderer)Error!void{
   // the growing state, made on the heap so the growing task can hold it
   const g=try r.gpa.create(Growing);
-  g.*=.{.arena=ArenaAllocator.init(r.gpa),.only=r.ext.only};
-  g.b=.{.gpa=g.arena.allocator()};
+  g.*=.{.arena=ArenaAllocator.init(r.gpa),.only=r.ext.only,.io=r.ext.io};
   r.ext.growing=g;
   // no I/O to grow on: grown here, before the first frame
   const io=r.ext.io orelse return g.run();
-  // a task of its own beside the frames (the I/O's, never a thread of ours)
+  // a task of its own beside the frames (the I/O's, never a thread of ours),
+  // spreading its pieces over the pool
   const future=io.concurrent(Growing.run,.{g})catch|e|{
     std.log.warn("meshes grown without a task of their own: {t}",.{e});
     return g.run();
@@ -504,9 +606,13 @@ pub fn meshProgress(r:*const Renderer)m.Vice(u32,2){
   const g=r.ext.growing orelse return.{1,1};
   return.{g.done.load(.monotonic),g.units()};
 }
+/// how many steps the welded meshes go up to the GPU in, one a loading
+/// frame, so the loading screen moves on while they go
+const uploadSteps=32;
 /// whether every mesh is grown and in one buffer: once they are through,
-/// uploads them (the first call after that) and frees the scratch. The
-/// world can be drawn only after this says so.
+/// sends them up a step at a time (one a call: the loading screen draws a
+/// frame between) and, the last step sent, frees the scratch. The world
+/// can be drawn only after this says so.
 pub fn meshesReady(r:*Renderer)Error!bool{
   // what the garden keeps, and the growing state (none: already in)
   const x=&r.ext;
@@ -514,25 +620,40 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   if(!g.finished.load(.acquire))return false;
   if(g.apart)|*a|a.future.await(a.io);
   g.apart=null;
-  defer{
+  // done or failed, the scratch goes
+  errdefer{
     g.end(r.gpa);
     x.growing=null;
   }
   if(g.failed)return error.OutOfMemory;
-  // every grown mesh, welded
+  // every grown mesh, welded, and each list as bytes
   const w=&g.welded;
+  const lists=[_][]const u8{sliceAsBytes(w.v.items),sliceAsBytes(w.skin.items),sliceAsBytes(w.grow.items),sliceAsBytes(w.indices.items)};
+  // read by every plant and part draw, every frame: in device memory,
+  // made empty first and filled step by step
+  const bufs=[_]*Buffer{&x.meshes,&x.skins,&x.grows,&x.indices};
+  if(g.sent==0)for(bufs,lists,0..)|b,l,k|{
+    b.*=try Buffer.initRoom(&r.ctx,if(k==3).{.index_buffer=true}else.{.vertex_buffer=true},l.len,&.{});
+  };
+  // this step's share of each list
+  for(bufs,lists)|b,l|{
+    // where this step's share begins and ends
+    const lo=l.len*g.sent/uploadSteps;
+    const hi=l.len*(g.sent+1)/uploadSteps;
+    try b.overwrite(&r.ctx,lo,l[lo..hi]);
+  }
+  g.sent+=1;
+  _=g.done.fetchAdd(1,.monotonic);
+  if(g.sent<uploadSteps)return false;
   x.plantRuns=w.runs[0..plantMeshes].*;
   x.plantMorph=g.plantMorph;
   x.partRuns=w.runs[plantMeshes..][0..meshlib.slots].*;
   x.partMorph=g.partMorph;
   x.partGlassy=g.partGlassy;
-  // read by every plant and part draw, every frame: in device memory
-  x.meshes=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(w.v.items));
-  x.skins=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(w.skin.items));
-  x.grows=try Buffer.initWith(&r.ctx,.{.vertex_buffer=true},sliceAsBytes(w.grow.items));
-  x.indices=try Buffer.initWith(&r.ctx,.{.index_buffer=true},sliceAsBytes(w.indices.items));
   x.identity=0;
   std.log.info("meshes welded: {d} corners drawn from {d} vertices",.{w.indices.items.len,w.v.items.len});
+  g.end(r.gpa);
+  x.growing=null;
   return true;
 }
 /// whether a vertex of role `p` in a plant of species `id` can be drawn

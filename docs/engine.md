@@ -173,8 +173,12 @@ A builder makes a triangle soup (three vertices a triangle).
 `engine.gfx.weld.weld` turns runs of it into indexed meshes: corners that
 are the same vertex bit for bit are drawn from one, triangles keep their
 order, and runs given one group (growth keys) share their indices and
-line up vertex for vertex. Draw a `weld.Run` with
-`drawIndexed(count, …, first, base, …)`.
+line up vertex for vertex. The runs may lie in many soups (one builder
+each, built apart on the pool), never copied into one; each group is
+welded on a core of its own, the same result as on one. Draw a
+`weld.Run` with `drawIndexed(count, …, first, base, …)`.
+A builder's `io`, when set, lets a sculpt meshed into it spread its
+field over the cores.
 
 ### Growth splines
 `engine.gfx.growth.Grower(M, leaf)`:

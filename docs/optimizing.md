@@ -79,8 +79,17 @@ What the pieces cost on 2026-11-01 (demo, msaa8, plant pass 11.1 ms):
 ## 4. The methods that worked, and how to keep using them
 
 ### Indexed meshes (`engine.gfx.weld`)
-Builders make triangle soups (three vertices a triangle). Once every
-mesh is grown, `Growing.weldAll` (render/renderer.zig) welds each run:
+Builders make triangle soups (three vertices a triangle). Each mesh at
+each level of detail is a piece built in a builder of its own, the
+pieces taken by the pool's threads one after another as each comes
+free (they differ widely in size). Each piece builds in an arena of its
+own, freed the moment it is built, keeping only its soup copied out at
+its size (skin and growth lists only where any vertex has them); the
+weld's scratch is freed as it goes, and the soups once welded. One
+shared arena for all of it held every piece's scratch to the end: 70 GB
+at its peak, now about 11. Once every piece is grown,
+`Growing.weldAll` (render/renderer.zig) welds each run straight from its
+piece, each group on a core of its own:
 corners that are the same vertex bit for bit (vertex, skin, growth
 record) become one, so the GPU shades a shared vertex once. Passes draw
 a `Run` with `drawIndexed(count, …, first, base, …)`.

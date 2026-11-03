@@ -12,6 +12,8 @@ const std=@import("std");
 const assert=std.debug.assert;
 /// the allocator a builder's lists grow with
 const Allocator=std.mem.Allocator;
+/// the I/O whose pool a build's heavy pieces (sculpts) are spread over
+const Io=std.Io;
 /// the test helpers
 const testing=std.testing;
 /// all the maths: vectors, matrices, splines, easing
@@ -218,6 +220,9 @@ pub fn Mesher(comptime Role:type,comptime stem:Role)type{
     /// how tubes and lofts close at their ends (claws and thorns set `.sharp`
     /// round their own building, and set it back)
     tips:Tips=.round,
+    /// where a sculpt meshed into it works out its field and vertices over
+    /// the cores (null: here alone, the same mesh either way)
+    io:?Io=null,
     /// how many points along a surface to step over at this level
     pub fn step(b:*const Builder)usize{return@as(usize,1)<<@intCast(b.lod);}
     /// how many sides a ring keeps at this level (never fewer than `min`)

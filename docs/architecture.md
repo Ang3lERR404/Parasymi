@@ -65,6 +65,11 @@ jobs.each(io, n, min, Ctx, ctx, Ctx.run);
 ```
 
 The first range runs on the calling thread, the rest on main's `Io` pool.
+A task of its own may call it too: the meshes growing call it to build
+their pieces and weld them while the loading screen draws. When items
+differ widely in cost, ask for one range a core and let each take the
+next item from a shared atomic counter (`Growing.Build`, the weld's
+`Shared`), so no core waits on a heavy split; the result is the same.
 
 ### The pool
 - It is `w.io` (`World.io`). Main sets it after `Game.init` and in

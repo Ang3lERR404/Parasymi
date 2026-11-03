@@ -21,12 +21,18 @@ const Thread=std.Thread;
 const testing=std.testing;
 /// most ranges one call splits into
 const maxParts=16;
-/// the machine's cores, counted once (only main calls `each`)
-var cores:usize=0;
+/// the machine's cores, counted at the first call (main and a task of its
+/// own, the meshes growing, may both call `each`: kept atomic)
+var cores=std.atomic.Value(usize).init(0);
 /// how many ranges a call may split into: the cores, at most `maxParts`
 fn parts()usize{
-  if(cores==0)cores=Thread.getCpuCount() catch 1;
-  return@min(cores,maxParts);
+  // the cores as counted, or counted now (two first calls count alike)
+  var n=cores.load(.monotonic);
+  if(n==0){
+    n=Thread.getCpuCount() catch 1;
+    cores.store(n,.monotonic);
+  }
+  return@min(n,maxParts);
 }
 /// `run(ctx, lo, hi)` over [0, n) in ranges of at least `min` items: the
 /// first range here, the rest on the pool (or here too when it is busy).

@@ -303,6 +303,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   // the sculpted body, freed once the hide is laid
   var s=try sculpted(b.gpa,&w);
   defer s.deinit();
+  s.io=b.io;
   try s.mesh(mg.gen,b,cell*m.f(@as(u32,1)<<@intCast(b.lod)),0.5,.stem);
   try eyes(b,&w);
   try vines(b,&s,&w);
