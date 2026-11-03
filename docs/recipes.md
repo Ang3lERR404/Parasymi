@@ -13,6 +13,9 @@ Paths are under `src/` unless shown otherwise. Look a file up in
    - Add hooks as needed (the list is in that file's header).
    - A `meshes` tuple for every library mesh it emits.
    - `meets` if it is a lineage structure.
+   - Taking light (`.light`)? It wears the sign: `.crown` (how high its
+     halo crown hangs; its crowns join its meshes by themselves) and
+     `.ley` (what turns ley-blue), see visual.md, "The sign of light".
 2. **Register it**: one line in `kinds` in `game/structures.zig`.
 3. **Mesh**: `gfx/meshes/<kind>.zig` with `build(b)` on a
    `growth.Skeleton` ([growth.md](growth.md)), built from its lineage's

@@ -56,7 +56,7 @@ pub const meshes=.{.braidWrap,.braidWrapLeft,.braidWrapRight,.braidLane0,.braidL
 /// decision: like a conduit, it grows along its arches' growth splines but
 /// never sways (its arches join the next one's under the ground) and draws
 /// its own arches, one per edge it is fed from; `mesh` is its preview.
-pub const def:st.Def=.{.item=.braidedConduit,.lineage=.symbiotic,.size=1,.mesh=.braidedConduit,.grow=2,.carrier=true,.bare=true,.tall=0.3,.light=.looks};
+pub const def:st.Def=.{.item=.braidedConduit,.lineage=.symbiotic,.size=1,.mesh=.braidedConduit,.grow=2,.carrier=true,.bare=true,.tall=0.3,.light=.looks,.ley=.leaves};
 /// a sporecaster grown beside it: the study of braided drift
 pub const meets:st.Meeting=.{.kind=.sporecaster,.found=.braidAndSpore};
 /// how many lanes it carries side by side: four

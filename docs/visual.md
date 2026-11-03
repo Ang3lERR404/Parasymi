@@ -260,6 +260,43 @@ own).
   branches after, leaves unfolding as the front passes, emitted pieces
   last ([growth.md](growth.md)).
 
+### The sign of light
+(`game/light_crown.zig`, `meshes/light_crown.zig`; who wears what:
+[radiant-plants.md](radiant-plants.md#how-a-powered-structure-shows-it).)
+A structure that takes the light grid's light shows how much it has. Both
+signs follow its **shine** (`Structure.shine`: its `lit` share eased over
+a few seconds, `shineEase`), which every part it emits carries to the GPU
+while `Parts.ley` is set (`PartInstance.k.y`; `k.z` its top's world
+height, `k.w` its height).
+
+- **The halo crown** (`Def.crown`: how high over its foot it hangs, 0
+  none): radiant fragments, gathered, never grown (radiant_kit pieces
+  drawn as part `.crown`). Each structure is given one of four set designs
+  by its seed (`designOf`):
+  - **diadem:** nine tall pearl petals standing on a ring of light, long
+    and short in turn, leaning out at their tips like a coronet, beads
+    between, a fainter tilted ring round them;
+  - **circlet:** starglass points (grown crystals) round a ring of light,
+    a wider tilted ring round them, motes over their tips;
+  - **orrery:** a cut crystal heart in two rings of light crossed at a
+    slant, beads riding them, a ring of motes round its waist;
+  - **lotus:** a little celestial bloom: a luminous heart with stamens, an
+    upright cup of petals, a wider whorl opening out and down, motes.
+  As its light rises each fragment flies in from out and above along its
+  bearing, turning round the crown, settling in its turn (whole by 0.3 of
+  its light, `CROWN_*` in part.vert); in the dark they fly off again, the
+  last come the first gone, and fade. Gathered, its rings turn slowly
+  against one another, drift a little apart and back, and the whole bobs.
+  Pearl with a soap-bubble film (part.frag), light held in it: it is in
+  `PARTS_LIGHT`, so it casts no shadow and lights the fog round it, and it
+  sheds a soft pearl-blue light on the structure under it.
+- **Ley-blue leaves** (`Def.ley`): its leaves (`.fronds`: a leafless
+  parasite's tendrils too) turn the ley lines' blue (common.glsl `LEY`)
+  from its top downward, as far down its height as its light is bright:
+  half lit, the top half. The front is soft and wavers leaf to leaf; each
+  leaf keeps its own light and dark and stays matte, holding a breath of
+  light pulsing as the ley does. Conduits wear only this, never a crown.
+
 ### Germinator
 (`Def.still`: no breath, so its emitted pieces stay on it; `Def.preview`
 whole.)

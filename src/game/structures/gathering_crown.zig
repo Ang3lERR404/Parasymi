@@ -54,7 +54,7 @@ pub const meets:st.Meeting=.{.kind=.ganglion,.found=.crownAndNerve};
 pub const meshes=.{.bellyLump,.itemPod,.crownRoot1,.crownRoot2,.crownRoot3,.crownRoot4,.crownRoot5};
 /// what a crown is: grown from its seed, one tile across, a low store
 /// swaying freely in the breeze
-pub const def:st.Def=.{.item=.gatheringCrown,.lineage=.symbiotic,.size=1,.mesh=.gatheringCrown,.store=true,.grow=5,.sway=0.6,.tall=0.45,.sap=0.35,.light=.boost,.draws=2};
+pub const def:st.Def=.{.item=.gatheringCrown,.lineage=.symbiotic,.size=1,.mesh=.gatheringCrown,.store=true,.grow=5,.sway=0.6,.tall=0.45,.sap=0.35,.light=.boost,.draws=2,.crown=0.75,.ley=.leaves};
 /// how far it reaches, in tiles, every way
 pub const reachTiles=2;
 /// the width of the square of tiles it reaches over

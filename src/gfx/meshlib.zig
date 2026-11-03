@@ -397,6 +397,14 @@ const parts=struct{
   pub const haloRing=@import("meshes/halo.zig").ring;
   /// the flash of light where a halo's blooms meet
   pub const haloFlash=@import("meshes/halo.zig").flash;
+  /// a powered structure's halo crown: a circlet of pearl petals on a ring of light
+  pub const lightCrownDiadem=@import("meshes/light_crown.zig").diadem;
+  /// a powered structure's halo crown: starglass points round a ring of light
+  pub const lightCrownCirclet=@import("meshes/light_crown.zig").circlet;
+  /// a powered structure's halo crown: a cut heart in two crossed rings of light
+  pub const lightCrownOrrery=@import("meshes/light_crown.zig").orrery;
+  /// a powered structure's halo crown: a little celestial bloom hanging over it
+  pub const lightCrownLotus=@import("meshes/light_crown.zig").lotus;
   /// soft rays sent between two celestial blooms
   pub const bloomThread=@import("meshes/bloom_thread.zig");
   /// a spark of lightning jumping in a weftstone's chamber as it ionizes

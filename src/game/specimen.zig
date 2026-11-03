@@ -244,6 +244,11 @@ pub const Specimen=struct{
   carryT:f32=0,
   /// the tile it stands on (found by `sow`)
   at:m.Vice(i32,2)=.{0,0},
+  /// a structure: the share of light it is held in (`--lit=`; unset, the
+  /// light grid's, none alone), its crown gathering and ley-blue following
+  lit:?f32=null,
+  /// a structure: the crown it is given (`--crown=`; unset, its seed's)
+  crown:?lib.lightCrown.Design=null,
   /// whether the wolf is drawn beside it (plucking it)
   pub fn wolf(s:*const Specimen)bool{return s.state==.pluck;}
   /// the meshes to build: the species' (and a floater's shadow; the wolf's
@@ -359,7 +364,7 @@ pub const Specimen=struct{
       }),
       .structure=>|k|{
         // whether it took root
-        const ok=try g.structs.place(g.gpa,&g.world,s.at[0],s.at[1],k,0,seed);
+        const ok=try g.structs.place(g.gpa,&g.world,s.at[0],s.at[1],k,0,if(s.crown)|c|lib.lightCrown.seedOf(c)else seed);
         if(!ok)diag.whyNot(&g.structs,&g.world,s.at[0],s.at[1],k);
         // (put down as by the gardener's hand, in the garden's act: a
         // strange seed shown in act 2 is planted)
@@ -427,6 +432,11 @@ pub const Specimen=struct{
         const one=&g.structs.list.items[0];
         one.grown=l.growth;
         one.activity=0;
+        // held in light: its crown gathers and its ley-blue creeps as in play
+        if(s.lit)|v|{
+          one.lit=v;
+          one.shine=m.damp(one.shine,v,lib.structures.shineEase,dt);
+        }
       },
       .samples,.sculpt=>{},
     }

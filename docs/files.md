@@ -151,6 +151,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `icon.zig` — item icons for the HUD: what sits in a belly slot, a hotbar pod or on the cursor.
+- `light_crown.zig` — the sign a powered structure wears (docs/radiant-plants.md): while it is lit, a halo crown of radiant fragments gathers over it and comes…
 - `loading.zig` — the loading screen: a living night with the garden's name and a tendril growing across it as far as what is made goes, leaves opening along…
 - `moss.zig` — ground the garden has changed: soil a moss creeper has turned to moss where the rain soaked it, so a grove may root there, and moss a night…
 - `options.zig` — the gardener's settings (pause menu, OPTIONS): how the garden is drawn and shown, and how often it saves itself.
@@ -345,6 +346,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `germinator.zig` — mesh: GERMINATOR.
 - `halo.zig` — meshes: the HALO.
 - `item_pod.zig` — mesh: ITEM POD.
+- `light_crown.zig` — meshes: the HALO CROWNS.
 - `lithophage.zig` — mesh: LITHOPHAGE.
 - `loomfern.zig` — mesh: LOOMFERN.
 - `mineral_kit.zig` — shared pieces for the ground's minerals: crystals, flat-faced (each face its own normal) so they catch the light as cut planes, and…

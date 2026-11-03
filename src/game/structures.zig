@@ -300,6 +300,14 @@ pub const Def=struct{
   light:Use=.none,
   /// how much light it draws at full work (glow)
   draws:f32=0,
+  /// the sign it wears in light (docs/radiant-plants.md): a halo crown of
+  /// radiant fragments gathered this high over its foot (tiles, before
+  /// research grows it; 0: it wears none), one of a few set designs picked
+  /// by its seed (game/light_crown.zig)
+  crown:f32=0,
+  /// and what of it turns ley-blue in its light, from its top (`tall`)
+  /// downward, the brighter the further
+  ley:Ley=.none,
   /// whether the unforming takes it, grown back down to nothing and gone
   /// (game/unforming.zig): every kind of a lineage but the convergent one,
   /// unless it evolves
@@ -323,6 +331,18 @@ pub const Use=enum(u8){
   /// it works as it always does, and only looks lit (draws nothing)
   looks,
 };
+/// what of a structure turns ley-blue in its light (part.vert)
+pub const Ley=enum(u8){
+  /// nothing: it shows its light no way of its own (or not yet)
+  none,
+  /// its leaves
+  leaves,
+  /// its leaves and its fronds (a leafless parasite's tendrils)
+  fronds,
+};
+/// how fast a structure's shine follows its light (per second): its crown
+/// gathers and its ley-blue creeps over a few seconds, never at a blink
+pub const shineEase:f32=0.6;
 /// how structure `s` takes light now
 pub const lightUse=hooks.lightUse;
 /// the structures' relays and light users, for the light grid
@@ -337,13 +357,16 @@ pub const meetCount=3;
 /// per-kind state; the active tag is the structure's kind.
 pub const State=reg.Union("State");
 /// every library mesh kind `k` draws: its mesh, its preview and what it
-/// emits (its `meshes`), gathered at compile time into one list
+/// emits (its `meshes`, and a crowned one's halo crowns), gathered at
+/// compile time into one list
 pub fn meshes(k:Kind)[]const meshlib.Id{
   return switch(k){
     inline else=>|t|comptime blk:{
       // the kind's def, and the extra meshes it lists (if any)
       const d:Def=reg.module(t).def;
-      const extra=if(reg.has(t,"meshes"))reg.module(t).meshes else.{};
+      // decision: a crowned kind's crowns join its list here, from its
+      // `Def.crown`, so wearing the sign is one line in its def
+      const extra=(if(reg.has(t,"meshes"))reg.module(t).meshes else.{})++(if(d.crown>0)lib.lightCrown.meshes else.{});
       // how many leading entries are its own: its mesh, and its preview if set
       const own:usize=if(d.preview!=null)2 else 1;
       // the list being filled

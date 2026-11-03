@@ -61,7 +61,7 @@ pub const meshes=.{.bellyLump,.sporeCarrier};
 pub const pairs:st.Pairs=.{};
 /// what a sporecaster is: grown from its seed, one tile across, a pale
 /// store that swaps sap and is drawn from afar
-pub const def:st.Def=.{.item=.sporecaster,.lineage=.parasitic,.size=1,.mesh=.sporecaster,.store=true,.grow=5,.sway=0.45,.tall=0.65,.sap=0.3,.far=true,.light=.needs,.draws=2};
+pub const def:st.Def=.{.item=.sporecaster,.lineage=.parasitic,.size=1,.mesh=.sporecaster,.store=true,.grow=5,.sway=0.45,.tall=0.65,.sap=0.3,.far=true,.light=.needs,.draws=2,.crown=0.95,.ley=.fronds};
 /// the most it holds
 pub const holdMost=40;
 /// how many of one kind a spore carries

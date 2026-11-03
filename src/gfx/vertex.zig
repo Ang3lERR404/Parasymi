@@ -96,12 +96,17 @@ pub const Part=enum(u32){
   /// so what it holds shows within, dense at its edges and down its
   /// furrows (tu.y 0 a fold's crown .. 1 a furrow's floor; part.frag)
   cortex,
+  /// a fragment of a powered structure's halo crown (radiant_kit pieces,
+  /// game/light_crown.zig): pearl with a soap-bubble film, light held in
+  /// it; gathered by its structure's light and come apart in the dark
+  /// (part.vert, by the instance's `k.y`)
+  crown,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail,.cortex=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail,.cortex,.crown=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve,.stone=>false,
   };
 }
@@ -226,12 +231,18 @@ pub const PartInstance=extern struct{
   /// `partGhost`, ...: what it is beyond its mesh
   flags:u32=0,
   /// x how far it is blended into its mesh's next key (0..1, the library's
-  /// `next`: a bud opening); yzw unused
+  /// `next`: a bud opening); yzw the light of the structure it belongs to
+  /// (game/parts.zig `Ley`): y its shine 0..1 (its leaves turn ley-blue,
+  /// its crown gathers), z the world height that blue starts down from, w
+  /// how far down it reaches in whole light
   k:m.Vice(f32,4)=.{0,0,0,0},
 };
 /// `PartInstance.flags`: a placement preview (casts no shadow); part.vert
 /// reads it as `PART_GHOST`
 pub const partGhost:u32=1;
+/// `PartInstance.flags`: its fronds (tendrils) turn ley-blue in its light
+/// too, not its leaves alone; part.vert reads it as `PART_LEY_FRONDS`
+pub const partLeyFronds:u32=2;
 /// a halo forming around a polyp (game/structures/polyp.zig), as an
 /// instance carries it to the shaders: xyz its centre (where the diamond
 /// sits), w how far it has come (0 the blooms leave their corners .. 1 they

@@ -86,6 +86,8 @@ zig build run -- --demo --unforming   # the world event begins at once (docs/tes
 zig build run -- --act2           # act 2 after the unforming: the star hyena (docs/testing.md)
 zig build run -- --plant=<species> | --structure=<kind> [--state= --period=]
                                   # one thing alone (docs/testing.md)
+                                  # a structure: --lit=S holds it in light (crown,
+                                  # ley-blue), --crown=diadem|circlet|orrery|lotus
 zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip
 zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P

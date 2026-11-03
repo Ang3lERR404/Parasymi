@@ -121,6 +121,21 @@ zig build run -- --structure=rootDigger --state=active --period=20 --inspect=roo
 - Shots land in `shots/<name>_<n>.png` after a 3 s settle.
 - Read the PNGs to verify.
 - A stage held still from every side: `--state=0.5`.
+- **A structure in light** (its halo crown and ley-blue leaves,
+  [visual.md](visual.md#the-sign-of-light)): alone it stands in no light,
+  so hold it in a share of it with `--lit=<0..1>` (with any state; its
+  shine eases up to it over a few seconds, so the first shots catch the
+  crown gathering), and pick its crown with
+  `--crown=<diadem|circlet|orrery|lotus>` (unset: its seed's):
+
+```
+zig build run -- --structure=germinator --state=mature --lit=1 --crown=lotus --inspect=germinator --shots=1 --orbit=12 --dist=3.2 --pitch=12 --tod=0.5
+zig build run -- --structure=germinator --state=mature --lit=0.5 --inspect=germinator --shots=1 --orbit=12 --dist=3.2 --pitch=12 --tod=0.5
+zig build run -- --structure=germinator --state=mature --lit=0.14 --crown=circlet --inspect=germinator --shots=1 --orbit=12 --dist=5 --pitch=4 --tod=0.5
+```
+  Half lit, the blue reaches halfway down; dim, only a few fragments are
+  flying in and only its top tips are blue. In play (`--demo`), the
+  germinator and arsthraxia by the solcyriphon wear it by day.
 
 **Which growth each shot shows.** The loop runs from the start, and the
 shots are spread over one turn of `--orbit` seconds. So shot `k` of `n`

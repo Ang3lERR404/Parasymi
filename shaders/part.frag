@@ -107,6 +107,9 @@ const float PLEXUS_LUB = 0.06;
 const float PLEXUS_DUB = 0.2;
 const float PLEXUS_THUMP = 0.035;
 const float PLEXUS_FADE = 0.35;
+// a halo crown's fragment: how much of the sky's light its upper faces
+// take by day (it is light itself, the key light left out)
+const float CROWN_SKY = 0.25;
 // the halo's projection: how many rays it has round it
 const float RAYS = 40.0;
 // the roles thin enough for light from behind to shine through (leaves,
@@ -335,6 +338,25 @@ void surface() {
     float ends = smoothstep(0.0, 0.08, v_t) * smoothstep(1.0, 0.92, v_t);
     c = col * (0.6 + 2.4 * core) * flick * v_glow;
     float a = clamp((0.25 + 0.75 * core) * flick, 0.0, 1.0) * ends * clamp(v_fade, 0.0, 1.0);
+    o = vec4(applyFog(c, v_pos), a);
+    return;
+  }
+  if (part == PART_CROWN) {
+    // a halo crown's fragment (game/light_crown.zig): pearl, as the
+    // radiant plants are, its thin film turning its hue with the view and
+    // drifting slowly over it like a soap bubble; light held inside it
+    // (v_glow), brightest where it is thinnest (its edges), see-through
+    // face-on; a breath of the sky's light on its upper faces by day so its
+    // form reads; fading in as it settles (v_fade)
+    float t = pc.eye_time.w;
+    float ndv = abs(dot(raw, V));
+    float fres = pow(1.0 - ndv, 2.0);
+    vec3 film = filmHue(ndv * 1.4 + v_t * 0.8 + v_phase * 3.0 + t * 0.03);
+    vec3 pearl = mix(v_col, film, 0.3 + 0.4 * fres);
+    c = pearl * (0.3 + 1.1 * fres) * (0.35 + 1.5 * v_glow);
+    c += pearl * (0.5 + 0.5 * n.y) * CROWN_SKY * DAYLIGHT;
+    c += mix(pearl, vec3(1.0), 0.5) * pow(max(dot(reflect(-V, n), SUN), 0.0), 40.0) * 0.6 * DAYLIGHT;
+    float a = mix(0.45, 0.95, fres) * clamp(v_fade, 0.0, 1.0);
     o = vec4(applyFog(c, v_pos), a);
     return;
   }

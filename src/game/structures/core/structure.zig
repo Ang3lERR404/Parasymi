@@ -83,6 +83,9 @@ pub const Structure=struct{
   /// its share of the light it takes this tick, 0..1 (sim/light.zig; worked
   /// out every tick, so a loaded one is dark only until the first)
   lit:f32=0,
+  /// its light smoothed, 0..1: how far its halo crown has gathered and its
+  /// ley-blue crept down it (game/light_crown.zig)
+  shine:f32=0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
   grown:f32=1,
   /// how far the unforming has taken it, 0 untouched .. 1 gone: it grows

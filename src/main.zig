@@ -156,6 +156,11 @@ pub fn main(init:Init)!void{
   var lone:?specimen.Specimen=null;
   var state:specimen.State=.grow;
   var period:?f32=null;
+  // a structure alone: `--lit=` the share of light it is held in (its crown
+  // gathers, its leaves turn ley-blue), `--crown=<diadem|circlet|orrery|lotus>`
+  // the crown it is given
+  var lit:?f32=null;
+  var crown:?lib.lightCrown.Design=null;
   // `--panel=<belly|research|paused|options|gardens|naming>` holds that panel open
   // (and keeps the HUD in `--inspect` shots); `--panel=overview` holds alt
   // mode on while roaming
@@ -204,6 +209,8 @@ pub fn main(init:Init)!void{
     if(startsWith(u8,a,"--samples="))lone=.{.what=.{.samples=try specimen.Samples.parse(a["--samples=".len..])}};
     if(startsWith(u8,a,"--state="))state=try specimen.State.parse(a["--state=".len..]);
     if(startsWith(u8,a,"--period="))period=try parseFloat(f32,a["--period=".len..]);
+    if(startsWith(u8,a,"--lit="))lit=m.clamp01(try parseFloat(f32,a["--lit=".len..]));
+    if(startsWith(u8,a,"--crown="))crown=stringToEnum(lib.lightCrown.Design,a["--crown=".len..]) orelse return error.BadCrown;
     if(eql(u8,a,"--panel=overview")){
       panel=.roam;
       overview=true;
@@ -216,6 +223,8 @@ pub fn main(init:Init)!void{
     if(!state.suits(l.what))return error.BadState;
     l.state=state;
     if(period)|t|l.period=@max(t,0.1);
+    l.lit=lit;
+    l.crown=crown;
   }
   // the only read of the controls file: no key or button is named in code.
   // First, so the strings can show what each action is bound to.

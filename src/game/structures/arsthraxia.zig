@@ -58,7 +58,7 @@ const v3=m.v3;
 pub const meshes=.{.driftFlower,.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaBud0,.arsthraxiaBud1,.arsthraxiaBud2,.arsthraxiaBud3,.arsthraxiaBudHeart,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
 /// what the lab is: 2×2, keeping what it is fed, swaying from its root two
 /// tiles tall, growing in over 8 s; shown whole (`preview`) before it is put down
-pub const def:st.Def=.{.item=.arsthraxia,.lineage=.symbiotic,.evolves=.convergent,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true,.light=.needs,.draws=3};
+pub const def:st.Def=.{.item=.arsthraxia,.lineage=.symbiotic,.evolves=.convergent,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true,.light=.needs,.draws=3,.crown=3.05,.ley=.leaves};
 /// most of one ingredient it will hold
 const stock=20;
 /// the satellites round its core from the start; one more per growth

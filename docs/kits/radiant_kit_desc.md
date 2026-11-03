@@ -10,7 +10,8 @@ kits.
 The **radiant (celestial) lineage's body**. It is shared by:
 - its plants: `plant` (the celestial bloom, form `radiant`) and `star`
   (the vesper, form `star`);
-- its structures: the diamond (`cut` + `shards`).
+- its structures: the diamond (`cut` + `shards`), and the halo crowns
+  powered structures wear (`light_crown.zig`).
 
 **A radiant thing is never grown, only gathered.** No stem, no growth
 spline, nothing that swells or scales up. A grounded one (the vesper) is
@@ -88,6 +89,7 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
 | `meshgen.zig` form `.radiant` | `plant` — species `bloom` |
 | `meshgen.zig` form `.star` | `star` — species `vesper` |
 | `halo.zig` (the diamond, shared by `diamond.zig`, polyp event) | `Cut`, `cut`, `shards` |
+| `light_crown.zig` (the halo crowns powered structures wear) | `fragment`, `halo`, `whorl`, `core`, `cut`; `mineralKit.crystal`; all re-marked part `.crown`, gathered in part.vert by the structure's shine (`CROWN_*`) |
 | `tests.zig` | pulls in its test |
 
 ## GPU side
