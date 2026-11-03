@@ -286,7 +286,13 @@ const parts=struct{
   pub const turnRootPale=@import("meshes/turn_root.zig").pale;
   /// a ganglion's nerve out to what it feeds, carrying a pulse
   pub const ganglionNerve=@import("meshes/ganglion.zig").nerve;
-  /// the ganglion: a parasite's nerve knot, see-through over what hangs inside
+  /// the trail of light a thing the ganglion holds leaves as it travels
+  /// inside its knot (the unforming's strip), drawn before the knot so its
+  /// cortex blends over it
+  pub const ganglionTrail=@import("meshes/unform_shard.zig").trail;
+  /// a thing the ganglion holds: a bead of light travelling inside its knot
+  pub const ganglionHeld=@import("meshes/ganglion.zig").held;
+  /// the ganglion: a parasite's brain, its cortex see-through over what travels inside
   pub const ganglion=@import("meshes/ganglion.zig");
   /// the sporecaster: a parasite that sends, see-through over what hangs inside
   pub const sporecaster=@import("meshes/sporecaster.zig");

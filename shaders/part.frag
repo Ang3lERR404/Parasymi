@@ -43,6 +43,15 @@ const float HUSK_CLEAR = 0.1;
 const vec3 HUSK_CRACK = vec3(0.55, 0.85, 1.6);
 const float HUSK_CRACK_SCALE = 22.0;
 const float HUSK_CRACK_W = 0.035;
+// a ganglion's cortex: how clear it is face-on, how fast it thickens
+// toward its edges, what its furrows take of its colour (darker, more
+// violet) and how much denser they are, how much of the light of what it
+// holds shines through it from inside
+const float CORTEX_CLEAR = 0.45;
+const float CORTEX_EDGE_POW = 2.2;
+const vec3 CORTEX_FURROW = vec3(0.3, 0.22, 0.45);
+const float CORTEX_FURROW_DENSE = 0.55;
+const float CORTEX_THROUGH = 1.4;
 // smooth value noise over a husk, its cracks laid along where it crosses
 // the middle
 float huskNoise(vec3 p) {
@@ -476,6 +485,27 @@ void surface() {
     float r = clamp(v_t, 0.0, 1.0);
     float a = v_fade * pow(1.0 - r, GROUND_SHADOW_FALLOFF);
     o = vec4(applyFog(GROUND_SHADOW, v_pos), a);
+    return;
+  }
+  if (part == PART_CORTEX) {
+    // a ganglion's folded cortex: pale matte tissue, milky and see-through
+    // face-on so what it holds shows within, denser at its edges and down
+    // its furrows (v_u 0 a fold's crown .. 1 a furrow's floor), which run
+    // darker and more violet, so its folds read; the light of what it
+    // holds shines through it from inside, and the key light a little
+    // from behind. No sheen: it is tissue. Only its near side is drawn.
+    if (dot(raw, V) < 0.0) discard;
+    float ndv = clamp(dot(n, V), 0.0, 1.0);
+    float fres = pow(1.0 - ndv, CORTEX_EDGE_POW);
+    float furrow = smoothstep(0.0, 1.0, clamp(v_u, 0.0, 1.0));
+    vec3 tissue = mix(v_col, v_col * CORTEX_FURROW, furrow);
+    PointLit pl = pointLights(v_pos, n, n, false);
+    c = shadeLitWith(tissue, n, sh, pl.plain);
+    c += tissue * (pl.behind * CORTEX_THROUGH + max(dot(-n, SUN), 0.0) * 0.2 * sh);
+    c += v_col * v_glow * 2.2;
+    c += v_col * pow(1.0 - ndv, RIM_POW) * mix(0.35, 0.12, DAYLIGHT);
+    alpha = clamp(mix(CORTEX_CLEAR, 1.0, fres) + furrow * CORTEX_FURROW_DENSE, 0.0, 1.0);
+    o = vec4(applyFog(c, v_pos), alpha);
     return;
   }
   if (part == PART_HUSK) {

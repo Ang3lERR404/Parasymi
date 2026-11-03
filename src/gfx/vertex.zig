@@ -92,12 +92,16 @@ pub const Part=enum(u32){
   /// ribbon turned to the eye, narrow and faint at its tail, bright and
   /// full at its head, the colour it carries (part.vert, part.frag)
   trail,
+  /// a ganglion's cortex: pale folded tissue, milky and see-through face-on
+  /// so what it holds shows within, dense at its edges and down its
+  /// furrows (tu.y 0 a fold's crown .. 1 a furrow's floor; part.frag)
+  cortex,
 };
 /// whether a library part of role `p` draws see-through (part.frag blends
 /// it over what lies behind): true for light, sap and glass, false for solids
 pub fn seeThrough(p:Part)bool{
   return switch(p){
-    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail=>true,
+    .bloom,.ear,.resin,.shadow,.thread,.flash,.halo,.projection,.energy,.pod,.plexus,.spark,.husk,.trail,.cortex=>true,
     .stem,.leaf,.thorn,.tendril,.prism,.core,.essence,.nerve,.stone=>false,
   };
 }
