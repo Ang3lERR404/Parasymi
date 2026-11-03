@@ -333,6 +333,18 @@ pub fn Inventory(comptime slots:usize)type{
     pub fn worth(inv:*const Self,item:Item)u32{return worthIn(&inv.slot,item);}
     /// spends `n` of `item`, stand-ins too (`Bag.spend`)
     pub fn spend(inv:*Self,item:Item,n:u32)bool{return inv.bag().spend(item,n);}
+    /// how many of `offered` it takes, stocking `want` up to `stock`: of
+    /// `want` itself, what it is short; of what stands in for it (a sunlit
+    /// essence for essence), enough of those to make the shortfall up
+    pub fn wantOf(inv:*const Self,want:Item,offered:Item,stock:u32)u32{
+      // how far short of its stock it is, stand-ins counted
+      const short=stock-|inv.worth(want);
+      if(offered==want)return short;
+      // what the offered item stands in for, if anything
+      const sf=offered.standsFor() orelse return 0;
+      if(sf.item!=want)return 0;
+      return(short+sf.n-1)/sf.n;
+    }
     /// slots holding anything.
     pub fn used(inv:*const Self)usize{
       // the running count
@@ -355,6 +367,21 @@ pub fn Inventory(comptime slots:usize)type{
       return f/m.f(slots);
     }
   };
+}
+test"a sunlit essence stands in for three, spent with change and wanted for them"{
+  // a small inventory: one essence and one sunlit essence
+  var inv:Inventory(4)=.{};
+  _=inv.add(.essence,1);
+  _=inv.add(.sunlitEssence,1);
+  try testing.expectEqual(@as(u32,4),inv.worth(.essence));
+  // spending two takes the plain one, then the sunlit one, two back as change
+  try testing.expect(inv.spend(.essence,2));
+  try testing.expectEqual(@as(u32,2),inv.count(.essence));
+  try testing.expectEqual(@as(u32,0),inv.count(.sunlitEssence));
+  try testing.expect(!inv.spend(.essence,3));
+  // stocking ten essence, it takes three sunlit ones for the eight it lacks
+  try testing.expectEqual(@as(u32,3),inv.wantOf(.essence,.sunlitEssence,10));
+  try testing.expectEqual(@as(u32,0),inv.wantOf(.essence,.grit,10));
 }
 test"inventory stacks and takes"{
   // a small inventory of four slots

@@ -126,7 +126,9 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
 /// what its weave is woven from, up to `stock` of each, less what it holds.
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32{
   for(craft.hand[s.state.germinator.recipe].in)|ing|{
-    if(ing.item==item)return stock-|s.inv.count(item);
+    // (a sunlit stand-in is taken for what it stands in for)
+    const w=s.inv.wantOf(ing.item,item,stock);
+    if(w>0)return w;
   }
   return 0;
 }

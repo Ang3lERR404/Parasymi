@@ -251,7 +251,9 @@ pub fn wants(s:*const st.Structure,g:*const prog.Progression,item:items.Item)u32
   // the study chosen now
   const id=g.current orelse return 0;
   for(prog.tree.get(id).perUnit)|ing|{
-    if(ing.item==item)return stock-|s.inv.count(item);
+    // (a sunlit stand-in is taken for what it stands in for)
+    const w=s.inv.wantOf(ing.item,item,stock);
+    if(w>0)return w;
   }
   return 0;
 }

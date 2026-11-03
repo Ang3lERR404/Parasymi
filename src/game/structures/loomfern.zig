@@ -122,7 +122,7 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   const self=ctx.ss.get(i);
   const f=&self.state.loomfern;
   if(self.inv.count(.fibre)>=buffer)return false;
-  if(f.fed==0 and self.inv.take(.essence,1))f.fed=perEssence;
+  if(f.fed==0 and self.inv.spend(.essence,1))f.fed=perEssence;
   f.t+=dt/(if(f.fed>0)fast else slow);
   if(f.t<1)return true;
   if(self.inv.add(.fibre,1)<1)return false;
@@ -131,9 +131,9 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(f.fed>0)f.fed-=1;
   return true;
 }
-/// it wants essence only, up to `essenceStock`, less what it holds.
+/// it wants essence only (or sunlit essence for it), up to `essenceStock`, less what it holds.
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32{
-  return if(item==.essence)essenceStock-|s.inv.count(.essence)else 0;
+  return s.inv.wantOf(.essence,item,essenceStock);
 }
 /// only the fibre it has woven leaves it.
 pub fn output(s:*const st.Structure)?items.Item{return if(s.inv.count(.fibre)>0).fibre else null;}
