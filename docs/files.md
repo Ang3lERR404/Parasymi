@@ -62,6 +62,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## engine/src/render/
 - `post.zig` — post-processing: light that bleeds, and smooth edges.
+- `rays.zig` — shadows traced as rays: what casts them, as it stands this very frame.
 - `renderer.zig` — frame orchestration: acquire, record every pass, submit, present.
 - `volume.zig` — the air between the eye and what it sees: volumes a game raymarches on the GPU from the world's depth (mist, haze, light falling through…
 

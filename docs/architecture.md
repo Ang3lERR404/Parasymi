@@ -232,6 +232,37 @@ the key light's map casts here (and a radiant plant's petals, leaves and
 veil, plant.vert under CUBE). A light says which cube it holds in its
 `col.w` (the renderer sets it).
 
+### Ray-traced shadows
+Where the GPU can trace rays (`Ctx.rayTracing`) and RAY TRACING is on
+(`Renderer.setRays`, `tracing`), the engine draws no shadow map or cube
+(they are cleared, never read) and traces instead (engine
+`render/rays.zig`):
+1. `prepare`: each capture pass (`plantsCapture`, `partsCapture`, target
+   `.capture`) reserves room for its instances' vertices
+   (`Rays.reserve`) and writes its table: each instance's first slot less
+   its mesh's first vertex, by its place among the instances
+   (`renderer.caught`), and marks its level's key (`Rays.mark`: the
+   instances' counts, so a frame like the last is refitted).
+2. The capture passes draw the same instances with plant.vert/part.vert
+   built with CAPTURE (which brings SHADOW without its views), nothing
+   rasterized (`pipeline.Desc.discard`), the push's `light` pointing at
+   the table. Each vertex is written where it is placed (light.glsl
+   `capture`), as NaN where it casts nothing; each instance is handed to
+   a bottom level (`renderer.handed`, `Into`: `plantLevel`, `pointLevel`
+   for a radiant plant's point-only petals, `partLevel`).
+3. `Rays.build` builds or refits each level, then the top level, which
+   set 0 binding 3 holds (`casters`); `Lighting.info.z` says rays are on.
+4. The lit fragment shaders are the RAY builds (`Desc.rayFrag`:
+   plant/part head, solid and glass, terrain and detail, pools, fog),
+   taken where the GPU can trace rays; light.glsl's `keyShadow`,
+   `airLit`, `cubeLit` and `pointShadow` trace while `info.z` is set,
+   else read the maps. plant.frag and part.frag define SAMPLED (shaded per
+   sample), so a pixel's rays are shared among its samples
+   (`info.w` the world's samples).
+A new caster needs nothing: what its shadow pass casts is caught. A new
+lit shader takes a RAY build in build.zig's variants and its pass's
+`rayFrag`.
+
 ### Other rules
 - part.vert picks how to place a part by `PartInstance.e.x`:
   - 0 matrix;

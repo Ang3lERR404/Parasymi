@@ -64,6 +64,12 @@ adds on top.
 ### gfx
 - Engine: ctx, swapchain, buffer, pipeline, and `vertex` (`Mesh`, `Skin`,
   `Grow`, `MeshPose`, `Ui`, `Light`).
+- `ctx` asks the GPU whether it can trace rays (VK_KHR_acceleration_structure,
+  VK_KHR_deferred_host_operations, VK_KHR_ray_query, and vertex shaders
+  that may write to buffers) and enables all of it only where it has all
+  of it: `Ctx.rayTracing` (and `scratchAlign`). Without it the device is
+  made exactly as before. (decision: the gardener's, crossing this layer.)
+- `pipeline.Desc.discard`: nothing rasterized, the vertex shader alone.
 - Engine `meshgen`: `Mesher(Part, stem)` with `Builder`, tubes, cone,
   loft, patch, ellipsoid, vines, braids, bands; the LOD scheme;
   Growth/transport.
@@ -85,8 +91,12 @@ adds on top.
   overhead map, a half-size volume after the world, its edge-aware
   composite), `cube` (the points of light's shadow cubes: which lights
   hold one, kept from frame to frame and eased in and out; their faces;
-  the depth images), `passes/ui`. `Renderer.pointShadows(count,size)` sets
-  how many lights may hold one and how fine.
+  the depth images), `rays` (shadows traced as rays: the casters caught as
+  drawn, their bottom levels built or refitted, the top level the shaders
+  trace through; only where `Ctx.rayTracing`), `passes/ui`.
+  `Renderer.pointShadows(count,size)` sets how many lights may hold one
+  and how fine; `Renderer.setRays(on)` traces shadows (where the GPU can)
+  or draws them into the maps, `tracing()` says which this frame.
 - Game: `renderer` (the garden's `G`), passes, terrain meshing.
 
 ### ui
@@ -110,7 +120,9 @@ adds on top.
 ### shaders
 - Engine: post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`
   (`airLit`: the key light at a point in the air; `cubeLit`, a shadow
-  cube looked up; `pointShadow`, a surface's), `growth.glsl`
+  cube looked up; `pointShadow`, a surface's; under RAY each traced
+  instead, `keyTraced`, `pointTraced`, `blocked`; under CAPTURE,
+  `capture`), `growth.glsl`
   (`growOut`), `volume.glsl` (what a volume pass reads),
   `volume_compose.frag`.
 - Game: everything else. `common.glsl` includes `light.glsl`; `part.vert`
@@ -168,7 +180,21 @@ A pass's `.target` is where it draws, in this order each frame:
   overhead map and the field (set 1, `volume.glsl`); rgb what the air sends to the eye, a
   how much shows through. The engine lays it over the HDR image before the
   glow;
-- `screen`: the HUD.
+- `screen`: the HUD;
+- `capture` (first of all, only while shadows are traced as rays; its
+  pipelines made only where the GPU can): nothing drawn into, nothing
+  rasterized. Its vertex shader, built with CAPTURE, writes each vertex
+  where it places it (light.glsl `capture`), the push's `light` pointing
+  at the pass's table (`rays.tableHead`, then each instance's slot less
+  its mesh's first vertex); in `prepare` it reserves room
+  (`Rays.reserve`) and marks its level (`Rays.mark`), in `record` it
+  hands each instance to a bottom level (`Rays.add`). The engine then
+  builds the levels and the top level.
+
+A pass's `rayFrag` is its fragment shader built with RAY (light.glsl's
+shadows traced while the record says so), taken where the GPU can trace
+rays. A shader built with RAY and SAMPLED (shaded once a sample) shares a
+pixel's rays among its samples.
 
 ### Meshes
 `engine.gfx.meshgen.Mesher(Part, stem)`:
@@ -218,7 +244,9 @@ header of `light.glsl` lists what it expects.
   `eb.compile`.
 - It passes `target`, `optimize`, `glslc` and `vk-registry` to
   `b.dependency("engine", ...)`.
-- It compiles its own shaders with `-I` set to both shader folders.
+- It compiles its own shaders with `-I` set to both shader folders; a
+  variant's define may name several, split by commas (`GLASS,RAY`). A
+  shader built with RAY is `#version 460` (ray queries need it).
 - `zig build test` runs the game's tests and the engine's.
   `cd engine && zig build test` runs the engine's tests alone.
 

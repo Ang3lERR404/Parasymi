@@ -159,6 +159,22 @@ zig build run -- --demo --tod=0.0 --inspect=germinator --shots=2 --orbit=30 --di
 For the same view without them, set `lightShadows = off` in the
 gardener's `options.cfg` (or OPTIONS, LIGHT SHADOWS) and shoot again.
 
+## Ray tracing on and off
+`--rt=on` or `--rt=off` traces shadows as rays or draws them into maps
+for this run, whatever OPTIONS says (like `--novsync`; a GPU that cannot
+trace rays draws maps either way). Shoot the same view both ways to
+compare:
+
+```
+zig build run -- --demo --rt=off --tod=0.3 --inspect=player --shots=4 --orbit=2 --dist=4 --pitch=30
+zig build run -- --demo --rt=on --tod=0.3 --inspect=player --shots=4 --orbit=2 --dist=4 --pitch=30
+zig build run -- --demo --rt=on --tod=0.0 --inspect=solcyriphon --shots=1 --orbit=30 --dist=9 --pitch=12
+```
+
+Four shots half a second apart catch the plants swaying: their shadows
+must sway with them. The log's last lines say how many triangles cast
+(`rays:`) and how often the levels were refitted or built.
+
 ## Faster than the clock
 `--speed=N` runs the world N times faster: its ticks, its sky and the
 air's moisture together, so everything keeps in step. For slow things

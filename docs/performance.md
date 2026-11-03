@@ -74,6 +74,36 @@ measured release on the same machine, `--demo --inspect=player`, msaa8,
 - LIGHT SHADOWS in the options sets how many lights (0, 2, 4) and how
   fine (256², 512²); the default is the full look.
 
+## Ray-traced shadows
+RAY TRACING on (engine `render/rays.zig`, light.glsl RAY), measured
+release on an RTX 4060 Ti, `--demo --inspect=player --shots=2 --orbit=8`,
+2026-11-03 (GPU ms, maps → rays):
+
+| | msaa4 day | msaa4 night | msaa8 day | msaa8 night |
+|---|---|---|---|---|
+| whole frame | 21.1 → 41.9 | 23.1 → 43.2 | 30.4 → 58.0 | 31.5 → 60.0 |
+| plantsHead | 8.7 → 18.9 | 9.7 → 19.7 | 14.0 → 28.0 | 14.8 → 28.9 |
+| fog | 1.3 → 2.9 | 1.2 → 3.0 | 1.4 → 3.2 | 1.4 → 3.3 |
+| maps + cubes drawn / caught + built | 1.6 → 3.3 | 1.9 → 3.2 | 1.6 → 3.4 | 1.9 → 3.6 |
+
+- The cost is the rays' traversal through dense foliage: with the rays
+  sent but culled before any level (mask), the frame is 36 ms (msaa8);
+  with none sent, 27: about a billion rays a second, in fragment shaders
+  shaded per sample.
+- What was taken, invisibly: the casters at their coarsest level, as the
+  maps (the drawn levels gave 13.5 M triangles and a 222 ms frame for the
+  same shadows); a pixel's rays shared among its samples (`sharers`; 4 a
+  sample at msaa8 cost 85 ms in plantsHead alone); the key light's first
+  rays agreeing ending the rest; the plants, the radiant petals and the
+  parts in levels of their own, refitted while what they hold stays the
+  same (a build of 1.2 M triangles 4.4 ms, refitted about 1 ms; the parts'
+  motes come and go every frame, so they never rebuild the plants').
+- Not taken (they would change the look): fewer than sixteen rays a pixel
+  for the key light's soft edge, one ray a light.
+- What is left to try, exact: a depth pre-pass, so no hidden fragment
+  sends rays; instance order kept stable across levels of detail, so the
+  plants' level is refitted more often.
+
 ## Level of detail
 Every plant and library mesh is built at `meshgen.lods` (3) levels of
 detail, so far-away things use fewer triangles.

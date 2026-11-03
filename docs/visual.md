@@ -674,6 +674,43 @@ flooding. His pose is the clip `src/anim/sleep.anim` (keyed in animedit,
 - Options, LIGHT SHADOWS: off, two lights (256² faces), four lights
   (256²), four lights fine (512², the default).
 
+### Ray-traced shadows (engine `render/rays.zig`; options, RAY TRACING)
+Where the GPU can trace rays (acceleration structures and ray queries,
+`Ctx.rayTracing`), every shadow above is traced instead of read from a
+map, on by default; where it cannot, the option shows NOT SUPPORTED and
+the maps and cubes stay as they are. The look is the maps' look, only
+truer:
+- **What casts is what is drawn, this very frame.** The casters' own
+  vertex shaders run again with nothing rasterized (`plantsCapture`,
+  `partsCapture`: plant.vert and part.vert built with CAPTURE), so sway,
+  growth, the radiant fragments' gathering, a structure's breath and the
+  skinned wolf are all in the rays: a shadow moves with its plant, never
+  standing still. Each caster at its coarsest level, as the maps draw it.
+- **The same casters.** CAPTURE keeps the shadow passes' rules: light
+  itself (`PARTS_LIGHT`, the radiant fragments, motes, beams), a floater's
+  lantern, the soft patch under a floater and a placement preview cast
+  nothing; a radiant plant's petals, leaves and veil block only the points
+  of light's rays (as they cast only into the cubes), its living leaves
+  the key light's too.
+- **The key light's soft edge** (`keyTraced`): rays toward it spread over
+  its breadth (`LIGHT_SPREAD`), turned by a hash of the place as the map's
+  taps were, so the edge is as steady (no flicker: nothing changes from
+  frame to frame but what moves). Sixteen a pixel in all; where a point's
+  first rays all agree it is wholly lit or wholly shaded and sends no
+  more. A pass shaded per sample deals a pixel's rays out among its
+  samples, which the resolve averages back. Sharp where a shadow meets
+  what casts it, softening as it falls away, without the map's texels.
+- **Points of light** (`pointTraced`): four rays a pixel to points across
+  the light's breadth (`POINT_RADIUS`, 5 cm), stopping short of its near
+  plane as its cube's faces did; still only the lights holding a cube
+  (LIGHT SHADOWS), easing in and out as before.
+- **In the fog**: each march step sends one ray toward the key light, and
+  each of a shadowed light's 24 looks one toward it; the march's dither
+  softens them as the map's filtered tap did. Shafts and the rays between
+  a solcyriphon's petals read as they did.
+- Surfaces lift their rays a hair off themselves toward the light (6 mm,
+  and 0.6 mm a metre from the eye), so nothing shadows itself.
+
 ## Post-processing (engine `render/post.zig`)
 - World passes draw into an HDR image (one that can hold light brighter
   than white).
