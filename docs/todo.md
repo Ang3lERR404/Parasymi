@@ -27,6 +27,8 @@ carries the game's early days.
   the light at night. A patch never runs dry, but each has its own
   richness, like Factorio's oil fields. At the unforming each patch goes
   dark by shooting its light up into the sky.
+- **Fibre.** It comes only from the fibre plant's nodes, gathered by
+  hand; no plant grows it.
 - **The parasitic side.** It has one species and three structures; it needs
   more. One parasitic structure could live through the unforming by
   becoming convergent, mirroring the arsthraxia (the Pulse, a mimosa-like
@@ -42,9 +44,19 @@ carries the game's early days.
 - The constellate lineage is in the game behind its own flag; it still
   has to join the garden proper.
 - Act 2 keeping the hyena to the convergent and constellate lineages
-  alone.
+  alone. By hand he weaves only the five constellate parts today
+  (`craft.byHyena`); how the convergent lineage serves him is not worked
+  out.
 - The constellate lineage has no studies yet, so no look for its nodes
   on the research tree ([research-tree.md](research-tree.md)).
+
+## Small things
+- **Matter has no icons.** Seeds and structures show a seed broken open;
+  grit, fibre, essence, starlight and the other matter are only their
+  colour in the belly and hotbar (`game/icon.zig`).
+- **Two unused numbers** in `world/gen.zig`: `roughL` (a roughness
+  wavelength) and `nodeChance` (`slotAmount` thins the nodes instead).
+  Use them or let them go.
 
 ## Playtesting
 - Whether the light grid's numbers feel right in play
