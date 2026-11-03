@@ -123,6 +123,13 @@ pub const hand=[_]Recipe{
   .{.out=.constellateLeaf,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
   .{.out=.constellateBud,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
   .{.out=.constellateStem,.in=&.{.{.item=.fragment,.n=10}},.time=3,.by=.hyena},
+  // the light grid's plants (docs/radiant-plants.md), last so saved
+  // gardens' chosen weaves keep their places. The solcyriphon is open from
+  // the start: the arsthraxia studies only in its light
+  .{.out=.seedSolcyriphon,.in=&.{.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2},.{.item=.fibre,.n=2}},.time=3},
+  .{.out=.seedHeliocyra,.in=&.{.{.item=.starglass,.n=1},.{.item=.starlight,.n=2},.{.item=.leyShard,.n=1}},.time=3,.needs=.bentLight},
+  .{.out=.seedHalcyra,.in=&.{.{.item=.eveningSilk,.n=2},.{.item=.essence,.n=2},.{.item=.fibre,.n=1}},.time=3,.needs=.halcyonVeil},
+  .{.out=.seedAstrocyme,.in=&.{.{.item=.starglass,.n=2},.{.item=.eveningSilk,.n=1},.{.item=.essence,.n=2}},.time=4,.needs=.heldLight},
 };
 /// whether the weave at `idx` in `hand` makes a seed (an item that plants)
 pub fn isSeedRecipe(idx:usize)bool{return hand[idx].out.plants()!=null;}
@@ -212,7 +219,7 @@ pub const Crafter=struct{
   t:f32=0,
   /// whether `inv` holds everything the recipe eats
   pub fn can(inv:items.Bag,r:Recipe)bool{
-    for(r.in)|ing|if(inv.count(ing.item)<ing.n)return false;
+    for(r.in)|ing|if(inv.worth(ing.item)<ing.n)return false;
     return true;
   }
   /// takes the ingredients now; false if missing or the queue is full.
@@ -220,7 +227,7 @@ pub const Crafter=struct{
     // the recipe asked for
     const r=hand[idx];
     if(c.len==queueMax or !can(inv,r))return false;
-    for(r.in)|ing|_=inv.take(ing.item,ing.n);
+    for(r.in)|ing|_=inv.spend(ing.item,ing.n);
     c.queue[c.len]=@intCast(idx);
     c.len+=1;
     return true;

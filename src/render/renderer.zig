@@ -738,7 +738,7 @@ fn settle(r:*Renderer)void{
 /// preview is see-through whole: the glass pass draws all of its mesh.
 fn plantGlassy(id:species.Id,p:vertex.Part)bool{
   return switch(species.get(id).genome.form){
-    .radiant,.star=>true,
+    .radiant,.star,.lens,.bouquet,.heliotrope,.veil=>true,
     .herb,.coil,.drift,.confluence,.lily,.creeper=>p==.pod or p==.bloom or p==.resin,
   };
 }

@@ -35,7 +35,9 @@
 //!                               into the mist and the cloud round it
 //!   describe(s, d, g, x, y)     one line of hover text
 //!   ground(kind) bool           which tiles it may stand on (default: any tile)
-//!   field(s) ?Field             a field of celestial energy it holds
+//!   relay(s) ?light.Relay       a relay of the light grid it holds (a diamond)
+//!   lightUse(s) Use             how it takes light now, when not its `Def.light`
+//!   draws(s) f32                how much light it draws, when not its `Def.draws`
 //!   hold(s, x, y) ?Hold         how it draws the floater at a tile toward itself
 //!   size(s) f32                 how much larger than its mesh it has grown
 //!                               (by research), its growing in aside
@@ -132,8 +134,6 @@ pub const handOff=handoff.handOff;
 pub const handOffWith=handoff.handOffWith;
 /// how a structure draws a floater toward itself
 pub const Hold=hooks.Hold;
-/// every field of celestial energy the structures hold
-pub const fields=hooks.fields;
 /// how a structure draws the floater at a tile toward itself, if it does
 pub const hold=hooks.hold;
 /// hand back what a structure holds outside its slots
@@ -295,6 +295,11 @@ pub const Def=struct{
   /// the lineage the unforming evolves it into instead of taking it (the
   /// arsthraxia: symbiotic into convergent)
   evolves:?species.Lineage=null,
+  /// how it takes the light grid's light (sim/light.zig): not at all,
+  /// working faster in it, working only in it, or only looking lit
+  light:Use=.none,
+  /// how much light it draws at full work (glow)
+  draws:f32=0,
   /// whether the unforming takes it, grown back down to nothing and gone
   /// (game/unforming.zig): every kind of a lineage but the convergent one,
   /// unless it evolves
@@ -307,6 +312,23 @@ pub const Def=struct{
 };
 /// every kind's `def`, looked up by kind
 pub const defs=reg.table(Def,"def");
+/// how a structure takes the light grid's light
+pub const Use=enum(u8){
+  /// it never does
+  none,
+  /// it works without light, faster in it (`hooks.boost`)
+  boost,
+  /// it works only in light, as fast as its light allows
+  needs,
+  /// it works as it always does, and only looks lit (draws nothing)
+  looks,
+};
+/// how structure `s` takes light now
+pub const lightUse=hooks.lightUse;
+/// the structures' relays and light users, for the light grid
+pub const lightGrid=hooks.lightGrid;
+/// how many seconds of work a structure does in a tick, by its light
+pub const workTime=hooks.workTime;
 /// another structure (`kind`, most often of the other lineage) that, both grown within
 /// `meetCount` tiles of each other, is witnessed as the discovery `found`
 pub const Meeting=struct{kind:Kind,found:prog.Discovery};

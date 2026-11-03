@@ -159,7 +159,7 @@ pub const keys=8;
 /// confluence its growth keys.
 pub fn variants(id:species.Id)u32{
   return switch(species.get(id).genome.form){
-    .herb,.coil,.drift,.radiant,.star,.lily,.creeper=>variantCount,
+    .herb,.coil,.drift,.radiant,.star,.lily,.creeper,.lens,.bouquet,.heliotrope,.veil=>variantCount,
     .confluence=>keys,
   };
 }
@@ -174,7 +174,7 @@ pub const Key=struct{
 /// null for a species of fixed shapes
 pub fn growthKey(id:species.Id,growth:f32)?Key{
   switch(species.get(id).genome.form){
-    .herb,.coil,.drift,.radiant,.star,.lily,.creeper=>return null,
+    .herb,.coil,.drift,.radiant,.star,.lily,.creeper,.lens,.bouquet,.heliotrope,.veil=>return null,
     .confluence=>{
       // how far through the keys the growth lies, and the key just below it
       const x=m.clamp01(growth)*(keys-1);

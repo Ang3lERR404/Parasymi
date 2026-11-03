@@ -413,10 +413,10 @@ pub const Specimen=struct{
         }
         // unforming: the event held where it is this far through its shattering
         if(s.state==.unform)g.unforming=.{.phase=.shattering,.t=if(lib.unforming.radiant(sp))lib.unforming.momentOf(seed,s.share())else lib.unforming.witherMoment(seed,s.share())};
-        // the plants lit by radiance; it alone, lit as its look says
-        const rad=&g.eco.radiance.radiating;
-        try rad.resize(g.gpa,g.plants.len());
-        rad.items[0]=def.radiance>0 and l.radiating;
+        // the light each relay carries; it alone, lit as its look says
+        const lit=&g.eco.light.carried;
+        try lit.resize(g.gpa,g.plants.len());
+        lit.items[0]=if(def.lightNode() and l.radiating)1 else 0;
       },
       .structure=>{
         if(g.structs.list.items.len==0)try s.put(g);

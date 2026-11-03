@@ -21,7 +21,7 @@ const World=lib.world.World;
 /// every player-facing string, for the time of day's name
 const txt=lib.txt;
 /// seconds per full day/night cycle
-pub const dayLen:f32=300;
+pub const dayLen:f32=600;
 /// the game starts mid-morning
 const startTod:f32=0.3;
 /// daylight rises from sun elevation `dawnAt` over `dawnSpan`

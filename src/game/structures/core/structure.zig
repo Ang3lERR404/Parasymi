@@ -80,6 +80,9 @@ pub const Structure=struct{
   partners:[partnerSlots]?Ref=@splat(null),
   /// smoothed 0..1, drives glow and motion
   activity:f32=0,
+  /// its share of the light it takes this tick, 0..1 (sim/light.zig; worked
+  /// out every tick, so a loaded one is dark only until the first)
+  lit:f32=0,
   /// 0 a sprout .. 1 grown (see `Def.grow`)
   grown:f32=1,
   /// how far the unforming has taken it, 0 untouched .. 1 gone: it grows

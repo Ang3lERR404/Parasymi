@@ -117,20 +117,23 @@ fn structure(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,sp:*const st.Structure
   if(wet(g))|a|try air(d,at[0],at[1]+(lines-1)*lineH,a);
 }
 /// a plant's card: its name, a tendril of how far grown (with its stage),
-/// then what it yields and how healthy it is, or for a bloom whether it
-/// radiates and over how many links; and whether it draws radiance.
+/// then what it yields and how healthy it is, or for a relay of the light
+/// grid how much light it carries and over how many links; then whether it
+/// draws light, is overdriven by a night beam, or stands on soaked ground.
 fn plant(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,i:ck.PlantId,near:bool)Allocator.Error!void{
-  // the plant, its kind's definition, and the garden's radiance network
+  // the plant, its kind's definition, and the light grid
   const p=g.plants.list.get(i.idx());
   const def=species.get(p.sp);
-  const rad=&g.eco.radiance;
-  // whether the network has caught up to this plant yet
-  const known=i.idx()<rad.powered.items.len;
-  // a bloom waiting on its network, or a plant that draws radiance, says so
-  const waits=(def.radiance>0 and !(known and rad.radiating.items[i.idx()])) or def.needsRadiance or def.needsSoak;
-  // where the card's first line goes, and the current line's left and top
+  const lt=&g.eco.light;
+  // whether the grid has caught up to this plant yet
+  const known=i.idx()<lt.lit.items.len;
+  // how much light it carries (a node), and how hard a beam overdrives it
+  const carried=if(known)lt.carried.items[i.idx()]else 0;
+  const beamed=if(known)lt.beamed.items[i.idx()]else 0;
+  // a relay says more of its light, a plant that draws light or is beamed or needs soaked ground says so
+  const more=def.lightNode() or def.draw>0 or def.needsSoak or beamed>0;
   // how many lines it takes, the air's last
-  const lines:f32=@as(f32,if(waits)4 else 3)+@as(f32,if(wet(g)!=null)1 else 0);
+  const lines:f32=@as(f32,if(more)4 else 3)+@as(f32,if(wet(g)!=null)1 else 0);
   const at=try card(g,d,screenW,screenH,plantW,lines,near);
   const x=at[0];
   var y=at[1];
@@ -147,30 +150,37 @@ fn plant(g:*play.Game,d:*Draw,screenW:f32,screenH:f32,i:ck.PlantId,near:bool)All
     _=try d.print(x+152,y,s.textNote,s.dim,txt.s.hud.growth,.{p.growth*100});
   }
   y+=lineH;
-  if(def.radiance>0){
-    // a bloom: it yields nothing; it radiates, or waits on its network
-    // how many radiance links this bloom has
+  if(def.lightNode()){
+    // a relay: it yields nothing; it carries light, or none reaches it
+    // how many relays this one links to
     var links:u32=0;
-    for(rad.links.items)|l|{
-      if(l.a==i or l.b==i)links+=1;
+    for(lt.links.items)|l|{
+      if(l.a==.plant and l.a.plant==i)links+=1;
+      if(l.b==.plant and l.b.plant==i)links+=1;
     }
-    // whether this bloom radiates now
-    const lit=known and rad.radiating.items[i.idx()];
-    _=try d.print(x,y,s.textBody,if(lit)s.gold else s.dim,txt.s.hud.bloom,.{if(lit)txt.s.hud.radiating else txt.s.hud.dark,links,p.health*100});
-    if(!lit)_=try d.text(x,y+lineH,s.textNote,s.dim,txt.s.hud.noMature);
+    _=try d.print(x,y,s.textBody,if(carried>0)s.gold else s.dim,txt.s.hud.relay,.{carried,links,p.health*100});
+    y+=lineH;
+    if(def.glow[0]+def.glow[1]>0)_=try d.print(x,y,s.textNote,s.gold,txt.s.hud.makes,.{def.glow[0],def.glow[1]})
+    else if(def.store>0)_=try d.print(x,y,s.textNote,s.gold,txt.s.hud.stored,.{p.stored,def.store})
+    else if(carried<=0)_=try d.text(x,y,s.textNote,s.dim,txt.s.hud.dark);
     return;
   }
   // what it yields, or a question when the gardener has not learned it
   const yields=if(g.prog.yieldKnown(p.sp))txt.item(def.yields).short else txt.s.hud.unknownYield;
   _=try d.print(x,y,s.textBody,s.gold,txt.s.hud.plant,.{yields,p.essence,p.health*100});
-  if(def.needsRadiance){
-    // whether it is drawing radiance now
-    const lit=known and rad.powered.items[i.idx()];
-    _=try d.text(x,y+lineH,s.textNote,if(lit)s.gold else s.dim,if(lit)txt.s.hud.drawingRadiance else txt.s.hud.withering);
-  }
-  if(def.needsSoak){
+  y+=lineH;
+  if(beamed>0){
+    // whether a halcyra guards it from the beam
+    const safe=known and lt.guarded.items[i.idx()];
+    _=try d.text(x,y,s.textNote,s.gold,if(safe)txt.s.hud.guarded else txt.s.hud.overdriven);
+  }else if(def.draw>0){
+    // its share of the light it draws
+    const lit=if(known)lt.lit.items[i.idx()]else 0;
+    if(lit>=lib.light.needAt)_=try d.print(x,y,s.textNote,s.gold,txt.s.hud.drawingRadiance,.{lit*100})
+    else _=try d.text(x,y,s.textNote,s.dim,txt.s.hud.withering);
+  }else if(def.needsSoak){
     // whether the ground under it is soaked now
     const wetNow=p.chunk.wet[p.tile]>=lib.ecology.soakedAt;
-    _=try d.text(x,y+lineH,s.textNote,if(wetNow)s.gold else s.dim,if(wetNow)txt.s.hud.soaked else txt.s.hud.drying);
+    _=try d.text(x,y,s.textNote,if(wetNow)s.gold else s.dim,if(wetNow)txt.s.hud.soaked else txt.s.hud.drying);
   }
 }

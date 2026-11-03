@@ -111,8 +111,49 @@ pub const Item=enum(u8){
   constellateStem,
   /// a constellate heart taken up whole (put down, it plays its story afresh)
   constellateHeart,
+  /// the seed of a solcyriphon, the light grid's maker
+  seedSolcyriphon,
+  /// the seed of an astrocyme, the light grid's store
+  seedAstrocyme,
+  /// the seed of a heliocyra, the light grid's shaper
+  seedHeliocyra,
+  /// the seed of a halcyra, the light grid's guard
+  seedHalcyra,
+  /// clear crystal a driftwisp yields now and then under a night beam
+  starglass,
+  /// threads of light a vesper yields now and then under a night beam
+  eveningSilk,
+  /// essence a night beam has steeped: worth `sunlitWorth` essence wherever
+  /// essence is asked
+  sunlitEssence,
+  /// convergence essence a night beam has steeped: worth `sunlitWorth` of it
+  sunlitConvergenceEssence,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
+  /// the sunlit kind of a yield, what one unit in ten becomes in overdrive
+  /// (an item with none is its own)
+  pub fn sunlit(i:Item)Item{
+    return switch(i){
+      .essence=>.sunlitEssence,
+      .convergenceEssence=>.sunlitConvergenceEssence,
+      else=>i,
+    };
+  }
+  /// what item `i` stands in for, and how many of it (a sunlit essence for
+  /// `sunlitWorth` essence), if anything
+  pub fn standsFor(i:Item)?Ingredient{
+    return switch(i){
+      .sunlitEssence=>.{.item=.essence,.n=sunlitWorth},
+      .sunlitConvergenceEssence=>.{.item=.convergenceEssence,.n=sunlitWorth},
+      else=>null,
+    };
+  }
+  /// the item that stands in for `sunlitWorth` of item `i`, if any
+  pub fn steeped(i:Item)?Item{
+    // its sunlit kind
+    const s=i.sunlit();
+    return if(s!=i)s else null;
+  }
   /// the species item `i` plants, if it is a seed
   pub fn plants(i:Item)?species.Id{return species.fromSeed(i);}
 };
@@ -170,7 +211,17 @@ const infos=EnumArray(Item,Info).init(.{
   .constellateBud=.{.col=.{180,190,255,255}},
   .constellateStem=.{.col=.{130,180,240,255}},
   .constellateHeart=.{.col=.{200,225,255,255}},
+  .seedSolcyriphon=.{.col=.{255,225,150,255}},
+  .seedAstrocyme=.{.col=.{230,200,255,255}},
+  .seedHeliocyra=.{.col=.{255,200,120,255}},
+  .seedHalcyra=.{.col=.{200,235,255,255}},
+  .starglass=.{.col=.{225,245,255,255}},
+  .eveningSilk=.{.col=.{255,200,170,255}},
+  .sunlitEssence=.{.col=.{255,240,170,255}},
+  .sunlitConvergenceEssence=.{.col=.{245,200,255,255}},
 });
+/// how many of the plain kind a sunlit one is worth
+pub const sunlitWorth=3;
 /// one slot's worth: an item and how many of it
 pub const Stack=struct{
   /// what is held
@@ -213,6 +264,24 @@ pub const Bag=struct{
   }
   /// how many of `item` the bag holds
   pub fn count(b:Bag,item:Item)u32{return countIn(b.slot,item);}
+  /// how many of `item` the bag holds, counting what stands in for it (a
+  /// sunlit essence as `sunlitWorth` essence): what a recipe may spend
+  pub fn worth(b:Bag,item:Item)u32{return worthIn(b.slot,item);}
+  /// spends `n` of `item`, the plain ones first, then stand-ins, the change
+  /// handed back as plain ones; spends exactly `n` or nothing
+  pub fn spend(b:Bag,item:Item,n:u32)bool{
+    if(b.worth(item)<n)return false;
+    // how many plain ones it holds, and how many more it must make up
+    const plain=@min(b.count(item),n);
+    _=b.take(item,plain);
+    const short=n-plain;
+    if(short==0)return true;
+    // the stand-ins spent, and what they leave over
+    const k=(short+sunlitWorth-1)/sunlitWorth;
+    _=b.take(item.steeped().?,k);
+    _=b.add(item,@intCast(k*sunlitWorth-short));
+    return true;
+  }
   /// removes exactly `n` or nothing.
   pub fn take(b:Bag,item:Item,n:u32)bool{
     if(b.count(item)<n)return false;
@@ -239,6 +308,12 @@ fn countIn(slot:[]const?Stack,item:Item)u32{
   for(slot)|s|if(s)|st|if(st.item==item){c+=st.n;};
   return c;
 }
+/// how many of `item` the slots hold, what stands in for it counted at its worth
+fn worthIn(slot:[]const?Stack,item:Item)u32{
+  // the stand-in for it, if any
+  const st=item.steeped() orelse return countIn(slot,item);
+  return countIn(slot,item)+countIn(slot,st)*sunlitWorth;
+}
 /// an inventory of `slots` slots, held by value (the wolf's belly, a structure's store)
 pub fn Inventory(comptime slots:usize)type{
   return struct{
@@ -254,6 +329,10 @@ pub fn Inventory(comptime slots:usize)type{
     pub fn take(inv:*Self,item:Item,n:u32)bool{return inv.bag().take(item,n);}
     /// how many of `item` it holds
     pub fn count(inv:*const Self,item:Item)u32{return countIn(&inv.slot,item);}
+    /// how many of `item` it may spend, stand-ins counted (`Bag.worth`)
+    pub fn worth(inv:*const Self,item:Item)u32{return worthIn(&inv.slot,item);}
+    /// spends `n` of `item`, stand-ins too (`Bag.spend`)
+    pub fn spend(inv:*Self,item:Item,n:u32)bool{return inv.bag().spend(item,n);}
     /// slots holding anything.
     pub fn used(inv:*const Self)usize{
       // the running count

@@ -12,6 +12,8 @@ const species=lib.species;
 const plantsMod=lib.plants;
 /// the chunk: each tile's ley
 const ck=lib.ck;
+/// the light grid: what each plant draws, the beams and the guards
+const light=lib.light;
 /// the world module
 const world=lib.world;
 /// the garden's streamed world, whose tiles the plants stand on
@@ -36,35 +38,27 @@ pub const Mods=struct{
   yieldMult:[species.count]f32=@splat(1),
   /// how dark it is (0 day .. 1 night); floating plants drink starlight.
   night:f32=0,
-  /// fields of celestial energy held by something other than a bloom (a
-  /// completed halo); they power plants as a bloom's field does
-  fields:[]const Field=&.{},
-};
-/// a disc of celestial energy around a tile: every tile within `radius` of it.
-pub const Field=struct{
-  /// the tile at its centre: world x
-  x:i32,
-  /// and world y
-  y:i32,
-  /// how far out it reaches (tiles)
-  radius:f32=0,
-  /// whether world tile (wx, wy) lies in it
-  pub fn holds(fl:Field,wx:i32,wy:i32)bool{
-    // how far the tile lies from the centre, across and down
-    const dx=wx-fl.x;
-    const dy=wy-fl.y;
-    return m.f(dx*dx+dy*dy)<=fl.radius*fl.radius;
-  }
-  /// how far out it reaches on either axis
-  pub fn reach(fl:Field)i32{return m.floorTo(i32,fl.radius);}
+  /// the relays the structures hold (a diamond), for the light grid
+  relays:[]const light.Relay=&.{},
+  /// the structures that draw light, for the light grid
+  users:[]const light.User=&.{},
+  /// how hard overdrive harms a plant (1; Tempered Light halves it)
+  overdriveHarm:f32=1,
 };
 /// what a tick saw happen, for the game to tell of
 pub const Events=struct{
   /// how many plants died this tick
   died:u32=0,
 };
-/// health lost per second by a plant that needs radiance and has none
+/// health lost per second by a plant short of the light it draws
 const unpoweredWither:f32=0.06;
+/// how much faster a plant grows and yields under a whole night's beam (2: 3x)
+const overdriveBoost:f32=2;
+/// health a plant loses a second under a whole night's beam, unguarded
+/// (600 s days: about a night and a half)
+const overdriveHurt:f32=0.004;
+/// the share of a beamed plant's yield that is rare
+const rareShare:f32=0.1;
 /// how wet a tile's ground must be for a plant that needs soaked ground
 /// to live (`Species.needsSoak`), and how fast it withers drier (health/s:
 /// about eight minutes, so it waits out the dry spells between showers)
@@ -105,137 +99,8 @@ const heal:f32=0.02;
 const flowGain:f32=4;
 /// how quickly the shown flow eases toward the mana moved, per tick (0..1)
 const flowEase:f32=0.05;
-/// celestial energy (the blooms'). Blooms link with every bloom of their
-/// kind within `link` tiles into networks; a network radiates when it holds
-/// at least one mature bloom, and then every bloom in it, growing or not,
-/// holds its field. A plant needs only one radiating bloom within range.
-/// Worked out each tick from the blooms alone: their links pairwise (they
-/// are few), then each radiating bloom's field by the tiles under it, the
-/// same way containment is; plants are never scanned against blooms.
-pub const Radiance=struct{
-  /// per plant: whether it stands in a radiating bloom's field
-  powered:std.ArrayList(bool)=.empty,
-  /// per plant: whether it is a bloom that radiates
-  radiating:std.ArrayList(bool)=.empty,
-  /// linked pairs of blooms (drawn as threads of light); `live` when their
-  /// network radiates
-  links:std.ArrayList(Link)=.empty,
-  /// scratch: the blooms' plant indices, their networks (union-find roots)
-  /// and which networks hold a mature bloom: the blooms' plant indices
-  blooms:std.ArrayList(u32)=.empty,
-  /// each bloom's network, as a union-find parent
-  root:std.ArrayList(u32)=.empty,
-  /// per network: whether it holds a mature bloom
-  live:std.ArrayList(bool)=.empty,
-  /// two blooms linked: their plants, and whether their network radiates
-  pub const Link=struct{
-    /// one bloom of the pair
-    a:Id,
-    /// the other
-    b:Id,
-    /// whether their network radiates
-    live:bool,
-  };
-  /// frees the scratch and per-plant lists
-  pub fn deinit(r:*Radiance,gpa:Allocator)void{
-    r.powered.deinit(gpa);r.radiating.deinit(gpa);r.links.deinit(gpa);r.blooms.deinit(gpa);r.root.deinit(gpa);r.live.deinit(gpa);
-  }
-  /// the root of bloom `i`'s network (union-find, walking up its parents)
-  fn find(r:*Radiance,i:u32)u32{
-    // the bloom being walked up from
-    var k=i;
-    while(r.root.items[k]!=k)k=r.root.items[k];
-    return k;
-  }
-  /// works out, for this tick, which plants are powered, which blooms
-  /// radiate and which pairs of blooms are linked, from the blooms and the
-  /// standing `fields` alone
-  pub fn update(r:*Radiance,gpa:Allocator,p:*const Plants,w:*const World,fields:[]const Field)Allocator.Error!void{
-    // how many plants there are
-    const n=p.len();
-    try r.powered.resize(gpa,n);
-    @memset(r.powered.items,false);
-    try r.radiating.resize(gpa,n);
-    @memset(r.radiating.items,false);
-    r.links.clearRetainingCapacity();
-    r.blooms.clearRetainingCapacity();
-    // the plant columns
-    const s=p.list.slice();
-    // standing fields (halos) power what lies inside them; they are few and
-    // small, so their tiles are walked as a bloom's are
-    for(fields)|fl|{
-      // how far the field reaches either way
-      const reach=fl.reach();
-      // walks the square of tiles round it
-      var it=m.footprint(fl.x-reach,fl.y-reach,@intCast(2*reach+1));
-      while(it.next())|t|{
-        if(!fl.holds(t[0],t[1]))continue;
-        // the plant rooted on this tile, if any
-        const j=w.occAt(t[0],t[1]).asPlant() orelse continue;
-        r.powered.items[j.idx()]=true;
-      }
-      // and every floater over a tile it holds (they may share one)
-      for(p.floaters.items)|f|{
-        if(fl.holds(s.items(.x)[f.idx()],s.items(.y)[f.idx()]))r.powered.items[f.idx()]=true;
-      }
-    }
-    for(s.items(.sp),0..)|sp,i|{
-      if(species.get(sp).radiance>0)try r.blooms.append(gpa,@intCast(i));
-    }
-    // how many blooms there are
-    const bn=r.blooms.items.len;
-    if(bn==0)return;
-    // networks: every pair within linking range joins
-    try r.root.resize(gpa,bn);
-    for(r.root.items,0..)|*x,k|x.*=@intCast(k);
-    // each plant's anchor tile, across and down
-    const xs=s.items(.x);
-    const ys=s.items(.y);
-    for(0..bn)|a|for(a+1..bn)|b|{
-      // the two blooms' plants
-      const ia=r.blooms.items[a];
-      const ib=r.blooms.items[b];
-      // how far apart they may stand and still link: the shorter reach of the two
-      const reach=@min(species.get(s.items(.sp)[ia]).link,species.get(s.items(.sp)[ib]).link);
-      // how far apart they are, across and down
-      const dx=m.f(xs[ia]-xs[ib]);
-      const dy=m.f(ys[ia]-ys[ib]);
-      if(dx*dx+dy*dy>reach*reach)continue;
-      try r.links.append(gpa,.{.a=.of(ia),.b=.of(ib),.live=false});
-      // the two blooms' networks
-      const ra=r.find(@intCast(a));
-      const rb=r.find(@intCast(b));
-      if(ra!=rb)r.root.items[ra]=rb;
-    };
-    // a network radiates when it holds a mature bloom
-    try r.live.resize(gpa,bn);
-    @memset(r.live.items,false);
-    for(r.blooms.items,0..)|i,k|{
-      if(s.items(.growth)[i]>=1)r.live.items[r.find(@intCast(k))]=true;
-    }
-    for(r.blooms.items,0..)|i,k|{
-      if(r.live.items[r.find(@intCast(k))])r.radiating.items[i]=true;
-    }
-    for(r.links.items)|*l|l.live=r.radiating.items[l.a.idx()];
-    // each radiating bloom powers the plants on the tiles in its field
-    for(r.blooms.items)|i|{
-      if(!r.radiating.items[i])continue;
-      // the bloom's field's radius, and its reach in whole tiles
-      const rad=species.get(s.items(.sp)[i]).radiance;
-      const reach:i32=@intFromFloat(@ceil(rad));
-      // walks the square of tiles round it
-      var it=m.footprint(-reach,-reach,@intCast(2*reach+1));
-      while(it.next())|d|{
-        if(m.f(m.sumOf(i32,2,d*d))>rad*rad)continue;
-        // the plant on this tile, if any
-        const j=p.at(w,xs[i]+d[0],ys[i]+d[1]) orelse continue;
-        r.powered.items[j.idx()]=true;
-      }
-    }
-  }
-};
 /// the ecology's per-tick scratch: what each plant gains or loses,
-/// containment, radiance, and the plants that died
+/// containment, the light grid, and the plants that died
 pub const Ecology=struct{
   /// per plant: mana gained or lost this tick
   dm:std.ArrayList(f32)=.empty,
@@ -245,14 +110,14 @@ pub const Ecology=struct{
   df:std.ArrayList(f32)=.empty,
   /// per plant: its drain rate after containment (1, or `species.contained`).
   calm:std.ArrayList(f32)=.empty,
-  /// the blooms' networks and fields, worked out each tick
-  radiance:Radiance=.{},
+  /// the light grid, worked out each tick
+  light:light.Light=.{},
   /// the plants that died this tick
   dead:std.ArrayList(Id)=.empty,
   /// frees the scratch
   pub fn deinit(e:*Ecology,gpa:Allocator)void{
     e.dm.deinit(gpa);e.dh.deinit(gpa);e.df.deinit(gpa);e.calm.deinit(gpa);e.dead.deinit(gpa);
-    e.radiance.deinit(gpa);
+    e.light.deinit(gpa);
   }
   /// mature containing plants (the confluence) calm every parasite within
   /// their reach: they keep draining, at a fraction of the rate.
@@ -288,15 +153,18 @@ pub const Ecology=struct{
     if(p.topologyDirty)p.rebuildLinks(w);
     // how many plants there are
     const n=p.len();
+    // the light grid first: the structures read their light from it, plants or none
+    try e.light.update(gpa,p,w,mods.relays,mods.users,mods.night,dt);
     if(n==0)return ev;
     try e.dm.resize(gpa,n);@memset(e.dm.items,0);
     try e.dh.resize(gpa,n);@memset(e.dh.items,0);
     try e.df.resize(gpa,n);@memset(e.df.items,0);
     try e.contain(gpa,p,w);
-    try e.radiance.update(gpa,p,w,mods.fields);
-    // the containment and power each plant has this tick
+    // the containment, light, beam and guard each plant has this tick
     const calm=e.calm.items;
-    const powered=e.radiance.powered.items;
+    const lit=e.light.lit.items;
+    const beamed=e.light.beamed.items;
+    const guarded=e.light.guarded.items;
     // each plant's mana, health and flow deltas
     const dm=e.dm.items;
     const dh=e.dh.items;
@@ -313,8 +181,9 @@ pub const Ecology=struct{
     // the chunk and tile each stands on
     const chunks=s.items(.chunk);
     const tiles=s.items(.tile);
-    // the essence each holds
+    // the essence each holds, and how much of it is rare
     const essence=s.items(.essence);
+    const rare=s.items(.rare);
     // each plant's two neighbour rings
     const n1=s.items(.n1);
     const n2=s.items(.n2);
@@ -388,11 +257,17 @@ pub const Ecology=struct{
           if(mana[j]<starved*species.get(sps[j]).manaCap)dh[j]-=starveHurt*dt;
         }
       }
-      // without celestial energy a plant that needs it halts and withers
-      if(sp.needsRadiance and !powered[i]){
+      // short of a quarter of the light it draws, a plant halts and withers
+      if(sp.draw>0 and lit[i]<light.needAt){
         dh[i]-=unpoweredWither*dt;
         continue;
       }
+      // a night beam on it: overdriven, it grows and yields faster, and,
+      // unguarded, it slowly dies of it
+      const beam=beamed[i];
+      if(beam>0 and !guarded[i])dh[i]-=overdriveHurt*beam*mods.overdriveHarm*dt;
+      // how fast it lives: by the light it draws, and the beam's overdrive
+      const pace=(if(sp.draw>0)lit[i]else 1)*(1+overdriveBoost*beam);
       // on ground the rain has not soaked, one that needs it halts and withers
       if(sp.needsSoak and c.wet[t]<soakedAt){
         dh[i]-=dryWither*dt;
@@ -401,15 +276,20 @@ pub const Ecology=struct{
       if(growth[i]<1){
         // how long it takes to mature at full mana
         const mature=if(span[i]>0)span[i]else sp.matureTime;
-        growth[i]=@min(1,growth[i]+dt/mature*(growMin+(1-growMin)*fill)*health[i]*(1+kinGrow*kin));
+        growth[i]=@min(1,growth[i]+dt/mature*(growMin+(1-growMin)*fill)*health[i]*(1+kinGrow*kin)*pace);
       }else{
         // mana condenses into essence held by the plant until harvested.
         // how much essence it has room for, and the mana condensed into it
         const room=cap-essence[i];
-        const conv=@min(@min(mana[i],sp.yield*fill*dt),room);
+        const conv=@min(@min(mana[i],sp.yield*fill*dt*pace),room);
         dm[i]-=conv;
-        essence[i]=@min(cap,essence[i]+conv*mods.yieldMult[@intFromEnum(sps[i])]*(1+kinYield*kin));}
-      dh[i]+=if(fill<empty and growth[i]>=1)-fadeTime*dt else heal*dt;
+        // the essence it gains, a share of it rare under a beam
+        const gained=@min(cap-essence[i],conv*mods.yieldMult[@intFromEnum(sps[i])]*(1+kinYield*kin));
+        essence[i]+=gained;
+        if(beam>0)rare[i]=@min(essence[i],rare[i]+gained*rareShare);
+      }
+      // (an unguarded plant under a beam never heals: it burns)
+      dh[i]+=if(fill<empty and growth[i]>=1)-fadeTime*dt else if(beam>0 and !guarded[i])0 else heal*dt;
     }
     // each plant's shown flow
     const flow=s.items(.flow);
@@ -488,7 +368,7 @@ test"a mature confluence halves parasite drain within 3 tiles"{
   try testing.expectApproxEqAbs(full*(1-species.contained),loss[0]-loss[1],1e-4);
   try testing.expectApproxEqAbs(loss[0],loss[2],1e-4);
 }
-test"blooms power plants in range, link into networks, and uprooting cuts them off"{
+test"a vesper lives on a solcyriphon's light and withers out of it"{
   // the test allocator
   const gpa=testing.allocator;
   // a small loaded world
@@ -503,38 +383,48 @@ test"blooms power plants in range, link into networks, and uprooting cuts them o
   defer p.deinit(gpa);
   var eco:Ecology=.{};
   defer eco.deinit(gpa);
-  // a mature bloom over (2,0), a vesper (which needs radiance) beside it
-  try testing.expect(try p.placeEx(gpa,&w,2,0,.{.x=2,.y=0,.chunk=undefined,.tile=undefined,.sp=.bloom,.seed=0.1,.growth=1}));
-  try testing.expect(try p.place(gpa,&w,0,0,.vesper,0.2));
-  // a young bloom 7 tiles on (within linking range, out of the first's
-  // field) and a second vesper inside only its field
-  try testing.expect(try p.placeEx(gpa,&w,9,0,.{.x=9,.y=0,.chunk=undefined,.tile=undefined,.sp=.bloom,.seed=0.3}));
-  try testing.expect(try p.place(gpa,&w,11,0,.vesper,0.4));
-  // the vesper by the mature bloom, and the one by the young bloom
-  const near=p.at(&w,0,0).?;
-  const far=p.at(&w,11,0).?;
-  for(0..testHz)|_|_=try eco.tick(gpa,&p,&w,.{},testDt);
-  // the first draws from the mature bloom; the second from the young one,
-  // which radiates because it is linked to a network with a mature bloom
-  try testing.expect(eco.radiance.powered.items[near.idx()]);
-  try testing.expect(eco.radiance.powered.items[far.idx()]);
-  try testing.expectEqual(@as(usize,1),eco.radiance.links.items.len);
-  try testing.expect(eco.radiance.links.items[0].live);
-  try testing.expect(p.list.items(.growth)[near.idx()]>0);
-  // uproot the mature bloom: the young one's network holds no mature bloom
-  // now, so nothing radiates, and both vespers halt and wither
-  try testing.expect(p.removeAt(&w,2,0));
-  // the near vesper's growth before the power goes
-  const growthBefore=p.list.items(.growth)[p.at(&w,0,0).?.idx()];
+  // a grown solcyriphon over (2,0), a vesper beside it, another far off
+  try testing.expect(try p.placeEx(gpa,&w,2,0,.{.x=2,.y=0,.chunk=undefined,.tile=undefined,.sp=.solcyriphon,.seed=0.1,.growth=1}));
+  try testing.expect(try p.place(gpa,&w,3,0,.vesper,0.2));
+  try testing.expect(try p.place(gpa,&w,15,0,.vesper,0.4));
   for(0..testHz*5)|_|_=try eco.tick(gpa,&p,&w,.{},testDt);
-  // the two vespers' slots now
-  const a=p.at(&w,0,0).?.idx();
-  const b=p.at(&w,11,0).?.idx();
-  try testing.expect(!eco.radiance.powered.items[a]and!eco.radiance.powered.items[b]);
-  try testing.expectEqual(growthBefore,p.list.items(.growth)[a]);
-  try testing.expect(p.list.items(.health)[a]<0.8 and p.list.items(.health)[b]<0.8);
-  // one bloom left: nothing to link to
-  try testing.expectEqual(@as(usize,0),eco.radiance.links.items.len);
+  // the near one grew, healthy; the far one stood still and withered
+  const near=p.at(&w,3,0).?.idx();
+  const far=p.at(&w,15,0).?.idx();
+  try testing.expect(p.list.items(.growth)[near]>0 and p.list.items(.health)[near]>0.99);
+  try testing.expectEqual(@as(f32,0),p.list.items(.growth)[far]);
+  try testing.expect(p.list.items(.health)[far]<0.8);
+}
+test"a night beam overdrives the plant under it, steeping rare yield, and a halcyra keeps it alive"{
+  // the test allocator
+  const gpa=testing.allocator;
+  // grown and healthy after a night's beam, rare yield, with and without a halcyra
+  var after:[2]m.Vice(f32,3)=undefined;
+  for(0..2)|k|{
+    // a small loaded world
+    var w=World.init(gpa,5);
+    defer w.deinit();
+    try w.stream(.{.x=0,.y=0},1,100);
+    // the chunk at the origin, soil
+    const c=w.chunkOfTile(0,0).?;
+    for(0..6)|y|for(0..6)|x|{c.kind[y*ck.sizeTiles+x]=.soil;};
+    // the plants, and the ecology over them
+    var p:Plants=.{};
+    defer p.deinit(gpa);
+    var eco:Ecology=.{};
+    defer eco.deinit(gpa);
+    // a solcyriphon over a grown lumenroot, and in the second garden a halcyra beside it
+    try testing.expect(try p.placeEx(gpa,&w,2,2,.{.x=2,.y=2,.chunk=undefined,.tile=undefined,.sp=.solcyriphon,.seed=0.1,.growth=1}));
+    try testing.expect(try p.placeEx(gpa,&w,2,2,.{.x=2,.y=2,.chunk=undefined,.tile=undefined,.sp=.lumenroot,.seed=0.2,.growth=1}));
+    if(k==1)try testing.expect(try p.placeEx(gpa,&w,3,2,.{.x=3,.y=2,.chunk=undefined,.tile=undefined,.sp=.halcyra,.seed=0.3,.growth=1}));
+    for(0..testHz*60)|_|_=try eco.tick(gpa,&p,&w,.{.night=1},testDt);
+    // the lumenroot
+    const r=p.at(&w,2,2).?.idx();
+    after[k]=.{p.list.items(.health)[r],p.list.items(.rare)[r],p.list.items(.essence)[r]};
+  }
+  // unguarded it is harmed and rare yield is steeping; guarded, unharmed
+  try testing.expect(after[0][0]<0.99 and after[0][1]>0);
+  try testing.expect(after[1][0]>0.99 and after[1][1]>0);
 }
 test"a mire lily drinks soaked ground and withers on dry"{
   // the test allocator

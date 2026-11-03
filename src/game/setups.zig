@@ -62,6 +62,13 @@ pub fn demo(g:*Game,seconds:f32)Allocator.Error!void{
     _=g.structs.insert(&g.prog,j,.essence,20);
     _=g.structs.insert(&g.prog,j,.grit,20);
   }
+  // the light grid over them: a solcyriphon between the germinator and the
+  // arsthraxia (which studies only in its light), blooms carrying it on to
+  // the two sporecasters (they cast and take in only lit)
+  try grown(g,cx,cz+4,.solcyriphon,0.15);
+  try grown(g,cx-3,cz+8,.bloom,0.25);
+  try grown(g,cx+8,cz+3,.bloom,0.35);
+  try radiantGarden(g,cx,cz-13);
   _=try g.plants.place(g.gpa,&g.world,cx-6,cz+6,.hollowheart,0.7);
   _=try g.plants.place(g.gpa,&g.world,cx-5,cz-1,.driftwisp,0.8);
   _=try g.plants.place(g.gpa,&g.world,cx-4,cz+2,.driftwisp,0.9);
@@ -252,6 +259,31 @@ fn haloGarden(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
   }
   _=try g.plants.place(g.gpa,&g.world,x+3,z,.vesper,0.5);
   _=try g.plants.place(g.gpa,&g.world,x+5,z+3,.vesper,0.6);
+  // the light the vespers live on, linked to the ring's blooms
+  try grown(g,x+1,z-3,.solcyriphon,0.45);
+}
+/// a grown plant of `sp` at tile `x`,`z` (a floater at its centre), its own `seed`
+fn grown(g:*Game,x:i32,z:i32,sp:species.Id,seed:f32)Allocator.Error!void{
+  _=try g.plants.placeEx(g.gpa,&g.world,x,z,.{.x=x,.y=z,.chunk=undefined,.tile=undefined,.sp=sp,.seed=seed,.growth=1,.mana=10});
+}
+/// north of the garden, the light grid's own plants (docs/radiant-plants.md):
+/// a solcyriphon pouring its night beam into a bloom below it, which
+/// carries it on; an astrocyme filling beside them; a heliocyra casting a
+/// strip east from the solcyriphon's field and a second one bending it
+/// south; and a second solcyriphon over a lumenroot (overdriven at night)
+/// with a halcyra beside it, guarding it
+fn radiantGarden(g:*Game,cx:i32,cz:i32)Allocator.Error!void{
+  for([_]prog.Id{.seedSplicing,.temperedLight,.bentLight,.halcyonVeil,.heldLight})|id|g.prog.done.insert(id);
+  try grown(g,cx,cz,.solcyriphon,0.11);
+  try grown(g,cx,cz,.bloom,0.21);
+  try grown(g,cx-3,cz+1,.astrocyme,0.31);
+  try grown(g,cx+1,cz+2,.heliocyra,0.41);
+  try grown(g,cx+6,cz+2,.heliocyra,0.51);
+  g.plants.list.items(.dir)[g.plants.len()-1]=1;
+  try grown(g,cx+6,cz+5,.vesper,0.61);
+  try grown(g,cx-6,cz-3,.solcyriphon,0.71);
+  try grown(g,cx-6,cz-3,.lumenroot,0.81);
+  try grown(g,cx-5,cz-3,.halcyra,0.91);
 }
 /// the nearest free spot beside a resource node gets a root-digger, with a
 /// sap cache next to it to fill.

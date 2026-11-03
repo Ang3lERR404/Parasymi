@@ -37,6 +37,14 @@ const parts=struct{
   pub const mireLily=@import("species/mire_lily.zig");
   /// a breed of the rain, spreading moss onto soaked soil
   pub const mossCreeper=@import("species/moss_creeper.zig");
+  /// the light grid's maker, drinking starlight straight from the sky
+  pub const solcyriphon=@import("species/solcyriphon.zig");
+  /// the light grid's store: a spiral bouquet filling flower by flower
+  pub const astrocyme=@import("species/astrocyme.zig");
+  /// the light grid's shaper: a heliotrope casting light in strips
+  pub const heliocyra=@import("species/heliocyra.zig");
+  /// the light grid's guard: a veiled flower no beam kills under it
+  pub const halcyra=@import("species/halcyra.zig");
 };
 /// the registry over `parts`: their ids, count and definitions
 const reg=registry.Registry(parts);
@@ -96,6 +104,20 @@ pub const Form=enum(u8){
   /// (`stemH` long) creeping out over the ground, a rosette of `leaves`
   /// and a tuft of moss rooting at each node (meshgen/creepers.zig)
   creeper,
+  /// the solcyriphon: a lens of facets round a glowing heart, a flower of
+  /// `petals` rising round it open to the sky, `tendrils` threads of light
+  /// trailing beneath; hung high, gathered (radiant_kit)
+  lens,
+  /// the astrocyme: a spiral bouquet of `petals` flowers winding up a thread
+  /// of light, each opening as it fills (radiant_kit)
+  bouquet,
+  /// the heliocyra: a heliotrope's head on a neck of light, a cut crystal
+  /// at its heart, turned the way it casts its strip (radiant_kit)
+  heliotrope,
+  /// the halcyra: a small flower hooded by a see-through veil, crystal
+  /// petals at its edge, a thread of light wound round what it guards
+  /// (radiant_kit)
+  veil,
 };
 /// procedural mesh parameters (see gfx/meshgen.zig).
 pub const Genome=struct{
@@ -210,13 +232,30 @@ pub const Species=struct{
   /// where its ripe yield is plucked by paw: how high over its foot (a
   /// floater's: over its own floating point), in metres at full size
   pluck:f32=0.5,
-  /// celestial energy: the radius (tiles) of the field this plant holds
-  /// once it radiates (0: none) (see ecology `Radiance`)
+  /// the light grid (sim/light.zig): how far (tiles) its field reaches,
+  /// once grown, for what draws light to take from it (0: none)
   radiance:f32=0,
-  /// how far (tiles) it links with others of its kind into one network
+  /// how far (tiles) it links with other relays, light passing along
   link:f32=0,
-  /// it needs celestial energy: outside every field it halts and withers
-  needsRadiance:bool=false,
+  /// the light it makes: by day spread round itself, by night poured down
+  /// in one beam onto what is under it (glow; only a solcyriphon's)
+  glow:m.Vice(f32,2)=.{0,0},
+  /// the most light it carries on (glow; 0: it is no relay)
+  carry:f32=0,
+  /// how long a strip it casts of the light it takes (tiles; a heliocyra's)
+  strip:u8=0,
+  /// how much light it stores (glow-seconds; an astrocyme's)
+  store:f32=0,
+  /// how far (tiles) it guards plants from overdrive when alone (a halcyra's)
+  guards:f32=0,
+  /// how much light it draws (glow); below `light.needAt` of it, it halts
+  /// and withers
+  draw:f32=0,
+  /// its rare yield in overdrive, when not the sunlit kind of `yields`
+  rare:?items.Item=null,
+  /// four of it grown in a cross form a halo, and are drawn into its
+  /// diamond (the celestial bloom)
+  halo:bool=false,
   /// it turns soaked soil to moss (game/moss.zig): grown and healthy, one
   /// tile every this many seconds on average (0: never), within
   /// `creepReach` tiles of it
@@ -232,6 +271,10 @@ pub const Species=struct{
   /// growth stages named on hover (0: unstaged; names in `game/text.zig`,
   /// the mesh itself grows continuously; see meshgen `keys`).
   stages:u8=0,
+  /// whether it is a node of the light grid: it makes, carries or casts light
+  pub fn lightNode(s:*const Species)bool{return s.carry>0 or s.glow[0]+s.glow[1]>0 or s.strip>0;}
+  /// what one unit in ten of its yield becomes in overdrive
+  pub fn rareYield(s:*const Species)items.Item{return s.rare orelse s.yields.sunlit();}
   /// the lineage it is drawn as: `look`, else its own
   pub fn drawnAs(s:*const Species)Lineage{return s.look orelse s.lineage;}
   /// the shader-side lineage scalar it is drawn with
@@ -260,7 +303,7 @@ test"a body of one lineage's kit is grown only for that lineage"{
     const of:?Lineage=switch(s.genome.form){
       .coil=>.parasitic,
       .confluence=>.convergent,
-      .radiant,.star=>.radiant,
+      .radiant,.star,.lens,.bouquet,.heliotrope,.veil=>.radiant,
       .herb,.drift,.lily,.creeper=>null,
     };
     if(of)|l|try testing.expectEqual(l,s.lineage);

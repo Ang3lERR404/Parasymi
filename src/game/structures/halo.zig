@@ -104,7 +104,7 @@ pub fn seek(ctx:st.Ctx)Allocator.Error!bool{
   // the plants' columns
   const s=ctx.plants.list.slice();
   for(s.items(.sp),s.items(.x),s.items(.y),0..)|sp,x,y,i|{
-    if(species.get(sp).radiance<=0 or s.items(.growth)[i]<1)continue;
+    if(!species.get(sp).halo or s.items(.growth)[i]<1)continue;
     // taken as the ring's east point: the heart west of it
     const cx=x-points[0][0]*reachTiles;
     const cy=y-points[0][1]*reachTiles;
@@ -129,7 +129,7 @@ pub fn active(p:*const Plants,w:*const World,at:m.Vice(i32,2))bool{
   const id=p.at(w,at[0],at[1]) orelse return false;
   const i=id.idx();
   const s=p.list.slice();
-  return species.get(s.items(.sp)[i]).radiance>0 and s.items(.growth)[i]>=1 and s.items(.health)[i]>activeHealth;
+  return species.get(s.items(.sp)[i]).halo and s.items(.growth)[i]>=1 and s.items(.health)[i]>activeHealth;
 }
 /// ease each point's light toward whether a grown bloom holds it (1) or
 /// not (`dim`).

@@ -178,8 +178,8 @@ Named for halcyon: calm, sheltered.
   spread over the plants round it.
 
 ## The numbers (a first balance, to tune in play)
-Measured against what is in the game now, with the day the gardener wants:
-twice today's, 600 s a day and night (`sky.dayLen`, now 300), stars fall
+Measured against what is in the game, with the day the gardener wanted:
+twice the old one: 600 s a day and night (`sky.dayLen`), stars fall
 in about the darkest third of it, a bloom seed is 3 starlight + 1 ley
 shard + 2 essence, a driftwisp yields 0.06, a root-digger digs one every
 4 s, a branch research is 20 units.

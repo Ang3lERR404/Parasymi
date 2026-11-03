@@ -41,6 +41,8 @@ pub const r1=12;
 pub const r2=20;
 /// how close two floaters may hang, centre to centre (m)
 pub const floatGap=0.8;
+/// floaters hanging this far apart in height never crowd each other (m)
+pub const floatTiers=1.5;
 /// how near a cursor ray must pass a floater's float to touch it (m)
 pub const floatTouch=0.6;
 /// fewer plants than this a thread are relinked in one go
@@ -92,6 +94,11 @@ pub const Plant=struct{
   flow:f32=0,
   /// harvestable store: the species' yield condensed from mana.
   essence:f32=0,
+  /// of that store, how many units are rare: steeped by a night beam
+  /// (`Species.rareYield`), handed out first
+  rare:f32=0,
+  /// the light it holds in store (glow-seconds; an astrocyme's)
+  stored:f32=0,
   /// the way it was turned to (R), and how it got there
   dir:m.Dir=0,
   /// how it is turning (R), timed from when it began
@@ -122,13 +129,13 @@ pub const Plants=struct{
   pub fn canPlace(p:*const Plants,w:*const World,wx:i32,wy:i32,sp:species.Id)bool{
     // the species' definition
     const def=species.get(sp);
-    if(def.floating)return p.canFloat(w,m.tileCentre(wx,wy,0));
+    if(def.floating)return p.canFloat(w,m.tileCentre(wx,wy,0),sp);
     return w.footprintFree(wx,wy,def.size,ck.Kind.fertile);
   }
   /// whether a plant of species `sp` may stand at ground point `pt`: a
   /// floater right there, a rooted one on the footprint centred nearest it
   pub fn canPlaceNear(p:*const Plants,w:*const World,pt:m.V3,sp:species.Id)bool{
-    if(species.get(sp).floating)return p.canFloat(w,pt);
+    if(species.get(sp).floating)return p.canFloat(w,pt,sp);
     // the footprint's top-left tile
     const t=anchor(pt,sp);
     return p.canPlace(w,t[0],t[1],sp);
@@ -150,15 +157,20 @@ pub const Plants=struct{
     const half=if(def.floating)0 else m.f(def.size-1)*0.5;
     return m.tileAt(pt-m.v3(half,0,half));
   }
-  /// whether a floater may hang at ground point `pt`: over loaded ground,
-  /// no nearer another floater than `floatGap` (it may hang over anything else)
-  fn canFloat(p:*const Plants,w:*const World,pt:m.V3)bool{
+  /// whether a floater of species `sp` may hang at ground point `pt`: over
+  /// loaded ground, no nearer another floater hanging about as high than
+  /// `floatGap` (it may hang over anything else, a floater far below or
+  /// above it too: a solcyriphon over the bloom it pours its beam into)
+  fn canFloat(p:*const Plants,w:*const World,pt:m.V3,sp:species.Id)bool{
     // the tile under the point
     const t=m.tileAt(pt);
     if(w.chunkOfTile(t[0],t[1])==null)return false;
-    // every plant's point
+    // every plant's point and species, and how high this one hangs
     const ats=p.list.items(.at);
+    const sps=p.list.items(.sp);
+    const high=species.get(sp).hover;
     for(p.floaters.items)|f|{
+      if(@abs(species.get(sps[f.idx()]).hover-high)>=floatTiers)continue;
       // the way to that floater, flat on the ground
       const d=(ats[f.idx()]-pt)*m.v3(1,0,1);
       if(m.dot(d,d)<floatGap*floatGap)return false;
@@ -285,6 +297,21 @@ pub const Plants=struct{
       k+=1;
     }
     while(k<ring.len and ring[k]!=.none):(k+=1)ring[k]=.none;
+  }
+  /// what taking yield from a plant gave: how many plain units, how many rare
+  pub const Taken=struct{plain:u16=0,rare:u16=0};
+  /// takes up to `n` whole units of plant `id`'s ripe yield, its rare ones
+  /// first (a night beam's, `Species.rareYield`)
+  pub fn takeYield(p:*Plants,id:Id,n:u16)Taken{
+    // the plant's row and columns, and how many whole units it holds
+    const i=id.idx();
+    const s=p.list.slice();
+    const whole=@min(m.floorTo(u16,s.items(.essence)[i]),n);
+    // how many of them are rare
+    const rare=@min(m.floorTo(u16,s.items(.rare)[i]),whole);
+    s.items(.essence)[i]-=m.f(whole);
+    s.items(.rare)[i]-=m.f(rare);
+    return.{.plain=whole-rare,.rare=rare};
   }
   /// the tiles a plant covers: its footprint, or the one tile it hovers over.
   pub fn extent(p:*const Plants,i:usize)Rect{

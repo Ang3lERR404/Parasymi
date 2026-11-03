@@ -54,7 +54,7 @@ const v3=m.v3;
 pub const meshes=.{.germinatorPool,.loomfernSheaf,.loomfernThread};
 /// what a loomfern is: grown from its seed, one tile across, a low store
 /// swaying freely in the breeze
-pub const def:st.Def=.{.item=.loomfern,.lineage=.symbiotic,.size=1,.mesh=.loomfern,.store=true,.grow=5,.sway=0.7,.tall=0.5};
+pub const def:st.Def=.{.item=.loomfern,.lineage=.symbiotic,.size=1,.mesh=.loomfern,.store=true,.grow=5,.sway=0.7,.tall=0.5,.light=.boost,.draws=1};
 /// a lithophage grown beside it: the study of woven stone
 pub const meets:st.Meeting=.{.kind=.lithophage,.found=.loomAndStone};
 /// seconds a fibre takes unfed

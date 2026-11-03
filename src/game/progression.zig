@@ -95,6 +95,14 @@ const techs=struct{
   pub const rootWells=@import("research/root_wells.zig");
   /// the storm spire, opened by the first rain
   pub const stormCalling=@import("research/storm_calling.zig");
+  /// overdrive tempered: it harms half as hard
+  pub const temperedLight=@import("research/tempered_light.zig");
+  /// the heliocyra, opened by the first starglass
+  pub const bentLight=@import("research/bent_light.zig");
+  /// the halcyra, opened by the first evening silk
+  pub const halcyonVeil=@import("research/halcyon_veil.zig");
+  /// the astrocyme, after bent light and the halcyon veil
+  pub const heldLight=@import("research/held_light.zig");
 };
 /// the registry over `techs`: ids, `has` and `module` for the hooks
 const reg=registry.Registry(techs);
@@ -120,6 +128,12 @@ pub const Discovery=enum{
   firstRain,
   /// the first storm a storm spire strikes (structures/storm_spire.zig)
   firstStorm,
+  /// a night beam first overdriving a plant (game/beam_ground.zig)
+  overdrive,
+  /// the first starglass steeped in a driftwisp under a beam
+  starglass,
+  /// the first evening silk steeped in a vesper under a beam
+  eveningSilk,
 };
 /// a technology's id, one per module in `techs`
 pub const Id=reg.Id;
@@ -292,8 +306,8 @@ pub const Progression=struct{
     // its cost
     const r=tree.get(id);
     if(!lab.fed)feed:{
-      for(r.perUnit)|ing|if(inv.count(ing.item)<ing.n)break:feed;
-      for(r.perUnit)|ing|_=inv.take(ing.item,ing.n);
+      for(r.perUnit)|ing|if(inv.worth(ing.item)<ing.n)break:feed;
+      for(r.perUnit)|ing|_=inv.spend(ing.item,ing.n);
       lab.fed=true;
     }
     // how much of a unit a second it works: whole if fed, else the unfed share
@@ -371,6 +385,18 @@ pub const Progression=struct{
       },
       .firstStorm=>{
         g.say(txt.s.msg.firstStorm,.{});
+      },
+      .overdrive=>{
+        g.say(txt.s.msg.overdrive,.{});
+        g.say(txt.s.msg.researchNamed,.{txt.research(.temperedLight).name});
+      },
+      .starglass=>{
+        g.say(txt.s.msg.starglass,.{});
+        g.say(txt.s.msg.researchNamed,.{txt.research(.bentLight).name});
+      },
+      .eveningSilk=>{
+        g.say(txt.s.msg.eveningSilk,.{});
+        g.say(txt.s.msg.researchNamed,.{txt.research(.halcyonVeil).name});
       },
     }
   }

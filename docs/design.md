@@ -350,20 +350,39 @@ already holds them.
 - Once mature, it halves parasite drain within 3 tiles.
 - "Convergence Theory" only reveals its yield.
 
-## Radiance (`species/bloom.zig`, `ecology.Radiance`)
-Radiance is a field of light that some plants need to live.
+## The light grid (`sim/light.zig`)
+Radiance is the garden's power: light that structures and some plants
+run on. Every number, and why, is in [radiant-plants.md](radiant-plants.md).
 
-- **Celestial bloom:** sown, floating (hover 3.2), yields nothing. It
-  radiates a 3.5-tile field. Seed: 3 starlight + 1 ley shard + 2 essence.
-- **Networks:** blooms within 10 tiles of each other link into a network.
-  A network radiates when it holds a mature bloom, and then all its blooms
-  do. So uprooting a linking bloom cuts off those beyond it.
-- **Needing it:** plants with `needsRadiance` (vesper, for now) halt and
-  wither (0.06 HP/s) outside every field.
-- **Worked out per tick from blooms only:** first the pairwise links, then
-  each radiating bloom's tiles.
-- **Hover panel:** RADIATING/DARK + links for a bloom; DRAWING
-  RADIANCE/WITHERING for a plant that needs it.
+- **Only the solcyriphon makes light** (open from the start; seed 4
+  starlight + 2 ley shard + 2 fibre). It hangs high (5.5 m). By day it
+  spreads 6 glow over a 3-tile field; by night it folds and pours a 12 glow
+  beam straight down onto what is under it.
+- **Relays carry it**, each up to its `carry`, linked within `link`:
+  the celestial bloom (4 glow, field 3.5, link 10; it makes none now), the
+  diamond (16, field 7, link 14), the astrocyme (stores 720 glow-seconds).
+  Light flows out from where it is made, nearest first: each relay keeps
+  what its own users want and hands the rest evenly to those it reached.
+- **Local only:** a user takes from the one relay it stands best in, at
+  full strength within a tile, fading to a quarter at the field's edge,
+  and only its share when that relay's users want more than reaches it.
+- **The heliocyra** casts what it takes (up to 3 from a field, a whole
+  beam from above) as a strip a tile wide and 8 long the way it faces; a
+  strip striking another bends on (losing a tenth).
+- **The beam:** onto a relay, carried on; onto a plant, overdrive (3x
+  growth and yield, one yield in ten rare, 0.004 HP/s and no healing unless
+  a halcyra guards it; Tempered Light halves the harm); onto bare moss, a
+  1% chance a night of a ley line (`game/beam_ground.zig`, kept like moss).
+- **Users:** the vesper draws 1 and withers below a quarter. Structures
+  say how in `Def.light`/`Def.draws`: boosted (germinator 2, root-digger
+  1, loomfern 1, gathering crown 2, lithophage 3) work up to 1.5x as fast
+  in full light; needing it (the arsthraxia 3, until evolved; the
+  sporecaster 2 at both ends) work only lit; conduits, braided conduits
+  and sap caches only look lit. One place paces them: `workTime` in
+  `structures/core/hooks.zig`.
+- **Hover panel:** a relay's light carried and links (a solcyriphon's day
+  and night light, an astrocyme's store); a plant's share of the light it
+  draws, or that a beam overdrives it (guarded or not).
 
 ## Halo and diamond (`halo.zig`, `diamond.zig`)
 - **Four blooms are enough:** grown blooms (HP > 0.5) on the four points

@@ -2,7 +2,7 @@
 //! parasite touch. Shares with symbiotes and drains parasites. The evening
 //! star's flower, of the radiant lineage's body (radiant_kit `star`): it
 //! is gathered, never grown, falling in from the sky piece by piece, and
-//! it needs celestial energy: outside a bloom's field it withers, its
+//! it draws light from the grid: short of a quarter of it, it withers, its
 //! pieces loosening and sinking as its light dims.
 const lib=@import("../../lib.zig");
 /// the species registry: what a species is
@@ -18,8 +18,9 @@ pub const def:species.Species=.{
   .matureTime=16,.manaCap=24,.leyDraw=0.8,.share=0.6,.drain=0.8,.yield=0.4,
   // plucked from its core, hanging on light over its tile
   .pluck=0.6,
-  // decision: the first plant that needs radiance (the brief names none)
-  .needsRadiance=true,
+  // it draws one glow from the light grid; below a quarter of it, it halts
+  // and withers. A night beam's overdrive steeps evening silk in it
+  .draw=1,.rare=.eveningSilk,
   // it hangs over its tile on light, rooted by light; it does not bend from its root
   .sway=0.5,
   .genome=.{

@@ -185,6 +185,12 @@ pub const Strings=struct{
     firstRain:S="",
     /// the first storm struck
     firstStorm:S="",
+    /// a night beam first overdriving a plant
+    overdrive:S="",
+    /// the first starglass steeped in a driftwisp
+    starglass:S="",
+    /// the first evening silk steeped in a vesper
+    eveningSilk:S="",
     /// the unforming learned, just before it begins
     unformingNear:S="",
     /// the unforming begun: the radiant plants shatter, the lineages die
@@ -304,21 +310,26 @@ pub const Strings=struct{
     stage:S="",
     /// how grown the hovered thing is (`{0}`%)
     growth:S="",
-    /// a bloom hovered: its name, how many it links to, its health
-    bloom:S="",
-    /// a bloom's network is lit
-    radiating:S="",
-    /// a bloom's network is dark
+    /// a relay of the light grid hovered: the light it carries, how many
+    /// it links to, its health
+    relay:S="",
+    /// no light reaches the hovered relay
     dark:S="",
-    /// a bloom's network holds no grown bloom
-    noMature:S="",
+    /// an astrocyme hovered: the light it holds, of how much
+    stored:S="",
+    /// a solcyriphon hovered: the light it spreads by day, its beam by night
+    makes:S="",
+    /// the hovered plant is under a night beam
+    overdriven:S="",
+    /// the hovered plant is under a night beam, guarded
+    guarded:S="",
     /// a plant hovered: its name, its yield and its health
     plant:S="",
     /// what stands for a yield not yet studied
     unknownYield:S="",
-    /// a radiant-fed plant drawing light
+    /// a plant that draws light, and its share of it (`{0}`%)
     drawingRadiance:S="",
-    /// a radiant-fed plant without light, withering
+    /// a plant that draws light, short of it, withering
     withering:S="",
     /// a plant that needs soaked ground, on it and drinking
     soaked:S="",

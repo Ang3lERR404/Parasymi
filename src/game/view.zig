@@ -282,9 +282,9 @@ fn groundOf(sp:species.Id,c:*const ck.Chunk,t:u16)f32{
 }
 fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
   for(&g.inst)|*l|l.clearRetainingCapacity();
-  // the plants' columns, and which blooms radiate
+  // the plants' columns, and the light each relay carries
   const s=g.plants.list.slice();
-  const radiating=g.eco.radiance.radiating.items;
+  const carried=g.eco.light.carried.items;
   for(0..g.plants.len())|i|{
     // where the plant's footprint centres, across the ground
     const ctr=g.plants.centre(i);
@@ -298,7 +298,7 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
       .essence=s.items(.essence)[i],
       .since=g.tug.sinceOf(ck.PlantId.of(i),s.items(.at)[i]),
       // (worked out each tick: a plant sown since has none yet)
-      .radiating=i<radiating.len and radiating[i],
+      .radiating=i<carried.len and carried[i]>0,
     },tf);
   }
 }
@@ -379,32 +379,31 @@ pub fn pluckPoint(g:*const Game,i:usize,from:m.V3)m.V3{
 /// the forming halo drawing in the bloom at a tile, as the shaders take it
 /// (`vertex.noHalo` for none): they spiral it in (common.glsl `haloSpiral`).
 fn haloOf(g:*const Game,def:*const species.Species,x:i32,y:i32)m.Vice(f32,4){
-  if(def.radiance<=0)return vertex.noHalo;
+  if(!def.halo)return vertex.noHalo;
   // the halo structure holding the bloom at this tile, if any
   const hd=st.hold(&g.structs,x,y) orelse return vertex.noHalo;
   // the halo's seat over its centre, where the bloom is drawn to
   const to=structCentre(g,hd.s)+m.v3(0,hd.h.seat,0);
   return.{to[0],to[1],to[2],hd.h.k};
 }
-/// the threads of light between linked blooms (see ecology `Radiance`):
-/// bent on the GPU from one bloom's core to the other's with a slight sag,
-/// bright where their network radiates, faint where it is dark. A thread
-/// reaches out from the more grown bloom as that bloom finishes assembling.
-/// A forming halo draws its blooms in, and the GPU bends the threads from
-/// them along (`Look.ends`).
+/// the threads of light between linked relays (sim/light.zig): bent on
+/// the GPU from one relay's core to the other's with a slight sag, bright
+/// where light passed between them, faint where none did. A forming halo
+/// draws its blooms in, and the GPU bends the threads from them along
+/// (`Look.ends`). A structure's relay (a diamond) holds its end still at
+/// its heart.
 fn threads(g:*Game,tf:f32)Allocator.Error!void{
   // the plants' columns
   const s=g.plants.list.slice();
-  for(g.eco.radiance.links.items)|l|{
-    // the two blooms, the more grown one first
-    var ia=l.a.idx();
-    var ib=l.b.idx();
-    // links are worked out each tick; an uproot since then leaves a stale one
-    if(ia>=g.plants.len() or ib>=g.plants.len())continue;
-    if(species.get(s.items(.sp)[ia]).radiance<=0 or species.get(s.items(.sp)[ib]).radiance<=0)continue;
-    if(s.items(.growth)[ib]>s.items(.growth)[ia])swap(usize,&ia,&ib);
+  for(g.eco.light.links.items)|l|{
+    // the two ends' points, and a plant end's slot (the first a plant, if either is)
+    const pa=nodeEnd(g,l.a,tf) orelse continue;
+    const pb=nodeEnd(g,l.b,tf) orelse continue;
+    var ia:usize=if(l.a==.plant)l.a.plant.idx()else if(l.b==.plant)l.b.plant.idx()else continue;
+    var ib:usize=if(l.b==.plant)l.b.plant.idx()else ia;
+    if(l.a!=.plant)swap(usize,&ia,&ib);
     // the two cores, and the span from one to the other
-    const pos=[2]m.V3{end(g,ia,tf),end(g,ib,tf)};
+    const pos=[2]m.V3{pa,pb};
     const span=pos[1]-pos[0];
     // a beam runs true, bowing only a breath as the blooms drift
     const sag=m.v3(0,beamSag*@sin(tf*beamSagRate+m.f(ia)),0);
@@ -412,8 +411,8 @@ fn threads(g:*Game,tf:f32)Allocator.Error!void{
     const ctrl=[4]m.V3{pos[0],pos[0]+span*m.splat3(1.0/3.0)+sag,pos[0]+span*m.splat3(2.0/3.0)+sag,pos[1]};
     // which way is across the beam, level
     const side=m.norm(m.cross(span,m.v3(0,1,0)));
-    // how far out the beam has reached, 0..1, as its bloom finishes
-    const reach=m.smooth(m.unlerp(beamFrom,1,s.items(.growth)[ia]));
+    // how far out the beam has reached, 0..1, as its relay finishes
+    const reach=m.smooth(m.unlerp(beamFrom,1,s.items(.growth)[if(l.a==.plant)l.a.plant.idx()else l.b.plant.idx()]));
     if(reach<=0)continue;
     // decision: one halo per beam; a beam between two halos' blooms (never
     // at once in practice) follows the first
@@ -423,12 +422,29 @@ fn threads(g:*Game,tf:f32)Allocator.Error!void{
     // which ends a halo moves: 1 the first, 2 the second, 3 both
     const ends:f32=(if(ha[3]>=0)@as(f32,1)else 0)+(if(hb[3]>=0)@as(f32,2)else 0);
     try g.parts.emitCurve(.bloomThread,ctrl,side,1,reach,.{
-      .glow=if(l.live)1 else beamDim,.phase=s.items(.seed)[ia],
+      .glow=if(l.glow>0)1 else beamDim,.phase=s.items(.seed)[ia],
       .halo=if(ha[3]>=0)ha else hb,.ends=ends,
     });
   }
 }
-/// a bloom's core this frame (over its tile; a forming halo moves it on the GPU)
+/// a node's core this frame: a relay plant's over its tile (a forming halo
+/// moves it on the GPU), a structure's relay where it hangs; null for a
+/// link worked out before the plant or structure it names was taken away
+fn nodeEnd(g:*Game,r:lib.light.Ref,tf:f32)?m.V3{
+  switch(r){
+    .plant=>|id|{
+      if(id.idx()>=g.plants.len())return null;
+      return end(g,id.idx(),tf);
+    },
+    .relay=>|k|{
+      if(k>=g.relays.items.len)return null;
+      // the relay, and the ground under it
+      const rl=g.relays.items[k];
+      return rl.at+m.v3(0,g.heightAt(rl.x,rl.y)+lib.haloStructure.hover,0);
+    },
+  }
+}
+/// a relay plant's core this frame (over its tile; a forming halo moves it on the GPU)
 fn end(g:*Game,i:usize,tf:f32)m.V3{
   // the plants' columns, and the bloom's kind
   const s=g.plants.list.slice();
@@ -461,7 +477,7 @@ const Drawn=struct{
   ghost:bool=false,
   /// whether the preview fits where it is
   fits:bool=true,
-  /// a celestial bloom: whether its network radiates (it shines in full)
+  /// a relay of the light grid: whether light reaches it (it shines in full)
   radiating:bool=false,
   /// the way it faces
   dir:m.Dir=0,
@@ -539,7 +555,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   // about, pearl tinted by its film, pulsing slowly, brighter as it
   // assembles (a dark network's only faintly), following it as a forming
   // halo draws it in and dimming as it folds
-  if(def.radiance>0 and !d.ghost){
+  if(def.lightNode() and !d.ghost){
     // how far it has assembled, where a forming halo draws its light, and its pulse
     const assembled=m.smooth(m.unlerp(bloomLitFrom,1,d.growth));
     const drawn=haloMod.spiral(m.v3(at[0],y+bloomCore,at[2]),halo);

@@ -14,8 +14,8 @@ const items=lib.items;
 const species=lib.species;
 /// every plant in the garden
 const Plants=lib.plants.Plants;
-/// a field of celestial energy, as the ecology reads it
-const Field=lib.ecology.Field;
+/// the light grid: a structure's relay, and one that draws light
+const light=lib.light;
 /// what the gardener has understood
 const prog=lib.progression;
 /// the scene's list of moving parts a structure adds to
@@ -43,13 +43,48 @@ const reg=lib.structures.reg;
 /// common.glsl `haloSpiral`) and how high over the structure's ground it
 /// is drawn to (`seat`).
 pub const Hold=struct{k:f32,seat:f32};
-/// every field of celestial energy a structure holds, into `out`.
-pub fn fields(ss:*const Structures,gpa:Allocator,out:*std.ArrayList(Field))Allocator.Error!void{
-  out.clearRetainingCapacity();
-  for(ss.list.items)|*s|switch(s.kind()){
-    inline else=>|k|if(comptime reg.has(k,"field"))if(reg.module(k).field(s))|f|try out.append(gpa,f),
+/// the structures' part in the light grid this tick: every relay one
+/// holds (its `relay` hook) into `relays`, and every one that takes light
+/// (its `Use` not `.none`) into `users`, its slot into `ids` beside it
+pub fn lightGrid(ss:*const Structures,gpa:Allocator,relays:*std.ArrayList(light.Relay),users:*std.ArrayList(light.User),ids:*std.ArrayList(Id))Allocator.Error!void{
+  relays.clearRetainingCapacity();
+  users.clearRetainingCapacity();
+  ids.clearRetainingCapacity();
+  for(ss.list.items,0..)|*s,i|{
+    switch(s.kind()){
+      inline else=>|k|if(comptime reg.has(k,"relay"))if(reg.module(k).relay(s))|r|try relays.append(gpa,r),
+    }
+    if(lightUse(s)==.none or s.grown<1 or s.fade>0)continue;
+    try users.append(gpa,.{.at=s.at,.draw=draws(s)});
+    try ids.append(gpa,.of(i));
+  }
+}
+/// how structure `s` takes light now (its `lightUse` hook, else its kind's
+/// `Def.light`: the arsthraxia needs it only until it evolves)
+pub fn lightUse(s:*const Structure)lib.structures.Use{
+  return switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"lightUse"))reg.module(k).lightUse(s)else s.def().light,
   };
 }
+/// how much light structure `s` draws at full work (its `draws` hook, else
+/// its kind's `Def.draws`: a lithophage draws more the further it reaches)
+pub fn draws(s:*const Structure)f32{
+  return switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"draws"))reg.module(k).draws(s)else s.def().draws,
+  };
+}
+/// how many seconds of work structure `s` does in `dt` by its light: a
+/// boost works up to `light.boost` faster, what needs light works as fast
+/// as its light allows and not at all short of `light.needAt`
+pub fn workTime(s:*const Structure,dt:f32)f32{
+  return switch(lightUse(s)){
+    .none,.looks=>dt,
+    .boost=>dt*(1+boost*s.lit),
+    .needs=>if(s.lit<light.needAt)0 else dt*s.lit,
+  };
+}
+/// how much faster a boosted structure works in whole light (0.5: 1.5x)
+pub const boost:f32=0.5;
 /// the structure drawing the floater at a tile toward itself, if any.
 pub fn hold(ss:*const Structures,wx:i32,wy:i32)?struct{s:*const Structure,h:Hold}{
   for(ss.list.items)|*s|switch(s.kind()){
@@ -143,12 +178,12 @@ pub fn icon(k:Kind,ic:iconKit.Icon,col:Color)Allocator.Error!void{
     inline else=>|t|if(comptime reg.has(t,"icon"))try reg.module(t).icon(ic,col)else try iconKit.plain(ic,col),
   }
 }
-/// take one ripe unit of a mature plant's yield (plants never set seed).
+/// take one ripe unit of a mature plant's yield (plants never set seed): a
+/// rare one first, while it holds any (`Plants.takeYield`)
 pub fn harvestOne(plants:*Plants,id:PlantId)?items.Item{
-  // the plant's row, and every plant's columns
-  const p=id.idx();
-  const s=plants.list.slice();
-  if(s.items(.growth)[p]<1 or s.items(.essence)[p]<1)return null;
-  s.items(.essence)[p]-=1;
-  return species.get(s.items(.sp)[p]).yields;
+  if(plants.list.items(.growth)[id.idx()]<1)return null;
+  // what one unit taken gives, if it holds one
+  const got=plants.takeYield(id,1);
+  if(got.rare>0)return species.get(plants.list.items(.sp)[id.idx()]).rareYield();
+  return if(got.plain>0)species.get(plants.list.items(.sp)[id.idx()]).yields else null;
 }

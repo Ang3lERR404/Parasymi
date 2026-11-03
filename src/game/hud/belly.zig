@@ -300,7 +300,7 @@ fn weaves(g:*play.Game,d:*Draw,px:f32,wy:f32)Allocator.Error!void{
     var x=colx+44;
     for(r.in,0..)|ing,j|{
       // whether the belly holds enough of this ingredient
-      const have=g.player.inv.count(ing.item)>=ing.n;
+      const have=g.player.inv.worth(ing.item)>=ing.n;
       try d.grain(x+6,y+10,9,13,ing.item.info().col,if(have)0.7 else 0,m.f(j)*0.3);
       x=try d.print(x+14,y+5,s.textFine,if(have)s.white else s.dim,txt.s.hud.ingredient,.{ing.n,txt.item(ing.item).short})+10;
     }

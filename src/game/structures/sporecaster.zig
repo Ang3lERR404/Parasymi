@@ -7,7 +7,9 @@
 //! hands what they bring to its neighbours, or conduits pull it away, or,
 //! paired on itself, it sends it on again: the loop conduits cannot close.
 //! A spore whose caster is gone turns home and gives back what it carried;
-//! one whose caster is full hangs over it until there is room.
+//! one whose caster is full hangs over it until there is room. It needs
+//! the light grid's light at both ends: a dark caster casts no spores, and
+//! a spore over a dark one hangs there until its light comes.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -59,7 +61,7 @@ pub const meshes=.{.bellyLump,.sporeCarrier};
 pub const pairs:st.Pairs=.{};
 /// what a sporecaster is: grown from its seed, one tile across, a pale
 /// store that swaps sap and is drawn from afar
-pub const def:st.Def=.{.item=.sporecaster,.lineage=.parasitic,.size=1,.mesh=.sporecaster,.store=true,.grow=5,.sway=0.45,.tall=0.65,.sap=0.3,.far=true};
+pub const def:st.Def=.{.item=.sporecaster,.lineage=.parasitic,.size=1,.mesh=.sporecaster,.store=true,.grow=5,.sway=0.45,.tall=0.65,.sap=0.3,.far=true,.light=.needs,.draws=2};
 /// the most it holds
 pub const holdMost=40;
 /// how many of one kind a spore carries
@@ -157,6 +159,8 @@ pub fn drift(ctx:st.Ctx,self:*st.Structure,air:*Air,kind:st.Kind,dt:f32)bool{
       sp.home=true;
       continue;
     };
+    // a dark one takes nothing in: the spore hangs over it till it is lit
+    if(lib.structures.lightUse(ctx.ss.get(j))!=.none and ctx.ss.get(j).lit<lib.light.needAt)continue;
     // how many the one below took in
     const took=switch(ctx.ss.send(ctx,j,.{.arrived=.{.item=sp.item,.n=sp.n}})){
       .took=>|k|k,
@@ -245,7 +249,8 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(ctx.ss.getPartner(i)==null)return busy;
   // the tile of the caster it sends to
   const to=self.partner().?.tile();
-  if(self.inv.total()==0)return busy;
+  // dark, it casts nothing (what is aloft still drifts on)
+  if(self.inv.total()==0 or self.lit<lib.light.needAt)return busy;
   sc.t+=dt;
   if(sc.t<launch)return true;
   // the kind it holds most of, a load of it
@@ -258,6 +263,10 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(launchSpore(self,&sc.spores,ctx.w,it.item,@intCast(@min(it.n,load)),to))sc.t=0;
   return true;
 }
+/// how its light paces it: never by the tick (its spores aloft drift on in
+/// the dark); it casts only while lit and lands only in a lit caster, so it
+/// still draws its light as one that needs it
+pub fn lightUse(_:*const st.Structure)st.Use{return.looks;}
 /// uprooted: what its spores carry comes back into its slots with them.
 pub fn release(s:*st.Structure)?items.Item{
   bringHome(s,&s.state.sporecaster.spores);
@@ -406,6 +415,8 @@ test"spores carry what a caster is fed to the one it is paired with, however far
   // the sender
   const a=ss.at(&w,0,0).?;
   try testing.expect(ss.pairWith(a,ss.at(&w,28,0).?));
+  // both in light (they cast and take in only lit)
+  for(ss.list.items)|*c|c.lit=1;
   try testing.expectEqual(@as(u16,12),ss.insert(&g,a,.essence,12));
   try testing.expectEqual(@as(u16,7),ss.insert(&g,a,.grit,7));
   // a caster that sends lets nothing go to conduits
@@ -436,6 +447,8 @@ test"spores whose caster is uprooted turn home with what they carry"{
   // the sender
   const a=ss.at(&w,0,0).?;
   try testing.expect(ss.pairWith(a,ss.at(&w,28,0).?));
+  // both in light (they cast and take in only lit)
+  for(ss.list.items)|*c|c.lit=1;
   _=ss.insert(&g,a,.fibre,10);
   try bench.run(&ss,&w,&plants,&g,1);
   _=ss.remove(&w,ss.at(&w,28,0).?);

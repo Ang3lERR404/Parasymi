@@ -120,7 +120,7 @@ const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the stored layout's version: bumped whenever one changes
-const version:u32=33;
+const version:u32=34;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -166,6 +166,10 @@ const PlantRec=extern struct{
   flow:f32,
   /// the essence it has ripened
   essence:f32,
+  /// how much of that is rare, steeped by a night beam
+  rare:f32,
+  /// the light it holds in store (an astrocyme's)
+  stored:f32,
   /// the way it faces, 0..3
   dir:u32,
 };
@@ -268,7 +272,7 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
     .x=s.items(.x)[i],.y=s.items(.y)[i],.ax=s.items(.at)[i][0],.az=s.items(.at)[i][2],.sp=@intFromEnum(s.items(.sp)[i]),
     .growth=s.items(.growth)[i],.span=s.items(.span)[i],.mana=s.items(.mana)[i],.health=s.items(.health)[i],
     .seed=s.items(.seed)[i],.flow=s.items(.flow)[i],.essence=s.items(.essence)[i],
-    .dir=s.items(.dir)[i],
+    .rare=s.items(.rare)[i],.stored=s.items(.stored)[i],.dir=s.items(.dir)[i],
   });
   try w.put(u32,@intCast(g.structs.list.items.len));
   for(g.structs.list.items)|*it|{
@@ -285,11 +289,11 @@ pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
   try w.put(u32,@intCast(touched.items.len));
   for(touched.items)|c|try w.put(NodesRec,.{.at=c.at,.res=c.res});
   // the moss the creepers grew, tile by tile
-  var mossed:std.ArrayList(m.Vice(i32,2))=.empty;
+  var mossed:std.ArrayList(lib.moss.Kept)=.empty;
   defer mossed.deinit(gpa);
   try g.moss.list(gpa,&mossed);
   try w.put(u32,@intCast(mossed.items.len));
-  for(mossed.items)|t|try w.put(m.Vice(i32,2),t);
+  for(mossed.items)|t|try w.put(lib.moss.Kept,t);
   // the wild flowers, tile by tile
   try w.put(u32,@intCast(g.wild.count()));
   var wi=g.wild.flowers.iterator();
@@ -351,7 +355,7 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
     _=try g.plants.placeNear(gpa,&g.world,m.v3(p.ax,0,p.az),.{
       .x=p.x,.y=p.y,.chunk=undefined,.tile=undefined,.sp=sp,
       .growth=p.growth,.span=p.span,.mana=p.mana,.health=p.health,.seed=p.seed,
-      .flow=p.flow,.essence=p.essence,.dir=@intCast(p.dir),
+      .flow=p.flow,.essence=p.essence,.rare=p.rare,.stored=p.stored,.dir=@intCast(p.dir),
     });
   }
   // how many structures are stored
@@ -386,12 +390,13 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
     const c=try g.world.ensure(n.at);
     c.res=n.res;
   }
-  // the moss the creepers grew, laid on its chunks as they stream in
+  // the ground the garden changed (moss, beam-born ley), laid on its chunks as they stream in
   const mossed=try r.get(u32);
   for(0..mossed)|_|{
-    // the tile
-    const t=try r.get(m.Vice(i32,2));
-    try g.moss.grow(gpa,&g.world,t[0],t[1]);
+    // the tile, and what it became
+    const t=try r.get(lib.moss.Kept);
+    if(t.grown>@intFromEnum(lib.moss.Grown.ley))return error.CorruptSave;
+    try g.moss.become(gpa,&g.world,t.x,t.y,@enumFromInt(t.grown));
   }
   // the wild flowers
   const wilds=try r.get(u32);

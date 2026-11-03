@@ -11,6 +11,8 @@ const color=engine.core.color;
 /// the driftwisp: a floating symbiote that condenses starlight, swaying most of all
 pub const def:species.Species=.{
   .lineage=.symbiotic,.seed=.seedDriftwisp,.floating=true,.yields=.starlight,
+  // a night beam's overdrive steeps starglass in its dish
+  .rare=.starglass,
   .matureTime=20,.manaCap=8,.leyDraw=0.5,.share=0.4,.drain=0,.yield=0.06,
   // plucked from its catcher dish, where its yield pools over the float
   .pluck=0.31,

@@ -1,8 +1,9 @@
-//! moss grown in the garden: soil a moss creeper has turned to moss where
-//! the rain soaked it, so a grove may root there. The world regrows its
-//! ground from the seed whenever a chunk streams in, so the grown moss is
-//! kept here, tile by tile (and saved), and laid back onto every chunk as
-//! it comes (`Chunk.mossed`).
+//! ground the garden has changed: soil a moss creeper has turned to moss
+//! where the rain soaked it, so a grove may root there, and moss a night
+//! beam has turned to a ley line now and then (`beamGround`). The world
+//! regrows its ground from the seed whenever a chunk streams in, so the
+//! changed ground is kept here, tile by tile (and saved), and laid back
+//! onto every chunk as it comes (`Chunk.mossed`).
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -25,27 +26,44 @@ const Game=lib.play.Game;
 pub const mossWater:f32=0.4;
 /// how many tiles a creeper tries for each new tile of moss before it gives up
 const tries=6;
+/// the ley a beam-born ley line holds (the generator's run 0.2 to about 4)
+pub const bornLey:f32=1.6;
+/// what a changed tile has become
+pub const Grown=enum(u8){
+  /// moss, from soil a creeper reached in the rain
+  moss,
+  /// a ley line, from moss under a night beam
+  ley,
+};
+/// a changed tile as stored: its column, its row, what it has become
+pub const Kept=extern struct{x:i32,y:i32,grown:u32};
 /// a tile's place, packed into one key
 fn key(x:i32,y:i32)u64{return(@as(u64,@as(u32,@bitCast(x)))<<32)|@as(u32,@bitCast(y));}
 /// the tile a key names
 fn unkey(k:u64)m.Vice(i32,2){return.{@bitCast(@as(u32,@truncate(k>>32))),@bitCast(@as(u32,@truncate(k)))};}
-/// every tile grown to moss
+/// every tile the garden has changed
 pub const Moss=struct{
-  /// the tiles, by their packed place
-  tiles:std.AutoHashMapUnmanaged(u64,void)=.empty,
+  /// the tiles, by their packed place, and what each has become
+  tiles:std.AutoHashMapUnmanaged(u64,Grown)=.empty,
   /// frees the tiles
   pub fn deinit(s:*Moss,gpa:Allocator)void{s.tiles.deinit(gpa);}
-  /// how many tiles have grown to moss
+  /// how many tiles have changed
   pub fn count(s:*const Moss)usize{return s.tiles.count();}
-  /// every tile grown to moss, by place, into `out`
-  pub fn list(s:*const Moss,gpa:Allocator,out:*std.ArrayList(m.Vice(i32,2)))Allocator.Error!void{
-    var it=s.tiles.keyIterator();
-    while(it.next())|k|try out.append(gpa,unkey(k.*));
+  /// every changed tile, by place and what it became, into `out`
+  pub fn list(s:*const Moss,gpa:Allocator,out:*std.ArrayList(Kept))Allocator.Error!void{
+    var it=s.tiles.iterator();
+    while(it.next())|e|{
+      // the tile's place
+      const t=unkey(e.key_ptr.*);
+      try out.append(gpa,.{.x=t[0],.y=t[1],.grown=@intFromEnum(e.value_ptr.*)});
+    }
   }
   /// tile (x, y) grown to moss: kept, and laid on its chunk if streamed in
-  pub fn grow(s:*Moss,gpa:Allocator,w:*World,x:i32,y:i32)Allocator.Error!void{
-    try s.tiles.put(gpa,key(x,y),{});
-    if(w.chunkOfTile(x,y))|c|lay(c,ck.localIndex(x,y));
+  pub fn grow(s:*Moss,gpa:Allocator,w:*World,x:i32,y:i32)Allocator.Error!void{try s.become(gpa,w,x,y,.moss);}
+  /// tile (x, y) become `to`: kept, and laid on its chunk if streamed in
+  pub fn become(s:*Moss,gpa:Allocator,w:*World,x:i32,y:i32,to:Grown)Allocator.Error!void{
+    try s.tiles.put(gpa,key(x,y),to);
+    if(w.chunkOfTile(x,y))|c|lay(c,ck.localIndex(x,y),to);
   }
   /// the grown moss laid onto every chunk streamed in since it was last
   /// laid (fresh from the seed, it has none)
@@ -60,15 +78,24 @@ pub const Moss=struct{
       for(0..ck.tileCount)|t|{
         // the tile's place
         const x,const y=c.tileOf(t);
-        if(s.tiles.contains(key(x,y)))lay(c,t);
+        if(s.tiles.get(key(x,y)))|to|lay(c,t,to);
       }
     }
   }
 };
-/// tile `t` of chunk `c` turned to moss, holding a moss's water, its ground meshed again
-fn lay(c:*ck.Chunk,t:usize)void{
-  c.kind[t]=.moss;
-  c.waterCap[t]=@max(c.waterCap[t],mossWater);
+/// tile `t` of chunk `c` turned to `to`: moss holding a moss's water, or a
+/// ley line rich in ley; its ground meshed again
+fn lay(c:*ck.Chunk,t:usize,to:Grown)void{
+  switch(to){
+    .moss=>{
+      c.kind[t]=.moss;
+      c.waterCap[t]=@max(c.waterCap[t],mossWater);
+    },
+    .ley=>{
+      c.kind[t]=.ley;
+      c.leyCap[t]=@max(c.leyCap[t],bornLey);
+    },
+  }
   c.dirty=true;
 }
 /// one tick (`dt` s) of the garden's creepers: each grown, healthy one now
@@ -151,12 +178,12 @@ test"a grown creeper turns soaked soil round it to moss, never dry soil"{
     }else{
       try std.testing.expect(g.moss.count()>=5);
       // every tile it grew lies within its reach, and is moss
-      var tiles:std.ArrayList(m.Vice(i32,2))=.empty;
+      var tiles:std.ArrayList(Kept)=.empty;
       defer tiles.deinit(gpa);
       try g.moss.list(gpa,&tiles);
       for(tiles.items)|t|{
-        try std.testing.expect(@abs(t[0]-(x+2))<=2 and @abs(t[1]-z)<=2);
-        try std.testing.expectEqual(ck.Kind.moss,g.world.chunkOfTile(t[0],t[1]).?.kind[ck.localIndex(t[0],t[1])]);
+        try std.testing.expect(@abs(t.x-(x+2))<=2 and @abs(t.y-z)<=2 and t.grown==@intFromEnum(Grown.moss));
+        try std.testing.expectEqual(ck.Kind.moss,g.world.chunkOfTile(t.x,t.y).?.kind[ck.localIndex(t.x,t.y)]);
       }
     }
   }

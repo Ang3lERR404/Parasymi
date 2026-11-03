@@ -108,8 +108,13 @@ pub const Game=struct{
   structs:st.Structures=.{},
   /// the ecology's state between ticks
   eco:Ecology=.{},
-  /// the standing fields of celestial energy (halos), gathered each tick
-  fields:std.ArrayList(ecology.Field)=.empty,
+  /// the relays the structures hold (a diamond), gathered each tick for
+  /// the light grid
+  relays:std.ArrayList(lib.light.Relay)=.empty,
+  /// the structures that take light, gathered each tick for the light grid
+  users:std.ArrayList(lib.light.User)=.empty,
+  /// beside `users`: which structure each is
+  userIds:std.ArrayList(st.Id)=.empty,
   /// convergence's search for lineages meeting
   converge:convergence.Seeker=.{},
   /// what the gardener has understood, and the message log
@@ -346,7 +351,9 @@ pub const Game=struct{
     g.rows.deinit();
     g.stars.deinit(g.gpa);
     g.eco.deinit(g.gpa);
-    g.fields.deinit(g.gpa);
+    g.relays.deinit(g.gpa);
+    g.users.deinit(g.gpa);
+    g.userIds.deinit(g.gpa);
     g.plants.deinit(g.gpa);
     g.structs.deinit(g.gpa);
     g.world.deinit();
@@ -453,13 +460,19 @@ pub const Game=struct{
       g.ticks+=1;
       return;
     };
-    // the modifiers this tick: progression's, the night, the standing fields
+    // the modifiers this tick: progression's, the night, the structures'
+    // part in the light grid
     var mods=g.prog.mods();
     mods.night=1-g.sky.daylight();
-    try st.fields(&g.structs,g.gpa,&g.fields);
-    mods.fields=g.fields.items;
+    try st.lightGrid(&g.structs,g.gpa,&g.relays,&g.users,&g.userIds);
+    mods.relays=g.relays.items;
+    mods.users=g.users.items;
     // what befell the garden this tick
     const ev=try g.eco.tick(g.gpa,&g.plants,&g.world,mods,tickTime);
+    // each structure that takes light has its share of it
+    for(g.structs.list.items)|*it|it.lit=0;
+    for(g.userIds.items,g.eco.light.userLit.items)|id,v|g.structs.get(id).lit=v;
+    lib.beamGround.tick(g,tickTime);
     try g.converge.tick(g.gpa,&g.world,&g.plants,&g.structs,&g.prog);
     try lib.moss.creep(g,tickTime);
     g.moss.apply(&g.world);

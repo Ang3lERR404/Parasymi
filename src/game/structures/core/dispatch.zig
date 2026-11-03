@@ -198,9 +198,12 @@ pub fn tickWith(ctx:Ctx,dt:f32)Allocator.Error!void{
     // one whose life is all growing works as it grows)
     const growing=g0.grown<1;
     if(growing)g0.grown=@min(1,g0.grown+dt/g0.def().grow);
-    const active=if(growing and !g0.def().worksGrowing)false else switch(g0.kind()){
+    // how much work it does this tick, by its light: boosted, or held
+    // still when it needs light it has not got
+    const work=if(growing)dt else lib.structures.workTime(g0,dt);
+    const active=if((growing and !g0.def().worksGrowing) or work<=0)false else switch(g0.kind()){
       // a tick that may put something down can fail for room
-      inline else=>|k|if(comptime reg.has(k,"tick"))try orFail(reg.module(k).tick(ctx,id,dt))else false,
+      inline else=>|k|if(comptime reg.has(k,"tick"))try orFail(reg.module(k).tick(ctx,id,work))else false,
     };
     // fetched again: its own tick may have put another down and moved the list
     const s=ss.get(id);

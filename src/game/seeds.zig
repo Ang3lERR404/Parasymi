@@ -44,6 +44,14 @@ const kinds=struct{
   pub const mireLily=@import("seeds/mire_lily.zig");
   /// the moss creeper's seed
   pub const mossCreeper=@import("seeds/moss_creeper.zig");
+  /// the solcyriphon's seed, the light grid's maker
+  pub const solcyriphon=@import("seeds/solcyriphon.zig");
+  /// the astrocyme's seed, the light grid's store
+  pub const astrocyme=@import("seeds/astrocyme.zig");
+  /// the heliocyra's seed, the light grid's shaper
+  pub const heliocyra=@import("seeds/heliocyra.zig");
+  /// the halcyra's seed, the light grid's guard
+  pub const halcyra=@import("seeds/halcyra.zig");
 };
 /// the seed registry built from `kinds`: its ids and its modules
 const reg=registry.Registry(kinds);

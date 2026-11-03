@@ -86,6 +86,10 @@ const float FORM_RADIANT = 4.0;
 const float FORM_STAR = 5.0;
 const float FORM_LILY = 6.0;
 const float FORM_CREEPER = 7.0;
+const float FORM_LENS = 8.0;
+const float FORM_BOUQUET = 9.0;
+const float FORM_HELIOTROPE = 10.0;
+const float FORM_VEIL = 11.0;
 bool isForm(float f, float form) { return abs(f - form) < 0.5; }
 // sets of forms, one bit each (as the roles' sets): what forms do alike is
 // keyed off a set (formIn), so a new form joins a behaviour by joining it
@@ -93,8 +97,9 @@ bool isForm(float f, float form) { return abs(f - form) < 0.5; }
 bool formIn(uint set, float f) { return ((set >> uint(f + 0.5)) & 1u) != 0u; }
 // the radiant lineage's plants (radiant_kit): petals and leaves floating
 // free of a core, gathered and turned by it, never bending from a root and
-// glowing with the light they carry (the celestial bloom, the vesper)
-const uint FORMS_FREE = FORM_BIT(FORM_RADIANT) | FORM_BIT(FORM_STAR);
+// glowing with the light they carry (the celestial bloom, the vesper, and
+// the light grid's solcyriphon, astrocyme, heliocyra and halcyra)
+const uint FORMS_FREE = FORM_BIT(FORM_RADIANT) | FORM_BIT(FORM_STAR) | FORM_BIT(FORM_LENS) | FORM_BIT(FORM_BOUQUET) | FORM_BIT(FORM_HELIOTROPE) | FORM_BIT(FORM_VEIL);
 // lying afloat on the water (meshgen/lilies.zig, its origin the surface):
 // what lies on it drifts and bobs, never bending from a root (plant.vert)
 const uint FORMS_AFLOAT = FORM_BIT(FORM_LILY);

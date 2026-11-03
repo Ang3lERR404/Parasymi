@@ -42,6 +42,8 @@ pub const tendril=@import("game/tendril.zig");
 pub const weather=@import("game/weather.zig");
 /// moss grown in the garden by its creepers, kept and laid on each chunk
 pub const moss=@import("game/moss.zig");
+/// where a night beam falls on bare ground: moss now and then turned to ley
+pub const beamGround=@import("game/beam_ground.zig");
 /// wild flowers sprung up by the pools, kept tile by tile
 pub const wild=@import("game/wild.zig");
 /// the loading screen: a night with a tendril growing across it
@@ -208,5 +210,7 @@ pub const terrainMesh=@import("render/terrain_mesh.zig");
 pub const meshCache=@import("render/mesh_cache.zig");
 /// the fixed-tick ecology: mana, sharing, draining, growth and death
 pub const ecology=@import("sim/ecology.zig");
+/// the light grid: who makes, carries, casts, draws and guards light
+pub const light=@import("sim/light.zig");
 /// debugging helpers: why a structure can't be placed
 pub const diagnostics=@import("diagnostics.zig");

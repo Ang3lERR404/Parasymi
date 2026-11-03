@@ -172,7 +172,7 @@ fn recipes(g:*play.Game,d:*Draw,sp:*const st.Structure,choices:[]const u8,x:f32,
   _=try d.print(ix,cy-24,s.textBody,if(shown==chosen)s.gold else s.white,if(r.n>1)txt.s.hud.recipeMany else txt.s.hud.recipe,.{txt.item(r.out).name,r.n});
   for(r.in,0..)|ing,j|{
     // how many the structure holds of it, whether that is enough, and its line
-    const have=sp.inv.count(ing.item);
+    const have=sp.inv.worth(ing.item);
     const enough=have>=ing.n;
     const ly=cy+4+recipeLine*m.f(j);
     try d.grain(ix+10,ly+5,9,13,ing.item.info().col,if(enough)0.7 else 0,m.f(j)*0.3);

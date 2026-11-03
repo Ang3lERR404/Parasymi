@@ -58,7 +58,7 @@ const v3=m.v3;
 pub const meshes=.{.driftFlower,.arsthraxiaCore,.arsthraxiaCup,.arsthraxiaBud0,.arsthraxiaBud1,.arsthraxiaBud2,.arsthraxiaBud3,.arsthraxiaBudHeart,.arsthraxiaShoot,.arsthraxiaVines,.arsthraxiaWhorl,.arsthraxiaWisp,.arsthraxiaWoven,.arsthraxiaWovenWhorl,.arsthraxiaWovenCup};
 /// what the lab is: 2×2, keeping what it is fed, swaying from its root two
 /// tiles tall, growing in over 8 s; shown whole (`preview`) before it is put down
-pub const def:st.Def=.{.item=.arsthraxia,.lineage=.symbiotic,.evolves=.convergent,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true};
+pub const def:st.Def=.{.item=.arsthraxia,.lineage=.symbiotic,.evolves=.convergent,.size=2,.mesh=.arsthraxia,.preview=.arsthraxiaWhole,.store=true,.sway=0.8,.tall=2.0,.grow=8,.bare=true,.light=.needs,.draws=3};
 /// most of one ingredient it will hold
 const stock=20;
 /// the satellites round its core from the start; one more per growth
@@ -212,6 +212,9 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
     .lit,.arrived,.petalComing,.petalSnapped,.fastenComing,.fastened=>return.ignored,
   }
 }
+/// it studies only in the light grid's light, until the unforming evolves
+/// it: then it is freed, and studies without
+pub fn lightUse(s:*const st.Structure)st.Use{return if(s.state.arsthraxia.evolved).none else def.light;}
 /// condenses the study a little (a flare when a unit is done), turns its
 /// flower with its work and grows what is learned on it. Returns whether
 /// it is studying.

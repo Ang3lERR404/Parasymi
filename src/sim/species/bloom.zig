@@ -1,10 +1,9 @@
-//! CELESTIAL BLOOM: the garden's power source. A floating radiant plant that
-//! yields nothing; it radiates. Mature, it holds a field of celestial
-//! energy around it (`radiance`), and it links with every other bloom
-//! within `link` tiles into one network: a growing bloom joined to a
-//! network that holds a mature one radiates too, so uprooting the bloom
-//! that joins them cuts off everything downstream. Plants that need
-//! radiance (`needsRadiance`) halt and wither outside every field.
+//! CELESTIAL BLOOM: a relay of the light grid, a small pole. A floating
+//! radiant plant that yields nothing and makes no light: grown, it links
+//! with every relay within `link` tiles, carries on up to `carry` of the
+//! light that reaches it along them, and lights the field round it
+//! (`radiance`) for what draws light (sim/light.zig). Uprooting the bloom
+//! that joins two relays cuts off everything beyond it.
 const lib=@import("../../lib.zig");
 /// the species registry: what a species is
 const species=lib.species;
@@ -12,15 +11,15 @@ const species=lib.species;
 const engine=lib.engine;
 /// colour types, for its genome's pearl colours
 const color=engine.core.color;
-/// the celestial bloom: a floating radiant plant, holding a field of
-/// light 3.5 tiles round and linking with blooms within 10
+/// the celestial bloom: a floating relay, carrying up to 4 glow, its field
+/// 3.5 tiles round, linking with relays within 10
 pub const def:species.Species=.{
   // decision: radiant, drawn as it always was, with the symbiotes' sap
   .lineage=.radiant,.look=.symbiotic,.seed=.seedBloom,.floating=true,
-  // no item, no output: it radiates instead (the sky feeds it, as it does
-  // every floater; it never condenses essence)
+  // no item, no output: it carries light instead (the sky feeds it, as it
+  // does every floater; it never condenses essence)
   .matureTime=30,.manaCap=10,.leyDraw=0.5,.share=0,.drain=0,.yield=0,
-  .radiance=3.5,.link=10,
+  .radiance=3.5,.link=10,.carry=4,.halo=true,
   // the highest living thing in the garden, above the fallen starlight
   .hover=3.2,
   // it drifts and bobs; it does not bend from a root

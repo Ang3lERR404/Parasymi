@@ -300,8 +300,12 @@ pub fn pluckOn(g:*Game,dt:f32)?f32{
     // what it yields, and how many the belly took
     const es=m.floorTo(u16,s.items(.essence)[i]);
     const n=(es+p.left-1)/p.left;
-    const yields=species.get(s.items(.sp)[i]).yields;
-    const got=g.player.inv.add(yields,n);
+    const def=species.get(s.items(.sp)[i]);
+    const yields=def.yields;
+    // the rare ones first (a night beam's), then the plain, as the belly has room
+    const rare=g.player.inv.add(def.rareYield(),@min(m.floorTo(u16,s.items(.rare)[i]),n));
+    s.items(.rare)[i]-=m.f(rare);
+    const got=rare+g.player.inv.add(yields,n-rare);
     s.items(.essence)[i]-=m.f(got);
     p.got+=got;
     if(got>0){
