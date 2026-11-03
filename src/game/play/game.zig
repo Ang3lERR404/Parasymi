@@ -534,6 +534,34 @@ pub const Game=struct{
   pub const moveAcross=lib.play.belly.moveAcross;
   /// put a carried stack down on a slot (`belly.putDown`)
   pub const putDown=lib.play.belly.putDown;
+  /// works a resource node for a tick (`actions.gather`)
+  pub const gather=lib.actions.gather;
+  /// put the selected hotbar item into the world (`actions.put`)
+  pub const put=lib.actions.put;
+  /// whether the chosen hotbar item may go down at this tile (`actions.canPut`)
+  pub const canPut=lib.actions.canPut;
+  /// queues weave `i` (an index into `craft.hand`) in the wolf's own hands, taking its ingredients now (`actions.weaveByHand`)
+  pub const weaveByHand=lib.actions.weaveByHand;
+  /// give a structure everything from the belly it will take (`actions.feed`)
+  pub const feed=lib.actions.feed;
+  /// what a click (or the interact key) on a structure does (`actions.interact`)
+  pub const interact=lib.actions.interact;
+  /// turn what stands at a tile a quarter, clockwise or `back` (`actions.turnAt`)
+  pub const turnAt=lib.actions.turnAt;
+  /// take up the seed (or bulb) of what stands at a tile, facing as it does (`actions.pick`)
+  pub const pick=lib.actions.pick;
+  /// empty a structure into the belly (what fits) (`actions.takeFrom`)
+  pub const takeFrom=lib.actions.takeFrom;
+  /// uproot a structure (`actions.unbuild`)
+  pub const unbuild=lib.actions.unbuild;
+  /// start plucking a mature plant's yield by paw (`pluckOn` carries it on) (`actions.harvest`)
+  pub const harvest=lib.actions.harvest;
+  /// one frame of plucking (`actions.pluckOn`)
+  pub const pluckOn=lib.actions.pluckOn;
+  /// pull a plant up (`actions.uproot`)
+  pub const uproot=lib.actions.uproot;
+  /// starlight drifts toward the wolf's chest and is absorbed on touch (`actions.catchStarlight`)
+  pub const catchStarlight=lib.actions.catchStarlight;
   /// the frozen world's menus, each frame (`menus.menu`)
   pub const menu=lib.play.menus.menu;
   /// does what a pause row says (`menus.choose`)

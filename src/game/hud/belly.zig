@@ -36,8 +36,6 @@ const hud=lib.hud;
 const Slot=lib.hudSlot.Slot;
 /// the bindings, to see whether take is held
 const ctl=lib.controls;
-/// the gardener's actions, for weaving by hand
-const actions=lib.actions;
 /// the keys and buttons down this frame
 const Input=lib.engine.platform.input.Input;
 /// how many slots hang to a row
@@ -94,7 +92,7 @@ pub fn click(g:*play.Game,p:Pick,press:hud.Press,in:*const Input)void{
     .use=>switch(p){
       .slot=>|i|if(across)g.moveAcross(.{.slot=i})else g.clickSlot(i),
       .store=>|i|if(across)g.moveAcross(.{.store=i})else g.clickStore(i),
-      .weave=>|i|if(g.held!=null)g.drop()else actions.weaveByHand(g,i),
+      .weave=>|i|if(g.held!=null)g.drop()else g.weaveByHand(i),
     },
     .discard=>switch(p){
       .slot=>|i|g.discard(i),

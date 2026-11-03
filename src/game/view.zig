@@ -42,8 +42,6 @@ const haloMod=lib.haloStructure;
 const lightCrown=lib.lightCrown;
 /// resource nodes: their meshes and glows
 const resources=lib.resources;
-/// the gardener's actions, for whether a preview fits
-const actions=lib.actions;
 /// plucking: a drawn plant's size, the plucked plant's bend
 const pluck=lib.pluck;
 /// the HUD, built into the scene each frame
@@ -837,7 +835,7 @@ fn ghost(g:*Game,tf:f32)Allocator.Error!void{
   const item=g.selected() orelse return;
   if(!play.known(g,item))return;
   // whether it fits there: free, in reach, and one in the belly
-  const ok=actions.canPut(g,h) and g.player.inReach(h[0],h[1]) and g.player.inv.count(item)>0;
+  const ok=g.canPut(h) and g.player.inReach(h[0],h[1]) and g.player.inv.count(item)>0;
   if(item.plants())|sp|{
     // a fixed seed so the preview does not spin about as the cursor moves
     return plant(g,.{.sp=sp,.x=h[0],.y=h[1],.at=Plants.spot(sp,h,g.hoverAt),.ground=g.heightAt(h[0],h[1]),.growth=1,.seed=ghostSeed,.ghost=true,.fits=ok,.dir=g.placeDir},tf);

@@ -47,8 +47,6 @@ const Draw=lib.engine.ui.draw.Draw;
 const Color=lib.engine.ui.draw.Color;
 /// the whole game, for the uprooting test
 const play=lib.play;
-/// the wolf's actions, for the uprooting test
-const actions=lib.actions;
 /// the digger's mesh: its root's reach and its gourd
 const mesh=lib.rootDigger;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
@@ -376,7 +374,7 @@ test"uprooting a digger returns its bulb and what it holds"{
   _=g.structs.get(id).inv.add(.grit,3);
   // the grit the wolf carried before
   const grit=g.player.inv.count(.grit);
-  actions.unbuild(&g,id);
+  g.unbuild(id);
   try testing.expectEqual(@as(u32,1),g.player.inv.count(.rootDigger));
   try testing.expectEqual(grit+3,g.player.inv.count(.grit));
   try testing.expect(g.structs.at(&g.world,at[0],at[1])==null);

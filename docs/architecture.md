@@ -121,7 +121,10 @@ All math goes through engine `core/math.zig` (`m`). It has:
 - vectors and matrices, `alignY`, `Frustum`;
 - motion and curves: `damp`, `dampV`, `dampBy` (easing toward a target,
   the same at any frame rate), `spring`, `springDamper`, `catmullRom`,
-  `splineResample`.
+  `splineResample`;
+- constants: `pi`, `tau`, `halfPi`, `sqrt2`, `goldenAngle` (leaves,
+  petals and shards stepped round so none line up), `goldenShare`
+  (`@mod(i*goldenShare,1)` scatters steps evenly over 0..1).
 
 Use these, never the same thing written out by hand:
 
@@ -133,6 +136,7 @@ Use these, never the same thing written out by hand:
 | `x+=(t-x)*@min(1,dt*k)` | `x=m.damp(x,t,k,dt)` (`dampV` for points) |
 | `@as(m.Vec(t,n),@splat(x))` | `m.splatOf(t,n,x)` |
 | `@sqrt(m.sumOf(t,n,v*v))` | `m.lenOf(t,n,v)` |
+| `2.39996`, `0.618` | `m.goldenAngle`, `m.goldenShare` |
 | `a[0]-b[0],a[1]-b[1]` by lanes | `a-b` on `Vec`s |
 
 When a new pattern repeats, add a helper here (with a test) rather than

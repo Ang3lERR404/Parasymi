@@ -244,7 +244,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   if(ctl.pressed(in,.rotate)and!inspecting){
     // whether counter is held, turning the other way, and whether something turned
     const back=ctl.down(in,.counter);
-    const turned=if(g.hover)|h|near and actions.turnAt(g,h,back)else false;
+    const turned=if(g.hover)|h|near and g.turnAt(h,back)else false;
     if(!turned)g.placeDir+%=@as(m.Dir,if(back)3 else 1);
   }
   if(g.hover)|h|if(near)if(g.world.chunkOfTile(h[0],h[1]))|c|{
@@ -258,19 +258,19 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     // held, use puts what is in hand down wherever it fits as the cursor
     // sweeps; where it does not, a click interacts with a structure or
     // harvests a plant (so does interact, always)
-    if(using and ctl.down(in,.use) and actions.canPut(g,h)){
-      if(g.plantCd<=0)try actions.put(g,h);
+    if(using and ctl.down(in,.use) and g.canPut(h)){
+      if(g.plantCd<=0)try g.put(h);
     }else if((using and ctl.pressed(in,.use)) or ctl.pressed(in,.interact)){
       if(onStruct)|j|{
-        actions.interact(g,h,j);
+        g.interact(h,j);
         g.useSpent=ctl.down(in,.use);
-      }else if(onPlant!=null)actions.harvest(g,h);
+      }else if(onPlant!=null)g.harvest(h);
     }
-    if(ctl.pressed(in,.pick))_=actions.pick(g,h);
+    if(ctl.pressed(in,.pick))_=g.pick(h);
     if(ctl.pressed(in,.harvest)and!alt){
       if(onStruct)|j|{
-        if(ctl.down(in,.take))actions.takeFrom(g,j)else actions.feed(g,j);
-      }else actions.harvest(g,h);
+        if(ctl.down(in,.take))g.takeFrom(j)else g.feed(j);
+      }else g.harvest(h);
     }
     if(ctl.pressed(in,.configure))if(onStruct)|j|st.configure(&g.structs,j,&g.prog);
     // remove, pressed or held: what stands goes (one tile at a time as
@@ -281,13 +281,13 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
         // whether the cursor has moved onto a new tile since the last removal
         const fresh=if(g.removed)|r|r[0]!=h[0] or r[1]!=h[1]else true;
         if(ctl.pressed(in,.remove)or(fresh and g.removeCd<=0)){
-          if(onStruct)|j|actions.unbuild(g,j)else actions.uproot(g,h);
+          if(onStruct)|j|g.unbuild(j)else g.uproot(h);
           g.removed=h;
           g.removeCd=actions.removeCooldown;
           g.linger=actions.lingerPut;
         }
       }else if(c.res[t]>0 and c.occ[t]==.none){
-        working=actions.gather(g,c,t,dt);
+        working=g.gather(c,t,dt);
         gathering=working;
       }
     }
@@ -304,7 +304,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
       // the node's index within its chunk
       const t=ck.localIndex(h[0],h[1]);
       if(g.player.inReach(h[0],h[1])){
-        working=actions.gather(g,c,t,dt);
+        working=g.gather(c,t,dt);
         gathering=working;
       }else seeking=true;
       work=m.tileCentre(h[0],h[1],c.height[t]);
@@ -315,7 +315,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   if(gathering or wish[0]!=0 or wish[1]!=0)g.pluck=null;
   // what the pluck under way had given before this frame
   const had=if(g.pluck)|p|p.got else 0;
-  const plucked=actions.pluckOn(g,dt);
+  const plucked=g.pluckOn(dt);
   if(plucked!=null)if(g.pluck)|p|{
     // where the paws pluck: a yield come loose there this frame bursts
     // out round them, and the plant shivers
@@ -363,7 +363,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   g.cam.target=m.dampV(g.cam.target,follow,followLerp,dt);
   if(g.specimen==null){
     try g.stars.update(g.gpa,&g.sky,g.player.pos,&g.world,dt);
-    actions.catchStarlight(g,dt);
+    g.catchStarlight(dt);
   }
   // stream the world around the player; chunks holding what we grew stay
   // (as many rings as the options' render distance says)

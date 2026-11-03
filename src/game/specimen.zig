@@ -57,8 +57,6 @@ const resources=lib.resources;
 const Parts=lib.parts.Parts;
 /// the game's state and its tick
 const play=lib.play;
-/// the wolf's actions, for turning a thing as R does
-const actions=lib.actions;
 /// how a turn is timed
 const turn=lib.turn;
 /// the whole running game the specimen stands in
@@ -393,7 +391,7 @@ pub const Specimen=struct{
       s.feedT-=dt;
       if(s.feedT<=0){
         s.feedT=s.loop();
-        _=actions.turnAt(g,s.at,false);
+        _=g.turnAt(s.at,false);
       }
     }
     switch(s.what){
@@ -418,7 +416,7 @@ pub const Specimen=struct{
           s.feedT-=dt;
           if(s.feedT<=0){
             p.items(.essence)[0]=def.manaCap;
-            actions.harvest(g,s.at);
+            g.harvest(s.at);
             s.feedT=holdTime;
           }
         }
