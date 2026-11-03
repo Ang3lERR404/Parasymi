@@ -139,7 +139,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   // gathered afresh: the patch, the sleeping wolf, the lights
   g.parts.clear();
   g.parts.look(cam.viewEye(),m.Frustum.of(cam.viewProj()),m.norm(moon));
-  for(&g.inst)|*l|l.clearRetainingCapacity();
+  view.clearPlants(g);
   try g.parts.emit(.stageMound,m.translate(at),.{});
   // each plant stands on the mound where it is
   for(patch)|p|try view.stagePlant(g,p.sp,at+m.v3(p.at[0],mound.height(m.len(m.v3(p.at[0],0,p.at[1])),m.atan2(p.at[1],p.at[0])),p.at[1]),1,p.seed,tf);
@@ -184,7 +184,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     .uiTime=tf,
     .stage=true,
   };
-  for(&out.instances,g.inst)|*o,l|o.*=l.items;
+  view.handPlants(g,&out);
   return out;
 }
 /// the wolf's pose `t` seconds into its sleep, looping (read from its

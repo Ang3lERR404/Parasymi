@@ -281,28 +281,74 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     .ui=g.ui.v.items,
     .uiTime=@floatCast(@mod(g.uiTime,timeWrap)),
   };
-  for(&out.instances,g.inst)|*o,l|o.*=l.items;
+  handPlants(g,&out);
   return out;
 }
+/// this frame's plant lists emptied, drawn and caught
+pub fn clearPlants(g:*Game)void{
+  for(&g.inst)|*l|l.clearRetainingCapacity();
+  for(&g.caught)|*l|l.clearRetainingCapacity();
+  for(&g.caughtIn)|*l|l.clearRetainingCapacity();
+}
+/// `out`'s plant instances, drawn and caught for the rays, this frame's lists
+pub fn handPlants(g:*const Game,out:*renderer.Scene)void{
+  for(&out.instances,g.inst)|*o,l|o.*=l.items;
+  for(&out.caught,g.caught)|*o,l|o.*=l.items;
+  for(&out.caughtIn,g.caughtIn)|*o,l|o.*=l.items;
+}
+/// whether plant `i`'s footprint centres within `reach` of the camera's
+/// target, across the ground: near enough to be drawn
+fn nearOf(g:*const Game,i:usize,reach:f32)bool{
+  // where its footprint centres
+  const ctr=g.plants.centre(i);
+  return @abs(ctr[0]-g.cam.target[0])<=reach and @abs(ctr[1]-g.cam.target[2])<=reach;
+}
+/// the name the plant on tile (`x`, `y`) is caught under for the rays: its
+/// patch's (`renderer.patchTiles` across)
+fn patchOf(x:i32,y:i32)u64{return renderer.patchCatch(@divFloor(x,renderer.patchTiles),@divFloor(y,renderer.patchTiles));}
+/// whether a plant of kind `def` standing at `at` on ground `ground` is
+/// seen: its bounding sphere in view (a floater's centred where it hangs:
+/// one hung high, the solcyriphon, would be culled seen level with it)
+fn seenAt(g:*const Game,def:*const species.Species,at:m.V3,ground:f32)bool{
+  // its foot, and its bounding sphere's reach
+  const foot=m.v3(at[0],ground,at[2]);
+  const reach=plantBound+m.f(def.size);
+  return g.parts.sees(foot+m.v3(0,if(def.floating)def.hover else reach*plantBoundUp,0),reach);
+}
 /// plant instances near the camera, grouped by mesh: each plant's variant
-/// comes from its tile, so it always regrows the same shape.
+/// comes from its tile, so it always regrows the same shape; and every
+/// plant of each patch in view caught for the rays.
 /// where a plant of species `sp` on tile `t` of chunk `c` is drawn from:
 /// the ground's height, or the water's over it for one that floats on it
 fn groundOf(sp:species.Id,c:*const ck.Chunk,t:u16)f32{
   return c.height[t]+if(species.get(sp).onWater)c.pool[t]else 0;
 }
 fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
-  for(&g.inst)|*l|l.clearRetainingCapacity();
+  clearPlants(g);
   // the plants' columns, and the light each relay carries
   const s=g.plants.list.slice();
   const carried=g.eco.light.carried.items;
+  // the patches with a plant seen in them: every plant of each is caught
+  // for the rays, seen or not, so a patch's level holds the same meshes
+  // from frame to frame and is only refitted as the camera turns
+  g.seenPatches.clearRetainingCapacity();
   for(0..g.plants.len())|i|{
-    // where the plant's footprint centres, across the ground
-    const ctr=g.plants.centre(i);
-    if(@abs(ctr[0]-g.cam.target[0])>reach or @abs(ctr[1]-g.cam.target[2])>reach)continue;
+    // its kind
+    const sp=s.items(.sp)[i];
+    if(!nearOf(g,i,reach)or!seenAt(g,species.get(sp),s.items(.at)[i],groundOf(sp,s.items(.chunk)[i],s.items(.tile)[i])))continue;
+    try g.seenPatches.put(g.gpa,patchOf(s.items(.x)[i],s.items(.y)[i]),{});
+  }
+  for(0..g.plants.len())|i|{
+    // whether it is near enough to draw, and the patch it is caught under
+    // for the rays if any plant of it is seen
+    const near=nearOf(g,i,reach);
+    const patch=patchOf(s.items(.x)[i],s.items(.y)[i]);
+    const caught:?u64=if(g.seenPatches.contains(patch))patch else null;
+    if(!near and caught==null)continue;
     // what its form shows of its own state, and the way a guard leans
     const own=ownOf(g,i);
     try plant(g,.{
+      .near=near,.caught=caught,
       .own=own.k,.face=own.face,
       .sp=s.items(.sp)[i],.x=s.items(.x)[i],.y=s.items(.y)[i],.at=s.items(.at)[i],.ground=groundOf(s.items(.sp)[i],s.items(.chunk)[i],s.items(.tile)[i]),
       .growth=s.items(.growth)[i],.mana=s.items(.mana)[i],.seed=s.items(.seed)[i],
@@ -650,25 +696,27 @@ const Drawn=struct{
   own:f32=0,
   /// the yaw it is drawn facing instead of its own (`Own.face`)
   face:?f32=null,
+  /// whether it is near enough the camera to be drawn (if seen)
+  near:bool=true,
+  /// the name it is caught under for the rays (`catchOf`; null: not caught)
+  caught:?u64=null,
 };
 /// a plant of kind `sp` drawn standing at `at` (its ground `at`'s height)
 /// with no plant in the garden behind it, `growth` grown, `seed` its own:
 /// the main menu's patch round the sleeping wolf
 pub fn stagePlant(g:*Game,sp:species.Id,at:m.V3,growth:f32,seed:f32,tf:f32)Allocator.Error!void{
-  try plant(g,.{.sp=sp,.x=@intFromFloat(@floor(at[0])),.y=@intFromFloat(@floor(at[2])),.at=m.v3(at[0],0,at[2]),.ground=at[1],.growth=growth,.seed=seed,.health=1},tf);
+  try plant(g,.{.sp=sp,.x=@intFromFloat(@floor(at[0])),.y=@intFromFloat(@floor(at[2])),.at=m.v3(at[0],0,at[2]),.ground=at[1],.growth=growth,.seed=seed,.health=1,.caught=renderer.looseCatch},tf);
 }
 /// draws one plant (or its placement preview): culled to the view, posed
 /// as it turns, floated over its shadow if it floats, its instance added to
 /// its mesh's list, and a celestial bloom's light.
 fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
-  // its kind, its foot, and its bounding sphere's reach
+  // its kind, and its foot
   const def=species.get(d.sp);
-
   const foot=m.v3(d.at[0],d.ground,d.at[2]);
-  const reach=plantBound+m.f(def.size);
-  // (a floater's sphere is centred where it hangs: one hung high, the
-  // solcyriphon, would be culled seen level with it)
-  if(!g.parts.sees(foot+m.v3(0,if(def.floating)def.hover else reach*plantBoundUp,0),reach))return;
+  // whether it is drawn: near enough, and seen; else it is only caught for the rays
+  const seen=d.near and seenAt(g,def,d.at,d.ground);
+  if(!seen and d.caught==null)return;
   // the level of detail its distance from the eye calls for
   const lod=meshgen.lodAt(m.dist(foot,g.parts.eye));
   // where it stands, across and up
@@ -679,7 +727,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   // turning, a rooted one heaves itself up on its roots; a floater only turns
   // how it is posed this moment of its turn
   const pose=turn.pose(d.turn,d.dir,g.time,!def.floating);
-  if(!pose.still()and!def.floating){
+  if(!pose.still()and!def.floating and seen){
     // its size (tiles)
     const size=m.f(def.size);
     y+=heave(size)*pose.lift;
@@ -695,7 +743,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     y=at[1];
     // its shadow's radius, shrinking as it rises
     const r=shadowR-shadowShrink*(at[1]-ground-def.hover);
-    if(!d.ghost)try g.parts.emit(.shadow,m.chain(&.{m.translate(m.v3(at[0],ground+shadowLift,at[2])),m.scale3(m.v3(r,1,r))}),.{.fade=shadowFade,.halo=halo});
+    if(!d.ghost and seen)try g.parts.emit(.shadow,m.chain(&.{m.translate(m.v3(at[0],ground+shadowLift,at[2])),m.scale3(m.v3(r,1,r))}),.{.fade=shadowFade,.halo=halo});
   }
   // a confluence grows through its keys, blending from one to the next;
   // other plants pick a shape by tile
@@ -706,7 +754,8 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   // the colour of what it yields, its form's own state beside it
   var yield=color.Rgba8.of(def.yields.info().col).toF4();
   yield[3]=d.own;
-  try g.inst[meshgen.plantSlot(d.sp,key.v,lod)].append(g.gpa,.{
+  // its instance: drawn if seen, caught for the rays under its chunk's name
+  const inst=vertex.PlantInstance{
     .pos=.{at[0],y,at[2]},
     .a=.{d.growth,d.mana/def.manaCap,d.seed,def.affinity()},
     .b=.{d.flow,d.health,def.sway,m.f(@intFromEnum(def.genome.form))},
@@ -717,7 +766,15 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     .ripe=.{if(d.growth>=1)m.clamp01(d.essence/def.manaCap)else 0,m.f(def.genome.pods),def.genome.podR,d.since},
     .yield=yield,
     .glitch=if(d.ghost)vertex.noGlitch else if(lib.unforming.radiant(d.sp)).{g.unforming.glitchOf(d.seed),0,0,0}else if(lib.unforming.dies(d.sp)).{-1,g.unforming.witherOf(d.seed),0,0}else vertex.noGlitch,
-  });
+  };
+  if(seen)try g.inst[meshgen.plantSlot(d.sp,key.v,lod)].append(g.gpa,inst);
+  if(d.caught)|name|{
+    // the mesh it casts with, at every level of detail the same
+    const mesh=renderer.caster(meshgen.plantSlot(d.sp,key.v,0));
+    try g.caught[mesh].append(g.gpa,inst);
+    try g.caughtIn[mesh].append(g.gpa,name);
+  }
+  if(!seen)return;
   // a celestial bloom is the garden's light: its core sheds it round
   // about, pearl tinted by its film, pulsing slowly, brighter as it
   // assembles (a dark network's only faintly), following it as a forming
@@ -838,7 +895,7 @@ fn ghost(g:*Game,tf:f32)Allocator.Error!void{
   const ok=g.canPut(h) and g.player.inReach(h[0],h[1]) and g.player.inv.count(item)>0;
   if(item.plants())|sp|{
     // a fixed seed so the preview does not spin about as the cursor moves
-    return plant(g,.{.sp=sp,.x=h[0],.y=h[1],.at=Plants.spot(sp,h,g.hoverAt),.ground=g.heightAt(h[0],h[1]),.growth=1,.seed=ghostSeed,.ghost=true,.fits=ok,.dir=g.placeDir},tf);
+    return plant(g,.{.sp=sp,.x=h[0],.y=h[1],.at=Plants.spot(sp,h,g.hoverAt),.ground=g.heightAt(h[0],h[1]),.growth=1,.seed=ghostSeed,.ghost=true,.fits=ok,.dir=g.placeDir,.caught=renderer.looseCatch},tf);
   }
   // the structure kind it grows, and its definition
   const k=st.kindOf(item) orelse return;

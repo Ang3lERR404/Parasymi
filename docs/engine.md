@@ -187,9 +187,11 @@ A pass's `.target` is where it draws, in this order each frame:
   where it places it (light.glsl `capture`), the push's `light` pointing
   at the pass's table (`rays.tableHead`, then each instance's slot less
   its mesh's first vertex); in `prepare` it reserves room
-  (`Rays.reserve`) and marks its level (`Rays.mark`), in `record` it
-  hands each instance to a bottom level (`Rays.add`). The engine then
-  builds the levels and the top level.
+  (`Rays.reserve`), in `record` it hands each instance to a bottom level
+  the game names (`Rays.add`, a `u64`: the garden names one per patch of
+  plants and set, and one for the parts). The engine keeps each level
+  from frame to frame, refits it while it holds the same meshes, builds
+  it anew when that changes, then builds the top level.
 
 A pass's `rayFrag` is its fragment shader built with RAY (light.glsl's
 shadows traced while the record says so), taken where the GPU can trace

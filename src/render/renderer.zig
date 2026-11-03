@@ -178,6 +178,13 @@ pub const Scene=struct{
   clear:m.Vice(f32,3),
   /// plant instances grouped by mesh variant (see meshgen.plantSlot).
   instances:[plantMeshes][]const vertex.PlantInstance,
+  /// plant instances caught for the rays (where shadows are traced),
+  /// grouped by their caster's mesh (`caster`): every plant of each patch
+  /// in view, seen or not, so a patch's level holds the same from frame to
+  /// frame and is only refitted
+  caught:[plantMeshes][]const vertex.PlantInstance=@splat(&.{}),
+  /// the name each of those is caught under (`patchCatch`, `looseCatch`)
+  caughtIn:[plantMeshes][]const u64=@splat(&.{}),
   /// rigid part instances grouped by mesh (player, nodes, motes, ...).
   parts:[meshlib.slots][]const vertex.PartInstance,
   /// skinned parts' bones (see `vertex.Skin`): each matrix carries a vertex
@@ -234,19 +241,32 @@ pub fn caster(slot:usize)usize{return slot-slot%meshgen.lods+meshgen.lods-1;}
 /// where a caster is caught for the rays (rays.zig): which bottom level,
 /// as which set of casters
 pub const Into=struct{
-  /// the bottom level
-  level:usize,
+  /// the bottom level's name
+  level:u64,
   /// what it casts for: every light, or only the points of light
   set:raysMod.Caster,
 };
-/// the plants, casting every light's shadows, in a level of their own (they
-/// stay from frame to frame, so it is refitted)
-pub const plantLevel:Into=.{.level=0,.set=.both};
-/// a radiant plant's petals, leaves and veil, casting only the points of light's
-pub const pointLevel:Into=.{.level=1,.set=.points};
+/// the plants caught under `caughtIn` (a patch's, `patchCatch`, or the loose
+/// ones), casting every light's shadows: a level per patch, so a camera
+/// turning brings whole patches in and out and the rest are only refitted
+pub fn plantLevel(caughtIn:u64)Into{return.{.level=caughtIn<<1,.set=.both};}
+/// a radiant plant's petals, leaves and veil caught under `caughtIn`, casting
+/// only the points of light's
+pub fn pointLevel(caughtIn:u64)Into{return.{.level=caughtIn<<1|1,.set=.points};}
 /// the parts (the wolf, structures and what comes and goes: motes, bursts)
 /// in a level of their own, so their coming and going never rebuilds the plants'
-pub const partLevel:Into=.{.level=2,.set=.both};
+pub const partLevel:Into=.{.level=~@as(u64,0),.set=.both};
+// decision: a patch is caught when any plant of it is seen, and is a
+// sixty-fourth of a chunk. Whole chunks in view, or patches culled by a
+// sphere round them, held three or four times the triangles the plants
+// seen did, and a stress garden's ran out of memory.
+/// the plants are caught for the rays in square patches this many tiles across
+pub const patchTiles:i32=4;
+/// the name patch (`px`, `py`)'s plants are caught under for the rays
+pub fn patchCatch(px:i32,py:i32)u64{return@as(u64,@as(u32,@bitCast(px)))<<32|@as(u32,@bitCast(py));}
+/// the name plants of no patch are caught under (a placement preview: it
+/// comes and goes, so it never rebuilds a patch's level)
+pub const looseCatch:u64=1<<62;
 // decision: the rays meet each caster at the level of detail the shadow
 // maps draw it at (its coarsest): what is drawn at its own level casted
 // alike in shots (the leaves' blotches are their own shadows, not the
@@ -1015,11 +1035,9 @@ fn upload(r:*Renderer,c:*ck.Chunk,verts:[]const vertex.Terrain,tiles:[]const ver
 /// instances (`first`, `counts`, drawn from `runs`) given room among the
 /// caught vertices (its first slot into `at`), and each instance its
 /// slot less its mesh's first vertex, by its place among the instances
-pub fn caught(r:*Renderer,table:*Buffer,at:[]u64,first:[]const u32,counts:[]const u32,runs:[]const Run,levels:[]const usize)void{
-  // the rays catching them, told how many instances each mesh has (a
-  // frame the same as the last is refitted)
+pub fn caught(r:*Renderer,table:*Buffer,at:[]u64,first:[]const u32,counts:[]const u32,runs:[]const Run)void{
+  // the rays catching them
   const ra=&r.rays.?;
-  for(levels)|l|ra.mark(l,sliceAsBytes(counts));
   for(counts,first,at,0..)|n,f0,*a,i|{
     // the run its instances are caught with
     const run=runs[caughtMesh(i)];

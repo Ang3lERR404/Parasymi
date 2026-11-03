@@ -120,6 +120,26 @@ driver paging: `--stress` with rays went from 125 ms a frame to 54 (rays
 - A new mesh whose shader reads skin or growth must be a library mesh
   (or its pieces laid among the leading ones).
 
+### Ray levels per patch, refitted (`renderer.patchTiles`, engine `Rays`)
+The plants caught for the rays were one bottom level of the plants seen,
+so every camera move changed what it held and it was built anew each
+frame (stress: rays 29 ms of a 52 ms frame, 28.8 of it the build). Now
+each 4×4-tile patch with any plant seen is caught whole, seen or not,
+into a level of its own, kept from frame to frame and refitted while it
+holds the same meshes: stress rays 6.6 ms, the frame 29 ms; demo 60 to 56.
+- Patches, not chunks: a whole 32-tile chunk in view, or a patch culled by
+  a sphere round it, caught three or four times the triangles and ran an
+  8 GB card out of memory. "Any plant seen" keeps the excess to a patch's
+  edge (stress: 3120 caught for 2595 seen).
+- Video memory is the wall here: past about 7.5 GB the driver pages and
+  every pass slows (sky 0.3 ms became 11). So levels are sized exactly
+  (one outgrown is freed a few frames later, never a wait), a level
+  uncaught a few frames is let go, and builds go in batches sharing a
+  64 MB scratch (all at once they wanted 575 MB).
+- The top level is made once with room for `maxLevels`: the shaders'
+  descriptor binds it, so making it anew would leave them tracing a freed
+  one (device lost).
+
 ### Only the see-through tail in the glass passes (`Run.early`)
 The weld puts each run's late triangles (see-through ones) last; the
 glass and air passes draw only `first+early ..`, the solid passes the
@@ -184,9 +204,9 @@ Take derivatives (`fwidth`, `dFdx`) before the branch.
 3. **Shadow casters per cascade** (stress `plantsShadow` ~2.3 ms):
    every caster is drawn into all three cascades; cull per cascade.
    Exact.
-4. **Rays in a big garden** (stress `rays` ~29 ms): the plants caught
-   are those the camera sees, so as it moves the plants' level is built
-   anew rather than refitted. A level per chunk, refitted, rebuilt only
-   when its own plants change, would keep a moving camera cheap. Exact.
+4. **Video memory** (stress peaks near 7.7 GB of 8): the mesh upload's
+   staging (~1.7 GB at once) and two caught sets of equal room (the
+   points-only set holds far fewer). Less held means no paging on
+   smaller cards. Exact.
 5. **Compute pre-transform, meshlets**: only if the vertex stage leads
    again (see shader-optimization.md, round two).

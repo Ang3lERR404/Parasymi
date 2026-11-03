@@ -526,7 +526,7 @@ pub fn Renderer(comptime G:type)type{
       std.log.info("gpu compose {d:.3}",.{r.gpuMs[compose]});
       std.log.info("gpu cubes {d:.3}",.{r.gpuMs[cubed]});
       std.log.info("gpu rays {d:.3}",.{r.gpuMs[built]});
-      if(r.rays)|*ra|std.log.info("rays: {d} triangles cast every light's shadows, {d} only the points'; levels refitted {d}, built {d}",.{ra.trisOf(.both),ra.trisOf(.points),ra.refitted,ra.rebuilt});
+      if(r.rays)|*ra|std.log.info("rays: {d} triangles cast every light's shadows, {d} only the points', in {d} levels; levels refitted {d}, built {d}",.{ra.trisOf(.both),ra.trisOf(.points),ra.levelsNow(),ra.refitted,ra.rebuilt});
       std.log.info("gpu total {d:.3}",.{r.gpuTotal});
     }
     /// free every GPU object the renderer made (null handles are skipped).

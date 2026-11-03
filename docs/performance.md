@@ -94,15 +94,17 @@ release on an RTX 4060 Ti, `--demo --inspect=player --shots=2 --orbit=8`,
   maps (the drawn levels gave 13.5 M triangles and a 222 ms frame for the
   same shadows); a pixel's rays shared among its samples (`sharers`; 4 a
   sample at msaa8 cost 85 ms in plantsHead alone); the key light's first
-  rays agreeing ending the rest; the plants, the radiant petals and the
-  parts in levels of their own, refitted while what they hold stays the
-  same (a build of 1.2 M triangles 4.4 ms, refitted about 1 ms; the parts'
-  motes come and go every frame, so they never rebuild the plants').
+  rays agreeing ending the rest; the plants in a level per 4×4-tile patch
+  (and set), every plant of a patch with any seen, so a turning camera
+  brings whole patches in and out and the rest are only refitted (one
+  plants' level culled plant by plant was built anew whenever the camera
+  moved: stress rays 29 ms, now 6.6); the parts in a level of their own
+  (their motes come and go every frame, so they never rebuild the
+  plants').
 - Not taken (they would change the look): fewer than sixteen rays a pixel
   for the key light's soft edge, one ray a light.
 - What is left to try, exact: a depth pre-pass, so no hidden fragment
-  sends rays; instance order kept stable across levels of detail, so the
-  plants' level is refitted more often.
+  sends rays.
 
 ## Level of detail
 Every plant and library mesh is built at `meshgen.lods` (3) levels of

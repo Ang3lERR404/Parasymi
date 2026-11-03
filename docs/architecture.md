@@ -245,17 +245,26 @@ Where the GPU can trace rays (`Ctx.rayTracing`) and RAY TRACING is on
    `.capture`) reserves room for its instances' vertices
    (`Rays.reserve`) and writes its table: each instance's first slot less
    its mesh's first vertex, by its place among the instances
-   (`renderer.caught`), and marks its level's key (`Rays.mark`: the
-   instances' counts, so a frame like the last is refitted).
-2. The capture passes draw the same instances with plant.vert/part.vert
+   (`renderer.caught`). The plants' capture draws its own instances
+   (`Scene.caught`): every plant of each patch (`renderer.patchTiles`,
+   4×4 tiles) with any plant seen, at its caster mesh, each named for its
+   patch (`Scene.caughtIn`, `renderer.patchCatch`; a placement preview
+   and the title's stage plants `looseCatch`).
+2. The capture passes draw those instances with plant.vert/part.vert
    built with CAPTURE (which brings SHADOW without its views), nothing
    rasterized (`pipeline.Desc.discard`), the push's `light` pointing at
    the table. Each vertex is written where it is placed (light.glsl
    `capture`), as NaN where it casts nothing; each instance is handed to
-   a bottom level (`renderer.handed`, `Into`: `plantLevel`, `pointLevel`
-   for a radiant plant's point-only petals, `partLevel`).
-3. `Rays.build` builds or refits each level, then the top level, which
-   set 0 binding 3 holds (`casters`); `Lighting.info.z` says rays are on.
+   a bottom level by name (`renderer.handed`, `Into`: `plantLevel` and
+   `pointLevel` of its patch, the latter for a radiant plant's
+   point-only petals; `partLevel`). Each geometry added folds its indices,
+   vertex count and triangles into its level's key.
+3. `Rays.build` refits each level whose key matches its last full build
+   (rebuilt every `refits` frames, staggered), builds the rest, in
+   batches sharing a capped scratch (`scratchBatch`), then the top level
+   (at most `maxLevels`), which set 0 binding 3 holds (`casters`);
+   `Lighting.info.z` says rays are on. A level uncaught a few frames is
+   let go, one outgrown is freed once no frame in flight traces it.
 4. The lit fragment shaders are the RAY builds (`Desc.rayFrag`:
    plant/part head, solid and glass, terrain and detail, pools, fog),
    taken where the GPU can trace rays; light.glsl's `keyShadow`,

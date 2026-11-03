@@ -279,6 +279,14 @@ pub const Game=struct{
   ticks:u64=0,
   /// the plant instances to draw this frame, one list per plant mesh
   inst:[renderer.plantMeshes]std.ArrayList(vertex.PlantInstance)=@splat(.empty),
+  /// the plant instances caught for the rays this frame (`Scene.caught`):
+  /// every plant of each patch in view, one list per caster mesh
+  caught:[renderer.plantMeshes]std.ArrayList(vertex.PlantInstance)=@splat(.empty),
+  /// the name each of those is caught under (`Scene.caughtIn`)
+  caughtIn:[renderer.plantMeshes]std.ArrayList(u64)=@splat(.empty),
+  /// the patches with a plant seen in them this frame (view.zig), each
+  /// of whose plants is caught for the rays
+  seenPatches:std.AutoHashMapUnmanaged(u64,void)=.empty,
   /// the chunks streamed far enough away to let go, gathered each frame
   far:std.ArrayList(*ck.Chunk)=.empty,
   /// the renderer's numbers from last frame
@@ -346,6 +354,9 @@ pub const Game=struct{
     g.moss.deinit(g.gpa);
     g.wild.deinit(g.gpa);
     for(&g.inst)|*l|l.deinit(g.gpa);
+    for(&g.caught)|*l|l.deinit(g.gpa);
+    for(&g.caughtIn)|*l|l.deinit(g.gpa);
+    g.seenPatches.deinit(g.gpa);
     g.far.deinit(g.gpa);
     g.parts.deinit();
     g.ui.deinit();

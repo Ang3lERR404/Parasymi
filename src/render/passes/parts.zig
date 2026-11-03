@@ -287,7 +287,7 @@ pub const capture=struct{
     if(!r.tracing())return;
     // the parts' own frame: its runs of instances
     const pf=&r.frames[r.fi].pass.parts;
-    renderer.caught(r,&f.table,&f.at,&pf.first,&pf.counts,&r.ext.partRuns,&.{renderer.partLevel.level});
+    renderer.caught(r,&f.table,&f.at,&pf.first,&pf.counts,&r.ext.partRuns);
   }
   /// draws every instance once more, nothing rasterized, writing out each
   /// vertex where it is placed, and hands each to the rays
