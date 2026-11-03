@@ -20,8 +20,9 @@ pub const def:species.Species=.{
   // does every floater; it never condenses essence)
   .matureTime=30,.manaCap=10,.leyDraw=0.5,.share=0,.drain=0,.yield=0,
   .radiance=3.5,.link=10,.carry=4,.halo=true,
-  // the highest living thing in the garden, above the fallen starlight
-  .hover=3.2,
+  // high in the sky over the garden, above the fallen starlight (a
+  // solcyriphon hangs higher still, over it)
+  .hover=4.7,
   // it drifts and bobs; it does not bend from a root
   .sway=0.6,
   // pearl: plant.frag lays an iridescent film over it (it belongs to the sky)

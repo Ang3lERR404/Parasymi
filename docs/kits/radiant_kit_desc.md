@@ -93,7 +93,7 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
   strands, order 0.03–0.09: just after the heart lands).
 
 ### The solcyriphon (`solcyriphon`, form `lens`)
-A lens, a flower facing up and a touch of jellyfish, hung 5.5 m up. Its
+A lens, a flower facing up and a touch of jellyfish, hung 7 m up. Its
 origin is the heart: a gold `core`, a `lens` of 10 facets round it, two
 whorls of 7 broad petals rising round the lens open to the sky, 9
 `trailing` threads with beads, 16 motes. plant.vert folds it by how dark

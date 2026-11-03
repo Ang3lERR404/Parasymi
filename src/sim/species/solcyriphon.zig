@@ -20,7 +20,7 @@ pub const def:species.Species=.{
   .matureTime=40,.manaCap=10,.leyDraw=0.5,.share=0,.drain=0,.yield=0,
   .radiance=3,.link=10,.glow=.{6,12},.carry=12,
   // high over everything, so a bloom or a plant may hang or stand under it
-  .hover=5.5,
+  .hover=7,
   // it drifts and bobs; it does not bend from a root
   .sway=0.4,
   .genome=.{

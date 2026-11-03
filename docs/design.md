@@ -363,7 +363,7 @@ Radiance is the garden's power: light that structures and some plants
 run on. Every number, and why, is in [radiant-plants.md](radiant-plants.md).
 
 - **Only the solcyriphon makes light** (open from the start; seed 4
-  starlight + 2 ley shard + 2 fibre). It hangs high (5.5 m). By day it
+  starlight + 2 ley shard + 2 fibre). It hangs high (7 m, a bloom 4.7). By day it
   spreads 6 glow over a 3-tile field; by night it folds and pours a 12 glow
   beam straight down onto what is under it.
 - **Relays carry it**, each up to its `carry`, linked within `link`:
