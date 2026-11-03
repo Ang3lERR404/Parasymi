@@ -325,6 +325,26 @@ whole.)
 - **Each item** is prised loose (`diggerClod`s flung up about the claw),
   then swells up the core in its colour to the gourd.
 
+### Lithophage
+(`Def.bare`, its own `emit`.) A stone coral: half plant, half mineral.
+
+- A pale bulb of parasite tissue half sunk in the soil, a cup of five
+  stony septa on its crown (the grit pools there).
+- Five coral limbs (part `.stone`, bone pale, paler at the tips), exactly
+  alike, each forking in two; clusters of three clear lilac crystals
+  (`mineralKit.crystal`, part `.bloom`, see-through) bud on them.
+- **Grows forever:** each tile it reaches further grows on a tier
+  (`lithophageTier1..4`): every tip grown on outward, the foot creeping
+  out over the ground between the limbs with an upright where it ends,
+  bigger crystals. Never scaled up whole.
+- **Tendrils** (`lithophageTendril1..12`, one per length, bent along a
+  curve): under the ground near it, a line of dark cracks with a glowing
+  seam; they surface through a few heaved stones and creep on as a pale
+  coral runner with small crystals and short side limbs, digging into the
+  node with five rootlets and a last crystal cluster.
+- What it draws runs back along the tendril as a mote, condenses into the
+  crystal budding on its first limb, and is sapped down into the cup.
+
 ### Conduit
 (`Def.bare`, its own `emit`.)
 

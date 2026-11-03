@@ -449,11 +449,12 @@ pub const Strings=struct{
     loomFed:S="",
     /// a loomfern full: lead a conduit away
     loomFull:S="",
-    /// a lithophage drawing stone into its crystal, and its grit
+    /// a lithophage drawing stone up its tendrils: how many, how far it
+    /// reaches, its crystal and its grit
     lithDraws:S="",
     /// a lithophage sapping its crystal into grit
     lithSaps:S="",
-    /// a lithophage with no stone round it to draw
+    /// a lithophage with no stone in its reach to draw
     lithStarved:S="",
     /// a braided conduit's four lanes, each what it carries
     lanes:S="",
