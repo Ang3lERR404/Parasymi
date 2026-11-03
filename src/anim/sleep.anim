@@ -9,6 +9,8 @@ key neck.x 0 0.85
 key head.x 0 0.45
 key legs.0.root.x 0 -1.9
 key legs.1.root.x 0 -1.75
+key legs.0.root.z 0 0.15
+key legs.1.root.z 0 -0.4
 key legs.0.mid 0 2.6
 key legs.1.mid 0 2.5
 key legs.0.low.x 0 -1.6
