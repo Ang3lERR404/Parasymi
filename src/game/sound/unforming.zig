@@ -1,4 +1,4 @@
-//! the unforming heard: a low D swelling under it all, glass raining as the sky shatters, a seam humming shut, ash crumbling, a crack as each radiant plant breaks, a rising ping as each shard reaches the star, a whistle as the seed falls and a deep bell blooming where it lands.
+//! the unforming heard: its own theme playing under it all (unforming_theme.zig), glass raining as the sky shatters, a seam humming shut, ash crumbling, a crack as each radiant plant breaks, a rising ping as each shard reaches the star, a whistle as the seed falls and a deep bell blooming where it lands.
 /// the hub every game module is reached through
 const lib=@import("../../lib.zig");
 /// the generic engine package
@@ -38,9 +38,6 @@ const rainSide:f32=0.85;
 const arriveSide:f32=0.6;
 /// how wide the landing's glass chord opens (pan, lowest to highest)
 const landSpread:f32=1;
-/// how far apart each drone note and its beating twin sit (pan): the beat
-/// heard drifting between the speakers
-const droneApart:f32=0.35;
 /// how far apart the seam's tone and its twin sit (pan)
 const sealApart:f32=0.3;
 /// where the ash's two streams of grains crumble (pan)
@@ -146,21 +143,8 @@ const Crack=struct{
     return c.amp>silent;
   }
 };
-// ---- the drone: a low D held under it all ----
-/// its notes (MIDI): D2, A2, D3 and the Lydian G#3 faint over them
-const droneNote=[_]f32{38,45,50,56};
-/// (their levels)
-const droneLevel=[droneNote.len]f32{1,0.6,0.35,0.12};
-/// how far a twin of each drifts off it (Hz), beating slowly against it
-const droneBeat:f32=0.35;
-/// how long it takes to swell in (s), how long after landing it fades (s)
-const droneRise:f32=3;
-/// (how long it fades)
-const droneFade:f32=9;
-/// what darkens it (Hz)
-const droneDark:f32=700;
-/// how loud
-const drone:f32=0.016;
+/// the theme played under it all
+const Theme=lib.sound.unformingTheme.Theme;
 // ---- the glass rain: the sky shattering pane by pane ----
 /// glints a second at the shift's height
 const rainMost:f32=22;
@@ -297,14 +281,8 @@ pub const Unformed=struct{
   arrived:u32=0,
   /// whether the seed has landed in its hearing
   landed:bool=false,
-  /// the drone's sines and their beating twins
-  drone:[droneNote.len]dsp.Sine,
-  /// (their twins)
-  droneTwin:[droneNote.len]dsp.Sine,
-  /// what darkens the drone (each side)
-  droneSoft:dsp.StereoPole,
-  /// where the drone's notes and their twins sit, left and right of the middle
-  droneSides:[2]dsp.Frame,
+  /// its theme, played by the music's mixer in the hall (`theme.render`)
+  theme:Theme,
   /// samples until the next glint of the rain
   rainWait:u32=0,
   /// the seam's tone and its twin, gliding down
@@ -333,22 +311,12 @@ pub const Unformed=struct{
   land:?Land=null,
   /// the event heard from its moment `t`, its sounds drawn from `seed`
   pub fn init(t:f32,seed:u64,rate:f32)Unformed{
-    // the drone's sines and their twins
-    var d:[droneNote.len]dsp.Sine=undefined;
-    var tw:[droneNote.len]dsp.Sine=undefined;
-    for(droneNote,0..)|n,k|{
-      d[k]=.init(dsp.noteToHz(n),rate);
-      tw[k]=.init(dsp.noteToHz(n)+droneBeat*(1+m.f(k)),rate);
-    }
     return.{
       .rate=rate,
       .r=.init(seed),
       .clock=t,
       .wither=.init(0,0.6,rate),
-      .drone=d,
-      .droneTwin=tw,
-      .droneSoft=.init(droneDark,rate),
-      .droneSides=.{dsp.spot(-droneApart),dsp.spot(droneApart)},
+      .theme=.init(t,seed^0x7E3E,rate),
       .seal=.{.rate=rate,.freq=dsp.noteToHz(sealNotes[0])},
       .sealTwin=.{.rate=rate,.freq=dsp.noteToHz(sealNotes[0])+sealBeat},
       .sealSides=.{dsp.spot(-sealApart),dsp.spot(sealApart)},
@@ -365,6 +333,7 @@ pub const Unformed=struct{
   /// struck, the withering followed
   pub fn apply(u:*Unformed,h:Heard)void{
     if(@abs(h.t-u.clock)>0.25)u.clock=h.t;
+    u.theme.keep(h.t);
     u.wither.target=h.wither;
     for(0..h.cracks)|_|u.crack();
     for(0..h.arrivals)|_|{
@@ -388,16 +357,9 @@ pub const Unformed=struct{
   /// false once all of it has rung away
   pub fn render(u:*Unformed,out:[]dsp.Frame)bool{
     for(out,0..)|*s,i|{
-      // the clock, and how much the drone is heard (swelling in, fading after the landing)
+      // the clock
       const t=u.clock;
-      const dr=m.smooth(m.clamp01(t/droneRise))*(1-m.smooth(m.clamp01((t-ev.landAt)/droneFade)));
       var y:dsp.Frame=@splat(0);
-      if(dr>0){
-        // each note to one side of the middle, its twin to the other
-        var d:dsp.Frame=@splat(0);
-        for(&u.drone,&u.droneTwin,droneLevel)|*a,*b,l|d+=dsp.put(u.droneSides[0],a.next()*0.5*l)+dsp.put(u.droneSides[1],b.next()*0.5*l);
-        y+=u.droneSoft.low(d)*dsp.mid(dr*drone);
-      }
       // the seam humming shut as the ley lines seal, sinking
       const sk=(t-ev.sealStart)/(ev.sealEnd-ev.sealStart);
       if(sk>0 and sk<1){
@@ -447,19 +409,18 @@ pub const Unformed=struct{
     }
     u.glints.render(out);
     u.cracks.render(out);
-    // all of it rung away once the event has settled and nothing rings
-    return u.clock<ev.settled or u.land!=null or u.ringing() or u.wither.value>silent;
+    // all of it rung away once the event has settled, nothing rings and the
+    // theme has given the garden's music back
+    return u.clock<ev.settled or u.land!=null or u.ringing() or u.wither.value>silent or !u.theme.done();
   }
   /// whether any glint still rings
   fn ringing(u:*const Unformed)bool{
     for(u.glints.slots)|g|if(g!=null)return true;
     return false;
   }
-  /// how much the music gives way to it (0 none .. 1 all): from its first
-  /// moment until its drone fades
-  pub fn hush(u:*const Unformed)f32{
-    return m.smooth(m.clamp01(u.clock/droneRise))*(1-m.smooth(m.clamp01((u.clock-ev.landAt)/droneFade)));
-  }
+  /// how much the garden's music gives way to it (0 none .. 1 all): cut as
+  /// it begins, given back after the landing (its theme's)
+  pub fn hush(u:*const Unformed)f32{return u.theme.hush();}
 };
 /// the sample rate the tests render at (samples a second)
 const testRate:f32=48000;
@@ -500,6 +461,6 @@ test"the unforming sounds in every stretch, softly, swells to its landing and ri
   // the landing is its loudest moment, the fall louder than just before it
   const land:usize=@intFromFloat(ev.landAt);
   for(peak,0..)|p,i|if(i!=land and i!=land+1)try testing.expect(p<=@max(peak[land],peak[land+1]));
-  // the drone has faded long before the end
+  // it has quieted long before the end
   try testing.expect(rms[@intFromFloat(ev.settled-1)]<rms[5]*0.2);
 }

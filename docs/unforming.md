@@ -46,7 +46,12 @@ than all at once.
 
 | t (s) | What happens |
 |---|---|
-| 0 | Every starlight mote shatters (6 warm shards each, 1.4 s) and no star falls again. Every structure is sent `Msg.unform`: the arsthraxia evolves. A low D swells in under it all and the music gives way. |
+| 0 | Every starlight mote shatters (6 warm shards each, 1.4 s) and no star falls again. Every structure is sent `Msg.unform`: the arsthraxia evolves. The garden's music cuts dead and a second of silence falls. |
+| 1 – 5 | The theme's lament: a lone cello sings the garden's Lydian line over a choir's hum, its raised fourth (G#) on top. |
+| 5 – 7.5 | The cello returns to the G# and it bends down to G; the choir follows into D minor and a heartbeat of timpani begins. |
+| 6 – 13.4 | Far off, mostly heard through the hall, the world screams: a voice comes in every 0.7 s, harmonic but straining, cracking. |
+| 7.5 – 10 | The loss: the choir's line falls, the strings sigh, a timpani roll swells. |
+| 10 – 13.4 | The peak: the whole orchestra with low brass and the great taiko on every heartbeat. |
 | 0 – 6 | Radiant plants (bloom, vesper) begin to glitch, one after another. |
 | +5 each | Each one glitches over 5 s: bands of it slip sideways and it blinks, cracks of its own light run over it cell by cell, and past halfway it breaks along them into large shards of its own film's colour that drift out and up, turning, and shrink away. At 60% through it sends 4 shards up, each trailing a ribbon of that colour; a glass snap and scatter of glints is heard. |
 | 0 – 14 | Symbiotic and parasitic plants wither, each over 6 s (starting within the first 8 s): they dry out grey, bow over and curl, then crumble from the top down into flakes of ash, an ember along each edge as it breaks, lifting off downwind; dry crumbling is heard. The lineages' structures grow back down to nothing. What they held is lost. |
@@ -54,8 +59,8 @@ than all at once.
 | ~2.8 – 10 | The ley lines seal from their edges in, a bright seam closing, leaving scars of bare soil; a seam is heard humming shut, sinking an octave. |
 | 10 | Sealed. Every ley shard node breaks (glass heard) into 7 violet crystals that drift up weightless; each at its own moment cracks and melts into a burst of violet motes. |
 | up to 13.4 | The shards fly up (2.4 s each, swirling, ribbons behind them) to a point 14 m over the middle of where the radiant plants stood. A star of gathered light swells there as they arrive: a web of pale blue points and threads (as the sky's plexus) round a heart of light, turning slowly, flaring as each shard lands, each landing ringing a Lydian step higher. |
-| 13.4 – 15.6 | The **strange seed** falls (2.2 s, faster as it goes), its star shrinking back into it, a comet's tail of light behind it; it whistles down. |
-| 15.6 | It lands: a ring of light rolls out over the ground from it (2.4 s, the halo's flash), motes flung up, and a deep soft bell blooms with a thump under it and a glass chord ringing up over it: **OUT OF THE SHATTERED LIGHT, A SEED FALLS. IT DOES NOT TAKE ROOT**. The drone fades over the next 9 s. |
+| 13.4 – 15.6 | The **strange seed** falls (2.2 s, faster as it goes), its star shrinking back into it, a comet's tail of light behind it. The whole theme and the world's screaming stop dead; only its whistle is heard. |
+| 15.6 | It lands: a ring of light rolls out over the ground from it (2.4 s, the halo's flash), motes flung up, and a deep soft bell blooms with a thump and the great taiko under it and a glass chord ringing up over it, the choir, strings and horns blooming into D major with the G# back: **OUT OF THE SHATTERED LIGHT, A SEED FALLS. IT DOES NOT TAKE ROOT**. The theme rings away; from 8 s after, the garden's music returns over 10 s. |
 | 40 | The last drifting ley shard blinks out. The event's clock stops. |
 
 The phases (`Phase`) are `waiting` → `shattering` → `falling` → `landed`.
@@ -129,18 +134,47 @@ landing ring (`haloFlash`) and motes, and the drifting ley crystals and
 their melting, each lighting the air round it.
 
 ## How it sounds
-`sound/unforming.zig` (`Unformed`), all soft and in the music's D Lydian.
-The game sends `unforming.heard` each frame while it runs (main.zig): its
-clock, how much is withering, and the cracks and arrivals since last
-heard; the sound keeps its own clock between frames. A drone (D2, A2, D3,
-faint G#3, each beating against a twin) swells in over 3 s and fades 9 s
-after the landing, the music hushed to 30% under it; glass glints rain
-while the sky shatters, thickest midway; the seam glides D3 to D2 as the
-ley seals; crackle in a high band as ash crumbles; each crack a noise
-snap and 4 to 7 glints; each arrival a glint a Lydian step above the
-last; the fall a band of air swept down 3.2 kHz to 280 Hz with a tone
-gliding under it; the landing a D2 bell (five partials), a sinking
-thump and the D5 F#5 A5 C#6 G#6 chord ringing up.
+`sound/unforming.zig` (`Unformed`) and its theme,
+`sound/unforming_theme.zig` (`Theme`). The game sends `unforming.heard`
+each frame while it runs (main.zig): its clock, how much is withering, and
+the cracks and arrivals since last heard; the sound keeps its own clock
+between frames.
+
+**The theme** is the garden's music breaking: its D Lydian loses its raised
+fourth (the sound of wonder) and the landing gives it back. The mixer
+(`Sounds.musics`) cuts the day's and night's music to nothing within
+0.25 s and plays the theme in their place, in the same stone hall:
+- a cello (three saws a hair apart, a wood body, vibrato growing into each
+  note) sings D3 A3 G#3 F#3 over the choir's quiet hum (G#4 C#4 A3 D2) and
+  low strings;
+- at 5 s the cello's G#3 bends to G3 over 0.7 s, the choir moves to Gm/D,
+  then D minor; the heartbeat (timpani D2, two strokes 0.26 s apart, every
+  0.9 s) grows from soft to hard until the drop;
+- at 7.5 s the choir falls through Bb and A, the strings bow harder, a
+  timpani roll (14 strokes a second) swells into the peak;
+- at 10 s the peak: timpani and the great taiko strike, low brass (saws
+  held dark, opening as they swell) on D, Bb and A, the choir past its
+  night's full voice, the strings bowing three times as hard, the taiko on
+  every beat;
+- the world screams from 6 s: eight voices (D5 A5 F5 D6 C5 G5 C6 F6), each
+  a throat's buzz shaped into an "ahh" that opens into a cry as it strains,
+  scooping in from 3 semitones under, climbing 1.5, its vibrato widening to
+  70 cents, cracking once up 4 to 7 semitones, darkened by distance and sent
+  mostly into the hall (`farDry` of it heard straight). Until the starlit
+  patches fire their beams up, the screaming stands for the light torn out;
+- at the drop (13.4 s) a gate shuts it all in 50 ms and the hall's tail is
+  taken down to a tenth, so the seed's whistle falls in near silence;
+- at the landing every voice is made afresh: timpani and great taiko, the
+  choir on C#5 G#4 F#3 D2, strings, horns and the cello's D3, ringing away
+  over 9 s; the garden's music comes back from 8 s after, over 10 s.
+
+**Over it**, all soft and in D Lydian: glass glints rain while the sky
+shatters, thickest midway; the seam glides D3 to D2 as the ley seals;
+crackle in a high band as ash crumbles; each crack a noise snap and 4 to 7
+glints; each arrival a glint a Lydian step above the last; the fall a band
+of air swept down 3.2 kHz to 280 Hz with a tone gliding under it; the
+landing a D2 bell (five partials), a sinking thump and the D5 F#5 A5 C#6
+G#6 chord ringing up.
 
 ## Saves
 `Unforming` (phase, time, where the seed gathers, whether the ley has

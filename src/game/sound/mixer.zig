@@ -46,8 +46,12 @@ const voiceCount=lib.sound.voiceCount;
 const Wind=lib.sound.wind.Wind;
 /// the unforming heard
 const Unformed=lib.sound.unforming.Unformed;
-/// how much of the music is left while the unforming sounds at its fullest
-const hushed:f32=0.3;
+/// how much of the garden's music is left while the unforming sounds: none,
+/// its own theme plays instead
+const hushed:f32=0;
+/// how much of the world's far-off screaming is heard straight, not through
+/// the hall
+const farDry:f32=0.35;
 /// how long the hall rings (s, to -60 dB)
 const hallRt60:f32=4.2;
 /// how long before it answers (s): a large space
@@ -287,19 +291,29 @@ pub const Sounds=struct{
     }
   }
   /// the day's and the night's music, mixed into `out` with the hall they
-  /// ring in (its tail spread wide round them), a block at a time
+  /// ring in (its tail spread wide round them), a block at a time; while
+  /// the unforming sounds, its theme in their place, the world's screams
+  /// heard mostly through the hall
   pub fn musics(s:*Sounds,out:[]dsp.Frame)void{
     // how far into `out` the blocks have reached
     var off:usize=0;
     while(off<out.len){
-      // this block's length, and the music alone in it
+      // this block's length, the music alone in it, and the far-off voices
       const k=@min(hallBlock,out.len-off);
       var buf:[hallBlock]dsp.Frame=@splat(@splat(0));
+      var far:[hallBlock]dsp.Frame=@splat(@splat(0));
       s.music.render(buf[0..k]);
       s.night.render(buf[0..k]);
-      // how much of it the unforming leaves
-      const left=if(s.unformed)|*u|m.lerp(1,hushed,u.hush())else 1;
-      for(out[off..][0..k],buf[0..k])|*o,x|o.*+=(x+dsp.mid(hallWet)*s.hall.tick(x))*dsp.mid(left);
+      // how much of the hall's tail is let through
+      var tail:f32=1;
+      if(s.unformed)|*u|{
+        // how much of the garden's music the unforming leaves, its theme over it
+        const left=m.lerp(1,hushed,u.hush());
+        for(buf[0..k])|*x|x.*=dsp.mid(left)*x.*;
+        u.theme.render(buf[0..k],far[0..k]);
+        tail=u.theme.tailLeft();
+      }
+      for(out[off..][0..k],buf[0..k],far[0..k])|*o,x,f|o.*+=x+f*dsp.mid(farDry)+s.hall.tick(x+f)*dsp.mid(hallWet*tail);
       off+=k;
     }
   }
