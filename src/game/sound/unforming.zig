@@ -36,8 +36,6 @@ const rainSide:f32=0.85;
 /// how wide the arrivals ring round the star (pan), each the golden share
 /// of the way round from the last so none sits on another
 const arriveSide:f32=0.6;
-/// the golden share, stepping each arrival round
-const golden:f32=0.618034;
 /// how wide the landing's glass chord opens (pan, lowest to highest)
 const landSpread:f32=1;
 /// how far apart each drone note and its beating twin sit (pan): the beat
@@ -371,7 +369,7 @@ pub const Unformed=struct{
     for(0..h.cracks)|_|u.crack();
     for(0..h.arrivals)|_|{
       // where round the star it rings
-      const round=m.f(u.arrived)*golden;
+      const round=m.f(u.arrived)*m.goldenShare;
       u.glints.cycle(.init(lydianNote(arriveFrom,u.arrived%arriveSteps),arriveRing,arriveLevel,0,((round-@floor(round))*2-1)*arriveSide,u.rate));
       u.arrived+=1;
     }

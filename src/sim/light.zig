@@ -599,6 +599,8 @@ fn storeOf(s:Slice,nd:Node)f32{
   if(species.get(s.items(.sp)[id.idx()]).store<=0)return 0;
   return s.items(.stored)[id.idx()];
 }
+/// the tests step at the 60 Hz tick: seconds a step
+const testDt:f32=1.0/60.0;
 /// a small garden for the tests: soil round the origin, plants on it
 const Bench=struct{
   /// the world
@@ -625,7 +627,7 @@ const Bench=struct{
     return.of(b.p.len()-1);
   }
   /// works the grid out once, at `night`
-  fn run(b:*Bench,gpa:Allocator,night:f32)!void{try b.l.update(gpa,&b.p,&b.w,&.{},&.{},night,1.0/60.0);}
+  fn run(b:*Bench,gpa:Allocator,night:f32)!void{try b.l.update(gpa,&b.p,&b.w,&.{},&.{},night,testDt);}
 };
 test"by day a solcyriphon lights its field; a bloom linked to it carries it on, nearest first"{
   // the test allocator, and a small garden
@@ -670,7 +672,7 @@ test"what only looks lit is lit where light reaches it, though it draws none"{
   defer b.deinit(gpa);
   // a solcyriphon, and two users drawing nothing: one in its field, one far out
   _=try b.put(gpa,2,2,.solcyriphon);
-  try b.l.update(gpa,&b.p,&b.w,&.{},&.{.{.at=m.v3(3.5,0,2.5),.draw=0},.{.at=m.v3(14.5,0,14.5),.draw=0}},0,1.0/60.0);
+  try b.l.update(gpa,&b.p,&b.w,&.{},&.{.{.at=m.v3(3.5,0,2.5),.draw=0},.{.at=m.v3(14.5,0,14.5),.draw=0}},0,testDt);
   try testing.expect(b.l.userLit.items[0]>0.9);
   try testing.expectEqual(@as(f32,0),b.l.userLit.items[1]);
 }

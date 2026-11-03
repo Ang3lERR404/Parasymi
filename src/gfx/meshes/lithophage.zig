@@ -394,7 +394,7 @@ pub const crystal=struct{
     // points out every way from the heart, as it grows in sap
     for(0..9)|i|{
       // this crystal's angle round the heart (the golden angle per step)
-      const th=m.f(i)*2.39996;
+      const th=m.f(i)*m.goldenAngle;
       // its height on the unit sphere, from near the top down to near the bottom
       const y=m.lerp(0.85,-0.85,m.ratio(i,8));
       // the sphere's radius at that height

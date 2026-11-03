@@ -103,7 +103,7 @@ fn trunkPts()[growth.res]V3{
   return pts;
 }
 /// offshoot `i`'s bearing round the spire
-fn shootBearing(i:usize)f32{return m.f(i)*2.39996+0.7;}
+fn shootBearing(i:usize)f32{return m.f(i)*m.goldenAngle+0.7;}
 /// the tip of offshoot `i`, where its thread leaves
 pub fn tipAt(i:usize)V3{
   // the way out, and where it leaves the spire

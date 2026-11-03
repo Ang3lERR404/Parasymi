@@ -65,7 +65,7 @@ pub fn hanging(b:*Builder,g:species.Genome,k:usize,root:V3,out:V3,drop:f32,stalk
 }
 /// the place pod `k` of `n` takes round a stem: its bearing, turned by the
 /// golden angle from the one before so they never line up
-pub fn bearing(k:usize,variant:u32)f32{return m.f(k)*2.39996+m.f(variant)*0.8;}
+pub fn bearing(k:usize,variant:u32)f32{return m.f(k)*m.goldenAngle+m.f(variant)*0.8;}
 test"a bead is marked as its pod, its radius on every vertex"{
   // a builder, a genome with three pods, and the bead
   var b=Builder{.gpa=std.testing.allocator};

@@ -46,7 +46,7 @@ const solveArm=lib.player.ik.solveArm;
 /// a leg reaching its foot (inverse kinematics)
 const solveLeg=lib.player.ik.solveLeg;
 /// tests step at the 60 Hz tick: seconds a step
-const testDt:f32=1.0/60.0;
+const testDt:f32=lib.play.tickTime;
 /// the float slack the tests allow
 const testEps:f32=1e-4;
 test"belly contents lag a sprint, overshoot a stop, then settle"{

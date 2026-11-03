@@ -80,7 +80,7 @@ pub const star=struct{
       const k=if(i<outer)i else i-outer;
       const y=1-2*(m.f(k)+0.5)/m.f(n);
       const r=@sqrt(@max(1-y*y,0));
-      const a=m.f(k)*2.39996+(if(i<outer)@as(f32,0)else 1.1);
+      const a=m.f(k)*m.goldenAngle+(if(i<outer)@as(f32,0)else 1.1);
       p.*=m.v3(@cos(a)*r,y,@sin(a)*r)*m.splat3(if(i<outer)@as(f32,1)else innerR);
     }
     // each point: a small octahedron of light

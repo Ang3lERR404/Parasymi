@@ -151,9 +151,6 @@ const tipOrbit:f32=0.045;
 const tipSpin:f32=2.2;
 /// how large it is, against a core satellite
 const tipScale:f32=0.7;
-/// the golden angle (radians): spreads the satellites round the fused
-/// core evenly, as round a sphere
-const golden:f32=2.39996;
 /// how far an evolved one's floating flower bobs on its tethers (m)
 const floatBob:f32=0.012;
 /// how fast it bobs (rad/s)
@@ -262,7 +259,7 @@ pub fn wants(s:*const st.Structure,g:*const prog.Progression,item:items.Item)u32
 fn orbit(k:usize,tf:f32)struct{at:V3,ahead:V3}{
   // how far round it has spun, and the tilted plane it spins in
   const turn=tf*spinRate*(1+spinSpread*m.f(k))+m.ratio(k,satellites)*m.tau;
-  const plane=m.chain(&.{m.rotY(m.f(k)*golden),m.rotX(orbitTilt[k%orbitTilt.len])});
+  const plane=m.chain(&.{m.rotY(m.f(k)*m.goldenAngle),m.rotX(orbitTilt[k%orbitTilt.len])});
   return.{
     .at=m.mulPoint(plane,v3(@cos(turn),0,@sin(turn))),
     .ahead=m.mulPoint(plane,v3(-@sin(turn),0,@cos(turn))),
@@ -273,7 +270,7 @@ fn fused(k:usize,tf:f32)V3{
   // its height on the sphere, the ring's radius there, and its bearing
   const y=1-2*(m.f(k)+0.5)/m.f(satellites+shoots);
   const r=@sqrt(@max(0,1-y*y));
-  const a=m.f(k)*golden+tf*fusedTurn;
+  const a=m.f(k)*m.goldenAngle+tf*fusedTurn;
   return v3(@cos(a)*r,y,@sin(a)*r);
 }
 /// turns +y to `dir` (unit) the shortest way round, spun `spin` about it
@@ -346,8 +343,8 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   // the newest growing in
   for(0..@min(a.branches,branchesDrawn))|k|{
     // how high up it sits, its bearing round the stems, and its size
-    const y=0.3+1.05*@mod(m.f(k)*0.618,1);
-    const ang=m.f(k)*golden+s.seed*m.tau;
+    const y=0.3+1.05*@mod(m.f(k)*m.goldenShare,1);
+    const ang=m.f(k)*m.goldenAngle+s.seed*m.tau;
     const size=0.6*(if(k+1==a.branches)m.smooth(a.graft)else 1);
     // where it sits, held just off the stems
     const at=v3(@cos(ang)*branchR,y,@sin(ang)*branchR);

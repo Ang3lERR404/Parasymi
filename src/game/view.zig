@@ -927,7 +927,7 @@ fn moteShards(g:*Game,mo:skyMod.Mote)Allocator.Error!void{
   const e=1-(1-k)*(1-k)*(1-k);
   for(0..moteShardCount)|j|{
     // this shard's heading: spread round the mote, tipped up and down
-    const a=mo.phase*m.tau*5+m.f(j)*golden;
+    const a=mo.phase*m.tau*5+m.f(j)*m.goldenAngle;
     const up=@sin(mo.phase*17+m.f(j)*1.9)*0.8;
     const dir=m.norm(m.v3(@cos(a),up,@sin(a)));
     const at=mo.pos+dir*m.splat3(moteShardReach*e);
@@ -941,8 +941,6 @@ const moteShardCount=6;
 const moteShardReach:f32=0.9;
 /// how big each starts (of the shard mesh)
 const moteShardSize:f32=2.0;
-/// the golden angle (radians), spreading its shards evenly round it
-const golden:f32=2.39996;
 /// fallen starlight: each mote turns slowly and twinkles, hovering with a
 /// slow breath over the ground; while it falls, fading echoes of it trail
 /// above, a streak of light.

@@ -58,6 +58,12 @@ pub const tau=math.tau;
 pub const sqrt2=math.sqrt2;
 /// a quarter turn (pi / 2).
 pub const halfPi=pi/2.0;
+/// the golden angle (radians, a turn times 1 - 1/phi): things stepped round by
+/// it never line up, leaves, petals and shards spread evenly round a stem
+pub const goldenAngle:f32=2.39996;
+/// the golden share (1/phi): `@mod(i*goldenShare,1)` scatters steps evenly
+/// over 0..1, never two close together
+pub const goldenShare:f32=0.618034;
 /// `x` held within `lo..hi`
 pub const clamp=math.clamp;
 /// `x` raised to the power `p`

@@ -40,8 +40,6 @@ const cushionLumps=9;
 const tuftLumps=3;
 /// fine roots each node sends down
 const nodeRoots=3;
-/// the golden angle: each runner a little apart from the last
-const golden:f32=2.39996;
 /// a moss creeper grown from its genome, lying on the ground at its
 /// origin; grown by tu.x (plant.vert): its cushion first, then its runners
 /// creeping out, each node's rosette and tuft forming as the runner reaches it
@@ -56,7 +54,7 @@ pub fn creeper(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
   // the runners, out over the ground a golden angle apart
   for(0..g.tendrils)|i|{
     // its bearing and length
-    const a=m.f(i)*golden+m.f(variant)*0.8+rng.range(-0.25,0.25);
+    const a=m.f(i)*m.goldenAngle+m.f(variant)*0.8+rng.range(-0.25,0.25);
     const len=g.stemH*rng.range(0.75,1.15);
     // its control points: out along the ground, wandering a little
     var c:[6]V3=undefined;
@@ -118,7 +116,7 @@ pub fn creeper(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
 fn lumps(b:*Builder,rng:*Rng,at:V3,r:f32,n:usize,col:color.Rgba8,tip:color.Rgba8,t:f32)Allocator.Error!void{
   for(0..n)|i|{
     // where the lump sits, how big it is, and how high
-    const a=m.f(i)*golden+rng.range(-0.3,0.3);
+    const a=m.f(i)*m.goldenAngle+rng.range(-0.3,0.3);
     const d=if(i==0)0 else r*0.55*@sqrt(m.ratio(i,n))*rng.range(0.8,1.1);
     const s=r*rng.range(0.32,0.45)*(1-0.35*d/r);
     try mg.ellipsoid(b,.{

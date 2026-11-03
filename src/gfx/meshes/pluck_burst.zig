@@ -37,7 +37,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     // whether it is a mote, the way out it lies (motes upward, drops
     // round about and a little up), and where its vertices begin
     const mote=i%moteEvery==0;
-    const a=m.f(i)*2.39996+rng.range(-0.3,0.3);
+    const a=m.f(i)*m.goldenAngle+rng.range(-0.3,0.3);
     const up=if(mote)rng.range(0.5,1.0)else rng.range(-0.15,0.45);
     const dir=m.norm(v3(@cos(a),up,@sin(a)));
     const s=b.mark();

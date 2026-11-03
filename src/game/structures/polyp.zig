@@ -161,11 +161,11 @@ test"a polyp feeds on a grown bloom near it, letting flowers drift up to five, a
   // the tick context
   const ctx:st.Ctx=.{.gpa=gpa,.w=&w,.plants=&plants,.g=&g,.ss=&ss};
   // no bloom: it starves
-  for(0..600)|_|try st.Structures.tickWith(ctx,1.0/60.0);
+  for(0..600)|_|try st.Structures.tickWith(ctx,lib.play.tickTime);
   try testing.expectEqual(@as(u32,0),ss.get(id).inv.count(.driftFlower));
   // a grown bloom two tiles off: it feeds, until five drift
   try testing.expect(try plants.placeEx(gpa,&w,9,7,.{.x=9,.y=7,.chunk=undefined,.tile=undefined,.sp=.bloom,.seed=0,.growth=1,.mana=10}));
-  for(0..60*@as(usize,@intFromFloat(feedTime))*7)|_|try st.Structures.tickWith(ctx,1.0/60.0);
+  for(0..60*@as(usize,@intFromFloat(feedTime))*7)|_|try st.Structures.tickWith(ctx,lib.play.tickTime);
   try testing.expectEqual(most,ss.get(id).inv.count(.driftFlower));
   // one is pulled from the air
   try testing.expectEqual(items.Item.driftFlower,handOver(ss.get(id)).?);

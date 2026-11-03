@@ -175,8 +175,6 @@ const pitch:f32=0.46;
 const thick:f32=0.1;
 /// braided roots a rooted symbiote spreads into the soil
 const roots=5;
-/// the golden angle: leaves and offshoots turn by it, each a little apart
-const golden:f32=2.39996;
 /// how many young leaves stand folded round a plant's crown
 const crownLeaves=3;
 /// the longest leaf (m) still cut with teeth: longer ones (a tree's) are smooth-edged
@@ -340,7 +338,7 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
     const up=m.ratio(i,@max(g.leaves,1)-1);
     const k=m.clamp(m.lerp(@max(from-0.08,0.1),0.88,up)+rng.range(-0.02,0.02),0.02,0.95);
     // its bearing
-    const ang=m.f(i)*golden+m.f(variant)+rng.range(-0.35,0.35);
+    const ang=m.f(i)*m.goldenAngle+m.f(variant)+rng.range(-0.35,0.35);
     try mg.leaf(b,.{
       .at=onStem(&spine,&radii,k,ang),.dir=m.norm(v3(@cos(ang),m.lerp(0.05,0.5,up)+rng.range(-0.1,0.1),@sin(ang))),
       .len=g.leafLen*m.lerp(1.35,0.5,up)*rng.range(0.75,1.3),.width=g.leafW*m.lerp(1.3,0.85,up)*rng.range(0.8,1.15),
@@ -363,7 +361,7 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
   for(0..g.thorns)|i|{
     // how far up the stem, and the thorn's bearing
     const k=0.15+0.7*rng.float();
-    const ang=m.f(i)*golden*1.3;
+    const ang=m.f(i)*m.goldenAngle*1.3;
     try b.cone(m.alongPath(&spine,k),m.norm(v3(@cos(ang),0.4,@sin(ang))),0.045,0.01,color.shade(g.bloomCol,0.7),k,.thorn);
   }
   // prop roots: braided, from low on the stem down into the soil close
@@ -403,7 +401,7 @@ pub fn plant(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32,rooted:bool)All
   for(0..shoots)|i|{
     // how far up the stem it leaves, its bearing, and its length
     const k=m.lerp(shootFrom,0.85,(m.f(i)+srng.range(0.2,0.8))/m.f(shoots));
-    const ang=m.f(i)*golden*1.7+1.1+m.f(variant)*0.9+srng.range(-0.3,0.3);
+    const ang=m.f(i)*m.goldenAngle*1.7+1.1+m.f(variant)*0.9+srng.range(-0.3,0.3);
     const len=g.stemH*srng.range(0.32,0.46)*m.lerp(1.15,0.75,k);
     // its path, timing, and the tip and axis its bud or bloom sits on
     const sh=mg.shootPath(&spine,k,k,ang,len,srng.range(0.3,0.6),seed+%i*211);

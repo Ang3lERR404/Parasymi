@@ -90,7 +90,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
     const u=(m.f(k)+0.5)/m.f(@max(n,1));
     const y=(u*2-1)*0.7;
     const out_=@sqrt(@max(1-y*y,0))*tangleOut*(if(n==1)@as(f32,0)else 1);
-    const a=m.f(k)*2.39996+tf*turnRate*m.tau+s.seed*6;
+    const a=m.f(k)*m.goldenAngle+tf*turnRate*m.tau+s.seed*6;
     const at=mesh.heart+m.v3(@cos(a)*mesh.sacR[0]*out_,y*mesh.sacR[1]*tangleOut+bobAmount*@sin(tf*bobRate+m.f(k)*2),@sin(a)*mesh.sacR[2]*out_);
     // its size: larger the fuller it is
     const r=lumpR+lumpGrow*m.clamp01(m.f(it.n)/lumpFull);

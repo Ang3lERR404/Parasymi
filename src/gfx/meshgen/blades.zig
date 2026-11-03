@@ -16,6 +16,8 @@ const color=engine.core.color;
 const V3=m.V3;
 /// the seeded stream a natural leaf is varied by
 const Rng=engine.core.rng.Rng;
+/// the golden Weyl step, spreading the blades' hashes far apart
+const goldenStep=engine.core.rng.goldenStep;
 /// how many segments a blade's midrib is cut into
 const bladeSegs=lib.meshgen.bladeSegs;
 /// the mesh builder blades are poured into
@@ -210,7 +212,7 @@ const naturalTeeth=m.Vice(f32,2){4,6};
 pub fn natural(b:*Builder,base:V3,dir:V3,len:f32,width:f32,droop:f32,col:color.Rgba8,tip:color.Rgba8,t:f32,stalk:Stalk)Allocator.Error!void{
   // the leaf's own stream, seeded by where it grows
   const h:u32=@bitCast(base[0]*7919.3+base[1]*1047.29+base[2]*12997.09+len*511.7);
-  var rng=Rng.init(@as(u64,h)*%0x9E3779B97F4A7C15+%1);
+  var rng=Rng.init(@as(u64,h)*%goldenStep+%1);
   try leaf(b,.{
     .at=base,.dir=dir,.len=len*rng.range(0.85,1.15),.width=width*rng.range(0.85,1.12),.droop=droop*rng.range(0.75,1.3),
     .curl=rng.range(0,0.2),.twist=rng.range(-0.55,0.55),.wave=rng.range(0.05,0.16),.teeth=rng.range(naturalTeeth[0],naturalTeeth[1]),

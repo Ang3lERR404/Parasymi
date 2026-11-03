@@ -115,7 +115,7 @@ fn clump(b:*mg.Builder,c:Clump)Allocator.Error!void{
 /// paddle blade unfurling at its top once it is up
 fn leaf(b:*mg.Builder,k:*growth.Skeleton,base:growth.Id,c:Clump,i:usize,rng:*Rng)Allocator.Error!void{
   // its heading round the clump (radians), how far it leans out and how tall it stands
-  const a=(m.f(i)*2.39996)+rng.range(-0.2,0.2);
+  const a=(m.f(i)*m.goldenAngle)+rng.range(-0.2,0.2);
   const out=v3(@cos(a),0,@sin(a));
   const lean=rng.range(0.12,0.3);
   const h=c.tall*rng.range(0.7,1)*(1-0.25*m.ratio(i,c.leaves));

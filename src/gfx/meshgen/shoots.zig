@@ -45,19 +45,21 @@ pub fn plant(b:*Builder,id:species.Id,variant:u32)Allocator.Error!void{
   const def=species.get(id);
   const g=def.genome;
   const seed=@as(u64,@intFromEnum(id))*977+77;
+  // this variant's own seed, a step on from the species'
+  const own=seed+@as(u64,variant)*131;
   switch(g.form){
-    .herb=>try structureKit.plant(b,g,seed+@as(u64,variant)*131,variant,!def.floating),
-    .coil=>try parasiteKit.plant(b,g,seed+@as(u64,variant)*131),
-    .drift=>try drift(b,g,seed+@as(u64,variant)*131,variant),
-    .radiant=>try radiantKit.plant(b,g,seed+@as(u64,variant)*131,variant),
-    .star=>try radiantKit.star(b,g,seed+@as(u64,variant)*131,variant),
+    .herb=>try structureKit.plant(b,g,own,variant,!def.floating),
+    .coil=>try parasiteKit.plant(b,g,own),
+    .drift=>try drift(b,g,own,variant),
+    .radiant=>try radiantKit.plant(b,g,own,variant),
+    .star=>try radiantKit.star(b,g,own,variant),
     // the light grid's plants, each gathered into its own body
-    .lens=>try radiantKit.solcyriphon(b,g,seed+@as(u64,variant)*131,variant),
-    .bouquet=>try radiantKit.astrocyme(b,g,seed+@as(u64,variant)*131,variant),
-    .heliotrope=>try radiantKit.heliocyra(b,g,seed+@as(u64,variant)*131,variant),
-    .veil=>try radiantKit.halcyra(b,g,seed+@as(u64,variant)*131,variant),
-    .lily=>try lib.meshgen.lilies.lily(b,g,seed+@as(u64,variant)*131,variant),
-    .creeper=>try lib.meshgen.creepers.creeper(b,g,seed+@as(u64,variant)*131,variant),
+    .lens=>try radiantKit.solcyriphon(b,g,own,variant),
+    .bouquet=>try radiantKit.astrocyme(b,g,own,variant),
+    .heliotrope=>try radiantKit.heliocyra(b,g,own,variant),
+    .veil=>try radiantKit.halcyra(b,g,own,variant),
+    .lily=>try lib.meshgen.lilies.lily(b,g,own,variant),
+    .creeper=>try lib.meshgen.creepers.creeper(b,g,own,variant),
     // a confluence's variants are its growth keys, all grown from one seed
     .confluence=>try convergenceKit.confluence(b,g,seed,m.ratio(variant,keys-1)),
   }

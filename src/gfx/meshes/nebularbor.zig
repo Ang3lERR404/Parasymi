@@ -284,7 +284,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
 }
 /// where young leaf `i` sits up the stem (a share of the trunk) and its
 /// bearing round it (the golden angle, so none shades the next)
-fn youngAt(i:usize)m.Vice(f32,2){return.{m.lerp(youngFrom,youngTo,m.ratio(i,youngLeaves-1)),m.f(i)*2.39996};}
+fn youngAt(i:usize)m.Vice(f32,2){return.{m.lerp(youngFrom,youngTo,m.ratio(i,youngLeaves-1)),m.f(i)*m.goldenAngle};}
 /// the sapling's young leaves up its stem, each on its own stalk: the
 /// lower half fall as the crown spreads; the rest hold until it is a real
 /// tree (`grown`), then fall one by one, an offshoot growing out where

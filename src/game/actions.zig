@@ -385,7 +385,7 @@ test"plants never set seed; an uprooted plant comes back as its seed"{
   }));
   harvest(&g,.{x+2,z});
   // plucked by paw over the next frames, until all it ripened is taken
-  while(pluckOn(&g,1.0/60.0)!=null){}
+  while(pluckOn(&g,play.tickTime)!=null){}
   try testing.expectEqual(@as(u32,2),g.player.inv.count(.essence));
   try testing.expectEqual(@as(u32,0),g.player.inv.count(.seedLumenroot));
   uproot(&g,.{x+2,z});
@@ -413,7 +413,7 @@ test"a harvest is plucked by paw: a few plucks, each yield carried in as a bead"
   // how many times the belly took some, and what it held last
   var plucks:u32=0;
   var had:u32=0;
-  while(pluckOn(&g,1.0/60.0)!=null){
+  while(pluckOn(&g,play.tickTime)!=null){
     // what the belly holds now
     const now=g.player.inv.count(.essence);
     if(now>had)plucks+=1;
@@ -456,7 +456,7 @@ test"a confluence gives only convergence essence"{
   }));
   harvest(&g,.{x+3,z+1});
   // plucked by paw over the next frames, until all it ripened is taken
-  while(pluckOn(&g,1.0/60.0)!=null){}
+  while(pluckOn(&g,play.tickTime)!=null){}
   try testing.expectEqual(@as(u32,3),g.player.inv.count(.convergenceEssence));
   try testing.expectEqual(@as(u32,0),g.player.inv.count(.seedLumenroot));
   try testing.expectEqual(@as(u32,0),g.player.inv.count(.seedThornleech));

@@ -146,7 +146,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   // what drifts down out of the dark over him, each kind its own count,
   // size and glow, each piece its own seed
   for(drifts,0..)|d,k|for(0..d.n)|i|{
-    try g.parts.emitFall(d.id,at,m.f(k*drifted+i)*0.618+m.f(k)*0.37,fallHigh,fallSpread,d.size,.{.glow=d.glow,.phase=m.ratio(i,d.n)});
+    try g.parts.emitFall(d.id,at,m.f(k*drifted+i)*m.goldenShare+m.f(k)*0.37,fallHigh,fallSpread,d.size,.{.glow=d.glow,.phase=m.ratio(i,d.n)});
   };
   // the wolf, posed by its sleep where it lies (a copy: the gardener's own
   // is left as it is, to wake into the garden)

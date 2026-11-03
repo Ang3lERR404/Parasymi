@@ -137,7 +137,7 @@ fn stems(b:*mg.Builder,rng:*Rng)Allocator.Error!void{
   const boll=color.rgb(0.80,0.58,0.22).toRgba8(255);
   for(0..stemCount)|i|{
     // this stem's bearing, how far it bows out, and how tall it stands
-    const a=m.ratio(i,stemCount)*m.tau*2.39996+rng.range(-0.2,0.2);
+    const a=m.ratio(i,stemCount)*m.tau*m.goldenAngle+rng.range(-0.2,0.2);
     const out=bearing(a);
     const lean=rng.range(0.12,0.55);
     const len=rng.range(0.75,1.05);

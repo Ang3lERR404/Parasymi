@@ -6,11 +6,14 @@ const std=@import("std");
 const m=@import("math.zig");
 /// the test helpers
 const testing=std.testing;
+/// the golden ratio's share of 2^64 (Weyl step): the generator's stride and
+/// the nudge before every mix, so consecutive seeds land far apart
+pub const goldenStep:u64=0x9E3779B97F4A7C15;
 /// scrambles a 64-bit value until every bit depends on every other
 /// (splitmix64's finaliser): the root of every hash and the generator
 pub inline fn mix64(x0:u64)u64{
   // the value, nudged by the golden ratio, then folded and multiplied twice
-  var x=x0+%0x9E3779B97F4A7C15;
+  var x=x0+%goldenStep;
   x=(x^(x>>30))*%0xBF58476D1CE4E5B9;
   x=(x^(x>>27))*%0x94D049BB133111EB;
   return x^(x>>31);
@@ -38,7 +41,7 @@ pub const Rng=struct{
   /// a generator started from `seed`, mixed first so near seeds diverge
   pub fn init(seed:u64)Rng{return.{.s=mix64(seed)};}
   /// the next 64 random bits, stepping the state on
-  pub fn next(r:*Rng)u64{r.s+%=0x9E3779B97F4A7C15;return mix64(r.s);}
+  pub fn next(r:*Rng)u64{r.s+%=goldenStep;return mix64(r.s);}
   /// decision: bits 8..31 of the output, as every grown mesh and the
   /// starfall were tuned against; changing them reshapes every plant.
   pub fn float(r:*Rng)f32{return unit(@truncate(r.next()));}

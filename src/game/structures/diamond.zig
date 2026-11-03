@@ -189,7 +189,7 @@ test"four grown blooms in a cross form a diamond at their heart, no polyp needed
     /// ticks the grid, ecology, structures and the search at 60 Hz for `secs` seconds
     fn runFor(e:*Ecology,p:*Plants,ww:*World,s:*st.Structures,gg:*prog.Progression,r:*std.ArrayList(light.Relay),u:*std.ArrayList(light.User),k:*std.ArrayList(st.Id),secs:f32)!void{
       // the tick length, and the time run so far
-      const dt:f32=1.0/60.0;
+      const dt:f32=lib.play.tickTime;
       var t:f32=0;
       while(t<secs):(t+=dt){
         try st.lightGrid(s,testing.allocator,r,u,k);

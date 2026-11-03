@@ -311,7 +311,7 @@ test"the unforming shatters every mote at once, and no star falls again"{
   defer w.deinit();
   sf.shatterAll();
   // a few seconds of the deepest night
-  for(0..240)|_|try sf.update(testing.allocator,&sky,m.v3(0,0,0),&w,1.0/60.0);
+  for(0..240)|_|try sf.update(testing.allocator,&sky,m.v3(0,0,0),&w,lib.play.tickTime);
   try testing.expectEqual(@as(usize,0),sf.motes.items.len);
 }
 test"the shifted sky is the ley's, with no sun to key it"{
@@ -331,13 +331,13 @@ test"a near mote twinkles now and then, a far one never"{
   var heard:u32=0;
   // a minute at 60 frames a second
   for(0..3600)|_|{
-    sf.listen(here,1.0/60.0);
+    sf.listen(here,lib.play.tickTime);
     if(sf.twinkled()!=null)heard+=1;
   }
   try testing.expectEqual(@as(u32,0),heard);
   sf.motes.items[0].pos=m.v3(2,0,0);
   for(0..3600)|_|{
-    sf.listen(here,1.0/60.0);
+    sf.listen(here,lib.play.tickTime);
     if(sf.twinkled())|t|{
       heard+=1;
       try testing.expect(t.near>0.5 and t.near<0.8);

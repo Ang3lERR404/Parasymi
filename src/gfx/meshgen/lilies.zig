@@ -41,8 +41,6 @@ const padFloat:f32=0.025;
 const stemRes=16;
 /// how many roots the crown sends down
 const roots=4;
-/// the golden angle: each pad a little apart from the last
-const golden:f32=2.39996;
 /// how many sepals lie under a bloom
 const sepals=4;
 /// a bloom's rings of petals, outer to inner: how many, how long (of the
@@ -86,7 +84,7 @@ pub fn lily(b:*Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!voi
   // out than the last, stacked so the later lie over the earlier
   for(0..g.leaves)|i|{
     // its bearing, how far out its middle lies, its radius and when it opens
-    const a=m.f(i)*golden+m.f(variant)*0.9+rng.range(-0.3,0.3);
+    const a=m.f(i)*m.goldenAngle+m.f(variant)*0.9+rng.range(-0.3,0.3);
     const out=g.leafLen*(0.9+0.75*m.ratio(i,@max(g.leaves,1)))*rng.range(0.85,1.15);
     const r=g.leafLen*rng.range(0.75,1.05);
     const t=m.lerp(0.25,0.8,m.ratio(i,@max(g.leaves,1)));
