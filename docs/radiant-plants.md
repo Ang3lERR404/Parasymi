@@ -178,7 +178,8 @@ Named for halcyon: calm, sheltered.
   spread over the plants round it.
 
 ## The numbers (a first balance, to tune in play)
-Measured against what is in the game now: a day is 300 s, stars fall
+Measured against what is in the game now, with the day the gardener wants:
+twice today's, 600 s a day and night (`sky.dayLen`, now 300), stars fall
 in about the darkest third of it, a bloom seed is 3 starlight + 1 ley
 shard + 2 essence, a driftwisp yields 0.06, a root-digger digs one every
 4 s, a branch research is 20 units.
@@ -193,7 +194,7 @@ boost.
 | Solcyriphon, by night | a 12 glow beam into what is under it | one tile |
 | Bloom (relay) | carries up to 4 glow | 3.5 tiles (as now) |
 | Diamond (big relay) | carries up to 16 glow | 7 tiles (as now) |
-| Astrocyme | holds 360 glow-seconds (6 flowers of 60), takes or gives up to 4 glow | 3 tiles |
+| Astrocyme | holds 720 glow-seconds (6 flowers of 120), takes or gives up to 4 glow | 3 tiles |
 | Heliocyra strip | takes up to 3 glow from its field, or the whole 12 glow beam; carries it 8 tiles, losing 10% at each bend | 1×8 tiles |
 
 - **Distance:** a structure gets full light within a tile of its relay,
@@ -225,17 +226,17 @@ boost.
 - One yield in ten is rare: **sunlit essence** (counts as 3 essence in
   any recipe), **sunlit convergence essence** (counts as 3), **starglass**
   from a driftwisp, **evening silk** from a vesper.
-- It costs the plant 0.008 HP a second under the beam, so an unguarded
+- It costs the plant 0.004 HP a second under the beam, so an unguarded
   plant dies over about a night and a half.
 - **Tempered Light** (research, 15 units of 1 starlight + 1 essence,
   opened by the first overdrive) halves the harm: about three nights.
-- **Moss:** a 0.5% chance each night that a mossy tile under the beam
+- **Moss:** a 1% chance each night that a mossy tile under the beam
   becomes a ley line. **Any other bare ground:** nothing.
 
 ### The lithophage's reach
 Grown, it reaches 2 tiles. It reaches one tile further each time its
-age triples: 3 tiles after 10 days, 4 after 30, 5 after 90, and so on,
-forever. Each unit its tendrils draw refines to 2 (a root-digger's gives
+age triples: 3 tiles after 5 days (50 minutes), 4 after 15, 5 after 45,
+and so on, forever. Each unit its tendrils draw refines to 2 (a root-digger's gives
 1); a ley shard still gives 3 grit.
 
 ### Seeds and research
