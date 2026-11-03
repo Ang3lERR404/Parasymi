@@ -122,6 +122,8 @@ pub const Beam=struct{
   y:i32,
   /// its strength, 0 none .. 1 a whole night's beam
   k:f32,
+  /// the relay that takes it, if it falls on one (where it ends)
+  into:?Ref=null,
 };
 /// how a node was reached from its parent: along a link, out of the field
 /// it stands in (a heliocyra), or by a strip striking it
@@ -174,6 +176,9 @@ pub const Light=struct{
   beamed:std.ArrayList(f32)=.empty,
   /// per plant: whether a halcyra guards it from overdrive
   guarded:std.ArrayList(bool)=.empty,
+  /// per plant: the one plant a halcyra guards beside it (`.none`: it
+  /// guards all round it alone, or it is no halcyra)
+  ward:std.ArrayList(Id)=.empty,
   /// per plant: the light it carried, if it is a node (glow)
   carried:std.ArrayList(f32)=.empty,
   /// per relay passed in: the light it carried (glow)
@@ -206,7 +211,7 @@ pub const Light=struct{
   const Pick=struct{node:u32,strength:f32};
   /// frees every list
   pub fn deinit(l:*Light,gpa:Allocator)void{
-    l.lit.deinit(gpa);l.beamed.deinit(gpa);l.guarded.deinit(gpa);l.carried.deinit(gpa);l.relayCarried.deinit(gpa);l.userLit.deinit(gpa);
+    l.lit.deinit(gpa);l.beamed.deinit(gpa);l.guarded.deinit(gpa);l.ward.deinit(gpa);l.carried.deinit(gpa);l.relayCarried.deinit(gpa);l.userLit.deinit(gpa);
     l.links.deinit(gpa);l.strips.deinit(gpa);l.beams.deinit(gpa);l.nodes.deinit(gpa);l.edges.deinit(gpa);l.first.deinit(gpa);
     l.found.deinit(gpa);l.order.deinit(gpa);l.pick.deinit(gpa);l.nodeOf.deinit(gpa);
   }
@@ -220,6 +225,7 @@ pub const Light=struct{
     try resetTo(f32,gpa,&l.lit,n,1);
     try resetTo(f32,gpa,&l.beamed,n,0);
     try resetTo(bool,gpa,&l.guarded,n,false);
+    try resetTo(Id,gpa,&l.ward,n,.none);
     try resetTo(f32,gpa,&l.carried,n,0);
     try resetTo(u32,gpa,&l.nodeOf,n,none);
     try resetTo(f32,gpa,&l.relayCarried,relays.len,0);
@@ -281,7 +287,7 @@ pub const Light=struct{
       // the relay under it, if any
       if(l.under(k))|r|{
         l.nodes.items[r].supply+=beam;
-        try l.beams.append(gpa,.{.from=id,.glow=beam,.onto=.relay,.x=nd.x,.y=nd.y,.k=night});
+        try l.beams.append(gpa,.{.from=id,.glow=beam,.onto=.relay,.x=nd.x,.y=nd.y,.k=night,.into=l.nodes.items[r].ref});
         continue;
       }
       // else the plant under it, if any: overdriven
@@ -546,6 +552,7 @@ pub const Light=struct{
       }else null;
       if(beside)|j|{
         l.guarded.items[j.idx()]=true;
+        l.ward.items[i]=j;
         continue;
       }
       // every plant within its reach, rooted or floating
@@ -686,6 +693,8 @@ test"a halcyra beside a plant guards it alone; alone, it guards all round it"{
   try b.run(gpa,0);
   try testing.expect(b.l.guarded.items[by.idx()]);
   try testing.expect(!b.l.guarded.items[off.idx()]);
+  // (it says whom it guards, for its thread to wind round)
+  try testing.expectEqual(by,b.l.ward.items[0]);
   // a lone halcyra guards both plants within its reach
   _=try b.put(gpa,10,10,.halcyra);
   const a=try b.put(gpa,10,12,.lumenroot);

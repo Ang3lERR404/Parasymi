@@ -97,7 +97,8 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
   the ley lines' glow rises off the ground into the mist, pulsing with
   them (read from the overhead map, the ground drawn from above).
 - **Everything that glows lights the air** (a standing rule): beams,
-  flashes, the halo, energy, the constellate's glowing edges and points
+  flashes, the halo, energy, the constellate's glowing edges and points,
+  the solcyriphon's night beam and the heliocyras' strips
   each cast a soft haze into the fog round them, brighter in the mist,
   faint in clear air (`partsAir`, docs/architecture.md).
 - **The constellate tendril:** a braid of fragments flowing along it like
@@ -130,7 +131,8 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
 - Holding a seed shows a ghost of the grown plant: green where it fits,
   red where it does not.
 - **Forms** (`species.Form`): herb 0, coil 1, drift 2, confluence 3,
-  radiant 4, star 5. In common.glsl, `FORMS_FREE` = the radiant ones.
+  radiant 4, star 5, lily 6, creeper 7, lens 8, bouquet 9, heliotrope 10,
+  veil 11. In common.glsl, `FORMS_FREE` = the radiant ones.
 
 ### Symbiotes (`herb`, `structureKit.plant`)
 These are the symbiotic structures' body.
@@ -225,6 +227,47 @@ A flower whose petals float free, gathered by its core.
 - **Grown:** whorls turn slowly, alternating, and drift apart and back. It
   bobs and never bends.
 - With the vesper, it is the garden's only true glow.
+
+### The light grid's plants (`radiantKit`; details in docs/kits/radiant_kit_desc.md)
+All gathered from rigid fragments like the bloom, pearl with the film,
+shattering at the unforming.
+- **Solcyriphon** (`lens`): a lens of crystal facets round a gold heart, a
+  flower of broad petals rising round it open to the sky, threads of light
+  with beads trailing beneath like a jellyfish's. By day open wide, its
+  threads drifting, motes of its light spread out and down round it. By
+  night (plant.vert, by `DAYLIGHT`) the petals close into a tight bud, the
+  threads coil up under the lens, the heart burns smaller and brighter, and
+  its beam falls (below).
+- **Astrocyme** (`bouquet`): six small flowers fanning up from one knot of
+  light on stalks of light, winding round a rising thread. Each opens as
+  the store fills past its share, bottom up (the instance's `yield.w`);
+  an empty one's petals hang open and drift loose round it, dim.
+- **Heliocyra** (`heliotrope`): a neck of light bowing up to a head facing
+  the way it casts: a cut crystal heart crowned with stamens, short gold
+  petals and a wheel of rays that flutter; its crystal burns with its strip.
+- **Halcyra** (`veil`): a small flower under a sheer bell of broad gores,
+  crystal petals at the bell's edge rocking into the light and flinging
+  sparkles. Beside a plant it leans over it, its thread wound round that
+  plant; alone its thread opens into a net 2.2 m round over the plants.
+- **Crystal** (`.prism` on a radiant plant, plant.frag `CRYSTAL_*`): clear,
+  each facet flashing the key light and the points of light in fire, and
+  winking.
+- Grounded relays (astrocyme, heliocyra) shed a fifth of a bloom's light,
+  from their heart (an empty astrocyme less).
+
+### Shafts of light (`lightBeam`, `lightStrip`, part `.shaft`)
+Light itself: no shadow, and it lights the fog round it (`PARTS_LIGHT`).
+- **The night beam:** from under a solcyriphon's lens straight down to the
+  relay that takes it or the ground, as strong as the night is deep. A
+  white-gold core in a soft glow turned to the eye, widening as it falls,
+  light pouring down it in swells, motes sinking through it, flaring where
+  it lands; a point of light there and one halfway down.
+- **A heliocyra's strip:** a thread of light falls from its crystal to its
+  tile's edge, then a band a tile wide is laid just over the ground the way
+  it faces, tile by tile over the ground's rise and fall: soft edges, a
+  bright thread down its middle, light running out along it; as bright as
+  the light it carries (a dark one a faint trace), a point of light every
+  three tiles.
 
 ### Beams between linked blooms (`bloomThread`, part `.thread`)
 - Soft rays: a camera-facing spindle bent in part.vert's curve mode.

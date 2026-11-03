@@ -51,8 +51,11 @@ pub fn plant(b:*Builder,id:species.Id,variant:u32)Allocator.Error!void{
     .drift=>try drift(b,g,seed+@as(u64,variant)*131,variant),
     .radiant=>try radiantKit.plant(b,g,seed+@as(u64,variant)*131,variant),
     .star=>try radiantKit.star(b,g,seed+@as(u64,variant)*131,variant),
-    // the light grid's plants: gathered as the bloom is until their own bodies are grown
-    .lens,.bouquet,.heliotrope,.veil=>try radiantKit.plant(b,g,seed+@as(u64,variant)*131,variant),
+    // the light grid's plants, each gathered into its own body
+    .lens=>try radiantKit.solcyriphon(b,g,seed+@as(u64,variant)*131,variant),
+    .bouquet=>try radiantKit.astrocyme(b,g,seed+@as(u64,variant)*131,variant),
+    .heliotrope=>try radiantKit.heliocyra(b,g,seed+@as(u64,variant)*131,variant),
+    .veil=>try radiantKit.halcyra(b,g,seed+@as(u64,variant)*131,variant),
     .lily=>try lib.meshgen.lilies.lily(b,g,seed+@as(u64,variant)*131,variant),
     .creeper=>try lib.meshgen.creepers.creeper(b,g,seed+@as(u64,variant)*131,variant),
     // a confluence's variants are its growth keys, all grown from one seed

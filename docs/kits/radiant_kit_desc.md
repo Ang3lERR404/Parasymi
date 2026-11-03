@@ -1,6 +1,6 @@
 # radiant_kit
 
-`src/gfx/meshes/radiant_kit.zig` (394 lines). Imports: `meshgen` (`mg`),
+`src/gfx/meshes/radiant_kit.zig`. Imports: `meshgen` (`mg`),
 `mineralKit` (`mineral`), `vertex`, `sim/species`, `core/math`,
 `core/color`, `core/rng`. **Never** `growth` or the symbiotic/parasitic
 kits.
@@ -8,8 +8,10 @@ kits.
 ## What it is
 
 The **radiant (celestial) lineage's body**. It is shared by:
-- its plants: `plant` (the celestial bloom, form `radiant`) and `star`
-  (the vesper, form `star`);
+- its plants: `plant` (the celestial bloom, form `radiant`), `star`
+  (the vesper, form `star`) and the light grid's four: `solcyriphon`
+  (`lens`), `astrocyme` (`bouquet`), `heliocyra` (`heliotrope`),
+  `halcyra` (`veil`);
 - its structures: the diamond (`cut` + `shards`), and the halo crowns
   powered structures wear (`light_crown.zig`).
 
@@ -37,11 +39,12 @@ Each fragment tells the shader three things:
 |---|---|
 | tu.x | assembly order, 0 first .. 1 last |
 | tu.y | `Ring` as a number; a thread adds `(1 - along) * threadAmount` (0.9), so its heart end stays put |
+| tu.z | `aux`: what its form says besides (an astrocyme flower's number from 1; a root's strike height; a heliocyra head's distance out) |
 | colour alpha | bearing round the heart (`bearing / τ * 255`: the angle scaled into 0..255), the way it comes in from |
 
-`Ring = enum(u8) { core, inner, middle, outer, motes, halo, leaves, yield, root }`.
-Each ring moves its own way (plant.vert `SPIN[9]` turn rates; `.root`
-never turns).
+`Ring = enum(u8) { core, inner, middle, outer, motes, halo, leaves, yield, root, facets, trailing, veil, wound, net }`.
+Each ring moves its own way (plant.vert `SPIN[14]` turn rates; `.root`
+and `.wound` never turn).
 
 A radiant structure's body is `.core`. `threadAmount` = common.glsl
 `RADIANT_THREAD`.
@@ -61,6 +64,13 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
 | `cutSides` = 8, `Cut{rows:[]const m.Vice(f32,3) (height, radius, twist in half sides), deepRows, deep, lite, part = .prism}` | a cut crystal's profile; a row of radius 0 is a point |
 | `cut(b, c, rng)` | flat facets between rows (`mineral.facet`), staggered by twist, slightly uneven; every facet its own fragment, gathered **foot up**, each row in turn round it, within `cutShare` (0.8) of the order |
 | `shards(b, n, at, c, rng)` | small `mineral.crystal`s out of a cut's foot, leaning away, settling after its facets (order 0.8..1) |
+| `Stamens{r, n, lite, seed, at, y, len, lean}` / `stamens(b, s, rng)` | a crown of stamens (threads tipped with beads), the core's and the heliocyra's |
+| `Lens{n, inner, outer, thick, y, order, lite, deep}` / `lens(b, R, l, lite, seed)` | a flat ring of `n` crystal segments round the heart, each a flat gem cut to a ridge above and below (`.prism`), its own fragment on ring `.facets`, tethered |
+| `Trail{n, at, y, len, r, beads, order, col}` / `trailing(b, R, t, seed, rng)` | threads of light trailing beneath like a jellyfish's, beads strung down them; ring `.trailing`, held at the top |
+| `CrystalPetal{base, dir, face, len, w, thick, col, tip}` / `crystalPetal(b, c)` | a broad lozenge of crystal, eight flat facets (`.prism`) |
+| `woundThread(b, heart, lite, order)` | a halcyra's thread from its leaning heart (`veilLean`) arcing to a plant `veilReach` off along +x and winding down round it; ring `.wound` |
+| `net(b, heart, R, lite, order)` | the same thread opened into a net (8 spokes, 2 sagging rings, beads at the crossings) 2.2 m round; ring `.net` |
+| `bouquetAt(k)`, `bouquetFlowers/High/Low/Turn/Out/Taper` | where an astrocyme's flower `k` hangs (plant.vert `bouquetAt`, the same numbers) |
 | `plant(b, genome, seed, variant)` | the celestial bloom (see below) |
 | `star(b, genome, seed, variant)` | the vesper (see below) |
 
@@ -82,12 +92,51 @@ A radiant structure's body is `.core`. `threadAmount` = common.glsl
 - All of it lifted `stemH` over its tile, held to it by a `root` (5
   strands, order 0.03–0.09: just after the heart lands).
 
+### The solcyriphon (`solcyriphon`, form `lens`)
+A lens, a flower facing up and a touch of jellyfish, hung 5.5 m up. Its
+origin is the heart: a gold `core`, a `lens` of 10 facets round it, two
+whorls of 7 broad petals rising round the lens open to the sky, 9
+`trailing` threads with beads, 16 motes. plant.vert folds it by how dark
+it is (`FORMS_NIGHT_FOLD`, read off `DAYLIGHT`): by night its petals close
+up tight, its threads coil up under the lens, its heart burns smaller and
+brighter; by day its motes spread out and down round it.
+
+### The astrocyme (`astrocyme`, form `bouquet`)
+A spiral bouquet. A knot of light 0.12 m over its tile, held by a `root`;
+a twisting thread of light rises from it, and six flowers fan up from the
+knot on stalks of light, winding round the thread (`bouquetAt`), each a
+small `core` and a whorl of 7 petals, every vertex marked with its flower
+in tu.z. plant.vert (`FORMS_SHARED`) opens flower `k` as its store
+(instance `yield.w`) fills past `k / 6`, bottom up: gathering, it closes
+into a bud and opens; empty, its petals hang open and drift loose round
+its heart, circling, its light dim. Emptying, they come apart top down.
+
+### The heliocyra (`heliocyra`, form `heliotrope`)
+A heliotrope: a neck of light from a knot over its tile (held by a
+`root`) bows up to a head facing +x, lifted 0.45 rad: a `cut` crystal
+heart, a crown of 9 `stamens`, a ring of 9 short gold petals and a wheel
+of 14 rays. Drawn turned the way it casts (never its seed's yaw:
+`FORMS_FACING`); its rays flutter (tu.z), its head swings a little, its
+crystal burns with its strip's light (`FORMS_FLUTTER`, `yield.w`).
+
+### The halcyra (`halcyra`, form `veil`)
+A small flower (`core`, a cup of 5) 0.5 m over its tile on a `root`,
+hooded by a veil of 9 broad gores curving down like a jellyfish's bell
+(ring `.veil`, drawn sheer), 9 `crystalPetal`s hanging between them at
+the veil's edge (ring `.facets`), sparkling motes flung off them. Its
+thread is built both ways (`woundThread`, `net`); plant.vert
+(`FORMS_GUARDING`, `yield.w` the reach to the plant it guards, 0 alone)
+shows one: beside a plant it leans over it (`veilLean`, the view turning
+it toward that plant) with the thread wound round it, carried on to
+where the plant stands; alone the net spreads.
+
 ## Who uses it
 
 | User | Uses |
 |---|---|
 | `meshgen.zig` form `.radiant` | `plant` — species `bloom` |
 | `meshgen.zig` form `.star` | `star` — species `vesper` |
+| `meshgen/shoots.zig` forms `.lens`, `.bouquet`, `.heliotrope`, `.veil` | `solcyriphon`, `astrocyme`, `heliocyra`, `halcyra` |
 | `halo.zig` (the diamond, shared by `diamond.zig`, polyp event) | `Cut`, `cut`, `shards` |
 | `light_crown.zig` (the halo crowns powered structures wear) | `fragment`, `halo`, `whorl`, `core`, `cut`; `mineralKit.crystal`; all re-marked part `.crown`, gathered in part.vert by the structure's shine (`CROWN_*`) |
 | `tests.zig` | pulls in its test |
@@ -131,6 +180,8 @@ Shadow variants leave out light itself; only `.leaves` fragments cast.
 ## Test
 
 `"a celestial bloom, a vesper and a cut crystal are wholly gathered fragments"`
+and `"the light grid's four are wholly gathered, grounded ones dig in, and
+the bouquet is as the shaders know it"` (every variant and level of detail)
 checks:
 - every vertex has an order in 0..1, a valid ring, and no NaN;
 - **nothing is on a growth spline** (`b.grow` untouched);
@@ -145,4 +196,7 @@ checks:
 - Never scale it in; give every new piece a fragment with an order and a
   ring.
 - Check: `--plant=bloom --state=grow`, `--plant=vesper --state=grow|wither`,
+  `--plant=solcyriphon --tod=0|0.5`, `--plant=astrocyme --state=fill`,
+  `--plant=heliocyra`, `--plant=halcyra` (alone: its net; `--demo` for a
+  guarded plant, the beam and the strips),
   `--structure=diamond --state=grow`.

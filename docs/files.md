@@ -347,6 +347,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `halo.zig` — meshes: the HALO.
 - `item_pod.zig` — mesh: ITEM POD.
 - `light_crown.zig` — meshes: the HALO CROWNS.
+- `light_shaft.zig` — meshes: LIGHT BEAM and LIGHT STRIP.
 - `lithophage.zig` — mesh: LITHOPHAGE.
 - `loomfern.zig` — mesh: LOOMFERN.
 - `mineral_kit.zig` — shared pieces for the ground's minerals: crystals, flat-faced (each face its own normal) so they catch the light as cut planes, and…

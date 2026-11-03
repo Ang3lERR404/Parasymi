@@ -146,6 +146,12 @@ const float BURST_FALL = 1.6;
 // glowing sap part's
 const float PULSE_RATE = 3.0;
 const float DIM_GLOW = 0.06;
+// a falling shaft of light (a solcyriphon's beam) is this share of its
+// width where it leaves the lens, widening to all of it where it lands
+const float SHAFT_SPREAD = 0.45;
+// a strip laid over the ground is this far either side of its middle (m:
+// a tile wide, its `flutter` carrying its whole length instead)
+const float STRIP_HALF_WIDTH = 0.48;
 // the constellate web (meshes/constellate.zig; PLEXUS_POINTS must match its
 // `count`): how many points float in a cluster, which one is its heart (in
 // the middle of the spindle), how far each drifts from where it rests and
@@ -1669,6 +1675,22 @@ void main() {
       float head = clamp(tu.x, 0.0, 1.0);
       w = vec4(C + right * p.x * ip.y * 0.5 * mix(0.12, 1.0, head * head), 1.0);
       wn = toEye;
+    } else if (part == PART_SHAFT) {
+      // a shaft of light: laid flat over the ground (tu.z 1, a strip),
+      // STRIP_HALF_WIDTH either side of its middle along the side, facing
+      // the sky; or falling (a beam), `ip.y` metres either side, turned to
+      // the eye from every side, widening a little as it falls (SHAFT_SPREAD)
+      if (tu.z > 0.5) {
+        vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
+        vec3 N = cross(B, T);
+        w = vec4(C + B * p.x * STRIP_HALF_WIDTH, 1.0);
+        wn = N.y < 0.0 ? -N : N;
+      } else {
+        vec3 toEye = normalize(pc.eye_time.xyz - C);
+        vec3 right = normalize(cross(T, toEye) + vec3(1e-5, 0.0, 0.0));
+        w = vec4(C + right * p.x * ip.y * mix(SHAFT_SPREAD, 1.0, clamp(tu.x, 0.0, 1.0)), 1.0);
+        wn = toEye;
+      }
     } else {
       vec3 B = normalize(tint.xyz - T * dot(tint.xyz, T));
       vec3 N = cross(B, T);
@@ -1790,7 +1812,7 @@ void main() {
   // a flash, a halo's projection and research energy shine as bright as
   // their glow, never pulsing, as does a spark (it flickers on its own);
   // a prism has no light of its own
-  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY || part == PART_SPARK || part == PART_TRAIL) v_glow = ip.x;
+  if (part == PART_FLASH || part == PART_PROJECTION || part == PART_ENERGY || part == PART_SPARK || part == PART_TRAIL || part == PART_SHAFT) v_glow = ip.x;
   // the ring: an arc is as bright as the points at its ends (tint holds
   // the four points' light, east, south, west, north; tu.x its angle)
   if (part == PART_HALO) {
@@ -1865,7 +1887,7 @@ void main() {
   v_part = float(part);
   v_t = tu.x;
   // a beam carries its length instead, so its rays and motes keep their size
-  v_fade = part == PART_THREAD ? length(c3.xyz - c0.xyz) : ip.w;
+  v_fade = (part == PART_THREAD || part == PART_SHAFT) ? length(c3.xyz - c0.xyz) : ip.w;
   // the halo's ring and its projection carry their radius (their scale)
   if (part == PART_HALO || part == PART_PROJECTION) v_fade = length(c0.xyz);
   if (drawn && part == PART_SHADOW) v_fade *= 1.0 - haloFold(ih.w);
@@ -1888,8 +1910,12 @@ void main() {
   if (part == PART_PLEXUS) v_obj = vec3(tu.y, 0.0, 0.0);
   // a trail of light: how far across it (-1 to 1; 0 a point), for its glow
   if (part == PART_TRAIL) v_obj = vec3(tu.y, 0.0, 0.0);
+  // a shaft: a strip's whole length (m, its `flutter`), so it fades in and out only at its ends
+  if (part == PART_SHAFT) v_obj = vec3(ip.y, 0.0, 0.0);
   v_phase = ip.z;
   v_aux = ip.y;
+  // a shaft carries how far along its whole length (m) this piece of it begins
+  if (part == PART_SHAFT) v_aux = ip.w;
   // the halo's ring and the rays making it appear as its diamond forms
   // (from its shards, as its blooms close in)
   if (part == PART_HALO || part == PART_PROJECTION) v_aux = drawn ? sqrt(haloPull(ih.w)) : 1.0;
