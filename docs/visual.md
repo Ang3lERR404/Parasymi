@@ -249,6 +249,9 @@ shattering at the unforming.
   crystal petals at the bell's edge rocking into the light and flinging
   sparkles. Beside a plant it leans over it, its thread wound round that
   plant; alone its thread opens into a net 2.2 m round over the plants.
+  It eases from one to the other over about two seconds (`Plant.lean`,
+  `light.leanRate`): leaning in, its thread winds out of its heart and
+  its net folds back in, tip last; alone, the other way round.
 - **Crystal** (`.prism` on a radiant plant, plant.frag `CRYSTAL_*`): clear,
   each facet flashing the key light and the points of light in fire, and
   winking.
