@@ -240,6 +240,10 @@ pub const PartInstance=extern struct{
 /// `PartInstance.flags`: a placement preview (casts no shadow); part.vert
 /// reads it as `PART_GHOST`
 pub const partGhost:u32=1;
+/// `PartInstance.flags`: no leaves, its crystals turn ley-blue in its light
+/// from the top down, and a curve-placed runner of it from its home end
+/// out toward its far one; part.vert reads it as `PART_LEY_CRYSTALS`
+pub const partLeyCrystals:u32=4;
 /// `PartInstance.flags`: its fronds (tendrils) turn ley-blue in its light
 /// too, not its leaves alone; part.vert reads it as `PART_LEY_FRONDS`
 pub const partLeyFronds:u32=2;

@@ -97,8 +97,9 @@ pub const Ley=struct{
   top:f32,
   /// how far down from there it reaches in whole light (m)
   span:f32,
-  /// its fronds turn too, not its leaves alone (`vertex.partLeyFronds`)
-  fronds:bool=false,
+  /// what of it turns, if not its leaves alone: the `PartInstance.flags`
+  /// that say so (`vertex.partLeyFronds`, `vertex.partLeyCrystals`)
+  flags:u32=0,
 };
 /// the scene's moving parts for one frame: instances gathered per library
 /// mesh and level of detail, the bones and lights they bring, and the eye
@@ -207,7 +208,7 @@ pub const Parts=struct{
     var it=inst;
     if(p.ley)|l|{
       it.k=.{inst.k[0],l.amount,l.top,l.span};
-      if(l.fronds)it.flags|=vertex.partLeyFronds;
+      it.flags|=l.flags;
     }
     try p.lists[meshlib.slot(id,lod)].append(p.gpa,it);
   }

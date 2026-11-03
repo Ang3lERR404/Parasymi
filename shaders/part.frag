@@ -498,6 +498,9 @@ void surface() {
     vec3 H = normalize(SUN + V);
     c += lit * pow(max(dot(n, H), 0.0), PRISM_SPEC_POW) * 1.6 * step(0.0, dot(n, SUN)) * sh;
     c += film * fres * mix(0.25, 0.08, day);
+    // a lit lithophage's crystals hold the ley's light (v_glow, part.vert):
+    // brightest where they are thinnest, at their edges
+    c += v_col * v_glow * (1.2 + 1.6 * fres);
     o = vec4(applyFog(c, v_pos), 1.0);
     return;
   }

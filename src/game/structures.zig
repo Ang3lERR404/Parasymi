@@ -38,6 +38,8 @@
 //!   relay(s) ?light.Relay       a relay of the light grid it holds (a diamond)
 //!   lightUse(s) Use             how it takes light now, when not its `Def.light`
 //!   draws(s) f32                how much light it draws, when not its `Def.draws`
+//!   crownAt(s) f32              how high its halo crown hangs now, when not
+//!                               its `Def.crown` (one that grows taller)
 //!   hold(s, x, y) ?Hold         how it draws the floater at a tile toward itself
 //!   size(s) f32                 how much larger than its mesh it has grown
 //!                               (by research), its growing in aside
@@ -339,12 +341,17 @@ pub const Ley=enum(u8){
   leaves,
   /// its leaves and its fronds (a leafless parasite's tendrils)
   fronds,
+  /// no leaves: its crystals, glowing blue from the top down, and out
+  /// along its runners toward the nodes they dig into (the lithophage)
+  crystals,
 };
 /// how fast a structure's shine follows its light (per second): its crown
 /// gathers and its ley-blue creeps over a few seconds, never at a blink
 pub const shineEase:f32=0.6;
 /// how structure `s` takes light now
 pub const lightUse=hooks.lightUse;
+/// how high structure `s`'s halo crown hangs now
+pub const crownAt=hooks.crownAt;
 /// the structures' relays and light users, for the light grid
 pub const lightGrid=hooks.lightGrid;
 /// how many seconds of work a structure does in a tick, by its light

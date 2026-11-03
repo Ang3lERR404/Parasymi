@@ -46,6 +46,9 @@ const designs=@typeInfo(Design).@"enum".fields.len;
 const spread:f32=7.31;
 /// below this shine nothing of the crown is drawn (all of it is out of sight)
 const dark:f32=0.004;
+/// how far under its crown a crowned structure's top is (tiles): where its
+/// ley-blue starts down from
+const crownGap:f32=0.25;
 /// how wide a crown is over one tile of footprint (its ring's radius, m)
 const widthPer:f32=0.24;
 /// how brightly a crown's fragments hold light in whole light
@@ -71,9 +74,14 @@ pub fn ley(s:*const Structure,ctr:m.V3)?Ley{
   const d=s.def();
   if(d.ley==.none and d.crown<=0)return null;
   if(s.shine<dark)return null;
-  // how tall it stands
-  const tall=d.tall*s.size();
-  return.{.amount=s.shine,.top=ctr[1]+tall,.span=tall,.fronds=d.ley==.fronds};
+  // how tall it stands: a crowned one up to just under its crown (which
+  // rises as it grows taller), else its swaying height
+  const tall=s.size()*(if(d.crown>0)@max(st.crownAt(s)-crownGap,0.1)else d.tall);
+  return.{.amount=s.shine,.top=ctr[1]+tall,.span=tall,.flags=switch(d.ley){
+    .none,.leaves=>0,
+    .fronds=>lib.vertex.partLeyFronds,
+    .crystals=>lib.vertex.partLeyCrystals,
+  }};
 }
 /// its halo crown over it, gathered as far as its shine, and the light it
 /// sheds round it (while `Parts.ley` carries its shine to the GPU)
@@ -84,7 +92,7 @@ pub fn wear(s:*const Structure,out:*Parts,ctr:m.V3)Allocator.Error!void{
   // how large research has grown it, how wide its crown, and where it hangs
   const size=s.size();
   const width=widthPer*m.f(d.size)*size;
-  const at=ctr+m.v3(0,d.crown*size,0);
+  const at=ctr+m.v3(0,st.crownAt(s)*size,0);
   // the crown's mesh, by its design
   const id:lib.meshlib.Id=switch(designOf(s.seed)){
     inline else=>|k|meshes[@intFromEnum(k)],

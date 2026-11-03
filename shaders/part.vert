@@ -50,6 +50,8 @@ layout(location = 25) in vec3 knrm;
 const uint PART_GHOST = 1u;
 // iflags: its fronds turn ley-blue too (vertex.partLeyFronds)
 const uint PART_LEY_FRONDS = 2u;
+// iflags: no leaves, its crystals and runners turn ley-blue (vertex.partLeyCrystals)
+const uint PART_LEY_CRYSTALS = 4u;
 
 // this frame's bones (renderer Scene.bones): each carries a vertex from
 // where it was built to where it is now
@@ -122,6 +124,12 @@ const float LEY_EDGE = 0.18;
 const float LEY_WAVER = 0.07;
 const vec3 LEY_LEAF = LEY * vec3(0.26, 0.27, 0.36);
 const float LEY_GLOW = 0.06;
+// a leafless one's blue (PART_LEY_CRYSTALS): its crystals' blue (brighter
+// than a leaf's: they glow, as do its runners' cracks) and their light, and
+// how much of the blue its runners' coral takes
+const vec3 LEY_GEM = LEY * vec3(0.55, 0.6, 0.75);
+const float LEY_GEM_GLOW = 0.35;
+const float LEY_CORAL = 0.45;
 // a flash spreads out from this share of its size to this many times it
 const float FLASH_FROM = 0.1;
 const float FLASH_TO = 3.2;
@@ -1830,6 +1838,26 @@ void main() {
     float lum = dot(v_col, vec3(0.2126, 0.7152, 0.0722));
     v_col = mix(v_col, LEY_LEAF * clamp(lum * 7.0, 0.45, 1.6), blue);
     v_glow += blue * LEY_GLOW * (0.6 + 0.4 * leyPulse(w.xyz, t)) * ik.y;
+  }
+  // a leafless one's blue in its crystals (the lithophage's): they glow
+  // ley-blue from its top down, as far as its light is bright; along a
+  // runner (curve-placed, built along +Y from its home end) the blue
+  // creeps out from home toward its node instead, through the runner's
+  // coral, its crystals and the cracks it runs under. Each crystal keeps
+  // its facets' film over the blue; the coral keeps its stone
+  bool curve = mode == PLACE_CURVE;
+  // (its crystals are glowing `.bloom`, its condensing crystal `.prism`,
+  // its runners' coral `.stone`, the glow in their cracks `.bloom`)
+  bool gemOn = part == PART_PRISM || part == PART_BLOOM || (curve && part == PART_STONE);
+  if (ik.y > 0.0 && (iflags & PART_LEY_CRYSTALS) != 0u && gemOn) {
+    float down = curve ? clamp(pos.y, 0.0, 1.0) : clamp((ik.z - w.y) / max(ik.w, 0.05), 0.0, 1.0);
+    float waver = LEY_WAVER * sin(w.x * 9.0 + w.z * 7.0 + w.y * 5.0);
+    float reach = ik.y * (1.0 + LEY_EDGE);
+    float blue = smoothstep(reach, reach - LEY_EDGE, down + waver);
+    float pulse = 0.6 + 0.4 * leyPulse(w.xyz, t);
+    float take = part == PART_STONE ? LEY_CORAL : 1.0;
+    v_col = mix(v_col, LEY_GEM, blue * take);
+    v_glow += blue * take * LEY_GEM_GLOW * pulse * ik.y;
   }
   // a crown's fragment holds light as its structure's does (ip.x), fading
   // in as it settles

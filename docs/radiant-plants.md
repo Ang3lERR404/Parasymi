@@ -82,8 +82,10 @@ Settled in the build ([visual.md](visual.md#the-sign-of-light)): four
 crown designs (diadem, circlet, orrery, lotus), picked by the structure's
 seed. Crowned and blue: germinator, root-digger, loomfern, gathering
 crown, sap cache, arsthraxia (until it evolves), sporecaster (having no
-leaves, its fronds turn). Blue only: conduits and braided conduits. The
-lithophage waits for its rebuild. A structure that only looks lit (`.looks`:
+leaves, its fronds turn), lithophage (its crystals glow blue from the top
+down, and the blue creeps out along its runners and their cracks toward
+the nodes; its crown rises as its coral grows on, `crownAt`). Blue only:
+conduits and braided conduits. A structure that only looks lit (`.looks`:
 the sap cache, the conduits) draws no light, and is lit wherever light
 reaches it.
 

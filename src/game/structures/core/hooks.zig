@@ -73,6 +73,14 @@ pub fn draws(s:*const Structure)f32{
     inline else=>|k|if(comptime reg.has(k,"draws"))reg.module(k).draws(s)else s.def().draws,
   };
 }
+/// how high over its foot structure `s`'s halo crown hangs now (tiles,
+/// before research grows it; its `crownAt` hook, else its kind's
+/// `Def.crown`: a lithophage's rises as its coral grows on)
+pub fn crownAt(s:*const Structure)f32{
+  return switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"crownAt"))reg.module(k).crownAt(s)else s.def().crown,
+  };
+}
 /// how many seconds of work structure `s` does in `dt` by its light: a
 /// boost works up to `light.boost` faster, what needs light works as fast
 /// as its light allows and not at all short of `light.needAt`

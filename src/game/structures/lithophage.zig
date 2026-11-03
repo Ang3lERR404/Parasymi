@@ -92,8 +92,9 @@ pub const meshes=tierIds++tendrilIds++[_]meshlib.Id{.lithophageCrystal,.germinat
 /// store that swaps sap, drawn by itself (its coral grows on with its age),
 /// stony and swaying only a little
 pub const def:st.Def=.{.item=.lithophage,.lineage=.parasitic,.size=1,.mesh=.lithophage,.store=true,.grow=6,.bare=true,.sway=0.2,.tall=0.6,.sap=0.32,
-  // it draws faster in light (docs/radiant-plants.md), more the further it reaches (`draws`)
-  .light=.boost,.draws=3};
+  // it draws faster in light (docs/radiant-plants.md), more the further it
+  // reaches (`draws`); lit, it wears the crown, its crystals and runners blue
+  .light=.boost,.draws=3,.crown=0.65,.ley=.crystals};
 /// how far it reaches once grown (tiles)
 pub const grownReach:i32=2;
 /// the light it draws: `Def.draws`, and one more for each tile it reaches
@@ -208,6 +209,17 @@ pub fn tierGrown(n:usize,lv:f32)f32{
   const past=lv-m.f(n-1);
   if(n<mesh.tiers)return m.clamp01(past);
   return if(past<=0)0 else 1-1/(1+lastPace*past);
+}
+/// how much higher its crown hangs for each tier its coral grows on (tiles)
+const crownRise:f32=0.2;
+/// how high its halo crown hangs now: over its young coral, rising tier by
+/// tier as the coral grows on under it
+pub fn crownAt(s:*const st.Structure)f32{
+  // how far along its life it is, and how many tiers have grown on so far
+  const lv=level(s.state.lithophage.age);
+  var grownOn:f32=0;
+  for(1..tierIds.len+1)|n|grownOn+=tierGrown(n,lv);
+  return def.crown+crownRise*grownOn;
 }
 /// what a mineral refines into: a ley shard `leyWorth` grit, grit `refined`
 fn worth(item:items.Item)u32{return if(item==.leyShard)leyWorth else refined;}

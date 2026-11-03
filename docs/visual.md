@@ -270,7 +270,8 @@ while `Parts.ley` is set (`PartInstance.k.y`; `k.z` its top's world
 height, `k.w` its height).
 
 - **The halo crown** (`Def.crown`: how high over its foot it hangs, 0
-  none): radiant fragments, gathered, never grown (radiant_kit pieces
+  none; one that grows taller raises it, the `crownAt` hook: the
+  lithophage's rises tier by tier): radiant fragments, gathered, never grown (radiant_kit pieces
   drawn as part `.crown`). Each structure is given one of four set designs
   by its seed (`designOf`):
   - **diadem:** nine tall pearl petals standing on a ring of light, long
@@ -296,6 +297,13 @@ height, `k.w` its height).
   half lit, the top half. The front is soft and wavers leaf to leaf; each
   leaf keeps its own light and dark and stays matte, holding a breath of
   light pulsing as the ley does. Conduits wear only this, never a crown.
+  A crowned one's blue starts just under its crown (`crownGap`).
+- **Ley-blue crystals** (`.crystals`: the lithophage, which has no
+  leaves): its crystals take the blue from its top down and glow with it
+  (part.frag adds it over the prism film), and along each runner (a curve
+  built along +Y from home) the blue creeps out from home toward its node
+  as its light rises, through the cracks it runs under, the runner's coral
+  (partly: it stays stone) and the crystals budding on it.
 
 ### Germinator
 (`Def.still`: no breath, so its emitted pieces stay on it; `Def.preview`
