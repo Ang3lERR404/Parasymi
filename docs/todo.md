@@ -41,6 +41,14 @@ carries the game's early days.
 - Animation as the constellate parts drift together and merge.
 - The constellate lineage is in the game behind its own flag; it still
   has to join the garden proper.
+- Act 2 keeping the hyena to the convergent and constellate lineages
+  alone.
+- The constellate lineage has no studies yet, so no look for its nodes
+  on the research tree ([research-tree.md](research-tree.md)).
+
+## Playtesting
+- Whether the light grid's numbers feel right in play
+  ([radiant-plants.md](radiant-plants.md)).
 
 ## Saves that never break
 *Planned, not started.* Today plants, the belly, research, the weave queue

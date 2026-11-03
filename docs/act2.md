@@ -84,6 +84,4 @@ is what the code must come back to.
 - Accepted: "looks right" (2026-11-02).
 
 ## Not built yet
-- The wolf rooting into the tree (how act 2 begins in play).
-- Animation as parts drift and merge.
-- Act 2 keeping the hyena to the convergent and constellate lineages.
+In [todo.md](todo.md#act-2).

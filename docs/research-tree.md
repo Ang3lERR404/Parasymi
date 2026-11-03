@@ -74,4 +74,4 @@ progress, or what it still waits for. A click on the backdrop lets the
 card go.
 
 ## Not yet
-- The constellate lineage has no studies, so no node look yet.
+In [todo.md](todo.md#act-2).

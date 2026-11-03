@@ -1,7 +1,6 @@
-# More radiant plants (notes, not built)
+# More radiant plants
 
 The radiant lineage designed with the gardener, one question at a time.
-Nothing here is in the game yet.
 
 ## What every radiant thing keeps
 - **Gathered, never grown.** Rigid fragments flying in to a heart, held by
@@ -268,4 +267,4 @@ and so on, forever. Each unit its tendrils draw refines to 2 (a root-digger's gi
   guards them yet.
 
 ## Still to decide
-- Whether these numbers feel right in play.
+In [todo.md](todo.md#playtesting).
