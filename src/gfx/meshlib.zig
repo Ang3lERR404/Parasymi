@@ -56,6 +56,14 @@ const parts=struct{
   pub const nodeGrit=@import("meshes/node_grit.zig");
   /// a clump of fibre plant, long stalks rising
   pub const nodeFibre=@import("meshes/node_fibre.zig");
+  /// a sample: the fibre node as a golden flax starburst
+  pub const nodeFibreFlax=@import("meshes/node_fibre_looks.zig").flax;
+  /// a sample: the fibre node as bronze strap leaves fraying at their tips
+  pub const nodeFibreHarakeke=@import("meshes/node_fibre_looks.zig").harakeke;
+  /// a sample: the fibre node as a twisted rope bursting into a fibre fountain
+  pub const nodeFibreSheaf=@import("meshes/node_fibre_looks.zig").sheaf;
+  /// a sample: the fibre node as harakeke fans shot through with flax stems
+  pub const nodeFibreBlend=@import("meshes/node_fibre_looks.zig").blend;
   /// ley shards: crystals grown out of a ley line
   pub const nodeLey=@import("meshes/node_ley.zig");
   /// a fallen fragment of starlight, a small faceted bipyramid
