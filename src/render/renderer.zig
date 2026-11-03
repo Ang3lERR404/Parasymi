@@ -486,20 +486,21 @@ const Growing=struct{
     g.saved.store(true,.release);
   }
   /// lists the pieces in the order one builder would build them (each
-  /// species at each level, then each level's library meshes), builds them
+  /// level's library meshes, then each species at each level), builds them
   /// over the pool, checks the keys line up, and welds them
   fn all(g:*Growing)Allocator.Error!void{
     // the arena every piece grows in
     const gpa=g.arena.allocator();
     // the library meshes to build: those shown alone, or all of them
     const shown:[]const meshlib.Id=if(g.only)|o|o.parts else meshlib.ids;
-    // the pieces, in order
+    // the pieces, in order: the library meshes first, the only ones whose
+    // skin and growth are read (the weld keeps them for those alone)
     var list:std.ArrayList(Piece)=.empty;
+    for(0..meshgen.lods)|l|for(shown)|id|try list.append(gpa,.{.of=.{.part=id},.lod=@intCast(l)});
     for(species.ids)|id|for(0..meshgen.lods)|l|{
       if(g.only)|o|if(o.species!=id)continue;
       try list.append(gpa,.{.of=.{.plant=id},.lod=@intCast(l)});
     };
-    for(0..meshgen.lods)|l|for(shown)|id|try list.append(gpa,.{.of=.{.part=id},.lod=@intCast(l)});
     g.pieces=list.items;
     // the next piece to take, and whether building one ran out of memory
     var next=Atomic(usize).init(0);
@@ -579,13 +580,15 @@ const Growing=struct{
       },
     }
     // what is kept till the weld, at its size, freed once welded; skin
-    // and growth lists only where a vertex has any (most meshes have none)
+    // and growth lists only where a vertex has any (most meshes have none),
+    // and only a library mesh's (plant shaders read neither)
     const keep=g.arena.child_allocator;
-    if(b.skin.items.len>0)_=try b.skinOf(b.v.items.len);
-    if(b.grow.items.len>0)_=try b.growOf(b.v.items.len);
+    const read=p.of==.part;
+    if(read and b.skin.items.len>0)_=try b.skinOf(b.v.items.len);
+    if(read and b.grow.items.len>0)_=try b.growOf(b.v.items.len);
     p.v=try keep.dupe(vertex.Mesh,b.v.items);
-    p.skin=try keep.dupe(vertex.Skin,b.skin.items);
-    p.grow=try keep.dupe(vertex.Grow,b.grow.items);
+    p.skin=try keep.dupe(vertex.Skin,if(read)b.skin.items else&.{});
+    p.grow=try keep.dupe(vertex.Grow,if(read)b.grow.items else&.{});
     p.late=try keep.alloc(bool,b.v.items.len);
     for(b.v.items,p.late)|x,*lt|lt.*=switch(p.of){
       .plant=>|id|plantGlassy(id,@enumFromInt(x.part)),
@@ -626,7 +629,9 @@ const Growing=struct{
       const into=groups[z];
       for(&groups)|*gr|if(gr.*==from){gr.*=into;};
     };
-    g.welded=try weld.weld(gpa,g.io,soups,&ranges,&groups,&g.done);
+    // the library meshes' pieces, laid first: the only ones whose skin and growth are kept
+    const lead=meshgen.lods*shown.len;
+    g.welded=try weld.weld(gpa,g.io,soups,&ranges,&groups,lead,&g.done);
     // the pieces' soups are welded: freed before the upload
     g.freePieces();
     // each plant slot's run, then each part slot's
@@ -723,6 +728,8 @@ pub fn meshProgress(r:*const Renderer)m.Vice(u32,2){
 /// how many steps the welded meshes go up to the GPU in, one a loading
 /// frame, so the loading screen moves on while they go
 const uploadSteps=32;
+/// the least bytes a welded list's buffer holds (an empty list still makes one)
+const leastBytes=256;
 /// whether every mesh is grown and in one buffer: once they are through,
 /// sends them up a step at a time (one a call: the loading screen draws a
 /// frame between) and, the last step sent, frees the scratch. The world
@@ -746,8 +753,9 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   // read by every plant and part draw, every frame: in device memory,
   // made empty first and filled step by step
   const bufs=[_]*Buffer{&x.meshes,&x.skins,&x.grows,&x.indices};
+  // (never empty: a buffer must hold something, as with no library mesh shown)
   if(g.sent==0)for(bufs,lists,0..)|b,l,k|{
-    b.*=try Buffer.initRoom(&r.ctx,if(k==3)indexUsage(r)else.{.vertex_buffer=true},l.len,&.{});
+    b.*=try Buffer.initRoom(&r.ctx,if(k==3)indexUsage(r)else.{.vertex_buffer=true},@max(l.len,leastBytes),&.{});
   };
   // this step's share of each list, while any is left to send
   if(g.sent<uploadSteps){

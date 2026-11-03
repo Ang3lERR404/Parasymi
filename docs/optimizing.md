@@ -109,6 +109,17 @@ a `Run` with `drawIndexed(count, …, first, base, …)`.
   and land in a slot's range. Smooth meshes share ~5x; faceted ones
   (the constellate's fragments) ~2x.
 
+### Skin and growth only where they are read (`weld`'s `lead`)
+Only the parts' shaders read skin weights and growth records; the plants'
+read neither. The library meshes' pieces are laid first, and the weld
+keeps skin and growth only as far as their vertices run: the plants' 33
+million vertices no longer carry 84 unread bytes each (~2.8 GB of video
+memory). On an 8 GB card that was the difference between fitting and the
+driver paging: `--stress` with rays went from 125 ms a frame to 54 (rays
+98 → 29), and with buffers doubled it ran out of memory outright.
+- A new mesh whose shader reads skin or growth must be a library mesh
+  (or its pieces laid among the leading ones).
+
 ### Only the see-through tail in the glass passes (`Run.early`)
 The weld puts each run's late triangles (see-through ones) last; the
 glass and air passes draw only `first+early ..`, the solid passes the
@@ -173,7 +184,9 @@ Take derivatives (`fwidth`, `dFdx`) before the branch.
 3. **Shadow casters per cascade** (stress `plantsShadow` ~2.3 ms):
    every caster is drawn into all three cascades; cull per cascade.
    Exact.
-4. **Vertex memory** (~3.5 GB): most vertices carry 56 bytes of unused
-   skin. Keep skins only for skinned meshes. Exact.
+4. **Rays in a big garden** (stress `rays` ~29 ms): the plants caught
+   are those the camera sees, so as it moves the plants' level is built
+   anew rather than refitted. A level per chunk, refitted, rebuilt only
+   when its own plants change, would keep a moving camera cheap. Exact.
 5. **Compute pre-transform, meshlets**: only if the vertex stage leads
    again (see shader-optimization.md, round two).

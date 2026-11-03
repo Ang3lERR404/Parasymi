@@ -13,7 +13,9 @@
 //! The runs may lie in several soups (each built apart, on a thread of its
 //! own), never copied into one. Each group is welded on its own (over the
 //! pool, `jobs.each`), then all are laid end to end in the soups' order:
-//! the same welding however split.
+//! the same welding however split. Skin weights and growth records are kept
+//! only as far as the leading soups' vertices (the meshes that read them):
+//! a garden's plants, laid after, would carry 84 bytes a vertex unread.
 /// the standard library
 const std=@import("std");
 /// the allocator the welded lists grow with (shared by the pool's threads:
@@ -93,9 +95,10 @@ pub const Range=struct{
 pub const Welded=struct{
   /// the vertices kept
   v:std.ArrayList(vertex.Mesh)=.empty,
-  /// each kept vertex's skin weights
+  /// each kept vertex's skin weights, as far as the leading soups' run
+  /// (`weld`'s `lead`): the vertices after them read none, so keep none
   skin:std.ArrayList(vertex.Skin)=.empty,
-  /// each kept vertex's growth record
+  /// each kept vertex's growth record (as far as `skin`)
   grow:std.ArrayList(vertex.Grow)=.empty,
   /// every run's corners, as indices from its base
   indices:std.ArrayList(u32)=.empty,
@@ -279,8 +282,11 @@ const Lay=struct{
         // the soup this member lies in, and where its vertices go
         const s=l.soups[r.soup];
         const base=@as(usize,o.base)+k*o.kept.len;
+        // (skin and growth only where they are kept: the leading soups')
+        const lists=base<l.w.skin.items.len;
         for(o.kept,base..)|c,d|{
           l.w.v.items[d]=s.v[r.first+c];
+          if(!lists)continue;
           l.w.skin.items[d]=s.skinAt(r.first+c).*;
           l.w.grow.items[d]=s.growAt(r.first+c).*;
         }
@@ -294,10 +300,14 @@ const Lay=struct{
 /// a group where its first run lay), so a later key's vertices stay after
 /// an earlier one's. Groups are welded over `io`'s pool (null: here, the
 /// same result); `progress`, if given, counts each run as it is welded
-/// (empty ones at once). `gpa` must be thread-safe.
-pub fn weld(gpa:Allocator,io:?Io,soups:[]const Soup,ranges:[]const Range,groups:[]const u32,progress:?*Atomic(u32))Allocator.Error!Welded{
-  std.debug.assert(ranges.len==groups.len);
+/// (empty ones at once). `gpa` must be thread-safe. Skin weights and growth
+/// records are kept only for the first `lead` soups' vertices (the meshes
+/// whose shaders read them, laid first): every soup after keeps none, and
+/// the lists end where the leading soups' welded vertices end.
+pub fn weld(gpa:Allocator,io:?Io,soups:[]const Soup,ranges:[]const Range,groups:[]const u32,lead:usize,progress:?*Atomic(u32))Allocator.Error!Welded{
+  std.debug.assert(ranges.len==groups.len and lead<=soups.len);
   for(soups)|s|std.debug.assert((s.skin.len==0 or s.skin.len==s.v.len) and (s.grow.len==0 or s.grow.len==s.v.len));
+  for(soups[lead..])|s|std.debug.assert(s.skin.len==0 and s.grow.len==0);
   // what comes out, freed again if welding fails
   var w=Welded{};
   errdefer w.deinit(gpa);
@@ -357,6 +367,8 @@ pub fn weld(gpa:Allocator,io:?Io,soups:[]const Soup,ranges:[]const Range,groups:
   // where each group lies in the whole, and how long the whole is
   var nIdx:u32=0;
   var nVert:u32=0;
+  // where the leading soups' vertices end (their groups come first)
+  var covered:u32=0;
   for(gs,outs)|g,*o|{
     // how many vertices each member keeps
     const kept:u32=@intCast(o.kept.len);
@@ -365,11 +377,12 @@ pub fn weld(gpa:Allocator,io:?Io,soups:[]const Soup,ranges:[]const Range,groups:
     for(g.members,0..)|r,k|w.runs[r]=.{.first=nIdx,.count=g.n,.base=nVert+@as(u32,@intCast(k))*kept,.verts=kept,.early=o.early};
     nIdx+=g.n;
     nVert+=@as(u32,@intCast(g.members.len))*kept;
+    if(g.at[0].soup<lead)covered=nVert;
   }
   try w.indices.resize(gpa,nIdx);
   try w.v.resize(gpa,nVert);
-  try w.skin.resize(gpa,nVert);
-  try w.grow.resize(gpa,nVert);
+  try w.skin.resize(gpa,covered);
+  try w.grow.resize(gpa,covered);
   next.store(0,.monotonic);
   jobs.each(io,gs.len,1,Lay,.{.soups=soups,.groups=gs,.outs=outs,.w=&w,.next=&next},Lay.layAll);
   return w;
@@ -408,7 +421,7 @@ test"a welded soup draws every corner exactly as it was, each shared vertex once
   grow[6].at=.{0.5,0,0,0};
   const soup=Soup{.v=&v,.skin=&skin,.grow=&grow};
   const ranges=[_]Range{.{.first=6,.count=3},.{.first=0,.count=6},.{}};
-  var w=try weld(testing.allocator,null,&.{soup},&ranges,&.{0,1,2},null);
+  var w=try weld(testing.allocator,null,&.{soup},&ranges,&.{0,1,2},1,null);
   defer w.deinit(testing.allocator);
   try testing.expectEqual(@as(u32,4),w.runs[1].verts);
   try testing.expectEqual(@as(u32,3),w.runs[0].verts);
@@ -429,7 +442,7 @@ test"runs welded together share their indices and line up vertex for vertex"{
   const grow=[_]vertex.Grow{.{}}**12;
   const soup=Soup{.v=&v,.skin=&skin,.grow=&grow};
   const ranges=[_]Range{.{.first=6,.count=6},.{.first=0,.count=6}};
-  var w=try weld(testing.allocator,null,&.{soup},&ranges,&.{7,7},null);
+  var w=try weld(testing.allocator,null,&.{soup},&ranges,&.{7,7},1,null);
   defer w.deinit(testing.allocator);
   try testing.expectEqual(w.runs[0].first,w.runs[1].first);
   try testing.expectEqual(w.runs[0].verts,w.runs[1].verts);
@@ -450,7 +463,7 @@ test"late triangles go last, each part in its own order, every corner as it was"
   late[1]=true;
   late[8]=true;
   const soup=Soup{.v=&v,.skin=&skin,.grow=&grow,.late=&late};
-  var w=try weld(testing.allocator,null,&.{soup},&.{.{.count=12}},&.{0},null);
+  var w=try weld(testing.allocator,null,&.{soup},&.{.{.count=12}},&.{0},1,null);
   defer w.deinit(testing.allocator);
   // the run, and the soup triangle each of its triangles must be
   const r=w.runs[0];
@@ -498,7 +511,7 @@ test"welded over the pool from soups apart, runs come out exactly as from one so
   @memset(skin[whole[16].first..whole[23].first+whole[23].count],.{});
   const soup=Soup{.v=v,.skin=skin,.grow=grow,.late=late};
   // welded here from the one soup
-  var here=try weld(gpa,null,&.{soup},&whole,&groups,null);
+  var here=try weld(gpa,null,&.{soup},&whole,&groups,1,null);
   defer here.deinit(gpa);
   // the same corners as five soups of eight runs each, welded over the pool
   var soups:[5]Soup=undefined;
@@ -512,7 +525,7 @@ test"welded over the pool from soups apart, runs come out exactly as from one so
     for(apart[k*8..][0..8],whole[k*8..][0..8])|*a,r|a.*=.{.soup=@intCast(k),.first=r.first-lo,.count=r.count};
   }
   var counted=Atomic(u32).init(0);
-  var pooled=try weld(gpa,testing.io,&soups,&apart,&groups,&counted);
+  var pooled=try weld(gpa,testing.io,&soups,&apart,&groups,soups.len,&counted);
   defer pooled.deinit(gpa);
   try testing.expectEqual(@as(u32,whole.len),counted.load(.monotonic));
   try testing.expectEqualSlices(u8,sliceAsBytes(here.runs),sliceAsBytes(pooled.runs));
@@ -520,4 +533,30 @@ test"welded over the pool from soups apart, runs come out exactly as from one so
   try testing.expectEqualSlices(u8,sliceAsBytes(here.v.items),sliceAsBytes(pooled.v.items));
   try testing.expectEqualSlices(u8,sliceAsBytes(here.skin.items),sliceAsBytes(pooled.skin.items));
   try testing.expectEqualSlices(u8,sliceAsBytes(here.grow.items),sliceAsBytes(pooled.grow.items));
+}
+test"skin and growth are kept only for the leading soups, the rest welded alike"{
+  // a skinned, grown triangle in the first soup, a plain quad in the second
+  const a=[_]vertex.Mesh{testVertex(0,1),testVertex(1,1),testVertex(2,1)};
+  const b=[_]vertex.Mesh{testVertex(0,2),testVertex(1,2),testVertex(2,2),testVertex(2,2),testVertex(1,2),testVertex(3,2)};
+  const skin=[_]vertex.Skin{.{.bones=3,.weights=.{255,0,0,0}}}**3;
+  const grow=[_]vertex.Grow{.{.at=.{0.25,0.5,0,0}}}**3;
+  const soups=[_]Soup{.{.v=&a,.skin=&skin,.grow=&grow},.{.v=&b}};
+  const ranges=[_]Range{.{.soup=1,.count=6},.{.soup=0,.count=3}};
+  // (the same soups with every list kept, for the vertices and indices)
+  var all=try weld(testing.allocator,null,&soups,&ranges,&.{0,1},soups.len,null);
+  defer all.deinit(testing.allocator);
+  var w=try weld(testing.allocator,null,&soups,&ranges,&.{0,1},1,null);
+  defer w.deinit(testing.allocator);
+  // the leading soup's three vertices first, its lists ending with them
+  try testing.expectEqual(@as(u32,0),w.runs[1].base);
+  try testing.expectEqual(@as(usize,3),w.skin.items.len);
+  try testing.expectEqual(@as(usize,3),w.grow.items.len);
+  try expectSame(&w,soups[0],0,w.runs[1]);
+  try testing.expectEqualSlices(u8,sliceAsBytes(all.runs),sliceAsBytes(w.runs));
+  try testing.expectEqualSlices(u32,all.indices.items,w.indices.items);
+  try testing.expectEqualSlices(u8,sliceAsBytes(all.v.items),sliceAsBytes(w.v.items));
+  // none led: no lists at all
+  var none=try weld(testing.allocator,null,&.{soups[1]},&.{.{.count=6}},&.{0},0,null);
+  defer none.deinit(testing.allocator);
+  try testing.expectEqual(@as(usize,0),none.skin.items.len);
 }

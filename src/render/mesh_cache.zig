@@ -55,7 +55,7 @@ const sculpts=lib.sculpts;
 /// the folder inside home the cache files go in
 pub const folder="cache";
 /// the file's first bytes: what it is, and its layout's version
-const magic="PSYMSH01".*;
+const magic="PSYMSH02".*;
 /// how much of a file is read at once while the program is hashed
 const hashChunk=1<<22;
 /// the file's head: what it is, the key it was written for, and how many
@@ -75,6 +75,9 @@ const Head=extern struct{
   skinned:u64=0,
   /// how many vertices have growth records
   grown:u64=0,
+  /// how many vertices the skin and growth lists run over (the leading
+  /// meshes', which read them: `weld`'s `lead`)
+  covered:u64=0,
   /// how many bytes of the tables kept beside them
   extra:u64=0,
 };
@@ -151,9 +154,10 @@ fn readBody(gpa:Allocator,io:Io,f:File,head:Head,extras:[]const []u8)ReadError!w
   w.runs=try gpa.alloc(weld.Run,head.runs);
   try w.v.resize(gpa,head.verts);
   try w.indices.resize(gpa,head.indices);
-  try w.skin.resize(gpa,head.verts);
+  if(head.covered>head.verts)return error.CutShort;
+  try w.skin.resize(gpa,head.covered);
   @memset(w.skin.items,blankSkin);
-  try w.grow.resize(gpa,head.verts);
+  try w.grow.resize(gpa,head.covered);
   @memset(w.grow.items,blankGrow);
   // where the next section begins
   var at:u64=@sizeOf(Head);
@@ -217,7 +221,7 @@ fn writeSide(gpa:Allocator,io:Io,dir:Dir,path:[]const u8,want:u64,w:*const weld.
   var grown=try keptOf(vertex.Grow,gpa,w.grow.items,blankGrow);
   defer grown.deinit(gpa);
   // the head
-  var head=Head{.key=want,.verts=w.v.items.len,.indices=w.indices.items.len,.runs=w.runs.len,.skinned=skinned.idx.len,.grown=grown.idx.len};
+  var head=Head{.key=want,.verts=w.v.items.len,.indices=w.indices.items.len,.runs=w.runs.len,.skinned=skinned.idx.len,.grown=grown.idx.len,.covered=w.skin.items.len};
   for(extras)|x|head.extra+=x.len;
   // where the next section goes
   var at:u64=0;
@@ -274,13 +278,14 @@ test"meshes kept come back exactly, only for their own key"{
   // a folder of its own to keep them in
   var tmp=testing.tmpDir(.{});
   defer tmp.cleanup();
-  // four vertices, one skinned, one grown; two runs; six indices
+  // four vertices, one skinned, one grown, the lists over the first three
+  // only; two runs; six indices
   var w=weld.Welded{};
   defer w.deinit(gpa);
   for(0..4)|i|try w.v.append(gpa,.{.pos=.{m.f(i),0,0},.nrm=.{0,1,0},.col=.{.r=1,.g=2,.b=3,.a=4},.tu=.{0,0,0},.part=@intCast(i)});
-  try w.skin.appendNTimes(gpa,blankSkin,4);
+  try w.skin.appendNTimes(gpa,blankSkin,3);
   w.skin.items[2]=.{.bones=7,.weights=.{255,0,0,0}};
-  try w.grow.appendNTimes(gpa,blankGrow,4);
+  try w.grow.appendNTimes(gpa,blankGrow,3);
   w.grow.items[1]=.{.at=.{0.5,0.25,0,1}};
   try w.indices.appendSlice(gpa,&.{0,1,2,2,1,3});
   w.runs=try gpa.dupe(weld.Run,&.{.{.count=3,.verts=3},.{.first=3,.count=3,.base=0,.verts=4,.early=3}});
