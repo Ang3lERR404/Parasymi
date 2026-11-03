@@ -90,11 +90,19 @@ grown (`Def.grow`):
   conduits.
 
 ### Parasitic (pale, alien, `parasiteKit`)
-- **Lithophage** ("Lithophagy"): drains grit and ley nodes on the 8 tiles
-  around it, one every 3 s, into a crystal in its crop (6 grit, ley
-  shard = 3). The crystal is sapped back out as 6 grit into its
-  cup. It is fed ley shards only, so any grit it holds is grit it sapped
-  (the gardener's call: grit).
+- **Lithophage** ("Lithophagy"): the root-digger's upgrade, a stone
+  coral. It sends tendrils out over a radius (one per grit or ley node,
+  nearest first, at most 12) and draws a unit up one of them every 3 s,
+  in turn. It refines what comes up its roots: each grit unit becomes 2
+  grit (a root-digger's gives 1), a ley shard 3. What it draws condenses
+  into a crystal budding on its coral; at 12 grit the crystal is sapped
+  out, 1 grit a second, into the cup on its foot (holds 16). It is fed ley
+  shards only, so any grit it holds is grit it sapped (the gardener's
+  call: grit).
+  - **It grows forever.** Grown, it reaches 2 tiles (a disc: a tile is in
+    reach when its centre is within reach + a half). It reaches one tile
+    further each time its age triples: 3 after 5 days (3000 s), 4 after
+    15, 5 after 45, and so on. Its coral grows on a tier for each tile.
 - **Ganglion** ("Lithophagy"): holds 8. Every 0.35 s it hands one item
   out, going round its sides in turn, to whatever wants it, and to
   carriers not facing into it. Use it to split lines, or to feed several

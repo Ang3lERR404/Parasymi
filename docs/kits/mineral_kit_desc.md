@@ -27,7 +27,7 @@ ground down to worn faces. Not grown, not on splines.
 |---|---|
 | `node_ley.zig` | `crystal` (violet cluster), `stone` |
 | `node_grit.zig` | `stone` (faceted stones), `crystal` (quartz chips) |
-| `lithophage.zig` | `crystal` (the crystal in its crop) |
+| `lithophage.zig` | `crystal` (the crystal budding on its coral, crystals on its limbs and runners), `stone` (crust heaved where a tendril surfaces) |
 | `mote.zig` | `facet` (star mote's faceted core) |
 | `radiant_kit.zig` | `facet` (in `cut`), `crystal` (in `shards`) |
 
@@ -46,5 +46,6 @@ ground down to worn faces. Not grown, not on splines.
 - No growth: a node's minerals are just there. A structure that makes a
   crystal scales it by `growth.formed(form, grown)`, or by its own
   progress, in the mesh that emits it.
-- Check: `--structure=lithophage --state=active` (crystal in its crop).
+- Check: `--structure=lithophage --state=active` (crystals on its coral
+  and runners).
   Nodes appear around any `--structure` specimen.

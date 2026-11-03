@@ -16,7 +16,7 @@ uses it, what the shaders read from it, its rules and tests.
 | parasite_kit | [parasite_kit_desc.md](parasite_kit_desc.md) | parasitic (pale, exact fives) | growth splines; plants by tu.x | `coil` plants (thornleech), lithophage, ganglion, sporecaster; convergence_kit and convergent structures |
 | convergence_kit | [convergence_kit_desc.md](convergence_kit_desc.md) | both lineages mixed | growth splines (`*On`); confluence by keys | confluence, weftstone, driftbraid, monfris, vultrixi |
 | radiant_kit | [radiant_kit_desc.md](radiant_kit_desc.md) | radiant / celestial | **gathered, never grown** | celestial bloom, vesper, diamond (halo) |
-| mineral_kit | [mineral_kit_desc.md](mineral_kit_desc.md) | ground minerals | not grown | grit and ley nodes, lithophage crystal, star mote, radiant_kit cuts/shards |
+| mineral_kit | [mineral_kit_desc.md](mineral_kit_desc.md) | ground minerals | not grown | grit and ley nodes, lithophage crystals and crust, star mote, radiant_kit cuts/shards |
 | sculpt_kit | [sculpt_kit_desc.md](sculpt_kit_desc.md) | the wolf's skin (SDF) | skinned, not grown | wolf body, belly, ears, wolf_kit |
 | wolf_kit | [wolf_kit_desc.md](wolf_kit_desc.md) | the wolf's details | skinned, not grown | wolf body, belly, pecs, rump |
 

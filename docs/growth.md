@@ -18,7 +18,9 @@ never grown by scaling the whole:
   how far it reaches.
 - **Conduit:** each arch is its own spline; side roots are grown by how
   far they reach.
-- **Lithophage**, and its roots. **Ganglion**, and its nerves.
+- **Lithophage**: its young coral, then a tier grown on for each tile it
+  reaches further (`Tier(n)`, emitted with how far along its life it is;
+  the last never quite ends), and its tendrils, grown by how far they reach. **Ganglion**, and its nerves.
 - **Braided conduit:** the weave and each lane are their own meshes on the
   same spline.
 - **Gathering crown**, and its roots (`Root(n)` per distance).

@@ -107,7 +107,7 @@ tu.x is height (the crown is 0.85..1).
 | User | Uses |
 |---|---|
 | `meshgen.zig` (plant form `.coil`) | `plant` — species `thornleech` |
-| `lithophage.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, palette, `fold` |
+| `lithophage.zig` | `foot`, palette, `fold` (five coral limbs, septa, rootlets) |
 | `ganglion.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `nodule`, `wobble`, palette |
 | `sporecaster.zig` | `stalk`, `foot`, `roots`, `organs`, `bladder`, `frondPath`, `pod`, `podGirth`, `podFoot`, palette |
 | `convergence_kit.zig` | `Section`, `Stalk`, `section`, `parting`, `lattice`, `frondPath`, `nodule`, `fold`, `twist`, palette |

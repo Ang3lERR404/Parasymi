@@ -271,14 +271,42 @@ const parts=struct{
   pub const crownRoot5=@import("meshes/gathering_crown.zig").Root(4);
   /// the gathering crown: a symbiote rosette that gathers for the garden
   pub const gatheringCrown=@import("meshes/gathering_crown.zig");
-  /// the lithophage: a parasite that eats stone, a bulbous foot half sunk
+  /// the lithophage: a stone coral that eats stone, young, on its pale foot
   pub const lithophage=@import("meshes/lithophage.zig");
+  /// its coral's first tier of later growth, as it first reaches 3 tiles
+  pub const lithophageTier1=@import("meshes/lithophage.zig").Tier(1);
+  /// its second, as it reaches 4
+  pub const lithophageTier2=@import("meshes/lithophage.zig").Tier(2);
+  /// its third, as it reaches 5
+  pub const lithophageTier3=@import("meshes/lithophage.zig").Tier(3);
+  /// its fourth and last, creeping on forever after
+  pub const lithophageTier4=@import("meshes/lithophage.zig").Tier(4);
   /// the crystal it grows with what it draws, and saps away
   pub const lithophageCrystal=@import("meshes/lithophage.zig").crystal;
-  /// one of its roots, out to a node beside it
-  pub const lithophageRoot=@import("meshes/lithophage.zig").root;
-  /// the same root, out to a node on a diagonal
-  pub const lithophageRootFar=@import("meshes/lithophage.zig").rootFar;
+  /// one of its tendrils, cracks then a coral runner, to a node 1 tile off
+  pub const lithophageTendril1=@import("meshes/lithophage.zig").Tendril(0);
+  /// the same tendril to a node 1.41 tiles off
+  pub const lithophageTendril2=@import("meshes/lithophage.zig").Tendril(1);
+  /// the same tendril to a node 2 tiles off
+  pub const lithophageTendril3=@import("meshes/lithophage.zig").Tendril(2);
+  /// the same tendril to a node 2.24 tiles off
+  pub const lithophageTendril4=@import("meshes/lithophage.zig").Tendril(3);
+  /// the same tendril to a node 2.83 tiles off
+  pub const lithophageTendril5=@import("meshes/lithophage.zig").Tendril(4);
+  /// the same tendril to a node 3.16 tiles off
+  pub const lithophageTendril6=@import("meshes/lithophage.zig").Tendril(5);
+  /// the same tendril to a node 3.61 tiles off
+  pub const lithophageTendril7=@import("meshes/lithophage.zig").Tendril(6);
+  /// the same tendril to a node 4.12 tiles off
+  pub const lithophageTendril8=@import("meshes/lithophage.zig").Tendril(7);
+  /// the same tendril to a node 4.6 tiles off
+  pub const lithophageTendril9=@import("meshes/lithophage.zig").Tendril(8);
+  /// the same tendril to a node 5.1 tiles off
+  pub const lithophageTendril10=@import("meshes/lithophage.zig").Tendril(9);
+  /// the same tendril to a node 5.8 tiles off
+  pub const lithophageTendril11=@import("meshes/lithophage.zig").Tendril(10);
+  /// the same tendril to a node 6.5 tiles off
+  pub const lithophageTendril12=@import("meshes/lithophage.zig").Tendril(11);
   // what a rooted thing walks on while it turns (R)
   /// a root a rooted thing walks on while it turns, symbiote green
   pub const turnRoot=@import("meshes/turn_root.zig");
