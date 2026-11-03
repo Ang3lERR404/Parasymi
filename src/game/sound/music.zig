@@ -110,7 +110,8 @@ pub const Music=struct{
   motif:[motif]?u8=@splat(null),
   /// the variation's scale steps (null rests)
   varied:[motif]?u8=@splat(null),
-  /// whether the next phrase is the first, which always takes a new motif
+  /// whether the next phrase is the day's first, which always plays the
+  /// garden's theme
   fresh:bool=true,
   /// silent through the night: nothing rings, the next day starts a phrase
   resting:bool=true,
@@ -164,6 +165,7 @@ pub const Music=struct{
     mu.cymbals.clear();
     mu.step=0;
     mu.left=0;
+    mu.fresh=true;
     mu.resting=true;
   }
   /// plays `buf` (zeroed) out, striking each step as it comes
@@ -220,13 +222,21 @@ pub const Music=struct{
     mu.drumStep(s);
     mu.step=(mu.step+1)%phraseSteps;
   }
-  /// a new phrase: maybe new chords, a new motif or a variation of the last
+  /// a new phrase: the garden's theme (always the day's first), or maybe
+  /// new chords, a new motif or a variation of the last
   pub fn phrase(mu:*Music)void{
     mu.calm=mu.r.float()<score.calmChance;
-    if(mu.r.float()<newChords)mu.chords=progressions[mu.r.below(progressions.len)];
-    if(mu.fresh or mu.r.float()<newMotifChance){
-      mu.motif=mu.newMotif();
+    if(mu.fresh or mu.r.float()<score.themeChance){
+      // the theme over the first progression, its answer after it
+      mu.chords=progressions[0];
+      mu.motif=score.theme;
+      mu.varied=score.themeAnswer;
       mu.fresh=false;
+      return;
+    }
+    if(mu.r.float()<newChords)mu.chords=progressions[mu.r.below(progressions.len)];
+    if(mu.r.float()<newMotifChance){
+      mu.motif=mu.newMotif();
     }else mu.motif=mu.alter(mu.varied);
     mu.varied=mu.alter(mu.motif);
     if(mu.r.float()<breathe){

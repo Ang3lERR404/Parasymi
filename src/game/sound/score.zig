@@ -36,6 +36,18 @@ pub const melHi:u8=15;
 pub const noteChance=m.Vice(f32,3){0.9,0.6,0.3};
 /// how loud a note is there (before it strays by `vary`)
 pub const noteVel=m.Vice(f32,3){1,0.8,0.62};
+// decision: the garden has a theme of its own, so the unforming can break a
+// tune the player knows (as Little Inferno's "Up Up Up the Chimney" plays
+// Sugar Plumps' melody flipped over new chords, the gardener's reference)
+/// the garden's theme (scale steps above the key, null rests): two bars
+/// rising from D4 through the raised fourth to D5 and hanging on it,
+/// D4 F#4 A4 G#4 A4 B4 D5 C#5 A4 G#4
+pub const theme=[motif]?u8{7,null,9,11,10,null,null,11,12,null,14,null,13,11,10,null};
+/// its answer, the second half of a phrase that plays it: home again,
+/// D4 F#4 A4 G#4 F#4 E4 F#4 D4
+pub const themeAnswer=[motif]?u8{7,null,9,11,10,null,null,9,8,null,9,null,7,null,null,null};
+/// how often a phrase plays the garden's theme (each day's first always does)
+pub const themeChance:f32=0.3;
 /// a new motif instead of a variation of the last, a new progression
 /// instead of the last, and each step's chance to change in a variation
 /// (this one: the chance of a new motif)

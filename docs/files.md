@@ -263,7 +263,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `tests.zig` — the garden's sounds rendered offline and measured.
 - `twinkle.zig` — a mote of starlight twinkling: a few glassy pings dying in a shimmer.
 - `unforming.zig` — the unforming heard: its own theme playing under it all (unforming_theme.zig), glass raining as the sky shatters, a seam humming shut, ash…
-- `unforming_theme.zig` — the unforming's own theme: the garden's music breaking.
+- `unforming_theme.zig` — the unforming's own theme, after Little Inferno's "Incident on the Other Side of the Wall" as the gardener heard it: a creak and swell as…
 - `voices.zig` — the day's piano: a felt-hammered string struck and ringing.
 - `wind.zig` — the wind over the garden: a hush in slow gusts, whistling in the strong ones.
 

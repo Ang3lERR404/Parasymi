@@ -46,8 +46,10 @@
 //!   cymbal swelling to crash on its first step; a wandering
 //!   Lydian line (its raised fourth the sound of wonder) over a soft left
 //!   hand, phrased as a motif and its variation over open chords (major
-//!   sevenths, the Lydian II, ninths left ringing); it rises with the
-//!   morning and fades out at dusk.
+//!   sevenths, the Lydian II, ninths left ringing); each morning's first
+//!   phrase, and now and then another, is the garden's own theme, rising
+//!   through the raised fourth and home again; it rises with the morning
+//!   and fades out at dusk.
 //! - by night, music: a choir of sopranos, altos, tenors and basses, eight
 //!   voices each, singing "ahh" through slow open chords, each section
 //!   gliding to its nearest note of the next and swelling through each
@@ -63,16 +65,16 @@
 //!   unit is done a soft bell chord in the music's key blooms upward over a
 //!   warm low note, and a breath rushes up its stems with the surge of light.
 //! - the unforming (the first world event): the garden's music cuts dead
-//!   and its own theme plays in the hall instead, the garden's music
-//!   breaking. A lone cello sings the Lydian line over a choir's hum; its
-//!   raised fourth bends down to G and the key falls into D minor; a
-//!   heartbeat of timpani and the choir's falling lament swell, a timpani
-//!   roll rising into the whole orchestra with low brass and the great
-//!   taiko, and far off, mostly heard through the hall, the world screams,
-//!   voice by voice, harmonic but harrowing, cracking as it strains. All
-//!   of it stops dead for the seed's fall; the landing brings the raised
-//!   fourth back in choir and strings, and the garden's music returns
-//!   slowly after. Over the theme: glass rains as the sky shatters, as
+//!   and its own theme plays in the hall instead: the world creaks as if
+//!   about to break, one great deep horn sounds, and over a rumble, masses
+//!   falling, burning and fireworks whistling up without bursting, a wall
+//!   of two choirs, strings, violins and at last trumpets climbs through
+//!   bright suspended chords over a held D, never resolving; one woman
+//!   screams far off, almost joining the choir, the land echoing her, and
+//!   the music falls slowly away into silence and the earth's last rumbles.
+//!   After the landing the choirs and strings rise slowly and the garden's
+//!   theme comes home on the bells; the garden's music returns slowly
+//!   after. Over the theme: glass rains as the sky shatters, as
 //!   thick as the front sweeping down; each radiant plant breaks with a
 //!   snap and a scatter of glints, the stars and the ley nodes likewise;
 //!   the ley lines hum shut, a seam sinking an octave; dry ash crumbles as
