@@ -249,6 +249,7 @@ pub fn main(init:Init)!void{
   const r=try Renderer.init(gpa,window,opts.vsync,opts.aa,.{.only=if(lone)|*l|try l.only(init.arena.allocator())else null,.io=io});
   defer r.deinit();
   opts.aa=r.antialiasing();
+  try r.pointShadows(opts.lightShadows.lights(),opts.lightShadows.res());
   // the loading screen shows while every mesh grows (on a thread of its
   // own), the world wakes and its ground is meshed. Until the world is
   // woken its chunks are counted as many as stream in round the gardener.
@@ -522,6 +523,7 @@ fn apply(io:Io,game:*Game,r:*Renderer,display:*Display,applied:*Options)!void{
   const o=&game.opts;
   try r.antialias(o.aa);
   o.aa=r.antialiasing();
+  try r.pointShadows(o.lightShadows.lights(),o.lightShadows.res());
   try r.setVsync(o.vsync);
   // whether the window is fullscreen now
   const full=display.mode==.fullscreen;

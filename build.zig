@@ -28,7 +28,8 @@ const shaders=[_][]const u8{
 /// variants draw only the see-through fragments the plain ones skip; the
 /// head variants shade the always-solid triangles, lighter; the
 /// shadow variants place what casts into each cascade of the key light's
-/// shadow map; the overhead ones draw the ground from above for the fog;
+/// shadow map, the cube ones into each face of a point of light's shadow
+/// cube; the overhead ones draw the ground from above for the fog;
 /// the air ones light the fog round what glows.
 const variants=[_][3][]const u8{
   .{"plant_glass.frag","plant.frag","GLASS"},
@@ -37,6 +38,8 @@ const variants=[_][3][]const u8{
   .{"part_head.frag","part.frag","HEAD"},
   .{"plant_shadow.vert","plant.vert","SHADOW"},
   .{"part_shadow.vert","part.vert","SHADOW"},
+  .{"plant_cube.vert","plant.vert","CUBE"},
+  .{"part_cube.vert","part.vert","CUBE"},
   .{"part_air.vert","part.vert","AIR"},
   .{"part_air.frag","part.frag","AIR"},
   .{"terrain_overhead.vert","terrain.vert","OVERHEAD"},

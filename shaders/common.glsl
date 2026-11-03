@@ -1,6 +1,11 @@
 //! shared by every world pass: push constants, the sky's shift, garden wind, growth, gathering, halo spiral, the plexus and shading (shadows and points of light from the engine's light.glsl).
 #extension GL_EXT_buffer_reference : require
 #extension GL_EXT_buffer_reference_uvec2 : require
+#ifdef CUBE
+// a point of light's shadow cube is cast into as the key light's map is,
+// each face a view (light.glsl `project`)
+#define SHADOW
+#endif
 #ifdef SHADOW
 // a shadow caster draws into every cascade at once, one view each
 #extension GL_EXT_multiview : require
@@ -472,7 +477,7 @@ PointLit pointLights(vec3 wpos, vec3 n, vec3 R, bool mirror) {
     float k = d2 / (lp.w * lp.w);
     if (k >= 1.0) continue;
     vec3 col = L.lights[i].col.rgb;
-    float win = (1.0 - k) * (1.0 - k);
+    float win = (1.0 - k) * (1.0 - k) * pointShadow(L, i, wpos, n, d);
     float inv = inversesqrt(max(d2, 1e-6));
     float f = dot(n, d) * inv;
     vec3 lit = col * win / (1.0 + LIGHT_FALLOFF * k);

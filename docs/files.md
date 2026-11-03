@@ -9,7 +9,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `composite.frag` — the world and its glow onto the screen: highlights rolled off above 0.8, faint vignette, luma in alpha for FXAA.
 - `fxaa.frag` — FXAA 3.11 (quality) on the tone-mapped scene, before the UI.
 - `growth.glsl` — growth along growth splines on the GPU (gfx/growth.zig): a vertex shrunk into the point it grows out of until its spline's front comes by…
-- `light.glsl` — the engine's light as a world shader reads it: the frame's `Lighting` record (render/light.zig), the key light's cascaded shadows and the…
+- `light.glsl` — the engine's light as a world shader reads it: the frame's `Lighting` record (render/light.zig), the key light's cascaded shadows, the…
 - `post.glsl` — shared by the post-processing passes: the screen triangle's uv in, one colour out, their own push constants.
 - `post.vert` — one triangle covering the screen for the post-processing passes.
 - `shadow.frag` — shadow casters write depth alone.
@@ -54,6 +54,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## engine/src/render/
 - `camera.zig` — angled top-down camera: pans over the ground plane, zooms along its view ray, and orbits its target: turns (yaw) freely and tilts (pitch)…
+- `cube.zig` — points of light that cast shadows: the few most telling lights near the camera each get a cube of depth round them, so what stands in their…
 - `light.zig` — light that moves: the key light's (sun or moon) shadows and the points of light the garden makes (blooms, motes, a halo's flash).
 
 ## engine/src/render/passes/

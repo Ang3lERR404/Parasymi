@@ -83,7 +83,10 @@ adds on top.
 ### render
 - Engine: `Renderer(G)`, post, light, camera, `volume` (the air: the
   overhead map, a half-size volume after the world, its edge-aware
-  composite), `passes/ui`.
+  composite), `cube` (the points of light's shadow cubes: which lights
+  hold one, kept from frame to frame and eased in and out; their faces;
+  the depth images), `passes/ui`. `Renderer.pointShadows(count,size)` sets
+  how many lights may hold one and how fine.
 - Game: `renderer` (the garden's `G`), passes, terrain meshing.
 
 ### ui
@@ -106,7 +109,8 @@ adds on top.
 
 ### shaders
 - Engine: post, bloom, composite, fxaa, ui, `shadow.frag`, `light.glsl`
-  (`airLit`: the key light at a point in the air), `growth.glsl`
+  (`airLit`: the key light at a point in the air; `cubeLit`, a shadow
+  cube looked up; `pointShadow`, a surface's), `growth.glsl`
   (`growOut`), `volume.glsl` (what a volume pass reads),
   `volume_compose.frag`.
 - Game: everything else. `common.glsl` includes `light.glsl`; `part.vert`
@@ -139,6 +143,11 @@ so each module embeds its own shaders.
 
 A pass's `.target` is where it draws, in this order each frame:
 - `shadow`: the key light's cascades;
+- `cube`: each face of each shadow cube held this frame in turn, the
+  push's `light` pointing at that face's matrix (light.glsl `CubeFace`,
+  a shader built with CUBE), `Renderer.cubeNow` saying which face (cube ×
+  6 + face) and `cubeSpheres` where each light is and how far it reaches,
+  so a pass draws only what may stand in it there (`cube.sees`);
 - `overhead`: the overhead map, seen from straight above. It is fixed to
   the world and wraps (a texel a unit, `volume.overheadSize` across) and
   is kept from frame to frame, so a pass redraws only a few pieces a frame,

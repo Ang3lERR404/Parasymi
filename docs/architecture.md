@@ -218,6 +218,20 @@ dense (`airDensity`, shaders/air.glsl, the same air the fog marches), and
 hidden behind what stands in front of it. A new glowing role only needs to
 be in `PARTS_LIGHT` and `vertex.seeThrough`.
 
+### Points of light with shadows
+The few most telling points of light near the camera hold shadow cubes
+(engine `render/cube.zig`), drawn before the world by the `cube` passes
+(`plantsCube`, `partsCube`: plant.vert and part.vert built with `-DCUBE`,
+which brings `SHADOW`), a face at a time, each pass drawing from its own
+list of what may stand in that face (`Frame.cubeInst`, filled in
+`prepare` from `Renderer.cubeSpheres`, culled by each mesh's reach,
+`Ext.plantReach`/`partReach`). The fog marches each shadowed light's
+chord and lets through only what its cube does; every lit surface looks
+it up in `pointShadow`. A new caster needs nothing: whatever casts into
+the key light's map casts here (and a radiant plant's petals, leaves and
+veil, plant.vert under CUBE). A light says which cube it holds in its
+`col.w` (the renderer sets it).
+
 ### Other rules
 - part.vert picks how to place a part by `PartInstance.e.x`:
   - 0 matrix;

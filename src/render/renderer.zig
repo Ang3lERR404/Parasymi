@@ -84,6 +84,11 @@ pub const passes=struct{
   pub const plantsShadow=@import("passes/plants.zig").shadow;
   /// parts cast into the key light's shadow map
   pub const partsShadow=@import("passes/parts.zig").shadow;
+  // what casts the shadows of the points of light holding a cube, into each
+  /// plants within a light's reach cast into its shadow cube
+  pub const plantsCube=@import("passes/plants.zig").cube;
+  /// parts that may stand in a light cast into its shadow cube
+  pub const partsCube=@import("passes/parts.zig").cube;
   /// the ground seen from above into the overhead map, for the fog
   pub const terrainOverhead=@import("passes/terrain.zig").overhead;
   // the moisture in the air, stepped on in the engine's field before the world
@@ -216,6 +221,14 @@ pub fn carry(prev:Stats)Stats{return.{.meshed=prev.meshed};}
 /// mesh's levels side by side). A shadow needs no fine detail, and every
 /// caster is drawn into every cascade.
 pub fn caster(slot:usize)usize{return slot-slot%meshgen.lods+meshgen.lods-1;}
+/// how far from its origin a caster reaching `size` (its mesh's farthest
+/// vertex, `Ext.plantReach`/`partReach`) may lean into a light, grown as
+/// large as a plant grows and swayed as far as the wind takes it
+pub fn casterReach(size:f32)f32{return size*casterGrowth+casterSway;}
+/// how much larger than its mesh a caster may be drawn (a plant's own size)
+const casterGrowth:f32=1.5;
+/// how far a caster may sway beyond that (world units)
+const casterSway:f32=0.5;
 /// a sphere around a chunk (from its centre, `chunkMidY` up) holding all
 /// of it, its terraces and what grows on its tiles, for culling it to the
 /// view: half its diagonal (rounded up) and a margin
@@ -295,6 +308,11 @@ pub const Ext=struct{
   /// per part slot: whether any of its vertices can be see-through (sap,
   /// resin, shadow, beam, halo); the glass pass draws only those
   partGlassy:[meshlib.slots]bool=@splat(false),
+  /// per plant slot, how far its farthest vertex lies from its origin (mesh
+  /// space): a shadow cube draws a plant only if this may reach its light
+  plantReach:[plantMeshes]f32=@splat(0),
+  /// the same per part slot
+  partReach:[meshlib.slots]f32=@splat(0),
   /// one chunk's ground and detail per place in a meshing batch
   scratch:[meshBatch]std.ArrayList(vertex.Terrain)=@splat(.empty),
   /// the same per place in a batch, for the detail records
@@ -714,6 +732,8 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   x.partRuns=w.runs[plantMeshes..][0..meshlib.slots].*;
   x.partMorph=g.partMorph;
   x.partGlassy=g.partGlassy;
+  reaches(w.v.items,&x.plantRuns,&x.plantReach);
+  reaches(w.v.items,&x.partRuns,&x.partReach);
   x.identity=0;
   std.log.info("meshes welded: {d} corners drawn from {d} vertices",.{w.indices.items.len,w.v.items.len});
   x.growing=null;
@@ -741,6 +761,14 @@ fn plantGlassy(id:species.Id,p:vertex.Part)bool{
     .radiant,.star,.lens,.bouquet,.heliotrope,.veil=>true,
     .herb,.coil,.drift,.confluence,.lily,.creeper=>p==.pod or p==.bloom or p==.resin,
   };
+}
+/// per run of `runs` (its vertices among `verts`), how far its farthest
+/// vertex lies from its origin
+fn reaches(verts:[]const vertex.Mesh,runs:[]const Run,out:[]f32)void{
+  for(out,runs)|*o,run|{
+    o.*=0;
+    for(verts[run.base..][0..run.verts])|v|o.*=@max(o.*,m.len(m.v3(v.pos[0],v.pos[1],v.pos[2])));
+  }
 }
 /// per part slot: whether any of its run of `verts` can be see-through
 fn glassy(verts:[]const vertex.Mesh,ranges:*const[meshlib.slots]m.Vice(u32,2),out:*[meshlib.slots]bool)void{
@@ -777,6 +805,7 @@ pub fn setParts(r:*Renderer,b:*meshgen.Builder,ranges:[meshlib.slots]m.Vice(u32,
   // unwelded: each run's indices count up through its own vertices
   for(&x.partRuns,ranges)|*run,rg|run.*=.{.first=rg[0],.count=rg[1],.base=0,.verts=rg[0]+rg[1]};
   glassy(b.v.items,&ranges,&x.partGlassy);
+  reaches(b.v.items,&x.partRuns,&x.partReach);
   if(x.identity<n){
     // indices counting up from 0, with room to spare
     const room=n+n/toolRoom;

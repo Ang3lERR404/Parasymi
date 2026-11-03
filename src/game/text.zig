@@ -359,6 +359,8 @@ pub const Strings=struct{
     toggle:S="",
     /// a list, every autosave interval (`options.autosaveMinutes` order)
     autosave:S="",
+    /// a list, every level of the points of light's shadows (`options.LightShadows` order)
+    lightShadows:S="",
     /// the options panel's way back
     optionsBack:S="",
     /// the keybinds panel's title
@@ -683,6 +685,7 @@ test"the strings file fills every key, shown with the bound keys"{
   try testing.expectEqual(fields(@FieldType(opt.Options,"aa")).len,count(s.hud.antialias));
   try testing.expectEqual(2,count(s.hud.toggle));
   try testing.expectEqual(opt.autosaveMinutes.len,count(s.hud.autosave));
+  try testing.expectEqual(fields(opt.LightShadows).len,count(s.hud.lightShadows));
   try testing.expectEqual(4,count(s.hud.gardensAge));
   try testing.expectEqual(4,count(s.hud.facing));
 }

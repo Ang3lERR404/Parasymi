@@ -13,7 +13,9 @@
 //!
 //! Points of light are sent each frame in the same record as the cascades
 //! (`Lighting`, reached by its address like the bones), and every lit
-//! surface sums them on the GPU (light.glsl `pointLight`).
+//! surface sums them on the GPU (light.glsl `pointLight`). The few most
+//! telling of them hold shadow cubes of their own (cube.zig), kept in the
+//! same record and read through the same descriptor set.
 /// the standard library
 const std=@import("std");
 /// the Vulkan bindings: images, samplers, descriptors, rendering scopes
@@ -28,12 +30,14 @@ const Ctx=ctx.Ctx;
 const sw=@import("../gfx/swapchain.zig");
 /// the GPU layouts: a point of light as the shaders read it
 const vertex=@import("../gfx/vertex.zig");
+/// points of light that cast shadows: their cubes, as the record holds them
+const cube=@import("cube.zig");
 /// slices of the view, each its own layer (light.glsl CASCADES)
 pub const cascades=3;
 /// texels along each side of a cascade's layer
 pub const res=2048;
 /// points of light a frame can hold (light.glsl MAX_LIGHTS)
-pub const maxLights=32;
+pub const maxLights=cube.maxLights;
 /// the views the casters draw: one per cascade
 pub const views:u32=(1<<cascades)-1;
 /// casters pushed away from the light by a constant and with their slope
@@ -65,14 +69,21 @@ pub const Lighting=extern struct{
   texel:m.Vice(f32,4),
   /// x points of light, y how far from the eye shadows reach, zw unused
   info:m.Vice(f32,4),
-  /// the frame's points of light, the first `info[0]` of them lit
+  /// the frame's points of light, the first `info[0]` of them lit (a
+  /// light holding a shadow cube says which in its `col[3]`)
   lights:[maxLights]vertex.Light,
+  /// the points of light's shadow cubes (cube.zig), those held drawn this
+  /// frame, the rest showing no shadow
+  cubes:[cube.maxCubes]cube.Cube,
 };
 comptime{
   // std430 as light.glsl reads it: the texel sizes pack into one vec4
-  if(cascades>4 or @offsetOf(Lighting,"info")!=cascades*64+16 or @offsetOf(Lighting,"lights")!=cascades*64+32)
+  if(cascades>4 or @offsetOf(Lighting,"info")!=cascades*64+16 or @offsetOf(Lighting,"lights")!=cascades*64+32 or @offsetOf(Lighting,"cubes")!=cascades*64+32+maxLights*32 or @sizeOf(cube.Cube)!=32+cube.faces*64)
     @compileError("Lighting must match light.glsl's layout");
 }
+/// where cube `i`'s face `f` lies in the lighting record (a face's casters are
+/// pushed this far past the record's address: light.glsl `CubeFace`)
+pub fn faceAt(i:usize,f:usize)usize{return @offsetOf(Lighting,"cubes")+i*@sizeOf(cube.Cube)+@offsetOf(cube.Cube,"faces")+f*@sizeOf(m.M4);}
 /// the cascades for a view: each world to its clip space, the world size
 /// of its texels, and how far from the eye they reach in all
 pub const Fit=struct{mats:[cascades]m.M4,texel:[cascades]f32,reach:f32};
@@ -178,7 +189,8 @@ pub const Shadow=struct{
   /// a plain sampler reading its raw depths (for how far a shadow falls
   /// from what casts it)
   depthSampler:vk.Sampler=.null_handle,
-  /// the descriptor set's layout: one image-and-sampler binding
+  /// the descriptor set's layout: the map through each sampler, and the
+  /// points of light's shadow cubes
   setLayout:vk.DescriptorSetLayout=.null_handle,
   /// the pool its one set comes from
   pool:vk.DescriptorPool=.null_handle,
@@ -234,14 +246,16 @@ pub const Shadow=struct{
       .compare_enable=.false,.compare_op=.always,.min_lod=0,.max_lod=0,
       .border_color=.float_opaque_white,.unnormalized_coordinates=.false,
     },null);
-    // the set's two bindings: the map through each sampler, read by both stages
+    // the set's bindings: the map through each sampler, then the points of
+    // light's shadow cubes (pointed at by `bindCubes`), read by both stages
     const bindings=[_]vk.DescriptorSetLayoutBinding{
       .{.binding=0,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
       .{.binding=1,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
+      .{.binding=2,.descriptor_type=.combined_image_sampler,.descriptor_count=1,.stage_flags=.{.vertex=true,.fragment=true}},
     };
     s.setLayout=try c.device.createDescriptorSetLayout(&.{.binding_count=bindings.len,.p_bindings=&bindings},null);
-    // room for that one descriptor
-    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=2}};
+    // room for those descriptors
+    const sizes=[_]vk.DescriptorPoolSize{.{.type=.combined_image_sampler,.descriptor_count=bindings.len}};
     s.pool=try c.device.createDescriptorPool(&.{.max_sets=1,.pool_size_count=sizes.len,.p_pool_sizes=&sizes},null);
     try c.device.allocateDescriptorSets(&.{.descriptor_pool=s.pool,.descriptor_set_count=1,.p_set_layouts=@ptrCast(&s.setLayout)},@ptrCast(&s.set));
     // what the set's binding points at: the map's view, through the sampler
@@ -252,6 +266,17 @@ pub const Shadow=struct{
     const writes=[_]vk.WriteDescriptorSet{
       .{.dst_set=s.set,.dst_binding=0,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=&info,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
       .{.dst_set=s.set,.dst_binding=1,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=&depthInfo,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
+    };
+    c.device.updateDescriptorSets(&writes,null);
+  }
+  /// point the set's third binding at the points of light's shadow cubes
+  /// `q` (again whenever they are made anew; no frame may be in flight)
+  pub fn bindCubes(s:*const Shadow,c:*const Ctx,q:*const cube.Cubes)void{
+    // the cubes as the shaders read them
+    const info=[_]vk.DescriptorImageInfo{q.info()};
+    // the write that points the binding there
+    const writes=[_]vk.WriteDescriptorSet{
+      .{.dst_set=s.set,.dst_binding=2,.dst_array_element=0,.descriptor_count=1,.descriptor_type=.combined_image_sampler,.p_image_info=&info,.p_buffer_info=undefined,.p_texel_buffer_view=undefined},
     };
     c.device.updateDescriptorSets(&writes,null);
   }

@@ -47,6 +47,31 @@ pub const Options=struct{
   fullscreen:bool=false,
   /// minutes between autosaves (one of `autosaveMinutes`; 0: never)
   autosave:u8=5,
+  /// how many points of light near the camera cast shadows into the air,
+  /// and how finely (the full look by default)
+  lightShadows:LightShadows=.full,
+};
+/// how many points of light near the camera cast shadows (their glow
+/// fanning out in rays between what stands in it), and how finely, in
+/// `txt.s.hud.lightShadows` order
+pub const LightShadows=enum{
+  /// none: every glow a soft ball
+  off,
+  /// the two most telling lights, in coarse cubes
+  few,
+  /// the four most telling lights, in coarse cubes
+  more,
+  /// the four most telling lights, in fine cubes
+  full,
+  /// how many lights cast shadows at this level
+  pub fn lights(l:LightShadows)usize{
+    return switch(l){.off=>0,.few=>2,.more,.full=>4};
+  }
+  /// texels along each side of a shadow cube's face at this level (the
+  /// cubes keep their size while none is cast)
+  pub fn res(l:LightShadows)u32{
+    return switch(l){.off=>0,.few,.more=>256,.full=>512};
+  }
 };
 /// the autosave intervals offered, in minutes (in `txt.s.hud.autosave` order)
 pub const autosaveMinutes=[_]u8{0,1,2,5,10,15,30,60};
@@ -59,7 +84,9 @@ pub const Setting=enum{
   /// filling the screen
   fullscreen,
   /// how often the garden saves itself
-  autosave
+  autosave,
+  /// how many points of light cast shadows, and how finely
+  lightShadows
 };
 /// how many settings there are
 pub const settingCount=fields(Setting).len;
@@ -75,7 +102,7 @@ pub const Kind=enum{
 /// how `set` is set
 pub fn kind(set:Setting)Kind{
   return switch(set){
-    .antialias=>.picker,
+    .antialias,.lightShadows=>.picker,
     .vsync,.fullscreen=>.toggle,
     .autosave=>.slider,
   };
@@ -85,21 +112,21 @@ pub fn isOn(o:*const Options,set:Setting)bool{
   return switch(set){
     .vsync=>o.vsync,
     .fullscreen=>o.fullscreen,
-    .antialias,.autosave=>false,
+    .antialias,.autosave,.lightShadows=>false,
   };
 }
 /// how many stops the slider `set` has (1 for any other kind)
 pub fn stops(set:Setting)usize{
   return switch(set){
     .autosave=>autosaveMinutes.len,
-    .antialias,.vsync,.fullscreen=>1,
+    .antialias,.vsync,.fullscreen,.lightShadows=>1,
   };
 }
 /// which stop the slider `set` is at (0 for any other kind)
 pub fn stopOf(o:*const Options,set:Setting)usize{
   return switch(set){
     .autosave=>autosaveIndex(o.autosave),
-    .antialias,.vsync,.fullscreen=>0,
+    .antialias,.vsync,.fullscreen,.lightShadows=>0,
   };
 }
 /// the slider `set` moved to stop `i` (kept to its stops; any other kind
@@ -107,7 +134,7 @@ pub fn stopOf(o:*const Options,set:Setting)usize{
 pub fn setStop(o:*Options,set:Setting,i:usize)void{
   switch(set){
     .autosave=>o.autosave=autosaveMinutes[@min(i,autosaveMinutes.len-1)],
-    .antialias,.vsync,.fullscreen=>{},
+    .antialias,.vsync,.fullscreen,.lightShadows=>{},
   }
 }
 /// where `minutes` is in `autosaveMinutes` (else the next longer one there)
@@ -137,6 +164,11 @@ pub fn step(o:*Options,set:Setting,dir:i32,most:u32)void{
       const n:i32=autosaveMinutes.len;
       o.autosave=autosaveMinutes[@intCast(@mod(@as(i32,@intCast(autosaveIndex(o.autosave)))+dir,n))];
     },
+    .lightShadows=>{
+      // how many levels there are
+      const n:i32=@intCast(fields(LightShadows).len);
+      o.lightShadows=@enumFromInt(@mod(@as(i32,@intFromEnum(o.lightShadows))+dir,n));
+    },
   }
 }
 /// what `set` is now, as shown
@@ -146,6 +178,7 @@ pub fn shown(o:*const Options,set:Setting)[]const u8{
     .vsync=>txt.nth(txt.s.hud.toggle,@intFromBool(o.vsync)),
     .fullscreen=>txt.nth(txt.s.hud.toggle,@intFromBool(o.fullscreen)),
     .autosave=>txt.nth(txt.s.hud.autosave,autosaveIndex(o.autosave)),
+    .lightShadows=>txt.nth(txt.s.hud.lightShadows,@intFromEnum(o.lightShadows)),
   };
 }
 /// the file as written: each setting by name (any may be missing)
@@ -160,6 +193,8 @@ const Source=struct{
     fullscreen:?[]const u8=null,
     /// `autosave = <minutes>`
     autosave:?[]const u8=null,
+    /// `lightShadows = off|few|more|full`
+    lightShadows:?[]const u8=null,
   }=.{},
 };
 /// a switch that is on, as written
@@ -185,6 +220,7 @@ pub fn parse(text:[]const u8)Options{
   if(f.vsync)|v|o.vsync=!eql(u8,v,off);
   if(f.fullscreen)|v|o.fullscreen=eql(u8,v,on);
   if(f.autosave)|v|if(parseInt(u8,v,10))|n|{o.autosave=autosaveMinutes[autosaveIndex(n)];}else|_|{};
+  if(f.lightShadows)|v|o.lightShadows=stringToEnum(LightShadows,v) orelse o.lightShadows;
   return o;
 }
 /// writes `o` as cfg source.
@@ -194,6 +230,7 @@ pub fn format(o:*const Options,w:*Writer)Writer.Error!void{
     "[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\nautosave = {d}\n",.{
     o.aa,if(o.vsync)on else off,if(o.fullscreen)on else off,o.autosave,
   });
+  try w.print("lightShadows = {t}\n",.{o.lightShadows});
 }
 /// reads `filePath`; the defaults if it cannot be read, written out if there
 /// is none.
@@ -224,7 +261,7 @@ pub fn save(o:*const Options,io:Io)Error!void{
 }
 test"options round-trip through their file; unknown values keep the defaults"{
   // a set of options off the defaults, written out
-  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15};
+  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.lightShadows=.few};
   // room for the file, and the writer that fills it
   var buf:[256]u8=undefined;
   var w:Writer=.fixed(&buf);
@@ -255,6 +292,13 @@ test"anti-aliasing turns both ways and skips what the GPU cannot take"{
   o.autosave=60;
   step(&o,.autosave,1,4);
   try testing.expectEqual(@as(u8,0),o.autosave);
+  // the points of light's shadows: the full look by default, wrapping round to none
+  try testing.expectEqual(LightShadows.full,o.lightShadows);
+  step(&o,.lightShadows,1,4);
+  try testing.expectEqual(LightShadows.off,o.lightShadows);
+  try testing.expectEqual(@as(usize,0),o.lightShadows.lights());
+  step(&o,.lightShadows,-1,4);
+  try testing.expectEqual(@as(usize,4),o.lightShadows.lights());
 }
 test"each setting is a toggle, a picker or a slider; a slider is set by its stops"{
   // the defaults
