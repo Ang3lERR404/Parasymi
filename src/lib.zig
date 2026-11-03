@@ -200,6 +200,8 @@ pub const wolfRump=@import("gfx/meshes/wolf_rump.zig");
 pub const wolfPanel=@import("gfx/meshes/wolf_panel.zig");
 /// the ground's mesh, built from each chunk's tiles
 pub const terrainMesh=@import("render/terrain_mesh.zig");
+/// the grown meshes kept on disk between starts
+pub const meshCache=@import("render/mesh_cache.zig");
 /// the fixed-tick ecology: mana, sharing, draining, growth and death
 pub const ecology=@import("sim/ecology.zig");
 /// debugging helpers: why a structure can't be placed

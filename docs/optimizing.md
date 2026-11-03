@@ -87,7 +87,12 @@ own, freed the moment it is built, keeping only its soup copied out at
 its size (skin and growth lists only where any vertex has them); the
 weld's scratch is freed as it goes, and the soups once welded. One
 shared arena for all of it held every piece's scratch to the end: 70 GB
-at its peak, now about 11. Once every piece is grown,
+at its peak, now about 11. The welded whole is kept on disk
+(render/mesh_cache.zig, `cache/<program>-<mode>.meshes` in the
+gardener's folder, ~1.9 GB), keyed by a hash of the program file and every
+sculpt: a start with the same key reads it (meshes in at ~3 s, release)
+instead of growing; any other grows and writes it anew beside the upload,
+let go once written while the garden is played. Once every piece is grown,
 `Growing.weldAll` (render/renderer.zig) welds each run straight from its
 piece, each group on a core of its own:
 corners that are the same vertex bit for bit (vertex, skin, growth

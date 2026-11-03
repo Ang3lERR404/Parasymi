@@ -399,6 +399,9 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `lib.zig` — the import hub: every game file reaches std, the engine and every other game module through here (`const lib = @import("../lib.zig")`)…
 - `main.zig` — Parasymi: a garden of magically infused plants, parasitic and symbiotic, growing toward something beyond comprehension.
 
+## src/render/
+- `mesh_cache.zig` — the grown meshes kept on disk between starts: once every mesh is grown and welded, the whole is written to `cache/<game>.meshes` in the…
+
 ## src/render/passes/
 - `detail.zig` — detail: the ground's grass, clods and stones, grown on the GPU.
 - `fog.zig` — fog: the air the garden stands in, marched on the GPU after the world at half the screen's size (fog.frag): a haze over everything, mist…

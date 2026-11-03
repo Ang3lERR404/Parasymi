@@ -28,6 +28,10 @@ const eql=std.mem.eql;
 const sort=std.mem.sort;
 /// orders two names
 const lessThan=std.mem.lessThan;
+/// a value's bytes, for the shelf's stamp
+const asBytes=std.mem.asBytes;
+/// the hash a sculpt's file is stamped with
+const Wyhash=std.hash.Wyhash;
 /// the log, for a sculpt that will not read
 const log=std.log;
 /// the test helpers
@@ -161,6 +165,9 @@ pub const Kept=struct{
   rigged:Rigged,
   /// the clip of its own name keyed for it, if there is one
   loop:?clip.Clip,
+  /// a hash of its file as read: the meshes kept on disk are made again
+  /// when a sculpt changes (render/mesh_cache.zig)
+  stamp:u64=0,
   /// its bones at `t` (s) into its loop (at rest without one), standing at
   /// `place`: the matrices in `out`, their count returned
   pub fn bonesAt(k:*Kept,t:f32,place:M4,out:*[rig.maxBones]M4)usize{
@@ -181,6 +188,17 @@ var shelf:std.ArrayList(Kept)=.empty;
 var shelfGpa:?Allocator=null;
 /// the sculpts on the shelf
 pub fn all()[]Kept{return shelf.items;}
+/// one hash of every sculpt on the shelf, its name and file, in order:
+/// changes whenever a sculpt is added, removed, renamed or edited
+pub fn stamp()u64{
+  // the hash, fed each sculpt in turn
+  var h=Wyhash.init(0);
+  for(shelf.items)|k|{
+    h.update(k.name);
+    h.update(asBytes(&k.stamp));
+  }
+  return h.final();
+}
 /// the sculpt kept by `name`, if there is one
 pub fn find(name:[]const u8)?usize{
   for(shelf.items,0..)|k,i|if(eql(u8,k.name,name))return i;
@@ -242,7 +260,7 @@ fn readDir(gpa:Allocator,io:Io,root:Dir,meshes:[]const u8,clips:[]const u8)Alloc
     errdefer if(loop)|*c|c.deinit();
     const kept=try gpa.dupe(u8,name);
     errdefer gpa.free(kept);
-    try shelf.append(gpa,.{.name=kept,.rigged=rigged,.loop=loop});
+    try shelf.append(gpa,.{.name=kept,.rigged=rigged,.loop=loop,.stamp=Wyhash.hash(0,text)});
   }
 }
 /// the clip `<name>.anim` in `clips` under `root`, if it is there and keyed

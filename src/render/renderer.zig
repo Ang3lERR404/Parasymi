@@ -11,6 +11,10 @@ const std=lib.std;
 const Allocator=std.mem.Allocator;
 /// views a slice of vertices as the bytes a buffer takes
 const sliceAsBytes=std.mem.sliceAsBytes;
+/// views a table as its bytes, to keep it on disk
+const asBytes=std.mem.asBytes;
+/// the grown meshes kept on disk between starts
+const meshCache=lib.meshCache;
 /// the arena the growing meshes' scratch lives in, freed in one go
 const ArenaAllocator=std.heap.ArenaAllocator;
 /// the I/O the meshes grow on, apart, while the loading screen shows
@@ -293,6 +297,9 @@ pub const Ext=struct{
   detailScratch:[meshBatch]std.ArrayList(vertex.DetailTile)=@splat(.empty),
   /// the meshes while they are still growing (see `meshesReady`)
   growing:?*Growing=null,
+  /// the meshes grown, still being written to disk while the garden is
+  /// played (see `settle`)
+  keeping:?*Growing=null,
   /// how many vertices of `meshes` a tool last put in (`setParts`; 0: none)
   toolVerts:usize=0,
 };
@@ -319,6 +326,12 @@ const Growing=struct{
   failed:bool=false,
   /// how many of the upload's steps are sent (`meshesReady`)
   sent:u32=0,
+  /// the task keeping the welded meshes on disk, if one runs
+  saving:?Io.Future(void)=null,
+  /// set once nothing is left to keep on disk (the scratch waits for it)
+  saved:Atomic(bool)=.init(true),
+  /// room for the cache file's name
+  cacheName:[256]u8=undefined,
   /// every piece, in the order a single builder would have built them
   pieces:[]Piece=&.{},
   /// (first vertex, count) per plant slot, within its piece's builder
@@ -370,10 +383,51 @@ const Growing=struct{
     const n=if(g.only)|o|@as(usize,if(o.species!=null)1 else 0)+o.parts.len else species.ids.len+meshlib.count;
     return@intCast(n*meshgen.lods+plantMeshes+meshlib.slots+uploadSteps);
   }
-  /// the growing task's body: grows everything, then marks it finished (or failed)
+  /// the growing task's body: reads the meshes kept on disk if they are
+  /// still these, else grows everything (and keeps it, on a task of its
+  /// own), then marks it finished (or failed)
   fn run(g:*Growing)void{
-    g.failed=std.meta.isError(g.all());
+    g.failed=std.meta.isError(g.cached());
     g.finished.store(true,.release);
+  }
+  /// the tables kept beside the welded meshes on disk, as bytes
+  fn tables(g:*Growing)[3][]u8{return.{asBytes(&g.plantMorph),asBytes(&g.partMorph),asBytes(&g.partGlassy)};}
+  /// the meshes kept on disk, if their key is this game's and its
+  /// sculpts'; else grown, and kept for the next start. One thing shown
+  /// alone (`only`) is grown alone and never kept.
+  fn cached(g:*Growing)Allocator.Error!void{
+    // the I/O the file is read on, the key, and the file's name (none of
+    // them: grown as ever)
+    const io=g.io orelse return g.all();
+    if(g.only!=null)return g.all();
+    const key=meshCache.key(g.arena.child_allocator,io) orelse return g.all();
+    const file=meshCache.fileName(io,&g.cacheName) orelse return g.all();
+    // the tables, as bytes to read into
+    const t=g.tables();
+    if(meshCache.read(g.arena.child_allocator,io,lib.home.dir(),file,key,&t))|w|{
+      g.welded=w;
+      // everything but the upload is done
+      g.done.store(g.units()-uploadSteps,.monotonic);
+      std.log.info("meshes read from {s}",.{file});
+      return;
+    }
+    try g.all();
+    if(g.stop.load(.monotonic))return;
+    // kept beside the upload, on a task of its own (here, if none)
+    g.saved.store(false,.monotonic);
+    g.saving=io.concurrent(save,.{g,io,key,file})catch|e|none:{
+      std.log.warn("mesh cache kept without a task of its own: {t}",.{e});
+      save(g,io,key,file);
+      break:none null;
+    };
+  }
+  /// keeps the welded meshes and their tables on disk in `file` under `key`, then
+  /// says so (the scratch is let go only after: `settle`)
+  fn save(g:*Growing,io:Io,key:u64,file:[]const u8)void{
+    // the tables, as bytes to write
+    const t=g.tables();
+    meshCache.write(g.arena.child_allocator,io,lib.home.dir(),file,key,&g.welded,&.{t[0],t[1],t[2]});
+    g.saved.store(true,.release);
   }
   /// lists the pieces in the order one builder would build them (each
   /// species at each level, then each level's library meshes), builds them
@@ -555,6 +609,8 @@ const Growing=struct{
   fn end(g:*Growing,gpa:Allocator)void{
     g.stop.store(true,.monotonic);
     if(g.apart)|*a|a.future.await(a.io);
+    if(g.saving)|*s|s.await(g.io.?);
+    g.saving=null;
     g.freePieces();
     g.welded.deinit(g.arena.child_allocator);
     g.arena.deinit();
@@ -585,6 +641,8 @@ pub fn release(r:*Renderer)void{
   const x=&r.ext;
   if(x.growing)|g|g.end(r.gpa);
   x.growing=null;
+  if(x.keeping)|g|g.end(r.gpa);
+  x.keeping=null;
   for(x.slots.items)|*s|{
     s.buf.deinit(c);
     s.detail.deinit(c);
@@ -635,15 +693,17 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   if(g.sent==0)for(bufs,lists,0..)|b,l,k|{
     b.*=try Buffer.initRoom(&r.ctx,if(k==3).{.index_buffer=true}else.{.vertex_buffer=true},l.len,&.{});
   };
-  // this step's share of each list
-  for(bufs,lists)|b,l|{
-    // where this step's share begins and ends
-    const lo=l.len*g.sent/uploadSteps;
-    const hi=l.len*(g.sent+1)/uploadSteps;
-    try b.overwrite(&r.ctx,lo,l[lo..hi]);
+  // this step's share of each list, while any is left to send
+  if(g.sent<uploadSteps){
+    for(bufs,lists)|b,l|{
+      // where this step's share begins and ends
+      const lo=l.len*g.sent/uploadSteps;
+      const hi=l.len*(g.sent+1)/uploadSteps;
+      try b.overwrite(&r.ctx,lo,l[lo..hi]);
+    }
+    g.sent+=1;
+    _=g.done.fetchAdd(1,.monotonic);
   }
-  g.sent+=1;
-  _=g.done.fetchAdd(1,.monotonic);
   if(g.sent<uploadSteps)return false;
   x.plantRuns=w.runs[0..plantMeshes].*;
   x.plantMorph=g.plantMorph;
@@ -652,9 +712,20 @@ pub fn meshesReady(r:*Renderer)Error!bool{
   x.partGlassy=g.partGlassy;
   x.identity=0;
   std.log.info("meshes welded: {d} corners drawn from {d} vertices",.{w.indices.items.len,w.v.items.len});
-  g.end(r.gpa);
   x.growing=null;
+  // still being kept on disk: let go once that is done (`settle`), the
+  // garden played meanwhile
+  if(g.saved.load(.acquire))g.end(r.gpa)else x.keeping=g;
   return true;
+}
+/// lets the meshes kept on disk beside play go, once they are written
+fn settle(r:*Renderer)void{
+  // what the garden keeps, and the meshes being written (none: nothing)
+  const x=&r.ext;
+  const g=x.keeping orelse return;
+  if(!g.saved.load(.acquire))return;
+  g.end(r.gpa);
+  x.keeping=null;
 }
 /// whether a vertex of role `p` in a plant of species `id` can be drawn
 /// see-through (plant.frag blends it below SOLID): every part of a radiant
@@ -748,6 +819,7 @@ pub fn dropWorld(r:*Renderer)Allocator.Error!void{
 /// upload meshes for new/dirty chunks (at most `budget`, and no more once
 /// `ms` milliseconds are spent) and drop evicted ones.
 pub fn syncWorld(r:*Renderer,w:*World,budget:u32,ms:f64)Error!void{
+  settle(r);
   // what the garden keeps
   const x=&r.ext;
   for(w.evicted.items)|si|{

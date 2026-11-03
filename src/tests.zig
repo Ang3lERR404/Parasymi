@@ -36,4 +36,5 @@ test{
   _=lib.wolfRump;
   _=lib.wolfPanel;
   _=lib.radiantKit;
+  _=lib.meshCache;
 }
