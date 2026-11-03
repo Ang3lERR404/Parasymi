@@ -429,9 +429,11 @@ pub const Game=struct{
     }
   };
   /// the plant at tile `h`: the floater the cursor touches when `h` is the
-  /// hovered tile, else whatever stands or floats there
+  /// hovered tile, else whatever stands or floats there. The floater aimed at
+  /// may have been uprooted since (removed this frame, its slot swapped or
+  /// gone), so it counts only while a plant still stands in its slot on `h`.
   pub fn plantAt(g:*const Game,h:m.Vice(i32,2))?PlantId{
-    if(g.hoverFloat)|f|if(g.hover)|hv|if(hv[0]==h[0] and hv[1]==h[1])return f;
+    if(g.hoverFloat)|f|if(g.hover)|hv|if(hv[0]==h[0] and hv[1]==h[1] and f.idx()<g.plants.list.len and g.plants.list.items(.x)[f.idx()]==h[0] and g.plants.list.items(.y)[f.idx()]==h[1])return f;
     return g.plants.at(&g.world,h[0],h[1]);
   }
   /// whether tile `h` holds a resource node with nothing on it: no
