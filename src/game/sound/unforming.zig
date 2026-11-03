@@ -194,31 +194,37 @@ const fallNotes=m.Vice(f32,2){86,62};
 const fallAir:f32=0.03;
 /// (its tone)
 const fallTone:f32=0.006;
-// ---- the landing: a deep bell blooming, glass ringing up over it ----
-/// its bell's partials (shares of D2), levels and rings (s)
-const landPartials=[_]f32{1,2,3,4.2,5.4};
+// ---- the landing: a great bell tolling, a boom under it, glass over it ----
+// decision: the landing read as comical (the gardener's word) with a glass
+// chord rung up note by note (a wand's sparkle) and a thump sinking fast (a
+// cartoon's bwomp): the bell is now a great church bell's (its hum an
+// octave under, its minor tierce), the boom holds its depth and rings long,
+// and the glass sounds all at once, soft, a shimmer over the bell
+/// its bell's partials (shares of D2: hum, prime, tierce, quint, nominal and
+/// two over), levels and rings (s)
+const landPartials=[_]f32{0.5,1,1.19,1.5,2,2.5,3};
 /// (their levels)
-const landPartialLevel=[landPartials.len]f32{1,0.6,0.45,0.25,0.15};
+const landPartialLevel=[landPartials.len]f32{0.7,1,0.5,0.35,0.55,0.22,0.12};
 /// (their rings)
-const landPartialRing=[landPartials.len]f32{4,3,2.4,1.4,0.9};
+const landPartialRing=[landPartials.len]f32{7,5,3.4,2.8,2.4,1.5,1};
 /// its bell's note (MIDI): D2
 const landNote:f32=38;
-/// its thump: a low sine sinking (Hz) and falling away (s)
-const thumpSweep=m.Vice(f32,2){70,32};
-/// (falling away)
-const thumpFall:f32=0.22;
-/// the glass chord ringing up over it (MIDI): D5 F#5 A5 C#6 G#6, each this long after the last (s)
+/// its boom: a low sine hardly sinking (Hz) and ringing away (s)
+const thumpSweep=m.Vice(f32,2){36,31};
+/// (ringing away)
+const thumpFall:f32=1.1;
+/// the glass over it (MIDI): D5 F#5 A5 C#6 G#6, struck together
 const landChord=[_]f32{74,78,81,85,92};
-/// (each this long after the last)
-const landStagger:f32=0.11;
-/// how long the chord rings (s), and how loud
-const landChordRing:f32=2.8;
+/// how far apart its notes are struck (s): together
+const landStagger:f32=0;
+/// how long the glass rings (s), and how loud
+const landChordRing:f32=4;
 /// (how loud)
-const landChordLevel:f32=0.012;
-/// how loud the bell and the thump
-const landBell:f32=0.03;
-/// (the thump)
-const landThump:f32=0.08;
+const landChordLevel:f32=0.004;
+/// how loud the bell and the boom
+const landBell:f32=0.05;
+/// (the boom)
+const landThump:f32=0.16;
 /// the landing's low half: the bell and the thump (its glass is glints)
 const Land=struct{
   /// the bell's partials
@@ -264,7 +270,8 @@ const Land=struct{
       l.thumpAmp*=l.thumpKeep;
       l.at+|=1;
     }
-    return l.amp[0]>silent;
+    // (its hum, the longest ringing, heard as loud as it is)
+    return l.amp[0]*landBell>silent;
   }
 };
 /// the unforming heard, from its first moment until it has all rung away
@@ -424,7 +431,7 @@ pub const Unformed=struct{
 };
 /// the sample rate the tests render at (samples a second)
 const testRate:f32=48000;
-test"the unforming sounds in every stretch, softly, swells to its landing and rings away"{
+test"the unforming sounds in every stretch, swells to its landing and rings away"{
   // the test harness
   const testing=lib.std.testing;
   // the event heard from its first moment, told a frame at a time
@@ -454,8 +461,8 @@ test"the unforming sounds in every stretch, softly, swells to its landing and ri
   // it ends once settled and rung away
   try testing.expect(!alive);
   try testing.expect(m.f(frame)/60>ev.settled);
-  // soft throughout, never near clipping
-  for(peak)|p|try testing.expect(p<0.25);
+  // it never clips
+  for(peak)|p|try testing.expect(p<1);
   // it sounds in every stretch: the shattering, the sealing, the fall
   for([_]f32{1.5,5,9,ev.shatterEnd+1})|at|try testing.expect(rms[@intFromFloat(at)]>1e-3);
   // the landing is its loudest moment, the fall louder than just before it

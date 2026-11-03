@@ -77,8 +77,8 @@
 //!   snap and a scatter of glints, the stars and the ley nodes likewise;
 //!   the ley lines hum shut, a seam sinking an octave; dry ash crumbles as
 //!   the old lineages wither; each shard reaching the star rings a step
-//!   higher; the seed whistles down and lands with a deep soft bell, a
-//!   thump under it and a glass chord ringing up over it.
+//!   higher; the seed whistles down and lands with a great church bell, a
+//!   deep boom under it and soft glass struck together over it.
 /// the hub every game module is reached through
 const lib=@import("../lib.zig");
 /// the footstep: a soft crunchy rustle under a paw

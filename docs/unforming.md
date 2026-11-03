@@ -143,7 +143,10 @@ between frames.
 **The theme** is the garden's music breaking: its D Lydian loses its raised
 fourth (the sound of wonder) and the landing gives it back. The mixer
 (`Sounds.musics`) cuts the day's and night's music to nothing within
-0.25 s and plays the theme in their place, in the same stone hall:
+0.25 s and plays the theme in their place, in the same stone hall, loud:
+the event is the loudest thing in the game. Two choirs sing every chord (each
+its own voices, thickening each other) and the strings carry a contrabass
+octave (D1, Bb1, A1) under the loss, the peak and the landing:
 - a cello (three saws a hair apart, a wood body, vibrato growing into each
   note) sings D3 A3 G#3 F#3 over the choir's quiet hum (G#4 C#4 A3 D2) and
   low strings;
@@ -152,8 +155,8 @@ fourth (the sound of wonder) and the landing gives it back. The mixer
   0.9 s) grows from soft to hard until the drop;
 - at 7.5 s the choir falls through Bb and A, the strings bow harder, a
   timpani roll (14 strokes a second) swells into the peak;
-- at 10 s the peak: timpani and the great taiko strike, low brass (saws
-  held dark, opening as they swell) on D, Bb and A, the choir past its
+- at 10 s the peak: timpani and the great taiko strike, four low horns (saws
+  held dark, opening as they swell) on D, Bb and A, root to octave fifth, the choir past its
   night's full voice, the strings bowing three times as hard, the taiko on
   every beat;
 - the world screams from 6 s: eight voices (D5 A5 F5 D6 C5 G5 C6 F6), each
@@ -164,17 +167,22 @@ fourth (the sound of wonder) and the landing gives it back. The mixer
   patches fire their beams up, the screaming stands for the light torn out;
 - at the drop (13.4 s) a gate shuts it all in 50 ms and the hall's tail is
   taken down to a tenth, so the seed's whistle falls in near silence;
-- at the landing every voice is made afresh: timpani and great taiko, the
-  choir on C#5 G#4 F#3 D2, strings, horns and the cello's D3, ringing away
-  over 9 s; the garden's music comes back from 8 s after, over 10 s.
+- at the landing every voice is made afresh: timpani and the great taiko
+  strike, then the strings (0.3 s), the choirs on C#5 G#4 F#3 D2 (0.7 s)
+  and the cello's D3 (1.2 s) rise slowly out of the bell, no brass (brass
+  on a major chord read as a fanfare), ringing away over 9 s; the garden's music comes back from 8 s after, over 10 s.
 
-**Over it**, all soft and in D Lydian: glass glints rain while the sky
+**Over it**, in D Lydian: glass glints rain while the sky
 shatters, thickest midway; the seam glides D3 to D2 as the ley seals;
 crackle in a high band as ash crumbles; each crack a noise snap and 4 to 7
 glints; each arrival a glint a Lydian step above the last; the fall a band
 of air swept down 3.2 kHz to 280 Hz with a tone gliding under it; the
-landing a D2 bell (five partials), a sinking thump and the D5 F#5 A5 C#6
-G#6 chord ringing up.
+landing a great church bell on D2 (its hum an octave under, its minor
+tierce, quint and nominal, ringing up to 7 s), a deep boom hardly sinking
+(36 to 31 Hz, ringing over a second) and the D5 F#5 A5 C#6 G#6 glass struck
+together, soft, a shimmer over the bell. (Rung up note by note, the glass
+read as a wand's sparkle, and a thump sinking fast as a cartoon's bwomp:
+the gardener called that landing comical.)
 
 ## Saves
 `Unforming` (phase, time, where the seed gathers, whether the ley has

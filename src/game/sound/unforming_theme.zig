@@ -180,11 +180,11 @@ const hornOpen:f32=2400;
 /// how much it rings where it is held back
 const hornQ:f32=0.9;
 /// where the two horns sit (pan)
-const hornPan=m.Vice(f32,2){-0.25,-0.05};
+const hornPan=m.Vice(f32,4){-0.35,-0.2,-0.05,0.1};
 /// how loud
-const horn:f32=0.08;
+const horn:f32=0.06;
 /// how many horns play (each a note)
-const hornCount=2;
+const hornCount=4;
 /// one horn: a few saws a hair apart, held dark and opening brassy the
 /// louder it swells
 const Horn=struct{
@@ -412,7 +412,7 @@ const Sing=struct{
 /// a chord the strings bow: its notes (MIDI, 0 for none) and how hard
 const Bowed=struct{
   /// the notes
-  notes:[5]u8,
+  notes:[6]u8,
   /// how hard (1 a night's bowing)
   vel:f32,
 };
@@ -481,7 +481,7 @@ const reborn=Sing{.notes=.{73,68,54,38},.loud=1.4};
 const cues=[_]Cue{
   // the lament: the garden's line alone over the choir's hum
   .{.at=lamentAt,.what=.{.sing=lament}},
-  .{.at=lamentAt,.what=.{.bow=.{.notes=.{38,45,0,0,0},.vel=0.5}}},
+  .{.at=lamentAt,.what=.{.bow=.{.notes=.{38,45,0,0,0,0},.vel=0.5}}},
   .{.at=lamentAt+0.2,.what=.{.line=.{.note=50}}},
   .{.at=lamentAt+1.3,.what=.{.line=.{.note=57}}},
   .{.at=lamentAt+2.2,.what=.{.line=.{.note=56}}},
@@ -491,11 +491,11 @@ const cues=[_]Cue{
   .{.at=bendAt,.what=.{.sing=.{.notes=lament.notes,.loud=0.3}}},
   .{.at=bendAt+0.6,.what=.{.line=.{.note=55,.glide=0.7}}},
   .{.at=bendAt+1.3,.what=.{.sing=.{.notes=.{67,62,58,38},.loud=0.5}}},
-  .{.at=bendAt+1.3,.what=.{.bow=.{.notes=.{38,50,55,58,0},.vel=1.2}}},
+  .{.at=bendAt+1.3,.what=.{.bow=.{.notes=.{26,38,50,55,58,0},.vel=1.2}}},
   .{.at=bendAt+2.2,.what=.{.line=.{.note=53}}},
   // the loss: D minor, the choir's line falling
   .{.at=lossAt,.what=.{.sing=.{.notes=.{65,62,57,38},.loud=0.65}}},
-  .{.at=lossAt,.what=.{.bow=.{.notes=.{38,45,50,53,0},.vel=1.4}}},
+  .{.at=lossAt,.what=.{.bow=.{.notes=.{26,38,45,50,53,0},.vel=1.6}}},
   .{.at=lossAt+0.5,.what=.{.line=.{.note=50}}},
   .{.at=lossAt+1.1,.what=.{.sing=.{.notes=.{70,65,58,46},.loud=0.8}}},
   .{.at=lossAt+1.1,.what=.{.line=.{.note=53}}},
@@ -504,29 +504,29 @@ const cues=[_]Cue{
   // the peak: the whole orchestra
   .{.at=peakAt,.what=.{.strike=.{.note=38,.vel=1,.boom=1}}},
   .{.at=peakAt,.what=.{.sing=.{.notes=.{74,69,62,38},.loud=1.6}}},
-  .{.at=peakAt,.what=.{.brass=.{.notes=.{50,57},.loud=1}}},
-  .{.at=peakAt,.what=.{.bow=.{.notes=.{38,50,57,62,65},.vel=3}}},
+  .{.at=peakAt,.what=.{.brass=.{.notes=.{38,50,57,62},.loud=1}}},
+  .{.at=peakAt,.what=.{.bow=.{.notes=.{26,38,50,57,62,65},.vel=3}}},
   .{.at=peakAt,.what=.{.line=.{.note=38}}},
   .{.at=peakAt+1.2,.what=.{.strike=.{.note=46,.vel=0.9,.boom=0.8}}},
   .{.at=peakAt+1.2,.what=.{.sing=.{.notes=.{77,70,62,46},.loud=1.7}}},
-  .{.at=peakAt+1.2,.what=.{.brass=.{.notes=.{46,53},.loud=1}}},
-  .{.at=peakAt+1.2,.what=.{.bow=.{.notes=.{46,53,58,62,65},.vel=3}}},
+  .{.at=peakAt+1.2,.what=.{.brass=.{.notes=.{34,46,53,58},.loud=1}}},
+  .{.at=peakAt+1.2,.what=.{.bow=.{.notes=.{34,46,53,58,62,65},.vel=3}}},
   .{.at=peakAt+1.2,.what=.{.line=.{.note=46}}},
   .{.at=peakAt+2.3,.what=.{.strike=.{.note=45,.vel=1,.boom=1}}},
   .{.at=peakAt+2.3,.what=.{.sing=.{.notes=.{76,69,61,45},.loud=1.8}}},
-  .{.at=peakAt+2.3,.what=.{.brass=.{.notes=.{45,52},.loud=1}}},
-  .{.at=peakAt+2.3,.what=.{.bow=.{.notes=.{45,52,57,61,64},.vel=3.2}}},
+  .{.at=peakAt+2.3,.what=.{.brass=.{.notes=.{33,45,52,57},.loud=1}}},
+  .{.at=peakAt+2.3,.what=.{.bow=.{.notes=.{33,45,52,57,61,64},.vel=3.2}}},
   .{.at=peakAt+2.3,.what=.{.line=.{.note=45}}},
   // the drop: the seed falls in silence
   .{.at=dropAt,.what=.drop},
-  // the landing: the raised fourth back, the magic reborn
+  // the landing: a great boom, then the raised fourth back, the magic
+  // reborn rising slowly out of the bell (no brass: brass on a major chord
+  // read as a fanfare)
   .{.at=landAt,.what=.land},
   .{.at=landAt,.what=.{.strike=.{.note=38,.vel=1,.boom=1}}},
-  .{.at=landAt,.what=.{.sing=reborn}},
-  .{.at=landAt,.what=.{.bow=.{.notes=.{38,45,54,61,68},.vel=1.8}}},
-  .{.at=landAt,.what=.{.brass=.{.notes=.{50,57},.loud=0.6}}},
-  .{.at=landAt,.what=.{.line=.{.note=50}}},
-  .{.at=landAt+4,.what=.unbrass},
+  .{.at=landAt+0.3,.what=.{.bow=.{.notes=.{26,38,45,54,61,68},.vel=1.8}}},
+  .{.at=landAt+0.7,.what=.{.sing=reborn}},
+  .{.at=landAt+1.2,.what=.{.line=.{.note=50}}},
   .{.at=landAt+5,.what=.{.sing=.{.notes=reborn.notes,.loud=0.5}}},
   .{.at=landAt+8,.what=.unbow},
   .{.at=landAt+8,.what=.rest},
@@ -534,7 +534,7 @@ const cues=[_]Cue{
 };
 // ---- the whole theme ----
 /// how many bowed notes, timpani strokes and taiko booms may sound at once
-const bowCount=12;
+const bowCount=18;
 /// (timpani strokes)
 const timpCount=32;
 /// (taiko booms)
@@ -546,8 +546,10 @@ const gateS:f32=0.05;
 const dropTail:f32=0.1;
 /// (how fast)
 const tailS:f32=0.12;
+/// how many choirs sing
+const choirCount=2;
 /// how loud the theme is
-const level:f32=1;
+const level:f32=2.2;
 /// samples rendered at a time
 const chunk=256;
 /// the unforming's theme played out, from its moment `clock`
@@ -566,8 +568,9 @@ pub const Theme=struct{
   rollAt:f32,
   /// how many of the world's voices have come in
   wailed:usize,
-  /// the choir
-  choir:Choir,
+  /// the choir, twice over (each its own voices, so the two thicken each
+  /// other as a great choir does)
+  choirs:[choirCount]Choir,
   /// the strings
   bows:dsp.Pool(Bow,bowCount)=.{},
   /// the timpani
@@ -598,12 +601,13 @@ pub const Theme=struct{
       .beatAt=bendAt,
       .rollAt=lossAt,
       .wailed=0,
-      .choir=.init(lament.notes,&r,rate),
       .cello=.init(&r,rate),
+      .choirs=undefined,
       .horns=undefined,
       .gate=.init(if(dropped)0 else 1,gateS,rate),
       .tail=.init(if(dropped)dropTail else 1,tailS,rate),
     };
+    for(&th.choirs)|*ch|ch.*=.init(lament.notes,&r,rate);
     for(&th.horns,0..)|*h,k|h.*=.init(hornPan[k],&r,rate);
     th.r=r;
     // what came before `t` is past
@@ -687,8 +691,8 @@ pub const Theme=struct{
   /// does what one cue says
   fn cueOf(th:*Theme,w:What)void{
     switch(w){
-      .sing=>|s|th.choir.sing(s.notes,s.loud,&th.r),
-      .hush=>th.choir.hush(),
+      .sing=>|s|for(&th.choirs)|*ch|ch.sing(s.notes,s.loud,&th.r),
+      .hush=>for(&th.choirs)|*ch|ch.hush(),
       .bow=>|b|{
         th.unbow();
         for(b.notes)|note|if(note!=0)th.bows.add(.init(note,b.vel,&th.r,th.rate));
@@ -708,7 +712,7 @@ pub const Theme=struct{
       },
       .land=>{
         // every voice silenced and made afresh, so the landing blooms from nothing
-        th.choir=.init(reborn.notes,&th.r,th.rate);
+        for(&th.choirs)|*ch|ch.*=.init(reborn.notes,&th.r,th.rate);
         th.bows.clear();
         th.timps.clear();
         th.booms.clear();
@@ -731,7 +735,7 @@ pub const Theme=struct{
     var cry:[chunk]dsp.Frame=@splat(@splat(0));
     const s=stage[0..dry.len];
     const c=cry[0..dry.len];
-    th.choir.render(s);
+    for(&th.choirs)|*ch|ch.render(s);
     th.bows.render(s);
     th.timps.render(s);
     th.booms.render(s);
@@ -792,9 +796,9 @@ test"the theme is silent at first, builds to its peak, drops out for the fall, b
     a.*=@sqrt(a.*/(testRate/2));
     c.*=@sqrt(c.*/(testRate/2));
   }
-  // it rings away, never near clipping
+  // it rings away and never clips
   try testing.expect(th.done());
-  try testing.expect(peak<0.9);
+  try testing.expect(peak<1);
   // silent as it begins, the lament heard, the peak far louder
   try testing.expect(rms[0]<1e-4);
   const lamentRms=rms[6];
