@@ -177,10 +177,83 @@ Named for halcyon: calm, sheltered.
   wound round that plant. Alone, the thread opens into a net of light
   spread over the plants round it.
 
+## The numbers (a first balance, to tune in play)
+Measured against what is in the game now: a day is 300 s, stars fall
+in about the darkest third of it, a bloom seed is 3 starlight + 1 ley
+shard + 2 essence, a driftwisp yields 0.06, a root-digger digs one every
+4 s, a branch research is 20 units.
+
+Light is counted in **glow**: one glow runs one small structure at full
+boost.
+
+### Making and carrying
+| Thing | Light | Reach |
+|---|---|---|
+| Solcyriphon, by day | 6 glow, shared among the relays within its field and lighting that field itself | 3 tiles |
+| Solcyriphon, by night | a 12 glow beam into what is under it | one tile |
+| Bloom (relay) | carries up to 4 glow | 3.5 tiles (as now) |
+| Diamond (big relay) | carries up to 16 glow | 7 tiles (as now) |
+| Astrocyme | holds 360 glow-seconds (6 flowers of 60), takes or gives up to 4 glow | 3 tiles |
+| Heliocyra strip | takes up to 3 glow from its field, or the whole 12 glow beam; carries it 8 tiles, losing 10% at each bend | 1×8 tiles |
+
+- **Distance:** a structure gets full light within a tile of its relay,
+  fading evenly to a quarter at the field's edge.
+- **Budget:** a relay's light is shared out by draw. If its users want
+  more than it carries, each gets the same share (carried ÷ wanted).
+- **Halcyra:** alone, it guards every plant within 2 tiles.
+
+### Drawing
+| User | Draws | In light |
+|---|---|---|
+| Vesper | 1 | lives (below a quarter of its draw it withers, as now) |
+| Germinator | 2 | boost |
+| Root-digger | 1 | boost |
+| Loomfern | 1 | boost |
+| Gathering crown | 2 | boost |
+| Lithophage | 3, +1 per tile it reaches past 2 | boost |
+| Sporecaster | 2 at each end | needs it |
+| Arsthraxia | 3 | needs it (until it evolves) |
+| Conduits, sap cache | 0 | looks only |
+
+- **Boost:** full light (strength × share = 1) makes a structure work
+  1.5× as fast; less light, less boost, straight down to none.
+- **Needing it:** a structure that needs light works at the speed its
+  light allows and stops below a quarter.
+
+### Overdrive (the night beam on a plant)
+- Grows 3× as fast, yields 3× as much.
+- One yield in ten is rare: **sunlit essence** (counts as 3 essence in
+  any recipe), **sunlit convergence essence** (counts as 3), **starglass**
+  from a driftwisp, **evening silk** from a vesper.
+- It costs the plant 0.008 HP a second under the beam, so an unguarded
+  plant dies over about a night and a half.
+- **Tempered Light** (research, 15 units of 1 starlight + 1 essence,
+  opened by the first overdrive) halves the harm: about three nights.
+- **Moss:** a 0.5% chance each night that a mossy tile under the beam
+  becomes a ley line. **Any other bare ground:** nothing.
+
+### The lithophage's reach
+Grown, it reaches 2 tiles. It reaches one tile further each time its
+age triples: 3 tiles after 10 days, 4 after 30, 5 after 90, and so on,
+forever. Each unit its tendrils draw refines to 2 (a root-digger's gives
+1); a ley shard still gives 3 grit.
+
+### Seeds and research
+| Seed | Costs | Opened by |
+|---|---|---|
+| Solcyriphon | 4 starlight, 2 ley shard, 2 fibre | open from the start (see below) |
+| Heliocyra | 1 starglass, 2 starlight, 1 ley shard | **Bent Light**: 15 units of 2 starlight + 1 ley shard, after the first starglass |
+| Halcyra | 2 evening silk, 2 essence, 1 fibre | **Halcyon Veil**: 15 units of 1 evening silk + 1 essence, after the first evening silk |
+| Astrocyme | 2 starglass, 1 evening silk, 2 essence | **Held Light**: 20 units of 2 starlight + 1 essence, after Bent Light and Halcyon Veil (a branch) |
+
+- **The solcyriphon must be open from the start**, like the bloom: the
+  arsthraxia needs light to study, so without one no research can begin.
+  It costs more than a bloom, so the first is a real step.
+- **The order this makes:** solcyriphon and blooms first; then a
+  driftwisp under the beam for starglass (the heliocyra); vespers under
+  it for evening silk (the halcyra); both open the astrocyme. The first
+  starglass and silk cost a driftwisp's and a vesper's lives, since nothing
+  guards them yet.
+
 ## Still to decide
-- The numbers: how much light a solcyriphon makes by day and by night,
-  how far each relay reaches, how much each structure and vesper draws,
-  how fast boosts run, how much an astrocyme holds.
-- Seeds and research: what each new plant's seed costs (starglass and
-  evening silk go here) and which research opens it.
-- What the beam does to bare ground that is not moss.
+- Whether these numbers feel right in play.
