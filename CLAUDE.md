@@ -43,6 +43,7 @@ idioms and what not to do), every session.
 | making a frame cheaper (measure, knock-outs, proving the look held, what worked) | [docs/optimizing.md](docs/optimizing.md) |
 | shaders, for speed | [docs/shader-optimization.md](docs/shader-optimization.md) |
 | player controls | [docs/controls.md](docs/controls.md) |
+| what is left to do (the only list of it) | [docs/todo.md](docs/todo.md) |
 
 When a change alters what one of these says, update it in the same commit.
 
@@ -282,4 +283,6 @@ injected params, no global env/args. `@Type` removed (`@Pointer`,
 Done and next: [docs/design.md](docs/design.md#roadmap). The vertical
 slice's list is done (the first world event, launched from the diamond, and
 the sky shift at convergence); what comes next is the gardener's to name.
+Everything still to add, change or mend lives in [docs/todo.md](docs/todo.md)
+and nowhere else: a kept idea is written there, a finished one struck.
 Target: a stranger plays 2 hours and says "I want to see what happens next."

@@ -532,8 +532,7 @@ constellate one alone. What the gardener decided for this act, and why:
   show). Whole, its petals turn round the core and every 6 s spring shut,
   their tips gathering one point of light over it, let go as a mote and a
   new fragment; it keeps up to 20 fragments, a click takes one.
-- **Next:** the wolf's rooting into the tree (how act 2 begins in play);
-  animation as parts drift and merge.
+- **Next:** in [todo.md](todo.md#act-2).
 ## The research tree (T, `hud/research.zig`)
 Research is a living tree over the whole screen, the world paused behind
 it. It starts as a sprout and every study known grows it, crown and roots
@@ -634,3 +633,5 @@ reach (`view.zig`, `play.drawLimitOf`).
 
 Target: a stranger plays 2 hours and says "I want to see what happens
 next."
+
+What is still to do lives in [todo.md](todo.md), the only list of it.
