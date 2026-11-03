@@ -12,8 +12,9 @@
 //! belly fills, while its top stays with the spine. The sac carries tu.y =
 //! `belly`: the shader carves it, a crease down its middle there even when
 //! empty, one across it folding in as it fills (crossing at the belly
-//! button, `crossing`), and the button itself, the sac's own surface: a pit
-//! with a knot in it and a puckered rim, the knot rising out as it fills.
+//! button, `crossing`), and the button itself, the sac's own smooth
+//! surface: a hollow with a knot in it, sunk in when empty, its ring
+//! pushed out into a dome and the knot popping out on it as it fills.
 //! The grid gathers its rows and columns round the button (`gathered`) so
 //! all that is carved finely.
 const lib=@import("../../lib.zig");
@@ -84,7 +85,7 @@ const vertex=lib.vertex;
 /// the sac's grid: rings from bottom to top
 const rings=48;
 /// the sac's grid: steps round it
-const sides=72;
+const sides=96;
 /// a point on the sac at `th` (0 bottom .. pi top) and `ph` around (0 the
 /// right side, pi/2 the front), `lift` times out from its surface, in the
 /// waist's frame
@@ -223,7 +224,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     vx.tu[1]=belly;
   };
   // decision: the belly button is no knot of its own but the sac's surface
-  // carved by the shader (pit, knot, puckered rim), so it melts into it
+  // carved by the shader (a hollow and its knot), so it melts into it
   // into the waist's place in the bind pose: the gut with the gut bones,
   // the rest with the spine, the hips below it and the ribs above. The
   // weights change with height alone, and the gut swells the sac to three

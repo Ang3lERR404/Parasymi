@@ -1194,30 +1194,30 @@ vec3 catmullTan(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
 // normal its surface goes (negative: in). A crease down its middle, there
 // even when empty and deepening as it fills, fading toward the ribs; one
 // across it, folding in only as it fills; and the button, the sac's own
-// surface: a pit with a rounded knot in it and a puckered rim round it.
-// Empty it is sunk in; as the belly swells the pit fills, the creases
-// part round it and the knot pops out past the sac's surface.
+// surface, smooth all round: a hollow with a rounded knot in it. Empty it
+// is sunk in; as the belly swells the creases part round it, the hollow's
+// ring is pushed out into a dome and the knot pops out on top of it.
 float bellyCarve(vec3 d, float fill) {
-  const float DOWN_W = 0.012;   // the crease down the middle: its width
+  const float DOWN_W = 0.007;   // the crease down the middle: how fast it falls away from its fold
+  const float DOWN_E = 0.0012;  // how tightly its fold is rounded (smaller: sharper)
   const float ACROSS_W = 0.017; // the crease across it
-  const float RIM_R = 0.03;     // the rim: how far out from the button
-  const float RIM_W = 0.008;    // and how wide
-  // the button: how far from it, which way round it, and how far popped
+  // how far from the button, and how far popped
   float r = length(d);
-  float a = r > 1e-5 ? atan(d.y, d.x) : 0.0;
   float rise = smoothstep(0.0, 1.0, fill);
-  float down = mix(0.022, 0.03, fill);
+  float down = mix(0.03, 0.04, fill);
   float across = 0.024 * fill;
-  float cv = down * exp(-d.x * d.x / (DOWN_W * DOWN_W)) * smoothstep(-0.02, 0.05, d.z) * (1.0 - smoothstep(0.12, 0.21, d.y));
+  // the centre crease falls away from a tight, rounded fold (a softened |x|)
+  float fold = sqrt(d.x * d.x + DOWN_E * DOWN_E) - DOWN_E;
+  float cv = down * exp(-fold / DOWN_W) * smoothstep(-0.02, 0.05, d.z) * (1.0 - smoothstep(0.12, 0.21, d.y));
   float ch = across * exp(-d.y * d.y / (ACROSS_W * ACROSS_W)) * smoothstep(-0.08, 0.02, d.z);
   // the two creases joined softly (the deeper sets how they share), parting
   // round the button as it pops
-  float crease = (cv + ch - cv * ch / max(max(down, across), 1e-4)) * (1.0 - rise * exp(-r * r / (0.03 * 0.03)));
-  float knotW = mix(0.008, 0.013, rise);
-  float knot = mix(0.012, 0.03, rise) * exp(-r * r / (knotW * knotW));
-  float pit = mix(0.02, 0.003, rise) * exp(-r * r / (0.021 * 0.021));
-  float rim = 0.005 * (1.0 + 0.45 * cos(7.0 * a)) * exp(-(r - RIM_R) * (r - RIM_R) / (RIM_W * RIM_W));
-  return knot - pit + rim - crease;
+  float crease = (cv + ch - cv * ch / max(max(down, across), 1e-4)) * (1.0 - rise * exp(-r * r / (0.035 * 0.035)));
+  // the knot, and the ring round it: a hollow when empty, a dome when full
+  float knotW = mix(0.008, 0.012, rise);
+  float knot = mix(0.012, 0.026, rise) * exp(-r * r / (knotW * knotW));
+  float ring = mix(-0.02, 0.012, rise) * exp(-r * r / (0.022 * 0.022));
+  return knot + ring - crease;
 }
 
 void main() {
