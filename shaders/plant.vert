@@ -134,6 +134,7 @@ const float HELIO_BRIGHT = 1.8;
 // VEIL_SPARK_FROM to VEIL_SPARK_TO (m) and fall VEIL_SPARK_FALL (m)
 // (radiant_kit `veilLean`, `veilReach`; must match)
 const float VEIL_HIGH = 0.5;
+const float GUARD_STEPS = 64.0;
 const float VEIL_LEAN = 0.5;
 const float VEIL_REACH = 1.0;
 const float VEIL_BREATH = 0.07;
@@ -221,8 +222,10 @@ const uint FORMS_FACING = FORM_BIT(FORM_HELIOTROPE) | FORM_BIT(FORM_VEIL);
 // a head on a neck: its petals flutter (tu.z how far out), its head
 // swings a little, its crystal burns with what it casts (iy.w)
 const uint FORMS_FLUTTER = FORM_BIT(FORM_HELIOTROPE);
-// a guard: beside a plant (iy.w how far off it stands) it leans over it,
-// its thread wound round it; alone (iy.w 0) its thread opens into a net
+// a guard: beside a plant it leans over it, its thread wound round it;
+// alone (iy.w 0) its thread opens into a net. iy.w packs how far off that
+// plant stands (whole steps of 1/GUARD_STEPS m) and how far it leans, 0..1
+// (the fraction; view.zig `leanPacked`), so it eases between the two
 const uint FORMS_GUARDING = FORM_BIT(FORM_VEIL);
 // afloat (common.glsl FORMS_AFLOAT): how far what lies on the water drifts
 // on the wind (m), how far it bobs on slow ripples (m), how deep under the
@@ -382,6 +385,9 @@ void main() {
     float own = iy.w;
     // a guard beside no plant spreads its net; beside one it leans over it
     bool alone = own <= 0.0;
+    // a guard's lean, 0 alone .. 1 over the plant it guards, and its reach to it
+    float leans = guarding ? fract(own) / 0.99 : 0.0;
+    float reachTo = guarding ? floor(own) / GUARD_STEPS : own;
     // the light it carries, by its ring before its form adds its own
     int ri = clamp(int(ring), 0, 13);
     float glow = GLOW[ri];
@@ -540,13 +546,18 @@ void main() {
       // and its net put away into its heart. Alone, the net is spread and
       // the wound thread put away.
       vec3 heart = vec3(0.0, VEIL_HIGH, 0.0);
-      if (!alone && !wound && !netted) {
-        float lean = VEIL_LEAN * (rooted ? 1.0 - held : 1.0);
+      float ease = smoothstep(0.0, 1.0, leans);
+      if (!wound && !netted) {
+        float lean = VEIL_LEAN * ease * (rooted ? 1.0 - held : 1.0);
         p = turnAbout(p, vec3(0.0, 0.0, -1.0), lean);
         n = turnAbout(n, vec3(0.0, 0.0, -1.0), lean);
       }
-      if (wound) p.x += (max(own, VEIL_REACH) - VEIL_REACH) * smoothstep(VEIL_REACH * 0.5, VEIL_REACH * 0.85, p.x);
-      if ((wound && alone) || (netted && !alone)) {
+      if (wound) p.x += (max(reachTo, VEIL_REACH) - VEIL_REACH) * smoothstep(VEIL_REACH * 0.5, VEIL_REACH * 0.85, p.x);
+      // its thread winds out from its heart as it leans in, its net folds
+      // back into it (each staggered along its own length, tip last)
+      if (wound) p = mix(heart, p, smoothstep(0.0, 1.0, ease * 1.4 - order * 0.4));
+      if (netted) p = mix(heart, p, smoothstep(0.0, 1.0, (1.0 - ease) * 1.4 - order * 0.4));
+      if ((wound && ease <= 0.001) || (netted && ease >= 0.999)) {
         p = heart;
         unseen = true;
       }

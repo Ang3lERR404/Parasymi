@@ -48,6 +48,10 @@ pub const beamCatch:f32=0.6;
 pub const stripTake:f32=3;
 /// the share of a strip's light a heliocyra keeps as it bends it on
 pub const bendKeep:f32=0.9;
+/// how fast a halcyra leans over a plant put down beside it, or draws
+/// back to its net when the plant is gone (a share a second: about two
+/// seconds either way)
+pub const leanRate:f32=1.6;
 /// a relay a structure holds (a diamond): where it hangs, how far its field
 /// reaches, how much it carries and how far it links
 pub const Relay=struct{
@@ -235,7 +239,7 @@ pub const Light=struct{
     l.beams.clearRetainingCapacity();
     l.nodes.clearRetainingCapacity();
     try l.gather(gpa,s,relays);
-    try l.guard(s,p,w);
+    try l.guard(s,p,w,dt);
     if(l.nodes.items.len>0){
       try l.pour(gpa,s,p,w,night);
       try l.join(gpa);
@@ -539,17 +543,22 @@ pub const Light=struct{
     return pk.strength*nd.kept/nd.demand;
   }
   /// halcyras guard: one put down beside a plant guards that one alone,
-  /// one with no plant beside it every plant within its reach
-  fn guard(l:*Light,s:Slice,p:*const Plants,w:*const World)Allocator.Error!void{
+  /// one with no plant beside it every plant within its reach; each eases
+  /// its lean toward the one it guards, or back to its net alone, over
+  /// `dt` (`leanRate`)
+  fn guard(l:*Light,s:Slice,p:*const Plants,w:*const World,dt:f32)Allocator.Error!void{
     for(s.items(.sp),0..)|sp,i|{
       // the species, and how far it guards
       const d=species.get(sp);
-      if(d.guards<=0 or s.items(.growth)[i]<1)continue;
-      // the first plant beside it, if any
-      const beside=for(s.items(.n1)[i])|j|{
+      if(d.guards<=0)continue;
+      // the first plant beside it, if any (none while it is still gathering)
+      const beside=if(s.items(.growth)[i]<1)null else for(s.items(.n1)[i])|j|{
         if(j==.none)break null;
         if(!species.get(s.items(.sp)[j.idx()]).lightNode())break j;
       }else null;
+      if(beside)|j|s.items(.leanTo)[i]=s.items(.at)[j.idx()];
+      s.items(.lean)[i]=m.damp(s.items(.lean)[i],if(beside!=null)1 else 0,leanRate,dt);
+      if(s.items(.growth)[i]<1)continue;
       if(beside)|j|{
         l.guarded.items[j.idx()]=true;
         l.ward.items[i]=j;
@@ -695,6 +704,10 @@ test"a halcyra beside a plant guards it alone; alone, it guards all round it"{
   try testing.expect(!b.l.guarded.items[off.idx()]);
   // (it says whom it guards, for its thread to wind round)
   try testing.expectEqual(by,b.l.ward.items[0]);
+  // it leans in over the plant beside it by degrees, never at a blink
+  try testing.expect(b.p.list.items(.lean)[0]<0.1);
+  for(0..120)|_|try b.run(gpa,0);
+  try testing.expect(b.p.list.items(.lean)[0]>0.9);
   // a lone halcyra guards both plants within its reach
   _=try b.put(gpa,10,10,.halcyra);
   const a=try b.put(gpa,10,12,.lumenroot);

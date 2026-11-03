@@ -99,6 +99,13 @@ pub const Plant=struct{
   rare:f32=0,
   /// the light it holds in store (glow-seconds; an astrocyme's)
   stored:f32=0,
+  /// a halcyra: how far it leans over the plant it guards, 0 alone (its
+  /// net spread) .. 1 leaning (its thread wound round), eased so it never
+  /// flips at a blink (sim/light.zig `guard`; not saved: it eases back in)
+  lean:f32=0,
+  /// a halcyra: where the plant it leans toward last stood, kept while it
+  /// eases back from one taken away
+  leanTo:m.V3=@splat(0),
   /// the way it was turned to (R), and how it got there
   dir:m.Dir=0,
   /// how it is turning (R), timed from when it began

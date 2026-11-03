@@ -319,7 +319,7 @@ fn plants(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
 const Own=struct{
   /// an astrocyme's fill 0..1, a heliocyra's strip's light 0..1 (of what
   /// it takes from a field, more for a beam's), a halcyra's reach to the
-  /// plant it guards (m; 0 alone)
+  /// plant it leans toward and how far it leans, packed (`leanPacked`)
   k:f32=0,
   /// a halcyra beside a plant: the yaw that turns it toward it
   face:?f32=null,
@@ -335,15 +335,23 @@ fn ownOf(g:*const Game,i:usize)Own{
     for(l.strips.items)|st0|if(st0.from.idx()==i)return.{.k=st0.glow/lib.light.stripTake};
     return.{};
   }
-  if(def.guards>0 and i<l.ward.items.len){
-    // the plant it guards beside it, if any, and the way to it across the ground
-    const w=l.ward.items[i];
-    if(w==.none or w.idx()>=g.plants.len())return.{};
-    const d=s.items(.at)[w.idx()]-s.items(.at)[i];
-    return.{.k=m.len(m.v3(d[0],0,d[2])),.face=m.atan2(-d[2],d[0])};
+  if(def.guards>0){
+    // how far it leans, and the way to where the plant it leans toward last stood
+    const lean=s.items(.lean)[i];
+    if(lean<=leanGone)return.{};
+    const d=s.items(.leanTo)[i]-s.items(.at)[i];
+    return.{.k=leanPacked(m.len(m.v3(d[0],0,d[2])),lean),.face=m.atan2(-d[2],d[0])};
   }
   return.{};
 }
+/// a halcyra leaning less than this is drawn wholly alone, its net spread
+const leanGone:f32=0.002;
+/// a halcyra's reach (m) and lean (0..1) packed in one float for the GPU
+/// (plant.vert `GUARD_STEPS`, must match): the reach in whole steps of
+/// 1/`leanSteps` m, the lean in the fraction
+pub fn leanPacked(reach:f32,lean:f32)f32{return@floor(reach*leanSteps)+m.clamp(lean,0,0.99);}
+/// how finely a halcyra's reach is packed (steps a metre)
+const leanSteps:f32=64;
 /// the burst where a plucked plant's yield came loose, while it lasts:
 /// motes and drops of what it yields flung out round the paws, glowing
 /// and shrinking away
