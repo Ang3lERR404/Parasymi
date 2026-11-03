@@ -341,7 +341,6 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `mote.zig` — mesh: MOTE.
 - `nebularbor.zig` — mesh: NEBULARBOR, the mist tree: a tree of both lineages on its 3x3 ground, the first thing to breathe moisture into the air…
 - `node_fibre.zig` — mesh: NODE FIBRE.
-- `node_fibre_looks.zig` — mesh: three looks for the fibre node, laid side by side (`--samples=`) for the gardener to choose from.
 - `node_grit.zig` — mesh: NODE GRIT.
 - `node_ley.zig` — mesh: NODE LEY.
 - `palette.zig` — shared look for library meshes: the vine-wolf palette (woody cores, living vines, leaves, amber sap) and a per-mesh deterministic random…

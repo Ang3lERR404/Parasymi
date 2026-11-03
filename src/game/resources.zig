@@ -30,7 +30,7 @@ pub const Node=struct{
 pub const nodes=EnumArray(ck.Kind,?Node).init(.{
   .soil=.{.item=.grit,.mesh=.nodeGrit},
   .stone=.{.item=.grit,.mesh=.nodeGrit},
-  .moss=.{.item=.fibre,.mesh=.nodeFibre,.sway=1,.tall=0.45},
+  .moss=.{.item=.fibre,.mesh=.nodeFibre,.sway=1,.tall=0.5},
   .ley=.{.item=.leyShard,.mesh=.nodeLey,.glow=0.7},
 });
 /// the node a tile kind offers, if any

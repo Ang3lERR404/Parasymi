@@ -397,7 +397,9 @@ This is what plays while a halo forms from four blooms
 - **Crystals** stay flat-faced, cut planes catching the light.
 - **Ley shards:** a violet crystal cluster.
 - **Grit:** boulders with quartz chips.
-- **Fibre:** a swaying clump of arching stalks.
+- **Fibre:** a swaying clump that reads from above against the moss: three
+  fans of bronze strap leaves, the outer ones fraying at their tips into
+  pale fibre, shot through with golden flax stems crowned by round seed bolls.
 
 ## Sap
 Sap everywhere is alive. Bubbles rise inside; beads slide down its surface
