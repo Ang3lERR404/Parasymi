@@ -262,6 +262,14 @@ pub fn catmullRom(p0:V3,p1:V3,p2:V3,p3:V3,t:f32)V3{
     (p0*splat3(2)-p1*splat3(5)+p2*splat3(4)-p3)*splat3(t2) +
     (p1*splat3(3)-p0-p2*splat3(3)+p3)*splat3(t3))*splat3(0.5);
 }
+/// the four control points of a cubic Bézier running straight from `a` to
+/// `b`, its middle two (at a third and two thirds of the way) lifted by
+/// `lift`: a line that bows by `lift`, or with none a true straight one
+pub fn straightCubic(a:V3,b:V3,lift:V3)[4]V3{
+  // the run from one end to the other
+  const span=b-a;
+  return.{a,a+span*splat3(1.0/3.0)+lift,a+span*splat3(2.0/3.0)+lift,b};
+}
 /// resample the Catmull-Rom spline through every point of `pts` into `out`,
 /// evenly spaced by arc length. The end points repeat as their own outer
 /// control points, so the curve starts and ends exactly on them.
@@ -619,6 +627,14 @@ test"the mean of many points is their middle, at any width"{
   try testing.expectEqual(Vec(i32,2){0,1},meanOf(i32,2,&tiles));
   // one point alone is its own mean
   try testing.expectEqual(V4{1,2,3,4},meanOf(f32,4,&.{V4{1,2,3,4}}));
+}
+test"a straight cubic's control points sit at its thirds, lifted alike"{
+  // a run along x, lifted up y
+  const c=straightCubic(v3(0,0,0),v3(3,0,0),v3(0,1,0));
+  try testing.expectEqual(v3(0,0,0),c[0]);
+  try testing.expectEqual(v3(1,1,0),c[1]);
+  try testing.expectEqual(v3(2,1,0),c[2]);
+  try testing.expectEqual(v3(3,0,0),c[3]);
 }
 test"alignUp rounds up to the step, keeping what already sits on it"{
   try testing.expectEqual(@as(u64,256),alignUp(1,256));

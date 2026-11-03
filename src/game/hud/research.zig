@@ -202,6 +202,12 @@ const tendrilW:f32=150;
 const tendrilH=s.barH;
 /// the icon of what a study lets be woven: its radius on the card (pixels)
 const iconR:f32=30;
+/// the card's lines under its name (pixels down): the description...
+const descDown:f32=24;
+/// ...the cost, or what it waits for...
+const costDown:f32=46;
+/// ...and the progress tendril
+const barDown:f32=70;
 /// the title and hint stand this far (pixels) in from the top left
 const headX:f32=40;
 /// the band (pixels) the title and hint take across the top, kept clear of
@@ -651,12 +657,16 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
     shownBox.take(l.limb[i][seg],nodeR*bigNode*sp.grow);
     if(gl>0)shownBox.take(on(&l.root[i],gl),0);
   };
-  const full=layout(1,0,0);
-  sp.bounds=.{};
-  sp.bounds.take(m.splat3(0),0);
-  for(0..nodeCount)|i|{
-    sp.bounds.line(&full.limb[i],nodeR*bigNode);
-    sp.bounds.line(&full.root[i],0);
+  // (the whole grown tree never changes: found once each time it opens)
+  if(reopened){
+    // the tree grown fully and still
+    const full=layout(1,0,0);
+    sp.bounds=.{};
+    sp.bounds.take(m.splat3(0),0);
+    for(0..nodeCount)|i|{
+      sp.bounds.line(&full.limb[i],nodeR*bigNode);
+      sp.bounds.line(&full.root[i],0);
+    }
   }
   sp.least=sp.bounds.fit(screenW,screenH)[1]*minZoomShare/fitFill;
   // where the view goes: fitted to what shows, or after the focused study
@@ -826,23 +836,23 @@ fn card(g:*play.Game,d:*Draw,b:Box,id:Id)Allocator.Error!void{
   const y=b.y+26;
   if(wovenItem(id))|it|try icon.draw(d,it,.{b.x+iconR+22,b.y+b.h/2},iconR,@floatCast(g.uiTime),m.f(@intFromEnum(id))*0.21,if(st==.done)1 else 0.4,if(st==.locked)140 else 255);
   _=try d.text(x,y,s.textRow,col,txt.research(id).name);
-  _=try d.text(x,y+24,s.textFine,s.dim,txt.research(id).desc);
+  _=try d.text(x,y+descDown,s.textFine,s.dim,txt.research(id).desc);
   if(st==.locked){
     for(r.prereq)|q|if(!g.prog.done.contains(q)){
-      _=try d.print(x,y+46,s.textFine,s.researchLocked,txt.s.hud.researchDormant,.{txt.research(q).name});
+      _=try d.print(x,y+costDown,s.textFine,s.researchLocked,txt.s.hud.researchDormant,.{txt.research(q).name});
       return;
     };
-    _=try d.text(x,y+46,s.textFine,s.researchLocked,txt.s.hud.researchUnwitnessed);
+    _=try d.text(x,y+costDown,s.textFine,s.researchLocked,txt.s.hud.researchUnwitnessed);
     return;
   }
   // where the next ingredient is written (pixels from the left)
   var cx=x;
   for(r.perUnit,0..)|ing,j|{
-    try d.grain(cx+6,y+51,9,13,ing.item.info().col,0.6,m.f(j)*0.3);
-    cx=try d.print(cx+14,y+46,s.textFine,s.dim,txt.s.hud.ingredient,.{ing.n,txt.item(ing.item).short})+10;
+    try d.grain(cx+6,y+costDown+5,9,13,ing.item.info().col,0.6,m.f(j)*0.3);
+    cx=try d.print(cx+14,y+costDown,s.textFine,s.dim,txt.s.hud.ingredient,.{ing.n,txt.item(ing.item).short})+10;
   }
-  _=try d.print(cx+8,y+46,s.textFine,s.dim,txt.s.hud.researchCost,.{r.units,r.unitTime});
-  try d.tendril(x,y+70,tendrilW,tendrilH,col,frac(g,id),m.f(@intFromEnum(id))*0.21);
+  _=try d.print(cx+8,y+costDown,s.textFine,s.dim,txt.s.hud.researchCost,.{r.units,r.unitTime});
+  try d.tendril(x,y+barDown,tendrilW,tendrilH,col,frac(g,id),m.f(@intFromEnum(id))*0.21);
 }
 test"the tree lays itself out: hosts first, every study a lineage, tips apart and above the soil"{
   // every host comes before what grows from it, one ring nearer the trunk

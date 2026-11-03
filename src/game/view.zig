@@ -506,7 +506,7 @@ fn threads(g:*Game,tf:f32)Allocator.Error!void{
     // a beam runs true, bowing only a breath as the blooms drift
     const sag=m.v3(0,beamSag*@sin(tf*beamSagRate+m.f(ia)),0);
     // the beam's four control points
-    const ctrl=[4]m.V3{pos[0],pos[0]+span*m.splat3(1.0/3.0)+sag,pos[0]+span*m.splat3(2.0/3.0)+sag,pos[1]};
+    const ctrl=m.straightCubic(pos[0],pos[1],sag);
     // which way is across the beam, level
     const side=m.norm(m.cross(span,m.v3(0,1,0)));
     // how far out the beam has reached, 0..1, as its relay finishes
@@ -580,9 +580,8 @@ fn shafts(g:*Game,tf:f32)Allocator.Error!void{
     const top=end(g,i,tf)-m.v3(0,beamFromBelow,0);
     const ground=g.heightAt(bm.x,bm.y);
     const to=if(bm.into)|r|(nodeEnd(g,r,tf) orelse m.v3(top[0],ground,top[2]))else m.v3(top[0],ground,top[2]);
-    // the four control points, straight down, and its length
-    const span=to-top;
-    const ctrl=[4]m.V3{top,top+span*m.splat3(1.0/3.0),top+span*m.splat3(2.0/3.0),to};
+    // the four control points, straight down
+    const ctrl=m.straightCubic(top,to,m.splat3(0));
     try g.parts.emitCurve(.lightBeam,ctrl,m.v3(1,0,0),1,1,.{.glow=beamGlow*bm.k,.flutter=beamHalf,.phase=s.items(.seed)[i],.fade=0});
     try g.parts.light(to+m.v3(0,0.3,0),beamCol*m.splat3(beamLand*bm.k),beamLandReach);
     try g.parts.light(m.lerpV(top,to,0.5),beamCol*m.splat3(beamMid*bm.k),beamMidReach);
