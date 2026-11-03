@@ -184,7 +184,7 @@ pub fn gait(p:*const Player)Gait{
   return out;
 }
 /// how full the belly is to look at (0..1) for what it holds
-pub fn bellyFill(p:*const Player)f32{return 1-@exp(-m.f(p.inv.total())/bellyItems);}
+pub fn bellyFill(p:*const Player)f32{return p.fullHeld orelse 1-@exp(-m.f(p.inv.total())/bellyItems);}
 /// the feet: plant, lift, swing to where they are wanted. Returns whether
 /// one came down this frame.
 pub fn step(p:*Player,ground:?*const World,spd:f32,dt:f32)bool{

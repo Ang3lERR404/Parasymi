@@ -154,6 +154,9 @@ pub const Player=struct{
   breath:f32=0,
   /// how full the belly looks, easing toward the inventory's fill
   fullness:f32=0,
+  /// a fill held from outside (`--full=`, for shots of the belly at one
+  /// size), whatever it holds; null: the inventory's own
+  fullHeld:?f32=null,
   /// velocity last frame and the acceleration felt since, in the wolf's own
   /// frame (x right, z forward)
   lastVel:V3=v3(0,0,0),

@@ -137,9 +137,8 @@ pub const stageAt=m.Vice(f32,2){1.0/3.0,2.0/3.0};
 /// how much fullness each stage blends over about its threshold
 pub const stageBlend:f32=0.08;
 /// the belly-rest idle: standing still this long with the belly at least
-/// `restFull` full (fully in by `restFullIn`), the right paw rests on top
-/// of the belly (at `restOn`, the sac's upper half's frame, in its own
-/// shares: its radii and height) and the left leans on the hip (at
+/// `restFull` full (fully in by `restFullIn`), the right palm lies on the
+/// belly's upper front (at `restOn`, on its skinned surface) and the left leans on the hip (at
 /// `restHip`, the pelvis's frame, x outward), its knuckles curled, the
 /// elbow out; the two ease in on a slow spring
 /// (this one: how long it stands still first, s)
@@ -150,10 +149,23 @@ pub const restFull:f32=1.0/3.0;
 pub const restFullIn:f32=0.45;
 /// how stiffly the rest pose eases in (spring frequency)
 pub const restFreq:f32=2.2;
-/// where the right paw rests on the belly (shares of the sac's radii and height)
-pub const restOn=v3(0.1,0.92,0.45);
-/// the wrist sits this far off the sac, the paw lying on it
-pub const restLift:f32=0.045;
+/// where on the sac the right palm lies, in the sac's own angles: how far
+/// up it from the bottom and how far round from its right side (radians);
+/// found on the skinned surface, so it lies there at every fill
+pub const restOn=m.Vice(f32,2){m.pi*0.66,m.halfPi-0.42};
+/// the palm's middle sits this far off the sac (half the paw's thickness, m)
+pub const restPalm:f32=0.03;
+/// how far down the hand from the wrist the palm's middle is (m)
+pub const restHeel:f32=0.048;
+/// the resting fingers point down the sac and this much in toward its middle
+pub const restInward:f32=0.35;
+/// a full belly swells past the arm's easy reach; the paw slides up the
+/// sac until the wrist is this share of the arm's length from the shoulder
+pub const restReach:f32=0.9;
+/// how high up the sac it may slide (radians from the bottom)
+pub const restTop:f32=m.pi*0.9;
+/// how many halvings find where up the sac it is in reach
+pub const restSteps:usize=14;
 /// where the left paw leans on the hip (pelvis frame, m, x outward)
 pub const restHip=v3(0.22,0.08,-0.01);
 /// how far the hip-leaning elbow swings out (radians)
@@ -162,11 +174,6 @@ pub const restElbowOut:f32=1.0;
 pub const restFlat:f32=0.12;
 /// how tight the hip-leaning (left) paw curls its knuckles
 pub const restFist:f32=1.1;
-/// the paw on the belly turns palm down and bends onto it this far
-/// (this one: how far it turns palm down, radians)
-pub const restPronate:f32=1.4;
-/// how far the resting paw bends over the belly's curve (radians)
-pub const restDrape:f32=0.7;
 /// the gait: a full cycle (both feet) covers `cycle + cyclePerSpeed *
 /// speed` metres; a foot is planted for `duty` of it, more of it walking
 /// slowly than running

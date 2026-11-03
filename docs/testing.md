@@ -224,6 +224,14 @@ zig build run -- --act2 --structure=strangeSeed --state=active --period=2000 --s
 zig build run -- --act2 --structure=yielder --state=active --period=2000 --inspect=yielder --shots=3 --orbit=30 --dist=3 --pitch=12
 ```
 
+## The belly at one size
+`--full=F` holds the wolf's belly F full (0..1) whatever it carries;
+standing still past a third it takes the belly-rest pose, e.g.
+
+```
+zig build run -- --demo --full=1 --inspect=player --shots=6 --orbit=12 --dist=1.1 --pitch=5
+```
+
 ## A HUD panel
 `--panel=<title|belly|research|paused|options|keybinds|gardens|naming>` holds it open and
 keeps the HUD in `--inspect` shots (`--panel=overview` roams with alt mode

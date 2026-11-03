@@ -1247,9 +1247,23 @@ vec3 catmullTan(vec3 a, vec3 b, vec3 c, vec3 d, float f) {
 // normal its surface goes (negative: in). A crease down its middle, there
 // even when empty and deepening as it fills, fading toward the ribs; one
 // across it, folding in only as it fills; and the button, the sac's own
-// surface, smooth all round: a hollow with a rounded knot in it. Empty it
-// is sunk in; as the belly swells the creases part round it, the hollow's
-// ring is pushed out into a dome and the knot pops out on top of it.
+// surface, smooth all round. Empty it is an innie: a round hollow with a
+// small rounded knot sunk in it and a soft lip round its rim; as the belly
+// swells the creases part round it and it rounds out into an outie: a
+// round dome button, its top rounded (never peaked), standing in a soft
+// collar on a gentle swell.
+// a round bump of radius `w` at distance `r` from its middle: 1 there,
+// easing out to 0 at `w`, flat at both ends (so its top is rounded and it
+// melts into what is round it)
+float bellyCap(float r, float w) { return 1.0 - smoothstep(0.0, w, r); }
+// a round dome of radius `w` at distance `r` from its middle: 1 there, its
+// top broad and rounded like a button's (no bell's peak), its edge easing
+// flat into what is round it (1 - 3t^4 + 2t^6)
+float bellyDome(float r, float w) {
+  float t = min(r / w, 1.0);
+  float t2 = t * t;
+  return 1.0 - t2 * t2 * (3.0 - 2.0 * t2);
+}
 float bellyCarve(vec3 d, float fill) {
   const float DOWN_W = 0.007;   // the crease down the middle: how fast it falls away from its fold
   const float DOWN_E = 0.0012;  // how tightly its fold is rounded (smaller: sharper)
@@ -1266,11 +1280,27 @@ float bellyCarve(vec3 d, float fill) {
   // the two creases joined softly (the deeper sets how they share), parting
   // round the button as it pops
   float crease = (cv + ch - cv * ch / max(max(down, across), 1e-4)) * (1.0 - rise * exp(-r * r / (0.035 * 0.035)));
-  // the knot, and the ring round it: a hollow when empty, a dome when full
-  float knotW = mix(0.008, 0.012, rise);
-  float knot = mix(0.012, 0.026, rise) * exp(-r * r / (knotW * knotW));
-  float ring = mix(-0.02, 0.012, rise) * exp(-r * r / (0.022 * 0.022));
-  return knot + ring - crease;
+  // empty, the innie: the hollow, the knot sunk in it, the lip round its rim
+  const float HOLLOW_W = 0.02;  // the hollow's radius
+  const float HOLLOW_D = 0.011; // how deep it sinks
+  const float KNOT_W = 0.008;   // the sunk knot's radius
+  const float KNOT_H = 0.006;   // how far it rises from the hollow's floor
+  const float LIP_R = 0.021;    // where the lip runs round
+  const float LIP_W = 0.006;    // how wide the lip is
+  const float LIP_H = 0.0025;   // how far it stands
+  float lipD = (r - LIP_R) / LIP_W;
+  float innie = -HOLLOW_D * bellyCap(r, HOLLOW_W) + KNOT_H * bellyCap(r, KNOT_W) + LIP_H * exp(-lipD * lipD);
+  // full, the outie: the round button, the collar it stands in, the swell under it
+  const float BUTTON_W = 0.016; // the button's radius
+  const float BUTTON_H = 0.008; // how far it stands out (half its radius: a round dome)
+  const float COLLAR_R = 0.0175;// where the collar's soft fold runs round it
+  const float COLLAR_W = 0.0035;// how wide that fold is
+  const float COLLAR_D = 0.0018;// how deep
+  const float SWELL_W = 0.04;   // the gentle swell it sits on
+  const float SWELL_H = 0.0025;
+  float colD = (r - COLLAR_R) / COLLAR_W;
+  float outie = BUTTON_H * bellyDome(r, BUTTON_W) - COLLAR_D * exp(-colD * colD) + SWELL_H * bellyCap(r, SWELL_W);
+  return mix(innie, outie, rise) - crease;
 }
 
 void main() {

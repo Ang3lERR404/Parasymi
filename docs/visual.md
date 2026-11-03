@@ -948,7 +948,10 @@ A plant's yield shows on it, where the paws pluck it:
 ### Belly-rest idle (`restArms`, `rest*`)
 - **When:** standing still `restAfter` s with the belly past a third full
   (fully in the pose by `restFullIn`).
-- **Pose:** the right paw lies palm down over the top of the sac; the left
+- **Pose:** the right palm lies flat on the belly's upper front, fingers
+  down its curve (`bellyPaw`: found on the sac's skinned surface,
+  `wolfBelly.posed`, so it lies there at every size; once the belly swells
+  past the arm's easy reach it slides up the sac just far enough); the left
   fist sits on the hip, elbow out (`solveArmTurned` swings the elbow round
   the shoulder-wrist line).
 - Eased in on a slow spring; gone once he moves, works or gathers.
@@ -965,9 +968,10 @@ A plant's yield shows on it, where the paws pluck it:
 - A sharp crease runs down its middle (a tight rounded fold), there even
   empty, deeper as it fills; a second folds across it only as it fills.
 - The belly button is the sac's own smooth surface (part.vert
-  `bellyCarve`, the grid gathered round it): a hollow with a knot in it,
-  sunk in when empty; as the belly swells the creases part round it, the
-  hollow's ring is pushed out into a dome and the knot pops out on top.
+  `bellyCarve`, the grid gathered round it): empty, an innie (a round
+  hollow, a small knot sunk in it, a soft lip); as the belly swells the
+  creases part round it and it rounds out into an outie, a round dome
+  button (`bellyDome`: broad rounded top, never peaked) in a soft collar.
 - **Normals:** `vertex.Skin` carries each weight's slope (`gx/gy/gz`).
   part.vert bends skinned normals by the true Jacobian (how the surface
   actually stretches and turns there), not by the blended bones alone.

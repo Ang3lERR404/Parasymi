@@ -91,18 +91,24 @@ const pryTwist=lib.player.tuning.pryTwist;
 const pullEnd=lib.player.tuning.pullEnd;
 /// the wolf being posed
 const Player=lib.player.player.Player;
-/// how far the resting paw bends over the belly's curve (radians)
-const restDrape=lib.player.tuning.restDrape;
 /// how far the hip-leaning elbow swings out (radians)
 const restElbowOut=lib.player.tuning.restElbowOut;
 /// where the left paw leans on the hip (pelvis frame)
 const restHip=lib.player.tuning.restHip;
-/// how far the resting wrist sits off the sac (m)
-const restLift=lib.player.tuning.restLift;
-/// where the right paw rests on the belly (shares of the sac)
+/// where on the sac the right palm lies (its angles up and round it)
 const restOn=lib.player.tuning.restOn;
-/// how far the resting paw turns palm down (radians)
-const restPronate=lib.player.tuning.restPronate;
+/// how far the resting palm's middle sits off the sac (m)
+const restPalm=lib.player.tuning.restPalm;
+/// how far down the hand from the wrist the palm's middle is (m)
+const restHeel=lib.player.tuning.restHeel;
+/// how far in toward the belly's middle the resting fingers point
+const restInward=lib.player.tuning.restInward;
+/// the share of the arm's length the resting wrist may be from the shoulder
+const restReach=lib.player.tuning.restReach;
+/// how high up the sac the resting paw may slide (radians from the bottom)
+const restTop=lib.player.tuning.restTop;
+/// how many halvings find where up the sac the paw is in reach
+const restSteps=lib.player.tuning.restSteps;
 /// the rear's opacity
 const rumpOpacity=lib.player.tuningLook.rumpOpacity;
 /// how much more a full, stretched sac lets show through
@@ -289,19 +295,72 @@ fn tailAlong(p:*const Player,q:*skel.Pose,pts:[skel.tailCount+1]V3)void{
     frame=m.chain(&.{frame,q.tail[i].m4()});
   }
 }
-/// the belly-rest idle, blended in by `r`: the right wrist onto the top
-/// of the belly, the palm laid on it; the left on the hip, the wrist
-/// bent back and the elbow turned out
+/// where the resting right paw lies on the belly in pose `q`: its wrist,
+/// and (in the wolf's space) the way its fingers run and its palm faces
+pub const BellyPaw=struct{
+  /// where the wrist is wanted
+  wrist:V3,
+  /// the way the fingers run, along the sac
+  fingers:V3,
+  /// the way the palm faces, into the sac
+  palm:V3,
+  /// how far up the sac it lies (radians from the bottom)
+  up:f32,
+};
+/// the right paw laid on the belly's skinned surface in pose `q`, its palm
+/// flat on the sac, its fingers running down the curve and a little in
+/// toward the middle: at `restOn`, or as a full belly swells out past the
+/// arm's easy reach, slid up the sac just so far that the arm still
+/// reaches it unstretched, so it lies on the belly at every fill
+pub fn bellyPaw(q:skel.Pose)BellyPaw{
+  // the bones, their skinning matrices as the GPU has them this frame, and the right shoulder
+  const w=skel.fk(q);
+  const skin=skel.skin(w,&bindInv(),q.breath);
+  const shoulder=m.origin(w[@intFromEnum(skel.sides[1].arm)]);
+  // how far from the shoulder the wrist may be
+  const most=restReach*(skel.upperArm+skel.forearmLength);
+  // where up the sac: `restOn`'s, or, out of reach there, found between it
+  // and the top by halving (the wrist nears the shoulder going up)
+  var lo=restOn[0];
+  if(m.dist(pawAt(&skin,lo).wrist,shoulder)<=most)return pawAt(&skin,lo);
+  var hi=restTop;
+  for(0..restSteps)|_|{
+    // halfway, and which half the reach falls in
+    const mid=0.5*(lo+hi);
+    if(m.dist(pawAt(&skin,mid).wrist,shoulder)>most)lo=mid else hi=mid;
+  }
+  return pawAt(&skin,hi);
+}
+/// the right paw laid on the sac `th` up it (and `restOn` round it), for
+/// the bones' skinning matrices `skin`
+fn pawAt(skin:*const[skel.count]M4,th:f32)BellyPaw{
+  // where round the sac, a small step either way, and the sac's facing there
+  const ph=restOn[1];
+  const e:f32=0.02;
+  const n=bellyMesh.posedNormal(skin,th,ph);
+  // down the sac (toward its bottom) and round it toward its middle
+  const down=bellyMesh.posed(skin,th-e,ph,1)-bellyMesh.posed(skin,th+e,ph,1);
+  const inward=bellyMesh.posed(skin,th,ph+e,1)-bellyMesh.posed(skin,th,ph-e,1);
+  // the fingers along the surface: down and in, nothing out of it
+  const lay=m.norm(down)+m.norm(inward)*m.splat3(restInward);
+  const fingers=m.norm(lay-n*m.splat3(m.dot(lay,n)));
+  // the palm's middle just off the sac, the wrist up the hand from it
+  const mid=bellyMesh.posed(skin,th,ph,1)+n*m.splat3(restPalm);
+  return.{.wrist=mid-fingers*m.splat3(restHeel),.fingers=fingers,.palm=-n,.up=th};
+}
+/// the belly-rest idle, blended in by `r`: the right palm laid flat on the
+/// belly's upper front (on its skinned surface, so at every fill); the left
+/// on the hip, the wrist bent back and the elbow turned out
 pub fn restArms(q:*skel.Pose,r:f32)void{
   // the bones in the wolf's space, and the way into the chest's frame
   const w=skel.fk(q.*);
   const into=m.inverseRigid(w[@intFromEnum(Bone.chest)]);
-  // where the right paw rests on the sac, in its upper half's frame
-  const on=restOn*v3(bellyMesh.rx,bellyMesh.upReach,bellyMesh.rz);
+  // the right paw on the belly
+  const paw=bellyPaw(q.*);
   // where each wrist is wanted: the left on the hip, the right on the belly
   const at=[2]V3{
     m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1)),
-    m.mulPoint(w[@intFromEnum(Bone.gutTop)],on)+v3(0,restLift,0),
+    paw.wrist,
   };
   for(0..2)|s|{
     // which side, how far the elbow swings out, and the arm reaching there
@@ -312,11 +371,11 @@ pub fn restArms(q:*skel.Pose,r:f32)void{
     const a=&q.arms[s];
     a.root=skel.Turn.blend(a.root,ik.root,r);
     a.mid=m.lerp(a.mid,ik.mid,r);
-    // (on the belly the paw turns palm down and bends onto the sac; on
-    // the hip the wrist cocks back)
+    // (on the belly the paw lies flat along the sac; on the hip the wrist
+    // cocks back)
     // the wrist's turn wanted
-    const low:skel.Turn=if(s==0).{.x=-0.5,.z=x*0.3}else.{.y=-x*restPronate,.z=-x*restDrape};
-    a.low=.{.x=m.lerp(a.low.x,low.x,r),.y=m.lerp(a.low.y,low.y,r),.z=m.lerp(a.low.z,low.z,r)};
+    const low:skel.Turn=if(s==0).{.x=-0.5,.z=x*0.3}else lib.player.ik.handTo(ik,s,m.mulDir(into,paw.fingers),m.mulDir(into,paw.palm));
+    a.low=skel.Turn.blend(a.low,low,r);
   }
 }
 /// gathering: each arm blended (by `sq`) toward reaching its wrist's

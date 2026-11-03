@@ -177,7 +177,10 @@ pub fn main(init:Init)!void{
   // has run its course, the seed it let fall in his keeping
   // decision: a test flag until the wolf's rooting begins act 2 in play
   var act2=false;
+  // `--full=`: the wolf's belly held this full (0..1), for shots of it at one size
+  var full:?f32=null;
   for(args[1..])|a|{
+    if(startsWith(u8,a,"--full="))full=m.clamp01(try parseFloat(f32,a["--full=".len..]));
     if(eql(u8,a,"--inspect"))inspect=.player;
     if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
     if(startsWith(u8,a,"--shots="))turn.shots=try parseInt(u32,a["--shots=".len..],0);
@@ -314,6 +317,7 @@ pub fn main(init:Init)!void{
   }
   if(tod)|t|game.sky.tod=t;
   game.speed=speed;
+  game.player.fullHeld=full;
   if(unforming)game.prog.done.insert(.unforming);
   if(act2 and lone==null)try lib.act.begin(&game);
   if(act2 and demo)try setups.act2(&game,demoAct2);

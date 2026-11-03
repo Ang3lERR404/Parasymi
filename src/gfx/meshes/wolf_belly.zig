@@ -13,8 +13,9 @@
 //! `belly`: the shader carves it, a crease down its middle there even when
 //! empty, one across it folding in as it fills (crossing at the belly
 //! button, `crossing`), and the button itself, the sac's own smooth
-//! surface: a hollow with a knot in it, sunk in when empty, its ring
-//! pushed out into a dome and the knot popping out on it as it fills.
+//! surface: an innie when empty (a round hollow, a knot sunk in it),
+//! rounding out as it fills into an outie, a round dome button in a soft
+//! collar. `posed` finds any point of it skinned, for the paw laid on it.
 //! The grid gathers its rows and columns round the button (`gathered`) so
 //! all that is carved finely.
 const lib=@import("../../lib.zig");
@@ -69,9 +70,9 @@ const gather:f32=0.72;
 fn gathered(u:f32,at:f32)f32{return u-gather*@sin(m.tau*(u-at))/m.tau;}
 /// where the creases cross (the belly button, on the sac's surface), in
 /// the bind pose (wolf space)
-pub fn crossing()V3{
-  return v3(0,skel.hipY+skel.waistAt[1],skel.waistAt[2])+surface(navelTh,m.halfPi,1);
-}
+pub fn crossing()V3{return waistBind+surface(navelTh,m.halfPi,1);}
+/// where the waist's frame sits in the bind pose (unturned there, only moved)
+const waistBind=v3(0,skel.hipY+skel.waistAt[1],skel.waistAt[2]);
 /// points along the sash where it crosses the belly
 const sashPoints=25;
 /// where on the sac the sash is at `k` (0 under the -x pectoral .. 1
@@ -224,7 +225,7 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
     vx.tu[1]=belly;
   };
   // decision: the belly button is no knot of its own but the sac's surface
-  // carved by the shader (a hollow and its knot), so it melts into it
+  // carved by the shader (a rounded button in a soft ring), so it melts into it
   // into the waist's place in the bind pose: the gut with the gut bones,
   // the rest with the spine, the hips below it and the ribs above. The
   // weights change with height alone, and the gut swells the sac to three
@@ -232,38 +233,80 @@ pub fn build(b:*mg.Builder)Allocator.Error!void{
   // it too (each weight's slope, carried in the skin), not by the blended
   // bones alone
   for(b.v.items[start..],try b.skinOf(start))|vx,*k|{
-    // the vertex's height, and how much of it is the gut
-    const y=vx.pos[1];
-    const g=vx.tu[0];
-    // how fast that gut share changes going up
-    const dg=share(y-centre[1])[1];
-    // how much of the gut is its lower bone, and its slope
-    const lo=lower(y-centre[1]);
     // each bone's weight for this vertex, and how fast it changes going up
-    var w:[skel.count]f32=@splat(0);
-    var dw:[skel.count]f32=@splat(0);
-    // how much of the rest the hips and the ribs take, low and high, and their slopes
-    const low=ramp(-y,0,0.09,0.5);
-    const high=ramp(y,0.06,0.1,0.6);
-    // those slopes turned to run up the sac
-    const dlow=-low[1];
-    const dhigh=high[1];
-    w[@intFromEnum(skel.Bone.gut)]=g*lo[0];
-    dw[@intFromEnum(skel.Bone.gut)]=dg*lo[0]+g*lo[1];
-    w[@intFromEnum(skel.Bone.gutTop)]=g*(1-lo[0]);
-    dw[@intFromEnum(skel.Bone.gutTop)]=dg*(1-lo[0])-g*lo[1];
-    w[@intFromEnum(skel.Bone.pelvis)]=(1-g)*low[0];
-    dw[@intFromEnum(skel.Bone.pelvis)]=-dg*low[0]+(1-g)*dlow;
-    w[@intFromEnum(skel.Bone.chest)]=(1-g)*high[0];
-    dw[@intFromEnum(skel.Bone.chest)]=-dg*high[0]+(1-g)*dhigh;
-    w[@intFromEnum(skel.Bone.waist)]=(1-g)*(1-low[0]-high[0]);
-    dw[@intFromEnum(skel.Bone.waist)]=-dg*(1-low[0]-high[0])-(1-g)*(dlow+dhigh);
+    const sw=weights(vx.pos[1]);
     // each weight's slope as a direction: straight up, by how fast it changes
     var grad:[skel.count]V3=undefined;
-    for(&grad,dw)|*q,d|q.*=v3(0,d,0);
-    k.*=Sculpt.packWith(&w,&grad);
+    for(&grad,sw.dw)|*q,d|q.*=v3(0,d,0);
+    k.*=Sculpt.packWith(&sw.w,&grad);
   }
   b.xform(start,skel.bind()[@intFromEnum(skel.Bone.waist)]);
+}
+/// each bone's weight for a point of the sac and how fast it changes going up
+const Weights=struct{
+  /// the weights, one per bone (summing to 1)
+  w:[skel.count]f32=@splat(0),
+  /// each weight's slope up the sac
+  dw:[skel.count]f32=@splat(0),
+};
+/// the skin of a point of the sac `y` up the waist's frame: the gut (its
+/// lower and upper bones) by its share, the rest the spine's, the hips
+/// below and the ribs above
+fn weights(y:f32)Weights{
+  // how much of the gut it is, and how fast that changes going up
+  const sh=share(y-centre[1]);
+  const g=sh[0];
+  const dg=sh[1];
+  // how much of the gut is its lower bone, and its slope
+  const lo=lower(y-centre[1]);
+  // how much of the rest the hips and the ribs take, low and high, and their slopes
+  const low=ramp(-y,0,0.09,0.5);
+  const high=ramp(y,0.06,0.1,0.6);
+  // those slopes turned to run up the sac
+  const dlow=-low[1];
+  const dhigh=high[1];
+  // the weights, filled in below
+  var out=Weights{};
+  out.w[@intFromEnum(skel.Bone.gut)]=g*lo[0];
+  out.dw[@intFromEnum(skel.Bone.gut)]=dg*lo[0]+g*lo[1];
+  out.w[@intFromEnum(skel.Bone.gutTop)]=g*(1-lo[0]);
+  out.dw[@intFromEnum(skel.Bone.gutTop)]=dg*(1-lo[0])-g*lo[1];
+  out.w[@intFromEnum(skel.Bone.pelvis)]=(1-g)*low[0];
+  out.dw[@intFromEnum(skel.Bone.pelvis)]=-dg*low[0]+(1-g)*dlow;
+  out.w[@intFromEnum(skel.Bone.chest)]=(1-g)*high[0];
+  out.dw[@intFromEnum(skel.Bone.chest)]=-dg*high[0]+(1-g)*dhigh;
+  out.w[@intFromEnum(skel.Bone.waist)]=(1-g)*(1-low[0]-high[0]);
+  out.dw[@intFromEnum(skel.Bone.waist)]=-dg*(1-low[0]-high[0])-(1-g)*(dlow+dhigh);
+  return out;
+}
+/// where the sac's surface is at `th` (0 bottom .. pi top) and `ph` around
+/// (0 the right side, pi/2 the front), `lift` times out from it, in the
+/// wolf's space for the bones `skin` (`skel.skin`'s matrices): skinned just
+/// as the GPU skins it, so a paw laid there lies on it at every fill
+pub fn posed(skin:*const[skel.count]m.M4,th:f32,ph:f32,lift:f32)V3{
+  // the point in the waist's frame, and in the bind pose (the waist there
+  // unturned, only moved, as `crossing` has it)
+  const local=surface(th,ph,lift);
+  const bound=local+waistBind;
+  // the bones' weights there, and the point carried by them
+  const sw=weights(local[1]);
+  var out=v3(0,0,0);
+  for(sw.w,skin)|wt,mat|if(wt>0){
+    out+=m.mulPoint(mat,bound)*m.splat3(wt);
+  };
+  return out;
+}
+/// the sac's outward facing (unit) at `th` and `ph` for the bones `skin`,
+/// from small steps either way across its posed surface
+pub fn posedNormal(skin:*const[skel.count]m.M4,th:f32,ph:f32)V3{
+  // how far each small step goes
+  const e:f32=0.01;
+  // the steps up the sac and round it, and the way out they must agree with
+  const dt=posed(skin,th+e,ph,1)-posed(skin,th-e,ph,1);
+  const dp=posed(skin,th,ph+e,1)-posed(skin,th,ph-e,1);
+  const n=m.norm(m.cross(dp,dt));
+  const out=posed(skin,th,ph,1)-posed(skin,th,ph,0.5);
+  return if(m.dot(n,out)<0)-n else n;
 }
 test"the belly is full below and narrows toward the ribs"{
   // how wide the sac is at its middle, and high up toward the ribs

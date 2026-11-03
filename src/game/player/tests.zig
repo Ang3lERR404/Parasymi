@@ -29,9 +29,11 @@ const pecMax=lib.player.tuningLook.pecMax;
 const Player=lib.player.player.Player;
 /// where the left paw leans on the hip
 const restHip=lib.player.tuning.restHip;
-/// how far the resting wrist sits off the sac (m)
-const restLift=lib.player.tuning.restLift;
-/// where the right paw rests on the belly
+/// how far the resting palm's middle sits off the sac (m)
+const restPalm=lib.player.tuning.restPalm;
+/// how far down the hand from the wrist the palm's middle is (m)
+const restHeel=lib.player.tuning.restHeel;
+/// where on the sac the right palm lies
 const restOn=lib.player.tuning.restOn;
 /// the furthest the rear strays from rest (m)
 const rumpMax=lib.player.tuningLook.rumpMax;
@@ -206,27 +208,35 @@ test"the belly's stages: light, heavy, full, each a little slower and never slow
   }
 }
 test"standing still with a heavy belly, one paw rests on it and the other on the hip"{
-  // a wolf with a heavy-looking belly
-  var p:Player=.{.pos=v3(0,0,0)};
-  p.fullness=0.6;
-  p.inv=.{};
-  // the time gone
-  var t:f32=0;
-  while(t<4):(t+=testDt){
-    p.animate(null,testDt);
-    p.fullness=0.6;
+  // the right palm lies on the sac at every fill heavy enough to rest
+  for([_]f32{0.5,0.75,1})|fill|{
+    // a wolf with a heavy-looking belly
+    var p:Player=.{.pos=v3(0,0,0)};
+    p.fullHeld=fill;
+    p.fullness=fill;
+    // the time gone
+    var t:f32=0;
+    while(t<4):(t+=testDt)p.animate(null,testDt);
+    try testing.expect(p.restPose.x>0.95);
+    // the pose, its bones, and where the right paw and left paw should rest
+    const q=p.pose();
+    const w=skel.fk(q);
+    const paw=lib.player.posing.bellyPaw(q);
+    const hip=m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1));
+    const hand=w[@intFromEnum(skel.sides[1].hand)];
+    try testing.expect(m.dist(m.origin(hand),paw.wrist)<0.02);
+    try testing.expect(m.dist(m.origin(w[@intFromEnum(skel.sides[0].hand)]),hip)<0.03);
+    // the palm's middle just off the sac where it rests, the fingers along it
+    const skin=skel.skin(w,&lib.player.ik.bindInv(),q.breath);
+    const mid=m.mulPoint(hand,v3(0,-restHeel,0));
+    try testing.expect(m.dist(mid,bellyMesh.posed(&skin,paw.up,restOn[1],1))<restPalm+0.01);
+    try testing.expect(m.dot(m.mulDir(hand,v3(0,-1,0)),paw.fingers)>0.9);
   }
-  try testing.expect(p.restPose.x>0.95);
-  // the posed bones, and where the right paw and left paw should rest
-  const w=skel.fk(p.pose());
-  const belly=m.mulPoint(w[@intFromEnum(Bone.gutTop)],restOn*v3(bellyMesh.rx,bellyMesh.upReach,bellyMesh.rz))+v3(0,restLift,0);
-  const hip=m.mulPoint(w[@intFromEnum(Bone.pelvis)],restHip*v3(-1,1,1));
-  try testing.expect(m.dist(m.origin(w[@intFromEnum(skel.sides[1].hand)]),belly)<0.03);
-  try testing.expect(m.dist(m.origin(w[@intFromEnum(skel.sides[0].hand)]),hip)<0.03);
   // a light belly never takes the pose
   // a wolf with a light belly
   var q:Player=.{.pos=v3(0,0,0)};
-  t=0;
+  // the time gone
+  var t:f32=0;
   while(t<4):(t+=testDt)q.animate(null,testDt);
   try testing.expect(q.restPose.x<0.01);
 }

@@ -105,6 +105,7 @@ zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --
 zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
+zig build run -- --full=0.7       # the wolf's belly held 70% full (docs/testing.md)
 zig build run -- --speed=6        # the world runs 6x faster (ticks, sky, air together;
                                   # for slow things watched unattended, docs/testing.md)
 zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name> --at=S --channel=<name> --shot]
