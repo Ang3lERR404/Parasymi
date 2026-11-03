@@ -65,6 +65,7 @@ const float SHEEN_POWER = 40.0;
 #define PART_SPARK 20     // a spark of lightning: white-hot core, violet edge
 #define PART_HUSK 21      // a crystal husk: clear glass, glowing cracks
 #define PART_TRAIL 22     // a trail of light along a curve, bright at its head
+#define PART_CORTEX 23    // a ganglion's cortex: pale folded tissue, milky see-through
 // sets of roles, one bit each: a shader keys what roles do alike off a set
 // (PART_IN), so a new role joins a behaviour by joining its set
 #define PART_BIT(p) (1u << uint(p))

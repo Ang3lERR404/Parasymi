@@ -385,6 +385,25 @@ whole.)
 - **Driftbraid:** the reference for convergent structures, on that weave.
 - **Monfris:** four corners of grafted stems twining into one crowned
   body.
+- **Ganglion:** a brain, the parasites' own. On the kit's foot, roots and
+  lattice stalk (a sac on its core) sits a folded pale knot: two halves
+  side by side, sculpted as one seamless surface (engine `gfx/sculpt.zig`),
+  furrows cut into each in fives, exactly alike (five long ones front to
+  back, three short ones branching off each, two curving round each pole),
+  so the folds between them swell round.
+  - Its cortex (part `cortex`) is matte pale tissue, milky and see-through
+    face-on, denser at its edges and down its furrows (tu.y how deep),
+    which run darker and violet, so the folds read from every side.
+  - What it holds travels inside it (`ganglionHeld`, beads of light in
+    each item's colour) round a figure of eight through both halves, each
+    trailing a ribbon of light (`ganglionTrail`, a `.trail`), the knot lit
+    from within by one point of light in their colours.
+  - Its nerves to the neighbours it feeds branch as a neuron's: a sheathed
+    axon out of the knot's underside, parting in two and two again, four
+    fine twigs diving into the ground at the tile's edge; the pulse of what
+    it hands on runs out along all of them (part `core`).
+  - Growing, the stalk rises and the knot's stem with it, then both halves
+    swell out of the stem's top together, furrows and all.
 
 ## Halo
 This is what plays while a halo forms from four blooms

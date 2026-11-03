@@ -4,9 +4,11 @@
 //! take one: any structure beside it that wants it (so one line can feed
 //! several germinators or arsthraxias, each only what it needs), and any
 //! carrier leading away from it, which splits a line two or three ways.
-//! It never hands back into a carrier facing into it. A nerve grows out to
-//! each neighbour it feeds, and a pulse of what it hands on runs out along
-//! it.
+//! It never hands back into a carrier facing into it. It is a brain: a
+//! folded pale knot, what it holds seen travelling inside it, glowing,
+//! each leaving a trail of light. A nerve grows out to each neighbour it
+//! feeds, branching as a neuron's, and a pulse of what it hands on runs
+//! out along it.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -44,12 +46,12 @@ const Parts=lib.parts.Parts;
 const Draw=lib.engine.ui.draw.Draw;
 /// a UI colour: four bytes, red, green, blue and alpha
 const Color=lib.engine.ui.draw.Color;
-/// the ganglion's mesh: where its bladder's heart is and how wide
+/// the ganglion's mesh: the knot's middle and the path inside it what it holds travels
 const mesh=lib.ganglion;
 /// builds a three-float vector
 const v3=m.v3;
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
-pub const meshes=.{.bellyLump,.ganglionNerve};
+pub const meshes=.{.ganglionHeld,.ganglionNerve,.ganglionTrail};
 /// what a ganglion is: grown from its seed, one tile across, a pale low
 /// knot that stores and swaps sap, swaying a little
 pub const def:st.Def=.{.item=.ganglion,.lineage=.parasitic,.size=1,.mesh=.ganglion,.store=true,.grow=4,.sway=0.4,.tall=0.45,.sap=0.3};
@@ -63,19 +65,25 @@ const nerveGrow:f32=0.8;
 const nerveWither:f32=1.2;
 /// a pulse runs out along a nerve this fast (its length a second)
 const pulseRate:f32=3;
-/// what it holds hangs in its bladder in a ring this far out, as a share
-/// of the bladder's radius
-const ringRadius:f32=0.45;
 /// the size of a held shape holding a single thing
-const lumpR:f32=0.022;
-/// how much larger a held shape grows as the bladder fills
-const lumpGrow:f32=0.02;
-/// how far each held shape bobs up and down
-const bobAmount:f32=0.01;
-/// how fast the ring of held shapes turns (radians a second)
-const turnRate:f32=0.3;
-/// how brightly the nerves and held shapes glow
+const lumpR:f32=0.013;
+/// how much larger a held shape grows as the knot fills
+const lumpGrow:f32=0.01;
+/// how brightly the nerves glow
 const glow:f32=0.2;
+/// how brightly a held shape glows as it travels
+const lumpGlow:f32=0.8;
+/// how far behind a held shape its trail reaches (a share of the path)
+const trailLen:f32=0.12;
+/// how brightly a trail glows, and how wide it is at its head (metres)
+const trailGlow:f32=2.2;
+/// (how wide)
+const trailWidth:f32=0.03;
+/// how strongly what it holds lights the knot from within, the fuller the
+/// brighter, and how far that light reaches
+const innerLight:f32=1.2;
+/// (how far)
+const innerReach:f32=0.4;
 /// what a ganglion remembers between ticks: whose turn it is, its nerves
 /// and the pulses running along them
 pub const State=struct{
@@ -143,40 +151,55 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   // nobody took anything: try again next tick
   return true;
 }
-/// it wants anything, while its bladder has room (up to `holdMost` in all).
+/// it wants anything, while its knot has room (up to `holdMost` in all).
 pub fn wants(s:*const st.Structure,_:*const prog.Progression,_:items.Item)u32{return holdMost-|s.inv.total();}
-/// its nerves out to the neighbours it feeds, a pulse of what it hands on
-/// running out along each, and what it holds hanging in its bladder.
+/// its nerves out to the neighbours it feeds, branching as a neuron's, a
+/// pulse of what it hands on running out along each; and what it holds
+/// travelling round the path inside its knot, glowing, each trailing
+/// light, the knot lit from within by them.
 pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!void{
-  // its remembered state
+  // its remembered state, and its kind (how it sways)
   const gs=&s.state.ganglion;
-  for(gs.reach,0..)|r,d|{
+  const d=s.def();
+  for(gs.reach,0..)|r,side|{
     if(r<=0)continue;
     // how far the pulse has run (-1: none), and the colour it carries
-    const carry=gs.pulse[d]orelse-1;
-    const col=color.Rgba8.of(gs.sent[d].info().col).toF4();
-    try out.emit(.ganglionNerve,m.chain(&.{m.translate(ctr),m.rotY(m.dirYaw(@intCast(d)))}),.{
-      .glow=glow,.phase=s.seed+m.f(d)*0.2,.grown=r*s.grown,.carry=carry,.carryCol=.{col[0],col[1],col[2]},
+    const carry=gs.pulse[side]orelse-1;
+    const col=color.Rgba8.of(gs.sent[side].info().col).toF4();
+    try out.emit(.ganglionNerve,m.chain(&.{m.translate(ctr),m.rotY(m.dirYaw(@intCast(side)))}),.{
+      .glow=glow,.phase=s.seed,.grown=r*s.grown,.carry=carry,.carryCol=.{col[0],col[1],col[2]},
+      .sway=d.sway,.tall=d.tall,
     });
   }
   if(s.grown<1)return;
   // how many stacks it holds, and which of them is being drawn
   const n=s.inv.used();
+  if(n==0)return;
   var k:usize=0;
-  // its frame in the world
+  // its frame in the world, and the light of what it holds summed
   const base=s.place(ctr);
+  var lit=m.splat3(0);
   for(s.inv.slot)|slot|{
     // the stack in this slot
     const it=slot orelse continue;
-    // the stack's place on the ring: its angle, the ring's reach, where it hangs
-    const a=m.ratio(k,n)*m.tau+tf*turnRate+s.seed*6;
-    const ring=if(n==1)0 else mesh.heartR[0]*ringRadius;
-    const at=mesh.heartAt+v3(@cos(a)*ring,bobAmount*@sin(tf*1.1+m.f(k)*2),@sin(a)*ring);
+    // its colour, how far round the path it has travelled, and where that is
+    const col=color.Rgba8.of(it.item.info().col).toF4();
+    const u=m.ratio(k,n)+tf*mesh.travel+s.seed;
+    const at=mesh.route(u);
     // its size: larger the fuller the stack
     const r=lumpR+lumpGrow*m.ratio(it.n,holdMost);
-    try s.emitLump(out,base,at,r,it.item,glow);
+    try out.emit(.ganglionHeld,m.mul(base,m.chain(&.{m.translate(at),m.scale3(m.splat3(r))})),.{
+      .glow=lumpGlow,.phase=s.seed,.tint=col,.sway=d.sway,.tall=d.tall,.drop=at[1],
+    });
+    // its trail: from as far back along the path as it reaches, up to it
+    var ctrl:[4]m.V3=undefined;
+    for(&ctrl,0..)|*c,j|c.*=m.mulPoint(base,mesh.route(u-trailLen*(1-m.ratio(j,3))));
+    try out.emitCurve(.ganglionTrail,ctrl,m.v3(1,0,0),1,1,.{.glow=trailGlow,.flutter=trailWidth,.carryCol=.{col[0],col[1],col[2]}});
+    lit+=v3(col[0],col[1],col[2]);
     k+=1;
   }
+  // the knot lit from within, in the colours it holds, the fuller the brighter
+  try out.light(m.mulPoint(base,mesh.brainAt),lit/m.splat3(m.f(n))*m.splat3(innerLight*(0.5+0.5*m.ratio(s.inv.total(),holdMost))),innerReach);
 }
 /// its line in the panel: how many neighbours it shares with, and how full
 /// it is (dim while it feeds nobody).
