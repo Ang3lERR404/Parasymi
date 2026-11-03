@@ -153,8 +153,10 @@ pub const Ctx=struct{
     const devExts=[_][*:0]const u8{vk.extensions.khr_swapchain.name};
     c.sampleShading=c.instance.getPhysicalDeviceFeatures(c.pdev).sample_rate_shading==.true;
     // (a vertex may be clipped away by a distance of its own: what a
-    // skinned mesh hides, see part.vert; every desktop GPU has it)
-    const f10:vk.PhysicalDeviceFeatures=.{.sample_rate_shading=if(c.sampleShading).true else.false,.shader_clip_distance=.true};
+    // skinned mesh hides, see part.vert; every desktop GPU has it), and
+    // the points of light's shadow cubes are read as one cube array
+    // (render/cube.zig; every desktop GPU has that too)
+    const f10:vk.PhysicalDeviceFeatures=.{.sample_rate_shading=if(c.sampleShading).true else.false,.shader_clip_distance=.true,.image_cube_array=.true};
     c.vkd=try gpa.create(vk.DeviceWrapper);
     errdefer gpa.destroy(c.vkd);
     // the new logical device

@@ -598,7 +598,13 @@ void main() {
     v_glow = glow;
     v_inst = vec4(aff, seed, health, float(part));
     gl_Position = project(wp);
-#ifdef SHADOW
+#ifdef CUBE
+    // decision: in a point of light's shadow cube a radiant plant's petals,
+    // leaves and veil (once settled) stand round the light at its heart, so
+    // its glow fans out between them in rays (the gardener's ask); its
+    // core, motes, threads and lens, light itself, still cast none
+    if (!(whorled || leaves || veil) || unseen || settle < 0.5) gl_Position = UNSEEN;
+#elif defined(SHADOW)
     // a radiant plant is light itself: it casts no shadow, but for the
     // living leaves a vesper carries (once they have come down)
     if (!leaves || settle < 0.5) gl_Position = UNSEEN;

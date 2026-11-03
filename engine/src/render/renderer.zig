@@ -36,6 +36,8 @@ const pipeline=@import("../gfx/pipeline.zig");
 const postMod=@import("post.zig");
 /// light that moves: shadow cascades and points of light
 const light=@import("light.zig");
+/// points of light that cast shadows: their cubes and which lights hold them
+const cube=@import("cube.zig");
 /// the air: the overhead map, the field, the volume and its composite
 const Volume=@import("volume.zig").Volume;
 /// what the field is kept in (volume.zig)
@@ -68,11 +70,18 @@ pub const pass=struct{
     ui
   };
   /// what a pass draws into: the key light's shadow map (depth alone, every
-  /// cascade at once), the overhead map, the world's HDR image, the air's
-  /// volume after it, or the screen after the world (and its glow): the UI
+  /// cascade at once), the points of light's shadow cubes, the overhead
+  /// map, the world's HDR image, the air's volume after it, or the screen
+  /// after the world (and its glow): the UI
   pub const Target=enum{
     /// the key light's shadow map: depth alone, every cascade in one draw
     shadow,
+    /// a face of a point of light's shadow cube (cube.zig): depth alone.
+    /// Recorded once for each face of each cube held this frame, its push's
+    /// `light` pointing at that face's matrix (light.glsl `CubeFace`) and
+    /// `Renderer.cubeNow` saying which (cube × 6 + face), so a pass may draw only what lies
+    /// inside that face within its light's reach (`Renderer.cubeSpheres`, `cube.sees`)
+    cube,
     /// the overhead map: colour alone, seen from straight above (each draw
     /// pushes its own `vp`, `volume.overheadOf`), before the world; kept
     /// from frame to frame, so a pass redraws only what changed
@@ -157,11 +166,11 @@ pub const pass=struct{
       .vert=vs,.frag=fs,
       .bindings=d.bindings,.attrs=d.attrs,
       .layout=layout,
-      .colorFormat=switch(d.target){.shadow=>.undefined,.field=>fieldFormat,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
-      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,
+      .colorFormat=switch(d.target){.shadow,.cube=>.undefined,.field=>fieldFormat,.overhead,.world,.volume=>hdrFormat,.screen=>screen},
+      .depth=d.depth,.depthWrite=d.depthWrite,.depthCompare=if(d.nearer).less else.less_or_equal,.depthAttachment=d.target==.shadow or d.target==.cube or d.target==.world,.blend=d.blend,.additive=d.additive,.cull=false,
       .samples=postMod.sampleFlags(if(d.target==.world)samples else 1),.perSample=d.perSample,
-      .viewMask=if(d.target==.shadow)light.views else 0,
-      .depthBias=if(d.target==.shadow)light.bias else null,
+      .viewMask=switch(d.target){.shadow=>light.views,.cube=>cube.views,else=>0},
+      .depthBias=switch(d.target){.shadow=>light.bias,.cube=>cube.bias,else=>null},
     });
   }
 };
@@ -217,13 +226,16 @@ pub fn Renderer(comptime G:type)type{
     pub const Scene=G.Scene;
     /// a frame's counts
     pub const Stats=G.Stats;
-    /// what the GPU's time is told apart by: each pass (`Pass` order), then
-    /// the glow and the composite (`glow`, `compose`)
-    pub const stageCount=reg.count+2;
+    /// what the GPU's time is told apart by: each pass (`Pass` order; a
+    /// `cube` pass's time is the shadow cubes' together), then the glow,
+    /// the composite and every shadow cube drawn (`glow`, `compose`, `cubed`)
+    pub const stageCount=reg.count+3;
     /// (the glow's stage)
     pub const glow=reg.count;
     /// (the composite's stage)
     pub const compose=reg.count+1;
+    /// (the shadow cubes' stage: every `cube` pass into every cube held)
+    pub const cubed=reg.count+2;
     /// time stamps a frame writes: one before it, one after each stage
     const stamps=stageCount+1;
     /// what one frame in flight holds: its command buffer, sync, pass
@@ -273,6 +285,23 @@ pub fn Renderer(comptime G:type)type{
     post:Post=.{},
     /// the key light's shadow map
     shadow:light.Shadow=.{},
+    /// the points of light's shadow cubes
+    cubes:cube.Cubes=.{},
+    /// which lights hold the cubes, kept from frame to frame
+    casters:cube.Casters=.{},
+    /// how many points of light may hold a cube (0 .. `cube.maxCubes`;
+    /// `pointShadows` sets it)
+    cubeCount:usize=cube.maxCubes,
+    /// each cube held this frame, the light it is drawn round (xyz where,
+    /// w how far it reaches), null for one not drawn: what a `cube` pass
+    /// may cull to
+    cubeSpheres:[cube.maxCubes]?m.Vice(f32,4)=@splat(null),
+    /// while the `cube` passes record: which face of which cube they draw
+    /// into (cube × `cube.faces` + face)
+    cubeNow:usize=0,
+    /// the wall clock when the last frame's light was written (s), for
+    /// easing the shadows in and out
+    clock:?f64=null,
     /// the air: the overhead map, the volume and its composite
     volume:Volume=.{},
     /// whether presenting waits for the display's refresh
@@ -341,6 +370,8 @@ pub fn Renderer(comptime G:type)type{
       r.sc=try sw.Swapchain.init(c,r.gpa,@intCast(fb[0]),@intCast(fb[1]),r.vsync,.null_handle);
       r.post=try Post.init(c,r.sc.format.format,r.sc.extent.width,r.sc.extent.height,r.fit(r.post.aa));
       r.shadow=try light.Shadow.init(c);
+      r.cubes=try cube.Cubes.init(c,r.cubes.res);
+      r.shadow.bindCubes(c,&r.cubes);
       r.volume=try Volume.init(c,r.sc.extent.width,r.sc.extent.height,r.sc.depthView);
       for(&r.frames)|*f|{
         f.lighting=try Buffer.init(c,@sizeOf(light.Lighting),.{.storage_buffer=true,.shader_device_address=true});
@@ -417,6 +448,20 @@ pub fn Renderer(comptime G:type)type{
       }
       try r.makePipes(true);
     }
+    /// how many of the most telling points of light near the camera cast
+    /// shadows (`count`, held to 0 .. `cube.maxCubes`; a light losing its
+    /// place eases its shadow out), each in a cube `size` texels a face
+    /// side (a new size waits for the GPU and makes the cubes anew)
+    pub fn pointShadows(r:*R,count:usize,size:u32)Error!void{
+      r.cubeCount=@min(count,cube.maxCubes);
+      if(size==r.cubes.res or size==0)return;
+      // the context, short
+      const c=&r.ctx;
+      c.device.deviceWaitIdle()catch|e|return ctx.fold(e);
+      r.cubes.deinit(c);
+      r.cubes=try cube.Cubes.init(c,size);
+      r.shadow.bindCubes(c,&r.cubes);
+    }
     /// wait for the display's refresh or not; remakes the swapchain
     pub fn setVsync(r:*R,on:bool)Error!void{
       if(on==r.vsync)return;
@@ -445,6 +490,7 @@ pub fn Renderer(comptime G:type)type{
       inline for(reg.ids)|id|std.log.info("gpu {s} {d:.3}",.{@tagName(id),r.gpuMs[@intFromEnum(id)]});
       std.log.info("gpu glow {d:.3}",.{r.gpuMs[glow]});
       std.log.info("gpu compose {d:.3}",.{r.gpuMs[compose]});
+      std.log.info("gpu cubes {d:.3}",.{r.gpuMs[cubed]});
       std.log.info("gpu total {d:.3}",.{r.gpuTotal});
     }
     /// free every GPU object the renderer made (null handles are skipped).
@@ -477,6 +523,7 @@ pub fn Renderer(comptime G:type)type{
       for(r.layouts)|l|c.device.destroyPipelineLayout(l,null);
       r.post.deinit(c);
       r.volume.deinit(c);
+      r.cubes.deinit(c);
       r.shadow.deinit(c);
       r.sc.deinit(c,r.gpa,false);
     }
@@ -594,9 +641,14 @@ pub fn Renderer(comptime G:type)type{
       inline for(reg.ids)|id|{
         if(comptime reg.has(id,"prepare"))reg.module(id).prepare(r,&@field(f.pass,@tagName(id)),&sc,&stats);
       }
+      r.cubes.ready(cmd);
       r.shadow.begin(cmd);
       r.record(f,cmd,.shadow,&sc,&stats);
       r.shadow.end(cmd);
+      if(comptime targets(.cube)){
+        r.recordCubes(f,cmd,&sc,&stats);
+        stamp(cmd,f,cubed);
+      }
       r.volume.beginOverhead(cmd);
       cmd.bindDescriptorSets(.graphics,r.layout(.world),0,&.{r.shadow.set},null);
       r.record(f,cmd,.overhead,&sc,&stats);
@@ -665,6 +717,30 @@ pub fn Renderer(comptime G:type)type{
         }
       }
     }
+    /// every `cube` pass into each face of each shadow cube held this frame,
+    /// one face at a time: the scene's push pointing at that face's matrix, `cubeNow`
+    /// saying which (timed together, as the `cubed` stage)
+    fn recordCubes(r:*R,f:*Frame,cmd:vk.CommandBufferProxy,scene:*const Scene,stats:*Stats)void{
+      // where the frame's lighting record lies on the GPU
+      const at=f.lighting.address(&r.ctx);
+      for(r.cubeSpheres,0..)|sphere,i|{
+        if(sphere==null)continue;
+        r.cubes.begin(cmd,i);
+        for(0..cube.faces)|fc|{
+          // the scene as this face's casters see it: its matrix in place of the record
+          var sc=scene.*;
+          const face=at+light.faceAt(i,fc);
+          sc.push.light=.{@truncate(face),@truncate(face>>32)};
+          r.cubeNow=i*cube.faces+fc;
+          r.cubes.open(cmd,i,fc);
+          inline for(reg.ids)|id|{
+            if(comptime reg.module(id).desc.target==.cube)reg.module(id).record(r,&@field(f.pass,@tagName(id)),cmd,&sc,stats);
+          }
+          r.cubes.close(cmd);
+        }
+        r.cubes.end(cmd,i);
+      }
+    }
     /// a time stamp once the GPU is through what was recorded before it,
     /// ending `stage`
     fn stamp(cmd:vk.CommandBufferProxy,f:*Frame,stage:u32)void{
@@ -713,9 +789,26 @@ pub fn Renderer(comptime G:type)type{
         .cascades=cas.mats,.texel=undefined,
         .info=.{m.f(n),cas.reach,0,0},
         .lights=undefined,
+        .cubes=@splat(cube.none),
       };
       @memcpy(l.texel[0..light.cascades],&cas.texel);
       @memcpy(l.lights[0..n],scene.lights[0..n]);
+      for(l.lights[0..n])|*pl|pl.col[3]=0;
+      // the seconds since the last frame's light, by the wall clock (so the
+      // shadows ease alike whatever the world's pace)
+      const now=glfw.getTime();
+      const dt:f32=if(r.clock)|was|@floatCast(@max(now-was,0))else 0;
+      r.clock=now;
+      // which lights hold the shadow cubes now, and each one's record
+      const fr=m.Frustum.of(p.vp);
+      r.casters.update(l.lights[0..n],eye,target,&fr,r.cubeCount,dt);
+      for(r.casters.slots,&l.cubes,&r.cubeSpheres,0..)|s,*q,*sphere,i|{
+        sphere.*=null;
+        const li=s.light orelse continue;
+        q.*=cube.record(l.lights[li],li,cube.Casters.shownOf(s));
+        l.lights[li].col[3]=m.f(i+1);
+        sphere.*=l.lights[li].pos;
+      }
       f.lighting.write(0,asBytes(&l));
       // where the record sits on the GPU, split into two words for the push
       const at=f.lighting.address(&r.ctx);

@@ -53,6 +53,27 @@ The overhead map draws only 4 chunks a frame (new ones first, then the
 rest in turn): the chunks' ground buffers are host-visible, so reading all
 of them every frame cost 2.6 ms.
 
+## Shadows of the points of light
+The four shadow cubes (engine `render/cube.zig`) and their lookups,
+measured release on the same machine, `--demo --inspect=player`, msaa8,
+2026-11-03 (before → after, GPU ms):
+
+| | day (0.45) | night (0.0) |
+|---|---|---|
+| whole frame | 23.2 → 25.9 | 24.6 → 30.1 |
+| cubes (drawing them) | – → 1.1 | – → 1.2 |
+| plantsHead (surfaces looking them up) | 10.7 → 11.7 | 11.5 → 13.9 |
+| fog (24 looks a ray a shadowed light) | 0.9 → 1.1 | 0.9 → 1.2 |
+
+- Each face is drawn on its own with only the casters inside it (`cube.sees`)
+  within the light's reach: drawing all six faces of every caster in reach
+  at once (multiview) cost 2.8 ms, the same picture.
+- What is left to try, exact: the cube of a light that has not moved,
+  over casters that have not (nothing sways quite still, so rarely),
+  kept from the frame before.
+- LIGHT SHADOWS in the options sets how many lights (0, 2, 4) and how
+  fine (256², 512²); the default is the full look.
+
 ## Level of detail
 Every plant and library mesh is built at `meshgen.lods` (3) levels of
 detail, so far-away things use fewer triangles.

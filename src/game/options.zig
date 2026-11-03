@@ -54,8 +54,33 @@ pub const Options=struct{
   /// how far the garden is drawn: rings of chunks streamed in and drawn
   /// round the gardener (one of `renderRings`)
   renderDistance:u8=4,
+  /// how many points of light near the camera cast shadows into the air,
+  /// and how finely (the full look by default)
+  lightShadows:LightShadows=.full,
   /// how many rings of chunks are streamed in and drawn round the gardener
   pub fn rings(o:*const Options)i32{return renderRings[ringsIndex(o.renderDistance)];}
+};
+/// how many points of light near the camera cast shadows (their glow
+/// fanning out in rays between what stands in it), and how finely, in
+/// `txt.s.hud.lightShadows` order
+pub const LightShadows=enum{
+  /// none: every glow a soft ball
+  off,
+  /// the two most telling lights, in coarse cubes
+  few,
+  /// the four most telling lights, in coarse cubes
+  more,
+  /// the four most telling lights, in fine cubes
+  full,
+  /// how many lights cast shadows at this level
+  pub fn lights(l:LightShadows)usize{
+    return switch(l){.off=>0,.few=>2,.more,.full=>4};
+  }
+  /// texels along each side of a shadow cube's face at this level (the
+  /// cubes keep their size while none is cast)
+  pub fn res(l:LightShadows)u32{
+    return switch(l){.off=>0,.few,.more=>256,.full=>512};
+  }
 };
 /// the autosave intervals offered, in minutes (in `txt.s.hud.autosave` order)
 pub const autosaveMinutes=[_]u8{0,1,2,5,10,15,30,60};
@@ -74,6 +99,8 @@ pub const Setting=enum{
   autosave,
   /// how far the garden is drawn
   renderDistance,
+  /// how many points of light cast shadows, and how finely
+  lightShadows,
 };
 /// how many settings there are
 pub const settingCount=fields(Setting).len;
@@ -89,7 +116,7 @@ pub const Kind=enum{
 /// how `set` is set
 pub fn kind(set:Setting)Kind{
   return switch(set){
-    .antialias=>.picker,
+    .antialias,.lightShadows=>.picker,
     .vsync,.fullscreen=>.toggle,
     .autosave,.renderDistance=>.slider,
   };
@@ -99,7 +126,7 @@ pub fn isOn(o:*const Options,set:Setting)bool{
   return switch(set){
     .vsync=>o.vsync,
     .fullscreen=>o.fullscreen,
-    .antialias,.autosave,.renderDistance=>false,
+    .antialias,.autosave,.renderDistance,.lightShadows=>false,
   };
 }
 /// how many stops the slider `set` has (1 for any other kind)
@@ -107,7 +134,7 @@ pub fn stops(set:Setting)usize{
   return switch(set){
     .autosave=>autosaveMinutes.len,
     .renderDistance=>renderRings.len,
-    .antialias,.vsync,.fullscreen=>1,
+    .antialias,.vsync,.fullscreen,.lightShadows=>1,
   };
 }
 /// which stop the slider `set` is at (0 for any other kind)
@@ -115,7 +142,7 @@ pub fn stopOf(o:*const Options,set:Setting)usize{
   return switch(set){
     .autosave=>autosaveIndex(o.autosave),
     .renderDistance=>ringsIndex(o.renderDistance),
-    .antialias,.vsync,.fullscreen=>0,
+    .antialias,.vsync,.fullscreen,.lightShadows=>0,
   };
 }
 /// the slider `set` moved to stop `i` (kept to its stops; any other kind
@@ -124,7 +151,7 @@ pub fn setStop(o:*Options,set:Setting,i:usize)void{
   switch(set){
     .autosave=>o.autosave=autosaveMinutes[@min(i,autosaveMinutes.len-1)],
     .renderDistance=>o.renderDistance=renderRings[@min(i,renderRings.len-1)],
-    .antialias,.vsync,.fullscreen=>{},
+    .antialias,.vsync,.fullscreen,.lightShadows=>{},
   }
 }
 /// where `want` rings are in `renderRings` (else the next further one there)
@@ -164,6 +191,11 @@ pub fn step(o:*Options,set:Setting,dir:i32,most:u32)void{
       const n:i32=renderRings.len;
       o.renderDistance=renderRings[@intCast(m.clamp(@as(i32,@intCast(ringsIndex(o.renderDistance)))+dir,0,n-1))];
     },
+    .lightShadows=>{
+      // how many levels there are
+      const n:i32=@intCast(fields(LightShadows).len);
+      o.lightShadows=@enumFromInt(@mod(@as(i32,@intFromEnum(o.lightShadows))+dir,n));
+    },
   }
 }
 /// what `set` is now, as shown
@@ -174,6 +206,7 @@ pub fn shown(o:*const Options,set:Setting)[]const u8{
     .fullscreen=>txt.nth(txt.s.hud.toggle,@intFromBool(o.fullscreen)),
     .autosave=>txt.nth(txt.s.hud.autosave,autosaveIndex(o.autosave)),
     .renderDistance=>txt.nth(txt.s.hud.renderDistance,ringsIndex(o.renderDistance)),
+    .lightShadows=>txt.nth(txt.s.hud.lightShadows,@intFromEnum(o.lightShadows)),
   };
 }
 /// the file as written: each setting by name (any may be missing)
@@ -190,6 +223,8 @@ const Source=struct{
     autosave:?[]const u8=null,
     /// `renderDistance = <rings>`
     renderDistance:?[]const u8=null,
+    /// `lightShadows = off|few|more|full`
+    lightShadows:?[]const u8=null,
   }=.{},
 };
 /// a switch that is on, as written
@@ -216,6 +251,7 @@ pub fn parse(text:[]const u8)Options{
   if(f.fullscreen)|v|o.fullscreen=eql(u8,v,on);
   if(f.autosave)|v|if(parseInt(u8,v,10))|n|{o.autosave=autosaveMinutes[autosaveIndex(n)];}else|_|{};
   if(f.renderDistance)|v|if(parseInt(u8,v,10))|n|{o.renderDistance=renderRings[ringsIndex(n)];}else|_|{};
+  if(f.lightShadows)|v|o.lightShadows=stringToEnum(LightShadows,v) orelse o.lightShadows;
   return o;
 }
 /// writes `o` as cfg source.
@@ -226,6 +262,7 @@ pub fn format(o:*const Options,w:*Writer)Writer.Error!void{
     "[options]\nantialias = {t}\nvsync = {s}\nfullscreen = {s}\nautosave = {d}\nrenderDistance = {d}\n",.{
     o.aa,if(o.vsync)on else off,if(o.fullscreen)on else off,o.autosave,o.renderDistance,
   });
+  try w.print("lightShadows = {t}\n",.{o.lightShadows});
 }
 /// reads `filePath`; the defaults if it cannot be read, written out if there
 /// is none.
@@ -256,7 +293,7 @@ pub fn save(o:*const Options,io:Io)Error!void{
 }
 test"options round-trip through their file; unknown values keep the defaults"{
   // a set of options off the defaults, written out
-  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6};
+  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6,.lightShadows=.few};
   // room for the file, and the writer that fills it
   var buf:[fileMost]u8=undefined;
   var w:Writer=.fixed(&buf);
@@ -302,6 +339,13 @@ test"anti-aliasing turns both ways and skips what the GPU cannot take"{
   o.autosave=60;
   step(&o,.autosave,1,4);
   try testing.expectEqual(@as(u8,0),o.autosave);
+  // the points of light's shadows: the full look by default, wrapping round to none
+  try testing.expectEqual(LightShadows.full,o.lightShadows);
+  step(&o,.lightShadows,1,4);
+  try testing.expectEqual(LightShadows.off,o.lightShadows);
+  try testing.expectEqual(@as(usize,0),o.lightShadows.lights());
+  step(&o,.lightShadows,-1,4);
+  try testing.expectEqual(@as(usize,4),o.lightShadows.lights());
 }
 test"each setting is a toggle, a picker or a slider; a slider is set by its stops"{
   // the defaults

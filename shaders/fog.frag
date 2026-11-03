@@ -1,5 +1,5 @@
 #version 450
-//! the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the hollows, what is breathed into it (mist and cloud), the key light falling through it in shafts, the points of light and the ley lines glowing in it.
+//! the air the garden stands in, marched once a half-size texel along the eye's ray: a haze over everything, mist lying low and pooled in the hollows, what is breathed into it (mist and cloud), the key light falling through it in shafts, the points of light (those holding shadow cubes in rays between what stands in them) and the ley lines glowing in it.
 #extension GL_GOOGLE_include_directive : require
 #include "common.glsl"
 #include "volume.glsl"
@@ -15,7 +15,9 @@
 // ground shades the air too and light falls through the gaps in shafts.
 // Above the slab only the haze is left, thinning with height, and the ray
 // through it is summed in closed form. The points of light glow in the air
-// round them, each summed in closed form along the ray; the ley lines'
+// round them, each summed in closed form along the ray (one holding a
+// shadow cube only as much as its cube lets through, so it fans out in rays
+// and shadow wedges); the ley lines'
 // glow, read from the overhead map, rises off the ground into it.
 
 layout(location = 0) flat in mat4 v_inv;
@@ -36,6 +38,10 @@ const float EVEN = 0.3;
 const float SHAFT = 1.0;
 // how strongly the points of light glow in it
 const float POINT_AIR = 2.0;
+// how many times a light holding a shadow cube looks it up across the ray's
+// chord through its reach (so what stands in its light shades the air: rays
+// and shadow wedges round it)
+const int CUBE_STEPS = 24;
 // the ley lines' glow in it: how strongly, how high it rises, how far round
 // a line it spreads (units)
 const float LEY_AIR = 3.0;
@@ -147,7 +153,29 @@ void main() {
     vec3 p = eye + dir * at;
     float rho = airDensity(p, t);
     float seen = at < s0 ? t0 : at >= s1 ? trans : stepTrans[clamp(int((at - s0) / max(ds, 1e-4)), 0, STEPS - 1)];
-    scat += L.lights[i].col.rgb * sum * win * rho * seen * ALBEDO * POINT_AIR;
+    // a light holding a shadow cube: only the share of its glow its cube
+    // lets through, taken at CUBE_STEPS points across the chord. They are
+    // spaced evenly in the angle the light sees them at (u = c tan a), so
+    // each carries an equal share of the glow summed above, and weighed by
+    // the falloff's edge; each set a little further in by the march's own
+    // dither. With nothing in the way the share is all of it, so a shadow
+    // easing in or out (its cube's `lit.y`) changes nothing until something
+    // stands between.
+    int s = int(L.lights[i].col.w + 0.5) - 1;
+    float shown = s >= 0 ? L.cubes[s].lit.y : 0.0;
+    float through = 1.0;
+    if (shown > 0.0) {
+      float a0 = atan(ua / c), a1 = atan(ub / c);
+      float lit = 0.0, all = 0.0;
+      for (int j = 0; j < CUBE_STEPS; j++) {
+        float u = c * tan(mix(a0, a1, (float(j) + dither) / float(CUBE_STEPS)));
+        float e = max(1.0 - (h2 + u * u) / r2, 0.0);
+        lit += e * e * cubeLit(L, s, eye + dir * (near + u));
+        all += e * e;
+      }
+      through = mix(1.0, lit / max(all, 1e-6), shown);
+    }
+    scat += L.lights[i].col.rgb * sum * win * rho * seen * through * ALBEDO * POINT_AIR;
   }
   o = vec4(scat, trans);
 }

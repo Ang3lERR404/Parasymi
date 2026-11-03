@@ -96,6 +96,15 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
 - **Glow:** the points of light (blooms, motes) light the air round them;
   the ley lines' glow rises off the ground into the mist, pulsing with
   them (read from the overhead map, the ground drawn from above).
+- **Lights with shape:** the four most telling points of light near the
+  camera hold shadow cubes (see Lighting, below), so what stands in their
+  light blocks it in the air too: a glow fans out in rays between
+  petals, leaves and stems, with shadow wedges behind them, as the sun
+  falls in shafts. Along each eye ray through such a light's reach its
+  cube is looked up 24 times (`CUBE_STEPS`, spaced evenly in the angle
+  the light sees them at, set in by the march's own dither), and only the
+  share let through is added to its closed-form glow; with nothing in
+  the way the glow is exactly as before. The rest keep their soft ball.
 - **Everything that glows lights the air** (a standing rule): beams,
   flashes, the halo, energy, the constellate's glowing edges and points,
   the solcyriphon's night beam and the heliocyras' strips
@@ -641,6 +650,29 @@ flooding. His pose is the clip `src/anim/sleep.anim` (keyed in animedit,
 - Shader side: engine light.glsl `keyShadow`, `pointLight`; common.glsl
   `shadeLit`.
 - Culling keeps whatever may cast a shadow into view (`Parts.sees`).
+
+### Shadows of the points of light (engine `render/cube.zig`)
+- The four most telling lights near the camera (strong, far reaching,
+  near the line from the eye to what it looks at, in view) each hold a
+  shadow cube: six 90° depth faces round the light, 512² each, drawn a
+  face at a time with only the casters inside that face and within the
+  light's reach, at their coarsest LOD (`plantsCube`, `partsCube`).
+- A light keeps its cube while it moves (matched to where it was last
+  frame), a held light counts 1.5× so two alike never trade, and a
+  shadow eases in and out over 0.6 s as a light gains or loses its place
+  (`Casters`): never a pop.
+- What casts: what casts into the key light's map, and also a radiant
+  plant's petals, leaves and veil (decision: they stand round the light
+  at its heart, so its glow fans out between them, the gardener's ask);
+  its core, motes, threads and lens, and every `PARTS_LIGHT` role, cast
+  none. What lies nearer the light than its near plane (6% of its reach,
+  0.2–0.6) is not drawn, so the shell a light glows inside never hides it.
+- Read in the fog (above) and on every lit surface (`pointShadow`, one
+  hardware-filtered compare, lifted two texels off the surface): the
+  ground and plants round a shadowed light show the shadows of what
+  stands in it.
+- Options, LIGHT SHADOWS: off, two lights (256² faces), four lights
+  (256²), four lights fine (512², the default).
 
 ## Post-processing (engine `render/post.zig`)
 - World passes draw into an HDR image (one that can hold light brighter

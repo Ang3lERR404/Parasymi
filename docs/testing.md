@@ -147,6 +147,18 @@ time   = 3 + k * orbit / n          // 3 s settle, then evenly spaced
 growth = (time mod (period + 1.5)) / period   // the loop is period + 1.5 s hold
 ```
 
+## Lights with shape
+The points of light's shadows (rays and shadow wedges in the fog round
+the lights nearest the camera) show best by night, low among plants, by
+the light where a beam lands:
+
+```
+zig build run -- --demo --tod=0.0 --inspect=germinator --shots=2 --orbit=30 --dist=5 --pitch=10
+```
+
+For the same view without them, set `lightShadows = off` in the
+gardener's `options.cfg` (or OPTIONS, LIGHT SHADOWS) and shoot again.
+
 ## Faster than the clock
 `--speed=N` runs the world N times faster: its ticks, its sky and the
 air's moisture together, so everything keeps in step. For slow things
