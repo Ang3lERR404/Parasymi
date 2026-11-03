@@ -162,7 +162,8 @@ building and building until a scream, then falling. The mixer
   (a deep body bent sharp by the blow, a crunch, gravel trickling), from
   0.8 to 3.5 a second, all round; burning from 8.5 s (crackle and a low
   roar); fireworks from 8 s, 1.8 a second, whistling up from about 450 Hz to
-  2.5 kHz and never bursting;
+  2.5 kHz and never bursting; all of it kept under the music, and giving
+  way to 40% while she screams, so she is heard over it;
 - **the scream** (11.4 s): one woman, a Rosenberg glottal pulse shaking from
   cycle to cycle, through an open "ah": a breath in, a cry rising from A5 to
   30 cents over D6 (almost the choir's high D), holding 1.2 s, her voice

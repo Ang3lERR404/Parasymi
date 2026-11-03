@@ -498,7 +498,7 @@ const rumbleLevel=m.Vice(f32,3){0.3,0.5,1};
 /// how slowly the rumble follows (s, ~63%)
 const rumbleGlide:f32=0.8;
 /// how loud the rumble is
-const rumble:f32=0.45;
+const rumble:f32=0.22;
 /// masses falling: how many a second as the cacophony starts and at its height
 const debrisRate=m.Vice(f32,2){0.8,3.5};
 /// the burning: crackles a second, how long each, where they ring (Hz)
@@ -512,7 +512,7 @@ const fireRoarHz:f32=300;
 /// how slowly the burning swells (s, ~63%)
 const fireGlide:f32=1.2;
 /// how loud the crackle and the roar
-const burning:f32=0.25;
+const burning:f32=0.12;
 /// (the roar)
 const fireRoar:f32=1.5;
 /// the fireworks: how many rise a second, from where to where (Hz), how long
@@ -524,7 +524,7 @@ const fireworkTo=m.Vice(f32,2){1800,3200};
 /// (how long, s)
 const fireworkLen=m.Vice(f32,2){0.9,1.6};
 /// how loud
-const firework:f32=0.03;
+const firework:f32=0.018;
 /// how a fall is heard: its body's pitch (Hz), how long it rings (s), how
 /// much crunch and gravel, and how long the gravel trickles (s)
 const Fall=struct{
@@ -556,7 +556,7 @@ const crunchFall:f32=0.08;
 /// the gravel's grains a second
 const gravelGrains:f32=900;
 /// how loud a fall is
-const fall:f32=0.1;
+const fall:f32=0.05;
 /// one mass falling and hitting the ground: a deep body bent sharp by the
 /// blow, a crunch, gravel trickling after
 const Thud=struct{
@@ -839,6 +839,13 @@ const fallS:f32=0.7;
 const fallenTail:f32=0.25;
 /// (how slowly)
 const tailS:f32=0.8;
+// decision: the world breaking was too loud and buried her scream (the
+// gardener's word): it sits under the music, and gives way further for her
+/// how much of the world breaking is left while she screams, and how fast
+/// it gives way (s, ~63%)
+const screamDuck:f32=0.4;
+/// (how fast)
+const duckS:f32=0.3;
 /// how loud the theme is
 const level:f32=1.4;
 /// samples rendered at a time
@@ -916,6 +923,8 @@ pub const Theme=struct{
   gate:dsp.Smooth,
   /// how much of the hall's tail is let through
   tail:dsp.Smooth,
+  /// how much of the world breaking is heard: giving way while she screams
+  world:dsp.Smooth,
   /// the theme heard from its moment `t`, drawn from `seed`
   pub fn init(t:f32,seed:u64,rate:f32)Theme{
     // its own random numbers, and whether `t` falls where the music is gone
@@ -949,6 +958,7 @@ pub const Theme=struct{
       .fireLoud=.init(0,fireGlide,rate),
       .gate=.init(if(gone)0 else 1,gateS,rate),
       .tail=.init(if(gone)fallenTail else 1,tailS,rate),
+      .world=.init(1,duckS,rate),
     };
     th.creakGrit.density=creakGrains;
     th.fireGrit.density=fireGrains;
@@ -1112,15 +1122,18 @@ pub const Theme=struct{
     th.bells.render(s);
     // the world breaking and her scream, past the gate: the music falls
     // away, the world goes on
-    th.thuds.render(dry);
-    th.whistles.render(dry);
+    var broken:[chunk]dsp.Frame=@splat(@splat(0));
+    const w=broken[0..dry.len];
+    th.thuds.render(w);
+    th.whistles.render(w);
     th.screams.render(far);
     // how loud the rumble and the burning should be now, and the creak
     const into=m.clamp01((th.clock-hornAt)/(fallAt-hornAt));
     th.rumbleLoud.target=if(th.clock<hornAt)rumbleLevel[0]*th.creakNow()else if(th.clock<fallAt)m.lerp(rumbleLevel[1],rumbleLevel[2],into)else 0;
     th.fireLoud.target=if(th.clock>=fireAt and th.clock<fallAt)1 else 0;
+    th.world.target=if(th.clock>=screamAt-0.3 and th.clock<landAt)screamDuck else 1;
     const cr=th.creakNow();
-    for(dry,s)|*d,x|{
+    for(dry,s,w)|*d,x,b|{
       // the violins and the horns, then the gate over all of it
       var z=x+th.violins.tick();
       for(&th.horns)|*h|z+=h.tick();
@@ -1135,12 +1148,15 @@ pub const Theme=struct{
         d.*+=dsp.pan(y*cr*creak,-0.2);
       }
       th.at+%=1;
+      // the world breaking, giving way for her: the falls and fireworks,
       // the rumble (the darkened noise is small, so it is scaled back up)
+      var wb=b;
       const rl=th.rumbleLoud.next();
-      if(rl>silent)d.*+=th.rumbleLp.low(.{th.rumbleNoise[0].next(),th.rumbleNoise[1].next()})*dsp.mid(rl*rumble*12);
+      if(rl>silent)wb+=th.rumbleLp.low(.{th.rumbleNoise[0].next(),th.rumbleNoise[1].next()})*dsp.mid(rl*rumble*12);
       // the burning
       const fl=th.fireLoud.next();
-      if(fl>silent)d.*+=dsp.mid((th.fireBand.tick(th.fireGrit.next())+th.roarLp.low(th.roar.next())*fireRoar)*fl*burning);
+      if(fl>silent)wb+=dsp.mid((th.fireBand.tick(th.fireGrit.next())+th.roarLp.low(th.roar.next())*fireRoar)*fl*burning);
+      d.*+=wb*dsp.mid(th.world.next());
     }
   }
 };
