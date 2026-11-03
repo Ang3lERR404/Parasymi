@@ -108,6 +108,9 @@ pub fn build(b:*Build)!void{
       // writing them out to the gardener's folder (%LOCALAPPDATA%\Parasymi)
       // when missing; the tests check the strings file is complete
       for([_][]const u8{"parasymi.cfg","controls.cfg"})|c|md.addAnonymousImport(c,.{.root_source_file=bb.path(bb.fmt("src/cfg/{s}",.{c}))});
+      // decision: the wolf's clips the game plays (the main menu's sleep)
+      // ship inside it as the strings do, keyed in animedit as ever
+      for([_][]const u8{"sleep.anim"})|c|md.addAnonymousImport(c,.{.root_source_file=bb.path(bb.fmt("src/anim/{s}",.{c}))});
       return md;
     }
   };

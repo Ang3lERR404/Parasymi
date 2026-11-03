@@ -20,6 +20,8 @@ pub const desc:pass.Desc=.{
 };
 /// draws every live chunk's ground the camera can see, one draw each
 pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+  // (none of it on the main menu's dark stage)
+  if(scene.stage)return;
   cmd.bindPipeline(.graphics,r.pipe(.terrain));
   cmd.pushConstants(r.layout(desc.layout),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
   // no offset into a chunk's buffer
@@ -54,6 +56,8 @@ pub const overhead=struct{
   /// draws a few live chunks' ground into the map: those not in it yet,
   /// then the next in turn, each placed by its own square of the map
   pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+    // (none of it on the main menu's dark stage)
+    if(scene.stage)return;
     cmd.bindPipeline(.graphics,r.pipe(.terrainOverhead));
     // every chunk slot, and how many are drawn so far
     const slots=r.ext.slots.items;

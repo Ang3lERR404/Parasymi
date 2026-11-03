@@ -62,6 +62,17 @@ const parts=struct{
   pub const mote=@import("meshes/mote.zig");
   /// what bursts out where a plant's yield comes loose: motes and drops of it
   pub const pluckBurst=@import("meshes/pluck_burst.zig");
+  // the main menu's stage
+  /// the mossy mound the wolf sleeps on
+  pub const stageMound=@import("meshes/stage.zig").mound;
+  /// a petal drifting down out of the dark
+  pub const fallPetal=@import("meshes/stage.zig").petal;
+  /// a small whole flower drifting down
+  pub const fallFlower=@import("meshes/stage.zig").flower;
+  /// a seed borne down on its fluff
+  pub const fallSeed=@import("meshes/stage.zig").seed;
+  /// a glowing grain of pollen drifting down
+  pub const fallPollen=@import("meshes/stage.zig").pollen;
   // the gardener's sculpts, one slot each (sculpts.slots of them)
   /// the first sculpt on the shelf
   pub const sculpt0=@import("meshes/sculpt.zig").Slot(0);

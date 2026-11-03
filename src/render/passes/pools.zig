@@ -24,6 +24,8 @@ const vertsPerQuad=6;
 const quads=96*96;
 /// draws every quad, one instanced draw
 pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+  // (none of it on the main menu's dark stage)
+  if(scene.stage)return;
   cmd.bindPipeline(.graphics,r.pipe(.pools));
   cmd.pushConstants(r.layout(desc.layout),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
   cmd.draw(vertsPerQuad,quads,0,0);

@@ -37,6 +37,8 @@ const Game=lib.play.game.Game;
 const GardenAct=lib.play.GardenAct;
 /// the pause menu's rows
 const PauseRow=lib.play.PauseRow;
+/// the main menu's rows
+const TitleRow=lib.play.TitleRow;
 /// the pause menu and the panels opened from it, while the world is
 /// frozen: a click on a pause row does what it says; on an option it
 /// turns it (the other button turns it back); in the saved gardens it
@@ -66,6 +68,7 @@ pub fn menu(g:*Game,in:*const Input,dt:f32)void{
 /// does what pause row `row` says: resume, open the options or the saved
 /// gardens, toggle fullscreen, or ask main to save and leave.
 pub fn choose(g:*Game,row:PauseRow)void{
+  g.menuHome=.paused;
   switch(row){
     .@"resume"=>g.mode=.roam,
     .options=>g.mode=.options,
@@ -73,6 +76,20 @@ pub fn choose(g:*Game,row:PauseRow)void{
     .gardens=>g.openGardens(),
     .fullscreen=>g.opts.fullscreen=!g.opts.fullscreen,
     .quit=>g.request=.quit,
+  }
+}
+/// does what main menu row `row` says: wake into the newest garden or the
+/// fresh one, open the saved gardens, the options or the keybinds (each
+/// going back to the main menu), or leave without saving
+pub fn chooseTitle(g:*Game,row:TitleRow)void{
+  g.menuHome=.title;
+  switch(row){
+    .@"continue"=>if(g.gardens.items.len>0){g.request=.{.loadFrom=g.gardens.items[0].name};},
+    .newGarden=>g.mode=.roam,
+    .gardens=>g.openGardens(),
+    .options=>g.mode=.options,
+    .keybinds=>g.openKeybinds(),
+    .leave=>g.request=.leave,
   }
 }
 /// the saved gardens menu opens on a fresh list, the played garden chosen

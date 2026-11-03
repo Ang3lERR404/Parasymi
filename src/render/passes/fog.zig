@@ -19,6 +19,8 @@ pub const desc:pass.Desc=.{
 };
 /// marches the air: one full-screen triangle
 pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+  // (no air on the main menu's dark stage: only the glows' own, partsAir)
+  if(scene.stage)return;
   cmd.bindPipeline(.graphics,r.pipe(.fog));
   cmd.pushConstants(r.layout(desc.layout),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
   cmd.draw(3,1,0,0);

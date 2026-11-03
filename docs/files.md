@@ -144,6 +144,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `slot.zig` — a slot, the first of the HUD's components: a husk hanging in its box.
 - `status.zig` — time of day (a sun or moon pod) and how full the wolf's sap belly is.
 - `structure.zig` — a structure's panel (a click on one that keeps items): its slots beside the belly's, lifted and put down between them as in the belly, and…
+- `title.zig` — the main menu, at the start: beside the wolf asleep on its dark stage, a column of the menu's rows down the right of the screen under the…
 - `toggle.zig` — a toggle, the sixth of the HUD's components: a bud on a short stem that is shut while off and opens into a lit bloom when on, easing…
 - `tooltip.zig` — an item's full name, on a small trellis beside the cursor, while the mouse rests on a row showing one (a slot holding one, a recipe).
 
@@ -309,6 +310,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `style.zig` — shared HUD colours (every panel a trellis, every slot a husk), type scale and bar sizes.
 - `tendril.zig` — the flow: constellate tendrils (act 2).
 - `text.zig` — every player-facing string, loaded once at startup from `filePath` (`parasymi.cfg`) and never read again.
+- `title.zig` — the main menu's stage: the wolf curled up asleep in a small patch of flowers, centre stage on a dark ground under one warm light, petals…
 - `unforming.zig` — THE UNFORMING: the garden's first world event, begun the moment the study of that name is learned.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 - `weather.zig` — WEATHER: the rain the garden's air rains soaking back into its ground.
@@ -357,6 +359,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sculpt.zig` — mesh: SCULPT.
 - `shadow.zig` — mesh: SHADOW.
 - `sporecaster.zig` — mesh: SPORECASTER.
+- `stage.zig` — meshes: the main menu's stage (game/title.zig).
 - `storm_spire.zig` — mesh: the storm spire (structures/storm_spire.zig), a kin of the weftstone (convergence kit) that charges the air and strikes the rain…
 - `strange_seed.zig` — mesh: STRANGE SEED.
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with

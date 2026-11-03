@@ -77,10 +77,15 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   }
   if(ctl.pressed(in,.fullscreen)and!listening)g.opts.fullscreen=!g.opts.fullscreen;
   if(ctl.pressed(in,.back))switch(g.mode){
-    .roam=>g.mode=.paused,
+    .roam=>{
+      g.mode=.paused;
+      g.menuHome=.paused;
+    },
     .belly,.structure,.research,.paused=>g.mode=.roam,
-    .options,.gardens=>g.mode=.paused,
-    .keybinds=>if(listening){g.rebinding=null;}else{g.mode=.paused;},
+    .options,.gardens=>g.mode=g.menuHome,
+    .keybinds=>if(listening){g.rebinding=null;}else{g.mode=g.menuHome;},
+    // (the main menu stays: there is nothing behind it to go back to)
+    .title=>{},
     .naming=>g.mode=g.namingFrom,
     .inspect=>g.inspect(in,false),
   }else if(!g.mode.live())g.menu(in,dt);

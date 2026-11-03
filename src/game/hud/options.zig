@@ -69,6 +69,8 @@ const trackH:f32=18;
 const ease:f32=12;
 /// how many settings there are, one row each
 const settings=opt.settingCount;
+/// drawn at the main menu too (`hud.build`)
+pub const atTitle=true;
 /// shown while the options are open.
 pub fn visible(g:*const play.Game)bool{return g.mode==.options;}
 /// a setting's row, a picker's leaves, or BACK
@@ -113,7 +115,7 @@ pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
     .setting=>|set|if(!(opt.kind(set)==.slider and dir>0))turn(g,set,dir),
     .less=>|set|if(dir>0)turn(g,set,-1),
     .more=>|set|if(dir>0)turn(g,set,1),
-    .back=>if(dir>0){g.mode=.paused;},
+    .back=>if(dir>0){g.mode=g.menuHome;},
   }
 }
 /// a slider held: set to the stop under the cursor

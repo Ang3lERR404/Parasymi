@@ -187,6 +187,10 @@ pub const Scene=struct{
   ui:[]const vertex.Ui,
   /// UI clock (keeps running while the world is paused)
   uiTime:f32,
+  /// a stage in the dark (the main menu, game/title.zig): no sky, ground,
+  /// grass, pools or rain are drawn, only what is gathered on it, over the
+  /// colour cleared to
+  stage:bool=false,
 };
 /// what a frame counted, for the stats overlay
 pub const Stats=struct{

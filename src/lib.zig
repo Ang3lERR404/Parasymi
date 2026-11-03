@@ -22,6 +22,10 @@ pub const world=@import("world/world.zig");
 pub const play=@import("game/play.zig");
 /// what gets drawn: the game state turned into the renderer's scene
 pub const view=@import("game/view.zig");
+/// the main menu's stage: the wolf asleep in a patch of flowers
+pub const title=@import("game/title.zig");
+/// the stage's meshes: its mound's height, what drifts down on it
+pub const stageMeshes=@import("gfx/meshes/stage.zig");
 /// the vine-wolf the gardener plays: movement, belly and steps
 pub const player=@import("game/player.zig");
 /// one plant or structure standing alone, for `--plant=` / `--structure=`

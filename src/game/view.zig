@@ -197,6 +197,8 @@ const rootFlutter:f32=0.35;
 /// threads, the wolf, nodes, structures, ghost and motes as parts, the best
 /// lights, the HUD, and the push constants for sky, fog, sun and view.
 pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
+  // at the main menu the wolf sleeps on its stage instead
+  if(g.atTitle())return lib.title.scene(g,screen);
   // how far round the camera target things are drawn (tiles), and the shader clock
   const reach=g.cam.reach(play.drawLimit);
   const tf:f32=@floatCast(@mod(g.time,timeWrap));
@@ -325,7 +327,7 @@ pub fn filmHue(x:f32)m.V3{
 /// the most telling points of light first, the rest dropped: the renderer
 /// takes `renderer.maxLights` (strong, far reaching lights near what the
 /// camera looks at win)
-fn rankLights(g:*Game)void{
+pub fn rankLights(g:*Game)void{
   // the lights gathered this frame
   const ls=g.parts.lights.items;
   if(ls.len<=renderer.maxLights)return;
@@ -472,6 +474,12 @@ const Drawn=struct{
   /// seconds since its yield last came loose in the paws (`pluck.Tug.sinceOf`)
   since:f32=vertex.noPluck,
 };
+/// a plant of kind `sp` drawn standing at `at` (its ground `at`'s height)
+/// with no plant in the garden behind it, `growth` grown, `seed` its own:
+/// the main menu's patch round the sleeping wolf
+pub fn stagePlant(g:*Game,sp:species.Id,at:m.V3,growth:f32,seed:f32,tf:f32)Allocator.Error!void{
+  try plant(g,.{.sp=sp,.x=@intFromFloat(@floor(at[0])),.y=@intFromFloat(@floor(at[2])),.at=m.v3(at[0],0,at[2]),.ground=at[1],.growth=growth,.seed=seed,.health=1},tf);
+}
 /// draws one plant (or its placement preview): culled to the view, posed
 /// as it turns, floated over its shadow if it floats, its instance added to
 /// its mesh's list, and a celestial bloom's light.

@@ -148,6 +148,63 @@ test"the pause menu opens the options; clicks turn them and lead back"{
   // nothing moved while frozen
   try testing.expectEqual(@as(u64,0),g.ticks);
 }
+test"the main menu: its panels lead back to it, continue wants a garden saved, new garden goes in, leave asks main"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  g.mode=.title;
+  // the stage is drawn, with only the menu's panels over it
+  _=try lib.view.scene(&g,screen);
+  try testing.expect(g.atTitle());
+  try testing.expect(g.rows.find(hud.row(.title,.{.row=.newGarden}))!=null);
+  // nothing saved: continue is not offered
+  try testing.expect(g.rows.find(hud.row(.title,.{.row=.@"continue"}))==null);
+  // the options lead back to the main menu, not the pause menu
+  try click.on(&g,&in,hud.row(.title,.{.row=.options}),screen);
+  try testing.expectEqual(Mode.options,g.mode);
+  try testing.expect(g.atTitle());
+  try click.on(&g,&in,hud.row(.options,.back),screen);
+  try testing.expectEqual(Mode.title,g.mode);
+  // so do the keybinds, by the back key too
+  try click.on(&g,&in,hud.row(.title,.{.row=.keybinds}),screen);
+  try testing.expectEqual(Mode.keybinds,g.mode);
+  in.advance();
+  ctl.hold(&in,.back,true);
+  try g.update(&in,tickTime,screen);
+  ctl.hold(&in,.back,false);
+  try testing.expectEqual(Mode.title,g.mode);
+  // back at the main menu, the back key does nothing
+  in.advance();
+  ctl.hold(&in,.back,true);
+  try g.update(&in,tickTime,screen);
+  ctl.hold(&in,.back,false);
+  try testing.expectEqual(Mode.title,g.mode);
+  // leave asks main to close, saving nothing
+  try click.on(&g,&in,hud.row(.title,.{.row=.leave}),screen);
+  try testing.expect(g.request.?==.leave);
+  g.request=null;
+  // new garden goes into the garden grown behind it; paused there, the
+  // options lead back to the pause menu again
+  try click.on(&g,&in,hud.row(.title,.{.row=.newGarden}),screen);
+  try testing.expectEqual(Mode.roam,g.mode);
+  try testing.expect(!g.atTitle());
+  in.advance();
+  ctl.hold(&in,.back,true);
+  try g.update(&in,tickTime,screen);
+  ctl.hold(&in,.back,false);
+  try testing.expectEqual(Mode.paused,g.mode);
+  try click.on(&g,&in,hud.row(.pause,.{.row=.options}),screen);
+  try click.on(&g,&in,hud.row(.options,.back),screen);
+  try testing.expectEqual(Mode.paused,g.mode);
+}
 test"the saved gardens scroll, save over one or delete it only when asked twice, and load"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;

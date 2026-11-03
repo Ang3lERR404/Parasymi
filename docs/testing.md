@@ -181,7 +181,7 @@ zig build run -- --act2 --structure=yielder --state=active --period=2000 --inspe
 ```
 
 ## A HUD panel
-`--panel=<belly|research|paused|options|keybinds|gardens|naming>` holds it open and
+`--panel=<title|belly|research|paused|options|keybinds|gardens|naming>` holds it open and
 keeps the HUD in `--inspect` shots (`--panel=overview` roams with alt mode
 held on), e.g.
 

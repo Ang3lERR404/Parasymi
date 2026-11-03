@@ -75,6 +75,19 @@ const int PLACE_CURVE = 1;   // along a Catmull-Rom curve (the tail, beams)
 const int PLACE_MOTE = 2;    // a star mote
 const int PLACE_SKINNED = 3; // by its bones
 const int PLACE_BURST = 4;   // a burst flung out where a yield came loose
+const int PLACE_FALL = 5;    // drifting down out of the dark over the main menu's stage
+// how fast what drifts down over the stage falls (m/s), slowest and fastest
+const float FALL_SLOW = 0.09;
+const float FALL_FAST = 0.22;
+// how far it sways side to side as it falls (m)
+const float FALL_SWAY = 0.16;
+// how fast it tumbles (radians a second), slowest and fastest
+const float FALL_SPIN_MIN = 0.4;
+const float FALL_SPIN_MAX = 1.6;
+// the share of its fall over which it swells in at the top and shrinks
+// away at the bottom
+const float FALL_IN = 0.1;
+const float FALL_OUT = 0.18;
 
 // how a diamond gathers (common.glsl gatherAway, gatherIn): its facets
 // settle PRISM_PACE of the way apart by order, each over PRISM_SPAN,
@@ -1624,6 +1637,31 @@ void main() {
     float size = (1.0 - age) * (drop ? 1.0 : 0.65) * smoothstep(0.0, 0.06, age);
     w = M * vec4(at + nrm * BURST_BEAD * size, 1.0);
     wn = mat3(M) * nrm;
+  } else if (mode == PLACE_FALL) {
+    // drifting down out of the dark over the main menu's stage (ie.y its
+    // seed, ie.z how high over the stage it falls from, ie.w how far across
+    // it spreads): each at its own pace and place, swaying as it falls and
+    // tumbling about its own axis, swelling in at the top and shrinking away
+    // near the ground; then round again from the top. All from the clock
+    // and its seed: nothing is kept between frames
+    float sd = ie.y;
+    float H = max(ie.z, 1e-3);
+    vec3 h = hash33(vec3(sd, 17.1, 5.3));
+    vec3 q = hash33(vec3(sd, 2.9, 31.7));
+    float y = H - mod(t * mix(FALL_SLOW, FALL_FAST, h.x) + h.y * H, H);
+    vec3 at = vec3((h.z * 2.0 - 1.0) * ie.w + FALL_SWAY * sin(t * 0.7 + sd * 13.0), y,
+                   (q.x * 2.0 - 1.0) * ie.w * 0.6 + FALL_SWAY * 0.7 * sin(t * 0.53 + sd * 7.0));
+    // the way it tumbles about, and how far round it is
+    vec3 ax = normalize(q * 2.0 - 1.0 + vec3(0.0, 1e-3, 0.0));
+    float ang = t * mix(FALL_SPIN_MIN, FALL_SPIN_MAX, q.y) + sd * TAU;
+    float cs = cos(ang);
+    float sn = sin(ang);
+    mat3 R = cs * mat3(1.0) + sn * mat3(0.0, ax.z, -ax.y, -ax.z, 0.0, ax.x, ax.y, -ax.x, 0.0) + (1.0 - cs) * outerProduct(ax, ax);
+    float k = y / H;
+    float size = smoothstep(0.0, FALL_OUT, k) * smoothstep(1.0, 1.0 - FALL_IN, k);
+    w = vec4(c3.xyz + at + mat3(M) * (R * p) * size, 1.0);
+    wn = mat3(M) * (R * nrm);
+    twinkle = 0.75 + 0.25 * sin(t * 2.3 + sd * 40.0);
   } else if (mode == PLACE_MOTE) {
     // a star mote: it turns slowly, tilts, twinkles and, resting, hovers
     // with a slow breath; falling, its echoes (ie.w 1..3) trail above it,

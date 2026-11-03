@@ -1,0 +1,32 @@
+# clip
+subject wolf
+length 4
+key hip.y 0 0.17
+key pelvis.z 0 1.5708
+key waist.x 0 0.6
+key chest.x 0 0.55
+key neck.x 0 0.85
+key head.x 0 0.45
+key legs.0.root.x 0 -1.9
+key legs.1.root.x 0 -1.75
+key legs.0.mid 0 2.6
+key legs.1.mid 0 2.5
+key legs.0.low.x 0 -1.6
+key legs.1.low.x 0 -1.5
+key legs.0.foot 0 0.5
+key legs.1.foot 0 0.5
+key arms.0.root.x 0 -1.25
+key arms.1.root.x 0 -1.1
+key arms.0.root.z 0 -0.1
+key arms.1.root.z 0 0.05
+key arms.0.mid 0 2.1
+key arms.1.mid 0 1.9
+key tail.0.x 0 0.7
+key tail.1.x 0 0.7
+key tail.2.x 0 0.7
+key tail.3.x 0 0.6
+key ears.0.x 0 0.5
+key ears.1.x 0 0.5
+key breath 0 1
+key breath 2 1.05
+key breath 4 1

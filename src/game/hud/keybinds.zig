@@ -67,6 +67,8 @@ const fadeRows:f32=0.5;
 const pulse:f32=6;
 /// the longest a row's keys run as shown (bytes)
 const maxKeys=96;
+/// drawn at the main menu too (`hud.build`)
+pub const atTitle=true;
 /// shown while the keybinds are open.
 pub fn visible(g:*const play.Game)bool{return g.mode==.keybinds;}
 /// an action's row, ALL DEFAULTS, BACK, the scroll stem
@@ -91,7 +93,7 @@ pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
         ctl.resetAll();
         g.request=.bindings;
       },
-      .back=>g.mode=.paused,
+      .back=>g.mode=g.menuHome,
       .scroll=>{},
     },
     .remove=>switch(p){

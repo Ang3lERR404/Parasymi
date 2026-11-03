@@ -36,6 +36,8 @@ const half:f32=m.f(ck.sizeTiles)/2;
 /// draws the detail of every live chunk in view and near the focus, one
 /// instanced draw a chunk, each tile one instance
 pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+  // (none of it on the main menu's dark stage)
+  if(scene.stage)return;
   cmd.bindPipeline(.graphics,r.pipe(.detail));
   cmd.pushConstants(r.layout(desc.layout),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
   // no offset into a chunk's detail buffer

@@ -208,7 +208,7 @@ pub fn main(init:Init)!void{
       panel=.roam;
       overview=true;
     }else if(startsWith(u8,a,"--panel="))panel=switch(stringToEnum(play.Mode,a["--panel=".len..]) orelse return error.BadPanel){
-      inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming=>|p|p,
+      inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming,.title=>|p|p,
       else=>return error.BadPanel,
     };
   }
@@ -303,6 +303,14 @@ pub fn main(init:Init)!void{
   if(unforming)game.prog.done.insert(.unforming);
   if(act2 and lone==null)try lib.act.begin(&game);
   if(act2 and demo)try setups.act2(&game,demoAct2);
+  // decision: a plain start opens on the main menu (the wolf asleep, the
+  // fresh garden grown behind it); a start that names what to show (a
+  // test garden, a lone thing, a load, an act, the world event, shots)
+  // goes straight in, as before
+  if(lone==null and !demo and !stress and !load and !act2 and !unforming and inspect==null){
+    game.mode=.title;
+    relist(gpa,io,&game);
+  }
   if(inspect)|f|{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});
@@ -377,7 +385,7 @@ pub fn main(init:Init)!void{
       game.request=null;
       // a lone thing's world is never saved, and no garden replaces it
       if(game.specimen!=null and rq!=.bindings){
-        if(rq==.quit)window.setShouldClose(true);
+        if(rq==.quit or rq==.leave)window.setShouldClose(true);
         continue;
       }
       switch(rq){
@@ -409,6 +417,8 @@ pub fn main(init:Init)!void{
           keep(gpa,io,&game,game.slot orelse save.Name.of(save.auto).?);
           window.setShouldClose(true);
         },
+        // (from the main menu: no garden was entered, none is kept)
+        .leave=>window.setShouldClose(true),
       }
     }
     if(!eqlDeep(game.opts,applied))try apply(io,&game,r,&display,&applied);

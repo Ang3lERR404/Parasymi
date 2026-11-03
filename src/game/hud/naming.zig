@@ -41,6 +41,8 @@ const fieldY:f32=112;
 const fieldPad:f32=56;
 /// where OK and CANCEL sit, from the panel's top (pixels)
 const actsY:f32=190;
+/// drawn at the main menu too (`hud.build`)
+pub const atTitle=true;
 /// shown while a garden is being named.
 pub fn visible(g:*const play.Game)bool{return g.mode==.naming;}
 /// the name's field

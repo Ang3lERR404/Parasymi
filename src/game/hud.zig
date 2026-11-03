@@ -259,6 +259,8 @@ pub const panels=struct{
   pub const tooltip=@import("hud/tooltip.zig");
   /// what the cursor carries, hanging off the pointer
   pub const carry=@import("hud/carry.zig");
+  /// the main menu at the start, beside the sleeping wolf
+  pub const title=@import("hud/title.zig");
   /// the pause menu
   pub const pause=@import("hud/pause.zig");
   /// the options panel
@@ -285,10 +287,13 @@ pub fn build(g:*play.Game,screen:m.Vice(f32,2))Allocator.Error!void{
   const d=&g.ui;
   d.clear(@floatCast(g.uiTime));
   g.rows.clear();
+  // at the main menu (or a panel opened from it) only the panels kept there
+  // are drawn: no garden has been entered for the rest to tell of
+  const menu=g.atTitle();
   inline for(reg.ids)|id|{
     // this panel's module, and whether it is shown this frame
     const p=reg.module(id);
-    const show=if(comptime reg.has(id,"visible"))p.visible(g)else true;
+    const show=(!menu or comptime reg.has(id,"atTitle")) and if(comptime reg.has(id,"visible"))p.visible(g)else true;
     if(show)try p.draw(g,d,screen[0],screen[1]);
   }
 }

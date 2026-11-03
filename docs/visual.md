@@ -420,6 +420,24 @@ sap material):
 
 The bloom post-process makes the glow round the glints.
 
+## The main menu's stage (`game/title.zig`, `meshes/stage.zig`)
+The first thing seen: the wolf curled up asleep, centre stage, in a small
+patch of moss creepers, vespers and lumenroots, on a mossy mound that fades
+to soil and then to the dark at its rim. No sky, ground, grass, pools, rain
+or fog is drawn (`Scene.stage`); the background is cleared as black as the
+mound's far rim, so no horizon shows. One warm light hangs over him, a cool
+one rims his back, and the moon sits low behind, rimming rather than
+flooding. His pose is the clip `src/anim/sleep.anim` (keyed in animedit,
+`zig build animedit -- --wolf --clip=sleep`), looping its breath.
+- Out of the dark above, petals, small whole flowers (stamens and all),
+  seeds on their fluff and glowing pollen drift down: part.vert's
+  `PLACE_FALL` drops each from `fallHigh` at its own pace and place from
+  its seed and the clock, swaying and tumbling, swelling in at the top and
+  shrinking away near the ground. Nothing is kept between frames.
+- The menu is the HUD's (`hud/title.zig`): a trellis column down the right
+  under the game's name; the stage sits left of the middle.
+- Shots: `--inspect=player --shots=1 --panel=title`.
+
 ## Sky
 - A gradient dome, sun and moon, stars.
 - Star motes (faceted core, ring, needle rays) turn, twinkle, hover and

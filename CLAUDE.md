@@ -76,7 +76,7 @@ When a change alters what one of these says, update it in the same commit.
 ## Build and run
 ```
 zig build test                    # headless logic tests (no window/GPU)
-zig build run                     # debug (validation on)
+zig build run                     # debug (validation on); opens on the main menu
 zig build run -Drelease=true      # ReleaseFast (-Doptimize is not accepted)
 zig build run -- --demo           # test garden + structures, fast-forwarded
 zig build run -- --stress         # 120×120 plant field
@@ -89,7 +89,7 @@ zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip
 zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
-zig build run -- --panel=<belly|research|paused|options|keybinds|gardens|naming|overview>
+zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
 zig build run -- --speed=6        # the world runs 6x faster (ticks, sky, air together;
@@ -176,7 +176,7 @@ registry kinds outside the registry file; add a hook.
 | structures | `game/structures.zig` | `def`, `State`, `tick`, `link`, `wants`, `output`, `gives`, `receive`, `release`, `handOver`, `message`, `configure`, `recipes`, `chosen`, `choose`, `sown`, `emit`, `describe`, `ground`, `field`, `hold`, `icon`, `meshes`, `meets`, `adopts`, `pairs` |
 | research | `game/progression.zig` | `def` (`.branch` for big steps), `apply`, `unlocks`, `completed`, `veil`, `reveals` |
 | seed icons | `game/seeds.zig` | `item`, `icon` |
-| hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order), `Pick`, `click`, `shows`, `fire`, `focusable`, `drag`, `nudge`, `edit`, `typed` |
+| hud panels | `game/hud.zig` | `draw`, `visible` (draw order = declaration order), `Pick`, `click`, `shows`, `fire`, `focusable`, `drag`, `nudge`, `edit`, `typed`, `atTitle` (drawn at the main menu) |
 | render passes | `render/renderer.zig` (`passes`; engine `Renderer(G)`) | `desc` (`.target`: shadow/world/screen), `Frame`, `initFrame`/`deinitFrame`, `prepare`, `record` |
 
 Items (`sim/items.zig`, ids stored by value: new items go last) and weave

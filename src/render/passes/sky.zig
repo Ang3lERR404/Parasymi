@@ -15,6 +15,8 @@ pub const desc:pass.Desc=.{
 };
 /// draws the sky: one full-screen triangle
 pub fn record(r:*renderer.Renderer,_:*void,cmd:vk.CommandBufferProxy,scene:*const renderer.Scene,stats:*renderer.Stats)void{
+  // (none of it on the main menu's dark stage)
+  if(scene.stage)return;
   cmd.bindPipeline(.graphics,r.pipe(.sky));
   cmd.pushConstants(r.layout(desc.layout),pass.stages,0,@sizeOf(renderer.WorldPush),&scene.push);
   cmd.draw(3,1,0,0);

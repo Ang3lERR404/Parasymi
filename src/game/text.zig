@@ -332,6 +332,10 @@ pub const Strings=struct{
     pauseKeys:S="",
     /// a list, the pause rows (`play.PauseRow` order)
     pauseLabels:S="",
+    /// a list, the main menu's rows (`play.TitleRow` order)
+    titleLabels:S="",
+    /// under the main menu's continue: the garden it wakes into ({0} its name)
+    titleContinue:S="",
     /// the options panel's title
     optionsTitle:S="",
     /// how an option is turned
@@ -660,6 +664,7 @@ test"the strings file fills every key, shown with the bound keys"{
   try testing.expectEqual(count(s.hud.pauseKeys),count(s.hud.pauseLabels));
   for(values(ctl.Action))|a|try testing.expect(s.action.get(a).len>0);
   try testing.expectEqual(fields(lib.play.PauseRow).len,count(s.hud.pauseLabels));
+  try testing.expectEqual(fields(lib.play.TitleRow).len,count(s.hud.titleLabels));
   // the options module, whose lists the strings must match
   const opt=lib.options;
   try testing.expectEqual(fields(opt.Setting).len,count(s.hud.optionLabels));

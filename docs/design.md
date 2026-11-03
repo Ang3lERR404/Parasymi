@@ -602,7 +602,8 @@ it differs from what is in effect.
 ## Roadmap
 **Done:**
 - Foundations: engine, terrain, streaming, LOD + culling, GPU detail,
-  loading screen, files in `%LOCALAPPDATA%\Parasymi`, the grown meshes
+  loading screen, the main menu (the wolf asleep on a dark stage,
+  game/title.zig), files in `%LOCALAPPDATA%\Parasymi`, the grown meshes
   kept in its `cache/` between starts (render/mesh_cache.zig).
 - Plants: plants + 7 species, ecology, confluence, celestial bloom +
   radiance.

@@ -62,6 +62,8 @@ const stemX:f32=34;
 const fadeRows:f32=0.5;
 /// the seconds in a minute, an hour and a day, for how long ago a save was
 const secondsPer=[_]i64{60,3600,86400};
+/// drawn at the main menu too (`hud.build`)
+pub const atTitle=true;
 /// shown while the saved gardens are open.
 pub fn visible(g:*const play.Game)bool{return g.mode==.gardens;}
 /// a garden's row (0: a fresh one), a button (the name prompt's too), BACK,
@@ -87,7 +89,7 @@ pub fn click(g:*play.Game,p:Pick,press:hud.Press,_:*const Input)void{
       g.deleting=false;
     },
     .act=>|a|g.gardenAct(a),
-    .back=>g.mode=.paused,
+    .back=>g.mode=g.menuHome,
     .scroll=>{},
   }
 }

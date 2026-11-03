@@ -37,4 +37,5 @@ test{
   _=lib.wolfPanel;
   _=lib.radiantKit;
   _=lib.meshCache;
+  _=lib.title;
 }

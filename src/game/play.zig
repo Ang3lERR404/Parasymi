@@ -125,9 +125,26 @@ pub const Request=union(enum){
   delete:save.Name,
   /// save and leave
   quit,
+  /// leave without saving (from the main menu: no garden entered yet)
+  leave,
   /// the keybinds menu changed the bindings: write them out, and show
   /// every `{@action}` as now bound
   bindings,
+};
+/// the main menu's rows, in `txt.s.hud.titleLabels` order
+pub const TitleRow=enum{
+  /// into the newest saved garden (none saved: not offered)
+  @"continue",
+  /// into the fresh garden grown behind the menu
+  newGarden,
+  /// the saved gardens, to load one
+  gardens,
+  /// the options panel
+  options,
+  /// the keybinds
+  keybinds,
+  /// close the game
+  leave,
 };
 /// the pause menu's rows, in `txt.s.hud.pauseLabels` order
 pub const PauseRow=enum{
@@ -196,9 +213,12 @@ pub const Mode=enum{
   naming,
   /// the free camera is flying for inspection (Ctrl+F); the wolf stands idle
   inspect,
-  /// the world keeps moving underneath (everything but the pause menu, the
-  /// panels opened from it and the name prompt)
-  pub fn live(md:Mode)bool{return md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming;}
+  /// the main menu at the start: the wolf asleep in a patch of flowers on
+  /// a dark stage, the garden grown behind it but not yet entered
+  title,
+  /// the world keeps moving underneath (everything but the main menu, the
+  /// pause menu, the panels opened from them and the name prompt)
+  pub fn live(md:Mode)bool{return md!=.title and md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming;}
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode)bool{return md==.belly or md==.structure;}
 };
