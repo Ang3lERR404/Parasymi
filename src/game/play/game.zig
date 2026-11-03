@@ -224,6 +224,10 @@ pub const Game=struct{
   hoverFloat:?PlantId=null,
   /// how far the current gather has come (s)
   gatherT:f32=0,
+  /// remove, pressed over a resource node: the node's tile, held to while
+  /// remove stays down, however the cursor drifts as the camera follows the
+  /// wolf walking up to it (null once let go, or the node is spent)
+  gatherOn:?m.Vice(i32,2)=null,
   /// a ripe plant being plucked by paw, if any (game/pluck.zig)
   pluck:?lib.pluck.Pluck=null,
   /// the plucked plant's bend after the paws, springing back once let go
@@ -414,6 +418,14 @@ pub const Game=struct{
   pub fn plantAt(g:*const Game,h:m.Vice(i32,2))?PlantId{
     if(g.hoverFloat)|f|if(g.hover)|hv|if(hv[0]==h[0] and hv[1]==h[1])return f;
     return g.plants.at(&g.world,h[0],h[1]);
+  }
+  /// whether tile `h` holds a resource node with nothing on it: no
+  /// structure, no plant, its stock not spent
+  pub fn nodeAt(g:*const Game,h:m.Vice(i32,2))bool{
+    // the tile's chunk (none, and nothing is there) and its index in it
+    const c=g.world.chunkOfTile(h[0],h[1]) orelse return false;
+    const t=ck.localIndex(h[0],h[1]);
+    return c.res[t]>0 and c.occ[t]==.none and g.structs.at(&g.world,h[0],h[1])==null and g.plantAt(h)==null;
   }
   /// what structures' behaviour may touch, the wolf and the sky with the
   /// garden, and what befell it this tick (`ev`)

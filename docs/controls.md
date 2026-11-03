@@ -45,8 +45,10 @@ defaults.
 - it uproots a plant;
 - it takes up a structure, one tile at a time as the cursor sweeps
   (`removeCooldown`);
-- held on a resource node, it gathers. With no move key held, the wolf
-  steps up to the node (`gatherAt`) and pries it by hand.
+- pressed on a resource node, near or far, it takes that node
+  (`gatherOn`) and, held, gathers from it until let go, however the cursor
+  drifts as the camera follows. With no move key held, the wolf walks up
+  to the node (`gatherAt`) and pries it by hand.
 
 ### Picking and turning
 - **Q** picks the seed/bulb of what is under the cursor, and takes its

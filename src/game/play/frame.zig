@@ -224,7 +224,13 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     g.gatherT=0;
     g.fullWarned=false;
     g.removed=null;
+    g.gatherOn=null;
   }
+  // remove pressed over a bare resource node, near or far, takes that node
+  // as the one to gather from until let go
+  if(removing and ctl.pressed(in,.remove))if(g.hover)|h|{
+    if(g.nodeAt(h))g.gatherOn=h;
+  };
   // in the hyena's act, tendril held sweeps a path from one structure to
   // another, a tendril between them once let go
   if(g.act==.hyena and !inspecting)try lib.tendril.drag(g,ctl.down(in,.tendril) and uiHit==null,g.hover);
@@ -265,8 +271,9 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     }
     if(ctl.pressed(in,.configure))if(onStruct)|j|st.configure(&g.structs,j,&g.prog);
     // remove, pressed or held: what stands goes (one tile at a time as
-    // the cursor sweeps), a resource node is gathered from
-    if(removing){
+    // the cursor sweeps), a resource node is gathered from (a node taken
+    // to gather from is worked below, wherever the cursor is)
+    if(removing and g.gatherOn==null){
       if(onStruct!=null or onPlant!=null){
         // whether the cursor has moved onto a new tile since the last removal
         const fresh=if(g.removed)|r|r[0]!=h[0] or r[1]!=h[1]else true;
@@ -283,6 +290,23 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     }
     if(working or g.linger>0)work=m.tileCentre(h[0],h[1],c.height[t]);
   };
+  // whether the wolf walks up to a node taken to gather from, not yet in reach
+  var seeking=false;
+  // a node taken to gather from: worked once within reach, walked up to
+  // till then; let go once its stock is spent or something takes the tile
+  if(g.gatherOn)|h|{
+    if(!g.nodeAt(h)){
+      g.gatherOn=null;
+    }else if(g.world.chunkOfTile(h[0],h[1]))|c|{
+      // the node's index within its chunk
+      const t=ck.localIndex(h[0],h[1]);
+      if(g.player.inReach(h[0],h[1])){
+        working=actions.gather(g,c,t,dt);
+        gathering=working;
+      }else seeking=true;
+      work=m.tileCentre(h[0],h[1],c.height[t]);
+    }
+  }
   // plucking: the pluck under way goes on, the paws at the plant's yield
   // (moving off, or gathering from a node, lets it go)
   if(gathering or wish[0]!=0 or wish[1]!=0)g.pluck=null;
@@ -313,14 +337,14 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   // decision: gathering with no move held, the wolf steps up to the node
   // until its paws can grip it (it crouches and pries it by hand); so too
   // to a plant it plucks
-  if(gathering or plucked!=null)if(wish[0]==0 and wish[1]==0)if(work)|at|{
+  if(gathering or seeking or plucked!=null)if(wish[0]==0 and wish[1]==0)if(work)|at|{
     // how far the node is, across and along, and its distance
     const dx=at[0]-g.player.pos[0];
     const dz=at[2]-g.player.pos[2];
     const d=@sqrt(dx*dx+dz*dz);
     // how eagerly to step, slowing as the paws reach it
     // (a plant from a little further off, clear of its leaves)
-    const stand=if(gathering)playerMod.gatherAt else playerMod.tuning.pluckAt;
+    const stand=if(gathering or seeking)playerMod.gatherAt else playerMod.tuning.pluckAt;
     const go=m.clamp01((d-stand)*approach);
     if(d>1e-3)wish=.{dx/d*go,dz/d*go};
   };

@@ -115,6 +115,51 @@ test"R turns what is under the cursor (Shift back), Q picks its bulb, a click op
   try testing.expectEqual(@as(m.Dir,3),g.structs.get(put).dir);
   try testing.expectEqual(@as(u32,1),g.player.inv.count(.sapCache));
 }
+test"remove pressed on a far node holds to it: the wolf walks up and gathers, wherever the cursor drifts"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  // the tile the wolf stands on
+  const x,const z=m.tileAt(g.player.pos);
+  // a bare strip of soil east of the wolf, a moss node at its end, out of reach
+  for(0..6)|dx|{
+    // the tile this many east of the wolf, its chunk and index
+    const tx=x+1+@as(i32,@intCast(dx));
+    const c=g.world.chunkOfTile(tx,z).?;
+    const t=ck.localIndex(tx,z);
+    c.kind[t]=if(dx==5).moss else.soil;
+    c.res[t]=if(dx==5)50 else 0;
+    c.occ[t]=.none;
+  }
+  // the node's tile
+  const node=m.Vice(i32,2){x+6,z};
+  try testing.expect(!g.player.inReach(node[0],node[1]));
+  g.player.inv=.{};
+  // pressed over the node, then held while the cursor rests on bare soil
+  aim(&g,&in,node,testScreen);
+  in.advance();
+  ctl.hold(&in,.remove,true);
+  try g.update(&in,tickTime,testScreen);
+  try testing.expect(g.gatherOn!=null);
+  for(0..300)|_|{
+    aim(&g,&in,.{x+2,z},testScreen);
+    in.advance();
+    try g.update(&in,tickTime,testScreen);
+  }
+  try testing.expect(g.player.inReach(node[0],node[1]));
+  try testing.expect(g.player.inv.count(.fibre)>=2);
+  // let go, the node is let go too
+  in.advance();
+  ctl.hold(&in,.remove,false);
+  try g.update(&in,tickTime,testScreen);
+  try testing.expect(g.gatherOn==null);
+}
 test"the left stick walks the wolf, the d-pad steps round the hotbar, the right trigger is use"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;

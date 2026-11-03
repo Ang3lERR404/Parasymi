@@ -21,7 +21,7 @@ const tendrilH=s.barHBold;
 /// how far (pixels) above the screen's middle it grows
 const aboveHead:f32=120;
 /// shown while a gathering is under way on something pointed at.
-pub fn visible(g:*const play.Game)bool{return g.gatherT>0 and g.hover!=null;}
+pub fn visible(g:*const play.Game)bool{return g.gatherT>0 and (g.hover!=null or g.gatherOn!=null);}
 /// draws the gold tendril above the middle, grown as far as the gathering is.
 pub fn draw(g:*play.Game,d:*Draw,w:f32,h:f32)Allocator.Error!void{
   // how far the gathering has come, 0..1
