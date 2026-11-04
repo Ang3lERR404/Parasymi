@@ -40,7 +40,9 @@ carries the game's early days.
   dark by shooting its light up into the sky. *Decided:* a halyriphon
   makes starlight only floating over a patch, nothing away from one (the
   patches are what a garden is built round). Each patch its own size,
-  about 3×3 to 10×10 tiles, beside its own richness.
+  about 3×3 to 10×10 tiles, beside its own richness. Its shape mostly a
+  semi-ragged organic splash (ragged, not wildly), now and then a soft
+  round pool.
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
