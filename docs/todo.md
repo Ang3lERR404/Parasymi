@@ -22,6 +22,7 @@ carries the game's early days.
   **hirusidandrath** in game~~ (code tag `thornleech`). ~~The mire lily
   is **helonycydira** in game~~ (code tag `mireLily`). ~~The moss
   creeper is **bryonifthofluris** in game~~ (code tag `mossCreeper`).
+  ~~The sap cache is **opoclarritheca** in game~~ (code tag `sapCache`).
 - **Balance.** What act 1 plants yield was picked long ago. Lumenroot,
   hollowheart and thornleech all give plain essence; both lineages'
   structures cost the same mix; nothing grows fibre. The shared core
