@@ -151,7 +151,13 @@ fn message(d:*Draw,sd:*const link.Said,x:f32,bottom:f32,w:f32,alpha:u8)Allocator
   const name=switch(sd.who){.gardener=>txt.s.hud.chatGardener,.claude=>txt.s.hud.chatClaude};
   var col:Color=switch(sd.who){.gardener=>s.chatGardener,.claude=>s.chatClaude};
   col[3]=alpha;
-  _=try d.text(x,first-lineH,s.textSmall,col,name);
+  // the name, and (not reaching Claude) the mark after it
+  const nx=try d.text(x,first-lineH,s.textSmall,col,name);
+  if(sd.failed){
+    var fc=s.chatFailed;
+    fc[3]=alpha;
+    _=try d.text(nx+Draw.width(" ",s.textSmall),first-lineH,s.textSmall,fc,txt.s.hud.chatFailed);
+  }
   // the text's colour, faded alike
   var tc=s.white;
   tc[3]=alpha;

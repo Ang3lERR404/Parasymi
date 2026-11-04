@@ -51,6 +51,15 @@ const maxFile:usize=1<<20;
 /// the gardener's folder; the working directory until `open`.
 // decision: one process-wide handle, set once at startup like `txt.s`.
 var opened:?Dir=null;
+/// the gardener's folder's full path, for telling where files went
+var pathBuf:[maxPath]u8=undefined;
+/// how much of `pathBuf` is real (0: the working directory)
+var pathLen:usize=0;
+/// the longest folder path kept for telling (bytes)
+const maxPath=512;
+/// the gardener's folder's full path, as found by `open` ("." before it,
+/// or when the working directory serves)
+pub fn where()[]const u8{return if(pathLen==0)"." else pathBuf[0..pathLen];}
 /// the gardener's folder, or the working directory before `open`
 pub fn dir()Dir{return opened orelse .cwd();}
 /// the gardener's folder could not be found or made
@@ -78,6 +87,7 @@ pub fn open(io:Io,env:*const Environ.Map)Error!void{
     return error.NoHome;
   };
   log.info("files in {s}\\{s}",.{base,name});
+  pathLen=if(bufPrint(&pathBuf,"{s}\\{s}",.{base,name}))|p|p.len else|_|0;
   return makeSaves(io);
 }
 /// makes the `saves/` folder inside home if it is missing

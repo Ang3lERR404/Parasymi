@@ -640,6 +640,10 @@ test"the chat to Claude: opened only when linked, typed, sent, closed"{
   // an answer hangs beside play, drawn without the panel's field
   g.chat.add(.claude,"I see the wolf near the river, all looks well from here, a long answer that wraps over several lines",g.uiTime);
   try testing.expect(hud.panels.chat.visible(&g));
+  // a message of the gardener's that never reached Claude, drawn marked
+  g.chat.add(.gardener,"did this get through?",g.uiTime);
+  g.chat.failLast();
+  try testing.expect(g.chat.kept()[g.chat.count-1].failed);
   _=try lib.view.scene(&g,screen);
   try testing.expect(g.rows.find(hud.row(.chat,.field))==null);
   // long gone, it hangs no more

@@ -34,6 +34,8 @@ const trim=std.mem.trim;
 const testing=std.testing;
 /// the text input a message is typed into
 const TextInput=lib.engine.ui.textInput.TextInput;
+/// the log, telling where messages went
+const log=std.log;
 // decision: file names, not player-facing text, so not in the strings
 /// the meeting place's folder, inside the gardener's home
 pub const folder="link";
@@ -85,6 +87,8 @@ pub const Said=struct{
   len:usize=0,
   /// when it was said (the game's `uiTime`)
   at:f64=0,
+  /// the gardener's, and it could not be written for Claude (shown so)
+  failed:bool=false,
   /// what was said
   pub fn text(s:*const Said)[]const u8{return s.buf[0..s.len];}
 };
@@ -112,6 +116,10 @@ pub const Chat=struct{
   }
   /// the messages kept, oldest first
   pub fn kept(c:*const Chat)[]const Said{return c.said[0..c.count];}
+  /// the newest message did not reach Claude
+  pub fn failLast(c:*Chat)void{
+    if(c.count>0)c.said[c.count-1].failed=true;
+  }
 };
 /// writes one message as its JSON line (newline ended) to `w`
 pub fn encode(w:*Writer,text:[]const u8)Writer.Error!void{
@@ -195,6 +203,12 @@ pub fn freeAll(gpa:Allocator,out:*ArrayList([]u8))void{
 pub const Link=struct{
   /// the meeting place, opened inside the gardener's home
   dir:Dir,
+  /// the meeting place's full path, for the log
+  where:[]const u8=".",
+  /// whether the state's last write failed (told once, and again when mended)
+  stateFailed:bool=false,
+  /// whether the state was ever written (the first is told)
+  stateWritten:bool=false,
   /// Claude's answers, read so far
   inbox:Inbox=.{},
   /// seconds since the last look for news
@@ -203,11 +217,11 @@ pub const Link=struct{
   frameWanted:bool=false,
   /// opens (making it) the meeting place in `home`, hearing only what
   /// Claude says from now on
-  pub fn open(io:Io,home:Dir)Error!Link{
+  pub fn open(io:Io,home:Dir,where:[]const u8)Error!Link{
     home.createDirPath(io,folder) catch return error.LinkUnwritable;
     // the folder
     const d=home.openDir(io,folder,.{}) catch return error.LinkUnreadable;
-    var l=Link{.dir=d};
+    var l=Link{.dir=d,.where=where};
     l.inbox.skip(io,d,fromClaude);
     return l;
   }
@@ -233,14 +247,29 @@ pub const Link=struct{
       l.frameWanted=if(l.dir.access(io,wantFrame,.{}))|_|true else|_|false;
     }
   }
-  /// the gardener said `text`: kept in `chat` and handed to Claude
+  /// the gardener said `text`: kept in `chat` and handed to Claude, the
+  /// log telling where it went; when it cannot be written it is marked
+  /// in the sidebar (and the log says so)
   pub fn say(l:*Link,io:Io,chat:*Chat,text:[]const u8,at:f64)Error!void{
     chat.add(.gardener,text,at);
-    try append(io,l.dir,toClaude,text);
+    append(io,l.dir,toClaude,text)catch|e|{
+      chat.failLast();
+      log.warn("link: NOT sent, {s}\\{s}\\{s}: {t}",.{l.where,folder,toClaude,e});
+      return e;
+    };
+    log.info("link: sent to {s}\\{s}\\{s}",.{l.where,folder,toClaude});
   }
-  /// writes the state's text, whole, over the last
+  /// writes the state's text, whole, over the last; the first write, a
+  /// failure and its mending are told in the log (once each, not every second)
   pub fn writeState(l:*Link,io:Io,text:[]const u8)Error!void{
-    l.dir.writeFile(io,.{.sub_path=stateFile,.data=text}) catch return error.LinkUnwritable;
+    l.dir.writeFile(io,.{.sub_path=stateFile,.data=text})catch{
+      if(!l.stateFailed)log.warn("link: state NOT written, {s}\\{s}\\{s}",.{l.where,folder,stateFile});
+      l.stateFailed=true;
+      return error.LinkUnwritable;
+    };
+    if(l.stateFailed or !l.stateWritten)log.info("link: state written to {s}\\{s}\\{s}",.{l.where,folder,stateFile});
+    l.stateFailed=false;
+    l.stateWritten=true;
   }
   /// the frame asked for is being taken: the ask is answered (its file
   /// taken away, so the bridge knows to wait for the picture)
@@ -311,7 +340,7 @@ test"the link asks for a frame once, until it is taken"{
   const io=testing.io;
   var tmp=testing.tmpDir(.{});
   defer tmp.cleanup();
-  var l=try Link.open(io,tmp.dir);
+  var l=try Link.open(io,tmp.dir,"tmp");
   defer l.close(io);
   var c=Chat{};
   try l.poll(testing.allocator,io,&c,0);
@@ -326,10 +355,27 @@ test"the link asks for a frame once, until it is taken"{
   try l.poll(testing.allocator,io,&c,2);
   try testing.expect(!l.frameWanted);
   try l.say(io,&c,"hi claude",3);
+  try testing.expect(!c.kept()[c.count-1].failed);
   // what the gardener said lands in Claude's file
   var ib=Inbox{};
   var out:ArrayList([]u8)=.empty;
   defer freeAll(testing.allocator,&out);
   try ib.take(testing.allocator,io,l.dir,toClaude,&out);
   try testing.expectEqualStrings("hi claude",out.items[0]);
+}
+test"a message that cannot be written is marked, the state's failure told"{
+  const io=testing.io;
+  var tmp=testing.tmpDir(.{});
+  defer tmp.cleanup();
+  var l=try Link.open(io,tmp.dir,"tmp");
+  defer l.close(io);
+  // Claude's file stands in the way as a folder: nothing can be written there
+  try l.dir.createDirPath(io,toClaude);
+  try l.dir.createDirPath(io,stateFile);
+  var c=Chat{};
+  try testing.expectError(error.LinkUnwritable,l.say(io,&c,"lost",0));
+  try testing.expect(c.kept()[0].failed);
+  try testing.expectEqualStrings("lost",c.kept()[0].text());
+  try testing.expectError(error.LinkUnwritable,l.writeState(io,"x"));
+  try testing.expect(l.stateFailed);
 }

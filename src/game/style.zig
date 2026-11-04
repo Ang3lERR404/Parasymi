@@ -88,6 +88,8 @@ pub const menuHover:C=.{255,215,130,40};
 pub const selection:C=.{255,200,110,95};
 /// `--link`: the gardener's name over their messages, young leaf green
 pub const chatGardener:C=.{150,220,140,255};
+/// `--link`: a message that never reached Claude, marked a withered rust
+pub const chatFailed:C=.{230,120,90,255};
 /// `--link`: Claude's name over its messages, a soft lilac
 pub const chatClaude:C=.{200,180,255,255};
 /// research panel's bed: dusk-dark, a little violet, the sapling's sky

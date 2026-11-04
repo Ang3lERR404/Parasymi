@@ -421,6 +421,8 @@ pub const Strings=struct{
     chatHint:S="",
     /// how the chat is opened, under the recent messages
     chatOpen:S="",
+    /// beside a message that could not be handed to Claude
+    chatFailed:S="",
     /// shown while the free camera is on, and how to leave it
     freeCam:S="",
     /// how the free camera flies
