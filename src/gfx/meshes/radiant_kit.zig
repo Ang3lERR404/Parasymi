@@ -855,20 +855,14 @@ pub fn solcyriphon(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator
   try trailing(b,radius,.{.n=g.tendrils,.at=0.9,.y=0.2,.len=.{4.2,6.2},.r=0.03,.beads=4,.order=.{0.68,0.86},.col=lite},seed+%0x7A11,&rng);
   try motes(b,radius,16,lite,&rng);
 }
-/// the halyriphon's crown, which part of it is still being chosen (drafts
-/// for the gardener, shot one by one): a ring of crystal facets catching
-/// the light over the lantern, a tilted halo with motes, or a wide open
-/// whorl of petals
-pub const LumiCrown=enum{
-  /// a lens of crystal facets laid flat over the lantern's top
-  facets,
-  /// a thin tilted ring of light over it, motes spiralling in
-  halo,
-  /// a wide, shallow whorl of floating petals open to the sky
-  whorl,
-};
-/// which crown the halyriphon is drawn with (a draft, while the gardener chooses)
-pub const lumiCrown:LumiCrown=.facets;
+/// the halyriphon's crown, all three of the gardener's drafts layered (the
+/// gardener's pick): its facets' own soft aqua, its petals' own lilac, its halo's star-blue,
+/// never white
+const lumiFacet=color.rgb(0.32,0.62,0.78).toRgba8(255);
+/// (its petals' tips)
+const lumiPetal=color.rgb(0.62,0.48,0.86).toRgba8(255);
+/// (its halo: a soft star-blue)
+const lumiHalo=color.rgb(0.5,0.66,1.0).toRgba8(255);
 /// the halyriphon's lantern: how many comb rows run up it (the old
 /// lantern's eight), how far they turn round it mouth to top (turns, its
 /// `lanternTwist`), how far off its skin they float (a share of its
@@ -892,7 +886,9 @@ const lumiPodOut:f32=0.35;
 /// light floating a hair off its skin, each its own colour of the split
 /// light, beads strung along it; beneath, its filaments (the other heart
 /// of it) trailing as threads of light with beads strung down them; over
-/// it its yield's beads and its crown (`lumiCrown`, still being chosen).
+/// it its yield's beads and its crown: a ring of crystal facets close over
+/// its top, an open whorl of floating petals above them, a thin halo tilted
+/// round it all with motes spiralling in (the gardener's three, layered).
 /// The origin is the heart.
 pub fn lumi(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!void{
   // its own random stream
@@ -943,15 +939,12 @@ pub fn lumi(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
     try mg.ellipsoid(b,.{.center=v3(@cos(a)*radius*lumiPodOut,lumiPodHigh,@sin(a)*radius*lumiPodOut),.radii=m.splat3(g.podR),.col=lite,.part=.pod,.rings=5,.segs=7});
     fragment(b,s,.{.order=m.lerp(0.9,0.98,m.ratio(k,@max(g.pods,1))),.ring=.yield,.bearing=a});
   }
-  // its crown, over the lantern's top
-  switch(lumiCrown){
-    .facets=>try lens(b,radius,.{.n=9,.inner=0.3,.outer=0.95,.thick=0.06,.y=1.12,.order=.{0.72,0.9},.lite=color.mix(lite,body,0.35),.deep=body},lite,seed+%0x1E26),
-    .halo=>{
-      try motes(b,radius,10,lite,&rng);
-      try halo(b,radius*1.5,radius*0.025,0.35,0.95,lite);
-    },
-    .whorl=>try whorl(b,radius,.{.n=g.petals,.ring=.outer,.at=0.5,.y=1.3,.len=1.6,.w=0.42,.rise=0.5,.flare=0.35,.cup=0.45,.order=.{0.72,0.92},.col=body,.tip=color.mix(lite,white,0.5)},lite,seed+%0x2B11,&rng),
-  }
+  // its crown, layered: facets close over its top, a whorl of petals
+  // opening above them, a halo tilted round it all, motes coming in
+  try lens(b,radius,.{.n=9,.inner=0.3,.outer=0.85,.thick=0.06,.y=1.08,.order=.{0.72,0.84},.lite=lumiFacet,.deep=body},lite,seed+%0x1E26);
+  try whorl(b,radius,.{.n=g.petals,.ring=.outer,.at=0.55,.y=1.45,.len=1.4,.w=0.36,.rise=0.62,.flare=0.45,.cup=0.45,.order=.{0.82,0.93},.col=body,.tip=lumiPetal},lite,seed+%0x2B11,&rng);
+  try motes(b,radius,10,lite,&rng);
+  try halo(b,radius*2.1,radius*0.022,0.4,0.96,lumiHalo);
 }
 /// how many flowers an astrocyme's bouquet holds, one share of its store
 /// each (its genome's `petals`; plant.vert `BOUQUET_FLOWERS`, must match)
