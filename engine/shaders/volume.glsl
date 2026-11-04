@@ -15,13 +15,17 @@ layout(set = 1, binding = 2) uniform sampler2D field_map;
 ivec2 volumePixel(ivec2 t) { return min(t * 2, textureSize(scene_depth, 0) - 1); }
 // the world's depth there (1 where nothing was drawn: the sky)
 float volumeDepth(ivec2 t) { return texelFetch(scene_depth, volumePixel(t), 0).r; }
+// where on the screen (-1..1 across and down) volume texel `t` looks
+vec2 volumeNdc(ivec2 t) { return (vec2(volumePixel(t)) + 0.5) / vec2(textureSize(scene_depth, 0)) * 2.0 - 1.0; }
 // the world point seen through that pixel at depth `d`, through the inverse
 // view-projection `inv`
 vec3 volumePoint(mat4 inv, ivec2 t, float d) {
-  vec2 ndc = (vec2(volumePixel(t)) + 0.5) / vec2(textureSize(scene_depth, 0)) * 2.0 - 1.0;
-  vec4 w = inv * vec4(ndc, d, 1.0);
+  vec4 w = inv * vec4(volumeNdc(t), d, 1.0);
   return w.xyz / w.w;
 }
+// the unit way out of the eye through volume texel `t` (light.glsl
+// `viewRay`: steady as the camera moves, where an unprojected point is not)
+vec3 volumeRay(ivec2 t) { return normalize(viewRay(volumeNdc(t))); }
 const float OVERHEAD_SIZE = 512.0; // (render/volume.zig overheadSize; must match)
 // where world point `w` lies on the overhead map (its repeating sampler
 // wraps it onto the map)

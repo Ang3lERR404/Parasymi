@@ -11,6 +11,23 @@
 // (which brings SHADOW, without its views), a caster's vertex shader writes
 // out where it places each vertex instead (`capture`).
 
+// the way out of the eye through the screen point `ndc` (-1..1 across and
+// down), not of unit length: worked out from the rows of `pc.vp`, never its
+// inverse, which, unprojecting the far plane and taking the eye away, loses
+// so much in floats that what is drawn by it shook a pixel or two whenever
+// the camera moved. A direction lands on the point where rows 0 and 1 over
+// row 3 are its x and y, so it lies along both planes' meeting, facing where
+// row 3 (the depth in front) is positive. It is linear in `ndc`: blended
+// between a triangle's corners it is exact
+vec3 viewRay(vec2 ndc) {
+  vec3 r0 = vec3(pc.vp[0][0], pc.vp[1][0], pc.vp[2][0]);
+  vec3 r1 = vec3(pc.vp[0][1], pc.vp[1][1], pc.vp[2][1]);
+  vec3 r3 = vec3(pc.vp[0][3], pc.vp[1][3], pc.vp[2][3]);
+  // one sign for every point: the way the screen's middle faces
+  float facing = dot(cross(r0, r1), r3) < 0.0 ? -1.0 : 1.0;
+  return facing * cross(r0 - ndc.x * r3, r1 - ndc.y * r3);
+}
+
 // this frame's light (render/light.zig `Lighting`): the key light's shadow
 // cascades and the points of light a game makes
 const int CASCADES = 3;

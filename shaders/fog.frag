@@ -87,9 +87,8 @@ void main() {
   float d = volumeDepth(tx);
   bool sky = d >= 1.0;
   vec3 eye = pc.eye_time.xyz;
-  vec3 hit = volumePoint(v_inv, tx, sky ? 0.5 : d);
-  vec3 dir = normalize(hit - eye);
-  float len = sky ? pc.view.w * SKY_REACH : length(hit - eye);
+  vec3 dir = volumeRay(tx);
+  float len = sky ? pc.view.w * SKY_REACH : length(volumePoint(v_inv, tx, d) - eye);
   // the key light along it, and the sky's light all round
   vec3 key = keyLight() * phase(dot(dir, SUN)) * SHAFT * ALBEDO;
   vec3 amb = pc.fog.rgb * SKY_AIR;
