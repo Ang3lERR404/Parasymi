@@ -70,10 +70,9 @@ carries the game's early days.
   ([radiant-plants.md](radiant-plants.md)).
 
 ### The gardener's first playthrough (2026-11-03)
-*Noted, not started.*
-- **First person, the wrong thing in the sky.** Looking up at a floating
-  plant from the wolf's eyes names the plant growing on the ground right
-  under it instead.
+*The rest is mended (the floater looked at, the sky's shaking, the light's
+flicker and the lenses, what the wolf and the germinator weave); the sky's
+hues are being chosen from samples.*
 - **The sky wants a darker hue** by day; the iridescent beams don't show
   well against it.
 - **The night sky wants darker hues** too: deepened and saturated, like a
@@ -84,15 +83,6 @@ carries the game's early days.
   heliocyra's strip have a white-hot core (part.frag: the core and motes
   mixed 60% toward white, `SHAFT_CORE`/`SHAFT_MOTE` past 1); the pale gold
   should show through, and the fog round them glow gold with it.
-- **The sky jitters.** The whole sky shakes in a fast jittery motion as day
-  and night pass; likely the day-night transition was never smoothed.
-- **Light flickers.** The light grid's numbers jump around now and then,
-  or some plants reset their state as night turns to day; the lenses need
-  a boost.
-- **The wolf weaves only the basics.** By hand: conduit, sap cache and
-  germinator, nothing else.
-- **The germinator weaves convergent things**, and never should: it is
-  symbiotic, yet it offers every recipe (`craft.all`).
 
 ## Act 3, far off
 *A seed, nothing decided.* Evolved plants in space: the garden at last
