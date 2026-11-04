@@ -100,6 +100,23 @@ pub fn chooseTitle(g:*Game,row:TitleRow)void{
     .leave=>g.request=.leave,
   }
 }
+/// the chat to Claude opens, its field taking the typing (the world held)
+pub fn openChat(g:*Game)void{
+  g.mode=.chat;
+  g.typing=hud.row(.chat,.field);
+  g.keyFocus=null;
+}
+/// the chat closes; what was half typed stays for next time
+pub fn closeChat(g:*Game)void{
+  g.mode=.roam;
+  g.typing=null;
+}
+/// the message typed is sent (main hands it on) and the chat closes;
+/// nothing typed, it only closes
+pub fn sendChat(g:*Game)void{
+  if(g.chat.typed.len>0)g.chatSent=true;
+  g.closeChat();
+}
 /// the saved gardens menu opens on a fresh list, the played garden chosen
 pub fn openGardens(g:*Game)void{
   g.mode=.gardens;

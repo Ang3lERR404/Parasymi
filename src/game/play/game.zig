@@ -179,6 +179,12 @@ pub const Game=struct{
   /// the menu the options, keybinds and saved gardens go back to: the
   /// pause menu, or the main menu they were opened from
   menuHome:Mode=.paused,
+  /// `--link` is on: the chat to Claude can be opened
+  linked:bool=false,
+  /// the chat to Claude: its messages and the one being typed
+  chat:lib.link.Chat=.{},
+  /// a message typed and sent, waiting for main to hand it to Claude
+  chatSent:bool=false,
   /// the wolf's sleep at the main menu (game/title.zig), read the first
   /// time it is shown
   sleep:?lib.engine.anim.clip.Clip=null,
@@ -584,6 +590,12 @@ pub const Game=struct{
   pub const chooseTitle=lib.play.menus.chooseTitle;
   /// at the main menu, or a panel opened from it (no garden entered yet)
   pub fn atTitle(g:*const Game)bool{return g.mode==.title or (g.menuHome==.title and !g.mode.live());}
+  /// opens the chat to Claude, typing (`menus.openChat`)
+  pub const openChat=lib.play.menus.openChat;
+  /// closes the chat to Claude (`menus.closeChat`)
+  pub const closeChat=lib.play.menus.closeChat;
+  /// sends the message typed (`menus.sendChat`)
+  pub const sendChat=lib.play.menus.sendChat;
   /// opens the saved gardens (`menus.openGardens`)
   pub const openGardens=lib.play.menus.openGardens;
   /// opens the keybinds (`menus.openKeybinds`)

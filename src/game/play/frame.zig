@@ -62,6 +62,9 @@ const padOrbit:f32=350;
 /// the starlit patches' twinkles, and streaming the world round the wolf.
 pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   g.uiTime+=dt;
+  // the mode the frame began in (a key that closed a panel this frame
+  // opens nothing more)
+  const began=g.mode;
   g.frameMs+=(dt*m.msPerS-g.frameMs)*timingEase;
   g.cam.aspect=screen[0]/@max(screen[1],1);
   // system keys work everywhere; Esc closes a panel first, then pauses
@@ -69,7 +72,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   // name is asked for first)
   // (nor while a keybind listens: the key pressed is its new one)
   const listening=g.rebinding!=null and g.mode==.keybinds;
-  if(!listening and g.mode!=.naming){
+  if(!listening and g.mode!=.naming and g.mode!=.chat){
     if(ctl.pressed(in,.save))if(g.slot!=null){g.request=.save;}else g.startNaming();
     if(ctl.pressed(in,.load))g.request=.load;
   }
@@ -85,6 +88,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     // (the main menu stays: there is nothing behind it to go back to)
     .title=>{},
     .naming=>g.mode=g.namingFrom,
+    .chat=>g.closeChat(),
     .inspect=>g.inspect(in,false),
   }else if(!g.mode.live())g.menu(in,dt);
   if(!g.mode.live()){
@@ -139,6 +143,8 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   if(!inspecting){
     if(ctl.pressed(in,.belly))g.mode=if(g.mode==.belly).roam else.belly;
     if(ctl.pressed(in,.research))g.mode=if(g.mode==.research).roam else.research;
+    // with the link open: the chat to Claude, typed into at once
+    if(g.linked and began==.roam and g.mode==.roam and ctl.pressed(in,.chat))g.openChat();
   }
   if(ctl.pressed(in,.debug))g.debug=!g.debug;
   if(ctl.pressed(in,.overview))g.overview=!g.overview;

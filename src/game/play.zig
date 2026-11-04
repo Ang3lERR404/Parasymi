@@ -219,10 +219,12 @@ pub const Mode=enum{
   /// the main menu at the start: the wolf asleep in a patch of flowers on
   /// a dark stage, the garden grown behind it but not yet entered
   title,
+  /// `--link`: a message to Claude being typed (the world held still)
+  chat,
   /// the world keeps moving underneath (everything but the main menu, the
-  /// pause menu, the panels opened from them, the name prompt and the
-  /// research tree)
-  pub fn live(md:Mode)bool{return md!=.title and md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming and md!=.research;}
+  /// pause menu, the panels opened from them, the name prompt, the
+  /// research tree and the chat to Claude)
+  pub fn live(md:Mode)bool{return md!=.title and md!=.paused and md!=.options and md!=.keybinds and md!=.gardens and md!=.naming and md!=.research and md!=.chat;}
   /// the belly's slots are open: stacks are lifted and put down
   pub fn sorting(md:Mode)bool{return md==.belly or md==.structure;}
 };

@@ -25,6 +25,7 @@ test{
   _=lib.play;
   _=lib.orbit;
   _=lib.trail;
+  _=lib.link;
   _=lib.specimen;
   _=lib.player;
   _=lib.sound;

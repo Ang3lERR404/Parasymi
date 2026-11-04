@@ -97,6 +97,8 @@ pub const Action=enum{
   /// alt mode: show or hide, over every structure, an icon of what it
   /// weaves or holds
   overview,
+  /// `--link`: open the chat to Claude, typing a message
+  chat,
   /// hotbar slot 1, the leftmost (all of them in order: `slots`)
   slot1,
   /// hotbar slot 2

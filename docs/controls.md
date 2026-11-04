@@ -75,7 +75,7 @@ the top left.
   tile under the cursor floats, and the tiles swept after it.
 - **1–9 / 0 / - / = / Backspace** pick hotbar slots only. Research nodes
   and weave recipes are clicked in their panels.
-- **Tab** belly (weave), **T** research, **F3** debug.
+- **Tab** belly (weave), **T** research, **F3** debug; with `--link`, **Enter** talks to Claude (Enter sends, Esc closes).
 - **In the research tree** (the world paused): **LMB** a bud to study it,
   the view flying to it with its card; **MMB drag**, or **LMB drag** on
   the backdrop, moves round the tree; the **wheel** (or the zoom keys)

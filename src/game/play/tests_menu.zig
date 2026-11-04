@@ -569,3 +569,84 @@ test"a keybind clicked listens: the next key binds it, back cancels, the other b
   try click.on(&g,&in,hud.row(.keybinds,.back),screen);
   try testing.expectEqual(Mode.paused,g.mode);
 }
+/// presses action `a` for one frame and lets it go (the next frame's
+/// press is fresh)
+fn tap(g:*Game,in:*Input,a:ctl.Action,screen:m.Vice(f32,2))!void{
+  in.advance();
+  ctl.hold(in,a,true);
+  try g.update(in,tickTime,screen);
+  in.advance();
+  ctl.hold(in,a,false);
+}
+test"the chat to Claude: opened only when linked, typed, sent, closed"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,testing.io,defaultSeed);
+  defer g.deinit();
+  // the screen the clicks land on
+  const screen=testScreen;
+  try ctl.fill(&.{@embedFile("controls.cfg")});
+  defer ctl.unload();
+  // the input, driven by hand (no window)
+  var in:Input=.{.win=undefined};
+  in.mouse=.{-1e4,-1e4};
+  // not linked: the key does nothing
+  try tap(&g,&in,.chat,screen);
+  try testing.expectEqual(Mode.roam,g.mode);
+  g.linked=true;
+  try tap(&g,&in,.chat,screen);
+  try testing.expectEqual(Mode.chat,g.mode);
+  try testing.expect(!g.atTitle());
+  // the world holds still; letters bound to actions only type
+  const ticks=g.ticks;
+  // (a frame holds at most `maxTyped` characters: typed over two)
+  for([_][]const u8{"hello wolf, ","see this?"})|part|{
+    for(part)|c|in.type1(c);
+    try g.update(&in,tickTime,screen);
+    in.typedLen=0;
+  }
+  try testing.expectEqualStrings("hello wolf, see this?",g.chat.typed.slice());
+  try testing.expectEqual(ticks,g.ticks);
+  // the save and load keys wait while a message is typed
+  try tap(&g,&in,.save,screen);
+  try tap(&g,&in,.load,screen);
+  try testing.expect(g.request==null);
+  // the panel is drawn with its field to click
+  _=try lib.view.scene(&g,screen);
+  try testing.expect(g.rows.find(hud.row(.chat,.field))!=null);
+  // enter sends it and closes; main hands it on and clears it
+  try tap(&g,&in,.confirm,screen);
+  try testing.expectEqual(Mode.roam,g.mode);
+  try testing.expect(g.chatSent);
+  try testing.expect(g.typing==null);
+  g.chatSent=false;
+  g.chat.typed.clear();
+  // Esc closes without sending, the half typed kept
+  try tap(&g,&in,.chat,screen);
+  for("half")|c|in.type1(c);
+  try g.update(&in,tickTime,screen);
+  in.typedLen=0;
+  try tap(&g,&in,.back,screen);
+  try testing.expectEqual(Mode.roam,g.mode);
+  try testing.expect(!g.chatSent);
+  try testing.expectEqualStrings("half",g.chat.typed.slice());
+  // nothing typed: enter only closes
+  g.chat.typed.clear();
+  try tap(&g,&in,.chat,screen);
+  try tap(&g,&in,.confirm,screen);
+  try testing.expectEqual(Mode.roam,g.mode);
+  try testing.expect(!g.chatSent);
+  // an answer hangs beside play, drawn without the panel's field
+  g.chat.add(.claude,"I see the wolf near the river, all looks well from here, a long answer that wraps over several lines",g.uiTime);
+  try testing.expect(hud.panels.chat.visible(&g));
+  _=try lib.view.scene(&g,screen);
+  try testing.expect(g.rows.find(hud.row(.chat,.field))==null);
+  // long gone, it hangs no more
+  g.uiTime+=60;
+  try testing.expect(!hud.panels.chat.visible(&g));
+  // the pause menu does not open from the chat's Esc
+  try tap(&g,&in,.chat,screen);
+  try tap(&g,&in,.back,screen);
+  try testing.expectEqual(Mode.roam,g.mode);
+}

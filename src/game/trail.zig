@@ -51,20 +51,27 @@ pub const Trail=struct{
       t.pressed=.initEmpty();
       t.taken+=1;
     }
-    // the wolf's place
-    const p=g.player.pos;
-    try w.print("shot {d}, played {d:.1}s\n",.{t.taken,g.uiTime});
-    try w.print("mode {t}, back leads to {t}, at title {}\n",.{g.mode,g.menuHome,g.atTitle()});
-    try w.print("camera {s}, looking {}, overview {}\n",.{@tagName(g.cam.view),g.looking,g.overview});
-    try w.print("wolf at {d:.2} {d:.2} {d:.2}\n",.{p[0],p[1],p[2]});
-    try w.print("hotbar slot {d}, holding {}, pointing at {s}\n",.{g.hot,g.held!=null,if(g.pointed)|pk|@tagName(pk)else"nothing"});
-    try w.writeAll("pressed since last:");
-    // the walk over the presses
-    var it=t.pressed.iterator();
-    while(it.next())|a|try w.print(" {t}",.{a});
-    try w.writeAll("\n");
+    try w.print("shot {d}, ",.{t.taken});
+    try describe(g,t.pressed,w);
   }
 };
+/// writes what the game believes now to `w`: the time played, the mode and
+/// where back leads, the camera, the wolf's place, the hotbar and what is
+/// pointed at, and the actions in `pressed` (the trail's note, the link's state)
+pub fn describe(g:*const Game,pressed:EnumSet(ctl.Action),w:*Writer)Writer.Error!void{
+  // the wolf's place
+  const p=g.player.pos;
+  try w.print("played {d:.1}s\n",.{g.uiTime});
+  try w.print("mode {t}, back leads to {t}, at title {}\n",.{g.mode,g.menuHome,g.atTitle()});
+  try w.print("camera {s}, looking {}, overview {}\n",.{@tagName(g.cam.view),g.looking,g.overview});
+  try w.print("wolf at {d:.2} {d:.2} {d:.2}\n",.{p[0],p[1],p[2]});
+  try w.print("hotbar slot {d}, holding {}, pointing at {s}\n",.{g.hot,g.held!=null,if(g.pointed)|pk|@tagName(pk)else"nothing"});
+  try w.writeAll("pressed lately:");
+  // the walk over the presses
+  var it=pressed.iterator();
+  while(it.next())|a|try w.print(" {t}",.{a});
+  try w.writeAll("\n");
+}
 test"a trail asks for a shot once each interval"{
   // the input, driven by hand (no window), and a trail every second
   var in:Input=.{.win=undefined};

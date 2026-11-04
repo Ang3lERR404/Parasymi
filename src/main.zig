@@ -155,6 +155,9 @@ pub fn main(init:Init)!void{
   // the trail's folder, once made
   var trailBuf:[64]u8=undefined;
   var trailDir:[]const u8="";
+  // `--link`: talk with Claude while playing, through the link folder the
+  // bridge (tools/bridge.zig) shares; the chat opens with its key
+  var linkOn=false;
   // `--plant=<species>` / `--structure=<kind>` stands it alone (its
   // meshes alone built), `--state=` held or looped (grow, mature, 0.4,
   // 0.2..0.8; plants wither, flow, drain, dark, live; structures idle,
@@ -168,7 +171,7 @@ pub fn main(init:Init)!void{
   // the crown it is given
   var lit:?f32=null;
   var crown:?lib.lightCrown.Design=null;
-  // `--panel=<belly|research|paused|options|gardens|naming>` holds that panel open
+  // `--panel=<belly|research|paused|options|gardens|naming|chat>` holds that panel open
   // (and keeps the HUD in `--inspect` shots); `--panel=overview` holds alt
   // mode on while roaming
   var panel:?play.Mode=null;
@@ -190,6 +193,7 @@ pub fn main(init:Init)!void{
     if(eql(u8,a,"--inspect"))inspect=.player;
     if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
     if(eql(u8,a,"--record"))trail=.{};
+    if(eql(u8,a,"--link"))linkOn=true;
     if(startsWith(u8,a,"--record="))trail=.{.every=try parseFloat(f32,a["--record=".len..])};
     if(startsWith(u8,a,"--shots="))turn.shots=try parseInt(u32,a["--shots=".len..],0);
     if(startsWith(u8,a,"--orbit="))turn.period=try parseFloat(f32,a["--orbit=".len..]);
@@ -229,7 +233,7 @@ pub fn main(init:Init)!void{
       panel=.roam;
       overview=true;
     }else if(startsWith(u8,a,"--panel="))panel=switch(stringToEnum(play.Mode,a["--panel=".len..]) orelse return error.BadPanel){
-      inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming,.title=>|p|p,
+      inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming,.title,.chat=>|p|p,
       else=>return error.BadPanel,
     };
   }
@@ -348,6 +352,15 @@ pub fn main(init:Init)!void{
     };
     if(trail!=null)log.info("recording a trail into {s}",.{trailDir});
   }
+  // the link's folder, opened (none without `--link`, or if it cannot be)
+  var lk:?lib.link.Link=if(linkOn)lib.link.Link.open(io,home.dir())catch|e|blk:{
+    log.err("link: {t}",.{e});
+    break:blk null;
+  }else null;
+  defer if(lk)|*l|l.close(io);
+  if(lk!=null)log.info("linked: the chat to Claude opens with its key, files in {s}",.{lib.link.folder});
+  // what was pressed since the link's state was last written, and its clock
+  var linkState:lib.trail.Trail=.{.every=lib.link.stateEvery};
   // the shots still being written apart from the frames, each waited for
   // before the game closes
   var writing:std.ArrayList(Io.Future(void))=.empty;
@@ -377,6 +390,7 @@ pub fn main(init:Init)!void{
     // the swapchain's size this frame (px)
     const screen=r.extent();
     try game.update(&input,@floatCast(dt),screen);
+    if(lk)|*l|tendLink(gpa,io,l,&game,&linkState,&input,@floatCast(dt));
     // the sounds are heard from the view, told first so this frame's are placed from it
     if(sounds)|o|{
       o.send(.{.ear=game.ear()})catch|e|log.warn("ear: {t}",.{e});
@@ -481,7 +495,9 @@ pub fn main(init:Init)!void{
     // whether the window was resized since the last frame
     const resized=input.resized;
     input.resized=false;
-    r.capture=shoot;
+    // the link asked for a frame (and nothing is shooting the HUD away)
+    const linkShot=if(lk)|l|l.frameWanted and inspect==null else false;
+    r.capture=shoot or linkShot;
     try r.draw(&scene,resized);
     game.air=if(r.probed)|p|.{p[0],p[1],p[2]}else null;
     if(game.weather.soak(&game.world,r.field,r.fieldReads))game.prog.discover(.firstRain);
@@ -491,15 +507,22 @@ pub fn main(init:Init)!void{
       if(inspect!=null){
         // the focus's name, in `shots/<focus>_<n>.png`
         var nb:[32]u8=undefined;
-        try snap(gpa,io,sh,bufPrint(&pb,shots++sepStr++"{s}_{d}.png",.{turn.focus.name(&nb),turn.taken}) catch unreachable,&writing);
+        try snap(gpa,io,sh,.{.path=bufPrint(&pb,shots++sepStr++"{s}_{d}.png",.{turn.focus.name(&nb),turn.taken}) catch unreachable},&writing);
         turn.took();
-      }else if(trail)|*t|{
-        // the last shot's task is long done by now: let it go, so a long
-        // play keeps no list of them
+      }else{
+        // the last shots' tasks are long done by now: let them go, so a
+        // long play keeps no list of them
         for(writing.items)|*w|w.await(io);
         writing.clearRetainingCapacity();
-        try snap(gpa,io,sh,bufPrint(&pb,"{s}"++sepStr++"{d}.png",.{trailDir,t.taken}) catch unreachable,&writing);
-        noteTrail(io,t,&game,trailDir);
+        if(shoot)if(trail)|*t|{
+          try snap(gpa,io,sh,.{.path=bufPrint(&pb,"{s}"++sepStr++"{d}.png",.{trailDir,t.taken}) catch unreachable},&writing);
+          noteTrail(io,t,&game,trailDir);
+        };
+        if(linkShot)if(lk)|*l|{
+          // half size, written whole before it takes the frame's name
+          try snap(gpa,io,sh,.{.path=lib.link.frameTmp,.dir=l.dir,.half=true,.final=lib.link.frameFile},&writing);
+          l.frameTaken(io);
+        };
       }
       // (what time taking it still costs is not the world's, so the next
       // frame does not jump: springs would spike, timings slip)
@@ -508,6 +531,17 @@ pub fn main(init:Init)!void{
     }
   }
 }
+/// where a captured frame goes, and how
+const ShotTo=struct{
+  /// its path, in `dir`
+  path:[]const u8,
+  /// the folder it is written in (null: the working directory)
+  dir:?Dir=null,
+  /// whether it is written at half its size (each side), 2x2 pixels averaged
+  half:bool=false,
+  /// a name it takes once written whole (renamed in `dir`), if any
+  final:?[]const u8=null,
+};
 /// a captured frame on its way to `shots/<focus>_<n>.png`: its own copy
 /// of the pixels and of the path, freed once written
 const ShotFile=struct{
@@ -519,19 +553,69 @@ const ShotFile=struct{
   px:[]u8,
   /// whether each pixel comes blue first
   bgra:bool,
-  /// where it is written
+  /// where it is written (its own copy of the path, in `to`)
   path:[]u8,
+  /// where and how it goes
+  to:ShotTo,
   /// encode it as a PNG and write it (failures are logged), then free it
   fn write(f:ShotFile,gpa:Allocator,io:Io)void{
     defer gpa.free(f.px);
     defer gpa.free(f.path);
-    // the frame encoded as a PNG
-    const bytes=png.encode(gpa,f.w,f.h,f.px,if(f.bgra).bgra else.rgba)catch|e|return log.err("{s}: {t}",.{f.path,e});
+    // the pixels written, and their size: halved if asked
+    const px=if(f.to.half)halve(gpa,f.px,f.w,f.h)catch|e|return log.err("{s}: {t}",.{f.path,e})else f.px;
+    defer if(f.to.half)gpa.free(px);
+    const w=if(f.to.half)f.w/2 else f.w;
+    const h=if(f.to.half)f.h/2 else f.h;
+    // the frame encoded as a PNG, and the folder it goes in
+    const bytes=png.encode(gpa,w,h,px,if(f.bgra).bgra else.rgba)catch|e|return log.err("{s}: {t}",.{f.path,e});
     defer gpa.free(bytes);
-    Dir.cwd().writeFile(io,.{.sub_path=f.path,.data=bytes})catch|e|return log.err("{s}: {t}",.{f.path,e});
+    const d=f.to.dir orelse Dir.cwd();
+    d.writeFile(io,.{.sub_path=f.path,.data=bytes})catch|e|return log.err("{s}: {t}",.{f.path,e});
+    if(f.to.final)|fin|{
+      Dir.rename(d,f.path,d,fin,io)catch|e|return log.err("{s}: {t}",.{fin,e});
+      return;
+    }
     log.info("shot {s}",.{f.path});
   }
 };
+/// `px` (`w` by `h`, 4 bytes a pixel) at half its size each side, each
+/// pixel the mean of the 2x2 it stands for (owned)
+fn halve(gpa:Allocator,px:[]const u8,w:u32,h:u32)Allocator.Error![]u8{
+  // the halved size, and its pixels
+  const hw:usize=w/2;
+  const hh:usize=h/2;
+  const out=try gpa.alloc(u8,hw*hh*4);
+  for(0..hh)|y|for(0..hw)|x|for(0..4)|c|{
+    // the four pixels' channel summed
+    var sum:u32=0;
+    for(0..2)|dy|for(0..2)|dx|{
+      sum+=px[((2*y+dy)*w+(2*x+dx))*4+c];
+    };
+    out[(y*hw+x)*4+c]=@intCast(sum/4);
+  };
+  return out;
+}
+/// one frame's chores for the link: a message sent handed to Claude, the
+/// state written each second (with what was pressed), Claude's answers
+/// and a frame asked for looked for; failures only warn
+fn tendLink(gpa:Allocator,io:Io,l:*lib.link.Link,game:*Game,clock:*lib.trail.Trail,input:*const Input,dt:f32)void{
+  // (a garden loaded in play is a fresh `Game`: told again each frame)
+  game.linked=true;
+  if(game.chatSent){
+    game.chatSent=false;
+    l.say(io,&game.chat,game.chat.typed.slice(),game.uiTime)catch|e|log.warn("link: {t}",.{e});
+    game.chat.typed.clear();
+  }
+  if(clock.step(input,dt)){
+    // the state's text
+    var buf:[1024]u8=undefined;
+    var w:Io.Writer=.fixed(&buf);
+    lib.trail.describe(game,clock.pressed,&w)catch{};
+    clock.pressed=.initEmpty();
+    l.writeState(io,w.buffered())catch|e|log.warn("link: {t}",.{e});
+  }
+  if(l.step(dt))l.poll(gpa,io,&game.chat,game.uiTime)catch|e|log.warn("link: {t}",.{e});
+}
 /// writes the trail's note beside its shot, `<dir>/<n>.txt`, and counts
 /// the shot taken (a failure only costs the note)
 // decision: a few hundred bytes, written in the frame rather than on a task
@@ -548,12 +632,12 @@ fn noteTrail(io:Io,t:*lib.trail.Trail,game:*const Game,dir:[]const u8)void{
 /// encoded and written on a task of its own beside the frames (the I/O's,
 /// never a thread of ours), so the frame loop never waits on it; written
 /// here if no task can be had
-fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,path:[]const u8,writing:*std.ArrayList(Io.Future(void)))Allocator.Error!void{
+fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,to:ShotTo,writing:*std.ArrayList(Io.Future(void)))Allocator.Error!void{
   // room to keep its task, and the frame with its own copies of the pixels and the path
   try writing.ensureUnusedCapacity(gpa,1);
   const px=try gpa.dupe(u8,sh.px);
   errdefer gpa.free(px);
-  const f=ShotFile{.w=sh.w,.h=sh.h,.px=px,.bgra=sh.bgra,.path=try gpa.dupe(u8,path)};
+  const f=ShotFile{.w=sh.w,.h=sh.h,.px=px,.bgra=sh.bgra,.path=try gpa.dupe(u8,to.path),.to=to};
   const future=io.concurrent(ShotFile.write,.{f,gpa,io})catch|e|{
     log.warn("shot written without a task of its own: {t}",.{e});
     return f.write(gpa,io);

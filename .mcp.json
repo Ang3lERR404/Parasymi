@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "parasymi": {
+      "command": "./zig-out/bin/bridge.exe"
+    }
+  }
+}

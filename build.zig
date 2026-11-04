@@ -198,6 +198,19 @@ pub fn build(b:*Build)!void{
   meshCmd.setCwd(b.path("."));
   if(b.args)|args|meshCmd.addArgs(args);
   b.step("meshedit","run the mesh editor.").dependOn(&meshCmd.step);
+  // the bridge (tools/bridge.zig): the MCP server Claude Code starts to
+  // talk with the game (`--link`); installed with the game, so
+  // `zig-out/bin/bridge.exe` is there for `.mcp.json`
+  const bridge=b.addExecutable(.{
+    .name="bridge",
+    .root_module=b.createModule(.{
+      .optimize=o,
+      .target=t,
+      .root_source_file=b.path("tools/bridge.zig"),
+      .imports=toolImports,
+    }),
+  });
+  b.installArtifact(bridge);
   // the sound check (tools/audiocheck.zig): plays a tone and records it
   // back, so it needs real speakers and stays out of `test`
   // the sound check executable: it needs only the engine
@@ -243,4 +256,12 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(animTests).step);
+  // the bridge's tests (its answers, the gardener's messages pushed)
+  const bridgeTests=b.addTest(.{.root_module=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/bridge.zig"),
+    .imports=toolImports,
+  }),.filters=filters});
+  testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
 }

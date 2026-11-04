@@ -411,6 +411,16 @@ pub const Strings=struct{
     namingCancel:S="",
     /// how a name is typed
     namingHint:S="",
+    /// `--link`: the chat to Claude's title
+    chatTitle:S="",
+    /// who said a message: the gardener
+    chatGardener:S="",
+    /// who said a message: Claude
+    chatClaude:S="",
+    /// how a message is typed and sent
+    chatHint:S="",
+    /// how the chat is opened, under the recent messages
+    chatOpen:S="",
     /// shown while the free camera is on, and how to leave it
     freeCam:S="",
     /// how the free camera flies

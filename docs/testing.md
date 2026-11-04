@@ -127,6 +127,27 @@ the newest as they land to watch a playthrough nearly live, and to catch
 a bug too quick to describe: the note says what the game thought, the
 shot what it drew.
 
+## Talking to Claude while playing (`--link`)
+The game and Claude meet in a folder of the gardener's home,
+`%LOCALAPPDATA%\Parasymi\link\` (`game/link.zig`): plain files, no
+sockets, so nothing in the game ever waits on Claude.
+- **The game** (`--link`): Enter opens the chat sidebar (WHISPERS) at the
+  right; type, Enter sends, Esc closes (the world holds still while
+  typing). Claude's answers hang beside play for 20 s, fading. The game
+  rewrites `state.txt` each second (the trail's note), and answers a
+  `wantFrame` with `frame.png` (half size, HUD and all).
+- **The bridge** (`tools/bridge.zig`, `zig-out/bin/bridge.exe`, built by
+  `zig build`): the MCP server Claude Code starts from `.mcp.json`. Tools:
+  `reply` (into the sidebar), `game_state`, `game_frame`. It pushes each
+  message the gardener sends into Claude's session as a channel event.
+- **Pushing needs channels**, a Claude Code research preview: a terminal
+  session (not the desktop app) started in this folder with
+  `claude --dangerously-load-development-channels server:parasymi`
+  (confirm the development-channel prompt and the new MCP server). Without
+  the flag the three tools still work; the gardener's messages wait until
+  Claude looks.
+- Start the game (`zig build run -- --link`), then talk.
+
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.
 

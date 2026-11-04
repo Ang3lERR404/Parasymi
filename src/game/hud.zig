@@ -271,6 +271,8 @@ pub const panels=struct{
   pub const gardens=@import("hud/gardens.zig");
   /// the naming card for a new garden
   pub const naming=@import("hud/naming.zig");
+  /// `--link`: the chat to Claude, its recent messages beside play
+  pub const chat=@import("hud/chat.zig");
 };
 /// the panel registry built from `panels`: its ids, modules and hooks
 const reg=registry.Registry(panels);

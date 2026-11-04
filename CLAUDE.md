@@ -104,7 +104,7 @@ zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip
 zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
-zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|overview>
+zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|chat|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync
 zig build run -- --full=0.7       # the wolf's belly held 70% full (docs/testing.md)
@@ -112,6 +112,10 @@ zig build run -- --speed=6        # the world runs 6x faster (ticks, sky, air to
                                   # for slow things watched unattended, docs/testing.md)
 zig build run -- --record=5       # a playback trail: while playing, a shot + a note of
                                   # the game's state every 5 s into shots/trail_<time>/
+zig build run -- --link           # chat to Claude in game (Enter); the bridge
+                                  # (tools/bridge.zig, .mcp.json) carries it; push
+                                  # needs `claude --dangerously-load-development-channels
+                                  # server:parasymi` (docs/testing.md)
 zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name> --at=S --channel=<name> --shot]
                                   # animation editor (tools/animedit.zig): keys a clip
                                   # on the real renderer, saves src/anim/<name>.anim;
