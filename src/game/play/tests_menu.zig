@@ -196,6 +196,10 @@ test"the main menu: its panels lead back to it, continue wants a garden saved, n
   try click.on(&g,&in,hud.row(.title,.{.row=.newGarden}),screen);
   try testing.expectEqual(Mode.roam,g.mode);
   try testing.expect(!g.atTitle());
+  // the research tree opened at once is the garden's, not the main menu
+  g.mode=.research;
+  try testing.expect(!g.atTitle());
+  g.mode=.roam;
   in.advance();
   ctl.hold(&in,.back,true);
   try g.update(&in,tickTime,screen);

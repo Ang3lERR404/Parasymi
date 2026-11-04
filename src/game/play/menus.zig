@@ -89,7 +89,11 @@ pub fn chooseTitle(g:*Game,row:TitleRow)void{
   g.menuHome=.title;
   switch(row){
     .@"continue"=>if(g.gardens.items.len>0){g.request=.{.loadFrom=g.gardens.items[0].name};},
-    .newGarden=>g.mode=.roam,
+    // (in the garden now: what it opens is play's, not the main menu's)
+    .newGarden=>{
+      g.mode=.roam;
+      g.menuHome=.paused;
+    },
     .gardens=>g.openGardens(),
     .options=>g.mode=.options,
     .keybinds=>g.openKeybinds(),
