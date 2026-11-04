@@ -76,7 +76,14 @@ carries the game's early days.
   under it instead.
 - **The sky wants a darker hue** by day; the iridescent beams don't show
   well against it.
-- **The night sky wants darker hues** too.
+- **The night sky wants darker hues** too: deepened and saturated, like a
+  real night sky, so vibrant hues come through instead of a milky
+  lavender-white. The fog takes its colour from the sky (`SKY_AIR`), so it
+  deepens with it.
+- **The light shafts read white.** The solcyriphon's beam and the
+  heliocyra's strip have a white-hot core (part.frag: the core and motes
+  mixed 60% toward white, `SHAFT_CORE`/`SHAFT_MOTE` past 1); the pale gold
+  should show through, and the fog round them glow gold with it.
 - **The sky jitters.** The whole sky shakes in a fast jittery motion as day
   and night pass; likely the day-night transition was never smoothed.
 - **Light flickers.** The light grid's numbers jump around now and then,
