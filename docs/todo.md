@@ -43,7 +43,7 @@ carries the game's early days.
 - ~~**A rooted starlight catcher for the symbiotic lineage**, the
   garden's first starlight: built (`structures/star_catcher.zig`,
   [design.md](design.md#base-structures), [visual.md](visual.md#starlight-catcher)).~~
-  Still open: its in-game name (STARLIGHT CATCHER stands in); whether it
+  In game **stellasaluumni** (the gardener's "skitter bug"). Still open: whether it
   can walk on its little legs in play (only the look is decided); the
   magic lifting it is kept subtle for now, the gardener may revisit it.
 - **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
