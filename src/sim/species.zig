@@ -229,6 +229,14 @@ pub const Species=struct{
   sway:f32=1,
   /// a floater's height above the ground
   hover:f32=1.15,
+  /// how far a floater's body hangs below its float (m, at full size):
+  /// a driftwisp's trailing filaments, a solcyriphon's lens. The cursor
+  /// touches it anywhere along that, not only at its float
+  trails:f32=0,
+  /// how far its body rises above its float (m, at full size)
+  crests:f32=0.5,
+  /// how far out from its middle its body reaches (m, at full size)
+  girth:f32=0.6,
   /// where its ripe yield is plucked by paw: how high over its foot (a
   /// floater's: over its own floating point), in metres at full size
   pluck:f32=0.5,

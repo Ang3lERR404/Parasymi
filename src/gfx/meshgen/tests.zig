@@ -106,3 +106,30 @@ test"every plant that yields ripens it in all its pods, where the paws reach for
     if(n>0)try testing.expect(@abs(sum/m.f(n)-def.pluck)<0.15);
   }
 }
+test"a floater's touched body covers all of its mesh, so what is looked at is what is touched"{
+  inline for(lib.species.ids)|id|{
+    // its kind; only floaters are touched by their body
+    const def=lib.species.get(id);
+    if(def.floating){
+      // its mesh, grown whole
+      var b:Builder=.{.gpa=testing.allocator};
+      defer b.deinit();
+      try plant(&b,id,0);
+      for(b.v.items)|v|{
+        // how far below and above its float the vertex lies, and how far out
+        try testing.expect(v.pos[1]>=-def.trails-0.05);
+        try testing.expect(v.pos[1]<=def.crests+0.05);
+        try testing.expect(m.lenOf(f32,2,.{v.pos[0],v.pos[2]})<=def.girth+0.05);
+      }
+    }
+  }
+}
+test"every plant's mesh is whole: no vertex lands nowhere"{
+  inline for(lib.species.ids)|id|{
+    // its mesh, grown whole
+    var b:Builder=.{.gpa=testing.allocator};
+    defer b.deinit();
+    try plant(&b,id,0);
+    for(b.v.items)|v|for(0..3)|k|try testing.expect(@abs(v.pos[k])<1e4);
+  }
+}

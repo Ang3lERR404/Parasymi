@@ -23,6 +23,8 @@ pub const def:species.Species=.{
   // high in the sky over the garden, above the fallen starlight (a
   // solcyriphon hangs higher still, over it)
   .hover=4.7,
+  // a wide, flat bloom
+  .trails=0.2,.girth=0.9,
   // it drifts and bobs; it does not bend from a root
   .sway=0.6,
   // pearl: plant.frag lays an iridescent film over it (it belongs to the sky)

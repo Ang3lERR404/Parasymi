@@ -228,6 +228,27 @@ pub inline fn lenOf(comptime t:type,comptime s:usize,a:Vec(t,s))t{return@sqrt(su
 pub inline fn len(a:V3)f32{return lenOf(f32,3,a);}
 /// how far apart two points are
 pub inline fn dist(a:V3,b:V3)f32{return len(a-b);}
+/// where a ray from `o` along unit `d` passes nearest the segment `a`..`b`:
+/// how far along the ray (never behind its start) and how far off, squared
+pub fn rayNearSegment(o:V3,d:V3,a:V3,b:V3)struct{t:f32,gapSq:f32}{
+  // the segment's run, and its squared length
+  const u=b-a;
+  const uu=dot(u,u);
+  // how the ray and the segment lean on each other, and how far apart they start
+  const du=dot(d,u);
+  const w=o-a;
+  const den=uu-du*du;
+  // the nearest place along the segment, first as if both ran forever
+  // (parallel or a point: its start), kept on the segment
+  var s:f32=if(uu>eps and den>eps)clamp01((dot(u,w)-du*dot(d,w))/den)else 0;
+  // the ray's nearest place to it, never behind the start, then the
+  // segment's nearest place to that, kept on the segment
+  const t=@max(dot(a+u*splat3(s)-o,d),0);
+  if(uu>eps)s=clamp01(dot(o+d*splat3(t)-a,u)/uu);
+  // the gap between the two nearest places
+  const gap=o+d*splat3(t)-(a+u*splat3(s));
+  return.{.t=t,.gapSq=dot(gap,gap)};
+}
 /// the vector turned unit length; one too short to point anywhere is left as is
 pub inline fn norm(a:V3)V3{
   // its length, divided out
@@ -657,6 +678,19 @@ test"damping feels the same at any frame rate"{
   try testing.expect(whole>0 and whole<10);
   // a point eases the same way, lane by lane
   try testing.expectApproxEqAbs(whole,dampV(v3(0,0,0),v3(10,0,0),4,0.1)[0],1e-5);
+}
+test"a ray passes nearest a segment where they cross, or by its nearer end"{
+  // a ray along +x, a post standing across its path, and one off to the side
+  const crossing=rayNearSegment(v3(0,0,0),v3(1,0,0),v3(3,-1,0),v3(3,1,0));
+  try testing.expectApproxEqAbs(@as(f32,3),crossing.t,1e-5);
+  try testing.expectApproxEqAbs(@as(f32,0),crossing.gapSq,1e-5);
+  const above=rayNearSegment(v3(0,0,0),v3(1,0,0),v3(2,1,0),v3(2,3,0));
+  try testing.expectApproxEqAbs(@as(f32,2),above.t,1e-5);
+  try testing.expectApproxEqAbs(@as(f32,1),above.gapSq,1e-5);
+  // behind the start, the ray's start is what passes nearest
+  const behind=rayNearSegment(v3(0,0,0),v3(1,0,0),v3(-2,0,1),v3(-2,0,2));
+  try testing.expectApproxEqAbs(@as(f32,0),behind.t,1e-5);
+  try testing.expectApproxEqAbs(@as(f32,5),behind.gapSq,1e-5);
 }
 test"lengths and distances at any width"{
   try testing.expectEqual(@as(f32,5),lenOf(f32,2,.{3,4}));

@@ -138,6 +138,7 @@ Use these, never the same thing written out by hand:
 | `@sqrt(m.sumOf(t,n,v*v))` | `m.lenOf(t,n,v)` |
 | `2.39996`, `0.618` | `m.goldenAngle`, `m.goldenShare` |
 | `a[0]-b[0],a[1]-b[1]` by lanes | `a-b` on `Vec`s |
+| a ray's closest pass to a segment, worked out by hand | `m.rayNearSegment(o,d,a,b)` (`.t` along it, `.gapSq` off it) |
 
 When a new pattern repeats, add a helper here (with a test) rather than
 writing it out again.

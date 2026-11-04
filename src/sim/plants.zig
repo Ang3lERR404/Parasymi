@@ -43,8 +43,6 @@ pub const r2=20;
 pub const floatGap=0.8;
 /// floaters hanging this far apart in height never crowd each other (m)
 pub const floatTiers=1.5;
-/// how near a cursor ray must pass a floater's float to touch it (m)
-pub const floatTouch=0.6;
 /// fewer plants than this a thread are relinked in one go
 const linksMin=512;
 /// a square of tiles: a footprint.
@@ -229,21 +227,22 @@ pub const Plants=struct{
     for(p.floaters.items)|f|if(xs[f.idx()]==wx and ys[f.idx()]==wy)return f;
     return null;
   }
-  /// the floater a ray from `o` along unit `d` passes nearest its start,
-  /// within `floatTouch` of where it hangs (`hang.at(id)`), and how far along
-  /// the ray that is
+  /// the floater a ray from `o` along unit `d` touches nearest its start,
+  /// anywhere on its body (its species' `trails` below where it hangs,
+  /// `hang.at(id)`, to `crests` above, `girth` out), and how far along the
+  /// ray that is
   pub fn floaterOnRay(p:*const Plants,o:m.V3,d:m.V3,comptime Hang:type,hang:Hang)?Touch{
     // the nearest so far
     var best:?Touch=null;
     for(p.floaters.items)|f|{
-      // where it hangs, how far along the ray it lies, and how far off it
+      // where it hangs, its body's reach, and where the ray passes nearest it
       const c=hang.at(f);
-      const t=m.dot(c-o,d);
-      if(t<=0)continue;
-      if(best)|b|if(t>=b.t)continue;
-      const off=c-(o+d*m.splat3(t));
-      if(m.dot(off,off)>floatTouch*floatTouch)continue;
-      best=.{.id=f,.t=t};
+      const def=species.get(p.list.items(.sp)[f.idx()]);
+      const near=m.rayNearSegment(o,d,c-m.v3(0,def.trails,0),c+m.v3(0,def.crests,0));
+      if(near.t<=0)continue;
+      if(best)|b|if(near.t>=b.t)continue;
+      if(near.gapSq>def.girth*def.girth)continue;
+      best=.{.id=f,.t=near.t};
     }
     return best;
   }

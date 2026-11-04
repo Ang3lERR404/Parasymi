@@ -21,6 +21,8 @@ pub const def:species.Species=.{
   .radiance=3,.link=10,.glow=.{6,12},.carry=12,
   // high over everything, so a bloom or a plant may hang or stand under it
   .hover=7,
+  // its lens hung two metres beneath the float
+  .trails=2.15,.girth=0.95,
   // it drifts and bobs; it does not bend from a root
   .sway=0.4,
   .genome=.{

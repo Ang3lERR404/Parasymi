@@ -236,13 +236,15 @@ fn lantern(b:*Builder,g:species.Genome,radius:f32,seed:u64)Allocator.Error!void{
 /// how much of a comb row's crest lies at height `s` (0 mouth .. 1 top) and
 /// bearing `ph`
 fn lanternCrest(s:f32,ph:f32)f32{
-  return m.pow(f32,0.5+0.5*@cos(lanternRows*ph+lanternTwist*s*m.tau),lanternCrestCount);
+  return m.pow(f32,@max(0.5+0.5*@cos(lanternRows*ph+lanternTwist*s*m.tau),0),lanternCrestCount);
 }
 /// a point on the lantern at height `s` (0 its mouth .. 1 its top) and bearing `ph`
 fn lanternAt(radius:f32,s:f32,ph:f32)V3{
   // the height, held to the lantern (0..1)
   const k=m.clamp01(s);
   // the radius here: an egg, broadest low, ribbed by the combs
-  const r=radius*m.pow(f32,@sin(k*m.pi),0.7)*(1.08-0.22*k)*(1+lanternRib*lanternCrest(k,ph));
+  // (the sine held off below zero: at the top it rounds a hair under, and
+  // its power would be no number)
+  const r=radius*m.pow(f32,@max(@sin(k*m.pi),0),0.7)*(1.08-0.22*k)*(1+lanternRib*lanternCrest(k,ph));
   return m.v3(@cos(ph)*r,radius*m.lerp(-0.85,1.0,k),@sin(ph)*r);
 }

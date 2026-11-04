@@ -195,3 +195,36 @@ test"the left stick walks the wolf, the d-pad steps round the hotbar, the right 
   in.hold(.{.trigger=.right_trigger},true);
   try testing.expect(ctl.down(&in,.use));
 }
+test"out of the wolf's eyes, a floater looked at is the one named, never the plant rooted under it"{
+  // the test allocator, which catches leaks
+  const gpa=testing.allocator;
+  // a fresh game on the test seed
+  var g=try Game.init(gpa,defaultSeed);
+  defer g.deinit();
+  // the tile the wolf stands on, and the tile three east of it
+  const x,const z=m.tileAt(g.player.pos);
+  const at=m.Vice(i32,2){x+3,z};
+  // the tile made bare soil, so both plants take
+  const c=g.world.chunkOfTile(at[0],at[1]).?;
+  const t=ck.localIndex(at[0],at[1]);
+  c.kind[t]=.soil;
+  c.res[t]=0;
+  c.occ[t]=.none;
+  try testing.expect(try g.plants.place(gpa,&g.world,at[0],at[1],.lumenroot,0));
+  try testing.expect(try g.plants.place(gpa,&g.world,at[0],at[1],.driftwisp,0));
+  // the floater, and the plant rooted under it
+  const rooted=g.plants.at(&g.world,at[0],at[1]).?;
+  const floater=g.plants.floaters.items[0];
+  try testing.expect(rooted!=floater);
+  // the eyes, and where the floater hangs
+  const eye=lib.act.eyes(g.act,&g.player,@floatCast(g.time));
+  const a=g.plants.list.items(.at)[floater.idx()];
+  const hung=m.v3(a[0],@max(g.heightAt(at[0],at[1]),0)+lib.species.get(.driftwisp).hover,a[2]);
+  // looking from the eyes at its trailing filaments, well below its float
+  const d=m.norm(hung-m.v3(0,0.8,0)-eye);
+  g.cam.yaw=m.atan2(-d[0],-d[2]);
+  g.cam.view=.{.eyes=.{.pos=eye,.pitch=m.asin(d[1]),.k=1}};
+  g.aim(testScreen*m.splatOf(f32,2,0.5),testScreen,false);
+  try testing.expect(g.hover!=null);
+  try testing.expectEqual(floater,g.plantAt(g.hover.?).?);
+}

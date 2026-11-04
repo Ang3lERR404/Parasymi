@@ -16,6 +16,8 @@ pub const def:species.Species=.{
   .matureTime=20,.manaCap=8,.leyDraw=0.5,.share=0.4,.drain=0,.yield=0.06,
   // plucked from its catcher dish, where its yield pools over the float
   .pluck=0.31,
+  // its filaments trailing a metre beneath the float
+  .trails=1.1,
   // light and hanging in the air: the wind carries it furthest
   .sway=1.8,
   .genome=.{
