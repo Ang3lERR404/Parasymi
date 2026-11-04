@@ -222,9 +222,10 @@ Code:
 - `WorldPush` ≤ 192 bytes. A new see-through part role goes in
   `vertex.seeThrough`. A structure that emits a library mesh lists it in its
   `meshes` hook.
-- Bump `version` in `save.zig` when a stored layout changes (not for structures:
-  they are `record`s, read by field name; a `State` owning memory has a
-  `deinit`, and `Structures.remove`'s result is the caller's to `deinit`).
+- Saves never break: everything is a `record`, read by field and tag name
+  (never bump `version`; something new to keep goes in `save.Saved`). A
+  `State` owning memory has a `deinit`, and `Structures.remove`'s result is
+  the caller's to `deinit`.
 
 Meshes:
 - Every flower has stamens (`meshgen.stamens`); closed buds hide theirs.

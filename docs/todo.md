@@ -178,8 +178,8 @@ structures, simple or complex in what they do, as Factorio's Lua mods do.
   in the game's AppData folder (`%LOCALAPPDATA%\Parasymi\mod-data`); no
   other files, no network. Lua's own `io`/`os` left out, a file call of our
   own that refuses any path outside `mod-data`.
-- **Before it:** saves that never break (items by name), and scripts kept
-  deterministic, as the threading rule asks.
+- **Before it:** scripts kept deterministic, as the threading rule asks
+  (saves already never break: items by name).
 
 ## Lanes and injectors
 *Being designed.* Today a conduit carries one item at a time. Every
@@ -220,23 +220,6 @@ whorls and bell bloom.
   join.
 - **Whole:** a soap-bubble shimmer and one breath of far choir ("ooh"),
   breaking into a fizz of crystal grains that scatter and fade.
-
-## Saves that never break
-*Planned, not started.* Today plants, the belly, research, the weave queue
-and wild flowers are saved as raw bytes, so a change to their shape refuses
-old saves, and reordering items, species or research scrambles them
-quietly. Structures already survive change (named-field `record`s). The
-plan, one commit per step:
-1. Save items, species and research nodes by name hash, not by number.
-2. The belly and the weave queue as `record`s.
-3. Research as `record`s: only what is known and its progress, by name.
-4. Plants and wild flowers as `record`s, checking save time and size.
-5. One last `version` bump, and a test that saves, changes a field and
-   loads again.
-
-Renames still need a small old-name → new-name table. Changing world
-generation still moves the land under a save; only storing the land would
-mend that.
 
 ## Hidden plants
 *Ideas, kept to be talked over one at a time.*

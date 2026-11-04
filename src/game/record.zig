@@ -1,17 +1,20 @@
-//! a value as a record of named fields (structures in saves): each field is
+//! a value as a record of named fields (every save, structures and all): each field is
 //! written with its name's hash and its length, so a record read back into
 //! a type that has since gained, lost or changed a field keeps what still
 //! matches and the defaults for the rest. Stores numbers, bools, enums (by
 //! tag name), optionals, arrays, vectors, structs, tagged unions (by tag
-//! name) and `ArrayList`s; anything else (a pointer) is refused at compile
-//! time.
+//! name), `ArrayList`s and `std.EnumSet`/`EnumArray`/`EnumMap` (by their
+//! keys' tag names, so reordered or new tags never scramble them); anything
+//! else (a pointer) is refused at compile time.
 //!
 //! A value's bytes: a number or packed struct raw; an enum its tag name's
 //! hash (u32; a non-exhaustive one its integer); an optional a 0/1 byte and
 //! the value; an array, vector or list its count (u32) and each element
 //! framed; a struct its field count (u16) and per field its name's hash
 //! (u32) and the field framed; a union its tag name's hash and the payload
-//! framed. Framed: its length (u32), then its bytes.
+//! framed; an enum set its count (u32) and each key framed; an enum array
+//! or map its count and per entry its key framed and its value framed.
+//! Framed: its length (u32), then its bytes.
 const lib=@import("../lib.zig");
 /// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
 const m=lib.engine.core.math;
@@ -29,6 +32,12 @@ const activeTag=std.meta.activeTag;
 const Fnv=std.hash.Fnv1a_32;
 /// the test harness
 const testing=std.testing;
+/// which keys of an enum are in (the tests' stored sets)
+const EnumSet=std.EnumSet;
+/// a value for every key of an enum (the tests' stored rows)
+const EnumArray=std.EnumArray;
+/// a value for some keys of an enum (the tests' stored maps)
+const EnumMap=std.EnumMap;
 /// the record was cut short or does not frame (or memory ran out)
 pub const Error=error{CorruptSave}||Allocator.Error;
 /// what a name (a field's, a tag's) is stored as
@@ -39,9 +48,51 @@ fn isList(comptime T:type)bool{
 }
 /// the element type of the list `T`
 fn ListItem(comptime T:type)type{return@typeInfo(@FieldType(T,"items")).pointer.child;}
+/// which of the standard library's enum-keyed collections a type is
+const Keyed=enum{
+  /// not one of them
+  none,
+  /// an `EnumSet`: which keys are in
+  set,
+  /// an `EnumArray`: a value for every key
+  array,
+  /// an `EnumMap`: a value for some keys
+  map,
+};
+/// which enum-keyed collection `T` is (an `Indexer` and a `Key`, and a
+/// `bits` mask, a `values` row, or both)
+fn keyed(comptime T:type)Keyed{
+  if(@typeInfo(T)!=.@"struct" or !@hasDecl(T,"Indexer") or !@hasDecl(T,"Key"))return.none;
+  // what it holds
+  const bits=@hasField(T,"bits");
+  const values=@hasField(T,"values");
+  return if(bits and values).map else if(bits).set else if(values).array else.none;
+}
+/// the tag of `E` whose name hashes to what `b` holds, if `b` is a stored
+/// tag and `E` still has it
+fn tagOf(comptime E:type,b:[]const u8)?E{
+  if(b.len!=4)return null;
+  // the stored tag name's hash
+  const h:u32=@bitCast(b[0..4].*);
+  inline for(@typeInfo(E).@"enum".fields)|f|if((comptime nameHash(f.name))==h)return@enumFromInt(f.value);
+  return null;
+}
+/// whether `T` is an exhaustive enum, stored by its tags' names
+fn isTag(comptime T:type)bool{
+  return switch(@typeInfo(T)){
+    .@"enum"=>|e|e.is_exhaustive,
+    else=>false,
+  };
+}
 /// a fresh `T`: its fields' defaults, else zero, false, null or the first tag
 pub fn fresh(comptime T:type)T{
   if(comptime isList(T))return.empty;
+  switch(comptime keyed(T)){
+    .none=>{},
+    .set=>return.initEmpty(),
+    .array=>return.initFill(fresh(T.Value)),
+    .map=>return.{},
+  }
   return switch(@typeInfo(T)){
     .void=>{},
     .bool=>false,
@@ -82,6 +133,27 @@ pub fn write(comptime T:type,gpa:Allocator,out:*ArrayList(u8),v:*const T)Allocat
   if(comptime isList(T)){
     try put(gpa,out,u32,@intCast(v.items.len));
     for(v.items)|*e|try writeFramed(ListItem(T),gpa,out,e);
+    return;
+  }
+  // an enum-keyed collection: only what it holds, each by its key's name
+  const kd=comptime keyed(T);
+  if(kd!=.none){
+    // how many keys it holds
+    var n:u32=0;
+    for(0..T.Indexer.count)|i|{
+      if(kd==.array or v.contains(T.Indexer.keyForIndex(i)))n+=1;
+    }
+    try put(gpa,out,u32,n);
+    for(0..T.Indexer.count)|i|{
+      // the key at this place
+      const k=T.Indexer.keyForIndex(i);
+      if(kd!=.array and !v.contains(k))continue;
+      try writeFramed(T.Key,gpa,out,&k);
+      switch(kd){
+        .array,.map=>try writeFramed(T.Value,gpa,out,&v.values[i]),
+        .set,.none=>{},
+      }
+    }
     return;
   }
   switch(@typeInfo(T)){
@@ -189,6 +261,38 @@ pub fn read(comptime T:type,gpa:Allocator,b:[]const u8,out:*T)Error!void{
     }
     return;
   }
+  // an enum-keyed collection, by its keys' names: a key gone is left out
+  const kd=comptime keyed(T);
+  if(kd!=.none){
+    // how many keys are stored
+    const n=try r.int(u32);
+    if(n>(b.len-r.pos)/4)return error.CorruptSave;
+    if(kd!=.array)out.*=fresh(T);
+    for(0..n)|_|{
+      // the key's bytes, and the key if it is still one
+      const kb=try r.frame();
+      const k=tagOf(T.Key,kb);
+      switch(kd){
+        .set=>if(k)|key|out.insert(key),
+        .array=>{
+          // the value's bytes
+          const vb=try r.frame();
+          if(k)|key|try read(T.Value,gpa,vb,out.getPtr(key));
+        },
+        .map=>{
+          // the value's bytes, and the value read from its defaults
+          const vb=try r.frame();
+          if(k)|key|{
+            var e=fresh(T.Value);
+            try read(T.Value,gpa,vb,&e);
+            out.put(key,e);
+          }
+        },
+        .none=>unreachable,
+      }
+    }
+    return;
+  }
   switch(@typeInfo(T)){
     .void=>{},
     .bool=>if(b.len==1){
@@ -196,12 +300,7 @@ pub fn read(comptime T:type,gpa:Allocator,b:[]const u8,out:*T)Error!void{
     },
     .int,.float=>if(b.len==@sizeOf(T))@memcpy(asBytes(out),b),
     .@"enum"=>|e|if(e.is_exhaustive){
-      if(b.len!=4)return;
-      // the stored tag name's hash
-      const h=try r.int(u32);
-      inline for(e.fields)|f|if((comptime nameHash(f.name))==h){
-        out.*=@enumFromInt(f.value);
-      };
+      if(tagOf(T,b))|k|out.*=k;
     }else if(b.len==@sizeOf(e.tag_type)){
       out.*=@enumFromInt(try r.int(e.tag_type));
     },
@@ -209,6 +308,11 @@ pub fn read(comptime T:type,gpa:Allocator,b:[]const u8,out:*T)Error!void{
       if(b.len==0)return;
       if(b[0]==0){
         out.*=null;
+        return;
+      }
+      // a tag no longer had is nothing at all (an item gone empties its slot)
+      if(comptime isTag(o.child)){
+        out.*=tagOf(o.child,b[1..]);
         return;
       }
       // the value read over: what was there, else a fresh one
@@ -281,6 +385,33 @@ test"a record keeps what still matches and the defaults for the rest"{
   // the old record written and read into the new one
   const got=try again(Old,New,.{.a=40,.b=2.5,.k=.sand,.opt=null},.{});
   try testing.expectEqual(New{.c=7,.b=2.5,.a=5,.k=.sand,.opt=null,.arr=.{1,2}},got);
+}
+test"enum sets, arrays and maps by their keys' names"{
+  // the old keys, and the new ones: reordered, one gone, one new
+  const Old=enum{moss,soil,sand};
+  const New=enum{fern,sand,moss};
+  // what is stored with the old keys
+  var set=EnumSet(Old).initEmpty();
+  set.insert(.moss);
+  set.insert(.soil);
+  var arr=EnumArray(Old,u32).initFill(0);
+  arr.set(.sand,3);
+  arr.set(.soil,9);
+  var map:EnumMap(Old,f32)=.{};
+  map.put(.moss,1.5);
+  // read back with the new keys
+  const s2=try again(EnumSet(Old),EnumSet(New),set,.initFull());
+  try testing.expect(s2.contains(.moss) and !s2.contains(.sand) and !s2.contains(.fern));
+  const a2=try again(EnumArray(Old,u32),EnumArray(New,u32),arr,.initFill(7));
+  try testing.expectEqual(@as(u32,3),a2.get(.sand));
+  try testing.expectEqual(@as(u32,0),a2.get(.moss));
+  try testing.expectEqual(@as(u32,7),a2.get(.fern));
+  const m2=try again(EnumMap(Old,f32),EnumMap(New,f32),map,.{});
+  try testing.expectEqual(@as(?f32,1.5),m2.get(.moss));
+  try testing.expectEqual(@as(?f32,null),m2.get(.sand));
+  // an optional tag no longer had is nothing, one still had is kept
+  try testing.expectEqual(@as(?New,null),try again(?Old,?New,.soil,.fern));
+  try testing.expectEqual(@as(?New,.sand),try again(?Old,?New,.sand,null));
 }
 test"unions by tag name, lists grown back, nested records"{
   // the test allocator

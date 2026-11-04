@@ -589,16 +589,25 @@ layout rules. Never hand-place a node.
 - Autosave (always `autosave.sav`) runs every `Options.autosave` minutes
   of play (default 5; options panel: never..60).
 
-### Save versions
-Bump `version` when a stored layout changes. (The fingerprint checks
-sizes only.)
-
-Structures are the exception. They are stored as `record`s
-(`game/record.zig`: named, framed fields; enums and kinds stored by name).
-So a structure's state may gain, lose or change fields, or hold lists (its
-`State.deinit` frees them), without a bump. Older saves keep what matches,
-take the defaults for the rest, and drop structures of a kind that is
-gone.
+### Saves that never break
+A save never needs a version bump. After a fixed header (magic, version,
+seed) the whole garden is one `record` (`game/record.zig`: named, framed
+fields), the `Saved` struct in `save.zig`, and every structure follows as
+its kind's name hash and a record of its own (its `State.deinit` frees any
+lists it holds). Items, species, research, discoveries and every other tag
+are stored by name, never by number, `EnumSet`s and `EnumArray`s too.
+- A field a save lacks keeps the fresh garden's value; a field the build
+  no longer has is passed over.
+- Reordering items, species or research changes nothing.
+- A thing that is gone is left out: an item empties its slot, a species'
+  plants, a structure's kind, a weave no longer woven by hand.
+- A structure that no longer fits its tiles is let go, not refused.
+- Something new to keep goes in `Saved` (filled in `snapshot`, laid back in
+  `decode`); a type `record` cannot store is refused at compile time.
+- Renaming a field or a tag reads as one gone and one new: keep the old
+  name, or add an old-name table when one is first needed.
+- Saves from before version 35 (raw bytes) are refused. Changing world
+  generation still moves the land under a save.
 
 ### Seeds
 Each start grows a fresh world (the seed is logged and kept in its saves).

@@ -6,13 +6,13 @@
 //! Each garden is a file of its own in `home.saves` (`<name>.sav`), named
 //! by the gardener (`Name.typed`); the timer saves into `auto`.
 //!
-//! Format: a small header (magic, version, layout fingerprint) followed by
-//! plain-old-data records. The fingerprint changes whenever a stored type's
-//! size changes, so an incompatible save is refused instead of misread.
-//! Structures are the exception: each is its kind's name hash and a
-//! `record` of named fields, so a structure or its state gaining, losing or
-//! changing a field (or holding a list) keeps older saves loading; one of a
-//! kind that is gone is left out.
+//! Format: a small header (magic, version, seed) that never changes, the
+//! whole garden as one `record` of named fields, then every structure as its
+//! kind's name hash and a record of its own. Items, species, research and
+//! every other tag are stored by name, never by number, so saves never
+//! break: a field gained keeps the fresh garden's value, a field gone is
+//! passed over, a reordered tag still reads as itself, and a thing that is
+//! gone (an item, a species, a structure's kind) is left out.
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -20,6 +20,14 @@ const std=lib.std;
 const Allocator=std.mem.Allocator;
 /// the I/O interface every file call goes through
 const Io=std.Io;
+/// a growable list: the bytes written, and the record's lists
+const ArrayList=std.ArrayList;
+/// which keys of an enum are in: what is known, what was witnessed
+const EnumSet=std.EnumSet;
+/// a value for every key of an enum: each study's progress
+const EnumArray=std.EnumArray;
+/// the tag an integer names, for the moss's stored ground
+const fromInt=std.enums.fromInt;
 /// a value's raw bytes
 const asBytes=std.mem.asBytes;
 /// are two strings equal?
@@ -38,10 +46,6 @@ const sepStr=std.fs.path.sep_str;
 const nsPerS=std.time.ns_per_s;
 /// the test harness
 const testing=std.testing;
-/// an enum's tags, for counting the items
-const fields=std.meta.fields;
-/// a check that holds at compile time
-const assert=std.debug.assert;
 /// sorts the listed gardens, newest first
 const sort=std.mem.sort;
 /// formats a save's path into a fixed buffer
@@ -70,22 +74,12 @@ const craft=lib.craft;
 const st=lib.structures;
 /// named-field records, how structures are stored
 const record=lib.record;
-/// the player module, for its belly's type
-const playerMod=lib.player;
 /// the game's state
 const play=lib.play;
 /// every player-facing string
 const txt=lib.txt;
 /// the whole running game saved and rebuilt
 const Game=play.Game;
-/// the wolf's belly, as stored
-const Belly=@FieldType(playerMod.Player,"inv");
-/// a hotbar slot is stored as its item's id, or this when empty
-const noItem:u8=0xff;
-/// how many kinds of item there are
-const itemCount=fields(items.Item).len;
-// every item id must fit below the empty-slot mark
-comptime{assert(itemCount<noItem);}
 /// where saves were kept before they moved into `home.saves`
 pub const legacy="parasymi.sav";
 /// a saved garden's file extension, and its scratch copy's while written
@@ -119,8 +113,10 @@ pub fn named(t:*const Typed)?Name{
 const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
 /// the first four bytes of every save
 const magic="PRSY".*;
-/// the stored layout's version: bumped whenever one changes
-const version:u32=34;
+/// the save format's version: 35 and on, every save is named records
+const version:u32=35;
+/// the oldest version still read: before it saves were raw bytes
+const firstNamed:u32=35;
 /// max save file size (64 MB): a garden with millions of plants will never
 /// approach this; anything larger is almost certainly a corrupt or malicious file.
 const maxSave:usize=64<<20;
@@ -135,50 +131,65 @@ pub const Error=error{
   SaveUnwritable,
   /// the file is not a save at all (no magic)
   NotASave,
-  /// written by a build whose stored layout differs
+  /// written before saves were named records
   IncompatibleSave,
   /// the file is cut short or holds what cannot be
   CorruptSave,
 }||Allocator.Error;
-/// one plant, without its runtime links (rebuilt on load).
-const PlantRec=extern struct{
+// a weave is stored as what it makes, so no two hand weaves may make the same
+comptime{
+  for(craft.hand,0..)|a,i|for(craft.hand[0..i])|b|{
+    if(a.out==b.out)@compileError("save: two hand weaves make "++@tagName(a.out));
+  };
+}
+/// one plant, without its runtime links (rebuilt on load)
+const PlantRec=struct{
   /// its tile column
-  x:i32,
+  x:i32=0,
   /// its tile row
-  y:i32,
+  y:i32=0,
   /// where it stands across (a floater's own free point, m)
-  ax:f32,
+  ax:f32=0,
   /// and along
-  az:f32,
-  /// its species id
-  sp:u32,
+  az:f32=0,
+  /// its species, by name (none: a species no longer grown, left out)
+  sp:?species.Id=null,
   /// how grown it is, 0..1
-  growth:f32,
+  growth:f32=0,
   /// its own growing time (s; 0: its species')
-  span:f32,
+  span:f32=0,
   /// the mana it holds
-  mana:f32,
+  mana:f32=0,
   /// its health, 0..1
-  health:f32,
+  health:f32=1,
   /// its seed, the per-plant variation
-  seed:f32,
+  seed:f32=0,
   /// the flow through it
-  flow:f32,
+  flow:f32=0,
   /// the essence it has ripened
-  essence:f32,
+  essence:f32=0,
   /// how much of that is rare, steeped by a night beam
-  rare:f32,
+  rare:f32=0,
   /// the light it holds in store (an astrocyme's)
-  stored:f32,
-  /// the way it faces, 0..3
-  dir:u32,
+  stored:f32=0,
+  /// the way it faces
+  dir:m.Dir=0,
 };
-/// one chunk whose resource nodes differ from what the generator made.
+/// one chunk whose resource nodes differ from what the generator made
 const NodesRec=struct{
   /// which chunk
   at:ck.Coord,
   /// what is left in each of its tiles' nodes
   res:[ck.tileCount]ck.Res,
+};
+/// one tile the garden changed (moss, beam-born ley)
+const MossRec=struct{
+  /// its column
+  x:i32=0,
+  /// its row
+  y:i32=0,
+  /// what it became, by name (none: a ground no longer grown, left out)
+  grown:?lib.moss.Grown=null,
 };
 /// one wild flower and the tile it grows on
 const WildRec=struct{
@@ -187,118 +198,150 @@ const WildRec=struct{
   /// the flower
   flower:lib.wild.Flower,
 };
-/// what opens every save: the magic, the version, the layout fingerprint
-/// and the seed the world regrows from
+/// one slot of the wolf's belly
+const Held=struct{
+  /// what it holds, by name (none: empty, or an item that is gone)
+  item:?items.Item=null,
+  /// how many
+  n:u16=0,
+};
+/// the weave queue: what each queued weave makes, and how far the first is
+const Weave=struct{
+  /// each queued weave, by the item it makes (none: a weave that is gone)
+  queue:ArrayList(?items.Item)=.empty,
+  /// seconds the first weave has been worked
+  t:f32=0,
+};
+/// what the gardener knows: every study and discovery by name, and how far
+/// each study has come
+const Known=struct{
+  /// every technology known
+  done:EnumSet(prog.Id)=.initEmpty(),
+  /// every discovery witnessed
+  found:EnumSet(prog.Discovery)=.initEmpty(),
+  /// the world event's blend 0..1
+  veil:f32=0,
+  /// the technology the labs work on
+  current:?prog.Id=null,
+  /// units finished so far, per technology
+  progress:EnumArray(prog.Id,u32)=.initFill(0),
+};
+/// the whole garden as one record of named fields: a field this build no
+/// longer has is passed over, one the save lacks keeps the fresh garden's
+const Saved=struct{
+  /// the game's random stream
+  rng:Rng=.{.s=0},
+  /// the time of day, 0..1
+  tod:f32=0,
+  /// the game's clock (s)
+  time:f64=0,
+  /// the hotbar slot in hand
+  hot:u32=0,
+  /// the hotbar, each slot an item by name or empty
+  bar:[play.barSlots]?items.Item=@splat(null),
+  /// the way the next thing placed faces
+  placeDir:m.Dir=0,
+  /// where the wolf stands
+  pos:m.V3=@splat(0),
+  /// the way the wolf faces (rad)
+  facing:f32=0,
+  /// the wolf's belly, slot by slot
+  belly:ArrayList(Held)=.empty,
+  /// the weave queue
+  weave:Weave=.{},
+  /// what the gardener knows
+  known:Known=.{},
+  /// the world event
+  unforming:lib.unforming.Unforming=.{},
+  /// the act the garden is in
+  act:lib.act.Act=.wolf,
+  /// the tendrils drawn
+  tendrils:ArrayList(lib.tendril.Tendril)=.empty,
+  /// everything it grew
+  plants:ArrayList(PlantRec)=.empty,
+  /// the chunks whose nodes were gathered from
+  nodes:ArrayList(NodesRec)=.empty,
+  /// the ground the garden changed
+  moss:ArrayList(MossRec)=.empty,
+  /// the wild flowers
+  wild:ArrayList(WildRec)=.empty,
+  /// frees its lists
+  fn deinit(s:*Saved,gpa:Allocator)void{
+    s.belly.deinit(gpa);
+    s.weave.queue.deinit(gpa);
+    s.tendrils.deinit(gpa);
+    s.plants.deinit(gpa);
+    s.nodes.deinit(gpa);
+    s.moss.deinit(gpa);
+    s.wild.deinit(gpa);
+  }
+};
+/// what opens every save, the same in every version: the magic, the
+/// version and the seed the world regrows from
 const Header=extern struct{
   /// always `magic`
   magic:m.Vice(u8,4),
   /// the build's `version`
   version:u32,
-  /// the build's `layoutFingerprint`
-  layout:u64,
   /// the world's seed
   seed:u64,
 };
-/// changes whenever any stored record's layout changes.
-const layoutFingerprint=blk:{
-  // the hash so far, folded with each stored size
-  var h:u64=0xA5;
-  for([_]usize{
-    @sizeOf(PlantRec),@sizeOf(NodesRec),@sizeOf(WildRec),
-    @sizeOf(prog.Progression),@sizeOf(craft.Crafter),@sizeOf(Belly),
-    @sizeOf(Rng),species.count,
-  })|n|h=h*%0x100000001B3^n;
-  break:blk h;
-};
-/// the bytes being written, value by value
-const Writer=struct{
-  /// the allocator they grow with
-  gpa:Allocator,
-  /// the bytes so far
-  buf:std.ArrayList(u8)=.empty,
-  /// a value's raw bytes onto the end
-  fn put(w:*Writer,comptime T:type,v:T)Allocator.Error!void{
-    try w.buf.appendSlice(w.gpa,asBytes(&v));
-  }
-};
-/// a cursor over a save's bytes
-const Reader=struct{
-  /// the bytes being read
-  data:[]const u8,
-  /// how far into them the next read starts
-  pos:usize=0,
-  /// the next `T`, raw; corrupt if it would run past the end
-  fn get(r:*Reader,comptime T:type)Error!T{
-    if(r.pos+@sizeOf(T)>r.data.len)return error.CorruptSave;
-    // the value being read
-    var v:T=undefined;
-    @memcpy(asBytes(&v),r.data[r.pos..][0..@sizeOf(T)]);
-    r.pos+=@sizeOf(T);
-    return v;
-  }
-};
-/// the garden as bytes (owned): the header, the gardener and what it
-/// knows, every plant and structure, and the gathered chunks' nodes
-pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
-  // the bytes being written
-  var w:Writer=.{.gpa=gpa};
-  errdefer w.buf.deinit(gpa);
-  try w.put(Header,.{.magic=magic,.version=version,.layout=layoutFingerprint,.seed=g.world.seed});
-  // the gardener and what it knows
-  try w.put(Rng,g.rng);
-  try w.put(f32,g.sky.tod);
-  try w.put(f64,g.time);
-  try w.put(u32,@intCast(g.hot));
-  // the hotbar, each slot an item id or `noItem`
-  var bar:[play.barSlots]u8=undefined;
-  for(g.bar,&bar)|b,*o|o.*=if(b)|it|@intFromEnum(it)else noItem;
-  try w.put([play.barSlots]u8,bar);
-  try w.put(m.Dir,g.placeDir);
-  try w.put(m.V3,g.player.pos);
-  try w.put(f32,g.player.facing);
-  try w.put(Belly,g.player.inv);
-  try w.put(craft.Crafter,g.weave);
-  try w.put(prog.Progression,g.prog);
-  try w.put(lib.unforming.Unforming,g.unforming);
-  try w.put(u8,@intFromEnum(g.act));
-  // the tendrils drawn
-  try w.put(u32,@intCast(g.tendrils.list.items.len));
-  for(g.tendrils.list.items)|t|try w.put(lib.tendril.Tendril,t);
-  // everything it grew
+/// the garden `g` as one record (its lists owned)
+fn snapshot(gpa:Allocator,g:*const Game)Allocator.Error!Saved{
+  // the record being filled
+  var sv=Saved{.rng=g.rng,.tod=g.sky.tod,.time=g.time,.hot=@intCast(g.hot),.bar=g.bar,.placeDir=g.placeDir,
+    .pos=g.player.pos,.facing=g.player.facing,.weave=.{.t=g.weave.t},.unforming=g.unforming,.act=g.act,
+    .known=.{.done=g.prog.done,.found=g.prog.found,.veil=g.prog.veil,.current=g.prog.current,.progress=g.prog.progress}};
+  errdefer sv.deinit(gpa);
+  for(g.player.inv.slot)|o|try sv.belly.append(gpa,if(o)|s|.{.item=s.item,.n=s.n}else.{});
+  for(g.weave.queue[0..g.weave.len])|q|try sv.weave.queue.append(gpa,craft.hand[q].out);
+  try sv.tendrils.appendSlice(gpa,g.tendrils.list.items);
   // the plant list's columns
   const s=g.plants.list.slice();
-  try w.put(u32,@intCast(g.plants.len()));
-  for(0..g.plants.len())|i|try w.put(PlantRec,.{
-    .x=s.items(.x)[i],.y=s.items(.y)[i],.ax=s.items(.at)[i][0],.az=s.items(.at)[i][2],.sp=@intFromEnum(s.items(.sp)[i]),
+  try sv.plants.ensureTotalCapacity(gpa,g.plants.len());
+  for(0..g.plants.len())|i|sv.plants.appendAssumeCapacity(.{
+    .x=s.items(.x)[i],.y=s.items(.y)[i],.ax=s.items(.at)[i][0],.az=s.items(.at)[i][2],.sp=s.items(.sp)[i],
     .growth=s.items(.growth)[i],.span=s.items(.span)[i],.mana=s.items(.mana)[i],.health=s.items(.health)[i],
     .seed=s.items(.seed)[i],.flow=s.items(.flow)[i],.essence=s.items(.essence)[i],
-    .rare=s.items(.rare)[i],.stored=s.items(.stored)[i],.dir=s.items(.dir)[i],
+    .rare=s.items(.rare)[i],.stored=s.items(.stored)[i],.dir=@intCast(s.items(.dir)[i]),
   });
-  try w.put(u32,@intCast(g.structs.list.items.len));
-  for(g.structs.list.items)|*it|{
-    try w.put(u32,record.nameHash(@tagName(it.kind())));
-    try record.writeFramed(st.Structure,gpa,&w.buf,it);
-  }
   // gathered resource nodes (only chunks that differ from generation)
-  // the chunks whose nodes were gathered from
-  var touched:std.ArrayList(*const ck.Chunk)=.empty;
-  defer touched.deinit(gpa);
   // the walk over every chunk in the world
   var it=g.world.map.valueIterator();
-  while(it.next())|c|if(gathered(g.world.seed,c.*))try touched.append(gpa,c.*);
-  try w.put(u32,@intCast(touched.items.len));
-  for(touched.items)|c|try w.put(NodesRec,.{.at=c.at,.res=c.res});
+  while(it.next())|c|if(gathered(g.world.seed,c.*))try sv.nodes.append(gpa,.{.at=c.*.at,.res=c.*.res});
   // the moss the creepers grew, tile by tile
-  var mossed:std.ArrayList(lib.moss.Kept)=.empty;
+  var mossed:ArrayList(lib.moss.Kept)=.empty;
   defer mossed.deinit(gpa);
   try g.moss.list(gpa,&mossed);
-  try w.put(u32,@intCast(mossed.items.len));
-  for(mossed.items)|t|try w.put(lib.moss.Kept,t);
+  for(mossed.items)|t|try sv.moss.append(gpa,.{.x=t.x,.y=t.y,.grown=fromInt(lib.moss.Grown,t.grown)});
   // the wild flowers, tile by tile
-  try w.put(u32,@intCast(g.wild.count()));
   var wi=g.wild.flowers.iterator();
-  while(wi.next())|e|try w.put(WildRec,.{.at=lib.wild.unkey(e.key_ptr.*),.flower=e.value_ptr.*});
-  return w.buf.toOwnedSlice(gpa);
+  while(wi.next())|e|try sv.wild.append(gpa,.{.at=lib.wild.unkey(e.key_ptr.*),.flower=e.value_ptr.*});
+  return sv;
+}
+/// the garden as bytes (owned): the header, the garden as one record, and
+/// every structure, each its kind's name hash and a record of its own
+pub fn encode(gpa:Allocator,g:*const Game)Allocator.Error![]u8{
+  // the bytes being written
+  var out:ArrayList(u8)=.empty;
+  errdefer out.deinit(gpa);
+  // the header
+  const h=Header{.magic=magic,.version=version,.seed=g.world.seed};
+  try out.appendSlice(gpa,asBytes(&h));
+  // the garden as one record
+  var sv=try snapshot(gpa,g);
+  defer sv.deinit(gpa);
+  try record.writeFramed(Saved,gpa,&out,&sv);
+  // the structures
+  const n:u32=@intCast(g.structs.list.items.len);
+  try out.appendSlice(gpa,asBytes(&n));
+  for(g.structs.list.items)|*it|{
+    // its kind's name hash
+    const kh=record.nameHash(@tagName(it.kind()));
+    try out.appendSlice(gpa,asBytes(&kh));
+    try record.writeFramed(st.Structure,gpa,&out,it);
+  }
+  return out.toOwnedSlice(gpa);
 }
 /// whether any of a chunk's nodes differ from what the generator made
 fn gathered(seed:u64,c:*const ck.Chunk)bool{
@@ -311,63 +354,79 @@ fn gathered(seed:u64,c:*const ck.Chunk)bool{
   }
   return false;
 }
-/// rebuild a game from bytes produced by `encode`.
+/// rebuild a game from bytes produced by `encode` (this build's or any
+/// other since saves became named records)
 pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
-  // the cursor over the bytes
-  var r:Reader=.{.data=data};
-  // the header
-  const h=try r.get(Header);
-  if(!eql(u8,&h.magic,&magic))return error.NotASave;
-  if(h.version!=version or h.layout!=layoutFingerprint)return error.IncompatibleSave;
+  if(data.len<magic.len or !eql(u8,data[0..magic.len],&magic))return error.NotASave;
+  // the cursor over the bytes, and the header
+  var in:record.In=.{.b=data};
+  const h=try in.int(Header);
+  if(h.version<firstNamed)return error.IncompatibleSave;
   // a fresh garden from the saved seed, filled in below
   var g=try Game.init(gpa,null,h.seed);
   errdefer g.deinit();
-  g.rng=try r.get(Rng);
-  g.sky.tod=try r.get(f32);
-  g.time=try r.get(f64);
-  g.hot=try r.get(u32);
-  if(g.hot>=play.barSlots)return error.CorruptSave;
-  for(try r.get([play.barSlots]u8),&g.bar)|b,*o|o.*=if(b==noItem)null
-    else if(b<itemCount)@enumFromInt(b)
-    else return error.CorruptSave;
-  g.placeDir=try r.get(m.Dir);
-  g.player.pos=try r.get(m.V3);
-  g.player.facing=try r.get(f32);
-  g.player.inv=try r.get(Belly);
-  g.weave=try r.get(craft.Crafter);
-  g.prog=try r.get(prog.Progression);
-  g.unforming=try r.get(lib.unforming.Unforming);
-  g.act=lib.act.Act.of(try r.get(u8)) orelse return error.CorruptSave;
-  // the tendrils drawn
-  const tendrils=try r.get(u32);
-  g.tendrils.list.clearRetainingCapacity();
-  for(0..tendrils)|_|try g.tendrils.list.append(g.gpa,try r.get(lib.tendril.Tendril));
+  // the fresh garden as a record, read over with what was saved
+  var sv=try snapshot(gpa,&g);
+  defer sv.deinit(gpa);
+  try record.read(Saved,gpa,try in.frame(),&sv);
+  g.rng=sv.rng;
+  g.sky.tod=sv.tod;
+  g.time=sv.time;
+  g.hot=if(sv.hot<play.barSlots)sv.hot else 0;
+  g.bar=sv.bar;
+  g.placeDir=sv.placeDir;
+  g.player.pos=sv.pos;
+  g.player.facing=sv.facing;
   g.cam.target=g.player.pos;
-  // how many plants are stored
-  const plants=try r.get(u32);
-  for(0..plants)|_|{
-    // the stored plant
-    const p=try r.get(PlantRec);
-    if(p.sp>=species.count or p.dir>=m.dirs.len)return error.CorruptSave;
+  // the belly, slot by slot: an item gone leaves its slot empty
+  g.player.inv=.{};
+  for(sv.belly.items,0..)|b,i|{
+    if(i==g.player.inv.slot.len)break;
+    if(b.item)|it|if(b.n>0){g.player.inv.slot[i]=.{.item=it,.n=b.n};};
+  }
+  // the weave queue, each found again by what it makes
+  g.weave=.{.t=sv.weave.t};
+  for(sv.weave.queue.items)|q|{
+    // what the weave makes, and the hand weave that makes it
+    const it=q orelse continue;
+    const idx=handOf(it) orelse continue;
+    if(g.weave.len==g.weave.queue.len)break;
+    g.weave.queue[g.weave.len]=idx;
+    g.weave.len+=1;
+  }
+  if(g.weave.len==0)g.weave.t=0;
+  g.prog.done=sv.known.done;
+  g.prog.found=sv.known.found;
+  g.prog.veil=sv.known.veil;
+  g.prog.current=sv.known.current;
+  g.prog.progress=sv.known.progress;
+  g.unforming=sv.unforming;
+  g.act=sv.act;
+  // the tendrils drawn
+  g.tendrils.list.clearRetainingCapacity();
+  for(sv.tendrils.items)|t|{
+    // the tendril, its tile count kept within its path
+    var c=t;
+    c.n=@min(c.n,lib.tendril.most);
+    try g.tendrils.list.append(g.gpa,c);
+  }
+  // everything it grew; a species no longer grown is left out
+  for(sv.plants.items)|p|{
     // its species
-    const sp:species.Id=@enumFromInt(p.sp);
+    const sp=p.sp orelse continue;
     try ensureFootprint(&g,p.x,p.y,species.get(sp).size);
     _=try g.plants.placeNear(gpa,&g.world,m.v3(p.ax,0,p.az),.{
       .x=p.x,.y=p.y,.chunk=undefined,.tile=undefined,.sp=sp,
       .growth=p.growth,.span=p.span,.mana=p.mana,.health=p.health,.seed=p.seed,
-      .flow=p.flow,.essence=p.essence,.rare=p.rare,.stored=p.stored,.dir=@intCast(p.dir),
+      .flow=p.flow,.essence=p.essence,.rare=p.rare,.stored=p.stored,.dir=p.dir,
     });
   }
   // how many structures are stored
-  const structs=try r.get(u32);
+  const structs=try in.int(u32);
   for(0..structs)|_|{
-    // its kind's name hash
-    const kh=try r.get(u32);
-    // a cursor at the structure's frame, and its bytes
-    var in:record.In=.{.b=r.data,.pos=r.pos};
+    // its kind's name hash, and its record's bytes
+    const kh=try in.int(u32);
     const body=try in.frame();
-    r.pos=in.pos;
-    // a kind no longer grown is left out
     // its kind; one no longer grown is left out
     const k=st.kindByName(kh) orelse continue;
     // a blank structure of that kind, read over
@@ -375,38 +434,28 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
     errdefer s.deinit(gpa);
     try record.read(st.Structure,gpa,body,&s);
     try ensureFootprint(&g,s.x,s.y,s.def().size);
-    // restored as saved (inventory, per-kind data). If it does not fit the
-    // save is corrupt (the world is regenerated from the same seed, so the
-    // tile was valid when saved).
-    if(!try g.structs.restore(gpa,&g.world,s))return error.CorruptSave;
+    // restored as saved (inventory, per-kind data); one that no longer
+    // fits (its footprint grew, the land moved) is let go
+    if(!try g.structs.restore(gpa,&g.world,s))s.deinit(gpa);
   }
   g.structs.relink();
-  // how many gathered chunks are stored
-  const nodes=try r.get(u32);
-  for(0..nodes)|_|{
-    // the stored chunk's nodes
-    const n=try r.get(NodesRec);
+  // the gathered chunks' nodes
+  for(sv.nodes.items)|n|{
     // the chunk, made if it is not streamed in yet
     const c=try g.world.ensure(n.at);
     c.res=n.res;
   }
   // the ground the garden changed (moss, beam-born ley), laid on its chunks as they stream in
-  const mossed=try r.get(u32);
-  for(0..mossed)|_|{
-    // the tile, and what it became
-    const t=try r.get(lib.moss.Kept);
-    if(t.grown>@intFromEnum(lib.moss.Grown.ley))return error.CorruptSave;
-    try g.moss.become(gpa,&g.world,t.x,t.y,@enumFromInt(t.grown));
-  }
+  for(sv.moss.items)|t|if(t.grown)|to|try g.moss.become(gpa,&g.world,t.x,t.y,to);
   // the wild flowers
-  const wilds=try r.get(u32);
-  for(0..wilds)|_|{
-    // the flower and its tile
-    const f=try r.get(WildRec);
-    try g.wild.put(gpa,f.at[0],f.at[1],f.flower);
-  }
+  for(sv.wild.items)|f|try g.wild.put(gpa,f.at[0],f.at[1],f.flower);
   g.prog.say(txt.s.msg.remembers,.{});
   return g;
+}
+/// the hand weave that makes `it`, as its index in `craft.hand`
+fn handOf(it:items.Item)?u8{
+  for(craft.hand,0..)|r,i|if(r.out==it)return @intCast(i);
+  return null;
 }
 /// streams in every chunk a footprint `size` tiles across at `x, y` touches
 fn ensureFootprint(g:*Game,x:i32,y:i32,size:u8)Allocator.Error!void{
@@ -547,6 +596,13 @@ test"a garden survives a save round trip"{
   var g=try Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   try lib.setups.demo(&g,3);
+  // a weave queued, a study half done, a hotbar slot filled
+  g.weave.queue[0]=2;
+  g.weave.len=1;
+  g.weave.t=0.5;
+  g.prog.progress.set(.driftSpores,3);
+  g.prog.current=.driftSpores;
+  g.bar[1]=.fibre;
   // gather from some node so a depleted chunk is stored too
   // the chunk the wolf stands in
   const c=g.world.chunkOfTile(m.tileOf(g.player.pos[0]),m.tileOf(g.player.pos[2])).?;
@@ -561,9 +617,56 @@ test"a garden survives a save round trip"{
   try testing.expectEqual(g.player.inv.count(.grit),back.player.inv.count(.grit));
   try testing.expect(back.prog.done.contains(.rootCommunion));
   try testing.expectEqual(g.player.pos,back.player.pos);
+  try testing.expectEqual(g.player.inv.slot,back.player.inv.slot);
+  try testing.expectEqual(@as(usize,1),back.weave.len);
+  try testing.expectEqual(@as(u8,2),back.weave.queue[0]);
+  try testing.expectEqual(@as(f32,0.5),back.weave.t);
+  try testing.expectEqual(@as(u32,3),back.prog.progress.get(.driftSpores));
+  try testing.expectEqual(@as(?prog.Id,.driftSpores),back.prog.current);
+  try testing.expectEqual(g.bar,back.bar);
+  try testing.expectEqual(g.wild.count(),back.wild.count());
   // the rebuilt garden's chunk under the wolf
   const c2=back.world.chunkOfTile(m.tileOf(g.player.pos[0]),m.tileOf(g.player.pos[2])).?;
   try testing.expectEqualSlices(ck.Res,&c.res,&c2.res);
   // a structure's per-kind state comes back intact
   for(g.structs.list.items,0..)|s,i|try testing.expectEqual(s.kind(),back.structs.list.items[i].kind());
+}
+test"a save from another build loads: fields it lacks stay fresh, fields unknown are passed over"{
+  // the test allocator, and the bytes of a save from a build whose garden
+  // has a field this one never had and lacks every other
+  const gpa=testing.allocator;
+  var out:ArrayList(u8)=.empty;
+  defer out.deinit(gpa);
+  const h=Header{.magic=magic,.version=version+9,.seed=play.defaultSeed};
+  try out.appendSlice(gpa,asBytes(&h));
+  // that build's garden: the act it is in, and a comet this one knows nothing of
+  const Later=struct{act:lib.act.Act=.hyena,comet:m.Vice(f32,3)=.{1,2,3}};
+  try record.writeFramed(Later,gpa,&out,&.{});
+  // and a structure of a kind long gone
+  const n:u32=1;
+  try out.appendSlice(gpa,asBytes(&n));
+  const kh=record.nameHash("aKindNeverGrown");
+  try out.appendSlice(gpa,asBytes(&kh));
+  try record.writeFramed(u32,gpa,&out,&n);
+  var back=try decode(gpa,out.items);
+  defer back.deinit();
+  // the fresh garden from the same seed, to compare against
+  var fresh=try Game.init(gpa,null,play.defaultSeed);
+  defer fresh.deinit();
+  try testing.expectEqual(lib.act.Act.hyena,back.act);
+  try testing.expectEqual(fresh.player.pos,back.player.pos);
+  try testing.expectEqual(@as(usize,0),back.structs.list.items.len);
+}
+test"an old raw save is refused, never misread, and a cut-short one is corrupt"{
+  // the test allocator, and a raw save's header from before named records
+  const gpa=testing.allocator;
+  const old=Header{.magic=magic,.version=firstNamed-1,.seed=1};
+  try testing.expectError(error.IncompatibleSave,decode(gpa,asBytes(&old)));
+  try testing.expectError(error.NotASave,decode(gpa,"PR"));
+  // a whole save, cut short
+  var g=try Game.init(gpa,null,play.defaultSeed);
+  defer g.deinit();
+  const bytes=try encode(gpa,&g);
+  defer gpa.free(bytes);
+  try testing.expectError(error.CorruptSave,decode(gpa,bytes[0..bytes.len/2]));
 }
