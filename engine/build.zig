@@ -98,7 +98,10 @@ pub fn build(b:*Build)void{
     mod.addAnonymousImport(s,.{.root_source_file=compile(b,glslcPath,dir,&.{dir},&inputs,.{.name=s})});
   }
   // the engine's logic tests need no window or GPU
-  const tests=b.addTest(.{.root_module=mod});
+  // `-Dtest-filter=<text>`: only the tests whose names hold it run (given
+  // more than once, those holding any of them)
+  const filters=b.option([]const []const u8,"test-filter","run only the tests whose names contain this")orelse&.{};
+  const tests=b.addTest(.{.root_module=mod,.filters=filters});
   // the `test` step a caller (or `zig build test`) runs
   const testStep=b.step("test","run the engine's unit tests.");
   testStep.dependOn(&b.addRunArtifact(tests).step);

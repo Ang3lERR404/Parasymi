@@ -1,5 +1,11 @@
 # Testing one plant or structure
 
+For the headless tests: `zig build test` runs them all;
+`zig build test -Dtest-filter=<text>` runs only those whose names hold
+`<text>` (the test's own words, or its module path such as
+`game.sound`), in the game's, the engine's and the editors' tests
+alike. Given more than once, a test holding any of them runs.
+
 `--plant`, `--structure`, `game/specimen.zig`.
 
 This is the way to check a species' or structure's growth, look and work:

@@ -81,6 +81,9 @@ pub fn build(b:*Build)!void{
   const o=b.standardOptimizeOption(.{
     .preferred_optimize_mode=.ReleaseFast
   });
+  // `-Dtest-filter=<text>`: only the tests whose names hold it run (given
+  // more than once, those holding any of them)
+  const filters=b.option([]const []const u8,"test-filter","run only the tests whose names contain this")orelse&.{};
   // the shader compiler, found through the Vulkan SDK
   const glslc=eb.glslc(b);
   // the engine package, built for the same target and mode
@@ -214,9 +217,10 @@ pub fn build(b:*Build)!void{
   // the game's headless test binary, rooted at tests.zig
   const tests=b.addTest(.{
     .root_module=Mods.make(b,"src/tests.zig",t,o,engine,&spvs),
+    .filters=filters,
   });
   // the engine's own tests
-  const engineTests=b.addTest(.{.root_module=engine});
+  const engineTests=b.addTest(.{.root_module=engine,.filters=filters});
   // `zig build test`: runs all of them
   const testStep=b.step("test","run unit tests.");
   testStep.dependOn(&b.addRunArtifact(tests).step);
@@ -228,7 +232,7 @@ pub fn build(b:*Build)!void{
     .target=t,
     .root_source_file=b.path("tools/meshedit.zig"),
     .imports=toolImports,
-  })});
+  }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(meshTests).step);
   // the animation editor's tests (eases, copying, the wolf's mirror),
   // built from its own root the same way
@@ -237,6 +241,6 @@ pub fn build(b:*Build)!void{
     .target=t,
     .root_source_file=b.path("tools/animedit.zig"),
     .imports=toolImports,
-  })});
+  }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(animTests).step);
 }
