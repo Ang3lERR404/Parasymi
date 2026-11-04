@@ -84,6 +84,13 @@ structures, simple or complex in what they do, as Factorio's Lua mods do.
   Lua (small, C, known from Factorio) or WebAssembly; simple plants maybe
   from building blocks ("takes essence, waits 5 s, gives fibre") with no
   code. One registry member, "modded", whose hooks call the mod's script.
+- **A behaviour editor** beside meshedit and animedit, so most mods need
+  no code: what a plant does built by hand and saved as `.zon`. Safe and
+  deterministic by design (a mod does only what its blocks can). All three
+  feels blended: rules snap on in order like Scratch, wired to each other
+  like a node graph, and drawn as a growing stem, each rule a leaf or bud
+  ("when it holds 3 essence" sprouting "weave 1 fibre"). Lua stays the
+  far-off expert road for what the blocks cannot do.
 - **Looks** from sculpts (`.mesh`) and clips (`.anim`), which the game
   already reads at start; modded plants still keep the plant rules
   (growing, sway, stamens).
