@@ -69,6 +69,11 @@ carries the game's early days.
 - Whether the light grid's numbers feel right in play
   ([radiant-plants.md](radiant-plants.md)).
 
+## Act 3, far off
+*A seed, nothing decided.* Evolved plants in space: the garden at last
+reaching up into the sky it has looked at all along (starlight gathered,
+living constellations, a hyena made of stars). Kept open on purpose.
+
 ## Lanes and injectors
 *Being designed.* Today a conduit carries one item at a time. Every
 belt-like carrier (conduit, braided conduit, vultrixi tether, the
