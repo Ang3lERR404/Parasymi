@@ -89,6 +89,10 @@ carries the game's early days.
   still to shape: its name, modules, key, research, cost, sound, numbers.
 
 ## Small things
+- **A field-of-view option, later.** The camera's fields of view are fixed
+  in `engine/src/render/camera.zig` (first person 1.1 rad tall, about 97°
+  wide at 16:9). The gardener sees wide (about 90° each side) and plays
+  other games at max FOV; an options slider can come later, not now.
 - **Flags as enums** (the gardener's idea). `main.zig` reads its command
   line through a chain of `startsWith(u8,a,"--plant=")` tests, every
   argument held against every flag name. Instead, an engine helper
