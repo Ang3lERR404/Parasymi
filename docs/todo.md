@@ -47,7 +47,12 @@ carries the game's early days.
   rooted catcher (below): the only way in, paying for the first seeds,
   the germinator and later the halyriphon (all keep their starlight
   costs). The first patch is found by exploring like the rest, never
-  placed beside where the wolf wakes.
+  placed beside where the wolf wakes. Its night light: one wide column
+  over the whole patch made of several coloured searchlight cones
+  pointing down from the sky, overlapping into one column, each its own
+  colour and drifting a little, so the column shifts through the rainbow
+  from within (the radiant hearts' wandering cones, `view.heartCones`,
+  aimed down and kept inside the patch; held to the glow bar).
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
