@@ -657,6 +657,31 @@ test"a save from another build loads: fields it lacks stay fresh, fields unknown
   try testing.expectEqual(fresh.player.pos,back.player.pos);
   try testing.expectEqual(@as(usize,0),back.structs.list.items.len);
 }
+test"an old save naming a renamed study, item or kind loads it under its new name"{
+  // the test allocator, and the bytes of a save from before the renames
+  const gpa=testing.allocator;
+  var out:ArrayList(u8)=.empty;
+  defer out.deinit(gpa);
+  const h=Header{.magic=magic,.version=version,.seed=play.defaultSeed};
+  try out.appendSlice(gpa,asBytes(&h));
+  // the old build's names: a study and an item since renamed
+  const OldStudy=enum{saveTestOldStudy};
+  const OldItem=enum{saveTestOldItem};
+  // that build's garden: the study under way and a hotbar slot, by old names
+  const Before=struct{
+    known:struct{current:?OldStudy=.saveTestOldStudy}=.{},
+    bar:m.Vice(?OldItem,1)=.{.saveTestOldItem},
+  };
+  try record.writeFramed(Before,gpa,&out,&.{});
+  const n:u32=0;
+  try out.appendSlice(gpa,asBytes(&n));
+  var back=try decode(gpa,out.items);
+  defer back.deinit();
+  try testing.expectEqual(@as(?prog.Id,.driftSpores),back.prog.current);
+  try testing.expectEqual(@as(?items.Item,.grit),back.bar[0]);
+  // a structure stored under its kind's old name
+  try testing.expectEqual(@as(?st.Kind,.conduit),st.kindByName(record.nameHash("saveTestOldKind")));
+}
 test"an old raw save is refused, never misread, and a cut-short one is corrupt"{
   // the test allocator, and a raw save's header from before named records
   const gpa=testing.allocator;

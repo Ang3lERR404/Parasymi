@@ -42,6 +42,78 @@ const EnumMap=std.EnumMap;
 pub const Error=error{CorruptSave}||Allocator.Error;
 /// what a name (a field's, a tag's) is stored as
 pub fn nameHash(name:[]const u8)u32{return Fnv.hash(name);}
+/// a name list of a struct, union or enum
+const fieldNames=std.meta.fieldNames;
+/// a name a code tag or field once had and the one it has now: a save
+/// naming the old one reads as the new one
+pub const Renamed=struct{
+  /// the name saves may still hold
+  was:[]const u8,
+  /// the name it goes by now
+  now:[]const u8,
+};
+/// the old-name table: every code tag (species, structure kind, item,
+/// research, anything stored by name) or field renamed since saves became
+/// named, so a renamed thing is carried over, never dropped. Add a line
+/// when renaming; never remove one. A name renamed twice chains (a to b,
+/// b to c). The player-facing names live in `src/cfg/parasymi.cfg` and
+/// change freely; only code names need a line here.
+pub const renamed=[_]Renamed{};
+/// names only the tests rename (they stand for a renamed species, kind,
+/// study and item, and the tests' own enums)
+const testRenamed=[_]Renamed{
+  .{.was="recordOldest",.now="recordOld"},
+  .{.was="recordOld",.now="recordNew"},
+  .{.was="recordOldField",.now="recordField"},
+  .{.was="saveTestOldKind",.now="conduit"},
+  .{.was="saveTestOldStudy",.now="driftSpores"},
+  .{.was="saveTestOldItem",.now="grit"},
+};
+/// the table this build reads: `renamed`, and in a test build the tests' own
+const formerly=renamed++(if(lib.builtin.is_test)testRenamed else [_]Renamed{});
+/// the table as name hashes: each line's old name and new name
+const formerHashes=blk:{
+  @setEvalBranchQuota(100_000);
+  // the pairs, filled line by line
+  var p:[formerly.len]m.Vice(u32,2)=undefined;
+  for(formerly,0..)|r,i|p[i]=.{nameHash(r.was),nameHash(r.now)};
+  break:blk p;
+};
+/// the name stored as `h` is called now, followed through the table (null:
+/// the table never renamed it)
+fn current(h:u32)?u32{
+  // the name as far as it has been followed
+  var now=h;
+  outer:for(0..formerHashes.len)|_|{
+    now=for(formerHashes)|p|{
+      if(p[0]==now)break p[1];
+    }else break:outer;
+  }
+  return if(now==h)null else now;
+}
+/// whether one of `names` hashes to `h`
+fn has(comptime names:[]const [:0]const u8,h:u32)bool{
+  inline for(names)|n|if((comptime nameHash(n))==h)return true;
+  return false;
+}
+/// the name hash among `T`'s fields or tags that the stored `h` stands for:
+/// `h` itself, else what the old-name table renamed it to (null: gone)
+fn known(comptime T:type,h:u32)?u32{
+  // the names `T` has now
+  const names=comptime fieldNames(T);
+  if(has(names,h))return h;
+  // what the table renamed it to
+  const now=current(h) orelse return null;
+  return if(has(names,now))now else null;
+}
+/// the tag of `E` stored as the name hash `h` (through the old-name
+/// table), if `E` still has it
+pub fn tagByHash(comptime E:type,h:u32)?E{
+  // the hash of the name it has now
+  const n=known(E,h) orelse return null;
+  inline for(@typeInfo(E).@"enum".fields)|f|if((comptime nameHash(f.name))==n)return@enumFromInt(f.value);
+  return null;
+}
 /// whether `T` is an `ArrayList` (it has `items`, `capacity` and a `Slice`)
 fn isList(comptime T:type)bool{
   return@typeInfo(T)==.@"struct"and@hasField(T,"items")and@hasField(T,"capacity")and@hasDecl(T,"Slice");
@@ -72,10 +144,7 @@ fn keyed(comptime T:type)Keyed{
 /// tag and `E` still has it
 fn tagOf(comptime E:type,b:[]const u8)?E{
   if(b.len!=4)return null;
-  // the stored tag name's hash
-  const h:u32=@bitCast(b[0..4].*);
-  inline for(@typeInfo(E).@"enum".fields)|f|if((comptime nameHash(f.name))==h)return@enumFromInt(f.value);
-  return null;
+  return tagByHash(E,@bitCast(b[0..4].*));
 }
 /// whether `T` is an exhaustive enum, stored by its tags' names
 fn isTag(comptime T:type)bool{
@@ -341,9 +410,11 @@ pub fn read(comptime T:type,gpa:Allocator,b:[]const u8,out:*T)Error!void{
       // how many fields are stored
       const n=try r.int(u16);
       for(0..n)|_|{
-        // this field's name hash, and its bytes
-        const h=try r.int(u32);
+        // this field's stored name hash, and its bytes
+        const stored=try r.int(u32);
         const e=try r.frame();
+        // the field it is now, through the old-name table (none: gone)
+        const h=known(T,stored) orelse continue;
         inline for(s.fields)|f|{
           if(f.is_comptime)continue;
           if((comptime nameHash(f.name))==h)try read(f.type,gpa,e,&@field(out.*,f.name));
@@ -352,8 +423,10 @@ pub fn read(comptime T:type,gpa:Allocator,b:[]const u8,out:*T)Error!void{
     },
     .@"union"=>|u|{
       // the stored tag name's hash, and the payload's bytes
-      const h=try r.int(u32);
+      const stored=try r.int(u32);
       const e=try r.frame();
+      // the tag it is now, through the old-name table (none: gone, left as it was)
+      const h=known(T,stored) orelse return;
       inline for(u.fields)|f|if((comptime nameHash(f.name))==h){
         if(@field(u.tag_type.?,f.name)!=activeTag(out.*))out.*=@unionInit(T,f.name,fresh(f.type));
         try read(f.type,gpa,e,&@field(out.*,f.name));
@@ -435,6 +508,26 @@ test"unions by tag name, lists grown back, nested records"{
   // a union that has lost those tags
   const V=union(enum){none,other:u8};
   try testing.expectEqual(V.none,try again(U,V,.{.one=.{}},.none));
+}
+test"a renamed tag or field is carried over through the old-name table"{
+  // the old names, and the new: one renamed, one renamed twice, one kept
+  const Old=enum{recordOldest,keep,recordOld};
+  const New=enum{recordNew,keep};
+  try testing.expectEqual(@as(?New,.recordNew),try again(?Old,?New,.recordOld,null));
+  try testing.expectEqual(@as(?New,.recordNew),try again(?Old,?New,.recordOldest,null));
+  try testing.expectEqual(@as(?New,.keep),try again(?Old,?New,.keep,null));
+  // a set, and a field and a union tag renamed
+  var set=EnumSet(Old).initEmpty();
+  set.insert(.recordOld);
+  try testing.expect((try again(EnumSet(Old),EnumSet(New),set,.initEmpty())).contains(.recordNew));
+  const S1=struct{recordOldField:u8=0};
+  const S2=struct{recordField:u8=0};
+  try testing.expectEqual(@as(u8,9),(try again(S1,S2,.{.recordOldField=9},.{})).recordField);
+  const U1=union(enum){none,recordOld:u8};
+  const U2=union(enum){none,recordNew:u8};
+  try testing.expectEqual(U2{.recordNew=4},try again(U1,U2,.{.recordOld=4},.none));
+  // a name the table never renamed, and gone, stays gone
+  try testing.expectEqual(@as(?u32,null),current(nameHash("neverRenamed")));
 }
 test"a cut-short record is corrupt, never misread"{
   // a record with a number and a list

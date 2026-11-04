@@ -4,6 +4,8 @@
 //! it as `@import("parasymi")`; the game itself starts from main.zig.
 /// the standard library, for every game file
 pub const std=@import("std");
+/// what this build is (a test build reads the saves' test-only old names)
+pub const builtin=@import("builtin");
 /// the engine package: core, platform, anim, gfx, world, render and ui
 pub const engine=@import("engine");
 /// what can be held: the item table and stacks of items

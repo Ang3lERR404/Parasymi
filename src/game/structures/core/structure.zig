@@ -214,10 +214,10 @@ pub fn freshState(k:Kind)State{
     },
   };
 }
-/// a kind by its name's hash (`record.nameHash`), as saves store it
+/// a kind by its name's hash (`record.nameHash`), as saves store it (a
+/// renamed kind through the old-name table)
 pub fn kindByName(h:u32)?Kind{
-  inline for(reg.ids)|k|if((comptime record.nameHash(@tagName(k)))==h)return k;
-  return null;
+  return record.tagByHash(Kind,h);
 }
 /// a structure of kind `k` at the origin, its state fresh (what a saved
 /// one is read over)

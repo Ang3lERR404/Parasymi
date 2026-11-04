@@ -604,8 +604,12 @@ are stored by name, never by number, `EnumSet`s and `EnumArray`s too.
 - A structure that no longer fits its tiles is let go, not refused.
 - Something new to keep goes in `Saved` (filled in `snapshot`, laid back in
   `decode`); a type `record` cannot store is refused at compile time.
-- Renaming a field or a tag reads as one gone and one new: keep the old
-  name, or add an old-name table when one is first needed.
+- Code names (tags and fields) are what saves hold; the names the player
+  reads live in `src/cfg/parasymi.cfg` and change freely. Renaming a code
+  name takes one line in the old-name table (`record.renamed`: was, now),
+  never removed: a stored name the build no longer has is looked up there
+  (chains followed) and carried over as the new one, for every species,
+  structure kind, item, study, discovery and field alike.
 - Saves from before version 35 (raw bytes) are refused. Changing world
   generation still moves the land under a save.
 
