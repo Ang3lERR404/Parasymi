@@ -27,8 +27,10 @@ carries the game's early days.
   the light at night. A patch never runs dry, but each has its own
   richness, like Factorio's oil fields. At the unforming each patch goes
   dark by shooting its light up into the sky.
-- **Fibre.** It comes only from the fibre plant's nodes, gathered by
-  hand; no plant grows it.
+- **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
+  out of essence, but no convergent plant makes it, so once the
+  symbiotic lineage is gone only the fibre plant's nodes, gathered by
+  hand, are left.
 - **The parasitic side.** It has one species and three structures; it needs
   more. One parasitic structure could live through the unforming by
   becoming convergent, mirroring the arsthraxia (the Pulse, a mimosa-like
