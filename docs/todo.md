@@ -107,9 +107,15 @@ hues are being chosen from samples.*
   travels along the ring, so each bloom's link is seen running round it.
 - **A solcyriphon over a diamond amplifies it** (the gardener's idea).
   When its night beam strikes a diamond directly, the diamond acts as a
-  lens: the light it carries is multiplied, by about 5%. To settle:
-  whether more than one solcyriphon can stack it. Update
-  radiant-plants.md when built.
+  lens: the light it carries is multiplied, by about 5%. Solcyriphons
+  never stack it: one beam, one boost. Update radiant-plants.md when
+  built.
+- **A radiant amplifier** (the gardener's idea, to be shaped). A new
+  radiant plant, opened by its own research and woven for one purpose:
+  amplifying the light grid's output. Its look, numbers and how it sits
+  in the grid (beside a relay? in a beam's path?) are still to settle;
+  gathered from `radiantKit` fragments like every radiant thing, held to
+  the glow bar.
 - **Relays carry without a cap** (the gardener's word: a cap is too
   punishing). The bloom's 4 glow and the diamond's 16 glow limits go;
   a relay carries all the light it is given, its reach unchanged.
