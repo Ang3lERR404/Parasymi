@@ -118,6 +118,15 @@ carries the game's early days.
 - ~~**A playback trail**~~ built: `--record[=S]`
   ([testing.md](testing.md#a-playback-trail-while-the-gardener-plays)).
 
+## Saved gardens
+- **A picture of each saved garden** (the gardener's idea, 2026-11-04,
+  as Factorio shows a factory beside its save). Whenever the garden is
+  saved (by hand or the autosave), the game takes a screenshot of it
+  (the world, without the HUD) and keeps it beside the save; the saved
+  gardens menu shows the picture of the garden chosen. A small image,
+  written beside the frames like the `--inspect` shots; a save with no
+  picture yet (older ones) shows none, never breaks.
+
 ### The gardener's first playthrough (2026-11-03)
 *The rest is mended (the floater looked at, the sky's shaking, the light's
 flicker and the lenses, what the wolf and the germinator weave); the sky's
