@@ -30,7 +30,12 @@ carries the game's early days.
 - **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
   out of essence, but no convergent plant makes it, so once the
   symbiotic lineage is gone only the fibre plant's nodes, gathered by
-  hand, are left.
+  hand, are left. *The answer being shaped:* a new convergent plant of
+  the rain pools, one joined structure of two parts: reeds or flax rooted
+  in the pool bed, growing fibre stalks, and at their feet the convergent
+  lineage's pink flowers on lily pads, harvesting the fibre. Never a
+  loomfern that lives through the unforming: that is the arsthraxia's
+  alone.
 - **The parasitic side.** It has one species and three structures; it needs
   more. One parasitic structure could live through the unforming by
   becoming convergent, mirroring the arsthraxia (the Pulse, a mimosa-like
