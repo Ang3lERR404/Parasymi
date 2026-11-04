@@ -140,6 +140,10 @@ const bloomLight:f32=3.5;
 const bloomDark:f32=0.2;
 /// how high (metres) over its float a bloom's core sheds its light
 const bloomCore:f32=0.35;
+/// how far a plant's crown glow shimmers either way (a share), and its pace (radians a second)
+const crownShimmer:f32=0.2;
+/// (its pace)
+const crownShimmerRate:f32=1.7;
 /// how much of its pearl's film tints a bloom's own round light, 0..1
 const bloomFilm:f32=0.25;
 /// how strong its round light is, a share of its light: low, so its cones
@@ -829,6 +833,14 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     try g.caughtIn[mesh].append(g.gpa,name);
   }
   if(!seen)return;
+  // a light of its own over it by night (the lumi lantern's lilac crown),
+  // shimmering, lighting the fog round it, as grown and well as it is
+  if(def.crownGlow)|cg|if(!d.ghost){
+    // how deep the night is, and its shimmer
+    const night=1-g.sky.daylight();
+    const shimmer=1+crownShimmer*@sin(tf*crownShimmerRate+d.seed*m.tau)*@sin(tf*crownShimmerRate*0.61+d.seed*9);
+    if(night>0)try g.parts.light(at+m.v3(0,cg.high,0),m.Vice(f32,3){cg.col[0],cg.col[1],cg.col[2]}*m.splat3(night*shimmer*d.growth*d.health),cg.reach);
+  };
   // a celestial bloom is the garden's light: its core sheds it round
   // about, pearl tinted by its film, pulsing slowly, brighter as it
   // assembles (a dark network's only faintly), following it as a forming

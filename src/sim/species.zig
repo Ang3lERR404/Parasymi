@@ -184,6 +184,15 @@ pub const Genome=struct{
   /// the bloom's colour
   bloomCol:color.Rgb,
 };
+/// a light a plant throws over itself by night (`Species.crownGlow`)
+pub const CrownGlow=struct{
+  /// how high over its point it glows (m)
+  high:f32,
+  /// its colour and strength (linear)
+  col:m.Vice(f32,3),
+  /// how far it reaches (m)
+  reach:f32,
+};
 /// everything a species is: its lineage, seed, footprint, mana and yield,
 /// how it grows and looks
 pub const Species=struct{
@@ -236,6 +245,10 @@ pub const Species=struct{
   /// a driftwisp's trailing filaments, a solcyriphon's lens. The cursor
   /// touches it anywhere along that, not only at its float
   trails:f32=0,
+  /// a light of its own glowing over it by night, lighting the fog round
+  /// it (the lumi lantern's lilac crown): how high over its point (m),
+  /// its colour (linear) and how far it reaches; none: it throws none
+  crownGlow:?CrownGlow=null,
   /// how far its body rises above its float (m, at full size)
   crests:f32=0.5,
   /// how far out from its middle its body reaches (m, at full size)

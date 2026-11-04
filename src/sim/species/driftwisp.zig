@@ -18,6 +18,8 @@ pub const def:species.Species=.{
   .pluck=0.31,
   // its filaments trailing a metre beneath the float
   .trails=1.1,
+  // its crown's petals glow lilac by night, lighting the fog round it
+  .crownGlow=.{.high=0.24,.col=.{0.5,0.32,0.85},.reach=2.4},
   // light and hanging in the air: the wind carries it furthest
   .sway=1.8,
   .genome=.{

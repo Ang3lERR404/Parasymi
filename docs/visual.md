@@ -195,15 +195,22 @@ proportion only.
 - A candelabrum of 5 fronds, each ending in a pod crowned by 5 frondlets.
 - plant.vert parts the cage from the foot up (tu.y) and opens the crown.
 
-### Floaters (`drift`)
-- **Lantern:** a comb-jelly lantern (`meshgen.lantern`): clear sap, 8
-  twisting comb rows in split-light colours, a golden spore inside.
-  plant.frag shades it apart by tu.x 0.5, with a bright iridescent film.
-  Approved as is.
-- A catcher dish.
-- Hair-thin filaments waving in two lengths (plant.vert runs a wave down
-  them).
-- A slow bob over a ground shadow.
+### The lumi lantern (halyriphon, `drift`, `radiantKit.lumi`)
+Turned radiant in look (its lineage move is still to come): gathered,
+never grown (`FORMS_FREE`).
+- **Lantern** (the gardener's heart of it, kept): the old comb-jelly
+  lantern (`meshgen.drifts.lantern`) whole, gathered in as one sheer pane
+  of light round a small radiant heart; its 8 comb rows lifted off it as
+  threads of light a hair off the skin, each its own colour of the split
+  light, beads strung along.
+- **Filaments** (the other heart, kept): threads of light trailing in two
+  lengths, beads strung down them.
+- **Crown** (the gardener's pick: all three drafts layered): a ring of 9
+  aqua crystal facets close over its top; a lilac whorl of floating petals
+  above, light itself (`Whorl.part = .bloom`), glowing by night and
+  lighting the fog round it (`Species.crownGlow`, shimmering); a thin
+  star-blue halo tilted round it all, motes spiralling in. Nothing white.
+- Its yield's beads float over the crown; a slow bob over a ground shadow.
 
 ### Confluence
 - 8 growth keys of one vertex layout, blended in plant.vert (binding 2).

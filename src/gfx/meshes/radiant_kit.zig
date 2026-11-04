@@ -249,6 +249,9 @@ pub const Whorl=struct{
   col:Rgba8,
   /// toward its tips, where the light inside it gathers
   tip:Rgba8,
+  /// the role its petals are drawn with: living tissue (`.leaf`), or light
+  /// itself, glowing of its own by night (`.bloom`, the lumi lantern's)
+  part:vertex.Part=.leaf,
 };
 /// a whorl of petals floating free round the heart, a gap off it, each its
 /// own fragment held to the core by a thread of light from the core's
@@ -270,7 +273,7 @@ pub fn whorl(b:*mg.Builder,radius:f32,wh:Whorl,lite:Rgba8,seed:u64,rng:*Rng)Allo
       .base=base,.out=out,
       .len=radius*wh.len*rng.range(0.9,1.1),.width=radius*wh.w,
       .rise=wh.rise+rng.range(-0.1,0.1),.flare=wh.flare,.cup=wh.cup,
-      .col=wh.col,.tip=wh.tip,.part=.leaf,
+      .col=wh.col,.tip=wh.tip,.part=wh.part,
     });
     fragment(b,s,f);
     // the thread: from just inside the core's skin to just short of the claw
@@ -942,7 +945,7 @@ pub fn lumi(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
   // its crown, layered: facets close over its top, a whorl of petals
   // opening above them, a halo tilted round it all, motes coming in
   try lens(b,radius,.{.n=9,.inner=0.3,.outer=0.85,.thick=0.06,.y=1.08,.order=.{0.72,0.84},.lite=lumiFacet,.deep=body},lite,seed+%0x1E26);
-  try whorl(b,radius,.{.n=g.petals,.ring=.outer,.at=0.55,.y=1.45,.len=1.4,.w=0.36,.rise=0.62,.flare=0.45,.cup=0.45,.order=.{0.82,0.93},.col=body,.tip=lumiPetal},lite,seed+%0x2B11,&rng);
+  try whorl(b,radius,.{.n=g.petals,.ring=.outer,.at=0.55,.y=1.45,.len=1.4,.w=0.36,.rise=0.62,.flare=0.45,.cup=0.45,.order=.{0.82,0.93},.col=body,.tip=lumiPetal,.part=.bloom},lite,seed+%0x2B11,&rng);
   try motes(b,radius,10,lite,&rng);
   try halo(b,radius*2.1,radius*0.022,0.4,0.96,lumiHalo);
 }
