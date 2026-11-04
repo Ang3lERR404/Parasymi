@@ -42,7 +42,8 @@ carries the game's early days.
   patches are what a garden is built round). Each patch its own size,
   about 3×3 to 10×10 tiles, beside its own richness. Its shape mostly a
   semi-ragged organic splash (ragged, not wildly), now and then a soft
-  round pool.
+  round pool. Along the ley lines they lie anywhere from about 30 m to
+  120 m apart.
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
