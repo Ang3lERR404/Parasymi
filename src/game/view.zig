@@ -148,12 +148,11 @@ const bloomLight:f32=3.5;
 const bloomDark:f32=0.2;
 /// how high (metres) over its float a bloom's core sheds its light
 const bloomCore:f32=0.35;
-/// how much of its heart's rainbow tints a bloom's light, 0..1: enough that
-/// the fog round it and what it lights shimmer through the hues with its
-/// twinkling heart, never a plain white
-const bloomFilm:f32=0.6;
-/// how fast a bloom's light turns through the rainbow (turns of the hue a second)
-const bloomHueRate:f32=0.08;
+/// how much of its pearl's film tints a bloom's own round light, 0..1
+const bloomFilm:f32=0.25;
+/// how strong its round light is, a share of its light: low, so its cones
+/// of colour (`heartCones`) carry the light, not a haze round it
+const bloomRound:f32=0.3;
 /// how far a bloom's light pulses either way (a share)
 const bloomPulse:f32=0.15;
 /// how fast it pulses (radians a second)
@@ -425,6 +424,67 @@ pub fn filmHue(x:f32)m.V3{
     0.5+0.5*@cos(m.tau*(0.33+x)),
     0.5+0.5*@cos(m.tau*(0.67+x)),
   };
+}
+/// a saturated hue of the rainbow (one turn per unit of `x`): the film's
+/// hue sharpened, its brightest channel at one
+fn rainbow(x:f32)m.V3{
+  // the film's soft hue, cubed so its weakest channels fall away
+  const h=filmHue(x);
+  const s=h*h*h;
+  return s/m.splat3(@max(s[0],@max(s[1],s[2])));
+}
+/// the cones of light a radiant heart throws at `at`, `strength` its
+/// light: `heartCones` wide soft cones, each its own colour, wandering on
+/// its own (its own way round and down, swinging at its own two paces),
+/// breathing in brightness at its own pace; together they overlap, part
+/// and drift, filling the fog round it with colour and splashing it on
+/// the ground and plants they sweep over (light.glsl `coneOf`)
+fn heartCones(g:*Game,at:m.V3,strength:f32,seed:f32,tf:f32)Allocator.Error!void{
+  for(0..coneCount)|k|{
+    // this cone's own random draws, from the plant's seed and its place
+    const h=[_]f32{hashOf(seed,k,1),hashOf(seed,k,2),hashOf(seed,k,3),hashOf(seed,k,4),hashOf(seed,k,5),hashOf(seed,k,6)};
+    // its way round: spread from its neighbours, swinging at two paces of its own
+    const yaw=m.ratio(k,coneCount)*m.tau+h[0]*coneSpread+coneSwing*@sin(tf*m.lerp(coneSlow[0],coneSlow[1],h[1])+h[2]*m.tau)+coneSwing*0.55*@sin(tf*m.lerp(coneFast[0],coneFast[1],h[3])+h[4]*m.tau);
+    // how far below level it leans, rising and dipping on its own
+    const dip=m.lerp(coneDip[0],coneDip[1],0.5+0.5*@sin(tf*m.lerp(coneSlow[0],coneSlow[1],h[5])*1.3+h[1]*m.tau));
+    const way=m.v3(@cos(dip)*@sin(yaw),-@sin(dip),@cos(dip)*@cos(yaw));
+    // its colour, drifting slowly through the rainbow, and its breath
+    const col=m.lerpV(rainbow(m.ratio(k,coneCount)+h[2]*0.15+tf*coneHueRate*(0.6+h[3])),m.v3(1,1,1),conePearl);
+    const breath=1+coneBreath*@sin(tf*m.lerp(coneBreathRate[0],coneBreathRate[1],h[4])+h[5]*m.tau);
+    try g.parts.spot(at,way,@cos(coneHalf),col*m.splat3(strength*coneLight*breath),coneReach);
+  }
+}
+/// a radiant heart's cones: how many
+const coneCount=4;
+/// how far a cone's resting way round strays from an even spread (radians)
+const coneSpread:f32=0.8;
+/// how far a cone swings round from its resting way (radians)
+const coneSwing:f32=0.9;
+/// a cone's slow and fast swings: the range each one's pace is drawn from (radians a second)
+const coneSlow=m.Vice(f32,2){0.09,0.18};
+/// (its faster swing)
+const coneFast=m.Vice(f32,2){0.21,0.37};
+/// how far below level a cone leans: between these (radians)
+const coneDip=m.Vice(f32,2){0.35,1.05};
+/// a cone's half-width (radians): wide, to fill the air
+const coneHalf:f32=0.42;
+/// how far a cone reaches (metres)
+const coneReach:f32=10;
+/// a cone's brightness, a share of its heart's light
+const coneLight:f32=1.6;
+/// how much of a pearl's white softens a cone's colour (never white itself)
+const conePearl:f32=0.06;
+/// how fast a cone's colour drifts through the rainbow (turns a second)
+const coneHueRate:f32=0.02;
+/// how far a cone breathes either way (a share), and the range of its pace (radians a second)
+const coneBreath:f32=0.25;
+/// (the range its breath's pace is drawn from)
+const coneBreathRate=m.Vice(f32,2){0.4,0.9};
+/// a draw 0..1 for cone `k` of a plant of `seed`, the `which`th
+fn hashOf(seed:f32,k:usize,which:u32)f32{
+  // a sine hash: the fractional part of a large multiple
+  const x=@sin(seed*127.1+m.f(k)*311.7+m.f(which)*74.7)*43758.5453;
+  return x-@floor(x);
 }
 /// the most telling points of light first, the rest dropped: the renderer
 /// takes `renderer.maxLights` (strong, far reaching lights near what the
@@ -792,9 +852,11 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // how strong its light is now
     const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark)*(if(def.floating)@as(f32,1)else groundedLight)*(if(def.store>0)m.lerp(groundedEmpty,1,d.own)else 1)*m.lerp(1,lightByDay,g.sky.daylight());
     if(strength>0){
-      // its light's tint, pearl blended toward its heart's turning rainbow
-      const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*bloomHueRate),bloomFilm);
-      try g.parts.light(drawn.at,tint*m.splat3(strength),bloomReach);
+      // a soft pearl light round it (its tint a breath of its film), and
+      // its cones of coloured light wandering out into the night
+      const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*0.03),bloomFilm);
+      try g.parts.light(drawn.at,tint*m.splat3(strength*bloomRound),bloomReach);
+      try heartCones(g,drawn.at,strength,d.seed,tf);
     }
   }
 }

@@ -47,6 +47,11 @@ const float POINT_HUG = 6.0;
 // chord through its reach (so what stands in its light shades the air: rays
 // and shadow wedges round it)
 const int CUBE_STEPS = 24;
+// a light thrown in a cone: how many steps its glow is summed in across the
+// ray's chord, and how strongly the air inside it glows (it fills its cone,
+// not a ball round the light)
+const int CONE_STEPS = 12;
+const float CONE_AIR = 2.5;
 // the ley lines' glow in it: how strongly, how high it rises, how far round
 // a line it spreads (units)
 const float LEY_AIR = 3.0;
@@ -167,6 +172,23 @@ void main() {
     float c = sqrt((r2 + LIGHT_FALLOFF * h2) / LIGHT_FALLOFF);
     float sum = r2 / (LIGHT_FALLOFF * c) * (atan(ub / c) - atan(ua / c));
     float win = pow(1.0 - h2 / r2, POINT_HUG);
+    // a light thrown in a cone (a spotlight in the fog): its falloff summed
+    // in CONE_STEPS steps across the chord, each step as lit as the cone is
+    // there and faded by the light's reach as a surface is, so the air
+    // glows inside the cone all the way out, not only round the light
+    if (L.lights[i].dir.w >= -1.0) {
+      float du = (ub - ua) / float(CONE_STEPS);
+      sum = 0.0;
+      for (int j = 0; j < CONE_STEPS; j++) {
+        float u = ua + du * (float(j) + dither);
+        vec3 q = eye + dir * (near + u) - lp.xyz;
+        float q2 = max(dot(q, q), 1e-6);
+        float e = max(1.0 - q2 / r2, 0.0);
+        sum += coneOf(L.lights[i], q * inversesqrt(q2)) * e * e * du / (1.0 + LIGHT_FALLOFF * q2 / r2);
+      }
+      if (sum <= 0.0) continue;
+      win = CONE_AIR;
+    }
     float at = clamp(near, 0.0, len);
     vec3 p = eye + dir * at;
     float rho = airDensity(p, t);

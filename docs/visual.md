@@ -241,9 +241,16 @@ A flower whose petals float free, gathered by its core.
   over it, each its own hue of the spectrum, flaring and fading at its own
   pace over a pearl the film turns (`CORE_FLECKS`, `CORE_TWINKLE*`); light
   past full is carried in a deeper shade of its own hue (`CORE_OVER`), so
-  it still feeds the glow. Its light (and so the fog round it and what it
-  lights) is pearl blended 60% toward a rainbow turning slowly through the
-  hues (view.zig `bloomFilm`, `bloomHueRate`).
+  it still feeds the glow.
+- **Its light:** a soft pearl light round it, low (`bloomRound`), and
+  four wide soft cones of coloured light thrown out of the heart like
+  spotlights in fog (view.zig `heartCones`). Each its own colour (spread
+  round the rainbow, drifting slowly), each wandering on its own: its own
+  way round and down, swinging at two paces of its own, rising and dipping,
+  breathing in brightness; they overlap, part and drift. Each lights the
+  fog inside it (fog.frag sums a cone's glow across the ray, `CONE_STEPS`,
+  `CONE_AIR`) and splashes its colour on the ground and plants it sweeps
+  (light.glsl `coneOf`: a point of light's `dir`, its cone).
 - **What each fragment carries:** assembly order (tu.x), `radiantKit.Ring`
   (tu.y; a thread adds its distance from its petal) and bearing (colour
   alpha).

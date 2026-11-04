@@ -31,12 +31,23 @@ vec3 viewRay(vec2 ndc) {
 // this frame's light (render/light.zig `Lighting`): the key light's shadow
 // cascades and the points of light a game makes
 const int CASCADES = 3;
-const int MAX_LIGHTS = 32;
+const int MAX_LIGHTS = 48;
 const int MAX_CUBES = 4;
 struct PointLight {
   vec4 pos; // xyz where, w how far it reaches
   vec4 col; // linear rgb times its strength; w its shadow cube plus one (0 none)
+  vec4 dir; // a cone it is thrown in: xyz the way its middle points, w the cosine of its half-width (below -1: all round)
 };
+// how much of a cone's width fades softly to its edge (a share of the way
+// from its rim to its middle, in cosine): wide and soft, like a spotlight in fog
+const float CONE_SOFT = 0.6;
+// how much of point of light `l`'s light goes the way `away` (unit, from
+// the light outward): 1 all round for a plain point of light; in a cone,
+// full near its middle, fading softly to nothing at its rim
+float coneOf(PointLight l, vec3 away) {
+  if (l.dir.w < -1.0) return 1.0;
+  return smoothstep(l.dir.w, mix(l.dir.w, 1.0, CONE_SOFT), dot(away, l.dir.xyz));
+}
 // a point of light's shadow cube (render/cube.zig `Cube`)
 struct Cube {
   vec4 at;      // xyz the light it was drawn round, w how far it reaches (its far plane)
@@ -414,7 +425,9 @@ vec3 pointLight(vec3 wpos, vec3 n, float wrap) {
     float d2 = dot(d, d);
     float k = d2 / (lp.w * lp.w);
     if (k >= 1.0) continue;
-    float win = (1.0 - k) * (1.0 - k) * pointShadow(L, i, wpos, n, d);
+    float win = (1.0 - k) * (1.0 - k) * coneOf(L.lights[i], -d * inversesqrt(max(d2, 1e-6)));
+    if (win <= 0.0) continue;
+    win *= pointShadow(L, i, wpos, n, d);
     float facing = (dot(n, d) * inversesqrt(max(d2, 1e-6)) + wrap) / (1.0 + wrap);
     sum += L.lights[i].col.rgb * max(facing, 0.0) * win / (1.0 + LIGHT_FALLOFF * k);
   }

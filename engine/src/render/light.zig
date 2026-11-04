@@ -81,7 +81,7 @@ pub const Lighting=extern struct{
 };
 comptime{
   // std430 as light.glsl reads it: the texel sizes pack into one vec4
-  if(cascades>4 or @offsetOf(Lighting,"info")!=cascades*64+16 or @offsetOf(Lighting,"lights")!=cascades*64+32 or @offsetOf(Lighting,"cubes")!=cascades*64+32+maxLights*32 or @sizeOf(cube.Cube)!=32+cube.faces*64)
+  if(cascades>4 or @offsetOf(Lighting,"info")!=cascades*64+16 or @offsetOf(Lighting,"lights")!=cascades*64+32 or @offsetOf(Lighting,"cubes")!=cascades*64+32+maxLights*48 or @sizeOf(vertex.Light)!=48 or @sizeOf(cube.Cube)!=32+cube.faces*64)
     @compileError("Lighting must match light.glsl's layout");
 }
 /// where cube `i`'s face `f` lies in the lighting record (a face's casters are

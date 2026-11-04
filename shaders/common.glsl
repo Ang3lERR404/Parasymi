@@ -487,8 +487,10 @@ PointLit pointLights(vec3 wpos, vec3 n, vec3 R, bool mirror) {
     float k = d2 / (lp.w * lp.w);
     if (k >= 1.0) continue;
     vec3 col = L.lights[i].col.rgb;
-    float win = (1.0 - k) * (1.0 - k) * pointShadow(L, i, wpos, n, d);
     float inv = inversesqrt(max(d2, 1e-6));
+    float win = (1.0 - k) * (1.0 - k) * coneOf(L.lights[i], -d * inv);
+    if (win <= 0.0) continue;
+    win *= pointShadow(L, i, wpos, n, d);
     float f = dot(n, d) * inv;
     vec3 lit = col * win / (1.0 + LIGHT_FALLOFF * k);
     p.plain += lit * max(f, 0.0);

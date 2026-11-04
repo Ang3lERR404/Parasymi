@@ -15,6 +15,12 @@ pub const Light=extern struct{
   pos:m.Vice(f32,4),
   /// linear rgb times its strength; w unused
   col:m.Vice(f32,4),
+  /// a cone it is thrown in, like a spotlight: xyz the way its middle
+  /// points (unit), w the cosine of its half-width; w below -1 throws it
+  /// all round (`round`, a plain point of light)
+  dir:m.Vice(f32,4)=round,
+  /// a point of light's `dir`: no cone, lit all round
+  pub const round=m.Vice(f32,4){0,-1,0,-2};
 };
 /// one corner of a UI quad, a glyph or a drawn shape, as the UI shaders read it
 pub const Ui=extern struct{

@@ -91,6 +91,12 @@ hues are being chosen from samples.*
   real night sky, so vibrant hues come through instead of a milky
   lavender-white. The fog takes its colour from the sky (`SKY_AIR`), so it
   deepens with it.
+- **A radiant heart's cones of light: awaiting the gardener's look.** The
+  rainbow haze round a heart read cheap; in its place each celestial bloom
+  throws four wandering cones of coloured light into the fog and onto the
+  ground (built, see visual.md). Still to settle: the gardener's word on
+  them, and whether the other radiant kinds' hearts throw cones too (today
+  only the celestial bloom's, the light nodes).
 - **The diamond's animations are far below the bar.** It never got
   polished motion: its forming, its idle and its light all want bringing
   up to the current standard (the growth and plant quality the rest of

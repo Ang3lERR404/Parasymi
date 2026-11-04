@@ -223,6 +223,15 @@ dense (`airDensity`, shaders/air.glsl, the same air the fog marches), and
 hidden behind what stands in front of it. A new glowing role only needs to
 be in `PARTS_LIGHT` and `vertex.seeThrough`.
 
+### Points of light thrown in a cone
+A point of light (engine `vertex.Light`, 48 of them a frame) may be
+thrown in a cone, a spotlight: its `dir` holds the way the cone's middle
+points and the cosine of its half-width (`Light.round`, w below -1, lights
+all round). light.glsl `coneOf` fades it softly to the cone's rim; every
+surface (`pointLight`, the game's `pointLights`) and the fog (fog.frag, the
+cone's glow summed across each ray in `CONE_STEPS`) take it. The game
+throws one with `Parts.spot`.
+
 ### Points of light with shadows
 The few most telling points of light near the camera hold shadow cubes
 (engine `render/cube.zig`), drawn before the world by the `cube` passes

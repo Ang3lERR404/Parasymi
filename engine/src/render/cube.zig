@@ -203,7 +203,7 @@ pub const Casters=struct{
   pub fn shownOf(s:Slot)f32{return m.smooth(s.shown);}
 };
 /// points of light a frame holds (light.zig `maxLights` is this one)
-pub const maxLights=32;
+pub const maxLights=48;
 /// how telling light `l` is for a cube: strong, far reaching and near the
 /// line from the eye to what it looks at scores high; one the view cannot
 /// see, or too dim, scores nothing

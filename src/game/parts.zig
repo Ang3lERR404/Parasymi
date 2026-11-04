@@ -170,6 +170,16 @@ pub const Parts=struct{
     if(p.view)|v|if(!v.sphere(at,reach))return;
     try p.lights.append(p.gpa,.{.pos=.{at[0],at[1],at[2],reach},.col=.{col[0],col[1],col[2],0}});
   }
+  /// a light thrown in a cone, like a spotlight: from `where` the way `way`
+  /// points (unit), `half` the cosine of its half-width; it lights the fog
+  /// inside it and what it falls on, as far as `reach`
+  pub fn spot(p:*Parts,where:m.V3,way:m.V3,half:f32,col:m.V3,reach:f32)Allocator.Error!void{
+    // where it is and the way it points, carried by the turning structure if one is set
+    const at=if(p.around)|a|m.mulPoint(a,where)else where;
+    const to=if(p.around)|a|m.norm(m.mulDir(a,way))else way;
+    if(p.view)|v|if(!v.sphere(at,reach))return;
+    try p.lights.append(p.gpa,.{.pos=.{at[0],at[1],at[2],reach},.col=.{col[0],col[1],col[2],0},.dir=.{to[0],to[1],to[2],half}});
+  }
   /// something breathing moisture into the air round `at` (x, z) within
   /// `reach`: `low` a second into the mist on the ground, `high` into the
   /// cloud over it (render passes/moisture.zig)
