@@ -173,7 +173,7 @@ test"a twinkle is a few soft high pings, louder the nearer, and ends"{
     // the sounds, with the wind hushed
     var s:Sounds=.init(11,testRate);
     s.wind.level=0;
-    s.apply(.{.twinkle=.{.mote=.{.near=near}}});
+    s.apply(.{.twinkle=.{.spark=.{.near=near}}});
     try testing.expect(s.twinkles.slots[0].?.n>=pingRange[0] and s.twinkles.slots[0].?.n<=pingRange[1]);
     // a block of samples
     var buf:[480]Frame=undefined;
@@ -423,7 +423,7 @@ test"what happens to the ear's right is heard on the right, and to its left on t
     s=.init(32,testRate);
     s.wind.level=0;
     s.apply(.{.ear=.{.at=.{0,1,0},.side=.{1,0,0}}});
-    s.apply(.{.twinkle=.{.mote=.{.near=1,.at=at}}});
+    s.apply(.{.twinkle=.{.spark=.{.near=1,.at=at}}});
     const tw=sides(&s,100);
     try testing.expect((tw.r>tw.l*2)==right and (tw.l>tw.r*2)==!right);
     // the arsthraxia at work, by day and night alike (both musics hushed)

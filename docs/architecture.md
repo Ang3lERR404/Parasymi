@@ -316,7 +316,9 @@ lit shader takes a RAY build in build.zig's variants and its pass's
   - 0 matrix;
   - 1 curve (beams; `e.y` is the reach);
   - 2 star mote;
-  - 3 skinned (`e.y` is the first bone).
+  - 3 skinned (`e.y` is the first bone);
+  - 4 a burst; 5 falling over the menu's stage; 6 a starlit patch's spark
+    (`e.y` its seed, `e.z` how far it rises, below 0 falls, `e.w` its spread).
 - `WorldPush` is 192 bytes (the limit is checked at pipeline creation).
 - GPU buffers retired mid-frame wait in `Renderer.pending` until every
   frame in flight is done.

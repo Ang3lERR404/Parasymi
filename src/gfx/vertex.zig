@@ -29,6 +29,10 @@ pub const Terrain=extern struct{
   /// tiles meeting at it share it out), which terrain.frag melts together
   /// along wandering, noisy borders
   mat:m.Vice(u8,4),
+  /// a starlit patch here: how far inside it (0 off any .. 1 deep in),
+  /// how rich it is (0 the poorest .. 1 the richest), unused, unused; its
+  /// dark-blue field, deeper the richer (terrain.frag)
+  star:m.Vice(u8,4)=.{0,0,0,0},
 };
 /// shading role of a vertex; shaders key secondary motion and glow off it
 /// (common.glsl's `PART_*` numbers match these tags in order)
@@ -165,7 +169,7 @@ pub const DetailTile=extern struct{
   corners:m.Vice(f32,4),
   /// the tile's ground colour, which its blades take on
   col:color.Rgba8,
-  /// tile kind, ley 0..255, unused, unused
+  /// tile kind, ley 0..255, how far inside a starlit patch its middle lies, how rich that patch is
   info:m.Vice(u8,4),
   /// how much of each kind of ground (soil, moss, stone, ley) lies at its
   /// corner (x0,z0), as the ground beneath shares it out: grass grows as

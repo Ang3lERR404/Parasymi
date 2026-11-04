@@ -32,7 +32,7 @@ Use it whenever any of these change:
   - a species: its own (+ `shadow` for floaters);
   - a structure: `st.meshes(kind)` (its `mesh`, `preview` and `meshes`
     hook) + the resource node meshes.
-- **Left out:** the wolf, motes, ghosts and starfall. A plant also has no
+- **Left out:** the wolf, ghosts and the starlit patches. A plant also has no
   nodes or structures.
 - **Ignored:** saves, loads and autosave; also `--demo`/`--stress`/`--load`
   when used with it.

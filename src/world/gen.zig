@@ -274,6 +274,8 @@ pub fn generate(seed:u64,c:*ck.Chunk)void{
   // the levelled terraces round the chunk, read once
   var f:Field=.{};
   f.fill(seed,c.originX(),c.originY());
+  // the starlit patches touching it, gathered once
+  const stars=lib.starlit.Near.of(seed,c.originX(),c.originY(),c.originX()+ck.sizeTiles,c.originY()+ck.sizeTiles);
   for(0..ck.tileCount)|i|{
     // this tile's place in the world
     const wx,const wy=c.tileOf(i);
@@ -287,6 +289,10 @@ pub fn generate(seed:u64,c:*ck.Chunk)void{
     c.waterCap[i]=s.water;
     c.res[i]=s.res;
     c.occ[i]=.none;
+    // how far it lies in a starlit patch, and the yield there
+    const hit=stars.at(wx,wy);
+    c.star[i]=hit.field;
+    c.starYield[i]=if(hit.field>0)hit.yield else 0;
   }
 }
 test"generation is deterministic"{

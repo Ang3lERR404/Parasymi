@@ -201,6 +201,9 @@ pub const Species=struct{
   size:u8=1,
   /// whether it floats, taking no tile
   floating:bool=false,
+  /// whether it catches starlight: a floater that drinks only over a
+  /// starlit patch, as much as the patch is rich, nothing away from one
+  catches:bool=false,
   /// what condenses inside the plant from its mana, harvested by hand or conduit.
   yields:items.Item=.essence,
   /// seconds to maturity at full mana.

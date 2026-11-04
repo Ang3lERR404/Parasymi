@@ -48,15 +48,6 @@ const putCooldown:f32=0.25;
 pub const removeCooldown:f32=0.2;
 /// how long before a "none left" warning may be said again (s)
 const warnCooldown:f32=1.5;
-/// starlight within `attract` tiles of the chest drifts to it, faster the
-/// closer (`pull` less `pullFalloff` per tile away), and is absorbed within `absorb`
-const attract:f32=2.4;
-/// how fast the nearest starlight is drawn in (a share of the gap a second)
-const pull:f32=5;
-/// how much slower each tile further out is drawn
-const pullFalloff:f32=1.5;
-/// how close (tiles) a mote must come to the chest to be taken in
-const absorb:f32=0.65;
 /// works a resource node for a tick: every `gatherTime` it puts one item in
 /// the belly and spends one from the node. Returns whether the wolf keeps
 /// working this tile (the node still has some and the belly had room).
@@ -342,30 +333,6 @@ pub fn uproot(g:*Game,h:m.Vice(i32,2))void{
     if(g.player.inv.add(seed,1)==0)return g.prog.say(txt.s.msg.bellyFull,.{});
   }
   g.plants.remove(&g.world,id);
-}
-/// starlight drifts toward the wolf's chest and is absorbed on touch.
-pub fn catchStarlight(g:*Game,dt:f32)void{
-  // where the motes are drawn to, and the mote being looked at
-  const chest=g.player.chest();
-  var i:usize=0;
-  while(i<g.stars.motes.items.len){
-    // the mote, the way to the chest, and how far that is
-    const mo=&g.stars.motes.items[i];
-    if(mo.shattering()){i+=1;continue;}
-    const d=chest-mo.pos;
-    const dist=m.len(d);
-    if(dist<attract){
-      mo.pulled=true;
-      mo.pos=m.dampV(mo.pos,chest,pull-dist*pullFalloff,dt);
-    }else if(mo.pulled){
-      mo.pulled=false;
-    }
-    if(dist<absorb and g.player.inv.add(.starlight,1)==1){
-      _=g.stars.motes.swapRemove(i);
-      continue;
-    }
-    i+=1;
-  }
 }
 test"plants never set seed; an uprooted plant comes back as its seed"{
   // the test allocator, a fresh game, and the tile two right of the wolf

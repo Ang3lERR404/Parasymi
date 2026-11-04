@@ -46,7 +46,7 @@ const vertex=lib.vertex;
 const Draw=engine.ui.draw.Draw;
 /// a scrolled list's place, for the saved gardens
 const Scroll=engine.ui.scroll.Scroll;
-/// the sky: day and night, and the starfall
+/// the sky: day and night
 const skyMod=lib.sky;
 /// the player module
 const playerMod=lib.player;
@@ -125,8 +125,8 @@ pub const Game=struct{
   cam:Camera=.{},
   /// the sky: the hour, day and night
   sky:skyMod.Sky=.{},
-  /// the starlight falling at night, as motes
-  stars:skyMod.Starfall,
+  /// the starlit patches round the camera, and the twinkles heard in them
+  starlight:lib.starlight.Starlight,
   /// the vine-wolf: where it stands, its belly, its pose
   player:Player,
   /// the game's own random stream, seeded from the world's seed
@@ -318,7 +318,7 @@ pub const Game=struct{
       .gpa=gpa,
       .world=World.init(gpa,seed),
       .rng=Rng.init(seed^0xA11CE),
-      .stars=.{.rng=Rng.init(seed^0x57A2)},
+      .starlight=.{.rng=Rng.init(seed^0x57A2)},
       .player=.{.pos=m.v3(0.5,0,0.5)},
       .parts=Parts.init(gpa),
       .ui=.{.gpa=gpa},
@@ -365,7 +365,6 @@ pub const Game=struct{
     g.parts.deinit();
     g.ui.deinit();
     g.rows.deinit();
-    g.stars.deinit(g.gpa);
     g.eco.deinit(g.gpa);
     g.relays.deinit(g.gpa);
     g.users.deinit(g.gpa);
@@ -482,6 +481,7 @@ pub const Game=struct{
     // part in the light grid
     var mods=g.prog.mods();
     mods.night=1-g.sky.daylight();
+    mods.starlit=g.unforming.phase==.waiting;
     try st.lightGrid(&g.structs,g.gpa,&g.relays,&g.users,&g.userIds);
     mods.relays=g.relays.items;
     mods.users=g.users.items;
@@ -576,8 +576,6 @@ pub const Game=struct{
   pub const pluckOn=lib.actions.pluckOn;
   /// pull a plant up (`actions.uproot`)
   pub const uproot=lib.actions.uproot;
-  /// starlight drifts toward the wolf's chest and is absorbed on touch (`actions.catchStarlight`)
-  pub const catchStarlight=lib.actions.catchStarlight;
   /// the frozen world's menus, each frame (`menus.menu`)
   pub const menu=lib.play.menus.menu;
   /// does what a pause row says (`menus.choose`)

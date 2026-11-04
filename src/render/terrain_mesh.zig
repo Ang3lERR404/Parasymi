@@ -282,10 +282,18 @@ const Put=struct{
   info:m.Vice(u8,4),
   /// the share of each kind of ground there
   mat:m.Vice(u8,4),
+  /// the starlit patch there: how far inside, how rich
+  star:m.Vice(u8,4),
 };
 /// appends one ground vertex
 fn put(out:*std.ArrayList(TV),gpa:Allocator,v:Put)Allocator.Error!void{
-  try out.append(gpa,.{.pos=.{v.p[0],v.p[1],v.p[2]},.nrm=.{v.n[0],v.n[1],v.n[2]},.col=v.c,.info=v.info,.mat=v.mat});
+  try out.append(gpa,.{.pos=.{v.p[0],v.p[1],v.p[2]},.nrm=.{v.n[0],v.n[1],v.n[2]},.col=v.c,.info=v.info,.mat=v.mat,.star=v.star});
+}
+/// a starlit patch's share of ground point (x, z) as a vertex carries it
+fn starOf(stars:*const lib.starlit.Near,x:f32,z:f32)m.Vice(u8,4){
+  // the deepest patch the point lies in
+  const hit=stars.atPoint(.{x,z});
+  return.{m.unorm8(hit.field),m.unorm8(hit.rich),0,0};
 }
 /// every shared point of a chunk's half-tile grid (one point beyond it on
 /// each side, for slopes at its border), worked out once
@@ -321,6 +329,8 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
   // the chunk's corner in world tiles
   const ox=c.originX();
   const oy=c.originY();
+  // the starlit patches touching it, gathered once
+  const stars=lib.starlit.Near.of(seed,ox,oy,ox+ck.sizeTiles,oy+ck.sizeTiles);
   for(0..ck.sizeTiles)|uy|for(0..ck.sizeTiles)|ux|{
     // this tile within the chunk
     const lx:i32=@intCast(ux);
@@ -376,7 +386,7 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
       for([_]m.Vice(usize,2){.{1,1},corners[j],corners[(j+1)%4]})|cn|{
         // this vertex: the centre or a corner, at its height
         const at=v3(x0+0.5*m.f(cn[0]),gh[cn[1]][cn[0]],z0+0.5*m.f(cn[1]));
-        try put(out,gpa,.{.p=at,.n=gn[cn[1]][cn[0]],.c=gc[cn[1]][cn[0]],.info=.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]},.mat=gm[cn[1]][cn[0]]});
+        try put(out,gpa,.{.p=at,.n=gn[cn[1]][cn[0]],.c=gc[cn[1]][cn[0]],.info=.{info[0],gl[cn[1]][cn[0]],info[2],gd[cn[1]][cn[0]]},.mat=gm[cn[1]][cn[0]],.star=starOf(&stars,at[0],at[2])});
       }
     }
     // the detail on it (grass as thick as the ground beneath is grassy,
@@ -386,7 +396,11 @@ pub fn build(gpa:Allocator,seed:u64,c:*const ck.Chunk,out:*std.ArrayList(TV),det
       .at=.{x0,gh[1][1],z0},
       .corners=.{gh[0][0],gh[2][0],gh[2][2],gh[0][2]},
       .col=r.col[i].toRgba8(255),
-      .info=.{@intFromEnum(k),ley,0,0},
+      .info=blk:{
+        // the starlit patch at its middle
+        const s=starOf(&stars,x0+0.5,z0+0.5);
+        break:blk.{@intFromEnum(k),ley,s[0],s[1]};
+      },
       .k00=gm[0][0],.k01=gm[2][0],.k11=gm[2][2],.k10=gm[0][2],.kc=gm[1][1],
     });
   };

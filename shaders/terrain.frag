@@ -16,6 +16,7 @@ layout(location = 1) centroid in vec3 v_nrm;
 layout(location = 2) in vec3 v_col;
 layout(location = 3) in vec4 v_info;
 layout(location = 4) in vec4 v_mat;
+layout(location = 5) in vec4 v_star; // a starlit patch here: how far inside, how rich (terrain_mesh.zig)
 layout(location = 0) out vec4 o;
 
 // ley sight: the currents' colour (plain: common.glsl `LEY`; veiled), and
@@ -45,6 +46,21 @@ const float PLEXUS_AIR = 0.35;
 // darker it is, and how much bluer its darkening leans
 const float WET_DARK = 0.42;
 const vec3 WET_TINT = vec3(0.92, 0.96, 1.0);
+// a starlit patch's field (game/starlight.zig): its dark blue, lighter the
+// poorer the patch, nearly the constellate lineage's own the richer (linear);
+// how much of the ground (and its grass) it covers; how far its rim frays
+// in and out and over what width (m); how faintly it glows of its own,
+// shimmering, and how fast that shimmer runs; the size of the faint star
+// glints in it (cells a metre) and how often one twinkles
+const vec3 STAR_POOR = vec3(0.025, 0.045, 0.15);
+const vec3 STAR_RICH = vec3(0.004, 0.012, 0.11);
+const float STAR_COVER = 0.92;
+const float STAR_FRAY = 0.35;
+const float STAR_FRAY_L = 1.6;
+const float STAR_GLOW = 0.06;
+const float STAR_SHIMMER = 0.9;
+const float STAR_GLINTS = 5.0;
+const float STAR_GLINT_RATE = 1.7;
 
 void main() {
   vec3 n = normalize(v_nrm);
@@ -105,6 +121,26 @@ void main() {
     float det = dot(dpx, r1);
     vec3 grad = sign(det) * (dFdx(g.height) * r1 + dFdy(g.height) * r2);
     n = normalize(abs(det) * n - grad * GROUND_BUMP * fine);
+  }
+  // a starlit patch: its dark-blue field over the ground and its grass, its
+  // rim frayed in and out, deeper blue the richer it is, glowing faintly
+  // with a slow shimmer and a few twinkling star glints; gone once the sky
+  // has shifted (the unforming shot its light into the sky)
+  if (v_star.x > 0.0) {
+    vec2 fp = v_pos.xz / STAR_FRAY_L;
+    vec2 fi = floor(fp);
+    vec2 ff = fp - fi;
+    ff = ff * ff * (3.0 - 2.0 * ff);
+    float fray = mix(mix(hash12(fi), hash12(fi + vec2(1.0, 0.0)), ff.x), mix(hash12(fi + vec2(0.0, 1.0)), hash12(fi + vec2(1.0)), ff.x), ff.y);
+    float cover = smoothstep(0.05, 0.4, v_star.x + STAR_FRAY * (fray - 0.5)) * (1.0 - SHIFT);
+    vec3 field = mix(STAR_POOR, STAR_RICH, v_star.y);
+    albedo = mix(albedo, field, cover * STAR_COVER);
+    // its own faint light, shimmering, and its glints twinkling
+    vec2 gc = floor(v_pos.xz * STAR_GLINTS);
+    float gh = hash12(gc + 7.3);
+    float glint = pow(max(sin(t * STAR_GLINT_RATE * (0.5 + gh) + gh * TAU), 0.0), 24.0) * step(0.8, gh) * smoothstep(0.22, 0.0, length(fract(v_pos.xz * STAR_GLINTS) - 0.5));
+    float shimmer = 0.75 + 0.25 * sin(t * STAR_SHIMMER + fray * TAU);
+    glow += normalize(field + 1e-4) * cover * (STAR_GLOW * shimmer + glint * 0.6);
   }
 #ifndef OVERHEAD
   // the rain soaking it (and its grass) darker

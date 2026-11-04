@@ -18,6 +18,8 @@ pub const turn=@import("sim/turn.zig");
 pub const ck=@import("world/chunk.zig");
 /// world generation: the ground as a pure function of seed and tile
 pub const gen=@import("world/gen.zig");
+/// the starlit patches beside the ley lines, drawn from the world's seed
+pub const starlit=@import("world/starlit.zig");
 /// the garden's world: chunks streamed in round the gardener
 pub const world=@import("world/world.zig");
 /// play: the running game, its modes and its frame update
@@ -128,6 +130,8 @@ pub const seeds=@import("game/seeds.zig");
 pub const setups=@import("game/setups.zig");
 /// the sky: time of day, sun, stars and daylight
 pub const sky=@import("game/sky.zig");
+/// the starlit patches as the garden sees and hears them: their field, haze, sparks and night column
+pub const starlight=@import("game/starlight.zig");
 /// the garden's sound: footsteps, twinkles, music and hums
 pub const sound=@import("game/sound.zig");
 /// the halo a diamond projects, which polyp and diamond both hold

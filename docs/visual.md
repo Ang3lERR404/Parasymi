@@ -615,9 +615,33 @@ flooding. His pose is the clip `src/anim/sleep.anim` (keyed in animedit,
 
 ## Sky
 - A gradient dome, sun and moon, stars.
-- Star motes (faceted core, ring, needle rays) turn, twinkle, hover and
-  trail echoes while falling. At the unforming each shatters into 6
-  crystal shards of its warm light, flung out and fading (1.4 s).
+- No star falls: starlight is gathered on the starlit patches (below).
+
+## Starlit patches
+`game/starlight.zig` (where they lie: `world/starlit.zig`).
+- **By day, a hint:** a dark-blue field on the ground and its grass
+  (terrain.frag `STAR_*`, carried by `vertex.Terrain.star` and the detail
+  tiles' info), its rim frayed in and out, lighter blue the poorer the
+  patch and nearly the constellate lineage's blue the richer; a faint
+  shimmer of its own and a few round star glints twinkling in it. A very
+  faint blue haze over it (a low point of light lighting the fog), and
+  small flat star sparks (`meshes/spark.zig`, part.vert `PLACE_SPARK`,
+  always facing the eye) rising 1.6 m and fading, tinted its blue.
+- **By night, a column** (the gardener's draft v2): 5 to 9 coloured
+  searchlights (each patch its own count) 16 m over it pointing down,
+  each landing within 0.45 of the patch's width of its middle, its foot
+  0.35 of it wide, wandering on two paces, breathing and drifting through
+  the rainbow; they shine from round the patch (0.9 of its radius out) so
+  each colour keeps to its own shaft in the air and they overlap into one
+  column on the ground. Sparks drift down it from 9 m and vanish, each
+  tinted a rainbow hue over its patch's blue. A wolf standing in one
+  hears a spark twinkle now and then.
+- **The unforming:** its searchlights turn upward from the ground, flare
+  and fade over 4 s as its light shoots into the sky; its field fades
+  with the sky's shift and never comes back.
+- Shots: the patches near the start of the default seed lie at, e.g.,
+  (-69, -27) (rich 0.63) and (70, 18) (a poor round pool):
+  `--seed=0x5EED0F11FE --inspect=-69,-27 --tod=0 --dist=22 --pitch=20`.
 - **Shifting** (the unforming, `SHIFT` in common.glsl, the paws' spare
   push slot): the old sky shatters like glass from the zenith down. A ring
   of bright cracks sweeps over the dome to the horizon (about 6 s), ragged

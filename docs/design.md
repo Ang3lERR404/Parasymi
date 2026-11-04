@@ -43,6 +43,28 @@ a grand garden. The view is 2.5D: a 3D world seen from above.
   unbuild) where nothing stands under it. Nothing is ever sown or put
   under one.
 
+## Starlit patches (`world/starlit.zig`, `game/starlight.zig`)
+Starlight is light gathered from the stars, never fallen. It pools in
+patches on and beside the ley lines, the oil fields a garden is built
+round.
+- **Where:** the land is cut into 48-tile cells; a cell a ley line
+  crosses near its middle holds a patch two times in three, its middle on
+  the line or beside it. Patches lie 30 m apart at the least, mostly 40
+  to 60 m, more where a cell is left empty. The first is found by
+  exploring, never placed by the wolf.
+- **Each its own:** 3x3 to 10x10 tiles; most a semi-ragged splash, one
+  in five a soft round pool; its richness drawn so rich ones are rare,
+  the richest giving ten times the poorest (`Patch.yield`, 0.3 to 3).
+  All drawn from the world's seed, so a patch is the same loaded or not
+  and is never saved (`Chunk.star`, `Chunk.starYield`).
+- **Never runs dry.** A halyriphon (code `driftwisp`, `Species.catches`)
+  drinks only floating over a patch, as much as the patch is rich, and
+  nothing away from one (`ecology`, `Mods.starlit`).
+- **The first starlight** is to come from a rooted symbiotic catcher,
+  woven of grit and fibre (planned, [todo.md](todo.md)); until it is
+  built nothing makes starlight before a halyriphon is woven.
+- How it looks: [visual.md](visual.md#starlit-patches).
+
 ## Base structures
 - **Conduit:** pulls from behind and pushes forward. It grows a side root
   to a plant beside or behind it, and harvests the plant once the root
@@ -458,9 +480,11 @@ The whole event, second by second: [unforming.md](unforming.md).
   woven of both lineages (`arsthraxia_convergent.zig`, the gardener's
   pick). Its flower is the kit's own, two blooms nested, floating a
   little over its calyx, tethered to it by thin strands of both lineages.
-- **The stars shatter:** every starlight mote shatters at once as it
-  begins (`Starfall.shatterAll`), and no star falls again: starlight is
-  no longer to be had.
+- **The starlit patches go dark:** as it begins each patch shoots its
+  light up into the sky (its searchlights turned upward, flaring, gone
+  over 4 s; `starlight.dark`), where it becomes stars, and stays dark: a
+  halyriphon catches nothing any more. Only a constellate plant of act 2
+  (planned, [todo.md](todo.md#act-2)) will call it back down.
 - **The sky shifts for good** (1 s in, over 12 s; `Sky.shift`): the old
   sky shatters like glass from the zenith down to the horizon, falling
   away pane by pane to the ley's violet, glowing, its sun and moon (and

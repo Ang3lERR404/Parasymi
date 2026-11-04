@@ -59,7 +59,7 @@ const padOrbit:f32=350;
 /// system keys, the menus while frozen, then (live) the sky, camera and
 /// looking, panels and hotbar keys, HUD clicks, movement, what the cursor
 /// does to the tile it is on, weaving, the wolf's move and pose, the
-/// starfall, and streaming the world round the wolf.
+/// the starlit patches' twinkles, and streaming the world round the wolf.
 pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   g.uiTime+=dt;
   g.frameMs+=(dt*m.msPerS-g.frameMs)*timingEase;
@@ -362,8 +362,7 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   const follow=g.player.pos+m.v3(0,followHeight,0);
   g.cam.target=m.dampV(g.cam.target,follow,followLerp,dt);
   if(g.specimen==null){
-    try g.stars.update(g.gpa,&g.sky,g.player.pos,&g.world,dt);
-    g.catchStarlight(dt);
+    g.starlight.listen(g,dt);
   }
   // stream the world around the player; chunks holding what we grew stay
   // (as many rings as the options' render distance says)

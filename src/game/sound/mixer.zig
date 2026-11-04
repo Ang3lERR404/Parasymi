@@ -38,7 +38,7 @@ const Settle=lib.sound.sap.Settle;
 const Step=lib.sound.footstep.Step;
 /// how many twinkles may ring at once
 const twinkles=lib.sound.twinkle.twinkles;
-/// one twinkle of a mote of starlight
+/// one twinkle of a starlit patch's spark
 const Twinkle=lib.sound.twinkle.Twinkle;
 /// how many footsteps may sound at once
 const voiceCount=lib.sound.voiceCount;
@@ -81,8 +81,8 @@ pub const Sounds=struct{
     step:struct{fall:Footfall,muffle:f32=0},
     /// the view entered (true) or left (false) the wolf's eyes
     eyes:bool,
-    /// a mote of starlight near the wolf twinkled, `muffle` (0..1) of the way to it hidden
-    twinkle:struct{mote:lib.sky.Twinkle,muffle:f32=0},
+    /// a starlit patch's spark near the wolf twinkled, `muffle` (0..1) of the way to it hidden
+    twinkle:struct{spark:lib.starlight.Twinkle,muffle:f32=0},
     /// the daylight changed (0 night .. 1 day)
     daylight:f32,
     /// the arsthraxia's working: how far along (`progress`, 0..1), how well
@@ -190,7 +190,7 @@ pub const Sounds=struct{
       },
       .twinkle=>|tw|{
         // the mote that twinkled
-        const t=tw.mote;
+        const t=tw.spark;
         s.twinkles.cycle(.init(m.clamp01(t.near),s.ear.hear(t.at,tw.muffle),&s.r,s.rate));
       },
       .daylight=>|d|{

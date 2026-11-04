@@ -8,6 +8,8 @@ test{
   _=lib.sculptRig;
   _=lib.controls;
   _=lib.gen;
+  _=lib.starlit;
+  _=lib.starlight;
   _=lib.world;
   _=lib.weather;
   _=lib.moss;

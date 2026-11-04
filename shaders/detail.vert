@@ -20,7 +20,7 @@
 layout(location = 0) in vec3 at;      // tile corner x, centre height, corner z
 layout(location = 1) in vec4 corners; // corner heights (x0,z0) (x0,z1) (x1,z1) (x1,z0)
 layout(location = 2) in vec4 col;
-layout(location = 3) in vec4 info;    // kind/255, ley, -, -
+layout(location = 3) in vec4 info;    // kind/255, ley, starlit patch: how far inside, how rich
 layout(location = 4) in vec4 k00;     // the ground's kinds (soil, moss, stone, ley) at corner (x0,z0)
 layout(location = 5) in vec4 k01;     // (at (x0,z1))
 layout(location = 6) in vec4 k11;     // (at (x1,z1))
@@ -32,6 +32,7 @@ layout(location = 1) out vec3 v_nrm;
 layout(location = 2) out vec3 v_col;
 layout(location = 3) out vec4 v_info;
 layout(location = 4) out vec4 v_mat; // the ground's kinds: unused off the ground
+layout(location = 5) out vec4 v_star; // the starlit patch under the tile: how far inside, how rich
 
 // vertices the lumps take, then the grass: how many blades at most, and the
 // vertices each runs (two bands of two triangles, a tip of one)
@@ -120,6 +121,7 @@ void hide() {
   v_col = vec3(0.0);
   v_info = vec4(0.0);
   v_mat = vec4(0.0);
+  v_star = vec4(0.0);
 }
 
 // one grass blade's vertex `j` (of BLADE_VERTS), blade `blade` of the tile
@@ -195,6 +197,7 @@ void blade(int blade, int j) {
   v_col = srgb2lin(min(c, vec3(1.0)));
   // w > 0 marks grass for terrain.frag (ley glow), z 0: not the ground
   v_info = vec4(info.x, info.y, 0.0, max(s, 0.004));
+  v_star = vec4(info.z, info.w, 0.0, 0.0);
   gl_Position = project(p);
 }
 
@@ -202,6 +205,7 @@ void main() {
   int kind = int(info.x * 255.0 + 0.5);
   int vi = gl_VertexIndex;
   v_mat = vec4(0.0);
+  v_star = vec4(0.0);
   if (vi >= LUMP_VERTS) {
     int g = vi - LUMP_VERTS;
     int bl = g / BLADE_VERTS;
@@ -272,5 +276,6 @@ void main() {
   // a clod's crust dries paler on top, darker and damper underneath
   v_col = stone ? srgb2lin(grey) * mix(0.8, 1.05, n.y * 0.5 + 0.5) : tile * vec3(0.8, 0.75, 0.7) * mix(0.75, 1.1, n.y * 0.5 + 0.5);
   v_info = vec4(info.x, info.y, 0.0, 0.0);
+  v_star = vec4(info.z, info.w, 0.0, 0.0);
   gl_Position = project(p);
 }

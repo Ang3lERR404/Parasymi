@@ -8,8 +8,9 @@
 //! lineages die with them: their plants wither, their structures unform
 //! (grown back down to nothing and gone), all but the arsthraxia, which
 //! evolves instead (`Msg.unform`). What is convergent stays.
-//! The sky goes with them. Every starlight mote shatters at once and no
-//! star falls again; the sky shifts for good to the ley's violet glow, its
+//! The sky goes with them. Every starlit patch shoots its light up into the
+//! sky, where it becomes stars, and stays dark (game/starlight.zig); the
+//! sky shifts for good to the ley's violet glow, its
 //! sun and moon gone (`Sky.shift`); the ley lines seal up, closing to scars
 //! of bare soil (`gen.sealOf`), and the ley shard nodes on them shatter,
 //! their shards drifting off weightless and blinking out.
@@ -174,7 +175,7 @@ pub const Heard=struct{
   /// how much of the dying lineages is withering now (0 none .. 1 a garden's worth)
   wither:f32,
   /// how many things broke like glass since last heard: a radiant plant
-  /// letting its shards go, the stars all at once, the ley nodes as the
+  /// letting its shards go, the starlit patches all at once, the ley nodes as the
   /// lines seal
   cracks:u32,
   /// how many shards reached the star since last heard
@@ -188,7 +189,7 @@ pub fn heard(g:*const Game,from:f32)Heard{
   // the event, and what it sends
   const u=&g.unforming;
   var h:Heard=.{.t=u.t,.wither=0,.cracks=0,.arrivals=0};
-  // the stars all at once as it begins, the ley nodes as the lines seal
+  // the starlit patches all at once as it begins, the ley nodes as the lines seal
   if(passed(from,u.t,0))h.cracks+=starCracks;
   if(passed(from,u.t,sealEnd))h.cracks+=leyCracks;
   for(g.unformSources.items)|src|{
@@ -211,7 +212,7 @@ pub fn heard(g:*const Game,from:f32)Heard{
 }
 /// whether moment `at` came after `a` and by `b`
 fn passed(a:f32,b:f32,at:f32)bool{return a<at and at<=b;}
-/// how many cracks the stars shattering sound as, and the ley nodes
+/// how many cracks the starlit patches shooting their light up sound as, and the ley nodes
 const starCracks:u32=2;
 /// (the ley nodes)
 const leyCracks:u32=3;
@@ -263,9 +264,8 @@ pub fn tick(g:*Game,dt:f32)Allocator.Error!void{
     },
   }
   if(u.phase==.waiting)return;
-  // the sky shifting, no star falling, and the ley lines sealed once closed
+  // the sky shifting, and the ley lines sealed once closed
   g.sky.shift=u.shift();
-  g.stars.stilled=true;
   if(u.t>=sealEnd)try seal(g);
 }
 /// the ley lines sealed: every streamed chunk's ley tiles closed to soil
@@ -323,7 +323,6 @@ fn begin(g:*Game)Allocator.Error!void{
   u.at=.{mid[0],g.heightAt(m.floorTo(i32,mid[0]),m.floorTo(i32,mid[2]))+skyHeight,mid[2]};
   u.phase=.shattering;
   u.t=0;
-  g.stars.shatterAll();
   for(0..g.structs.list.items.len)|i|_=g.structs.send(g.structCtx(.{}),.of(i),.unform);
   g.prog.say(txt.s.msg.unformingBegins,.{});
 }
@@ -613,7 +612,7 @@ test"the ley lines seal: ley tiles close to soil, their nodes shattering into dr
   var it=g.world.map.valueIterator();
   while(it.next())|cp|for(cp.*.kind)|k|try testing.expect(k!=.ley);
   try testing.expect(g.leyDrifts.items.len>=1);
-  try testing.expect(g.stars.stilled and g.sky.shift>0.7);
+  try testing.expect(lib.starlight.dark(&g)>=1 and g.sky.shift>0.7);
 }
 test"a radiant plant's moment falls within the spread, and its shattering runs 0..1"{
   // the test harness

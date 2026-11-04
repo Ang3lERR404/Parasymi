@@ -427,7 +427,7 @@ pub const Strings=struct{
     draws:S="",
     /// debug: the wolf's tile and the time of day
     pos:S="",
-    /// debug: starlight motes and meshed chunks
+    /// debug: starlit patches near and meshed chunks
     motes:S="",
   }=.{},
   /// one-line hover descriptions of structures

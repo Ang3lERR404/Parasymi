@@ -29,40 +29,14 @@ carries the game's early days.
   set against it. It prints a sheet and flags what is far too cheap or
   dear. It checks, never sets: the gardener still picks the numbers, and
   it catches what a changed recipe breaks.
-- **Starlight.** Light gathered *from* the stars, not stars falling (the
-  falling motes and `Starfall` go). Starlit patches spawn where it is
-  strongest, beside the ley lines (which gain patches too). By day a patch
-  is a hint: a dark-blue field, little stars floating up. By night a light
-  beams onto it in shifting rainbow and star motes drift down and vanish.
-  The driftwisp is its catcher, floating over a patch, its dish catching
-  the light at night. A patch never runs dry, but each has its own
-  richness, like Factorio's oil fields. At the unforming each patch goes
-  dark by shooting its light up into the sky, where it becomes stars, and
-  stays dark (only a constellate plant of act 2 calls it back: see
-  Act 2). *Decided:* a halyriphon
-  makes starlight only floating over a patch, nothing away from one (the
-  patches are what a garden is built round). Each patch its own size,
-  about 3×3 to 10×10 tiles, beside its own richness (the richest about
-  10× the poorest: a rich patch is a real jackpot; it shows in the
-  field, a deeper blue the richer it is, the richest almost the
-  constellate lineage's blue, the poorest a lighter blue). Its shape mostly a
-  semi-ragged organic splash (ragged, not wildly), now and then a soft
-  round pool. Along the ley lines they lie anywhere from about 30 m to
-  120 m apart. With the motes gone, the first starlight comes from the
-  rooted catcher (below): the only way in, paying for the first seeds,
-  the germinator and later the halyriphon (all keep their starlight
-  costs). The first patch is found by exploring like the rest, never
-  placed beside where the wolf wakes. Its night light: one wide column
-  over the whole patch made of 5 to 9 coloured searchlight cones (each
-  patch its own count; approved draft v2: 16 m up, each foot 0.35 of the
-  patch wide, wandering up to 0.45 of it from the middle, brightness 5)
-  pointing down from the sky, overlapping into one column, each its own
-  colour and drifting a little, so the column shifts through the rainbow
-  from within (the radiant hearts' wandering cones, `view.heartCones`,
-  aimed down and kept inside the patch; held to the glow bar). By day,
-  layered: a dark-blue field on the ground itself, a very faint haze just
-  above it, and small camera-facing star motes rising a little way before
-  fading out (held to the glow bar).
+- ~~**Starlight.** Light gathered from the stars on starlit patches by
+  the ley lines, the falling motes and `Starfall` gone: built as the
+  gardener shaped it ([design.md](design.md#starlit-patches-worldstarlitzig-gamestarlightzig),
+  [visual.md](visual.md#starlit-patches)).~~ Still open: the first
+  starlight. Until the rooted catcher (below) is built, nothing makes
+  starlight before a halyriphon is woven, and a halyriphon costs
+  starlight, so a fresh garden cannot start; the first seeds, the
+  germinator and the halyriphon keep their starlight costs.
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are

@@ -18,8 +18,6 @@ const noise=engine.core.noise;
 const color=engine.core.color;
 /// hashing a tile or index to a steady random value
 const rng=engine.core.rng;
-/// the sky: its motes, and how long one takes to shatter
-const skyMod=lib.sky;
 /// the chunk layer: tiles, coordinates
 const ck=lib.ck;
 /// every plant kind's definition
@@ -134,12 +132,6 @@ const ghostGlow:f32=0.6;
 const ghostPulse:f32=0.4;
 /// resource nodes shrink to `nodeMin` of full size as they empty
 const nodeMin:f32=0.55;
-/// star motes: their size
-const moteSize:f32=1.8;
-/// how many echoes trail a falling mote
-const echoes=3;
-/// an echo's size, shrinking further for each one behind
-const echoSize:f32=1.2;
 /// points of light. A celestial bloom: how far its light reaches (metres)
 const bloomReach:f32=9;
 /// how strong a bloom's light is
@@ -169,12 +161,6 @@ const groundedEmpty:f32=0.3;
 const lightByDay:f32=0.3;
 /// a bloom sheds light only once it has assembled this far
 const bloomLitFrom:f32=0.6;
-/// a star mote's light: its reach (metres)
-const moteReach:f32=3.2;
-/// a star mote's light: its strength
-const moteLight:f32=0.9;
-/// a star mote's light: its colour (linear)
-const moteCol=m.V3{1.0,0.86,0.62};
 /// a glowing resource node (ley shards): its light's reach (metres)
 const nodeReach:f32=2.6;
 /// a glowing node's light: its strength
@@ -207,7 +193,7 @@ const rootSteps:f32=3;
 /// how much the roots flutter
 const rootFlutter:f32=0.35;
 /// the scene for this frame on a screen `screen` pixels across: the plants,
-/// threads, the wolf, nodes, structures, ghost and motes as parts, the best
+/// threads, the wolf, nodes, structures, ghost and starlit patches as parts, the best
 /// lights, the HUD, and the push constants for sky, fog, sun and view.
 pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   // at the main menu the wolf sleeps on its stage instead
@@ -224,7 +210,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   try burst(g);
   try threads(g,tf);
   try shafts(g,tf);
-  // a specimen stands alone: no wolf, ghosts or motes, and a plant no
+  // a specimen stands alone: no wolf, ghosts or starlit patches, and a plant no
   // nodes or structures (their meshes were never built)
   const alone=g.specimen!=null;
   // where the wolf's paws are, for their contact shadows (none when alone)
@@ -247,7 +233,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   if(!alone)try lib.tendril.draw(g,&g.parts);
   if(!alone){
     try ghost(g,tf);
-    try motes(g);
+    try g.starlight.draw(g,reach,tf);
   }
   try hud.build(g,screen);
   // the veil of what is not yet understood, and the sky's colour under it
@@ -426,7 +412,7 @@ pub fn filmHue(x:f32)m.V3{
 }
 /// a saturated hue of the rainbow (one turn per unit of `x`): the film's
 /// hue sharpened, its brightest channel at one
-fn rainbow(x:f32)m.V3{
+pub fn rainbow(x:f32)m.V3{
   // the film's soft hue, cubed so its weakest channels fall away
   const h=filmHue(x);
   const s=h*h*h;
@@ -1041,47 +1027,5 @@ fn nodes(g:*Game,nr:i32)Allocator.Error!void{
         if(node.glow>0)try g.parts.light(m.tileCentre(wx,wz,c.height[t]+nodeLift),nodeCol*m.splat3(nodeLight*node.glow*sc),nodeReach);
       }
     }
-  }
-}
-/// a mote shattering (the unforming): its shards of starlight flung out
-/// round where it was, tumbling, shrinking and fading, a last flash of its
-/// light going with them
-fn moteShards(g:*Game,mo:skyMod.Mote)Allocator.Error!void{
-  // how far through it is (0..1), how far its shards have flown (easing out)
-  const k=m.clamp01(mo.shatter/skyMod.shatterTime);
-  const e=1-(1-k)*(1-k)*(1-k);
-  for(0..moteShardCount)|j|{
-    // this shard's heading: spread round the mote, tipped up and down
-    const a=mo.phase*m.tau*5+m.f(j)*m.goldenAngle;
-    const up=@sin(mo.phase*17+m.f(j)*1.9)*0.8;
-    const dir=m.norm(m.v3(@cos(a),up,@sin(a)));
-    const at=mo.pos+dir*m.splat3(moteShardReach*e);
-    try g.parts.emit(.unformShard,m.chain(&.{m.translate(at),m.rotY(a+k*6),m.rotX(up*3+k*5),m.scale3(m.splat3(moteShardSize*(1-k)))}),.{.glow=2*(1-k),.phase=@mod(mo.phase+m.f(j)*0.13,1),.tint=.{moteCol[0],moteCol[1],moteCol[2],0.8}});
-  }
-  try g.parts.light(mo.pos,moteCol*m.splat3(moteLight*2*(1-k)),moteReach);
-}
-/// shards each shattering mote breaks into
-const moteShardCount=6;
-/// how far its shards fly (m)
-const moteShardReach:f32=0.9;
-/// how big each starts (of the shard mesh)
-const moteShardSize:f32=2.0;
-/// fallen starlight: each mote turns slowly and twinkles, hovering with a
-/// slow breath over the ground; while it falls, fading echoes of it trail
-/// above, a streak of light.
-fn motes(g:*Game)Allocator.Error!void{
-  for(g.stars.motes.items)|mo|{
-    if(mo.shattering()){
-      try moteShards(g,mo);
-      continue;
-    }
-    // how faded the mote is, 0..1
-    const fade=m.clamp01(mo.life);
-    try g.parts.emitMote(mo.pos,mo.phase,fade,if(mo.falling)0 else-1,moteSize*fade);
-    // a mote is a spark of starlight: it lights what it falls past and the
-    // ground it rests over
-    try g.parts.light(mo.pos,moteCol*m.splat3(moteLight*fade),moteReach);
-    if(!mo.falling)continue;
-    for(1..echoes+1)|k|try g.parts.emitMote(mo.pos,mo.phase,fade,m.f(k),echoSize*fade/(1+m.f(k)));
   }
 }

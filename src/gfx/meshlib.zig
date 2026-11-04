@@ -60,6 +60,8 @@ const parts=struct{
   pub const nodeLey=@import("meshes/node_ley.zig");
   /// a fallen fragment of starlight, a small faceted bipyramid
   pub const mote=@import("meshes/mote.zig");
+  /// a starlit patch's star spark: a flat four-pointed star of light
+  pub const spark=@import("meshes/spark.zig");
   /// what bursts out where a plant's yield comes loose: motes and drops of it
   pub const pluckBurst=@import("meshes/pluck_burst.zig");
   // the main menu's stage

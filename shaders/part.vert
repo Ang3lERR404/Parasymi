@@ -80,6 +80,15 @@ const int PLACE_MOTE = 2;    // a star mote
 const int PLACE_SKINNED = 3; // by its bones
 const int PLACE_BURST = 4;   // a burst flung out where a yield came loose
 const int PLACE_FALL = 5;    // drifting down out of the dark over the main menu's stage
+const int PLACE_SPARK = 6;   // a starlit patch's star spark, facing the eye, rising or falling
+// a starlit patch's sparks: how fast they travel (m/s), slowest and
+// fastest, a share of their way up or down; how far they sway (m); the
+// share of their way they swell in over and fade away over
+const float SPARK_SLOW = 0.35;
+const float SPARK_FAST = 0.8;
+const float SPARK_SWAY = 0.12;
+const float SPARK_IN = 0.15;
+const float SPARK_OUT = 0.45;
 // how fast what drifts down over the stage falls (m/s), slowest and fastest
 const float FALL_SLOW = 0.09;
 const float FALL_FAST = 0.22;
@@ -1768,6 +1777,31 @@ void main() {
     w = vec4(c3.xyz + at + mat3(M) * (R * p) * size, 1.0);
     wn = mat3(M) * (R * nrm);
     twinkle = 0.75 + 0.25 * sin(t * 2.3 + sd * 40.0);
+  } else if (mode == PLACE_SPARK) {
+    // a starlit patch's star spark (ie.y its seed, ie.z how far it travels:
+    // up by day, below 0 down by night, ie.w how far across the patch it
+    // may start): each at its own pace and place in the patch, swaying a
+    // little, swelling in, then fading out before its way's end; then round
+    // again. Flat, it always faces the eye. All from the clock and its seed
+    float sd = ie.y;
+    float H = abs(ie.z);
+    vec3 h = hash33(vec3(sd, 3.7, 11.9));
+    vec3 q = hash33(vec3(sd, 8.3, 23.1));
+    float k = fract(t * mix(SPARK_SLOW, SPARK_FAST, h.x) / max(H, 1e-3) + h.y);
+    // where in the patch it starts: a point in a disc, spread evenly
+    float a = q.x * TAU;
+    float rr = sqrt(q.y) * ie.w;
+    float y = ie.z > 0.0 ? k * H : H * (1.0 - k);
+    vec3 at = vec3(cos(a) * rr + SPARK_SWAY * sin(t * 0.9 + sd * 17.0), y, sin(a) * rr + SPARK_SWAY * 0.7 * sin(t * 0.61 + sd * 5.0));
+    // its own flat frame, square to the eye
+    vec3 wc = c3.xyz + at;
+    vec3 toEye = normalize(pc.eye_time.xyz - wc);
+    vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), toEye) + vec3(1e-4, 0.0, 0.0));
+    vec3 up = cross(toEye, right);
+    float size = smoothstep(0.0, SPARK_IN, k) * (1.0 - smoothstep(1.0 - SPARK_OUT, 1.0, k)) * length(M[0].xyz);
+    w = vec4(wc + (right * p.x + up * p.y) * size, 1.0);
+    wn = toEye;
+    twinkle = 0.7 + 0.3 * sin(t * 4.3 + sd * 31.0) * sin(t * 2.1 + sd * 9.0);
   } else if (mode == PLACE_MOTE) {
     // a star mote: it turns slowly, tilts, twinkles and, resting, hovers
     // with a slow breath; falling, its echoes (ie.w 1..3) trail above it,

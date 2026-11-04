@@ -123,6 +123,12 @@ pub const Chunk=struct{
   /// how hard it rains over each tile (0..1 of a downpour), read back with
   /// `wet` (not saved)
   rain:[tileCount]f32=@splat(0),
+  /// how far inside a starlit patch each tile lies (0 off any .. 1 deep
+  /// in; world/starlit.zig, drawn from the seed, never saved)
+  star:[tileCount]f32=@splat(0),
+  /// the yield a catcher over each tile gives, a multiple of a plain one's
+  /// (0 off any patch; the richest patches about ten times the poorest)
+  starYield:[tileCount]f32=@splat(0),
   /// whether the garden's grown moss has been laid on it since it was
   /// streamed in (game/moss.zig)
   mossed:bool=false,

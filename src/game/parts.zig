@@ -17,21 +17,19 @@ const PartInstance=vertex.PartInstance;
 /// how part.vert places an instance (`PartInstance.e.x`; 0: by its matrix):
 /// bent along a curve
 const placeCurve:f32=1;
-/// how part.vert places a star mote
-const placeMote:f32=2;
 /// how part.vert places a skinned mesh, moved by its bones
 const placeSkin:f32=3;
 /// part.vert's burst placement: flung out from where a yield came loose
 const placeBurst:f32=4;
 /// part.vert's falling placement: drifting down over the main menu's stage
 const placeFall:f32=5;
+/// part.vert's spark placement: a starlit patch's spark, facing the eye
+const placeSpark:f32=6;
 /// culling spheres: a mesh reaches `bound` times its scale plus
 /// `boundPad` from its origin
 const bound:f32=2.5;
 /// what a mesh's culling sphere reaches beyond its scaled size
 const boundPad:f32=0.5;
-/// how far a star mote's culling sphere reaches
-const moteBound:f32=0.6;
 /// what may cast a shadow into view is kept too: a thing this high over
 /// the ground is assumed to cast
 const castAbove:f32=2;
@@ -271,14 +269,16 @@ pub const Parts=struct{
     inst.e=.{0,m.f(base),m.f(n),len};
     try p.add(id,at,inst);
   }
-  /// a star mote at `at`: part.vert turns it, twinkles it and hovers it;
-  /// `echo` 0 the mote, 1.. its trail above it while falling, -1 resting.
-  pub fn emitMote(p:*Parts,at:m.V3,phase:f32,life:f32,echo:f32,glow:f32)Allocator.Error!void{
-    // the mote's instance
-    var inst=instance(m.translate(at),.{.glow=glow,.phase=phase});
-    inst.e=.{placeMote,phase,life,echo};
-    if(p.view)|v|if(!v.sphere(at,moteBound))return;
-    try p.add(.mote,at,inst);
+  /// a starlit patch's spark over `at` (the patch's middle on the ground):
+  /// part.vert lifts it `travel` m from a point within `spread` of `at` by
+  /// day, or drops it from `-travel` m by night, facing the eye, at its own
+  /// pace and place (`seed`); `size` its scale
+  pub fn emitSpark(p:*Parts,at:m.V3,seed:f32,travel:f32,spread:f32,size:f32,lookIn:Look)Allocator.Error!void{
+    if(p.view)|v|if(!v.sphere(at+m.v3(0,@abs(travel)*0.5,0),spread+@abs(travel)))return;
+    // its instance, scaled about its own middle
+    var inst=instance(m.chain(&.{m.translate(at),m.scale3(m.splat3(size))}),lookIn);
+    inst.e=.{placeSpark,seed,travel,spread};
+    try p.add(.spark,at,inst);
   }
   /// a burst of library mesh `id` at `at`, `reach` across, `age` through
   /// its life (0..1): part.vert flings its beads out and shrinks them away

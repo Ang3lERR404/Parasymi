@@ -38,6 +38,9 @@ pub const Mods=struct{
   yieldMult:[species.count]f32=@splat(1),
   /// how dark it is (0 day .. 1 night); floating plants drink starlight.
   night:f32=0,
+  /// whether the starlit patches still shine (dark for good once the
+  /// unforming begins): a catcher drinks only over a shining one
+  starlit:bool=true,
   /// the relays the structures hold (a diamond), for the light grid
   relays:[]const light.Relay=&.{},
   /// the structures that draw light, for the light grid
@@ -198,8 +201,10 @@ pub const Ecology=struct{
       const c=chunks[i];
       const t=tiles[i];
       if(sp.floating){
-        // floaters never touch the ley: they drink the night sky
-        dm[i]+=sp.leyDraw*(dayDrink+(1-dayDrink)*mods.night)*dt;
+        // floaters never touch the ley: they drink the night sky; a
+        // catcher only over a shining starlit patch, as much as it is rich
+        const over=if(!sp.catches)1 else if(mods.starlit)c.starYield[t]else 0;
+        dm[i]+=sp.leyDraw*(dayDrink+(1-dayDrink)*mods.night)*over*dt;
       }else{
         // the ley it draws this tick, at most what the tile holds
         const got=@min(c.ley[t],sp.leyDraw*dt);
@@ -455,4 +460,32 @@ test"a mire lily drinks soaked ground and withers on dry"{
   // dry: it stood still and withered
   try testing.expectEqual(@as(f32,0),after[1][0]);
   try testing.expect(after[1][1]<0.99);
+}
+test"a halyriphon catches starlight only over a shining starlit patch"{
+  // the test allocator
+  const gpa=testing.allocator;
+  // the mana each held after a night: over a patch, off one, over one gone dark
+  var held:m.Vice(f32,3)=undefined;
+  for(0..3)|k|{
+    // a small loaded world
+    var w=World.init(gpa,5);
+    defer w.deinit();
+    try w.stream(.{.x=0,.y=0},1,100);
+    // the chunk at the origin: its tile (2, 2) in a patch (but in the second case)
+    const c=w.chunkOfTile(0,0).?;
+    @memset(&c.starYield,0);
+    if(k!=1)c.starYield[2*ck.sizeTiles+2]=1;
+    // the plants, and the ecology over them
+    var p:Plants=.{};
+    defer p.deinit(gpa);
+    var eco:Ecology=.{};
+    defer eco.deinit(gpa);
+    // a grown halyriphon over the tile, its mana empty
+    try testing.expect(try p.placeEx(gpa,&w,2,2,.{.x=2,.y=2,.chunk=undefined,.tile=undefined,.sp=.driftwisp,.seed=0.1,.growth=1,.mana=0}));
+    for(0..testHz*10)|_|_=try eco.tick(gpa,&p,&w,.{.night=1,.starlit=k!=2},testDt);
+    held[k]=p.list.items(.mana)[0]+p.list.items(.essence)[0];
+  }
+  try testing.expect(held[0]>0);
+  try testing.expectEqual(@as(f32,0),held[1]);
+  try testing.expectEqual(@as(f32,0),held[2]);
 }

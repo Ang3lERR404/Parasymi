@@ -248,7 +248,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `setups.zig` — prepared worlds for showcasing and testing (`--demo`, `--stress`).
-- `sky.zig` — day/night cycle and starfall.
+- `sky.zig` — the day and night cycle.
 - `sound.zig` — what the garden sounds like: the source the audio device plays (main.zig opens it on `platform.audio.Output`).
 
 ## src/game/sound/
@@ -272,6 +272,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 
 ## src/game/
 - `specimen.zig` — `--plant=<species>` / `--structure=<kind>`: one plant or structure alone (or `--samples=<mesh>,...`: library meshes side by side along the x
+- `starlight.zig` — the starlit patches as the garden sees and hears them (where they lie is world/starlit.zig's).
 - `structures.zig` — grown structures: the first steps from hand work toward automation.
 
 ## src/game/structures/
@@ -376,6 +377,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `sap_cache.zig` — mesh: SAP CACHE.
 - `sculpt.zig` — mesh: SCULPT.
 - `shadow.zig` — mesh: SHADOW.
+- `spark.zig` — mesh: SPARK.
 - `sporecaster.zig` — mesh: SPORECASTER.
 - `stage.zig` — meshes: the main menu's stage (game/title.zig).
 - `storm_spire.zig` — mesh: the storm spire (structures/storm_spire.zig), a kin of the weftstone (convergence kit) that charges the air and strikes the rain…
@@ -469,4 +471,5 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/world/
 - `chunk.zig` — the garden's chunk: a 32x32 block of tiles (engine world/chunk.zig), stored as struct-of-arrays so hot loops stay linear.
 - `gen.zig` — world generation: a pure function of (seed, tile coordinate).
+- `starlit.zig` — starlit patches: pools of light gathered from the stars, lying on and beside the ley lines.
 - `world.zig` — the garden's world: the engine's streamed chunk map (engine world/world.zig) over the garden's tiles (chunk.zig) and generation (gen.zig).

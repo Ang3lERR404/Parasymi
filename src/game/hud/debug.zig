@@ -46,5 +46,5 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,_:f32)Allocator.Error!void{
   y+=lineH;
   _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.pos,.{g.player.pos[0],g.player.pos[2],g.sky.tod});
   y+=lineH;
-  _=try d.print(bx+18,y,s.textLabel,s.dim,txt.s.hud.motes,.{g.stars.motes.items.len,rs.meshed});
+  _=try d.print(bx+18,y,s.textLabel,s.dim,txt.s.hud.motes,.{g.starlight.near.n,rs.meshed});
 }

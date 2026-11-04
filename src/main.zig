@@ -368,8 +368,8 @@ pub fn main(init:Init)!void{
     for(game.player.footfalls())|ff|if(ff)|f|if(sounds)|o|if(lib.act.steps(game.act)){
       o.send(.{.step=.{.fall=f,.muffle=game.muffle(f.at)}})catch|e|log.warn("footstep: {t}",.{e});
     };
-    if(game.stars.twinkled())|t|if(sounds)|o|{
-      o.send(.{.twinkle=.{.mote=t,.muffle=game.muffle(t.at)}})catch|e|log.warn("twinkle: {t}",.{e});
+    if(game.starlight.twinkled())|t|if(sounds)|o|{
+      o.send(.{.twinkle=.{.spark=t,.muffle=game.muffle(t.at)}})catch|e|log.warn("twinkle: {t}",.{e});
     };
     // the day's music follows the daylight
     if(@abs(game.sky.daylight()-toldDay)>dayTold)if(sounds)|o|{

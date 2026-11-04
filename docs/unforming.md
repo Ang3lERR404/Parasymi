@@ -46,7 +46,7 @@ than all at once.
 
 | t (s) | What happens |
 |---|---|
-| 0 | Every starlight mote shatters (6 warm shards each, 1.4 s) and no star falls again. Every structure is sent `Msg.unform`: the arsthraxia evolves. The garden's music cuts dead; the world creaks and swells, as if about to break under its own weight. |
+| 0 | Every starlit patch shoots its light up into the sky (its searchlights turned upward, flaring and fading over 4 s), where it becomes stars, and stays dark. Every structure is sent `Msg.unform`: the arsthraxia evolves. The garden's music cuts dead; the world creaks and swells, as if about to break under its own weight. |
 | 1.6 | One great deep horn: the beginning of the end. Under everything a rumble begins, masses fall and hit the ground all round, and a wall of choirs and strings rises. |
 | 1.6 – 12.5 | The wall: bright, heavenly, suspended chords over a held D, never resolving, climbing chord by chord, dipping once, climbing again. |
 | 8 – 12.5 | Fireworks rise whistling into the sky (the shards flying up) and never burst; the burning begins; trumpets ring out from 8.85 s. |
