@@ -19,7 +19,8 @@ carries the game's early days.
   code tag stays `driftwisp`). ~~The lumenroot is **lucirhizaphaeroth**
   in game~~ (code tag `lumenroot`). ~~The hollowheart is **cavikoicyra**
   in game~~ (code tag `hollowheart`). ~~The thornleech is
-  **hirusidandrath** in game~~ (code tag `thornleech`).
+  **hirusidandrath** in game~~ (code tag `thornleech`). ~~The mire lily
+  is **helonycydira** in game~~ (code tag `mireLily`).
 - **Balance.** What act 1 plants yield was picked long ago. Lumenroot,
   hollowheart and thornleech all give plain essence; both lineages'
   structures cost the same mix; nothing grows fibre. The shared core
