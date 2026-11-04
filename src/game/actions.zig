@@ -431,6 +431,12 @@ test"a harvest is plucked by paw: a few plucks, each yield carried in as a bead"
 }
 test"seeds are woven only by a germinator, which is woven from gathered matter"{
   for(craft.byHand)|i|try testing.expect(!craft.germinatorOnly(i));
+  // the wolf's hands weave the basics alone: a conduit, a sap cache, a germinator
+  try testing.expectEqual(@as(usize,3),craft.byHand.len);
+  for(craft.byHand)|i|{
+    const out=craft.hand[i].out;
+    try testing.expect(out==.conduit or out==.sapCache or out==.germinator);
+  }
   for(craft.hand)|r|if(r.out==.germinator)for(r.in)|ing|{
     try testing.expect(ing.item==.fibre or ing.item==.grit or ing.item==.starlight);
   };

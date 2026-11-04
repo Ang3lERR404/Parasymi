@@ -19,7 +19,8 @@ a grand garden. The view is 2.5D: a 3D world seen from above.
 - **Research works like Factorio's labs:** structures eat the ingredients
   one unit at a time.
 - **Plants never set seed.** Only a germinator weaves seeds. Weaving by
-  hand makes bulbs only (`craft.byHand`).
+  hand makes the basics only: a conduit, a sap cache, a germinator
+  (`Recipe.basic`, `craft.byHand`).
 - **The germinator is the bootstrap** and the hub of automation. It is
   woven from fibre, grit and starlight. It weaves every recipe, seeds and
   bulbs alike (`craft.all`), and lets go only of what it wove itself
