@@ -43,7 +43,10 @@ carries the game's early days.
   about 3×3 to 10×10 tiles, beside its own richness. Its shape mostly a
   semi-ragged organic splash (ragged, not wildly), now and then a soft
   round pool. Along the ley lines they lie anywhere from about 30 m to
-  120 m apart.
+  120 m apart. With the motes gone, the first starlight comes from the
+  rooted catcher (below): the only way in, paying for the first seeds,
+  the germinator and later the halyriphon (all keep their starlight
+  costs).
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
@@ -55,6 +58,9 @@ carries the game's early days.
   driftwisp's place: a new basic structure, rooted beside a patch,
   reaching up for the light; it gathers starlight far less well than the
   floating driftwisp, so the radiant one is worth reaching for.
+  *Decided:* it is the garden's first starlight. The wolf weaves it by
+  hand from cheap matter only (grit and fibre, never starlight), plants it
+  beside a patch, and it trickles out starlight slowly.
 - **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
   out of essence, but no convergent plant makes it, so once the
   symbiotic lineage is gone only the fibre plant's nodes, gathered by
