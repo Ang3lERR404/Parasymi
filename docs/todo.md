@@ -93,6 +93,22 @@ Factorio's belts, each side a short row of items**.
   stream and reform inside the lane.
 - Still to shape: how the base one looks.
 
+## The radiant lineage's forming sound
+*Direction approved, not built.* Fantasy mixed with sci-fi: real glass,
+bells and choir (never small synth tones, which read comical), shaped in
+strange ways. Soft, in D Lydian, kept apart from the arsthraxia's glass
+whorls and bell bloom.
+- **Each fragment arriving:** a glass tink, heard swelling up *reversed*
+  before it lands, light arriving ahead of the thing; the tinks climb a
+  D Lydian chord, so a forming plays a small arpeggio. A quiet echo of the
+  unforming's climbing bell per shard, so that moment plays back something
+  heard all game.
+- **The threads of light:** a bowed-glass hum, a finger round a wine
+  glass, slowly phasing like light through a prism, growing as threads
+  join.
+- **Whole:** a soap-bubble shimmer and one breath of far choir ("ooh"),
+  breaking into a fizz of crystal grains that scatter and fade.
+
 ## Saves that never break
 *Planned, not started.* Today plants, the belly, research, the weave queue
 and wild flowers are saved as raw bytes, so a change to their shape refuses
