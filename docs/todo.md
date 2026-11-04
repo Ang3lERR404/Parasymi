@@ -78,6 +78,17 @@ carries the game's early days.
   on the research tree ([research-tree.md](research-tree.md)).
 
 ## Small things
+- **Flags as enums** (the gardener's idea). `main.zig` reads its command
+  line through a chain of `startsWith(u8,a,"--plant=")` tests, every
+  argument held against every flag name. Instead, an engine helper
+  (`core`) splits `--name=value` once, turns the name into the caller's
+  flag enum in one `stringToEnum`, and the caller `switch`es on it
+  (exhaustive; a labeled switch where one flag falls through into
+  another). Strings only at the edge, enums past it; a flag the switch
+  forgets won't build. Names the flag can't spell plainly, long or
+  hyphenated ones and short abbreviations, are tags like `@"long-name"`
+  (outside names, so they keep their own spelling). The editors' tools
+  take the same helper.
 - **Matter has no icons.** Seeds and structures show a seed broken open;
   grit, fibre, essence, starlight and the other matter are only their
   colour in the belly and hotbar (`game/icon.zig`).
