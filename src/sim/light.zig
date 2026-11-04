@@ -290,7 +290,11 @@ pub const Light=struct{
       if(beam<=0)continue;
       // the relay under it, if any
       if(l.under(k))|r|{
-        l.nodes.items[r].supply+=beam;
+        // decision: the beam's light is the solcyriphon's to hand on, the
+        // relay under it reached from it as any other: so light flows one
+        // way from dawn to dusk to dawn, never turning round where the beam
+        // outgrows the day's glow (it flickered there)
+        nd.supply+=beam;
         try l.beams.append(gpa,.{.from=id,.glow=beam,.onto=.relay,.x=nd.x,.y=nd.y,.k=night,.into=l.nodes.items[r].ref});
         continue;
       }
@@ -420,21 +424,31 @@ pub const Light=struct{
     // the nodes
     const ns=l.nodes.items;
     l.order.clearRetainingCapacity();
-    // the sources first, in order: what makes light, and stores with light in them
-    for(ns,0..)|nd,k|if(nd.supply>0 or storeOf(s,nd)>0)try l.order.append(gpa,@intCast(k));
-    for(l.order.items)|k|ns[k].parent=k;
-    // breadth first out along the edges
+    // the sources, strongest first, each spreading breadth first out along
+    // the edges before the next is looked at: one a stronger source reached
+    // is fed from it as well as making its own (a relay a dusk beam has
+    // only begun to pour into stays fed by the solcyriphon above it, not
+    // cut off with the beam's first trickle)
     var head:usize=0;
-    while(head<l.order.items.len):(head+=1){
-      // the node being spread from
-      const u=l.order.items[head];
-      for(l.edges.items[l.first.items[u]..l.first.items[u+1]])|e|{
-        if(ns[e.to].parent!=none)continue;
-        ns[e.to].parent=u;
-        ns[e.to].way=e.way;
-        try l.order.append(gpa,e.to);
-      }
+    while(true){
+      // the strongest source no light has reached yet
+      var top:?usize=null;
+      for(ns,0..)|nd,k|if(nd.supply>0 and nd.parent==none and (top==null or nd.supply>ns[top.?].supply)){top=k;};
+      const k=top orelse break;
+      ns[k].parent=@intCast(k);
+      try l.order.append(gpa,@intCast(k));
+      try l.spread(gpa,&head);
     }
+    // then the stores with light in them that none of it reached, each a
+    // source of its own (never before what makes light: a store a tick
+    // filled and the next emptied would turn the whole tree each tick, the
+    // light flickering between two ways of flowing)
+    const made=l.order.items.len;
+    for(ns,0..)|nd,k|if(nd.parent==none and storeOf(s,nd)>0){
+      ns[k].parent=@intCast(k);
+      try l.order.append(gpa,@intCast(k));
+    };
+    if(l.order.items.len>made)try l.spread(gpa,&head);
     for(l.order.items)|u|{
       // the node, what reached it and what it carries
       const nd=&ns[u];
@@ -476,6 +490,22 @@ pub const Light=struct{
     // the strips, as long as they run, lit by what their heliocyras carry
     for(ns)|nd|if(nd.strip>0)try l.strips.append(gpa,.{.from=nd.ref.plant,.len=nd.strip,.glow=nd.carried});
   }
+  /// breadth first out along the edges from the nodes in `order` from
+  /// `head.*` on, each node reached once, from the first to reach it
+  fn spread(l:*Light,gpa:Allocator,head:*usize)Allocator.Error!void{
+    // the nodes
+    const ns=l.nodes.items;
+    while(head.*<l.order.items.len):(head.*+=1){
+      // the node being spread from
+      const u=l.order.items[head.*];
+      for(l.edges.items[l.first.items[u]..l.first.items[u+1]])|e|{
+        if(ns[e.to].parent!=none)continue;
+        ns[e.to].parent=u;
+        ns[e.to].way=e.way;
+        try l.order.append(gpa,e.to);
+      }
+    }
+  }
   /// hands `spare` from node `u` on to the nodes it reached first, evenly,
   /// each up to what it takes in (light bent on loses a little on the
   /// way); returns how much went
@@ -509,12 +539,12 @@ pub const Light=struct{
   fn isChild(ns:[]const Node,u:u32,e:Edge)bool{return ns[e.to].parent==u and ns[e.to].way==e.way;}
   /// how much more the node `e` leads to takes in, its way taken into
   /// account (a heliocyra takes `stripTake` from a field; light bent on
-  /// counts before its loss)
+  /// counts before its loss; what it makes itself fills it too)
   fn room(ns:[]const Node,e:Edge)f32{
     // the node it leads to, and the most it takes in that way
     const to=ns[e.to];
     const most=if(e.way==.field)@min(stripTake,to.cap)else to.cap;
-    const had=to.got/(if(e.way==.bend)bendKeep else 1);
+    const had=to.got/(if(e.way==.bend)bendKeep else 1)+to.supply;
     return@max(0,most-had);
   }
   /// every user's share: how strongly it is reached times its node's share
@@ -750,4 +780,33 @@ test"an astrocyme stores what none takes, and gives it back when its users go sh
   const v=try b.put(gpa,9,2,.vesper);
   try b.run(gpa,1);
   try testing.expect(b.l.lit.items[v.idx()]>0.9);
+}
+test"through a whole day and night the light never flickers: no share jumps from one tick to the next"{
+  // the test allocator, and a small garden: a solcyriphon over a bloom, an
+  // astrocyme and a far bloom linked on, a vesper by each, two structures
+  const gpa=testing.allocator;
+  var b=try Bench.init(gpa);
+  defer b.deinit(gpa);
+  _=try b.put(gpa,2,2,.solcyriphon);
+  _=try b.put(gpa,2,2,.bloom);
+  _=try b.put(gpa,6,2,.astrocyme);
+  _=try b.put(gpa,10,2,.bloom);
+  // the vespers, one by each relay
+  const vs=[_]Id{try b.put(gpa,3,3,.vesper),try b.put(gpa,7,3,.vesper),try b.put(gpa,11,3,.vesper)};
+  // the structures drawing light, by the near and the far bloom
+  const users=[_]User{.{.at=m.v3(3.5,0,1.5),.draw=2},.{.at=m.v3(9.5,0,1.5),.draw=2}};
+  // each share last tick
+  var prev=[_]f32{0}**(vs.len+users.len);
+  for(0..4000)|k|{
+    // the day, then dusk, the night and dawn, a thousand ticks each
+    const t=m.f(k);
+    const night:f32=if(k<1000)0 else if(k<2000)(t-1000)/1000 else if(k<3000)1 else 1-(t-3000)/1000;
+    try b.l.update(gpa,&b.p,&b.w,&.{},&users,night,testDt);
+    // each share now
+    var now:[vs.len+users.len]f32=undefined;
+    for(vs,0..)|v,i|now[i]=b.l.lit.items[v.idx()];
+    for(0..users.len)|i|now[vs.len+i]=b.l.userLit.items[i];
+    if(k>0)for(now,prev)|a,p|try testing.expect(@abs(a-p)<0.05);
+    prev=now;
+  }
 }

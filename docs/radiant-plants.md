@@ -200,12 +200,12 @@ boost.
 ### Making and carrying
 | Thing | Light | Reach |
 |---|---|---|
-| Solcyriphon, by day | 6 glow, shared among the relays within its field and lighting that field itself | 3 tiles |
-| Solcyriphon, by night | a 12 glow beam into what is under it | one tile |
+| Solcyriphon, by day | 9 glow, shared among the relays within its field and lighting that field itself | 3 tiles |
+| Solcyriphon, by night | an 18 glow beam into what is under it, handed on from the solcyriphon as its day light is (so light never turns round at dusk) | one tile |
 | Bloom (relay) | carries up to 4 glow | 3.5 tiles (as now) |
 | Diamond (big relay) | carries up to 16 glow | 7 tiles (as now) |
 | Astrocyme | holds 720 glow-seconds (6 flowers of 120), takes or gives up to 4 glow | 3 tiles |
-| Heliocyra strip | takes up to 3 glow from its field, or the whole 12 glow beam; carries it 8 tiles, losing 10% at each bend | 1×8 tiles |
+| Heliocyra strip | takes up to 3 glow from its field, or the whole 18 glow beam; carries it 8 tiles, losing 10% at each bend | 1×8 tiles |
 
 - **Distance:** a structure gets full light within a tile of its relay,
   fading evenly to a quarter at the field's edge.

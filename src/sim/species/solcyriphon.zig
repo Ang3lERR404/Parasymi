@@ -12,13 +12,15 @@ const species=lib.species;
 const engine=lib.engine;
 /// colour types, for its genome's pearl and gold
 const color=engine.core.color;
-/// the solcyriphon: hung high over its tile, 6 glow spread over 3 tiles by
-/// day, a 12 glow beam by night; links with relays within 10 tiles
+/// the solcyriphon: hung high over its tile, 9 glow spread over 3 tiles by
+/// day, an 18 glow beam by night; links with relays within 10 tiles
 pub const def:species.Species=.{
   .lineage=.radiant,.seed=.seedSolcyriphon,.floating=true,
   // it makes light, not essence: the sky feeds it as it does every floater
   .matureTime=40,.manaCap=10,.leyDraw=0.5,.share=0,.drain=0,.yield=0,
-  .radiance=3,.link=10,.glow=.{6,12},.carry=12,
+  // decision: half again what it first made (the gardener's playthrough:
+  // the lenses wanted a boost), carrying its whole beam on
+  .radiance=3,.link=10,.glow=.{9,18},.carry=18,
   // high over everything, so a bloom or a plant may hang or stand under it
   .hover=7,
   // its lens hung two metres beneath the float
