@@ -87,6 +87,7 @@ When a change alters what one of these says, update it in the same commit.
 ## Build and run
 ```
 zig build test                    # headless logic tests (no window/GPU)
+zig build test -Dtest-filter=sky  # only the tests whose names hold "sky"
 zig build run                     # debug (validation on); opens on the main menu
 zig build run -Drelease=true      # ReleaseFast (-Doptimize is not accepted)
 zig build run -- --demo           # test garden + structures, fast-forwarded
