@@ -116,8 +116,11 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
   brightness that tonemap and bloom clip it white; the pale gold shafts
   set it). And it shimmers, never sits still: a shimmering light reads
   angelic and mythical, a still one like a lamp; radiant light shimmers
-  with the rainbow drifting through it. New lights meet both; older ones
-  are brought up to them.
+  with the rainbow drifting through it. And it varies, never a fixed
+  count: how many cones or searchlights a light throws differs from one
+  to the next (a radiant heart's six to nine, a starlight patch's
+  column five to nine), as sizes and spacing do in the world. New lights
+  meet all three; older ones are brought up to them.
 - **The constellate tendril:** a braid of fragments flowing along it like
   a stream; how the plexus web makes it, with every number, is in
   [tendril.md](tendril.md).
