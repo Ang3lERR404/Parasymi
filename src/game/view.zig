@@ -148,8 +148,12 @@ const bloomLight:f32=3.5;
 const bloomDark:f32=0.2;
 /// how high (metres) over its float a bloom's core sheds its light
 const bloomCore:f32=0.35;
-/// how much of its pearl's film tints a bloom's light, 0..1
-const bloomFilm:f32=0.35;
+/// how much of its heart's rainbow tints a bloom's light, 0..1: enough that
+/// the fog round it and what it lights shimmer through the hues with its
+/// twinkling heart, never a plain white
+const bloomFilm:f32=0.6;
+/// how fast a bloom's light turns through the rainbow (turns of the hue a second)
+const bloomHueRate:f32=0.08;
 /// how far a bloom's light pulses either way (a share)
 const bloomPulse:f32=0.15;
 /// how fast it pulses (radians a second)
@@ -788,8 +792,8 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
     // how strong its light is now
     const strength=bloomLight*assembled*d.health*drawn.open*pulse*(1-shattered)*(if(d.radiating)@as(f32,1)else bloomDark)*(if(def.floating)@as(f32,1)else groundedLight)*(if(def.store>0)m.lerp(groundedEmpty,1,d.own)else 1)*m.lerp(1,lightByDay,g.sky.daylight());
     if(strength>0){
-      // its light's tint, pearl blended toward its film's hue
-      const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*0.03),bloomFilm);
+      // its light's tint, pearl blended toward its heart's turning rainbow
+      const tint=m.lerpV(m.v3(1,1,1),filmHue(d.seed*3+tf*bloomHueRate),bloomFilm);
       try g.parts.light(drawn.at,tint*m.splat3(strength),bloomReach);
     }
   }

@@ -79,6 +79,17 @@ const float CRYSTAL_WINK_GAIN = 1.4;
 // a halcyra's veil (radiant_kit.Ring `veil`; must match): how clear it is
 // face-on, a bell of glass
 const float RING_VEIL = 11.0;
+// a radiant heart's rainbow, never burnt-out white: its twinkling flecks
+// (cells a metre of its own space), how fast they twinkle and how widely
+// that pace varies (rad/s), how sharp a twinkle's flare, how much of the
+// film turns the pearl under them; and the most the heart's light past
+// full ever comes to, carried in a deeper shade of its own hue
+const float CORE_FLECKS = 60.0;
+const float CORE_TWINKLE = 2.5;
+const float CORE_TWINKLE_SPREAD = 4.0;
+const float CORE_TWINKLE_SHARP = 4.0;
+const float CORE_PEARL_FILM = 0.45;
+const float CORE_OVER = 0.8;
 const float VEIL_CLEAR = 0.12;
 // a placement preview: green where it fits, red where it cannot be sown,
 // breathing at this rate (rad/s)
@@ -159,8 +170,9 @@ void surface() {
     // grazing angles) and in its core, pulsing out from the heart, with sap
     // bubbles rising through it. Fragments fade in as they lock into place.
     // Its tissue is iridescent: a pearl whose thin film turns its hue with
-    // the view angle, drifting slowly along each petal; the core and its
-    // threads stay near white, with only a breath of the film. What carries
+    // the view angle, drifting slowly along each petal; its threads stay
+    // near white, with only a breath of the film, and its heart twinkles in
+    // flecks of rainbow over a pearl (below). What carries
     // less light (v_glow: a vesper's living leaves) keeps more of its own
     // colour and body; withering out of radiance, the light goes out of it.
     float core = part == PART_BLOOM ? 1.3 : 1.1;
@@ -194,10 +206,24 @@ void surface() {
       float wink = pow(0.5 + 0.5 * sin(pc.eye_time.w * CRYSTAL_WINK_RATE + dot(floor(v_obj * CRYSTAL_WINK_CELLS), vec3(12.9, 78.2, 37.7))), CRYSTAL_WINK_SHARP);
       c += mix(vec3(1.0), fire, 0.7) * wink * CRYSTAL_WINK_GAIN * glow;
     }
+    float ring = floor(v_sheet.x + 0.01);
+    // the heart (ring 0, its sap and stamens): rainbow light, not white
+    if (ring < 0.5 && part != PART_PRISM && part != PART_POD) {
+      // (the gardener's pick, from samples): twinkling flecks, cells over
+      // the heart each its own hue, flaring and fading at their own pace
+      // over a pearl that turns with the film
+      float t = pc.eye_time.w;
+      vec3 h = hash33(floor(v_obj * CORE_FLECKS) + seed * 7.0);
+      float tw = pow(0.5 + 0.5 * sin(t * (CORE_TWINKLE + CORE_TWINKLE_SPREAD * h.y) + h.z * TAU), CORE_TWINKLE_SHARP);
+      vec3 hue = mix(mix(vec3(1.0), filmHue(ndv * 1.5 + t * 0.05), CORE_PEARL_FILM), spectral(h.x), tw);
+      hue /= max(max(hue.r, hue.g), max(hue.b, 1e-3));
+      float e = max(max(c.r, c.g), c.b);
+      float over = max(e - 1.0, 0.0);
+      c = hue * min(e, 1.0) + hue * hue * (CORE_OVER * over / (CORE_OVER + over));
+    }
     // petals are thin: see-through face-on, their edges bright (living
     // leaves denser; a veil sheerer still, a bell of glass; a crystal clear
     // but for its flashes)
-    float ring = floor(v_sheet.x + 0.01);
     float a = (part == PART_LEAF ? mix(mix(0.85, 0.3, v_glow), 0.9, fres) : mix(0.5, 0.95, fres)) * v_young;
     if (abs(ring - RING_VEIL) < 0.5) a = mix(VEIL_CLEAR, 0.8, fres) * v_young;
     if (part == PART_PRISM) a = clamp(mix(0.45, 0.9, fres) + dot(c, vec3(0.1)), 0.0, 1.0) * v_young;

@@ -236,6 +236,14 @@ A flower whose petals float free, gathered by its core.
   it, each held by a thread of light; motes spiralling in; a tilted halo.
 - **Surface:** pearl with an iridescent film (plant.frag `filmHue`, by
   view angle).
+- **Its heart** (and every radiant heart, ring `core`): never a burnt-out
+  white. Twinkling flecks (the gardener's pick from samples): small cells
+  over it, each its own hue of the spectrum, flaring and fading at its own
+  pace over a pearl the film turns (`CORE_FLECKS`, `CORE_TWINKLE*`); light
+  past full is carried in a deeper shade of its own hue (`CORE_OVER`), so
+  it still feeds the glow. Its light (and so the fog round it and what it
+  lights) is pearl blended 60% toward a rainbow turning slowly through the
+  hues (view.zig `bloomFilm`, `bloomHueRate`).
 - **What each fragment carries:** assembly order (tu.x), `radiantKit.Ring`
   (tu.y; a thread adds its distance from its petal) and bearing (colour
   alpha).

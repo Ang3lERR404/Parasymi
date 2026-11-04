@@ -91,12 +91,6 @@ hues are being chosen from samples.*
   real night sky, so vibrant hues come through instead of a milky
   lavender-white. The fog takes its colour from the sky (`SKY_AIR`), so it
   deepens with it.
-- **The radiant cores read white.** The glowing heart of each radiant
-  plant with a core (the celestial bloom and the others of the radiant
-  kit) clips to a burnt-out white; it should glow in the radiant lineage's
-  rainbow (as its threads and halo already do, `filmHue`), and so should
-  the glow it puts in the fog and the light it casts. Its exact rainbow is
-  the gardener's to pick from samples.
 - **The diamond's animations are far below the bar.** It never got
   polished motion: its forming, its idle and its light all want bringing
   up to the current standard (the growth and plant quality the rest of
