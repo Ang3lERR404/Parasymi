@@ -118,6 +118,16 @@ carries the game's early days.
 - ~~**A playback trail**~~ built: `--record[=S]`
   ([testing.md](testing.md#a-playback-trail-while-the-gardener-plays)).
 
+- **Talking to Claude from inside the game** (the gardener's idea,
+  2026-11-04; a dev tool, not multiplayer). A chat sidebar in the game
+  whose messages go straight to Claude, and a local MCP server the game
+  runs (on this machine only) so Claude can follow the play: tools such
+  as the game's state (the trail's note), the newest frame, and the
+  chat. Claude reading the game is the easy half; a message arriving in
+  Claude's session on its own (pushed, not fetched) is the open question:
+  look into Claude Code's ways of pushing into a session (MCP channels)
+  before building.
+
 ## Saved gardens
 - **A picture of each saved garden** (the gardener's idea, 2026-11-04,
   as Factorio shows a factory beside its save). Whenever the garden is
