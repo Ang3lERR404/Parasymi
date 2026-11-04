@@ -28,6 +28,17 @@ carries the game's early days.
   the light at night. A patch never runs dry, but each has its own
   richness, like Factorio's oil fields. At the unforming each patch goes
   dark by shooting its light up into the sky.
+- **The driftwisp turns radiant.** It already acts radiant (catches
+  starlight, a lantern whose comb rows split light), so it moves to the
+  radiant lineage, keeping most of its look and vibe. Radiant things are
+  gathered, never grown, so its sap float and trailing filaments are
+  rebuilt from `radiantKit` fragments: the same comb-jelly lantern of
+  light, its filaments as strands of gathered light (held to the glow
+  bar: its own colour, shimmering).
+- **A rooted starlight catcher for the symbiotic lineage.** To fill the
+  driftwisp's place: a new basic structure, rooted beside a patch,
+  reaching up for the light; it gathers starlight far less well than the
+  floating driftwisp, so the radiant one is worth reaching for.
 - **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
   out of essence, but no convergent plant makes it, so once the
   symbiotic lineage is gone only the fibre plant's nodes, gathered by
