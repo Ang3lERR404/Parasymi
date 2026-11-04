@@ -73,8 +73,10 @@ Factorio's belts, each side a short row of items**.
   fixed to that lane.
 - **Every tier above** can switch lanes and reach farther (what mods give
   Factorio's inserters, here in the game itself).
-- Still to shape: what the symbiotic and parasitic ones do differently at
-  the same tier, what convergent and constellate add, how each looks.
+- **Symbiotic and parasitic** (the same tier): they work the same; only
+  their look differs, yin and yang. The early game stays gentle, so
+  neither costs or punishes more than the other.
+- Still to shape: what convergent and constellate add, how each looks.
 
 ## Saves that never break
 *Planned, not started.* Today plants, the belly, research, the weave queue
