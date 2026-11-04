@@ -207,7 +207,7 @@ const uint FORMS_CROWNED = FORM_BIT(FORM_COIL);
 // up (tu.y how far each strand has parted, parasite_kit `lattice`)
 const uint FORMS_PARTING = FORM_BIT(FORM_COIL);
 // filaments hanging from a float, rippling like a jelly's
-const uint FORMS_FILAMENTS = FORM_BIT(FORM_DRIFT);
+const uint FORMS_FILAMENTS = 0u;
 // the light grid's plants, each its own way (radiant_kit): folding up for
 // the night by how dark it is, its threads drawn in, its heart burning
 // small and bright (the solcyriphon)

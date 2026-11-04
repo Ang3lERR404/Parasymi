@@ -50,7 +50,7 @@ pub fn plant(b:*Builder,id:species.Id,variant:u32)Allocator.Error!void{
   switch(g.form){
     .herb=>try structureKit.plant(b,g,own,variant,!def.floating),
     .coil=>try parasiteKit.plant(b,g,own),
-    .drift=>try drift(b,g,own,variant),
+    .drift=>try radiantKit.lumi(b,g,own,variant),
     .radiant=>try radiantKit.plant(b,g,own,variant),
     .star=>try radiantKit.star(b,g,own,variant),
     // the light grid's plants, each gathered into its own body

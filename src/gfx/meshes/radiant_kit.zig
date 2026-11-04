@@ -855,6 +855,104 @@ pub fn solcyriphon(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator
   try trailing(b,radius,.{.n=g.tendrils,.at=0.9,.y=0.2,.len=.{4.2,6.2},.r=0.03,.beads=4,.order=.{0.68,0.86},.col=lite},seed+%0x7A11,&rng);
   try motes(b,radius,16,lite,&rng);
 }
+/// the halyriphon's crown, which part of it is still being chosen (drafts
+/// for the gardener, shot one by one): a ring of crystal facets catching
+/// the light over the lantern, a tilted halo with motes, or a wide open
+/// whorl of petals
+pub const LumiCrown=enum{
+  /// a lens of crystal facets laid flat over the lantern's top
+  facets,
+  /// a thin tilted ring of light over it, motes spiralling in
+  halo,
+  /// a wide, shallow whorl of floating petals open to the sky
+  whorl,
+};
+/// which crown the halyriphon is drawn with (a draft, while the gardener chooses)
+pub const lumiCrown:LumiCrown=.facets;
+/// the halyriphon's lantern: how many comb rows run up it (the old
+/// lantern's eight), how far they turn round it mouth to top (turns, its
+/// `lanternTwist`), how far off its skin they float (a share of its
+/// radius) and how many beads of split light each strings
+const lumiCombs=8;
+/// (how far they turn)
+const lumiTwist:f32=0.7;
+/// (how far off the skin)
+const lumiCombOff:f32=1.07;
+/// (how many beads)
+const lumiCombBeads=5;
+/// its yield beads: how high over the heart they hang (m, its species' `pluck`)
+/// and how far out round it (a share of the radius)
+const lumiPodHigh:f32=0.31;
+/// (how far out)
+const lumiPodOut:f32=0.35;
+/// the halyriphon (the `drift` form, turned radiant): a comb-jelly lantern
+/// of light, gathered, never grown: its old sap lantern kept whole (the
+/// gardener's heart of it), gathered in as one sheer pane of light round
+/// its heart (`core`); its eight comb rows lifted off it as threads of
+/// light floating a hair off its skin, each its own colour of the split
+/// light, beads strung along it; beneath, its filaments (the other heart
+/// of it) trailing as threads of light with beads strung down them; over
+/// it its yield's beads and its crown (`lumiCrown`, still being chosen).
+/// The origin is the heart.
+pub fn lumi(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!void{
+  // its own random stream
+  var rng=Rng.init(seed);
+  // the pale body, the light it holds, and white
+  const body=g.stemCol.toRgba8(255);
+  const lite=g.bloomCol.toRgba8(255);
+  const white=color.rgb(1,1,1).toRgba8(255);
+  // the lantern's radius, which everything is sized by
+  const radius=g.bloomR*0.62;
+  try core(b,.{.r=radius*0.8,.body=color.mix(body,lite,0.5),.lite=lite,.stamens=5,.seed=seed},&rng);
+  // the lantern: its sap skin, the old comb-jelly egg kept whole, gathered
+  // in as one pane of light, sheer
+  const skin=b.mark();
+  try mg.drifts.lantern(b,g,radius,seed);
+  fragment(b,skin,.{.order=0.08,.ring=.veil});
+  // where on the rainbow this lantern's split light begins
+  const hue0=m.f(seed%97)/97+m.f(variant)*0.25;
+  for(0..lumiCombs)|i|{
+    // this comb row's own colour of the split light
+    const x=hue0+m.ratio(i,lumiCombs);
+    const film=color.rgb(0.5+0.5*@cos(m.tau*x),0.5+0.5*@cos(m.tau*(x+0.33)),0.5+0.5*@cos(m.tau*(x+0.67))).toRgba8(255);
+    const col=color.mix(film,white,0.25);
+    // its path: along the lantern's comb crest, a hair off the skin, mouth to top
+    var path:[16]V3=undefined;
+    for(&path,0..)|*p,j|{
+      const s=m.lerp(0.1,0.9,m.ratio(j,path.len-1));
+      const ph=(m.ratio(i,lumiCombs)-lumiTwist*s/m.f(lumiCombs))*m.tau;
+      p.*=mg.drifts.lanternAt(radius*lumiCombOff,s,ph);
+    }
+    // the comb row and the beads of split light strung along it, one fragment
+    const a=m.ratio(i,lumiCombs)*m.tau;
+    const s0=b.mark();
+    try threadOn(b,&path,radius*0.035,col);
+    for(0..lumiCombBeads)|k|{
+      try mg.ellipsoid(b,.{.center=m.alongPath(&path,(m.f(k)+0.5)/m.f(lumiCombBeads)),.radii=m.splat3(radius*0.045),.col=col,.part=.bloom,.rings=3,.segs=5});
+    }
+    fragment(b,s0,.{.order=m.lerp(0.14,0.4,m.ratio(i,lumiCombs)),.ring=.inner,.bearing=a});
+  }
+  // its filaments: threads of light trailing from under it, two lengths, beads strung down them
+  try trailing(b,radius,.{.n=g.tendrils,.at=0.3,.y=0.62,.len=.{2.8,6.4},.r=0.022,.beads=3,.order=.{0.45,0.7},.col=g.leafCol.toRgba8(255)},seed+%0x7A12,&rng);
+  // its yield: beads of starlight held over its crown, where the paws reach
+  // for them (its species' `pluck`), the last to settle
+  for(0..g.pods)|k|{
+    // this bead's bearing (its place among the pods), and where its vertices begin
+    const a=(m.f(k)+0.5)/m.f(g.pods)*m.tau;
+    const s=b.mark();
+    try mg.ellipsoid(b,.{.center=v3(@cos(a)*radius*lumiPodOut,lumiPodHigh,@sin(a)*radius*lumiPodOut),.radii=m.splat3(g.podR),.col=lite,.part=.pod,.rings=5,.segs=7});
+    fragment(b,s,.{.order=m.lerp(0.9,0.98,m.ratio(k,@max(g.pods,1))),.ring=.yield,.bearing=a});
+  }
+  // its crown, over the lantern's top
+  switch(lumiCrown){
+    .facets=>try lens(b,radius,.{.n=9,.inner=0.3,.outer=0.95,.thick=0.06,.y=1.12,.order=.{0.72,0.9},.lite=color.mix(lite,body,0.35),.deep=body},lite,seed+%0x1E26),
+    .halo=>{
+      try motes(b,radius,10,lite,&rng);
+      try halo(b,radius*1.5,radius*0.025,0.35,0.95,lite);
+    },
+    .whorl=>try whorl(b,radius,.{.n=g.petals,.ring=.outer,.at=0.5,.y=1.3,.len=1.6,.w=0.42,.rise=0.5,.flare=0.35,.cup=0.45,.order=.{0.72,0.92},.col=body,.tip=color.mix(lite,white,0.5)},lite,seed+%0x2B11,&rng),
+  }
+}
 /// how many flowers an astrocyme's bouquet holds, one share of its store
 /// each (its genome's `petals`; plant.vert `BOUQUET_FLOWERS`, must match)
 pub const bouquetFlowers=6;

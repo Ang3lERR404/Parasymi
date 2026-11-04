@@ -191,7 +191,7 @@ const lanternTwist:f32=0.7;
 /// carry the light split into colours (pale rainbow along each one); the
 /// skin between them is clear sap. One shared-vertex sheet closed at both
 /// poles, so it is watertight.
-fn lantern(b:*Builder,g:species.Genome,radius:f32,seed:u64)Allocator.Error!void{
+pub fn lantern(b:*Builder,g:species.Genome,radius:f32,seed:u64)Allocator.Error!void{
   // the lantern's rows (mouth to top) and points round each row
   const rowCount=17;
   const colCount=49;
@@ -239,7 +239,7 @@ fn lanternCrest(s:f32,ph:f32)f32{
   return m.pow(f32,@max(0.5+0.5*@cos(lanternRows*ph+lanternTwist*s*m.tau),0),lanternCrestCount);
 }
 /// a point on the lantern at height `s` (0 its mouth .. 1 its top) and bearing `ph`
-fn lanternAt(radius:f32,s:f32,ph:f32)V3{
+pub fn lanternAt(radius:f32,s:f32,ph:f32)V3{
   // the height, held to the lantern (0..1)
   const k=m.clamp01(s);
   // the radius here: an egg, broadest low, ribbed by the combs
