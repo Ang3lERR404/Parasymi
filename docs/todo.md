@@ -104,6 +104,10 @@ hues are being chosen from samples.*
   radiant hearts' wandering cones of coloured light raise the bar further:
   the diamond, the lattice that gathers four blooms' light and splits it,
   should split light at least as richly (its halo and projection included).
+  *The gardener's idea for showing the connection:* a bloom near a
+  diamond's halo shoots a narrower, directed beam into the ring's
+  rainbow; where it lands, a flat camera-facing mote of light appears and
+  travels along the ring, so each bloom's link is seen running round it.
 
 ## Act 3, far off
 *A seed, nothing decided.* Evolved plants in space: the garden at last
