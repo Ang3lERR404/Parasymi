@@ -110,12 +110,18 @@ hues are being chosen from samples.*
   lens: the light it carries is multiplied, by about 5%. Solcyriphons
   never stack it: one beam, one boost. Update radiant-plants.md when
   built.
-- **A radiant amplifier** (the gardener's idea, to be shaped). A new
+- **A radiant amplifier** (the gardener's idea, shaped 2026-11-04). A new
   radiant plant, opened by its own research and woven for one purpose:
-  amplifying the light grid's output. Its look, numbers and how it sits
-  in the grid (beside a relay? in a beam's path?) are still to settle;
-  gathered from `radiantKit` fragments like every radiant thing, held to
-  the glow bar.
+  amplifying the light grid's output. It pairs with one solcyriphon,
+  floating at the same height beside it, and makes that one's light (its
+  day light and its night beam) stronger.
+  *Its look (the gardener's pick):* a wreath of small mirror flowers
+  orbiting the solcyriphon, each one taking on a different colour of the
+  spectrum (red, orange, gold, green, blue, violet), their mirror petals
+  turned in, reflecting light back into its lens, so together they make a
+  turning rainbow wreath. Gathered from `radiantKit` fragments like every
+  radiant thing, held to the glow bar. Still to settle: its name, its
+  boost, its research and cost.
 - **Relays carry without a cap** (the gardener's word: a cap is too
   punishing). The bloom's 4 glow and the diamond's 16 glow limits go;
   a relay carries all the light it is given, its reach unchanged.
