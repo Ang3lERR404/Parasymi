@@ -6,24 +6,16 @@ the doc that covers it). Each entry says plainly what it is and how far
 along it stands.
 
 ## Act 1 rework
-*Brainstormed, not started.* Act 1 (everything before the unforming) still
+*Brainstormed, names done.* Act 1 (everything before the unforming) still
 carries the game's early days.
-- **Names.** The first plants and structures have plain-English names
-  (lumenroot, driftwisp, hollowheart, thornleech, mire lily, moss creeper,
-  sap cache, root-digger, gathering crown) beside the newer coined ones
-  (astrocyme, heliocyra, halcyra, arsthraxia, vultrixi, nebularbor,
-  monfris). The old names are to be reborn in the new style, in the
-  player-facing strings (`src/cfg/parasymi.cfg`); a code tag is renamed
-  only when the gardener says so, through the old-name table
-  (`record.renamed`). ~~The driftwisp is **halyriphon** in game~~ (its
-  code tag stays `driftwisp`). ~~The lumenroot is **lucirhizaphaeroth**
-  in game~~ (code tag `lumenroot`). ~~The hollowheart is **cavikoicyra**
-  in game~~ (code tag `hollowheart`). ~~The thornleech is
-  **hirusidandrath** in game~~ (code tag `thornleech`). ~~The mire lily
-  is **helonycydira** in game~~ (code tag `mireLily`). ~~The moss
-  creeper is **bryonifthofluris** in game~~ (code tag `mossCreeper`).
-  ~~The sap cache is **opoclarritheca** in game~~ (code tag `sapCache`).
-  ~~The root-digger is **oryctaluume** in game~~ (code tag `rootDigger`).
+- ~~**Names.** The first plants and structures are reborn in the new
+  style, in game only (`src/cfg/parasymi.cfg`; every code tag kept, a code
+  rename going through the old-name table, `record.renamed`, only when
+  the gardener says so): driftwisp → halyriphon, lumenroot →
+  lucirhizaphaeroth, hollowheart → cavikoicyra, thornleech →
+  hirusidandrath, mire lily → helonycydira, moss creeper →
+  bryonifthofluris, sap cache → opoclarritheca, root-digger →
+  oryctaluume, gathering crown → coronisdilephyra.~~
 - **Balance.** What act 1 plants yield was picked long ago. Lumenroot,
   hollowheart and thornleech all give plain essence; both lineages'
   structures cost the same mix; nothing grows fibre. The shared core
