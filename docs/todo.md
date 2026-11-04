@@ -90,7 +90,9 @@ structures, simple or complex in what they do, as Factorio's Lua mods do.
   feels blended: rules snap on in order like Scratch, wired to each other
   like a node graph, and drawn as a growing stem, each rule a leaf or bud
   ("when it holds 3 essence" sprouting "weave 1 fibre"). Lua stays the
-  far-off expert road for what the blocks cannot do.
+  far-off expert road for what the blocks cannot do. The game's own
+  structures' behaviours offered as ready-made blocks too, to mix and
+  match (a loomfern's weaving with a gathering crown's gathering).
 - **Looks** from sculpts (`.mesh`) and clips (`.anim`), which the game
   already reads at start; modded plants still keep the plant rules
   (growing, sway, stamens).
