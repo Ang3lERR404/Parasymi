@@ -386,12 +386,14 @@ const parts=struct{
   pub const polypHanging=@import("meshes/polyp.zig").hanging;
   /// a mixed look for the polyp: a colony of slender hydras on the fleshy mound
   pub const polypHydras=@import("meshes/polyp_hydra.zig").colony;
-  /// a draft for the rooted starlight catcher: middling stalk, six hands, an even dish
-  pub const catcherBalanced=starlightCatcher.Look(starlightCatcher.balanced);
-  /// a draft for the rooted starlight catcher: a tall slender reed, a wide shallow dish
-  pub const catcherReed=starlightCatcher.Look(starlightCatcher.reed);
-  /// a draft for the rooted starlight catcher: short and stout, big hands, a deep dish
-  pub const catcherCup=starlightCatcher.Look(starlightCatcher.cup);
+  /// a draft for the rooted starlight catcher: a deep sky dish of fine petals ringed with light-catching hairs
+  pub const catcherSky=starlightCatcher.Look(.sky);
+  /// a draft for the rooted starlight catcher: feathery plumes fanned up out of a small cup
+  pub const catcherPlume=starlightCatcher.Look(.plume);
+  /// a draft for the rooted starlight catcher: a cup of broad petals round a lens of sap, dew-tipped hairs
+  pub const catcherDew=starlightCatcher.Look(.dew);
+  /// a bead of gathered starlight, glowing in a catcher draft's heart and down its vine
+  pub const catcherBead=starlightCatcher.bead;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, crowned with its feathery tentacles
   pub const polypHydraFeathered=@import("meshes/polyp_hydra.zig").feathered;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, its long tentacles plumed at their tips
