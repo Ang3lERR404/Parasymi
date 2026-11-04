@@ -434,28 +434,58 @@ fn rainbow(x:f32)m.V3{
   return s/m.splat3(@max(s[0],@max(s[1],s[2])));
 }
 /// the cones of light a radiant heart throws at `at`, `strength` its
-/// light: `heartCones` wide soft cones, each its own colour, wandering on
-/// its own (its own way round and down, swinging at its own two paces),
+/// light: between `coneFew` and `coneMost` wide soft cones (how many
+/// drifting slowly over time, `howMany`, each one past the first few
+/// fading in and out rather than popping), each its own colour, wandering
+/// on its own (its own way round and down, swinging at its own two paces),
 /// breathing in brightness at its own pace; together they overlap, part
 /// and drift, filling the fog round it with colour and splashing it on
 /// the ground and plants they sweep over (light.glsl `coneOf`)
 fn heartCones(g:*Game,at:m.V3,strength:f32,seed:f32,tf:f32)Allocator.Error!void{
-  for(0..coneCount)|k|{
+  // how many cones it throws just now, a share past a whole one fading
+  const n=howMany(seed,tf);
+  for(0..coneMost)|k|{
+    // how far this cone has faded in: whole for the first `n`, the next part way
+    const here=m.clamp01(n-m.f(k));
+    if(here<=0)continue;
     // this cone's own random draws, from the plant's seed and its place
     const h=[_]f32{hashOf(seed,k,1),hashOf(seed,k,2),hashOf(seed,k,3),hashOf(seed,k,4),hashOf(seed,k,5),hashOf(seed,k,6)};
     // its way round: spread from its neighbours, swinging at two paces of its own
-    const yaw=m.ratio(k,coneCount)*m.tau+h[0]*coneSpread+coneSwing*@sin(tf*m.lerp(coneSlow[0],coneSlow[1],h[1])+h[2]*m.tau)+coneSwing*0.55*@sin(tf*m.lerp(coneFast[0],coneFast[1],h[3])+h[4]*m.tau);
+    const yaw=m.ratio(k,coneMost)*m.tau+h[0]*coneSpread+coneSwing*@sin(tf*m.lerp(coneSlow[0],coneSlow[1],h[1])+h[2]*m.tau)+coneSwing*0.55*@sin(tf*m.lerp(coneFast[0],coneFast[1],h[3])+h[4]*m.tau);
     // how far below level it leans, rising and dipping on its own
     const dip=m.lerp(coneDip[0],coneDip[1],0.5+0.5*@sin(tf*m.lerp(coneSlow[0],coneSlow[1],h[5])*1.3+h[1]*m.tau));
     const way=m.v3(@cos(dip)*@sin(yaw),-@sin(dip),@cos(dip)*@cos(yaw));
     // its colour, drifting slowly through the rainbow, and its breath
-    const col=m.lerpV(rainbow(m.ratio(k,coneCount)+h[2]*0.15+tf*coneHueRate*(0.6+h[3])),m.v3(1,1,1),conePearl);
+    const col=m.lerpV(rainbow(m.ratio(k,coneMost)+h[2]*0.15+tf*coneHueRate*(0.6+h[3])),m.v3(1,1,1),conePearl);
     const breath=1+coneBreath*@sin(tf*m.lerp(coneBreathRate[0],coneBreathRate[1],h[4])+h[5]*m.tau);
-    try g.parts.spot(at,way,@cos(coneHalf),col*m.splat3(strength*coneLight*breath),coneReach);
+    try g.parts.spot(at,way,@cos(coneHalf),col*m.splat3(strength*coneLight*breath*m.smooth(here)),coneReach);
   }
 }
-/// a radiant heart's cones: how many
-const coneCount=4;
+/// a radiant heart's cones: the fewest it ever throws, and the most (the
+/// gardener's 6 to 9)
+const coneFew:f32=6;
+/// (the most)
+const coneMost=9;
+/// how fast the count drifts between them (radians a second): over a
+/// couple of minutes, each heart at its own place in the drift
+const coneCountRate:f32=0.05;
+/// how many cones a heart of `seed` throws at time `tf`: between `coneFew`
+/// and `coneMost`, drifting slowly, the share past a whole one the next
+/// cone's fade
+fn howMany(seed:f32,tf:f32)f32{
+  return m.lerp(coneFew,m.f(coneMost),0.5+0.5*@sin(tf*coneCountRate+seed*m.tau));
+}
+test"a heart throws between six and nine cones, drifting"{
+  // the fewest and most seen over a long while
+  var lo:f32=99;
+  var hi:f32=0;
+  for(0..2000)|i|{
+    const n=howMany(0.37,m.f(i)*0.5);
+    lo=@min(lo,n);
+    hi=@max(hi,n);
+  }
+  try lib.std.testing.expect(lo>=coneFew-1e-4 and lo<coneFew+0.05 and hi<=m.f(coneMost)+1e-4 and hi>m.f(coneMost)-0.05);
+}
 /// how far a cone's resting way round strays from an even spread (radians)
 const coneSpread:f32=0.8;
 /// how far a cone swings round from its resting way (radians)
@@ -471,7 +501,7 @@ const coneHalf:f32=0.42;
 /// how far a cone reaches (metres)
 const coneReach:f32=10;
 /// a cone's brightness, a share of its heart's light
-const coneLight:f32=1.6;
+const coneLight:f32=1.2;
 /// how much of a pearl's white softens a cone's colour (never white itself)
 const conePearl:f32=0.06;
 /// how fast a cone's colour drifts through the rainbow (turns a second)

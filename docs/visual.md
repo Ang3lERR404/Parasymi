@@ -243,7 +243,9 @@ A flower whose petals float free, gathered by its core.
   past full is carried in a deeper shade of its own hue (`CORE_OVER`), so
   it still feeds the glow.
 - **Its light:** a soft pearl light round it, low (`bloomRound`), and
-  four wide soft cones of coloured light thrown out of the heart like
+  six to nine wide soft cones of coloured light (how many drifting slowly
+  over a couple of minutes, `howMany`, a cone fading in or out rather than
+  popping; the gardener's 6 to 9) thrown out of the heart like
   spotlights in fog (view.zig `heartCones`). Each its own colour (spread
   round the rainbow, drifting slowly), each wandering on its own: its own
   way round and down, swinging at two paces of its own, rising and dipping,
