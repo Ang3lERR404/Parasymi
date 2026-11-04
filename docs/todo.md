@@ -142,5 +142,9 @@ mend that.
 - **The copycat.** Grows into the shape of what the wolf stands near most.
 - **The humming bulb.** At night hums the main menu's melody, heard only
   when standing still beside it.
+- **The wolf's blep.** Now and then, idle, the wolf's tongue tip peeks
+  out, a little blep.
+- **The hyena's whoop.** Very rarely the star hyena gives the rising
+  "whoop" real hyenas call.
 - **The lost seed.** One seed in the world grows a plant as plants looked
   in an older version of the game.
