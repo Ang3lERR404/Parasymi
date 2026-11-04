@@ -618,7 +618,7 @@ flooding. His pose is the clip `src/anim/sleep.anim` (keyed in animedit,
 - No star falls: starlight is gathered on the starlit patches (below).
 
 ## Starlit patches
-`game/starlight.zig` (where they lie: `world/starlit.zig`).
+`game/starlight.zig` (where they lie: `world/starlit.zig`). The gardener's look, approved in game.
 - **By day, a hint:** a dark-blue field on the ground and its grass
   (terrain.frag `STAR_*`, carried by `vertex.Terrain.star` and the detail
   tiles' info), its rim frayed in and out, lighter blue the poorer the
