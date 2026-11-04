@@ -51,12 +51,13 @@ const moonSwing:f32=0.5;
 const moonLift:f32=0.3;
 /// how far north the moon's light leans
 const moonLean:f32=-0.3;
-/// the sky's colours (linear): night, a deep saturated navy (the
-/// gardener's word: like a real night sky, vibrant hues coming through,
-/// never milky)
-const nightSky=m.Vice(f32,3){0.004,0.007,0.032};
-/// a plain day: a deep, saturated blue the light's beams show against
-const daySky=m.Vice(f32,3){0.04,0.1,0.3};
+/// the sky's colours at the horizon (linear; the haze takes them too, and
+/// the dome deepens up from them to its zenith, sky.frag OLD_ZENITH_*):
+/// night, a deep violet (the gardener's word: like a real night sky,
+/// vibrant hues coming through, never milky)
+const nightSky=m.Vice(f32,3){0.011,0.005,0.034};
+/// a plain day: saturated, with a dash of cyan, the light's beams showing against it
+const daySky=m.Vice(f32,3){0.035,0.15,0.3};
 /// a day veiled by the world event: a little violet
 const veiledSky=m.Vice(f32,3){0.2,0.12,0.38};
 /// the dusk glow near the horizon

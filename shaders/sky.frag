@@ -11,9 +11,15 @@
 layout(location = 0) in vec3 v_dir;
 layout(location = 0) out vec4 o;
 
-// the zenith's tint over the horizon's colour, by night and by day
+// the zenith's tint over the horizon's colour, by night and by day (the
+// ley's sky after the unforming)
 const vec3 ZENITH_NIGHT = vec3(0.45, 0.55, 0.85);
 const vec3 ZENITH_DAY = vec3(0.55, 0.65, 1.0);
+// the old sky's zenith (linear), the horizon (the fog's colour, game/sky.zig)
+// deepening up to it: by day from a dash of cyan into a semi-deep blue, by
+// night from violet into a broody royal purple (the gardener's word)
+const vec3 OLD_ZENITH_DAY = vec3(0.022, 0.06, 0.25);
+const vec3 OLD_ZENITH_NIGHT = vec3(0.014, 0.002, 0.03);
 // the key light seen in the sky: a cool moon, a warm sun; how tight its glow
 // is, and where its disc's edge lies (cosine of its angular radius)
 const vec3 MOON_SKY = vec3(0.55, 0.65, 0.95);
@@ -136,7 +142,7 @@ vec3 leyGlow(vec3 d, float up, float t) {
 // glow around it, and stars once it is dark
 vec3 oldSky(vec3 d, float up, float day) {
   vec3 horizon = pc.fog.rgb;
-  vec3 zenith = mix(horizon * ZENITH_NIGHT, horizon * ZENITH_DAY, day);
+  vec3 zenith = mix(OLD_ZENITH_NIGHT, OLD_ZENITH_DAY, day);
   vec3 c = mix(horizon, zenith, pow(up, 0.6));
   float toward = max(dot(d, SUN), 0.0);
   vec3 light = mix(MOON_SKY, SUN_SKY, day);
