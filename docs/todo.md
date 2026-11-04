@@ -37,7 +37,9 @@ carries the game's early days.
   The driftwisp is its catcher, floating over a patch, its dish catching
   the light at night. A patch never runs dry, but each has its own
   richness, like Factorio's oil fields. At the unforming each patch goes
-  dark by shooting its light up into the sky.
+  dark by shooting its light up into the sky. *Decided:* a halyriphon
+  makes starlight only floating over a patch, nothing away from one (the
+  patches are what a garden is built round).
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
