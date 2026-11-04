@@ -75,7 +75,10 @@ Factorio's belts, each side a short row of items**.
   Factorio's inserters, here in the game itself).
 - **Symbiotic and parasitic** (the same tier): they work the same; only
   their look differs, yin and yang. The early game stays gentle, so
-  neither costs or punishes more than the other.
+  neither costs or punishes more than the other. The symbiotic one, a
+  curling tendril, cups the item like a leaf holding dew and lays it in
+  softly; the parasitic one, a quick pale feeler, snaps it up and flicks
+  it in, lively, never cruel.
 - Still to shape: what convergent and constellate add, how each looks.
 
 ## Saves that never break
