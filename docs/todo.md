@@ -122,6 +122,13 @@ carries the game's early days.
   bridge ([testing.md](testing.md#talking-to-claude-while-playing---link)).
   Still to try for real: a terminal Claude Code session with the channel
   flag, the gardener typing in game.
+- **The link in the editors** (the gardener's idea, 2026-11-04): meshedit
+  and animedit linked the same way, so Claude builds a sculpt or keys a
+  clip live while the gardener watches and gives feedback in the
+  editor's own chat. The bridge gains tools to read the open sculpt or
+  clip, change forms (add, move, turn, size, shade, nest) or keys, and
+  see the editor's view; every change goes through the editor's history,
+  so ctrl+z takes back anything Claude did.
 
 ## Saved gardens
 - **A picture of each saved garden** (the gardener's idea, 2026-11-04,
