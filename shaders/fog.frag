@@ -38,6 +38,11 @@ const float EVEN = 0.3;
 const float SHAFT = 1.0;
 // how strongly the points of light glow in it
 const float POINT_AIR = 2.0;
+// how close round each light its glow in the air keeps (the power its
+// window falls off by, across the ray's nearest pass over its reach): held
+// round the light, so the lights' glows never sum into a milky veil over
+// the whole night sky (the gardener's word: deep, saturated)
+const float POINT_HUG = 6.0;
 // how many times a light holding a shadow cube looks it up across the ray's
 // chord through its reach (so what stands in its light shades the air: rays
 // and shadow wedges round it)
@@ -50,8 +55,20 @@ const float LEY_SPREAD = 2.0;
 // the sky's light all round, as a share of the sky's colour (less than all
 // of it, so what the key light reaches stands out from what it does not)
 const float SKY_AIR = 0.75;
-// how far a ray into the sky is followed (a share of the drawn reach)
+// how far a ray into the sky is followed (a share of the drawn reach): all
+// of it along the horizon, so the sky melts into the haze over the far
+// ground with no seam, thinning to `SKY_REACH_UP` higher up, so the sky
+// overhead shows deep through it (the gardener's word: darker)
 const float SKY_REACH = 1.0;
+const float SKY_REACH_UP = 0.4;
+// how high above the horizon (a ray's rise) the haze has thinned to that
+const float SKY_THIN = 0.35;
+// how far the key light scattered in the air over the sky takes the sky's
+// own hue (air scatters blue), so it reads deep and saturated, never milky
+const float SKY_HUE = 0.8;
+// how much of the moon's light the air over the sky scatters, by night (by
+// day all the sun's): a night sky stays deep, never moonlit milk
+const float SKY_KEY_NIGHT = 0.25;
 
 // the share of the key light sent along the ray (1 even), cosine `c`
 // between the ray and the way toward the light
@@ -88,7 +105,7 @@ void main() {
   bool sky = d >= 1.0;
   vec3 eye = pc.eye_time.xyz;
   vec3 dir = volumeRay(tx);
-  float len = sky ? pc.view.w * SKY_REACH : length(volumePoint(v_inv, tx, d) - eye);
+  float len = sky ? pc.view.w * mix(SKY_REACH, SKY_REACH_UP, smoothstep(0.0, SKY_THIN, dir.y)) : length(volumePoint(v_inv, tx, d) - eye);
   // the key light along it, and the sky's light all round
   vec3 key = keyLight() * phase(dot(dir, SUN)) * SHAFT * ALBEDO;
   vec3 amb = pc.fog.rgb * SKY_AIR;
@@ -128,8 +145,10 @@ void main() {
     gather(rho * ds, light, scat, trans);
     stepTrans[i] = trans;
   } else for (int i = 0; i < STEPS; i++) stepTrans[i] = trans;
-  // the haze after it (a ray rising out of the slab into the sky)
-  gather(hazeDepth(eye.y + dy * s1, eye.y + dy * len, dy, len - s1), amb + key, scat, trans);
+  // the haze after it (a ray rising out of the slab into the sky), the key
+  // light it scatters taking the sky's hue
+  vec3 hue = pc.fog.rgb / max(max(pc.fog.r, max(pc.fog.g, pc.fog.b)), 1e-4);
+  gather(hazeDepth(eye.y + dy * s1, eye.y + dy * len, dy, len - s1), amb + key * mix(vec3(1.0), hue, SKY_HUE) * mix(SKY_KEY_NIGHT, 1.0, DAYLIGHT), scat, trans);
   // the points of light: each one's glow along the ray in closed form (its
   // falloff, light.glsl `pointLight`, summed across the chord through its
   // reach), in the air as it is where the ray passes nearest it, seen
@@ -147,7 +166,7 @@ void main() {
     if (ua >= ub) continue;
     float c = sqrt((r2 + LIGHT_FALLOFF * h2) / LIGHT_FALLOFF);
     float sum = r2 / (LIGHT_FALLOFF * c) * (atan(ub / c) - atan(ua / c));
-    float win = (1.0 - h2 / r2) * (1.0 - h2 / r2);
+    float win = pow(1.0 - h2 / r2, POINT_HUG);
     float at = clamp(near, 0.0, len);
     vec3 p = eye + dir * at;
     float rho = airDensity(p, t);
