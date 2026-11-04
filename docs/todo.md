@@ -80,10 +80,12 @@ hues are being chosen from samples.*
   real night sky, so vibrant hues come through instead of a milky
   lavender-white. The fog takes its colour from the sky (`SKY_AIR`), so it
   deepens with it.
-- **The light shafts read white.** The solcyriphon's beam and the
-  heliocyra's strip have a white-hot core (part.frag: the core and motes
-  mixed 60% toward white, `SHAFT_CORE`/`SHAFT_MOTE` past 1); the pale gold
-  should show through, and the fog round them glow gold with it.
+- **The radiant cores read white.** The glowing heart of each radiant
+  plant with a core (the celestial bloom and the others of the radiant
+  kit) clips to a burnt-out white; it should glow in the radiant lineage's
+  rainbow (as its threads and halo already do, `filmHue`), and so should
+  the glow it puts in the fog and the light it casts. Its exact rainbow is
+  the gardener's to pick from samples.
 
 ## Act 3, far off
 *A seed, nothing decided.* Evolved plants in space: the garden at last

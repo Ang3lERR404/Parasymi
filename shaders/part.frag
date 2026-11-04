@@ -90,8 +90,16 @@ const float SHAFT_HAZE = 0.35;
 const float STRIP_BAND = 0.8;
 const float SHAFT_SWELL = 0.9;
 const float SHAFT_LAND = 1.2;
-const float SHAFT_CORE = 2.0;
-const float SHAFT_MOTE = 2.2;
+const float SHAFT_CORE = 1.6;
+const float SHAFT_MOTE = 1.8;
+// light past full brightness is carried in a deeper gold (the shaft's gold
+// times this): every channel then swells together without the green and
+// blue catching up the red, so where it runs brightest it stays pale gold
+// and still feeds the glow, never clipping to white
+const vec3 SHAFT_DEEP = vec3(1.0, 0.62, 0.28);
+// the most that overflow ever comes to (it eases toward this, so a strip
+// in full light is bright gold, not a white bar)
+const float SHAFT_OVER = 0.6;
 const float SHAFT_MOTE_CELL = 0.35;
 // research energy: deep violet, white-gold at its heart; its core's
 // filaments (how many arms, how far they wind in from the rim, how fast),
@@ -383,8 +391,8 @@ void surface() {
   if (part == PART_SHAFT) {
     // a shaft of light (v_t 0 where it leaves .. 1 where it ends, v_u
     // across it -1..1, v_aux + v_t * v_fade metres from where it was
-    // made). Falling (a solcyriphon's night beam, v_sheet.y 0): a white
-    // gold core in a soft glow, light pouring down it in slow swells,
+    // made). Falling (a solcyriphon's night beam, v_sheet.y 0): a bright
+    // pale gold core in a soft glow, light pouring down it in slow swells,
     // motes of light sinking through it, flaring where it lands. Laid over
     // the ground (a heliocyra's strip, v_sheet.y 1): a band a tile wide,
     // soft at its edges, a bright thread down its middle, light running
@@ -417,7 +425,10 @@ void surface() {
     float ends = smoothstep(0.0, 0.06, v_t) * smoothstep(1.0, 0.985, v_t);
     if (laid) ends = smoothstep(0.45, 0.85, x) * (1.0 - smoothstep(v_obj.x + 0.1, v_obj.x + 0.5, x));
     float land = laid ? 0.0 : smoothstep(0.8, 1.0, v_t);
-    c = (gold * (haze * (laid ? STRIP_BAND : SHAFT_HAZE) + swell * haze * SHAFT_SWELL + land * haze * SHAFT_LAND) + mix(gold, vec3(1.0), 0.6) * (core * SHAFT_CORE + mo * SHAFT_MOTE)) * lit;
+    // how much light there is here: up to full in the pale gold, past it in the deeper
+    float e = (haze * (laid ? STRIP_BAND : SHAFT_HAZE) + swell * haze * SHAFT_SWELL + land * haze * SHAFT_LAND + core * SHAFT_CORE + mo * SHAFT_MOTE) * lit;
+    float over = max(e - 1.0, 0.0);
+    c = gold * min(e, 1.0) + gold * SHAFT_DEEP * (SHAFT_OVER * over / (SHAFT_OVER + over));
     float a = clamp(haze * (laid ? 0.5 : 0.22) + core * 0.6 + mo * 0.8 + swell * haze * 0.15, 0.0, 1.0) * ends * clamp(lit * 1.5, 0.15, 1.0);
     o = vec4(applyFog(c, v_pos), a);
     return;

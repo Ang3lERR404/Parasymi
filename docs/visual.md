@@ -274,9 +274,12 @@ shattering at the unforming.
 
 ### Shafts of light (`lightBeam`, `lightStrip`, part `.shaft`)
 Light itself: no shadow, and it lights the fog round it (`PARTS_LIGHT`).
+Pale gold throughout, never white: light past full brightness is carried
+in a deeper gold and eased toward a ceiling (`SHAFT_DEEP`, `SHAFT_OVER`),
+so the screen's highlight roll-off never bleaches its brightest parts.
 - **The night beam:** from under a solcyriphon's lens straight down to the
   relay that takes it or the ground, as strong as the night is deep. A
-  white-gold core in a soft glow turned to the eye, widening as it falls,
+  bright pale gold core in a soft glow turned to the eye, widening as it falls,
   light pouring down it in swells, motes sinking through it, flaring where
   it lands; a point of light there and one halfway down.
 - **A heliocyra's strip:** a thread of light falls from its crystal to its
