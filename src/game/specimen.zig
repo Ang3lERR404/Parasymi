@@ -91,6 +91,8 @@ const never:f32=1e9;
 /// a sculpt's clip is timed by the game's clock wrapped this often (s),
 /// so a long run keeps its precision
 const loopWrap:f64=3600;
+/// how fast a hovering sample bobs (radians a second)
+const hoverRate:f32=0.9;
 /// a tile to sow on: searched this far round the wolf
 const search:i32=8;
 /// active, a structure is handed one of what it wants this often (s), and
@@ -465,7 +467,9 @@ pub const Specimen=struct{
     for(sm.list(),0..)|id,i|{
       // its tile along the line, and the middle of it on the ground
       const x=s.at[0]+@divFloor((@as(i32,@intCast(i))*2-@as(i32,@intCast(sm.n-1)))*sampleGap,2);
-      const at=m.footprintCentre(x,s.at[1],1,g.heightAt(x,s.at[1]));
+      // (a hovering sample bobbing on a hint of magic, slow and soft)
+      const bob=meshlib.hover(id)*@sin(@as(f32,@floatCast(@mod(g.time,loopWrap)))*hoverRate+m.f(i));
+      const at=m.footprintCentre(x,s.at[1],1,g.heightAt(x,s.at[1]))+m.v3(0,bob,0);
       // how it sways
       const like=likeOf(id);
       // (a skinned sample: posed by its bones, on the game's clock)

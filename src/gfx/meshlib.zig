@@ -476,6 +476,13 @@ pub fn glows(id:Id)[]const Glow{
     inline else=>|k|if(@hasDecl(reg.module(k),"glows"))reg.module(k).glows else &.{},
   };
 }
+/// how far a sample of mesh `id` bobs up and down as it hovers (its
+/// `hover`, m; 0: it stands still), lifted by a hint of magic
+pub fn hover(id:Id)f32{
+  return switch(id){
+    inline else=>|k|if(@hasDecl(reg.module(k),"hover"))reg.module(k).hover else 0,
+  };
+}
 /// how many library meshes there are
 pub const count=reg.count;
 /// every library mesh id, in draw order
