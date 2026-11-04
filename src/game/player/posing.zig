@@ -322,7 +322,8 @@ pub fn bellyPaw(q:skel.Pose)BellyPaw{
   // where up the sac: `restOn`'s, or, out of reach there, found between it
   // and the top by halving (the wrist nears the shoulder going up)
   var lo=restOn[0];
-  if(m.dist(pawAt(&skin,lo).wrist,shoulder)<=most)return pawAt(&skin,lo);
+  const rest=pawAt(&skin,lo);
+  if(m.dist(rest.wrist,shoulder)<=most)return rest;
   var hi=restTop;
   for(0..restSteps)|_|{
     // halfway, and which half the reach falls in

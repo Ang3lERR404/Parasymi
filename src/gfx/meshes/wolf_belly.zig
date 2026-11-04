@@ -254,17 +254,20 @@ const Weights=struct{
 /// below and the ribs above
 fn weights(y:f32)Weights{
   // how much of the gut it is, and how fast that changes going up
-  const sh=share(y-centre[1]);
+  const yc=y-centre[1];
+  const sh=share(yc);
   const g=sh[0];
   const dg=sh[1];
   // how much of the gut is its lower bone, and its slope
-  const lo=lower(y-centre[1]);
+  const lo=lower(yc);
   // how much of the rest the hips and the ribs take, low and high, and their slopes
   const low=ramp(-y,0,0.09,0.5);
   const high=ramp(y,0.06,0.1,0.6);
   // those slopes turned to run up the sac
   const dlow=-low[1];
   const dhigh=high[1];
+  // how much of the rest is the spine's own
+  const spine=1-low[0]-high[0];
   // the weights, filled in below
   var out=Weights{};
   out.w[@intFromEnum(skel.Bone.gut)]=g*lo[0];
@@ -275,8 +278,8 @@ fn weights(y:f32)Weights{
   out.dw[@intFromEnum(skel.Bone.pelvis)]=-dg*low[0]+(1-g)*dlow;
   out.w[@intFromEnum(skel.Bone.chest)]=(1-g)*high[0];
   out.dw[@intFromEnum(skel.Bone.chest)]=-dg*high[0]+(1-g)*dhigh;
-  out.w[@intFromEnum(skel.Bone.waist)]=(1-g)*(1-low[0]-high[0]);
-  out.dw[@intFromEnum(skel.Bone.waist)]=-dg*(1-low[0]-high[0])-(1-g)*(dlow+dhigh);
+  out.w[@intFromEnum(skel.Bone.waist)]=(1-g)*spine;
+  out.dw[@intFromEnum(skel.Bone.waist)]=-dg*spine-(1-g)*(dlow+dhigh);
   return out;
 }
 /// where the sac's surface is at `th` (0 bottom .. pi top) and `ph` around

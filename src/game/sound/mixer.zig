@@ -313,7 +313,10 @@ pub const Sounds=struct{
         u.theme.render(buf[0..k],far[0..k]);
         tail=u.theme.tailLeft();
       }
-      for(out[off..][0..k],buf[0..k],far[0..k])|*o,x,f|o.*+=x+f*dsp.mid(farDry)+s.hall.tick(x+f)*dsp.mid(hallWet*tail);
+      // how much of the far-off voices is heard straight, and of the hall
+      const straight=dsp.mid(farDry);
+      const wet=dsp.mid(hallWet*tail);
+      for(out[off..][0..k],buf[0..k],far[0..k])|*o,x,f|o.*+=x+f*straight+s.hall.tick(x+f)*wet;
       off+=k;
     }
   }

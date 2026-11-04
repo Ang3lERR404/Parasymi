@@ -72,6 +72,21 @@ const cutIn:f32=0.25;
 const doneAt:f32=landAt+giveBackAfter+giveBack+1;
 /// a moment that never comes
 const never:f32=1e9;
+/// how far the event's clock may drift from the theme's before it is mended (s)
+pub const slip:f32=0.25;
+/// cents in an octave: a tuning `c` cents off is a ratio of 2^(c/1200)
+const centsPerOctave:f32=1200;
+/// the ratio a tuning `c` cents off its note plays at
+fn centsRatio(c:f32)f32{return m.pow(f32,2,c/centsPerOctave);}
+/// the least random draw a wait is taken from (so no wait is endless)
+const gapFloor:f32=1e-3;
+/// a random wait (s) until the next of something heard `perS` times a
+/// second on average, drawn from `r`
+fn gap(r:*rng.Rng,perS:f32)f32{return -@log(@max(r.float(),gapFloor))/perS;}
+/// how far round the stage masses fall and fireworks rise (pan, either way)
+const scatterPan:f32=0.9;
+/// how many notes a chord of the strings has (0 for none)
+const bowNotes=6;
 // ---- the bells: a celesta and glockenspiel struck together ----
 /// a bell's partials (shares of its pitch), levels and rings (s)
 const bellPartials=[_]f32{1,2,2.76,5.4};
@@ -198,7 +213,7 @@ const Fiddle=struct{
     };
     for(&f.saws,&f.tune,&f.seats,fiddleCents,0..)|*o,*t,*seat,cents,k|{
       o.*=.{.rate=rate,.shape=.saw,.phase=r.float()};
-      t.*=m.pow(f32,2,cents/1200);
+      t.*=centsRatio(cents);
       seat.*=dsp.spot(fiddlePan+(m.f(k)/(fiddlers-1)-0.5)*fiddleSpread);
     }
     return f;
@@ -274,7 +289,7 @@ const Horn=struct{
     var h:Horn=.{.saws=undefined,.tune=undefined,.swell=.init(0,hornSwell,rate),.open=open,.tone=.init(.low,hornDark,hornQ,rate),.place=dsp.spot(pan),.rate=rate};
     for(&h.saws,&h.tune,hornCents)|*o,*t,cents|{
       o.*=.{.rate=rate,.shape=.saw,.phase=r.float()};
-      t.*=m.pow(f32,2,cents/1200);
+      t.*=centsRatio(cents);
     }
     return h;
   }
@@ -331,6 +346,8 @@ const cryVibrato=m.Vice(f32,2){30,110};
 const cryVibratoHz:f32=6.5;
 /// where in the hold her voice breaks (s into the hold, from and to)
 const breakS=m.Vice(f32,2){0.5,0.95};
+/// how long her voice takes to break and to mend at either edge of it (s)
+const breakEdge:f32=0.05;
 /// how much her pitch shakes from cycle to cycle, steady and breaking (a share)
 const jitter=m.Vice(f32,2){0.008,0.04};
 /// how much her loudness shakes from cycle to cycle, steady and breaking (a share)
@@ -427,21 +444,22 @@ const Scream=struct{
   }
   /// mixes it into `out`; false once it has ended
   pub fn render(s:*Scream,out:[]dsp.Frame)bool{
-    // how long it holds its cry
-    const hold=holdS;
+    // how long a sample lasts
+    const dt=1/s.rate;
     for(out)|*o|{
       const a=s.age;
-      s.age+=1/s.rate;
+      s.age+=dt;
       if(a<0)continue;
-      // how far into the voiced cry, and where: rising, holding, sobbing
+      // how far into the voiced cry and into its hold, and where: rising, holding, sobbing
       const v=a-inhaleS;
-      const holdK=m.clamp01((v-riseS)/hold);
-      const sobK=m.clamp01((v-riseS-hold)/sobS);
+      const held=v-riseS;
+      const holdK=m.clamp01(held/holdS);
+      const sobK=m.clamp01((held-holdS)/sobS);
       // whether her voice is breaking now (0..1, smooth at its edges)
-      const bk=m.clamp01((v-riseS-breakS[0])/0.05)*(1-m.clamp01((v-riseS-breakS[1])/0.05));
+      const bk=m.clamp01((held-breakS[0])/breakEdge)*(1-m.clamp01((held-breakS[1])/breakEdge));
       // her pitch: rising to the crest, climbing as she holds, sinking into the sob
       var hz=if(v<riseS)m.lerp(cryHz[0],cryHz[1],m.smooth(m.clamp01(v/riseS)))else m.lerp(cryHz[1],cryHz[2],m.smooth(sobK));
-      hz*=m.pow(f32,2,(cryClimb*holdK*(1-sobK)+m.lerp(cryVibrato[0],cryVibrato[1],holdK)*(1-sobK)*@sin(m.tau*s.vib))/1200);
+      hz*=centsRatio(cryClimb*holdK*(1-sobK)+m.lerp(cryVibrato[0],cryVibrato[1],holdK)*(1-sobK)*@sin(m.tau*s.vib));
       s.vib+=cryVibratoHz/s.rate;
       s.vib-=@floor(s.vib);
       // the glottis: a new cycle shakes anew
@@ -525,6 +543,8 @@ const fireworkTo=m.Vice(f32,2){1800,3200};
 const fireworkLen=m.Vice(f32,2){0.9,1.6};
 /// how loud
 const firework:f32=0.018;
+/// how sharply a firework's whistle rings in its band
+const whistleQ:f32=12;
 /// how a fall is heard: its body's pitch (Hz), how long it rings (s), how
 /// much crunch and gravel, and how long the gravel trickles (s)
 const Fall=struct{
@@ -656,7 +676,7 @@ const Whistle=struct{
   fn init(r:*rng.Rng,rate:f32)Whistle{
     // where its whistle starts
     const from=r.range(fireworkFrom[0],fireworkFrom[1]);
-    return.{.tone=.{.rate=rate,.freq=from},.air=.init(r.next()),.band=.init(.band,from,12,rate),.from=from,.to=r.range(fireworkTo[0],fireworkTo[1]),.len=r.range(fireworkLen[0],fireworkLen[1]),.gain=r.range(0.6,1),.place=dsp.spot(r.range(-0.9,0.9)),.rate=rate};
+    return.{.tone=.{.rate=rate,.freq=from},.air=.init(r.next()),.band=.init(.band,from,whistleQ,rate),.from=from,.to=r.range(fireworkTo[0],fireworkTo[1]),.len=r.range(fireworkLen[0],fireworkLen[1]),.gain=r.range(0.6,1),.place=dsp.spot(r.range(-scatterPan,scatterPan)),.rate=rate};
   }
   /// mixes it into `out`; false once it has risen out of hearing
   pub fn render(w:*Whistle,out:[]dsp.Frame)bool{
@@ -664,7 +684,7 @@ const Whistle=struct{
       // how far it has risen, and its pitch there
       const k=w.age/w.len;
       const hz=w.from*m.pow(f32,w.to/w.from,k);
-      if(w.at%retune==0)w.band.tune(.band,hz,12,w.rate);
+      if(w.at%retune==0)w.band.tune(.band,hz,whistleQ,w.rate);
       w.at+%=1;
       w.tone.freq=hz;
       // in quickly, thinning out as it climbs
@@ -691,7 +711,7 @@ const Chord=struct{
   /// the choirs' notes (MIDI, soprano first)
   sing:[lib.sound.choir.sections]u8,
   /// the strings' notes (MIDI)
-  bow:[6]u8,
+  bow:[bowNotes]u8,
   /// the violins' note (MIDI)
   high:u8,
   /// how loud the choirs (1 a night's full voice) and how hard the strings
@@ -727,7 +747,7 @@ const Sing=struct{
 /// a chord the strings bow: its notes (MIDI, 0 for none) and how hard
 const Bowed=struct{
   /// the notes
-  notes:[6]u8,
+  notes:[bowNotes]u8,
   /// how hard (1 a night's bowing)
   vel:f32,
 };
@@ -846,6 +866,8 @@ const tailS:f32=0.8;
 const screamDuck:f32=0.4;
 /// (how fast)
 const duckS:f32=0.3;
+/// how long before her scream the world begins to give way (s)
+const duckLead:f32=0.3;
 /// how loud the theme is
 const level:f32=1.4;
 /// samples rendered at a time
@@ -964,7 +986,7 @@ pub const Theme=struct{
     th.fireGrit.density=fireGrains;
     for(&th.creakBands,0..)|*f,k|f.*=.init(.band,creakHz[k],creakQ[k],rate);
     for(&th.choirs)|*ch|ch.*=.init(reborn.notes,&r,rate);
-    for(&th.horns,0..)|*h,k|h.*=.init(hornPan[k],hornOpen[k/2],&r,rate);
+    th.horns=hornsOf(&r,rate);
     th.r=r;
     // what came before `t` is past
     while(th.cue<cues.len and cues[th.cue].at<t)th.cue+=1;
@@ -975,7 +997,7 @@ pub const Theme=struct{
   }
   /// the event's clock as told: only a slip is mended
   pub fn keep(th:*Theme,t:f32)void{
-    if(@abs(t-th.clock)>0.25)th.clock=t;
+    if(@abs(t-th.clock)>slip)th.clock=t;
   }
   /// how much the garden's music gives way to it (0 none .. 1 all): cut at
   /// once as it begins, given back slowly after the landing
@@ -1034,14 +1056,14 @@ pub const Theme=struct{
     }
     // masses falling, thicker as it goes on
     while(th.debrisAt<=th.clock and th.debrisAt<fallAt){
-      th.thuds.cycle(.init(debris,th.r.range(debrisHz[0],debrisHz[1]),th.r.range(0.5,1),th.r.range(-0.9,0.9),&th.r,th.rate));
+      th.thuds.cycle(.init(debris,th.r.range(debrisHz[0],debrisHz[1]),th.r.range(0.5,1),th.r.range(-scatterPan,scatterPan),&th.r,th.rate));
       const k=m.clamp01((th.debrisAt-hornAt)/(fallAt-hornAt));
-      th.debrisAt+=-@log(@max(th.r.float(),1e-3))/m.lerp(debrisRate[0],debrisRate[1],k);
+      th.debrisAt+=gap(&th.r,m.lerp(debrisRate[0],debrisRate[1],k));
     }
     // fireworks rising
     while(th.fireworkAt<=th.clock and th.fireworkAt<fallAt){
       th.whistles.cycle(.init(&th.r,th.rate));
-      th.fireworkAt+=-@log(@max(th.r.float(),1e-3))/fireworksRate;
+      th.fireworkAt+=gap(&th.r,fireworksRate);
     }
   }
   /// chord `i` of the wall comes in on the choirs, strings, violins and
@@ -1050,12 +1072,31 @@ pub const Theme=struct{
     // the chord, and how far up the wall it is
     const c=wall[i];
     const k=m.f(i)/m.f(wall.len-1);
-    for(&th.choirs)|*ch|ch.sing(c.sing,c.loud,&th.r);
-    th.unbow();
-    for(c.bow)|note|if(note!=0)th.bows.add(.init(note,c.vel,&th.r,th.rate));
+    th.sing(c.sing,c.loud);
+    th.bow(c.bow,c.vel);
     th.violins.play(c.high,m.lerp(0.6,1.3,k));
     if(c.trumpets[0]!=0)for(th.horns[0..2],c.trumpets)|*h,note|h.play(note,m.lerp(0.7,1.1,k));
-    th.booms.cycle(.init(boomHz,boomRing,m.lerp(wallBoom[0],wallBoom[1],k),0,&th.r,th.rate));
+    th.boom(m.lerp(wallBoom[0],wallBoom[1],k));
+  }
+  /// both choirs sing `notes` at `loud`
+  fn sing(th:*Theme,notes:[lib.sound.choir.sections]u8,loud:f32)void{
+    for(&th.choirs)|*ch|ch.sing(notes,loud,&th.r);
+  }
+  /// the strings let their chord go and bow `notes` (0 for none) at `vel`
+  fn bow(th:*Theme,notes:[bowNotes]u8,vel:f32)void{
+    th.unbow();
+    for(notes)|note|if(note!=0)th.bows.add(.init(note,vel,&th.r,th.rate));
+  }
+  /// the great taiko booms, as hard as `vel`
+  fn boom(th:*Theme,vel:f32)void{
+    th.booms.cycle(.init(boomHz,boomRing,vel,0,&th.r,th.rate));
+  }
+  /// the horns made afresh, silent, drawn from `r`: two trumpets, two low horns
+  fn hornsOf(r:*rng.Rng,rate:f32)[hornCount]Horn{
+    // the horns, each at its seat
+    var hs:[hornCount]Horn=undefined;
+    for(&hs,0..)|*h,k|h.*=.init(hornPan[k],hornOpen[k/2],r,rate);
+    return hs;
   }
   /// her scream, and the land's echoes of it
   fn scream(th:*Theme)void{
@@ -1065,18 +1106,15 @@ pub const Theme=struct{
   /// does what one cue says
   fn cueOf(th:*Theme,w:What)void{
     switch(w){
-      .sing=>|s|for(&th.choirs)|*ch|ch.sing(s.notes,s.loud,&th.r),
+      .sing=>|s|th.sing(s.notes,s.loud),
       .hush=>for(&th.choirs)|*ch|ch.hush(),
-      .bow=>|b|{
-        th.unbow();
-        for(b.notes)|note|if(note!=0)th.bows.add(.init(note,b.vel,&th.r,th.rate));
-      },
+      .bow=>|b|th.bow(b.notes,b.vel),
       .unbow=>th.unbow(),
       .brass=>|b|for(th.horns[2..],b.notes)|*h,note|h.play(note,b.loud),
       .unbrass=>|s|for(th.horns[2..])|*h|h.release(s),
       .strike=>|s|{
         th.timps.cycle(.init(s.note,s.vel,0,kettlePan[0],&th.r,th.rate));
-        if(s.boom>0)th.booms.cycle(.init(boomHz,boomRing,s.boom,0,&th.r,th.rate));
+        if(s.boom>0)th.boom(s.boom);
       },
       .fall=>{
         th.gate=.init(th.gate.value,fallS,th.rate);
@@ -1094,7 +1132,7 @@ pub const Theme=struct{
         th.screams.clear();
         th.whistles.clear();
         th.violins=.init(&th.r,th.rate);
-        for(&th.horns,0..)|*h,k|h.*=.init(hornPan[k],hornOpen[k/2],&th.r,th.rate);
+        th.horns=hornsOf(&th.r,th.rate);
         th.gate=.init(0,gateS,th.rate);
         th.gate.target=1;
         th.tail.target=1;
@@ -1127,12 +1165,12 @@ pub const Theme=struct{
     th.thuds.render(w);
     th.whistles.render(w);
     th.screams.render(far);
-    // how loud the rumble and the burning should be now, and the creak
-    const into=m.clamp01((th.clock-hornAt)/(fallAt-hornAt));
-    th.rumbleLoud.target=if(th.clock<hornAt)rumbleLevel[0]*th.creakNow()else if(th.clock<fallAt)m.lerp(rumbleLevel[1],rumbleLevel[2],into)else 0;
-    th.fireLoud.target=if(th.clock>=fireAt and th.clock<fallAt)1 else 0;
-    th.world.target=if(th.clock>=screamAt-0.3 and th.clock<landAt)screamDuck else 1;
+    // how loud the creak, the rumble and the burning should be now
     const cr=th.creakNow();
+    const into=m.clamp01((th.clock-hornAt)/(fallAt-hornAt));
+    th.rumbleLoud.target=if(th.clock<hornAt)rumbleLevel[0]*cr else if(th.clock<fallAt)m.lerp(rumbleLevel[1],rumbleLevel[2],into)else 0;
+    th.fireLoud.target=if(th.clock>=fireAt and th.clock<fallAt)1 else 0;
+    th.world.target=if(th.clock>=screamAt-duckLead and th.clock<landAt)screamDuck else 1;
     for(dry,s,w)|*d,x,b|{
       // the violins and the horns, then the gate over all of it
       var z=x+th.violins.tick();

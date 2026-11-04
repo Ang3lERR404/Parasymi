@@ -144,15 +144,19 @@ pub fn insert(ss:*Structures,g:*const prog.Progression,id:Id,item:items.Item,n:u
   if(k==0)return 0;
   return ss.get(id).bag().add(item,k);
 }
+/// whom structure `s` meets, and what that reveals (its kind's `meets`), if anyone
+fn meetingOf(s:*const lib.structures.Structure)?Meeting{
+  return switch(s.kind()){
+    inline else=>|k|if(comptime reg.has(k,"meets"))reg.module(k).meets else null,
+  };
+}
 /// witness every pair of grown structures that `meets` the other (once
 /// each: a discovery found is never looked for again)
 pub fn meetings(ss:*const Structures,g:*prog.Progression)void{
   for(ss.list.items)|*a|{
     if(a.grown<1)continue;
     // whom this one meets, and what that meeting reveals
-    const mt:Meeting=switch(a.kind()){
-      inline else=>|k|if(comptime reg.has(k,"meets"))reg.module(k).meets else continue,
-    };
+    const mt=meetingOf(a) orelse continue;
     if(g.found.contains(mt.found))continue;
     for(ss.list.items)|*b|{
       if(b.kind()!=mt.kind or b.grown<1)continue;
@@ -174,9 +178,7 @@ pub fn growTogether(ss:*Structures,gpa:Allocator,w:*World,g:*prog.Progression,dt
   for(0..ss.list.items.len)|ia|{
     // the first of the pair, and whom it grows together with
     const a=&ss.list.items[ia];
-    const mt:Meeting=switch(a.kind()){
-      inline else=>|k|if(comptime reg.has(k,"meets"))reg.module(k).meets else continue,
-    };
+    const mt=meetingOf(a) orelse continue;
     const into=mt.into orelse continue;
     if(a.fade>0 and a.merging==0)continue;
     if(a.grown<1 and a.merging==0)continue;
@@ -208,9 +210,7 @@ pub fn growTogether(ss:*Structures,gpa:Allocator,w:*World,g:*prog.Progression,dt
     // the first of a pair grown together, and what it became
     const a=&ss.list.items[k];
     if(a.merging<1)continue;
-    const mt:Meeting=switch(a.kind()){
-      inline else=>|kk|if(comptime reg.has(kk,"meets"))reg.module(kk).meets else continue,
-    };
+    const mt=meetingOf(a) orelse continue;
     const into=mt.into orelse continue;
     // where the first stood, which way it faced, and its seed
     const x=a.x;

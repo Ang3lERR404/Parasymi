@@ -145,6 +145,8 @@ const Crack=struct{
 };
 /// the theme played under it all
 const Theme=lib.sound.unformingTheme.Theme;
+/// how far the event's clock may drift from the sounds' before it is mended (s)
+const slip=lib.sound.unformingTheme.slip;
 // ---- the glass rain: the sky shattering pane by pane ----
 /// glints a second at the shift's height
 const rainMost:f32=22;
@@ -339,7 +341,7 @@ pub const Unformed=struct{
   /// mended, so it runs on smoothly between frames), each crack and arrival
   /// struck, the withering followed
   pub fn apply(u:*Unformed,h:Heard)void{
-    if(@abs(h.t-u.clock)>0.25)u.clock=h.t;
+    if(@abs(h.t-u.clock)>slip)u.clock=h.t;
     u.theme.keep(h.t);
     u.wither.target=h.wither;
     for(0..h.cracks)|_|u.crack();
