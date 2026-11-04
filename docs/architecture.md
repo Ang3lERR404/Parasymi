@@ -227,8 +227,29 @@ dense (`airDensity`, shaders/air.glsl, the same air the fog marches), and
 hidden behind what stands in front of it. A new glowing role only needs to
 be in `PARTS_LIGHT` and `vertex.seeThrough`.
 
+### As many points of light as the garden throws
+No point of light is ever dropped: the frame's lighting record (engine
+`light.Head`, then every `vertex.Light` the scene makes) grows to hold
+them, and the view is cut into cells (engine `render/cells.zig`): the
+screen into 32 by 18 tiles, each tile along the eye's depth into 32
+slices (the nearest from the eye to 1 unit, each further one a constant
+share deeper, the last running on), and one more cell a tile for its
+whole depth. Each frame a compute pass (`cells.comp`) tests every light's
+sphere of reach against every cell's planes and writes a bit for each
+light that touches it, a 32-bit word for every 32 lights, so however many
+crowd one cell none is left out. A surface finds its cell from where it
+lands in the eye's clip space (lighting.glsl `cellAt`) and walks only its
+bits, in the order the frame holds the lights, so its sum is the sum over
+all of them (`pointLight`, the game's `pointLights`); a ray through the
+air walks its tile's whole-depth cell (`columnAt`, fog.frag). A point
+outside every cell (behind the eye, off screen: the overhead map) walks
+every light. The shadow cubes and traced shadows are unchanged: a light
+still says which cube it holds in its `col[3]`. A new shader reading the
+lights includes `light.glsl` (the record is in `lighting.glsl`) and
+walks `lightsIn(L, cellAt(L, wpos), w, count)` the same way.
+
 ### Points of light thrown in a cone
-A point of light (engine `vertex.Light`, 48 of them a frame) may be
+A point of light (engine `vertex.Light`, as many as the garden throws) may be
 thrown in a cone, a spotlight: its `dir` holds the way the cone's middle
 points and the cosine of its half-width (`Light.round`, w below -1, lights
 all round). light.glsl `coneOf` fades it softly to the cone's rim; every

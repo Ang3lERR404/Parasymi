@@ -91,7 +91,9 @@ adds on top.
   overhead map, a half-size volume after the world, its edge-aware
   composite), `cube` (the points of light's shadow cubes: which lights
   hold one, kept from frame to frame and eased in and out; their faces;
-  the depth images), `rays` (shadows traced as rays: the casters caught as
+  the depth images), `cells` (the view cut into cells, each listing the
+  points of light reaching it, filled each frame by a compute pass, so a
+  frame holds as many lights as a game makes), `rays` (shadows traced as rays: the casters caught as
   drawn, their bottom levels built or refitted, the top level the shaders
   trace through; only where `Ctx.rayTracing`), `passes/ui`.
   `Renderer.pointShadows(count,size)` sets how many lights may hold one

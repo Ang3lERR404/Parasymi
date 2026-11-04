@@ -14,6 +14,12 @@
 //! place, never popping.
 /// the standard library
 const std=@import("std");
+/// sorts a list in place (the wanted lights, in the order the frame holds them)
+const sortBy=std.mem.sort;
+/// the order smallest first
+const ascending=std.sort.asc;
+/// where a value first lies in a list (null: nowhere)
+const indexOf=std.mem.indexOfScalar;
 /// the Vulkan bindings: images, views, samplers, rendering scopes
 const vk=@import("vulkan");
 /// all the maths: vectors, matrices, the view's frustum
@@ -147,46 +153,52 @@ pub const Casters=struct{
   /// line from `eye` to `target`) are wanted, and every slot's shadow eases
   /// `dt` seconds toward shown (wanted) or gone (not; a slot freed once gone)
   pub fn update(c:*Casters,lights:[]const vertex.Light,eye:m.V3,target:m.V3,fr:*const m.Frustum,count:usize,dt:f32)void{
-    // how many lights are looked at, and which a slot has found again
-    const n=@min(lights.len,maxLights);
-    var taken:[maxLights]bool=@splat(false);
-    for(&c.slots)|*s|{
+    // every light is looked at, however many the frame makes: what is kept
+    // is only per slot (a light is taken once a slot holds it)
+    for(&c.slots,0..)|*s,k|{
       s.light=null;
       if(!s.held)continue;
       // the nearest light not yet found by another slot, if it is near enough
       var best:?usize=null;
       var bestD:f32=follow;
-      for(lights[0..n],0..)|l,i|{
-        if(taken[i])continue;
+      for(lights,0..)|l,i|{
+        if(c.holds(i,k))continue;
         // how far this light is from where the slot's was
         const d=m.dist(m.v3(l.pos[0],l.pos[1],l.pos[2]),s.at);
         if(d<bestD){best=i;bestD=d;}
       }
-      if(best)|b|{
-        s.light=b;
-        taken[b]=true;
-      }else s.*=.{};
+      if(best)|b|s.light=b else s.*=.{};
     }
-    // every light's score, a held light's counted more
-    var score:[maxLights]f32=undefined;
-    for(lights[0..n],0..)|l,i|score[i]=telling(l,eye,target,fr)*(if(taken[i])keep else 1);
-    // the most telling `count` lights, by score (none that scores nothing)
-    var want:[maxLights]bool=@splat(false);
-    for(0..@min(count,maxCubes))|_|{
-      // the best not yet wanted
-      var best:?usize=null;
-      for(0..n)|i|{
-        if(!want[i] and score[i]>0 and (best==null or score[i]>score[best.?]))best=i;
-      }
-      want[best orelse break]=true;
+    // the most telling `count` lights, by score, a held light's counted more
+    // (none that scores nothing; of two alike, the earlier), kept best first
+    const most=@min(count,maxCubes);
+    // the wanted lights so far, best first, their scores, and how many
+    var top:[maxCubes]usize=undefined;
+    var topScore:[maxCubes]f32=undefined;
+    var wn:usize=0;
+    for(lights,0..)|l,i|{
+      // this light's score
+      const sc=telling(l,eye,target,fr)*(if(c.holds(i,maxCubes))keep else 1);
+      if(sc<=0)continue;
+      // where it ranks among those kept so far (after any as good)
+      var at=wn;
+      while(at>0 and sc>topScore[at-1])at-=1;
+      if(at>=most)continue;
+      // those below it move down one, the last falling off
+      var j=@min(wn,most-1);
+      while(j>at):(j-=1){top[j]=top[j-1];topScore[j]=topScore[j-1];}
+      top[at]=i;
+      topScore[at]=sc;
+      wn=@min(wn+1,most);
     }
+    // the wanted lights, in the order the frame holds them
+    sortBy(usize,top[0..wn],{},ascending(usize));
     // the slots keep, or let go, what they hold
-    for(&c.slots)|*s|if(s.light)|i|{s.wanted=want[i];};
+    for(&c.slots)|*s|if(s.light)|i|{s.wanted=indexOf(usize,top[0..wn],i)!=null;};
     // wanted lights without a slot take a free one
-    for(0..n)|i|if(want[i] and !taken[i]){
+    for(top[0..wn])|i|if(!c.holds(i,maxCubes)){
       for(&c.slots)|*s|if(!s.held){
         s.*=.{.held=true,.light=i,.wanted=true};
-        taken[i]=true;
         break;
       };
     };
@@ -201,9 +213,12 @@ pub const Casters=struct{
   }
   /// how much of slot `s`'s shadow shows, eased at both ends
   pub fn shownOf(s:Slot)f32{return m.smooth(s.shown);}
+  /// whether a slot before `upTo` (all: `maxCubes`) holds light `i` this frame
+  fn holds(c:*const Casters,i:usize,upTo:usize)bool{
+    for(c.slots[0..upTo])|s|if(s.light==i)return true;
+    return false;
+  }
 };
-/// points of light a frame holds (light.zig `maxLights` is this one)
-pub const maxLights=48;
 /// how telling light `l` is for a cube: strong, far reaching and near the
 /// line from the eye to what it looks at scores high; one the view cannot
 /// see, or too dim, scores nothing

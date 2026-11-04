@@ -1,4 +1,4 @@
-//! the engine's light as a world shader reads it: the frame's `Lighting` record (render/light.zig), the key light's cascaded shadows, the points of light and the shadow cubes of those holding one (render/cube.zig).
+//! the engine's light as a world shader reads it: the frame's lighting record (lighting.glsl, render/light.zig), the key light's cascaded shadows, the points of light (only those the cell at a point lists) and the shadow cubes of those holding one (render/cube.zig).
 // The including shader declares first: the extensions GL_EXT_buffer_reference
 // and GL_EXT_buffer_reference_uvec2 (and, when built with SHADOW, or with
 // CUBE and SHADOW both, drawing a shadow cube's casters,
@@ -28,16 +28,10 @@ vec3 viewRay(vec2 ndc) {
   return facing * cross(r0 - ndc.x * r3, r1 - ndc.y * r3);
 }
 
-// this frame's light (render/light.zig `Lighting`): the key light's shadow
-// cascades and the points of light a game makes
-const int CASCADES = 3;
-const int MAX_LIGHTS = 48;
-const int MAX_CUBES = 4;
-struct PointLight {
-  vec4 pos; // xyz where, w how far it reaches
-  vec4 col; // linear rgb times its strength; w its shadow cube plus one (0 none)
-  vec4 dir; // a cone it is thrown in: xyz the way its middle points, w the cosine of its half-width (below -1: all round)
-};
+// this frame's light (render/light.zig `Head`): the key light's shadow
+// cascades, the points of light a game makes (as many as it makes) and the
+// cells listing which reach where
+#include "lighting.glsl"
 // how much of a cone's width fades softly to its edge (a share of the way
 // from its rim to its middle, in cosine): wide and soft, like a spotlight in fog
 const float CONE_SOFT = 0.6;
@@ -48,19 +42,6 @@ float coneOf(PointLight l, vec3 away) {
   if (l.dir.w < -1.0) return 1.0;
   return smoothstep(l.dir.w, mix(l.dir.w, 1.0, CONE_SOFT), dot(away, l.dir.xyz));
 }
-// a point of light's shadow cube (render/cube.zig `Cube`)
-struct Cube {
-  vec4 at;      // xyz the light it was drawn round, w how far it reaches (its far plane)
-  vec4 lit;     // x which point of light, y how much of its shadow shows, z its near plane
-  mat4 face[6]; // world to each face's clip space (+x, -x, +y, -y, +z, -z)
-};
-layout(buffer_reference, std430, buffer_reference_align = 16) readonly buffer Lighting {
-  mat4 cascade[CASCADES]; // world to each cascade's clip space
-  float texel[4];         // the world size of each cascade's texels
-  vec4 info;              // x points of light, y how far from the eye shadows reach, z 1 traced as rays, w the world's samples a pixel
-  PointLight lights[MAX_LIGHTS];
-  Cube cubes[MAX_CUBES];
-};
 #ifdef CUBE
 // drawing a shadow cube's casters (built with CUBE, which brings SHADOW):
 // `pc.light` points at the face being drawn in the record instead
@@ -413,23 +394,32 @@ float pointShadow(Lighting L, int i, vec3 wpos, vec3 n, vec3 d) {
 // the light the points of light (a game's blooms, motes, flashes) shed on a
 // surface at `wpos` facing `n`: each brightest beside it, gone at its
 // reach, and where it holds a shadow cube, blocked by what stands between.
-// `wrap` > 0 lets light reach round thin tissue (0 a plain surface).
+// `wrap` > 0 lets light reach round thin tissue (0 a plain surface). Only
+// the lights its cell lists are visited (every one outside the cells),
+// in the order the frame holds them, so the sum is the same as over all.
 const float LIGHT_FALLOFF = 8.0; // how fast a point of light dims with (distance / reach)^2
-vec3 pointLight(vec3 wpos, vec3 n, float wrap) {
+vec3 pointLightIn(vec3 wpos, vec3 n, float wrap, int cell) {
   Lighting L = Lighting(pc.light);
-  int count = int(L.info.x + 0.5);
+  int count = lightCount(L);
   vec3 sum = vec3(0.0);
-  for (int i = 0; i < count; i++) {
-    vec4 lp = L.lights[i].pos;
-    vec3 d = lp.xyz - wpos;
-    float d2 = dot(d, d);
-    float k = d2 / (lp.w * lp.w);
-    if (k >= 1.0) continue;
-    float win = (1.0 - k) * (1.0 - k) * coneOf(L.lights[i], -d * inversesqrt(max(d2, 1e-6)));
-    if (win <= 0.0) continue;
-    win *= pointShadow(L, i, wpos, n, d);
-    float facing = (dot(n, d) * inversesqrt(max(d2, 1e-6)) + wrap) / (1.0 + wrap);
-    sum += L.lights[i].col.rgb * max(facing, 0.0) * win / (1.0 + LIGHT_FALLOFF * k);
+  for (int w = 0; w * 32 < count; w++) {
+    uint bits = lightsIn(L, cell, w, count);
+    while (bits != 0u) {
+      int i = w * 32 + findLSB(bits);
+      bits &= bits - 1u;
+      vec4 lp = L.lights[i].pos;
+      vec3 d = lp.xyz - wpos;
+      float d2 = dot(d, d);
+      float k = d2 / (lp.w * lp.w);
+      if (k >= 1.0) continue;
+      float win = (1.0 - k) * (1.0 - k) * coneOf(L.lights[i], -d * inversesqrt(max(d2, 1e-6)));
+      if (win <= 0.0) continue;
+      win *= pointShadow(L, i, wpos, n, d);
+      float facing = (dot(n, d) * inversesqrt(max(d2, 1e-6)) + wrap) / (1.0 + wrap);
+      sum += L.lights[i].col.rgb * max(facing, 0.0) * win / (1.0 + LIGHT_FALLOFF * k);
+    }
   }
   return sum;
 }
+// (the lights the cell at `wpos` lists, as `pointLightIn` takes them)
+vec3 pointLight(vec3 wpos, vec3 n, float wrap) { return pointLightIn(wpos, n, wrap, cellAt(Lighting(pc.light), wpos)); }

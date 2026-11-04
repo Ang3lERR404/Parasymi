@@ -53,6 +53,26 @@ The overhead map draws only 4 chunks a frame (new ones first, then the
 rest in turn): the chunks' ground buffers are host-visible, so reading all
 of them every frame cost 2.6 ms.
 
+## Every point of light, listed by cell
+The 48-lights-a-frame limit lifted (engine `render/cells.zig`), measured
+release, msaa8, RTX 4060 Ti, 2026-11-04, `--inspect=player --shots=2
+--orbit=8` (before → after, GPU ms):
+
+| | lights a frame | whole frame | fog | cells' lists |
+|---|---|---|---|---|
+| demo, night (0.0) | 48 of 142 → all 142 | 64.3 → 64.7 | 2.37 → 2.55 | – → 0.06 |
+| demo, day (0.45) | | 61.8 → 60.2 | 2.21 → 2.32 | |
+| stress, night | 6 → 6 | 32.9 → 31.0 | 1.13 → 1.14 | |
+
+Three times the lights for the same frame: each shaded point walks only
+the few its cell lists. The picture was proven to hold by a check build
+(every surface summing both ways and the air flagging any light that
+glows along a ray but is missing from its list, painted magenta where
+they part): none showed over the night demo and stress field, while a
+control build with the lists' reach halved turned the whole screen
+magenta. What is left to try, exact: testing a cone's own shape (not its
+whole sphere) against each cell, so a cell beside a cone lists it no more.
+
 ## Shadows of the points of light
 The four shadow cubes (engine `render/cube.zig`) and their lookups,
 measured release on the same machine, `--demo --inspect=player`, msaa8,

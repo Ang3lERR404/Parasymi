@@ -73,8 +73,6 @@ pub const Shot=er.Shot;
 pub const Error=er.Error;
 /// frames in flight at once
 pub const frames=er.frames;
-/// points of light a frame can hold (the rest of `Scene.lights` is dropped)
-pub const maxLights=er.maxLights;
 /// stages the GPU's time is told apart by: each pass, then glow and composite
 pub const stageCount=Renderer.stageCount;
 /// the stage the bloom's glow is timed as
@@ -190,8 +188,8 @@ pub const Scene=struct{
   /// skinned parts' bones (see `vertex.Skin`): each matrix carries a vertex
   /// from where it was built to where it is this frame
   bones:[]const m.M4,
-  /// points of light, most telling first (the renderer takes the first
-  /// `maxLights`)
+  /// points of light, every one the garden throws this frame (the renderer
+  /// takes them all)
   lights:[]const vertex.Light,
   /// what breathes moisture into the air this frame
   moisture:[]const vertex.Moisture=&.{},

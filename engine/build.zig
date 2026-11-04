@@ -12,10 +12,10 @@ const splitScalar=std.mem.splitScalar;
 /// the engine's own shaders, embedded in its module
 const shaders=[_][]const u8{
   "post.vert","bloom_down.frag","bloom_up.frag","composite.frag","fxaa.frag",
-  "ui.vert","ui.frag","shadow.frag","volume_compose.frag",
+  "ui.vert","ui.frag","shadow.frag","volume_compose.frag","cells.comp",
 };
 /// files the engine's shaders (and a game's) may include
-pub const includes=[_][]const u8{"post.glsl","light.glsl","growth.glsl","volume.glsl"};
+pub const includes=[_][]const u8{"post.glsl","light.glsl","lighting.glsl","growth.glsl","volume.glsl"};
 /// one shader to compile: `name` it is imported as, the `source` file it is
 /// compiled from (`name` when null) and a `define` to compile it with
 /// (several split by commas: "GLASS,RAY")

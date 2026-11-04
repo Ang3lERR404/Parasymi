@@ -6,8 +6,6 @@ const lib=@import("../lib.zig");
 const std=lib.std;
 /// the allocator type drawing may fail with
 const Allocator=std.mem.Allocator;
-/// an in-place sort, for ranking the lights
-const pdq=std.sort.pdq;
 /// trading two values' places
 const swap=std.mem.swap;
 /// the engine package
@@ -251,7 +249,6 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
     try ghost(g,tf);
     try motes(g);
   }
-  rankLights(g);
   try hud.build(g,screen);
   // the veil of what is not yet understood, and the sky's colour under it
   const veil=g.prog.veil;
@@ -518,30 +515,6 @@ fn hashOf(seed:f32,k:usize,which:u32)f32{
 }
 /// the weights a cone's draws are hashed with (the seed, the cone, which draw)
 const coneHashWeights=m.Vice(f32,3){127.1,311.7,74.7};
-/// the most telling points of light first, the rest dropped: the renderer
-/// takes `renderer.maxLights` (strong, far reaching lights near what the
-/// camera looks at win)
-pub fn rankLights(g:*Game)void{
-  // the lights gathered this frame
-  const ls=g.parts.lights.items;
-  if(ls.len<=renderer.maxLights)return;
-  // how a light is scored against what the camera looks at
-  const Rank=struct{
-    /// where the camera looks
-    focus:m.V3,
-    /// how telling light `l` is: strong, far reaching and near the focus scores high
-    fn score(ctx:@This(),l:vertex.Light)f32{
-      // how far the light is from the focus, and how strong it is
-      const d=m.v3(l.pos[0],l.pos[1],l.pos[2])-ctx.focus;
-      const strength=@max(l.col[0],@max(l.col[1],l.col[2]));
-      return strength*l.pos[3]*l.pos[3]/(1+m.dot(d,d));
-    }
-    /// whether `a` is more telling than `b`, for the sort
-    fn before(ctx:@This(),a:vertex.Light,b:vertex.Light)bool{return score(ctx,a)>score(ctx,b);}
-  };
-  pdq(vertex.Light,ls,Rank{.focus=g.cam.target},Rank.before);
-  g.parts.lights.shrinkRetainingCapacity(renderer.maxLights);
-}
 /// where a floater hangs this frame: its hover height with a slow rise and
 /// fall, and a lazy drift about its own point `c` (off the grid).
 fn floatAt(def:*const species.Species,c:m.V3,ground:f32,seed:f32,tf:f32)m.V3{

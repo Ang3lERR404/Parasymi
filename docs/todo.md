@@ -132,13 +132,6 @@ carries the game's early days.
 - **Two unused numbers** in `world/gen.zig`: `roughL` (a roughness
   wavelength) and `nodeChance` (`slotAmount` thins the nodes instead).
   Use them or let them go.
-- **The engine holds only 48 points of light a frame.** A garden at night
-  passes that easily (6 to 9 cones a radiant heart, 5 to 9 searchlights a
-  starlight patch), and the weakest are dropped. Lift it with nothing given
-  up (no light dropped, dimmed or fewer, no visible change): lights in a
-  buffer that grows, each part of the screen (and depth) listing only the
-  lights that reach it, built on the GPU, the surfaces and the air reading
-  only their own lists.
 
 ## Playtesting
 - Whether the light grid's numbers feel right in play

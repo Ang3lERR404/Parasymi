@@ -157,7 +157,6 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
   const feet=try sleeper.rig(&g.parts,false);
   try g.parts.light(at+keyAt,keyCol,keyReach);
   try g.parts.light(at+rimAt,rimCol,rimReach);
-  view.rankLights(g);
   try hud.build(g,screen);
   // the eye, and the way toward the key light
   const eye=cam.viewEye();

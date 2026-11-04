@@ -11,8 +11,10 @@
 //! texels, so shadow edges hold still as the view pans. The world shaders
 //! read it with hardware depth compares (light.glsl `keyShadow`).
 //!
-//! Points of light are sent each frame in the same record as the cascades
-//! (`Lighting`, reached by its address like the bones), and every lit
+//! Points of light are sent each frame in the same record as the cascades,
+//! after its head (`Head`, reached by its address like the bones), as many
+//! as the game makes; the view's cells (cells.zig) list which reach where,
+//! and every lit
 //! surface sums them on the GPU (light.glsl `pointLight`). The few most
 //! telling of them hold shadow cubes of their own (cube.zig), kept in the
 //! same record and read through the same descriptor set.
@@ -36,8 +38,6 @@ const cube=@import("cube.zig");
 pub const cascades=3;
 /// texels along each side of a cascade's layer
 pub const res=2048;
-/// points of light a frame can hold (light.glsl MAX_LIGHTS)
-pub const maxLights=cube.maxLights;
 /// the views the casters draw: one per cascade
 pub const views:u32=(1<<cascades)-1;
 /// casters pushed away from the light by a constant and with their slope
@@ -60,9 +60,12 @@ const reachMax:f32=260;
 const radiusStep:f32=1.0/32.0;
 /// and never in steps finer than this (world units)
 const stepMin:f32=0.25;
-/// what the world shaders read about light each frame (light.glsl
-/// `Lighting`)
-pub const Lighting=extern struct{
+/// what the world shaders read about light each frame, before the points
+/// of light themselves (lighting.glsl `Lighting`): the record is this head,
+/// then every point of light the frame makes, as many as it makes (the
+/// record's buffer grows to hold them; the first `info[0]` are lit, a
+/// light holding a shadow cube saying which in its `col[3]`)
+pub const Head=extern struct{
   /// world to each cascade's clip space
   cascades:[cascades]m.M4,
   /// per cascade, the world size of one of its texels (one vec4's worth)
@@ -72,21 +75,28 @@ pub const Lighting=extern struct{
   /// read from the maps, w the world's samples a pixel (a pass shaded per
   /// sample shares a pixel's rays among them)
   info:m.Vice(f32,4),
-  /// the frame's points of light, the first `info[0]` of them lit (a
-  /// light holding a shadow cube says which in its `col[3]`)
-  lights:[maxLights]vertex.Light,
+  /// world to the eye's clip space, as the view is cut into cells (cells.zig)
+  grid:m.M4,
+  /// x the far edge of the nearest slice of depth, y slices for each e-fold
+  /// of depth beyond it (cells.zig `slicing`)
+  slicing:m.Vice(f32,4),
+  /// xy where the cells' lists lie on the GPU (low word, high word)
+  cells:m.Vice(u32,4),
   /// the points of light's shadow cubes (cube.zig), those held drawn this
   /// frame, the rest showing no shadow
   cubes:[cube.maxCubes]cube.Cube,
 };
 comptime{
-  // std430 as light.glsl reads it: the texel sizes pack into one vec4
-  if(cascades>4 or @offsetOf(Lighting,"info")!=cascades*64+16 or @offsetOf(Lighting,"lights")!=cascades*64+32 or @offsetOf(Lighting,"cubes")!=cascades*64+32+maxLights*48 or @sizeOf(vertex.Light)!=48 or @sizeOf(cube.Cube)!=32+cube.faces*64)
-    @compileError("Lighting must match light.glsl's layout");
+  // std430 as lighting.glsl reads it: the texel sizes pack into one vec4,
+  // and the points of light follow the head
+  if(cascades>4 or @offsetOf(Head,"info")!=cascades*64+16 or @offsetOf(Head,"grid")!=cascades*64+32 or @offsetOf(Head,"cells")!=cascades*64+112 or @offsetOf(Head,"cubes")!=cascades*64+128 or @sizeOf(Head)%16!=0 or @sizeOf(vertex.Light)!=48 or @sizeOf(cube.Cube)!=32+cube.faces*64)
+    @compileError("Head must match lighting.glsl's layout");
 }
+/// the bytes a lighting record holding `n` points of light takes
+pub fn recordBytes(n:usize)usize{return @sizeOf(Head)+n*@sizeOf(vertex.Light);}
 /// where cube `i`'s face `f` lies in the lighting record (a face's casters are
 /// pushed this far past the record's address: light.glsl `CubeFace`)
-pub fn faceAt(i:usize,f:usize)usize{return @offsetOf(Lighting,"cubes")+i*@sizeOf(cube.Cube)+@offsetOf(cube.Cube,"faces")+f*@sizeOf(m.M4);}
+pub fn faceAt(i:usize,f:usize)usize{return @offsetOf(Head,"cubes")+i*@sizeOf(cube.Cube)+@offsetOf(cube.Cube,"faces")+f*@sizeOf(m.M4);}
 /// the cascades for a view: each world to its clip space, the world size
 /// of its texels, and how far from the eye they reach in all
 pub const Fit=struct{mats:[cascades]m.M4,texel:[cascades]f32,reach:f32};

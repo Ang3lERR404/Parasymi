@@ -158,8 +158,14 @@ void main() {
   // falloff, light.glsl `pointLight`, summed across the chord through its
   // reach), in the air as it is where the ray passes nearest it, seen
   // through what lies before that
-  int count = int(L.info.x + 0.5);
-  for (int i = 0; i < count; i++) {
+  // (only those the cells along this ray list: every depth of its tile)
+  int count = lightCount(L);
+  int column = columnAt(L, eye, dir);
+  for (int w = 0; w * 32 < count; w++) {
+  uint bits = lightsIn(L, column, w, count);
+  while (bits != 0u) {
+    int i = w * 32 + findLSB(bits);
+    bits &= bits - 1u;
     vec4 lp = L.lights[i].pos;
     vec3 to = lp.xyz - eye;
     float near = dot(to, dir);
@@ -216,6 +222,7 @@ void main() {
       through = mix(1.0, lit / max(all, 1e-6), shown);
     }
     scat += L.lights[i].col.rgb * sum * win * rho * seen * through * ALBEDO * POINT_AIR;
+  }
   }
   o = vec4(scat, trans);
 }

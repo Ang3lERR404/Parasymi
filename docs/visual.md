@@ -674,9 +674,10 @@ flooding. His pose is the clip `src/anim/sleep.anim` (keyed in animedit,
 - Terrain receives shadows but does not cast them.
 
 ### Points of light
-- `Parts.light`: blooms, motes, ley shards, diamond and flash. At most
-  `maxLights` (32), ranked in view.zig.
-- They and the cascades travel in `Lighting`, reached by address
+- `Parts.light`: blooms, motes, ley shards, diamond and flash; `Parts.spot`
+  a cone. Every one is lit, however many (none dropped: the view's cells
+  list which reach where, architecture.md).
+- They and the cascades travel in the lighting record, reached by address
   (`WorldPush.light`).
 - Shader side: engine light.glsl `keyShadow`, `pointLight`; common.glsl
   `shadeLit`.

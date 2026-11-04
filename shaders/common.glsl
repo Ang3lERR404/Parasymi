@@ -476,30 +476,38 @@ const float SKY_SPOT_GAIN = 0.45;
 // (wrap 1) and facing away (-n), and, with `mirror`, mirrored in wet
 // skin along `R`
 struct PointLit { vec3 plain; vec3 wrapped; vec3 behind; vec3 mirrored; };
-PointLit pointLights(vec3 wpos, vec3 n, vec3 R, bool mirror) {
+// (only the lights cell `cell` lists: light.glsl `pointLightIn`)
+PointLit pointLightsIn(vec3 wpos, vec3 n, vec3 R, bool mirror, int cell) {
   Lighting L = Lighting(pc.light);
-  int count = int(L.info.x + 0.5);
+  int count = lightCount(L);
   PointLit p = PointLit(vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0));
-  for (int i = 0; i < count; i++) {
-    vec4 lp = L.lights[i].pos;
-    vec3 d = lp.xyz - wpos;
-    float d2 = dot(d, d);
-    float k = d2 / (lp.w * lp.w);
-    if (k >= 1.0) continue;
-    vec3 col = L.lights[i].col.rgb;
-    float inv = inversesqrt(max(d2, 1e-6));
-    float win = (1.0 - k) * (1.0 - k) * coneOf(L.lights[i], -d * inv);
-    if (win <= 0.0) continue;
-    win *= pointShadow(L, i, wpos, n, d);
-    float f = dot(n, d) * inv;
-    vec3 lit = col * win / (1.0 + LIGHT_FALLOFF * k);
-    p.plain += lit * max(f, 0.0);
-    p.wrapped += lit * max((f + 1.0) * 0.5, 0.0);
-    p.behind += lit * max(-f, 0.0);
-    if (mirror) p.mirrored += col * hardSpot(R, d * inv, POINT_SPOT) * POINT_SPOT_GAIN * win;
+  for (int w = 0; w * 32 < count; w++) {
+    uint bits = lightsIn(L, cell, w, count);
+    while (bits != 0u) {
+      int i = w * 32 + findLSB(bits);
+      bits &= bits - 1u;
+      vec4 lp = L.lights[i].pos;
+      vec3 d = lp.xyz - wpos;
+      float d2 = dot(d, d);
+      float k = d2 / (lp.w * lp.w);
+      if (k >= 1.0) continue;
+      vec3 col = L.lights[i].col.rgb;
+      float inv = inversesqrt(max(d2, 1e-6));
+      float win = (1.0 - k) * (1.0 - k) * coneOf(L.lights[i], -d * inv);
+      if (win <= 0.0) continue;
+      win *= pointShadow(L, i, wpos, n, d);
+      float f = dot(n, d) * inv;
+      vec3 lit = col * win / (1.0 + LIGHT_FALLOFF * k);
+      p.plain += lit * max(f, 0.0);
+      p.wrapped += lit * max((f + 1.0) * 0.5, 0.0);
+      p.behind += lit * max(-f, 0.0);
+      if (mirror) p.mirrored += col * hardSpot(R, d * inv, POINT_SPOT) * POINT_SPOT_GAIN * win;
+    }
   }
   return p;
 }
+// (the lights the cell at `wpos` lists)
+PointLit pointLights(vec3 wpos, vec3 n, vec3 R, bool mirror) { return pointLightsIn(wpos, n, R, mirror, cellAt(Lighting(pc.light), wpos)); }
 
 // the hard light on sap at `wpos` (mesh-space `obj`, its glints ride with
 // it) facing `n`, seen from `V`: `sapc` its colour, `clear` how see-through
