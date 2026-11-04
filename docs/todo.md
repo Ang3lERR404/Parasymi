@@ -97,6 +97,10 @@ hues are being chosen from samples.*
   rainbow (as its threads and halo already do, `filmHue`), and so should
   the glow it puts in the fog and the light it casts. Its exact rainbow is
   the gardener's to pick from samples.
+- **The diamond's animations are far below the bar.** It never got
+  polished motion: its forming, its idle and its light all want bringing
+  up to the current standard (the growth and plant quality the rest of
+  the garden holds, and the glow bar: its own colours, shimmering).
 
 ## Act 3, far off
 *A seed, nothing decided.* Evolved plants in space: the garden at last
