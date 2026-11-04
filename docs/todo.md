@@ -74,6 +74,26 @@ carries the game's early days.
 reaching up into the sky it has looked at all along (starlight gathered,
 living constellations, a hyena made of stars). Kept open on purpose.
 
+## Mods
+*An idea being shaped, far off.* Players make their own plants and
+structures, simple or complex in what they do, as Factorio's Lua mods do.
+- **Data** (items, weave recipes, costs, yields, timings) could live in
+  `.zon` files read at start (`std.zon`); names become entries in a list,
+  not types, since a running game makes no new types.
+- **Behaviour** through an embedded language rather than one of our own:
+  Lua (small, C, known from Factorio) or WebAssembly; simple plants maybe
+  from building blocks ("takes essence, waits 5 s, gives fibre") with no
+  code. One registry member, "modded", whose hooks call the mod's script.
+- **Looks** from sculpts (`.mesh`) and clips (`.anim`), which the game
+  already reads at start; modded plants still keep the plant rules
+  (growing, sway, stamens).
+- **Safety:** a mod reaches only other mods and its own `mod-data` folder
+  in the game's AppData folder (`%LOCALAPPDATA%\Parasymi\mod-data`); no
+  other files, no network. Lua's own `io`/`os` left out, a file call of our
+  own that refuses any path outside `mod-data`.
+- **Before it:** saves that never break (items by name), and scripts kept
+  deterministic, as the threading rule asks.
+
 ## Lanes and injectors
 *Being designed.* Today a conduit carries one item at a time. Every
 belt-like carrier (conduit, braided conduit, vultrixi tether, the
