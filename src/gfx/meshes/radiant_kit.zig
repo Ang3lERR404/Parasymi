@@ -913,7 +913,7 @@ pub fn lumi(b:*mg.Builder,g:species.Genome,seed:u64,variant:u32)Allocator.Error!
   for(0..lumiCombs)|i|{
     // this comb row's own colour of the split light
     const x=hue0+m.ratio(i,lumiCombs);
-    const film=color.rgb(0.5+0.5*@cos(m.tau*x),0.5+0.5*@cos(m.tau*(x+0.33)),0.5+0.5*@cos(m.tau*(x+0.67))).toRgba8(255);
+    const film=mg.drifts.splitLight(x);
     const col=color.mix(film,white,0.25);
     // its path: along the lantern's comb crest, a hair off the skin, mouth to top
     var path:[16]V3=undefined;

@@ -405,7 +405,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 ## src/gfx/meshgen/
 - `blades.zig` — blades: a bent strip with a body, its vein on the cupped face.
 - `creepers.zig` — creepers: a moss creeper (the `creeper` form), lying low on the ground.
-- `drifts.zig` — the drifting plants: tendrils and lanterns.
+- `drifts.zig` — the lumi lantern's sap lantern (a floater's comb-jelly body) and the light split into colours along its comb rows; radiantKit.lumi gathers…
 - `flowers.zig` — flowers, buds and leaves set along a path.
 - `laminae.zig` — laminae: leaves with a body, folding to a midrib.
 - `lilies.zig` — lilies: a water lily (the `lily` form), its origin on the water's surface.

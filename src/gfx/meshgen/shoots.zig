@@ -30,8 +30,6 @@ const V3=m.V3;
 const Builder=lib.meshgen.Builder;
 /// how many growth keys a confluence is built at
 const keys=lib.meshgen.keys;
-/// builds a drifting plant (drifts.zig)
-const drift=lib.meshgen.drifts.drift;
 /// bends control points the way a vine grows
 const grow=lib.meshgen.grow;
 /// how a branch flares into the stem it leaves

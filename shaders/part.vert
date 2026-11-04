@@ -76,7 +76,7 @@ layout(location = 11) out vec2 v_sheet;      // a leaf or petal: along it 0..1, 
 // how an instance is placed (vertex.zig `PartInstance.e.x`; must match)
 const int PLACE_MATRIX = 0;
 const int PLACE_CURVE = 1;   // along a Catmull-Rom curve (the tail, beams)
-const int PLACE_MOTE = 2;    // a star mote
+const int PLACE_MOTE = 2;    // (retired: no star falls any more; the number kept)
 const int PLACE_SKINNED = 3; // by its bones
 const int PLACE_BURST = 4;   // a burst flung out where a yield came loose
 const int PLACE_FALL = 5;    // drifting down out of the dark over the main menu's stage
@@ -142,9 +142,6 @@ const float LEY_CORAL = 0.45;
 // a flash spreads out from this share of its size to this many times it
 const float FLASH_FROM = 0.1;
 const float FLASH_TO = 3.2;
-// a star mote: how fast it turns (rad/s), how far its echoes trail above it
-const float MOTE_TURN = 0.35;
-const float ECHO_RISE = 0.16;
 // a burst where a yield came loose (meshes/pluck_burst.zig): its beads'
 // radius (mesh space), how far its motes drift up and its drops fall
 // over its life (mesh space: the matrix sizes it)
@@ -1802,22 +1799,6 @@ void main() {
     w = vec4(wc + (right * p.x + up * p.y) * size, 1.0);
     wn = toEye;
     twinkle = 0.7 + 0.3 * sin(t * 4.3 + sd * 31.0) * sin(t * 2.1 + sd * 9.0);
-  } else if (mode == PLACE_MOTE) {
-    // a star mote: it turns slowly, tilts, twinkles and, resting, hovers
-    // with a slow breath; falling, its echoes (ie.w 1..3) trail above it,
-    // fading and shrinking
-    float ph = ie.y;
-    float echo = ie.w;
-    twinkle = 0.75 + 0.25 * sin(t * 3.1 + ph * 40.0) * sin(t * 1.7 + ph * 13.0);
-    float turn = t * MOTE_TURN + ph * TAU - max(echo, 0.0) * 0.3;
-    float tilt = echo > 0.5 ? 0.0 : 0.25 * sin(t * 0.5 + ph * 9.0);
-    float size = (0.55 + 0.55 * ie.z) * (0.9 + 0.1 * twinkle) * (1.0 - 0.22 * max(echo, 0.0));
-    float hover = echo < 0.0 ? 0.05 * sin(t * 1.1 + ph * 30.0) : 0.0;
-    mat3 R = mat3(cos(turn), 0.0, -sin(turn), 0.0, 1.0, 0.0, sin(turn), 0.0, cos(turn))
-           * mat3(cos(tilt), sin(tilt), 0.0, -sin(tilt), cos(tilt), 0.0, 0.0, 0.0, 1.0);
-    w = vec4(c3.xyz + vec3(0.0, hover + ECHO_RISE * max(echo, 0.0), 0.0) + R * p * size, 1.0);
-    wn = R * nrm;
-    if (echo > 0.5) twinkle = 1.0;
   } else {
     w = M * vec4(p, 1.0);
 #ifdef SHADOW
@@ -2012,7 +1993,7 @@ void main() {
   // what is light itself casts no shadow (a star mote, PARTS_LIGHT: a beam,
   // a halo's flash, ring and rays), nor does the soft shadow under a floater
   // or a placement preview
-  bool casts = !(mode == PLACE_MOTE || mode == PLACE_BURST || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u);
+  bool casts = !(mode == PLACE_SPARK || mode == PLACE_BURST || part == PART_SHADOW || PART_IN(PARTS_LIGHT, part) || (iflags & PART_GHOST) != 0u);
 #ifdef CAPTURE
   // caught for the rays: what casts, casts for every light (as the cubes have it)
   capture(w.xyz, casts, casts);

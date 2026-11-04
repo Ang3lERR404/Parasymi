@@ -6,7 +6,9 @@ the doc that covers it). Each entry says plainly what it is and how far
 along it stands.
 
 ## Act 1 rework
-*Brainstormed, names done.* Act 1 (everything before the unforming) still
+*Paused by the gardener (2026-11-04) after the names, the starlit
+patches, the stellasaluumni and the lumi lantern's look; the rest stays
+open.* Act 1 (everything before the unforming) still
 carries the game's early days.
 - ~~**Names.** The first plants and structures are reborn in the new
   style, in game only (`src/cfg/parasymi.cfg`; every code tag kept, a code
