@@ -17,6 +17,8 @@ const Allocator=std.mem.Allocator;
 const testing=std.testing;
 /// all the maths: vectors, easing and conversions
 const m=lib.engine.core.math;
+/// the engine's noise: the sine hash bolts are kinked by
+const noise=lib.engine.core.noise;
 /// chunk sizes and tile kinds
 const ck=lib.ck;
 /// what can be held: item kinds
@@ -161,9 +163,7 @@ pub fn breath(s:*const st.Structure)?st.Breath{
 }
 /// a number 0..1 from `a`, `b` and `c`, the same for the same three
 fn hash(a:f32,b:f32,c:f32)f32{
-  // a fast scramble of the three
-  const h=@sin(a*12.9898+b*78.233+c*37.719)*43758.5453;
-  return h-@floor(h);
+  return noise.sineHash(3,.{a,b,c},noise.sineWeights[0..3].*);
 }
 /// a bolt from `from` to `to` (world), kinked by `key`, glowing, its flash lighting the air
 fn bolt(out:*Parts,from:V3,to:V3,key:f32,bright:f32)Allocator.Error!void{

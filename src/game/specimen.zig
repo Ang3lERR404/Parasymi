@@ -707,10 +707,12 @@ fn drawsDeclared(gpa:Allocator,k:st.Kind,state:State)!void{
   const declared=st.meshes(k);
   var parts=Parts.init(gpa);
   defer parts.deinit();
+  // how often its pieces are looked at (s)
+  const look:f32=0.25;
   // seconds looked at so far
   var t:f32=0;
-  while(t<30):(t+=0.25){
-    for(0..@intFromFloat(0.25/play.tickTime))|_|try g.step();
+  while(t<30):(t+=look){
+    for(0..@intFromFloat(look/play.tickTime))|_|try g.step();
     parts.clear();
     for(g.structs.list.items)|*s|{
       // its centre on the ground

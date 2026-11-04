@@ -117,6 +117,35 @@ test"fbm range + determinism + seed sensitivity"{
   // another seed is another field almost everywhere
   try testing.expect(differs>70);
 }
+/// the classic sine hash's weights, one per input (the fourth most often a seed)
+pub const sineWeights=m.Vice(f32,4){12.9898,78.233,37.719,91.31};
+/// how far the sine is stretched before its whole part is dropped
+const sineScale:f32=43758.5453;
+/// a number 0..1 from the `n` inputs `p`, each weighed by `w`: the classic
+/// sine hash, a fast scramble, the same for the same inputs (summed left to
+/// right, so it matches the sum written out)
+pub fn sineHash(comptime n:usize,p:m.Vice(f32,n),w:m.Vice(f32,n))f32{
+  // the inputs weighed and summed in turn
+  var s:f32=p[0]*w[0];
+  inline for(1..n)|i|s+=p[i]*w[i];
+  // the sine stretched, its fraction kept
+  const h=@sin(s)*sineScale;
+  return h-@floor(h);
+}
+test"the sine hash is 0..1 and matches it written out"{
+  // a few inputs, and the hash written out by hand
+  const a:f32=3.25;
+  const b:f32=7;
+  const c:f32=0.5;
+  const h=@sin(a*12.9898+b*78.233+c*37.719)*43758.5453;
+  try testing.expectEqual(h-@floor(h),sineHash(3,.{a,b,c},sineWeights[0..3].*));
+  // and in range over a sweep
+  for(0..200)|i|{
+    // the hash of this step
+    const v=sineHash(2,.{m.f(i)*0.37,1.5},.{127.1,311.7});
+    try testing.expect(v>=0 and v<1);
+  }
+}
 test"ridged is in 0..1"{
   // the point walked along a slanted line
   var x:f32=-10;

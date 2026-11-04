@@ -16,6 +16,8 @@ const Allocator=std.mem.Allocator;
 const testing=std.testing;
 /// all the maths: vectors, matrices, curves
 const m=lib.engine.core.math;
+/// the engine's noise: the sine hash the sparks jump by
+const noise=lib.engine.core.noise;
 /// colour conversions, for tinting motes and sparks by their item's colour
 const color=lib.engine.core.color;
 /// chunk layout: tiles, their kinds, heights and what is left in them
@@ -390,9 +392,7 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
 /// a number 0..1 from a jump `step`, a spark `j` and what is asked of it
 /// `q`, the same for the same three, scattered for any other
 fn hash(step:f32,j:usize,q:f32,seed:f32)f32{
-  // a fast scramble of the four
-  const h=@sin(step*12.9898+m.f(j)*78.233+q*37.719+seed*91.31)*43758.5453;
-  return h-@floor(h);
+  return noise.sineHash(4,.{step,m.f(j),q,seed},noise.sineWeights);
 }
 /// the lightning in its chamber as it ionizes, jumping anew `sparkRate`
 /// times a second: at first one tiny spark off a node toward the crystal,

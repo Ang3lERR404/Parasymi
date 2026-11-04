@@ -14,6 +14,8 @@ const swap=std.mem.swap;
 const engine=lib.engine;
 /// all the maths: vectors, matrices, easing, tiles
 const m=engine.core.math;
+/// the engine's noise: the sine hash a heart's cones draw from
+const noise=engine.core.noise;
 /// colour types: what a plant yields, as its pods colour it
 const color=engine.core.color;
 /// hashing a tile or index to a steady random value
@@ -512,10 +514,10 @@ const coneBreath:f32=0.25;
 const coneBreathRate=m.Vice(f32,2){0.4,0.9};
 /// a draw 0..1 for cone `k` of a plant of `seed`, the `which`th
 fn hashOf(seed:f32,k:usize,which:u32)f32{
-  // a sine hash: the fractional part of a large multiple
-  const x=@sin(seed*127.1+m.f(k)*311.7+m.f(which)*74.7)*43758.5453;
-  return x-@floor(x);
+  return noise.sineHash(3,.{seed,m.f(k),m.f(which)},coneHashWeights);
 }
+/// the weights a cone's draws are hashed with (the seed, the cone, which draw)
+const coneHashWeights=m.Vice(f32,3){127.1,311.7,74.7};
 /// the most telling points of light first, the rest dropped: the renderer
 /// takes `renderer.maxLights` (strong, far reaching lights near what the
 /// camera looks at win)
