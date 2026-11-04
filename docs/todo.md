@@ -40,7 +40,8 @@ carries the game's early days.
   dark by shooting its light up into the sky. *Decided:* a halyriphon
   makes starlight only floating over a patch, nothing away from one (the
   patches are what a garden is built round). Each patch its own size,
-  about 3×3 to 10×10 tiles, beside its own richness. Its shape mostly a
+  about 3×3 to 10×10 tiles, beside its own richness (the richest about
+  10× the poorest: a rich patch is a real jackpot). Its shape mostly a
   semi-ragged organic splash (ragged, not wildly), now and then a soft
   round pool. Along the ley lines they lie anywhere from about 30 m to
   120 m apart. With the motes gone, the first starlight comes from the
