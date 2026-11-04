@@ -176,7 +176,8 @@ plant.
   - It draws one unit every 2 s from them in turn into its bulb (12 grit,
     4 ley).
   - It ionizes 4 grit + 1 ley into a ley crystal in 6 s; holds 8 and hands
-    them on.
+    them on. Once the unforming has sealed the ley lines, 1 convergence
+    essence fed in charges a crystal in the ley's place (`lateSpark`).
 - **Driftbraid** (braided conduit + sporecaster, BRAIDED DRIFT): paired
   both ways by configuring one, then the other. It sends what it is fed by
   spore and takes in what comes back. It lets go only what came by spore

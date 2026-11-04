@@ -172,7 +172,20 @@ pub const State=struct{
   ionizing:bool=false,
   /// how far along that crystal is (0..1)
   ion:f32=0,
+  /// what charged the crystal ionizing: a ley shard, or (the ley lines
+  /// sealed by the unforming) convergence essence
+  spark:items.Item=.leyShard,
 };
+/// what charges a crystal once the unforming has sealed the ley lines: the
+/// lineages' meeting, condensed (the gardener's word)
+pub const lateSpark=items.Item.convergenceEssence;
+/// what it holds to charge its next crystal: ley shards first, then
+/// convergence essence
+fn sparkOf(s:*const st.Structure)?items.Item{
+  if(s.inv.count(.leyShard)>=ionLey)return.leyShard;
+  if(s.inv.count(lateSpark)>=ionLey)return lateSpark;
+  return null;
+}
 /// whether an item is a mineral it draws (grit or ley shard)
 fn mineral(item:items.Item)bool{return item==.grit or item==.leyShard;}
 /// whether its bulb has room for one more of `item`
@@ -251,12 +264,13 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
     }
   }
   // ionizing: a measure of grit and ley into a crystal
-  if(!ws.ionizing and self.inv.count(.leyCrystal)<crystalCount and self.inv.count(.grit)>=ionGrit and self.inv.count(.leyShard)>=ionLey){
+  if(!ws.ionizing and self.inv.count(.leyCrystal)<crystalCount and self.inv.count(.grit)>=ionGrit)if(sparkOf(self))|sp|{
     _=self.inv.take(.grit,ionGrit);
-    _=self.inv.take(.leyShard,ionLey);
+    _=self.inv.take(sp,ionLey);
+    ws.spark=sp;
     ws.ionizing=true;
     ws.ion=0;
-  }
+  };
   if(ws.ionizing){
     busy=true;
     ws.ion=@min(1,ws.ion+dt/ionize);
@@ -267,11 +281,13 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   }
   return busy;
 }
-/// grit and ley shards, while its bulb has room for them.
-pub fn wants(s:*const st.Structure,_:*const prog.Progression,item:items.Item)u32{
+/// grit and ley shards, while its bulb has room for them; once the
+/// unforming has sealed the ley lines, convergence essence in their place.
+pub fn wants(s:*const st.Structure,g:*const prog.Progression,item:items.Item)u32{
   return switch(item){
     .grit=>bulbGrit-|s.inv.count(.grit),
     .leyShard=>bulbLey-|s.inv.count(.leyShard),
+    lateSpark=>if(g.done.contains(.unforming))bulbLey-|s.inv.count(lateSpark)else 0,
     else=>0,
   };
 }
@@ -281,7 +297,7 @@ pub fn release(s:*st.Structure)?items.Item{
   const ws=&s.state.weftstone;
   if(ws.ionizing){
     _=s.inv.add(.grit,ionGrit);
-    _=s.inv.add(.leyShard,ionLey);
+    _=s.inv.add(ws.spark,ionLey);
     ws.ionizing=false;
   }
   return null;
@@ -426,7 +442,7 @@ pub fn describe(s:*const st.Structure,d:*Draw,_:*const prog.Progression,x:f32,y:
     _=try d.print(x,y,style.textBody,style.dim,txt.s.describe.weftStarved,.{crystals,crystalCount});
     return;
   }
-  _=try d.print(x,y,style.textBody,style.white,txt.s.describe.weftDraws,.{latched,s.inv.count(.grit),bulbGrit,s.inv.count(.leyShard),bulbLey,crystals,crystalCount});
+  _=try d.print(x,y,style.textBody,style.white,txt.s.describe.weftDraws,.{latched,s.inv.count(.grit),bulbGrit,s.inv.count(.leyShard)+s.inv.count(lateSpark),bulbLey,crystals,crystalCount});
 }
 /// its bulb: a caged chamber with a crystal sparking in it, two vanes
 /// strung with threads fanned out over it, tendrils reaching down to
@@ -542,4 +558,29 @@ test"a weftstone's tendrils reach no further than R and latch no more than LATCH
     try testing.expect(@abs(o[0])<=reachTiles and @abs(o[1])<=reachTiles);
   };
   try testing.expectEqual(@as(u32,latchCount),latched);
+}
+test"after the unforming, with the ley lines sealed, a weftstone ionizes grit and convergence essence into ley crystals"{
+  // the allocator, the world and its bare ground: no ley node anywhere
+  const gpa=testing.allocator;
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  _=try bench.ground(&w,.{.width=6,.depth=6,.bare=true});
+  // no plants, the structures, and what the gardener understands
+  var plants:Plants=.{};
+  defer plants.deinit(gpa);
+  var ss:st.Structures=.{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression=.{};
+  try testing.expect(try ss.place(gpa,&w,2,2,.weftstone,0,0));
+  // the weftstone
+  const id=ss.floaterAt(2,2).?;
+  // before the unforming it wants no essence; after, it does
+  try testing.expectEqual(@as(u32,0),ss.wants(&g,id,lateSpark));
+  g.done.insert(.unforming);
+  try testing.expect(ss.wants(&g,id,lateSpark)>0);
+  // fed grit and essence, it ionizes a crystal
+  _=ss.insert(&g,id,.grit,ionGrit);
+  _=ss.insert(&g,id,lateSpark,ionLey);
+  try bench.run(&ss,&w,&plants,&g,ionize+1);
+  try testing.expectEqual(@as(u32,1),ss.get(id).inv.count(.leyCrystal));
 }
