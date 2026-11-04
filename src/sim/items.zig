@@ -128,6 +128,8 @@ pub const Item=enum(u8){
   sunlitEssence,
   /// convergence essence a night beam has steeped: worth `sunlitWorth` of it
   sunlitConvergenceEssence,
+  /// the bulb of a starlight catcher, the garden's first starlight
+  starCatcher,
   /// how item `i` looks (its colour)
   pub fn info(i:Item)Info{return infos.get(i);}
   /// the sunlit kind of a yield, what one unit in ten becomes in overdrive
@@ -219,6 +221,7 @@ const infos=EnumArray(Item,Info).init(.{
   .eveningSilk=.{.col=.{255,200,170,255}},
   .sunlitEssence=.{.col=.{255,240,170,255}},
   .sunlitConvergenceEssence=.{.col=.{245,200,255,255}},
+  .starCatcher=.{.col=.{160,190,235,255}},
 });
 /// how many of the plain kind a sunlit one is worth
 pub const sunlitWorth=3;

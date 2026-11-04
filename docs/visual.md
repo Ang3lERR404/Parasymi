@@ -452,6 +452,28 @@ whole.)
   its stack, which swells) or rises out.
 - Contents hang inside.
 
+### Starlight catcher
+The gardener's look (`meshes/starlight_catcher.zig`, chosen from samples:
+the reed's proportions, the sky dish and the dew cup blended), a delicate
+harvester of the faintest starlight, 1.1 m.
+- **Pseudo-rooted:** seven braided legs arch up out of its body and down
+  to the ground, only their tips touching it (the gardener's favourite);
+  its body floats 8 cm over them, bobbing 1.2 cm, slow (`Def.bob`), lifted
+  by a hint of magic kept subtle (a faint star-blue light under it; the
+  gardener may revisit how much it shows).
+- A rosette of natural leaves cupped upward like open hands, young ones
+  folded at the stalk; a fine woven stalk with two small leaf pairs; a
+  thread-thin vine winding 0.6 of the way up with tiny leaves.
+- **The bowl:** 18 fine petals (built in 16 rows, smooth), sage to a pale
+  star-blue rim, turned to the sky; 24 hair-fine filaments round the rim,
+  each tipped with a bead; two dew-tipped hairs on each petal; a lens of
+  amber sap in its heart with stamens round it.
+- **By night, gathering:** beads of gathered light glow in the lens and
+  down the vine to its legs (`catcherBead`), as bright as it works.
+- Grows: legs and hands first, the stalk rising, its leaf pairs and vine
+  as it passes, the bowl opening petal by petal, the lens, stamens and
+  hairs last.
+
 ### Root-digger
 - Four braided roots break the ground (soil heaved round them) and twine
   up to grip a small resin gourd, with a leaf tuft on top.

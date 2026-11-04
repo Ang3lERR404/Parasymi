@@ -51,7 +51,7 @@ pub const Recipe=struct{
   /// in act 2 (only his)
   by:lib.act.Act=.wolf,
   /// whether the wolf weaves it by hand too: only the basics (a conduit, a
-  /// sap cache, a germinator), the gardener's word; all else is a weaver's
+  /// sap cache, a starlight catcher, a germinator), the gardener's word; all else is a weaver's
   basic:bool=false,
   /// whether the research it needs (if any) is known
   pub fn unlocked(r:Recipe,g:*const prog.Progression)bool{
@@ -87,6 +87,8 @@ pub const hand=[_]Recipe{
   .{.out=.seedMossCreeper,.in=&.{.{.item=.convergenceEssence,.n=2},.{.item=.grit,.n=1}},.time=2.5,.needs=.mossCreeping},
   .{.out=.conduit,.n=2,.in=&.{.{.item=.fibre,.n=2},.{.item=.grit,.n=1}},.time=1,.basic=true},
   .{.out=.sapCache,.in=&.{.{.item=.fibre,.n=4},.{.item=.grit,.n=4}},.time=2,.basic=true},
+  // the garden's first starlight: cheap matter only, never starlight (the gardener's word)
+  .{.out=.starCatcher,.in=&.{.{.item=.fibre,.n=3},.{.item=.grit,.n=2}},.time=2,.basic=true},
   // no essence: nothing yields it until the germinator has woven a seed
   .{.out=.germinator,.in=&.{.{.item=.fibre,.n=6},.{.item=.grit,.n=4},.{.item=.starlight,.n=2}},.time=3,.basic=true},
   .{.out=.arsthraxia,.in=&.{.{.item=.fibre,.n=8},.{.item=.grit,.n=6},.{.item=.essence,.n=4},.{.item=.starlight,.n=4},.{.item=.leyShard,.n=2}},.time=4},

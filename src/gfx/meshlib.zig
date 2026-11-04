@@ -21,7 +21,7 @@ const mg=lib.meshgen;
 const m=engine.core.math;
 /// the engine's registry: one module per thing, an enum over them
 const registry=engine.core.registry;
-/// the rooted starlight catcher's draft and its beads of light
+/// the rooted starlight catcher and its beads of light
 const starlightCatcher=@import("meshes/starlight_catcher.zig");
 /// every library mesh, one member each, in draw order: translucent ones
 /// after what they cover (the registry's order is the draw order)
@@ -386,9 +386,9 @@ const parts=struct{
   pub const polypHanging=@import("meshes/polyp.zig").hanging;
   /// a mixed look for the polyp: a colony of slender hydras on the fleshy mound
   pub const polypHydras=@import("meshes/polyp_hydra.zig").colony;
-  /// a draft for the rooted starlight catcher: the sky dish and the dew cup in one, on its little legs
-  pub const catcherBlend=starlightCatcher.blend;
-  /// a bead of gathered starlight, glowing in a catcher draft's heart and down its vine
+  /// the rooted starlight catcher: the sky dish and the dew cup in one, on its little legs
+  pub const starCatcher=starlightCatcher.blend;
+  /// a bead of gathered starlight, glowing in a catcher's lens and down its vine
   pub const catcherBead=starlightCatcher.bead;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, crowned with its feathery tentacles
   pub const polypHydraFeathered=@import("meshes/polyp_hydra.zig").feathered;

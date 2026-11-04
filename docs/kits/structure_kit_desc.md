@@ -91,6 +91,7 @@ and the loomfern's pinnae are natural too, sitting on their rachis
 | `loomfern.zig` | `rootMat` |
 | `conduit.zig` | `rootlet` (the arch's rootlets; the arch itself is `conduit.arch`) |
 | `node_fibre.zig` | `rootMat` (plain) |
+| `starlight_catcher.zig` | `resinPod` (its legs braid on its own skeleton) |
 
 Companion pieces not in this kit, but part of the same vocabulary:
 - `conduit.arch` / `spineCtrl`: a woven arch with a sapwood `.core` and

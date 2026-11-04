@@ -32,11 +32,7 @@ carries the game's early days.
 - ~~**Starlight.** Light gathered from the stars on starlit patches by
   the ley lines, the falling motes and `Starfall` gone: built as the
   gardener shaped it ([design.md](design.md#starlit-patches-worldstarlitzig-gamestarlightzig),
-  [visual.md](visual.md#starlit-patches)).~~ Still open: the first
-  starlight. Until the rooted catcher (below) is built, nothing makes
-  starlight before a halyriphon is woven, and a halyriphon costs
-  starlight, so a fresh garden cannot start; the first seeds, the
-  germinator and the halyriphon keep their starlight costs.
+  [visual.md](visual.md#starlit-patches)).~~
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
@@ -44,13 +40,12 @@ carries the game's early days.
   rebuilt from `radiantKit` fragments: the same comb-jelly lantern of
   light, its filaments as strands of gathered light (held to the glow
   bar: its own colour, shimmering).
-- **A rooted starlight catcher for the symbiotic lineage.** To fill the
-  driftwisp's place: a new basic structure, rooted beside a patch,
-  reaching up for the light; it gathers starlight far less well than the
-  floating driftwisp, so the radiant one is worth reaching for.
-  *Decided:* it is the garden's first starlight. The wolf weaves it by
-  hand from cheap matter only (grit and fibre, never starlight), plants it
-  beside a patch, and it trickles out starlight slowly.
+- ~~**A rooted starlight catcher for the symbiotic lineage**, the
+  garden's first starlight: built (`structures/star_catcher.zig`,
+  [design.md](design.md#base-structures), [visual.md](visual.md#starlight-catcher)).~~
+  Still open: its in-game name (STARLIGHT CATCHER stands in); whether it
+  can walk on its little legs in play (only the look is decided); the
+  magic lifting it is kept subtle for now, the gardener may revisit it.
 - **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
   out of essence, but no convergent plant makes it, so once the
   symbiotic lineage is gone only the fibre plant's nodes, gathered by

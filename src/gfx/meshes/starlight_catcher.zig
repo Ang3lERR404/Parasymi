@@ -75,7 +75,7 @@ const legGirth:f32=0.02;
 const lift:f32=0.08;
 /// how far it bobs up and down as it hovers (m; its legs' tips sink this
 /// far into the ground at rest, so they never leave it)
-const bob:f32=0.012;
+pub const bob:f32=0.012;
 /// how high a leg's knee arches over the body's foot (m)
 const knee:f32=0.05;
 /// the soft light of the magic lifting it, under its body (linear), and how far

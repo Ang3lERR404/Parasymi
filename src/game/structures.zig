@@ -206,6 +206,8 @@ pub const kinds=struct{
   pub const strangeSeed=@import("structures/strange_seed.zig");
   /// a constellate core with four petals snapped on, yielding fragments
   pub const yielder=@import("structures/yielder.zig");
+  /// the symbiotic lineage's rooted catcher, gathering starlight from a patch by night
+  pub const starCatcher=@import("structures/star_catcher.zig");
   /// a constellate petal put down alone, drifting to a core nearby
   pub const petal=@import("structures/petal.zig");
   /// a constellate leaf put down alone, floating
@@ -274,6 +276,9 @@ pub const Def=struct{
   floating:bool=false,
   /// how high over the ground a floating one hangs
   hover:f32=0,
+  /// how far it bobs up and down, lifted by a hint of magic (m; 0: it
+  /// stands still), all it draws with it (`bobAt`)
+  bob:f32=0,
   /// its mesh is drawn by its own `emit` (a diamond: it forms on the GPU),
   /// not breathing and growing in as the others do; `mesh` is its preview
   bare:bool=false,
@@ -320,6 +325,11 @@ pub const Def=struct{
   /// a parasite's: the roots it turns on (R) are pale, not bark
   pub fn pale(d:Def)bool{return d.lineage==.parasitic;}
 };
+/// how far a structure of def `d` and seed `seed` has bobbed up at shader
+/// time `tf` (m): slow and soft, each at its own place in the swing
+pub fn bobAt(d:Def,seed:f32,tf:f32)f32{return d.bob*@sin(tf*bobRate+seed*m.tau);}
+/// how fast a bobbing structure bobs (radians a second)
+const bobRate:f32=0.9;
 /// every kind's `def`, looked up by kind
 pub const defs=reg.table(Def,"def");
 /// how a structure takes the light grid's light

@@ -521,6 +521,8 @@ pub const Strings=struct{
     yielderPetals:S="",
     /// a whole yielder at work: how many fragments it holds
     yielderWhole:S="",
+    /// a starlight catcher: how much starlight it holds
+    starCatcher:S="",
     /// a constellate petal put down with no core near enough
     petalWaiting:S="",
     /// a constellate petal drifting over to the core it merges with

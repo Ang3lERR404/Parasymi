@@ -198,6 +198,8 @@ pub const stormSpireMesh=@import("gfx/meshes/storm_spire.zig");
 pub const sporecaster=@import("gfx/meshes/sporecaster.zig");
 /// the structure kit: the shared grown pieces of structures
 pub const structureKit=@import("gfx/meshes/structure_kit.zig");
+/// the rooted starlight catcher's mesh: its look and where its beads of light hang
+pub const starlightCatcher=@import("gfx/meshes/starlight_catcher.zig");
 /// mesh: the vultrixi, a gathering crown and ganglion grown into one
 pub const vultrixi=@import("gfx/meshes/vultrixi.zig");
 /// mesh: the weftstone, a loomfern and lithophage grown into one

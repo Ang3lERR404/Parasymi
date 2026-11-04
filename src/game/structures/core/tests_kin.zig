@@ -114,7 +114,7 @@ fn snakeOf(comptime name:[]const u8)[]const u8{
   return out;
 }
 test"no kind reads or writes another kind's state outside its tests"{
-  @setEvalBranchQuota(2_000_000);
+  @setEvalBranchQuota(4_000_000);
   inline for(comptime std.meta.declarations(kinds))|d|{
     // the kind's source, and the part of it before its first test
     const src=@embedFile("../"++comptime snakeOf(d.name)++".zig");

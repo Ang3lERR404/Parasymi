@@ -60,9 +60,9 @@ round.
 - **Never runs dry.** A halyriphon (code `driftwisp`, `Species.catches`)
   drinks only floating over a patch, as much as the patch is rich, and
   nothing away from one (`ecology`, `Mods.starlit`).
-- **The first starlight** is to come from a rooted symbiotic catcher,
-  woven of grit and fibre (planned, [todo.md](todo.md)); until it is
-  built nothing makes starlight before a halyriphon is woven.
+- **The first starlight** comes from the starlight catcher (below),
+  woven of grit and fibre: it gathers from a patch by night, slowly,
+  until a halyriphon can be woven.
 - How it looks: [visual.md](visual.md#starlit-patches).
 
 ## Base structures
@@ -70,6 +70,14 @@ round.
   to a plant beside or behind it, and harvests the plant once the root
   arrives.
 - **Sap cache, germinator, arsthraxia** (research).
+- **Starlight catcher** (`structures/star_catcher.zig`): the garden's
+  first starlight. Woven by hand from 3 fibre + 2 grit (never starlight),
+  it is put down on or beside a starlit patch (within 1 tile) and by
+  night gathers 1 starlight every 40 s times the patch's yield (0.3 to 3)
+  and the night's depth, keeping up to 20; a click takes one. Far slower
+  than a halyriphon over the same patch. Once the unforming has darkened
+  the patches it gathers nothing (symbiotic: it is taken with its
+  lineage). Whether it can walk on its little legs is not decided.
 - **Root-digger:** 1×1, on soil or moss. Research "Deep Rooting"; costs
   3 fibre + 2 grit + 1 ley shard. It digs an adjacent node at 1 item every
   4 s into an 8-item buffer and feeds its neighbours. With no node, it
