@@ -46,7 +46,8 @@ carries the game's early days.
   120 m apart. With the motes gone, the first starlight comes from the
   rooted catcher (below): the only way in, paying for the first seeds,
   the germinator and later the halyriphon (all keep their starlight
-  costs).
+  costs). The first patch is found by exploring like the rest, never
+  placed beside where the wolf wakes.
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
