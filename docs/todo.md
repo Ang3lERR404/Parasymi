@@ -48,7 +48,9 @@ carries the game's early days.
   the germinator and later the halyriphon (all keep their starlight
   costs). The first patch is found by exploring like the rest, never
   placed beside where the wolf wakes. Its night light: one wide column
-  over the whole patch made of several coloured searchlight cones
+  over the whole patch made of 5 to 9 coloured searchlight cones (each
+  patch its own count; the draft, 16 m up, a little more colourful than
+  the first)
   pointing down from the sky, overlapping into one column, each its own
   colour and drifting a little, so the column shifts through the rainbow
   from within (the radiant hearts' wandering cones, `view.heartCones`,
