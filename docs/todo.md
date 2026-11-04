@@ -37,7 +37,9 @@ carries the game's early days.
   The driftwisp is its catcher, floating over a patch, its dish catching
   the light at night. A patch never runs dry, but each has its own
   richness, like Factorio's oil fields. At the unforming each patch goes
-  dark by shooting its light up into the sky. *Decided:* a halyriphon
+  dark by shooting its light up into the sky, where it becomes stars, and
+  stays dark (only a constellate plant of act 2 calls it back: see
+  Act 2). *Decided:* a halyriphon
   makes starlight only floating over a patch, nothing away from one (the
   patches are what a garden is built round). Each patch its own size,
   about 3×3 to 10×10 tiles, beside its own richness (the richest about
@@ -104,6 +106,12 @@ carries the game's early days.
   out.
 - The constellate lineage has no studies yet, so no look for its nodes
   on the research tree ([research-tree.md](research-tree.md)).
+- A constellate plant that calls starlight back down. After the
+  unforming the starlight patches stay dark on their own (their light,
+  shot into the sky, became stars); only this specialized constellate
+  plant, unlocked by a high amount of research, brings a patch back, so a
+  patch returns only where the gardener works for it. Its look, name and
+  how it works are to be shaped with the gardener.
 
 ## Small things
 - **Flags as enums** (the gardener's idea). `main.zig` reads its command
