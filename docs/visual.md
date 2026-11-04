@@ -196,7 +196,8 @@ proportion only.
 - plant.vert parts the cage from the foot up (tu.y) and opens the crown.
 
 ### The lumi lantern (halyriphon, `drift`, `radiantKit.lumi`)
-Turned radiant in look (its lineage move is still to come): gathered,
+Turned radiant in look, approved by the gardener ("magnifique, es bonita";
+its lineage move is still to come): gathered,
 never grown (`FORMS_FREE`).
 - **Lantern** (the gardener's heart of it, kept): the old comb-jelly
   lantern (`meshgen.drifts.lantern`) whole, gathered in as one sheer pane

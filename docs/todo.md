@@ -39,7 +39,11 @@ carries the game's early days.
   gathered, never grown, so its sap float and trailing filaments are
   rebuilt from `radiantKit` fragments: the same comb-jelly lantern of
   light, its filaments as strands of gathered light (held to the glow
-  bar: its own colour, shimmering).
+  bar: its own colour, shimmering). *Its look is done and approved*
+  ([visual.md](visual.md#the-lumi-lantern-halyriphon-drift-radiantkitlumi)).
+  Still open: the lineage move itself (in code it is still symbiotic;
+  radiant plants shatter at the unforming, so what happens to it then is
+  to be decided with the gardener).
 - ~~**A rooted starlight catcher for the symbiotic lineage**, the
   garden's first starlight: built (`structures/star_catcher.zig`,
   [design.md](design.md#base-structures), [visual.md](visual.md#starlight-catcher)).~~
