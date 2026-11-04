@@ -125,7 +125,8 @@ carries the game's early days.
   (the world, without the HUD) and keeps it beside the save; the saved
   gardens menu shows the picture of the garden chosen. A small image,
   written beside the frames like the `--inspect` shots; a save with no
-  picture yet (older ones) shows none, never breaks.
+  picture yet (older ones) shows none, never breaks; loaded and saved
+  once, it gains its picture like any other.
 
 ### The gardener's first playthrough (2026-11-03)
 *The rest is mended (the floater looked at, the sky's shaking, the light's
