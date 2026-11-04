@@ -54,7 +54,10 @@ carries the game's early days.
   pointing down from the sky, overlapping into one column, each its own
   colour and drifting a little, so the column shifts through the rainbow
   from within (the radiant hearts' wandering cones, `view.heartCones`,
-  aimed down and kept inside the patch; held to the glow bar).
+  aimed down and kept inside the patch; held to the glow bar). By day,
+  layered: a dark-blue field on the ground itself, a very faint haze just
+  above it, and small camera-facing star motes rising a little way before
+  fading out (held to the glow bar).
 - **The driftwisp turns radiant.** It already acts radiant (catches
   starlight, a lantern whose comb rows split light), so it moves to the
   radiant lineage, keeping most of its look and vibe. Radiant things are
