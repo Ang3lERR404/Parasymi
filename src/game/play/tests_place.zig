@@ -46,7 +46,7 @@ test"R turns what is under the cursor (Shift back), Q picks its bulb, a click op
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
@@ -119,7 +119,7 @@ test"remove pressed on a far node holds to it: the wolf walks up and gathers, wh
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
@@ -164,7 +164,7 @@ test"the left stick walks the wolf, the d-pad steps round the hotbar, the right 
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
@@ -199,7 +199,7 @@ test"out of the wolf's eyes, a floater looked at is the one named, never the pla
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the tile the wolf stands on, and the tile three east of it
   const x,const z=m.tileAt(g.player.pos);

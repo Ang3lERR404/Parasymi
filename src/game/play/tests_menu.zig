@@ -44,7 +44,7 @@ test"the wolf stays put without input"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   try lib.setups.demo(&g,5);
   // the input, driven by hand (no window)
@@ -96,7 +96,7 @@ test"clicking a research node or weave recipe picks it; number keys only pick th
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -125,7 +125,7 @@ test"the pause menu opens the options; clicks turn them and lead back"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -152,7 +152,7 @@ test"the main menu: its panels lead back to it, continue wants a garden saved, n
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -209,7 +209,7 @@ test"the saved gardens scroll, save over one or delete it only when asked twice,
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -275,7 +275,7 @@ test"the save key asks a garden without a name for one: typed, taken asks twice,
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -329,7 +329,7 @@ test"the garden saves itself once the autosave interval is played"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   try ctl.fill(&.{@embedFile("controls.cfg")});
   defer ctl.unload();
@@ -353,7 +353,7 @@ test"a menu button clicks as mouse1 is let go over it; sliding off first takes i
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -386,7 +386,7 @@ test"the keys move between a menu's rows, turn settings left and right, and conf
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -435,7 +435,7 @@ test"a slider is dragged along its stem; a picker's leaves turn it either way"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -470,7 +470,7 @@ test"the name prompt's caret moves, typing goes in there, and a selection is cut
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -519,7 +519,7 @@ test"the HUD holds as many clickable rows as are drawn"{
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   for(0..500)|i|try g.rows.add(.{.x=m.f(i)*4,.y=0,.w=4,.h=4},hud.row(.pause,.{.row=.quit}));
   try testing.expectEqual(@as(usize,500),g.rows.all().len);
@@ -529,7 +529,7 @@ test"a keybind clicked listens: the next key binds it, back cancels, the other b
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;

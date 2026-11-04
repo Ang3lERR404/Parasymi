@@ -151,7 +151,7 @@ const testing=std.testing;
 test"flowers spring up on a pool's soaked edge, a tile apart, never in it, on dry ground or on what stands there"{
   // a fresh game, and the tile two right of the wolf
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,lib.play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,lib.play.defaultSeed);
   defer g.deinit();
   const x,const z=m.tileAt(g.player.pos);
   // the pool's tile

@@ -370,7 +370,7 @@ pub fn catchStarlight(g:*Game,dt:f32)void{
 test"plants never set seed; an uprooted plant comes back as its seed"{
   // the test allocator, a fresh game, and the tile two right of the wolf
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   // the wolf's tile
   const x,const z=m.tileAt(g.player.pos);
@@ -395,7 +395,7 @@ test"plants never set seed; an uprooted plant comes back as its seed"{
 test"a harvest is plucked by paw: a few plucks, each yield carried in as a bead"{
   // the test allocator, a fresh game, and the tile two right of the wolf
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   // the wolf's tile, the chunk two tiles right of it and that tile within it
   const x,const z=m.tileAt(g.player.pos);
@@ -444,7 +444,7 @@ test"seeds are woven only by a germinator, which is woven from gathered matter"{
 test"a confluence gives only convergence essence"{
   // the test allocator, and a fresh game
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   // the wolf's tile, and the 2x2 footprint two tiles right of it
   const x,const z=m.tileAt(g.player.pos);

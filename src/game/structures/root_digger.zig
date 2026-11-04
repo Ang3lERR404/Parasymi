@@ -362,7 +362,7 @@ test"a conduit behind the digger carries its items away"{
 test"uprooting a digger returns its bulb and what it holds"{
   // the allocator, and a whole game
   const gpa=testing.allocator;
-  var g=try play.Game.init(gpa,play.defaultSeed);
+  var g=try play.Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   // the wolf's tile, and its chunk
   const at=m.tileAt(g.player.pos);

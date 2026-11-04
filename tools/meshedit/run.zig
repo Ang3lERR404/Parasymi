@@ -215,7 +215,7 @@ pub fn main(init:std.process.Init)!void{
   var ranges:[meshlib.slots]m.Vice(u32,2)=@splat(.{0,0});
   _=try loadFrame(&screenL,r,&input,&last,.forms,.{.done=1,.total=whole});
   // the quiet world the sculpt stands on
-  var game=try Game.init(gpa,play.defaultSeed);
+  var game=try Game.init(gpa,null,play.defaultSeed);
   defer game.deinit();
   game.world.io=io;
   game.opts=opts;

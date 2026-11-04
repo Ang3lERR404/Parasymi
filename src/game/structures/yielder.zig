@@ -141,7 +141,7 @@ test"a yielder yields only whole, a fragment each cycle, keeping at most its fil
 test"a petal put down near a core drifts over and merges, one too far waits"{
   // a fresh game, its world streamed in round the gardener
   const gpa=testing.allocator;
-  var g=try lib.play.Game.init(gpa,lib.play.defaultSeed);
+  var g=try lib.play.Game.init(gpa,testing.io,lib.play.defaultSeed);
   defer g.deinit();
   try g.world.stream(g.focus(),2,1000);
   // a core, a petal two tiles off and one far beyond reach

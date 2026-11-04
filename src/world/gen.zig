@@ -9,6 +9,8 @@ const engine=lib.engine;
 const ck=lib.ck;
 /// the test expectations
 const testing=std.testing;
+/// what the tests' sweeps of tiles are allocated from
+const Allocator=std.mem.Allocator;
 /// all the maths: conversions
 const m=engine.core.math;
 /// smooth noise: fractal and ridged
@@ -296,25 +298,73 @@ test"generation is deterministic"{
   try testing.expectEqualSlices(f32,&a.height,&b.height);
   try testing.expectEqualSlices(ck.Kind,&a.kind,&b.kind);
 }
+/// a square of tiles, each one's value worked out once, for the tests that
+/// sweep wide stretches of land and read every tile many times over:
+/// tiles [lo, hi) each way
+const Sweep=struct{
+  /// the westmost (and northmost) tile it holds
+  lo:i32,
+  /// how many tiles across it is
+  w:usize,
+  /// each tile's value, row by row
+  v:[]f32,
+  /// every tile of [lo, hi) each way, its value `of(seed, x, y)`
+  fn init(gpa:Allocator,seed:u64,lo:i32,hi:i32,comptime of:fn(u64,i32,i32)f32)Allocator.Error!Sweep{
+    // tiles across, and the sweep being filled
+    const w:usize=@intCast(hi-lo);
+    const s:Sweep=.{.lo=lo,.w=w,.v=try gpa.alloc(f32,w*w)};
+    for(0..w)|y|for(0..w)|x|{
+      s.v[y*w+x]=of(seed,lo+@as(i32,@intCast(x)),lo+@as(i32,@intCast(y)));
+    };
+    return s;
+  }
+  /// frees its values
+  fn deinit(s:Sweep,gpa:Allocator)void{gpa.free(s.v);}
+  /// tile (x, y)'s value
+  fn at(s:Sweep,x:i32,y:i32)f32{return s.v[@as(usize,@intCast(y-s.lo))*s.w+@as(usize,@intCast(x-s.lo))];}
+};
+/// the levelled terrace of tile (x, y), as a single tile works it out
+fn loneStep(seed:u64,x:i32,y:i32)f32{return Lone.step(.{.seed=seed,.wx=x,.wy=y},0,0);}
+/// one tile's levelled terraces round it, read from a sweep of them
+const InSweep=struct{
+  /// the sweep
+  s:*const Sweep,
+  /// the tile, across
+  x:i32,
+  /// the tile, down
+  y:i32,
+  /// the levelled terrace `dx, dy` tiles off it
+  fn step(t:InSweep,dx:i32,dy:i32)f32{return t.s.at(t.x+dx,t.y+dy);}
+};
 test"no lone tile juts up above its four neighbours"{
   // the lone columns the noise alone would raise, so the test is known to bite
   var raw:usize=0;
-  // a wide stretch of land, its terraces read tile by tile
+  // a wide stretch of land and a tile round it: each tile's noise step, and
+  // its terrace levelled, worked out once
+  // decision: read from sweeps, so each tile is worked out once instead of
+  // once per neighbour that looks at it (the same numbers, far sooner)
+  const steps=try Sweep.init(testing.allocator,1234,-121,121,rawStep);
+  defer steps.deinit(testing.allocator);
+  const lv=try Sweep.init(testing.allocator,1234,-121,121,loneStep);
+  defer lv.deinit(testing.allocator);
+  // the stretch, its terraces read tile by tile
   var y:i32=-120;
   while(y<120):(y+=1){
     // the column being read
     var x:i32=-120;
     while(x<120):(x+=1){
       // the tile's terrace and its four neighbours'
-      const own=stepOf(continentOf(1234,warped(1234,x,y)));
-      const at=levelled(1234,x,y,own);
-      const near=@max(@max(levelled(1234,x-1,y,rawStep(1234,x-1,y)),levelled(1234,x+1,y,rawStep(1234,x+1,y))),@max(levelled(1234,x,y-1,rawStep(1234,x,y-1)),levelled(1234,x,y+1,rawStep(1234,x,y+1))));
+      const own=steps.at(x,y);
+      const at=lv.at(x,y);
+      const near=@max(@max(lv.at(x-1,y),lv.at(x+1,y)),@max(lv.at(x,y-1),lv.at(x,y+1)));
       try testing.expect(at<=near);
-      const rawNear=@max(@max(rawStep(1234,x-1,y),rawStep(1234,x+1,y)),@max(rawStep(1234,x,y-1),rawStep(1234,x,y+1)));
+      const rawNear=@max(@max(steps.at(x-1,y),steps.at(x+1,y)),@max(steps.at(x,y-1),steps.at(x,y+1)));
       if(own>rawNear)raw+=1;
     }
   }
   try testing.expect(raw>0);
+  // the noise step is the continent's, warped, stepped
+  try testing.expectEqual(stepOf(continentOf(1234,warped(1234,7,-3))),steps.at(7,-3));
 }
 test"a chunk eases its terraces just as single tiles do"{
   // a chunk off the origin, generated whole
@@ -330,18 +380,23 @@ test"terraces ease into one another, never a hard step between tiles"{
   // the steepest rise between neighbours: eased, and as the levelled terraces stand
   var steep:f32=0;
   var hard:f32=0;
+  // every levelled terrace the ease reads, each worked out once
+  const s=try Sweep.init(testing.allocator,1234,-80-easeSpan,80+1+easeSpan,loneStep);
+  defer s.deinit(testing.allocator);
+  // a single tile eases the same from them as on its own
+  try testing.expectEqual(eased(Lone,.{.seed=1234,.wx=5,.wy=-9}),eased(InSweep,.{.s=&s,.x=5,.y=-9}));
   var y:i32=-80;
   while(y<80):(y+=1){
     // the column being read
     var x:i32=-80;
     while(x<80):(x+=1){
       // this tile's terrace and the next one's across and down, eased and levelled
-      const at=eased(Lone,.{.seed=1234,.wx=x,.wy=y});
-      const lv=Lone.step(.{.seed=1234,.wx=x,.wy=y},0,0);
+      const at=eased(InSweep,.{.s=&s,.x=x,.y=y});
+      const lv=s.at(x,y);
       inline for(.{.{1,0},.{0,1}})|d|{
-        const next=eased(Lone,.{.seed=1234,.wx=x+d[0],.wy=y+d[1]});
+        const next=eased(InSweep,.{.s=&s,.x=x+d[0],.y=y+d[1]});
         steep=@max(steep,@abs(next-at));
-        hard=@max(hard,@abs(Lone.step(.{.seed=1234,.wx=x,.wy=y},d[0],d[1])-lv));
+        hard=@max(hard,@abs(s.at(x+d[0],y+d[1])-lv));
       }
     }
   }

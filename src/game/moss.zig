@@ -155,7 +155,7 @@ test"a grown creeper turns soaked soil round it to moss, never dry soil"{
   const gpa=std.testing.allocator;
   for([_]f32{0,1})|wetness|{
     // a fresh game, and the tile two right of the wolf
-    var g=try Game.init(gpa,lib.play.defaultSeed);
+    var g=try Game.init(gpa,std.testing.io,lib.play.defaultSeed);
     defer g.deinit();
     const x,const z=m.tileAt(g.player.pos);
     // the ground round it: soil, wet as this case, nothing on it

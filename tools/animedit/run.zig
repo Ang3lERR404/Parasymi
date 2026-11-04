@@ -271,7 +271,7 @@ pub fn main(init:std.process.Init)!void{
     if(!try loadFrame(&screenL,r,&input,&last,.forms,.{.done=renderer.meshProgress(r)[0],.total=whole}))return;
   }
   // the quiet world the subject stands in
-  var game=try Game.init(gpa,play.defaultSeed);
+  var game=try Game.init(gpa,null,play.defaultSeed);
   defer game.deinit();
   game.world.io=io;
   game.opts=opts;

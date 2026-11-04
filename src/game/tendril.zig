@@ -310,7 +310,7 @@ test"a tendril costs a fragment for every two tiles of it"{
 test"a tendril braids, then carries what its start holds to its end, one at a time"{
   // a fresh game, its world streamed in round the gardener
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,lib.play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,lib.play.defaultSeed);
   defer g.deinit();
   try g.world.stream(g.focus(),2,1000);
   // a yielder holding three fragments, a heart five tiles on that takes them

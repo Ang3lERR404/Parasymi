@@ -182,7 +182,7 @@ test"a heart waits bloomed for four petals, then settles and builds a part of te
 test"four buds put down near a bare stem fasten on it, and it becomes the heart"{
   // a fresh game, its world streamed in round the gardener
   const gpa=testing.allocator;
-  var g=try lib.play.Game.init(gpa,lib.play.defaultSeed);
+  var g=try lib.play.Game.init(gpa,testing.io,lib.play.defaultSeed);
   defer g.deinit();
   try g.world.stream(g.focus(),2,1000);
   // a stem, and four buds round it

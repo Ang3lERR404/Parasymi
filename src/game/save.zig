@@ -320,7 +320,7 @@ pub fn decode(gpa:Allocator,data:[]const u8)Error!Game{
   if(!eql(u8,&h.magic,&magic))return error.NotASave;
   if(h.version!=version or h.layout!=layoutFingerprint)return error.IncompatibleSave;
   // a fresh garden from the saved seed, filled in below
-  var g=try Game.init(gpa,h.seed);
+  var g=try Game.init(gpa,null,h.seed);
   errdefer g.deinit();
   g.rng=try r.get(Rng);
   g.sky.tod=try r.get(f32);
@@ -544,7 +544,7 @@ test"a typed name holds only what a file name may, and never the autosave's"{
 test"a garden survives a save round trip"{
   // the test allocator, and a demo garden grown on for three seconds
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   try lib.setups.demo(&g,3);
   // gather from some node so a depleted chunk is stored too

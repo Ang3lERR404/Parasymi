@@ -38,7 +38,7 @@ test"a germinator's panel: choose its seed, put in only what it weaves from, mov
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -111,7 +111,7 @@ test"a click lifts a stack, the next puts it down; dropped on the hotbar it assi
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;
@@ -164,7 +164,7 @@ test"discard throws away a belly stack, hovered or carried, never a structure's"
   // the test allocator, which catches leaks
   const gpa=testing.allocator;
   // a fresh game on the test seed
-  var g=try Game.init(gpa,defaultSeed);
+  var g=try Game.init(gpa,testing.io,defaultSeed);
   defer g.deinit();
   // the screen the clicks land on
   const screen=testScreen;

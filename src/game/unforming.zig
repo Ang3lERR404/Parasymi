@@ -592,7 +592,7 @@ test"the ley lines seal: ley tiles close to soil, their nodes shattering into dr
   const testing=std.testing;
   const gpa=testing.allocator;
   // a fresh game, its world streamed in round the wolf
-  var g=try Game.init(gpa,lib.play.defaultSeed);
+  var g=try Game.init(gpa,std.testing.io,lib.play.defaultSeed);
   defer g.deinit();
   try g.world.stream(g.focus(),2,1000);
   // the chunk the wolf stands in, two of its tiles made a ley line, one bearing a node
@@ -633,7 +633,7 @@ test"learned, the unforming shatters the radiant plants, kills the lineages, evo
   const testing=std.testing;
   const gpa=testing.allocator;
   // a fresh game, its world streamed in round the wolf
-  var g=try Game.init(gpa,lib.play.defaultSeed);
+  var g=try Game.init(gpa,std.testing.io,lib.play.defaultSeed);
   defer g.deinit();
   try g.world.stream(g.focus(),2,1000);
   // the wolf's tile, and the ground round it laid flat with soil

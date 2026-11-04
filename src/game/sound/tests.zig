@@ -5,6 +5,10 @@ const lib=@import("../../lib.zig");
 const std=lib.std;
 /// the test expectations
 const testing=std.testing;
+/// the pool the long listens run side by side on
+const jobs=lib.engine.core.jobs;
+/// how a long listen fails: one of its checks did not hold
+pub const Failed=error{TestUnexpectedResult,TestExpectedEqual};
 /// the generic engine package
 const engine=lib.engine;
 /// all the maths: conversions, the largest counts
@@ -218,7 +222,9 @@ test"the wind is gentle, swells in gusts and whistles only in some"{
   try testing.expect(lo>0.0005 and hi>2*lo);
   try testing.expect(whistled>10 and whistled<400);
 }
-test"the music is silent at night and plays softly by day, on a steady pulse"{
+/// the day's music heard through a night and two minutes of day: silent
+/// at night, soft by day on a steady pulse, resting after the dusk
+fn listenDay()Failed!void{
   // the sounds, with the wind and the night's music hushed
   var s:Sounds=.init(17,testRate);
   s.wind.level=0;
@@ -284,7 +290,9 @@ test"a phrase's second half varies its first, and melody stays in range"{
   // an open chord holds its seventh too (C sharp over Dmaj7)
   try testing.expectEqual(@as(u8,73),chordTone(73,.{.root=0,.seventh=11}));
 }
-test"the night's music is silent by day and plays softly by night: the choir and the strings"{
+/// the night's music heard through a day and two minutes of night: silent
+/// by day, soft by night (the choir and the strings), resting after the dawn
+fn listenNight()Failed!void{
   // the sounds, with the wind and the day's music hushed
   var s:Sounds=.init(23,testRate);
   s.wind.level=0;
@@ -446,20 +454,66 @@ test"the arsthraxia follows as the ear turns"{
   const after=sides(&s,300);
   try testing.expect(after.l>after.r*1.5);
 }
-test"the music, the night and the wind are wide: both sides heard, unlike each other"{
-  // the day's music, the night's, and the wind alone
-  for([_]f32{1,0,-1})|d|{
-    var s:Sounds=.init(35,testRate);
-    if(d>=0){
-      s.wind.level=0;
-      s.apply(.{.daylight=d});
-    }
-    // past their first swell
-    _=sides(&s,1500);
-    const w=sides(&s,3000);
-    try testing.expect(w.l>0 and w.r>w.l*0.5 and w.r<w.l*2);
-    // how alike the two sides are (1 the same, 0 unrelated)
-    const alike=w.shared/@sqrt(w.l*w.r);
-    try testing.expect(alike<0.9);
+/// one of the music, the night and the wind heard on its own past its
+/// first swell (`d` the daylight for a music, below 0 the wind alone):
+/// both sides heard, unlike each other
+fn listenWide(d:f32)Failed!void{
+  var s:Sounds=.init(35,testRate);
+  if(d>=0){
+    s.wind.level=0;
+    s.apply(.{.daylight=d});
   }
+  // past their first swell
+  _=sides(&s,1500);
+  const w=sides(&s,3000);
+  try testing.expect(w.l>0 and w.r>w.l*0.5 and w.r<w.l*2);
+  // how alike the two sides are (1 the same, 0 unrelated)
+  const alike=w.shared/@sqrt(w.l*w.r);
+  try testing.expect(alike<0.9);
+}
+/// the day's music heard wide
+fn listenWideDay()Failed!void{return listenWide(1);}
+/// the night's music heard wide
+fn listenWideNight()Failed!void{return listenWide(0);}
+/// the wind alone heard wide
+fn listenWideWind()Failed!void{return listenWide(-1);}
+/// one long listen: what it checks, and the check
+const Listen=struct{
+  /// what it checks, named as its own test was
+  name:[]const u8,
+  /// the listen itself
+  run:*const fn()Failed!void,
+};
+/// every listen that renders minutes of sound: each stands alone (its own
+/// sounds, its own seed), so they are heard side by side
+const listens=[_]Listen{
+  .{.name="the music is silent at night and plays softly by day, on a steady pulse",.run=listenDay},
+  .{.name="the night's music is silent by day and plays softly by night: the choir and the strings",.run=listenNight},
+  .{.name="the music, the night and the wind are wide: both sides heard, unlike each other (the music)",.run=listenWideDay},
+  .{.name="the music, the night and the wind are wide: both sides heard, unlike each other (the night)",.run=listenWideNight},
+  .{.name="the music, the night and the wind are wide: both sides heard, unlike each other (the wind)",.run=listenWideWind},
+  .{.name="the theme creaks, builds without a break, screams, falls away and blooms again at the landing",.run=lib.sound.unformingTheme.listenTheme},
+};
+/// the long listens run on the pool, each writing what it came to
+const Heard=struct{
+  /// what each listen came to
+  got:[]Failed!void,
+  /// runs listens [lo, hi), telling which failed and where
+  fn run(h:Heard,lo:usize,hi:usize)void{
+    for(lo..hi)|i|{
+      h.got[i]=listens[i].run();
+      if(h.got[i])|_|{}else|e|{
+        std.debug.print("{s}: {t}\n",.{listens[i].name,e});
+        if(@errorReturnTrace())|tr|std.debug.dumpErrorReturnTrace(tr);
+      }
+    }
+  }
+};
+test"the long listens: the music by day, the night's by night, both and the wind wide, the unforming's theme"{
+  // decision: minutes of sound rendered sample by sample were most of the
+  // test run, heard one after another; each listen stands alone, so they
+  // are heard side by side on the pool, every check kept as it was
+  var got:[listens.len]Failed!void=undefined;
+  jobs.each(testing.io,listens.len,1,Heard,.{.got=&got},Heard.run);
+  for(got)|r|try r;
 }

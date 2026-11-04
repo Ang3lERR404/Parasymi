@@ -4,6 +4,8 @@ const lib=@import("../../lib.zig");
 const std=lib.std;
 /// the allocator type the game is built with
 const Allocator=std.mem.Allocator;
+/// the pool the world's chunks are generated on
+const Io=std.Io;
 /// the engine package
 const engine=lib.engine;
 /// all the maths: vectors, tiles, facings
@@ -308,8 +310,9 @@ pub const Game=struct{
   leyDrifts:std.ArrayList(lib.unforming.Drift)=.empty,
   /// a fresh game on world `seed`: the wolf set down on the first fertile
   /// tile found spiralling out from the origin, the chunks round it streamed,
-  /// and the waking messages said.
-  pub fn init(gpa:Allocator,seed:u64)Error!Game{
+  /// and the waking messages said. The chunks are generated on `io`'s pool
+  /// (none: one after another), which the world keeps for its later work.
+  pub fn init(gpa:Allocator,io:?Io,seed:u64)Error!Game{
     // the game being built
     var g:Game=.{
       .gpa=gpa,
@@ -322,6 +325,7 @@ pub const Game=struct{
       .rows=.{.gpa=gpa},
     };
     errdefer g.deinit();
+    g.world.io=io;
     // start on dry land: spiral out from the origin until a fertile tile shows up.
     // the ring being searched (tiles from the origin)
     var r:i32=0;

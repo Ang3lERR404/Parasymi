@@ -33,6 +33,8 @@ const indexOfScalar=std.mem.indexOfScalar;
 const testing=std.testing;
 /// the engine package
 const engine=lib.engine;
+/// the pool the mesh test's games run side by side on
+const jobs=engine.core.jobs;
 /// all the maths: tiles, rings, easing
 const m=engine.core.math;
 /// the chunk grid: tiles, kinds and heights
@@ -680,7 +682,7 @@ test"a loop runs its period, holds its end, then starts again"{
 test"held, the plant shows its state and nothing else grows it"{
   // the test allocator, and a fresh game
   const gpa=testing.allocator;
-  var g=try Game.init(gpa,play.defaultSeed);
+  var g=try Game.init(gpa,testing.io,play.defaultSeed);
   defer g.deinit();
   g.specimen=.{.what=.{.plant=.vesper},.state=.{.held=0.5}};
   try g.specimen.?.sow(&g);
@@ -691,39 +693,65 @@ test"held, the plant shows its state and nothing else grows it"{
   try testing.expectEqual(@as(f32,0.5),g.plants.list.items(.growth)[0]);
   try testing.expectEqual(@as(f32,1),g.plants.list.items(.health)[0]);
 }
-test"a structure alone draws only the meshes it declares"{
-  // the test allocator
-  const gpa=testing.allocator;
-  for(values(st.Kind))|k|for([_]State{.grow,.active})|state|{
-    // a fresh game
-    var g=try Game.init(gpa,play.defaultSeed);
-    defer g.deinit();
-    g.specimen=.{.what=.{.structure=k},.state=state,.period=20};
-    try g.specimen.?.sow(&g);
-    try testing.expectEqual(@as(usize,1),g.structs.list.items.len);
-    // the meshes the structure says it draws, and the parts collector
-    const declared=st.meshes(k);
-    var parts=Parts.init(gpa);
-    defer parts.deinit();
-    // a loop and a half, its pieces looked at four times a second
-    // seconds looked at so far
-    var t:f32=0;
-    while(t<30):(t+=0.25){
-      for(0..@intFromFloat(0.25/play.tickTime))|_|try g.step();
-      parts.clear();
-      for(g.structs.list.items)|*s|{
-        // its centre on the ground
-        const ctr=s.at+m.v3(0,g.heightAt(s.x,s.y),0);
-        try st.emit(s,&parts,ctr,t);
-      }
-      for(parts.lists,0..)|l,slot|if(l.items.len>0){
-        // the mesh this slot's instances belong to
-        const id:meshlib.Id=@enumFromInt(slot/meshgen.lods);
-        if(indexOfScalar(meshlib.Id,declared,id)==null){
-          std.debug.print("{t} emits {t}, not in its `meshes`\n",.{k,id});
-          return error.UndeclaredMesh;
-        }
-      };
+/// one structure kind put down alone in a fresh game and held in `state`
+/// for a loop and a half, its pieces looked at four times a second: an
+/// error if it ever emits a mesh missing from its `meshes`
+fn drawsDeclared(gpa:Allocator,k:st.Kind,state:State)!void{
+  // a fresh game
+  var g=try Game.init(gpa,testing.io,play.defaultSeed);
+  defer g.deinit();
+  g.specimen=.{.what=.{.structure=k},.state=state,.period=20};
+  try g.specimen.?.sow(&g);
+  try testing.expectEqual(@as(usize,1),g.structs.list.items.len);
+  // the meshes the structure says it draws, and the parts collector
+  const declared=st.meshes(k);
+  var parts=Parts.init(gpa);
+  defer parts.deinit();
+  // seconds looked at so far
+  var t:f32=0;
+  while(t<30):(t+=0.25){
+    for(0..@intFromFloat(0.25/play.tickTime))|_|try g.step();
+    parts.clear();
+    for(g.structs.list.items)|*s|{
+      // its centre on the ground
+      const ctr=s.at+m.v3(0,g.heightAt(s.x,s.y),0);
+      try st.emit(s,&parts,ctr,t);
     }
-  };
+    for(parts.lists,0..)|l,slot|if(l.items.len>0){
+      // the mesh this slot's instances belong to
+      const id:meshlib.Id=@enumFromInt(slot/meshgen.lods);
+      if(indexOfScalar(meshlib.Id,declared,id)==null){
+        std.debug.print("{t} emits {t}, not in its `meshes`\n",.{k,id});
+        return error.UndeclaredMesh;
+      }
+    };
+  }
+}
+/// the states every structure is watched in for its meshes
+const watchedStates=[_]State{.grow,.active};
+/// every structure kind in every watched state, each watched on its own
+/// game, the games run side by side
+const DrawsAll=struct{
+  /// what the games are allocated from
+  gpa:Allocator,
+  /// what each watch came to, kinds first then states
+  // decision: anyerror, as each watch fails in whatever way its game does
+  // and only the first failure is raised again
+  got:[]anyerror!void,
+  /// watches kinds and states [lo, hi) of every pairing
+  fn run(d:DrawsAll,lo:usize,hi:usize)void{
+    for(lo..hi)|i|{
+      d.got[i]=drawsDeclared(d.gpa,values(st.Kind)[i/watchedStates.len],watchedStates[i%watchedStates.len]);
+      if(d.got[i])|_|{}else|_|if(@errorReturnTrace())|tr|std.debug.dumpErrorReturnTrace(tr);
+    }
+  }
+};
+test"a structure alone draws only the meshes it declares"{
+  // every pairing of kind and state, and what each came to
+  // decision: the games are independent, so they run on the pool together
+  // (the same watches, the same checks, many times sooner)
+  const n=values(st.Kind).len*watchedStates.len;
+  var got:[n]anyerror!void=undefined;
+  jobs.each(testing.io,n,1,DrawsAll,.{.gpa=testing.allocator,.got=&got},DrawsAll.run);
+  for(got)|r|try r;
 }

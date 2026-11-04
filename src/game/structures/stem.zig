@@ -127,7 +127,7 @@ pub fn icon(ic:iconKit.Icon,col:Color)Allocator.Error!void{
 test"two leaves and a later stem put down near a stem fasten at its joints: a whole sprig"{
   // a fresh game, its world streamed in round the gardener
   const gpa=testing.allocator;
-  var g=try lib.play.Game.init(gpa,lib.play.defaultSeed);
+  var g=try lib.play.Game.init(gpa,testing.io,lib.play.defaultSeed);
   defer g.deinit();
   try g.world.stream(g.focus(),2,1000);
   // the host stem first, then two leaves and a branch stem near it

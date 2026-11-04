@@ -283,12 +283,10 @@ pub fn main(init:Init)!void{
     break:fresh s;
   };
   log.info("world seed 0x{x}",.{world});
-  // the running game, grown from that seed
-  var game=try Game.init(gpa,world);
+  // the running game, grown from that seed, its heavy work (chunks
+  // generated and meshed, plants relinked) split over the pool
+  var game=try Game.init(gpa,io,world);
   defer game.deinit();
-  // the world's heavy work (chunks generated and meshed, plants relinked)
-  // is split over the pool
-  game.world.io=io;
   game.opts=opts;
   game.gpu=.{.samples=r.maxSamples(),.rays=r.ctx.rayTracing};
   // the garden's sound; without a device it plays on in silence

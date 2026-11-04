@@ -1216,7 +1216,10 @@ test"the score runs in time order, the wall climbs to its last chord before it f
   for(wall)|c|try testing.expectEqual(@as(u8,38),c.sing[3]);
   try testing.expect(screamAt<fallAt and screamAt>wallAt(5));
 }
-test"the theme creaks, builds without a break, screams, falls away and blooms again at the landing"{
+/// the theme from its first moment to its end: it creaks, builds without a
+/// break, screams, falls away and blooms again at the landing (heard
+/// beside the other long listens, sound/tests.zig)
+pub fn listenTheme()lib.sound.tests.Failed!void{
   // the theme from its first moment, the loudness (rms) of each half
   // second, of the stage and of her scream
   var th:Theme=.init(0,11,testRate);

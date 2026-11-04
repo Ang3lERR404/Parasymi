@@ -72,10 +72,14 @@ next item from a shared atomic counter (`Growing.Build`, the weld's
 `Shared`), so no core waits on a heavy split; the result is the same.
 
 ### The pool
-- It is `w.io` (`World.io`). Main sets it after `Game.init` and in
-  `restore`. Anything holding the world uses it.
-- `null` runs everything in place. That is what headless tests and
-  `Game.init`'s first stream use.
+- It is `w.io` (`World.io`). `Game.init(gpa,io,seed)` sets it before its
+  first stream (main passes its own, tests `testing.io`); main sets it
+  again in `restore`. Anything holding the world uses it.
+- `null` runs everything in place. That is what a loaded save's first
+  stream and the editors' quiet world use.
+- Tests whose heavy pieces stand alone (the long sound listens, the
+  structure-mesh watch) run them side by side through `jobs.each` on
+  `testing.io`, every check kept, so `zig build test` stays quick.
 
 ### When it is allowed
 Only for work where each index writes only its own outputs, and reads
