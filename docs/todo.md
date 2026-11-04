@@ -12,7 +12,8 @@ carries the game's early days.
   (lumenroot, driftwisp, hollowheart, thornleech, mire lily, moss creeper,
   sap cache, root-digger, gathering crown) beside the newer coined ones
   (astrocyme, heliocyra, halcyra, arsthraxia, vultrixi, nebularbor,
-  monfris). The old names are to be reborn in the new style.
+  monfris). The old names are to be reborn in the new style. A candidate:
+  **halyriphon** for the repurposed driftwisp (not settled).
 - **Balance.** What act 1 plants yield was picked long ago. Lumenroot,
   hollowheart and thornleech all give plain essence; both lineages'
   structures cost the same mix; nothing grows fibre. The shared core
