@@ -69,6 +69,21 @@ carries the game's early days.
 - Whether the light grid's numbers feel right in play
   ([radiant-plants.md](radiant-plants.md)).
 
+### The gardener's first playthrough (2026-11-03)
+*Noted, not started.*
+- **First person, the wrong thing in the sky.** Looking up at something in
+  the sky from the wolf's eyes shows the wrong object.
+- **The sky wants a darker hue** by day; the iridescent beams don't show
+  well against it.
+- **The night sky wants darker hues** too.
+- **The sky jitters** as the day and night tick over.
+- **Light flickers.** The power in the light grid notably flickers; the
+  lenses need a boost.
+- **The wolf weaves only the basics.** By hand it should reach the simple
+  recipes alone, never anything advanced.
+- **The germinator weaves convergent things**, and never should: it is
+  symbiotic, yet it offers every recipe (`craft.all`).
+
 ## Act 3, far off
 *A seed, nothing decided.* Evolved plants in space: the garden at last
 reaching up into the sky it has looked at all along (starlight gathered,
