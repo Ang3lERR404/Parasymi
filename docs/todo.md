@@ -71,16 +71,19 @@ carries the game's early days.
 
 ### The gardener's first playthrough (2026-11-03)
 *Noted, not started.*
-- **First person, the wrong thing in the sky.** Looking up at something in
-  the sky from the wolf's eyes shows the wrong object.
+- **First person, the wrong thing in the sky.** Looking up at a floating
+  plant from the wolf's eyes names the plant growing on the ground right
+  under it instead.
 - **The sky wants a darker hue** by day; the iridescent beams don't show
   well against it.
 - **The night sky wants darker hues** too.
-- **The sky jitters** as the day and night tick over.
-- **Light flickers.** The power in the light grid notably flickers; the
-  lenses need a boost.
-- **The wolf weaves only the basics.** By hand it should reach the simple
-  recipes alone, never anything advanced.
+- **The sky jitters.** The whole sky shakes in a fast jittery motion as day
+  and night pass; likely the day-night transition was never smoothed.
+- **Light flickers.** The light grid's numbers jump around now and then,
+  or some plants reset their state as night turns to day; the lenses need
+  a boost.
+- **The wolf weaves only the basics.** By hand: conduit, sap cache and
+  germinator, nothing else.
 - **The germinator weaves convergent things**, and never should: it is
   symbiotic, yet it offers every recipe (`craft.all`).
 
