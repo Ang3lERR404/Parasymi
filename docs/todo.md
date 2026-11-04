@@ -274,6 +274,11 @@ whorls and bell bloom.
   for good, outside any one garden's save, and can be woven into any later
   garden.
 - **The sleepy flower.** Opens only while the wolf sleeps beside it.
+  *Its look (taken by the gardener, 2026-11-04):* by day an ordinary
+  closed bud. When the wolf lies down near it, it slowly uncurls in time
+  with his breathing, a soft glow inside like a tiny night-light, lasting
+  only while he sleeps (lighting the fog round it, its own colour,
+  shimmering); when he wakes it folds shut before you get a good look.
 - **The copycat.** Grows into the shape of what the wolf stands near most.
 - **The humming bulb.** At night hums the main menu's melody, heard only
   when standing still beside it.
