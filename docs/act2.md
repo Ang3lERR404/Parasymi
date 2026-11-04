@@ -83,5 +83,41 @@ is what the code must come back to.
     the lowest.
 - Accepted: "looks right" (2026-11-02).
 
+## The star caller (being shaped with the gardener, 2026-11-04)
+At the unforming each starlight patch shoots its light into the sky, where
+it becomes stars, and the patch stays dark. The star caller calls it back:
+a grand constellate structure, unlocked by a great deal of research, that
+pulls the stars down into a dark patch. Planned step by step, as the heart
+was; nothing here is built.
+- **Modular, a formation:** constellate modules laid out in a set pattern
+  round the dark patch, and a **key** at its centre that decides what the
+  whole does (the calling key relights the patch; other keys may come
+  later). Inspired by a multiblock with a swappable centre piece; the look
+  is wholly constellate (star-web, plexus fragments, its blue).
+- **It grows in stages** once the formation is complete and the key set,
+  an event watched through a night like the heart's story.
+  1. **Awakening:** the formation links up.
+  2. **Unravelling:** the modules untangle themselves into long strands
+     that rise into the air between the ground and the sky.
+  3. **The weaving:** the strands circle round the patch, and as they spin
+     they weave together into one shape: **a ring of flowing energy, a
+     halo almost**, one half turning clockwise and the other
+     counter-clockwise, constellate flowers blooming among its rungs. Both
+     ways at once: an inner and an outer ring turning against each other,
+     rungs of light between them, and an upper and a lower layer of that
+     turning against each other too.
+  4. **The gathering:** a single petal from each flower drifts to the
+     centre of the halo, more and more of them, until they almost make
+     light; they spin faster and faster, exponentially, as they almost
+     unfurl, but they never combine into one.
+  5. **The beam:** just then light comes down from the heavens into the
+     centre, a faint thin beam at first that quickly intensifies into one
+     condensed beam crashing down into the patch, and the patch relights.
+- **Afterwards everything stays standing:** the formation, the turning
+  halo with its flowers, the petals spinning at its centre and the beam,
+  for as long as the patch is lit.
+- Still to shape: its name, its modules and their pattern, its key, its
+  research and cost, its sound, and the numbers.
+
 ## Not built yet
 In [todo.md](todo.md#act-2).

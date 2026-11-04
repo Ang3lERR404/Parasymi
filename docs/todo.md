@@ -110,8 +110,9 @@ carries the game's early days.
   unforming the starlight patches stay dark on their own (their light,
   shot into the sky, became stars); only this specialized constellate
   plant, unlocked by a high amount of research, brings a patch back, so a
-  patch returns only where the gardener works for it. Its look, name and
-  how it works are to be shaped with the gardener.
+  patch returns only where the gardener works for it. Its shape and its
+  five-stage growth are planned in [act2.md](act2.md#the-star-caller-being-shaped-with-the-gardener-2026-11-04);
+  still to shape: its name, modules, key, research, cost, sound, numbers.
 
 ## Small things
 - **Flags as enums** (the gardener's idea). `main.zig` reads its command
