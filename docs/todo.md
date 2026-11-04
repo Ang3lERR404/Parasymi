@@ -62,6 +62,20 @@ carries the game's early days.
 - Whether the light grid's numbers feel right in play
   ([radiant-plants.md](radiant-plants.md)).
 
+## Lanes and injectors
+*Being designed.* Today a conduit carries one item at a time. Every
+belt-like carrier (conduit, braided conduit, vultrixi tether, the
+constellate tendril; not the sporecasters) is to have **two sides, like
+Factorio's belts, each side a short row of items**.
+- Items are put into a lane by **injector plants**, one per tier, each
+  better than the last.
+- **Base tier:** slow, one item at a time, into the lane it faces, and
+  fixed to that lane.
+- **Every tier above** can switch lanes and reach farther (what mods give
+  Factorio's inserters, here in the game itself).
+- Still to shape: what the symbiotic and parasitic ones do differently at
+  the same tier, what convergent and constellate add, how each looks.
+
 ## Saves that never break
 *Planned, not started.* Today plants, the belly, research, the weave queue
 and wild flowers are saved as raw bytes, so a change to their shape refuses
