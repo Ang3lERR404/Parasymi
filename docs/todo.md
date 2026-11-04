@@ -115,6 +115,14 @@ carries the game's early days.
 ## Playtesting
 - Whether the light grid's numbers feel right in play
   ([radiant-plants.md](radiant-plants.md)).
+- **A playback trail** (the gardener's idea, 2026-11-04): a flag (say
+  `--record=S`) that saves a screenshot every S seconds while the gardener
+  plays normally, into a folder like `shots/` (one subfolder a session),
+  each with a small note beside it of what the game believed (the open
+  panel, where back leads, the last inputs). Claude reads the frames as
+  they land, a semi-live window into a playthrough, so bugs are caught
+  that are too quick to describe. Reuses the `--inspect` shot writing
+  (beside the frames, never stalling them).
 
 ### The gardener's first playthrough (2026-11-03)
 *The rest is mended (the floater looked at, the sky's shaking, the light's
