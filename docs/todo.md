@@ -120,8 +120,9 @@ hues are being chosen from samples.*
   spectrum (red, orange, gold, green, blue, violet), their mirror petals
   turned in, reflecting light back into its lens, so together they make a
   turning rainbow wreath. Gathered from `radiantKit` fragments like every
-  radiant thing, held to the glow bar. Still to settle: its name, its
-  boost, its research and cost.
+  radiant thing, held to the glow bar. Its boost: its solcyriphon's light
+  25% stronger (a starting number, tuned in play). Still to settle: its
+  name, its research and cost.
 - **Relays carry without a cap** (the gardener's word: a cap is too
   punishing). The bloom's 4 glow and the diamond's 16 glow limits go;
   a relay carries all the light it is given, its reach unchanged.
