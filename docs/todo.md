@@ -81,8 +81,10 @@ Factorio's belts, each side a short row of items**.
   it in, lively, never cruel.
 - **Convergent:** the two braided together, a tendril and a feeler taking
   turns, one cupping, one flicking; so faster than either alone.
-- Still to shape: what constellate adds and how it looks; how the base
-  one looks.
+- **Constellate:** picks the kind and the lane and reaches farthest. No
+  arm: a small web unravels the item into fragments that drift into the
+  stream and reform inside the lane.
+- Still to shape: how the base one looks.
 
 ## Saves that never break
 *Planned, not started.* Today plants, the belly, research, the weave queue
