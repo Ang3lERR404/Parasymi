@@ -329,6 +329,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `tendril.zig` — the flow: constellate tendrils (act 2).
 - `text.zig` — every player-facing string, loaded once at startup from `filePath` (`parasymi.cfg`) and never read again.
 - `title.zig` — the main menu's stage: the wolf curled up asleep in a small patch of flowers, centre stage on a dark ground under one warm light, petals…
+- `trail.zig` — `--record[=S]`: a playback trail.
 - `unforming.zig` — THE UNFORMING: the garden's first world event, begun the moment the study of that name is learned.
 - `view.zig` — what gets drawn: turns the game state into a render Scene (plant instances, rigid parts, HUD, sky/fog/light push constants).
 - `weather.zig` — WEATHER: the rain the garden's air rains soaking back into its ground.

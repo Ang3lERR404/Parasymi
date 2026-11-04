@@ -149,6 +149,12 @@ pub fn main(init:Init)!void{
   // turn), `--dist=`, `--pitch=` (degrees) shape it
   var inspect:?orbit.Focus=null;
   var turn:orbit.Orbit=.{};
+  // `--record[=S]`: a shot and a note every S seconds of ordinary play,
+  // into `shots/trail_<time>/` (not with `--inspect`, whose shots win)
+  var trail:?lib.trail.Trail=null;
+  // the trail's folder, once made
+  var trailBuf:[64]u8=undefined;
+  var trailDir:[]const u8="";
   // `--plant=<species>` / `--structure=<kind>` stands it alone (its
   // meshes alone built), `--state=` held or looped (grow, mature, 0.4,
   // 0.2..0.8; plants wither, flow, drain, dark, live; structures idle,
@@ -183,6 +189,8 @@ pub fn main(init:Init)!void{
     if(startsWith(u8,a,"--full="))full=m.clamp01(try parseFloat(f32,a["--full=".len..]));
     if(eql(u8,a,"--inspect"))inspect=.player;
     if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
+    if(eql(u8,a,"--record"))trail=.{};
+    if(startsWith(u8,a,"--record="))trail=.{.every=try parseFloat(f32,a["--record=".len..])};
     if(startsWith(u8,a,"--shots="))turn.shots=try parseInt(u32,a["--shots=".len..],0);
     if(startsWith(u8,a,"--orbit="))turn.period=try parseFloat(f32,a["--orbit=".len..]);
     if(startsWith(u8,a,"--dist="))turn.dist=try parseFloat(f32,a["--dist=".len..]);
@@ -330,6 +338,15 @@ pub fn main(init:Init)!void{
   if(inspect)|f|{
     turn.focus=f;
     Dir.cwd().createDirPath(io,shots)catch|e|log.err("{s}: {t}",.{shots,e});
+  }else if(trail!=null){
+    // the time it began (s since 1970), naming the folder
+    const began=@divFloor(Io.Clock.real.now(io).nanoseconds,std.time.ns_per_s);
+    trailDir=bufPrint(&trailBuf,shots++sepStr++lib.trail.prefix++"{d}",.{began}) catch unreachable;
+    Dir.cwd().createDirPath(io,trailDir)catch|e|{
+      log.err("{s}: {t}",.{trailDir,e});
+      trail=null;
+    };
+    if(trail!=null)log.info("recording a trail into {s}",.{trailDir});
   }
   // the shots still being written apart from the frames, each waited for
   // before the game closes
@@ -439,7 +456,8 @@ pub fn main(init:Init)!void{
     }
     if(!eqlDeep(game.opts,applied))try apply(io,&game,r,&display,&applied);
     // inspecting, the camera turns round the focus and the HUD is hidden
-    const shoot=if(inspect!=null)turn.step(&game,@floatCast(dt))else false;
+    // else a trail asks for one now and then, the HUD kept in it
+    const shoot=if(inspect!=null)turn.step(&game,@floatCast(dt))else if(trail)|*t|t.step(&input,@floatCast(dt))else false;
     // the clock before the simulation, to time it
     const t0=glfw.getTime();
     try game.simulate(dt);
@@ -468,11 +486,25 @@ pub fn main(init:Init)!void{
     game.air=if(r.probed)|p|.{p[0],p[1],p[2]}else null;
     if(game.weather.soak(&game.world,r.field,r.fieldReads))game.prog.discover(.firstRain);
     if(r.shot())|sh|{
-      try snap(gpa,io,sh,&turn,&writing);
+      // the shot's path
+      var pb:[96]u8=undefined;
+      if(inspect!=null){
+        // the focus's name, in `shots/<focus>_<n>.png`
+        var nb:[32]u8=undefined;
+        try snap(gpa,io,sh,bufPrint(&pb,shots++sepStr++"{s}_{d}.png",.{turn.focus.name(&nb),turn.taken}) catch unreachable,&writing);
+        turn.took();
+      }else if(trail)|*t|{
+        // the last shot's task is long done by now: let it go, so a long
+        // play keeps no list of them
+        for(writing.items)|*w|w.await(io);
+        writing.clearRetainingCapacity();
+        try snap(gpa,io,sh,bufPrint(&pb,"{s}"++sepStr++"{d}.png",.{trailDir,t.taken}) catch unreachable,&writing);
+        noteTrail(io,t,&game,trailDir);
+      }
       // (what time taking it still costs is not the world's, so the next
       // frame does not jump: springs would spike, timings slip)
       last=glfw.getTime();
-      if(turn.done())window.setShouldClose(true);
+      if(inspect!=null and turn.done())window.setShouldClose(true);
     }
   }
 }
@@ -500,17 +532,23 @@ const ShotFile=struct{
     log.info("shot {s}",.{f.path});
   }
 };
-/// send a captured frame off to be written as `shots/<focus>_<n>.png`:
-/// copied, then encoded and written on a task of its own beside the frames
-/// (the I/O's, never a thread of ours), so the frame loop never waits on
-/// it; written here if no task can be had
-fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,turn:*orbit.Orbit,writing:*std.ArrayList(Io.Future(void)))Allocator.Error!void{
-  defer turn.took();
-  // buffers for the focus's name and the shot's path
-  var nb:[32]u8=undefined;
+/// writes the trail's note beside its shot, `<dir>/<n>.txt`, and counts
+/// the shot taken (a failure only costs the note)
+// decision: a few hundred bytes, written in the frame rather than on a task
+fn noteTrail(io:Io,t:*lib.trail.Trail,game:*const Game,dir:[]const u8)void{
+  // the note's text, and its path
+  var buf:[1024]u8=undefined;
+  var w:Io.Writer=.fixed(&buf);
   var pb:[96]u8=undefined;
-  // the shot's path, `shots/<focus>_<n>.png`
-  const path=bufPrint(&pb,shots++sepStr++"{s}_{d}.png",.{turn.focus.name(&nb),turn.taken}) catch unreachable;
+  const path=bufPrint(&pb,"{s}"++sepStr++"{d}.txt",.{dir,t.taken}) catch unreachable;
+  t.note(game,&w)catch{};
+  Dir.cwd().writeFile(io,.{.sub_path=path,.data=w.buffered()})catch|e|log.warn("{s}: {t}",.{path,e});
+}
+/// send a captured frame off to be written as `path` (a PNG): copied, then
+/// encoded and written on a task of its own beside the frames (the I/O's,
+/// never a thread of ours), so the frame loop never waits on it; written
+/// here if no task can be had
+fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,path:[]const u8,writing:*std.ArrayList(Io.Future(void)))Allocator.Error!void{
   // room to keep its task, and the frame with its own copies of the pixels and the path
   try writing.ensureUnusedCapacity(gpa,1);
   const px=try gpa.dupe(u8,sh.px);

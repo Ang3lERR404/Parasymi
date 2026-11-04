@@ -117,6 +117,16 @@ rest. The game reads every sculpt at startup, the first 8 by name.
 zig build run -- --sculpt=<name> --inspect=player --shots=3 --orbit=6 --dist=1.6 --pitch=15
 ```
 
+## A playback trail, while the gardener plays
+`--record` (or `--record=S`) leaves the game as it is and saves a shot,
+HUD and all, every S seconds (5 by default) into `shots/trail_<time>/`:
+`<n>.png` beside `<n>.txt`, a note of what the game believed then (the
+mode, where back leads, the camera, the wolf's place, the hotbar, what
+the cursor points at, every action pressed since the last shot). Read
+the newest as they land to watch a playthrough nearly live, and to catch
+a bug too quick to describe: the note says what the game thought, the
+shot what it drew.
+
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.
 

@@ -24,6 +24,7 @@ test{
   _=lib.seeds;
   _=lib.play;
   _=lib.orbit;
+  _=lib.trail;
   _=lib.specimen;
   _=lib.player;
   _=lib.sound;

@@ -116,6 +116,8 @@ pub const hudPicker=@import("game/hud/picker.zig");
 pub const icon=@import("game/icon.zig");
 /// `--inspect`: the camera turning round one thing, taking shots
 pub const orbit=@import("game/orbit.zig");
+/// `--record`: a playback trail, a shot and a note every few seconds of play
+pub const trail=@import("game/trail.zig");
 /// research: what the gardener has understood and what it opens
 pub const progression=@import("game/progression.zig");
 /// what each kind of ground offers when gathered, and how its nodes look
