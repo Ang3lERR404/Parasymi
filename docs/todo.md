@@ -16,7 +16,8 @@ carries the game's early days.
   player-facing strings (`src/cfg/parasymi.cfg`); a code tag is renamed
   only when the gardener says so, through the old-name table
   (`record.renamed`). ~~The driftwisp is **halyriphon** in game~~ (its
-  code tag stays `driftwisp`).
+  code tag stays `driftwisp`). ~~The lumenroot is **lucirhizaphaeroth**
+  in game~~ (code tag `lumenroot`).
 - **Balance.** What act 1 plants yield was picked long ago. Lumenroot,
   hollowheart and thornleech all give plain essence; both lineages'
   structures cost the same mix; nothing grows fibre. The shared core
