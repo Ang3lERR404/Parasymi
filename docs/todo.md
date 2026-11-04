@@ -79,7 +79,10 @@ Factorio's belts, each side a short row of items**.
   curling tendril, cups the item like a leaf holding dew and lays it in
   softly; the parasitic one, a quick pale feeler, snaps it up and flicks
   it in, lively, never cruel.
-- Still to shape: what convergent and constellate add, how each looks.
+- **Convergent:** the two braided together, a tendril and a feeler taking
+  turns, one cupping, one flicking; so faster than either alone.
+- Still to shape: what constellate adds and how it looks; how the base
+  one looks.
 
 ## Saves that never break
 *Planned, not started.* Today plants, the belly, research, the weave queue
