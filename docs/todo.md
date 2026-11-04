@@ -94,7 +94,10 @@ hues are being chosen from samples.*
 - **The diamond's animations are far below the bar.** It never got
   polished motion: its forming, its idle and its light all want bringing
   up to the current standard (the growth and plant quality the rest of
-  the garden holds, and the glow bar: its own colours, shimmering).
+  the garden holds, and the glow bar: its own colours, shimmering). The
+  radiant hearts' wandering cones of coloured light raise the bar further:
+  the diamond, the lattice that gathers four blooms' light and splits it,
+  should split light at least as richly (its halo and projection included).
 
 ## Act 3, far off
 *A seed, nothing decided.* Evolved plants in space: the garden at last
