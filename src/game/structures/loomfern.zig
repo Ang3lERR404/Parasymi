@@ -56,7 +56,7 @@ pub const meshes=.{.germinatorPool,.loomfernSheaf,.loomfernThread};
 /// swaying freely in the breeze
 pub const def:st.Def=.{.item=.loomfern,.lineage=.symbiotic,.size=1,.mesh=.loomfern,.store=true,.grow=5,.sway=0.7,.tall=0.5,.light=.boost,.draws=1,.crown=0.78,.ley=.leaves};
 /// a lithophage grown beside it: the study of woven stone
-pub const meets:st.Meeting=.{.kind=.lithophage,.found=.loomAndStone};
+pub const meets:st.Meeting=.{.kind=.lithophage,.found=.loomAndStone,.into=.weftstone};
 /// seconds a fibre takes unfed
 pub const slow:f32=12;
 /// seconds a fibre takes while fed essence

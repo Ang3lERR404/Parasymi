@@ -22,8 +22,9 @@ a grand garden. The view is 2.5D: a 3D world seen from above.
   hand makes the basics only: a conduit, a sap cache, a germinator
   (`Recipe.basic`, `craft.byHand`).
 - **The germinator is the bootstrap** and the hub of automation. It is
-  woven from fibre, grit and starlight. It weaves every recipe, seeds and
-  bulbs alike (`craft.all`), and lets go only of what it wove itself
+  woven from fibre, grit and starlight. It weaves every recipe of the
+  first lineages, seeds and bulbs alike, never anything convergent
+  (`craft.all`), and lets go only of what it wove itself
   (`craft.woven`).
 - **Always open from the start:** lumenroot and thornleech seeds, conduits,
   sap caches, the germinator. Every other species is gated by research
@@ -182,8 +183,14 @@ plant.
   (`kept` counts per kind).
 - **Monfris** (weftstone + driftbraid, INTERWEAVING): 2×2. It weaves
   everything convergent (by `Def.lineage`: the polyp, weftstone,
-  driftbraid, monfris, Vultrixi; the germinator weaves these too, so the
-  first monfris can be made, never the hands), the arsthraxia once the
+  driftbraid, monfris, Vultrixi; never the germinator nor the hands).
+  The first of each is not woven but **grown together**: once its study is
+  known, a loomfern and a lithophage standing side by side grow back down
+  into each other over 8 s and a weftstone rises where the loomfern stood
+  (a braided conduit and a sporecaster, a driftbraid; a gathering crown and
+  a ganglion, a Vultrixi; a weftstone and a driftbraid, a monfris;
+  `Meeting.into`, `Structures.growTogether`). What the pair held is
+  lost. It also weaves the arsthraxia once the
   unforming has evolved it into a convergent structure (`Def.evolves`), and the
   advanced tier only it weaves
   (`Recipe.advanced`, none yet); together `craft.loomFor`. Never the

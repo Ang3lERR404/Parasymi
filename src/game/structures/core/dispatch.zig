@@ -26,6 +26,10 @@ const Ctx=lib.structures.structure.Ctx;
 const Id=lib.structures.Id;
 /// tiles apart that still count as side by side, for a meeting
 const meetCount=lib.structures.meetCount;
+/// seconds a pair takes to grow together
+const mergeTime=lib.structures.mergeTime;
+/// the structures' registry: every kind's definition
+const st=lib.structures;
 /// the kind a structure meets, and what that reveals
 const Meeting=lib.structures.Meeting;
 /// what one structure tells another
@@ -159,6 +163,91 @@ pub fn meetings(ss:*const Structures,g:*prog.Progression)void{
     }
   }
 }
+/// every pair side by side whose `meets` names what they grow `into`, both
+/// grown and its weave understood, grows together: both grow back down
+/// over `mergeTime` (working no more), then are lifted out and what they
+/// became is put down where the first stood, a sprout that grows up (what
+/// they held is lost). A partner gone, or moved off, leaves the other whole.
+pub fn growTogether(ss:*Structures,gpa:Allocator,w:*World,g:*prog.Progression,dt:f32)Allocator.Error!void{
+  // how far one tick takes a merging pair
+  const step=dt/mergeTime;
+  for(0..ss.list.items.len)|ia|{
+    // the first of the pair, and whom it grows together with
+    const a=&ss.list.items[ia];
+    const mt:Meeting=switch(a.kind()){
+      inline else=>|k|if(comptime reg.has(k,"meets"))reg.module(k).meets else continue,
+    };
+    const into=mt.into orelse continue;
+    if(a.fade>0 and a.merging==0)continue;
+    if(a.grown<1 and a.merging==0)continue;
+    if(!lib.craft.understood(g,st.defs.get(into).item)){
+      a.merging=0;
+      continue;
+    }
+    // its partner: one already growing together with it (as far along), else a fresh one
+    const b=for(ss.list.items,0..)|*b,ib|{
+      if(ib==ia or b.kind()!=mt.kind or gap(a,b)>0)continue;
+      if(b.merging==a.merging and (a.merging>0 or (b.grown>=1 and b.fade==0)))break b;
+    }else{
+      // none: a pair broken apart grows whole again
+      if(a.merging>0){
+        a.merging=0;
+        a.fade=0;
+      }
+      continue;
+    };
+    a.merging=@min(1,a.merging+step);
+    b.merging=a.merging;
+    a.fade=@min(a.merging,0.999);
+    b.fade=a.fade;
+  }
+  // the pairs grown into one: lifted out, their kin put down
+  var k=ss.list.items.len;
+  while(k>0){
+    k-=1;
+    // the first of a pair grown together, and what it became
+    const a=&ss.list.items[k];
+    if(a.merging<1)continue;
+    const mt:Meeting=switch(a.kind()){
+      inline else=>|kk|if(comptime reg.has(kk,"meets"))reg.module(kk).meets else continue,
+    };
+    const into=mt.into orelse continue;
+    // where the first stood, which way it faced, and its seed
+    const x=a.x;
+    const y=a.y;
+    const dir=a.dir;
+    const seed=a.seed;
+    // its partner
+    const ib=for(ss.list.items,0..)|*b,i|{
+      if(i!=k and b.kind()==mt.kind and b.merging>=1 and gap(a,b)==0)break i;
+    }else continue;
+    // what the pair were, for the message
+    const was=.{lib.txt.item(a.def().item).name,lib.txt.item(ss.list.items[ib].def().item).name};
+    // both lifted out (the later first, so the earlier keeps its slot)
+    var first=ss.remove(w,.of(@max(k,ib)));
+    first.deinit(gpa);
+    var second=ss.remove(w,.of(@min(k,ib)));
+    second.deinit(gpa);
+    // what they became, put down nearest where the first stood
+    // (whether it found room, and how far out the search has come)
+    var put=false;
+    var r:i32=0;
+    search:while(r<=mergeReach):(r+=1){
+      // the walk round that ring
+      var it=m.ring(r);
+      while(it.next())|o|if(try ss.place(gpa,w,x+o[0],y+o[1],into,dir,seed)){
+        ss.sprout(.of(ss.list.items.len-1));
+        put=true;
+        break:search;
+      };
+    }
+    if(put)g.say(lib.txt.s.msg.growTogether,.{was[0],was[1],lib.txt.item(st.defs.get(into).item).name});
+    k=@min(k,ss.list.items.len);
+  }
+}
+/// how many tiles out from where the first of a pair stood what they grow
+/// into may be put down, when that is taken
+const mergeReach:i32=3;
 /// every structure notices its neighbours (`link`) without working
 /// (`--structure` holding one still)
 pub fn link(ss:*Structures,gpa:Allocator,w:*World,plants:*Plants,g:*prog.Progression)void{

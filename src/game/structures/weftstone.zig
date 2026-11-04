@@ -57,7 +57,7 @@ const v3=m.v3;
 // decision: its hover is carried by its mesh (`mesh.hover`), so `hover`
 // stays 0 (the preview would lift it twice); breathing bobs it
 /// a driftbraid grown beside it: the study of interweaving
-pub const meets:st.Meeting=.{.kind=.driftbraid,.found=.weftAndDrift};
+pub const meets:st.Meeting=.{.kind=.driftbraid,.found=.weftAndDrift,.into=.monfris};
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.itemPod,.lithophageCrystal,.weftstoneTendril,.weftstoneSpark};
 /// what a weftstone is: grown from its seed, one tile across, a floating

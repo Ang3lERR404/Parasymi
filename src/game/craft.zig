@@ -163,8 +163,10 @@ pub fn handsOf(a:lib.act.Act)[]const u8{
   };
 }
 /// whether a germinator never weaves the weave at `idx`: the advanced tier,
-/// or the hyena's
-pub fn notGerminators(idx:usize)bool{return isAdvanced(idx) or hand[idx].by!=.wolf;}
+/// anything convergent (the gardener's word: the first convergent kin grow
+/// together from their pairs, `Meeting.into`, and a monfris weaves the
+/// rest), or the hyena's
+pub fn notGerminators(idx:usize)bool{return isAdvanced(idx) or hand[idx].lineage()==.convergent or hand[idx].by!=.wolf;}
 /// the seed weaves (indices into `hand`).
 pub const seeds=recipesWhere(isSeedRecipe,true);
 /// every weave but the advanced tier: what a germinator may be set to
@@ -187,6 +189,12 @@ pub const loomEvolved=recipesWhere(isLoomEvolved,true);
 /// what a monfris may be set to as far as the garden has come: more once
 /// the unforming has been.
 pub fn loomFor(g:*const prog.Progression)[]const u8{return if(g.done.contains(.unforming))&loomEvolved else&loom;}
+/// whether the gardener understands what weaving `item` needs (true when
+/// nothing weaves it, or its weave needs no study)
+pub fn understood(g:*const prog.Progression,item:items.Item)bool{
+  for(hand)|r|if(r.out==item)return r.unlocked(g);
+  return true;
+}
 /// whether some weave makes `item` (what a germinator lets go of).
 pub fn woven(item:items.Item)bool{
   for(hand)|r|if(r.out==item)return true;

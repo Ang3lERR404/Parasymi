@@ -91,6 +91,9 @@ pub const Structure=struct{
   /// how far the unforming has taken it, 0 untouched .. 1 gone: it grows
   /// back down as it comes and works no more (game/unforming.zig)
   fade:f32=0,
+  /// how far it has grown together with its partner, 0 apart .. 1 one
+  /// (`Structures.growTogether`): it grows back down as it goes, as fading
+  merging:f32=0,
   /// how it got to face `dir` (R turns it)
   turn:turn.Turn=.{},
   /// what kind it is: the live tag of its state

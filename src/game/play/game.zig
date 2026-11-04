@@ -490,6 +490,7 @@ pub const Game=struct{
     if(g.specimen)|sp|if(sp.lit)|v|for(g.structs.list.items)|*it|{it.lit=v;};
     lib.beamGround.tick(g,tickTime);
     try g.converge.tick(g.gpa,&g.world,&g.plants,&g.structs,&g.prog);
+    try g.structs.growTogether(g.gpa,&g.world,&g.prog,tickTime);
     try lib.moss.creep(g,tickTime);
     g.moss.apply(&g.world);
     try lib.wild.tick(g,tickTime);

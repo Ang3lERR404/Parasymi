@@ -197,6 +197,8 @@ pub const Strings=struct{
     unformingBegins:S="",
     /// the seed of the shattered light fallen to the ground
     seedFalls:S="",
+    /// two structures side by side grown together into their convergent kin
+    growTogether:S="",
     /// a vultrixi is being configured: choose the monfris it feeds
     tetherChoose:S="",
     /// a vultrixi is tethered to the monfris chosen

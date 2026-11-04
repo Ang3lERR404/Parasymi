@@ -219,9 +219,10 @@ test"a germinator weaves structure bulbs as well as seeds, and lets go only what
   // the germinator, and the weave tables
   const id=ss.at(&w,0,0).?;
   const craft=lib.craft;
-  // every weave is on offer, the bulbs too, but the advanced tier, which
-  // only a monfris weaves
-  try testing.expectEqual(craft.hand.len-craft.advanced.len-craft.byHyena.len,recipes(.germinator,&g).len);
+  // every weave is on offer, the bulbs too, but the advanced tier and
+  // anything convergent, which only a monfris weaves
+  for(recipes(.germinator,&g))|r|try testing.expect(craft.hand[r].lineage()!=.convergent and !craft.hand[r].advanced and craft.hand[r].by==.wolf);
+  for(craft.hand,0..)|h,r|if(h.lineage()!=.convergent and !h.advanced and h.by==.wolf)try testing.expect(indexOfScalar(u8,recipes(.germinator,&g),@intCast(r))!=null);
   for(recipes(.monfris,&g))|r|try testing.expect(craft.isLoom(r));
   // a monfris weaves every convergent weave, never a radiant one (the
   // diamond, the vesper seed), and the hands neither
@@ -346,4 +347,55 @@ test"every woven convergent structure is a monfris's to weave, and no radiant on
     if(lin==.convergent)try testing.expect(on);
     if(lin==.radiant)try testing.expect(!on);
   }
+}
+test"a loomfern and a lithophage side by side, woven stone understood, grow together into a weftstone"{
+  // the test allocator, a world with a patch of soil, and the garden on it
+  const gpa=testing.allocator;
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  _=try lib.structures.bench.ground(&w,.{.width=6,.depth=4});
+  var plants:Plants=.{};
+  defer plants.deinit(gpa);
+  var ss:Structures=.{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression=.{};
+  try testing.expect(try ss.place(gpa,&w,1,1,.loomfern,0,0));
+  try testing.expect(try ss.place(gpa,&w,2,1,.lithophage,0,0));
+  // not yet understood: they stay apart, whole
+  try ss.growTogether(gpa,&w,&g,1);
+  try testing.expectEqual(@as(f32,0),ss.get(ss.at(&w,1,1).?).merging);
+  // understood: they grow back down together, then are one weftstone
+  g.done.insert(.wovenStone);
+  try ss.growTogether(gpa,&w,&g,lib.structures.mergeTime/2);
+  try testing.expect(ss.get(ss.at(&w,1,1).?).fade>0);
+  try testing.expect(ss.get(ss.at(&w,2,1).?).fade>0);
+  try ss.growTogether(gpa,&w,&g,lib.structures.mergeTime);
+  try ss.growTogether(gpa,&w,&g,0);
+  try testing.expectEqual(@as(usize,1),ss.list.items.len);
+  try testing.expect(ss.list.items[0].kind()==.weftstone);
+  // a sprout, growing up from where they stood
+  try testing.expect(ss.list.items[0].grown<1);
+}
+test"a pair broken apart while growing together grows whole again"{
+  // the test allocator, a world with a patch of soil, and the garden on it
+  const gpa=testing.allocator;
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  _=try lib.structures.bench.ground(&w,.{.width=6,.depth=4});
+  var plants:Plants=.{};
+  defer plants.deinit(gpa);
+  var ss:Structures=.{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression=.{};
+  g.done.insert(.wovenStone);
+  try testing.expect(try ss.place(gpa,&w,1,1,.loomfern,0,0));
+  try testing.expect(try ss.place(gpa,&w,2,1,.lithophage,0,0));
+  try ss.growTogether(gpa,&w,&g,lib.structures.mergeTime/2);
+  // the lithophage taken up: the loomfern is whole again
+  var gone=ss.remove(&w,ss.at(&w,2,1).?);
+  gone.deinit(gpa);
+  try ss.growTogether(gpa,&w,&g,0.1);
+  const fern=ss.get(ss.at(&w,1,1).?);
+  try testing.expectEqual(@as(f32,0),fern.merging);
+  try testing.expectEqual(@as(f32,0),fern.fade);
 }

@@ -49,7 +49,7 @@ const mesh=lib.gatheringCrown;
 /// builds a three-float vector
 const v3=m.v3;
 /// a ganglion grown beside it: the study of shared nerves
-pub const meets:st.Meeting=.{.kind=.ganglion,.found=.crownAndNerve};
+pub const meets:st.Meeting=.{.kind=.ganglion,.found=.crownAndNerve,.into=.vultrixi};
 /// the library meshes it draws beyond its own (`meshes`: what `--structure` builds)
 pub const meshes=.{.bellyLump,.itemPod,.crownRoot1,.crownRoot2,.crownRoot3,.crownRoot4,.crownRoot5};
 /// what a crown is: grown from its seed, one tile across, a low store

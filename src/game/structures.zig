@@ -357,8 +357,13 @@ pub const lightGrid=hooks.lightGrid;
 /// how many seconds of work a structure does in a tick, by its light
 pub const workTime=hooks.workTime;
 /// another structure (`kind`, most often of the other lineage) that, both grown within
-/// `meetCount` tiles of each other, is witnessed as the discovery `found`
-pub const Meeting=struct{kind:Kind,found:prog.Discovery};
+/// `meetCount` tiles of each other, is witnessed as the discovery `found`;
+/// and, standing side by side once what `into` is woven from is understood,
+/// the two grow together into one `into` (`Structures.growTogether`)
+pub const Meeting=struct{kind:Kind,found:prog.Discovery,into:?Kind=null};
+/// seconds two structures take to grow back down into one another before
+/// what they become rises where they stood
+pub const mergeTime:f32=8;
 /// tiles apart (between footprints) that still count as side by side
 pub const meetCount=3;
 /// per-kind state; the active tag is the structure's kind.

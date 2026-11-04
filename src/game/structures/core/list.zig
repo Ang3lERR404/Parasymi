@@ -315,6 +315,8 @@ pub const Structures=struct{
   pub const insert=lib.structures.dispatch.insert;
   /// witness the lineages' meetings
   pub const meetings=lib.structures.dispatch.meetings;
+  /// pairs side by side growing together into their convergent kin
+  pub const growTogether=lib.structures.dispatch.growTogether;
   /// every structure notices its neighbours
   pub const link=lib.structures.dispatch.link;
   /// `link` with the game's whole context
