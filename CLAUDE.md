@@ -69,7 +69,8 @@ When a change alters what one of these says, update it in the same commit.
   step instead of "next I would…"; stop only for a blocking decision.
 - **Working**: commit `devel` after every verified change (builds,
   tests pass) without asking, and push once 10 commits are waiting
-  unpushed, after the sweep below; never commit `parasymi.sav`; report broken
+  unpushed, after the sweep below (a commit touching only `.md` files
+  never counts); never commit `parasymi.sav`; report broken
   work, don't commit it. Verify visual work in the running game
   (`--plant`/`--structure` + `--inspect` shots, read the PNGs) and say what
   was not checked.
