@@ -482,8 +482,10 @@ pub const Specimen=struct{
       for(meshlib.glows(id))|gl|{
         // the glowing mesh (a name the library lacks: a bug in the sample)
         const mesh=stringToEnum(meshlib.Id,gl.mesh).?;
-        try g.parts.emit(mesh,m.chain(&.{m.translate(at+gl.at),m.scale3(m.splat3(gl.scale))}),.{.phase=seed,.glow=gl.glow,.sway=like.sway,.tall=like.tall,.grown=l.growth});
-        try g.parts.light(at+gl.at,gl.light,gl.reach);
+        // how much of it glows now: all, or as deep as the night is
+        const lit=switch(gl.when){.always=>1,.night=>1-g.sky.daylight()};
+        try g.parts.emit(mesh,m.chain(&.{m.translate(at+gl.at),m.scale3(m.splat3(gl.scale))}),.{.phase=seed,.glow=gl.glow*lit,.sway=like.sway,.tall=like.tall,.grown=l.growth});
+        if(lit>0)try g.parts.light(at+gl.at,gl.light*m.splat3(lit),gl.reach);
       }
     }
   }

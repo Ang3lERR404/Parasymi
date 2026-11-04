@@ -51,21 +51,28 @@ pub const Petal=struct{
   t:f32=1,
   /// the shading role it is drawn with
   part:vertex.Part=.bloom,
+  /// how many rows it is built in, claw to tip (more: a smoother curve, at
+  /// most `maxRows`)
+  rows:usize=defaultRows,
 };
+/// how many rows a petal has, claw to tip, unless it asks for more
+const defaultRows=10;
+/// the most rows a petal may ask for (a lamina's most)
+pub const maxRows=16;
 /// a flower petal: narrow at its claw, broadest past the middle and closing
 /// in a rounded tip, cupped across its width, curving from upright at the
 /// base to open at the tip. A `lamina` (thin, bevelled at its edges); tu.y
 /// runs base to tip.
 pub fn petal(b:*Builder,p:Petal)Allocator.Error!void{
-  // how many rows the petal has, claw to tip
-  const ringCount=10;
+  // how many rows the petal has, claw to tip (as it asks, within reason)
+  const ringCount=@min(@max(p.rows,2),maxRows);
   // straight up, which the petal rises from
   const up=m.v3(0,1,0);
   // the way its width lies, across its facing
   const side=m.norm(m.cross(up,p.out));
   // each row's point along the midline, and the face it cups to
-  var spine:[ringCount]V3=undefined;
-  var nrm:[ringCount]V3=undefined;
+  var spine:[maxRows]V3=undefined;
+  var nrm:[maxRows]V3=undefined;
   spine[0]=p.base;
   for(0..ringCount)|i|{
     // how far along the petal this row is (0 claw .. 1 tip)
@@ -79,10 +86,10 @@ pub fn petal(b:*Builder,p:Petal)Allocator.Error!void{
     nrm[i]=m.norm(m.cross(side,dir));
   }
   // each row's side, half-width, how far its edges lift, and colour
-  var sides:[ringCount]V3=undefined;
-  var ws:[ringCount]f32=undefined;
-  var dish:[ringCount]f32=undefined;
-  var cs:[ringCount]color.Rgba8=undefined;
+  var sides:[maxRows]V3=undefined;
+  var ws:[maxRows]f32=undefined;
+  var dish:[maxRows]f32=undefined;
+  var cs:[maxRows]color.Rgba8=undefined;
   for(0..ringCount)|i|{
     // how far along the petal this row is (0..1)
     const k=m.ratio(i,ringCount-1);
@@ -92,7 +99,7 @@ pub fn petal(b:*Builder,p:Petal)Allocator.Error!void{
     dish[i]=p.cup*ws[i];
     cs[i]=color.mix(p.col,p.tip,k);
   }
-  try lamina(b,.{.spine=&spine,.side=&sides,.face=&nrm,.width=&ws,.dish=&dish,.broad=p.width,.col=&cs,.t=p.t,.part=p.part});
+  try lamina(b,.{.spine=spine[0..ringCount],.side=sides[0..ringCount],.face=nrm[0..ringCount],.width=ws[0..ringCount],.dish=dish[0..ringCount],.broad=p.width,.col=cs[0..ringCount],.t=p.t,.part=p.part});
 }
 /// pollen: the warm gold of an anther
 pub const pollen=color.rgb(0.92,0.72,0.3);

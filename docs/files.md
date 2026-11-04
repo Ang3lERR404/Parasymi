@@ -380,7 +380,7 @@ edit by hand (fix the file's `//!` header and regenerate).
 - `spark.zig` — mesh: SPARK.
 - `sporecaster.zig` — mesh: SPORECASTER.
 - `stage.zig` — meshes: the main menu's stage (game/title.zig).
-- `starlight_catcher.zig` — mesh: STARLIGHT CATCHER (drafts, side by side for the gardener).
+- `starlight_catcher.zig` — mesh: STARLIGHT CATCHER (a draft for the gardener).
 - `storm_spire.zig` — mesh: the storm spire (structures/storm_spire.zig), a kin of the weftstone (convergence kit) that charges the air and strikes the rain…
 - `strange_seed.zig` — mesh: STRANGE SEED.
 - `structure_kit.zig` — the symbiotic lineage's body: shared pieces for grown structures, in the plants' language (a woven root mat they rise from, grown vines with

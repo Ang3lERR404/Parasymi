@@ -1,18 +1,20 @@
-//! mesh: STARLIGHT CATCHER (drafts, side by side for the gardener). the
-//! symbiotic lineage's rooted catcher, rooted beside a starlit patch, a
-//! delicate harvester of the faintest starlight, in the reed's proportions
-//! (the gardener's pick): a low rosette of natural leaves cupped upward
-//! like open hands, a fine woven stalk rising 1.1 m, a thin vine winding a
-//! little way up it, and on top a catcher turned to the sky, stamens in its
-//! heart. The light it gathers shows: beads of it glow in the catcher's
-//! heart and run down the vine to the roots (each draft's `glows`). Three
-//! directions for the catcher on top (`Dish`): a deep sky dish of many fine
-//! petals ringed with hair-fine light-catching filaments; feathery plumes
-//! fanned up out of a small cup like antennae; a cup of broad petals
-//! holding a lens of sap, its rims fringed with dew-tipped hairs. It grows
-//! on a hidden stalk (gfx/growth.zig): roots spread with it, the hands
-//! unfold one by one, the stalk rises, the vine winds up it as it passes,
-//! the catcher opens last, its stamens and hairs after it.
+//! mesh: STARLIGHT CATCHER (a draft for the gardener). the symbiotic
+//! lineage's rooted catcher, rooted beside a starlit patch, a delicate
+//! harvester of the faintest starlight, in the reed's proportions (the
+//! gardener's pick): on its splayed little legs of root (the gardener's
+//! favourite), a low rosette of natural leaves cupped upward like open
+//! hands, a fine woven stalk rising 1.1 m with two small pairs of leaves
+//! along it, a thin vine winding a little way up it, and on top the
+//! catcher (the sky dish and the dew cup in one, the gardener's blend): a
+//! deep, smooth bowl of many fine petals turned to the sky, ringed with
+//! hair-fine bead-tipped filaments reaching up to catch the light, a lens
+//! of amber sap in its heart, dew-tipped hairs over its petals, stamens
+//! round the lens. By night the light it gathers shows: a bead of it glows
+//! in the lens and beads run down the vine to the roots (`glows`, by night
+//! only). It grows on a hidden stalk (gfx/growth.zig): the legs spread with
+//! it, the hands unfold one by one, the stalk rises, its leaf pairs open as
+//! it passes, the vine winds up it, the bowl opens petal by petal, the lens
+//! swells, the stamens and hairs last.
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -28,7 +30,7 @@ const mg=lib.meshgen;
 const pal=lib.palette;
 /// colour conversions, for its own muted greens and star-blues
 const color=engine.core.color;
-/// the structure kit: root mats, resin pods
+/// the structure kit: root mats (its legs), resin pods (its lens)
 const kit=lib.structureKit;
 /// the garden's growth timing: the hidden stalk everything grows along
 const growth=lib.growth;
@@ -42,24 +44,30 @@ const v3=m.v3;
 const handDark=color.rgb(0.1,0.24,0.13).toRgba8(255);
 /// (their tips)
 const handLite=color.rgb(0.32,0.5,0.34).toRgba8(255);
-/// the catcher's tissue: a dusk-grey sage at the base, a pale star-blue at the rim
-const dishBase=color.rgb(0.42,0.5,0.45).toRgba8(255);
+/// the bowl's tissue: a soft sage at the base, a pale star-blue at the rim
+const dishBase=color.rgb(0.3,0.42,0.3).toRgba8(255);
 /// (its rim)
-const dishTip=color.rgb(0.6,0.7,0.92).toRgba8(255);
-/// its fine hairs and plumes: silver-sage
+const dishTip=color.rgb(0.52,0.63,0.86).toRgba8(255);
+/// its fine hairs and filaments: silver-sage
 const hairCol=color.rgb(0.62,0.68,0.66).toRgba8(255);
-/// the beads of gathered light: star-blue
+/// the beads of dew and gathered light: star-blue
 const beadCol=color.rgb(0.6,0.75,1.0).toRgba8(255);
-/// the light its beads throw (linear), and how far
+/// the light its beads throw by night (linear), and how far
 const beadLight=m.V3{0.18,0.3,0.7};
 /// (how far)
 const beadReach:f32=1.6;
 /// how much later each hand and petal opens than the one before (a share of the growth)
 const stagger:f32=0.02;
-/// the reed's proportions: how tall to the catcher, how thick at its foot
+/// the reed's proportions: how tall to the bowl, how thick at its foot
 const tall:f32=1.1;
 /// (how thick)
 const girth:f32=0.018;
+/// how many legs of root it stands on, how far they splay, how thick
+const legs=7;
+/// (how far)
+const legReach:f32=0.3;
+/// (how thick)
+const legGirth:f32=0.02;
 /// how many hands ring the foot, how long and wide each, how steeply it rises
 const hands=7;
 /// (how long)
@@ -68,36 +76,58 @@ const handLen:f32=0.24;
 const handWide:f32=0.09;
 /// (how steeply)
 const handRise:f32=0.95;
+/// where up the stalk its leaf pairs sit (shares of it), and how long the leaves are
+const nodes=[_]f32{0.32,0.52};
+/// (how long)
+const nodeLeaf:f32=0.08;
 /// how far up the stalk the vine winds (a share), how many times round
 const vineTop:f32=0.62;
 /// (how many turns)
 const vineTurns:f32=2.4;
 /// points the vine's spiral is laid through
 const vinePts=16;
-/// how many beads of light run down the vine to the roots
-const beadsDown=5;
 /// the vine's turn, from the side of the stalk it starts on
 const vineStart:f32=0.7;
-/// the catcher on top: which direction
-pub const Dish=enum{
-  /// a deep bowl of many fine petals ringed with light-catching hairs
-  sky,
-  /// feathery plumes fanned up out of a small cup, like antennae
-  plume,
-  /// broad cupped petals holding a lens of sap, fringed with dew-tipped hairs
-  dew,
+/// how many beads of light run down the vine to the roots by night
+const beadsDown=5;
+/// the bowl: how many petals, how long each, how wide (a share of its
+/// length), how steeply they rise, how far they flare, how deeply each cups
+/// and how many rows each is built in (smooth, never faceted)
+const petals=18;
+/// (how long)
+const petalLen:f32=0.27;
+/// (how wide)
+const petalWide:f32=0.3;
+/// (how steeply)
+const petalRise:f32=0.42;
+/// (how far they flare)
+const petalFlare:f32=0.08;
+/// (how deeply each cups)
+const petalCup:f32=0.18;
+/// (how many rows)
+const petalRows=16;
+/// its rim's filaments: how many, and how long (at the least, and how much more)
+const filaments=24;
+/// (how long)
+const filamentLen=m.Vice(f32,2){0.09,0.035};
+/// the dew-tipped hairs over each petal, and how long
+const dewHairs=2;
+/// (how long)
+const dewLen:f32=0.035;
+/// the lens of sap in its heart: how high its middle sits over the bowl's
+/// heart and its half-sizes
+const lensHigh:f32=0.05;
+/// (its half-sizes)
+const lensR=v3(0.075,0.035,0.075);
+/// the catcher, as a library mesh, its beads glowing by night
+pub const blend=struct{
+  /// builds it: legs, hands, stalk, leaf pairs, vine and bowl on one growth skeleton
+  pub fn build(b:*mg.Builder)Allocator.Error!void{try catcher(b);}
+  /// its beads of gathered light: in the lens and down the vine, by night
+  pub const glows:[]const Glow=&beadsOf();
 };
-/// the catcher with dish `d`, as a library mesh, its beads glowing
-pub fn Look(comptime d:Dish)type{
-  return struct{
-    /// builds it: roots, hands, stalk, vine and the catcher on one growth skeleton
-    pub fn build(b:*mg.Builder)Allocator.Error!void{try catcher(b,d);}
-    /// its beads of gathered light: in the catcher's heart and down the vine
-    pub const glows:[]const Glow=&beadsOf(d);
-  };
-}
 /// mesh: CATCHER BEAD. a bead of gathered starlight, a unit across, soft
-/// star-blue; the catcher's drafts glow it in their hearts and down their vines
+/// star-blue; the catcher glows it in its lens and down its vine by night
 pub const bead=struct{
   /// builds the bead: a smooth ball
   pub fn build(b:*mg.Builder)Allocator.Error!void{
@@ -108,46 +138,37 @@ pub const bead=struct{
 const stalkCtrl=[_]V3{v3(0,-0.03,0),v3(0.012,tall*0.35,-0.006),v3(-0.01,tall*0.7,0.008),v3(0,tall,0)};
 /// a point of the vine's spiral, `u` of the way up it (0..1), off the stalk
 fn vineAt(u:f32)V3{
-  // how far round and up it is
+  // how far round and up it is, and how far out from the stalk
   const a=u*vineTurns*m.tau+vineStart;
   const h=u*vineTop*tall+0.02;
-  // the stalk there (a straight line through its ends is near enough for
-  // the beads; the vine itself follows the real spline)
   const r=girth*1.6+0.01;
   return v3(@cos(a)*r,h,@sin(a)*r);
 }
-/// the beads of light for dish `d`: one in the catcher's heart, and
-/// `beadsDown` down the vine to its foot
-fn beadsOf(comptime d:Dish)[1+beadsDown]Glow{
+/// the beads of light by night: one in the lens, and `beadsDown` down the vine to its foot
+fn beadsOf()[1+beadsDown]Glow{
   // the beads, filled in
   var gs:[1+beadsDown]Glow=undefined;
-  // the heart: how high it sits in the catcher, and how big
-  const heart:f32=switch(d){.sky=>0.04,.plume=>0.04,.dew=>0.07};
-  const size:f32=switch(d){.sky=>0.03,.plume=>0.018,.dew=>0.04};
-  gs[0]=.{.mesh="catcherBead",.at=v3(0,tall+heart,0),.scale=size,.glow=1.4,.light=beadLight*m.splat3(1.4),.reach=beadReach*1.5};
+  gs[0]=.{.mesh="catcherBead",.at=v3(0,tall+lensHigh,0),.scale=0.032,.glow=1.4,.light=beadLight*m.splat3(1.4),.reach=beadReach*1.5,.when=.night};
   for(0..beadsDown)|i|{
     // how far down the vine it is, smaller as it sinks
     const u=1-m.ratio(i+1,beadsDown+1);
-    gs[1+i]=.{.mesh="catcherBead",.at=vineAt(u),.scale=0.008+0.006*u,.glow=0.9,.light=beadLight*m.splat3(0.35),.reach=beadReach*0.6};
+    gs[1+i]=.{.mesh="catcherBead",.at=vineAt(u),.scale=0.008+0.006*u,.glow=0.9,.light=beadLight*m.splat3(0.35),.reach=beadReach*0.6,.when=.night};
   }
   return gs;
 }
-/// the catcher with dish `d`
-fn catcher(b:*mg.Builder,d:Dish)Allocator.Error!void{
+/// the catcher
+fn catcher(b:*mg.Builder)Allocator.Error!void{
   // the growth skeleton everything below is hung on
   var k=growth.Skeleton.begin(b);
-  // the catcher's heart, at the stalk's top
+  // the bowl's heart, at the stalk's top
   const top=v3(0,tall,0);
   const stalk=k.trunk(&stalkCtrl,.{.pace=1.4});
-  try kit.rootMat(b,7,0.3,0.02,0x5C10,.{.k=&k,.id=stalk});
+  try kit.rootMat(b,legs,legReach,legGirth,0x5C10,.{.k=&k,.id=stalk});
   try rosette(b,&k,stalk);
   try k.braid(b,stalk,.{.girth=girth,.tip=0.6,.strands=4,.twist=3.2,.wobble=pal.strandWobble,.seed=0x5C11,.core=pal.core,.strand=pal.vine});
+  try leafPairs(b,&k,stalk);
   try vine(b,&k,stalk);
-  switch(d){
-    .sky=>try skyDish(b,&k,stalk,top),
-    .plume=>try plumes(b,&k,stalk,top),
-    .dew=>try dewCup(b,&k,stalk,top),
-  }
+  try bowl(b,&k,stalk,top);
   k.finish(b);
 }
 /// the hands: natural leaves round the foot, each its own size, held up
@@ -175,8 +196,25 @@ fn rosette(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id)Allocator.Error!void
     try k.on(b,s,stalk,0.08+0.04*m.f(i),.{.from=base});
   }
 }
+/// the stalk's leaf pairs: at each node two small natural leaves either
+/// side of it, each pair turned a quarter round from the last, opening as
+/// the stalk's front passes
+fn leafPairs(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id)Allocator.Error!void{
+  for(nodes,0..)|u,n|{
+    // the node, and the way the pair faces
+    const at=k.point(stalk,u);
+    const a=m.f(n)*m.pi*0.5+0.3;
+    for([_]f32{0,m.pi})|turn|{
+      // this leaf: out from the stalk and a little up
+      const dir=m.norm(v3(@cos(a+turn),0.55,@sin(a+turn)));
+      const s=b.mark();
+      try mg.natural(b,at,dir,nodeLeaf*(1-0.2*m.f(n)),nodeLeaf*0.38,0.4,handDark,handLite,0.6,.stalked);
+      try k.on(b,s,stalk,u,.{.from=at});
+    }
+  }
+}
 /// the vine: a thread-thin tendril winding up the stalk from its foot,
-/// tapering to a point, tiny leaves along it (its beads glow over it)
+/// tapering to a point, tiny leaves along it (its beads glow over it by night)
 fn vine(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id)Allocator.Error!void{
   // its spiral round the stalk
   var c:[vinePts]V3=undefined;
@@ -193,10 +231,11 @@ fn vine(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id)Allocator.Error!void{
     try k.on(b,s,id,u,.{.from=at});
   }
 }
-/// hairs: `n` hair-fine filaments rising from `from` points, each tipped
-/// with a tiny bead, grown on the stalk's end after the catcher opens
+/// a hair-fine filament rising from `from` along `way`, `len` long,
+/// bending a little outward as it rises, tipped with a bead, grown on the
+/// stalk's end `delay` after it is done
 fn hair(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,from:V3,way:V3,len:f32,delay:f32)Allocator.Error!void{
-  // the hair's points, bending a little outward as it rises, and their stamps and radii
+  // the hair's points, their stamps and radii
   var p:[6]V3=undefined;
   var ts:[6]f32=undefined;
   var rs:[6]f32=undefined;
@@ -211,94 +250,38 @@ fn hair(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,from:V3,way:V3,len:f32,
   try mg.ellipsoid(b,.{.center=p[5],.radii=v3(0.0035,0.0035,0.0035),.col=beadCol,.part=.bloom,.rings=4,.segs=6,.t=1});
   try k.on(b,s,stalk,1,.{.from=from,.delay=delay});
 }
-/// stamens in the catcher's heart, standing last of all
-fn heartStamens(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,top:V3,len:f32,delay:f32)Allocator.Error!void{
-  const s=b.mark();
-  try mg.stamens(b,.{.heart=top+v3(0,0.008,0),.axis=v3(0,1,0),.n=11,.len=len,.r=0.0022,.anther=0.01,.lean=0.35,.arch=0.4,.col=handLite,.seed=0x5C12});
-  try k.on(b,s,stalk,1,.{.from=top,.delay=delay});
-}
-/// the sky dish: a deep bowl of many fine petals turned to the sky, a ring
-/// of hair-fine filaments round its rim reaching up to catch the light
-fn skyDish(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,top:V3)Allocator.Error!void{
-  // how many petals, and how long each
-  const n=18;
-  const len:f32=0.27;
-  for(0..n)|i|{
-    const a=(m.f(i)+0.5*m.f(i%2))/n*m.tau;
+/// the bowl: a deep, smooth dish of fine petals turned to the sky, opening
+/// one by one, a ring of bead-tipped filaments round its rim reaching up,
+/// dew-tipped hairs over its petals, a lens of amber sap swelling in its
+/// heart, stamens round the lens last of all
+fn bowl(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,top:V3)Allocator.Error!void{
+  // the lens, swelling as the bowl opens
+  const lens=b.mark();
+  try kit.resinPod(b,top+v3(0,lensHigh,0),lensR,10,14);
+  try k.on(b,lens,stalk,1,.{.from=top,.delay=0.04});
+  for(0..petals)|i|{
+    // its bearing round the bowl: the odd ones nudged half a step round, a little shorter
+    const a=(m.f(i)+0.5*m.f(i%2))/petals*m.tau;
+    const len=petalLen*(0.92+0.08*m.f(i%2));
     const s=b.mark();
-    try mg.petal(b,.{.base=top,.out=v3(@cos(a),0,@sin(a)),.len=len*(0.92+0.08*m.f(i%2)),.width=len*0.2,.rise=0.42,.flare=0.08,.cup=0.35,.col=dishBase,.tip=dishTip,.part=.bloom});
+    try mg.petal(b,.{.base=top,.out=v3(@cos(a),0,@sin(a)),.len=len,.width=len*petalWide,.rise=petalRise,.flare=petalFlare,.cup=petalCup,.col=dishBase,.tip=dishTip,.part=.bloom,.rows=petalRows});
     try k.on(b,s,stalk,1,.{.from=top,.delay=0.02+stagger*0.5*m.f(i)});
-  }
-  for(0..24)|i|{
-    // a hair rising from the rim, leaning outward
-    const a=m.ratio(i,24)*m.tau+0.13;
-    const rim=top+v3(@cos(a)*len*0.85,len*0.42,@sin(a)*len*0.85);
-    try hair(b,k,stalk,rim,m.norm(v3(@cos(a)*0.35,1,@sin(a)*0.35)),0.09+0.035*@abs(@sin(m.f(i)*2.3)),0.1+0.006*m.f(i));
-  }
-  try heartStamens(b,k,stalk,top,0.05,0.12);
-}
-/// plumes: a small cup, and out of it feathery plumes fanned up like
-/// antennae, each a fine rachis with tiny leaflets along both sides
-fn plumes(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,top:V3)Allocator.Error!void{
-  for(0..7)|i|{
-    // the cup's petals
-    const a=m.ratio(i,7)*m.tau;
-    const s=b.mark();
-    try mg.petal(b,.{.base=top,.out=v3(@cos(a),0,@sin(a)),.len=0.07,.width=0.03,.rise=0.8,.flare=0.3,.cup=0.6,.col=dishBase,.tip=dishTip,.part=.bloom});
-    try k.on(b,s,stalk,1,.{.from=top,.delay=0.02+stagger*m.f(i)});
-  }
-  for(0..6)|i|{
-    // a plume: its bearing, its lean out from upright, its length
-    const a=m.ratio(i,6)*m.tau+0.3;
-    const lean:f32=0.55+0.15*@sin(m.f(i)*1.7);
-    const len:f32=0.26+0.05*@cos(m.f(i)*2.1);
-    // its rachis, curving outward as it rises
-    var p:[8]V3=undefined;
-    var ts:[8]f32=undefined;
-    var rs:[8]f32=undefined;
-    for(&p,&ts,&rs,0..)|*q,*t,*r,j|{
-      const u=m.ratio(j,7);
-      const l=lean*u;
-      q.*=top+v3(@cos(a)*@sin(l)*len*u,@cos(l)*len*u,@sin(a)*@sin(l)*len*u);
-      t.*=1;
-      r.*=0.0025*(1-0.7*u)*m.smooth(m.clamp01(u*5));
-    }
-    const s=b.mark();
-    try b.tubeR(&p,&ts,&rs,hairCol,.stem,4);
-    for(1..7)|j|{
-      // a pair of leaflets either side of the rachis, shorter toward its tip
-      const at=p[j];
-      const side=m.norm(v3(-@sin(a),0,@cos(a)));
-      for([_]f32{-1,1})|sd|{
-        try mg.petal(b,.{.base=at,.out=side*m.splat3(sd),.len=0.04*(1-m.ratio(j,9)),.width=0.007,.rise=0.5,.flare=0.2,.cup=0.3,.col=hairCol,.tip=dishTip,.part=.leaf});
-      }
-    }
-    try mg.ellipsoid(b,.{.center=p[7],.radii=v3(0.005,0.005,0.005),.col=beadCol,.part=.bloom,.rings=4,.segs=6,.t=1});
-    try k.on(b,s,stalk,1,.{.from=top,.delay=0.08+0.02*m.f(i)});
-  }
-  try heartStamens(b,k,stalk,top,0.045,0.14);
-}
-/// the dew cup: broad petals cupped deep round a lens of sap, each rim
-/// fringed with fine hairs tipped with beads of dew
-fn dewCup(b:*mg.Builder,k:*growth.Skeleton,stalk:growth.Id,top:V3)Allocator.Error!void{
-  // the lens of sap in its heart, swelling as it opens
-  const pod=b.mark();
-  try kit.resinPod(b,top+v3(0,0.05,0),v3(0.08,0.04,0.08),10,14);
-  try k.on(b,pod,stalk,1,.{.from=top});
-  // how many petals, and how long each
-  const n=9;
-  const len:f32=0.23;
-  for(0..n)|i|{
-    const a=(m.f(i)+0.5*m.f(i%2))/n*m.tau;
-    const s=b.mark();
-    try mg.petal(b,.{.base=top,.out=v3(@cos(a),0,@sin(a)),.len=len,.width=len*0.48,.rise=0.95,.flare=0.45,.cup=0.75,.col=dishBase,.tip=dishTip,.part=.bloom});
-    try k.on(b,s,stalk,1,.{.from=top,.delay=0.03+stagger*m.f(i)});
-    for(0..4)|j|{
-      // a dew-tipped hair along its rim, leaning out
-      const e=a+(m.ratio(j,3)-0.5)*0.5;
-      const rim=top+v3(@cos(e)*len*0.55,len*0.78,@sin(e)*len*0.55);
-      try hair(b,k,stalk,rim,m.norm(v3(@cos(e)*0.7,1,@sin(e)*0.7)),0.035+0.01*m.f(j%2),0.1+0.004*m.f(i*4+j));
+    for(0..dewHairs)|j|{
+      // a dew-tipped hair standing off the petal's face, part way out
+      const out=0.45+0.25*m.f(j);
+      const e=a+(m.f(j)-0.5)*0.12;
+      const at=top+v3(@cos(e)*len*out*@cos(petalRise),len*out*@sin(petalRise)+0.004,@sin(e)*len*out*@cos(petalRise));
+      try hair(b,k,stalk,at,m.norm(v3(@cos(e)*0.2,1,@sin(e)*0.2)),dewLen*(0.8+0.4*m.f(j)),0.1+0.004*m.f(i*dewHairs+j));
     }
   }
-  try heartStamens(b,k,stalk,top+v3(0,0.03,0),0.04,0.14);
+  for(0..filaments)|i|{
+    // a filament rising from the rim, leaning outward
+    const a=m.ratio(i,filaments)*m.tau+0.13;
+    const rim=top+v3(@cos(a)*petalLen*0.85,petalLen*petalRise,@sin(a)*petalLen*0.85);
+    try hair(b,k,stalk,rim,m.norm(v3(@cos(a)*0.35,1,@sin(a)*0.35)),filamentLen[0]+filamentLen[1]*@abs(@sin(m.f(i)*2.3)),0.1+0.006*m.f(i));
+  }
+  // the stamens, standing round the lens last of all
+  const s=b.mark();
+  try mg.stamens(b,.{.heart=top+v3(0,lensHigh,0),.axis=v3(0,1,0),.n=11,.len=0.055,.r=0.0022,.anther=0.01,.lean=0.6,.arch=0.4,.col=handLite,.seed=0x5C12});
+  try k.on(b,s,stalk,1,.{.from=top,.delay=0.14});
 }

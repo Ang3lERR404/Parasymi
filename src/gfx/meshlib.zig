@@ -21,7 +21,7 @@ const mg=lib.meshgen;
 const m=engine.core.math;
 /// the engine's registry: one module per thing, an enum over them
 const registry=engine.core.registry;
-/// the rooted starlight catcher's drafts, each its own proportions
+/// the rooted starlight catcher's draft and its beads of light
 const starlightCatcher=@import("meshes/starlight_catcher.zig");
 /// every library mesh, one member each, in draw order: translucent ones
 /// after what they cover (the registry's order is the draw order)
@@ -386,12 +386,8 @@ const parts=struct{
   pub const polypHanging=@import("meshes/polyp.zig").hanging;
   /// a mixed look for the polyp: a colony of slender hydras on the fleshy mound
   pub const polypHydras=@import("meshes/polyp_hydra.zig").colony;
-  /// a draft for the rooted starlight catcher: a deep sky dish of fine petals ringed with light-catching hairs
-  pub const catcherSky=starlightCatcher.Look(.sky);
-  /// a draft for the rooted starlight catcher: feathery plumes fanned up out of a small cup
-  pub const catcherPlume=starlightCatcher.Look(.plume);
-  /// a draft for the rooted starlight catcher: a cup of broad petals round a lens of sap, dew-tipped hairs
-  pub const catcherDew=starlightCatcher.Look(.dew);
+  /// a draft for the rooted starlight catcher: the sky dish and the dew cup in one, on its little legs
+  pub const catcherBlend=starlightCatcher.blend;
   /// a bead of gathered starlight, glowing in a catcher draft's heart and down its vine
   pub const catcherBead=starlightCatcher.bead;
   /// a mixed look for the polyp: the hydra opening into its mouth disc, crowned with its feathery tentacles
@@ -446,6 +442,15 @@ pub const Glow=struct{
   light:m.V3,
   /// how far that light reaches
   reach:f32,
+  /// when it glows: always, or only as deep as the night is
+  when:GlowWhen=.always,
+};
+/// when a sample's glowing piece glows
+pub const GlowWhen=enum{
+  /// day and night alike
+  always,
+  /// only by night, as deep as the night is (light gathered from the stars)
+  night,
 };
 /// the key mesh `id` blends into (its `next`, by name; none: null): a bud's
 /// next shape as it opens, built after it, vertex for vertex alike
