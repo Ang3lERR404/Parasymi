@@ -19,6 +19,14 @@ carries the game's early days.
   structures cost the same mix; nothing grows fibre. The shared core
   resources (grit, fibre, ley shard, starlight, essence) stay for every
   lineage; lineage materials may sit on top.
+- **A balance tool** (the gardener's idea). A tool of its own
+  (`zig build balance`, in `tools/`, never part of `zig build test`,
+  which is slow enough already) that works out what everything is truly
+  worth: the simplest matter gets a base value, everything else its
+  recipe's sum (inputs, growing time, light), and every yield and cost is
+  set against it. It prints a sheet and flags what is far too cheap or
+  dear. It checks, never sets: the gardener still picks the numbers, and
+  it catches what a changed recipe breaks.
 - **Starlight.** Light gathered *from* the stars, not stars falling (the
   falling motes and `Starfall` go). Starlit patches spawn where it is
   strongest, beside the ley lines (which gain patches too). By day a patch
