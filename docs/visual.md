@@ -110,6 +110,14 @@ the screen's size and laid over it edge-aware (engine `render/volume.zig`).
   the solcyriphon's night beam and the heliocyras' strips
   each cast a soft haze into the fog round them, brighter in the mist,
   faint in clear air (`partsAir`, docs/architecture.md).
+- **The glow bar** (a standing rule, the gardener's, 2026-11-04): every
+  light, glow, beam and core keeps its own colour, never burnt out to
+  white (no heavy mixing toward white, nothing so far past full
+  brightness that tonemap and bloom clip it white; the pale gold shafts
+  set it). And it shimmers, never sits still: a shimmering light reads
+  angelic and mythical, a still one like a lamp; radiant light shimmers
+  with the rainbow drifting through it. New lights meet both; older ones
+  are brought up to them.
 - **The constellate tendril:** a braid of fragments flowing along it like
   a stream; how the plexus web makes it, with every number, is in
   [tendril.md](tendril.md).
