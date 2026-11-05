@@ -63,13 +63,22 @@ carries the game's early days.
   in the pool bed, growing fibre stalks, and at their feet the convergent
   lineage's pink flowers on lily pads, harvesting the fibre. Never a
   loomfern that lives through the unforming: that is the arsthraxia's
-  alone.
+  alone. *Its name* (the gardener, 2026-11-05): **Lincalamnenypherohiem**
+  (lin- flax, calam- reed, nem- thread, nymph- water lily, hiem- winter).
 - **The parasitic side.** It has one species and three structures; it needs
-  more. One parasitic structure could live through the unforming by
-  becoming convergent, mirroring the arsthraxia (the Pulse, a mimosa-like
-  heart, was proposed).
+  more. *Decided* (the gardener, 2026-11-05: "yes, pulse"): **the Pulse**,
+  a mimosa-like heart, is the parasitic structure that lives through the
+  unforming by becoming convergent, mirroring the arsthraxia. *Its role:*
+  it quickens (plants within its beat's reach grow faster, a pace-setter)
+  and it flinches like a mimosa (when something harms the garden nearby it
+  snaps shut and guards it). It pumps no items: the injectors do that.
+  Still to shape: what counts as harm; more may follow.
 - **The loss should sting.** The more act 1's plants helped, the harder
-  their death at the unforming should hit.
+  their death at the unforming should hit. *The shaped answer* (the
+  gardener, 2026-11-05): after the unforming, faint ghost outlines of the
+  gardener's old plants linger where they stood and fade over a day (the
+  more a plant helped, the longer or clearer it lingers); and what leaned
+  on act 1's plants falters until it is rebuilt. Not built yet.
 
 ## Act 2
 *Underway.* See [act2.md](act2.md).
@@ -219,8 +228,10 @@ hues are being chosen from samples.*
   turned in, reflecting light back into its lens, so together they make a
   turning rainbow wreath. Gathered from `radiantKit` fragments like every
   radiant thing, held to the glow bar. Its boost: its solcyriphon's light
-  25% stronger (a starting number, tuned in play). Still to settle: its
-  name, its research and cost.
+  25% stronger (a starting number, tuned in play). *Its name* (the
+  gardener, 2026-11-05): **Iridauxlariphon** (irid- rainbow, aux-
+  strengthen, -iphon the radiant ending). Still to settle: ~~its name~~,
+  its research and cost.
 - ~~**Relays carry without a cap**~~ done: blooms and diamonds carry all they are given (`species.uncapped`), reach unchanged. (the gardener's word: a cap is too
   punishing). The bloom's 4 glow and the diamond's 16 glow limits go;
   a relay carries all the light it is given, its reach unchanged.
