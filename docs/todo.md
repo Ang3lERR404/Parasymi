@@ -72,7 +72,13 @@ carries the game's early days.
   it quickens (plants within its beat's reach grow faster, a pace-setter)
   and it flinches like a mimosa (when something harms the garden nearby it
   snaps shut and guards it). It pumps no items: the injectors do that.
-  Still to shape: what counts as harm; more may follow.
+  ~~Still to shape: what counts as harm~~ *shaped* (the gardener chose
+  both): **drought**, when the ground near it dries it snaps shut and
+  holds its moisture, slowing the withering round it until rain returns
+  (as a real mimosa folds to save water); and **the wolf's touch**,
+  brushing past it folds it for a moment, pure charm with no game effect
+  ("it's nice for a game to have personality behind it, all the little
+  things count"). More may follow.
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
