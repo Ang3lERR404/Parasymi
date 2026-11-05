@@ -128,7 +128,7 @@ carries the game's early days.
   A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
   their arms twisted into streamers, new stars blooming pink where their
   gas collides. Maybe the sky after the unforming. Purely for beauty.
-- **Two unused numbers** in `world/gen.zig`: `roughL` (a roughness
+- ~~**Two unused numbers**~~ done: both removed (using either would have changed every world). In `world/gen.zig`: `roughL` (a roughness
   wavelength) and `nodeChance` (`slotAmount` thins the nodes instead).
   Use them or let them go.
 

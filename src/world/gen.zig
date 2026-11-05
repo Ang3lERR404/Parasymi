@@ -41,8 +41,6 @@ const warp:f32=14;
 const continentL:f32=70;
 /// how much the hills lift a tile within its terrace (m per unit of hill noise)
 const intra:f32=0.04;
-/// a roughness wavelength (tiles), unused for now
-const roughL:f32=120;
 /// the hills' wavelength (tiles)
 const hillL:f32=14;
 /// the hills' share of a tile's elevation
@@ -74,10 +72,8 @@ const veinOct=3;
 /// octaves of the resource patches' noise
 const patchOct=2;
 /// resource nodes cluster where patch noise rises above this
-/// (a share of `nodeChance` of their tiles, each holding `resMin` and up to `resSpread` more)
+/// (as many of their tiles as `slotAmount` leaves, each holding `resMin` and up to `resSpread` more)
 const patchAmount:f32=0.22;
-/// the share of a patch's tiles meant to bear a node (unused for now: `slotAmount` thins them)
-const nodeChance:f32=0.6;
 /// the least a node holds
 const resMin:f32=1500;
 /// how much more a node may hold, by its tile's roll
