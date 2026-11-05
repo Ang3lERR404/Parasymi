@@ -80,6 +80,10 @@ is what the code must come back to.
   night's stars").
 - *Its heart* (the gardener's pick): where the cup focuses the light, a
   slow swirl turns like a miniature galaxy, never a single bright point.
+  *Its colour* (the gardener's pick): a little colour of its own, as a
+  real galaxy's: a warm gold core, its arms fading out to blue. As its
+  store is spent it grows fainter and bluer (full: gold-hearted and
+  bright; nearly empty: a faint constellate blue).
 - *Night and day* (the gardener: "it's brilliant"): by day it weakens but
   never stops. Through the night it gathers more than it sends out, and
   the surplus is stored in the galaxy at its heart, which swells and
