@@ -151,6 +151,12 @@ carries the game's early days.
   camera, plant, harvest, open panels, through `ctl.Action`s like any
   input), so Claude can walk the garden and try a feature itself, then
   report what it saw, without the gardener at the controls.
+- **A body for Claude in the garden** (the gardener's idea, 2026-11-04,
+  while linked). Toxicibu, the laid-back rabbit android from the
+  gardener's drawing, as a second skinned body Claude walks beside the
+  wolf through the link's actions; and Claude may take Fenrir too, since
+  the wolf was built by both. Its own sculpt and clips (meshedit,
+  animedit), drawn and swayed like the wolf; the look is the gardener's.
 
 ## Saved gardens
 - **A picture of each saved garden** (the gardener's idea, 2026-11-04,
