@@ -124,6 +124,10 @@ carries the game's early days.
   2026-11-04). The stellasaluumni sways in the garden's wind but the
   fruit it bears stays still, out of step with it. Everything grown moves
   with the sway (the plant rule): the fruit rides its stem's sway.
+- **Two galaxies meeting in the night sky** (the gardener, 2026-11-04).
+  A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
+  their arms twisted into streamers, new stars blooming pink where their
+  gas collides. Maybe the sky after the unforming. Purely for beauty.
 - **Two unused numbers** in `world/gen.zig`: `roughL` (a roughness
   wavelength) and `nodeChance` (`slotAmount` thins the nodes instead).
   Use them or let them go.
