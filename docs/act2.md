@@ -73,7 +73,10 @@ is what the code must come back to.
   merely a flower's base, its head): the stem lifts it, it slowly follows
   the stars through the night, focusing their faint scattered light into
   the core. Tendrils carry that light out to the other constellate things.
-- Not part of the star caller. Still to shape: its name, numbers and look.
+- *Its name* (the gardener): **Halnoctsidirfilharactuum** (hal- halo,
+  noct- night, sidir- star, fil- phial or dish by sound).
+- Not part of the star caller. Still to shape: ~~its name~~, its numbers
+  and look.
 
 ## The strange seed
 - Its first model was a placeholder. It is a **crystal husk with a web
