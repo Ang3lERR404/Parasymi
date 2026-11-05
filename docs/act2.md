@@ -12,8 +12,19 @@ is what the code must come back to.
   storm, then takes root and becomes a tree himself, the garden's tree:
   already made of wood and vines, he does not merge into some other tree,
   he *becomes* one (the gardener). Not built yet: the rooting itself, and
-  how it is set off in play (still to shape). `--act2` starts there (the unforming run through, the
-  fallen strange seed in his keeping).
+  how it is set off in play (still to shape). `--act2` starts there (the
+  unforming run through, the fallen strange seed in his keeping).
+- **The transformation, step by step** (the gardener's):
+  1. The wolf digs into the ground with his claws and plants his feet
+     into the new holes.
+  2. Slowly but surely he morphs, and morphs, growing more tree-like by
+     the second, his own design fading away.
+  3. Once not a single trace of his design is left, fragments float from
+     his leaves: no beating, still, as light.
+  4. They begin to beat, faster and faster, until they converge,
+     building the star hyena.
+  5. The hyena takes the place the wolf once filled.
+  What sets it off in play is still to shape.
 - **The wolf is not the player in act 2.** Never write "the wolf" as the
   one who plants, builds or draws tendrils there.
 

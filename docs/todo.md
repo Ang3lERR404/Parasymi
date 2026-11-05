@@ -90,8 +90,9 @@ carries the game's early days.
 *Underway.* See [act2.md](act2.md).
 - The wolf becoming the tree: already made of wood and vines, he takes
   root and becomes a tree himself, the garden's tree (never merging into
-  another). How it is set off in play is still to shape; today only
-  `--act2` begins act 2.
+  another), step by step as
+  [act2.md](act2.md#when-it-happens) has it. How it is set off in play is
+  still to shape; today only `--act2` begins act 2.
 - Animation as the constellate parts drift together and merge.
 - The constellate lineage is in the game behind its own flag; it still
   has to join the garden proper.
