@@ -114,7 +114,7 @@ carries the game's early days.
   controller connected, every `{@action}` shows the pad button's glyph
   instead (drawn, like everything else), and switches back the moment the
   keyboard is used again.
-- **Grass tufts lying flat** (the gardener, playing, 2026-11-04, at night
+- ~~**Grass tufts lying flat**~~ done: a blade now turns about its root in the wind (keeping its length, at most ~50°) instead of being shoved a fixed distance, which laid the shortest flat. (the gardener, playing, 2026-11-04, at night
   in the eyes view). Some of the six-blade tufts read as stars pressed onto
   the ground instead of arching up (`detail.vert`: `BLADE_ARCH` up to
   0.45, and `GRASS_DROOP` sinking a blade the harder the wind bends it).

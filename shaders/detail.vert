@@ -76,8 +76,11 @@ const float STRAW_SHARE = 0.12;
 // grass in the wind: its own sway (rad/s, phase per unit along the wind),
 // the gust's push and its own sway's reach (this much even in a calm)
 const WindResponse GRASS = WindResponse(1.4, 0.4, 0.09, 0.035, 0.4);
-// how far a bent blade sinks (per bend squared)
-const float GRASS_DROOP = 0.3;
+// a blade bends in the wind by turning, never by being shoved: the push
+// (windPush, metres at a blade's tip) that turns it a whole radian, and the
+// most it ever turns (rad), so the shortest blades bow and never lie flat
+const float GRASS_BEND_REACH = 0.2;
+const float GRASS_BEND_MAX = 0.9;
 // the share of soil tiles bare of clods and stones
 const float SOIL_BARE = 0.35;
 // a stone's grey (sRGB)
@@ -180,11 +183,15 @@ void blade(int blade, int j) {
   vec3 n = normalize(cross(side, tangent));
   if (dot(n, lean) > 0.0) n = -n;
   n = normalize(mix(n, vec3(0.0, 1.0, 0.0), BLADE_SKYWARD));
-  // it bends in the garden's wind, the tip most, with a sway of its own
-  vec4 wind = gardenWind(t, p.xz);
-  float bend = windPush(t, wind, dot(floor(base.xz * 8.0), vec2(1.7, 2.3)), GRASS) * s * s;
-  p.xz += wind.xy * bend;
-  p.y -= GRASS_DROOP * bend * bend;
+  // it bends in the garden's wind, the tip most, with a sway of its own:
+  // turned about its root toward the wind, so it keeps its length (a
+  // fixed shove laid the short blades flat, stars pressed onto the ground)
+  vec4 wind = gardenWind(t, base.xz);
+  float push = windPush(t, wind, dot(floor(base.xz * 8.0), vec2(1.7, 2.3)), GRASS);
+  float bend = clamp(push / GRASS_BEND_REACH, -GRASS_BEND_MAX, GRASS_BEND_MAX) * s;
+  vec3 axis = vec3(wind.y, 0.0, -wind.x);
+  p = base + turnAbout(p - base, axis, bend);
+  n = turnAbout(n, axis, bend);
   // coloured by the ground it rises from: dark at the root, pale at the tip,
   // each blade a little its own, a few gone to straw at the tip
   vec4 g = vec4(b.x + b.y, 0.0, b.z, b.w);
