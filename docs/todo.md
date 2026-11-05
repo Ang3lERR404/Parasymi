@@ -296,9 +296,14 @@ Factorio's belts, each side a short row of items**.
 - ~~Still to shape: how the base one looks.~~ *Its look* (the gardener,
   2026-11-05: "a mix of all 3"): a root knuckle pushes up out of the soil
   and bends toward the lane; at its tip a single-leaf sprout whose leaf is
-  a seed pod. The pod splits open to catch the item, closes round it, and
-  the knuckle nudges it into its lane. Plain and humble, from before
-  either lineage.
+  a seed pod. The pod splits open to catch the item and closes round it.
+  The pod's tip is a hollow thorn, like a nettle's stinging hair: it
+  pierces the conduit's bark, the pod squeezes the item through as a new
+  swelling on that lane's strand, the thorn draws out and the bark seals.
+  Plain and humble, from before either lineage. *A conduit's two lanes*
+  are two strands of its weave (left and right): items swell along their
+  own strand inside the root, never sitting on top (the gardener: "that's
+  perfect").
 
 ## The radiant lineage's forming sound
 *Direction approved, not built.* Fantasy mixed with sci-fi: real glass,
