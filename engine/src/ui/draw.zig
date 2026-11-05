@@ -82,7 +82,53 @@ const cellH=font.glyphH+1;
 /// a glyph's quad reaches this many cells past its cell each way, room for
 /// the leaves its stems put out (must match GLYPH_PAD in shaders/ui.frag)
 const glyphPad=1;
-/// text shimmers along its length by this phase per pixel
+//// the keys, mouse buttons and pad buttons a binding names (pad glyphs)
+const input=@import("../platform/input.zig");
+/// the first byte standing for a pad button in a line of text (`padByte`):
+/// past ASCII, never a character's own (the strings are ASCII)
+const padFirst:u8=0x80;
+/// how many pad buttons (then the two triggers) have a byte of their own
+const padButtons=@typeInfo(input.PadButton).@"enum".fields.len;
+/// how many cells a pad button takes in a line of text
+pub const padCells:usize=3;
+/// a pad glyph's radius, a share of a line's height
+const padReach:f32=0.62;
+/// how lit a pad glyph's pods are
+/// how far a wooden pad glyph reaches either side of its middle, and how
+/// thick it is, shares of the glyph's radius
+const padSpan:f32=0.75;
+/// (see `padSpan`)
+const padThick:f32=0.95;
+const padLit:f32=0.35;
+/// the pad's wood: bumpers, triggers, sticks, Menu, View and the d-pad
+const padWood:Color=.{62,44,28,255};
+/// the dark of the letters on a face button
+const padInk:Color=.{24,20,16,255};
+/// the pale of the names and marks on the pad's wood
+const padPale:Color=.{238,226,198,255};
+/// a face button's own colour, as the pad's: A green, B red, X blue, Y yellow
+fn faceColor(p:input.PadButton)Color{
+  return switch(p){.a=>.{92,168,64,255},.b=>.{196,64,52,255},.x=>.{52,112,196,255},else=>.{224,184,52,255}};
+}
+/// the byte a pad button or trigger is written as in a line of text, for
+/// `text` to draw as that button (null: a key or mouse button)
+pub fn padByte(b:input.Bind)?u8{
+  return switch(b){
+    .pad=>|p|padFirst+@as(u8,@intCast(@intFromEnum(p))),
+    .trigger=>|t|padFirst+@as(u8,@intCast(padButtons+@intFromEnum(t))),
+    .key,.button=>null,
+  };
+}
+/// the pad button or trigger byte `ch` stands for, if it stands for one
+pub fn padOf(ch:u8)?input.Bind{
+  if(ch<padFirst)return null;
+  // which of them, counted from the first
+  const i=ch-padFirst;
+  if(i<padButtons)return.{.pad=@enumFromInt(i)};
+  if(i<padButtons+2)return.{.trigger=@enumFromInt(i-padButtons)};
+  return null;
+}
+// text shimmers along its length by this phase per pixel
 const shimmer:f32=0.01;
 /// how many growing things `grown` keeps track of at once
 const maxSprouts=48;
@@ -268,11 +314,17 @@ pub const Draw=struct{
     try d.shape(.gem,cx-r,cy-r,2*r,2*r,col,.{fire,phase});
   }
   /// a line of text from (x, y) at scale `s`, each glyph a quad of its
-  /// bitmap (spaces skipped). Returns the x after the last glyph.
+  /// bitmap (spaces skipped), a pad button's byte (`padByte`) drawn as
+  /// that button. Returns the x after the last glyph.
   pub fn text(d:*Draw,x:f32,y:f32,s:f32,col:Color,str:[]const u8)Allocator.Error!f32{
     // where the next glyph goes
     var cx=x;
     for(str)|ch|{
+      if(padOf(ch))|b|{
+        try d.padGlyph(cx,y,s,col,b);
+        cx+=padCells*cellW*s;
+        continue;
+      }
       // a glyph's quad size, padding and all, before scaling
       const pw=cellW+2*glyphPad;
       const ph=cellH+2*glyphPad;
@@ -281,8 +333,62 @@ pub const Draw=struct{
     }
     return cx;
   }
-  /// how wide `str` is at scale `s` (pixels)
-  pub fn width(str:[]const u8,s:f32)f32{return m.f(str.len)*cellW*s;}
+  /// how wide `str` is at scale `s` (pixels), a pad button `padCells` wide
+  pub fn width(str:[]const u8,s:f32)f32{
+    // the cells it takes
+    var cells:usize=0;
+    for(str)|ch|cells+=if(padOf(ch)!=null)padCells else 1;
+    return m.f(cells)*cellW*s;
+  }
+  /// pad button `b` drawn in a line of text whose cell starts at (x, y),
+  /// scale `s`: a face button a seed pod in its own colour, its letter on
+  /// it; a bumper, trigger or stick a short limb of wood with its name; the
+  /// d-pad a cross of twigs, the way pressed lit; Menu and View short
+  /// limbs marked with their lines. `col` is the text's own colour (the marks')
+  pub fn padGlyph(d:*Draw,x:f32,y:f32,s:f32,col:Color,b:input.Bind)Allocator.Error!void{
+    // the glyph's middle, and its size: a line tall
+    const cx=x+padCells*cellW*s/2-cellW*s/2;
+    const cy=y+cellH*s/2-s/2;
+    const r=cellH*s*padReach;
+    switch(b){
+      .pad=>|p|switch(p){
+        .a,.b,.x,.y=>{
+          try d.pod(cx,cy,r,faceColor(p),padLit,0);
+          _=try d.text(cx-cellW*s/2+s/2,y,s,padInk,switch(p){.a=>"A",.b=>"B",.x=>"X",else=>"Y"});
+        },
+        .left_bumper=>try d.padNamed(cx,cy,r,y,s,"LB"),
+        .right_bumper=>try d.padNamed(cx,cy,r,y,s,"RB"),
+        .left_thumb=>try d.padNamed(cx,cy,r,y,s,"LS"),
+        .right_thumb=>try d.padNamed(cx,cy,r,y,s,"RS"),
+        .start,.back,.guide=>{
+          try d.limb(.{cx-r*padSpan*0.6,cy},.{cx+r*padSpan*0.6,cy},r*padThick,r*padThick,padWood,0);
+          // Menu's three lines, View's two offset panes, the guide a ring
+          const w=r*0.55;
+          if(p==.start)for(0..3)|k|{
+            const ly=cy+(m.f(k)-1)*r*0.4;
+            try d.limb(.{cx-w,ly},.{cx+w,ly},s*0.8,s*0.8,padPale,0);
+          }else if(p==.back){
+            try d.limb(.{cx-w,cy-r*0.25},.{cx+w*0.4,cy-r*0.25},s*0.9,s*0.9,padPale,0);
+            try d.limb(.{cx-w*0.4,cy+r*0.25},.{cx+w,cy+r*0.25},s*0.9,s*0.9,padPale,0);
+          }else try d.glow(cx,cy,r*0.5,padPale);
+        },
+        .dpad_up,.dpad_right,.dpad_down,.dpad_left=>{
+          // the cross, and the arm pressed lit at its tip
+          try d.limb(.{cx-r,cy},.{cx+r,cy},s*1.6,s*1.6,padWood,0);
+          try d.limb(.{cx,cy-r},.{cx,cy+r},s*1.6,s*1.6,padWood,0.5);
+          const tip:m.Vice(f32,2)=switch(p){.dpad_up=>.{0,-1},.dpad_right=>.{1,0},.dpad_down=>.{0,1},else=>.{-1,0}};
+          try d.pod(cx+tip[0]*r*0.7,cy+tip[1]*r*0.7,r*0.38,col,padLit,0);
+        },
+      },
+      .trigger=>|t|try d.padNamed(cx,cy,r,y,s,if(t==.left_trigger)"LT"else"RT"),
+      .key,.button=>{},
+    }
+  }
+  /// a short thick limb of the pad's wood with a two-letter name over it
+  fn padNamed(d:*Draw,cx:f32,cy:f32,r:f32,y:f32,s:f32,name:[]const u8)Allocator.Error!void{
+    try d.limb(.{cx-r*padSpan,cy},.{cx+r*padSpan,cy},r*padThick,r*padThick,padWood,0);
+    _=try d.text(cx-cellW*s+s/2,y,s,padPale,name);
+  }
   /// `tpl` is a runtime template (`core/text.zig`), truncated to 256 bytes.
   pub fn print(d:*Draw,x:f32,y:f32,s:f32,col:Color,tpl:[]const u8,args:anytype)Allocator.Error!f32{
     // the filled template, before it is drawn
@@ -296,6 +402,22 @@ pub const Draw=struct{
     return d.text(x,y,s,col,bufPrint(&buf,"{d}",.{n})catch&buf);
   }
 };
+test"a pad button rides a line of text as one byte, drawn as the button and a few cells wide"{
+  // the test helpers, and a batch over the test allocator
+  const t=std.testing;
+  var d:Draw=.{.gpa=t.allocator};
+  defer d.deinit();
+  d.clear(0);
+  // every pad button and trigger has its own byte, read back as itself
+  for(std.enums.values(input.PadButton))|p|try t.expectEqual(input.Bind{.pad=p},padOf(padByte(.{.pad=p}).?).?);
+  for(std.enums.values(input.Trigger))|k|try t.expectEqual(input.Bind{.trigger=k},padOf(padByte(.{.trigger=k}).?).?);
+  try t.expect(padByte(.{.key=.w})==null);
+  try t.expect(padOf('A')==null);
+  // a line holding one: as wide as its letters and the button's cells
+  const line=[_]u8{'G','O',' ',padByte(.{.pad=.a}).?};
+  try t.expectEqual(m.f(3+padCells)*cellW*2,Draw.width(&line,2));
+  try t.expectEqual(10+m.f(3+padCells)*cellW*2,try d.text(10,10,2,.{255,255,255,255},&line));
+}
 test"a trellis grows from the frame it is first drawn, afresh after a break"{
   // a batch over the test allocator
   var d:Draw=.{.gpa=std.testing.allocator};

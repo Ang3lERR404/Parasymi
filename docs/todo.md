@@ -108,7 +108,7 @@ carries the game's early days.
 - **Matter has no icons.** Seeds and structures show a seed broken open;
   grit, fibre, essence, starlight and the other matter are only their
   colour in the belly and hotbar (`game/icon.zig`).
-- **Pad glyphs when a controller is connected** (the gardener, playing,
+- ~~**Pad glyphs when a controller is connected**~~ done: while the pad was used last every hint draws its buttons (`ui/draw.zig` padGlyph, `txt.showPad`); `--pad` for shots. (the gardener, playing,
   2026-11-04). The hints along the bottom and the paused menu name
   keyboard keys (ESC, O, K, F11…) even with the pad in hand; with a
   controller connected, every `{@action}` shows the pad button's glyph

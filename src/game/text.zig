@@ -32,6 +32,8 @@ const fields=std.meta.fields;
 const engine=lib.engine;
 /// the platform's keys and mouse buttons
 const input=engine.platform.input;
+/// the UI's draw batch: the byte a pad button rides a line of text as
+const draw=engine.ui.draw;
 /// the controls, whose bindings `{@action}` is written as
 const ctl=lib.controls;
 /// the runtime cfg reader, templates and list helpers
@@ -607,6 +609,14 @@ pub const Strings=struct{
 pub var s:Strings=.{};
 /// the cfg's text, owned while the strings point into it
 var src:[]u8=&.{};
+/// every string with each `{@action}` as its key or mouse button, and with
+/// each as its pad button (drawn as the button, `draw.padByte`); `s` is
+/// one of them, as `showPad` says
+var keyed:Strings=.{};
+/// (see `keyed`)
+var padded:Strings=.{};
+/// whether `s` shows the pad's buttons now
+var padShown=false;
 /// holds the strings `{@action}` tokens were written into
 var arena:?ArenaAllocator=null;
 /// the strings file cannot be read, or will not parse
@@ -642,10 +652,25 @@ pub fn fill(gpa:Allocator,texts:[]const[]const u8)Error!void{
   };
   assert(arena==null);
   arena=.init(gpa);
-  ctext.expand(Strings,&s,arena.?.allocator(),action,&bad)catch|e|return switch(e){
-    error.OutOfMemory=>error.OutOfMemory,
-    else=>{log.err("{s}: {t}: {s}",.{filePath,e,bad.buffered()});return error.BadStrings;},
-  };
+  // the strings as parsed, written out once for the keyboard, once for the pad
+  const raw=s;
+  for([_]*Strings{&keyed,&padded},[_]ctext.Lookup{&action,&padAction})|into,how|{
+    s=raw;
+    ctext.expand(Strings,&s,arena.?.allocator(),how,&bad)catch|e|return switch(e){
+      error.OutOfMemory=>error.OutOfMemory,
+      else=>{log.err("{s}: {t}: {s}",.{filePath,e,bad.buffered()});return error.BadStrings;},
+    };
+    into.*=s;
+  }
+  s=keyed;
+  padShown=false;
+}
+/// shows every `{@action}` as its pad button (`on`) or its key, as the pad
+/// or the keyboard and mouse was used last
+pub fn showPad(on:bool)void{
+  if(on==padShown)return;
+  s=if(on)padded else keyed;
+  padShown=on;
 }
 /// forgets every string and frees what held them
 pub fn unload(gpa:Allocator)void{
@@ -654,6 +679,9 @@ pub fn unload(gpa:Allocator)void{
   if(arena)|*a|a.deinit();
   arena=null;
   s=.{};
+  keyed=.{};
+  padded=.{};
+  padShown=false;
 }
 /// `{@name}`: the first key or button bound to action `name`.
 fn action(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
@@ -661,6 +689,20 @@ fn action(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
   const a=stringToEnum(ctl.Action,name) orelse return false;
   // the keys and buttons bound to it
   const binds=ctl.map.getPtrConst(a).items();
+  if(binds.len>0)try bindName(w,binds[0]);
+  return true;
+}
+/// `{@name}` for the pad: the first pad button or trigger bound to action
+/// `name`, as its byte (drawn as the button); none bound, its key
+fn padAction(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
+  // the action named; none, and the token is not one
+  const a=stringToEnum(ctl.Action,name) orelse return false;
+  // the keys and buttons bound to it
+  const binds=ctl.map.getPtrConst(a).items();
+  for(binds)|b|if(draw.padByte(b))|byte|{
+    try w.writeByte(byte);
+    return true;
+  };
   if(binds.len>0)try bindName(w,binds[0]);
   return true;
 }
@@ -697,6 +739,19 @@ test"the strings file fills every key, shown with the bound keys"{
   defer unload(gpa);
   try fill(gpa,&.{default});
   try testing.expect(indexOf(u8,s.hud.controls,ctext.token)==null);
+  // the pad used last: the controls line shows pad buttons, then keys again
+  const hasPad=struct{
+    // whether `str` holds a pad button's byte
+    fn in(str:[]const u8)bool{
+      for(str)|c|if(draw.padOf(c)!=null)return true;
+      return false;
+    }
+  }.in;
+  try testing.expect(!hasPad(s.hud.controls));
+  showPad(true);
+  try testing.expect(hasPad(s.hud.controls));
+  showPad(false);
+  try testing.expect(!hasPad(s.hud.controls));
   // rebinding changes what is shown
   unload(gpa);
   try ctl.fill(&.{@embedFile("controls.cfg")++"\n[bind]\nbelly = mouse_middle | b\n"});

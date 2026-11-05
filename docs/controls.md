@@ -76,6 +76,7 @@ the top left.
 - **1–9 / 0 / - / = / Backspace** pick hotbar slots only. Research nodes
   and weave recipes are clicked in their panels.
 - **Tab** belly (weave), **T** research, **F3** debug (timings, the wolf's tile and chunk, the view's heading, what the cursor points at, and a grid on the ground: tile edges gold, each tile's fan diagonals cyan, chunk borders pink); with `--link`, **Enter** talks to Claude (Enter sends, Esc closes).
+- **Pad glyphs:** while the pad was used last (a button, trigger or stick), every hint names the pad's buttons, drawn: A B X Y as seed pods in their own colours, bumpers, triggers and sticks as wooden limbs with their names, the d-pad a cross of twigs, Menu and View marked limbs; a key, a click or the mouse moving brings the keys back. An action with no pad binding keeps its key. `--pad` holds the pad as last used, for shots.
 - **In the research tree** (the world paused): **LMB** a bud to study it,
   the view flying to it with its card; **MMB drag**, or **LMB drag** on
   the backdrop, moves round the tree; the **wheel** (or the zoom keys)

@@ -83,6 +83,8 @@ const Flag=enum{
   crown,
   /// `--panel=`: a HUD panel held open
   panel,
+  /// `--pad`: the pad held as last used (its buttons in every hint), for shots
+  pad,
 };
 /// a value seen as its raw bytes (a fresh seed is filled through it)
 const asBytes=std.mem.asBytes;
@@ -247,6 +249,8 @@ pub fn main(init:Init)!void{
   var act2=false;
   // `--full=`: the wolf's belly held this full (0..1), for shots of it at one size
   var full:?f32=null;
+  // `--pad`: the pad held as last used, so shots show its buttons
+  var padHeld=false;
   for(args[1..])|a|{
     // the argument as one of the flags (none: it is passed over, as ever),
     // and its value, for the flags that need one
@@ -262,6 +266,7 @@ pub fn main(init:Init)!void{
       .load=>if(bare){load=true;},
       .unforming=>if(bare){unforming=true;},
       .act2=>if(bare){act2=true;},
+      .pad=>if(bare){padHeld=true;},
       .rt=>if(f.value)|v|{
         if(eql(u8,v,"on"))opts.rayTracing=true;
         if(eql(u8,v,"off"))opts.rayTracing=false;
@@ -453,6 +458,9 @@ pub fn main(init:Init)!void{
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
+    if(padHeld)input.padLast=true;
+    // every hint names the pad's buttons while the pad was used last
+    txt.showPad(input.padLast);
     // the clock this frame (s)
     const now=glfw.getTime();
     // a stalled frame must not fling animation or movement

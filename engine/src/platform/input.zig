@@ -59,6 +59,10 @@ pub const Stick=enum{
 /// how far a stick leans (0..1) before it counts at all: a resting stick
 /// that never quite centres stays still
 pub const deadzone:f32=0.2;
+/// how far a stick must lean (shaped, 0..1) to count as the pad being used
+pub const stickWake:f32=0.3;
+/// how far the cursor must move in a frame (pixels) to count as the mouse being used
+pub const mouseWake:f32=2;
 /// one physical key, mouse button or gamepad button.
 pub const Bind=union(enum){
   /// a key on the keyboard
@@ -173,6 +177,9 @@ pub const Input=struct{
   tprev:Triggers=.initEmpty(),
   /// the gamepad's sticks this frame, shaped: +x right, +y away (up)
   sticks:[2]m.Vec(f32,2)=.{.{0,0},.{0,0}},
+  /// whether the gamepad was used last (a button, trigger or stick) rather
+  /// than the keyboard or mouse: what the hints show (`noteDevice`)
+  padLast:bool=false,
   /// headless tests: a clipboard of their own instead of the window's
   ownClip:?*Clip=null,
   /// must be called once the Input has its final address.
@@ -211,6 +218,20 @@ pub const Input=struct{
     in.pcur=p.buttons;
     in.tcur=p.triggers;
     in.sticks=p.sticks;
+    in.noteDevice();
+  }
+  /// which was used last, the pad or the keyboard and mouse: a pad button
+  /// or trigger going down, or a stick leaning, turns it to the pad; a key
+  /// or mouse button going down, the wheel or the cursor moving, back
+  /// (the keyboard's way wins a frame both are used)
+  pub fn noteDevice(in:*Input)void{
+    // what went down this frame on each
+    const padDown=in.pcur.differenceWith(in.pprev).count()+in.tcur.differenceWith(in.tprev).count()>0;
+    const leant=m.lenOf(f32,2,in.sticks[0])>stickWake or m.lenOf(f32,2,in.sticks[1])>stickWake;
+    const keysDown=in.cur.differenceWith(in.prev).count()+in.bcur.differenceWith(in.bprev).count()>0;
+    const moved=m.lenOf(f32,2,in.mouseDelta)>mouseWake or in.scroll!=0;
+    if(padDown or leant)in.padLast=true;
+    if(keysDown or moved)in.padLast=false;
   }
   /// what the first gamepad plugged in holds (nothing without one)
   fn padRead()PadRead{
@@ -416,6 +437,33 @@ test"a bind goes down, repeats while held long, and is let go"{
   in.advance();
   in.hold(.{.trigger=.right_trigger},false);
   try testing.expect(in.released(.{.trigger=.right_trigger}));
+}
+test"the pad is last used once a button goes down or a stick leans, the keyboard or mouse once they are"{
+  // an input without a window, of its own clipboard
+  var clip=Clip{};
+  var in:Input=.{.win=undefined,.ownClip=&clip};
+  in.noteDevice();
+  try testing.expect(!in.padLast);
+  in.hold(.{.pad=.a},true);
+  in.noteDevice();
+  try testing.expect(in.padLast);
+  // held on, nothing new: still the pad
+  in.advance();
+  in.noteDevice();
+  try testing.expect(in.padLast);
+  // a key goes down: the keyboard
+  in.hold(.{.key=.w},true);
+  in.noteDevice();
+  try testing.expect(!in.padLast);
+  // a stick leant: the pad again; the cursor moved: the mouse
+  in.advance();
+  in.tilt(.left,.{0,0.8});
+  in.noteDevice();
+  try testing.expect(in.padLast);
+  in.tilt(.left,.{0,0});
+  in.mouseDelta=.{10,0};
+  in.noteDevice();
+  try testing.expect(!in.padLast);
 }
 test"a stick rests within its deadzone and reaches 1 at the rim"{
   try testing.expectEqual(m.Vec(f32,2){0,0},shape(.{0.1,-0.1}));
