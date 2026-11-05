@@ -104,6 +104,7 @@ const uint SHAPE_BLOSSOM = 11u;
 const uint SHAPE_GALL = 12u;
 const uint SHAPE_SHARD = 13u;
 const uint SHAPE_KNOT = 14u;
+const uint SHAPE_SWATCH = 15u;
 // the research tree's painting: the dark it hangs in, the soil under it, the
 // moon low behind (a share of the screen across and down), its pale light
 const vec3 DUSK_HIGH = vec3(0.003, 0.0028, 0.006);
@@ -1061,6 +1062,8 @@ void main() {
       case SHAPE_GALL: c = gall(v_uv, v_param.x, v_param.y); break;
       case SHAPE_SHARD: c = shard(v_uv, v_param.x, v_param.y); break;
       case SHAPE_KNOT: c = knot(v_uv, v_param.x, v_param.y); break;
+      // one pixel of a picture: its colour, the whole quad
+      case SHAPE_SWATCH: c = v_col; break;
       default: c = night(v_uv, v_param.y); break; // SHAPE_NIGHT
     }
     if (c.a < SHAPE_CLEAR) discard;

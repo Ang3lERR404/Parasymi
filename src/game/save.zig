@@ -16,6 +16,8 @@
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
+/// pictures: one kept beside each save, read back
+const png=lib.engine.core.png;
 /// the allocator the bytes and the rebuilt garden come from
 const Allocator=std.mem.Allocator;
 /// the I/O interface every file call goes through
@@ -110,7 +112,7 @@ pub fn named(t:*const Typed)?Name{
   return n.typed();
 }
 /// the longest path a save's file can have, scratch extension and all
-const maxPath=home.saves.len+1+maxName+ext.len+tmpExt.len;
+pub const maxPath=home.saves.len+1+maxName+ext.len+@max(tmpExt.len,pictureExt.len);
 /// the first four bytes of every save
 const magic="PRSY".*;
 /// the save format's version: 35 and on, every save is named records
@@ -551,7 +553,7 @@ pub fn save(g:*Game,gpa:Allocator,io:Io,name:Name)Error!void{
   home.dir().writeFile(io,.{.sub_path=tmp,.data=bytes}) catch return error.SaveUnwritable;
   Io.Dir.rename(home.dir(),tmp,home.dir(),pathOf(&toBuf,name,""),io) catch return error.SaveUnwritable;
 }
-/// lets the garden `name` go (its file is deleted).
+/// lets the garden `name` go (its file is deleted, and its picture)
 pub fn remove(io:Io,name:Name)Error!void{
   // room for the path
   var buf:[maxPath]u8=undefined;
@@ -559,6 +561,22 @@ pub fn remove(io:Io,name:Name)Error!void{
     error.FileNotFound=>error.NoSave,
     else=>error.SaveUnwritable,
   };
+  home.dir().deleteFile(io,pathOf(&buf,name,pictureExt))catch{};
+}
+/// what a save's picture is named after it: `<name>.sav.png`, beside it
+pub const pictureExt=".png";
+/// the most a save's picture may weigh, read back (bytes)
+const maxPicture:usize=1<<20;
+/// where garden `name`'s picture is kept, in the home folder
+pub fn picturePath(buf:*[maxPath]u8,name:Name)[]const u8{return pathOf(buf,name,pictureExt);}
+/// garden `name`'s picture, read back (null: it has none yet, as older
+/// saves, or it will not read: shown as none, never an error)
+pub fn picture(gpa:Allocator,io:Io,name:Name)?png.Image{
+  // room for the path, and the file's bytes
+  var buf:[maxPath]u8=undefined;
+  const bytes=home.dir().readFileAlloc(io,picturePath(&buf,name),gpa,.limited(maxPicture))catch{return null;};
+  defer gpa.free(bytes);
+  return png.decode(gpa,bytes)catch{return null;};
 }
 /// reads and rebuilds the garden saved as `name`
 pub fn load(gpa:Allocator,io:Io,name:Name)Error!Game{

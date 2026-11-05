@@ -1,5 +1,5 @@
 //! PNG encoding of 8-bit pixels (screenshots): RGB, every row Sub-filtered,
-//! one zlib stream in one IDAT chunk.
+//! one zlib stream in one IDAT chunk; and reading those back (`decode`).
 const std=@import("std");
 /// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
 const m=@import("math.zig");
@@ -19,11 +19,13 @@ const Crc32=std.hash.Crc32;
 const writeInt=std.mem.writeInt;
 /// the test helpers
 const testing=std.testing;
+/// whether two byte runs are the same (a file read back)
+const eql=std.mem.eql;
 /// stops on what must never happen
 const assert=std.debug.assert;
-/// reads a whole number in a set byte order (the test's)
+/// reads a whole number in a set byte order (the header, read back)
 const readInt=std.mem.readInt;
-/// the stream reader (the test's)
+/// the stream reader (the compressed pixels, read back)
 const Reader=std.Io.Reader;
 /// the eight bytes every PNG file opens with
 const signature="\x89PNG\r\n\x1a\n";
@@ -105,6 +107,76 @@ fn chunk(out:*Writer,kind:*const m.Vice(u8,4),data:[]const u8)Writer.Error!void{
   crc.update(kind);
   crc.update(data);
   try out.writeInt(u32,crc.final(),.big);
+}
+/// a picture read back: `w`×`h` pixels of RGB, row by row from the top
+pub const Image=struct{
+  /// its width, in pixels
+  w:u32,
+  /// its height, in pixels
+  h:u32,
+  /// its pixels, 3 bytes each (the caller frees them)
+  rgb:[]u8,
+  /// frees its pixels
+  pub fn deinit(im:Image,gpa:Allocator)void{gpa.free(im.rgb);}
+};
+/// what reading a PNG back can fail with: out of memory, or a file not as
+/// `encode` writes them (8-bit RGB, no interlace, one IDAT, Sub-filtered)
+pub const DecodeError=Allocator.Error||error{NotOurs};
+/// the largest side a picture read back may have (pixels), so a broken
+/// header never asks for the world
+const maxSide=4096;
+/// reads back a PNG `encode` wrote: its pixels as RGB. Any other kind of
+/// PNG, or a damaged one, is `NotOurs` (a picture shown is never trusted)
+pub fn decode(gpa:Allocator,bytes:[]const u8)DecodeError!Image{
+  if(bytes.len<8+25 or !eql(u8,bytes[0..8],signature))return error.NotOurs;
+  if(!eql(u8,bytes[12..16],"IHDR"))return error.NotOurs;
+  // the header: its size, and that it is ours
+  const w=readInt(u32,bytes[16..20],.big);
+  const h=readInt(u32,bytes[20..24],.big);
+  if(w==0 or h==0 or w>maxSide or h>maxSide)return error.NotOurs;
+  if(bytes[24]!=depth or bytes[25]!=rgb or bytes[26]!=0 or bytes[27]!=0 or bytes[28]!=0)return error.NotOurs;
+  // the IDAT chunk, right after IHDR
+  const at=8+25;
+  if(bytes.len<at+8)return error.NotOurs;
+  const n=readInt(u32,bytes[at..][0..4],.big);
+  if(!eql(u8,bytes[at+4..][0..4],"IDAT") or bytes.len<at+8+n)return error.NotOurs;
+  // the filtered rows, decompressed
+  const row=@as(usize,w)*3+1;
+  const raw=try gpa.alloc(u8,row*h);
+  defer gpa.free(raw);
+  var in:Reader=.fixed(bytes[at+8..][0..n]);
+  // the decompressor's window, on the heap (64K)
+  const window=try gpa.alloc(u8,flate.max_window_len);
+  defer gpa.free(window);
+  var d:flate.Decompress=.init(&in,.zlib,window);
+  d.reader.readSliceAll(raw)catch{return error.NotOurs;};
+  // each row unfiltered: Sub, each byte plus the one a pixel before
+  const out=try gpa.alloc(u8,@as(usize,w)*h*3);
+  errdefer gpa.free(out);
+  for(0..h)|y|{
+    // this row's filtered bytes, and its pixels
+    const f=raw[y*row..][0..row];
+    const o=out[y*w*3..][0..w*3];
+    if(f[0]!=sub)return error.NotOurs;
+    for(0..w*3)|k|o[k]=f[1+k]+%(if(k>=3)o[k-3]else 0);
+  }
+  return.{.w=w,.h=h,.rgb=out};
+}
+test"a PNG written is read back pixel for pixel; one not ours is refused"{
+  // the allocator, which finds leaks
+  const gpa=testing.allocator;
+  // 3×2 RGBA: a few colours
+  const px=[_]u8{10,20,30,0,200,100,50,0,255,255,255,0,0,0,0,0,1,2,3,0,250,128,7,0};
+  const file=try encode(gpa,3,2,&px,.rgba);
+  defer gpa.free(file);
+  const im=try decode(gpa,file);
+  defer im.deinit(gpa);
+  try testing.expectEqual(@as(u32,3),im.w);
+  try testing.expectEqual(@as(u32,2),im.h);
+  try testing.expectEqualSlices(u8,&.{10,20,30,200,100,50,255,255,255,0,0,0,1,2,3,250,128,7},im.rgb);
+  try testing.expectError(error.NotOurs,decode(gpa,"not a png at all, not even close to one"));
+  // cut short: refused, never a crash
+  try testing.expectError(error.NotOurs,decode(gpa,file[0..file.len/2]));
 }
 test"a PNG holds its pixels: header, then rows that decompress back"{
   // the allocator, which finds leaks

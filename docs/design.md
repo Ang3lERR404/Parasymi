@@ -622,6 +622,12 @@ layout rules. Never hand-place a node.
 - `Request` carries saves, loads, listing and deletes to main.
 - Autosave (always `autosave.sav`) runs every `Options.autosave` minutes
   of play (default 5; options panel: never..60).
+- **A picture of each garden:** every save (by hand, on quitting or the
+  autosave) takes a picture of the garden the next frame, the world
+  without the HUD, shrunk to at most 128 pixels wide and kept beside the
+  save as `<name>.sav.png` (deleted with it). The saved gardens menu shows
+  the chosen garden's on a trellis card beside the panel; a save with none
+  yet, or one that will not read, shows none.
 
 ### Saves that never break
 A save never needs a version bump. After a fixed header (magic, version,

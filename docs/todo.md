@@ -163,7 +163,7 @@ carries the game's early days.
   animedit), drawn and swayed like the wolf; the look is the gardener's.
 
 ## Saved gardens
-- **A picture of each saved garden** (the gardener's idea, 2026-11-04,
+- ~~**A picture of each saved garden**~~ done: `<name>.sav.png` beside each save, shown on a card beside the saved gardens panel. (the gardener's idea, 2026-11-04,
   as Factorio shows a factory beside its save). Whenever the garden is
   saved (by hand or the autosave), the game takes a screenshot of it
   (the world, without the HUD) and keeps it beside the save; the saved

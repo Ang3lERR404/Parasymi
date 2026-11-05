@@ -72,6 +72,8 @@ pub const Shape=enum(u32){
   /// where the lineages meet: two strands braiding a ring round a bloom;
   /// param.x = how far braided, param.y = seed
   knot,
+  /// a plain filled quad in its colour, unpadded: one pixel of a picture
+  swatch,
 };
 /// the first of a quad's two bit words when it holds a shape, not a glyph
 const shapeMark:u32=0xffff_ffff;
@@ -312,6 +314,15 @@ pub const Draw=struct{
   /// a cut gem of radius `r` at (cx, cy), its fire `fire` (0..1)
   pub fn gem(d:*Draw,cx:f32,cy:f32,r:f32,col:Color,fire:f32,phase:f32)Allocator.Error!void{
     try d.shape(.gem,cx-r,cy-r,2*r,2*r,col,.{fire,phase});
+  }
+  /// a small picture (`w`×`h` pixels of RGB, `rgb`) drawn from (x, y), each
+  /// of its pixels a `k`×`k` swatch, at opacity `alpha` (0..255)
+  pub fn picture(d:*Draw,x:f32,y:f32,k:f32,w:u32,h:u32,rgb:[]const u8,alpha:u8)Allocator.Error!void{
+    for(0..h)|py|for(0..w)|px|{
+      // this pixel's colour
+      const i=(py*w+px)*3;
+      try d.quad(x+m.f(px)*k,y+m.f(py)*k,k,k,k,k,.{rgb[i],rgb[i+1],rgb[i+2],alpha},.{shapeMark,@intFromEnum(Shape.swatch)},.{0,0});
+    };
   }
   /// a line of text from (x, y) at scale `s`, each glyph a quad of its
   /// bitmap (spaces skipped), a pad button's byte (`padByte`) drawn as

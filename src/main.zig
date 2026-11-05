@@ -455,6 +455,8 @@ pub fn main(init:Init)!void{
   var arsHumming=false;
   // and the unforming's moment when last heard (< 0 never)
   var unformHeard:f32=-1;
+  // quitting: closed once the garden's picture is taken
+  var closing=false;
   while(!window.shouldClose()){
     glfw.pollEvents();
     input.update();
@@ -541,7 +543,8 @@ pub fn main(init:Init)!void{
         .quit=>{
           // a garden never named is kept as the autosave
           keep(gpa,io,&game,game.slot orelse save.Name.of(save.auto).?);
-          window.setShouldClose(true);
+          // (closed once its picture is taken, the next frame)
+          if(game.pictureFor==null)window.setShouldClose(true)else closing=true;
         },
         // (from the main menu: no garden was entered, none is kept)
         .leave=>window.setShouldClose(true),
@@ -559,10 +562,13 @@ pub fn main(init:Init)!void{
     game.renderStats=r.stats;
     if(panel)|p|game.mode=p;
     if(overview)game.overview=true;
+    lookPicture(gpa,io,&game);
     game.weather.tick(game.moved);
     // what the renderer draws this frame
     var scene=try view.scene(&game,screen);
-    if(inspect!=null and panel==null){
+    // a garden just saved has its picture taken: the world, without the HUD
+    const picturing=game.pictureFor!=null and inspect==null;
+    if((inspect!=null and panel==null) or picturing){
       scene.ui=&.{};
     }else if(loadScreen.fading()){
       // the loading screen fades off the first frames of play, over the HUD
@@ -576,7 +582,7 @@ pub fn main(init:Init)!void{
     input.resized=false;
     // the link asked for a frame (and nothing is shooting the HUD away)
     const linkShot=if(lk)|l|l.frameWanted and inspect==null else false;
-    r.capture=shoot or linkShot;
+    r.capture=shoot or linkShot or picturing;
     try r.draw(&scene,resized);
     game.air=if(r.probed)|p|.{p[0],p[1],p[2]}else null;
     if(game.weather.soak(&game.world,r.field,r.fieldReads))game.prog.discover(.firstRain);
@@ -596,6 +602,16 @@ pub fn main(init:Init)!void{
         if(shoot)if(trail)|*t|{
           try snap(gpa,io,sh,.{.path=bufPrint(&pb,"{s}"++sepStr++"{d}.png",.{trailDir,t.taken}) catch unreachable},&writing);
           noteTrail(io,t,&game,trailDir);
+        };
+        if(picturing)if(game.pictureFor)|n|{
+          // beside its save, small; read back fresh by the menu
+          var sb:[save.maxPath]u8=undefined;
+          // decision: written in the frame (a small picture, once a save),
+          // so the menu reads it whole the moment it looks
+          try snapNow(gpa,io,sh,.{.path=save.picturePath(&sb,n),.dir=lib.home.dir(),.fit=pictureW});
+          game.pictureFor=null;
+          game.pictured=null;
+          if(closing)window.setShouldClose(true);
         };
         if(linkShot)if(lk)|*l|{
           // half size, written whole before it takes the frame's name
@@ -620,7 +636,12 @@ const ShotTo=struct{
   half:bool=false,
   /// a name it takes once written whole (renamed in `dir`), if any
   final:?[]const u8=null,
+  /// shrunk, each side by one whole step, till it is at most this wide
+  /// (0: as taken); a saved garden's picture
+  fit:u32=0,
 };
+/// how wide a saved garden's picture is at most (pixels)
+const pictureW:u32=128;
 /// a captured frame on its way to `shots/<focus>_<n>.png`: its own copy
 /// of the pixels and of the path, freed once written
 const ShotFile=struct{
@@ -640,11 +661,13 @@ const ShotFile=struct{
   fn write(f:ShotFile,gpa:Allocator,io:Io)void{
     defer gpa.free(f.px);
     defer gpa.free(f.path);
-    // the pixels written, and their size: halved if asked
-    const px=if(f.to.half)halve(gpa,f.px,f.w,f.h)catch|e|return log.err("{s}: {t}",.{f.path,e})else f.px;
-    defer if(f.to.half)gpa.free(px);
-    const w=if(f.to.half)f.w/2 else f.w;
-    const h=if(f.to.half)f.h/2 else f.h;
+    // the pixels written, and their size: shrunk if asked (halved, or by
+    // the whole step that fits them in `fit`)
+    const k:u32=if(f.to.half)2 else if(f.to.fit>0)@max(1,(f.w+f.to.fit-1)/f.to.fit)else 1;
+    const px=if(k>1)shrink(gpa,f.px,f.w,f.h,k)catch|e|return log.err("{s}: {t}",.{f.path,e})else f.px;
+    defer if(k>1)gpa.free(px);
+    const w=f.w/k;
+    const h=f.h/k;
     // the frame encoded as a PNG, and the folder it goes in
     const bytes=png.encode(gpa,w,h,px,if(f.bgra).bgra else.rgba)catch|e|return log.err("{s}: {t}",.{f.path,e});
     defer gpa.free(bytes);
@@ -657,20 +680,20 @@ const ShotFile=struct{
     log.info("shot {s}",.{f.path});
   }
 };
-/// `px` (`w` by `h`, 4 bytes a pixel) at half its size each side, each
-/// pixel the mean of the 2x2 it stands for (owned)
-fn halve(gpa:Allocator,px:[]const u8,w:u32,h:u32)Allocator.Error![]u8{
-  // the halved size, and its pixels
-  const hw:usize=w/2;
-  const hh:usize=h/2;
-  const out=try gpa.alloc(u8,hw*hh*4);
-  for(0..hh)|y|for(0..hw)|x|for(0..4)|c|{
-    // the four pixels' channel summed
+/// `px` (`w` by `h`, 4 bytes a pixel) at 1/`k` its size each side, each
+/// pixel the mean of the `k`x`k` it stands for (owned)
+fn shrink(gpa:Allocator,px:[]const u8,w:u32,h:u32,k:u32)Allocator.Error![]u8{
+  // the shrunk size, and its pixels
+  const sw:usize=w/k;
+  const sh:usize=h/k;
+  const out=try gpa.alloc(u8,sw*sh*4);
+  for(0..sh)|y|for(0..sw)|x|for(0..4)|c|{
+    // the pixels' channel summed
     var sum:u32=0;
-    for(0..2)|dy|for(0..2)|dx|{
-      sum+=px[((2*y+dy)*w+(2*x+dx))*4+c];
+    for(0..k)|dy|for(0..k)|dx|{
+      sum+=px[((k*y+dy)*w+(k*x+dx))*4+c];
     };
-    out[(y*hw+x)*4+c]=@intCast(sum/4);
+    out[(y*sw+x)*4+c]=@intCast(sum/(k*k));
   };
   return out;
 }
@@ -723,6 +746,28 @@ fn snap(gpa:Allocator,io:Io,sh:renderer.Shot,to:ShotTo,writing:*std.ArrayList(Io
   };
   writing.appendAssumeCapacity(future);
 }
+/// a captured frame written as `to` says, here and now (`snap` sends it
+/// off to be written beside the frames instead)
+fn snapNow(gpa:Allocator,io:Io,sh:renderer.Shot,to:ShotTo)Allocator.Error!void{
+  // the frame with its own copies of the pixels and the path
+  const px=try gpa.dupe(u8,sh.px);
+  errdefer gpa.free(px);
+  (ShotFile{.w=sh.w,.h=sh.h,.px=px,.bgra=sh.bgra,.path=try gpa.dupe(u8,to.path),.to=to}).write(gpa,io);
+}
+/// the saved gardens menu's picture: the chosen garden's read back when the
+/// choice changes (or its picture was just taken), let go when none is
+/// chosen; one that will not read shows none
+fn lookPicture(gpa:Allocator,io:Io,game:*Game)void{
+  // the garden whose picture is wanted, if any
+  const want:?save.Name=if(game.mode==.gardens and game.garden>0 and game.garden<=game.gardens.items.len)game.gardens.items[game.garden-1].name else null;
+  // whether the one read is that one already
+  const same=if(want)|w|(if(game.pictured)|p|p.same(w)else false)else game.pictured==null and game.gardenPicture==null;
+  if(same)return;
+  if(game.gardenPicture)|p|p.deinit(gpa);
+  game.gardenPicture=null;
+  game.pictured=want;
+  if(want)|w|game.gardenPicture=save.picture(gpa,io,w);
+}
 /// put the gardener's changed settings into effect (as far as the GPU and
 /// monitor allow, which the settings then show) and keep them.
 fn apply(io:Io,game:*Game,r:*Renderer,display:*Display,applied:*Options)!void{
@@ -747,6 +792,8 @@ fn apply(io:Io,game:*Game,r:*Renderer,display:*Display,applied:*Options)!void{
 fn keep(gpa:Allocator,io:Io,game:*Game,name:save.Name)void{
   game.sinceSave=0;
   save.save(game,gpa,io,name)catch|e|return game.prog.say(txt.s.msg.saveFailed,.{e});
+  // its picture, taken next frame
+  game.pictureFor=name;
   if(name.is(save.auto)){
     game.prog.say(txt.s.msg.autosaved,.{});
   }else{

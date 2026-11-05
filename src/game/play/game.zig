@@ -166,6 +166,14 @@ pub const Game=struct{
   listedAt:f64=0,
   /// the chosen row: 0 a fresh garden, else `gardens[i - 1]`
   garden:usize=0,
+  /// the garden just saved, whose picture the next frame takes (the
+  /// world without the HUD), kept beside its save
+  pictureFor:?save.Name=null,
+  /// the chosen saved garden's picture, read back for the menu (none:
+  /// none chosen, or it has none yet)
+  gardenPicture:?lib.engine.core.png.Image=null,
+  /// whose picture `gardenPicture` was read for (null: none looked for yet)
+  pictured:?save.Name=null,
   /// saving over the chosen garden was asked once already (the next SAVE does it)
   overwrite:bool=false,
   /// letting the chosen garden go was asked once already (the next DELETE does it)
@@ -357,6 +365,7 @@ pub const Game=struct{
   /// frees everything the game owns.
   pub fn deinit(g:*Game)void{
     if(g.sleep)|*c|c.deinit();
+    if(g.gardenPicture)|p|p.deinit(g.gpa);
     g.gardens.deinit(g.gpa);
     g.unformSources.deinit(g.gpa);
     g.leyDrifts.deinit(g.gpa);

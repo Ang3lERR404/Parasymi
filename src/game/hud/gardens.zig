@@ -149,7 +149,28 @@ pub fn draw(g:*play.Game,d:*Draw,screenW:f32,screenH:f32)Allocator.Error!void{
   // the hint, centred along the bottom
   const hint=txt.s.hud.gardensHint;
   _=try d.text(screenW/2-Draw.width(hint,s.textFine)/2,pn.box.y+ph-hintH+4,s.textFine,s.dim,hint);
+  if(g.gardenPicture)|pic|try picture(d,pic,px,pn.box.y+headerH,screenW);
 }
+/// the chosen garden's picture on a trellis card beside the panel (right
+/// of it, or left where the screen has no room)
+fn picture(d:*Draw,pic:lib.engine.core.png.Image,px:f32,top:f32,screenW:f32)Allocator.Error!void{
+  // its size on screen, the card's round it, and which side it goes
+  const w=m.f(pic.w)*pictureScale;
+  const h=m.f(pic.h)*pictureScale;
+  const cw=w+2*picturePad;
+  const right=px+pw+pictureGap+cw<=screenW;
+  const cx=if(right)px+pw+pictureGap else px-pictureGap-cw;
+  try d.trellis(cx,top,cw,h+2*picturePad,s.card,pictureSeed);
+  try d.picture(cx+picturePad,top+picturePad,pictureScale,pic.w,pic.h,pic.rgb,255);
+}
+/// how many screen pixels a side each of a garden's picture's pixels takes
+const pictureScale:f32=2;
+/// how far the picture's card reaches round it (pixels)
+const picturePad:f32=14;
+/// the gap between the panel and the picture's card (pixels)
+const pictureGap:f32=18;
+/// the picture card's trellis seed (its own vines and growth)
+const pictureSeed:f32=0.61;
 /// row `i` (0: a fresh garden) centred at `mid`, at opacity `a`
 fn row(g:*play.Game,d:*Draw,i:usize,px:f32,mid:f32,a:f32,t:f32)Allocator.Error!void{
   // whether it is chosen, whether the mouse is over it, and its pod's x
