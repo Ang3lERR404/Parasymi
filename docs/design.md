@@ -67,8 +67,10 @@ round.
 
 ## Base structures
 - **Conduit:** pulls from behind and pushes forward. It grows a side root
-  to a plant beside or behind it, and harvests the plant once the root
-  arrives.
+  to a plant beside or behind it, or to a producing structure at its
+  sides (anything with an `output`, never a store, so a line passing a
+  cache never drains it), and draws from it once the root arrives. A
+  conduit mid-line taps its sides too.
 - **Sap cache, germinator, arsthraxia** (research).
 - **Starlight catcher** (`structures/star_catcher.zig`): the garden's
   first starlight. Woven by hand from 3 fibre + 2 grit (never starlight),

@@ -301,6 +301,8 @@ pub const Structures=struct{
   pub const wants=lib.structures.dispatch.wants;
   /// what may leave a structure first
   pub const output=lib.structures.dispatch.output;
+  /// whether one makes things a carrier beside it may draw (`dispatch.produces`)
+  pub const produces=lib.structures.dispatch.produces;
   /// hand one item into a structure at an edge
   pub const handIn=lib.structures.dispatch.handIn;
   /// tell a structure something

@@ -2,7 +2,8 @@
 //! whatever is behind it (a structure's output, or a mature plant, which
 //! harvests it) and passes it forward to the next conduit or structure.
 //! It also sends a root out to any plant beside it (left, right or behind)
-//! and, once that root has reached it, harvests that plant too.
+//! or producing structure at its sides and, once that root has reached
+//! it, draws from it too.
 //! Its root digs up out of the soil at the edge it is fed from, arches
 //! over its tile and digs back in at its front, so chains join under the
 //! ground however they turn; what it carries runs through its core.
@@ -102,14 +103,27 @@ pub fn link(ctx:st.Ctx,i:st.Id)void{
 }
 /// the directions a conduit sends roots: behind, then its two sides.
 fn tapDirs(d:m.Dir)[3]m.Dir{return.{d+%2,d+%1,d+%3};}
-/// grow roots toward the plants beside a conduit, wither those with none.
+/// the producing structure a side root of conduit `self` taps the way `d`
+/// (none behind: what stands there is drawn through its arch instead).
+/// decision: side roots reach producers as well as plants (the gardener,
+/// 2026-11-04: the behind-only rule was the prototype's); stores stay
+/// behind-only (`produces`), so a line passing a cache never drains it.
+fn producerAt(ctx:st.Ctx,self:*const st.Structure,d:m.Dir)?st.Id{
+  if(d==self.dir+%2)return null;
+  // the step that way, and what stands there
+  const v=m.dirVec(d);
+  const j=ctx.ss.at(ctx.w,self.x+v.x,self.y+v.z) orelse return null;
+  return if(ctx.ss.produces(j))j else null;
+}
+/// grow roots toward the plants and producers beside a conduit, wither
+/// those with none.
 fn growRoots(ctx:st.Ctx,self:*st.Structure,dt:f32)void{
   // its remembered state
   const c=&self.state.conduit;
   for(tapDirs(self.dir))|d|{
-    // the step that way, whether a plant stands there, and the root reaching toward it
+    // the step that way, whether a plant or producer stands there, and the root reaching toward it
     const v=m.dirVec(d);
-    const there=ctx.plants.at(ctx.w,self.x+v.x,self.y+v.z)!=null;
+    const there=ctx.plants.at(ctx.w,self.x+v.x,self.y+v.z)!=null or producerAt(ctx,self,d)!=null;
     const r=&c.reach[d];
     r.*=st.reaching(r.*,there,dt*rootGrow,dt*rootWither);
   }
@@ -123,18 +137,28 @@ fn pull(ctx:st.Ctx,self:*st.Structure)?items.Item{
   const c=&self.state.conduit;
   const taps=tapDirs(self.dir);
   const bv=m.dirVec(taps[0]);
-  if(ss.at(ctx.w,self.x+bv.x,self.y+bv.z))|j|{
-    if(ss.get(j).def().carrier)return null; // carriers push, they are never pulled
+  // (a carrier behind pushes, it is never pulled: the sides are tapped still)
+  if(ss.at(ctx.w,self.x+bv.x,self.y+bv.z))|j|if(!ss.get(j).def().carrier){
     // what that structure lets go first (nothing: nothing pulled)
     const item=ss.output(j) orelse return null;
     _=ss.get(j).inv.take(item,1);
     c.came=behind;
     return item;
-  }
+  };
   for(0..taps.len)|k|{
     // the way taken in turn, the step there, and the plant standing there
     const d=taps[(c.turn+k)%taps.len];
     if(c.reach[d]<1)continue;
+    if(producerAt(ctx,self,d))|j|{
+      // what that producer lets go first, drawn up the root
+      if(ss.output(j))|item|{
+        _=ss.get(j).inv.take(item,1);
+        c.turn=@intCast((c.turn+k+1)%taps.len);
+        c.came=d-%self.dir;
+        return item;
+      }
+      continue;
+    }
     const v=m.dirVec(d);
     const p=ctx.plants.at(ctx.w,self.x+v.x,self.y+v.z) orelse continue;
     if(st.harvestOne(ctx.plants,p))|item|{

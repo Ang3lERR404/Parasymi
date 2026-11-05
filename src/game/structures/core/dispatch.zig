@@ -65,6 +65,18 @@ pub fn output(ss:*Structures,id:Id)?items.Item{
     inline else=>|k|if(comptime reg.has(k,"output"))reg.module(k).output(s)else null,
   };
 }
+/// whether structure `id` makes things for carriers to draw from it beside
+/// them: it has an `output` hook and is neither a carrier nor a store
+/// (stores are drawn from behind only, so a line passing one never drains it)
+pub fn produces(ss:*const Structures,id:Id)bool{
+  // the structure asked, and its kind's def
+  const s=&ss.list.items[id.idx()];
+  const d=s.def();
+  if(d.carrier or d.store)return false;
+  return switch(s.kind()){
+    inline else=>|k|comptime reg.has(k,"output"),
+  };
+}
 /// hand one `item` to structure `id`, coming in at `edge` (counted from
 /// the way it faces): a carrier takes it into its core or a lane
 /// (`receive`), anything else as `insert` does. Returns whether it went.

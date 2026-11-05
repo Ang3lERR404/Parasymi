@@ -83,6 +83,35 @@ test"a conduit's side root reaches a plant beside it and harvests it"{
   for(0..200)|_|try ss.tick(gpa,&w,&plants,&g,0.05);
   try testing.expectEqual(@as(u32,2),ss.get(ss.at(&w,2,0).?).inv.count(.essence));
 }
+test"a conduit's side root draws a producer's starlight but never drains a cache beside it"{
+  // the test allocator, and the world it grows on
+  const gpa=testing.allocator;
+  var w=World.init(gpa,5);
+  defer w.deinit();
+  try w.stream(.{.x=0,.y=0},1,100);
+  // the chunk at the origin, a 3×2 patch laid as soil
+  const c=w.chunkOfTile(0,0).?;
+  for(0..3)|x|for(0..2)|y|{const t=y*ck.sizeTiles+x;c.kind[t]=.soil;c.height[t]=1;c.res[t]=0;};
+  // the plants, the structures and what is understood
+  var plants:Plants=.{};
+  defer plants.deinit(gpa);
+  var ss:Structures=.{};
+  defer ss.deinit(gpa);
+  var g:prog.Progression=.{};
+  // conduit -> conduit -> cache along +x; a catcher beside the second
+  // conduit, a cache holding essence beside the first
+  try testing.expect(try ss.place(gpa,&w,0,0,.conduit,0,0));
+  try testing.expect(try ss.place(gpa,&w,1,0,.conduit,0,0));
+  try testing.expect(try ss.place(gpa,&w,2,0,.sapCache,0,0));
+  try testing.expect(try ss.place(gpa,&w,1,1,.starCatcher,0,0));
+  try testing.expect(try ss.place(gpa,&w,0,1,.sapCache,0,0));
+  _=ss.get(ss.at(&w,1,1).?).inv.add(.starlight,2);
+  _=ss.get(ss.at(&w,0,1).?).inv.add(.essence,3);
+  for(0..200)|_|try ss.tick(gpa,&w,&plants,&g,0.05);
+  try testing.expectEqual(@as(u32,2),ss.get(ss.at(&w,2,0).?).inv.count(.starlight));
+  try testing.expectEqual(@as(u32,0),ss.get(ss.at(&w,1,1).?).inv.count(.starlight));
+  try testing.expectEqual(@as(u32,3),ss.get(ss.at(&w,0,1).?).inv.count(.essence));
+}
 test"a footprint's ring holds every tile that many steps out, once, beside ones first in `m.dirs` order"{
   // a single tile's first ring: its four neighbours
   var one:Ring=.{.x0=0,.y0=0,.x1=0,.y1=0,.d=1};

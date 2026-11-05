@@ -94,6 +94,8 @@ pub fn tick(ctx:st.Ctx,i:st.Id,dt:f32)bool{
   if(sky.shift>0)return false;
   return step(st.slots,&s.state.starCatcher,&s.inv,patchNear(ctx.w,s.x,s.y),1-sky.daylight(),dt);
 }
+/// what a conduit's root may draw out of it: a starlight it has gathered
+pub fn output(s:*const st.Structure)?items.Item{return if(s.inv.count(.starlight)>0).starlight else null;}
 /// a click takes one starlight it has gathered
 pub fn handOver(s:*st.Structure)?items.Item{
   if(!s.inv.take(.starlight,1))return null;
