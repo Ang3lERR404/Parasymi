@@ -27,7 +27,13 @@ is what the code must come back to.
   The star hyena is no stranger replacing the wolf: he is born from him,
   the stilled light of the wolf-tree's leaves finding its heartbeat again
   (the gardener: "exactly on point").
-  What sets it off in play is still to shape.
+- **What sets it off** (the gardener's): the storm. The convergent trees
+  the wolf plants bring back the rain, and the storm spire (the
+  ionizer's kin, made for storms) brings the storm. Once the storm has
+  come, the player chooses when the wolf plants himself, and the choice
+  is offered without saying what will happen: "It lets the player
+  choose, but it does not tell them what is about to occur on purpose."
+  How the choice is offered is still to shape.
 - **The wolf is not the player in act 2.** Never write "the wolf" as the
   one who plants, builds or draws tendrils there.
 
