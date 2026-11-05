@@ -120,6 +120,10 @@ carries the game's early days.
   0.45, and `GRASS_DROOP` sinking a blade the harder the wind bends it).
   Not meant: blades should rise, arch and sway. Find which tufts flatten
   (strong wind's droop, the lean, or seen from above) and keep them standing.
+- **The skitter bug's yield fruit doesn't sway** (the gardener, playing,
+  2026-11-04). The stellasaluumni sways in the garden's wind but the
+  fruit it bears stays still, out of step with it. Everything grown moves
+  with the sway (the plant rule): the fruit rides its stem's sway.
 - **Two unused numbers** in `world/gen.zig`: `roughL` (a roughness
   wavelength) and `nodeChance` (`slotAmount` thins the nodes instead).
   Use them or let them go.
@@ -141,6 +145,12 @@ carries the game's early days.
   clip, change forms (add, move, turn, size, shade, nest) or keys, and
   see the editor's view; every change goes through the editor's history,
   so ctrl+z takes back anything Claude did.
+- **Claude playtests through the link** (the gardener's idea, 2026-11-04,
+  while playing linked). The link already shows Claude the state and
+  the frame; give the bridge tools to press actions too (move, turn the
+  camera, plant, harvest, open panels, through `ctl.Action`s like any
+  input), so Claude can walk the garden and try a feature itself, then
+  report what it saw, without the gardener at the controls.
 
 ## Saved gardens
 - **A picture of each saved garden** (the gardener's idea, 2026-11-04,
