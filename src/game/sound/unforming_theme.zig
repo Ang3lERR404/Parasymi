@@ -721,18 +721,23 @@ const Chord=struct{
   /// the trumpets' notes (MIDI; 0 not yet playing)
   trumpets:[2]u8=.{0,0},
 };
+/// the D held under the whole wall (MIDI D2), the choirs' lowest and the
+/// horn's and landing's strike
+const heldD:u8=38;
+/// the octave under it the strings' lowest bow (MIDI D1)
+const lowD:u8=26;
 /// the wall, a chord every `chordS` from the horn: climbing, dipping once,
 /// climbing again, never resolving over the held D (Dmaj9, E/D, A/D, Bm9/D,
 /// E/D again, F#m7/D, E/D high, Dmaj7#11)
 const wall=[_]Chord{
-  .{.sing=.{64,61,57,38},.bow=.{26,38,52,57,61,64},.high=76,.loud=0.8,.vel=1.4},
-  .{.sing=.{68,64,59,38},.bow=.{26,38,56,59,64,68},.high=80,.loud=0.95,.vel=1.7},
-  .{.sing=.{69,64,61,38},.bow=.{26,38,57,61,64,69},.high=81,.loud=1.1,.vel=2},
-  .{.sing=.{71,66,61,38},.bow=.{26,38,59,61,66,71},.high=83,.loud=1.25,.vel=2.3},
-  .{.sing=.{68,64,59,38},.bow=.{26,38,56,59,64,68},.high=80,.loud=1.2,.vel=2.2},
-  .{.sing=.{73,69,64,38},.bow=.{26,38,57,64,69,73},.high=85,.loud=1.5,.vel=2.8,.trumpets=.{73,69}},
-  .{.sing=.{76,71,64,38},.bow=.{26,38,59,64,71,76},.high=88,.loud=1.75,.vel=3.2,.trumpets=.{76,71}},
-  .{.sing=.{78,68,61,38},.bow=.{26,38,61,68,73,78},.high=90,.loud=2,.vel=3.6,.trumpets=.{78,73}},
+  .{.sing=.{64,61,57,heldD},.bow=.{lowD,heldD,52,57,61,64},.high=76,.loud=0.8,.vel=1.4},
+  .{.sing=.{68,64,59,heldD},.bow=.{lowD,heldD,56,59,64,68},.high=80,.loud=0.95,.vel=1.7},
+  .{.sing=.{69,64,61,heldD},.bow=.{lowD,heldD,57,61,64,69},.high=81,.loud=1.1,.vel=2},
+  .{.sing=.{71,66,61,heldD},.bow=.{lowD,heldD,59,61,66,71},.high=83,.loud=1.25,.vel=2.3},
+  .{.sing=.{68,64,59,heldD},.bow=.{lowD,heldD,56,59,64,68},.high=80,.loud=1.2,.vel=2.2},
+  .{.sing=.{73,69,64,heldD},.bow=.{lowD,heldD,57,64,69,73},.high=85,.loud=1.5,.vel=2.8,.trumpets=.{73,69}},
+  .{.sing=.{76,71,64,heldD},.bow=.{lowD,heldD,59,64,71,76},.high=88,.loud=1.75,.vel=3.2,.trumpets=.{76,71}},
+  .{.sing=.{78,68,61,heldD},.bow=.{lowD,heldD,61,68,73,78},.high=90,.loud=2,.vel=3.6,.trumpets=.{78,73}},
 };
 /// when chord `i` of the wall comes in
 fn wallAt(i:usize)f32{return hornAt+m.f(i)*chordS;}
@@ -800,11 +805,11 @@ const reborn=Sing{.notes=.{73,68,54,38},.loud=1.2};
 /// the score besides the wall and the world breaking, in time order
 const cues=[_]Cue{
   // the swell under the creak
-  .{.at=creakAt,.what=.{.bow=.{.notes=.{26,38,45,0,0,0},.vel=1}}},
+  .{.at=creakAt,.what=.{.bow=.{.notes=.{lowD,heldD,45,0,0,0},.vel=1}}},
   .{.at=creakAt+0.3,.what=.{.sing=.{.notes=.{64,61,57,38},.loud=0.3}}},
   // the great horn
   .{.at=hornAt,.what=.{.brass=.{.notes=.{26,38},.loud=1.6}}},
-  .{.at=hornAt,.what=.{.strike=.{.note=38,.vel=1,.boom=1}}},
+  .{.at=hornAt,.what=.{.strike=.{.note=heldD,.vel=1,.boom=1}}},
   .{.at=hornAt+1.4,.what=.{.unbrass=1.2}},
   // the low horns hold the D as the trumpets ring out
   .{.at=trumpetsAt,.what=.{.brass=.{.notes=.{26,38},.loud=0.8}}},
@@ -814,8 +819,8 @@ const cues=[_]Cue{
   // the landing: the bell and boom ring alone a moment, then the raised
   // fourth in the choirs and strings, and the theme comes home
   .{.at=landAt,.what=.land},
-  .{.at=landAt,.what=.{.strike=.{.note=38,.vel=1,.boom=1}}},
-  .{.at=landAt+0.3,.what=.{.bow=.{.notes=.{26,38,45,54,61,68},.vel=1.4}}},
+  .{.at=landAt,.what=.{.strike=.{.note=heldD,.vel=1,.boom=1}}},
+  .{.at=landAt+0.3,.what=.{.bow=.{.notes=.{lowD,heldD,45,54,61,68},.vel=1.4}}},
   .{.at=landAt+0.7,.what=.{.sing=reborn}},
   .{.at=landAt+5,.what=.{.sing=.{.notes=reborn.notes,.loud=0.5}}},
   .{.at=landAt+8,.what=.unbow},
@@ -1213,7 +1218,7 @@ test"the score runs in time order, the wall climbs to its last chord before it f
   // the wall ends higher than it began, held on D throughout, before it falls
   try testing.expect(wallAt(wall.len-1)<fallAt and fallAt<dropAt);
   try testing.expect(wall[wall.len-1].sing[0]>wall[0].sing[0]);
-  for(wall)|c|try testing.expectEqual(@as(u8,38),c.sing[3]);
+  for(wall)|c|try testing.expectEqual(heldD,c.sing[3]);
   try testing.expect(screamAt<fallAt and screamAt>wallAt(5));
 }
 /// the theme from its first moment to its end: it creaks, builds without a
