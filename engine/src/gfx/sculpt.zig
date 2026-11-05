@@ -194,6 +194,8 @@ fn shapeBound(s:Shape)struct{c:V3,r:f32}{
 }
 /// a colour's rgb as a vector of 0..255 values, for blending
 fn colV(c:color.Rgba8)V3{return v3(m.f(c.r),m.f(c.g),m.f(c.b));}
+/// whether two colours are the same (red, green and blue)
+fn eqlCol(a:color.Rgba8,b:color.Rgba8)bool{return a.r==b.r and a.g==b.g and a.b==b.b;}
 /// a point on the surface and its outward normal there
 pub const Hit=struct{
   /// the point on the surface
@@ -485,14 +487,23 @@ pub const Sculpt=struct{
     c/=m.splat3(@max(sum,1e-9));
     // decision: inks are painted on in the list's order, each over the
     // ones before (white over yellow, as in a drawing); one ink alone
-    // weighs against the solids as it always did
-    for(list)|i|{
+    // weighs against the solids as it always did, and inks of one colour
+    // overlapping add up as they always did (the wolf's sap panel): an
+    // earlier ink of the same colour weighs with the solids under it
+    for(list,0..)|i,k|{
       // the ink painted on
       const pf=&s.forms.items[i];
       if(pf.f.carve or pf.f.ink==0)continue;
-      // its weight, by how far inside its fade
+      // its weight, and the weight under it: the solids and the earlier inks of its colour
       const w=inkWeight*@exp(-@max(formDist(pf,p),0)/pf.f.ink);
-      c=m.lerpV(c,colV(pf.f.col),w/(w+sum));
+      var under=sum;
+      for(list[0..k])|j|{
+        // an earlier form, counted when it is an ink of this colour
+        const pe=&s.forms.items[j];
+        if(pe.f.carve or pe.f.ink==0 or !eqlCol(pe.f.col,pf.f.col))continue;
+        under+=inkWeight*@exp(-@max(formDist(pe,p),0)/pe.f.ink);
+      }
+      c=m.lerpV(c,colV(pf.f.col),w/(w+under));
     }
     return.{.c=c,.part=part};
   }
@@ -934,5 +945,24 @@ test"inks are painted in order: where two overlap the later one shows"{
     const later=colV(inks[1]);
     const earlier=colV(inks[0]);
     try testing.expect(m.dist(at,later)<0.25*m.dist(later,earlier));
+  }
+  // two inks of one colour overlapping add up as they always did: the
+  // weights summed against the solid's (the wolf's sap panel)
+  var s:Sculpt=.{.gpa=gpa,.parents=&.{null}};
+  defer s.deinit();
+  try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0,0,0),.r=m.splat3(0.1)}},.bone=0,.col=blue});
+  try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0,0,0.11),.r=m.splat3(0.05)}},.bone=0,.col=yellow,.ink=0.01});
+  try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0.04,0,0.1),.r=m.splat3(0.03)}},.bone=0,.col=yellow,.ink=0.02});
+  for([_]V3{v3(0,0,0.1),v3(0.06,0,0.08),v3(0.09,0,0.04)})|p|{
+    // the old sum: the solid weighs 1, each ink by its fade
+    var c=colV(blue);
+    var sum:f32=1;
+    for(s.forms.items[1..])|pf|{
+      const w=inkWeight*@exp(-@max(Sculpt.formDist(&pf,p),0)/pf.f.ink);
+      c+=colV(pf.f.col)*m.splat3(w);
+      sum+=w;
+    }
+    c/=m.splat3(sum);
+    try testing.expect(m.dist(c,s.colourFrom(p,&.{0,1,2}).c)<0.01);
   }
 }
