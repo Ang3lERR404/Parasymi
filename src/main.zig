@@ -566,9 +566,10 @@ pub fn main(init:Init)!void{
     game.weather.tick(game.moved);
     // what the renderer draws this frame
     var scene=try view.scene(&game,screen);
-    // a garden just saved has its picture taken: the world, without the HUD
+    // a garden just saved has its picture taken: the world copied out
+    // before the HUD is drawn over it (the screen still shows the HUD)
     const picturing=game.pictureFor!=null and inspect==null;
-    if((inspect!=null and panel==null) or picturing){
+    if(inspect!=null and panel==null){
       scene.ui=&.{};
     }else if(loadScreen.fading()){
       // the loading screen fades off the first frames of play, over the HUD
@@ -583,6 +584,7 @@ pub fn main(init:Init)!void{
     // the link asked for a frame (and nothing is shooting the HUD away)
     const linkShot=if(lk)|l|l.frameWanted and inspect==null else false;
     r.capture=shoot or linkShot or picturing;
+    r.bare=picturing;
     try r.draw(&scene,resized);
     game.air=if(r.probed)|p|.{p[0],p[1],p[2]}else null;
     if(game.weather.soak(&game.world,r.field,r.fieldReads))game.prog.discover(.firstRain);

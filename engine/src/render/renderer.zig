@@ -371,6 +371,9 @@ pub fn Renderer(comptime G:type)type{
     stats:Stats=.{},
     /// set before `draw`: copy that frame (UI and all) out for `shot`
     capture:bool=false,
+    /// with `capture`: copy the frame out before the screen passes (the UI)
+    /// draw, so the shot holds the world alone while the screen shows all
+    bare:bool=false,
     /// where a captured frame lands, and whether it holds one
     shotBuf:Buffer=.{},
     /// (whether `shotBuf` holds a frame not yet taken)
@@ -632,6 +635,7 @@ pub fn Renderer(comptime G:type)type{
     /// `resized`); a frame with `capture` set is kept for `shot`
     pub fn draw(r:*R,scene:*const Scene,resized:bool)Error!void{
       defer r.capture=false;
+      defer r.bare=false;
       r.frame(scene,resized)catch|e|return ctx.fold(e);
     }
     /// the frame last drawn with `capture` set (once; null if none was, or
@@ -766,8 +770,15 @@ pub fn Renderer(comptime G:type)type{
       r.beginScreen(cmd,img);
       r.post.compose(cmd,r.sc.extent);
       stamp(cmd,f,compose);
+      // a bare capture: the world copied out now, the UI then drawn over it
+      const bare=cap and r.bare;
+      if(bare){
+        cmd.endRendering();
+        r.copyOut(cmd,img);
+        r.resumeScreen(cmd,img);
+      }
       r.record(f,cmd,.screen,&sc,&stats);
-      r.end(cmd,img,cap);
+      r.end(cmd,img,cap and !bare);
       try cmd.endCommandBuffer();
       try r.submit(f,img);
       // how presenting went (out of date is handled below)
@@ -960,6 +971,24 @@ pub fn Renderer(comptime G:type)type{
         .resolve_mode=.{},
         .resolve_image_layout=.undefined,
         .load_op=.dont_care,
+        .store_op=.store,
+        .clear_value=.{.color=.{.float_32=.{0,0,0,1}}},
+      }};
+      r.scope(cmd,&color,null);
+    }
+    /// the swapchain image, copied out (`copyOut`), drawn on again: what the
+    /// composite left kept, for the screen passes to draw over
+    fn resumeScreen(r:*R,cmd:vk.CommandBufferProxy,img:u32)void{
+      sw.barrier(cmd,r.sc.images[img],sw.colorRange(),.transfer_src_optimal,.color_attachment_optimal,
+        .{.copy=true},.{.transfer_read=true},
+        .{.color_attachment_output=true},.{.color_attachment_write=true,.color_attachment_read=true});
+      // the swapchain image, loaded as it is
+      const color=[_]vk.RenderingAttachmentInfo{.{
+        .image_view=r.sc.views[img],
+        .image_layout=.color_attachment_optimal,
+        .resolve_mode=.{},
+        .resolve_image_layout=.undefined,
+        .load_op=.load,
         .store_op=.store,
         .clear_value=.{.color=.{.float_32=.{0,0,0,1}}},
       }};
