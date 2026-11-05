@@ -666,7 +666,7 @@ const ShotFile=struct{
     // the pixels written, and their size: shrunk if asked (halved, or by
     // the whole step that fits them in `fit`)
     const k:u32=if(f.to.half)2 else if(f.to.fit>0)@max(1,(f.w+f.to.fit-1)/f.to.fit)else 1;
-    const px=if(k>1)shrink(gpa,f.px,f.w,f.h,k)catch|e|return log.err("{s}: {t}",.{f.path,e})else f.px;
+    const px=if(k>1)png.shrink(gpa,f.px,f.w,f.h,k)catch|e|return log.err("{s}: {t}",.{f.path,e})else f.px;
     defer if(k>1)gpa.free(px);
     const w=f.w/k;
     const h=f.h/k;
@@ -682,23 +682,6 @@ const ShotFile=struct{
     log.info("shot {s}",.{f.path});
   }
 };
-/// `px` (`w` by `h`, 4 bytes a pixel) at 1/`k` its size each side, each
-/// pixel the mean of the `k`x`k` it stands for (owned)
-fn shrink(gpa:Allocator,px:[]const u8,w:u32,h:u32,k:u32)Allocator.Error![]u8{
-  // the shrunk size, and its pixels
-  const sw:usize=w/k;
-  const sh:usize=h/k;
-  const out=try gpa.alloc(u8,sw*sh*4);
-  for(0..sh)|y|for(0..sw)|x|for(0..4)|c|{
-    // the pixels' channel summed
-    var sum:u32=0;
-    for(0..k)|dy|for(0..k)|dx|{
-      sum+=px[((k*y+dy)*w+(k*x+dx))*4+c];
-    };
-    out[(y*sw+x)*4+c]=@intCast(sum/(k*k));
-  };
-  return out;
-}
 /// one frame's chores for the link: a message sent handed to Claude, the
 /// state written each second (with what was pressed), Claude's answers
 /// and a frame asked for looked for; failures only warn

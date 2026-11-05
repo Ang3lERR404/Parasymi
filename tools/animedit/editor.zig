@@ -223,6 +223,27 @@ pub const Editor=struct{
     try e.settle();
     e.restore(try e.history.redo(),"redone","nothing to redo");
   }
+  /// a whole edited clip `t` (Claude's, through the link) taken as one
+  /// step of the history, so undo takes it back; what happened, written
+  /// into `buf` for Claude (refused while the gardener's hands are on it)
+  pub fn adopt(e:*Editor,t:[]const u8,buf:[]u8)Allocator.Error![]const u8{
+    if(e.drag!=.none or e.naming!=null)return bufPrint(buf,"not taken: the gardener is dragging or typing; try again",.{})catch"busy";
+    try e.settle();
+    // the edited clip, read whole before the old one goes
+    var back=clip.Clip.parse(e.gpa,t)catch|er|return bufPrint(buf,"not taken: the text does not read ({t})",.{er})catch"not taken";
+    for(0..e.shown.len)|i|{
+      if(e.clip.track(e.chName(i))!=null and back.track(e.chName(i))==null)e.setValue(i,e.rest(i));
+    }
+    swap(clip.Clip,&e.clip,&back);
+    back.deinit();
+    e.t=@min(e.t,e.clip.length);
+    e.playing=false;
+    e.sample();
+    e.dirty=true;
+    try e.settle();
+    e.say("claude's edit taken (ctrl+z takes it back)",.{});
+    return bufPrint(buf,"taken: {d} channels keyed, {d:.2} s long; ctrl+z in the editor undoes it",.{e.clip.tracks.items.len,e.clip.length})catch"taken";
+  }
   /// the clip read back from the history's `kept` text (null: `none`
   /// said) and shown at the playhead; a channel whose keys all went back
   /// to its rest

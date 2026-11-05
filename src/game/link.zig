@@ -68,6 +68,17 @@ pub const wantFrame="wantFrame";
 pub const frameFile="frame.png";
 /// the frame while it is still being written (renamed when whole)
 pub const frameTmp="frame.png.part";
+/// a linked editor's open sculpt or clip, as its file would hold it
+/// (rewritten with the state; tools/editlink.zig)
+pub const documentFile="document.txt";
+/// left by the bridge: a whole edited sculpt or clip for a linked editor
+/// to take as one step of its history; taken away once answered
+pub const editFile="edit.txt";
+/// the edit while it is still being written (renamed when whole)
+pub const editTmp="edit.txt.part";
+/// the editor's answer to an edit (taken, or why not), written before
+/// the edit is taken away
+pub const editResultFile="editResult.txt";
 /// the longest message kept, in bytes (longer is cut)
 pub const maxText=280;
 /// how many messages the sidebar keeps

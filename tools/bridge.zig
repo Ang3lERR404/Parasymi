@@ -7,6 +7,10 @@
 //! `--dangerously-load-development-channels server:parasymi`), and Claude
 //! has three tools: `reply` (into the game's sidebar), `game_state` (what
 //! the game believes now) and `game_frame` (what it shows, as a picture).
+//! The editors linked the same way (`tools/editlink.zig`) answer those
+//! too, and two more: `editor_document` (the open sculpt or clip, as its
+//! file would hold it) and `editor_edit` (a whole edited one, taken as one
+//! step of the editor's history, so ctrl+z takes it back).
 //! Without the channel flag the tools still work; only the pushing waits.
 /// the standard library
 const std=@import("std");
@@ -60,17 +64,24 @@ const instructions=
   \\at most 280 characters, so keep it short). game_state tells what the game
   \\believes right now (open panel, where back leads, camera, the wolf's
   \\place, buttons pressed); game_frame shows the screen as a picture.
+  \\The mesh and animation editors can be linked the same way (--link): then
+  \\game_state and game_frame tell and show the editor, reply lands in its
+  \\chat card, editor_document gives the open sculpt or clip as its file's
+  \\text, and editor_edit takes a whole edited text back as one undoable step.
 ;
 /// the tools offered, as Claude Code lists them (on one line: a message
 /// is one line)
 const toolsJson=oneLine(
   \\[{"name":"reply","description":"Send a message to the gardener's in-game chat sidebar (upper case, at most 280 characters).","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"The message"}},"required":["text"]}},
   \\{"name":"game_state","description":"What the running game believes right now: mode, where back leads, camera, the wolf's place, hotbar, what is pointed at, actions pressed lately.","inputSchema":{"type":"object","properties":{}}},
-  \\{"name":"game_frame","description":"A picture of what the running game shows right now (half size PNG).","inputSchema":{"type":"object","properties":{}}}]
+  \\{"name":"game_frame","description":"A picture of what the running game shows right now (half size PNG).","inputSchema":{"type":"object","properties":{}}},
+  \\{"name":"editor_document","description":"The sculpt (meshedit) or clip (animedit) open in a linked editor, as the text its file holds.","inputSchema":{"type":"object","properties":{}}},
+  \\{"name":"editor_edit","description":"Give a linked editor a whole edited sculpt or clip text (editor_document's, changed): it is taken as one step of the editor's history, so ctrl+z there takes it back. Answers whether it was taken.","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"The whole edited document"}},"required":["text"]}}]
 );
 /// `s` with its line breaks taken out, at compile time
 fn oneLine(comptime s:[]const u8)[]const u8{
   comptime{
+    @setEvalBranchQuota(100000);
     var out:[]const u8="";
     for(s)|c|if(c!='\n'){out=out++&[_]u8{c};};
     return out;
@@ -139,7 +150,41 @@ const Bridge=struct{
       return toolText(w,id,st,false);
     }
     if(eql(u8,name,"game_frame"))return b.frame(gpa,io,id,w);
+    if(eql(u8,name,"editor_document")){
+      if(!fresh(io,b.dir))return toolText(w,id,"no editor is running with --link (no fresh state)",true);
+      // the document's text
+      const doc=b.dir.readFileAlloc(io,link.documentFile,gpa,.limited(1<<20)) catch return toolText(w,id,"no document: is it an editor that is linked, not the game?",true);
+      defer gpa.free(doc);
+      return toolText(w,id,doc,false);
+    }
+    if(eql(u8,name,"editor_edit")){
+      // the edited text
+      const text=if(args)|a|if(a.get("text"))|tv|switch(tv){.string=>|str|str,else=>null}else null else null;
+      const t=text orelse return toolText(w,id,"editor_edit needs the whole edited text",true);
+      return b.edit(gpa,io,id,t,w);
+    }
     return toolText(w,id,"no such tool",true);
+  }
+  /// leaves a whole edited document for the linked editor and waits for
+  /// it to be taken, answered with the editor's word on it
+  fn edit(b:*Bridge,gpa:Allocator,io:Io,id:Value,t:[]const u8,w:*Writer)!void{
+    if(!fresh(io,b.dir))return toolText(w,id,"no editor is running with --link (no fresh state)",true);
+    b.dir.deleteFile(io,link.editResultFile)catch{};
+    // written whole, then given its name, so the editor never reads half
+    b.dir.writeFile(io,.{.sub_path=link.editTmp,.data=t}) catch return toolText(w,id,"could not write the edit",true);
+    Dir.rename(b.dir,link.editTmp,b.dir,link.editFile,io) catch return toolText(w,id,"could not leave the edit",true);
+    // how long has been waited (ms)
+    var waited:u32=0;
+    while(waited<frameWaitMs):(waited+=lookMs){
+      io.sleep(.fromMilliseconds(lookMs),.awake)catch{};
+      if(b.dir.access(io,link.editFile,.{}))|_|continue else|_|{}
+      // the editor's answer, written before it took the edit away
+      const ans=b.dir.readFileAlloc(io,link.editResultFile,gpa,.limited(4096)) catch return toolText(w,id,"the edit was taken, but no answer was left",true);
+      defer gpa.free(ans);
+      return toolText(w,id,ans,!std.mem.startsWith(u8,ans,"taken"));
+    }
+    b.dir.deleteFile(io,link.editFile)catch{};
+    return toolText(w,id,"the editor did not take the edit in time (is it the game that is linked, not an editor?)",true);
   }
   /// asks the game for a frame and waits for it, answered as a picture
   fn frame(b:*Bridge,gpa:Allocator,io:Io,id:Value,w:*Writer)!void{
@@ -311,7 +356,7 @@ test"tools are listed, unknown methods refused, notifications unanswered"{
   var b=testBridge(tmp.dir,&sink.writer);
   const l=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"tools/list\"}");
   defer l.deinit();
-  try testing.expectEqual(@as(usize,3),l.value.object.get("result").?.object.get("tools").?.array.items.len);
+  try testing.expectEqual(@as(usize,5),l.value.object.get("result").?.object.get("tools").?.array.items.len);
   // every answer is one line: the protocol splits messages on line breaks
   var one:Writer.Allocating=.init(testing.allocator);
   defer one.deinit();
@@ -362,6 +407,29 @@ test"reply lands in the game's file; state needs a running game"{
   const e=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"tools/call\",\"params\":{\"name\":\"reply\",\"arguments\":{}}}");
   defer e.deinit();
   try testing.expect(e.value.object.get("result").?.object.get("isError").?.bool);
+}
+test"an editor's document is read; an edit needs its text and a linked editor"{
+  var tmp=testing.tmpDir(.{});
+  defer tmp.cleanup();
+  var sink:Writer.Allocating=.init(testing.allocator);
+  defer sink.deinit();
+  var b=testBridge(tmp.dir,&sink.writer);
+  // nothing linked: refused
+  const d0=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"editor_document\"}}");
+  defer d0.deinit();
+  try testing.expect(d0.value.object.get("result").?.object.get("isError").?.bool);
+  // an editor linked: its state fresh, its document read whole
+  try tmp.dir.writeFile(testing.io,.{.sub_path=link.stateFile,.data="editor: meshedit\n"});
+  try tmp.dir.writeFile(testing.io,.{.sub_path=link.documentFile,.data="# mesh\ncell 0.01\n"});
+  const d1=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"editor_document\"}}");
+  defer d1.deinit();
+  const c=d1.value.object.get("result").?.object.get("content").?.array.items[0].object;
+  try testing.expectEqualStrings("# mesh\ncell 0.01\n",c.get("text").?.string);
+  // an edit with no text is refused, and nothing is left for the editor
+  const e=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"editor_edit\",\"arguments\":{}}}");
+  defer e.deinit();
+  try testing.expect(e.value.object.get("result").?.object.get("isError").?.bool);
+  try testing.expectError(error.FileNotFound,tmp.dir.access(testing.io,link.editFile,.{}));
 }
 test"the gardener's messages are pushed once each, as channel events"{
   var tmp=testing.tmpDir(.{});

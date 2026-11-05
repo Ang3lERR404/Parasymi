@@ -310,6 +310,23 @@ pub const Editor=struct{
     try e.settle();
     e.restore(try e.history.redo(),"redone","nothing to redo");
   }
+  /// a whole edited mesh `t` (Claude's, through the link) taken as one
+  /// step of the history, so undo takes it back; what happened, written
+  /// into `buf` for Claude (refused while the gardener's hands are on it)
+  pub fn adopt(e:*Editor,t:[]const u8,buf:[]u8)Allocator.Error![]const u8{
+    if(e.drag!=.none or e.naming!=null or e.renaming!=null)return bufPrint(buf,"not taken: the gardener is dragging or typing; try again",.{})catch"busy";
+    try e.settle();
+    // the edited mesh, read whole before the old one goes
+    const d=Doc.parse(e.gpa,t)catch|er|return bufPrint(buf,"not taken: the text does not read ({t})",.{er})catch"not taken";
+    e.doc.deinit(e.gpa);
+    e.doc=d;
+    e.sel=@min(e.sel,e.pieces().len-|1);
+    e.bsel=@min(e.bsel,e.doc.bones.items.len-|1);
+    e.changed();
+    try e.settle();
+    e.say("claude's edit taken (ctrl+z takes it back)",.{});
+    return bufPrint(buf,"taken: {d} forms, {d} bones; ctrl+z in the editor undoes it",.{e.pieces().len,e.doc.bones.items.len})catch"taken";
+  }
   /// the mesh read back from the history's `kept` text (null: `none` said),
   /// the selection kept within its forms
   fn restore(e:*Editor,kept:?[]const u8,done:[]const u8,none:[]const u8)void{

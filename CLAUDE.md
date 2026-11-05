@@ -117,7 +117,7 @@ zig build run -- --link           # chat to Claude in game (Enter); the bridge
                                   # (tools/bridge.zig, .mcp.json) carries it; push
                                   # needs `claude --dangerously-load-development-channels
                                   # server:parasymi` (docs/testing.md)
-zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name> --at=S --channel=<name> --shot]
+zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<sculpt> [--clip=<name> --at=S --channel=<name> --shot --link]
                                   # animation editor (tools/animedit.zig): keys a clip
                                   # on the real renderer, saves src/anim/<name>.anim;
                                   # wolf joints are clickable, their gizmo keys them
@@ -125,7 +125,7 @@ zig build animedit -- --wolf | --plant=<species> | --structure=<kind> | --mesh=<
                                   # side does what every key does; `h` shows the help)
                                   # the camera orbits freely as meshedit's, `.` focuses
                                   # the selected joint (tools/orbit.zig)
-zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
+zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot --link]
                                   # mesh editor (tools/meshedit.zig): SDF forms melted
                                   # into one surface on bare ground, saves src/mesh/<name>.mesh;
                                   # the selected form's gizmo (1/2/3) moves, turns, sizes it;
@@ -141,7 +141,9 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot]
                                   # (`--rig`, `--try=p,y,r` for shots)
                                   # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
-                                  # both editors: ctrl+z undo, ctrl+y redo, a whole
+                                  # both editors: --link talks with Claude, who reads and
+                                  # edits the sculpt or clip, each edit one undo step
+                                  # (docs/testing.md); ctrl+z undo, ctrl+y redo, a whole
                                   # drag one step (tools/history.zig)
 zig build audiocheck              # sound path check (tools/audiocheck.zig): plays a
                                   # dsp.Voice through platform.audio, records it back by

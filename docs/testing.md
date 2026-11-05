@@ -152,6 +152,26 @@ game from the project folder.
   Claude looks.
 - Start the game (`zig build run -- --link`), then talk.
 
+### The editors linked (`--link`)
+- `zig build meshedit -- --mesh=<name> --link` or `zig build animedit --
+  --wolf --link` (any subject): the editor meets Claude through the same
+  `link/` folder (`tools/editlink.zig`). Link one thing at a time: the
+  game or one editor.
+- **The chat card** along the top: the key under Esc opens it, Enter
+  sends, Esc closes; the editor's own keys wait while it is open.
+  Claude's answers show in gold.
+- **Claude's tools:** `game_state` and `game_frame` tell and show the
+  editor; `reply` lands in its card; `editor_document` gives the open
+  sculpt or clip as the text its file holds; `editor_edit` takes a whole
+  edited text back. Every change of forms (add, move, turn, size, shade,
+  nest, bones) or of keys is one edited text.
+- **Every edit is one undoable step:** the editor takes it into its
+  history, so ctrl+z takes back anything Claude did. An edit is refused
+  (Claude is told why) while the gardener is dragging or typing, or when
+  the text does not read. Nothing is saved until the gardener saves.
+- A bridge started before this was built needs a restart (a new Claude
+  Code session) to offer the two new tools.
+
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.
 

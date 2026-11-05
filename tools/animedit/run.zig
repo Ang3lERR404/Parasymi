@@ -27,7 +27,11 @@ const Flag=enum{
   channel,
   /// `--shot`: one frame saved, then closed
   shot,
+  /// `--link`: talk with Claude, who can read and edit the clip (tools/editlink.zig)
+  link,
 };
+/// the editors' link with Claude
+const EditLink=@import("../editlink.zig").EditLink;
 /// where in a name any of a set of bytes first falls
 const indexOfAny=std.mem.indexOfAny;
 /// a name turned into its enum tag, or null if none matches
@@ -151,6 +155,8 @@ pub fn main(init:std.process.Init)!void{
   var channel:?[]const u8=null;
   // `--shot`: save one frame and close
   var shot=false;
+  // `--link`: talk with Claude through the link folder
+  var linkOn=false;
   for(args[1..])|a|{
     // the argument as one of its flags (none: passed over)
     const f=flag.parse(Flag,a) orelse continue;
@@ -163,6 +169,7 @@ pub fn main(init:std.process.Init)!void{
       .at=>if(f.value)|v|{start=try std.fmt.parseFloat(f32,v);},
       .channel=>if(f.value)|v|{channel=v;},
       .shot=>if(f.value==null){shot=true;},
+      .link=>if(f.value==null){linkOn=true;},
     }
   }
   // who the clip moves, which the flags must say
@@ -219,6 +226,13 @@ pub fn main(init:std.process.Init)!void{
   };
   defer e.clip.deinit();
   defer e.history.deinit();
+  // the link with Claude, if asked for
+  var el:?EditLink=null;
+  if(linkOn){
+    el=undefined;
+    try el.?.init(io);
+  }
+  defer if(el)|*l|l.deinit(io);
   // a sculpt's mesh and bones, read from the mesh editor's file
   var rigged:?Sculpt=switch(sj){
     .sculpt=>|n|load:{
@@ -354,7 +368,10 @@ pub fn main(init:std.process.Init)!void{
       .bones=bonesOf(e.pose,game.player.heading()),
       .heading=game.player.heading(),
     };
-    try e.handle(&input,screen,dt,&rg);
+    // (while the gardener types to Claude, the editor's own keys wait)
+    const chatting=if(el)|*l|l.keys(io,&input,game.uiTime)else false;
+    if(!chatting)try e.handle(&input,screen,dt,&rg);
+    if(el)|*l|try tendLink(l,&e,gpa,io,dt,game.uiTime,path);
     e.sample();
     switch(sj){
       .wolf=>game.player.posed=e.pose,
@@ -397,13 +414,18 @@ pub fn main(init:std.process.Init)!void{
     };
     ui.clear(@floatCast(game.uiTime));
     try e.draw(&ui,screen,&rg);
+    if(el)|*l|try l.draw(&ui,screen);
     scene.ui=ui.v.items;
     // whether the window was resized since the last frame
     const resized=input.resized;
     input.resized=false;
-    r.capture=shot and frames==shotFrames;
+    // the frame kept: for `--shot`, or a frame Claude asked for
+    const shooting=shot and frames==shotFrames;
+    r.capture=shooting or (if(el)|*l|l.wantsFrame()else false);
     try r.draw(&scene,resized);
     if(r.shot())|sh|{
+      if(el)|*l|if(l.wantsFrame())l.sendFrame(gpa,io,sh);
+      if(!shooting)continue;
       // the frame encoded as a PNG
       const bytes=try engine.core.png.encode(gpa,sh.w,sh.h,sh.px,if(sh.bgra).bgra else.rgba);
       defer gpa.free(bytes);
@@ -414,6 +436,23 @@ pub fn main(init:std.process.Init)!void{
     }
   }
   if(e.dirty)log.warn("{s}: unsaved changes dropped",.{path});
+}
+/// one frame of the link: an edit Claude left taken as one step of the
+/// history (and answered), and the state and the clip rewritten when due
+fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path:[]const u8)!void{
+  if(l.takeEdit(gpa,io))|t|{
+    defer gpa.free(t);
+    // room for the answer
+    var rb:[160]u8=undefined;
+    l.answer(io,try e.adopt(t,&rb));
+  }
+  if(!l.tick(gpa,io,dt,at))return;
+  // the clip's text, and what the editor shows
+  const doc=try animedit.editor.text(gpa,&e.clip);
+  defer gpa.free(doc);
+  var sb:[512]u8=undefined;
+  const state=std.fmt.bufPrint(&sb,"editor: animedit\nclip: {s}\nlength: {d:.2} s, playhead {d:.2} s, playing {}\nchannels keyed: {d}; selected channel: {s}\nunsaved changes: {}\n(editor_document gives the clip's text; editor_edit takes a whole edited one)\n",.{path,e.clip.length,e.t,e.playing,e.clip.tracks.items.len,e.chName(e.sel),e.dirty})catch"editor: animedit\n";
+  l.publish(io,state,doc);
 }
 /// one frame of the loading screen; false once the window is closed
 fn loadFrame(l:*loading.Loading,r:*Renderer,input:*Input,last:*f64,stage:loading.Stage,at:loading.Progress)!bool{

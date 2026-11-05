@@ -168,7 +168,7 @@ carries the game's early days.
   bridge ([testing.md](testing.md#talking-to-claude-while-playing---link)).
   Still to try for real: a terminal Claude Code session with the channel
   flag, the gardener typing in game.
-- **The link in the editors** (the gardener's idea, 2026-11-04): meshedit
+- ~~**The link in the editors**~~ done: `--link` in both, `tools/editlink.zig`, the bridge's `editor_document` and `editor_edit` ([testing.md](testing.md)). (the gardener's idea, 2026-11-04): meshedit
   and animedit linked the same way, so Claude builds a sculpt or keys a
   clip live while the gardener watches and gives feedback in the
   editor's own chat. The bridge gains tools to read the open sculpt or

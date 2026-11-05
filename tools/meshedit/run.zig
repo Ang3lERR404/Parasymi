@@ -23,10 +23,14 @@ const Flag=enum{
   @"try",
   /// `--rename=`: the sculpt renamed so at once
   rename,
+  /// `--link`: talk with Claude, who can read and edit the sculpt (tools/editlink.zig)
+  link,
 };
-/// reads a decimal number (`--try=`)
+/// the editors' link with Claude
+const EditLink=@import("../editlink.zig").EditLink;
 /// splits text at each comma (`--try=`)
 const splitScalar=std.mem.splitScalar;
+/// reads a decimal number (`--try=`)
 const parseFloat=std.fmt.parseFloat;
 /// where in a name any of a set of bytes first falls
 const indexOfAny=std.mem.indexOfAny;
@@ -130,6 +134,8 @@ pub fn main(init:std.process.Init)!void{
   var tryTurn:m.V3=.{0,0,0};
   // `--rename=<name>`: the sculpt renamed so at once, as a click on its path would
   var renameAs:?[]const u8=null;
+  // `--link`: talk with Claude through the link folder
+  var linkOn=false;
   for(args[1..])|a|{
     // the argument as one of its flags (none: passed over)
     const f=flag.parse(Flag,a) orelse continue;
@@ -140,6 +146,7 @@ pub fn main(init:std.process.Init)!void{
       .rig=>if(f.value==null){startRig=true;},
       .@"try"=>if(f.value)|v|{tryTurn=try turnsOf(v);},
       .rename=>if(f.value)|v|{renameAs=v;},
+      .link=>if(f.value==null){linkOn=true;},
     }
   }
   if(name.len==0 or indexOfAny(u8,name,notInName)!=null){
@@ -175,6 +182,13 @@ pub fn main(init:std.process.Init)!void{
   var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode,.history=try .init(gpa,first)};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
+  // the link with Claude, if asked for
+  var el:?EditLink=null;
+  if(linkOn){
+    el=undefined;
+    try el.?.init(io);
+  }
+  defer if(el)|*l|l.deinit(io);
   defer if(e.parts)|*f|f.deinit();
   defer if(e.ownedPath)|p|gpa.free(p);
   try e.reloadParts();
@@ -268,7 +282,10 @@ pub fn main(init:std.process.Init)!void{
     const seen:gizmo.View=.{.vp=game.cam.viewProj(),.eye=game.cam.viewEye(),.screen=screen};
     handles.clearRetainingCapacity();
     if(e.rigMode)try rigging.handles(&e,seen,origin,&handles,gpa)else for(e.pieces())|p|try handles.append(gpa,seen.project(origin+p.v.pos));
-    try e.handle(&input,handles.items,seen,origin);
+    // (while the gardener types to Claude, the editor's own keys wait)
+    const chatting=if(el)|*l|l.keys(io,&input,game.uiTime)else false;
+    if(!chatting)try e.handle(&input,handles.items,seen,origin);
+    if(el)|*l|try tendLink(l,&e,gpa,io,dt,game.uiTime,path);
     e.sel=@min(e.sel,e.pieces().len-|1);
     e.bsel=@min(e.bsel,e.doc.bones.items.len-|1);
     // the surface meshed again once it changed (while dragging, not every frame)
@@ -329,13 +346,18 @@ pub fn main(init:std.process.Init)!void{
     if(e.rigMode)try rigging.handles(&e,view,origin,&handles,gpa)else for(e.pieces())|p|try handles.append(gpa,view.project(origin+p.v.pos));
     ui.clear(@floatCast(game.uiTime));
     try e.draw(&ui,screen,handles.items,view,origin);
+    if(el)|*l|try l.draw(&ui,screen);
     scene.ui=ui.v.items;
     // whether the window was resized since the last frame
     const resized=input.resized;
     input.resized=false;
-    r.capture=shot and frames==shotFrames;
+    // the frame kept: for `--shot`, or a frame Claude asked for
+    const shooting=shot and frames==shotFrames;
+    r.capture=shooting or (if(el)|*l|l.wantsFrame()else false);
     try r.draw(&scene,resized);
     if(r.shot())|sh|{
+      if(el)|*l|if(l.wantsFrame())l.sendFrame(gpa,io,sh);
+      if(!shooting)continue;
       // the frame encoded as a PNG
       const bytes=try engine.core.png.encode(gpa,sh.w,sh.h,sh.px,if(sh.bgra).bgra else.rgba);
       defer gpa.free(bytes);
@@ -346,6 +368,23 @@ pub fn main(init:std.process.Init)!void{
     }
   }
   if(e.dirty)log.warn("{s}: unsaved changes dropped",.{path});
+}
+/// one frame of the link: an edit Claude left taken as one step of the
+/// history (and answered), and the state and the sculpt rewritten when due
+fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path:[]const u8)!void{
+  if(l.takeEdit(gpa,io))|t|{
+    defer gpa.free(t);
+    // room for the answer
+    var rb:[160]u8=undefined;
+    l.answer(io,try e.adopt(t,&rb));
+  }
+  if(!l.tick(gpa,io,dt,at))return;
+  // the sculpt's text, and what the editor shows
+  const doc=try meshedit.editor.text(gpa,&e.doc);
+  defer gpa.free(doc);
+  var sb:[512]u8=undefined;
+  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty})catch"editor: meshedit\n";
+  l.publish(io,state,doc);
 }
 /// `--try=`'s turns: pitch, yaw and roll (degrees), commas between, the ones left out none
 fn turnsOf(text:[]const u8)error{BadTry}!m.V3{

@@ -119,6 +119,23 @@ pub const Image=struct{
   /// frees its pixels
   pub fn deinit(im:Image,gpa:Allocator)void{gpa.free(im.rgb);}
 };
+/// `px` (`w`×`h`, 4 bytes a pixel) at 1/`k` its size each side, each
+/// pixel the mean of the `k`×`k` it stands for (owned): a frame made small
+pub fn shrink(gpa:Allocator,px:[]const u8,w:u32,h:u32,k:u32)Allocator.Error![]u8{
+  // the shrunk size, and its pixels
+  const sw:usize=w/k;
+  const sh:usize=h/k;
+  const out=try gpa.alloc(u8,sw*sh*4);
+  for(0..sh)|y|for(0..sw)|x|for(0..4)|c|{
+    // the pixels' channel summed
+    var sum:u32=0;
+    for(0..k)|dy|for(0..k)|dx|{
+      sum+=px[((k*y+dy)*w+(k*x+dx))*4+c];
+    };
+    out[(y*sw+x)*4+c]=@intCast(sum/(k*k));
+  };
+  return out;
+}
 /// what reading a PNG back can fail with: out of memory, or a file not as
 /// `encode` writes them (8-bit RGB, no interlace, one IDAT, Sub-filtered)
 pub const DecodeError=Allocator.Error||error{NotOurs};
