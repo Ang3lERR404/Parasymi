@@ -106,11 +106,14 @@ pub fn emit(s:*const st.Structure,out:*Parts,ctr:m.V3,tf:f32)Allocator.Error!voi
   // how much it glows: only while it gathers, by its activity
   const on=s.activity*s.grown;
   if(on<=0)return;
-  // where it hangs now, bobbing
-  const at=ctr+m.v3(0,st.bobAt(s.def(),s.seed,tf),0);
+  // its kind, and where it hangs now, bobbing
+  const d=s.def();
+  const at=ctr+m.v3(0,st.bobAt(d,s.seed,tf),0);
   for(look.blend.glows)|gl|{
     if(gl.when!=.night)continue;
-    try out.emit(.catcherBead,m.chain(&.{m.translate(at+gl.at),m.scale3(m.splat3(gl.scale))}),.{.phase=s.seed,.glow=gl.glow*on});
+    // each bead rides the vine's sway at its own height up it (rooted
+    // where the catcher is), so the fruit moves with the stem it hangs on
+    try out.emit(.catcherBead,m.chain(&.{m.translate(at+gl.at),m.scale3(m.splat3(gl.scale))}),.{.phase=s.seed,.glow=gl.glow*on,.sway=d.sway,.tall=d.tall,.drop=at[1]+gl.at[1]-ctr[1]});
     try out.light(at+gl.at,gl.light*m.splat3(on),gl.reach);
   }
 }

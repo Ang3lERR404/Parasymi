@@ -120,7 +120,7 @@ carries the game's early days.
   0.45, and `GRASS_DROOP` sinking a blade the harder the wind bends it).
   Not meant: blades should rise, arch and sway. Find which tufts flatten
   (strong wind's droop, the lean, or seen from above) and keep them standing.
-- **The skitter bug's yield fruit doesn't sway** (the gardener, playing,
+- ~~**The skitter bug's yield fruit doesn't sway**~~ done: its beads of light ride the vine's sway at their own height up it. (the gardener, playing,
   2026-11-04). The stellasaluumni sways in the garden's wind but the
   fruit it bears stays still, out of step with it. Everything grown moves
   with the sway (the plant rule): the fruit rides its stem's sway.
