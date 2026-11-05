@@ -100,7 +100,9 @@ is what the code must come back to.
   tendril gets the dish's light, for starlight does not run out by being
   shared.
 - Not part of the star caller. Still to shape: ~~its name~~, its numbers
-  and the rest of its look.
+  and the rest of its look; and what drinks the light at the tendrils'
+  far end (whether it lets the heart build parts, or makes constellate
+  things grow, glow or move), not decided yet.
 
 ## The strange seed
 - Its first model was a placeholder. It is a **crystal husk with a web
