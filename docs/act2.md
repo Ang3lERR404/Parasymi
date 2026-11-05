@@ -94,6 +94,11 @@ is what the code must come back to.
   (the light store), is gone after the unforming, so something had to
   fill the astrocyme's place; the galaxy store is that, merged into the
   gatherer itself.
+- *Sharing* (the gardener: "Precisely~"): the stars given form, their
+  sacrecy unimposed by usual challenges, so a dish feeds as many tendrils
+  as are drawn from it, with no cap, and sharing never thins it: each
+  tendril gets the dish's light, for starlight does not run out by being
+  shared.
 - Not part of the star caller. Still to shape: ~~its name~~, its numbers
   and the rest of its look.
 
