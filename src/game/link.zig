@@ -386,6 +386,10 @@ test"a message that cannot be written is marked, the state's failure told"{
   defer tmp.cleanup();
   var l=try Link.open(io,tmp.dir,"tmp");
   defer l.close(io);
+  // (the failures it tells are meant here: the warnings would fail the run)
+  const was=testing.log_level;
+  testing.log_level=.err;
+  defer testing.log_level=was;
   // Claude's file stands in the way as a folder: nothing can be written there
   try l.dir.createDirPath(io,toClaude);
   try l.dir.createDirPath(io,stateFile);

@@ -102,7 +102,7 @@ pub fn link(ctx:st.Ctx,i:st.Id)void{
   self.state.conduit.feeds=if(feeds==0)bit(behind)else feeds;
 }
 /// the directions a conduit sends roots: behind, then its two sides.
-fn tapDirs(d:m.Dir)[3]m.Dir{return.{d+%2,d+%1,d+%3};}
+fn tapDirs(d:m.Dir)[tapCount]m.Dir{return.{d+%2,d+%1,d+%3};}
 /// the producing structure a side root of conduit `self` taps the way `d`
 /// (none behind: what stands there is drawn through its arch instead).
 /// decision: side roots reach producers as well as plants (the gardener,
@@ -129,6 +129,16 @@ fn growRoots(ctx:st.Ctx,self:*st.Structure,dt:f32)void{
   }
   c.reach[self.dir]=0;
 }
+/// what a side root drew in, noted: the next root along takes the next
+/// turn (`k` the turn just taken), and it came in by the edge the world
+/// way `d` lies at, counted from the way it faces (`dir`)
+fn tapped(c:*State,dir:m.Dir,k:usize,d:m.Dir,item:items.Item)items.Item{
+  c.turn=@intCast((c.turn+k+1)%tapCount);
+  c.came=d-%dir;
+  return item;
+}
+/// how many ways a conduit sends roots (`tapDirs`)
+const tapCount=3;
 /// pull one item: from what is behind (a structure, or a plant its root
 /// has reached), else from a plant beside it whose root has reached it.
 fn pull(ctx:st.Ctx,self:*st.Structure)?items.Item{
@@ -153,19 +163,13 @@ fn pull(ctx:st.Ctx,self:*st.Structure)?items.Item{
       // what that producer lets go first, drawn up the root
       if(ss.output(j))|item|{
         _=ss.get(j).inv.take(item,1);
-        c.turn=@intCast((c.turn+k+1)%taps.len);
-        c.came=d-%self.dir;
-        return item;
+        return tapped(c,self.dir,k,d,item);
       }
       continue;
     }
     const v=m.dirVec(d);
     const p=ctx.plants.at(ctx.w,self.x+v.x,self.y+v.z) orelse continue;
-    if(st.harvestOne(ctx.plants,p))|item|{
-      c.turn=@intCast((c.turn+k+1)%taps.len);
-      c.came=d-%self.dir;
-      return item;
-    }
+    if(st.harvestOne(ctx.plants,p))|item|return tapped(c,self.dir,k,d,item);
   }
   return null;
 }
