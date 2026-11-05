@@ -74,9 +74,14 @@ is what the code must come back to.
   the stars through the night, focusing their faint scattered light into
   the core. Tendrils carry that light out to the other constellate things.
 - *Its name* (the gardener): **Halnoctsidirfilharactuum** (hal- halo,
-  noct- night, sidir- star, fil- phial or dish by sound).
+  noct- night, sidir- star, fil- phial or dish by sound; -haractuum, in
+  Claude's reading, Greek *kharaktēr*, a stamp or mark pressed in, and
+  Latin *actum*, a thing made: "the dish that takes the stamp of the
+  night's stars").
+- *Its heart* (the gardener's pick): where the cup focuses the light, a
+  slow swirl turns like a miniature galaxy, never a single bright point.
 - Not part of the star caller. Still to shape: ~~its name~~, its numbers
-  and look.
+  and the rest of its look.
 
 ## The strange seed
 - Its first model was a placeholder. It is a **crystal husk with a web
