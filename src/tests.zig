@@ -22,6 +22,7 @@ test{
   _=lib.turn;
   _=lib.structures;
   _=lib.seeds;
+  _=lib.matter;
   _=lib.play;
   _=lib.orbit;
   _=lib.trail;

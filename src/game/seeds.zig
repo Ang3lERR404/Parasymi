@@ -63,12 +63,12 @@ pub fn icon(item:items.Item,ic:iconKit.Icon,col:Color)Allocator.Error!bool{
   };
   return false;
 }
-/// whether some module in `kinds` draws `item`; true when it has a picture.
-fn drawn(item:items.Item)bool{
+/// whether some module in `kinds` draws `item`: true when it has a picture
+pub fn draws(item:items.Item)bool{
   inline for(reg.ids)|k|if(reg.module(k).item==item)return true;
   // the seed's module, when it is this item
   return false;
 }
 test"every sown species' seed has an icon"{
-  for(species.ids)|id|if(species.get(id).seed)|s|try testing.expect(drawn(s));
+  for(species.ids)|id|if(species.get(id).seed)|s|try testing.expect(draws(s));
 }

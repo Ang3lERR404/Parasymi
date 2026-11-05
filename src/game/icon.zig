@@ -1,8 +1,8 @@
 //! item icons for the HUD: what sits in a belly slot, a hotbar pod or on the
 //! cursor. A structure's bulb or a plant's seed is a seed broken open, its
 //! sprout or two showing what it will grow into (the structure's `icon`
-//! hook, or its module in `seeds.zig`, drawn with the kit below); anything
-//! else is its colour, for now.
+//! hook, or its module in `seeds.zig`, drawn with the kit below); matter
+//! is drawn as what it is (`matter.zig`); anything else is its colour.
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -207,6 +207,7 @@ pub fn draw(d:*Draw,item:items.Item,c:m.Vice(f32,2),r:f32,t:f32,phase:f32,lit:f3
     return;
   }
   if(try seeds.icon(item,ic,info.col))return;
+  if(try lib.matter.icon(item,ic,info.col))return;
   try d.pod(c[0],c[1],r*fillR,ic.col(info.col),lit,phase);
   // the item's short name, and its text size scaled to the slot
   const short=txt.item(item).short;

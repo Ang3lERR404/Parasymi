@@ -105,7 +105,7 @@ carries the game's early days.
   hyphenated ones and short abbreviations, are tags like `@"long-name"`
   (outside names, so they keep their own spelling). The editors' tools
   take the same helper.
-- **Matter has no icons.** Seeds and structures show a seed broken open;
+- ~~**Matter has no icons.**~~ done: `game/matter.zig` draws each as what it is; a test holds every item to an icon of its own. Seeds and structures show a seed broken open;
   grit, fibre, essence, starlight and the other matter are only their
   colour in the belly and hotbar (`game/icon.zig`).
 - ~~**Pad glyphs when a controller is connected**~~ done: while the pad was used last every hint draws its buttons (`ui/draw.zig` padGlyph, `txt.showPad`); `--pad` for shots. (the gardener, playing,

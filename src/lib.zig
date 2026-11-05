@@ -114,6 +114,8 @@ pub const hudSlider=@import("game/hud/slider.zig");
 pub const hudPicker=@import("game/hud/picker.zig");
 /// item icons: a seed broken open, a pod, a mote
 pub const icon=@import("game/icon.zig");
+/// matter's icons: grit, fibre, essence, starlight and the rest, drawn as what they are
+pub const matter=@import("game/matter.zig");
 /// `--inspect`: the camera turning round one thing, taking shots
 pub const orbit=@import("game/orbit.zig");
 /// `--record`: a playback trail, a shot and a note every few seconds of play
