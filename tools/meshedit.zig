@@ -40,7 +40,7 @@
 //! the gizmo moves a joint (`1`) or test-turns its bone (`2`, never kept)
 //! so the skin can be seen to bend. Each form rides one bone (`o` steps
 //! it), its twin the bone's twin, and the sculpt weights the skin to them.
-//! `enter` names the selected form (`snout`, `left ear`): typed in its row,
+//! `f2` names the selected form (`snout`, `left ear`): typed in its row,
 //! enter or escape done, kept in the file; the panel shows each value in
 //! words (`place up`, `colour red`, a cone's `tip radius`).
 //! Each form also picks the shader its part of the surface is drawn with

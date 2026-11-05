@@ -157,9 +157,12 @@ game from the project folder.
   --wolf --link` (any subject): the editor meets Claude through the same
   `link/` folder (`tools/editlink.zig`). Link one thing at a time: the
   game or one editor.
-- **The chat card** along the top: the key under Esc opens it, Enter
-  sends, Esc closes; the editor's own keys wait while it is open.
-  Claude's answers show in gold.
+- **The chat card** along the top: Enter opens it, as in the game (the
+  key under Esc does too), Enter sends, Esc closes; the editor's own
+  keys wait while it is open. While a name field is open (a form's, a
+  bone's, a mark's, the sculpt's) Enter finishes the name instead.
+  Naming a form or bone in meshedit is **F2**, linked or not (its
+  toolbar button stays). Claude's answers show in gold.
 - **Claude's tools:** `game_state` and `game_frame` tell and show the
   editor; `reply` lands in its card; `editor_document` gives the open
   sculpt or clip as the text its file holds; `editor_edit` takes a whole

@@ -1,7 +1,8 @@
 //! `--link` in the editors (meshedit, animedit): the editor talking with
 //! Claude through the same link folder the game uses (`game/link.zig`,
 //! the bridge `tools/bridge.zig`). The gardener types in the editor's own
-//! chat (the grave key, under Esc, opens it; Enter sends, Esc closes); Claude answers
+//! chat (Enter, as in the game, or the grave key opens it; Enter sends, Esc
+//! closes; while a name field is open Enter is the field's); Claude answers
 //! into it. The editor keeps `state.txt` (what is open) and
 //! `document.txt` (the sculpt or clip as its file would hold it) fresh,
 //! answers a frame asked for, turns its camera as Claude asks
@@ -61,6 +62,14 @@ const maxEdit=1<<20;
 const cardAt:f32=0.6;
 /// the card's trellis seed (its own vines)
 const cardSeed:f32=0.37;
+/// whether the editor's own name field holds the keyboard (then Enter is
+/// its, not the chat's)
+pub const Field=enum{
+  /// no field open: Enter opens the chat
+  free,
+  /// a form, bone, mark or the sculpt's name being typed
+  typing,
+};
 /// the editor's half of the link: the folder, the conversation and the
 /// clock the state is rewritten by
 pub const EditLink=struct{
@@ -89,12 +98,15 @@ pub const EditLink=struct{
   }
   /// lets go of the folder
   pub fn deinit(el:*EditLink,io:Io)void{el.link.close(io);}
-  /// the chat's keys this frame: the grave key opens it, Enter sends what
-  /// was typed, Esc closes it. True while the chat holds the keyboard (the
+  /// the chat's keys this frame: Enter (as in the game) or the grave key
+  /// opens it, Enter sends what was typed, Esc closes it; while the
+  /// editor's own name field holds the keyboard (`field`), Enter is its
+  /// and nothing opens. True while the chat holds the keyboard (the
   /// editor's own keys wait)
-  pub fn keys(el:*EditLink,io:Io,in:*const Input,at:f64)bool{
+  pub fn keys(el:*EditLink,io:Io,in:*const Input,at:f64,field:Field)bool{
     if(!el.open){
-      if(in.pressed(.{.key=.grave_accent}))el.open=true;
+      if(field==.typing)return false;
+      if(in.pressed(.{.key=.grave_accent}) or in.pressed(.{.key=.enter}) or in.pressed(.{.key=.kp_enter}))el.open=true;
       return el.open;
     }
     if(in.pressed(.{.key=.escape})){
@@ -183,7 +195,7 @@ pub const EditLink=struct{
       const shownT=if(t.len>perLine)t[t.len-perLine..]else t;
       const end=try d.text(x+pad,ty,s.textSmall,s.white,shownT);
       try d.leaf(.{end+2,ty+12},-m.halfPi,11,5,s.leaf,0.8,0.2);
-    }else _=try d.text(x+pad,ty,s.textSmall,s.dim,"THE KEY UNDER ESC TALKS WITH CLAUDE");
+    }else _=try d.text(x+pad,ty,s.textSmall,s.dim,"ENTER TALKS WITH CLAUDE");
   }
 };
 /// one line of the card: its text and whether Claude said it

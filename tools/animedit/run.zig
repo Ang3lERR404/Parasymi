@@ -369,7 +369,7 @@ pub fn main(init:std.process.Init)!void{
       .heading=game.player.heading(),
     };
     // (while the gardener types to Claude, the editor's own keys wait)
-    const chatting=if(el)|*l|l.keys(io,&input,game.uiTime)else false;
+    const chatting=if(el)|*l|l.keys(io,&input,game.uiTime,if(e.naming!=null).typing else.free)else false;
     if(!chatting)try e.handle(&input,screen,dt,&rg);
     if(el)|*l|try tendLink(l,&e,gpa,io,dt,game.uiTime,path);
     e.sample();

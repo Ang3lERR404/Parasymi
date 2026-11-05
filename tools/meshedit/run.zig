@@ -283,7 +283,7 @@ pub fn main(init:std.process.Init)!void{
     handles.clearRetainingCapacity();
     if(e.rigMode)try rigging.handles(&e,seen,origin,&handles,gpa)else for(e.pieces())|p|try handles.append(gpa,seen.project(origin+p.v.pos));
     // (while the gardener types to Claude, the editor's own keys wait)
-    const chatting=if(el)|*l|l.keys(io,&input,game.uiTime)else false;
+    const chatting=if(el)|*l|l.keys(io,&input,game.uiTime,if(e.naming!=null or e.renaming!=null).typing else.free)else false;
     if(!chatting)try e.handle(&input,handles.items,seen,origin);
     if(el)|*l|try tendLink(l,&e,gpa,io,dt,game.uiTime,path);
     e.sel=@min(e.sel,e.pieces().len-|1);
