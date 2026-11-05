@@ -24,6 +24,9 @@ is what the code must come back to.
   4. They begin to beat, faster and faster, until they converge,
      building the star hyena.
   5. The hyena takes the place the wolf once filled.
+  The star hyena is no stranger replacing the wolf: he is born from him,
+  the stilled light of the wolf-tree's leaves finding its heartbeat again
+  (the gardener: "exactly on point").
   What sets it off in play is still to shape.
 - **The wolf is not the player in act 2.** Never write "the wolf" as the
   one who plants, builds or draws tendrils there.
