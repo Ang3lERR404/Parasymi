@@ -393,8 +393,10 @@ fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path
   // the sculpt's text, and what the editor shows
   const doc=try meshedit.editor.text(gpa,&e.doc);
   defer gpa.free(doc);
-  var sb:[512]u8=undefined;
-  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty})catch"editor: meshedit\n";
+  var sb:[640]u8=undefined;
+  // what the gardener's hands are on (an edit waits while it is not free)
+  const hands=if(e.drag!=.none)"dragging (edits wait)"else if(e.naming!=null)"naming a form (Enter or Esc ends it; edits wait)"else if(e.renaming!=null)"renaming the sculpt (Enter or Esc ends it; edits wait)"else"free";
+  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\ngardener's hands: {s}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty,hands})catch"editor: meshedit\n";
   l.publish(io,state,doc);
 }
 /// `--try=`'s turns: pitch, yaw and roll (degrees), commas between, the ones left out none
