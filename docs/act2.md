@@ -85,7 +85,11 @@ is what the code must come back to.
   the surplus is stored in the galaxy at its heart, which swells and
   brightens, fullest at dawn; by day it spends that store, still sending
   light down the tendrils, the galaxy slowly shrinking back. How full it
-  is reads straight from the swirl's size and brightness.
+  is reads straight from the swirl's size and brightness. *Why* (the
+  gardener's own idea): the radiant lineage, and with it the astrocyme
+  (the light store), is gone after the unforming, so something had to
+  fill the astrocyme's place; the galaxy store is that, merged into the
+  gatherer itself.
 - Not part of the star caller. Still to shape: ~~its name~~, its numbers
   and the rest of its look.
 
