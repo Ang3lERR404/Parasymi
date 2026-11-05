@@ -9,8 +9,10 @@ is what the code must come back to.
 ## When it happens
 - Act 2 comes **only after the unforming** ([unforming.md](unforming.md)).
   The wolf, with the convergent lineage alone, makes the world rain and
-  storm, then roots himself into the garden's tree. Not built yet: the
-  rooting itself. `--act2` starts there (the unforming run through, the
+  storm, then takes root and becomes a tree himself, the garden's tree:
+  already made of wood and vines, he does not merge into some other tree,
+  he *becomes* one (the gardener). Not built yet: the rooting itself, and
+  how it is set off in play (still to shape). `--act2` starts there (the unforming run through, the
   fallen strange seed in his keeping).
 - **The wolf is not the player in act 2.** Never write "the wolf" as the
   one who plants, builds or draws tendrils there.

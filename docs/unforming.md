@@ -25,7 +25,7 @@ looks in [visual.md](visual.md#sky); watching it in [testing.md](testing.md#the-
   stop falling altogether.
 - Afterwards only the **convergent** lineage is left. With it alone the
   wolf has to make the world **rain** and **storm**; only then does he
-  root himself into the garden's tree, and act 2 begins.
+  take root and become the garden's tree himself, and act 2 begins.
 
 ## How it is reached
 1. **Four blooms** round an empty tile form a halo, and a **diamond** is
@@ -108,7 +108,8 @@ The phases (`Phase`) are `waiting` → `shattering` → `falling` → `landed`.
   unforming and the first rain.
 - **Act 2**: once the wolf, with the convergent lineage alone, has made
   the world rain (`firstRain`) and storm (`firstStorm`, the storm spire),
-  he roots himself into the garden's tree and the star hyena takes over.
+  he takes root and becomes the garden's tree himself, and the star hyena
+  takes over.
   The rooting is not yet in the game.
 
 ## Where it is drawn
