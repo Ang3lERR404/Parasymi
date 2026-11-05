@@ -279,6 +279,9 @@ pub const Def=struct{
   /// how far it bobs up and down, lifted by a hint of magic (m; 0: it
   /// stands still), all it draws with it (`bobAt`)
   bob:f32=0,
+  /// its little legs twitch and fidget now and then where it stands rooted
+  /// (the stellasaluumni; `vertex.partFidget`)
+  fidget:bool=false,
   /// its mesh is drawn by its own `emit` (a diamond: it forms on the GPU),
   /// not breathing and growing in as the others do; `mesh` is its preview
   bare:bool=false,

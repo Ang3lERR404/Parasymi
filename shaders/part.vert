@@ -52,6 +52,19 @@ const uint PART_GHOST = 1u;
 const uint PART_LEY_FRONDS = 2u;
 // iflags: no leaves, its crystals and runners turn ley-blue (vertex.partLeyCrystals)
 const uint PART_LEY_CRYSTALS = 4u;
+// iflags: its legs fidget (vertex.partFidget): what reaches out low round its
+// middle (FIDGET_FROM..FIDGET_TO across, under FIDGET_HIGH, mesh space, m)
+// lifts its tip and draws it in a little, now and then, each leg (by its
+// bearing, FIDGET_LEGS round) on a beat of its own, a brief twitch
+const uint PART_FIDGET = 8u;
+const float FIDGET_FROM = 0.1;
+const float FIDGET_TO = 0.28;
+const float FIDGET_HIGH = 0.2;
+const float FIDGET_LEGS = 7.0;
+const float FIDGET_RATE = 0.55;
+const float FIDGET_SHARP = 14.0;
+const float FIDGET_LIFT = 0.025;
+const float FIDGET_TUCK = 0.06;
 
 // this frame's bones (renderer Scene.bones): each carries a vertex from
 // where it was built to where it is now
@@ -1359,6 +1372,19 @@ void main() {
     carried = exp(-d * d / (CARRY_W * CARRY_W));
     wake = d < 0.0 ? exp(d / WAKE) * (1.0 - carried) : 0.0;
     p += nrm * SWELL * carried;
+  }
+  // a fidgeting thing's legs twitch now and then (a smooth field of the
+  // place, so shared vertices move alike)
+  if ((iflags & PART_FIDGET) != 0u) {
+    float reach = length(p.xz);
+    float leg = smoothstep(FIDGET_FROM, FIDGET_TO, reach) * (1.0 - smoothstep(0.0, FIDGET_HIGH, p.y));
+    if (leg > 0.0) {
+      float which = floor(atan(p.z, p.x) / TAU * FIDGET_LEGS + 0.5);
+      float own = hash12(vec2(which, ip.z * 17.0));
+      float twitch = pow(max(sin(t * FIDGET_RATE * (0.7 + 0.6 * own) + own * TAU * 3.0), 0.0), FIDGET_SHARP);
+      p.y += FIDGET_LIFT * twitch * leg;
+      p.xz *= 1.0 - FIDGET_TUCK * twitch * leg;
+    }
   }
   // secondary motion. Offsets must be identical for every copy of a shared
   // vertex (faceted parts carry different normals per face), so they use a

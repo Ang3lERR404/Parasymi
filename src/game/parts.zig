@@ -77,6 +77,8 @@ pub const Look=struct{
   carryCol:m.Vice(f32,3)=.{0,0,0},
   /// a placement preview: drawn, but casts no shadow
   ghost:bool=false,
+  /// its legs fidget (`vertex.partFidget`)
+  fidget:bool=false,
   /// how far it is blended into its mesh's next key (0..1; a bud opening
   /// between two of its shapes)
   morph:f32=0,
@@ -330,7 +332,7 @@ pub fn instance(mat:m.M4,look:Look)PartInstance{
     // placed by the matrix: e.yzw the carried essence's colour
     .e=.{0,look.carryCol[0],look.carryCol[1],look.carryCol[2]},
     .h=look.halo,
-    .flags=if(look.ghost)vertex.partGhost else 0,
+    .flags=(if(look.ghost)vertex.partGhost else 0)|(if(look.fidget)vertex.partFidget else 0),
     .k=.{look.morph,0,0,0},
   };
 }

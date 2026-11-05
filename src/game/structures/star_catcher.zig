@@ -45,7 +45,7 @@ const look=lib.starlightCatcher;
 pub const meshes=.{.catcherBead};
 /// what a catcher is: one tile of the symbiotic lineage, grown in 30 s,
 /// swaying a little, its body lifted and bobbing on a hint of magic
-pub const def:st.Def=.{.item=.starCatcher,.lineage=.symbiotic,.size=1,.mesh=.starCatcher,.grow=30,.sway=0.5,.tall=1.2,.bob=look.bob};
+pub const def:st.Def=.{.item=.starCatcher,.lineage=.symbiotic,.size=1,.mesh=.starCatcher,.grow=30,.sway=0.5,.tall=1.2,.bob=look.bob,.fidget=true};
 /// how long it takes to gather one starlight (s) at full night over a
 /// patch of plain yield (1): a richer patch quickens it, a poorer slows it
 pub const cycle:f32=40;

@@ -915,7 +915,7 @@ fn structures(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
     const bob=m.translate(m.v3(0,st.bobAt(s.def(),s.seed,tf),0));
     if(!s.def().bare)try g.parts.emit(s.def().mesh,m.chain(&.{bob,s.place(ctr),m.scale3(m.v3(breathe,2-breathe,breathe))}),.{
       .glow=glow+glowActive*a,.flutter=flutterAmount,.phase=s.seed,.fade=s.def().sap,
-      .sway=s.def().sway,.tall=s.def().tall,.grown=s.grown,
+      .sway=s.def().sway,.tall=s.def().tall,.grown=s.grown,.fidget=s.def().fidget,
     });
     try st.emit(s,&g.parts,ctr,tf);
     g.parts.around=null;

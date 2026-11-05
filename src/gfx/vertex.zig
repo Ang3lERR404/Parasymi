@@ -255,6 +255,10 @@ pub const partLeyCrystals:u32=4;
 /// `PartInstance.flags`: its fronds (tendrils) turn ley-blue in its light
 /// too, not its leaves alone; part.vert reads it as `PART_LEY_FRONDS`
 pub const partLeyFronds:u32=2;
+/// `PartInstance.flags`: its legs (what reaches out low round its middle)
+/// twitch and fidget now and then, each its own way; part.vert reads it as
+/// `PART_FIDGET`
+pub const partFidget:u32=8;
 /// a halo forming around a polyp (game/structures/polyp.zig), as an
 /// instance carries it to the shaders: xyz its centre (where the diamond
 /// sits), w how far it has come (0 the blooms leave their corners .. 1 they

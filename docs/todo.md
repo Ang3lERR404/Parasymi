@@ -49,8 +49,11 @@ carries the game's early days.
 - ~~**A rooted starlight catcher for the symbiotic lineage**, the
   garden's first starlight: built (`structures/star_catcher.zig`,
   [design.md](design.md#base-structures), [visual.md](visual.md#starlight-catcher)).~~
-  In game **stellasaluumni** (the gardener's "skitter bug"). Still open: whether it
-  can walk on its little legs in play (only the look is decided); the
+  In game **stellasaluumni** (the gardener's "skitter bug"). ~~Whether it
+  walks~~ decided (the gardener, 2026-11-05): it stays rooted, "easier to
+  debug until we have decently established dev tools"; its legs only
+  twitch and fidget now and then (`Def.fidget`, part.vert `PART_FIDGET`).
+  Walking may come back once the dev tools are better. The
   magic lifting it is kept subtle for now, the gardener may revisit it.
 - **Fibre after the unforming.** The loomfern (symbiotic) weaves fibre
   out of essence, but no convergent plant makes it, so once the
