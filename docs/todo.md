@@ -100,8 +100,11 @@ carries the game's early days.
   has to join the garden proper.
 - Act 2 keeping the hyena to the convergent and constellate lineages
   alone. By hand he weaves only the five constellate parts today
-  (`craft.byHyena`); how the convergent lineage serves him is not worked
-  out.
+  (`craft.byHyena`). ~~How the convergent lineage serves him~~ decided
+  ([act2.md](act2.md#the-convergent-lineage-his-hands)): his hands, its
+  weavers weaving for him; constellate things never feed on it. Not
+  built yet, nor the dish ([act2.md](act2.md#the-dish-gathering-the-scattered-starlight))
+  or convergent flowers turning to face him.
 - The constellate lineage has no studies yet, so no look for its nodes
   on the research tree ([research-tree.md](research-tree.md)).
 - A constellate plant that calls starlight back down. After the

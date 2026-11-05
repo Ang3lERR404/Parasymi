@@ -53,6 +53,27 @@ is what the code must come back to.
   anatomy, a smoother body (28 curved limbs, skinned, one bone each), less
   glare (each limb's lights dimmed where they crowd) and idle drift.
 - Look: `--samples=constellateHyena`; in play, `--act2`.
+- **Convergent flowers turn to face him** as he drifts past, like
+  sunflowers to the sun (the gardener: "that is perfect"). Not built yet.
+
+## The convergent lineage: his hands
+- The convergent lineage serves the star hyena as **his hands**: its
+  weavers (the monfris and kin) weave for him what he cannot by hand.
+- **Constellate things never feed on convergent essence.** The
+  gardener: "the constellate are the stars given form, their sacrecy is
+  unimposed by usual challenges" (*sacrecy*: their own word for
+  scarcity and sacredness at once).
+
+## The dish: gathering the scattered starlight
+- At the unforming the starlight dispersed thin across the sky, so
+  something must gather it: a new constellate part, **the dish**, cupped
+  like an arctic poppy's flower (which tracks the sun and focuses its
+  warmth). Alone it does nothing, as every constellate part.
+- **Combo: dish + stem + core** makes a light-gathering plant (the core is
+  merely a flower's base, its head): the stem lifts it, it slowly follows
+  the stars through the night, focusing their faint scattered light into
+  the core. Tendrils carry that light out to the other constellate things.
+- Not part of the star caller. Still to shape: its name, numbers and look.
 
 ## The strange seed
 - Its first model was a placeholder. It is a **crystal husk with a web
