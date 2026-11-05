@@ -128,9 +128,13 @@ a bug too quick to describe: the note says what the game thought, the
 shot what it drew.
 
 ## Talking to Claude while playing (`--link`)
-The game and Claude meet in a folder of the gardener's home,
-`%LOCALAPPDATA%\Parasymi\link\` (`game/link.zig`): plain files, no
-sockets, so nothing in the game ever waits on Claude.
+The game and Claude meet in `link\` in the project folder (the working
+directory both start in; `game/link.zig`, kept out of git): plain files,
+no sockets, so nothing in the game ever waits on Claude. Not AppData: the
+Claude app is a packaged app, and Windows gives it and all it starts a
+private copy of AppData, so a game started from the gardener's own
+console and the bridge would each look in a different folder. Start the
+game from the project folder.
 - **The game** (`--link`): Enter opens the chat sidebar (WHISPERS) at the
   right; type, Enter sends, Esc closes (the world holds still while
   typing). Claude's answers hang beside play for 20 s, fading. The game

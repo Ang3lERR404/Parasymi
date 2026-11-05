@@ -352,13 +352,17 @@ pub fn main(init:Init)!void{
     };
     if(trail!=null)log.info("recording a trail into {s}",.{trailDir});
   }
-  // the link's folder, opened (none without `--link`, or if it cannot be)
-  var lk:?lib.link.Link=if(linkOn)lib.link.Link.open(io,home.dir(),home.where())catch|e|blk:{
+  // the working directory's path, told in the link's log lines
+  var hereBuf:[lib.link.maxWhere]u8=undefined;
+  const here=lib.link.here(io,&hereBuf);
+  // the link's folder in the working directory, opened (none without
+  // `--link`, or if it cannot be)
+  var lk:?lib.link.Link=if(linkOn)lib.link.Link.open(io,Dir.cwd(),here)catch|e|blk:{
     log.err("link: {t}",.{e});
     break:blk null;
   }else null;
   defer if(lk)|*l|l.close(io);
-  if(lk!=null)log.info("linked: the chat to Claude opens with its key, files in {s}\\{s}",.{home.where(),lib.link.folder});
+  if(lk!=null)log.info("linked: the chat to Claude opens with its key, files in {s}\\{s}",.{here,lib.link.folder});
   // what was pressed since the link's state was last written, and its clock
   var linkState:lib.trail.Trail=.{.every=lib.link.stateEvery};
   // the shots still being written apart from the frames, each waited for

@@ -1,7 +1,7 @@
 //! the bridge between the game and Claude Code: a Model Context Protocol
 //! server Claude Code starts (`.mcp.json`) and talks to over stdin and
 //! stdout, one JSON-RPC message a line. It meets the game through the
-//! link folder in the gardener's home (`game/link.zig`): what the gardener
+//! link folder in the working directory (`game/link.zig`): what the gardener
 //! types in the game's chat is pushed into Claude's session as a channel
 //! event (`notifications/claude/channel`, when Claude Code runs with
 //! `--dangerously-load-development-channels server:parasymi`), and Claude
@@ -10,12 +10,10 @@
 //! Without the channel flag the tools still work; only the pushing waits.
 /// the standard library
 const std=@import("std");
-/// the game, for its link folder and the gardener's home
+/// the game, for its link folder
 const lib=@import("parasymi");
 /// the link's files and message lines
 const link=lib.link;
-/// the gardener's folder
-const home=lib.home;
 /// the allocator everything is made with
 const Allocator=std.mem.Allocator;
 /// the I/O interface every file call goes through
@@ -81,7 +79,7 @@ fn oneLine(comptime s:[]const u8)[]const u8{
 /// the bridge: the link folder, the gardener's file read so far, and the
 /// one writer every message out goes through
 const Bridge=struct{
-  /// the link folder in the gardener's home
+  /// the link folder in the working directory
   dir:Dir,
   /// the gardener's messages, read so far
   inbox:link.Inbox=.{},
@@ -250,17 +248,15 @@ fn fresh(io:Io,dir:Dir)bool{
   const now=Io.Clock.real.now(io).nanoseconds;
   return now-st.mtime.nanoseconds<freshS*std.time.ns_per_s;
 }
-/// opens the gardener's home and its link folder, then answers Claude Code
+/// opens the link folder, then answers Claude Code
 /// line by line until stdin closes, the watcher pushing beside it
 pub fn main(init:std.process.Init)!void{
   // the allocator, and the I/O
   const gpa=init.gpa;
   const io=init.io;
-  try home.open(io,init.environ_map);
-  defer home.close(io);
-  home.dir().createDirPath(io,link.folder)catch{};
-  // the link folder
-  var dir=try home.dir().openDir(io,link.folder,.{});
+  // the link folder, in the working directory (the project, as the game's)
+  Dir.cwd().createDirPath(io,link.folder)catch{};
+  var dir=try Dir.cwd().openDir(io,link.folder,.{});
   defer dir.close(io);
   // stdout and stdin, buffered
   var outBuf:[1<<16]u8=undefined;

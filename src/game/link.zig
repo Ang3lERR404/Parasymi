@@ -7,6 +7,13 @@
 //! `state.txt` fresh (what it believes, as the trail's note), and when the
 //! bridge leaves a `wantFrame` the game answers with `frame.png`.
 //! Plain files and no sockets: nothing in the game waits on Claude.
+//!
+//! The folder sits in the working directory (the project, where both
+//! `zig build run` and `.mcp.json`'s bridge start), not in AppData: the
+//! Claude app is a packaged app, and Windows hands it (and everything it
+//! starts) a private copy of AppData, so a game started from the
+//! gardener's own console and a bridge started by Claude would each meet
+//! in a different folder.
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -36,9 +43,19 @@ const testing=std.testing;
 const TextInput=lib.engine.ui.textInput.TextInput;
 /// the log, telling where messages went
 const log=std.log;
+/// the working directory's full path, for the log
+const currentPath=std.process.currentPath;
 // decision: file names, not player-facing text, so not in the strings
-/// the meeting place's folder, inside the gardener's home
+/// the meeting place's folder, inside the working directory
 pub const folder="link";
+/// the longest working directory path told in the log (bytes)
+pub const maxWhere=512;
+/// the working directory's full path written into `buf` (".", when it
+/// cannot be found), told so the log says where the meeting place is
+pub fn here(io:Io,buf:*[maxWhere]u8)[]const u8{
+  const n=currentPath(io,buf) catch return".";
+  return buf[0..n];
+}
 /// what the gardener said, a JSON line each, appended by the game
 pub const toClaude="toClaude.jsonl";
 /// what Claude said, a JSON line each, appended by the bridge
@@ -201,7 +218,7 @@ pub fn freeAll(gpa:Allocator,out:*ArrayList([]u8))void{
 /// the game's half of the link: its clocks, its reading of Claude's file,
 /// and a frame asked for
 pub const Link=struct{
-  /// the meeting place, opened inside the gardener's home
+  /// the meeting place, opened inside the working directory
   dir:Dir,
   /// the meeting place's full path, for the log
   where:[]const u8=".",
@@ -215,12 +232,12 @@ pub const Link=struct{
   sincePoll:f32=0,
   /// whether a frame was asked for and is still to be taken
   frameWanted:bool=false,
-  /// opens (making it) the meeting place in `home`, hearing only what
-  /// Claude says from now on
-  pub fn open(io:Io,home:Dir,where:[]const u8)Error!Link{
-    home.createDirPath(io,folder) catch return error.LinkUnwritable;
+  /// opens (making it) the meeting place in `base` (the working
+  /// directory, `where` its path), hearing only what Claude says from now on
+  pub fn open(io:Io,base:Dir,where:[]const u8)Error!Link{
+    base.createDirPath(io,folder) catch return error.LinkUnwritable;
     // the folder
-    const d=home.openDir(io,folder,.{}) catch return error.LinkUnreadable;
+    const d=base.openDir(io,folder,.{}) catch return error.LinkUnreadable;
     var l=Link{.dir=d,.where=where};
     l.inbox.skip(io,d,fromClaude);
     return l;
