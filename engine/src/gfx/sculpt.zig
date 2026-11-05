@@ -556,9 +556,27 @@ pub const Sculpt=struct{
       var solid=false;
       for(cand.items)|i|solid=solid or (!s.forms.items[i].f.carve and s.forms.items[i].f.ink==0);
       if(!solid)continue;
-      // the field at the block's centre
+      // the field at the block's centre, and how much farther it may read
+      // than the surface truly is: an ellipsoid's near distance overstates
+      // inside a flat one by up to its longest radius over its shortest,
+      // and a carve turns that inside out, so a block the hollow's floor
+      // passes through would be skipped (a hole)
       const d=s.dist(c,cand.items);
-      if(@abs(d)>half*1.6+2*h)continue;
+      var over:f32=1;
+      for(cand.items)|i|{
+        // the form looked at
+        const f=s.forms.items[i].f;
+        if(!f.carve)continue;
+        switch(f.shape){
+          .ellipsoid=>|e|{
+            // its radii as stretched
+            const r=e.r*f.stretch;
+            over=@max(over,@reduce(.Max,r)/@max(@reduce(.Min,r),1e-6));
+          },
+          else=>{},
+        }
+      }
+      if(@abs(d)>(half*1.6+2*h)*over)continue;
       map[(bz*nb[1]+by)*nb[0]+bx]=@intCast(blocks.items.len);
       try blocks.append(gpa,.{.at=.{bx,by,bz},.vals=undefined,.vid=@splat(noneId),.cand=try gpa.dupe(u32,cand.items)});
     };
@@ -836,4 +854,49 @@ test"a chain of one segment is its cone, and a bent chain is as near as its near
   // its sphere holds every point's ball
   const b=shapeBound(.{.chain=bent});
   for(0..3)|i|try testing.expect(m.dist(bent.pts[i],b.c)+0.03<=b.r+1e-6);
+}
+test"a flat hollow carved into a thin form leaves no holes: every edge is shared twice"{
+  // the test helpers
+  const testing=std.testing;
+  // the allocator the sculpt, builder and edge count use
+  const gpa=testing.allocator;
+  // a mesher with a single role
+  const M=@import("meshgen.zig").Mesher(enum(u32){stem},.stem);
+  // the builder the mesh goes into
+  var b:M.Builder=.{.gpa=gpa};
+  defer b.deinit();
+  // the one colour every form takes
+  const col=color.rgb(0.5,0.4,0.3).toRgba8(255);
+  // an ear: a thin paddle with a shallow, flat cup carved in its front
+  var s:Sculpt=.{.gpa=gpa,.parents=&.{null}};
+  defer s.deinit();
+  try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0,0,0),.r=v3(0.055,0.1,0.016)}},.bone=0,.col=col});
+  try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0,-0.005,0.02),.r=v3(0.037,0.075,0.012)}},.bone=0,.col=col,.carve=true,.k=0.006});
+  try s.mesh(M,&b,0.003,0.5,.stem);
+  try testing.expect(b.v.items.len>0);
+  // each edge, its two ends' bits in order, and how often triangles use it
+  var uses:std.AutoHashMap([6]u32,u32)=.init(gpa);
+  defer uses.deinit();
+  var t:usize=0;
+  while(t+3<=b.v.items.len):(t+=3){
+    for(0..3)|i|{
+      // the edge's two ends, as bits, the lesser first
+      const a=b.v.items[t+i].pos;
+      const c=b.v.items[t+(i+1)%3].pos;
+      const ka=[3]u32{@bitCast(a[0]),@bitCast(a[1]),@bitCast(a[2])};
+      const kc=[3]u32{@bitCast(c[0]),@bitCast(c[1]),@bitCast(c[2])};
+      const less=std.mem.order(u32,&ka,&kc)==.lt;
+      const key=if(less)ka++kc else kc++ka;
+      const g=try uses.getOrPut(key);
+      if(!g.found_existing)g.value_ptr.*=0;
+      g.value_ptr.*+=1;
+    }
+  }
+  // an edge used once is the rim of a hole
+  var open:usize=0;
+  var it=uses.valueIterator();
+  while(it.next())|n|{
+    if(n.*==1)open+=1;
+  }
+  try testing.expectEqual(@as(usize,0),open);
 }
