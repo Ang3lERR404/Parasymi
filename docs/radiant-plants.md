@@ -25,8 +25,10 @@ grid.
 - **Blooms are relays** (small poles): they carry light, they make none.
 - **The diamond is a big relay**: the same, wider and further (its field
   is already 7 tiles to a bloom's 3.5). It no longer stands alone.
-- The **driftwisp** (symbiotic) already makes starlight as an item, so no
-  radiant plant does that.
+- The **driftwisp** (in game the halyriphon, the gardener's lumi lantern)
+  is radiant now and makes starlight as an item, so no other radiant plant
+  does; it shatters at the unforming as the rest of them do (the gardener,
+  2026-11-05: "it shatters too").
 
 ## The solcyriphon: the gatherer (new radiant plant)
 Named by the gardener: sol (the sun) + Halcyra + siphon.

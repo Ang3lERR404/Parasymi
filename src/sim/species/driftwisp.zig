@@ -8,9 +8,12 @@ const species=lib.species;
 const engine=lib.engine;
 /// colour types, for its genome's pale blues
 const color=engine.core.color;
-/// the driftwisp: a floating symbiote that condenses starlight, swaying most of all
+/// the driftwisp (in game the halyriphon, the gardener's lumi lantern): a
+/// floating radiant plant that condenses starlight, swaying most of all
 pub const def:species.Species=.{
-  .lineage=.symbiotic,.seed=.seedDriftwisp,.floating=true,.catches=true,.yields=.starlight,
+  // decision (the gardener, 2026-11-05): radiant, so it shatters at the
+  // unforming as the light grid does; drawn with the symbiotes' sap as ever
+  .lineage=.radiant,.look=.symbiotic,.seed=.seedDriftwisp,.floating=true,.catches=true,.yields=.starlight,
   // a night beam's overdrive steeps starglass in its dish
   .rare=.starglass,
   .matureTime=20,.manaCap=8,.leyDraw=0.5,.share=0.4,.drain=0,.yield=0.06,

@@ -43,9 +43,9 @@ carries the game's early days.
   light, its filaments as strands of gathered light (held to the glow
   bar: its own colour, shimmering). *Its look is done and approved*
   ([visual.md](visual.md#the-lumi-lantern-halyriphon-drift-radiantkitlumi)).
-  Still open: the lineage move itself (in code it is still symbiotic;
-  radiant plants shatter at the unforming, so what happens to it then is
-  to be decided with the gardener).
+  ~~The lineage move~~ done: radiant in code (`species/driftwisp.zig`,
+  its symbiotes' sap look kept), and it shatters at the unforming (the
+  gardener: "it shatters too").
 - ~~**A rooted starlight catcher for the symbiotic lineage**, the
   garden's first starlight: built (`structures/star_catcher.zig`,
   [design.md](design.md#base-structures), [visual.md](visual.md#starlight-catcher)).~~
