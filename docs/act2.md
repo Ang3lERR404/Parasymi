@@ -33,7 +33,10 @@ is what the code must come back to.
   come, the player chooses when the wolf plants himself, and the choice
   is offered without saying what will happen: "It lets the player
   choose, but it does not tell them what is about to occur on purpose."
-  How the choice is offered is still to shape.
+- **How the choice is offered** (the gardener: "Something innocent is the
+  best illusion"): during a storm, one quiet prompt, innocent on its face
+  (say `{@action} rest here`), that says nothing of what follows. The
+  exact words are still the gardener's to pick.
 - **The wolf is not the player in act 2.** Never write "the wolf" as the
   one who plants, builds or draws tendrils there.
 
