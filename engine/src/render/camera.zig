@@ -162,8 +162,6 @@ pub const Camera=struct{
   pub fn viewProj(c:*const Camera)m.M4{
     // the far plane, further the further out it is
     const far=c.dist*farPerDist+farMin;
-    // the following view's direction, which the eased views blend from
-    const followDir=m.norm(c.aim()-c.eye());
     return switch(c.view){
       .follow=>m.mul(m.perspective(c.fov(),c.aspect,near,far),m.lookAt(c.eye(),c.aim(),upAxis)),
       .free=>|f|m.mul(m.perspective(freeFovy,c.aspect,freeNear,far),m.lookAt(f.pos,f.pos+f.forward(),f.up())),
@@ -172,20 +170,29 @@ pub const Camera=struct{
         const k=m.smooth(y.k);
         // where the view is
         const e=c.viewEye();
-        // which way it looks, blended from following to the eyes' gaze
-        const dir=m.norm(m.lerpV(followDir,toward(c.yaw,y.pitch),k));
-        break:blk m.mul(m.perspective(m.lerp(c.fov(),eyesFovy,k),c.aspect,m.lerp(near,eyesNear,k),far),m.lookAt(e,e+dir,upAxis));
+        break:blk m.mul(m.perspective(m.lerp(c.fov(),eyesFovy,k),c.aspect,m.lerp(near,eyesNear,k),far),m.lookAt(e,e+c.looking(),upAxis));
       },
       .returning=>|r|blk:{
         // how much of the free view is left, eased
         const w=1-m.smooth(m.clamp01(r.t/returnTime));
         // where the view is
         const e=c.viewEye();
-        // which way it looks and its up, blended from the free view's
-        const dir=m.norm(m.lerpV(followDir,r.from.forward(),w));
+        // its up, blended from the free view's
         const up=m.norm(m.lerpV(upAxis,r.from.up(),w));
-        break:blk m.mul(m.perspective(m.lerp(c.fov(),freeFovy,w),c.aspect,freeNear,far),m.lookAt(e,e+dir,up));
+        break:blk m.mul(m.perspective(m.lerp(c.fov(),freeFovy,w),c.aspect,freeNear,far),m.lookAt(e,e+c.looking(),up));
       },
+    };
+  }
+  /// which way the view looks now, a unit vector: the follow gaze, the free
+  /// view's forward, or the blend between them while easing (as `viewProj`)
+  pub fn looking(c:*const Camera)m.V3{
+    // the following view's direction, which the eased views blend from
+    const followDir=m.norm(c.aim()-c.eye());
+    return switch(c.view){
+      .follow=>followDir,
+      .free=>|f|f.forward(),
+      .eyes=>|y|m.norm(m.lerpV(followDir,toward(c.yaw,y.pitch),m.smooth(y.k))),
+      .returning=>|r|m.norm(m.lerpV(followDir,r.from.forward(),1-m.smooth(m.clamp01(r.t/returnTime)))),
     };
   }
   /// where the view actually is (the orbit eye, or wherever it flies).

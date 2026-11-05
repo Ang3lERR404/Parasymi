@@ -109,7 +109,18 @@ pub fn signedPow(x:f32,p:f32)f32{
 /// a 0..1 value quantised to a byte (clamped; truncates like the GPU's unorm).
 pub inline fn unorm8(x:f32)u8{return@intFromFloat(clamp01(x)*255);}
 /// degrees to radians.
-pub inline fn rad(deg:f32)f32{return deg*(pi/180.0);}
+pub inline fn rad(d:f32)f32{return d*(pi/180.0);}
+/// radians to degrees.
+pub inline fn deg(r:f32)f32{return r*(180.0/pi);}
+/// a ground direction's compass heading: degrees clockwise from north (-z),
+/// east (+x) 90, in 0..360
+pub fn heading(d:V3)f32{return@mod(deg(atan2(d[0],-d[2])),360);}
+/// the facing nearest a compass heading (degrees; `heading`)
+pub fn dirOfHeading(h:f32)Dir{
+  // the quarter turn from north it lies nearest, north 0 clockwise
+  const q:u2=@intFromFloat(@mod(@round(h/90),4));
+  return q+%3;
+}
 /// shortest signed difference `to - from`, wrapped into -pi..pi.
 pub inline fn angleDiff(from:f32,to:f32)f32{return atan2(@sin(to-from),@cos(to-from));}
 // ---- tiles ----
@@ -840,6 +851,17 @@ test"ortho maps its box onto clip space, near to depth 0, far to 1"{
 }
 test"degrees to radians, and a triangle's centroid"{
   try testing.expectApproxEqAbs(halfPi,rad(90),1e-6);
+  try testing.expectApproxEqAbs(@as(f32,90),deg(halfPi),1e-4);
+  // compass headings: north -z, east +x, south +z, west -x, and their facings
+  try testing.expectApproxEqAbs(@as(f32,0),heading(v3(0,0,-1)),1e-4);
+  try testing.expectApproxEqAbs(@as(f32,90),heading(v3(1,0,0)),1e-4);
+  try testing.expectApproxEqAbs(@as(f32,180),heading(v3(0,0,1)),1e-4);
+  try testing.expectApproxEqAbs(@as(f32,270),heading(v3(-1,0,0)),1e-4);
+  for(dirs)|d|{
+    const v=dirVec(d);
+    try testing.expectEqual(d,dirOfHeading(heading(v3(f(v.x),0,f(v.z)))));
+  }
+  try testing.expectEqual(@as(Dir,3),dirOfHeading(359));
   // a triangle's centre
   const c=centroid(v3(0,0,0),v3(3,0,0),v3(0,3,6));
   try testing.expectApproxEqAbs(@as(f32,1),c[0],1e-6);

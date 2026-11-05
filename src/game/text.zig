@@ -437,8 +437,15 @@ pub const Strings=struct{
     counts:S="",
     /// debug: instances, parts and draw calls
     draws:S="",
-    /// debug: the wolf's tile and the time of day
+    /// debug: the wolf's place (x, y, z) and the time of day
     pos:S="",
+    /// debug: the wolf's tile, its chunk, and the tile within that chunk
+    place:S="",
+    /// debug: the way the view looks (x, y, z), its compass facing, its
+    /// heading (degrees from north, clockwise) and pitch (degrees, up +)
+    looking:S="",
+    /// debug: the hovered tile and what stands on it
+    aimed:S="",
     /// debug: starlit patches near and meshed chunks
     motes:S="",
   }=.{},

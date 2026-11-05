@@ -54,6 +54,11 @@ const gen=lib.gen;
 const timeWrap:f64=3600;
 /// no hovered tile: a position far off any tile
 const noHover:f32=1e9;
+/// the push's `misc.y` flags (common.glsl `LEY_SIGHT`, `DEBUG_GRID`): ley
+/// sight understood, and the debug grid drawn on the ground while F3 is on
+const flagLeySight:f32=1;
+/// (see `flagLeySight`)
+const flagDebugGrid:f32=2;
 /// no wolf: its paws' contact shadows far off any tile
 const noFeet=[2]m.V3{m.splat3(noHover),m.splat3(noHover)};
 /// fog thickens over this many chunks' eighths past the camera distance
@@ -253,7 +258,7 @@ pub fn scene(g:*Game,screen:m.Vice(f32,2))Allocator.Error!renderer.Scene{
       .vp=g.cam.viewProj(),
       .eyeTime=.{eye[0],eye[1],eye[2],tf},
       .fog=.{sky[0],sky[1],sky[2],(1-shiftClear*g.sky.shift)/(fogReach+g.cam.dist)},
-      .misc=.{veil,if(g.prog.done.contains(.leySight))1 else 0,hv[0],hv[1]},
+      .misc=.{veil,(if(g.prog.done.contains(.leySight))flagLeySight else 0)+(if(g.debug)flagDebugGrid else 0),hv[0],hv[1]},
       .sun=.{ld[0],ld[1],ld[2],g.sky.daylight()},
       .view=.{g.cam.target[0],g.cam.target[2],reach*fogNear,reach},
       .feet=.{

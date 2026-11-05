@@ -24,7 +24,7 @@ layout(push_constant) uniform Push {
   mat4 vp;
   vec4 eye_time;  // xyz camera eye, w time (s)
   vec4 fog;       // rgb fog/sky colour (linear), w fog density
-  vec4 misc;      // x veil 0..1, y ley sight 0/1, zw hovered tile (x,z)
+  vec4 misc;      // x veil 0..1, y flags (1 ley sight, 2 debug grid), zw hovered tile (x,z)
   vec4 sun;       // xyz direction toward the key light (sun or moon), w daylight 0..1
   vec4 feet[2];   // the wolf's paws: xyz world position; [0].w facing yaw, [1].w the sky's shift
   vec4 view;      // xy camera target (x,z), z fog-out start, w fog-out end (horizontal)
@@ -38,6 +38,9 @@ layout(push_constant) uniform Push {
 // far the veil has drawn over it (0 none .. 1 full)
 #define DAYLIGHT pc.sun.w
 #define VEIL pc.misc.x
+// the flags in misc.y: ley sight shown (1), the debug grid on the ground (2)
+#define LEY_SIGHT mod(pc.misc.y, 2.0)
+#define DEBUG_GRID (pc.misc.y >= 2.0)
 // how far the unforming has shifted the sky, 0 the old one .. 1 the ley's
 // glow for good (sky.zig `Sky.shift`); the ley lines seal over part of it
 #define SHIFT pc.feet[1].w

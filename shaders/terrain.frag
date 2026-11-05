@@ -61,6 +61,19 @@ const float STAR_GLOW = 0.06;
 const float STAR_SHIMMER = 0.9;
 const float STAR_GLINTS = 5.0;
 const float STAR_GLINT_RATE = 1.7;
+// the debug grid (F3): tile edges, each tile's fan diagonals (where its four
+// triangles meet) and chunk borders, their colours and widths (pixels)
+const vec3 GRID_TILE = vec3(1.0, 0.85, 0.2);
+const vec3 GRID_FAN = vec3(0.2, 0.9, 1.0);
+const vec3 GRID_CHUNK = vec3(1.0, 0.2, 0.8);
+const float GRID_CHUNK_TILES = 32.0; // (chunk.zig sizeTiles; must match)
+const float GRID_WIDTH = 1.0;
+// how near (pixels) point `d` lies to a line `d` = 0, its screen rate `w`:
+// 1 on it, 0 a width away
+float gridLine(vec2 d, vec2 w, float width) {
+  vec2 k = 1.0 - smoothstep(vec2(0.0), w * width, abs(d));
+  return max(k.x, k.y);
+}
 
 void main() {
   vec3 n = normalize(v_nrm);
@@ -88,7 +101,7 @@ void main() {
     float pulse = leyPulse(v_pos, t);
 #endif
     vec3 leyc = mix(LEY, LEY_VEILED, VEIL);
-    glow += leyc * pc.misc.y * ley * ley * 0.45 * pulse * (1.0 - closed);
+    glow += leyc * LEY_SIGHT * ley * ley * 0.45 * pulse * (1.0 - closed);
     glow += SEAM * seam * (0.6 + 0.4 * pulse);
     // a faint plexus drifting over the ley lines themselves
     // (only evaluated where it shows: it is the costliest thing on the ground)
@@ -167,5 +180,19 @@ void main() {
     float strength = PAW_SHADOW_DARK / ((1.0 + lift * 5.0) * (1.0 + lift * 5.0));
     c *= 1.0 - strength * (1.0 - smoothstep(0.1, 1.0, e));
   }
-  o = vec4(applyFog(c, v_pos), 1.0);
+  c = applyFog(c, v_pos);
+  // the debug grid, over the fog so it reads at any distance
+  if (DEBUG_GRID) {
+    vec2 p = v_pos.xz;
+    vec2 w = fwidth(p);
+    vec2 f = fract(p);
+    float tile = gridLine(f - round(f), w, GRID_WIDTH);
+    float fan = gridLine(vec2(f.x - f.y, f.x + f.y - 1.0), vec2(w.x + w.y), GRID_WIDTH) * 0.6;
+    vec2 q = p / GRID_CHUNK_TILES;
+    float chunk = gridLine((q - round(q)) * GRID_CHUNK_TILES, w, GRID_WIDTH * 2.5);
+    c = mix(c, GRID_FAN, fan);
+    c = mix(c, GRID_TILE, tile * 0.8);
+    c = mix(c, GRID_CHUNK, chunk);
+  }
+  o = vec4(c, 1.0);
 }

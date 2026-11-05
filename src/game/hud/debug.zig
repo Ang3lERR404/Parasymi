@@ -1,4 +1,6 @@
-//! F3: frame/sim timings and world counts.
+//! F3: frame/sim timings, world counts, where the wolf stands (tile and
+//! chunk), which way the view looks and what the cursor points at; the
+//! ground draws its tile, fan and chunk grid meanwhile (terrain.frag).
 const lib=@import("../../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -20,6 +22,14 @@ const margin=s.edge;
 const bw:f32=364;
 /// the height of one line (pixels)
 const lineH:f32=22;
+/// the chunks: their size, and a tile's chunk
+const ck=lib.ck;
+/// the name of what stands on tile `hv`: a structure, else a plant, else nothing
+fn aimedName(g:*const play.Game,hv:m.Vice(i32,2))[]const u8{
+  if(g.structs.touched(&g.world,hv[0],hv[1]))|j|return txt.item(g.structs.list.items[j.idx()].def().item).name;
+  if(g.plantAt(hv))|p|return txt.plant(g.plants.list.items(.sp)[p.idx()]).name;
+  return txt.s.describe.nothing;
+}
 /// shown while the debug key has it toggled on.
 pub fn visible(g:*const play.Game)bool{return g.debug;}
 /// draws a card at the top right: frame, GPU and sim times, world counts,
@@ -29,7 +39,7 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,_:f32)Allocator.Error!void{
   const rs=g.renderStats;
   const bx=w-bw-margin;
   // how many lines it holds, and so the card's height
-  const lines=7;
+  const lines=10;
   const bh=lineH*m.f(lines)+28;
   try d.trellis(bx,14,bw,bh,s.card,0.85);
   // where the next line's top sits (pixels), moving down a line each print
@@ -44,7 +54,22 @@ pub fn draw(g:*play.Game,d:*Draw,w:f32,_:f32)Allocator.Error!void{
   y+=lineH;
   _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.draws,.{rs.instances,rs.parts,rs.draws});
   y+=lineH;
-  _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.pos,.{g.player.pos[0],g.player.pos[2],g.sky.tod});
+  _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.pos,.{g.player.pos[0],g.player.pos[1],g.player.pos[2],g.sky.tod});
+  y+=lineH;
+  // the wolf's tile, the chunk it lies in, and where in that chunk
+  const t=m.tileAt(g.player.pos);
+  const cc=ck.Coord.ofTile(t[0],t[1]);
+  _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.place,.{t[0],t[1],cc.x,cc.y,@mod(t[0],ck.sizeTiles),@mod(t[1],ck.sizeTiles)});
+  y+=lineH;
+  // which way the view looks, and its heading round the compass
+  const gz=g.cam.looking();
+  const hd=m.heading(gz);
+  _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.looking,.{gz[0],gz[1],gz[2],txt.nth(txt.s.hud.facing,m.dirOfHeading(hd)),hd,m.deg(m.atan2(gz[1],m.len(m.v3(gz[0],0,gz[2]))))});
+  y+=lineH;
+  // the hovered tile and what stands on it
+  if(g.hover)|hv|{
+    _=try d.print(bx+18,y,s.textLabel,s.white,txt.s.hud.aimed,.{hv[0],hv[1],aimedName(g,hv)});
+  }else _=try d.print(bx+18,y,s.textLabel,s.dim,txt.s.hud.aimed,.{0,0,txt.s.describe.nothing});
   y+=lineH;
   _=try d.print(bx+18,y,s.textLabel,s.dim,txt.s.hud.motes,.{g.starlight.near.n,rs.meshed});
 }

@@ -145,7 +145,8 @@ pub const WorldPush=extern struct{
   eyeTime:m.Vice(f32,4),
   /// rgb the fog and sky colour (linear), w the fog's density
   fog:m.Vice(f32,4),
-  /// x the veil 0..1, y ley sight 0/1, zw the hovered tile (x, z)
+  /// x the veil 0..1, y flags (1 ley sight, 2 the debug grid: view.zig
+  /// `flagLeySight`), zw the hovered tile (x, z)
   misc:m.Vice(f32,4),
   /// xyz the way toward the key light (sun or moon), w daylight 0..1
   sun:m.Vice(f32,4),
