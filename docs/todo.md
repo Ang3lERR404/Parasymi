@@ -344,6 +344,15 @@ whorls and bell bloom.
 - **Whole:** a soap-bubble shimmer and one breath of far choir ("ooh"),
   breaking into a fizz of crystal grains that scatter and fade.
 
+## Modular sound
+*The gardener, 2026-11-05. Kept, not to build yet.* Sound is built the
+way the garden is: every part has its own note, and when parts join their
+notes join into a chord, so a whole thing sings as one. The constellate
+dish, stem and core each hum a note and, snapped together, sing as one
+flower; the radiant forming sound's climbing tinks already do this. The
+unforming theme's held D is the root under it all, the world's own note
+as its light becomes stars.
+
 ## Hidden plants
 *Ideas, kept to be talked over one at a time.*
 - **The homage corner.** A nod to Magic Farm 2: Fairy Lands (Meridian93,
