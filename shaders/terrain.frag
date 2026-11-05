@@ -122,14 +122,18 @@ void main() {
   vec3 albedo = v_col;
   if (ground) {
     // the ground's own stuff: its kinds melted along frayed borders, each
-    // with its surface, the finest grain fading where a pixel spans too much
-    vec2 p = v_pos.xz;
+    // with its surface, the finest grain fading where a pixel spans too much.
+    // Worked out at the pixel's middle, not its centroid: where a triangle's
+    // edge crosses a pixel its centroid moves inside the triangle, so screen
+    // derivatives of it jump there and the bumps dotted every edge
+    vec3 at = interpolateAtOffset(v_pos, vec2(0.0));
+    vec2 p = at.xz;
     float span = length(fwidth(p));
     float fine = 1.0 - smoothstep(GRAIN_FADE * 0.5, GRAIN_FADE, span);
     GroundSurface g = groundOf(p, groundBlend(p, v_mat), fine);
     albedo = g.albedo;
     // its bumps tip the normal (the surface gradient, from screen derivatives)
-    vec3 dpx = dFdx(v_pos), dpy = dFdy(v_pos);
+    vec3 dpx = dFdx(at), dpy = dFdy(at);
     vec3 r1 = cross(dpy, n), r2 = cross(n, dpx);
     float det = dot(dpx, r1);
     vec3 grad = sign(det) * (dFdx(g.height) * r1 + dFdy(g.height) * r2);
