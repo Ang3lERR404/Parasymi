@@ -7,8 +7,23 @@ const Io=std.Io;
 const Dir=Io.Dir;
 /// whether two byte strings are the same
 const eql=std.mem.eql;
-/// whether an argument begins with a flag's name
-const startsWith=std.mem.startsWith;
+/// the command line's flags, split once at the edge (engine core)
+const flag=ps.engine.core.flag;
+/// every flag the mesh editor takes, by its own spelling (`flag.parse`)
+const Flag=enum{
+  /// `--mesh=`: the sculpt's name
+  mesh,
+  /// `--gizmo=`: what the gizmo does to start
+  gizmo,
+  /// `--shot`: one frame saved, then closed
+  shot,
+  /// `--rig`: start in rig mode
+  rig,
+  /// `--try=<pitch>,<yaw>,<roll>`: the last bone test-turned so
+  @"try",
+  /// `--rename=`: the sculpt renamed so at once
+  rename,
+};
 /// reads a decimal number (`--try=`)
 /// splits text at each comma (`--try=`)
 const splitScalar=std.mem.splitScalar;
@@ -116,12 +131,16 @@ pub fn main(init:std.process.Init)!void{
   // `--rename=<name>`: the sculpt renamed so at once, as a click on its path would
   var renameAs:?[]const u8=null;
   for(args[1..])|a|{
-    if(startsWith(u8,a,"--mesh="))name=a["--mesh=".len..];
-    if(startsWith(u8,a,"--gizmo="))mode=stringToEnum(gizmo.Mode,a["--gizmo=".len..]) orelse return error.BadGizmo;
-    if(eql(u8,a,"--shot"))shot=true;
-    if(eql(u8,a,"--rig"))startRig=true;
-    if(startsWith(u8,a,"--try="))tryTurn=try turnsOf(a["--try=".len..]);
-    if(startsWith(u8,a,"--rename="))renameAs=a["--rename=".len..];
+    // the argument as one of its flags (none: passed over)
+    const f=flag.parse(Flag,a) orelse continue;
+    switch(f.name){
+      .mesh=>if(f.value)|v|{name=v;},
+      .gizmo=>if(f.value)|v|{mode=stringToEnum(gizmo.Mode,v) orelse return error.BadGizmo;},
+      .shot=>if(f.value==null){shot=true;},
+      .rig=>if(f.value==null){startRig=true;},
+      .@"try"=>if(f.value)|v|{tryTurn=try turnsOf(v);},
+      .rename=>if(f.value)|v|{renameAs=v;},
+    }
   }
   if(name.len==0 or indexOfAny(u8,name,notInName)!=null){
     log.err("--mesh={s}: a plain file name, kept as "++dir++"/<name>"++ext,.{name});

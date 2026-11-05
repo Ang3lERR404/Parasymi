@@ -7,8 +7,27 @@ const Io=std.Io;
 const Dir=Io.Dir;
 /// whether two byte strings are the same
 const eql=std.mem.eql;
-/// whether an argument begins with a flag's name
-const startsWith=std.mem.startsWith;
+/// the command line's flags, split once at the edge (engine core)
+const flag=ps.engine.core.flag;
+/// every flag the animation editor takes, by its own spelling (`flag.parse`)
+const Flag=enum{
+  /// `--wolf`: the clip moves the wolf
+  wolf,
+  /// `--plant=`: a species the clip moves
+  plant,
+  /// `--structure=`: a structure the clip moves
+  structure,
+  /// `--mesh=`: a sculpt the clip moves
+  mesh,
+  /// `--clip=`: the clip's name
+  clip,
+  /// `--at=`: where the playhead starts (s)
+  at,
+  /// `--channel=`: the channel selected at the start
+  channel,
+  /// `--shot`: one frame saved, then closed
+  shot,
+};
 /// where in a name any of a set of bytes first falls
 const indexOfAny=std.mem.indexOfAny;
 /// a name turned into its enum tag, or null if none matches
@@ -133,14 +152,18 @@ pub fn main(init:std.process.Init)!void{
   // `--shot`: save one frame and close
   var shot=false;
   for(args[1..])|a|{
-    if(eql(u8,a,"--wolf"))subject=.wolf;
-    if(startsWith(u8,a,"--plant="))subject=.{.thing=.{.plant=stringToEnum(ps.species.Id,a["--plant=".len..]) orelse return error.BadPlant}};
-    if(startsWith(u8,a,"--structure="))subject=.{.thing=.{.structure=stringToEnum(ps.structures.Kind,a["--structure=".len..]) orelse return error.BadStructure}};
-    if(startsWith(u8,a,"--mesh="))subject=.{.sculpt=a["--mesh=".len..]};
-    if(startsWith(u8,a,"--clip="))name=a["--clip=".len..];
-    if(startsWith(u8,a,"--at="))start=try std.fmt.parseFloat(f32,a["--at=".len..]);
-    if(startsWith(u8,a,"--channel="))channel=a["--channel=".len..];
-    if(eql(u8,a,"--shot"))shot=true;
+    // the argument as one of its flags (none: passed over)
+    const f=flag.parse(Flag,a) orelse continue;
+    switch(f.name){
+      .wolf=>if(f.value==null){subject=.wolf;},
+      .plant=>if(f.value)|v|{subject=.{.thing=.{.plant=stringToEnum(ps.species.Id,v) orelse return error.BadPlant}};},
+      .structure=>if(f.value)|v|{subject=.{.thing=.{.structure=stringToEnum(ps.structures.Kind,v) orelse return error.BadStructure}};},
+      .mesh=>if(f.value)|v|{subject=.{.sculpt=v};},
+      .clip=>if(f.value)|v|{name=v;},
+      .at=>if(f.value)|v|{start=try std.fmt.parseFloat(f32,v);},
+      .channel=>if(f.value)|v|{channel=v;},
+      .shot=>if(f.value==null){shot=true;},
+    }
   }
   // who the clip moves, which the flags must say
   const sj=subject orelse {

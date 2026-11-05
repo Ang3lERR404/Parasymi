@@ -36,6 +36,8 @@ pub const core=struct{
   pub const png=@import("core/png.zig");
   /// sound shaping: oscillators, envelopes, filters, voices
   pub const dsp=@import("core/dsp.zig");
+  /// the command line's flags, split once and named by the caller's enum
+  pub const flag=@import("core/flag.zig");
 };
 /// what touches the machine: keys, the screen, the speakers
 pub const platform=struct{
@@ -135,6 +137,7 @@ test{
   _=core.text;
   _=core.png;
   _=core.dsp;
+  _=core.flag;
   _=platform.input;
   _=platform.audio;
   _=anim.rig;

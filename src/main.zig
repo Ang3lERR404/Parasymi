@@ -23,8 +23,67 @@ const parseInt=std.fmt.parseInt;
 const eql=std.mem.eql;
 /// whether two values are the same field by field (the settings)
 const eqlDeep=std.meta.eql;
-/// whether an argument begins with a flag's name
-const startsWith=std.mem.startsWith;
+/// the command line's flags, split once at the edge (engine core)
+const flag=lib.engine.core.flag;
+/// every flag the game takes, by its own spelling (`--name` or
+/// `--name=value`): read once by `flag.parse` and switched on, so a flag
+/// the switch forgets won't build
+const Flag=enum{
+  /// `--full=`: the wolf's belly held this full
+  full,
+  /// `--inspect[=focus]`: orbit and take shots, then quit
+  inspect,
+  /// `--record[=S]`: a playback trail of shots and notes
+  record,
+  /// `--link`: talk with Claude while playing
+  link,
+  /// `--shots=`: how many inspect shots
+  shots,
+  /// `--orbit=`: seconds an inspect orbit takes
+  orbit,
+  /// `--dist=`: how far the inspect eye stands
+  dist,
+  /// `--pitch=`: degrees the inspect eye looks down
+  pitch,
+  /// `--novsync`: frames as fast as they come
+  novsync,
+  /// `--rt=on|off`: ray-traced shadows or not
+  rt,
+  /// `--demo`: the test garden, fast-forwarded
+  demo,
+  /// `--stress`: a 120×120 plant field
+  stress,
+  /// `--load`: the newest saved garden
+  load,
+  /// `--unforming`: the world event begins at once
+  unforming,
+  /// `--act2`: the star hyena's act
+  act2,
+  /// `--tod=`: the time of day
+  tod,
+  /// `--speed=`: how much faster the world runs
+  speed,
+  /// `--seed=`: the world's seed
+  seed,
+  /// `--plant=`: one species alone
+  plant,
+  /// `--structure=`: one structure alone
+  structure,
+  /// `--sculpt=`: one sculpt alone, looping its clip
+  sculpt,
+  /// `--samples=`: library meshes side by side
+  samples,
+  /// `--state=`: how the lone thing is held or looped
+  state,
+  /// `--period=`: seconds a loop takes
+  period,
+  /// `--lit=`: the share of light a lone structure is held in
+  lit,
+  /// `--crown=`: the crown a lone structure wears
+  crown,
+  /// `--panel=`: a HUD panel held open
+  panel,
+};
 /// a value seen as its raw bytes (a fresh seed is filled through it)
 const asBytes=std.mem.asBytes;
 /// what the process is handed at start: allocators, I/O, args, environment
@@ -189,53 +248,61 @@ pub fn main(init:Init)!void{
   // `--full=`: the wolf's belly held this full (0..1), for shots of it at one size
   var full:?f32=null;
   for(args[1..])|a|{
-    if(startsWith(u8,a,"--full="))full=m.clamp01(try parseFloat(f32,a["--full=".len..]));
-    if(eql(u8,a,"--inspect"))inspect=.player;
-    if(startsWith(u8,a,"--inspect="))inspect=try orbit.Focus.parse(a["--inspect=".len..]);
-    if(eql(u8,a,"--record"))trail=.{};
-    if(eql(u8,a,"--link"))linkOn=true;
-    if(startsWith(u8,a,"--record="))trail=.{.every=try parseFloat(f32,a["--record=".len..])};
-    if(startsWith(u8,a,"--shots="))turn.shots=try parseInt(u32,a["--shots=".len..],0);
-    if(startsWith(u8,a,"--orbit="))turn.period=try parseFloat(f32,a["--orbit=".len..]);
-    if(startsWith(u8,a,"--dist="))turn.dist=try parseFloat(f32,a["--dist=".len..]);
-    if(startsWith(u8,a,"--pitch="))turn.pitch=m.rad(try parseFloat(f32,a["--pitch=".len..]));
-    if(eql(u8,a,"--novsync"))opts.vsync=false;
-    if(eql(u8,a,"--rt=on"))opts.rayTracing=true;
-    if(eql(u8,a,"--rt=off"))opts.rayTracing=false;
-    if(eql(u8,a,"--demo"))demo=true;
-    if(eql(u8,a,"--stress"))stress=true;
-    if(eql(u8,a,"--load"))load=true;
-    if(eql(u8,a,"--unforming"))unforming=true;
-    if(eql(u8,a,"--act2"))act2=true;
-    if(startsWith(u8,a,"--tod="))tod=try parseFloat(f32,a["--tod=".len..]);
-    if(startsWith(u8,a,"--speed="))speed=try parseFloat(f64,a["--speed=".len..]);
-    if(startsWith(u8,a,"--seed="))seed=try parseInt(u64,a["--seed=".len..],0);
-    if(startsWith(u8,a,"--plant="))lone=.{.what=.{.plant=stringToEnum(species.Id,a["--plant=".len..]) orelse return error.BadPlant}};
-    if(startsWith(u8,a,"--structure="))lone=.{.what=.{.structure=stringToEnum(st.Kind,a["--structure=".len..]) orelse return error.BadStructure}};
-    if(startsWith(u8,a,"--sculpt=")){
-      // the sculpt named, which must be on the shelf
-      const i=lib.sculpts.find(a["--sculpt=".len..]) orelse {
-        log.err("{s}: no such sculpt in "++lib.sculptDoc.dir,.{a});
-        return error.BadSculpt;
-      };
-      if(i>=lib.sculpts.slots){
-        log.err("{s}: only the first {d} sculpts by name are drawn",.{a,lib.sculpts.slots});
-        return error.BadSculpt;
-      }
-      lone=.{.what=.{.sculpt=@intCast(i)}};
+    // the argument as one of the flags (none: it is passed over, as ever),
+    // and its value, for the flags that need one
+    const f=flag.parse(Flag,a) orelse continue;
+    const bare=f.value==null;
+    switch(f.name){
+      .inspect=>inspect=if(f.value)|v|try orbit.Focus.parse(v)else .player,
+      .record=>trail=if(f.value)|v|.{.every=try parseFloat(f32,v)}else .{},
+      .link=>if(bare){linkOn=true;},
+      .novsync=>if(bare){opts.vsync=false;},
+      .demo=>if(bare){demo=true;},
+      .stress=>if(bare){stress=true;},
+      .load=>if(bare){load=true;},
+      .unforming=>if(bare){unforming=true;},
+      .act2=>if(bare){act2=true;},
+      .rt=>if(f.value)|v|{
+        if(eql(u8,v,"on"))opts.rayTracing=true;
+        if(eql(u8,v,"off"))opts.rayTracing=false;
+      },
+      .full=>if(f.value)|v|{full=m.clamp01(try parseFloat(f32,v));},
+      .shots=>if(f.value)|v|{turn.shots=try parseInt(u32,v,0);},
+      .orbit=>if(f.value)|v|{turn.period=try parseFloat(f32,v);},
+      .dist=>if(f.value)|v|{turn.dist=try parseFloat(f32,v);},
+      .pitch=>if(f.value)|v|{turn.pitch=m.rad(try parseFloat(f32,v));},
+      .tod=>if(f.value)|v|{tod=try parseFloat(f32,v);},
+      .speed=>if(f.value)|v|{speed=try parseFloat(f64,v);},
+      .seed=>if(f.value)|v|{seed=try parseInt(u64,v,0);},
+      .plant=>if(f.value)|v|{lone=.{.what=.{.plant=stringToEnum(species.Id,v) orelse return error.BadPlant}};},
+      .structure=>if(f.value)|v|{lone=.{.what=.{.structure=stringToEnum(st.Kind,v) orelse return error.BadStructure}};},
+      .sculpt=>if(f.value)|v|{
+        // the sculpt named, which must be on the shelf
+        const i=lib.sculpts.find(v) orelse {
+          log.err("{s}: no such sculpt in "++lib.sculptDoc.dir,.{a});
+          return error.BadSculpt;
+        };
+        if(i>=lib.sculpts.slots){
+          log.err("{s}: only the first {d} sculpts by name are drawn",.{a,lib.sculpts.slots});
+          return error.BadSculpt;
+        }
+        lone=.{.what=.{.sculpt=@intCast(i)}};
+      },
+      .samples=>if(f.value)|v|{lone=.{.what=.{.samples=try specimen.Samples.parse(v)}};},
+      .state=>if(f.value)|v|{state=try specimen.State.parse(v);},
+      .period=>if(f.value)|v|{period=try parseFloat(f32,v);},
+      .lit=>if(f.value)|v|{lit=m.clamp01(try parseFloat(f32,v));},
+      .crown=>if(f.value)|v|{crown=stringToEnum(lib.lightCrown.Design,v) orelse return error.BadCrown;},
+      .panel=>if(f.value)|v|{
+        if(eql(u8,v,"overview")){
+          panel=.roam;
+          overview=true;
+        }else panel=switch(stringToEnum(play.Mode,v) orelse return error.BadPanel){
+          inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming,.title,.chat=>|p|p,
+          else=>return error.BadPanel,
+        };
+      },
     }
-    if(startsWith(u8,a,"--samples="))lone=.{.what=.{.samples=try specimen.Samples.parse(a["--samples=".len..])}};
-    if(startsWith(u8,a,"--state="))state=try specimen.State.parse(a["--state=".len..]);
-    if(startsWith(u8,a,"--period="))period=try parseFloat(f32,a["--period=".len..]);
-    if(startsWith(u8,a,"--lit="))lit=m.clamp01(try parseFloat(f32,a["--lit=".len..]));
-    if(startsWith(u8,a,"--crown="))crown=stringToEnum(lib.lightCrown.Design,a["--crown=".len..]) orelse return error.BadCrown;
-    if(eql(u8,a,"--panel=overview")){
-      panel=.roam;
-      overview=true;
-    }else if(startsWith(u8,a,"--panel="))panel=switch(stringToEnum(play.Mode,a["--panel=".len..]) orelse return error.BadPanel){
-      inline.belly,.research,.paused,.options,.keybinds,.gardens,.naming,.title,.chat=>|p|p,
-      else=>return error.BadPanel,
-    };
   }
   if(lone)|*l|{
     if(!state.suits(l.what))return error.BadState;
