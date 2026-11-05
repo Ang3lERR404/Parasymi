@@ -293,7 +293,12 @@ Factorio's belts, each side a short row of items**.
 - **Constellate:** picks the kind and the lane and reaches farthest. No
   arm: a small web unravels the item into fragments that drift into the
   stream and reform inside the lane.
-- Still to shape: how the base one looks.
+- ~~Still to shape: how the base one looks.~~ *Its look* (the gardener,
+  2026-11-05: "a mix of all 3"): a root knuckle pushes up out of the soil
+  and bends toward the lane; at its tip a single-leaf sprout whose leaf is
+  a seed pod. The pod splits open to catch the item, closes round it, and
+  the knuckle nudges it into its lane. Plain and humble, from before
+  either lineage.
 
 ## The radiant lineage's forming sound
 *Direction approved, not built.* Fantasy mixed with sci-fi: real glass,
