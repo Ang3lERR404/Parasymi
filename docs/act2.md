@@ -80,6 +80,12 @@ is what the code must come back to.
   night's stars").
 - *Its heart* (the gardener's pick): where the cup focuses the light, a
   slow swirl turns like a miniature galaxy, never a single bright point.
+- *Night and day* (the gardener: "it's brilliant"): by day it weakens but
+  never stops. Through the night it gathers more than it sends out, and
+  the surplus is stored in the galaxy at its heart, which swells and
+  brightens, fullest at dawn; by day it spends that store, still sending
+  light down the tendrils, the galaxy slowly shrinking back. How full it
+  is reads straight from the swirl's size and brightness.
 - Not part of the star caller. Still to shape: ~~its name~~, its numbers
   and the rest of its look.
 
