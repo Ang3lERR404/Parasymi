@@ -26,6 +26,8 @@ const testing=std.testing;
 const values=std.enums.values;
 /// finds a token in a string (tests)
 const indexOf=std.mem.indexOf;
+/// whether two strings are the same
+const eql=std.mem.eql;
 /// a type's fields, for counting list entries against enums
 const fields=std.meta.fields;
 /// the engine package
@@ -250,6 +252,8 @@ pub const Strings=struct{
   hud:struct{
     /// the controls line along the bottom, every `{@action}` as bound
     controls:S="",
+    /// the mouse wheel, before the zoom keys (`{@wheel}`; the pad's hints show none)
+    wheel:S="",
     /// one ingredient in a recipe: how many (`{0}`) and its short name (`{1}`)
     ingredient:S="",
     /// what stands for something not yet understood
@@ -683,8 +687,23 @@ pub fn unload(gpa:Allocator)void{
   padded=.{};
   padShown=false;
 }
-/// `{@name}`: the first key or button bound to action `name`.
+/// what walks: the four move keys, or the pad's left stick (`{@move}`)
+const moveToken="move";
+/// the mouse wheel before the zoom keys (`{@wheel}`; nothing on the pad)
+const wheelToken="wheel";
+/// the four ways walked, in the order their keys are shown
+const moves=[_]ctl.Action{.moveForward,.moveLeft,.moveBack,.moveRight};
+/// `{@name}`: the first key or button bound to action `name`; `{@move}`
+/// the four move keys, `{@wheel}` the mouse wheel.
 fn action(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
+  if(eql(u8,name,moveToken)){
+    for(moves)|a|if(keyOf(a))|b|try bindName(w,b);
+    return true;
+  }
+  if(eql(u8,name,wheelToken)){
+    try w.writeAll(s.hud.wheel);
+    return true;
+  }
   // the action named; none, and the token is not one
   const a=stringToEnum(ctl.Action,name) orelse return false;
   // the keys and buttons bound to it
@@ -695,6 +714,13 @@ fn action(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
 /// `{@name}` for the pad: the first pad button or trigger bound to action
 /// `name`, as its byte (drawn as the button); none bound, its key
 fn padAction(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
+  // walking is the left stick (never bound: it is read as a stick)
+  if(eql(u8,name,moveToken)){
+    try w.writeByte(draw.padByte(.{.pad=.left_thumb}).?);
+    return true;
+  }
+  // the pad zooms by its own buttons, shown beside: no wheel
+  if(eql(u8,name,wheelToken))return true;
   // the action named; none, and the token is not one
   const a=stringToEnum(ctl.Action,name) orelse return false;
   // the keys and buttons bound to it
@@ -705,6 +731,11 @@ fn padAction(w:*Io.Writer,name:[]const u8)Io.Writer.Error!bool{
   };
   if(binds.len>0)try bindName(w,binds[0]);
   return true;
+}
+/// the first key or mouse button bound to action `a` (never the pad's)
+fn keyOf(a:ctl.Action)?input.Bind{
+  for(ctl.map.getPtrConst(a).items())|b|if(!b.onPad())return b;
+  return null;
 }
 /// how a key or button is shown: its `[key]`/`[mouse]` name in the cfg,
 /// else its binding name in capitals.
