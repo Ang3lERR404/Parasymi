@@ -203,6 +203,9 @@ pub const Hit=struct{
 };
 /// a build hands the cores blocks of the field this many at least
 const jobBlocks=4;
+/// how strongly an ink holds its colour inside it against the solids
+/// under it (the solid nearest weighs 1)
+const inkWeight:f32=8;
 /// a seamless surface sculpted out of forms melted into one: its forms,
 /// how bones join, and how softly weights and colours blend
 pub const Sculpt=struct{
@@ -467,21 +470,31 @@ pub const Sculpt=struct{
         part=pf.f.part;
       }
     }
-    // the colours summed by weight, and the weights' sum
+    // the solids' colours summed by weight (each by how near it is next
+    // to the nearest), and the weights' sum
     var c=v3(0,0,0);
     var sum:f32=0;
     for(list)|i|{
       // the form blended in
       const pf=&s.forms.items[i];
-      if(pf.f.carve)continue;
-      // its distance at `p`
-      const d=formDist(pf,p);
-      // its weight: an ink by how far inside its fade, a solid by how near it is next to the nearest
-      const w=if(pf.f.ink>0)8*@exp(-@max(d,0)/pf.f.ink)else@exp(-(d-best)/s.blend);
+      if(pf.f.carve or pf.f.ink>0)continue;
+      const w=@exp(-(formDist(pf,p)-best)/s.blend);
       c+=colV(pf.f.col)*m.splat3(w);
       sum+=w;
     }
-    return.{.c=c/m.splat3(@max(sum,1e-9)),.part=part};
+    c/=m.splat3(@max(sum,1e-9));
+    // decision: inks are painted on in the list's order, each over the
+    // ones before (white over yellow, as in a drawing); one ink alone
+    // weighs against the solids as it always did
+    for(list)|i|{
+      // the ink painted on
+      const pf=&s.forms.items[i];
+      if(pf.f.carve or pf.f.ink==0)continue;
+      // its weight, by how far inside its fade
+      const w=inkWeight*@exp(-@max(formDist(pf,p),0)/pf.f.ink);
+      c=m.lerpV(c,colV(pf.f.col),w/(w+sum));
+    }
+    return.{.c=c,.part=part};
   }
   /// mesh the surface with cells `h` across into `b`, a builder of the
   /// mesher `M` (gfx/meshgen.zig `Mesher`), every vertex the role of the
@@ -899,4 +912,27 @@ test"a flat hollow carved into a thin form leaves no holes: every edge is shared
     if(n.*==1)open+=1;
   }
   try testing.expectEqual(@as(usize,0),open);
+}
+test"inks are painted in order: where two overlap the later one shows"{
+  // the test helpers
+  const testing=std.testing;
+  // the allocator the sculpt uses
+  const gpa=testing.allocator;
+  // the body's blue, and the two inks' yellow and white
+  const blue=color.rgb(0.2,0.3,0.7).toRgba8(255);
+  const yellow=color.rgb(0.95,0.9,0.2).toRgba8(255);
+  const white=color.rgb(0.95,0.95,0.95).toRgba8(255);
+  // each order: yellow then white, white then yellow
+  for([_][2]color.Rgba8{.{yellow,white},.{white,yellow}})|inks|{
+    // a ball, its two inks over the same spot
+    var s:Sculpt=.{.gpa=gpa,.parents=&.{null}};
+    defer s.deinit();
+    try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0,0,0),.r=m.splat3(0.1)}},.bone=0,.col=blue});
+    for(inks)|c|try s.add(.{.shape=.{.ellipsoid=.{.c=v3(0,0,0.1),.r=m.splat3(0.05)}},.bone=0,.col=c,.ink=0.005});
+    // the colour where both cover the surface: the later ink's
+    const at=s.colourFrom(v3(0,0,0.1),&.{0,1,2}).c;
+    const later=colV(inks[1]);
+    const earlier=colV(inks[0]);
+    try testing.expect(m.dist(at,later)<0.25*m.dist(later,earlier));
+  }
 }
