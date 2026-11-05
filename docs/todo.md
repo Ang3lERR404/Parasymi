@@ -196,7 +196,7 @@ hues are being chosen from samples.*
   diamond's halo shoots a narrower, directed beam into the ring's
   rainbow; where it lands, a flat camera-facing mote of light appears and
   travels along the ring, so each bloom's link is seen running round it.
-- **A solcyriphon over a diamond amplifies it** (the gardener's idea).
+- ~~**A solcyriphon over a diamond amplifies it**~~ done (`light.lensGain`, 1.05; no look of its own yet). (the gardener's idea).
   When its night beam strikes a diamond directly, the diamond acts as a
   lens: the light it carries is multiplied, by about 5%. Solcyriphons
   never stack it: one beam, one boost. Update radiant-plants.md when

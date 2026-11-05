@@ -212,6 +212,10 @@ boost.
 - **Budget:** a relay carries on all it is given (no cap: the gardener
   found one too punishing), shared out by draw. If its users want more than
   reaches it, each gets the same share (carried ÷ wanted).
+- **A diamond under a beam is a lens:** when a solcyriphon's night beam
+  strikes a diamond straight on, the light the diamond carries is
+  multiplied by 1.05 (`light.lensGain`). Beams never stack it: one
+  boost, however many shine on it.
 - **Halcyra:** alone, it guards every plant within 2 tiles.
 
 ### Drawing

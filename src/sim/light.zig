@@ -44,6 +44,9 @@ pub const needAt:f32=0.25;
 /// how near under a solcyriphon a floater must hang to catch its beam (m,
 /// flat across the ground)
 pub const beamCatch:f32=0.6;
+/// how much a diamond a night beam strikes multiplies the light it carries
+/// (the gardener: about 5%; beams never stack it)
+pub const lensGain:f32=1.05;
 /// the most a heliocyra takes from the field it stands in (glow)
 pub const stripTake:f32=3;
 /// the share of a strip's light a heliocyra keeps as it bends it on
@@ -170,6 +173,9 @@ const Node=struct{
   parent:u32=none,
   /// how it was reached
   way:Way=.link,
+  /// a diamond a solcyriphon's night beam strikes: it acts as a lens, the
+  /// light it carries multiplied by `lensGain` (one beam or many, once)
+  lensed:bool=false,
 };
 /// the grid, worked out each tick: per plant, per relay and per user what
 /// it carries or gets, the beams, the strips and the threads of light
@@ -295,6 +301,8 @@ pub const Light=struct{
         // way from dawn to dusk to dawn, never turning round where the beam
         // outgrows the day's glow (it flickered there)
         nd.supply+=beam;
+        // a diamond struck straight on is a lens (structures' relays are diamonds)
+        if(l.nodes.items[r].ref==.relay)l.nodes.items[r].lensed=true;
         try l.beams.append(gpa,.{.from=id,.glow=beam,.onto=.relay,.x=nd.x,.y=nd.y,.k=night,.into=l.nodes.items[r].ref});
         continue;
       }
@@ -452,7 +460,7 @@ pub const Light=struct{
     for(l.order.items)|u|{
       // the node, what reached it and what it carries
       const nd=&ns[u];
-      nd.carried=@min(nd.supply+nd.got,nd.cap);
+      nd.carried=@min((nd.supply+nd.got)*(if(nd.lensed)lensGain else 1),nd.cap);
       // an astrocyme makes up its users' shortfall from its store
       if(storeOf(s,nd.*)>0){
         // the plant, and how much its users go short
@@ -723,6 +731,23 @@ test"by night the beam pours into the relay under it, or overdrives the plant un
   // by day, no beam
   try b.run(gpa,0);
   try testing.expectEqual(@as(f32,0),b.l.beamed.items[root.idx()]);
+}
+test"a diamond a night beam strikes is a lens: what it carries grows by lensGain, once"{
+  // the test allocator, and a small garden
+  const gpa=testing.allocator;
+  var b=try Bench.init(gpa);
+  defer b.deinit(gpa);
+  // a solcyriphon, and a diamond (a structure's relay) right under it
+  _=try b.put(gpa,4,4,.solcyriphon);
+  const under=[_]Relay{.{.at=m.v3(4.5,0,4.5),.radius=7,.carry=species.uncapped,.link=14,.x=4,.y=4}};
+  try b.l.update(gpa,&b.p,&b.w,&under,&.{},1,testDt);
+  // the whole beam reaches it, and it carries a twentieth more
+  const beam=species.get(.solcyriphon).glow[1];
+  try testing.expectApproxEqAbs(beam*lensGain,b.l.relayCarried.items[0],1e-3);
+  // a diamond the beam misses (linked, two tiles off) is no lens
+  const beside=[_]Relay{.{.at=m.v3(6.5,0,4.5),.radius=7,.carry=species.uncapped,.link=14,.x=6,.y=4}};
+  try b.l.update(gpa,&b.p,&b.w,&beside,&.{},1,testDt);
+  try testing.expect(b.l.relayCarried.items[0]<=beam+1e-3);
 }
 test"a halcyra beside a plant guards it alone; alone, it guards all round it"{
   // the test allocator, and a small garden
