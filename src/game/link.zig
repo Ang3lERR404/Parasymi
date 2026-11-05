@@ -79,6 +79,11 @@ pub const editTmp="edit.txt.part";
 /// the editor's answer to an edit (taken, or why not), written before
 /// the edit is taken away
 pub const editResultFile="editResult.txt";
+/// left by the bridge: how a linked editor's camera should look (a word
+/// and its numbers a line, tools/orbit.zig `Ask`); taken away once taken
+pub const viewFile="view.txt";
+/// the view while it is still being written (renamed when whole)
+pub const viewTmp="view.txt.part";
 /// the longest message kept, in bytes (longer is cut)
 pub const maxText=280;
 /// how many messages the sidebar keeps

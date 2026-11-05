@@ -28,6 +28,8 @@ const Dir=Io.Dir;
 const Writer=Io.Writer;
 /// a JSON value, read loosely
 const Value=std.json.Value;
+/// a JSON object's fields (a tool's arguments)
+const ObjectMap=std.json.ObjectMap;
 /// reads one JSON-RPC message
 const parseFromSlice=std.json.parseFromSlice;
 /// writes a JSON value
@@ -67,7 +69,8 @@ const instructions=
   \\The mesh and animation editors can be linked the same way (--link): then
   \\game_state and game_frame tell and show the editor, reply lands in its
   \\chat card, editor_document gives the open sculpt or clip as its file's
-  \\text, and editor_edit takes a whole edited text back as one undoable step.
+  \\text, editor_edit takes a whole edited text back as one undoable step,
+  \\and editor_view turns the editor's camera (focus a form, zoom, pan) and shows it.
 ;
 /// the tools offered, as Claude Code lists them (on one line: a message
 /// is one line)
@@ -76,7 +79,8 @@ const toolsJson=oneLine(
   \\{"name":"game_state","description":"What the running game believes right now: mode, where back leads, camera, the wolf's place, hotbar, what is pointed at, actions pressed lately.","inputSchema":{"type":"object","properties":{}}},
   \\{"name":"game_frame","description":"A picture of what the running game shows right now (half size PNG).","inputSchema":{"type":"object","properties":{}}},
   \\{"name":"editor_document","description":"The sculpt (meshedit) or clip (animedit) open in a linked editor, as the text its file holds.","inputSchema":{"type":"object","properties":{}}},
-  \\{"name":"editor_edit","description":"Give a linked editor a whole edited sculpt or clip text (editor_document's, changed): it is taken as one step of the editor's history, so ctrl+z there takes it back. Answers whether it was taken.","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"The whole edited document"}},"required":["text"]}}]
+  \\{"name":"editor_edit","description":"Give a linked editor a whole edited sculpt or clip text (editor_document's, changed): it is taken as one step of the editor's history, so ctrl+z there takes it back. Answers whether it was taken.","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"The whole edited document"}},"required":["text"]}},
+  \\{"name":"editor_view","description":"Turn a linked editor's camera at once, then answer with its frame. Each left out keeps the view: home (back to the first view), focus (meshedit: frame form N, counted from 1), then at, dist, yaw, pitch, zoom, pan.","inputSchema":{"type":"object","properties":{"home":{"type":"boolean","description":"back to the view the editor opened with, first"},"focus":{"type":"integer","description":"meshedit: the form (from 1) to frame first"},"at":{"type":"array","items":{"type":"number"},"description":"the point looked at, [x,y,z] m from the subject's foot"},"dist":{"type":"number","description":"how far from the target (m)"},"yaw":{"type":"number","description":"turn round the target (degrees; 0 looks down -z from +z, 90 from +x)"},"pitch":{"type":"number","description":"height over the target (degrees; 90 straight down, negative from under)"},"zoom":{"type":"number","description":"wheel notches nearer (negative: back)"},"pan":{"type":"array","items":{"type":"number"},"description":"move the target across the view, [right,up,forward] m"}}}}]
 );
 /// `s` with its line breaks taken out, at compile time
 fn oneLine(comptime s:[]const u8)[]const u8{
@@ -163,7 +167,27 @@ const Bridge=struct{
       const t=text orelse return toolText(w,id,"editor_edit needs the whole edited text",true);
       return b.edit(gpa,io,id,t,w);
     }
+    if(eql(u8,name,"editor_view"))return b.view(gpa,io,id,args,w);
     return toolText(w,id,"no such tool",true);
+  }
+  /// leaves Claude's ask of a linked editor's camera, waits for it to be
+  /// taken, then answers with the frame it shows
+  fn view(b:*Bridge,gpa:Allocator,io:Io,id:Value,args:?ObjectMap,w:*Writer)!void{
+    if(!fresh(io,b.dir))return toolText(w,id,"no editor is running with --link (no fresh state)",true);
+    // the ask's text, a word and its numbers a line
+    var buf:[1024]u8=undefined;
+    var tw:Writer=.fixed(&buf);
+    viewText(args,&tw) catch return toolText(w,id,"editor_view: at and pan are three numbers each; the rest one number (home true or false)",true);
+    b.dir.writeFile(io,.{.sub_path=link.viewTmp,.data=tw.buffered()}) catch return toolText(w,id,"could not write the view",true);
+    Dir.rename(b.dir,link.viewTmp,b.dir,link.viewFile,io) catch return toolText(w,id,"could not leave the view",true);
+    // how long has been waited (ms)
+    var waited:u32=0;
+    while(waited<frameWaitMs):(waited+=lookMs){
+      io.sleep(.fromMilliseconds(lookMs),.awake)catch{};
+      if(b.dir.access(io,link.viewFile,.{}))|_|continue else|_|return b.frame(gpa,io,id,w);
+    }
+    b.dir.deleteFile(io,link.viewFile)catch{};
+    return toolText(w,id,"the editor did not take the view in time (is it the game that is linked, not an editor?)",true);
   }
   /// leaves a whole edited document for the linked editor and waits for
   /// it to be taken, answered with the editor's word on it
@@ -280,6 +304,29 @@ fn picture(gpa:Allocator,w:*Writer,id:Value,png:[]const u8)!void{
   try w.writeAll(enc);
   try w.writeAll("\"}]}}");
 }
+/// a JSON number as a float, or null when it is none
+fn num(v:Value)?f64{
+  return switch(v){.integer=>|i|@floatFromInt(i),.float=>|x|x,else=>null};
+}
+/// the names of the one-number words of a view's ask (tools/orbit.zig `Ask`)
+const viewNums=[_][]const u8{"dist","yaw","pitch","zoom"};
+/// the names of the three-number words
+const viewTriples=[_][]const u8{"at","pan"};
+/// writes `editor_view`'s arguments as the ask's text the editor reads
+fn viewText(args:?ObjectMap,w:*Writer)error{BadView,WriteFailed}!void{
+  const a=args orelse return;
+  if(a.get("home"))|h|switch(h){.bool=>|on|if(on)try w.writeAll("home\n"),else=>return error.BadView};
+  if(a.get("focus"))|f|switch(f){.integer=>|n|try w.print("focus {d}\n",.{n}),else=>return error.BadView};
+  for(viewTriples)|word|if(a.get(word))|v|{
+    // three numbers, no more or fewer
+    const xs=switch(v){.array=>|l|l.items,else=>return error.BadView};
+    if(xs.len!=3)return error.BadView;
+    try w.print("{s}",.{word});
+    for(xs)|x|try w.print(" {d}",.{num(x) orelse return error.BadView});
+    try w.writeByte('\n');
+  };
+  for(viewNums)|word|if(a.get(word))|v|try w.print("{s} {d}\n",.{word,num(v) orelse return error.BadView});
+}
 /// writes the channel event for one of the gardener's messages
 fn event(w:*Writer,text:[]const u8)!void{
   try w.writeAll("{\"jsonrpc\":\"2.0\",\"method\":\"notifications/claude/channel\",\"params\":{\"content\":");
@@ -356,7 +403,7 @@ test"tools are listed, unknown methods refused, notifications unanswered"{
   var b=testBridge(tmp.dir,&sink.writer);
   const l=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"tools/list\"}");
   defer l.deinit();
-  try testing.expectEqual(@as(usize,5),l.value.object.get("result").?.object.get("tools").?.array.items.len);
+  try testing.expectEqual(@as(usize,6),l.value.object.get("result").?.object.get("tools").?.array.items.len);
   // every answer is one line: the protocol splits messages on line breaks
   var one:Writer.Allocating=.init(testing.allocator);
   defer one.deinit();
@@ -378,6 +425,19 @@ test"tools are listed, unknown methods refused, notifications unanswered"{
   const bad=try ask(&b,"{oops");
   defer bad.deinit();
   try testing.expectEqual(@as(i64,-32700),bad.value.object.get("error").?.object.get("code").?.integer);
+}
+test"a view's arguments become the ask's lines; a bad one is refused"{
+  // the arguments, read as Claude Code sends them
+  const p=try parseFromSlice(Value,testing.allocator,"{\"home\":true,\"focus\":2,\"at\":[0,0.1,0],\"yaw\":45,\"zoom\":-1.5}",.{});
+  defer p.deinit();
+  var buf:[256]u8=undefined;
+  var w:Writer=.fixed(&buf);
+  try viewText(p.value.object,&w);
+  try testing.expectEqualStrings("home\nfocus 2\nat 0 0.1 0\nyaw 45\nzoom -1.5\n",w.buffered());
+  const bad=try parseFromSlice(Value,testing.allocator,"{\"pan\":[1,2]}",.{});
+  defer bad.deinit();
+  var w2:Writer=.fixed(&buf);
+  try testing.expectError(error.BadView,viewText(bad.value.object,&w2));
 }
 test"reply lands in the game's file; state needs a running game"{
   var tmp=testing.tmpDir(.{});

@@ -175,6 +175,15 @@ carries the game's early days.
   clip, change forms (add, move, turn, size, shade, nest) or keys, and
   see the editor's view; every change goes through the editor's history,
   so ctrl+z takes back anything Claude did.
+- ~~**Claude turns the editors' camera**~~ done: the bridge's
+  `editor_view` (home, focus a form, at, dist, yaw, pitch, zoom, pan),
+  answered with the frame ([testing.md](testing.md)). (the gardener's
+  idea, 2026-11-05, while their mouse was out of batteries.)
+- **The pad in the editors** (the gardener's find, 2026-11-05: the mouse
+  out of batteries, the pad did nothing). meshedit and animedit answer
+  only the mouse and keyboard; give them the pad as the game has it
+  (orbit and zoom on the sticks, select and the toolbar's buttons by
+  `ctl.Action`s), never the Xbox or Share buttons.
 - **Claude playtests through the link** (the gardener's idea, 2026-11-04,
   while playing linked). The link already shows Claude the state and
   the frame; give the bridge tools to press actions too (move, turn the

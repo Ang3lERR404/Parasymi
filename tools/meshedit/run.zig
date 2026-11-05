@@ -325,6 +325,17 @@ pub fn main(init:std.process.Init)!void{
       cam.focus(origin+v.pos,@reduce(.Max,v.size));
     }
     e.focus=false;
+    // Claude's ask of the view, through the link: a form framed, or the
+    // first view, then turned, placed and zoomed as asked
+    if(el)|*l|if(l.takeView(io))|ask|{
+      if(ask.home)cam.send(origin+v3(0,lookUp,0),camDist);
+      if(ask.focus)|n|if(n>=1 and n<=e.pieces().len){
+        // the form's values
+        const v=e.pieces()[n-1].v;
+        cam.focus(origin+v.pos,@reduce(.Max,v.size));
+      };
+      cam.take(ask,origin);
+    };
     cam.step(&game.cam,dt);
     try renderer.syncWorld(r,&game.world,6,renderer.meshMs);
     // the scene as the game sees it, but only the ground and the sculpt
@@ -383,7 +394,7 @@ fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path
   const doc=try meshedit.editor.text(gpa,&e.doc);
   defer gpa.free(doc);
   var sb:[512]u8=undefined;
-  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty})catch"editor: meshedit\n";
+  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty})catch"editor: meshedit\n";
   l.publish(io,state,doc);
 }
 /// `--try=`'s turns: pitch, yaw and roll (degrees), commas between, the ones left out none

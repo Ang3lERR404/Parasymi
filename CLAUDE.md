@@ -142,8 +142,8 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot --link]
                                   # the camera orbits freely, `.` focuses the selected form
                                   # (gizmos: tools/gizmo.zig)
                                   # both editors: --link talks with Claude, who reads and
-                                  # edits the sculpt or clip, each edit one undo step
-                                  # (docs/testing.md); ctrl+z undo, ctrl+y redo, a whole
+                                  # edits the sculpt or clip, each edit one undo step,
+                                  # and turns the view (docs/testing.md); ctrl+z undo, ctrl+y redo, a whole
                                   # drag one step (tools/history.zig)
 zig build audiocheck              # sound path check (tools/audiocheck.zig): plays a
                                   # dsp.Voice through platform.audio, records it back by

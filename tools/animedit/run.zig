@@ -391,6 +391,12 @@ pub fn main(init:std.process.Init)!void{
       if(e.gizmoAt(&rg))|at|cam.focus(at.g.at,jointSize)else cam.send(home,homeDist);
     }
     e.focus=false;
+    // Claude's ask of the view, through the link: the first view, then
+    // turned, placed and zoomed as asked (a form's focus is meshedit's)
+    if(el)|*l|if(l.takeView(io))|ask|{
+      if(ask.home)cam.send(home,homeDist);
+      cam.take(ask,game.player.pos);
+    };
     cam.step(&game.cam,dt);
     game.player.animate(&game.world,dt);
     try game.simulate(dt);
@@ -451,7 +457,7 @@ fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path
   const doc=try animedit.editor.text(gpa,&e.clip);
   defer gpa.free(doc);
   var sb:[512]u8=undefined;
-  const state=std.fmt.bufPrint(&sb,"editor: animedit\nclip: {s}\nlength: {d:.2} s, playhead {d:.2} s, playing {}\nchannels keyed: {d}; selected channel: {s}\nunsaved changes: {}\n(editor_document gives the clip's text; editor_edit takes a whole edited one)\n",.{path,e.clip.length,e.t,e.playing,e.clip.tracks.items.len,e.chName(e.sel),e.dirty})catch"editor: animedit\n";
+  const state=std.fmt.bufPrint(&sb,"editor: animedit\nclip: {s}\nlength: {d:.2} s, playhead {d:.2} s, playing {}\nchannels keyed: {d}; selected channel: {s}\nunsaved changes: {}\n(editor_document gives the clip's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.clip.length,e.t,e.playing,e.clip.tracks.items.len,e.chName(e.sel),e.dirty})catch"editor: animedit\n";
   l.publish(io,state,doc);
 }
 /// one frame of the loading screen; false once the window is closed

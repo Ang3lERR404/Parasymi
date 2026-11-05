@@ -4,7 +4,8 @@
 //! chat (the grave key, under Esc, opens it; Enter sends, Esc closes); Claude answers
 //! into it. The editor keeps `state.txt` (what is open) and
 //! `document.txt` (the sculpt or clip as its file would hold it) fresh,
-//! answers a frame asked for, and takes a whole edited document Claude
+//! answers a frame asked for, turns its camera as Claude asks
+//! (`view.txt`), and takes a whole edited document Claude
 //! leaves in `edit.txt` as one step of its history, so ctrl+z takes back
 //! anything Claude did.
 /// the game, reached through its import hub
@@ -35,6 +36,8 @@ const png=engine.core.png;
 const Shot=ps.renderer.Shot;
 /// the editors' typing keys (shared with their name fields)
 const labels=@import("labels.zig");
+/// Claude's ask of the editor's camera
+const Ask=@import("orbit.zig").Ask;
 /// the log, for a link file that cannot be written
 const log=std.log;
 /// how often the state and the document are rewritten (s)
@@ -141,6 +144,18 @@ pub const EditLink=struct{
   /// free, then to `answer`)
   pub fn takeEdit(el:*EditLink,gpa:Allocator,io:Io)?[]u8{
     return el.link.dir.readFileAlloc(io,link.editFile,gpa,.limited(maxEdit))catch{return null;};
+  }
+  /// how Claude asked the camera to look, if an ask waits (taken away;
+  /// one that will not read is let go, logged)
+  pub fn takeView(el:*EditLink,io:Io)?Ask{
+    // the ask's text (small)
+    var buf:[1024]u8=undefined;
+    const t=el.link.dir.readFile(io,link.viewFile,&buf)catch{return null;};
+    el.link.dir.deleteFile(io,link.viewFile)catch|e|log.warn("link: view NOT taken away: {t}",.{e});
+    return Ask.parse(t)catch|e|{
+      log.warn("link: view: {t}",.{e});
+      return null;
+    };
   }
   /// tells Claude how its edit went (`result`), then takes the edit away
   /// (the bridge waits for it to go, then reads the answer)

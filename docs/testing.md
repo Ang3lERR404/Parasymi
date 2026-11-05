@@ -164,7 +164,13 @@ game from the project folder.
   editor; `reply` lands in its card; `editor_document` gives the open
   sculpt or clip as the text its file holds; `editor_edit` takes a whole
   edited text back. Every change of forms (add, move, turn, size, shade,
-  nest, bones) or of keys is one edited text.
+  nest, bones) or of keys is one edited text. `editor_view` turns the
+  editor's camera at once and answers with the frame: `home` (the first
+  view), `focus` (meshedit: form N, from 1), `at`, `dist`, `yaw`,
+  `pitch`, `zoom`, `pan` (across the view), each left out kept
+  (`tools/orbit.zig` `Ask`, through `link/view.txt`). So Claude looks
+  round a sculpt itself, with no window of its own on the gardener's
+  screen and no mouse needed.
 - **Every edit is one undoable step:** the editor takes it into its
   history, so ctrl+z takes back anything Claude did. An edit is refused
   (Claude is told why) while the gardener is dragging or typing, or when
