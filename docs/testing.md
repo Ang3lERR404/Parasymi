@@ -178,6 +178,15 @@ game from the project folder.
   history, so ctrl+z takes back anything Claude did. An edit is refused
   (Claude is told why) while the gardener is dragging or typing, or when
   the text does not read. Nothing is saved until the gardener saves.
+- **The file is watched** (`tools/ondisk.zig`): about once a second the
+  editor looks at its file's modified time, and reads it again only when
+  that moved. Holding what the file holds, it shows saved (so a sculpt
+  Claude wrote to the file and also sent as an edit is not "unsaved").
+  Changed on disk while nothing is unsaved in the editor, the file's is
+  taken quietly, one undo step. Changed on disk while the editor has
+  changes of its own too, nothing is overwritten: the note says so, the
+  state shows it, and the gardener picks: ctrl+s keeps the editor's
+  (saved over the file), f5 (the toolbar's "take file's") the file's.
 - A bridge started before this was built needs a restart (a new Claude
   Code session) to offer the two new tools.
 

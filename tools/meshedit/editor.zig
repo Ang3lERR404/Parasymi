@@ -31,6 +31,10 @@ const v3=m.v3;
 const labels=@import("../labels.zig");
 /// undo and redo: each settled mesh kept as its text
 const History=@import("../history.zig").History;
+/// the mesh's file kept an eye on, taken again when it changes on disk
+const ondisk=@import("../ondisk.zig");
+/// (see `ondisk`)
+const OnDisk=ondisk.OnDisk;
 /// the editor's root, through which its other files are reached
 const meshedit=@import("../meshedit.zig");
 /// every value of a form, each a named channel
@@ -130,6 +134,8 @@ pub const Editor=struct{
   naming:?labels.Typed=null,
   /// the meshes before and after this one, for undo and redo
   history:History,
+  /// the file as last seen on disk (`canon` its text read as this editor writes it)
+  disk:OnDisk,
   /// rig mode (`j`): the bones listed and placed in place of the forms
   rigMode:bool=false,
   /// the bone selected in rig mode
@@ -210,7 +216,51 @@ pub const Editor=struct{
   pub fn save(e:*Editor)void{
     if(!e.writeDoc(&e.doc,e.path))return;
     e.dirty=false;
+    e.wrote();
     e.say("saved {s}",.{e.path});
+  }
+  /// the file just written kept as the disk's, so the editor's own save is
+  /// never taken for a change on disk (out of memory: looked at afresh)
+  fn wrote(e:*Editor)void{
+    // the mesh's text as written
+    const t=text(e.gpa,&e.doc) catch return e.disk.deinit();
+    defer e.gpa.free(t);
+    e.disk.wrote(e.io,e.path,t) catch e.disk.deinit();
+  }
+  /// once a second (`dt` on), the file looked at while the hands are free:
+  /// the same as the mesh (saved), changed with nothing unsaved here
+  /// (taken, one step of the history), or changed while this has changes
+  /// too (a clash: said, never overwritten; ctrl+s keeps this, f5 the file's)
+  pub fn watch(e:*Editor,dt:f32)Allocator.Error!void{
+    if(!e.disk.tick(dt))return;
+    if(e.drag!=.none or e.naming!=null or e.renaming!=null)return;
+    // the mesh's text now
+    const now=try text(e.gpa,&e.doc);
+    defer e.gpa.free(now);
+    switch(try e.disk.check(e.io,e.path,now,e.dirty)){
+      .differs=>{},
+      .same=>e.dirty=false,
+      .take=>try e.takeDisk("the file changed on disk: taken (ctrl+z goes back)"),
+      .clash=>e.say("the file changed on disk too: ctrl+s keeps yours, f5 takes the file's",.{}),
+    }
+  }
+  /// the file's text as last seen on disk taken as one step of the history
+  /// (undo goes back), saying `done`
+  pub fn takeDisk(e:*Editor,done:[]const u8)Allocator.Error!void{
+    const t=e.disk.kept orelse return e.say("the file on disk does not read",.{});
+    if(e.drag!=.none or e.naming!=null or e.renaming!=null)return;
+    try e.settle();
+    // the file's mesh, read whole before the old one goes
+    const d=Doc.parse(e.gpa,t)catch|er|return e.say("the file on disk does not read: {t}",.{er});
+    e.doc.deinit(e.gpa);
+    e.doc=d;
+    e.sel=@min(e.sel,e.pieces().len-|1);
+    e.bsel=@min(e.bsel,e.doc.bones.items.len-|1);
+    e.changed();
+    try e.settle();
+    e.dirty=false;
+    e.disk.clash=false;
+    e.say("{s}",.{done});
   }
   /// mesh `d` written to `path`, making `src/mesh` if need be; false (and
   /// said) if it would not be written
@@ -266,6 +316,7 @@ pub const Editor=struct{
     e.ownedPath=path;
     e.path=path;
     e.dirty=false;
+    e.wrote();
     // the clip of the old name, renamed and keyed for the new one
     const clipMoved=try renameClip(gpa,io,old,name);
     // every other sculpt's nests that used the old name
@@ -508,4 +559,12 @@ pub fn text(gpa:Allocator,d:*const Doc)Allocator.Error![]u8{
   defer out.deinit();
   d.write(&out.writer) catch return error.OutOfMemory;
   return out.toOwnedSlice();
+}
+/// a mesh file's text `raw` as this editor would write it (the caller's to
+/// free); null when it will not read
+pub fn canon(gpa:Allocator,raw:[]const u8)?[]u8{
+  // the mesh it holds
+  var d=Doc.parse(gpa,raw) catch return null;
+  defer d.deinit(gpa);
+  return text(gpa,&d) catch null;
 }

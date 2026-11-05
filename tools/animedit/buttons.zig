@@ -54,6 +54,8 @@ pub const Act=enum{
   undo,
   /// a step forward
   redo,
+  /// the file's version taken, when it changed on disk while the clip had changes too
+  fromDisk,
   /// the camera onto the selected joint
   focus,
   /// the help on or off
@@ -83,6 +85,7 @@ pub const binds=[_]toolbar.Bind(Act){
   .{.key=.s,.ctrl=true,.act=.save},
   .{.key=.z,.ctrl=true,.act=.undo},
   .{.key=.y,.ctrl=true,.act=.redo},
+  .{.key=.F5,.act=.fromDisk},
   .{.key=.c,.ctrl=true,.act=.copy},
   .{.key=.v,.ctrl=true,.shift=false,.act=.paste},
   .{.key=.v,.ctrl=true,.shift=true,.act=.pasteMirrored},
@@ -115,6 +118,7 @@ const items=[_]Bar.Entry{
   .{.act=.save,.label="save",.key="ctrl+s",.gap=true},
   .{.act=.undo,.label="undo",.key="ctrl+z"},
   .{.act=.redo,.label="redo",.key="ctrl+y"},
+  .{.act=.fromDisk,.label="take file's",.key="f5"},
   .{.act=.focus,.label="focus",.key=".",.gap=true},
   .{.act=.help,.label="help",.key="h"},
 };
@@ -143,6 +147,7 @@ pub fn live(e:*const Editor)Set{
   on.setPresent(.save,e.dirty);
   on.setPresent(.undo,e.history.back.items.len>0);
   on.setPresent(.redo,e.history.ahead.items.len>0);
+  on.setPresent(.fromDisk,e.disk.clash);
   on.setPresent(.paste,e.copiedLen>0);
   on.setPresent(.pasteMirrored,e.copiedLen>0 and e.wolf());
   on.setPresent(.unmark,e.markHere()!=null);

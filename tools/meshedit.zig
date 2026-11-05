@@ -54,6 +54,9 @@
 //! under it alike; the wheel zooms); `.` eases it onto the selected form.
 //! `ctrl+z` undoes (tools/history.zig), `ctrl+y` or `ctrl+shift+z` redoes:
 //! a whole drag, or a whole typed name, is one step.
+//! The file is watched (tools/ondisk.zig): changed on disk with nothing
+//! unsaved here, it is taken (one undo step); with changes here too, it is
+//! never overwritten silently: `ctrl+s` keeps the editor's, `f5` the file's.
 //!
 //! decision: a developer's tool, not the game: its few words and keys are
 //! written here, not in the strings or controls files (the camera's orbit
@@ -87,6 +90,7 @@ test{
   _=@import("orbit.zig");
   _=@import("labels.zig");
   _=@import("history.zig");
+  _=@import("ondisk.zig");
   _=@import("toolbar.zig");
 }
 test{

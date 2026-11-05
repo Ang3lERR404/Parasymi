@@ -145,7 +145,9 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot --link]
                                   # edits the sculpt or clip, each edit one undo step,
                                   # and turns the view; Enter chats, as in the game
                                   # (meshedit names a form with F2) (docs/testing.md); ctrl+z undo, ctrl+y redo, a whole
-                                  # drag one step (tools/history.zig)
+                                  # drag one step (tools/history.zig); the file is watched:
+                                  # changed on disk it is taken, or on a clash ctrl+s keeps
+                                  # the editor's and f5 the file's (tools/ondisk.zig)
 zig build audiocheck              # sound path check (tools/audiocheck.zig): plays a
                                   # dsp.Voice through platform.audio, records it back by
                                   # loopback, fails unless heard at its pitch (needs speakers)

@@ -179,9 +179,12 @@ pub fn main(init:std.process.Init)!void{
   // the mesh's text as it was read, where the history starts
   const first=try meshedit.editor.text(gpa,&doc);
   defer gpa.free(first);
-  var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode,.history=try .init(gpa,first)};
+  var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=doc,.mode=mode,.history=try .init(gpa,first),.disk=.{.gpa=gpa,.canon=meshedit.editor.canon}};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
+  defer e.disk.deinit();
+  // the file as it is on disk now, so a later change to it is seen
+  _=try e.disk.look(io,path);
   // the link with Claude, if asked for
   var el:?EditLink=null;
   if(linkOn){
@@ -285,6 +288,7 @@ pub fn main(init:std.process.Init)!void{
     // (while the gardener types to Claude, the editor's own keys wait)
     const chatting=if(el)|*l|l.keys(io,&input,game.uiTime,if(e.naming!=null or e.renaming!=null).typing else.free)else false;
     if(!chatting)try e.handle(&input,handles.items,seen,origin);
+    try e.watch(dt);
     if(el)|*l|try tendLink(l,&e,gpa,io,dt,game.uiTime,path);
     e.sel=@min(e.sel,e.pieces().len-|1);
     e.bsel=@min(e.bsel,e.doc.bones.items.len-|1);
@@ -396,7 +400,7 @@ fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path
   var sb:[640]u8=undefined;
   // what the gardener's hands are on (an edit waits while it is not free)
   const hands=if(e.drag!=.none)"dragging (edits wait)"else if(e.naming!=null)"naming a form (Enter or Esc ends it; edits wait)"else if(e.renaming!=null)"renaming the sculpt (Enter or Esc ends it; edits wait)"else"free";
-  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\ngardener's hands: {s}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty,hands})catch"editor: meshedit\n";
+  const state=std.fmt.bufPrint(&sb,"editor: meshedit\nsculpt: {s}\nforms: {d}, selected {d}\nbones: {d}\nrig mode: {}\nunsaved changes: {}\nthe file changed on disk too (the gardener picks: ctrl+s keeps the editor's, f5 the file's): {}\ngardener's hands: {s}\n(editor_document gives the sculpt's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.pieces().len,e.sel,e.doc.bones.items.len,e.rigMode,e.dirty,e.disk.clash,hands})catch"editor: meshedit\n";
   l.publish(io,state,doc);
 }
 /// `--try=`'s turns: pitch, yaw and roll (degrees), commas between, the ones left out none

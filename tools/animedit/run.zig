@@ -213,6 +213,7 @@ pub fn main(init:std.process.Init)!void{
   // the editor, showing every channel of the wolf or a plant, or a structure's growth
   var e:Editor=.{
     .history=try .init(gpa,first),
+    .disk=.{.gpa=gpa,.canon=animedit.editor.canon},
     .gpa=gpa,
     .io=io,
     .subject=sj,
@@ -226,6 +227,9 @@ pub fn main(init:std.process.Init)!void{
   };
   defer e.clip.deinit();
   defer e.history.deinit();
+  defer e.disk.deinit();
+  // the file as it is on disk now, so a later change to it is seen
+  _=try e.disk.look(io,path);
   // the link with Claude, if asked for
   var el:?EditLink=null;
   if(linkOn){
@@ -371,6 +375,7 @@ pub fn main(init:std.process.Init)!void{
     // (while the gardener types to Claude, the editor's own keys wait)
     const chatting=if(el)|*l|l.keys(io,&input,game.uiTime,if(e.naming!=null).typing else.free)else false;
     if(!chatting)try e.handle(&input,screen,dt,&rg);
+    try e.watch(dt);
     if(el)|*l|try tendLink(l,&e,gpa,io,dt,game.uiTime,path);
     e.sample();
     switch(sj){
@@ -456,8 +461,8 @@ fn tendLink(l:*EditLink,e:*Editor,gpa:std.mem.Allocator,io:Io,dt:f32,at:f64,path
   // the clip's text, and what the editor shows
   const doc=try animedit.editor.text(gpa,&e.clip);
   defer gpa.free(doc);
-  var sb:[512]u8=undefined;
-  const state=std.fmt.bufPrint(&sb,"editor: animedit\nclip: {s}\nlength: {d:.2} s, playhead {d:.2} s, playing {}\nchannels keyed: {d}; selected channel: {s}\nunsaved changes: {}\n(editor_document gives the clip's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.clip.length,e.t,e.playing,e.clip.tracks.items.len,e.chName(e.sel),e.dirty})catch"editor: animedit\n";
+  var sb:[640]u8=undefined;
+  const state=std.fmt.bufPrint(&sb,"editor: animedit\nclip: {s}\nlength: {d:.2} s, playhead {d:.2} s, playing {}\nchannels keyed: {d}; selected channel: {s}\nunsaved changes: {}\nthe file changed on disk too (the gardener picks: ctrl+s keeps the editor's, f5 the file's): {}\n(editor_document gives the clip's text; editor_edit takes a whole edited one; editor_view turns the camera)\n",.{path,e.clip.length,e.t,e.playing,e.clip.tracks.items.len,e.chName(e.sel),e.dirty,e.disk.clash})catch"editor: animedit\n";
   l.publish(io,state,doc);
 }
 /// one frame of the loading screen; false once the window is closed

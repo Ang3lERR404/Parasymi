@@ -26,6 +26,9 @@
 //! it onto the selected joint (else back onto the whole subject).
 //! `ctrl+z` undoes (tools/history.zig), `ctrl+y` or `ctrl+shift+z` redoes:
 //! a whole drag, or a whole typed mark name, is one step.
+//! The file is watched (tools/ondisk.zig): changed on disk with nothing
+//! unsaved here, it is taken (one undo step); with changes here too, it is
+//! never overwritten silently: `ctrl+s` keeps the editor's, `f5` the file's.
 //! Each key eases on to the next its own way: `e` turns the selected
 //! channel's key at the playhead to the next ease (smooth, linear, step,
 //! ease in, ease out, back: a little past and settling), shift `e` the one

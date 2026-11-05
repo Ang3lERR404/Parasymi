@@ -99,7 +99,7 @@ test"a whole drag undoes in one step and redoes again"{
   // the mesh's text as it starts
   const first=try meshedit.editor.text(gpa,&d);
   defer gpa.free(first);
-  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first)};
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first),.disk=.{.gpa=gpa,.canon=meshedit.editor.canon}};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
   // a drag held over several frames: nothing settles until it ends
@@ -208,7 +208,7 @@ test"a group moves and turns with the selected form, round where it stands"{
   try d.pieces.append(gpa,.{.v=.{.pos=.{0.2,0.3,0}}});
   const first=try meshedit.editor.text(gpa,&d);
   defer gpa.free(first);
-  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first)};
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first),.disk=.{.gpa=gpa,.canon=meshedit.editor.canon}};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
   e.pick(1,true);
@@ -298,7 +298,7 @@ test"a bone taken out hands its children and its forms to its parent"{
   for(0..3)|i|try d.pieces.append(gpa,.{.bone=@intCast(i)});
   const first=try meshedit.editor.text(gpa,&d);
   defer gpa.free(first);
-  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first)};
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.path="unused",.doc=d,.history=try .init(gpa,first),.disk=.{.gpa=gpa,.canon=meshedit.editor.canon}};
   defer e.doc.deinit(gpa);
   defer e.history.deinit();
   // the middle bone taken out
@@ -317,4 +317,63 @@ test"a bone taken out hands its children and its forms to its parent"{
   try meshedit.rigging.add(&e);
   try testing.expectEqual(@as(?u8,1),e.doc.bones.items[2].parent);
   try testing.expectEqualStrings("bone 3",e.doc.bones.items[2].name.slice());
+}
+test"the file watched: the same text reads saved, a change on disk is taken, both changed is a clash the gardener settles"{
+  // the testing allocator and I/O, and a folder of the test's own
+  const gpa=testing.allocator;
+  const io=testing.io;
+  var tmp=testing.tmpDir(.{});
+  defer tmp.cleanup();
+  // the mesh's path from the working directory
+  var pb:[256]u8=undefined;
+  const path=try std.fmt.bufPrint(&pb,".zig-cache/tmp/{s}/m.mesh",.{tmp.sub_path});
+  // a mesh of one form, kept on disk and open in the editor
+  var d:Doc=.{};
+  try d.pieces.append(gpa,.{});
+  const first=try meshedit.editor.text(gpa,&d);
+  defer gpa.free(first);
+  try Io.Dir.cwd().writeFile(io,.{.sub_path=path,.data=first});
+  var e:Editor=.{.gpa=gpa,.io=io,.path=path,.doc=d,.history=try .init(gpa,first),.disk=.{.gpa=gpa,.canon=meshedit.editor.canon}};
+  defer e.doc.deinit(gpa);
+  defer e.history.deinit();
+  defer e.disk.deinit();
+  _=try e.disk.look(io,path);
+  // marked unsaved, though it holds what the file holds: saved at the next look
+  e.dirty=true;
+  try e.watch(1);
+  try testing.expect(!e.dirty);
+  // the file changed on disk, nothing unsaved here: taken, one undo step
+  var two:Doc=.{};
+  defer two.deinit(gpa);
+  try two.pieces.append(gpa,.{});
+  try two.pieces.append(gpa,.{});
+  const second=try meshedit.editor.text(gpa,&two);
+  defer gpa.free(second);
+  try Io.Dir.cwd().writeFile(io,.{.sub_path=path,.data=second});
+  e.disk.stamp=null;
+  try e.watch(1);
+  try testing.expectEqual(@as(usize,2),e.pieces().len);
+  try testing.expect(!e.dirty);
+  try testing.expectEqual(@as(usize,1),e.history.back.items.len);
+  // changed here and on disk: a clash, nothing overwritten, until f5 takes the file's
+  e.nudge(Ch.find("pos.x").?,0.1);
+  try e.settle();
+  try Io.Dir.cwd().writeFile(io,.{.sub_path=path,.data=first});
+  e.disk.stamp=null;
+  try e.watch(1);
+  try testing.expect(e.disk.clash);
+  try testing.expectEqual(@as(usize,2),e.pieces().len);
+  try e.takeDisk("taken");
+  try testing.expectEqual(@as(usize,1),e.pieces().len);
+  try testing.expect(!e.disk.clash and !e.dirty);
+  // or ctrl+s keeps the editor's: saved over the file, the clash settled
+  e.nudge(Ch.find("pos.x").?,0.1);
+  try Io.Dir.cwd().writeFile(io,.{.sub_path=path,.data=second});
+  e.disk.stamp=null;
+  try e.watch(1);
+  try testing.expect(e.disk.clash);
+  e.save();
+  try testing.expect(!e.disk.clash and !e.dirty);
+  try e.watch(1);
+  try testing.expect(!e.dirty);
 }

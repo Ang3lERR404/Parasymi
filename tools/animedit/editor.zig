@@ -35,6 +35,8 @@ const LookCh=clip.Channels(specimen.Look);
 const labels=@import("../labels.zig");
 /// undo and redo: each settled clip kept as its text
 const History=@import("../history.zig").History;
+/// the clip's file kept an eye on, taken again when it changes on disk
+const OnDisk=@import("../ondisk.zig").OnDisk;
 /// the editor's root, through which its other files are reached
 const animedit=@import("../animedit.zig");
 /// a rigged sculpt the clip may move
@@ -151,6 +153,8 @@ pub const Editor=struct{
   namingAt:f32=0,
   /// the clips before and after this one, for undo and redo
   history:History,
+  /// the file as last seen on disk (`canon` its text read as this editor writes it)
+  disk:OnDisk,
   /// the keys copied (`ctrl+c`), the first `copiedLen` of them held
   copied:[most]Held=undefined,
   /// how many keys are copied
@@ -399,7 +403,48 @@ pub const Editor=struct{
     Dir.cwd().createDirPath(io,dir)catch|er|return e.say("save failed: {t}",.{er});
     Dir.cwd().writeFile(io,.{.sub_path=e.path,.data=out.written()})catch|er|return e.say("save failed: {t}",.{er});
     e.dirty=false;
+    // the file just written kept as the disk's, so this save is never taken
+    // for a change on disk (out of memory: looked at afresh)
+    e.disk.wrote(io,e.path,out.written()) catch e.disk.deinit();
     e.say("saved {s}",.{e.path});
+  }
+  /// once a second (`dt` on), the file looked at while the hands are free:
+  /// the same as the clip (saved), changed with nothing unsaved here
+  /// (taken, one step of the history), or changed while this has changes
+  /// too (a clash: said, never overwritten; ctrl+s keeps this, f5 the file's)
+  pub fn watch(e:*Editor,dt:f32)Allocator.Error!void{
+    if(!e.disk.tick(dt))return;
+    if(e.drag!=.none or e.naming!=null)return;
+    // the clip's text now
+    const now=try text(e.gpa,&e.clip);
+    defer e.gpa.free(now);
+    switch(try e.disk.check(e.io,e.path,now,e.dirty)){
+      .differs=>{},
+      .same=>e.dirty=false,
+      .take=>try e.takeDisk("the file changed on disk: taken (ctrl+z goes back)"),
+      .clash=>e.say("the file changed on disk too: ctrl+s keeps yours, f5 takes the file's",.{}),
+    }
+  }
+  /// the file's text as last seen on disk taken as one step of the history
+  /// (undo goes back), saying `done`
+  pub fn takeDisk(e:*Editor,done:[]const u8)Allocator.Error!void{
+    const t=e.disk.kept orelse return e.say("the file on disk does not read",.{});
+    if(e.drag!=.none or e.naming!=null)return;
+    try e.settle();
+    // the file's clip, read whole before the old one goes
+    var back=clip.Clip.parse(e.gpa,t)catch|er|return e.say("the file on disk does not read: {t}",.{er});
+    for(0..e.shown.len)|i|{
+      if(e.clip.track(e.chName(i))!=null and back.track(e.chName(i))==null)e.setValue(i,e.rest(i));
+    }
+    swap(clip.Clip,&e.clip,&back);
+    back.deinit();
+    e.t=@min(e.t,e.clip.length);
+    e.playing=false;
+    e.sample();
+    try e.settle();
+    e.dirty=false;
+    e.disk.clash=false;
+    e.say("{s}",.{done});
   }
   /// time `t` (s) snapped to the nearest frame
   pub fn snap(t:f32)f32{return@round(t*fps)/fps;}
@@ -417,6 +462,14 @@ pub fn text(gpa:Allocator,c:*const clip.Clip)Allocator.Error![]u8{
   defer out.deinit();
   c.write(&out.writer) catch return error.OutOfMemory;
   return out.toOwnedSlice();
+}
+/// a clip file's text `raw` as this editor would write it (the caller's to
+/// free); null when it will not read
+pub fn canon(gpa:Allocator,raw:[]const u8)?[]u8{
+  // the clip it holds
+  var c=clip.Clip.parse(gpa,raw) catch return null;
+  defer c.deinit();
+  return text(gpa,&c) catch null;
 }
 /// whether (`x`,`y`) (px) is on the timeline, with a little slack round it
 pub fn inTimeline(screen:m.Vice(f32,2),x:f32,y:f32)bool{
@@ -451,7 +504,7 @@ test"a key's ease cycles round, keys copy and paste (mirrored across the wolf), 
   // the clip's text as it starts
   const first=try text(gpa,&c);
   defer gpa.free(first);
-  var e:Editor=.{.gpa=gpa,.io=testing.io,.subject=.wolf,.path="unused",.clip=c,.shown=&allPose,.history=try .init(gpa,first)};
+  var e:Editor=.{.gpa=gpa,.io=testing.io,.subject=.wolf,.path="unused",.clip=c,.shown=&allPose,.history=try .init(gpa,first),.disk=.{.gpa=gpa,.canon=canon}};
   defer e.clip.deinit();
   defer e.history.deinit();
   // the left shoulder's twist and pitch, and the jaw, keyed at the start

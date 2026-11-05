@@ -122,6 +122,7 @@ pub fn act(e:*Editor,a:Act,in:*const Input)Allocator.Error!void{
       if(e.clip.track(e.chName(e.sel))!=null)try e.key(e.sel);
     },
     .save=>e.save(),
+    .fromDisk=>if(e.disk.clash)try e.takeDisk("the file's taken (ctrl+z takes yours back)"),
     .undo=>if(shift)try e.redo()else try e.undo(),
     .redo=>try e.redo(),
     .copy=>e.copy(),

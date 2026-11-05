@@ -15,6 +15,8 @@ pub const Act=enum{
   undo,
   /// a step forward
   redo,
+  /// the file's version taken, when it changed on disk while the mesh had changes too
+  fromDisk,
   /// a new form from the selected (rig mode: a new bone on the selected)
   make,
   /// the selected form (bone) taken out
@@ -75,6 +77,7 @@ pub const binds=[_]toolbar.Bind(Act){
   .{.key=.s,.ctrl=true,.act=.save},
   .{.key=.z,.ctrl=true,.act=.undo},
   .{.key=.y,.ctrl=true,.act=.redo},
+  .{.key=.F5,.act=.fromDisk},
   .{.key=.j,.act=.rig},
   .{.key=.h,.act=.help},
   .{.key=.o,.act=.bone},
@@ -106,6 +109,7 @@ const formItems=[_]Bar.Entry{
   .{.act=.save,.label="save",.key="ctrl+s"},
   .{.act=.undo,.label="undo",.key="ctrl+z"},
   .{.act=.redo,.label="redo",.key="ctrl+y"},
+  .{.act=.fromDisk,.label="take file's",.key="f5"},
   .{.act=.make,.label="new form",.key="n",.gap=true},
   .{.act=.remove,.label="remove",.key="del"},
   .{.act=.next,.label="next form",.key="tab"},
@@ -135,6 +139,7 @@ const rigItems=[_]Bar.Entry{
   .{.act=.save,.label="save",.key="ctrl+s"},
   .{.act=.undo,.label="undo",.key="ctrl+z"},
   .{.act=.redo,.label="redo",.key="ctrl+y"},
+  .{.act=.fromDisk,.label="take file's",.key="f5"},
   .{.act=.make,.label="new bone",.key="n",.gap=true},
   .{.act=.remove,.label="remove",.key="del"},
   .{.act=.next,.label="next bone",.key="tab"},
@@ -191,6 +196,7 @@ pub fn live(e:*Editor)Set{
   on.setPresent(.save,e.dirty);
   on.setPresent(.undo,e.history.back.items.len>0);
   on.setPresent(.redo,e.history.ahead.items.len>0);
+  on.setPresent(.fromDisk,e.disk.clash);
   // how many things are listed (bones in rig mode, else forms), and the selected one
   const n=if(e.rigMode)e.doc.bones.items.len else e.pieces().len;
   const at=if(e.rigMode)e.bsel else e.sel;
