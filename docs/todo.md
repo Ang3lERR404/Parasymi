@@ -201,6 +201,10 @@ hues are being chosen from samples.*
   lens: the light it carries is multiplied, by about 5%. Solcyriphons
   never stack it: one beam, one boost. Update radiant-plants.md when
   built.
+- **A lensed diamond's shimmer** (kept for later, the gardener 2026-11-05:
+  "interesting idea, save for later"). While a solcyriphon's beam makes a
+  diamond a lens (`light.lensGain`), a faint extra shimmer runs through its
+  facets, its own colour, never white, so the 5% shows.
 - **A radiant amplifier** (the gardener's idea, shaped 2026-11-04). A new
   radiant plant, opened by its own research and woven for one purpose:
   amplifying the light grid's output. It pairs with one solcyriphon,

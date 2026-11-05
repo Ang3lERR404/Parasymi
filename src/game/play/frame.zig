@@ -76,7 +76,8 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
     if(ctl.pressed(in,.save))if(g.slot!=null){g.request=.save;}else g.startNaming();
     if(ctl.pressed(in,.load))g.request=.load;
   }
-  if(ctl.pressed(in,.fullscreen)and!listening)g.opts.fullscreen=!g.opts.fullscreen;
+  // (the pad's button only while paused: in play it runs)
+  if(!listening and (ctl.pressedOnKeys(in,.fullscreen) or (g.mode==.paused and ctl.pressed(in,.fullscreen))))g.opts.fullscreen=!g.opts.fullscreen;
   if(ctl.pressed(in,.back))switch(g.mode){
     .roam=>{
       g.mode=.paused;

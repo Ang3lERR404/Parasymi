@@ -348,6 +348,11 @@ pub fn pressed(in:*const Input,a:Action)bool{
   for(map.getPtrConst(a).items())|b|if(in.pressed(b))return true;
   return false;
 }
+/// did a key or mouse button bound to `a` (never the pad's) go down this frame?
+pub fn pressedOnKeys(in:*const Input,a:Action)bool{
+  for(map.getPtrConst(a).items())|b|if(!b.onPad() and in.pressed(b))return true;
+  return false;
+}
 /// was a key or button bound to `a` let go this frame?
 pub fn released(in:*const Input,a:Action)bool{
   for(map.getPtrConst(a).items())|b|if(in.released(b))return true;
