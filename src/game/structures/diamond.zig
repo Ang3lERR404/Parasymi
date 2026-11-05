@@ -5,7 +5,7 @@
 //! woven and put down over any dry tile. Small and still, a cut crystal that
 //! only catches light. It fragments that light into the halo's ring around
 //! it (see `halo.zig`). Grown, it is the light grid's big relay: it links
-//! further than a bloom, carries four times what one does, and lights a
+//! further than a bloom, carries all the light it is given, and lights a
 //! field twice as wide (sim/light.zig); it makes no light of its own.
 //! Put down by hand, it gathers from its shards as it grows in; grown, or
 //! born of a halo, it forms with a flash of light. Blooms sown on the
@@ -118,8 +118,8 @@ pub fn message(ctx:st.Ctx,i:st.Id,msg:st.Msg)st.Reply{
     .arrived,.unform,.graft,.petalComing,.petalSnapped,.fastenComing,.fastened=>return.ignored,
   }
 }
-/// the most light a diamond carries on (glow): four blooms' worth
-pub const carry:f32=16;
+/// the most light a diamond carries on: all it is given, as a bloom
+pub const carry:f32=lib.species.uncapped;
 /// how far a diamond links with other relays (tiles)
 pub const linkReach:f32=14;
 /// its relay of the light grid once grown and formed: `halo.diamondR`

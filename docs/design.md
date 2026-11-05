@@ -408,7 +408,7 @@ run on. Every number, and why, is in [radiant-plants.md](radiant-plants.md).
   spreads 6 glow over a 3-tile field; by night it folds and pours a 12 glow
   beam straight down onto what is under it.
 - **Relays carry it**, each up to its `carry`, linked within `link`:
-  the celestial bloom (4 glow, field 3.5, link 10; it makes none now), the
+  the celestial bloom (carries all it is given, field 3.5, link 10; it makes none now), the
   diamond (16, field 7, link 14), the astrocyme (stores 720 glow-seconds).
   Light flows out from where it is made, nearest first: each relay keeps
   what its own users want and hands the rest evenly to those it reached.

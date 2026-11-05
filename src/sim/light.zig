@@ -680,7 +680,7 @@ test"by day a solcyriphon lights its field; a bloom linked to it carries it on, 
   try testing.expectEqual(@as(usize,1),b.l.links.items.len);
   try testing.expect(b.l.links.items[0].glow>0);
 }
-test"a relay carries no more than it may: too many users share what reaches it"{
+test"a relay carries all it is given: six users round a bloom draw more than four glow"{
   // the test allocator, and a small garden
   const gpa=testing.allocator;
   var b=try Bench.init(gpa);
@@ -692,8 +692,11 @@ test"a relay carries no more than it may: too many users share what reaches it"{
   var v:[6]Id=undefined;
   for(&v,0..)|*x,k|x.*=try b.put(gpa,8+@as(i32,@intCast(k%3)),8+2*@as(i32,@intCast(k/3)),.vesper);
   try b.run(gpa,0);
-  // the bloom carries its most (4) for six users: each has at most two thirds
-  for(v)|x|try testing.expect(b.l.lit.items[x.idx()]<=4.0/6.0+1e-4 and b.l.lit.items[x.idx()]>0);
+  // the bloom has no cap (it once carried 4 at most, two thirds each):
+  // what the solcyriphon makes reaches all six, more than the old cap's share
+  var all:f32=0;
+  for(v)|x|all+=b.l.lit.items[x.idx()];
+  try testing.expect(all>4+1e-3);
 }
 test"what only looks lit is lit where light reaches it, though it draws none"{
   // the test allocator, and a small garden

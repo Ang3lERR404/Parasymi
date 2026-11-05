@@ -214,7 +214,7 @@ hues are being chosen from samples.*
   radiant thing, held to the glow bar. Its boost: its solcyriphon's light
   25% stronger (a starting number, tuned in play). Still to settle: its
   name, its research and cost.
-- **Relays carry without a cap** (the gardener's word: a cap is too
+- ~~**Relays carry without a cap**~~ done: blooms and diamonds carry all they are given (`species.uncapped`), reach unchanged. (the gardener's word: a cap is too
   punishing). The bloom's 4 glow and the diamond's 16 glow limits go;
   a relay carries all the light it is given, its reach unchanged.
   Update radiant-plants.md (Making and carrying) with it.

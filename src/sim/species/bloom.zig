@@ -1,7 +1,7 @@
 //! CELESTIAL BLOOM: a relay of the light grid, a small pole. A floating
 //! radiant plant that yields nothing and makes no light: grown, it links
-//! with every relay within `link` tiles, carries on up to `carry` of the
-//! light that reaches it along them, and lights the field round it
+//! with every relay within `link` tiles, carries on all the light that
+//! reaches it along them, and lights the field round it
 //! (`radiance`) for what draws light (sim/light.zig). Uprooting the bloom
 //! that joins two relays cuts off everything beyond it.
 const lib=@import("../../lib.zig");
@@ -11,7 +11,7 @@ const species=lib.species;
 const engine=lib.engine;
 /// colour types, for its genome's pearl colours
 const color=engine.core.color;
-/// the celestial bloom: a floating relay, carrying up to 4 glow, its field
+/// the celestial bloom: a floating relay, carrying all it is given, its field
 /// 3.5 tiles round, linking with relays within 10
 pub const def:species.Species=.{
   // decision: radiant, drawn as it always was, with the symbiotes' sap
@@ -19,7 +19,7 @@ pub const def:species.Species=.{
   // no item, no output: it carries light instead (the sky feeds it, as it
   // does every floater; it never condenses essence)
   .matureTime=30,.manaCap=10,.leyDraw=0.5,.share=0,.drain=0,.yield=0,
-  .radiance=3.5,.link=10,.carry=4,.halo=true,
+  .radiance=3.5,.link=10,.carry=species.uncapped,.halo=true,
   // high in the sky over the garden, above the fallen starlight (a
   // solcyriphon hangs higher still, over it)
   .hover=4.7,

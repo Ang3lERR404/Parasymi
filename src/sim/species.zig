@@ -15,6 +15,9 @@ const engine=lib.engine;
 const color=engine.core.color;
 /// all the maths: conversions
 const m=engine.core.math;
+/// a relay that carries on all the light it is given, however much (the
+/// gardener: a cap was too punishing)
+pub const uncapped:f32=m.inf(f32);
 /// the engine's registry: one module per thing, an enum over them
 const registry=engine.core.registry;
 /// every species, one module each
@@ -264,7 +267,8 @@ pub const Species=struct{
   /// the light it makes: by day spread round itself, by night poured down
   /// in one beam onto what is under it (glow; only a solcyriphon's)
   glow:m.Vice(f32,2)=.{0,0},
-  /// the most light it carries on (glow; 0: it is no relay)
+  /// the most light it carries on (glow; 0: it is no relay; `uncapped`:
+  /// all it is given)
   carry:f32=0,
   /// how long a strip it casts of the light it takes (tiles; a heliocyra's)
   strip:u8=0,
