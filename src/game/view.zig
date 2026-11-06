@@ -603,6 +603,11 @@ const beamLandReach:f32=4.5;
 const beamMid:f32=1.2;
 /// (and its reach, m)
 const beamMidReach:f32=3.5;
+/// how far the beam's light breathes either way (a share), and its pace
+/// (radians a second): a light is never still (the glow bar)
+const beamShimmer:f32=0.15;
+/// (its pace)
+const beamShimmerRate:f32=2.3;
 /// the beam's gold, the light it throws (linear)
 const beamCol=m.V3{1.0,0.78,0.45};
 /// how far below a solcyriphon's heart its beam leaves (m: under its lens)
@@ -647,8 +652,11 @@ fn shafts(g:*Game,tf:f32)Allocator.Error!void{
     // the four control points, straight down
     const ctrl=m.straightCubic(top,to,m.splat3(0));
     try g.parts.emitCurve(.lightBeam,ctrl,m.v3(1,0,0),1,1,.{.glow=beamGlow*bm.k,.flutter=beamHalf,.phase=s.items(.seed)[i],.fade=0});
-    try g.parts.light(to+m.v3(0,0.3,0),beamCol*m.splat3(beamLand*bm.k),beamLandReach);
-    try g.parts.light(m.lerpV(top,to,0.5),beamCol*m.splat3(beamMid*bm.k),beamMidReach);
+    // its light breathes as the beam flutters, where it lands a beat apart
+    // from halfway down
+    const seed=s.items(.seed)[i];
+    try g.parts.light(to+m.v3(0,0.3,0),beamCol*m.splat3(beamLand*bm.k*m.shimmer(tf,seed,beamShimmer,beamShimmerRate)),beamLandReach);
+    try g.parts.light(m.lerpV(top,to,0.5),beamCol*m.splat3(beamMid*bm.k*m.shimmer(tf,seed+0.5,beamShimmer,beamShimmerRate)),beamMidReach);
   }
   for(l.strips.items)|sp|{
     // the heliocyra, its kind, the way it faces and the step along it
@@ -843,7 +851,7 @@ fn plant(g:*Game,d:Drawn,tf:f32)Allocator.Error!void{
   if(def.crownGlow)|cg|if(!d.ghost){
     // how deep the night is, and its shimmer
     const night=1-g.sky.daylight();
-    const shimmer=1+crownShimmer*@sin(tf*crownShimmerRate+d.seed*m.tau)*@sin(tf*crownShimmerRate*0.61+d.seed*9);
+    const shimmer=m.shimmer(tf,d.seed,crownShimmer,crownShimmerRate);
     if(night>0)try g.parts.light(at+m.v3(0,cg.high,0),m.Vice(f32,3){cg.col[0],cg.col[1],cg.col[2]}*m.splat3(night*shimmer*d.growth*d.health),cg.reach);
   };
   // a celestial bloom is the garden's light: its core sheds it round
@@ -909,7 +917,7 @@ fn structures(g:*Game,reach:f32,tf:f32)Allocator.Error!void{
     // and its crown gathers over it (game/light_crown.zig)
     g.parts.ley=lightCrown.ley(s,ctr);
     defer g.parts.ley=null;
-    try lightCrown.wear(s,&g.parts,ctr);
+    try lightCrown.wear(s,&g.parts,ctr,tf);
     // unforming, it is drawn grown back down as far as it has gone
     // (lifted by a hint of magic, it bobs softly)
     const bob=m.translate(m.v3(0,st.bobAt(s.def(),s.seed,tf),0));

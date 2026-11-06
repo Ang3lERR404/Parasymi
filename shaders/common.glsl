@@ -80,7 +80,7 @@ const float SHEEN_POWER = 40.0;
 #define PART_POD 17       // a plant's yield ripening on it, a bead of sap
 #define PART_PLEXUS 18    // the constellate web: points, lines, panes of light
 #define PART_STONE 19     // weathered stone: grained, flecked, lichened
-#define PART_SPARK 20     // a spark of lightning: white-hot core, violet edge
+#define PART_SPARK 20     // a spark of lightning: pale violet core, deeper violet edge
 #define PART_HUSK 21      // a crystal husk: clear glass, glowing cracks
 #define PART_TRAIL 22     // a trail of light along a curve, bright at its head
 #define PART_CORTEX 23    // a ganglion's cortex: pale folded tissue, milky see-through

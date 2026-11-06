@@ -537,7 +537,7 @@ harvester of the faintest starlight, 1.1 m.
     strung across with fine green threads, like a loom's warp.
   - Air motes spiral in through the vanes into the chamber, always.
   - Ionizing, lightning jumps between the nodes and the crystal
-    (`weftstoneSpark`, part `spark`: white-hot core, violet edge, lights
+    (`weftstoneSpark`, part `spark`: pale violet core, deeper violet edge, lights
     the fog). It starts as one tiny spark and grows to five long ones as
     the crystal forms.
 - **The weave of both** (the convergence kit's stalk, chosen as a blend

@@ -197,14 +197,15 @@ carries the game's early days.
   1. ~~The final tone curve~~ done: `composite.frag` `shoulder` rolls off by
      the brightest channel and scales the rest with it, so a glow dims
      keeping its hue (the gardener, side by side: "oh my God it does").
-  2. A light trail's head (`part.frag` `PART_TRAIL`) mixed half to white
-     and brightest where it moves: three pulls on the eye at once.
-  3. Still lights: the solcyriphon beam's light on the ground and halfway
-     down it, and a crown's shed light, never breathe (`view.zig`
-     `shafts`, `light_crown.zig`).
-  4. Lightning's white-hot core (`PART_SPARK`): pale violet like its edge;
-     it comes from the plants, not the sky. The sun keeps its white, the
-     one source every colour comes from.
+  2. ~~A light trail's head~~ done: `PART_TRAIL` keeps its own colour to the
+     head (it was mixed half to white where it moves).
+  3. ~~Still lights~~ done: the solcyriphon beam's lights and a crown's shed
+     light breathe (`m.shimmer`, engine core/math, now shared with the
+     plants' crown glows).
+  4. ~~Lightning's white-hot core~~ done: `PART_SPARK`'s core is pale
+     violet. Not yet seen sparking in a shot (a weftstone only sparks
+     while ionizing): look at it in play. The sun keeps its white, the one
+     source every colour comes from.
   5. The halo's outer band washes half to white: looked at again once the
      curve keeps colour.
 

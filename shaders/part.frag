@@ -114,10 +114,11 @@ const float ENERGY_RINGS = 14.0;
 const float ENERGY_CLOSE = 5.0;
 const float ENERGY_PULSES = 3.0;
 const float ENERGY_RUN = 8.0;
-// a spark of lightning: its violet edge, its white-hot core, how tight
-// that core is, and how fast it flickers
+// a spark of lightning: its violet edge, its pale violet core (the plants'
+// own light, never white-hot), how tight that core is, and how fast it
+// flickers
 const vec3 SPARK_EDGE = vec3(0.55, 0.32, 1.0);
-const vec3 SPARK_CORE = vec3(1.0, 0.96, 1.0);
+const vec3 SPARK_CORE = vec3(0.86, 0.74, 1.0);
 const float SPARK_TIGHT = 6.0;
 const float SPARK_FLICKER = 47.0;
 // the constellate web: its blue, the pale it lightens to as a beat passes,
@@ -353,8 +354,8 @@ void surface() {
     return;
   }
   if (part == PART_SPARK) {
-    // a spark of lightning (v_t 0..1 along it): light itself, a white-hot
-    // core seen face-on, violet toward its edge, flickering fast; brighter
+    // a spark of lightning (v_t 0..1 along it): light itself, a pale violet
+    // core seen face-on, deeper violet toward its edge, flickering fast; brighter
     // than white, so the glow takes it up (v_glow how bright, v_fade how
     // much is left of it)
     if (dot(raw, V) < 0.0) discard;
@@ -444,7 +445,9 @@ void surface() {
     float core = exp(-x * x * 30.0);
     float halo = exp(-x * x * 3.0);
     float along = pow(head, 1.6) * smoothstep(1.0, 0.94, head);
-    vec3 col = mix(v_col, vec3(1.0), 0.5 * core * head);
+    // its head keeps its own colour, never going white (the glow bar):
+    // bright and moving, it already draws the eye
+    vec3 col = v_col;
     c = col * (halo * 0.9 + core * 2.2) * along * v_glow;
     float a = clamp(halo * 0.5 + core * 0.6, 0.0, 1.0) * along * clamp(v_fade, 0.0, 1.0);
     o = vec4(applyFog(c, v_pos), a);

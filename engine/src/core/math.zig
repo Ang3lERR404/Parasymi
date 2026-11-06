@@ -507,6 +507,13 @@ pub fn alignY(dir:V3)M4{
 pub inline fn dampBy(rate:f32,dt:f32)f32{return 1-@exp(-rate*dt);}
 /// `from` eased toward `to` at `rate` (per second) over `dt`
 pub inline fn damp(from:f32,to:f32,rate:f32,dt:f32)f32{return lerp(from,to,dampBy(rate,dt));}
+/// a light's shimmer at `t` (s): a scale round 1, at most `amount` over or
+/// under, two waves at `rate` (radians a second) and a little over half
+/// it beating together so it never repeats plainly; `seed` sets each
+/// light apart
+pub fn shimmer(t:f32,seed:f32,amount:f32,rate:f32)f32{
+  return 1+amount*@sin(t*rate+seed*tau)*@sin(t*rate*0.61+seed*9);
+}
 /// a point eased toward `to` at `rate` (per second) over `dt`
 pub inline fn dampV(from:V3,to:V3,rate:f32,dt:f32)V3{return lerpV(from,to,dampBy(rate,dt));}
 /// critically damped spring step (for procedural secondary motion).
@@ -680,6 +687,21 @@ test"unlerp undoes lerp and holds within 0..1"{
   try testing.expectEqual(@as(f32,1),unlerp(2,6,9));
   // running backward, high to low
   try testing.expectApproxEqAbs(@as(f32,0.75),unlerp(6,2,3),1e-6);
+}
+test"a shimmer stays within its amount round 1, and moves"{
+  // the least and most seen over a minute, and the first value
+  var lo:f32=2;
+  var hi:f32=0;
+  const first=shimmer(0,0.3,0.2,1.7);
+  var moved=false;
+  for(0..600)|i|{
+    const v=shimmer(ratio(i,10),0.3,0.2,1.7);
+    lo=@min(lo,v);
+    hi=@max(hi,v);
+    if(@abs(v-first)>0.01)moved=true;
+  }
+  try testing.expect(lo>=0.8-1e-5 and hi<=1.2+1e-5);
+  try testing.expect(moved);
 }
 test"damping feels the same at any frame rate"{
   // one whole step, and the same time in two halves
