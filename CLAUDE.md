@@ -107,6 +107,10 @@ zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --
                                   # --burst=S: camera held still, shots spread over S s;
                                   # `zig build burst -- --focus=<f> --shots=N [--at=x,y --r=R]`
                                   # sheets them and measures a spot's light (docs/testing.md)
+zig build capture                 # a see-through frame laid over anything on screen
+                                  # (tools/capture.zig): REC or F9 records a burst of what
+                                  # shows in it into shots/capture/<time>/ (frames, sheet,
+                                  # curve); -/+ or the wheel set the seconds; Esc closes
 zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|chat|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync

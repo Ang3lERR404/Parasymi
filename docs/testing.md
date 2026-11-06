@@ -126,6 +126,15 @@ zig build run -- --structure=weftstone --state=active --speed=8 --inspect=weftst
 radius. To prove a change made something move, measure the same spot in a
 build without the change: other lights sweeping over it move it too.
 
+What moves outside the game (another game in a borderless window, a
+video) is caught with the capture frame, `zig build capture` (or the
+gardener's desktop launcher): a see-through, borderless frame, always on
+top, sized by its edges and dragged by its band. REC, or F9 wherever the
+focus is, records a burst of what shows inside it over the seconds set
+(- and +, or the wheel) into `shots/capture/<time>/`: its frames, one
+`sheet.png` and `curve.txt` (the middle's light through them, as `zig
+build burst` prints it); `shots/capture/latest.txt` names the newest.
+
 ## A sculpt in the world
 `--sculpt=<name>` stands one of the gardener's sculpts (`src/mesh/<name>.mesh`,
 made in the mesh editor) alone on the free tile nearest spawn, drawn

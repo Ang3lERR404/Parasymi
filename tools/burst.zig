@@ -21,6 +21,8 @@ const Allocator=std.mem.Allocator;
 const Io=std.Io;
 /// a directory handle
 const Dir=Io.Dir;
+/// where text is written
+const Writer=Io.Writer;
 /// a text written into a buffer
 const bufPrint=std.fmt.bufPrint;
 /// a whole number read from text
@@ -36,7 +38,7 @@ const shotsDir="shots";
 /// the largest shot read (bytes)
 const maxShot=64<<20;
 /// the most frames a burst holds
-const maxFrames=120;
+pub const maxFrames=120;
 /// how much each frame is shrunk on the sheet (each side)
 const sheetShrink:u32=4;
 /// a spot that changes less than this from its quietest to its brightest
@@ -60,7 +62,7 @@ const Flag=enum{
   cols,
 };
 /// the spot measured in every frame: its middle and radius, in pixels
-const Spot=struct{
+pub const Spot=struct{
   /// its middle, x then y
   at:?m.Vice(u32,2)=null,
   /// how far round its middle it reaches
@@ -149,11 +151,17 @@ pub fn main(init:std.process.Init)!void{
     frames[read]=try png.decode(gpa,bytes);
     read+=1;
   }
-  try sheet(gpa,io,frames[0..read],cols,focus);
-  report(frames[0..read],spot);
+  const path=try bufPrint(&pb,shotsDir++"/{s}_sheet.png",.{focus});
+  try sheet(gpa,io,frames[0..read],cols,path);
+  print("sheet: {s} ({d} frames, {d} a row)\n",.{path,read,cols});
+  // the curve, written whole, then shown
+  var aw:Writer.Allocating=.init(gpa);
+  defer aw.deinit();
+  try report(frames[0..read],spot,&aw.writer);
+  print("{s}",.{aw.written()});
 }
-/// lays `frames` out `cols` a row, each shrunk, into `shots/<focus>_sheet.png`
-fn sheet(gpa:Allocator,io:Io,frames:[]const png.Image,cols:usize,focus:[]const u8)!void{
+/// lays `frames` out `cols` a row, each shrunk, into one picture at `path`
+pub fn sheet(gpa:Allocator,io:Io,frames:[]const png.Image,cols:usize,path:[]const u8)!void{
   // one frame's size on the sheet, the sheet's rows and its pixels (RGBA)
   const fw=frames[0].w/sheetShrink;
   const fh=frames[0].h/sheetShrink;
@@ -180,14 +188,11 @@ fn sheet(gpa:Allocator,io:Io,frames:[]const png.Image,cols:usize,focus:[]const u
   }
   const file=try png.encode(gpa,sw,sh,px,.rgba);
   defer gpa.free(file);
-  var pb:[128]u8=undefined;
-  const path=try bufPrint(&pb,shotsDir++"/{s}_sheet.png",.{focus});
   try Dir.cwd().writeFile(io,.{.sub_path=path,.data=file});
-  print("sheet: {s} ({d} frames, {d} a row)\n",.{path,frames.len,cols});
 }
-/// prints the spot's light in each frame as a bar, how much it changed from
-/// the frame before, and whether it breathes and whether it jumps
-fn report(frames:[]const png.Image,spot:Spot)void{
+/// writes to `w` the spot's light in each frame as a bar, how much it
+/// changed from the frame before, and whether it breathes and whether it jumps
+pub fn report(frames:[]const png.Image,spot:Spot,w:*Writer)Writer.Error!void{
   // each frame's light, and the least, most and sum of them
   var lights:[maxFrames]f32=undefined;
   var lo:f32=1;
@@ -202,7 +207,7 @@ fn report(frames:[]const png.Image,spot:Spot)void{
   const mean=sum/m.f(frames.len);
   // the most the spot changed between two frames
   var most:f32=0;
-  print("frame  light  change\n",.{});
+  try w.print("frame  light  change\n",.{});
   for(frames,0..)|im,i|{
     const ch=if(i==0)0 else spot.change(frames[i-1],im);
     most=@max(most,ch);
@@ -210,9 +215,9 @@ fn report(frames:[]const png.Image,spot:Spot)void{
     const bar=if(hi>lo)m.floorTo(usize,(lights[i]-lo)/(hi-lo)*barWidth+0.5)else 0;
     var bb:[barWidth]u8=undefined;
     @memset(&bb,'#');
-    print("{d:>5}  {d:.3}  {d:.3}  |{s}\n",.{i,lights[i],ch,bb[0..bar]});
+    try w.print("{d:>5}  {d:.3}  {d:.3}  |{s}\n",.{i,lights[i],ch,bb[0..bar]});
   }
-  print("light {d:.3}..{d:.3} (mean {d:.3}): {s}; most change between frames {d:.3}\n",.{lo,hi,mean,if(breathes(lo,hi,mean))"it breathes" else "it is still",most});
+  try w.print("light {d:.3}..{d:.3} (mean {d:.3}): {s}; most change between frames {d:.3}\n",.{lo,hi,mean,if(breathes(lo,hi,mean))"it breathes" else "it is still",most});
 }
 test"a spot's light is the mean of the pixels within it, its change between frames"{
   // two 4x4 frames: one black, one white in its middle 2x2

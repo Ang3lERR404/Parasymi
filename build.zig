@@ -238,6 +238,26 @@ pub fn build(b:*Build)!void{
   const burstCmd=b.addRunArtifact(burst);
   if(b.args)|args|burstCmd.addArgs(args);
   b.step("burst","lay a burst of shots out as a sheet and measure a spot's light through it.").dependOn(&burstCmd.step);
+  // the capture frame (tools/capture.zig): a see-through window laid over
+  // anything on screen, recording a burst of what shows in it; always
+  // fast (it copies the screen in time), a window of its own (no console),
+  // installed alone so a held bridge.exe never stops it
+  const captureMod=b.createModule(.{
+    .optimize=.ReleaseFast,
+    .target=t,
+    .root_source_file=b.path("tools/capture.zig"),
+    .imports=&.{.{.name="engine",.module=engine}},
+  });
+  captureMod.linkSystemLibrary("user32",.{});
+  captureMod.linkSystemLibrary("gdi32",.{});
+  // the capture frame's executable, installed on its own and then opened
+  const capture=b.addExecutable(.{.name="capture",.root_module=captureMod});
+  capture.subsystem=.windows;
+  const captureInstall=b.addInstallArtifact(capture,.{});
+  const captureCmd=b.addRunArtifact(capture);
+  captureCmd.step.dependOn(&captureInstall.step);
+  b.step("capture","open the capture frame over the screen.").dependOn(&captureCmd.step);
+
   // logic tests (world/sim/game, and the engine's own) need no window or
   // GPU, but share the game's imports so game-level code can be exercised
   // headless.
@@ -280,4 +300,14 @@ pub fn build(b:*Build)!void{
   testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
   // the burst reader's tests (a spot's light and change, a breath)
   testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=burstMod,.filters=filters})).step);
+  // the capture frame's tests (its plan, its band, its edges), linked as it is
+  const captureTestMod=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/capture.zig"),
+    .imports=&.{.{.name="engine",.module=engine}},
+  });
+  captureTestMod.linkSystemLibrary("user32",.{});
+  captureTestMod.linkSystemLibrary("gdi32",.{});
+  testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=captureTestMod,.filters=filters})).step);
 }
