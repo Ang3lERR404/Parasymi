@@ -79,6 +79,37 @@ carries the game's early days.
   brushing past it folds it for a moment, pure charm with no game effect
   ("it's nice for a game to have personality behind it, all the little
   things count"). More may follow.
+  *Its look, shaped as a chin wag* (the gardener, 2026-11-06; a first
+  draft sculpt in `src/mesh/thepulse.mesh`: parasite cage, sap heart,
+  mimosa fronds, pink pom-poms). The feeling: a beating heart, uncannily
+  like a real one, alive and alien. The heart close to a real heart, so
+  it reminds the player of their own, but never directly: something
+  familiar they can't quite place: a real heart's lean and fullness, its
+  great vessels becoming the fronds' stems arching from its top. The five
+  strands hug it like its veins, beating with it, but latched round it
+  too, claiming it as their own (the parasite holding the heart). The
+  heart is a symbiote's, taken: that is what gives it its plant look, and
+  the two beat together (already one before the unforming makes them
+  convergent). It looks withered, wrinkled, almost dry, but not: still
+  alive under it, shown both ways (the gardener: "quite brilliant"):
+  *the flush*, at rest a dried fig, dusty grey-green and creased; each
+  beat it swells, the creases pull nearly flat and a living green
+  spreads from its middle, then it sinks back dry (what you see from
+  across the garden); *the sap in the folds*, its skin matte throughout
+  but thin threads of sap deep in the creases catch the light, glinting
+  as the beat opens and closes them (the secret you find up close).
+  *Its roots and stem* (the gardener's picture, no bulb): pale vein-like
+  vines push out of the ground and spread over it in a small patch, then
+  gather into an uncanny spiral stem, curling and weaving up and up; at
+  the top, held between the roots' clutches, sits the heart (the same
+  pale strands that rise as the stem latch round it). *The clutch*
+  (chosen, a takeover still happening): five thick strands from the stem
+  grip the heart from below like fingers; from between them five thin
+  tendrils creep on over it as a closing net, gathering at its top and
+  rising as the vessels that arch into the parasite's lilac fronds; a
+  few of the heart's own old leaves still poke out between, withered,
+  curled, brown-green, what is left of the symbiote. At the unforming
+  the net closes whole and they become one (convergent).
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
