@@ -203,9 +203,8 @@ carries the game's early days.
      light breathe (`m.shimmer`, engine core/math, now shared with the
      plants' crown glows).
   4. ~~Lightning's white-hot core~~ done: `PART_SPARK`'s core is pale
-     violet. Not yet seen sparking in a shot (a weftstone only sparks
-     while ionizing): look at it in play. The sun keeps its white, the one
-     source every colour comes from.
+     violet, seen sparking in a burst (`--burst`, docs/testing.md). The
+     sun keeps its white, the one source every colour comes from.
   5. The halo's outer band washes half to white: looked at again once the
      curve keeps colour.
 
