@@ -68,7 +68,7 @@ const maxAnswer=4096;
 const instructions=
   \\Parasymi's bridge. The gardener can type to you from the game's chat
   \\sidebar while playing; each message arrives as <channel source="parasymi">.
-  \\Answer with the reply tool: it shows in the game's sidebar (upper case,
+  \\Answer with the reply tool: it shows in the game's sidebar (as written,
   \\at most 280 characters, so keep it short). game_state tells what the game
   \\believes right now (open panel, where back leads, camera, the wolf's
   \\place, buttons pressed); game_frame shows the screen as a picture.
@@ -81,7 +81,7 @@ const instructions=
 /// the tools offered, as Claude Code lists them (on one line: a message
 /// is one line)
 const toolsJson=oneLine(
-  \\[{"name":"reply","description":"Send a message to the gardener's in-game chat sidebar (upper case, at most 280 characters).","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"The message"}},"required":["text"]}},
+  \\[{"name":"reply","description":"Send a message to the gardener's in-game chat sidebar (shown as written, capitals and small letters, at most 280 characters).","inputSchema":{"type":"object","properties":{"text":{"type":"string","description":"The message"}},"required":["text"]}},
   \\{"name":"game_state","description":"What the running game believes right now: mode, where back leads, camera, the wolf's place, hotbar, what is pointed at, actions pressed lately.","inputSchema":{"type":"object","properties":{}}},
   \\{"name":"game_frame","description":"A picture of what the running game shows right now (half size PNG).","inputSchema":{"type":"object","properties":{}}},
   \\{"name":"editor_document","description":"The sculpt (meshedit) or clip (animedit) open in a linked editor, as the text its file holds.","inputSchema":{"type":"object","properties":{}}},

@@ -942,9 +942,10 @@ vec4 knot(vec2 px, float open, float seed) {
   return vec4(col, a * v_col.a);
 }
 
-// is glyph cell q set? (5x7 bitmap, row-major, bit 0 top-left)
+// is glyph cell q set? (5x7 bitmap and a row below the line for tails,
+// row-major, bit 0 top-left)
 bool lit(ivec2 q) {
-  if (q.x < 0 || q.y < 0 || q.x >= 5 || q.y >= 7) return false;
+  if (q.x < 0 || q.y < 0 || q.x >= 5 || q.y >= 8) return false;
   int b = q.y * 5 + q.x;
   uint word = b < 32 ? v_bits.x : v_bits.y;
   return ((word >> uint(b & 31)) & 1u) != 0u;
@@ -991,7 +992,7 @@ vec4 glyph() {
   vec2 uv = v_uv - GLYPH_PAD;
   float seed = v_param.y * 13.0;
   uv += (vec2(vnoise(uv * 0.4 + seed), vnoise(uv * 0.4 - seed + 5.0)) - 0.5) * GLYPH_BOW * big;
-  uv.x += sin(t * 1.3 + v_param.y * 9.0) * GLYPH_SWAY * (1.0 - uv.y / 7.0);
+  uv.x += sin(t * 1.3 + v_param.y * 9.0) * GLYPH_SWAY * max(1.0 - uv.y / 7.0, 0.0);
   ivec2 p = ivec2(floor(uv));
   int reach = big > 0.0 ? 2 : 1;
   float aa = 0.75 / px;

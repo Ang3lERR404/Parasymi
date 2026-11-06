@@ -1,23 +1,24 @@
 //! built-in 5x7 bitmap font, defined in code. Each glyph is 7 rows of 5 bits
-//! (MSB = leftmost column). Uppercase, digits and basic punctuation.
-/// the standard library
-const std=@import("std");
+//! (MSB = leftmost column), and an eighth below the line where the tails of
+//! g, j, p, q and y hang. Capitals, small letters, digits and basic punctuation.
 /// the maths: vectors (Vec), rows (Vice) and matrices (Mat)
 const m=@import("../core/math.zig");
-/// a letter in upper case
-const toUpper=std.ascii.toUpper;
 /// a glyph's width in pixels
 pub const glyphW=5;
-/// a glyph's height in pixels
+/// a glyph's height in pixels, from its top to the line it stands on
 pub const glyphH=7;
-/// a glyph: seven rows of five bits, the leftmost column in bit 4
-const Glyph=[7]u8;
-/// a glyph from its rows, as written in the table below
-fn g(rows:[7]u8)Glyph{return rows;}
+/// a glyph's rows: its height and the one below the line for tails
+pub const glyphRows=glyphH+1;
+/// a glyph: eight rows of five bits, the leftmost column in bit 4
+const Glyph=[glyphRows]u8;
+/// a glyph standing on the line, from its seven rows as written below
+fn g(rows:[glyphH]u8)Glyph{return rows++.{0};}
+/// a small letter whose tail may hang below the line, from all eight rows
+fn tail(rows:Glyph)Glyph{return rows;}
 /// every glyph, indexed by its ASCII code (blank where none is drawn)
 const table=blk:{
   // the glyphs, all blank until drawn
-  var t:[128]Glyph=@splat(.{0}**7);
+  var t:[128]Glyph=@splat(.{0}**glyphRows);
   t['A']=g(.{0b01110,0b10001,0b10001,0b11111,0b10001,0b10001,0b10001});
   t['B']=g(.{0b11110,0b10001,0b10001,0b11110,0b10001,0b10001,0b11110});
   t['C']=g(.{0b01110,0b10001,0b10000,0b10000,0b10000,0b10001,0b01110});
@@ -44,6 +45,32 @@ const table=blk:{
   t['X']=g(.{0b10001,0b10001,0b01010,0b00100,0b01010,0b10001,0b10001});
   t['Y']=g(.{0b10001,0b10001,0b10001,0b01010,0b00100,0b00100,0b00100});
   t['Z']=g(.{0b11111,0b00001,0b00010,0b00100,0b01000,0b10000,0b11111});
+  t['a']=g(.{0,0,0b01110,0b00001,0b01111,0b10001,0b01111});
+  t['b']=g(.{0b10000,0b10000,0b10110,0b11001,0b10001,0b10001,0b11110});
+  t['c']=g(.{0,0,0b01110,0b10000,0b10000,0b10001,0b01110});
+  t['d']=g(.{0b00001,0b00001,0b01101,0b10011,0b10001,0b10001,0b01111});
+  t['e']=g(.{0,0,0b01110,0b10001,0b11111,0b10000,0b01110});
+  t['f']=g(.{0b00110,0b01001,0b01000,0b11100,0b01000,0b01000,0b01000});
+  t['g']=tail(.{0,0,0b01111,0b10001,0b10001,0b01111,0b00001,0b01110});
+  t['h']=g(.{0b10000,0b10000,0b10110,0b11001,0b10001,0b10001,0b10001});
+  t['i']=g(.{0b00100,0,0b01100,0b00100,0b00100,0b00100,0b01110});
+  t['j']=tail(.{0b00010,0,0b00110,0b00010,0b00010,0b00010,0b10010,0b01100});
+  t['k']=g(.{0b10000,0b10000,0b10010,0b10100,0b11000,0b10100,0b10010});
+  t['l']=g(.{0b01100,0b00100,0b00100,0b00100,0b00100,0b00100,0b01110});
+  t['m']=g(.{0,0,0b11010,0b10101,0b10101,0b10001,0b10001});
+  t['n']=g(.{0,0,0b10110,0b11001,0b10001,0b10001,0b10001});
+  t['o']=g(.{0,0,0b01110,0b10001,0b10001,0b10001,0b01110});
+  t['p']=tail(.{0,0,0b11110,0b10001,0b10001,0b11110,0b10000,0b10000});
+  t['q']=tail(.{0,0,0b01101,0b10011,0b10001,0b01111,0b00001,0b00001});
+  t['r']=g(.{0,0,0b10110,0b11001,0b10000,0b10000,0b10000});
+  t['s']=g(.{0,0,0b01110,0b10000,0b01110,0b00001,0b11110});
+  t['t']=g(.{0b01000,0b01000,0b11100,0b01000,0b01000,0b01001,0b00110});
+  t['u']=g(.{0,0,0b10001,0b10001,0b10001,0b10011,0b01101});
+  t['v']=g(.{0,0,0b10001,0b10001,0b10001,0b01010,0b00100});
+  t['w']=g(.{0,0,0b10001,0b10001,0b10101,0b10101,0b01010});
+  t['x']=g(.{0,0,0b10001,0b01010,0b00100,0b01010,0b10001});
+  t['y']=tail(.{0,0,0b10001,0b10001,0b10001,0b01111,0b00001,0b01110});
+  t['z']=g(.{0,0,0b11111,0b00010,0b00100,0b01000,0b11111});
   t['0']=g(.{0b01110,0b10001,0b10011,0b10101,0b11001,0b10001,0b01110});
   t['1']=g(.{0b00100,0b01100,0b00100,0b00100,0b00100,0b00100,0b01110});
   t['2']=g(.{0b01110,0b10001,0b00001,0b00010,0b00100,0b01000,0b11111});
@@ -57,6 +84,7 @@ const table=blk:{
   t['.']=g(.{0,0,0,0,0,0b01100,0b01100});
   t[',']=g(.{0,0,0,0,0b01100,0b00100,0b01000});
   t[':']=g(.{0,0b01100,0b01100,0,0b01100,0b01100,0});
+  t[';']=g(.{0,0b01100,0b01100,0,0b01100,0b00100,0b01000});
   t['-']=g(.{0,0,0,0b11111,0,0,0});
   t['+']=g(.{0,0b00100,0b00100,0b11111,0b00100,0b00100,0});
   t['/']=g(.{0b00001,0b00010,0b00010,0b00100,0b01000,0b01000,0b10000});
@@ -76,9 +104,8 @@ const table=blk:{
 };
 /// packed bits for the shader: bit (row*5 + col), col 0 = leftmost.
 pub fn bits(ch:u8)m.Vice(u32,2){
-  // the letter, upper-cased, and its glyph ('?' past ASCII)
-  const c=toUpper(ch);
-  const glyph=table[if(c<128)c else'?'];
+  // the letter's glyph ('?' past ASCII)
+  const glyph=table[if(ch<128)ch else'?'];
   // the bits packed so far
   var v:u64=0;
   for(glyph,0..)|row,r|for(0..glyphW)|col|{

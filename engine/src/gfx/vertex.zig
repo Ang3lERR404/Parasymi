@@ -33,7 +33,7 @@ pub const Ui=extern struct{
   size:m.Vice(f32,2),
   /// its colour: red, green, blue, alpha bytes
   col:m.Vice(u8,4),
-  /// glyph: 5x7 bitmap packed row-major (bit 0 = top-left).
+  /// glyph: 5x7 bitmap and a tail row below it, packed row-major (bit 0 = top-left).
   /// shape: x = 0xffffffff, y = shape kind (see ui/draw.zig `Shape`)
   bits:m.Vice(u32,2),
   /// shape parameters: x value/selection 0..1, y phase/seed
