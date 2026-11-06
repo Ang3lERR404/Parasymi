@@ -145,6 +145,14 @@ carries the game's early days.
   patch returns only where the gardener works for it. Its shape and its
   five-stage growth are planned in [act2.md](act2.md#the-star-caller-being-shaped-with-the-gardener-2026-11-04);
   still to shape: its name, modules, key, research, cost, sound, numbers.
+- **Veils of light for the heart's rose** (the gardener, 2026-11-06, from
+  Grey Goo's Shroud, `shots/capture/1794004494`). Off the rose's petals
+  hang see-through veils of pale blue light trailing down to the ground:
+  sheer curtains made of many fine glowing threads, a few brighter strands
+  running through them, rippling and drifting slowly like a jellyfish's
+  trailing arms or an aurora, never still. Its kin seen on the same
+  structure (`1794003654`): fine wisps rising and curling out of its
+  glowing heart, and light pulsing through the veins of its petals.
 
 ## Small things
 - **A field-of-view option, later.** The camera's fields of view are fixed
