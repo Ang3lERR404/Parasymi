@@ -329,7 +329,7 @@ Factorio's belts, each side a short row of items**.
   perfect").
 
 ## The radiant lineage's forming sound
-*Built (sound/forming.zig), waiting for the gardener's ear.* Fantasy mixed with sci-fi: real glass,
+*Built (sound/forming.zig), waiting for the gardener's ear. With several gathering at once only the nearest is heard (the gardener: "only the nearest one really").* Fantasy mixed with sci-fi: real glass,
 bells and choir (never small synth tones, which read comical), shaped in
 strange ways. Soft, in D Lydian, kept apart from the arsthraxia's glass
 whorls and bell bloom.
