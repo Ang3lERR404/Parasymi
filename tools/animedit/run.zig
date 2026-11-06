@@ -400,6 +400,7 @@ pub fn main(init:std.process.Init)!void{
     // turned, placed and zoomed as asked (a form's focus is meshedit's)
     if(el)|*l|if(l.takeView(io))|ask|{
       if(ask.home)cam.send(home,homeDist);
+      if(ask.ui)|on|e.uiHidden=!on;
       cam.take(ask,game.player.pos);
     };
     cam.step(&game.cam,dt);
@@ -424,8 +425,10 @@ pub fn main(init:std.process.Init)!void{
       .heading=game.player.heading(),
     };
     ui.clear(@floatCast(game.uiTime));
-    try e.draw(&ui,screen,&rg);
-    if(el)|*l|try l.draw(&ui,screen);
+    if(!e.uiHidden or chatting){
+      try e.draw(&ui,screen,&rg);
+      if(el)|*l|try l.draw(&ui,screen);
+    }
     scene.ui=ui.v.items;
     // whether the window was resized since the last frame
     const resized=input.resized;

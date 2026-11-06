@@ -115,6 +115,8 @@ pub fn update(g:*Game,in:*const Input,dt:f32,screen:m.Vec(f32,2))Error!void{
   // alt held, for the free camera and to keep harvest off
   const alt=ctl.down(in,.alt);
   if(alt and ctl.pressed(in,.freeCam))g.inspect(in,g.mode!=.inspect);
+  // the HUD hidden or shown again, never while a field takes the keys
+  if(g.typing==null and ctl.pressed(in,.hideUi))g.uiHidden=!g.uiHidden;
   // whether the free camera is out
   const inspecting=g.mode==.inspect;
   g.cam.tick(dt);

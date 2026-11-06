@@ -150,6 +150,9 @@ pub const Editor=struct{
   bar:meshedit.buttons.Bar=.{},
   /// the help (`h`): what the mouse does, and the keys' other ways
   helpShown:bool=false,
+  /// the whole UI hidden (`f1`): panels, toolbar, chat card and handles,
+  /// the view seen bare (shown while the chat is typed in)
+  uiHidden:bool=false,
   /// whether the forms' handles and twins' marks are hidden (`v`), the
   /// surface seen bare; the selected form's gizmo still shows
   dotsHidden:bool=false,

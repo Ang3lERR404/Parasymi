@@ -140,7 +140,8 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot --link]
                                   # rides, test-turned to try it; `o` a form's bone
                                   # (`--rig`, `--try=p,y,r` for shots)
                                   # the camera orbits freely, `.` focuses the selected form,
-                                  # `v` hides the forms' dots (the surface seen bare)
+                                  # `v` hides the forms' dots (the surface seen bare);
+                                  # both editors: f1 hides the whole UI (the game's HUD too)
                                   # (gizmos: tools/gizmo.zig)
                                   # both editors: --link talks with Claude, who reads and
                                   # edits the sculpt or clip, each edit one undo step,

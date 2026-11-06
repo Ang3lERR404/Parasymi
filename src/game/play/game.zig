@@ -227,6 +227,9 @@ pub const Game=struct{
   keyFocus:?hud.Pick=null,
   /// the HUD row being typed into, if any
   typing:?hud.Pick=null,
+  /// the HUD hidden (`hideUi`): out in the garden or the free camera only
+  /// the garden is drawn; a menu opened still shows
+  uiHidden:bool=false,
   /// the window holds the cursor for looking out of the wolf's eyes; the
   /// frame it is taken its jump is not a look
   looking:bool=false,

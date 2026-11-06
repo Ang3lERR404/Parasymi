@@ -195,3 +195,11 @@ Esc/BACK returns to the pause menu.
 ## Free cam
 Click to look, **WASD** fly (**Shift** fast), **Space/Ctrl+Space**
 rise/sink, **Q/E** roll, **wheel** dolly. It eases back in 0.3 s.
+
+## Hide the HUD
+**F1** hides the HUD (the first-person aim with it), so the garden is
+seen bare while roaming or in the free camera; **F1** again shows it. A
+menu opened, or the chat being typed in, shows as ever. Never while a
+field takes the keys. Keyboard only. Both editors have the same on
+**F1** (panels, toolbar, chat card and handles; `editor_view`'s `ui`
+through the link).

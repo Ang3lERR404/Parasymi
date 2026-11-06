@@ -131,6 +131,9 @@ pub const Action=enum{
   slotNext,
   /// with alt: toggle the free camera
   freeCam,
+  /// hide the HUD, or show it again: the garden seen bare while roaming
+  /// or in the free camera (a menu opened still shows)
+  hideUi,
   /// in the free camera: fly faster while held
   flyFast,
   /// in the free camera: rise (with alt held, sink)

@@ -60,6 +60,9 @@ pub const Act=enum{
   focus,
   /// the help on or off
   help,
+  /// every panel, the toolbar, the chat and the handles hidden, the view
+  /// seen bare; again (the key only) to show them
+  ui,
 };
 /// the toolbar's own type for these acts
 pub const Bar=toolbar.Bar(Act);
@@ -94,6 +97,7 @@ pub const binds=[_]toolbar.Bind(Act){
   .{.key=.m,.shift=false,.act=.mark},
   .{.key=.m,.shift=true,.act=.unmark},
   .{.key=.h,.act=.help},
+  .{.key=.F1,.act=.ui},
 };
 /// the buttons, top to bottom
 const items=[_]Bar.Entry{
@@ -120,6 +124,7 @@ const items=[_]Bar.Entry{
   .{.act=.redo,.label="redo",.key="ctrl+y"},
   .{.act=.fromDisk,.label="take file's",.key="f5"},
   .{.act=.focus,.label="focus",.key=".",.gap=true},
+  .{.act=.ui,.label="hide ui",.key="f1"},
   .{.act=.help,.label="help",.key="h"},
 };
 /// the buttons

@@ -135,6 +135,8 @@ pub const Ask=struct{
   home:bool=false,
   /// meshedit: the forms' handles shown (true) or hidden (false)
   dots:?bool=null,
+  /// the editor's whole UI shown (true) or hidden (false)
+  ui:?bool=null,
   /// what an ask's text can fail to read with
   pub const Error=error{BadView};
   /// the ask from its text; a word it does not know, or a number that
@@ -149,8 +151,10 @@ pub const Ask=struct{
       const word=it.next() orelse continue;
       if(eql(u8,word,"home")){
         a.home=true;
-      }else if(eql(u8,word,"dots")){
-        a.dots=(parseInt(u1,it.next() orelse return error.BadView,10) catch return error.BadView)==1;
+      }else if(eql(u8,word,"dots") or eql(u8,word,"ui")){
+        // shown (1) or hidden (0)
+        const on=(parseInt(u1,it.next() orelse return error.BadView,10) catch return error.BadView)==1;
+        if(eql(u8,word,"dots"))a.dots=on else a.ui=on;
       }else if(eql(u8,word,"focus")){
         a.focus=parseInt(usize,it.next() orelse return error.BadView,10) catch return error.BadView;
       }else if(eql(u8,word,"at") or eql(u8,word,"pan")){
@@ -178,6 +182,7 @@ test"an ask is read and taken at once: turned, placed, panned across the view"{
   try testing.expect(m.dist(o.target,v3(1,0.1,-0.2))<1e-4);
   try testing.expect((try Ask.parse("focus 3\nhome")).focus.?==3);
   try testing.expect((try Ask.parse("dots 0")).dots.?==false);
+  try testing.expect((try Ask.parse("ui 1")).ui.?==true);
   try testing.expectError(error.BadView,Ask.parse("spin 3"));
   try testing.expectError(error.BadView,Ask.parse("at 1 2"));
 }

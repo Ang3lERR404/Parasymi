@@ -69,6 +69,9 @@ pub const Act=enum{
   rig,
   /// the help on or off
   help,
+  /// every panel, the toolbar, the chat and the handles hidden, the view
+  /// seen bare; again (the key only) to show them
+  ui,
 };
 /// the toolbar's own type for these acts
 pub const Bar=toolbar.Bar(Act);
@@ -82,6 +85,7 @@ pub const binds=[_]toolbar.Bind(Act){
   .{.key=.F5,.act=.fromDisk},
   .{.key=.j,.act=.rig},
   .{.key=.h,.act=.help},
+  .{.key=.F1,.act=.ui},
   .{.key=.v,.act=.dots},
   .{.key=.o,.act=.bone},
   .{.key=.n,.act=.make},
@@ -136,6 +140,7 @@ const formItems=[_]Bar.Entry{
   .{.act=.coarser,.label="coarser cells",.key="]"},
   .{.act=.rig,.label="rig mode",.key="j",.gap=true},
   .{.act=.dots,.label="hide dots",.key="v"},
+  .{.act=.ui,.label="hide ui",.key="f1"},
   .{.act=.help,.label="help",.key="h"},
 };
 /// the buttons shown in rig mode
@@ -155,6 +160,7 @@ const rigItems=[_]Bar.Entry{
   .{.act=.turn,.label="test turn",.key="2"},
   .{.act=.rig,.label="rig mode",.key="j",.gap=true},
   .{.act=.dots,.label="hide dots",.key="v"},
+  .{.act=.ui,.label="hide ui",.key="f1"},
   .{.act=.help,.label="help",.key="h"},
 };
 /// the buttons for the mode the editor is in

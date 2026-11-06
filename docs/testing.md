@@ -170,7 +170,8 @@ game from the project folder.
   nest, bones) or of keys is one edited text. `editor_view` turns the
   editor's camera at once and answers with the frame: `home` (the first
   view), `focus` (meshedit: form N, from 1), `dots` (meshedit: the
-  forms' handle dots shown or hidden, as `v` does), `at`, `dist`, `yaw`,
+  forms' handle dots shown or hidden, as `v` does), `ui` (the whole UI
+  shown or hidden, as f1 does), `at`, `dist`, `yaw`,
   `pitch`, `zoom`, `pan` (across the view), each left out kept
   (`tools/orbit.zig` `Ask`, through `link/view.txt`). So Claude looks
   round a sculpt itself, with no window of its own on the gardener's

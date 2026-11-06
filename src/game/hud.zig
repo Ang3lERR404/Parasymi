@@ -292,6 +292,10 @@ pub fn build(g:*play.Game,screen:m.Vice(f32,2))Allocator.Error!void{
   // at the main menu (or a panel opened from it) only the panels kept there
   // are drawn: no garden has been entered for the rest to tell of
   const menu=g.atTitle();
+  // the HUD hidden: out in the garden or the free camera nothing is drawn
+  // (a menu opened, or the chat being typed in, shows as ever, so none is
+  // left open unseen); decision: the first-person aim hides with it
+  if(g.uiHidden and g.typing==null and (g.mode==.roam or g.mode==.inspect))return;
   inline for(reg.ids)|id|{
     // this panel's module, and whether it is shown this frame
     const p=reg.module(id);

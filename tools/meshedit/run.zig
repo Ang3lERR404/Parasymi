@@ -334,6 +334,7 @@ pub fn main(init:std.process.Init)!void{
     if(el)|*l|if(l.takeView(io))|ask|{
       if(ask.home)cam.send(origin+v3(0,lookUp,0),camDist);
       if(ask.dots)|on|e.dotsHidden=!on;
+      if(ask.ui)|on|e.uiHidden=!on;
       if(ask.focus)|n|if(n>=1 and n<=e.pieces().len){
         // the form's values
         const v=e.pieces()[n-1].v;
@@ -361,8 +362,10 @@ pub fn main(init:std.process.Init)!void{
     handles.clearRetainingCapacity();
     if(e.rigMode)try rigging.handles(&e,view,origin,&handles,gpa)else for(e.pieces())|p|try handles.append(gpa,view.project(origin+p.v.pos));
     ui.clear(@floatCast(game.uiTime));
-    try e.draw(&ui,screen,handles.items,view,origin);
-    if(el)|*l|try l.draw(&ui,screen);
+    if(!e.uiHidden or chatting){
+      try e.draw(&ui,screen,handles.items,view,origin);
+      if(el)|*l|try l.draw(&ui,screen);
+    }
     scene.ui=ui.v.items;
     // whether the window was resized since the last frame
     const resized=input.resized;

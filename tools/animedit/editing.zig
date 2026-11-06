@@ -133,6 +133,7 @@ pub fn act(e:*Editor,a:Act,in:*const Input)Allocator.Error!void{
     .mark=>try e.startMark(),
     .unmark=>if(e.clip.unmark(e.t)){e.dirty=true;},
     .help=>e.helpShown=!e.helpShown,
+    .ui=>e.uiHidden=!e.uiHidden,
   }
 }
 /// one frame's mouse: a press on the timeline scrubs, on a row selects it
