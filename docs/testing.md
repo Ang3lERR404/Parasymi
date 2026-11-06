@@ -106,6 +106,26 @@ spawn, so looks can be compared at once.
 zig build run -- --samples=polypColony,polyp,polypHydraPlumed --state=mature --inspect=player --shots=3 --orbit=9 --dist=3.2 --pitch=18 --tod=0.5
 ```
 
+## What moves: a burst
+A still shot is one instant; what lives in motion (a flicker, a spark, a
+light that breathes) is checked as motion. `--burst=S` holds the
+`--inspect` camera still and spreads its `--shots` over S seconds of the
+game's clock; `zig build burst` then lays them out as one contact sheet
+(`shots/<focus>_sheet.png`) and measures one spot's light through them,
+printed as a curve: a breathing light is a wave, a still one a flat line
+("it breathes" / "it is still"), and how much the spot changes from frame
+to frame shows a spark jumping. Put the thing in the state that makes it
+move first (`--state=active`, `--speed=` to get there sooner).
+
+```
+zig build run -- --demo --tod=0.0 --inspect=solcyriphon --burst=6 --shots=24 --dist=7 --pitch=70
+zig build burst -- --focus=solcyriphon --shots=24 --at=800,600 --r=40 --cols=6
+zig build run -- --structure=weftstone --state=active --speed=8 --inspect=weftstone --burst=2 --shots=18 --dist=1.4 --pitch=8 --tod=0.0
+```
+`--at=x,y` is the spot in the shot's pixels (unset: its middle), `--r=` its
+radius. To prove a change made something move, measure the same spot in a
+build without the change: other lights sweeping over it move it too.
+
 ## A sculpt in the world
 `--sculpt=<name>` stands one of the gardener's sculpts (`src/mesh/<name>.mesh`,
 made in the mesh editor) alone on the free tile nearest spawn, drawn

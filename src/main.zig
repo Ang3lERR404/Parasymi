@@ -41,6 +41,8 @@ const Flag=enum{
   shots,
   /// `--orbit=`: seconds an inspect orbit takes
   orbit,
+  /// `--burst=`: the inspect camera held still, its shots spread over these seconds
+  burst,
   /// `--dist=`: how far the inspect eye stands
   dist,
   /// `--pitch=`: degrees the inspect eye looks down
@@ -207,7 +209,8 @@ pub fn main(init:Init)!void{
   var seed:?u64=null;
   // `--inspect[=player|<species>|<structure>|x,z]` turns the camera round
   // it, saving screenshots, then closes; `--shots=`, `--orbit=` (seconds a
-  // turn), `--dist=`, `--pitch=` (degrees) shape it
+  // turn), `--dist=`, `--pitch=` (degrees) shape it; `--burst=` (seconds)
+  // holds it still and spreads the shots over them instead
   var inspect:?orbit.Focus=null;
   var turn:orbit.Orbit=.{};
   // `--record[=S]`: a shot and a note every S seconds of ordinary play,
@@ -274,6 +277,7 @@ pub fn main(init:Init)!void{
       .full=>if(f.value)|v|{full=m.clamp01(try parseFloat(f32,v));},
       .shots=>if(f.value)|v|{turn.shots=try parseInt(u32,v,0);},
       .orbit=>if(f.value)|v|{turn.period=try parseFloat(f32,v);},
+      .burst=>if(f.value)|v|{turn.burst=try parseFloat(f32,v);},
       .dist=>if(f.value)|v|{turn.dist=try parseFloat(f32,v);},
       .pitch=>if(f.value)|v|{turn.pitch=m.rad(try parseFloat(f32,v));},
       .tod=>if(f.value)|v|{tod=try parseFloat(f32,v);},

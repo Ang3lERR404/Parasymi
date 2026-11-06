@@ -224,6 +224,20 @@ pub fn build(b:*Build)!void{
     }),
   });
   b.step("audiocheck","play a tone and check it is heard.").dependOn(&b.addRunArtifact(audiocheck).step);
+  // the burst reader (tools/burst.zig): a held-still `--inspect --burst=`
+  // run's frames as one contact sheet, and one spot's light measured
+  // through them; it needs only the engine
+  const burstMod=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/burst.zig"),
+    .imports=&.{.{.name="engine",.module=engine}},
+  });
+  // the burst reader's executable, and the command that runs it with any `--` args
+  const burst=b.addExecutable(.{.name="burst",.root_module=burstMod});
+  const burstCmd=b.addRunArtifact(burst);
+  if(b.args)|args|burstCmd.addArgs(args);
+  b.step("burst","lay a burst of shots out as a sheet and measure a spot's light through it.").dependOn(&burstCmd.step);
   // logic tests (world/sim/game, and the engine's own) need no window or
   // GPU, but share the game's imports so game-level code can be exercised
   // headless.
@@ -264,4 +278,6 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
+  // the burst reader's tests (a spot's light and change, a breath)
+  testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=burstMod,.filters=filters})).step);
 }

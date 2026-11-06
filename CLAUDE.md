@@ -104,6 +104,9 @@ zig build run -- --sculpt=<name>  # one of your sculpts alone, looping its clip
 zig build run -- --samples=<mesh>,<mesh>   # looks side by side along x (docs/testing.md)
 zig build run -- --inspect=<player|eyes|species|kind|x,z> --shots=N --orbit=S --dist=D --pitch=P
                                   # orbit + screenshots to shots/, then quit
+                                  # --burst=S: camera held still, shots spread over S s;
+                                  # `zig build burst -- --focus=<f> --shots=N [--at=x,y --r=R]`
+                                  # sheets them and measures a spot's light (docs/testing.md)
 zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|chat|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync

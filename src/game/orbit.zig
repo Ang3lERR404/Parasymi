@@ -3,7 +3,8 @@
 //! it and asking for a screenshot at evenly spaced bearings; once every
 //! shot is taken the game closes. For looking at visual work unattended.
 //! `eyes` looks out of the wolf's own eyes instead, turning round where it
-//! stands, `--pitch` down.
+//! stands, `--pitch` down. `--burst=S` holds the camera still and spreads
+//! the shots over S seconds, to catch what moves (`zig build burst`).
 const lib=@import("../lib.zig");
 /// the standard library, reached through the hub
 const std=lib.std;
@@ -91,12 +92,17 @@ pub const Orbit=struct{
   t:f32=0,
   /// how many shots have been taken
   taken:u32=0,
+  /// `--burst=S`: the camera held still at its first bearing and the shots
+  /// spread over these seconds instead of round a turn, so what lives in
+  /// motion (a flicker, a spark, a breathing light) is caught as it moves
+  burst:?f32=null,
   /// place the camera for this frame (after `Game.update`); true while a
   /// shot is due (it stays due until `took`)
   pub fn step(o:*Orbit,g:*Game,dt:f32)bool{
     o.t+=dt;
-    // the bearing now (radians), the point looked at, and the camera
-    const yaw=o.turn()*m.tau;
+    // the bearing now (radians; held at the first in a burst), the point
+    // looked at, and the camera
+    const yaw=if(o.burst!=null)0 else o.turn()*m.tau;
     const at=o.point(g);
     const c=&g.cam;
     if(o.focus==.eyes){
@@ -128,9 +134,14 @@ pub const Orbit=struct{
   pub fn done(o:*const Orbit)bool{return o.taken>=o.shots;}
   /// how far round it has turned (turns)
   fn turn(o:*const Orbit)f32{return@max(o.t-o.settle,0)/o.period;}
-  /// the next shot's bearing is reached
+  /// how far through its shots it is (0..1 and on): round the turn, or
+  /// through the burst's seconds
+  fn through(o:*const Orbit)f32{
+    return if(o.burst)|b|@max(o.t-o.settle,0)/b else o.turn();
+  }
+  /// the next shot's moment is reached
   fn due(o:*const Orbit)bool{
-    return!o.done() and o.t>=o.settle and o.turn()*m.f(o.shots)>=m.f(o.taken);
+    return!o.done() and o.t>=o.settle and o.through()*m.f(o.shots)>=m.f(o.taken);
   }
   /// the point the camera looks at: the wolf, a tile's centre, or the
   /// nearest plant of the species or structure of the kind (the wolf if none)
@@ -201,5 +212,19 @@ test"shots are due evenly round one turn, after the settle"{
     }
   }
   try testing.expectEqual(@as(u32,4),due);
+  try testing.expect(o.done());
+}
+test"a burst spreads its shots over its seconds, the turn ignored"{
+  // a two-second burst of 8 inside a long turn, and when each fell due
+  var o:Orbit=.{.period=100,.shots=8,.settle=1,.burst=2};
+  var t:f32=0;
+  while(t<4):(t+=0.05){
+    o.t=t;
+    if(o.due()){
+      // a quarter second apart, from the settle
+      try testing.expectApproxEqAbs(1+m.f(o.taken)*0.25,t,0.06);
+      o.took();
+    }
+  }
   try testing.expect(o.done());
 }
