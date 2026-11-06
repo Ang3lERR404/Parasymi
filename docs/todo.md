@@ -196,6 +196,13 @@ carries the game's early days.
   2026-11-04). The stellasaluumni sways in the garden's wind but the
   fruit it bears stays still, out of step with it. Everything grown moves
   with the sway (the plant rule): the fruit rides its stem's sway.
+- **The capture frame hears too** (the gardener, 2026-11-06; a side
+  idea, kept for later). REC also records what the speakers play
+  (WASAPI loopback, as `audiocheck` does) into a `.wav` beside the
+  frames, drawn as a spectrogram (time across, pitch up, loudness as
+  brightness) with a short text of its loudness over time and its
+  strongest pitches as notes, so Claude can read what a sound sounds
+  like; maybe pick single sounds out of it.
 - **Two galaxies meeting in the night sky** (the gardener, 2026-11-04).
   A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
   their arms twisted into streamers, new stars blooming pink where their
