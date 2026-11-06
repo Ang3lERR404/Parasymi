@@ -146,11 +146,12 @@ carries the game's early days.
   five-stage growth are planned in [act2.md](act2.md#the-star-caller-being-shaped-with-the-gardener-2026-11-04);
   still to shape: its name, modules, key, research, cost, sound, numbers.
 - **Veils of light for the heart's rose** (the gardener, 2026-11-06, from
-  Grey Goo's Shroud, `shots/capture/1794004494`). Off the rose's petals
-  hang see-through veils of pale blue light trailing down to the ground:
-  sheer curtains made of many fine glowing threads, a few brighter strands
-  running through them, rippling and drifting slowly like a jellyfish's
-  trailing arms or an aurora, never still. Its kin seen on the same
+  Grey Goo's Shroud, `shots/capture/1794004494`). In the gardener's words,
+  it looks like *flowing water*: light pouring off the rose's petals down
+  to the ground in see-through veils of pale blue, as a thin fall of water
+  pours over a ledge, sheer and made of many fine glowing threads, a few
+  brighter strands running through, always flowing and rippling, never
+  still. Its kin seen on the same
   structure (`1794003654`): fine wisps rising and curling out of its
   glowing heart, and light pulsing through the veins of its petals.
 
