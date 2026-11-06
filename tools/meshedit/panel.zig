@@ -153,15 +153,15 @@ pub fn draw(e:*Editor,d:*Draw,screen:m.Vice(f32,2),handles:[]const?m.Vec(f32,2),
       _=try d.text(pad+18,vy+m.f(Ch.count)*row+10,text,bare,bufPrint(&bb,"on {s}",.{e.doc.bones.items[@min(p.bone,e.doc.bones.items.len-1)].name.slice()})catch"?");
     }
   }else _=try d.text(pad+18,vy,text,bare,"no forms: new form (n) makes one");
-  // each form's handle where it stands
-  for(handles,0..)|h,i|if(h)|at|{
+  // each form's handle where it stands, unless hidden
+  if(!e.dotsHidden)for(handles,0..)|h,i|if(h)|at|{
     // this form, and its handle's colour
     const p=e.pieces()[i];
     const col=if(i==e.sel)sel else if(p.grouped)grouped else if(p.ink)ink else if(p.carve)carve else plain;
     if(i!=e.sel)try d.pod(at[0],at[1],handleR,col,1,0);
   };
   // each twin's mark where it stands, dim: it follows its form, never picked itself
-  for(e.pieces())|p|if(p.twin){
+  if(!e.dotsHidden)for(e.pieces())|p|if(p.twin){
     if(view.project(origin+p.mirrored().v.pos))|at|try d.pod(at[0],at[1],handleR*0.6,bare,1,0);
   };
   // the selected form's gizmo over everything in view

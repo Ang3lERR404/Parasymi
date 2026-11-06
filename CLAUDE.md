@@ -139,7 +139,8 @@ zig build meshedit -- [--mesh=<name> --gizmo=move|turn|size --shot --link]
                                   # `j` rig mode: bones (joint, parent, twin) the skin
                                   # rides, test-turned to try it; `o` a form's bone
                                   # (`--rig`, `--try=p,y,r` for shots)
-                                  # the camera orbits freely, `.` focuses the selected form
+                                  # the camera orbits freely, `.` focuses the selected form,
+                                  # `v` hides the forms' dots (the surface seen bare)
                                   # (gizmos: tools/gizmo.zig)
                                   # both editors: --link talks with Claude, who reads and
                                   # edits the sculpt or clip, each edit one undo step,

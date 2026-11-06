@@ -124,6 +124,7 @@ pub fn act(e:*Editor,a:Act,in:*const Input)Allocator.Error!void{
       e.say("{s}",.{if(e.rigMode)"rig mode: the bones"else"the forms"});
     },
     .help=>e.helpShown=!e.helpShown,
+    .dots=>e.dotsHidden=!e.dotsHidden,
     .save=>e.save(),
     .fromDisk=>if(e.disk.clash)try e.takeDisk("the file's taken (ctrl+z takes yours back)"),
     .undo=>if(shift)try e.redo()else try e.undo(),

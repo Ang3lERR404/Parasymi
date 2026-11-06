@@ -333,6 +333,7 @@ pub fn main(init:std.process.Init)!void{
     // first view, then turned, placed and zoomed as asked
     if(el)|*l|if(l.takeView(io))|ask|{
       if(ask.home)cam.send(origin+v3(0,lookUp,0),camDist);
+      if(ask.dots)|on|e.dotsHidden=!on;
       if(ask.focus)|n|if(n>=1 and n<=e.pieces().len){
         // the form's values
         const v=e.pieces()[n-1].v;

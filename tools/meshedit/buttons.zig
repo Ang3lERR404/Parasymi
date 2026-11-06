@@ -49,6 +49,8 @@ pub const Act=enum{
   rest,
   /// the camera onto the selected form (joint)
   focus,
+  /// the forms' handles shown or hidden, to see the surface bare
+  dots,
   /// the value above selected
   prevValue,
   /// the value below
@@ -80,6 +82,7 @@ pub const binds=[_]toolbar.Bind(Act){
   .{.key=.F5,.act=.fromDisk},
   .{.key=.j,.act=.rig},
   .{.key=.h,.act=.help},
+  .{.key=.v,.act=.dots},
   .{.key=.o,.act=.bone},
   .{.key=.n,.act=.make},
   .{.key=.delete,.act=.remove},
@@ -132,6 +135,7 @@ const formItems=[_]Bar.Entry{
   .{.act=.finer,.label="finer cells",.key="[",.gap=true},
   .{.act=.coarser,.label="coarser cells",.key="]"},
   .{.act=.rig,.label="rig mode",.key="j",.gap=true},
+  .{.act=.dots,.label="hide dots",.key="v"},
   .{.act=.help,.label="help",.key="h"},
 };
 /// the buttons shown in rig mode
@@ -150,6 +154,7 @@ const rigItems=[_]Bar.Entry{
   .{.act=.move,.label="move joint",.key="1",.gap=true},
   .{.act=.turn,.label="test turn",.key="2"},
   .{.act=.rig,.label="rig mode",.key="j",.gap=true},
+  .{.act=.dots,.label="hide dots",.key="v"},
   .{.act=.help,.label="help",.key="h"},
 };
 /// the buttons for the mode the editor is in
@@ -175,6 +180,7 @@ pub fn lit(e:*Editor)Set{
   var on=Set.initEmpty();
   on.setPresent(.rig,e.rigMode);
   on.setPresent(.help,e.helpShown);
+  on.setPresent(.dots,e.dotsHidden);
   on.setPresent(.move,e.mode==.move);
   on.setPresent(.turn,e.mode==.turn);
   on.setPresent(.size,e.mode==.size);

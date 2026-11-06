@@ -150,6 +150,9 @@ pub const Editor=struct{
   bar:meshedit.buttons.Bar=.{},
   /// the help (`h`): what the mouse does, and the keys' other ways
   helpShown:bool=false,
+  /// whether the forms' handles and twins' marks are hidden (`v`), the
+  /// surface seen bare; the selected form's gizmo still shows
+  dotsHidden:bool=false,
   /// the sculpt's own name as it is typed, once its path is clicked (null:
   /// not renaming); enter renames it, escape lets it be
   renaming:?labels.Typed=null,
