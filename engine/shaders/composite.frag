@@ -1,12 +1,13 @@
 #version 450
-//! the world and its glow onto the screen: highlights rolled off above 0.8, faint vignette, luma in alpha for FXAA.
+//! the world and its glow onto the screen: highlights rolled off above 0.8 keeping their hue, faint vignette, luma in alpha for FXAA.
 #extension GL_GOOGLE_include_directive : require
 #include "post.glsl"
 
 // the world and its glow onto the screen. The glow is laid over the scene,
 // then a gentle tone curve: below 0.8 the scene passes untouched (the
-// garden keeps its look), above it highlights roll off softly toward white
-// instead of clipping, so bright light reads as light. A faint vignette
+// garden keeps its look), above it highlights roll off softly by their
+// brightest channel, keeping their hue, instead of clipping or draining to
+// white, so bright light reads as light in its own colour. A faint vignette
 // draws the eye in. Output is linear (the swapchain, or the image FXAA
 // reads, encodes sRGB).
 layout(set = 0, binding = 0) uniform sampler2D scene;
@@ -23,9 +24,16 @@ const vec2 VIGNETTE_ASPECT = vec2(1.2, 1.0);
 // perceptual luma weights (Rec. 601), for FXAA
 const vec3 LUMA = vec3(0.299, 0.587, 0.114);
 
+// one value rolled off above the knee, toward 1 and never past it
+float roll(float v) {
+  return v <= KNEE ? v : KNEE + (1.0 - KNEE) * (1.0 - exp(-(v - KNEE) / (1.0 - KNEE)));
+}
+// a colour's highlights rolled off by its brightest channel, the others
+// scaled with it, so a bright glow dims keeping its own hue instead of
+// each channel flattening toward white on its own
 vec3 shoulder(vec3 c) {
-  vec3 over = max(c - KNEE, 0.0);
-  return min(c, vec3(KNEE)) + (1.0 - KNEE) * (1.0 - exp(-over / (1.0 - KNEE)));
+  float peak = max(max(c.r, c.g), c.b);
+  return peak <= KNEE ? c : c * (roll(peak) / peak);
 }
 
 void main() {

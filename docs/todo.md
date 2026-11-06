@@ -188,6 +188,25 @@ carries the game's early days.
 - ~~**Two unused numbers**~~ done: both removed (using either would have changed every world). In `world/gen.zig`: `roughL` (a roughness
   wavelength) and `nodeChance` (`slotAmount` thins the nodes instead).
   Use them or let them go.
+- **Lights read against the glow bar's reasons** (the gardener and Claude,
+  2026-11-06). White has no colour of its own and punches a hole in the
+  saturated night; the brightest spot is where the eye lands; movement
+  catches it most; yellow against the night is a lit window, warmth the
+  eye walks toward. Held to that, the shaders were read through and these
+  read wrong, in order:
+  1. ~~The final tone curve~~ done: `composite.frag` `shoulder` rolls off by
+     the brightest channel and scales the rest with it, so a glow dims
+     keeping its hue (the gardener, side by side: "oh my God it does").
+  2. A light trail's head (`part.frag` `PART_TRAIL`) mixed half to white
+     and brightest where it moves: three pulls on the eye at once.
+  3. Still lights: the solcyriphon beam's light on the ground and halfway
+     down it, and a crown's shed light, never breathe (`view.zig`
+     `shafts`, `light_crown.zig`).
+  4. Lightning's white-hot core (`PART_SPARK`): pale violet like its edge;
+     it comes from the plants, not the sky. The sun keeps its white, the
+     one source every colour comes from.
+  5. The halo's outer band washes half to white: looked at again once the
+     curve keeps colour.
 
 ## Playtesting
 - Whether the light grid's numbers feel right in play
