@@ -36,8 +36,40 @@ const parseFromSlice=std.json.parseFromSlice;
 const stringify=std.json.Stringify.value;
 /// the encoding a picture travels in
 const base64=std.base64.standard.Encoder;
-/// are two strings equal?
-const eql=std.mem.eql;
+/// a name read as its enum tag, or null when it is none of them
+const stringToEnum=std.meta.stringToEnum;
+/// every tag of an enum, in order
+const enumValues=std.enums.values;
+/// does a text begin with another?
+const startsWith=std.mem.startsWith;
+/// the JSON-RPC methods answered, by their names on the wire
+const Method=enum{
+  /// Claude Code says hello: answered with the protocol, the channel and the tools
+  initialize,
+  /// Claude Code is ready: pushes may begin (a notification, unanswered)
+  @"notifications/initialized",
+  /// are you there? answered at once
+  ping,
+  /// which tools there are
+  @"tools/list",
+  /// run one tool
+  @"tools/call",
+};
+/// the tools offered, by their names on the wire (as `toolsJson` lists them)
+const Tool=enum{
+  /// a message into the game's (or editor's) chat
+  reply,
+  /// what the game believes right now
+  game_state,
+  /// what the game shows, as a picture
+  game_frame,
+  /// the linked editor's open sculpt or clip
+  editor_document,
+  /// a whole edited sculpt or clip, given back to the editor
+  editor_edit,
+  /// turn the linked editor's camera, answered with its frame
+  editor_view,
+};
 /// a growable list
 const ArrayList=std.ArrayList;
 /// the test harness
@@ -126,55 +158,55 @@ const Bridge=struct{
     defer p.deinit();
     const msg=switch(p.value){.object=>|o|o,else=>return rpcError(w,.null,-32600,"invalid request")};
     const id=msg.get("id");
-    const method=if(msg.get("method"))|mv|switch(mv){.string=>|s|s,else=>""}else"";
-    if(eql(u8,method,"notifications/initialized")){
+    const method=if(msg.get("method"))|mv|switch(mv){.string=>|s|stringToEnum(Method,s),else=>null}else null;
+    if(method==.@"notifications/initialized"){
       b.ready=true;
       return;
     }
     // a notification: nothing owed
     const rid=id orelse return;
-    if(eql(u8,method,"initialize"))return result(w,rid,"{\"protocolVersion\":\""++protocol++"\",\"capabilities\":{\"experimental\":{\"claude/channel\":{}},\"tools\":{}},\"serverInfo\":{\"name\":\"parasymi\",\"version\":\"0.1.0\"},\"instructions\":"++jsonText(instructions)++"}");
-    if(eql(u8,method,"ping"))return result(w,rid,"{}");
-    if(eql(u8,method,"tools/list"))return result(w,rid,"{\"tools\":"++toolsJson++"}");
-    if(eql(u8,method,"tools/call"))return b.call(gpa,io,rid,msg.get("params"),w);
-    return rpcError(w,rid,-32601,"method not found");
+    const known=method orelse return rpcError(w,rid,-32601,"method not found");
+    return switch(known){
+      .initialize=>result(w,rid,"{\"protocolVersion\":\""++protocol++"\",\"capabilities\":{\"experimental\":{\"claude/channel\":{}},\"tools\":{}},\"serverInfo\":{\"name\":\"parasymi\",\"version\":\"0.1.0\"},\"instructions\":"++jsonText(instructions)++"}"),
+      .ping=>result(w,rid,"{}"),
+      .@"tools/list"=>result(w,rid,"{\"tools\":"++toolsJson++"}"),
+      .@"tools/call"=>b.call(gpa,io,rid,msg.get("params"),w),
+      // sent with an id by mistake: still nothing owed
+      .@"notifications/initialized"=>{},
+    };
   }
   /// runs one tool
   fn call(b:*Bridge,gpa:Allocator,io:Io,id:Value,params:?Value,w:*Writer)!void{
     // the tool's name and arguments
     const ps=if(params)|pv|switch(pv){.object=>|o|o,else=>null}else null;
-    const name=if(ps)|o|if(o.get("name"))|nv|switch(nv){.string=>|s|s,else=>""}else""else"";
+    const tool=if(ps)|o|if(o.get("name"))|nv|switch(nv){.string=>|s|stringToEnum(Tool,s),else=>null}else null else null;
     const args=if(ps)|o|if(o.get("arguments"))|av|switch(av){.object=>|ao|ao,else=>null}else null else null;
-    if(eql(u8,name,"reply")){
-      // the text to send
-      const text=if(args)|a|if(a.get("text"))|tv|switch(tv){.string=>|s|s,else=>null}else null else null;
-      const t=text orelse return toolText(w,id,"reply needs a text",true);
-      link.append(io,b.dir,link.fromClaude,t) catch return toolText(w,id,"could not write the link folder",true);
-      return toolText(w,id,if(fresh(io,b.dir))"sent"else"sent (the game does not seem to be running with --link; it will show when it is)",false);
+    // the text argument, when the tool takes one
+    const text=if(args)|a|if(a.get("text"))|tv|switch(tv){.string=>|s|s,else=>null}else null else null;
+    switch(tool orelse return toolText(w,id,"no such tool",true)){
+      .reply=>{
+        const t=text orelse return toolText(w,id,"reply needs a text",true);
+        link.append(io,b.dir,link.fromClaude,t) catch return toolText(w,id,"could not write the link folder",true);
+        return toolText(w,id,if(fresh(io,b.dir))"sent"else"sent (the game does not seem to be running with --link; it will show when it is)",false);
+      },
+      .game_state=>{
+        if(!fresh(io,b.dir))return toolText(w,id,"the game is not running with --link (no fresh state)",true);
+        // the state's text
+        const st=b.dir.readFileAlloc(io,link.stateFile,gpa,.limited(maxState)) catch return toolText(w,id,"could not read the state",true);
+        defer gpa.free(st);
+        return toolText(w,id,st,false);
+      },
+      .game_frame=>return b.frame(gpa,io,id,w),
+      .editor_document=>{
+        if(!fresh(io,b.dir))return toolText(w,id,"no editor is running with --link (no fresh state)",true);
+        // the document's text
+        const doc=b.dir.readFileAlloc(io,link.documentFile,gpa,.limited(maxDocument)) catch return toolText(w,id,"no document: is it an editor that is linked, not the game?",true);
+        defer gpa.free(doc);
+        return toolText(w,id,doc,false);
+      },
+      .editor_edit=>return b.edit(gpa,io,id,text orelse return toolText(w,id,"editor_edit needs the whole edited text",true),w),
+      .editor_view=>return b.view(gpa,io,id,args,w),
     }
-    if(eql(u8,name,"game_state")){
-      if(!fresh(io,b.dir))return toolText(w,id,"the game is not running with --link (no fresh state)",true);
-      // the state's text
-      const st=b.dir.readFileAlloc(io,link.stateFile,gpa,.limited(maxState)) catch return toolText(w,id,"could not read the state",true);
-      defer gpa.free(st);
-      return toolText(w,id,st,false);
-    }
-    if(eql(u8,name,"game_frame"))return b.frame(gpa,io,id,w);
-    if(eql(u8,name,"editor_document")){
-      if(!fresh(io,b.dir))return toolText(w,id,"no editor is running with --link (no fresh state)",true);
-      // the document's text
-      const doc=b.dir.readFileAlloc(io,link.documentFile,gpa,.limited(maxDocument)) catch return toolText(w,id,"no document: is it an editor that is linked, not the game?",true);
-      defer gpa.free(doc);
-      return toolText(w,id,doc,false);
-    }
-    if(eql(u8,name,"editor_edit")){
-      // the edited text
-      const text=if(args)|a|if(a.get("text"))|tv|switch(tv){.string=>|str|str,else=>null}else null else null;
-      const t=text orelse return toolText(w,id,"editor_edit needs the whole edited text",true);
-      return b.edit(gpa,io,id,t,w);
-    }
-    if(eql(u8,name,"editor_view"))return b.view(gpa,io,id,args,w);
-    return toolText(w,id,"no such tool",true);
   }
   /// leaves Claude's ask of a linked editor's camera, waits for it to be
   /// taken, then answers with the frame it shows
@@ -211,7 +243,7 @@ const Bridge=struct{
       // the editor's answer, written before it took the edit away
       const ans=b.dir.readFileAlloc(io,link.editResultFile,gpa,.limited(maxAnswer)) catch return toolText(w,id,"the edit was taken, but no answer was left",true);
       defer gpa.free(ans);
-      return toolText(w,id,ans,!std.mem.startsWith(u8,ans,"taken"));
+      return toolText(w,id,ans,!startsWith(u8,ans,"taken"));
     }
     b.dir.deleteFile(io,link.editFile)catch{};
     return toolText(w,id,"the editor did not take the edit in time (is it the game that is linked, not an editor?)",true);
@@ -314,24 +346,38 @@ fn picture(gpa:Allocator,w:*Writer,id:Value,png:[]const u8)!void{
 fn num(v:Value)?f64{
   return switch(v){.integer=>|i|@floatFromInt(i),.float=>|x|x,else=>null};
 }
-/// the names of the one-number words of a view's ask (tools/orbit.zig `Ask`)
-const viewNums=[_][]const u8{"dist","yaw","pitch","zoom"};
-/// the names of the three-number words
-const viewTriples=[_][]const u8{"at","pan"};
+/// the one-number words of a view's ask (tools/orbit.zig `Ask`)
+const ViewNum=enum{
+  /// how far from the target (m)
+  dist,
+  /// turn round the target (degrees)
+  yaw,
+  /// height over the target (degrees)
+  pitch,
+  /// wheel notches nearer
+  zoom,
+};
+/// the three-number words of a view's ask
+const ViewTriple=enum{
+  /// the point looked at
+  at,
+  /// the target moved across the view
+  pan,
+};
 /// writes `editor_view`'s arguments as the ask's text the editor reads
 fn viewText(args:?ObjectMap,w:*Writer)error{BadView,WriteFailed}!void{
   const a=args orelse return;
   if(a.get("home"))|h|switch(h){.bool=>|on|if(on)try w.writeAll("home\n"),else=>return error.BadView};
   if(a.get("focus"))|f|switch(f){.integer=>|n|try w.print("focus {d}\n",.{n}),else=>return error.BadView};
-  for(viewTriples)|word|if(a.get(word))|v|{
+  for(comptime enumValues(ViewTriple))|word|if(a.get(@tagName(word)))|v|{
     // three numbers, no more or fewer
     const xs=switch(v){.array=>|l|l.items,else=>return error.BadView};
     if(xs.len!=3)return error.BadView;
-    try w.print("{s}",.{word});
+    try w.print("{t}",.{word});
     for(xs)|x|try w.print(" {d}",.{num(x) orelse return error.BadView});
     try w.writeByte('\n');
   };
-  for(viewNums)|word|if(a.get(word))|v|try w.print("{s} {d}\n",.{word,num(v) orelse return error.BadView});
+  for(comptime enumValues(ViewNum))|word|if(a.get(@tagName(word)))|v|try w.print("{t} {d}\n",.{word,num(v) orelse return error.BadView});
 }
 /// writes the channel event for one of the gardener's messages
 fn event(w:*Writer,text:[]const u8)!void{
@@ -409,7 +455,10 @@ test"tools are listed, unknown methods refused, notifications unanswered"{
   var b=testBridge(tmp.dir,&sink.writer);
   const l=try ask(&b,"{\"jsonrpc\":\"2.0\",\"id\":\"a\",\"method\":\"tools/list\"}");
   defer l.deinit();
-  try testing.expectEqual(@as(usize,6),l.value.object.get("result").?.object.get("tools").?.array.items.len);
+  // the tools listed are exactly the ones answered, in the same order
+  const listed=l.value.object.get("result").?.object.get("tools").?.array.items;
+  try testing.expectEqual(enumValues(Tool).len,listed.len);
+  for(enumValues(Tool),listed)|t,v|try testing.expectEqualStrings(@tagName(t),v.object.get("name").?.string);
   // every answer is one line: the protocol splits messages on line breaks
   var one:Writer.Allocating=.init(testing.allocator);
   defer one.deinit();
