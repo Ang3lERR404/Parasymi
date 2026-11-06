@@ -79,6 +79,12 @@ carries the game's early days.
   brushing past it folds it for a moment, pure charm with no game effect
   ("it's nice for a game to have personality behind it, all the little
   things count"). More may follow.
+- **How a parasite grows** (the gardener, 2026-11-06, from Grey Goo's
+  Shroud, `shots/capture/1794004826` and `1794004849`): like a plant, but
+  its own way. First its roots burst up through the ground; then they
+  writhe and creep inward toward a centre, laying a veiny web along the
+  ground as they grow; what rises from there depends on the plant. Kept
+  in mind, not built.
   *Its look, shaped as a chin wag* (the gardener, 2026-11-06; a first
   draft sculpt in `src/mesh/thepulse.mesh`: parasite cage, sap heart,
   mimosa fronds, pink pom-poms). The feeling: a beating heart, uncannily
