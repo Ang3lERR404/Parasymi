@@ -76,6 +76,18 @@ const airGlide:f32=0.8;
 const airRetune:f32=0.02;
 /// a span of seconds drawn as samples
 const samples=lib.sound.sap.samples;
+/// how long a volume set takes to be heard (s, ~63%): quick, without a click
+const volumeGlide:f32=0.05;
+/// how loud each part of what is heard is set (each a gain, 0..1): the
+/// gardener's volumes (options.zig `gain`)
+pub const Volume=struct{
+  /// everything heard
+  all:f32=1,
+  /// the music, day and night, and the unforming's theme
+  music:f32=1,
+  /// the garden's own sounds: steps, wind, plants, the unforming's glass
+  sounds:f32=1,
+};
 /// the source the device pulls from (`platform.audio.Output(Sounds)`)
 pub const Sounds=struct{
   /// a paw landed; the view entered or left the wolf's eyes; a mote near
@@ -101,6 +113,8 @@ pub const Sounds=struct{
     ear:dsp.Ear,
     /// the echo of the place they are heard in now
     space:dsp.Space,
+    /// how loud each part is set now
+    volume:Volume,
   };
   /// samples per second the sounds are made at
   rate:f32,
@@ -151,6 +165,13 @@ pub const Sounds=struct{
   resAt:m.V3=@splat(0),
   /// how much of the way to it is hidden
   resMuffle:f32=0,
+  /// how loud everything, the music and the garden's sounds are, gliding
+  /// to what they are set
+  all:dsp.Smooth,
+  /// (the music)
+  musicVol:dsp.Smooth,
+  /// (the garden's sounds)
+  soundsVol:dsp.Smooth,
   /// the place's echo all that is heard in the world rings in
   air:dsp.Hall,
   /// the echo the place has now, gliding to the one it is told
@@ -177,6 +198,9 @@ pub const Sounds=struct{
       .airWet=.init(sp.wet,airGlide,rate),
       .airDamp=.init(sp.dampHz,airGlide,rate),
       .airTuned=.{sp.rt60,sp.dampHz},
+      .all=.init(1,volumeGlide,rate),
+      .musicVol=.init(1,volumeGlide,rate),
+      .soundsVol=.init(1,volumeGlide,rate),
     };
   }
   /// what happened, heard: a step takes a voice, the eyes fade the
@@ -230,6 +254,11 @@ pub const Sounds=struct{
         s.airWet.target=sp.wet;
         s.airDamp.target=sp.dampHz;
       },
+      .volume=>|v|{
+        s.all.target=v.all;
+        s.musicVol.target=v.music;
+        s.soundsVol.target=v.sounds;
+      },
     }
   }
   /// the next `out.len` frames: every sounding voice mixed in, those
@@ -250,6 +279,25 @@ pub const Sounds=struct{
     // what reaches the place's echo this block
     var sendBuf:[airBlock]f32=@splat(0);
     const send=sendBuf[0..out.len];
+    // the garden's own sounds, and the music, each mixed apart to be set
+    // as loud as the gardener asks
+    var fxBuf:[airBlock]dsp.Frame=@splat(@splat(0));
+    const fx=fxBuf[0..out.len];
+    var musicBuf:[airBlock]dsp.Frame=@splat(@splat(0));
+    const mu=musicBuf[0..out.len];
+    s.sounds(fx,send);
+    s.musics(mu);
+    for(out,fx,mu)|*o,x,y|{
+      const v=s.soundsVol.next();
+      const w=s.musicVol.next();
+      const a=s.all.next();
+      o.*+=(x*dsp.mid(v)+y*dsp.mid(w))*dsp.mid(a);
+    }
+    for(out)|*x|x.*=.{dsp.softClip(x[0]),dsp.softClip(x[1])};
+  }
+  /// the garden's own sounds, heard in the world, mixed into `out`, what
+  /// reaches the place's echo sent through it
+  fn sounds(s:*Sounds,out:[]dsp.Frame,send:[]f32)void{
     s.steps.renderSent(out,send);
     s.twinkles.renderSent(out,send);
     s.sap(out);
@@ -263,8 +311,6 @@ pub const Sounds=struct{
       if(!u.render(out))s.unformed=null;
     }
     s.wind.render(out);
-    s.musics(out);
-    for(out)|*x|x.*=.{dsp.softClip(x[0]),dsp.softClip(x[1])};
   }
   /// told of the radiant plant gathering nearest the wolf (`fo`, null with
   /// none): the one heard is told on, a new one begins as the last rings

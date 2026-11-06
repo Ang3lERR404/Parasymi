@@ -658,8 +658,8 @@ Each start grows a fresh world (the seed is logged and kept in its saves).
 `--seed=` repeats one; test gardens use `play.defaultSeed`.
 
 ### Options (`game/options.zig`, `hud/options.zig`)
-AA, vsync, fullscreen, autosave, render distance, light shadows and ray
-tracing, stored in `options.cfg`. RAY TRACING (on by default) traces
+AA, vsync, fullscreen, autosave, render distance, light shadows, ray
+tracing and the three volumes, stored in `options.cfg`. RAY TRACING (on by default) traces
 every shadow as rays where the GPU can (`Options.rayTracing`; NOT
 SUPPORTED shown, and the shadow maps kept, where it cannot; `Game.gpu`
 says which). It is written when one changes and kept across save loads.
@@ -667,7 +667,11 @@ Main applies `Game.opts` when it differs from what is in effect. Render
 distance is how many rings of 32-tile chunks are streamed in and drawn
 round the gardener (`Options.rings`: 2, 3, 4, 5, 6 or 8; 4 by default,
 112 m), read each frame by the streaming (`play/frame.zig`) and the draw
-reach (`view.zig`, `play.drawLimitOf`).
+reach (`view.zig`, `play.drawLimitOf`). VOLUME, MUSIC and SOUNDS are
+sliders in tenths (all full by default), heard squared (`options.gain`)
+and told to the mixer as they change: MUSIC sets the day's and night's
+music and the unforming's theme, SOUNDS everything heard in the world
+(steps, wind, plants, the unforming's glass), VOLUME both.
 
 ## Roadmap
 **Done:**

@@ -517,3 +517,21 @@ test"the long listens: the music by day, the night's by night, both and the wind
   jobs.each(testing.io,listens.len,1,Heard,.{.got=&got},Heard.run);
   for(got)|r|try r;
 }
+test"the gardener's volumes: the garden's sounds silenced, and everything"{
+  // a step heard at full, with the garden's sounds silenced, and with everything silenced
+  var got:[3]f32=undefined;
+  for([_]lib.sound.mixer.Volume{.{},.{.sounds=0},.{.all=0}},0..)|v,k|{
+    var s:Sounds=.init(41,testRate);
+    s.wind.level=0;
+    s.music.level=0;
+    s.night.level=0;
+    s.apply(.{.volume=v});
+    // past the volume's glide, then the step
+    _=sides(&s,50);
+    s.apply(.{.step=.{.fall=.{.weight=0.5,.pace=0.5,.at=m.v3(0,0,-2)}}});
+    const e=sides(&s,60);
+    got[k]=e.l+e.r;
+  }
+  try testing.expect(got[0]>0);
+  try testing.expect(got[1]<got[0]*1e-4 and got[2]<got[0]*1e-4);
+}

@@ -371,6 +371,8 @@ pub const Strings=struct{
     renderDistance:S="",
     /// a list, every level of the points of light's shadows (`options.LightShadows` order)
     lightShadows:S="",
+    /// a list, a volume's stops, silent to full (`options.volumeSteps` + 1)
+    volume:S="",
     /// ray tracing's value where the GPU cannot trace rays
     noRays:S="",
     /// the options panel's way back

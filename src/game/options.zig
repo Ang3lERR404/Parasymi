@@ -60,6 +60,12 @@ pub const Options=struct{
   /// whether shadows are traced as rays where the GPU can (else, or where
   /// it cannot, drawn into shadow maps): on by default
   rayTracing:bool=true,
+  /// how loud everything is, in tenths (0 silent .. `volumeSteps` full)
+  volume:u8=volumeSteps,
+  /// how loud the music is, day and night (tenths)
+  music:u8=volumeSteps,
+  /// how loud the garden's own sounds are: steps, wind, plants (tenths)
+  sounds:u8=volumeSteps,
   /// how many rings of chunks are streamed in and drawn round the gardener
   pub fn rings(o:*const Options)i32{return renderRings[ringsIndex(o.renderDistance)];}
 };
@@ -85,6 +91,15 @@ pub const LightShadows=enum{
     return switch(l){.off=>0,.few,.more=>256,.full=>512};
   }
 };
+/// a volume's stops: silent, then a tenth more each up to full
+pub const volumeSteps:u8=10;
+/// how loud a volume of `steps` tenths sounds as a gain (0..1): squared, so
+/// each stop sounds about as much louder as the last
+pub fn gain(steps:u8)f32{
+  // the share of full it is
+  const k=m.f(@min(steps,volumeSteps))/m.f(volumeSteps);
+  return k*k;
+}
 /// the autosave intervals offered, in minutes (in `txt.s.hud.autosave` order)
 pub const autosaveMinutes=[_]u8{0,1,2,5,10,15,30,60};
 /// the render distances offered, in rings of chunks (in
@@ -106,6 +121,12 @@ pub const Setting=enum{
   lightShadows,
   /// whether shadows are traced as rays
   rayTracing,
+  /// how loud everything is
+  volume,
+  /// how loud the music is
+  music,
+  /// how loud the garden's own sounds are
+  sounds,
 };
 /// what the GPU can take, which some settings are held to (main asks the
 /// renderer)
@@ -131,7 +152,7 @@ pub fn kind(set:Setting)Kind{
   return switch(set){
     .antialias,.lightShadows=>.picker,
     .vsync,.fullscreen,.rayTracing=>.toggle,
-    .autosave,.renderDistance=>.slider,
+    .autosave,.renderDistance,.volume,.music,.sounds=>.slider,
   };
 }
 /// whether the toggle `set` is on on `gpu` (false for any other kind; ray
@@ -141,7 +162,7 @@ pub fn isOn(o:*const Options,set:Setting,gpu:Gpu)bool{
     .vsync=>o.vsync,
     .fullscreen=>o.fullscreen,
     .rayTracing=>o.rayTracing and gpu.rays,
-    .antialias,.autosave,.renderDistance,.lightShadows=>false,
+    .antialias,.autosave,.renderDistance,.lightShadows,.volume,.music,.sounds=>false,
   };
 }
 /// how many stops the slider `set` has (1 for any other kind)
@@ -149,6 +170,7 @@ pub fn stops(set:Setting)usize{
   return switch(set){
     .autosave=>autosaveMinutes.len,
     .renderDistance=>renderRings.len,
+    .volume,.music,.sounds=>volumeSteps+1,
     .antialias,.vsync,.fullscreen,.lightShadows,.rayTracing=>1,
   };
 }
@@ -157,6 +179,9 @@ pub fn stopOf(o:*const Options,set:Setting)usize{
   return switch(set){
     .autosave=>autosaveIndex(o.autosave),
     .renderDistance=>ringsIndex(o.renderDistance),
+    .volume=>@min(o.volume,volumeSteps),
+    .music=>@min(o.music,volumeSteps),
+    .sounds=>@min(o.sounds,volumeSteps),
     .antialias,.vsync,.fullscreen,.lightShadows,.rayTracing=>0,
   };
 }
@@ -166,6 +191,9 @@ pub fn setStop(o:*Options,set:Setting,i:usize)void{
   switch(set){
     .autosave=>o.autosave=autosaveMinutes[@min(i,autosaveMinutes.len-1)],
     .renderDistance=>o.renderDistance=renderRings[@min(i,renderRings.len-1)],
+    .volume=>o.volume=@intCast(@min(i,volumeSteps)),
+    .music=>o.music=@intCast(@min(i,volumeSteps)),
+    .sounds=>o.sounds=@intCast(@min(i,volumeSteps)),
     .antialias,.vsync,.fullscreen,.lightShadows,.rayTracing=>{},
   }
 }
@@ -215,6 +243,8 @@ pub fn step(o:*Options,set:Setting,dir:i32,gpu:Gpu)void{
       o.lightShadows=@enumFromInt(@mod(@as(i32,@intFromEnum(o.lightShadows))+dir,n));
     },
     .rayTracing=>if(gpu.rays){o.rayTracing=!o.rayTracing;},
+    // a volume a tenth up or down, stopping at silent and full
+    .volume,.music,.sounds=>setStop(o,set,@intCast(m.clamp(@as(i32,@intCast(stopOf(o,set)))+dir,0,volumeSteps))),
   }
 }
 /// what `set` is now on `gpu`, as shown (ray tracing says so where the GPU
@@ -228,6 +258,7 @@ pub fn shown(o:*const Options,set:Setting,gpu:Gpu)[]const u8{
     .autosave=>txt.nth(txt.s.hud.autosave,autosaveIndex(o.autosave)),
     .renderDistance=>txt.nth(txt.s.hud.renderDistance,ringsIndex(o.renderDistance)),
     .lightShadows=>txt.nth(txt.s.hud.lightShadows,@intFromEnum(o.lightShadows)),
+    .volume,.music,.sounds=>txt.nth(txt.s.hud.volume,stopOf(o,set)),
   };
 }
 /// the file as written: each setting by name (any may be missing)
@@ -248,6 +279,12 @@ const Source=struct{
     lightShadows:?[]const u8=null,
     /// `rayTracing = on|off`
     rayTracing:?[]const u8=null,
+    /// `volume = <tenths>`
+    volume:?[]const u8=null,
+    /// `music = <tenths>`
+    music:?[]const u8=null,
+    /// `sounds = <tenths>`
+    sounds:?[]const u8=null,
   }=.{},
 };
 /// a switch that is on, as written
@@ -276,6 +313,9 @@ pub fn parse(text:[]const u8)Options{
   if(f.renderDistance)|v|if(parseInt(u8,v,10))|n|{o.renderDistance=renderRings[ringsIndex(n)];}else|_|{};
   if(f.lightShadows)|v|o.lightShadows=stringToEnum(LightShadows,v) orelse o.lightShadows;
   if(f.rayTracing)|v|o.rayTracing=!eql(u8,v,off);
+  if(f.volume)|v|if(parseInt(u8,v,10))|n|{o.volume=@min(n,volumeSteps);}else|_|{};
+  if(f.music)|v|if(parseInt(u8,v,10))|n|{o.music=@min(n,volumeSteps);}else|_|{};
+  if(f.sounds)|v|if(parseInt(u8,v,10))|n|{o.sounds=@min(n,volumeSteps);}else|_|{};
   return o;
 }
 /// writes `o` as cfg source.
@@ -287,6 +327,7 @@ pub fn format(o:*const Options,w:*Writer)Writer.Error!void{
     o.aa,if(o.vsync)on else off,if(o.fullscreen)on else off,o.autosave,o.renderDistance,
   });
   try w.print("lightShadows = {t}\nrayTracing = {s}\n",.{o.lightShadows,if(o.rayTracing)on else off});
+  try w.print("# volume, music, sounds: tenths of full (0 silent .. 10 full)\nvolume = {d}\nmusic = {d}\nsounds = {d}\n",.{o.volume,o.music,o.sounds});
 }
 /// reads `filePath`; the defaults if it cannot be read, written out if there
 /// is none.
@@ -317,7 +358,7 @@ pub fn save(o:*const Options,io:Io)Error!void{
 }
 test"options round-trip through their file; unknown values keep the defaults"{
   // a set of options off the defaults, written out
-  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6,.lightShadows=.few,.rayTracing=false};
+  const o:Options=.{.aa=.fxaa,.vsync=false,.fullscreen=true,.autosave=15,.renderDistance=6,.lightShadows=.few,.rayTracing=false,.volume=7,.music=3,.sounds=0};
   // room for the file, and the writer that fills it
   var buf:[fileMost]u8=undefined;
   var w:Writer=.fixed(&buf);
@@ -384,6 +425,21 @@ test"each setting is a toggle, a picker or a slider; a slider is set by its stop
   try testing.expectEqual(@as(u8,1),o.autosave);
   setStop(&o,.autosave,99);
   try testing.expectEqual(@as(u8,60),o.autosave);
+}
+test"each volume steps by tenths between silent and full, a squared gain"{
+  // the defaults: all full
+  var o:Options=.{};
+  try testing.expectEqual(Kind.slider,kind(.music));
+  try testing.expectEqual(@as(usize,volumeSteps+1),stops(.music));
+  try testing.expectEqual(@as(f32,1),gain(o.music));
+  step(&o,.music,1,.{});
+  try testing.expectEqual(volumeSteps,o.music);
+  step(&o,.music,-1,.{});
+  try testing.expectEqual(volumeSteps-1,o.music);
+  setStop(&o,.sounds,0);
+  try testing.expectEqual(@as(f32,0),gain(o.sounds));
+  try testing.expectEqual(@as(f32,0.25),gain(5));
+  try testing.expectEqual(volumeSteps,parse("[options]\nvolume = 99\n").volume);
 }
 test"ray tracing is on by default where the GPU can, and stays off where it cannot"{
   // the defaults, on a GPU that traces rays and on one that cannot

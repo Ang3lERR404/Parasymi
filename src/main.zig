@@ -457,6 +457,8 @@ pub fn main(init:Init)!void{
   var formingWas:?u32=null;
   // and whether it was told of one, so its leaving is told once
   var formingTold=false;
+  // and how loud each part was last set (none yet, so the first frame tells it)
+  var toldVolume:?lib.sound.mixer.Volume=null;
   // and the unforming's moment when last heard (< 0 never)
   var unformHeard:f32=-1;
   // quitting: closed once the garden's picture is taken
@@ -501,6 +503,15 @@ pub fn main(init:Init)!void{
         // its research done or gone: hushed, once
         o.send(.{.arsthraxia=.{.progress=0,.fed=0,.complete=false}})catch|e|log.warn("arsthraxia:{t}",.{e});
         arsHumming=false;
+      }
+    }
+    // the gardener's volumes, told as they change
+    if(sounds)|o|{
+      // how loud each part is set now
+      const v:lib.sound.mixer.Volume=.{.all=options.gain(game.opts.volume),.music=options.gain(game.opts.music),.sounds=options.gain(game.opts.sounds)};
+      if(toldVolume==null or !eqlDeep(toldVolume.?,v)){
+        o.send(.{.volume=v})catch|e|log.warn("volume: {t}",.{e});
+        toldVolume=v;
       }
     }
     // a radiant plant gathering near the wolf, each fragment heard landing

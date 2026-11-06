@@ -54,8 +54,10 @@ const swellLevel:f32=0.55;
 const swellIn:f32=0.04;
 /// a strike's soft attack (s)
 const tinkAttack:f32=0.003;
+/// a tink or the hum this far faded (a share of its loudness) is gone
+const tinkSilent:f32=2e-3;
 /// how loud a tink is
-const tinkLevel:f32=0.022;
+const tinkLevel:f32=0.06;
 /// how far either side of its plant each tink rings (pan), the golden share
 /// of the way round from the last so none sits on another
 const tinkSide:f32=0.35;
@@ -68,7 +70,7 @@ const echoAfter:f32=0.16;
 /// how long it rings (s), and how loud
 const echoRing:f32=1.1;
 /// (how loud)
-const echoLevel:f32=0.005;
+const echoLevel:f32=0.012;
 // ---- the hum: threads of light, a finger round a wine glass ----
 /// the hum's two notes (MIDI): D5 and A5, the key and its fifth
 const humNote=m.Vice(f32,2){74,81};
@@ -91,7 +93,7 @@ const humSoftHz=m.Vice(f32,2){1400,3600};
 /// how fast the hum follows the threads joining or fading (s, ~63%)
 const humGlide:f32=1.2;
 /// how loud the hum is with every thread joined
-const humLevel:f32=0.012;
+const humLevel:f32=0.03;
 /// samples between retunings of the hum's brightness
 const humRetune=64;
 // ---- the whole: a soap bubble, a breath of far choir, crystal grains ----
@@ -108,7 +110,7 @@ const bubbleIn:f32=0.06;
 /// (its fade, s, ~63%)
 const bubbleFall:f32=0.55;
 /// how loud the bubble is
-const bubbleLevel:f32=0.05;
+const bubbleLevel:f32=0.12;
 /// the choir's notes (MIDI): D4 F#4 A4 D5, an "ooh" chord
 const choirNotes=[_]f32{62,66,69,74};
 /// each note sung by two voices this far apart (cents either way)
@@ -126,7 +128,7 @@ const choirFall:f32=1.3;
 /// how far off it sounds: its highs darkened above this (Hz)
 const choirFar:f32=1800;
 /// how loud the breath is
-const choirLevel:f32=0.05;
+const choirLevel:f32=0.12;
 /// how long after the whole the grains begin to fizz, and stop (s)
 const grainSpan=m.Vice(f32,2){0.25,2.4};
 /// seconds between grains at first; they thin out as they fade
@@ -138,7 +140,7 @@ const grainSteps:u32=10;
 /// how long a grain rings (s), how loud at first, how far either side (pan)
 const grainRing:f32=0.12;
 /// (how loud at first)
-const grainLevel:f32=0.006;
+const grainLevel:f32=0.015;
 /// (how far either side, pan)
 const grainSide:f32=0.6;
 /// grains that may ring at once
@@ -206,7 +208,7 @@ const Tink=struct{
       s.*+=dsp.put(t.place,y*tinkLevel);
       t.at+|=1;
     }
-    return t.at<t.lead or t.amp[0]*tinkLevel>silent;
+    return t.at<t.lead or t.amp[0]>tinkSilent;
   }
 };
 /// the threads of light: two glasses rubbed, each two tones beating, their
@@ -495,7 +497,7 @@ pub const Forming=struct{
   /// whether anything of it still sounds
   fn ringing(f:*const Forming)bool{
     if(f.whole!=null)return true;
-    if(f.hum.joined.value*humLevel>silent)return true;
+    if(f.hum.joined.value>tinkSilent)return true;
     for(f.tinks.slots)|t|if(t!=null)return true;
     for(f.echoes.slots)|e|if(e!=null)return true;
     return false;
