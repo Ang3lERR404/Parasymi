@@ -58,6 +58,12 @@ const freshS=5;
 const maxLine=1<<22;
 /// the largest frame read back (bytes)
 const maxFrame=32<<20;
+/// the most of the game's state file read (bytes)
+const maxState=1<<16;
+/// the most of an editor's open document read (bytes)
+const maxDocument=1<<20;
+/// the most of an edit's answer read (bytes)
+const maxAnswer=4096;
 /// what Claude is told when the server connects
 const instructions=
   \\Parasymi's bridge. The gardener can type to you from the game's chat
@@ -149,7 +155,7 @@ const Bridge=struct{
     if(eql(u8,name,"game_state")){
       if(!fresh(io,b.dir))return toolText(w,id,"the game is not running with --link (no fresh state)",true);
       // the state's text
-      const st=b.dir.readFileAlloc(io,link.stateFile,gpa,.limited(1<<16)) catch return toolText(w,id,"could not read the state",true);
+      const st=b.dir.readFileAlloc(io,link.stateFile,gpa,.limited(maxState)) catch return toolText(w,id,"could not read the state",true);
       defer gpa.free(st);
       return toolText(w,id,st,false);
     }
@@ -157,7 +163,7 @@ const Bridge=struct{
     if(eql(u8,name,"editor_document")){
       if(!fresh(io,b.dir))return toolText(w,id,"no editor is running with --link (no fresh state)",true);
       // the document's text
-      const doc=b.dir.readFileAlloc(io,link.documentFile,gpa,.limited(1<<20)) catch return toolText(w,id,"no document: is it an editor that is linked, not the game?",true);
+      const doc=b.dir.readFileAlloc(io,link.documentFile,gpa,.limited(maxDocument)) catch return toolText(w,id,"no document: is it an editor that is linked, not the game?",true);
       defer gpa.free(doc);
       return toolText(w,id,doc,false);
     }
@@ -203,7 +209,7 @@ const Bridge=struct{
       io.sleep(.fromMilliseconds(lookMs),.awake)catch{};
       if(b.dir.access(io,link.editFile,.{}))|_|continue else|_|{}
       // the editor's answer, written before it took the edit away
-      const ans=b.dir.readFileAlloc(io,link.editResultFile,gpa,.limited(4096)) catch return toolText(w,id,"the edit was taken, but no answer was left",true);
+      const ans=b.dir.readFileAlloc(io,link.editResultFile,gpa,.limited(maxAnswer)) catch return toolText(w,id,"the edit was taken, but no answer was left",true);
       defer gpa.free(ans);
       return toolText(w,id,ans,!std.mem.startsWith(u8,ans,"taken"));
     }

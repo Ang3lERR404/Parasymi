@@ -62,6 +62,15 @@ const maxEdit=1<<20;
 const cardAt:f32=0.6;
 /// the card's trellis seed (its own vines)
 const cardSeed:f32=0.37;
+/// the bud at the typing's end: how far right of the text and down from
+/// its line it sits (pixels)
+const budAt=m.Vice(f32,2){2,12};
+/// (its length and width, pixels)
+const budSize=m.Vice(f32,2){11,5};
+/// (how open it is, and how far it curls)
+const budOpen:f32=0.8;
+/// (how far it curls)
+const budCurl:f32=0.2;
 /// whether the editor's own name field holds the keyboard (then Enter is
 /// its, not the chat's)
 pub const Field=enum{
@@ -194,7 +203,7 @@ pub const EditLink=struct{
       const t=el.chat.typed.slice();
       const shownT=if(t.len>perLine)t[t.len-perLine..]else t;
       const end=try d.text(x+pad,ty,s.textSmall,s.white,shownT);
-      try d.leaf(.{end+2,ty+12},-m.halfPi,11,5,s.leaf,0.8,0.2);
+      try d.leaf(.{end+budAt[0],ty+budAt[1]},-m.halfPi,budSize[0],budSize[1],s.leaf,budOpen,budCurl);
     }else _=try d.text(x+pad,ty,s.textSmall,s.dim,"ENTER TALKS WITH CLAUDE");
   }
 };

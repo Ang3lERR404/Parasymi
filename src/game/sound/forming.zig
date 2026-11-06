@@ -74,6 +74,8 @@ const echoLevel:f32=0.012;
 // ---- the hum: threads of light, a finger round a wine glass ----
 /// the hum's two notes (MIDI): D5 and A5, the key and its fifth
 const humNote=m.Vice(f32,2){74,81};
+/// tones each of the hum's notes is sung with, a hair apart
+const humTwins=2;
 /// how fast each note's two tones beat against each other (Hz)
 const humBeat=m.Vice(f32,2){0.23,0.37};
 /// its partials, as shares of its pitch
@@ -145,6 +147,15 @@ const grainLevel:f32=0.015;
 const grainSide:f32=0.6;
 /// grains that may ring at once
 const grainCount=24;
+/// cents in a note, for the choir's spread
+const centsPerNote:f32=100;
+/// voices singing each of the choir's notes
+const choirDouble=2;
+/// how much sparser the grains are by their end than at first (a share more
+/// gap per share of the span)
+const grainThin:f32=4;
+/// samples between retunings of the bubble's swept band
+const retune=lib.sound.sap.retune;
 /// how long after the whole it has surely rung away (s)
 const wholeLen:f32=6;
 // ---- the forming as a whole ----
@@ -216,21 +227,23 @@ const Tink=struct{
 /// threads join
 const Hum=struct{
   /// each note's two tones, each with its partials: [note][twin][partial]
-  osc:[2][2][humPartials.len]dsp.Osc,
+  osc:[humNote.len][humTwins][humPartials.len]dsp.Osc,
   /// the prism turning
   turn:dsp.Osc,
   /// the finger's friction
   noise:dsp.Noise,
   /// the friction rung at each note
-  rubs:[2]dsp.Biquad,
+  rubs:[humNote.len]dsp.Biquad,
   /// the low-pass over it all
   soft:dsp.OnePole,
   /// how many threads are joined (0..1), gliding
   joined:dsp.Smooth,
   /// samples a second
   rate:f32,
-  /// samples hummed (wraps), for when to retune its brightness
+  /// samples hummed (wraps), for when to retune its brightness and prism
   at:u32=0,
+  /// each partial's share as the prism has turned it, retuned now and then
+  lit:[humPartials.len]f32=@splat(1),
   /// a silent hum, its tones' phases drawn from `r`
   fn init(r:*rng.Rng,rate:f32)Hum{
     // the hum, its tones filled in below
@@ -243,10 +256,10 @@ const Hum=struct{
       .joined=.init(0,humGlide,rate),
       .rate=rate,
     };
-    for(0..2)|n|{
+    for(0..humNote.len)|n|{
       // the note's pitch
       const hz=dsp.noteToHz(humNote[n]);
-      for(0..2)|w|{
+      for(0..humTwins)|w|{
         // this twin's pitch, a hair apart from the other
         const at=hz+humBeat[n]*(m.f(w)-0.5);
         for(humPartials,0..)|p,k|h.osc[n][w][k]=.{.rate=rate,.freq=at*p,.phase=r.float()};
@@ -260,24 +273,29 @@ const Hum=struct{
     // how many threads are joined now
     const j=h.joined.next();
     if(j<silent and h.joined.target==0)return 0;
-    // where the prism has turned to (0..1), then turned on a sample
-    const turn=h.turn.phase;
+    // the prism and the brightness retuned now and then: both glide slowly
+    // decision: the prism turns once in nine seconds, so its partials' shares
+    // are worked out every `humRetune` samples, not every one
+    if(h.at%humRetune==0){
+      for(&h.lit,0..)|*l,k|{
+        // this partial's share, its own share of a turn after the last
+        l.*=1-prism*(0.5+0.5*@sin(m.tau*(h.turn.phase+m.f(k)/m.f(humPartials.len))));
+      }
+      h.soft.a=dsp.OnePole.coeff(m.lerp(humSoftHz[0],humSoftHz[1],j),h.rate);
+    }
+    h.at+%=1;
     _=h.turn.next();
     // the glasses summed, each partial's level turned by the prism
     var y:f32=0;
     for(0..humPartials.len)|k|{
-      // this partial's share, a third of a turn after the last
-      const lit=1-prism*(0.5+0.5*@sin(m.tau*(turn+m.f(k)/3)));
-      for(0..2)|n|{
-        for(0..2)|w|y+=h.osc[n][w][k].next()*humPartialLevel[k]*lit;
+      for(0..humNote.len)|n|{
+        for(0..humTwins)|w|y+=h.osc[n][w][k].next()*humPartialLevel[k]*h.lit[k];
       }
     }
     // the friction under it
     const fr=h.noise.next();
     for(&h.rubs)|*b|y+=b.tick(fr)*rub;
-    // brighter as more threads join (retuned now and then: it glides slowly)
-    h.at+%=1;
-    if(h.at%humRetune==0)h.soft.a=dsp.OnePole.coeff(m.lerp(humSoftHz[0],humSoftHz[1],j),h.rate);
+    // brighter as more threads join
     return h.soft.low(y)*j*humLevel;
   }
 };
@@ -291,7 +309,7 @@ const Whole=struct{
   /// the sweep's wave
   sweep:dsp.Osc,
   /// the choir's voices: two to a note
-  voices:[choirNotes.len*2]dsp.Osc,
+  voices:[choirNotes.len*choirDouble]dsp.Osc,
   /// the vowel's formants
   oo:[ooHz.len]dsp.Biquad,
   /// how far off it sounds
@@ -323,7 +341,7 @@ const Whole=struct{
       .r=.init(r.next()),
     };
     for(choirNotes,0..)|n,i|{
-      for(0..2)|k|w.voices[i*2+k]=.{.rate=rate,.shape=.saw,.freq=dsp.noteToHz(n+choirSpread/100*(m.f(k)*2-1)),.phase=r.float()};
+      for(0..choirDouble)|k|w.voices[i*choirDouble+k]=.{.rate=rate,.shape=.saw,.freq=dsp.noteToHz(n+choirSpread/centsPerNote*(m.f(k)*2-1)),.phase=r.float()};
     }
     for(&w.oo,ooHz,ooQ)|*f,hz,q|f.*=.init(.band,hz,q,rate);
     return w;
@@ -335,7 +353,7 @@ const Whole=struct{
       const t=m.f(w.at)/w.rate;
       // the bubble: noise in a band swept to and fro, swelling in and fading
       const sw=w.sweep.next();
-      if(w.at%32==0)w.band.tune(.band,bubbleHz*(1+bubbleSweep*@sin(m.tau*sw)),bubbleQ,w.rate);
+      if(w.at%retune==0)w.band.tune(.band,bubbleHz*(1+bubbleSweep*@sin(m.tau*sw)),bubbleQ,w.rate);
       const bubbleEnv=m.smooth(m.clamp01(t/bubbleIn))*@exp(-t/bubbleFall);
       var y=w.band.tick(w.noise.next())*bubbleEnv*bubbleLevel;
       // the breath: the voices shaped into "oo", far off, in and out once
@@ -359,7 +377,7 @@ const Whole=struct{
       const round=m.f(w.rung)*m.goldenShare;
       w.grains.add(.init(lydianNote(grainFrom,w.r.below(grainSteps)),vary(&w.r,grainRing),grainLevel*(1-k),m.f(out.len-left)/w.rate,((round-@floor(round))*2-1)*grainSide,w.rate));
       w.rung+=1;
-      w.wait=m.floorTo(u32,grainGap*(1+4*k)*w.rate*vary(&w.r,1));
+      w.wait=m.floorTo(u32,grainGap*(1+grainThin*k)*w.rate*vary(&w.r,1));
     }
     w.wait-|=left;
     w.grains.render(out);

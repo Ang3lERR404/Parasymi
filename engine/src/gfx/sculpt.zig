@@ -131,7 +131,7 @@ fn ellipsoid(p:V3,r:V3)f32{
   // the point's length in the ellipsoid's unit space, and in its squared space
   const k0=m.len(p/r);
   const k1=m.len(p/(r*r));
-  if(k1<1e-9)return-@reduce(.Min,r);
+  if(k1<tiny)return-@reduce(.Min,r);
   return k0*(k0-1)/k1;
 }
 /// the exact signed distance from `p` to a cone from `a` (radius `r1`)
@@ -208,6 +208,15 @@ const jobBlocks=4;
 /// how strongly an ink holds its colour inside it against the solids
 /// under it (the solid nearest weighs 1)
 const inkWeight:f32=8;
+/// a sum or length this small counts as none (kept from dividing by it)
+const tiny:f32=1e-9;
+/// the shortest radius a carved ellipsoid's stretch is measured against
+const radiusLeast:f32=1e-6;
+/// how far past a block's half-diagonal its centre's field may read and the
+/// block still hold surface (a share of it), and the cells added to that
+const blockReach:f32=1.6;
+/// (the cells added)
+const blockMargin:f32=2;
 /// a seamless surface sculpted out of forms melted into one: its forms,
 /// how bones join, and how softly weights and colours blend
 pub const Sculpt=struct{
@@ -484,7 +493,7 @@ pub const Sculpt=struct{
       c+=colV(pf.f.col)*m.splat3(w);
       sum+=w;
     }
-    c/=m.splat3(@max(sum,1e-9));
+    c/=m.splat3(@max(sum,tiny));
     // decision: inks are painted on in the list's order, each over the
     // ones before (white over yellow, as in a drawing); one ink alone
     // weighs against the solids as it always did, and inks of one colour
@@ -595,12 +604,12 @@ pub const Sculpt=struct{
           .ellipsoid=>|e|{
             // its radii as stretched
             const r=e.r*f.stretch;
-            over=@max(over,@reduce(.Max,r)/@max(@reduce(.Min,r),1e-6));
+            over=@max(over,@reduce(.Max,r)/@max(@reduce(.Min,r),radiusLeast));
           },
           else=>{},
         }
       }
-      if(@abs(d)>(half*1.6+2*h)*over)continue;
+      if(@abs(d)>(half*blockReach+blockMargin*h)*over)continue;
       map[(bz*nb[1]+by)*nb[0]+bx]=@intCast(blocks.items.len);
       try blocks.append(gpa,.{.at=.{bx,by,bz},.vals=undefined,.vid=@splat(noneId),.cand=try gpa.dupe(u32,cand.items)});
     };
