@@ -23,7 +23,7 @@ const retune=lib.sound.sap.retune;
 /// D Lydian's steps up from D (semitones): D E F# G# A B C#
 const lydian=[_]f32{0,2,4,6,7,9,11};
 /// the note (MIDI) a step of D Lydian `k` up from `from` is
-fn lydianNote(from:f32,k:u32)f32{return from+12*m.f(k/lydian.len)+lydian[k%lydian.len];}
+pub fn lydianNote(from:f32,k:u32)f32{return from+12*m.f(k/lydian.len)+lydian[k%lydian.len];}
 // decision: the event is all round the wolf, so its glass is heard from
 // everywhere (each break, pane and glint a place of its own) while what
 // is one thing (the drone, the seed's fall and landing) holds the middle
@@ -52,7 +52,7 @@ const glintAttack:f32=0.004;
 /// a glint this far rung out is gone
 const glintSilent:f32=2e-3;
 /// one glint: two partials ringing out from a soft strike
-const Glint=struct{
+pub const Glint=struct{
   /// its partials' sines
   osc:[glintPartials.len]dsp.Sine,
   /// each partial's level now, 1 falling away
@@ -71,7 +71,7 @@ const Glint=struct{
   place:dsp.Frame,
   /// a glint of note `note` (MIDI) ringing `ring` seconds (~63%) at
   /// `level`, `delay` seconds from now, at `pan`
-  fn init(note:f32,ring:f32,level:f32,delay:f32,pan:f32,rate:f32)Glint{
+  pub fn init(note:f32,ring:f32,level:f32,delay:f32,pan:f32,rate:f32)Glint{
     // its pitch, and its partials
     const hz=dsp.noteToHz(note);
     var osc:[glintPartials.len]dsp.Sine=undefined;

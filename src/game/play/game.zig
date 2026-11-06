@@ -529,6 +529,8 @@ pub const Game=struct{
   pub const space=lib.play.hearing.space;
   /// how much the ground hides a sound somewhere (`hearing.muffle`)
   pub const muffle=lib.play.hearing.muffle;
+  /// the radiant plant gathering that is heard now (`hearing.formingState`)
+  pub const formingState=lib.play.hearing.formingState;
   /// what the arsthraxia's sound plays now (`belly.arsthraxiaState`)
   pub const arsthraxiaState=lib.play.belly.arsthraxiaState;
   /// the view is in the wolf's eyes, its head hidden (`belly.headless`)

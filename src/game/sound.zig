@@ -64,6 +64,13 @@
 //!   condenses. Fed, it is brighter, quicker and a little louder. When a
 //!   unit is done a soft bell chord in the music's key blooms upward over a
 //!   warm low note, and a breath rushes up its stems with the surge of light.
+//! - a radiant plant gathering near the wolf: each fragment is heard
+//!   before it lands, a glass tink swelling up reversed (light arriving
+//!   ahead of the thing), struck as it settles; the tinks climb a D Lydian
+//!   chord, each answered far and quiet by the unforming's rising bell. A
+//!   bowed-glass hum, partials swelling in turn like light through a prism,
+//!   grows brighter as its threads join; once whole, a soap-bubble shimmer,
+//!   one breath of far choir ("ooh") and a fizz of crystal grains fading.
 //! - the unforming (the first world event): the garden's music cuts dead
 //!   and its own theme plays in the hall instead: the world creaks as if
 //!   about to break, one great deep horn sounds, and over a rumble, masses
@@ -111,6 +118,8 @@ pub const mixer=@import("sound/mixer.zig");
 pub const arsthraxia=@import("sound/arsthraxia.zig");
 /// the arsthraxia's unit done: a bell chord blooming and a breath rushing up
 pub const bloom=@import("sound/bloom.zig");
+/// a radiant plant gathering: tinks swelling up reversed, a glass hum, the whole shimmering
+pub const forming=@import("sound/forming.zig");
 /// the unforming heard: drone, glass, seam, ash, whistle and landing bell
 pub const unforming=@import("sound/unforming.zig");
 /// the unforming's own theme: the garden's music breaking and reborn
@@ -141,6 +150,7 @@ test{
   _=mixer;
   _=arsthraxia;
   _=bloom;
+  _=forming;
   _=unforming;
   _=unformingTheme;
   _=tests;

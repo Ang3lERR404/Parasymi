@@ -453,6 +453,10 @@ pub fn main(init:Init)!void{
   var toldDay:f32=-1;
   // and whether the arsthraxia was last heard humming, so its silence is told once
   var arsHumming=false;
+  // and the radiant plant gathering it was last told of, if any
+  var formingWas:?u32=null;
+  // and whether it was told of one, so its leaving is told once
+  var formingTold=false;
   // and the unforming's moment when last heard (< 0 never)
   var unformHeard:f32=-1;
   // quitting: closed once the garden's picture is taken
@@ -497,6 +501,19 @@ pub fn main(init:Init)!void{
         // its research done or gone: hushed, once
         o.send(.{.arsthraxia=.{.progress=0,.fed=0,.complete=false}})catch|e|log.warn("arsthraxia:{t}",.{e});
         arsHumming=false;
+      }
+    }
+    // a radiant plant gathering near the wolf, each fragment heard landing
+    if(sounds)|o|{
+      if(game.formingState(formingWas))|fg|{
+        o.send(.{.forming=fg})catch|e|log.warn("forming: {t}",.{e});
+        // once whole it is told no more, so the next one is heard
+        formingWas=if(fg.growth>=1)null else fg.id;
+        formingTold=true;
+      }else if(formingTold){
+        o.send(.{.forming=null})catch|e|log.warn("forming: {t}",.{e});
+        formingWas=null;
+        formingTold=false;
       }
     }
     // the unforming heard while it runs: its clock, what broke, what withers

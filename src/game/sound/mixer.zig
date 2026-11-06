@@ -46,6 +46,10 @@ const voiceCount=lib.sound.voiceCount;
 const Wind=lib.sound.wind.Wind;
 /// the unforming heard
 const Unformed=lib.sound.unforming.Unformed;
+/// a radiant plant gathering, heard
+const Forming=lib.sound.forming.Forming;
+/// a radiant plant gathering heard at once, and one ringing away after it
+const formingCount=2;
 /// how much of the garden's music is left while the unforming sounds: none,
 /// its own theme plays instead
 const hushed:f32=0;
@@ -89,6 +93,8 @@ pub const Sounds=struct{
     /// fed (`fed`, 0..1), whether it has just completed (`complete`) and
     /// where it stands (`at`, heard from there, `muffle` of the way to it hidden)
     arsthraxia:struct{progress:f32,fed:f32,complete:bool,at:m.V3=@splat(0),muffle:f32=0},
+    /// the radiant plant gathering nearest the wolf (null: none any more)
+    forming:?lib.sound.forming.Gathering,
     /// the unforming, this frame: its clock, what broke and what withers
     unforming:lib.unforming.Heard,
     /// where the sounds are heard from now (the view), and which way is right
@@ -134,6 +140,9 @@ pub const Sounds=struct{
   resFed:f32=0,
   /// whether its last word was a unit done, so one unit blooms once
   resDone:bool=false,
+  /// the radiant plants heard gathering: the one told of, and any still
+  /// ringing away
+  formings:dsp.Pool(Forming,formingCount)=.{},
   /// the unforming heard, from its first moment until it has rung away
   unformed:?Unformed=null,
   /// where the sounds are heard from: what places each between the speakers
@@ -210,6 +219,7 @@ pub const Sounds=struct{
           if(s.research)|*rs|rs.stop();
         }
       },
+      .forming=>|fo|s.gathering(fo),
       .unforming=>|h|{
         if(s.unformed==null)s.unformed=.init(h.t,s.r.next(),s.rate);
         s.unformed.?.apply(h);
@@ -247,6 +257,7 @@ pub const Sounds=struct{
       if(!rs.render(out,send,s.resProgress,s.resFed,s.ear.hear(s.resAt,s.resMuffle)))s.research=null;
     }
     s.blooms.renderSent(out,send);
+    s.formings.renderSent(out,send);
     s.echo(out,send);
     if(s.unformed)|*u|{
       if(!u.render(out))s.unformed=null;
@@ -254,6 +265,21 @@ pub const Sounds=struct{
     s.wind.render(out);
     s.musics(out);
     for(out)|*x|x.*=.{dsp.softClip(x[0]),dsp.softClip(x[1])};
+  }
+  /// told of the radiant plant gathering nearest the wolf (`fo`, null with
+  /// none): the one heard is told on, a new one begins as the last rings
+  /// away, and with none what still sounds rings out
+  fn gathering(s:*Sounds,fo:?lib.sound.forming.Gathering)void{
+    for(&s.formings.slots)|*sl|if(sl.*)|*f|{
+      if(fo)|g|{
+        if(f.id==g.id){
+          f.tell(g,s.ear.hear(g.at,g.muffle));
+          return;
+        }
+      }
+      f.leave();
+    };
+    if(fo)|g|s.formings.add(.init(g,s.ear.hear(g.at,g.muffle),s.r.next(),s.rate));
   }
   /// the place's echo of what `send` holds, mixed into `out`, gliding to the
   /// echo the place has now

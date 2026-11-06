@@ -7,6 +7,43 @@ const m=lib.engine.core.math;
 const dsp=lib.engine.core.dsp;
 /// the playable game, whose ground and structures are heard round
 const Game=lib.play.game.Game;
+/// the species registry: which plants are radiant, how high they hang
+const species=lib.species;
+/// a radiant plant gathering, as the sounds are told of it
+const Gathering=lib.sound.forming.Gathering;
+/// how far from the wolf a radiant plant gathering is heard (m)
+const formingHeard:f32=14;
+/// the radiant plant gathering that is heard now: the one heard last
+/// (`was`) told once more as it turns whole, else the nearest still
+/// gathering within hearing of the wolf; null with none
+pub fn formingState(g:*const Game,was:?u32)?Gathering{
+  // the plant columns
+  const s=g.plants.list.slice();
+  if(was)|w|if(w<s.len and species.get(s.items(.sp)[w]).lineage==.radiant and s.items(.growth)[w]>=1)return gathering(g,w);
+  // the nearest gathering, and how far it is (squared)
+  var best:?u32=null;
+  var near:f32=formingHeard*formingHeard;
+  for(s.items(.sp),s.items(.growth),s.items(.health),s.items(.at),0..)|sp,growth,health,at,i|{
+    if(growth>=1 or health<=0 or species.get(sp).lineage!=.radiant)continue;
+    // how far it is from the wolf, across the ground (squared)
+    const d=at-g.player.pos;
+    const d2=d[0]*d[0]+d[2]*d[2];
+    if(d2<near){
+      near=d2;
+      best=@intCast(i);
+    }
+  }
+  return if(best)|b|gathering(g,b)else null;
+}
+/// plant `i` as the sounds are told of it: how far gathered, heard from
+/// where it hangs, as hidden as the way to it is
+fn gathering(g:*const Game,i:u32)Gathering{
+  // the plant columns, and where it hangs
+  const s=g.plants.list.slice();
+  const c=s.items(.at)[i];
+  const at=m.v3(c[0],@max(g.heightAt(s.items(.x)[i],s.items(.y)[i]),0)+species.get(s.items(.sp)[i]).hover,c[2]);
+  return.{.id=i,.growth=s.items(.growth)[i],.at=at,.muffle=muffle(g,at)};
+}
 /// how many ways round the ear the ground is looked at
 const around=16;
 /// how far out each way (m)
