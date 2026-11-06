@@ -6,7 +6,8 @@
 //! is) records a burst of what shows inside the border over the seconds
 //! set (- and +, or the wheel), into `shots/capture/<time>/`: its frames,
 //! one contact sheet and a spot's light measured through them
-//! (`tools/burst.zig`). Its own button in the taskbar closes it, or Esc.
+//! (`tools/burst.zig`). Dragged while it records, it is followed; its size
+//! is held until it is done. Its own button in the taskbar closes it, or Esc.
 /// the standard library
 const std=@import("std");
 /// the engine: its PNG writing and its maths
@@ -368,8 +369,12 @@ const App=struct{
   font:?Handle=null,
   /// how long a capture runs (s)
   seconds:f32=startSeconds,
-  /// whether it is recording now
-  recording:bool=false,
+  /// whether it is recording now (the band and the recording's task both read it)
+  recording:std.atomic.Value(bool)=.init(false),
+  /// the recording's task, beside the frame's messages, so the frame never
+  /// stops answering (a frame that stops is ghosted by Windows, and the
+  /// screen behind it copies black)
+  task:?Io.Future(void)=null,
   /// what the band last says (after the seconds)
   status:[96]u8=undefined,
   /// how much of `status` is said
@@ -380,11 +385,10 @@ const App=struct{
     a.statusLen=s.len;
     a.redraw();
   }
-  /// draws the frame again now
+  /// asks for the frame to be drawn again (from either thread)
   fn redraw(a:*App)void{
     const h=a.hwnd orelse return;
     _=InvalidateRect(h,null,0);
-    _=UpdateWindow(h);
   }
   /// the screen's pixels showing inside the border (screen pixels)
   fn region(a:*const App)Rect{
@@ -393,23 +397,34 @@ const App=struct{
     _=GetWindowRect(a.hwnd.?,&r);
     return.{.left=r.left+border,.top=r.top+band,.right=r.right-border,.bottom=r.bottom-border};
   }
-  /// records what shows inside the border over `seconds`, then writes it
+  /// starts recording what shows inside the border over `seconds`, on its
+  /// own task, then writing it (the frame keeps answering meanwhile)
   fn capture(a:*App)void{
-    if(a.recording)return;
-    a.recording=true;
+    if(a.recording.load(.acquire))return;
+    if(a.task)|*t|t.await(a.io);
+    a.task=null;
+    a.recording.store(true,.release);
     a.say("recording...",.{});
+    // where it records, taken now, while the frame stands still
+    const r=a.region();
+    a.task=a.io.concurrent(work,.{a,r})catch{
+      work(a,r);
+      return;
+    };
+  }
+  /// records region `r`, then says what it left
+  fn work(a:*App,r:Rect)void{
     // the folder it was written in, or why it failed
-    const done=a.record()catch|e|{
-      a.recording=false;
+    const done=a.record(r)catch|e|{
+      a.recording.store(false,.release);
       a.say("failed: {t}",.{e});
       return;
     };
-    a.recording=false;
+    a.recording.store(false,.release);
     a.say("saved {d} frames: {s}",.{done.frames,done.name});
   }
   /// takes the frames, then writes them, their sheet and their curve
-  fn record(a:*App)!struct{frames:usize,name:[]const u8}{
-    const r=a.region();
+  fn record(a:*App,r:Rect)!struct{frames:usize,name:[]const u8}{
     const w=r.right-r.left;
     const h=r.bottom-r.top;
     if(w<@as(i32,keepShrink)*2 or h<@as(i32,keepShrink)*2)return error.TooSmall;
@@ -442,7 +457,10 @@ const App=struct{
       const due=start+@as(i96,@intFromFloat(m.f(i)*p.gapMs*std.time.ns_per_ms));
       const now=Io.Clock.real.now(a.io).nanoseconds;
       if(due>now)a.io.sleep(.fromNanoseconds(@intCast(due-now)),.awake)catch{};
-      if(BitBlt(mem,0,0,w,h,screen,r.left,r.top,win.srcCopy)==0)return error.CopyFailed;
+      // where the frame stands now: dragged while it records, it is followed
+      // (its size held as it began)
+      const at=a.region();
+      if(BitBlt(mem,0,0,w,h,screen,at.left,at.top,win.srcCopy)==0)return error.CopyFailed;
       frames.appendAssumeCapacity(try png.shrink(a.gpa,px[0..@as(usize,uw)*uh*4],uw,uh,keepShrink));
     }
     a.say("writing {d} frames...",.{p.frames});
@@ -542,7 +560,9 @@ fn wndProc(h:Handle,msg:u32,wp:usize,lp:isize)callconv(.winapi)isize{
       var r:Rect=undefined;
       _=GetWindowRect(h,&r);
       const p=halves(lp);
-      return hit(.{.x=p.x-r.left,.y=p.y-r.top},r.right-r.left,r.bottom-r.top);
+      const part=hit(.{.x=p.x-r.left,.y=p.y-r.top},r.right-r.left,r.bottom-r.top);
+      // recording, its size is held: an edge only drags it
+      return if(a.recording.load(.acquire) and part>=win.left)win.caption else part;
     },
     win.leftDown=>{
       const p=halves(lp);
@@ -596,7 +616,7 @@ fn draw(a:*App,h:Handle)void{
   // its brushes
   const key=CreateSolidBrush(keyCol) orelse return;
   defer _=DeleteObject(key);
-  const edge=CreateSolidBrush(if(a.recording)recCol else restCol) orelse return;
+  const edge=CreateSolidBrush(if(a.recording.load(.acquire))recCol else restCol) orelse return;
   defer _=DeleteObject(edge);
   const bed=CreateSolidBrush(bandCol) orelse return;
   defer _=DeleteObject(bed);
@@ -611,7 +631,7 @@ fn draw(a:*App,h:Handle)void{
   if(a.font)|f|_=SelectObject(dc,f);
   // the words' line
   const y=border+2;
-  words(dc,border+10,y,if(a.recording)recCol else restCol,"REC (F9)");
+  words(dc,border+10,y,if(a.recording.load(.acquire))recCol else restCol,"REC (F9)");
   words(dc,border+minusEnd-20,y,textCol,"-");
   var sb:[16]u8=undefined;
   words(dc,border+minusEnd+6,y,textCol,bufPrint(&sb,"{d:.1} s",.{a.seconds})catch"");
@@ -643,6 +663,8 @@ pub fn main(init:std.process.Init)!void{
     _=TranslateMessage(&msg);
     _=DispatchMessageW(&msg);
   }
+  // a recording still running finishes before the frame's memory goes
+  if(app.task)|*t|t.await(app.io);
 }
 test"a capture takes as many frames as its seconds allow, evenly apart"{
   const p=plan(2);

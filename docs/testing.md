@@ -131,7 +131,8 @@ video) is caught with the capture frame, `zig build capture` (or the
 gardener's desktop launcher): a see-through, borderless frame, always on
 top, sized by its edges and dragged by its band. REC, or F9 wherever the
 focus is, records a burst of what shows inside it over the seconds set
-(- and +, or the wheel) into `shots/capture/<time>/`: its frames, one
+(- and +, or the wheel; dragged meanwhile, it follows, its size held)
+into `shots/capture/<time>/`: its frames, one
 `sheet.png` and `curve.txt` (the middle's light through them, as `zig
 build burst` prints it); `shots/capture/latest.txt` names the newest.
 
