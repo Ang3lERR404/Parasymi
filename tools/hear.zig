@@ -77,6 +77,10 @@ const speakAbove:f32=12;
 const speakMin:f32=-55;
 /// how fast the room's hum is allowed to rise between phrases (dB a frame)
 const floorRise:f32=0.02;
+/// quieter than this is no microphone at all, only zeros (dB)
+const deadBelow:f32=-110;
+/// a steady sound taken as the hum sits this far under its own mean (dB)
+const hushBelow:f32=3;
 /// loud frames in a row that begin a phrase (30 ms)
 const startFrames:u32=3;
 /// quiet frames in a row that end one: a breath (0.7 s)
@@ -166,14 +170,22 @@ const Breaths=struct{
   quietRun:u32=0,
   /// frames since the phrase began; zero while not in one
   len:u32=0,
+  /// the phrase's frames' loudness added up (dB), for its mean
+  sum:f32=0,
   /// one frame of `db` heard: whether a phrase began or ended
   fn step(b:*Breaths,db:f32)Cut{
-    // the hum falls at once to anything quieter, and rises only slowly
-    // and only between phrases, so a long phrase never becomes the hum
-    const fl=b.floor orelse db;
-    b.floor=if(db<fl)db else if(b.len==0)fl+floorRise else fl;
+    // digital silence (a device waking, nothing recorded yet) says nothing
+    // about the room: never the hum, only quiet within a phrase
+    const dead=db<deadBelow;
+    if(dead and b.len==0)return.none;
+    if(!dead){
+      // the hum falls at once to anything quieter, and rises only slowly
+      // and only between phrases, so a long phrase never becomes the hum
+      const fl=b.floor orelse db;
+      b.floor=if(db<fl)db else if(b.len==0)fl+floorRise else fl;
+    }
     // whether this frame is speech
-    const loud=db>b.floor.?+speakAbove and db>speakMin;
+    const loud=!dead and db>b.floor.?+speakAbove and db>speakMin;
     if(b.len==0){
       b.loudRun=if(loud)b.loudRun+1 else 0;
       if(b.loudRun<startFrames)return.none;
@@ -182,11 +194,15 @@ const Breaths=struct{
       return.{.begin=b.loudRun};
     }
     b.len+=1;
+    b.sum+=db;
     b.quietRun=if(loud)0 else b.quietRun+1;
     if(b.quietRun<endFrames and b.len<maxFrames)return.none;
     // the quiet that ended it
     const q=b.quietRun;
-    b.*=.{.floor=b.floor};
+    // a phrase cut at its longest was most likely a steady sound (music,
+    // a fan) and not a voice: it becomes the room's hum
+    const hum=if(q<endFrames)@max(b.floor.?,b.sum/m.f(b.len)-hushBelow)else b.floor.?;
+    b.*=.{.floor=hum};
     return.{.end=q};
   }
 };
@@ -354,11 +370,18 @@ const Verbose=struct{
 fn wordsOf(arena:Allocator,v:Verbose)Allocator.Error![]Word{
   // the words so far, each text growing in the arena
   var out:ArrayList(Word)=.empty;
+  // inside a marker, which whisper splits into pieces ("[", "BLANK", "]")
+  var marker=false;
   for(v.segments)|seg|{
     for(seg.words)|t|{
       // the token without its spaces
       const bare=trim(u8,t.word," ");
-      if(bare.len==0 or bare[0]=='[')continue;
+      if(bare.len>0 and bare[0]=='[')marker=true;
+      if(marker){
+        if(std.mem.indexOfScalar(u8,bare,']')!=null)marker=false;
+        continue;
+      }
+      if(bare.len==0)continue;
       if(out.items.len==0 or startsWith(u8,t.word," ")){
         try out.append(arena,.{.text=try arena.dupe(u8,bare),.start=t.start,.end=t.end});
         continue;
@@ -809,8 +832,8 @@ test "a breath ends a phrase, the room's hum is not speech" {
   var ended:?usize=null;
   var quiet:u32=0;
   for(0..300)|i|{
-    // a hum, then speech, then a breath of hum
-    const db:f32=if(i>=50 and i<150)-20 else-50;
+    // a device waking (zeros), a hum, then speech, then a breath of hum
+    const db:f32=if(i<10)-200 else if(i>=50 and i<150)-20 else-50;
     switch(b.step(db)){
       .none=>{},
       .begin=>|back|{
@@ -859,6 +882,10 @@ test "whisper's tokens join into words" {
     .{.word="i",.start=0.6,.end=0.7},
     .{.word=",",.start=0.7,.end=0.7},
     .{.word=" [BLANK_AUDIO]",.start=0.8,.end=0.9},
+    .{.word=" [",.start=0.9,.end=0.9},
+    .{.word="BLANK",.start=0.9,.end=0.9},
+    .{.word="_AUDIO",.start=0.9,.end=0.9},
+    .{.word="]",.start=0.9,.end=0.9},
     .{.word=" hi",.start=1.0,.end=1.2},
   }}}};
   var ar=std.heap.ArenaAllocator.init(testing.allocator);
