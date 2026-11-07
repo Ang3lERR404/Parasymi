@@ -153,6 +153,12 @@ carries the game's early days.
   night to make something feel alive"): its veins pulse slower, like a
   sleeper's breath, the outposts falling into the same slow rhythm.
   Kept, not built.
+- **Plants that keep the day and night** (Claude's, from real plants; the
+  gardener: "they all do" feel right, 2026-11-06). The **heliocyra**
+  turns its face to follow the sun across the day, as a sunflower does;
+  the **vesper** opens only at dusk, as a moonflower does; **the Pulse**
+  folds its mimosa fronds shut every night, as a real mimosa does. Kept,
+  not built.
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
