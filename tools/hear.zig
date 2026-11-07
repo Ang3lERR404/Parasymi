@@ -157,7 +157,7 @@ const markEvery:u32=10;
 /// what a message says it is
 const aloud="(aloud) ";
 /// what can stop the listening
-const Error=error{ServerNotStarted,NoMicrophone};
+const Error=error{ServerNotStarted,NoMicrophone,NoWords};
 /// what one frame did to the listening
 const Cut=union(enum){
   /// nothing changed
@@ -179,6 +179,9 @@ const Breaths=struct{
   quietRun:u32=0,
   /// frames since the phrase began; zero while not in one
   len:u32=0,
+  /// quiet frames in a row that end a phrase (a breath; shorter between
+  /// words read one at a time)
+  endAfter:u32=endFrames,
   /// the phrase's frames' loudness added up (dB), for its mean
   sum:f32=0,
   /// one frame of `db` heard: whether a phrase began or ended
@@ -205,13 +208,13 @@ const Breaths=struct{
     b.len+=1;
     b.sum+=db;
     b.quietRun=if(loud)0 else b.quietRun+1;
-    if(b.quietRun<endFrames and b.len<maxFrames)return.none;
+    if(b.quietRun<b.endAfter and b.len<maxFrames)return.none;
     // the quiet that ended it
     const q=b.quietRun;
     // a phrase cut at its longest was most likely a steady sound (music,
     // a fan) and not a voice: it becomes the room's hum
-    const hum=if(q<endFrames)@max(b.floor.?,b.sum/m.f(b.len)-hushBelow)else b.floor.?;
-    b.*=.{.floor=hum};
+    const hum=if(q<b.endAfter)@max(b.floor.?,b.sum/m.f(b.len)-hushBelow)else b.floor.?;
+    b.*=.{.floor=hum,.endAfter=b.endAfter};
     return.{.end=q};
   }
 };
@@ -852,6 +855,106 @@ const Ear=struct{
     }
   }
 };
+/// quiet frames that end a word when words are read one at a time (0.25 s)
+const wordGapFrames:u32=25;
+/// what reading a WAV can fail with
+const WavError=error{NotWav,UnreadWav}||Allocator.Error;
+/// a WAV of any rate and channels, 16-bit or 32-bit float (as Audacity
+/// writes), as mono samples at `rate`
+fn readWav(arena:Allocator,bytes:[]const u8)WavError![]f32{
+  if(bytes.len<44 or !std.mem.eql(u8,bytes[0..4],"RIFF") or !std.mem.eql(u8,bytes[8..12],"WAVE"))return error.NotWav;
+  const rd=std.mem.readInt;
+  // the format, and where the samples are, found chunk by chunk
+  var fmtKind:u16=0;
+  var ch:u16=1;
+  var sr:u32=rate;
+  var bits:u16=16;
+  var data:?[]const u8=null;
+  var at:usize=12;
+  while(at+8<=bytes.len){
+    const id=bytes[at..][0..4];
+    const len=rd(u32,bytes[at+4..][0..4],.little);
+    const body=bytes[at+8..@min(bytes.len,at+8+len)];
+    if(std.mem.eql(u8,id,"fmt ") and body.len>=16){
+      fmtKind=rd(u16,body[0..2],.little);
+      ch=rd(u16,body[2..4],.little);
+      sr=rd(u32,body[4..8],.little);
+      bits=rd(u16,body[14..16],.little);
+      // the extensible format names its kind further in
+      if(fmtKind==0xfffe and body.len>=26)fmtKind=rd(u16,body[24..26],.little);
+    }
+    if(std.mem.eql(u8,id,"data"))data=body;
+    at+=8+len+(len&1);
+  }
+  const d=data orelse return error.UnreadWav;
+  const width:usize=bits/8;
+  if(ch==0 or width==0)return error.UnreadWav;
+  const n=d.len/(width*ch);
+  const mono=try arena.alloc(f32,n);
+  for(0..n)|i|{
+    // the channels averaged
+    var s:f32=0;
+    for(0..ch)|c|{
+      const p=d[(i*ch+c)*width..];
+      s+=switch(fmtKind){
+        1=>if(bits==16)m.f(rd(i16,p[0..2],.little))/32768 else if(bits==24)m.f(rd(i24,p[0..3],.little))/8388608 else return error.UnreadWav,
+        3=>if(bits==32)@as(f32,@bitCast(rd(u32,p[0..4],.little)))else return error.UnreadWav,
+        else=>return error.UnreadWav,
+      };
+    }
+    mono[i]=s/m.f(ch);
+  }
+  return if(sr==rate)mono else try ownear.resample(arena,mono,m.f(sr),m.f(rate));
+}
+/// learns the gardener's reading of `words` (in order, again and again)
+/// from the recording at `path`: cut into words at the pauses, each
+/// labelled in turn; every word after the first two rounds is guessed
+/// before it is learned, so the score shows what was learned, not echoed
+fn learnReading(gpa:Allocator,io:Io,own:*ownear.Ear,path:[]const u8,words:[]const []const u8)!void{
+  var ar=std.heap.ArenaAllocator.init(gpa);
+  defer ar.deinit();
+  const arena=ar.allocator();
+  const x=try readWav(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
+  // the recording cut at the pauses between words
+  var b=Breaths{.endAfter=wordGapFrames};
+  var segs:ArrayList([]const f32)=.empty;
+  var begin:?usize=null;
+  var at:usize=0;
+  while(at+hop<=x.len):(at+=hop){
+    const n=at+hop;
+    switch(b.step(dbOf(x[at..n]))){
+      .none=>{},
+      .begin=>|back|begin=n-|(back+prerollFrames/2)*hop,
+      .end=>|quiet|{
+        const end=n-(quiet-|tailFrames/2)*hop;
+        if(begin)|s|{
+          const fr=try Frames.measure(arena,x[s..end]);
+          if(voicedFrames(fr)>=minVoiced/3)try segs.append(arena,x[s..end]);
+        }
+        begin=null;
+      },
+    }
+  }
+  print("cut into {d} words ({d} read, {d} rounds of {d})\n",.{segs.items.len,segs.items.len,segs.items.len/@max(1,words.len),words.len});
+  if(segs.items.len%words.len!=0)print("(not a whole number of rounds: check the pauses; labelled in order anyway)\n",.{});
+  // guessed before learned, past the first two rounds
+  var right:usize=0;
+  var tried:usize=0;
+  for(segs.items,0..)|seg,i|{
+    const word=words[i%words.len];
+    if(i>=2*words.len){
+      const g=(try own.guess(arena,seg)) orelse continue;
+      tried+=1;
+      const ok=std.mem.eql(u8,g.word,word);
+      if(ok)right+=1;
+      print("  {s} -> {s}{s} ({s})\n",.{word,g.word,if(ok)"" else " *",@tagName(g.from)});
+    }
+    const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(io).nanoseconds,std.time.ns_per_ms));
+    try own.learn(io,word,seg,try wavOf(arena,seg),ms*100+@as(i64,@intCast(i)));
+  }
+  if(tried>0)print("my own ear, on words it had not learned from yet: {d}/{d}\n",.{right,tried});
+  print("now {d} sound-prints ({d} of your voice)\n",.{own.prints.items.len,own.learnedCount()});
+}
 /// waits for whisper's server to answer at all
 fn waitServer(gpa:Allocator,io:Io)!void{
   for(0..serverWaitS*4)|_|{
@@ -879,10 +982,26 @@ pub fn main(init:std.process.Init)!void{
   // recordings heard instead of the microphone, one after another
   // (`--file=`, as many as given; printed only, but the own ear learns)
   var files:ArrayList([]const u8)=.empty;
+  // a reading of words to learn from (`--learn=<wav> --words="yes no ..."`)
+  var learnPath:?[]const u8=null;
+  var learnWords:[]const u8="";
   const args=try init.minimal.args.toSlice(arena);
   for(args[1..])|a|{
     if(startsWith(u8,a,"--whisper="))base=a["--whisper=".len..];
     if(startsWith(u8,a,"--file="))try files.append(arena,a["--file=".len..]);
+    if(startsWith(u8,a,"--learn="))learnPath=a["--learn=".len..];
+    if(startsWith(u8,a,"--words="))learnWords=a["--words=".len..];
+  }
+  if(learnPath)|path|{
+    // a reading of words learned straight into the own ear, no whisper
+    var list:ArrayList([]const u8)=.empty;
+    var it=std.mem.tokenizeAny(u8,learnWords," ,");
+    while(it.next())|wd|try list.append(arena,try ownear.plainWord(arena,wd));
+    if(list.items.len==0)return error.NoWords;
+    var own=try ownear.Ear.init(gpa,io,try Dir.cwd().readFileAlloc(io,ownear.wordsPath,arena,.unlimited));
+    defer own.deinit();
+    try learnReading(gpa,io,&own,path,list.items);
+    return;
   }
   const exe=try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,serverExe});
   const model=try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,modelFile});
