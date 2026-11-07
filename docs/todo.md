@@ -272,7 +272,20 @@ carries the game's early days.
   frames, drawn as a spectrogram (time across, pitch up, loudness as
   brightness) with a short text of its loudness over time and its
   strongest pitches as notes, so Claude can read what a sound sounds
-  like; maybe pick single sounds out of it.
+  like; maybe pick single sounds out of it. (The ear, `zig build hear`,
+  now writes such spectrograms of the gardener's voice: the drawing and
+  measuring there can be reused.)
+- **The ear mishears s sounds, and the room** (the gardener, talking to
+  Claude aloud, 2026-11-07; to discuss later). Some s's are dropped or
+  misheard: whisper hears only to 8 kHz and the small model guesses. A
+  bigger model (`ggml-medium.en.bin`, 1.5 GB) would mishear less;
+  background noise in the gardener's room is worth a look then too.
+- **Claude's voice, richer** (the gardener, 2026-11-07, in the loop of
+  saying and hearing; `zig build speak`). It reads flat and thin: one
+  throat into one mouth. A real voice is layered, the chest humming
+  under the throat, the nose and head ringing with it, the breath
+  through all of them. Add those layers, one at a time, by ear. The
+  breath already fits; keep it.
 - **Two galaxies meeting in the night sky** (the gardener, 2026-11-04).
   A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
   their arms twisted into streamers, new stars blooming pink where their
