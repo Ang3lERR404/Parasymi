@@ -143,6 +143,13 @@ const airGain:f32=1;
 /// the throat's softened pulse brought back up, so the voice, not the
 /// breath, carries the sound (measured: the breath had drowned it, tinny)
 const voiceGain:f32=4;
+/// the chest's hum (Hz): low, under the voice
+const chestHz:f32=190;
+/// its width (Hz): broad, a body not a bell
+const chestBw:f32=140;
+/// how loud the chest hums with the throat (the gardener picked the fuller
+/// of two by ear, 2026-11-07: "much better")
+const chestGain:f32=0.18;
 /// how loud a hiss is against the voice: soft, never a hard edge
 const hissLoud:f32=0.6;
 /// a stop's burst against its hiss: a tap, never a pop
@@ -601,6 +608,9 @@ const Mouth=struct{
   dip:Dip=.{},
   /// the nose's own hum
   nose:Resonator=.{},
+  /// the chest: a low resonance humming along with the throat, beside the
+  /// mouth (the first of the voice's layers)
+  chest:Resonator=.{},
   /// the hiss's resonance, beside the row
   hissRes:Resonator=.{},
   /// the breath's and the hiss's noise
@@ -658,7 +668,10 @@ const Mouth=struct{
     const y=x+hiss;
     const out=y-mo.last;
     mo.last=y;
-    return out;
+    // the chest humming with the throat, joined after the lips (it is
+    // felt through the body, not shaped by the mouth)
+    mo.chest.tune(chestHz,chestBw);
+    return out+mo.chest.step(mo.soft*mo.now.voice)*chestGain;
   }
 };
 /// the whole plan spoken: its samples at `rate`, peak-normalized
