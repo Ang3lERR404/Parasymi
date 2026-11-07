@@ -673,9 +673,9 @@ fn pitchRange(arena:Allocator,fr:Frames)Allocator.Error!?struct{f32,f32}{
 }
 /// the highest pitch counted as a speaking voice (Hz): a squeal above it
 /// is more often a misread hiss than the gardener
-const speakTopHz:f32=450;
+const speakTopHz:f32=320;
 /// how many frames (10 ms) of voice a phrase needs to be speech at all
-const minVoiced:usize=8;
+const minVoiced:usize=12;
 /// how many of a phrase's frames have a speaking voice's pitch
 fn voicedFrames(fr:Frames)usize{
   // the frames voiced at a speaking pitch

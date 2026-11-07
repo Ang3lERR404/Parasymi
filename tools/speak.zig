@@ -47,7 +47,7 @@ const tokenize=std.mem.tokenizeScalar;
 /// an enum tag by its name
 const stringToEnum=std.meta.stringToEnum;
 /// samples a second (Hz)
-const rate:f32=44100;
+pub const rate:f32=44100;
 /// one sample's length (s)
 const dt:f32=1/rate;
 /// the voice's own pitch when nothing says otherwise (Hz): mid-range, calm
@@ -270,7 +270,7 @@ const Close=enum{
   hang,
 };
 /// one sound to say: a phoneme as written, or a pause that closes a phrase
-const Sound=struct{
+pub const Sound=struct{
   /// the phoneme, or none for a pause
   p:?Phoneme,
   /// stressed (a digit 1 or 2)
@@ -281,10 +281,10 @@ const Sound=struct{
   close:Close=.settle,
 };
 /// what reading the written sounds can fail with
-const ReadError=error{UnknownSound}||Allocator.Error;
+pub const ReadError=error{UnknownSound}||Allocator.Error;
 /// the sounds written in `text`: phonemes with a stress digit and `:`,
 /// and `, . ? ! ~` closing a phrase
-fn read(arena:Allocator,text:[]const u8)ReadError![]Sound{
+pub fn read(arena:Allocator,text:[]const u8)ReadError![]Sound{
   var out:ArrayList(Sound)=.empty;
   var it=tokenize(u8,text,' ');
   while(it.next())|tok|{
@@ -444,7 +444,7 @@ const Throat=struct{
   }
 };
 /// how the voice is asked to sound
-const Voice=struct{
+pub const Voice=struct{
   /// its own pitch (Hz)
   pitch:f32=basePitch,
   /// how much breath rides on it (0..1)
@@ -475,7 +475,7 @@ const Target=struct{
   pitch:f32=1,
 };
 /// one stretch of the plan: how long, and what it asks
-const Step=struct{
+pub const Step=struct{
   /// how long (s)
   len:f32,
   /// what it asks at its start
@@ -496,7 +496,7 @@ fn nextShape(sounds:[]const Sound,i:usize)[3]f32{
 }
 /// the plan: every sound turned into stretches of what the mouth does,
 /// the pitch drawn over each phrase
-fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
+pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
   var out:ArrayList(Step)=.empty;
   // where the current phrase began in `out`, to draw its pitch when it closes
   var phraseAt:usize=0;
@@ -700,7 +700,7 @@ const Mouth=struct{
   }
 };
 /// the whole plan spoken: its samples at `rate`, peak-normalized
-fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
+pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   // how many samples, with a breath of quiet at the end
   var total:f32=0.08;
   for(steps)|s|total+=s.len;
@@ -759,18 +759,18 @@ const defaultOut="shots/voice/said.wav";
 const defaultSay="HH AX L OW1 , EY1 N JH AX L . AY1 K AE1 N HH IY1 R Y UW1 ~";
 /// Claude's own word list: a word and its sounds a line, grown as words
 /// are needed (`#` begins a note)
-const wordsPath="tools/voice/words.txt";
+pub const wordsPath="tools/voice/words.txt";
 /// every try kept, its wave and a line of what it was, for the loop of
 /// saying, hearing the gardener's word on it, and changing one thing
 const triesDir="shots/voice/tries";
 /// what spelling plain text can fail with
-const SpellError=error{UnknownWord}||Allocator.Error;
+pub const SpellError=error{UnknownWord}||Allocator.Error;
 /// whether a byte ends a word as one of the marks that shape a close
 fn isMark(c:u8)bool{return switch(c){',','.','?','!','~'=>true,else=>false};}
 /// `text` spelled in sounds from the word list `words`: each word looked
 /// up (any case), the marks `, . ? ! ~` kept; every word not in the list
 /// is printed before failing, so all can be added at once
-fn spell(arena:Allocator,words:[]const u8,text:[]const u8)SpellError![]u8{
+pub fn spell(arena:Allocator,words:[]const u8,text:[]const u8)SpellError![]u8{
   // the list, by word
   var list:WordMap=.empty;
   var lines=tokenize(u8,words,'\n');
