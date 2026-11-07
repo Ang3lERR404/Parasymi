@@ -60,9 +60,26 @@ const swellS:f32=0.006;
 /// how long the pitch takes to follow (s): slow, a voice's line
 const pitchS:f32=0.06;
 /// how uneven each period is (share of the period), as a living throat's
-const jitter:f32=0.006;
+const jitter:f32=0.012;
 /// how uneven each pulse's strength is (share)
-const shimmer:f32=0.04;
+const shimmer:f32=0.07;
+/// how much each period's open share wavers (share)
+const openWobble:f32=0.08;
+/// how far the pitch wanders on its own, never quite still (share)
+const pitchWander:f32=0.035;
+/// how long one wander takes (s)
+const pitchWanderS:f32=0.35;
+/// how far the resonances wander, a mouth never quite still (share)
+const shapeWander:f32=0.03;
+/// how long one of their wanders takes (s)
+const shapeWanderS:f32=0.22;
+/// a stressed sound's pitch starts this much above its lift and falls
+/// through it, the way a voice leans on a word (times)
+const leanIn:f32=1.05;
+/// and ends this much under it (times)
+const leanOut:f32=0.95;
+/// a vowel fades this much by its end, a syllable's own swell (times)
+const vowelFade:f32=0.85;
 /// the share of a period the throat is open
 const openShare:f32=0.6;
 /// how much of the open share is the opening (the rest closes, faster)
@@ -314,6 +331,30 @@ const Noise=struct{
     return m.f(n.s)/2147483648-1;
   }
 };
+/// a slow wander between -1 and 1: a new place to drift to every so often,
+/// glided toward, so nothing living ever holds quite still
+const Drift=struct{
+  /// what picks each place
+  noise:Noise,
+  /// how long one wander takes, on average (s)
+  every:f32,
+  /// where it is now
+  now:f32=0,
+  /// where it is drifting to
+  goal:f32=0,
+  /// how long until the next place is picked (s)
+  left:f32=0,
+  /// one sample's drift
+  fn step(d:*Drift)f32{
+    d.left-=dt;
+    if(d.left<=0){
+      d.goal=d.noise.next();
+      d.left=d.every*(0.6+0.8*@abs(d.noise.next()));
+    }
+    d.now=m.damp(d.now,d.goal,1/d.every,dt);
+    return d.now;
+  }
+};
 /// the throat: a glottal pulse at the pitch it is given, a little uneven
 /// each period as a living one is, and how open it is (for breath)
 const Throat=struct{
@@ -323,6 +364,8 @@ const Throat=struct{
   hz:f32=basePitch,
   /// this period's own strength
   gain:f32=1,
+  /// the share of this period the throat is open
+  open:f32=openShare,
   /// what wavers it
   noise:Noise=.{.s=0x2545f491},
   /// one sample of the pulse's flow, and how open the throat is (0..1)
@@ -332,11 +375,13 @@ const Throat=struct{
       t.phase-=1;
       t.hz=hz*(1+jitter*t.noise.next());
       t.gain=1+shimmer*t.noise.next();
+      t.open=openShare*(1+openWobble*t.noise.next());
     }
-    // opening slowly, closing fast, then shut (Rosenberg's pulse)
+    // opening slowly, closing fast, then shut (Rosenberg's pulse), each
+    // period open a little longer or shorter than the last
     const ph=t.phase;
-    const op=openShare*openingShare;
-    const flow=if(ph<op)0.5-0.5*@cos(m.pi*ph/op)else if(ph<openShare)@cos(0.5*m.pi*(ph-op)/(openShare-op))else 0;
+    const op=t.open*openingShare;
+    const flow=if(ph<op)0.5-0.5*@cos(m.pi*ph/op)else if(ph<t.open)@cos(0.5*m.pi*(ph-op)/(t.open-op))else 0;
     return.{flow*t.gain,flow};
   }
 };
@@ -414,11 +459,14 @@ fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
     // the voice's own breath on every voiced sound
     const vb=v.breath*0.35;
     switch(sh.kind){
-      .vowel=>{
-        const t=Target{.f=sh.f,.voice=1,.breath=vb,.pitch=lift};
-        try out.append(arena,.{.len=len,.from=t,.to=t});
+      // a vowel swells and fades a little, and a stressed one leans in
+      // above its lift and falls through it
+      .vowel,.diphthong=>{
+        const into:f32=if(s.stressed)leanIn else 1;
+        const outOf:f32=if(s.stressed)leanOut else 1;
+        const end=if(sh.kind==.diphthong)sh.to else sh.f;
+        try out.append(arena,.{.len=len,.from=.{.f=sh.f,.voice=1,.breath=vb,.pitch=lift*into},.to=.{.f=end,.voice=vowelFade,.breath=vb,.pitch=lift*outOf}});
       },
-      .diphthong=>try out.append(arena,.{.len=len,.from=.{.f=sh.f,.voice=1,.breath=vb,.pitch=lift},.to=.{.f=sh.to,.voice=1,.breath=vb,.pitch=lift}}),
       .glide=>{
         const t=Target{.f=sh.f,.voice=0.75,.breath=vb,.pitch=lift};
         try out.append(arena,.{.len=len,.from=t,.to=t});
@@ -505,6 +553,8 @@ const Mouth=struct{
   hissRes:Resonator=.{},
   /// the breath's and the hiss's noise
   noise:Noise=.{},
+  /// each of the three lowest resonances' own slow wander
+  wander:[3]Drift=.{.{.noise=.{.s=0x1b873593},.every=shapeWanderS},.{.noise=.{.s=0xcc9e2d51},.every=shapeWanderS},.{.noise=.{.s=0x85ebca6b},.every=shapeWanderS}},
   /// what the mouth is doing now, glided toward what the plan asks
   now:Target=.{.f=.{500,1500,2500},.voice=0},
   /// the softening of the throat's brightness (a one-pole low pass)
@@ -538,7 +588,9 @@ const Mouth=struct{
       x=m.lerp(x,mo.nose.step(mo.dip.step(x)),mo.now.nasal);
     }
     const bws=[5]f32{60+mo.now.f[0]*0.06,90,140,b4,b5};
-    const fs=[5]f32{mo.now.f[0],mo.now.f[1],mo.now.f[2],f4,f5};
+    // the three lowest wandering a little, a mouth never quite still
+    var fs=[5]f32{mo.now.f[0],mo.now.f[1],mo.now.f[2],f4,f5};
+    for(0..3)|i|fs[i]*=1+shapeWander*mo.wander[i].step();
     for(&mo.res,0..)|*r,i|{
       r.tune(fs[i],bws[i]);
       x=r.step(x);
@@ -560,8 +612,9 @@ fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   for(steps)|s|total+=s.len;
   const out=try arena.alloc(f32,m.floorTo(usize,total*rate));
   var mo=Mouth{};
-  // the pitch, gliding along its own line
+  // the pitch, gliding along its own line and wandering a little off it
   var hz=v.pitch;
+  var wander=Drift{.noise=.{.s=0x68e31da4},.every=pitchWanderS};
   var i:usize=0;
   for(steps)|s|{
     const n=m.floorTo(usize,s.len*rate);
@@ -572,7 +625,7 @@ fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
       var want=s.from;
       for(0..3)|j|want.f[j]=m.lerp(s.from.f[j],s.to.f[j],t);
       want.pitch=m.lerp(s.from.pitch,s.to.pitch,t);
-      hz=m.damp(hz,v.pitch*want.pitch,1/pitchS,dt);
+      hz=m.damp(hz,v.pitch*want.pitch*(1+pitchWander*wander.step()),1/pitchS,dt);
       out[i]=mo.step(want,hz,v.breath);
       i+=1;
     }
@@ -674,12 +727,13 @@ test "a held vowel sings at the voice's pitch" {
   defer ar.deinit();
   const arena=ar.allocator();
   const v=Voice{.pitch=120,.breath=0};
-  const x=try speak(arena,try plan(arena,try read(arena,"AA1:"),v),v);
+  const x=try speak(arena,try plan(arena,try read(arena,"AA0:"),v),v);
   // the period found in the middle: the lag where it is most like itself
+  // (looked for between 73 and 176 Hz, so two periods never pass for one)
   const mid=x[x.len/3..][0..2048];
   var best:usize=0;
   var bestC:f32=-1e9;
-  for(200..800)|lag|{
+  for(250..600)|lag|{
     var c:f32=0;
     for(0..1024)|i|c+=mid[i]*mid[i+lag];
     if(c>bestC){
@@ -687,7 +741,9 @@ test "a held vowel sings at the voice's pitch" {
       best=lag;
     }
   }
-  try testing.expectApproxEqAbs(@as(f32,120),rate/m.f(best),120*0.05);
+  // (within its drift down, its wander and its close: a lone vowel is
+  // also the end of its phrase, settling)
+  try testing.expectApproxEqAbs(@as(f32,120),rate/m.f(best),120*0.15);
 }
 test "the close lifts or lets fall the phrase's end" {
   var ar=std.heap.ArenaAllocator.init(testing.allocator);
