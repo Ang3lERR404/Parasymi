@@ -906,6 +906,62 @@ fn readWav(arena:Allocator,bytes:[]const u8)WavError![]f32{
   }
   return if(sr==rate)mono else try ownear.resample(arena,mono,m.f(sr),m.f(rate));
 }
+/// the note names of an octave, from C
+const noteNames=[_][]const u8{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
+/// how long one note reading spans (frames, 0.1 s): a sung note's pitch is
+/// read as the middle of its frames there, so the quaver doesn't split it
+const noteFrames:usize=10;
+/// a note's number (MIDI: A4 is 69) nearest to `hz`
+fn noteOf(hz:f32)i32{return@intFromFloat(@round(69+12*@log2(hz/440)));}
+/// a recording looked at whole (`--look=<wav>`), as for singing: its
+/// spectrogram written beside it (`<wav>.png`, pitch drawn in cyan) and
+/// its pitch line read as notes (`<wav>.notes.txt`), each run of one note
+/// with how long it was held
+fn look(gpa:Allocator,io:Io,path:[]const u8)!void{
+  var ar=std.heap.ArenaAllocator.init(gpa);
+  defer ar.deinit();
+  const arena=ar.allocator();
+  const x=try readWav(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
+  const fr=try Frames.measure(arena,x);
+  try Dir.cwd().writeFile(io,.{.sub_path=try std.fmt.allocPrint(arena,"{s}.png",.{path}),.data=try spectrogram(arena,x,fr,&.{})});
+  var aw:Allocating=.init(arena);
+  const w=&aw.writer;
+  try w.print("{s}\n{d:.2} s\nnote (Hz) from-to s, held s\n",.{path,m.f(fr.db.len)/framesPerS});
+  // the notes, a reading every tenth of a second, runs of one note joined
+  var run:?struct{note:i32,hz:f32,from:usize,to:usize}=null;
+  const buf=try arena.alloc(f32,noteFrames);
+  var i:usize=0;
+  while(i<fr.hz.len):(i+=noteFrames){
+    // this reading's voiced pitches, and their middle
+    var n:usize=0;
+    for(fr.hz[i..@min(fr.hz.len,i+noteFrames)])|h|{
+      if(h)|hz|{
+        buf[n]=hz;
+        n+=1;
+      }
+    }
+    const note:?i32=if(n>=noteFrames/2)noteOf(try median(arena,buf[0..n]))else null;
+    if(run)|r|{
+      if(note!=null and note.?==r.note){
+        run.?.to=i+noteFrames;
+        continue;
+      }
+      try writeNote(w,r.note,r.hz,r.from,r.to);
+      run=null;
+    }
+    if(note)|nt|run=.{.note=nt,.hz=try median(arena,buf[0..n]),.from=i,.to=i+noteFrames};
+  }
+  if(run)|r|try writeNote(w,r.note,r.hz,r.from,r.to);
+  const text=aw.written();
+  try Dir.cwd().writeFile(io,.{.sub_path=try std.fmt.allocPrint(arena,"{s}.notes.txt",.{path}),.data=text});
+  print("{s}",.{text});
+}
+/// one held note, written as its name and octave, its pitch, when and how long
+fn writeNote(w:*Io.Writer,note:i32,hz:f32,from:usize,to:usize)Io.Writer.Error!void{
+  const name=noteNames[@intCast(@mod(note,12))];
+  const octave=@divFloor(note,12)-1;
+  try w.print("{s}{d} ({d:.0}) {d:.1}-{d:.1}, {d:.1}\n",.{name,octave,hz,m.f(from)/framesPerS,m.f(to)/framesPerS,m.f(to-from)/framesPerS});
+}
 /// learns the gardener's reading of `words` (in order, again and again)
 /// from the recording at `path`: cut into words at the pauses, each
 /// labelled in turn; every word after the first two rounds is guessed
@@ -990,6 +1046,7 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--whisper="))base=a["--whisper=".len..];
     if(startsWith(u8,a,"--file="))try files.append(arena,a["--file=".len..]);
     if(startsWith(u8,a,"--learn="))learnPath=a["--learn=".len..];
+    if(startsWith(u8,a,"--look="))return look(gpa,io,a["--look=".len..]);
     if(startsWith(u8,a,"--words="))learnWords=a["--words=".len..];
   }
   if(learnPath)|path|{
