@@ -30,6 +30,18 @@ const print=std.debug.print;
 const startsWith=std.mem.startsWith;
 /// the folder part of a path
 const dirname=std.fs.path.dirname;
+/// the text with the given bytes cut from its ends
+const trimAll=std.mem.trim;
+/// where a byte first is in a text
+const indexOfScalar=std.mem.indexOfScalar;
+/// whether a byte is a letter or a digit
+const isAlnum=std.ascii.isAlphanumeric;
+/// a text in small letters, newly allocated
+const lowered=std.ascii.allocLowerString;
+/// a text built up in memory
+const Allocating=Io.Writer.Allocating;
+/// the word list: a word to its sounds
+const WordMap=std.StringHashMapUnmanaged([]const u8);
 /// splits a text at a byte
 const tokenize=std.mem.tokenizeScalar;
 /// an enum tag by its name
@@ -272,15 +284,18 @@ fn read(arena:Allocator,text:[]const u8)ReadError![]Sound{
       held=true;
       name=name[0..name.len-1];
     }
+    // an unstressed AH is the schwa (AX), as the CMU word lists write it
+    var schwa=false;
     if(name.len>0 and name[name.len-1]>='0' and name[name.len-1]<='2'){
       stressed=name[name.len-1]!='0';
+      schwa=name[name.len-1]=='0';
       name=name[0..name.len-1];
     }
     const p=stringToEnum(Phoneme,name)orelse{
       print("unknown sound: {s}\n",.{tok});
       return error.UnknownSound;
     };
-    try out.append(arena,.{.p=p,.stressed=stressed,.held=held});
+    try out.append(arena,.{.p=if(schwa and p==.AH).AX else p,.stressed=stressed,.held=held});
   }
   return out.items;
 }
@@ -704,34 +719,109 @@ fn wavOf(arena:Allocator,x:[]const f32)Allocator.Error![]u8{
 const defaultOut="shots/voice/said.wav";
 /// what is said when nothing says otherwise: "hello, angel. I can hear you~"
 const defaultSay="HH AX L OW1 , EY1 N JH AX L . AY1 K AE1 N HH IY1 R Y UW1 ~";
-/// speaks `--say=` (sounds, as above) into `--out=`, and plays it with `--play`
+/// Claude's own word list: a word and its sounds a line, grown as words
+/// are needed (`#` begins a note)
+const wordsPath="tools/voice/words.txt";
+/// every try kept, its wave and a line of what it was, for the loop of
+/// saying, hearing the gardener's word on it, and changing one thing
+const triesDir="shots/voice/tries";
+/// what spelling plain text can fail with
+const SpellError=error{UnknownWord}||Allocator.Error;
+/// whether a byte ends a word as one of the marks that shape a close
+fn isMark(c:u8)bool{return switch(c){',','.','?','!','~'=>true,else=>false};}
+/// `text` spelled in sounds from the word list `words`: each word looked
+/// up (any case), the marks `, . ? ! ~` kept; every word not in the list
+/// is printed before failing, so all can be added at once
+fn spell(arena:Allocator,words:[]const u8,text:[]const u8)SpellError![]u8{
+  // the list, by word
+  var list:WordMap=.empty;
+  var lines=tokenize(u8,words,'\n');
+  while(lines.next())|raw|{
+    const line=trimAll(u8,raw," \r\t");
+    if(line.len==0 or line[0]=='#')continue;
+    const gap=indexOfScalar(u8,line,' ') orelse continue;
+    try list.put(arena,line[0..gap],trimAll(u8,line[gap..]," "));
+  }
+  var aw:Allocating=.init(arena);
+  const w=&aw.writer;
+  // whether any word was missing
+  var missing=false;
+  var i:usize=0;
+  while(i<text.len){
+    const c=text[i];
+    if(isMark(c)){
+      w.print("{c} ",.{c}) catch return error.OutOfMemory;
+      i+=1;
+      continue;
+    }
+    if(!isAlnum(c) and c!='\''){
+      i+=1;
+      continue;
+    }
+    // the word, lowered
+    const start=i;
+    while(i<text.len and (isAlnum(text[i]) or text[i]=='\''))i+=1;
+    const word=try lowered(arena,text[start..i]);
+    if(list.get(word))|sounds|{
+      w.print("{s} ",.{sounds}) catch return error.OutOfMemory;
+    }else{
+      print("not in my word list yet: {s}\n",.{word});
+      missing=true;
+    }
+  }
+  if(missing)return error.UnknownWord;
+  return aw.written();
+}
+/// speaks `--text=` (plain words, through the word list) or `--say=`
+/// (sounds, as above) into `--out=`, keeps the try, and plays it with `--play`
 pub fn main(init:std.process.Init)!void{
   const io=init.io;
   const arena=init.arena.allocator();
   var v=Voice{};
   var say:[]const u8=defaultSay;
+  var text:?[]const u8=null;
   var outPath:[]const u8=defaultOut;
   var play=false;
   const args=try init.minimal.args.toSlice(arena);
   for(args[1..])|a|{
     if(startsWith(u8,a,"--say="))say=a["--say=".len..];
+    if(startsWith(u8,a,"--text="))text=a["--text=".len..];
     if(startsWith(u8,a,"--out="))outPath=a["--out=".len..];
     if(startsWith(u8,a,"--pitch="))v.pitch=try std.fmt.parseFloat(f32,a["--pitch=".len..]);
     if(startsWith(u8,a,"--breath="))v.breath=try std.fmt.parseFloat(f32,a["--breath=".len..]);
     if(startsWith(u8,a,"--pace="))v.pace=try std.fmt.parseFloat(f32,a["--pace=".len..]);
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
+  if(text)|t|say=try spell(arena,try Dir.cwd().readFileAlloc(io,wordsPath,arena,.unlimited),t);
   const sounds=try read(arena,say);
   const x=try speak(arena,try plan(arena,sounds,v),v);
+  const wav=try wavOf(arena,x);
   if(dirname(outPath))|d|try Dir.cwd().createDirPath(io,d);
-  try Dir.cwd().writeFile(io,.{.sub_path=outPath,.data=try wavOf(arena,x)});
+  try Dir.cwd().writeFile(io,.{.sub_path=outPath,.data=wav});
   print("said {d:.2} s into {s}\n",.{m.f(x.len)/rate,outPath});
+  // the try kept, named by when, with a line of what it was
+  const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(io).nanoseconds,std.time.ns_per_ms));
+  try Dir.cwd().createDirPath(io,triesDir);
+  try Dir.cwd().writeFile(io,.{.sub_path=try std.fmt.allocPrint(arena,"{s}/{d}.wav",.{triesDir,ms}),.data=wav});
+  const note=try std.fmt.allocPrint(arena,"{d} pitch={d} breath={d} pace={d} | {s} | {s}\n",.{ms,v.pitch,v.breath,v.pace,text orelse "",say});
+  var log=try Dir.cwd().createFile(io,triesDir++"/log.txt",.{.truncate=false,.read=true});
+  defer log.close(io);
+  try log.writePositionalAll(io,note,try log.length(io));
+  print("kept as tries/{d}\n",.{ms});
   if(!play)return;
+  // the mark that tells the ear (tools/hear.zig) this is Claude's own
+  // voice on the speakers, not the gardener's, left while it plays
+  try Dir.cwd().createDirPath(io,"link");
+  try Dir.cwd().writeFile(io,.{.sub_path=speakingMark,.data=""});
+  defer Dir.cwd().deleteFile(io,speakingMark)catch{};
   // played through Windows' own player, waiting until it is done
   const cmd=try std.fmt.allocPrint(arena,"(New-Object Media.SoundPlayer '{s}').PlaySync()",.{outPath});
   const r=try std.process.run(arena,io,.{.argv=&.{"powershell.exe","-NoProfile","-Command",cmd}});
   if(r.term!=.exited or r.term.exited!=0)print("could not play it: {s}\n",.{r.stderr});
 }
+/// left in the link folder while the voice plays, so the ear never hears
+/// Claude's own voice as the gardener's (tools/hear.zig reads the same)
+const speakingMark="link/speaking";
 /// the test harness
 const testing=std.testing;
 test "sounds are read with their stress, holding and closes" {

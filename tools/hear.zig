@@ -145,6 +145,11 @@ const modelFile="models\\ggml-small.en.bin";
 const heardDir=link.folder++"/heard";
 /// how long the server may take to wake (s)
 const serverWaitS=60;
+/// left in the link folder by tools/speak.zig while Claude's own voice
+/// plays: a phrase heard then is Claude's, not the gardener's
+const speakingMark="speaking";
+/// how many frames between looks at that mark (0.1 s)
+const markEvery:u32=10;
 /// what a message says it is
 const aloud="(aloud) ";
 /// what can stop the listening
@@ -686,12 +691,24 @@ const Ear=struct{
   breaths:Breaths=.{},
   /// where a heard phrase goes
   send:Send=.link,
+  /// frames heard so far, for looking at the mark only now and then
+  count:u32=0,
+  /// whether Claude's own voice played during this phrase
+  overheard:bool=false,
+  /// whether Claude's own voice is playing now (tools/speak.zig's mark)
+  fn speaking(e:*Ear)bool{
+    _=e.dir.statFile(e.io,speakingMark,.{}) catch return false;
+    return true;
+  }
   /// one frame heard: a phrase begun, ended (and heard out), or the quiet
   /// before one kept short
   fn frame(e:*Ear,x:[]const f32)!void{
     try e.samples.appendSlice(e.gpa,x);
     // how many samples there are now
     const n=e.samples.items.len;
+    // while a phrase is heard, every so often: is Claude's own voice playing?
+    e.count+=1;
+    if(e.begin!=null and e.count%markEvery==0 and e.speaking())e.overheard=true;
     switch(e.breaths.step(dbOf(x))){
       .none=>if(e.begin==null and n>2*prerollFrames*hop){
         // only the quiet just before a phrase is kept
@@ -699,14 +716,20 @@ const Ear=struct{
         std.mem.copyForwards(f32,e.samples.items[0..keep],e.samples.items[n-keep..]);
         e.samples.shrinkRetainingCapacity(keep);
       },
-      .begin=>|back|e.begin=n-|(back+prerollFrames)*hop,
+      .begin=>|back|{
+        e.begin=n-|(back+prerollFrames)*hop;
+        e.overheard=e.speaking();
+      },
       .end=>|quiet|{
         // the phrase, from its preroll to a little after its last loud frame
         const end=n-(quiet-|tailFrames)*hop;
         const b=e.begin orelse 0;
-        e.hearPhrase(e.samples.items[b..end])catch|err|print("could not hear that phrase: {t}\n",.{err});
+        if(e.overheard or e.speaking()){
+          print("(my own voice, not heard as yours)\n",.{});
+        }else e.hearPhrase(e.samples.items[b..end])catch|err|print("could not hear that phrase: {t}\n",.{err});
         e.samples.clearRetainingCapacity();
         e.begin=null;
+        e.overheard=false;
       },
     }
   }

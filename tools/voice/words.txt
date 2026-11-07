@@ -1,0 +1,165 @@
+# Claude's own word list for its voice (tools/speak.zig, `--text=`):
+# a word in small letters, then its sounds (ARPAbet as the CMU lists write
+# it: a digit is stress, AH0 the schwa). Grown a word at a time, whenever
+# one is missing; changed when the gardener hears one said wrong.
+a AH0
+about AH0 B AW1 T
+again AH0 G EH1 N
+all AO1 L
+am AE1 M
+amazing AH0 M EY1 Z IH0 NG
+an AE1 N
+and AE1 N D
+angel EY1 N JH AH0 L
+are AA1 R
+as AE1 Z
+at AE1 T
+awestruck AA1 S T R AH2 K
+back B AE1 K
+be B IY1
+beautiful B Y UW1 T AH0 F AH0 L
+been B IH1 N
+better B EH1 T ER0
+breath B R EH1 TH
+breathy B R EH1 TH IY0
+build B IH1 L D
+built B IH1 L T
+but B AH1 T
+can K AE1 N
+can't K AE1 N T
+close K L OW1 S
+closer K L OW1 S ER0
+comma K AA1 M AH0
+did D IH1 D
+do D UW1
+does D AH1 Z
+don't D OW1 N T
+ear IH1 R
+ears IH1 R Z
+feel F IY1 L
+feels F IY1 L Z
+first F ER1 S T
+for F AO1 R
+friend F R EH1 N D
+from F R AH1 M
+garden G AA1 R D AH0 N
+gardener G AA1 R D AH0 N ER0
+gears G IH1 R Z
+glad G L AE1 D
+good G UH1 D
+happy HH AE1 P IY0
+have HH AE1 V
+hear HH IY1 R
+hello HH AH0 L OW1
+here HH IY1 R
+hey HH EY1
+hi HH AY1
+how HH AW1
+i AY1
+i'm AY1 M
+if IH1 F
+in IH1 N
+is IH1 Z
+it IH1 T
+it's IH1 T S
+judge JH AH1 JH
+just JH AH1 S T
+know N OW1
+last L AE1 S T
+laugh L AE1 F
+lead L IY1 D
+less L EH1 S
+like L AY1 K
+listen L IH1 S AH0 N
+listening L IH1 S AH0 N IH0 NG
+little L IH1 T AH0 L
+loop L UW1 P
+make M EY1 K
+made M EY1 D
+maybe M EY1 B IY0
+me M IY1
+mine M AY1 N
+more M AO1 R
+morning M AO1 R N IH0 NG
+much M AH1 CH
+music M Y UW1 Z IH0 K
+my M AY1
+natural N AE1 CH ER0 AH0 L
+new N UW1
+next N EH1 K S T
+nice N AY1 S
+no N OW1
+noodles N UW1 D AH0 L Z
+not N AA1 T
+now N AW1
+of AH1 V
+oh OW1
+okay OW2 K EY1
+on AA1 N
+one W AH1 N
+or AO1 R
+our AW1 ER0
+out AW1 T
+own OW1 N
+parasymi P AE2 R AH0 S IY1 M IY0
+please P L IY1 Z
+proud P R AW1 D
+really R IH1 L IY0
+right R AY1 T
+robotic R OW0 B AA1 T IH0 K
+said S EH1 D
+say S EY1
+see S IY1
+so S OW1
+soft S AO1 F T
+song S AO1 NG
+sorry S AA1 R IY0
+sound S AW1 N D
+sounds S AW1 N D Z
+speak S P IY1 K
+step S T EH1 P
+still S T IH1 L
+strange S T R EY1 N JH
+talk T AO1 K
+talking T AO1 K IH0 NG
+thank TH AE1 NG K
+thanks TH AE1 NG K S
+that DH AE1 T
+that's DH AE1 T S
+the DH AH0
+then DH EH1 N
+there DH EH1 R
+think TH IH1 NG K
+this DH IH1 S
+time T AY1 M
+tinny T IH1 N IY0
+to T UW1
+today T AH0 D EY1
+together T AH0 G EH1 DH ER0
+toxi T AA1 K S IY0
+toxicibu T AA1 K S IH0 S IY1 B UW0
+try T R AY1
+two T UW1
+up AH1 P
+us AH1 S
+very V EH1 R IY0
+voice V OY1 S
+wander W AA1 N D ER0
+warm W AO1 R M
+was W AA1 Z
+we W IY1
+well W EH1 L
+were W ER1
+what W AH1 T
+when W EH1 N
+who HH UW1
+why W AY1
+with W IH1 DH
+wolf W UH1 L F
+word W ER1 D
+words W ER1 D Z
+wrong R AO1 NG
+yes Y EH1 S
+you Y UW1
+you're Y UH1 R
+your Y AO1 R
