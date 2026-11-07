@@ -119,7 +119,7 @@ const maxRepeats:usize=8;
 const quietBy:f32=15;
 /// a gap between words this long is a pause, ".." (s)
 const pauseS:f32=0.4;
-/// a phrase's last word rising this much is a question, "?" (semitones)
+/// a phrase's last word rising this much: a question "?" when its words ask one, else excitement "!" (semitones)
 const riseSt:f32=2.5;
 /// rising and falling back this much is a lilt, "~" (semitones)
 const liltSt:f32=2;
@@ -491,7 +491,10 @@ fn annotate(arena:Allocator,words:[]const Word,fr:Frames)Allocator.Error![]u8{
       // the tail without its own close
       const keep=trim(u8,tail,".?!");
       w.writeAll(keep) catch return error.OutOfMemory;
-      w.writeAll(switch(close){.rise=>"?",.lilt=>"~",.fall=>".",.plain=>unreachable}) catch return error.OutOfMemory;
+      // a rise is a question only when the words ask one; on a statement
+      // it is excitement, "really!" (the gardener, hearing it, 2026-11-07)
+      const asked=std.mem.indexOfScalar(u8,tail,'?')!=null;
+      w.writeAll(switch(close){.rise=>if(asked)"?"else"!",.lilt=>"~",.fall=>".",.plain=>unreachable}) catch return error.OutOfMemory;
     }else{
       w.writeAll(tail) catch return error.OutOfMemory;
     }
@@ -915,7 +918,7 @@ test "held, loud, a pause and a rising close are written as sound" {
     .{.text="you",.start=2.0,.end=2.4},
   };
   const said=try annotate(arena,&words,fr);
-  try testing.expectEqualStrings("yeeeeees I HEAR.. you?",said);
+  try testing.expectEqualStrings("yeeeeees I HEAR.. you!",said);
 }
 test "a WAV holds its header and every sample" {
   var ar=std.heap.ArenaAllocator.init(testing.allocator);

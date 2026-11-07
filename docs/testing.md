@@ -238,7 +238,8 @@ to voice, rather than typing in turns.
 - **How it was said** is measured from the sound, not taken from the
   words, and written the way the gardener writes sound: a held word drawn
   out ("yeeees"), a loud one in capitals, a pause as "..", the close of a
-  phrase as "?" (rising), "~" (rising and falling back) or "." (falling
+  phrase as "!" (rising on a statement: excitement), "?" (rising on a
+  question), "~" (rising and falling back) or "." (falling
   flat). whisper's own word times are rough, so held sounds and pauses are
   counted from the loudness of the frames.
 - **What Claude gets:** one message per phrase in `link/toClaude.jsonl`,
