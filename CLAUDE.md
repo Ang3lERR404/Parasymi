@@ -116,6 +116,11 @@ zig build hear                    # Claude hears the gardener's voice (tools/hea
                                   # the repo, %USERPROFILE%\whisper), how it was said written as
                                   # text-as-sound, sent through link/ to the bridge;
                                   # --file=<wav> hears a recording, printed only (docs/testing.md)
+zig build speak -- --say="HH AX L OW1 , EY1 N JH AX L ." [--play --pitch= --breath= --pace=]
+                                  # Claude's own voice (tools/speak.zig): a glottal pulse
+                                  # through five resonances, sounds written in ARPAbet
+                                  # (digit = stress, ':' holds; , . ? ! ~ shape the close);
+                                  # writes shots/voice/said.wav (--out=)
 zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|chat|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync

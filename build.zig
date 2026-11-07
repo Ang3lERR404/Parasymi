@@ -226,6 +226,20 @@ pub fn build(b:*Build)!void{
   hearCmd.setCwd(b.path("."));
   if(b.args)|args|hearCmd.addArgs(args);
   b.step("hear","listen to the gardener's voice and send it to Claude.").dependOn(&hearCmd.step);
+  // the voice (tools/speak.zig): Claude's own, made from a throat and five
+  // resonances; writes under shots/, so it runs from the repo too
+  const speakMod=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/speak.zig"),
+    .imports=&.{.{.name="engine",.module=engine}},
+  });
+  // the voice's executable, and the command that runs it with any `--` args
+  const speak=b.addExecutable(.{.name="speak",.root_module=speakMod});
+  const speakCmd=b.addRunArtifact(speak);
+  speakCmd.setCwd(b.path("."));
+  if(b.args)|args|speakCmd.addArgs(args);
+  b.step("speak","say something in Claude's own voice.").dependOn(&speakCmd.step);
   // the sound check (tools/audiocheck.zig): plays a tone and records it
   // back, so it needs real speakers and stays out of `test`
   // the sound check executable: it needs only the engine
@@ -313,6 +327,8 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
+  // the voice's tests (reading sounds, resonances, pitch, closes)
+  testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=speakMod,.filters=filters})).step);
   // the ear's tests (breaths, pitch, words, sound written as text)
   testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=hearMod,.filters=filters})).step);
   // the burst reader's tests (a spot's light and change, a breath)
