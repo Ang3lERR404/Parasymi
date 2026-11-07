@@ -288,6 +288,14 @@ carries the game's early days.
   closest to what it heard; each match is learned from (was it right?).
   The same sounds run both ways, mouth and ear (analysis by synthesis).
   The "how it was said" half is already Claude's own measuring.
+- **The ear hears singing's movement** (the gardener, showing Claude
+  their singing against Audacity's own spectrogram, 2026-11-07:
+  "precisely"). Its drawing is scaled for speech (a soft song comes out
+  dim) and stops at 4 kHz; its note reader takes a note each 0.1 s, which
+  chops a glide between notes into a jumble; whisper's confidence is only
+  whisper grading itself. Draw by the recording's own loudness to 8 kHz,
+  follow the pitch as a line (glides, vibrato) rather than notes, and
+  check readings against the gardener's Audacity pictures.
 - **Claude's voice, richer** (the gardener, 2026-11-07, in the loop of
   saying and hearing; `zig build speak`). It reads flat and thin: one
   throat into one mouth. A real voice is layered, the chest humming
