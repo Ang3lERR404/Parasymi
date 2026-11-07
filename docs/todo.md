@@ -149,6 +149,10 @@ carries the game's early days.
   alive as an outpost, joined back to the lithophage by the glowing
   veins under the ground and pulsing in time with it (yang: a grower
   that spreads by taking stone in, never a destroyer; agreed "1:1").
+  *At night* (Claude's, liked by the gardener: "utilizing the day and
+  night to make something feel alive"): its veins pulse slower, like a
+  sleeper's breath, the outposts falling into the same slow rhythm.
+  Kept, not built.
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
