@@ -95,6 +95,16 @@ carries the game's early days.
   its sacs fill with pale-blue sap in plain view as it drinks; the crown
   of five lifts last, its pods at the tips. Grown, the veins on the
   ground stay, faintly pulsing toward what it drains.
+  *What it gathers* (agreed, "chef's kiss"; today's code, draining mana
+  from every neighbour and the ley, is an older draft): a leech drinks
+  blood, and a plant's blood is its **sap**, so it drinks sap straight
+  from living neighbours. Its veins are how it drinks, reaching toward its
+  hosts with the sap travelling in along them; its sacs fill with what it
+  drank, each taking its host's colour (fed on a lumenroot, a sac glows
+  with its light: it becomes what it took); its yield is that sap,
+  gathered and changed inside it. And as leeches were used in medicine,
+  yang and never evil: it drinks what a plant has too much of, or what is
+  going sour in it, and leaves it better off.
   *Its look, shaped as a chin wag* (the gardener, 2026-11-06; a first
   draft sculpt in `src/mesh/thepulse.mesh`: parasite cage, sap heart,
   mimosa fronds, pink pom-poms). The feeling: a beating heart, uncannily
