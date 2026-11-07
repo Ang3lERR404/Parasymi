@@ -66,6 +66,9 @@ const pitchWin:usize=640;
 const minHz:f32=70;
 /// the highest voice pitch looked for (Hz), a squeal included
 const maxHz:f32=800;
+/// above this share of samples crossing zero, a frame is hiss, not voice
+/// (a voice's crossings follow its low resonances; an s rushes past 4 kHz)
+const hissCrossings:f32=0.25;
 /// how alike a window and its shift must be to call it voiced (0..1)
 const clarityMin:f32=0.6;
 /// a shorter lag within this share of the best is taken instead, so a
@@ -89,8 +92,9 @@ const endFrames:u32=70;
 const maxFrames:u32=1500;
 /// quiet kept before a phrase's first loud frame, so a soft start isn't cut (0.3 s)
 const prerollFrames:u32=30;
-/// quiet kept after its last loud frame, so a trailing sound isn't cut (0.2 s)
-const tailFrames:u32=20;
+/// quiet kept after its last loud frame, so a trailing sound (a soft final
+/// s, quieter than the voice) isn't cut (0.35 s)
+const tailFrames:u32=35;
 /// the size of the spectrogram's transform (samples, 32 ms)
 const fftN:usize=512;
 /// the spectrogram's highest pitch (Hz): where a voice's shape lives
@@ -231,6 +235,13 @@ fn pitchAt(x:[]const f32)?f32{
   var e0:f32=0;
   for(x[0..pitchWin])|v|e0+=v*v;
   if(e0<=1e-7)return null;
+  // a hiss (s, sh, the "tch" of "pitch") flutters across zero far more
+  // often than a voice: it has no pitch, however alike it looks shifted
+  var crossings:usize=0;
+  for(1..pitchWin)|i|{
+    if((x[i]>=0)!=(x[i-1]>=0))crossings+=1;
+  }
+  if(m.ratio(crossings,pitchWin)>hissCrossings)return null;
   // how alike the window is to itself at each lag
   var c:[maxLag+2]f32=@splat(0);
   // the best likeness
@@ -898,6 +909,18 @@ test "a voice's pitch is found, not an octave off" {
     try testing.expectApproxEqAbs(hz,got,hz*0.02);
   }
   @memset(&x,0);
+  try testing.expectEqual(@as(?f32,null),pitchAt(&x));
+  // a hiss, an s: noise with its lows taken away, has no pitch
+  var s:u32=0x9e3779b9;
+  var last:f32=0;
+  for(&x)|*v|{
+    s^=s<<13;
+    s^=s>>17;
+    s^=s<<5;
+    const n=m.f(s)/2147483648-1;
+    v.*=n-last;
+    last=n;
+  }
   try testing.expectEqual(@as(?f32,null),pitchAt(&x));
 }
 test "whisper's tokens join into words" {
