@@ -211,6 +211,21 @@ pub fn build(b:*Build)!void{
     }),
   });
   b.installArtifact(bridge);
+  // the ear (tools/hear.zig): the gardener's voice heard through the
+  // microphone, read by whisper.cpp's server and sent through the link
+  // folder, so it runs from the repo where that folder is
+  const hearMod=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/hear.zig"),
+    .imports=toolImports,
+  });
+  // the ear's executable, and the command that runs it with any `--` args
+  const hear=b.addExecutable(.{.name="hear",.root_module=hearMod});
+  const hearCmd=b.addRunArtifact(hear);
+  hearCmd.setCwd(b.path("."));
+  if(b.args)|args|hearCmd.addArgs(args);
+  b.step("hear","listen to the gardener's voice and send it to Claude.").dependOn(&hearCmd.step);
   // the sound check (tools/audiocheck.zig): plays a tone and records it
   // back, so it needs real speakers and stays out of `test`
   // the sound check executable: it needs only the engine
@@ -298,6 +313,8 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
+  // the ear's tests (breaths, pitch, words, sound written as text)
+  testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=hearMod,.filters=filters})).step);
   // the burst reader's tests (a spot's light and change, a breath)
   testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=burstMod,.filters=filters})).step);
   // the capture frame's tests (its plan, its band, its edges), linked as it is

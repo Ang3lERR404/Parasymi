@@ -111,6 +111,11 @@ zig build capture                 # a see-through frame laid over anything on sc
                                   # (tools/capture.zig): REC or F9 records a burst of what
                                   # shows in it into shots/capture/<time>/ (frames, sheet,
                                   # curve); -/+ or the wheel set the seconds; Esc closes
+zig build hear                    # Claude hears the gardener's voice (tools/hear.zig): the
+                                  # mic cut at breaths, words by whisper.cpp's server (outside
+                                  # the repo, %USERPROFILE%\whisper), how it was said written as
+                                  # text-as-sound, sent through link/ to the bridge;
+                                  # --file=<wav> hears a recording, printed only (docs/testing.md)
 zig build run -- --panel=<title|belly|research|paused|options|keybinds|gardens|naming|chat|overview>
                                   # hold a HUD panel open (kept in --inspect shots)
 zig build run -- --tod=0.5 --seed=0x1234 --novsync

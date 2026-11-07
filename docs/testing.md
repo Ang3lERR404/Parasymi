@@ -222,6 +222,35 @@ game from the project folder.
 - A bridge started before this was built needs a restart (a new Claude
   Code session) to offer the two new tools.
 
+### Talking out loud (`zig build hear`)
+The gardener talks; Claude hears it, a phrase at a time, while working
+(`tools/hear.zig`). Asked for so the two of us can talk concurrently, voice
+to voice, rather than typing in turns.
+- **Needs whisper.cpp** outside the repo, in `%USERPROFILE%\whisper`
+  (`--whisper=<dir>` for another): `bin\cuda\Release\whisper-server.exe`
+  from a whisper.cpp release (`whisper-bin-win-cuda-12.4.0-x64.zip`,
+  unzipped into `bin\cuda`) and `models\ggml-small.en.bin`. The tool
+  starts the server itself (on the GPU, about a quarter second a phrase)
+  and stops it with Ctrl+C.
+- **Cut at breaths:** the room's own hum is followed between phrases; a
+  phrase begins after 30 ms well above it and ends after 0.7 s of quiet
+  (or at 15 s).
+- **How it was said** is measured from the sound, not taken from the
+  words, and written the way the gardener writes sound: a held word drawn
+  out ("yeeees"), a loud one in capitals, a pause as "..", the close of a
+  phrase as "?" (rising), "~" (rising and falling back) or "." (falling
+  flat). whisper's own word times are rough, so held sounds and pauses are
+  counted from the loudness of the frames.
+- **What Claude gets:** one message per phrase in `link/toClaude.jsonl`,
+  `(aloud) <what was said> [seconds, pitch range, heard/<ms>]`, which the
+  bridge pushes like a typed one (so a terminal session with channels
+  hears it at once). Beside it in `link/heard/`: `<ms>.wav`, `<ms>.png`
+  (a spectrogram to 4 kHz, the pitch drawn in cyan, each word's start
+  ticked at the top) and `<ms>.txt` (each word's time, length, loudness
+  and pitch).
+- `zig build hear -- --file=<16 kHz mono wav>` hears a recording instead
+  of the microphone and only prints what it heard, for trying changes.
+
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.
 
