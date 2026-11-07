@@ -49,10 +49,15 @@ const basePace:f32=1;
 const f4:f32=3400;
 /// the highest resonance (Hz)
 const f5:f32=4200;
-/// their bandwidths (Hz)
-const b4:f32=250;
+/// the second and third resonances' bandwidths (Hz): wide enough not to
+/// ring like metal
+const b2:f32=110;
+/// the third's (Hz)
+const b3:f32=200;
+/// the fourth's (Hz)
+const b4:f32=350;
 /// the highest one's bandwidth (Hz)
-const b5:f32=300;
+const b5:f32=500;
 /// how long resonances take to glide to the next sound (s)
 const glideS:f32=0.022;
 /// how long loudness takes to change (s): quicker than the mouth moves
@@ -105,11 +110,19 @@ const commaS:f32=0.16;
 /// an end's pause (s)
 const endS:f32=0.35;
 /// how bright the throat's pulse stays at full breath (Hz): a soft edge
-const softHz:f32=900;
+/// (measured against the gardener's own voice: brighter read as tinny)
+const softHz:f32=350;
 /// how much brighter it is with no breath at all (Hz)
-const softSpan:f32=2200;
+const softSpan:f32=900;
+/// how dark the breath is (Hz): air through a throat, not a hiss
+const airHz:f32=1800;
+/// the darkened breath brought back up to the loudness white noise had
+const airGain:f32=1;
+/// the throat's softened pulse brought back up, so the voice, not the
+/// breath, carries the sound (measured: the breath had drowned it, tinny)
+const voiceGain:f32=4;
 /// how loud a hiss is against the voice: soft, never a hard edge
-const hissLoud:f32=1.4;
+const hissLoud:f32=0.6;
 /// a stop's burst against its hiss: a tap, never a pop
 const burstSoft:f32=0.5;
 /// the loudest the voice is written (of full scale)
@@ -559,6 +572,8 @@ const Mouth=struct{
   now:Target=.{.f=.{500,1500,2500},.voice=0},
   /// the softening of the throat's brightness (a one-pole low pass)
   soft:f32=0,
+  /// the breath noise, darkened (a one-pole low pass)
+  air:f32=0,
   /// the last sample out, for the lips' radiation (a first difference)
   last:f32=0,
   /// one sample: the plan's target `want` at pitch `hz`
@@ -578,8 +593,10 @@ const Mouth=struct{
     // the breath through it, strongest while it is open
     const flow,const open=mo.throat.step(hz);
     mo.soft=m.damp(mo.soft,flow,m.tau*(softHz+softSpan*(1-breath)),dt);
-    const n=mo.noise.next();
-    const src=mo.soft*mo.now.voice*(1-0.5*breath)+n*(mo.now.breath+breath*0.25*mo.now.voice*open);
+    // the breath, darkened: air through a throat, not a hiss
+    mo.air=m.damp(mo.air,mo.noise.next(),m.tau*airHz,dt);
+    const n=mo.air*airGain;
+    const src=voiceGain*mo.soft*mo.now.voice*(1-0.5*breath)+n*(mo.now.breath+breath*0.25*mo.now.voice*open);
     // through the nose's dip, then the mouth's resonances
     var x=src;
     if(mo.now.nasal>0.01){
@@ -587,7 +604,7 @@ const Mouth=struct{
       mo.nose.tune(270,100);
       x=m.lerp(x,mo.nose.step(mo.dip.step(x)),mo.now.nasal);
     }
-    const bws=[5]f32{60+mo.now.f[0]*0.06,90,140,b4,b5};
+    const bws=[5]f32{60+mo.now.f[0]*0.06,b2,b3,b4,b5};
     // the three lowest wandering a little, a mouth never quite still
     var fs=[5]f32{mo.now.f[0],mo.now.f[1],mo.now.f[2],f4,f5};
     for(0..3)|i|fs[i]*=1+shapeWander*mo.wander[i].step();
