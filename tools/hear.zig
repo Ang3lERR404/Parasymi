@@ -687,6 +687,12 @@ fn voicedFrames(fr:Frames)usize{
   }
   return n;
 }
+/// Claude's own ear, hearing by imagining saying it
+const ownear=@import("ownear");
+/// how much either side of whisper's word times the own ear takes (s)
+const wordPad:f32=0.04;
+/// the shortest word the own ear will guess (samples, 60 ms)
+const minWordSamples:usize=960;
 /// where a heard phrase goes
 const Send=enum{
   /// into the link folder, pushed to Claude by the bridge
@@ -722,6 +728,8 @@ const Ear=struct{
   count:u32=0,
   /// whether Claude's own voice played during this phrase
   overheard:bool=false,
+  /// Claude's own ear (tools/ownear.zig), guessing beside whisper
+  own:?*ownear.Ear=null,
   /// whether Claude's own voice is playing now (tools/speak.zig's mark)
   fn speaking(e:*Ear)bool{
     _=e.dir.statFile(e.io,speakingMark,.{}) catch return false;
@@ -759,6 +767,32 @@ const Ear=struct{
         e.overheard=false;
       },
     }
+  }
+  /// Claude's own ear on the phrase `x`: each word whisper marked is
+  /// guessed by its sound alone, the guesses written to `w` with how many
+  /// matched whisper's, then each word learned as the gardener's own
+  fn ownGuess(e:*Ear,arena:Allocator,own:*ownear.Ear,x:[]const f32,words:[]const Word,ms:i64,w:*Io.Writer)!void{
+    try w.writeAll(" [mine:");
+    // how many words were checked, and how many my ear got right
+    var checked:usize=0;
+    var right:usize=0;
+    for(words,0..)|wd,i|{
+      const plain=try ownear.plainWord(arena,wd.text);
+      if(plain.len==0)continue;
+      // the word's samples, a little either side (whisper's times are rough)
+      const a=m.floorTo(usize,@max(0,wd.start-wordPad)*m.f(rate));
+      const b=@min(x.len,m.floorTo(usize,(wd.end+wordPad)*m.f(rate)));
+      if(b<=a+minWordSamples)continue;
+      const seg=x[a..b];
+      const g=(try own.guess(arena,seg)) orelse continue;
+      checked+=1;
+      const ok=std.mem.eql(u8,g.word,plain);
+      if(ok)right+=1;
+      try w.print(" {s}{s}",.{g.word,if(ok)"" else "*"});
+      // learned as the gardener's own, whichever way the guess went
+      own.learn(e.io,plain,seg,try wavOf(arena,seg),ms*100+@as(i64,@intCast(i)))catch|err|print("could not learn {s}: {t}\n",.{plain,err});
+    }
+    try w.print(" ({d}/{d})]",.{right,checked});
   }
   /// a whole phrase heard: its words read by whisper, how it was said
   /// measured and written as sound, then sent through the link
@@ -799,6 +833,9 @@ const Ear=struct{
     try w.print("{s}{s} [{d:.1} s",.{aloud,said,m.f(x.len)/m.f(rate)});
     if(try pitchRange(arena,fr))|pr|try w.print(", {d:.0}-{d:.0} Hz",.{pr[0],pr[1]});
     try w.print(", heard/{d}]",.{ms});
+    // my own ear's guess of each word, checked against whisper's, and
+    // each of the gardener's words learned for next time
+    if(e.own)|own|try e.ownGuess(arena,own,x,words,ms,w);
     const msg=aw.written();
     print("heard: {s}\n",.{msg});
     if(e.send==.print)return;
@@ -839,12 +876,13 @@ pub fn main(init:std.process.Init)!void{
   const arena=init.arena.allocator();
   // whisper's folder: `--whisper=`, or `%USERPROFILE%\whisper`
   var base:[]const u8=try std.fmt.allocPrint(arena,"{s}\\whisper",.{init.environ_map.get("USERPROFILE") orelse "."});
-  // a recording heard instead of the microphone (`--file=`, printed only)
-  var file:?[]const u8=null;
+  // recordings heard instead of the microphone, one after another
+  // (`--file=`, as many as given; printed only, but the own ear learns)
+  var files:ArrayList([]const u8)=.empty;
   const args=try init.minimal.args.toSlice(arena);
   for(args[1..])|a|{
     if(startsWith(u8,a,"--whisper="))base=a["--whisper=".len..];
-    if(startsWith(u8,a,"--file="))file=a["--file=".len..];
+    if(startsWith(u8,a,"--file="))try files.append(arena,a["--file=".len..]);
   }
   const exe=try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,serverExe});
   const model=try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,modelFile});
@@ -856,15 +894,22 @@ pub fn main(init:std.process.Init)!void{
   try Dir.cwd().createDirPath(io,heardDir);
   var dir=try Dir.cwd().openDir(io,link.folder,.{});
   defer dir.close(io);
-  if(file)|path|{
-    // the recording, a frame at a time, then a breath of silence to end it
-    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print};
+  // Claude's own ear: every word in the voice's list said once to learn
+  // its sound, and every word of the gardener's learned before
+  var own=try ownear.Ear.init(gpa,io,try Dir.cwd().readFileAlloc(io,ownear.wordsPath,arena,.unlimited));
+  defer own.deinit();
+  print("my own ear knows {d} sound-prints ({d} of your voice)\n",.{own.prints.items.len,own.learnedCount()});
+  if(files.items.len>0){
+    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own};
     defer ear.samples.deinit(gpa);
-    const x=try samplesOf(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
-    var at:usize=0;
-    while(at+hop<=x.len):(at+=hop)try ear.frame(x[at..][0..hop]);
-    const quiet:[hop]f32=@splat(0);
-    for(0..endFrames+1)|_|try ear.frame(&quiet);
+    for(files.items)|path|{
+      // each recording, a frame at a time, then a breath of silence to end it
+      const x=try samplesOf(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
+      var at:usize=0;
+      while(at+hop<=x.len):(at+=hop)try ear.frame(x[at..][0..hop]);
+      const quiet:[hop]f32=@splat(0);
+      for(0..endFrames+1)|_|try ear.frame(&quiet);
+    }
     return;
   }
   // the microphone, mono at whisper's rate, with room for a slow answer
@@ -872,7 +917,7 @@ pub fn main(init:std.process.Init)!void{
   defer cap.close(io);
   if(!try cap.waitStreaming(io,timeout(5)))return error.NoMicrophone;
   print("listening ({d} Hz). talk to me~ (Ctrl+C stops)\n",.{cap.rate()});
-  var ear=Ear{.gpa=gpa,.io=io,.dir=dir};
+  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own};
   defer ear.samples.deinit(gpa);
   // one frame's samples
   var buf:[hop]f32=undefined;

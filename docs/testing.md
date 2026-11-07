@@ -250,7 +250,18 @@ to voice, rather than typing in turns.
   ticked at the top) and `<ms>.txt` (each word's time, length, loudness
   and pitch).
 - `zig build hear -- --file=<16 kHz mono wav>` hears a recording instead
-  of the microphone and only prints what it heard, for trying changes.
+  of the microphone and only prints what it heard, for trying changes
+  (`--file=` may be given many times, heard one after another).
+- **Claude's own ear** (`tools/ownear.zig`) guesses each word beside
+  whisper: every word in the voice's list is said once in Claude's own
+  voice (`tools/speak.zig`) and its sound-print kept (mel cepstra); a heard
+  word is matched against them all, stretched in time (dynamic time
+  warping) and slid in pitch scale. Each word whisper marks is then
+  learned as one of the gardener's own sound-prints (`link/ear/<word>/`,
+  six a word kept). The message ends `[mine: ... (right/checked)]`, a
+  `*` on each word it got wrong. First replay of the gardener's 56
+  phrases from 2026-11-07: 16 of 325 words, near chance; it learns
+  from here.
 
 ## Screenshots, unattended
 Add `--inspect=<same species/kind>` and shape the orbit, e.g.

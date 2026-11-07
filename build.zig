@@ -240,6 +240,15 @@ pub fn build(b:*Build)!void{
   speakCmd.setCwd(b.path("."));
   if(b.args)|args|speakCmd.addArgs(args);
   b.step("speak","say something in Claude's own voice.").dependOn(&speakCmd.step);
+  // Claude's own ear (tools/ownear.zig): hears a word by imagining saying
+  // it in the voice above, and learns the gardener's; the ear uses it
+  const ownearMod=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/ownear.zig"),
+    .imports=&.{.{.name="engine",.module=engine},.{.name="speak",.module=speakMod}},
+  });
+  hearMod.addImport("ownear",ownearMod);
   // the sound check (tools/audiocheck.zig): plays a tone and records it
   // back, so it needs real speakers and stays out of `test`
   // the sound check executable: it needs only the engine
@@ -327,6 +336,8 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
+  // Claude's own ear's tests (its transform, a word matched stretched)
+  testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=ownearMod,.filters=filters})).step);
   // the voice's tests (reading sounds, resonances, pitch, closes)
   testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=speakMod,.filters=filters})).step);
   // the ear's tests (breaths, pitch, words, sound written as text)
