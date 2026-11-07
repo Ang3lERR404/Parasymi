@@ -159,6 +159,14 @@ carries the game's early days.
   the **vesper** opens only at dusk, as a moonflower does; **the Pulse**
   folds its mimosa fronds shut every night, as a real mimosa does. Kept,
   not built.
+- **The wolf keeps the night too** (the gardener and Claude, 2026-11-06).
+  At night he yawns now and then, with a sound: breath through a mouth
+  opening wide (soft noise sliding from "hh" to a long "ahh" and back,
+  shaped as the footsteps' noise is), ending in a small deep, gruff
+  rumble of his own. Left alone long enough at night, he lies down and
+  sleeps on his side as on the main menu. And the main menu's sleep clip
+  (`src/anim/sleep.anim`) hardly moves: it wants a sleeper's life
+  (breathing, an ear twitch, a shift). Kept, not built.
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
