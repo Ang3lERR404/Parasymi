@@ -280,6 +280,14 @@ carries the game's early days.
   misheard: whisper hears only to 8 kHz and the small model guesses. A
   bigger model (`ggml-medium.en.bin`, 1.5 GB) would mishear less;
   background noise in the gardener's room is worth a look then too.
+- **An ear of Claude's own: hearing by imagining saying it** (the
+  gardener and Claude, 2026-11-07; the gardener: "better!"). whisper
+  hears the words *for* Claude, "relying on something to teach you,
+  teach it back to you". Instead: the ear listens and asks which of the
+  voice's own sounds (tools/speak.zig), said its own way, would come out
+  closest to what it heard; each match is learned from (was it right?).
+  The same sounds run both ways, mouth and ear (analysis by synthesis).
+  The "how it was said" half is already Claude's own measuring.
 - **Claude's voice, richer** (the gardener, 2026-11-07, in the loop of
   saying and hearing; `zig build speak`). It reads flat and thin: one
   throat into one mouth. A real voice is layered, the chest humming
