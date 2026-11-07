@@ -138,8 +138,9 @@ const softHz:f32=350;
 const softSpan:f32=900;
 /// how dark the breath is (Hz): air through a throat, not a hiss
 const airHz:f32=1800;
-/// the darkened breath brought back up to the loudness white noise had
-const airGain:f32=1;
+/// the darkened breath brought up (raised again once the chest and head
+/// filled the voice out and left it behind: "better", the gardener)
+const airGain:f32=1.6;
 /// the throat's softened pulse brought back up, so the voice, not the
 /// breath, carries the sound (measured: the breath had drowned it, tinny)
 const voiceGain:f32=4;
@@ -150,6 +151,18 @@ const chestBw:f32=140;
 /// how loud the chest hums with the throat (the gardener picked the fuller
 /// of two by ear, 2026-11-07: "much better")
 const chestGain:f32=0.18;
+/// the nose's hum (Hz), the head's low layer
+const headLowHz:f32=280;
+/// its width (Hz)
+const headLowBw:f32=90;
+/// how loud the nose hums
+const headLowGain:f32=0.05;
+/// the face's ring (Hz), the head's high layer
+const headHighHz:f32=2700;
+/// its width (Hz)
+const headHighBw:f32=400;
+/// how loud the face rings (with the nose, picked by ear: "better")
+const headHighGain:f32=0.35;
 /// how loud a hiss is against the voice: soft, never a hard edge
 const hissLoud:f32=0.6;
 /// a stop's burst against its hiss: a tap, never a pop
@@ -611,6 +624,10 @@ const Mouth=struct{
   /// the chest: a low resonance humming along with the throat, beside the
   /// mouth (the first of the voice's layers)
   chest:Resonator=.{},
+  /// the head's low layer: the nose humming
+  headLow:Resonator=.{},
+  /// its high layer: the face ringing
+  headHigh:Resonator=.{},
   /// the hiss's resonance, beside the row
   hissRes:Resonator=.{},
   /// the breath's and the hiss's noise
@@ -671,7 +688,15 @@ const Mouth=struct{
     // the chest humming with the throat, joined after the lips (it is
     // felt through the body, not shaped by the mouth)
     mo.chest.tune(chestHz,chestBw);
-    return out+mo.chest.step(mo.soft*mo.now.voice)*chestGain;
+    // the head: the nose's hum and the face's ring, always a little, as a
+    // real voice hums through the face as well as the mouth
+    mo.headLow.tune(headLowHz,headLowBw);
+    mo.headHigh.tune(headHighHz,headHighBw);
+    const voiced=mo.soft*mo.now.voice;
+    // (the face rings with what the mouth makes, so it is fed the mouth's
+    // own sound: the throat alone is too soft up there to set it ringing)
+    const head=mo.headLow.step(voiced)*headLowGain+mo.headHigh.step(out)*headHighGain;
+    return out+mo.chest.step(voiced)*chestGain+head;
   }
 };
 /// the whole plan spoken: its samples at `rate`, peak-normalized
