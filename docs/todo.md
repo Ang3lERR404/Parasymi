@@ -195,6 +195,18 @@ carries the game's early days.
   glowing heart, and light pulsing through the veins of its petals.
 
 ## Small things
+- **Notes and memories that disagree, to go through with the gardener**
+  (found by the comment sweep, 2026-11-06; neither side changed yet, as
+  neither end is trusted blindly): (1) the cfg string `unforming.desc`
+  says "What the polyp dreams of", but the event launches from the
+  diamond; (2) memory `polyp-woven-look.md` says the halo still needs the
+  polyp in code, but the code forms it from four blooms alone;
+  (3) memory `zig-refactor-rules.md` says "bump save.VERSION", against
+  CLAUDE.md's never-bump rule; (4) the driftwisp header says "sap float
+  holding up a catcher dish", while the todo moves its body to radiant
+  fragments (the code still uses sap); (5) the seed-splicing research
+  says the vesper is "spliced from both lineages", though the vesper is
+  radiant (still how it is made).
 - **A field-of-view option, later.** The camera's fields of view are fixed
   in `engine/src/render/camera.zig` (first person 1.1 rad tall, about 97°
   wide at 16:9). The gardener sees wide (about 90° each side) and plays
