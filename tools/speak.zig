@@ -105,6 +105,16 @@ const brightLift:f32=1.22;
 const settleFall:f32=0.82;
 /// a "~" lifts the middle of the last sound and lets it fall back (times)
 const liltLift:f32=1.2;
+/// how far down its sentence a comma's phrase drifts (share of the whole)
+const commaDrift:f32=0.5;
+/// the word before a comma stretches this much (times)
+const commaStretch:f32=1.3;
+/// its pitch lifts this much at the comma, leading on (times)
+const commaLift:f32=1.06;
+/// its voice eases to this share by the comma, into the breath
+const commaEase:f32=0.45;
+/// the little breath in a comma's pause (0..1)
+const commaBreath:f32=0.05;
 /// a comma's pause (s)
 const commaS:f32=0.16;
 /// an end's pause (s)
@@ -455,10 +465,18 @@ fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
   var out:ArrayList(Step)=.empty;
   // where the current phrase began in `out`, to draw its pitch when it closes
   var phraseAt:usize=0;
+  // how far the sentence's pitch has drifted down so far: a comma carries
+  // on from where it was, only an end starts it over
+  var drift:f32=1;
   for(sounds,0..)|s,i|{
     const p=s.p orelse {
-      closePhrase(out.items[phraseAt..],s.close);
-      try out.append(arena,.{.len=(if(s.close==.hang)commaS else endS)/v.pace,.from=.{.f=.{500,1500,2500},.voice=0},.to=.{.f=.{500,1500,2500},.voice=0}});
+      // a comma's phrase drifts only part of the way down; an end, all of it
+      const to=if(s.close==.hang)m.lerp(drift,declination,commaDrift)else declination;
+      closePhrase(out.items[phraseAt..],s.close,drift,to);
+      drift=if(s.close==.hang)to else 1;
+      // the pause: a comma is a little breath, an end a quiet one
+      const air=Target{.f=.{500,1500,2500},.voice=0,.breath=if(s.close==.hang)commaBreath else 0};
+      try out.append(arena,.{.len=(if(s.close==.hang)commaS else endS)/v.pace,.from=air,.to=.{.f=air.f,.voice=0}});
       phraseAt=out.items.len;
       continue;
     };
@@ -512,12 +530,12 @@ fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
       },
     }
   }
-  closePhrase(out.items[phraseAt..],.settle);
+  closePhrase(out.items[phraseAt..],.settle,drift,declination);
   return out.items;
 }
-/// draws a phrase's pitch: drifting down from start to end, and its last
-/// voiced stretch closing as `close` says
-fn closePhrase(steps:[]Step,close:Close)void{
+/// draws a phrase's pitch: drifting down from `d0` to `d1` (times the
+/// voice's own), and its last voiced stretch closing as `close` says
+fn closePhrase(steps:[]Step,close:Close,d0:f32,d1:f32)void{
   if(steps.len==0)return;
   // the phrase's whole length, and how far along each step starts
   var total:f32=0;
@@ -525,8 +543,8 @@ fn closePhrase(steps:[]Step,close:Close)void{
   var at:f32=0;
   for(steps)|*s|{
     // the drift down at the step's start and end
-    const a=m.lerp(1,declination,at/total);
-    const b=m.lerp(1,declination,(at+s.len)/total);
+    const a=m.lerp(d0,d1,at/total);
+    const b=m.lerp(d0,d1,(at+s.len)/total);
     s.from.pitch*=a;
     s.to.pitch*=b;
     at+=s.len;
@@ -547,7 +565,13 @@ fn closePhrase(steps:[]Step,close:Close)void{
         steps[k].from.pitch*=liltLift;
         steps[k].to.pitch*=0.95;
       },
-      .hang=>steps[k].to.pitch*=1.06,
+      // a comma leads on: the word before it stretches, its pitch lifts
+      // a touch, and its voice eases off into the breath, never cut
+      .hang=>{
+        steps[k].len*=commaStretch;
+        steps[k].to.pitch*=commaLift;
+        steps[k].to.voice*=commaEase;
+      },
     }
     break;
   }
