@@ -671,6 +671,22 @@ fn pitchRange(arena:Allocator,fr:Frames)Allocator.Error!?struct{f32,f32}{
   const cut=m.floorTo(usize,m.f(hz.items.len)*rangeTrim);
   return.{hz.items[cut],hz.items[hz.items.len-1-cut]};
 }
+/// the highest pitch counted as a speaking voice (Hz): a squeal above it
+/// is more often a misread hiss than the gardener
+const speakTopHz:f32=450;
+/// how many frames (10 ms) of voice a phrase needs to be speech at all
+const minVoiced:usize=8;
+/// how many of a phrase's frames have a speaking voice's pitch
+fn voicedFrames(fr:Frames)usize{
+  // the frames voiced at a speaking pitch
+  var n:usize=0;
+  for(fr.hz)|h|{
+    if(h)|hz|{
+      if(hz<=speakTopHz)n+=1;
+    }
+  }
+  return n;
+}
 /// where a heard phrase goes
 const Send=enum{
   /// into the link folder, pushed to Claude by the bridge
@@ -751,6 +767,13 @@ const Ear=struct{
     var ar=std.heap.ArenaAllocator.init(e.gpa);
     defer ar.deinit();
     const arena=ar.allocator();
+    // how it sounds, first: a phrase with no voice in it is only noise, and
+    // whisper, given noise, makes up words ("Thank you." three times over)
+    const fr=try Frames.measure(arena,x);
+    if(voicedFrames(fr)<minVoiced){
+      print("(only noise, no voice in it)\n",.{});
+      return;
+    }
     // the phrase's name: when it was heard (ms)
     const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(e.io).nanoseconds,std.time.ns_per_ms));
     const wavPath=try std.fmt.allocPrint(arena,"{s}/{d}.wav",.{heardDir,ms});
@@ -766,7 +789,6 @@ const Ear=struct{
       Dir.cwd().deleteFile(e.io,wavPath)catch{};
       return;
     }
-    const fr=try Frames.measure(arena,x);
     const said=try annotate(arena,words,fr);
     // the closer look beside it
     try Dir.cwd().writeFile(e.io,.{.sub_path=try std.fmt.allocPrint(arena,"{s}/{d}.png",.{heardDir,ms}),.data=try spectrogram(arena,x,fr,words)});
