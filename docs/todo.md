@@ -85,6 +85,16 @@ carries the game's early days.
   writhe and creep inward toward a centre, laying a veiny web along the
   ground as they grow; what rises from there depends on the plant. Kept
   in mind, not built.
+- **The Hirusidandrath grows as a leech** (the gardener and Claude,
+  2026-11-06, sketched and agreed "1:1"). Today it rises from a point
+  like any plant and reads as an ornament (a candelabrum, a wire cage),
+  telling no leech's story. Its growth instead: five pale roots burst up
+  in a ring round where it will stand; they writhe inward to its centre,
+  veining the ground as they go; where they meet they braid both ways and
+  climb as its stalk, parting into the cage (the cage *is* its roots);
+  its sacs fill with pale-blue sap in plain view as it drinks; the crown
+  of five lifts last, its pods at the tips. Grown, the veins on the
+  ground stay, faintly pulsing toward what it drains.
   *Its look, shaped as a chin wag* (the gardener, 2026-11-06; a first
   draft sculpt in `src/mesh/thepulse.mesh`: parasite cage, sap heart,
   mimosa fronds, pink pom-poms). The feeling: a beating heart, uncannily
