@@ -1,7 +1,8 @@
 //! THE UNFORMING: the garden's first world event, begun the moment the
 //! study of that name is learned. Every radiant plant (the celestial
-//! bloom, the vesper) glitches, shatters like glass and blinks out of
-//! reality, one after another; what they were streams up as shards to one
+//! bloom, the vesper, the lumi lantern, every one of the lineage)
+//! glitches, shatters like glass and blinks out of reality, one after
+//! another; what they were streams up as shards to one
 //! point in the sky over the middle of them all, where it gathers into a
 //! seed, which falls to the ground and lies there, never planting itself
 //! (a `strangeSeed` the wolf may pick up). The symbiotic and parasitic

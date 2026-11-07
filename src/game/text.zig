@@ -167,9 +167,9 @@ pub const Strings=struct{
     arsthraxiaGrows:S="",
     /// a germinator is set to a new weave (`{0}`)
     germinatorWeaves:S="",
-    /// four blooms close a polyp's ring and it draws them in
+    /// four blooms close a ring and their light draws in
     haloForms:S="",
-    /// the blooms become one: a diamond floats over the polyp
+    /// the blooms become one: a diamond floats at their heart
     diamondForms:S="",
     /// after the diamond: celestial defragmentation may be studied
     latticeStirs:S="",

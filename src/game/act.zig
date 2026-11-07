@@ -1,5 +1,5 @@
 //! the garden's two acts. In the first the gardener is the wolf; in the
-//! second (once the wolf roots himself into the garden's tree, not yet in
+//! second (once the wolf takes root and becomes the garden's tree, not yet in
 //! the game: `--act2` begins there) it is the star hyena, a living
 //! constellation who never walks but hovers over the ground, with only the
 //! convergent lineage and the constellate one to work with. Which act a

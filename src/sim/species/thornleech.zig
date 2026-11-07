@@ -3,6 +3,10 @@
 //! hanging inside, a crown of five fronds each ending in a small cage of
 //! its own). Drains every non-parasitic neighbour and the ley beneath it;
 //! yields more, at their expense.
+//! An older draft: the agreed design drinks its living neighbours' sap
+//! through veins it lays on the ground, taking what they have too much of,
+//! and grows as a leech, roots first (docs/todo.md, "The Hirusidandrath
+//! grows as a leech").
 const lib=@import("../../lib.zig");
 /// the species registry: what a species is
 const species=lib.species;

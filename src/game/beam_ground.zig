@@ -15,7 +15,7 @@ const sky=lib.sky;
 /// the chance a whole night's beam on one moss tile turns it to a ley line
 pub const chance:f32=0.01;
 /// how long the beam falls in a night, as a share of a whole day (the
-/// darkest third, about as long as stars fall)
+/// night's darkest third)
 const nightShare:f32=1.0/3.0;
 /// one tick (`dt` s): every beam on bare moss may turn it to a ley line,
 /// at `chance` a night, by how strong the beam is

@@ -71,7 +71,8 @@ const techs=struct{
   pub const latticeOfThought=@import("research/lattice_of_thought.zig");
   /// loomferns and gathering crowns
   pub const livingLooms=@import("research/living_looms.zig");
-  /// lithophages and ganglia: parasites feeding on stone
+  /// lithophages, parasites feeding on stone, and ganglia, sharing out
+  /// what they are fed
   pub const lithophagy=@import("research/lithophagy.zig");
   /// braided conduits, four lanes in one weave
   pub const braidedRoots=@import("research/braided_roots.zig");

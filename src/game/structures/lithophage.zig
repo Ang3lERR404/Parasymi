@@ -1,4 +1,6 @@
-//! LITHOPHAGE: the root-digger's upgrade, a parasite that eats stone. It
+//! LITHOPHAGE: the parasites' stone-eater, the yang that takes the ground
+//! in (no kin of the root-digger, a symbiote that only works its nodes:
+//! two lineages, two ways of gathering). It
 //! grows as a stone coral, half plant, half mineral, and sends its tendrils
 //! out over a radius round it: each runs under the ground near it (a line
 //! of glowing cracks), surfaces further out as a pale coral runner creeping
@@ -14,6 +16,9 @@
 //! after 45 ...). Its coral grows on as it does, a tier of new growth for
 //! each tile it reaches further (gfx/meshes/lithophage.zig), its last tier
 //! creeping on ever more slowly.
+//! An older draft: the agreed design has the stone it eats become its own,
+//! eaten nodes living on as its outposts (docs/todo.md, "The lithophage
+//! turns the stone it eats into itself"); today it draws them off as grit.
 // decision: it is fed ley shards only: grit it holds is always grit it
 // has sapped (what leaves it), never grit it would eat again
 // decision: a ley shard is worth three grit whether a tendril draws it

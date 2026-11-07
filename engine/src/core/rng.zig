@@ -43,7 +43,7 @@ pub const Rng=struct{
   /// the next 64 random bits, stepping the state on
   pub fn next(r:*Rng)u64{r.s+%=goldenStep;return mix64(r.s);}
   /// decision: bits 8..31 of the output, as every grown mesh and the
-  /// starfall were tuned against; changing them reshapes every plant.
+  /// retired starfall were tuned against; changing them reshapes every plant.
   pub fn float(r:*Rng)f32{return unit(@truncate(r.next()));}
   /// a random float between `lo` and `hi` (`hi` itself never drawn)
   pub fn range(r:*Rng,lo:f32,hi:f32)f32{return lo+(hi-lo)*r.float();}

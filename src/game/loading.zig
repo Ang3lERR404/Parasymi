@@ -44,7 +44,8 @@ pub const Progress=struct{
 };
 /// the night behind everything: its colour (opaque)
 const night:Color=.{14,12,22,255};
-/// the night's seed, so its stars fall the same way each time
+/// the night's seed, so its clouds, sap veins and rising spores drift the
+/// same way each time
 const nightSeed:f32=0.37;
 /// the tendril: its share of the screen's width (at most `barMax` px); the
 /// name sits `titleUp` over it, the stage and counts `labelDown` under it

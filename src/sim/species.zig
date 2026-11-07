@@ -59,14 +59,15 @@ pub const count=reg.count;
 pub const ids=reg.ids;
 /// which path a plant walks
 pub const Lineage=enum(u8){
-  /// the sharers: they feed their neighbours
+  /// the sharers, the yin: they feed their neighbours
   symbiotic,
-  /// the takers: they drain their neighbours
+  /// the takers, the yang (the active half, never evil): they drain their
+  /// neighbours
   parasitic,
   /// both at once: the first step toward the eventual merge of the two paths.
   convergent,
   /// the sky's: gathered from light, never grown (the celestial bloom, the
-  /// vesper, the diamond)
+  /// vesper, the lumi lantern, the solcyriphon and their kin, the diamond)
   radiant,
   /// shader-side scalar: +1 symbiotic, -1 parasitic, 0 convergent or radiant.
   pub fn affinity(l:Lineage)f32{
