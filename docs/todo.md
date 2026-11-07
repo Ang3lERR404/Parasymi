@@ -136,6 +136,19 @@ carries the game's early days.
   few of the heart's own old leaves still poke out between, withered,
   curled, brown-green, what is left of the symbiote. At the unforming
   the net closes whole and they become one (convergent).
+- **The lithophage turns the stone it eats into itself** (the gardener
+  and Claude, 2026-11-06, sketched and agreed "absolutely as I
+  imagined it"). The stone never crumbles: it is *taken*, becoming the
+  lithophage's own. It happens at the mineral nodes its tendrils reach,
+  so the player watches it eat and every meal leaves a mark: pale veins
+  crack up through the node like frost; its colour (the parasites' pale
+  lilac) seeps in behind them, a rising front; then the surface softens
+  and lifts into lobed growth, buds ripening on its lobes, while the
+  stone's old outline stays faintly there underneath, as if the rock
+  remembers what it was. Eaten through, a node is not a husk: it stays
+  alive as an outpost, joined back to the lithophage by the glowing
+  veins under the ground and pulsing in time with it (yang: a grower
+  that spreads by taking stone in, never a destroyer; agreed "1:1").
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
