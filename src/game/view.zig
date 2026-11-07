@@ -608,6 +608,11 @@ const beamMidReach:f32=3.5;
 const beamShimmer:f32=0.15;
 /// (its pace)
 const beamShimmerRate:f32=2.3;
+/// how far over the ground the beam's landing light sits (m)
+const beamLandLift:f32=0.3;
+/// how far apart (a share of a light's seed) the light halfway down
+/// breathes from where the beam lands
+const beamMidBeat:f32=0.5;
 /// the beam's gold, the light it throws (linear)
 const beamCol=m.V3{1.0,0.78,0.45};
 /// how far below a solcyriphon's heart its beam leaves (m: under its lens)
@@ -651,12 +656,13 @@ fn shafts(g:*Game,tf:f32)Allocator.Error!void{
     const to=if(bm.into)|r|(nodeEnd(g,r,tf) orelse m.v3(top[0],ground,top[2]))else m.v3(top[0],ground,top[2]);
     // the four control points, straight down
     const ctrl=m.straightCubic(top,to,m.splat3(0));
-    try g.parts.emitCurve(.lightBeam,ctrl,m.v3(1,0,0),1,1,.{.glow=beamGlow*bm.k,.flutter=beamHalf,.phase=s.items(.seed)[i],.fade=0});
+    // its seed, its flutter's phase and its light's breath
+    const seed=s.items(.seed)[i];
+    try g.parts.emitCurve(.lightBeam,ctrl,m.v3(1,0,0),1,1,.{.glow=beamGlow*bm.k,.flutter=beamHalf,.phase=seed,.fade=0});
     // its light breathes as the beam flutters, where it lands a beat apart
     // from halfway down
-    const seed=s.items(.seed)[i];
-    try g.parts.light(to+m.v3(0,0.3,0),beamCol*m.splat3(beamLand*bm.k*m.shimmer(tf,seed,beamShimmer,beamShimmerRate)),beamLandReach);
-    try g.parts.light(m.lerpV(top,to,0.5),beamCol*m.splat3(beamMid*bm.k*m.shimmer(tf,seed+0.5,beamShimmer,beamShimmerRate)),beamMidReach);
+    try g.parts.light(to+m.v3(0,beamLandLift,0),beamCol*m.splat3(beamLand*bm.k*m.shimmer(tf,seed,beamShimmer,beamShimmerRate)),beamLandReach);
+    try g.parts.light(m.lerpV(top,to,0.5),beamCol*m.splat3(beamMid*bm.k*m.shimmer(tf,seed+beamMidBeat,beamShimmer,beamShimmerRate)),beamMidReach);
   }
   for(l.strips.items)|sp|{
     // the heliocyra, its kind, the way it faces and the step along it

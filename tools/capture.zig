@@ -67,6 +67,21 @@ const minusEnd:i32=102;
 const secondsEnd:i32=160;
 /// (+ ends)
 const plusEnd:i32=188;
+/// the band's words: how far below its top they sit (pixels)
+const wordsTop:i32=2;
+/// (how far in each word sits from where its stretch begins: REC, -, the
+/// seconds, + and the status)
+const recIn:i32=10;
+/// (- sits this far back from where it ends)
+const minusBack:i32=20;
+/// (the seconds)
+const secondsIn:i32=6;
+/// (+)
+const plusIn:i32=8;
+/// (the status)
+const statusIn:i32=10;
+/// the line between REC and the rest (pixels)
+const recLine:i32=2;
 /// a corner's grip reaches this far along its edges (pixels)
 const cornerReach:i32=18;
 /// the smallest the frame may be (pixels)
@@ -332,6 +347,12 @@ const win=struct{
   const srcCopy:u32=0x00CC0020;
   /// words drawn over what is there
   const transparentBk:i32=1;
+  /// a font's weight: semibold
+  const semiBold:i32=600;
+  /// a font's character set: the default one
+  const defaultCharset:u32=1;
+  /// a font's quality: ClearType
+  const clearType:u32=5;
   /// DPI awareness: every pixel a real one, on every screen
   const perMonitorV2:isize=-4;
   /// a message box that warns
@@ -626,17 +647,17 @@ fn draw(a:*App,h:Handle)void{
   _=FillRect(dc,&.{.left=0,.top=c.bottom-border,.right=c.right,.bottom=c.bottom},edge);
   _=FillRect(dc,&.{.left=0,.top=0,.right=c.right,.bottom=border},edge);
   _=FillRect(dc,&.{.left=border,.top=border,.right=c.right-border,.bottom=band},bed);
-  _=FillRect(dc,&.{.left=border+recEnd-2,.top=border,.right=border+recEnd,.bottom=band},edge);
+  _=FillRect(dc,&.{.left=border+recEnd-recLine,.top=border,.right=border+recEnd,.bottom=band},edge);
   _=SetBkMode(dc,win.transparentBk);
   if(a.font)|f|_=SelectObject(dc,f);
   // the words' line
-  const y=border+2;
-  words(dc,border+10,y,if(a.recording.load(.acquire))recCol else restCol,"REC (F9)");
-  words(dc,border+minusEnd-20,y,textCol,"-");
+  const y=border+wordsTop;
+  words(dc,border+recIn,y,if(a.recording.load(.acquire))recCol else restCol,"REC (F9)");
+  words(dc,border+minusEnd-minusBack,y,textCol,"-");
   var sb:[16]u8=undefined;
-  words(dc,border+minusEnd+6,y,textCol,bufPrint(&sb,"{d:.1} s",.{a.seconds})catch"");
-  words(dc,border+secondsEnd+8,y,textCol,"+");
-  words(dc,border+plusEnd+10,y,dimCol,a.status[0..a.statusLen]);
+  words(dc,border+minusEnd+secondsIn,y,textCol,bufPrint(&sb,"{d:.1} s",.{a.seconds})catch"");
+  words(dc,border+secondsEnd+plusIn,y,textCol,"+");
+  words(dc,border+plusEnd+statusIn,y,dimCol,a.status[0..a.statusLen]);
 }
 /// opens the frame over the screen and answers it until it is closed
 pub fn main(init:std.process.Init)!void{
@@ -652,7 +673,7 @@ pub fn main(init:std.process.Init)!void{
   _=SetWindowLongPtrW(h,win.userData,@bitCast(@intFromPtr(&app)));
   _=SetLayeredWindowAttributes(h,keyCol,255,win.colorKey);
   _=SetWindowDisplayAffinity(h,win.excludeFromCapture);
-  app.font=CreateFontW(fontH,0,0,0,600,0,0,0,1,0,0,5,0,wide("Segoe UI"));
+  app.font=CreateFontW(fontH,0,0,0,win.semiBold,0,0,0,win.defaultCharset,0,0,win.clearType,0,wide("Segoe UI"));
   defer if(app.font)|f|{_=DeleteObject(f);};
   if(RegisterHotKey(h,hotkeyId,win.noRepeat,win.f9)==0)app.say("F9 is taken elsewhere: use REC",.{});
   _=ShowWindow(h,win.show);

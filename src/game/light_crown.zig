@@ -63,6 +63,8 @@ const shedReach:f32=2.4;
 const shedShimmer:f32=0.15;
 /// (its pace)
 const shedShimmerRate:f32=1.4;
+/// the shine at which the shed light has eased fully in
+const shedFull:f32=0.3;
 /// the design a structure of seed `seed` wears: one of the few, as at
 /// random, the same every time
 pub fn designOf(seed:f32)Design{
@@ -104,7 +106,7 @@ pub fn wear(s:*const Structure,out:*Parts,ctr:m.V3,t:f32)Allocator.Error!void{
     inline else=>|k|meshes[@intFromEnum(k)],
   };
   try out.emit(id,m.chain(&.{m.translate(at),m.scale3(m.splat3(width))}),.{.glow=glow*s.shine,.phase=s.seed});
-  try out.light(at,shed*m.splat3(m.smooth(m.clamp01(s.shine/0.3))*s.shine*m.shimmer(t,s.seed,shedShimmer,shedShimmerRate)),shedReach*m.f(d.size));
+  try out.light(at,shed*m.splat3(m.smooth(m.clamp01(s.shine/shedFull))*s.shine*m.shimmer(t,s.seed,shedShimmer,shedShimmerRate)),shedReach*m.f(d.size));
 }
 test"a seed's crown is one of the designs, and every design has a seed"{
   for(0..100)|i|_=designOf(m.ratio(i,100));
