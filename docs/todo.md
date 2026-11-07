@@ -167,6 +167,13 @@ carries the game's early days.
   sleeps on his side as on the main menu. And the main menu's sleep clip
   (`src/anim/sleep.anim`) hardly moves: it wants a sleeper's life
   (breathing, an ear twitch, a shift). Kept, not built.
+  *The yawn needs a real mouth first* (agreed "1:1"): the wolf has a jaw
+  bone (panting opens it a little), but its forms are melted into the
+  muzzle as one surface (`gfx/meshes/wolf_body.zig`, blended within
+  0.012), so opening it stretches the skin instead of parting lips. The
+  melt that keeps him seamless fuses anything tucked that close; a mouth
+  needs a gap kept open with an inside behind it. He was built before a
+  mouth had to open (the old model).
 - **The loss should sting.** The more act 1's plants helped, the harder
   their death at the unforming should hit. *The shaped answer* (the
   gardener, 2026-11-05): after the unforming, faint ghost outlines of the
