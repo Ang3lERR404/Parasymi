@@ -82,8 +82,9 @@ When a change alters what one of these says, update it in the same commit.
   the look (verify as usual); (3) round the code out into dedicated
   "class" modules (a struct type with its methods) where it is most
   likely to be reused. Commit the sweep (verified), then push.
-- **Reports**: a short list of changes; a real deviation or blocker as one
-  bullet.
+- **Reports**: written for the gardener, as the shared memories say how
+  (`~/Documents/Claude/memory/`: who they are, how they read, how we talk;
+  they grow, so follow them over any copy kept here).
 
 ## Build and run
 ```
