@@ -682,34 +682,6 @@ fn madeUp(arena:Allocator,words:[]const Word,fr:Frames)Allocator.Error!bool{
   std.mem.sort(f32,db,{},std.sort.asc(f32));
   return db[m.floorTo(usize,m.f(db.len)*0.9)]<faintDb;
 }
-/// how close to its middle pitch (or an octave of it) a frame counts as
-/// unmoved (semitones)
-const steadySt:f32=0.3;
-/// a wordless sound this steady is the room, not the gardener: a voice
-/// always wavers, but a machine's hum sits dead still (2026-11-07: a hum
-/// at 116-117 Hz flipping to its octave, 231 Hz, came through as "(a
-/// little sound)" while the gardener was silent; their own sounds were
-/// 18-56% steady even counted loosely, at half a semitone)
-const humShare:f32=0.9;
-/// the share of a sound's voiced frames within `steadySt` of their middle
-/// pitch, an octave up or down counted as the same note (0..1)
-fn steadiness(arena:Allocator,fr:Frames)Allocator.Error!f32{
-  // the voiced frames' pitches
-  var hz:ArrayList(f32)=.empty;
-  for(fr.hz)|h|{
-    if(h)|v|try hz.append(arena,v);
-  }
-  if(hz.items.len==0)return 0;
-  std.mem.sort(f32,hz.items,{},std.sort.asc(f32));
-  const mid=hz.items[hz.items.len/2];
-  // the frames that never moved off the middle's note
-  var still:usize=0;
-  for(hz.items)|v|{
-    const d=stPerOctave*@log2(v/mid);
-    if(@abs(d-stPerOctave*@round(d/stPerOctave))<=steadySt)still+=1;
-  }
-  return m.ratio(still,hz.items.len);
-}
 /// how long whisper may lie idle before it sleeps, its GPU memory freed
 /// (10 min; the gardener's pick, 2026-11-07: woken again by a voice)
 const whisperRestMs:i64=10*60*1000;
@@ -1062,15 +1034,6 @@ const Ear=struct{
       return;
     }
     const wordless=found.len==0;
-    // a wordless sound that never wavers is the room's hum, not the gardener
-    if(wordless){
-      const s=try steadiness(arena,fr);
-      if(s>=humShare){
-        print("(the room's hum, not you: {d:.0}% dead steady)\n",.{s*100});
-        Dir.cwd().deleteFile(e.io,wavPath)catch{};
-        return;
-      }
-    }
     const words:[]const Word=if(wordless)&.{.{.text=littleSound,.start=0,.end=m.f(x.len)/m.f(rate)}}else found;
     const said=try annotate(arena,words,fr);
     // the closer look beside it
@@ -1411,20 +1374,6 @@ test "a voice's pitch is found, not an octave off" {
     last=n;
   }
   try testing.expectEqual(@as(?f32,null),pitchAt(&x));
-}
-test "a hum that never wavers is the room, a wavering squeak is the gardener" {
-  var ar=std.heap.ArenaAllocator.init(testing.allocator);
-  defer ar.deinit();
-  const arena=ar.allocator();
-  const n=120;
-  const fr=Frames{.db=try arena.alloc(f32,n),.hz=try arena.alloc(?f32,n)};
-  @memset(fr.db,-66);
-  // the room: 117 Hz, flipping to its octave now and then, as heard
-  for(fr.hz,0..)|*h,i|h.*=if(i%10<7)117 else 231;
-  try testing.expect(try steadiness(arena,fr)>=humShare);
-  // the gardener: a squeak gliding up and wobbling back, never still
-  for(fr.hz,0..)|*h,i|h.*=600*@exp2(m.f(i%40)/40+0.08*@sin(m.f(i)));
-  try testing.expect(try steadiness(arena,fr)<humShare);
 }
 test "whisper's stock line over a faint hiss is made up, a loud one is said" {
   var ar=std.heap.ArenaAllocator.init(testing.allocator);
