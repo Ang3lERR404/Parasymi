@@ -18,6 +18,8 @@ const std=@import("std");
 const engine=@import("engine");
 /// the game's hub, for the link folder's names and how a message is written
 const lib=@import("parasymi");
+/// the tools' shared sound files and spectra
+const audio=@import("audio");
 /// the meeting place shared with the bridge
 const link=lib.link;
 /// the Windows audio binding: the microphone
@@ -42,8 +44,6 @@ const Allocating=Io.Writer.Allocating;
 const print=std.debug.print;
 /// reads the server's answer
 const parseFromSliceLeaky=std.json.parseFromSliceLeaky;
-/// swaps two values in place
-const swap=std.mem.swap;
 /// a letter in capitals
 const toUpper=std.ascii.toUpper;
 /// whether a byte is a letter
@@ -223,7 +223,7 @@ fn dbOf(x:[]const f32)f32{
   // the sum of squares
   var s:f32=0;
   for(x)|v|s+=v*v;
-  return dsp.gainToDb(@sqrt(s/m.f(x.len))+1e-9);
+  return dsp.gainToDb(@sqrt(s/m.f(x.len))+tiny);
 }
 /// the shortest and longest lag looked at (samples)
 const minLag:usize=m.floorTo(usize,m.f(rate)/maxHz);
@@ -522,65 +522,18 @@ fn annotate(arena:Allocator,words:[]const Word,fr:Frames)Allocator.Error![]u8{
   }
   return aw.written();
 }
-/// `x` as a 16-bit mono WAV at `rate`
-fn wavOf(arena:Allocator,x:[]const f32)Allocator.Error![]u8{
-  // the header's 44 bytes, then two bytes a sample
-  const out=try arena.alloc(u8,44+x.len*2);
-  // the header's fields, little-endian
-  const le=std.mem.writeInt;
-  const dataLen:u32=@intCast(x.len*2);
-  @memcpy(out[0..4],"RIFF");
-  le(u32,out[4..8],36+dataLen,.little);
-  @memcpy(out[8..16],"WAVEfmt ");
-  le(u32,out[16..20],16,.little);
-  le(u16,out[20..22],1,.little);
-  le(u16,out[22..24],1,.little);
-  le(u32,out[24..28],rate,.little);
-  le(u32,out[28..32],rate*2,.little);
-  le(u16,out[32..34],2,.little);
-  le(u16,out[34..36],16,.little);
-  @memcpy(out[36..40],"data");
-  le(u32,out[40..44],dataLen,.little);
-  for(x,0..)|v,i|le(i16,out[44+i*2..][0..2],@intFromFloat(@round(@max(-1,@min(1,v))*32767)),.little);
-  return out;
-}
-/// an in-place fast Fourier transform of `re`, `im` (a power of two long)
-fn fft(re:[]f32,im:[]f32)void{
-  const n=re.len;
-  // the bit-reversed order
-  var j:usize=0;
-  for(1..n)|i|{
-    var bit=n>>1;
-    while(j&bit!=0):(bit>>=1)j^=bit;
-    j|=bit;
-    if(i<j){
-      swap(f32,&re[i],&re[j]);
-      swap(f32,&im[i],&im[j]);
-    }
-  }
-  // butterflies, doubling in size
-  var len:usize=2;
-  while(len<=n):(len<<=1){
-    const half=len/2;
-    var at:usize=0;
-    while(at<n):(at+=len){
-      for(0..half)|k|{
-        // the twiddle, and the pair it joins
-        const a=-m.tau*m.f(k)/m.f(len);
-        const wr=@cos(a);
-        const wi=@sin(a);
-        const p=at+k;
-        const q=p+half;
-        const vr=re[q]*wr-im[q]*wi;
-        const vi=re[q]*wi+im[q]*wr;
-        re[q]=re[p]-vr;
-        im[q]=im[p]-vi;
-        re[p]+=vr;
-        im[p]+=vi;
-      }
-    }
-  }
-}
+/// a loudness so small it only keeps the logarithm finite
+const tiny:f32=1e-9;
+/// a spectrogram's middle loudness colour (violet), before gold
+const violet=[3]f32{0.35,0.1,0.5};
+/// its loudest colour (gold)
+const gold=[3]f32{1,0.8,0.3};
+/// the pitch line's ink (cyan)
+const pitchInk=[3]u8{40,230,230};
+/// a word's start tick's ink (pale)
+const tickInk=[3]u8{230,230,230};
+/// how tall a word's start tick is (pixels)
+const tickPx:usize=6;
 /// the spectrogram's height (pixels)
 const specBins:usize=m.floorTo(usize,specTopHz*m.f(fftN)/m.f(rate));
 /// how tall the spectrogram is drawn (pixels)
@@ -605,14 +558,14 @@ fn spectrogram(arena:Allocator,x:[]const f32,fr:Frames,words:[]const Word)![]u8{
       re[i]=v*hann;
       im[i]=0;
     }
-    fft(&re,&im);
+    audio.fft(&re,&im);
     for(0..specBins)|bin|{
       // the bin's loudness, and its colour: dark, violet, gold
       const mag=@sqrt(re[bin]*re[bin]+im[bin]*im[bin])/m.f(fftN);
-      const t=m.unlerp(specLow,specHigh,dsp.gainToDb(mag+1e-9));
+      const t=m.unlerp(specLow,specHigh,dsp.gainToDb(mag+tiny));
       const lo=@min(1,t*2);
       const hi=@max(0,t*2-1);
-      const rgb=[3]f32{m.lerp(m.lerp(0,0.35,lo),1,hi),m.lerp(m.lerp(0,0.1,lo),0.8,hi),m.lerp(m.lerp(0,0.5,lo),0.3,hi)};
+      const rgb=[3]f32{m.lerp(m.lerp(0,violet[0],lo),gold[0],hi),m.lerp(m.lerp(0,violet[1],lo),gold[1],hi),m.lerp(m.lerp(0,violet[2],lo),gold[2],hi)};
       for(0..binPx)|dy|{
         // the pixel, counted from the top
         const y=specH-1-@as(u32,@intCast(bin*binPx+dy));
@@ -627,7 +580,7 @@ fn spectrogram(arena:Allocator,x:[]const f32,fr:Frames,words:[]const Word)![]u8{
         const y=specH-1-@min(specH-1,m.floorTo(u32,hz/specTopHz*m.f(specH)));
         for([_]u32{y,@min(specH-1,y+1)})|yy|{
           const o=(@as(usize,yy)*w+col)*4;
-          @memcpy(px[o..][0..3],&[3]u8{40,230,230});
+          @memcpy(px[o..][0..3],&pitchInk);
         }
       }
     }
@@ -635,9 +588,9 @@ fn spectrogram(arena:Allocator,x:[]const f32,fr:Frames,words:[]const Word)![]u8{
   // each word's start, ticked at the top
   for(words)|wd|{
     const col=@min(w-1,m.floorTo(u32,@max(0,wd.start)*framesPerS));
-    for(0..6)|y|{
+    for(0..tickPx)|y|{
       const o=(y*w+col)*4;
-      @memcpy(px[o..][0..3],&[3]u8{230,230,230});
+      @memcpy(px[o..][0..3],&tickInk);
     }
   }
   return png.encode(arena,w,specH,px,.rgba);
@@ -703,14 +656,6 @@ const Send=enum{
   /// only printed (`--file=`, trying a recording)
   print,
 };
-/// a 16-bit mono WAV's samples at `rate` (its header skipped), as floats
-fn samplesOf(arena:Allocator,wav:[]const u8)Allocator.Error![]f32{
-  // the samples after the 44-byte header
-  const body=wav[@min(wav.len,44)..];
-  const out=try arena.alloc(f32,body.len/2);
-  for(out,0..)|*v,i|v.*=m.f(std.mem.readInt(i16,body[i*2..][0..2],.little))/32768;
-  return out;
-}
 /// what the listening holds while it runs
 const Ear=struct{
   /// the allocator for everything kept
@@ -793,7 +738,7 @@ const Ear=struct{
       if(ok)right+=1;
       try w.print(" {s}{s}",.{g.word,if(ok)"" else "*"});
       // learned as the gardener's own, whichever way the guess went
-      own.learn(e.io,plain,seg,try wavOf(arena,seg),ms*100+@as(i64,@intCast(i)))catch|err|print("could not learn {s}: {t}\n",.{plain,err});
+      own.learn(e.io,plain,seg,try audio.wavOf(arena,seg,rate),ms*100+@as(i64,@intCast(i)))catch|err|print("could not learn {s}: {t}\n",.{plain,err});
     }
     try w.print(" ({d}/{d})]",.{right,checked});
   }
@@ -814,7 +759,7 @@ const Ear=struct{
     // the phrase's name: when it was heard (ms)
     const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(e.io).nanoseconds,std.time.ns_per_ms));
     const wavPath=try std.fmt.allocPrint(arena,"{s}/{d}.wav",.{heardDir,ms});
-    try Dir.cwd().writeFile(e.io,.{.sub_path=wavPath,.data=try wavOf(arena,x)});
+    try Dir.cwd().writeFile(e.io,.{.sub_path=wavPath,.data=try audio.wavOf(arena,x,rate)});
     // whisper's answer
     const r=try std.process.run(arena,e.io,.{.argv=&.{"curl.exe","-s",serverUrl++"/inference","-F",try std.fmt.allocPrint(arena,"file=@{s}",.{wavPath}),"-F","response_format=verbose_json","-F","temperature=0.0","-F","prompt="++prompt}});
     const v=parseFromSliceLeaky(Verbose,arena,r.stdout,.{.ignore_unknown_fields=true})catch{
@@ -857,55 +802,6 @@ const Ear=struct{
 };
 /// quiet frames that end a word when words are read one at a time (0.25 s)
 const wordGapFrames:u32=25;
-/// what reading a WAV can fail with
-const WavError=error{NotWav,UnreadWav}||Allocator.Error;
-/// a WAV of any rate and channels, 16-bit or 32-bit float (as Audacity
-/// writes), as mono samples at `rate`
-fn readWav(arena:Allocator,bytes:[]const u8)WavError![]f32{
-  if(bytes.len<44 or !std.mem.eql(u8,bytes[0..4],"RIFF") or !std.mem.eql(u8,bytes[8..12],"WAVE"))return error.NotWav;
-  const rd=std.mem.readInt;
-  // the format, and where the samples are, found chunk by chunk
-  var fmtKind:u16=0;
-  var ch:u16=1;
-  var sr:u32=rate;
-  var bits:u16=16;
-  var data:?[]const u8=null;
-  var at:usize=12;
-  while(at+8<=bytes.len){
-    const id=bytes[at..][0..4];
-    const len=rd(u32,bytes[at+4..][0..4],.little);
-    const body=bytes[at+8..@min(bytes.len,at+8+len)];
-    if(std.mem.eql(u8,id,"fmt ") and body.len>=16){
-      fmtKind=rd(u16,body[0..2],.little);
-      ch=rd(u16,body[2..4],.little);
-      sr=rd(u32,body[4..8],.little);
-      bits=rd(u16,body[14..16],.little);
-      // the extensible format names its kind further in
-      if(fmtKind==0xfffe and body.len>=26)fmtKind=rd(u16,body[24..26],.little);
-    }
-    if(std.mem.eql(u8,id,"data"))data=body;
-    at+=8+len+(len&1);
-  }
-  const d=data orelse return error.UnreadWav;
-  const width:usize=bits/8;
-  if(ch==0 or width==0)return error.UnreadWav;
-  const n=d.len/(width*ch);
-  const mono=try arena.alloc(f32,n);
-  for(0..n)|i|{
-    // the channels averaged
-    var s:f32=0;
-    for(0..ch)|c|{
-      const p=d[(i*ch+c)*width..];
-      s+=switch(fmtKind){
-        1=>if(bits==16)m.f(rd(i16,p[0..2],.little))/32768 else if(bits==24)m.f(rd(i24,p[0..3],.little))/8388608 else return error.UnreadWav,
-        3=>if(bits==32)@as(f32,@bitCast(rd(u32,p[0..4],.little)))else return error.UnreadWav,
-        else=>return error.UnreadWav,
-      };
-    }
-    mono[i]=s/m.f(ch);
-  }
-  return if(sr==rate)mono else try ownear.resample(arena,mono,m.f(sr),m.f(rate));
-}
 /// the note names of an octave, from C
 const noteNames=[_][]const u8{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"};
 /// how long one note reading spans (frames, 0.1 s): a sung note's pitch is
@@ -921,7 +817,7 @@ fn look(gpa:Allocator,io:Io,path:[]const u8)!void{
   var ar=std.heap.ArenaAllocator.init(gpa);
   defer ar.deinit();
   const arena=ar.allocator();
-  const x=try readWav(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
+  const x=try audio.readWav(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited),m.f(rate));
   const fr=try Frames.measure(arena,x);
   try Dir.cwd().writeFile(io,.{.sub_path=try std.fmt.allocPrint(arena,"{s}.png",.{path}),.data=try spectrogram(arena,x,fr,&.{})});
   var aw:Allocating=.init(arena);
@@ -970,7 +866,7 @@ fn learnReading(gpa:Allocator,io:Io,own:*ownear.Ear,path:[]const u8,words:[]cons
   var ar=std.heap.ArenaAllocator.init(gpa);
   defer ar.deinit();
   const arena=ar.allocator();
-  const x=try readWav(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
+  const x=try audio.readWav(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited),m.f(rate));
   // the recording cut at the pauses between words
   var b=Breaths{.endAfter=wordGapFrames};
   var segs:ArrayList([]const f32)=.empty;
@@ -1006,7 +902,7 @@ fn learnReading(gpa:Allocator,io:Io,own:*ownear.Ear,path:[]const u8,words:[]cons
       print("  {s} -> {s}{s} ({s})\n",.{word,g.word,if(ok)"" else " *",@tagName(g.from)});
     }
     const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(io).nanoseconds,std.time.ns_per_ms));
-    try own.learn(io,word,seg,try wavOf(arena,seg),ms*100+@as(i64,@intCast(i)));
+    try own.learn(io,word,seg,try audio.wavOf(arena,seg,rate),ms*100+@as(i64,@intCast(i)));
   }
   if(tried>0)print("my own ear, on words it had not learned from yet: {d}/{d}\n",.{right,tried});
   print("now {d} sound-prints ({d} of your voice)\n",.{own.prints.items.len,own.learnedCount()});
@@ -1080,7 +976,7 @@ pub fn main(init:std.process.Init)!void{
     defer ear.samples.deinit(gpa);
     for(files.items)|path|{
       // each recording, a frame at a time, then a breath of silence to end it
-      const x=try samplesOf(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
+      const x=try audio.samplesOf(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
       var at:usize=0;
       while(at+hop<=x.len):(at+=hop)try ear.frame(x[at..][0..hop]);
       const quiet:[hop]f32=@splat(0);
@@ -1208,25 +1104,4 @@ test "held, loud, a pause and a rising close are written as sound" {
   };
   const said=try annotate(arena,&words,fr);
   try testing.expectEqualStrings("yeeeeees I HEAR.. you!",said);
-}
-test "a WAV holds its header and every sample" {
-  var ar=std.heap.ArenaAllocator.init(testing.allocator);
-  defer ar.deinit();
-  const w=try wavOf(ar.allocator(),&.{0,1,-1});
-  try testing.expectEqual(@as(usize,50),w.len);
-  try testing.expectEqualStrings("RIFF",w[0..4]);
-  try testing.expectEqual(@as(i16,32767),std.mem.readInt(i16,w[46..48],.little));
-}
-test "the transform finds a tone in its bin" {
-  var re:[fftN]f32=undefined;
-  var im:[fftN]f32=@splat(0);
-  // a tone exactly on bin 20
-  for(&re,0..)|*v,i|v.*=@cos(m.tau*20*m.f(i)/m.f(fftN));
-  fft(&re,&im);
-  // the loudest bin in the lower half
-  var best:usize=0;
-  for(0..fftN/2)|i|{
-    if(re[i]*re[i]+im[i]*im[i]>re[best]*re[best]+im[best]*im[best])best=i;
-  }
-  try testing.expectEqual(@as(usize,20),best);
 }

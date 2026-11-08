@@ -17,6 +17,8 @@ const std=@import("std");
 const engine=@import("engine");
 /// Claude's own voice, which says each word to learn its sound
 const voice=@import("speak");
+/// the tools' shared sound files and spectra
+const audio=@import("audio");
 /// all the maths: casts, tau, powers
 const m=engine.core.math;
 /// an allocator
@@ -53,6 +55,14 @@ const lowHz:f32=100;
 const highHz:f32=7600;
 /// how many cepstra a frame keeps (the first, loudness, left out)
 pub const dims:usize=12;
+/// the mel scale's size (mels a decade)
+const melScale:f32=2595;
+/// where the mel scale bends from even to logarithmic (Hz)
+const melKnee:f32=700;
+/// the least a band's energy or a peak may be, so a logarithm stays finite
+const bandFloor:f32=1e-10;
+/// quieter than this share of a word's peak is the quiet round it
+const quietShare:f32=0.05;
 /// the pitch-scale slides tried, so another throat still matches
 const warps=[_]f32{0.86,0.93,1,1.07,1.14};
 /// a match too far to count, past any real one
@@ -90,46 +100,10 @@ pub const Guess=struct{
   /// whose voice the matched sound-print was
   from:From,
 };
-/// an in-place fast Fourier transform of `re`, `im` (a power of two long)
-fn fft(re:[]f32,im:[]f32)void{
-  const n=re.len;
-  // the bit-reversed order
-  var j:usize=0;
-  for(1..n)|i|{
-    var bit=n>>1;
-    while(j&bit!=0):(bit>>=1)j^=bit;
-    j|=bit;
-    if(i<j){
-      swap(f32,&re[i],&re[j]);
-      swap(f32,&im[i],&im[j]);
-    }
-  }
-  // butterflies, doubling in size
-  var len:usize=2;
-  while(len<=n):(len<<=1){
-    const half=len/2;
-    var at:usize=0;
-    while(at<n):(at+=len){
-      for(0..half)|k|{
-        const a=-m.tau*m.f(k)/m.f(len);
-        const wr=@cos(a);
-        const wi=@sin(a);
-        const p=at+k;
-        const q=p+half;
-        const vr=re[q]*wr-im[q]*wi;
-        const vi=re[q]*wi+im[q]*wr;
-        re[q]=re[p]-vr;
-        im[q]=im[p]-vi;
-        re[p]+=vr;
-        im[p]+=vi;
-      }
-    }
-  }
-}
 /// a frequency on the mel scale, how the ear spaces pitch
-fn mel(hz:f32)f32{return 2595*@log10(1+hz/700);}
+fn mel(hz:f32)f32{return melScale*@log10(1+hz/melKnee);}
 /// back from the mel scale to Hz
-fn hzOf(mels:f32)f32{return 700*(m.pow(f32,10,mels/2595)-1);}
+fn hzOf(mels:f32)f32{return melKnee*(m.pow(f32,10,mels/melScale)-1);}
 /// the sound-print of `x` (at `rate`), its pitch scale slid by `warp`:
 /// each frame's mel bands, logged, folded into cepstra, the whole print's
 /// mean taken away (so a louder or brighter room matches a quieter one)
@@ -152,10 +126,10 @@ pub fn printOf(arena:Allocator,x:[]const f32,warp:f32)Allocator.Error![]f32{
       re[i]=if(i<win and s<x.len)x[s]*hann else 0;
       im[i]=0;
     }
-    fft(&re,&im);
+    audio.fft(&re,&im);
     for(0..bands)|b|{
       // the band's triangle over the bins
-      var e:f32=1e-10;
+      var e:f32=bandFloor;
       const lo=edges[b];
       const mid=edges[b+1];
       const hi=edges[b+2];
@@ -242,7 +216,7 @@ pub const Ear=struct{
       const s=scratch.allocator();
       const v=voice.Voice{};
       const said=try voice.speak(s,try voice.plan(s,try voice.read(s,trimAll(u8,line[sp..]," ")),v),v);
-      const x=try resample(s,said,voice.rate,rate);
+      const x=try audio.resample(s,said,voice.rate,rate);
       try e.prints.append(a,.{.word=word,.feats=try printOf(a,trimmed(x),1),.from=.voice});
     }
     try e.loadLearned(io);
@@ -272,7 +246,7 @@ pub const Ear=struct{
       while(try files.next(io))|f|{
         if(f.kind!=.file)continue;
         const bytes=try sub.readFileAlloc(io,f.name,a,.unlimited);
-        try e.prints.append(a,.{.word=try a.dupe(u8,entry.name),.feats=try printOf(a,samplesOf(a,bytes),1),.from=.heard});
+        try e.prints.append(a,.{.word=try a.dupe(u8,entry.name),.feats=try printOf(a,try audio.samplesOf(a,bytes),1),.from=.heard});
       }
     }
   }
@@ -320,33 +294,14 @@ pub const Ear=struct{
 };
 /// `x` without the quiet at its ends (below a twentieth of its peak)
 fn trimmed(x:[]const f32)[]const f32{
-  var top:f32=1e-9;
+  var top:f32=bandFloor;
   for(x)|v|top=@max(top,@abs(v));
-  const floor=top*0.05;
+  const floor=top*quietShare;
   var a:usize=0;
   while(a<x.len and @abs(x[a])<floor)a+=1;
   var b=x.len;
   while(b>a and @abs(x[b-1])<floor)b-=1;
   return if(b-a>=win)x[a..b]else x;
-}
-/// `x` at rate `from` resampled to `to` (straight lines between samples)
-pub fn resample(arena:Allocator,x:[]const f32,from:f32,to:f32)Allocator.Error![]f32{
-  const n=m.floorTo(usize,m.f(x.len)*to/from);
-  const out=try arena.alloc(f32,n);
-  for(out,0..)|*v,i|{
-    const t=m.f(i)*from/to;
-    const k=m.floorTo(usize,t);
-    const b=@min(k+1,x.len-1);
-    v.*=m.lerp(x[@min(k,x.len-1)],x[b],t-m.f(k));
-  }
-  return out;
-}
-/// a 16-bit mono WAV's samples (its 44-byte header skipped), as floats
-pub fn samplesOf(arena:Allocator,wav:[]const u8)[]f32{
-  const body=wav[@min(wav.len,44)..];
-  const out=arena.alloc(f32,body.len/2) catch return &.{};
-  for(out,0..)|*v,i|v.*=m.f(std.mem.readInt(i16,body[i*2..][0..2],.little))/32768;
-  return out;
 }
 /// a word as whisper wrote it, made a word-list word: small letters, its
 /// punctuation gone (apostrophes kept)
@@ -359,27 +314,16 @@ pub fn plainWord(arena:Allocator,w:[]const u8)Allocator.Error![]u8{
 }
 /// the test harness
 const testing=std.testing;
-test "the transform finds a tone in its bin" {
-  var re:[fftN]f32=undefined;
-  var im:[fftN]f32=@splat(0);
-  for(&re,0..)|*v,i|v.*=@cos(m.tau*12*m.f(i)/m.f(fftN));
-  fft(&re,&im);
-  var best:usize=0;
-  for(0..fftN/2)|i|{
-    if(re[i]*re[i]+im[i]*im[i]>re[best]*re[best]+im[best]*im[best])best=i;
-  }
-  try testing.expectEqual(@as(usize,12),best);
-}
 test "a print matches itself stretched better than another word" {
   var ar=std.heap.ArenaAllocator.init(testing.allocator);
   defer ar.deinit();
   const a=ar.allocator();
   const v=voice.Voice{};
   // three words in Claude's own voice; one said again slower
-  const yes=try resample(a,try voice.speak(a,try voice.plan(a,try voice.read(a,"Y EH1 S"),v),v),voice.rate,rate);
-  const no=try resample(a,try voice.speak(a,try voice.plan(a,try voice.read(a,"N OW1"),v),v),voice.rate,rate);
+  const yes=try audio.resample(a,try voice.speak(a,try voice.plan(a,try voice.read(a,"Y EH1 S"),v),v),voice.rate,rate);
+  const no=try audio.resample(a,try voice.speak(a,try voice.plan(a,try voice.read(a,"N OW1"),v),v),voice.rate,rate);
   const slow=voice.Voice{.pace=0.75};
-  const yesSlow=try resample(a,try voice.speak(a,try voice.plan(a,try voice.read(a,"Y EH1 S"),slow),slow),voice.rate,rate);
+  const yesSlow=try audio.resample(a,try voice.speak(a,try voice.plan(a,try voice.read(a,"Y EH1 S"),slow),slow),voice.rate,rate);
   const pYes=try printOf(a,trimmed(yes),1);
   const pNo=try printOf(a,trimmed(no),1);
   const pSlow=try printOf(a,trimmed(yesSlow),1);

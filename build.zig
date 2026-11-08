@@ -211,6 +211,14 @@ pub fn build(b:*Build)!void{
     }),
   });
   b.installArtifact(bridge);
+  // the tools' shared sound files and spectra (tools/audio.zig): the
+  // transform, WAVs written and read, resampling; for the ear and voice
+  const audioMod=b.createModule(.{
+    .optimize=o,
+    .target=t,
+    .root_source_file=b.path("tools/audio.zig"),
+    .imports=&.{.{.name="engine",.module=engine}},
+  });
   // the ear (tools/hear.zig): the gardener's voice heard through the
   // microphone, read by whisper.cpp's server and sent through the link
   // folder, so it runs from the repo where that folder is
@@ -249,6 +257,9 @@ pub fn build(b:*Build)!void{
     .imports=&.{.{.name="engine",.module=engine},.{.name="speak",.module=speakMod}},
   });
   hearMod.addImport("ownear",ownearMod);
+  hearMod.addImport("audio",audioMod);
+  speakMod.addImport("audio",audioMod);
+  ownearMod.addImport("audio",audioMod);
   // the sound check (tools/audiocheck.zig): plays a tone and records it
   // back, so it needs real speakers and stays out of `test`
   // the sound check executable: it needs only the engine
@@ -336,7 +347,9 @@ pub fn build(b:*Build)!void{
     .imports=toolImports,
   }),.filters=filters});
   testStep.dependOn(&b.addRunArtifact(bridgeTests).step);
-  // Claude's own ear's tests (its transform, a word matched stretched)
+  // the shared sound files' tests (a WAV round trip, the transform)
+  testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=audioMod,.filters=filters})).step);
+  // Claude's own ear's tests (a word matched stretched)
   testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=ownearMod,.filters=filters})).step);
   // the voice's tests (reading sounds, resonances, pitch, closes)
   testStep.dependOn(&b.addRunArtifact(b.addTest(.{.root_module=speakMod,.filters=filters})).step);
