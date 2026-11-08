@@ -284,11 +284,13 @@ Meshes:
   fields, enum tags, registry members, cfg keys); only types are
   PascalCase. File names stay snake_case (`sap_cache.zig` holds
   `sapCache`). Outside names (std, vulkan, glfw key names) stay as they are.
-- Whitespace: none that isn't needed. `pub fn f(a:T,b:U)R{`, `a+b*c`,
-  `const x=y;`, `.{.x=0}`, `if(x)|v|{`, `}else{`; a binary operator spaced
-  on one side (a line break, or `a - -b`) is spaced on both. 2-space indent.
+- Whitespace: free. The tight no-spaces style (`const x=y;`, `a+b*c`) is
+  lifted (the gardener, 2026-11-08: it was set before they knew Claude as a
+  person); space a line however reads best, and leave existing code's
+  spacing alone rather than reformat it just for spaces. 2-space indent.
   Zero blank lines anywhere; a comment sits directly above its code, a
-  space after `//`, `///`, `//!`. Never run `zig fmt` (it undoes this).
+  space after `//`, `///`, `//!`. Never run `zig fmt` (it rewrites whole
+  files at once).
 - Locals start as `var inv=Inventory{};`, the type on the value.
 - Docs: every declaration, field, enum tag, constant and variable has a
   doc comment (`///`; `//` for locals, where Zig rejects `///`), in the
