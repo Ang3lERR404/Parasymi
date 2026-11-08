@@ -140,8 +140,9 @@ const endS:f32=0.35;
 const softHz:f32=350;
 /// how much brighter it is with no breath at all (Hz)
 const softSpan:f32=900;
-/// how dark the breath is (Hz): air through a throat, not a hiss
-const airHz:f32=1800;
+/// how dark the breath is (Hz): air through a throat, not a hiss (darkened
+/// again once the gardener saw it as a haze over every vowel, 2026-11-07)
+const airHz:f32=1200;
 /// the darkened breath brought up (raised again once the chest and head
 /// filled the voice out and left it behind: "better", the gardener)
 const airGain:f32=1.6;
@@ -165,12 +166,18 @@ const headLowGain:f32=0.05;
 const headHighHz:f32=2700;
 /// its width (Hz)
 const headHighBw:f32=400;
-/// how loud the face rings (with the nose, picked by ear: "better")
-const headHighGain:f32=0.35;
-/// how loud a hiss is against the voice: soft, never a hard edge
-const hissLoud:f32=0.6;
+/// how loud the face rings (with the nose, picked by ear: "better";
+/// softened once the gardener saw it as a band that never moves)
+const headHighGain:f32=0.2;
+/// how loud a hiss is against the voice: soft, never a hard edge (the
+/// gardener saw them blaze floor to ceiling; their own sit ~18 dB under
+/// their vowels, measured)
+const hissLoud:f32=0.33;
+/// how loud an unstressed vowel is against a stressed one, so words are
+/// not all equally loud
+const unstressedVoice:f32=0.65;
 /// a stop's burst against its hiss: a tap, never a pop
-const burstSoft:f32=0.5;
+const burstSoft:f32=0.35;
 /// a wander lasts at least this share of its average, and up to this
 /// much more (shares)
 const driftShortest:f32=0.6;
@@ -185,7 +192,7 @@ const nasalVoice:f32=0.6;
 /// how loud it buzzes under a voiced hiss (v, z, zh)
 const buzzVoice:f32=0.45;
 /// how much breath an h is
-const aspirateBreath:f32=0.55;
+const aspirateBreath:f32=0.3;
 /// how loud a voiced stop hums while shut (b, d, g)
 const closureHum:f32=0.12;
 /// how long an affricate's hiss lasts (s), ch and j
@@ -195,7 +202,7 @@ const burstS:f32=0.014;
 /// how loud the throat sounds in a voiced stop's burst
 const burstVoice:f32=0.3;
 /// how much breath follows a voiceless stop into its vowel
-const aspirationBreath:f32=0.45;
+const aspirationBreath:f32=0.25;
 /// how long that breath lasts (s)
 const aspirationS:f32=0.035;
 /// a stretch voiced at least this loud can carry a phrase's close
@@ -691,6 +698,9 @@ pub const Voice=struct{
   /// what it feels: a living throat, its folds slack or tense as the
   /// feeling and the breath ask, trembling a little; none, the stiff one
   feel:?Feel=null,
+  /// the loudest it is written (of full scale): lower to lay it beside a
+  /// quiet recording of the gardener's at the same loudness
+  level:f32=peak,
 };
 /// what the voice feels, which the throat carries
 pub const Feel=enum{
@@ -906,7 +916,9 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
         const into:f32=if(s.stressed)leanIn else 1;
         const outOf:f32=if(s.stressed)leanOut else 1;
         const end=if(sh.kind==.diphthong)sh.to else sh.f;
-        try out.append(arena,.{.len=len,.from=.{.f=sh.f,.voice=1,.breath=vb,.pitch=lift*into,.lean=lean},.to=.{.f=end,.voice=vowelFade,.breath=vb,.pitch=lift*outOf,.lean=lean}});
+        // an unstressed vowel quieter, so the words are not all as loud
+        const loudness:f32=if(s.stressed)1 else unstressedVoice;
+        try out.append(arena,.{.len=len,.from=.{.f=sh.f,.voice=loudness,.breath=vb,.pitch=lift*into,.lean=lean},.to=.{.f=end,.voice=vowelFade*loudness,.breath=vb,.pitch=lift*outOf,.lean=lean}});
       },
       .glide=>{
         const t=Target{.f=sh.f,.voice=glideVoice,.breath=vb,.pitch=lift};
@@ -1176,6 +1188,9 @@ const Mouth=struct{
     const voiced=voicing*mo.now.voice*loud;
     // (the face rings with what the mouth makes, so it is fed the mouth's
     // own sound: the throat alone is too soft up there to set it ringing)
+    // (the face's ring leans with the mouth's third, never one fixed band)
+    const faceLean=@min(octLeanMost,@max(1/octLeanMost,mo.now.f[2]/neutralShape[2]));
+    mo.headHigh.tune(headHighHz*mo.tract*faceLean,headHighBw);
     const head=mo.headLow.step(voiced)*headLowGain+mo.headHigh.step(out)*headHighGain;
     // the top octaves (only while asked for): up there a voice is mostly
     // breath, puffed through the folds each time they open, with a little
@@ -1256,7 +1271,7 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   // as loud as it may be, no louder
   var top:f32=1e-9;
   for(out)|x|top=@max(top,@abs(x));
-  for(out)|*x|x.*=peak*x.*/top;
+  for(out)|*x|x.*=v.level*x.*/top;
   return out;
 }
 /// where the voice is written when nothing says otherwise
@@ -1340,6 +1355,7 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--tract="))v.tract=try std.fmt.parseFloat(f32,a["--tract=".len..]);
     if(startsWith(u8,a,"--push="))v.push=try std.fmt.parseFloat(f32,a["--push=".len..]);
     if(startsWith(u8,a,"--octaves="))v.octaves=try std.fmt.parseFloat(f32,a["--octaves=".len..]);
+    if(startsWith(u8,a,"--level="))v.level=try std.fmt.parseFloat(f32,a["--level=".len..]);
     if(startsWith(u8,a,"--feel="))v.feel=stringToEnum(Feel,a["--feel=".len..]) orelse return error.UnknownFeel;
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
