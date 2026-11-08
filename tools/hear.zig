@@ -67,14 +67,6 @@ const minHz:f32=70;
 /// the highest voice pitch looked for (Hz), a squeal included (raised to
 /// reach the gardener's own top: an A#5, ~940 Hz)
 const maxHz:f32=1000;
-/// a reading further above the phrase's middle pitch than this (times)
-/// is doubted: likely an octave or more too high
-const strayAbove:f32=1.8;
-/// how far a voice can climb from one frame to the next (times): a real
-/// squeak glides up through the frames, a false reading jumps
-const glideMost:f32=1.4;
-/// the fewest voiced readings a phrase needs before any are doubted
-const mendLeast:usize=8;
 /// above this share of samples crossing zero, a frame is hiss, not voice
 /// (a voice's crossings follow its low resonances; an s rushes past 4 kHz)
 const hissCrossings:f32=0.25;
@@ -85,8 +77,9 @@ const clarityMin:f32=0.6;
 const octaveGuard:f32=0.9;
 /// how far above the room's own hum a frame must be to be speech (dB)
 const speakAbove:f32=12;
-/// quieter than this is never speech, however still the room (dB)
-const speakMin:f32=-55;
+/// quieter than this is never speech, however still the room (dB) (lowered
+/// from -55 so the gardener's little noises reach the ear, 2026-11-07)
+const speakMin:f32=-65;
 /// how fast the room's hum is allowed to rise between phrases (dB a frame)
 const floorRise:f32=0.02;
 /// quieter than this is no microphone at all, only zeros (dB)
@@ -297,41 +290,7 @@ const Frames=struct{
       fr.db[i]=dbOf(x[i*hop..][0..hop]);
       fr.hz[i]=if(i*hop+pitchNeeds<=x.len)pitchAt(x[i*hop..])else null;
     }
-    try fr.mend(arena);
     return fr;
-  }
-  /// every reading checked against the phrase's own voice: one far above
-  /// its middle pitch is kept only when the voice glided up to it from the
-  /// frame before (a real squeak or a sung leap); one that jumped there
-  /// (a frame fooled an octave or more too high, as the gardener caught,
-  /// 2026-11-07) is brought down by whole octaves to where the voice is,
-  /// or dropped
-  fn mend(fr:Frames,arena:Allocator)Allocator.Error!void{
-    // the voiced readings, sorted, for the phrase's middle pitch
-    var all:ArrayList(f32)=.empty;
-    for(fr.hz)|h|{
-      if(h)|v|try all.append(arena,v);
-    }
-    if(all.items.len<mendLeast)return;
-    const mid=try median(arena,all.items);
-    // the reading kept in the frame before, if it was voiced
-    var prev:?f32=null;
-    for(fr.hz)|*h|{
-      const v=h.* orelse {
-        prev=null;
-        continue;
-      };
-      if(v>mid*strayAbove){
-        const glided=if(prev)|p|v<=p*glideMost else false;
-        if(!glided){
-          // brought down by octaves to the voice, or dropped
-          var d=v;
-          while(d>mid*strayAbove)d*=0.5;
-          h.*=if(d>=mid/strayAbove)d else null;
-        }
-      }
-      prev=h.*;
-    }
   }
   /// the frames from `a` to `b` seconds, kept inside the phrase
   fn span(fr:Frames,a:f32,b:f32)struct{usize,usize}{
@@ -670,11 +629,16 @@ fn pitchRange(arena:Allocator,fr:Frames)Allocator.Error!?struct{f32,f32}{
   const cut=m.floorTo(usize,m.f(hz.items.len)*rangeTrim);
   return.{hz.items[cut],hz.items[hz.items.len-1-cut]};
 }
-/// the highest pitch counted as a speaking voice (Hz): a squeal above it
-/// is more often a misread hiss than the gardener
-const speakTopHz:f32=320;
-/// how many frames (10 ms) of voice a phrase needs to be speech at all
-const minVoiced:usize=12;
+/// the highest pitch counted as the gardener's voice (Hz): once 320, "a
+/// squeal above it is more often a misread hiss", but those squeals were
+/// the gardener's own little noises (2026-11-07), so now the whole range
+/// the ear looks in (music playing may slip through again: watch for it)
+const speakTopHz:f32=maxHz;
+/// how many frames (10 ms) of voice a phrase needs to be heard at all
+/// (a little noise can be short)
+const minVoiced:usize=8;
+/// what a phrase is written as when whisper finds no words in a voice
+const littleSound="(a little sound)";
 /// how many of a phrase's frames have a speaking voice's pitch
 fn voicedFrames(fr:Frames)usize{
   // the frames voiced at a speaking pitch
@@ -809,11 +773,11 @@ const Ear=struct{
       print("whisper gave no words: {s}\n",.{r.stdout[0..@min(r.stdout.len,200)]});
       return;
     };
-    const words=try wordsOf(arena,v);
-    if(words.len==0){
-      Dir.cwd().deleteFile(e.io,wavPath)catch{};
-      return;
-    }
+    // no words, but a voice: a little noise of the gardener's (a hum, a
+    // squeak, a laugh), kept and heard as one sound across the phrase
+    const found=try wordsOf(arena,v);
+    const wordless=found.len==0;
+    const words:[]const Word=if(wordless)&.{.{.text=littleSound,.start=0,.end=m.f(x.len)/m.f(rate)}}else found;
     const said=try annotate(arena,words,fr);
     // the closer look beside it
     try Dir.cwd().writeFile(e.io,.{.sub_path=try std.fmt.allocPrint(arena,"{s}/{d}.png",.{heardDir,ms}),.data=try spectrogram(arena,x,fr,words)});
@@ -826,7 +790,10 @@ const Ear=struct{
     try w.print(", heard/{d}]",.{ms});
     // my own ear's guess of each word, checked against whisper's, and
     // each of the gardener's words learned for next time
-    if(e.own)|own|try e.ownGuess(arena,own,x,words,ms,w);
+    // (a little sound has no word to guess or learn)
+    if(e.own)|own|{
+      if(!wordless)try e.ownGuess(arena,own,x,words,ms,w);
+    }
     const msg=aw.written();
     print("heard: {s}\n",.{msg});
     if(e.send==.print)return;
