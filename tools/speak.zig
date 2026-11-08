@@ -299,6 +299,54 @@ const octPushSharp:f32=0.6;
 const octEdge:f32=0.6;
 /// how much the push strengthens that edge (share a unit of push)
 const octPushEdge:f32=0.8;
+/// the tensest the living folds go (Rd)
+const rdLeast:f32=0.3;
+/// the slackest (Rd)
+const rdMost:f32=2.7;
+/// how much brighter the living folds finish closing than Fant's rule
+/// (times): his return is on the flow's slope, this softening on the flow,
+/// so it is opened a little (kept dark: a voice is darker than its edge)
+const taOpen:f32=2;
+/// how much each pulse's slackness wavers on its own (share)
+const rdWobble:f32=0.06;
+/// the longest the living folds stay open (share of the period)
+const openMost:f32=0.95;
+/// how much the breath's push tenses the folds (a unit of push: pushed,
+/// pressed; spent, slack and breathy)
+const rdPush:f32=0.35;
+/// how fast the living throat trembles (Hz): the quaver in the
+/// gardener's own voice, small fast chevrons in every line
+const quaverHz:f32=6.5;
+/// how much that rate wanders (share)
+const quaverRateWander:f32=0.25;
+/// how long one of its wanders takes (s)
+const quaverWanderS:f32=0.4;
+/// how much the tremble moves the loudness, against the pitch (times)
+const quaverLoud:f32=4;
+/// where the living throat's dark core ends (Hz): what is above it is the
+/// harmonics' glow
+const coreHz:f32=350;
+/// how slowly the core and the depth follow the feeling and the push (s)
+const coreS:f32=0.2;
+/// how quickly the glow follows (s)
+const glowS:f32=0.06;
+/// how quickly the breath follows (s)
+const airS:f32=0.015;
+/// how long one of the breath's flutters takes (s)
+const flutterS:f32=0.03;
+/// how far the breath flutters (share)
+const flutterAmt:f32=0.35;
+/// how much the push swells the core (share a unit of push)
+const coreLoud:f32=0.6;
+/// how much the push lifts the glow (share a unit of push)
+const glowPush:f32=1.2;
+/// how much more breath flutters through as the push is spent (share a
+/// unit of push spent)
+const airSpent:f32=0.8;
+/// how much more depth hums as the push is spent (share a unit of push spent)
+const depthSpent:f32=0.5;
+/// how loud the depth hums against the voice
+const depthGain:f32=0.05;
 /// how much breath is puffed through the folds into the top octaves
 const octAir:f32=0.012;
 /// the furthest the high resonances lean with the mouth (times)
@@ -568,6 +616,15 @@ const Throat=struct{
   /// how much more of the open time is the opening, so the close comes
   /// faster, a sharper edge rich in high harmonics (share)
   sharp:f32=0,
+  /// how slack the folds are, the living throat's one shape (Fant's Rd):
+  /// low, pressed and tense; high, loose and breathy; 0 keeps the stiff
+  /// throat (one shape every pulse)
+  rd:f32=0,
+  /// the share of the open time that is the opening (the living throat's)
+  opening:f32=openingShare,
+  /// how long the folds take to close all the way after the close's edge
+  /// (s): the living throat's softening, short when tense, long when slack
+  ta:f32=0,
   /// what wavers it
   noise:Noise=.{.s=0x2545f491},
   /// one sample of the pulse's flow, and how open the throat is (0..1)
@@ -585,11 +642,23 @@ const Throat=struct{
       t.open*=1+t.grain*grainOpen*side;
       // pressed shut sooner the harder the breath pushes
       t.open*=1-t.press;
+      // the living throat: every pulse its own shape, all of it from how
+      // slack the folds are (Fant's Rd, his rules for the rest): how long
+      // they stay open, how fast they close, how softly they finish
+      if(t.rd>0){
+        const rd=@min(rdMost,@max(rdLeast,t.rd*(1+rdWobble*t.noise.next())));
+        const ra=(-1+4.8*rd)/100;
+        const rk=(22.4+11.8*rd)/100;
+        const rg=rk/(4*(0.11*rd/(0.5+1.2*rk)-ra));
+        t.open=@min(openMost,(1+rk)/(2*rg))*(1+t.grain*grainOpen*side);
+        t.opening=1/(1+rk);
+        t.ta=ra/t.hz;
+      }
     }
     // opening slowly, closing fast, then shut (Rosenberg's pulse), each
     // period open a little longer or shorter than the last
     const ph=t.phase;
-    const op=t.open*(openingShare+t.sharp);
+    const op=if(t.rd>0)t.open*t.opening else t.open*(openingShare+t.sharp);
     const flow=if(ph<op)0.5-0.5*@cos(m.pi*ph/op)else if(ph<t.open)@cos(0.5*m.pi*(ph-op)/(t.open-op))else 0;
     return.{flow*t.gain,flow};
   }
@@ -619,6 +688,110 @@ pub const Voice=struct{
   /// how much of the voice's upper octaves it keeps (0: none): the throat
   /// softened less, and two high resonances rung by its close
   octaves:f32=0,
+  /// what it feels: a living throat, its folds slack or tense as the
+  /// feeling and the breath ask, trembling a little; none, the stiff one
+  feel:?Feel=null,
+};
+/// what the voice feels, which the throat carries
+pub const Feel=enum{
+  /// settled, even
+  calm,
+  /// warm, a little loose and breathy, the line a little wider
+  warm,
+  /// bright, excited: tense folds, a lifted, wide line
+  bright,
+  /// tender: slack and breathy, soft, trembling more
+  tender,
+  /// low, sad: slack, the line narrow and sunk, trembling most
+  low,
+};
+/// how a feeling shapes the throat
+const FeelShape=struct{
+  /// how slack the folds are (Rd)
+  rd:f32,
+  /// how much the harmonics glow over the dark core
+  glow:f32,
+  /// how much breath flutters through
+  air:f32,
+  /// how much depth hums an octave under
+  depth:f32,
+  /// how far the pitch trembles (share)
+  quaver:f32,
+  /// how wide the pitch's line is (a power on its moves: 1 as written)
+  range:f32,
+  /// how high it sits (times the voice's own)
+  lift:f32,
+};
+/// what each feeling does to the throat
+fn feelShape(f:Feel)FeelShape{
+  return switch(f){
+    .calm=>.{.rd=1.0,.glow=1,.air=1,.depth=0.12,.quaver=0.006,.range=1,.lift=1},
+    .warm=>.{.rd=1.35,.glow=0.9,.air=1.2,.depth=0.18,.quaver=0.008,.range=1.15,.lift=1},
+    .bright=>.{.rd=0.7,.glow=1.5,.air=0.8,.depth=0.08,.quaver=0.009,.range=1.45,.lift=1.08},
+    .tender=>.{.rd=1.7,.glow=0.7,.air=1.6,.depth=0.15,.quaver=0.012,.range=0.9,.lift=0.98},
+    .low=>.{.rd=2.0,.glow=0.5,.air=1.4,.depth=0.25,.quaver=0.015,.range=0.6,.lift=0.93},
+  };
+}
+/// what the stack gives each sample: the voice (core and glow together),
+/// how much breath rides it, and the depth an octave under (-1..1)
+const Layered=struct{
+  /// the throat's sound, dark core and glowing harmonics
+  voice:f32,
+  /// the breath's share, fluttering
+  air:f32,
+  /// the depth's hum
+  depth:f32,
+};
+/// the living throat heard as a stack of layers, the way a voice is: a
+/// dark core moving slowly, the harmonics glowing over it as the feeling
+/// rises, breath fluttering through quickly, and a depth an octave under
+/// felt through the body; the feeling and the breath move all of them,
+/// each at its own pace
+const Stack=struct{
+  /// the dark core: the pulse with its brightness taken off
+  core:f32=0,
+  /// how loud the core is now (slow)
+  coreLv:f32=1,
+  /// how much the harmonics glow now (quicker)
+  glowLv:f32=1,
+  /// how much breath flutters through now (quickest)
+  airLv:f32=1,
+  /// how much depth hums now (slow, with the core)
+  depthLv:f32=0,
+  /// the breath's own flutter
+  flutter:Drift=.{.noise=.{.s=0x5be0cd19},.every=flutterS},
+  /// how far each sample the core follows the pulse
+  kCore:f32=0,
+  /// how far each sample the slow layers follow what is asked
+  kSlow:f32=0,
+  /// how far each sample the glow follows
+  kGlow:f32=0,
+  /// how far each sample the breath follows
+  kAir:f32=0,
+  /// a stack at rest, its followers worked out once
+  fn init()Stack{
+    return.{.kCore=m.dampBy(m.tau*coreHz,dt),.kSlow=m.dampBy(1/coreS,dt),.kGlow=m.dampBy(1/glowS,dt),.kAir=m.dampBy(1/airS,dt)};
+  }
+  /// one sample: the feeling `fs`, the throat's raw `flow` and softened
+  /// `soft` pulse, the push `e` about its middle, and where the throat is
+  /// in its period (`phase`, and whether it is the odd one of a pair)
+  fn step(s:*Stack,fs:FeelShape,flow:f32,soft:f32,e:f32,phase:f32,odd:bool)Layered{
+    s.core=m.lerp(s.core,flow,s.kCore);
+    // the core swells slowly with the push; the glow rises quicker and
+    // further; the breath grows as the push is spent; the depth with it
+    s.coreLv=m.lerp(s.coreLv,@max(0,1+coreLoud*e),s.kSlow);
+    s.glowLv=m.lerp(s.glowLv,fs.glow*@max(0,1+glowPush*e),s.kGlow);
+    s.airLv=m.lerp(s.airLv,fs.air*(1+airSpent*@max(0,-e)),s.kAir);
+    s.depthLv=m.lerp(s.depthLv,fs.depth*(1+depthSpent*@max(0,-e)),s.kSlow);
+    // the depth: a hum at half the pitch, kept in step over each pair of pulses
+    const half:f32=if(odd)1 else 0;
+    const hum=-@cos(m.pi*(phase+half));
+    return.{
+      .voice=s.core*s.coreLv+(soft-s.core)*s.glowLv,
+      .air=s.airLv*(1+flutterAmt*s.flutter.step()),
+      .depth=hum*s.depthLv,
+    };
+  }
 };
 /// which way the air goes through a stretch of the plan
 const Air=enum{
@@ -875,6 +1048,15 @@ const Mouth=struct{
   lastFlow:f32=0,
   /// how much faster the folds close with the push at its middle (share)
   sharpAt:f32=0,
+  /// how slack the living throat's folds are with the push at its middle
+  /// (Rd; 0: the stiff throat)
+  rdAt:f32=0,
+  /// the throat's tremble this sample, on the loudness (share)
+  tremble:f32=0,
+  /// what the voice feels, shaping the living throat's stack (none: the stiff throat)
+  feel:?FeelShape=null,
+  /// the living throat's layers
+  stack:Stack=.{},
   /// a mouth at rest for a voice of `breath`: everything that never
   /// changes while it speaks worked out once (the high resonances, the
   /// chest, the head, the nose's hum, how fast things glide), not again
@@ -887,6 +1069,11 @@ const Mouth=struct{
     mo.kSoft=m.dampBy(m.tau*mo.softAt,dt);
     mo.octaves=v.octaves*octGain;
     mo.sharpAt=octSharp*v.octaves;
+    if(v.feel)|f|{
+      mo.feel=feelShape(f);
+      mo.rdAt=feelShape(f).rd;
+      mo.stack=Stack.init();
+    }
     mo.kAir=m.dampBy(m.tau*airHz,dt);
     mo.kEdge=m.dampBy(1/edgeS,dt);
     mo.res[3].tune(f4*v.tract,b4);
@@ -913,6 +1100,16 @@ const Mouth=struct{
       loud=@max(0,1+pushLoud*e);
       leak=1+pushAir*@max(0,-e);
     }
+    // the living throat: the push tenses or slackens the folds, and that
+    // alone shapes each pulse and how softly it closes (the stiff throat's
+    // pressing and brightening stand aside); the tremble rides the loudness
+    if(mo.rdAt>0){
+      mo.throat.press=0;
+      mo.throat.rd=mo.rdAt*@exp(-rdPush*e);
+      if(mo.throat.ta>0)mo.kSoft=m.dampBy(taOpen/mo.throat.ta,dt);
+      // (the stack's layers carry the push's loudness, each at its own pace)
+      loud=1+mo.tremble;
+    }
     // gliding toward what is asked: resonances slowly, loudness quickly
     const kf=mo.kf;
     const ka=mo.ka;
@@ -936,7 +1133,20 @@ const Mouth=struct{
     // fades over ~80 ms: a soft puff, never a tap at each start and stop)
     mo.slowVoice=m.lerp(mo.slowVoice,want.voice,mo.kEdge);
     const edgeAir=mo.edge*@abs(want.voice-mo.slowVoice);
-    const src=voiceGain*mo.soft*mo.now.voice*loud*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open*leak+edgeAir);
+    // the living throat heard as a stack of layers (a dark core, the
+    // harmonics glowing over it, breath fluttering through, a depth an
+    // octave under), each moved by the feeling and the breath at its own
+    // pace; the stiff throat is its one pulse
+    var voicing=mo.soft;
+    var airy=leak;
+    var depth:f32=0;
+    if(mo.feel)|fs|{
+      const l=mo.stack.step(fs,flow,mo.soft,e,mo.throat.phase,mo.throat.odd);
+      voicing=l.voice;
+      airy=l.air;
+      depth=l.depth;
+    }
+    const src=voiceGain*voicing*mo.now.voice*loud*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open*airy+edgeAir);
     // through the nose's dip, then the mouth's resonances
     var x=src;
     if(mo.now.nasal>nasalMin){
@@ -963,7 +1173,7 @@ const Mouth=struct{
     // felt through the body, not shaped by the mouth), and the head: the
     // nose's hum and the face's ring, always a little, as a real voice
     // hums through the face as well as the mouth (all tuned in `init`)
-    const voiced=mo.soft*mo.now.voice*loud;
+    const voiced=voicing*mo.now.voice*loud;
     // (the face rings with what the mouth makes, so it is fed the mouth's
     // own sound: the throat alone is too soft up there to set it ringing)
     const head=mo.headLow.step(voiced)*headLowGain+mo.headHigh.step(out)*headHighGain;
@@ -985,7 +1195,8 @@ const Mouth=struct{
       mo.octHigh.tune(octHighHz*mo.tract*lean,octHighBw);
       top=(mo.octLow.step(feed)+mo.octHigh.step(feed))*mo.octaves;
     }
-    return out+mo.chest.step(voiced)*chestGain+head+top;
+    // the depth an octave under, felt through the body, joined beside the chest
+    return out+mo.chest.step(voiced)*chestGain+head+top+depth*mo.now.voice*depthGain;
   }
 };
 /// the whole plan spoken: its samples at `rate`, peak-normalized
@@ -1000,6 +1211,10 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   var wander=Drift{.noise=.{.s=0x68e31da4},.every=pitchWanderS};
   // the lungs under it all
   var lungs=Lungs{};
+  // the feeling's shape on the throat, and its tremble (a living throat only)
+  const feel:?FeelShape=if(v.feel)|f|feelShape(f)else null;
+  var quaverAt:f32=0;
+  var quaverWander=Drift{.noise=.{.s=0x3c6ef372},.every=quaverWanderS};
   var i:usize=0;
   for(steps)|s|{
     const n=m.floorTo(usize,s.len*rate);
@@ -1012,7 +1227,17 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
       want.pitch=m.lerp(s.from.pitch,s.to.pitch,t);
       // the breath's push (only while it drives the voice: off, nothing moves)
       const push=if(v.push>0)lungs.step(s.air,mo.now.voice,want.lean)else 0;
-      hz=m.damp(hz,v.pitch*want.pitch*(1+pitchWander*wander.step())*(1+v.push*pushPitch*push),1/pitchS,dt);
+      // a feeling widens or narrows the line, sets where it sits, and
+      // trembles it, the loudness trembling with it
+      var line=want.pitch;
+      if(feel)|fs|{
+        quaverAt+=quaverHz*(1+quaverRateWander*quaverWander.step())*dt;
+        quaverAt-=@floor(quaverAt);
+        const q=fs.quaver*@sin(m.tau*quaverAt);
+        line=m.signedPow(want.pitch,fs.range)*fs.lift*(1+q);
+        mo.tremble=quaverLoud*q;
+      }
+      hz=m.damp(hz,v.pitch*line*(1+pitchWander*wander.step())*(1+v.push*pushPitch*push),1/pitchS,dt);
       out[i]=mo.step(want,hz,v.breath,push);
       i+=1;
     }
@@ -1115,6 +1340,7 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--tract="))v.tract=try std.fmt.parseFloat(f32,a["--tract=".len..]);
     if(startsWith(u8,a,"--push="))v.push=try std.fmt.parseFloat(f32,a["--push=".len..]);
     if(startsWith(u8,a,"--octaves="))v.octaves=try std.fmt.parseFloat(f32,a["--octaves=".len..]);
+    if(startsWith(u8,a,"--feel="))v.feel=stringToEnum(Feel,a["--feel=".len..]) orelse return error.UnknownFeel;
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
   if(text)|t|say=try spell(arena,try Dir.cwd().readFileAlloc(io,wordsPath,arena,.unlimited),t);
