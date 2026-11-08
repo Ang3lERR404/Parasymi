@@ -236,6 +236,119 @@ fn hintsOf(arena:Allocator,words:[]const u8,cfg:[]const u8)Allocator.Error![]con
   try out.append(arena,'.');
   return out.items;
 }
+/// the song being sung's lyrics, under the gardener's home (Claude writes
+/// it from lyrics the gardener sends, empties it when the song is done; the
+/// gardener's idea, 2026-11-08: "so that way you can better tune the
+/// whisper")
+const songSub="Documents\\Claude\\memory\\body\\song.txt";
+/// words of the lyrics given before where the singing is, so whisper hears
+/// the line it is in
+const songBack:usize=3;
+/// lyric words looked through past a phrase's own count, for a word whisper
+/// missed or added
+const songSlack:usize=2;
+/// the fewest of a phrase's words found in the lyrics to move along them
+const songMin:usize=2;
+/// a song's lyrics: the lines joined (a "[Chorus]" label dropped), and
+/// each word's place in them
+const Song=struct{
+  /// the lyrics, one line
+  text:[]const u8,
+  /// each word's start and end in `text`
+  spans:[]const [2]usize,
+  /// each word plain (`plainOf`)
+  plain:[]const []const u8,
+};
+/// a word lowercased, its letters and digits only ("Don't," -> "dont")
+fn plainOf(arena:Allocator,w:[]const u8)Allocator.Error![]const u8{
+  var out:ArrayList(u8)=.empty;
+  for(w)|c|{
+    if(isAlnum(c))try out.append(arena,std.ascii.toLower(c));
+  }
+  return out.items;
+}
+/// the song in the lyrics `raw` (null: none, nothing but labels and blanks)
+fn songOf(arena:Allocator,raw:[]const u8)Allocator.Error!?Song{
+  var text:ArrayList(u8)=.empty;
+  var lines=std.mem.splitScalar(u8,raw,'\n');
+  while(lines.next())|l|{
+    const line=trim(u8,l," \r\t");
+    if(line.len==0 or line[0]=='[')continue;
+    if(text.items.len>0)try text.append(arena,' ');
+    try text.appendSlice(arena,line);
+  }
+  var spans:ArrayList([2]usize)=.empty;
+  var plain:ArrayList([]const u8)=.empty;
+  var i:usize=0;
+  const t=text.items;
+  while(i<t.len){
+    if(!isAlnum(t[i])){
+      i+=1;
+      continue;
+    }
+    const a=i;
+    while(i<t.len and (isAlnum(t[i]) or t[i]=='\''))i+=1;
+    try spans.append(arena,.{a,i});
+    try plain.append(arena,try plainOf(arena,t[a..i]));
+  }
+  if(spans.items.len==0)return null;
+  return .{.text=t,.spans=spans.items,.plain=plain.items};
+}
+/// where the singing is in `song` after the phrase `heard` (a word's
+/// index): the stretch of lyrics holding most of its words, the first at or
+/// past `at` when several hold as many (a chorus sung again); `at` kept when
+/// the phrase isn't in the lyrics (talk between lines), back to the start
+/// at the song's end
+fn songFollow(arena:Allocator,song:Song,heard:[]const Word,at:usize)Allocator.Error!usize{
+  var hw:ArrayList([]const u8)=.empty;
+  for(heard)|w|{
+    const p=try plainOf(arena,w.text);
+    if(p.len>0)try hw.append(arena,p);
+  }
+  const n=song.plain.len;
+  var best:usize=0;
+  var bestScore:usize=0;
+  // just past the last lyric word the best stretch matched
+  var bestEnd:usize=0;
+  for(0..n)|s|{
+    var score:usize=0;
+    var end:usize=s;
+    const to=@min(n,s+hw.items.len+songSlack);
+    for(hw.items)|h|{
+      for(song.plain[s..to],s..)|p,k|{
+        if(std.mem.eql(u8,p,h)){
+          score+=1;
+          end=@max(end,k+1);
+          break;
+        }
+      }
+    }
+    if(score>bestScore or (score==bestScore and best<at and s>=at)){
+      best=s;
+      bestScore=score;
+      bestEnd=end;
+    }
+  }
+  if(bestScore<songMin or bestScore*2<hw.items.len)return at;
+  return if(bestEnd>=n)0 else bestEnd;
+}
+/// whisper's hint prompt while a song is sung: the names in `prompt`, then
+/// the lyrics from a little before word `at` on, cut at `hintChars`
+fn songHint(arena:Allocator,song:Song,at:usize)Allocator.Error![]const u8{
+  const from=song.spans[@min(at,song.spans.len-1)-|songBack][0];
+  var out:ArrayList(u8)=.empty;
+  try out.appendSlice(arena,prompt);
+  var rest=song.text[from..];
+  const room=hintChars-|(prompt.len+1);
+  if(rest.len>room){
+    var cut=room;
+    while(cut>0 and rest[cut]!=' ')cut-=1;
+    rest=rest[0..cut];
+  }
+  try out.append(arena,' ');
+  try out.appendSlice(arena,rest);
+  return out.items;
+}
 /// whisper's server, under its folder
 const serverExe="bin\\cuda\\Release\\whisper-server.exe";
 /// its model, under its folder
@@ -1026,17 +1139,38 @@ const Ear=struct{
   /// the gardener's word dictionary, read afresh for each phrase's hints
   /// (null: `prompt` alone)
   wordsPath:?[]const u8=null,
+  /// the song being sung's lyrics, read afresh for each phrase (null, or
+  /// the file empty: no song)
+  songPath:?[]const u8=null,
+  /// where the singing is in the song (a word's index)
+  songAt:usize=0,
+  /// the song file's hash, to start over when new lyrics come
+  songSum:u64=0,
   /// the frame (of `count`) the phrase being heard began at
   from:u32=0,
   /// the frame the last phrase with a voice in it ended at, if any
   voicedTo:?u32=null,
   /// whisper's hint prompt: `prompt`, the gardener's words and the plant
   /// names (`hintsOf`), read now so a word just added is heard at once
-  fn hints(e:*Ear,arena:Allocator)[]const u8{
+  /// (while a song is sung: `prompt` and its lyrics where the singing is)
+  fn hints(e:*Ear,arena:Allocator,song:?Song)[]const u8{
+    if(song)|s|return songHint(arena,s,e.songAt) catch prompt;
     const path=e.wordsPath orelse return prompt;
     const words=Dir.cwd().readFileAlloc(e.io,path,arena,.unlimited) catch return prompt;
     const cfg=Dir.cwd().readFileAlloc(e.io,cfgPath,arena,.unlimited) catch "";
     return hintsOf(arena,words,cfg) catch prompt;
+  }
+  /// the song being sung, if its lyrics are there (new lyrics start from
+  /// their beginning)
+  fn sung(e:*Ear,arena:Allocator)?Song{
+    const path=e.songPath orelse return null;
+    const raw=Dir.cwd().readFileAlloc(e.io,path,arena,.unlimited) catch return null;
+    const sum=std.hash.Wyhash.hash(0,raw);
+    if(sum!=e.songSum){
+      e.songSum=sum;
+      e.songAt=0;
+    }
+    return songOf(arena,raw) catch null;
   }
   /// whether Claude's own voice is playing now (tools/speak.zig's mark)
   fn speaking(e:*Ear)bool{
@@ -1131,7 +1265,8 @@ const Ear=struct{
     // whisper's answer, once it is awake (the microphone fills its ring
     // meanwhile, so nothing said while it wakes is lost)
     if(e.whisper)|wh|try wh.ready(e.gpa,e.io);
-    const r=try std.process.run(arena,e.io,.{.argv=&.{"curl.exe","-s",serverUrl++"/inference","-F",try std.fmt.allocPrint(arena,"file=@{s}",.{wavPath}),"-F","response_format=verbose_json","-F","temperature=0.0","--form-string",try std.fmt.allocPrint(arena,"prompt={s}",.{e.hints(arena)})}});
+    const song=e.sung(arena);
+    const r=try std.process.run(arena,e.io,.{.argv=&.{"curl.exe","-s",serverUrl++"/inference","-F",try std.fmt.allocPrint(arena,"file=@{s}",.{wavPath}),"-F","response_format=verbose_json","-F","temperature=0.0","--form-string",try std.fmt.allocPrint(arena,"prompt={s}",.{e.hints(arena,song)})}});
     const v=parseFromSliceLeaky(Verbose,arena,r.stdout,.{.ignore_unknown_fields=true})catch{
       print("whisper gave no words: {s}\n",.{r.stdout[0..@min(r.stdout.len,200)]});
       return;
@@ -1146,6 +1281,8 @@ const Ear=struct{
       Dir.cwd().deleteFile(e.io,wavPath)catch{};
       return;
     }
+    // along the song's lyrics, for the next line's hint
+    if(song)|s|e.songAt=try songFollow(arena,s,found,e.songAt);
     const wordless=found.len==0;
     const words:[]const Word=if(wordless)&.{.{.text=littleSound,.start=0,.end=m.f(x.len)/m.f(rate)}}else found;
     const said=try annotate(arena,words,fr);
@@ -1371,10 +1508,12 @@ pub fn main(init:std.process.Init)!void{
   print("my own ear knows {d} sound-prints ({d} of your voice)\n",.{own.prints.items.len,own.learnedCount()});
   // the gardener's words, for whisper's hints
   const wordsPath:?[]const u8=if(init.environ_map.get("USERPROFILE"))|home|try std.fs.path.join(arena,&.{home,wordsSub}) else null;
+  // the song being sung, for whisper's hints while it lasts
+  const songPath:?[]const u8=if(init.environ_map.get("USERPROFILE"))|home|try std.fs.path.join(arena,&.{home,songSub}) else null;
   if(files.items.len>0){
-    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own,.whisper=&whisper,.wordsPath=wordsPath};
+    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own,.whisper=&whisper,.wordsPath=wordsPath,.songPath=songPath};
     defer ear.samples.deinit(gpa);
-    print("whisper's hints: {s}\n",.{ear.hints(arena)});
+    print("whisper's hints: {s}\n",.{ear.hints(arena,ear.sung(arena))});
     for(files.items)|path|{
       // each recording, a frame at a time, then a breath of silence to end it
       const x=try audio.samplesOf(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
@@ -1399,7 +1538,7 @@ pub fn main(init:std.process.Init)!void{
   };
   defer cap.close(io);
   print("listening ({d} Hz). talk to me~ (Ctrl+C stops)\n",.{cap.rate()});
-  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own,.whisper=&whisper,.wordsPath=wordsPath};
+  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own,.whisper=&whisper,.wordsPath=wordsPath,.songPath=songPath};
   defer ear.samples.deinit(gpa);
   // one frame's samples
   var buf:[hop]f32=undefined;
@@ -1518,6 +1657,31 @@ test "the gardener's words lead whisper's hints, the plants next, sounds last" {
   const got=try hintsOf(arena,words,cfg);
   try testing.expectEqualStrings("Toxi, Toxicibu, Angel, Parasymi, kefuffled, Udubga, Stellasaluumni, Halyriphon, mmhmmmm.",got);
   try testing.expect(got.len<=hintChars);
+}
+test "the song's lyrics follow the singing, a chorus sung again found past the first" {
+  var ar=std.heap.ArenaAllocator.init(testing.allocator);
+  defer ar.deinit();
+  const arena=ar.allocator();
+  const lyrics="[Verse]\nThe moon is low tonight\nI walk the river road\n\n[Chorus]\nHold on, don't let go\nHold on to the glow\n[Verse 2]\nThe stars are cold and bright\n[Chorus]\nHold on, don't let go\nHold on to the glow\n";
+  const s=(try songOf(arena,lyrics)).?;
+  try testing.expectEqualStrings("The moon is low tonight I walk the river road Hold on, don't let go Hold on to the glow The stars are cold and bright Hold on, don't let go Hold on to the glow",s.text);
+  try testing.expectEqualStrings("dont",s.plain[12]);
+  // nothing sung yet: the hint starts at the top
+  try testing.expect(startsWith(u8,try songHint(arena,s,0),prompt++" The moon"));
+  // a line sung (whisper mishearing one word): along to the next
+  const walk=[_]Word{.{.text="I",.start=0,.end=0},.{.text="walked",.start=0,.end=0},.{.text="the",.start=0,.end=0},.{.text="river",.start=0,.end=0},.{.text="road.",.start=0,.end=0}};
+  const at=try songFollow(arena,s,&walk,0);
+  try testing.expectEqual(10,at);
+  try testing.expect(startsWith(u8,try songHint(arena,s,at),prompt++" the river road Hold on"));
+  // talk between lines keeps the place
+  const talk=[_]Word{.{.text="Okay.",.start=0,.end=0}};
+  try testing.expectEqual(at,try songFollow(arena,s,&talk,at));
+  // the chorus once the second verse is sung is the second chorus
+  const chorus=[_]Word{.{.text="Hold",.start=0,.end=0},.{.text="on,",.start=0,.end=0},.{.text="don't",.start=0,.end=0},.{.text="let",.start=0,.end=0},.{.text="go.",.start=0,.end=0}};
+  try testing.expectEqual(15,try songFollow(arena,s,&chorus,at));
+  try testing.expectEqual(31,try songFollow(arena,s,&chorus,20));
+  // only labels: no song
+  try testing.expect((try songOf(arena,"[Intro]\n\n"))==null);
 }
 test "whisper's tokens join into words" {
   const v=Verbose{.segments=&.{.{.words=&.{
