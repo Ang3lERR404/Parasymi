@@ -290,6 +290,19 @@ const octGain:f32=0.5;
 /// how much faster the folds close with the octaves full on (share of the
 /// open time moved from the close to the opening)
 const octSharp:f32=0.2;
+/// the fastest the close may come (share of the open time moved to the
+/// opening), so the opening never outlasts the folds being open
+const sharpMost:f32=0.27;
+/// how much the push sharpens the close (share a unit of push)
+const octPushSharp:f32=0.6;
+/// how much of the close's edge rings the top octaves
+const octEdge:f32=0.6;
+/// how much the push strengthens that edge (share a unit of push)
+const octPushEdge:f32=0.8;
+/// how much breath is puffed through the folds into the top octaves
+const octAir:f32=0.012;
+/// the furthest the high resonances lean with the mouth (times)
+const octLeanMost:f32=1.25;
 /// what kind of sound a phoneme is
 const Kind=enum{
   /// voiced and open: the resonances are the sound
@@ -860,6 +873,8 @@ const Mouth=struct{
   octHigh:Resonator=.{},
   /// the throat's last unsoftened flow, for its close's sharp edge
   lastFlow:f32=0,
+  /// how much faster the folds close with the push at its middle (share)
+  sharpAt:f32=0,
   /// a mouth at rest for a voice of `breath`: everything that never
   /// changes while it speaks worked out once (the high resonances, the
   /// chest, the head, the nose's hum, how fast things glide), not again
@@ -871,9 +886,7 @@ const Mouth=struct{
     mo.softAt=softHz+softSpan*(1-v.breath)+octSoftHz*v.octaves;
     mo.kSoft=m.dampBy(m.tau*mo.softAt,dt);
     mo.octaves=v.octaves*octGain;
-    mo.throat.sharp=octSharp*v.octaves;
-    mo.octLow.tune(octLowHz*v.tract,octLowBw);
-    mo.octHigh.tune(octHighHz*v.tract,octHighBw);
+    mo.sharpAt=octSharp*v.octaves;
     mo.kAir=m.dampBy(m.tau*airHz,dt);
     mo.kEdge=m.dampBy(1/edgeS,dt);
     mo.res[3].tune(f4*v.tract,b4);
@@ -892,8 +905,9 @@ const Mouth=struct{
     // spent, softer, darker and leakier (worked out only while it drives)
     var loud:f32=1;
     var leak:f32=1;
+    // the push about its middle, as the body feels it (0 while it does not drive)
+    const e=mo.push*push;
     if(mo.push>0){
-      const e=mo.push*push;
       mo.throat.press=@min(pressMost,@max(-pressMost,pushPress*e));
       mo.kSoft=m.dampBy(m.tau*@max(softFloorHz,mo.softAt+pushBright*e),dt);
       loud=@max(0,1+pushLoud*e);
@@ -953,13 +967,23 @@ const Mouth=struct{
     // (the face rings with what the mouth makes, so it is fed the mouth's
     // own sound: the throat alone is too soft up there to set it ringing)
     const head=mo.headLow.step(voiced)*headLowGain+mo.headHigh.step(out)*headHighGain;
-    // the top octaves: the throat's close is a sharp edge, rich far up;
-    // two high resonances ring with it (only while asked for)
+    // the top octaves (only while asked for): up there a voice is mostly
+    // breath, puffed through the folds each time they open, with a little
+    // of the close's sharp edge in it; both ride the breath's push (pushed,
+    // more edge and a sharper close; spent, softer and airier) and the two
+    // high resonances follow the mouth's own shape
     var top:f32=0;
     if(mo.octaves>0){
-      const edge=(flow-mo.lastFlow)*mo.now.voice*loud;
+      mo.throat.sharp=@min(sharpMost,mo.sharpAt*@max(0,1+octPushSharp*e));
+      const edge=(flow-mo.lastFlow)*octEdge*@max(0,1+octPushEdge*e);
       mo.lastFlow=flow;
-      top=(mo.octLow.step(edge)+mo.octHigh.step(edge))*mo.octaves;
+      const puff=mo.noise.next()*open*octAir*leak;
+      const feed=(edge+puff)*mo.now.voice*loud;
+      // the high resonances lean with the mouth's third, as the face does
+      const lean=@min(octLeanMost,@max(1/octLeanMost,mo.now.f[2]/neutralShape[2]));
+      mo.octLow.tune(octLowHz*mo.tract*lean,octLowBw);
+      mo.octHigh.tune(octHighHz*mo.tract*lean,octHighBw);
+      top=(mo.octLow.step(feed)+mo.octHigh.step(feed))*mo.octaves;
     }
     return out+mo.chest.step(voiced)*chestGain+head+top;
   }

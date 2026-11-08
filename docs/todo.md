@@ -314,7 +314,7 @@ carries the game's early days.
   hollow middle (1-2 kHz) and nothing at all above 4 kHz; `--octaves=`
   (a faster close of the folds, the throat softened less, two high
   resonances rung by the close) fills them, 0.6 matching the gardener's
-  balance band for band; awaiting their ear.
+  balance band for band. The gardener heard it buzz, every harmonic the same, not moved by breath or speech, and the push lost again: the top octaves made mostly of breath puffed through the folds as they open, the close sharpening and the edge growing with the push, the high resonances leaning with the mouth's shape; 0.4 matches their balance now; awaiting their ear.
 - **Two galaxies meeting in the night sky** (the gardener, 2026-11-04).
   A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
   their arms twisted into streamers, new stars blooming pink where their
