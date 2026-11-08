@@ -20,6 +20,8 @@ const audio=@import("audio");
 const m=engine.core.math;
 /// an allocator
 const Allocator=std.mem.Allocator;
+/// the engine's sound makers: the hall a room is made of
+const dsp=engine.core.dsp;
 /// the I/O interface every call goes through
 const Io=std.Io;
 /// a directory handle
@@ -223,6 +225,14 @@ const noseHz:f32=270;
 const noseBw:f32=100;
 /// a mouth at rest, neither open nor closed: the resonances it leans to
 const neutralShape=[3]f32{500,1500,2500};
+/// how much longer the stronger fold's pulse stays open (share of the grain)
+const grainOpen:f32=0.5;
+/// how long the small room rings (s, to -60 dB)
+const roomS:f32=0.45;
+/// how soon its first echo comes back (s)
+const roomPreS:f32=0.008;
+/// how dark its walls are (Hz): soft furnishings, not stone
+const roomDampHz:f32=3500;
 /// the loudest the voice is written (of full scale)
 const peak:f32=0.7;
 /// what kind of sound a phoneme is
@@ -478,6 +488,11 @@ const Throat=struct{
   hz:f32=basePitch,
   /// this period's own strength
   gain:f32=1,
+  /// how far the two folds fall apart, every other pulse a little
+  /// stronger and longer than the one between (0: in step)
+  grain:f32=0,
+  /// whether this period is the stronger of the pair
+  odd:bool=false,
   /// the share of this period the throat is open
   open:f32=openShare,
   /// what wavers it
@@ -490,6 +505,11 @@ const Throat=struct{
       t.hz=hz*(1+jitter*t.noise.next());
       t.gain=1+shimmer*t.noise.next();
       t.open=openShare*(1+openWobble*t.noise.next());
+      // the two folds a little apart: the pulses alternate, a grain under the note
+      t.odd=!t.odd;
+      const side:f32=if(t.odd)1 else-1;
+      t.gain*=1+t.grain*side;
+      t.open*=1+t.grain*grainOpen*side;
     }
     // opening slowly, closing fast, then shut (Rosenberg's pulse), each
     // period open a little longer or shorter than the last
@@ -507,6 +527,12 @@ pub const Voice=struct{
   breath:f32=baseBreath,
   /// how fast it speaks (1 = as written)
   pace:f32=basePace,
+  /// the throat's grain: how far its two folds fall apart (0: in step)
+  grain:f32=0,
+  /// the breath carried at the voice's edges, as it swells in and fades
+  edge:f32=0,
+  /// how much of a small room's echo rides with it (0: none)
+  room:f32=0,
   /// the body it speaks from, against Claude's own (1): below 1 a bigger
   /// body, a longer throat and a bigger chest, every resonance lower
   tract:f32=1,
@@ -709,6 +735,8 @@ const Mouth=struct{
   kSoft:f32=0,
   /// how far each sample the darkened breath follows its noise
   kAir:f32=0,
+  /// how much breath the voice's edges carry (its onsets and fades)
+  edge:f32=0,
   /// the body's size against the voice's own (below 1, bigger: every
   /// resonance lower)
   tract:f32=1,
@@ -717,7 +745,7 @@ const Mouth=struct{
   /// chest, the head, the nose's hum, how fast things glide), not again
   /// every sample
   fn init(v:Voice)Mouth{
-    var mo=Mouth{.tract=v.tract};
+    var mo=Mouth{.tract=v.tract,.edge=v.edge,.throat=.{.grain=v.grain}};
     mo.kf=m.dampBy(1/glideS,dt);
     mo.ka=m.dampBy(1/swellS,dt);
     mo.kSoft=m.dampBy(m.tau*(softHz+softSpan*(1-v.breath)),dt);
@@ -750,7 +778,9 @@ const Mouth=struct{
     // the breath, darkened: air through a throat, not a hiss
     mo.air=m.lerp(mo.air,mo.noise.next(),mo.kAir);
     const n=mo.air*airGain;
-    const src=voiceGain*mo.soft*mo.now.voice*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open);
+    // more air at the voice's edges, as it swells in and fades out
+    const edgeAir=mo.edge*@abs(want.voice-mo.now.voice);
+    const src=voiceGain*mo.soft*mo.now.voice*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open+edgeAir);
     // through the nose's dip, then the mouth's resonances
     var x=src;
     if(mo.now.nasal>nasalMin){
@@ -787,7 +817,7 @@ const Mouth=struct{
 /// the whole plan spoken: its samples at `rate`, peak-normalized
 pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   // how many samples, with a breath of quiet at the end
-  var total:f32=tailS;
+  var total:f32=tailS+(if(v.room>0)roomS else 0);
   for(steps)|s|total+=s.len;
   const out=try arena.alloc(f32,m.floorTo(usize,total*rate));
   var mo=Mouth.init(v);
@@ -810,6 +840,16 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
     }
   }
   while(i<out.len):(i+=1)out[i]=mo.step(.{.f=neutralShape,.voice=0},hz,v.breath);
+  // a room round the voice: a small one, the voice coming back off its
+  // walls a little, the dry voice kept
+  if(v.room>0){
+    const hall=try arena.create(dsp.Hall);
+    hall.*=.init(roomS,roomPreS,roomDampHz,rate);
+    for(out)|*x|{
+      const wet=hall.tick(dsp.mid(x.*));
+      x.*+=v.room*m.sumOf(f32,2,wet)*0.5;
+    }
+  }
   // as loud as it may be, no louder
   var top:f32=1e-9;
   for(out)|x|top=@max(top,@abs(x));
@@ -891,6 +931,9 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--pitch="))v.pitch=try std.fmt.parseFloat(f32,a["--pitch=".len..]);
     if(startsWith(u8,a,"--breath="))v.breath=try std.fmt.parseFloat(f32,a["--breath=".len..]);
     if(startsWith(u8,a,"--pace="))v.pace=try std.fmt.parseFloat(f32,a["--pace=".len..]);
+    if(startsWith(u8,a,"--grain="))v.grain=try std.fmt.parseFloat(f32,a["--grain=".len..]);
+    if(startsWith(u8,a,"--edge="))v.edge=try std.fmt.parseFloat(f32,a["--edge=".len..]);
+    if(startsWith(u8,a,"--room="))v.room=try std.fmt.parseFloat(f32,a["--room=".len..]);
     if(startsWith(u8,a,"--tract="))v.tract=try std.fmt.parseFloat(f32,a["--tract=".len..]);
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
