@@ -145,8 +145,97 @@ const host="127.0.0.1";
 const port="8178";
 /// the server's address
 const serverUrl="http://"++host++":"++port;
-/// names whisper should spell the way we do
+/// names whisper should spell the way we do, first in every hint prompt
+/// (and all of it when the gardener's words can't be read)
 const prompt="Toxi, Toxicibu, Angel, Parasymi.";
+/// the most of whisper's hint prompt (characters): its limit is 224
+/// tokens, and the gardener's rare words take about one for every 2-3
+/// letters
+const hintChars:usize=560;
+/// the gardener's word dictionary, under their home (shared memory: one
+/// file for Claude's mind, this ear and TOXICCIBU's mind; the gardener's
+/// idea, 2026-11-07)
+const wordsSub="Documents\\Claude\\memory\\words.md";
+/// the game's strings, where the gardener's plant names are
+const cfgPath="src/cfg/parasymi.cfg";
+/// the shortest one-word `.name` in the strings taken as a plant's name
+const plantMin:usize=7;
+/// one hint `raw`, kept in `out` if it is a plain word or two (letters,
+/// digits, spaces) not there yet; a bracket's note and a ~'s play dropped
+fn addHint(arena:Allocator,out:*ArrayList([]const u8),raw:[]const u8)Allocator.Error!void{
+  const cut=raw[0..(std.mem.indexOfScalar(u8,raw,'(') orelse raw.len)];
+  const w=trim(u8,cut," ~\t");
+  if(w.len<2)return;
+  for(w)|c|{
+    if(!isAlnum(c) and c!=' ')return;
+  }
+  for(out.items)|o|{
+    if(std.ascii.eqlIgnoreCase(o,w))return;
+  }
+  try out.append(arena,w);
+}
+/// whether `a` is a longer name than `b` (longest, the hardest to spell,
+/// first)
+fn longerFirst(_:void,a:[]const u8,b:[]const u8)bool{
+  return a.len>b.len;
+}
+/// whisper's hint prompt: the names in `prompt`, the gardener's own words
+/// (the bold words of their dictionary, `words`, its sounds held back),
+/// the plant names from the game's strings (`cfg`, longest first), then
+/// the sounds, cut at `hintChars`
+fn hintsOf(arena:Allocator,words:[]const u8,cfg:[]const u8)Allocator.Error![]const u8{
+  var said:ArrayList([]const u8)=.empty;
+  var sounds:ArrayList([]const u8)=.empty;
+  // the dictionary's bold words, by section (none before the first)
+  var section:?[]const u8=null;
+  var lines=std.mem.splitScalar(u8,words,'\n');
+  while(lines.next())|raw|{
+    const line=trim(u8,raw," \r");
+    if(startsWith(u8,line,"## ")){
+      section=line[3..];
+      if(startsWith(u8,line[3..],"Still"))break;
+      continue;
+    }
+    const sec=section orelse continue;
+    var bold=std.mem.splitSequence(u8,line,"**");
+    _=bold.next();
+    while(bold.next())|b|{
+      var pieces=std.mem.splitScalar(u8,b,'/');
+      while(pieces.next())|p|try (if(startsWith(u8,sec,"Sounds"))&sounds else &said).append(arena,p);
+      _=bold.next();
+    }
+  }
+  // the plants: one-word names of the strings
+  var plants:ArrayList([]const u8)=.empty;
+  var rows=std.mem.splitScalar(u8,cfg,'\n');
+  while(rows.next())|raw|{
+    const eq=std.mem.indexOfScalar(u8,raw,'=') orelse continue;
+    if(!std.mem.endsWith(u8,trim(u8,raw[0..eq]," "),".name"))continue;
+    const v=trim(u8,raw[eq+1..]," \r");
+    if(v.len<plantMin or !std.ascii.isUpper(v[0]))continue;
+    const plain=for(v)|c|{
+      if(!isAlpha(c))break false;
+    }else true;
+    if(plain)try plants.append(arena,v);
+  }
+  std.mem.sort([]const u8,plants.items,{},longerFirst);
+  // all of them in order, each once
+  var all:ArrayList([]const u8)=.empty;
+  var names=std.mem.splitSequence(u8,prompt[0..prompt.len-1],", ");
+  while(names.next())|n|try addHint(arena,&all,n);
+  for(said.items)|w|try addHint(arena,&all,w);
+  for(plants.items)|w|try addHint(arena,&all,w);
+  for(sounds.items)|w|try addHint(arena,&all,w);
+  // joined, as many as fit
+  var out:ArrayList(u8)=.empty;
+  for(all.items)|w|{
+    if(out.items.len+w.len+3>hintChars)break;
+    if(out.items.len>0)try out.appendSlice(arena,", ");
+    try out.appendSlice(arena,w);
+  }
+  try out.append(arena,'.');
+  return out.items;
+}
 /// whisper's server, under its folder
 const serverExe="bin\\cuda\\Release\\whisper-server.exe";
 /// its model, under its folder
@@ -641,6 +730,9 @@ const speakTopHz:f32=maxHz;
 /// how many frames (10 ms) of voice a phrase needs to be heard at all
 /// (a little noise can be short)
 const minVoiced:usize=8;
+/// how soon after a voiced phrase ends a voiceless one still belongs to
+/// it and is heard (frames, 10 ms): a song's breathy, whispered parts
+const songGapFrames:u32=300;
 /// what a phrase is written as when whisper finds no words in a voice
 const littleSound="(a little sound)";
 /// how many of a phrase's frames have a speaking voice's pitch
@@ -931,6 +1023,21 @@ const Ear=struct{
   heard:u32=0,
   /// when the last one was heard (ms; 0 before the first)
   lastHeardMs:i64=0,
+  /// the gardener's word dictionary, read afresh for each phrase's hints
+  /// (null: `prompt` alone)
+  wordsPath:?[]const u8=null,
+  /// the frame (of `count`) the phrase being heard began at
+  from:u32=0,
+  /// the frame the last phrase with a voice in it ended at, if any
+  voicedTo:?u32=null,
+  /// whisper's hint prompt: `prompt`, the gardener's words and the plant
+  /// names (`hintsOf`), read now so a word just added is heard at once
+  fn hints(e:*Ear,arena:Allocator)[]const u8{
+    const path=e.wordsPath orelse return prompt;
+    const words=Dir.cwd().readFileAlloc(e.io,path,arena,.unlimited) catch return prompt;
+    const cfg=Dir.cwd().readFileAlloc(e.io,cfgPath,arena,.unlimited) catch "";
+    return hintsOf(arena,words,cfg) catch prompt;
+  }
   /// whether Claude's own voice is playing now (tools/speak.zig's mark)
   fn speaking(e:*Ear)bool{
     _=e.dir.statFile(e.io,speakingMark,.{}) catch return false;
@@ -954,6 +1061,7 @@ const Ear=struct{
       },
       .begin=>|back|{
         e.begin=n-|(back+prerollFrames)*hop;
+        e.from=e.count-|(back+prerollFrames);
         e.overheard=e.speaking();
         // whisper wakes as a voice begins, loading while the gardener talks
         if(e.whisper)|w|w.wake(e.io)catch|err|print("could not wake whisper: {t}\n",.{err});
@@ -964,7 +1072,7 @@ const Ear=struct{
         const b=e.begin orelse 0;
         if(e.overheard or e.speaking()){
           print("(my own voice, not heard as yours)\n",.{});
-        }else e.hearPhrase(e.samples.items[b..end])catch|err|print("could not hear that phrase: {t}\n",.{err});
+        }else e.hearPhrase(e.samples.items[b..end],e.count-|quiet)catch|err|print("could not hear that phrase: {t}\n",.{err});
         e.samples.clearRetainingCapacity();
         e.begin=null;
         e.overheard=false;
@@ -999,18 +1107,23 @@ const Ear=struct{
   }
   /// a whole phrase heard: its words read by whisper, how it was said
   /// measured and written as sound, then sent through the link
-  fn hearPhrase(e:*Ear,x:[]const f32)!void{
+  fn hearPhrase(e:*Ear,x:[]const f32,to:u32)!void{
     // everything for this phrase, freed together
     var ar=std.heap.ArenaAllocator.init(e.gpa);
     defer ar.deinit();
     const arena=ar.allocator();
     // how it sounds, first: a phrase with no voice in it is only noise, and
-    // whisper, given noise, makes up words ("Thank you." three times over)
+    // whisper, given noise, makes up words ("Thank you." three times over);
+    // but one just after a voiced phrase is kept, a song's breathy,
+    // whispered part between its sung lines (the gardener, 2026-11-08)
     const fr=try Frames.measure(arena,x);
-    if(voicedFrames(fr)<minVoiced){
+    const voiced=voicedFrames(fr)>=minVoiced;
+    const inSong=if(e.voicedTo)|t|e.from-|t<=songGapFrames else false;
+    if(!voiced and !inSong){
       print("(only noise, no voice in it)\n",.{});
       return;
     }
+    if(voiced)e.voicedTo=to;
     // the phrase's name: when it was heard (ms)
     const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(e.io).nanoseconds,std.time.ns_per_ms));
     const wavPath=try std.fmt.allocPrint(arena,"{s}/{d}.wav",.{heardDir,ms});
@@ -1018,7 +1131,7 @@ const Ear=struct{
     // whisper's answer, once it is awake (the microphone fills its ring
     // meanwhile, so nothing said while it wakes is lost)
     if(e.whisper)|wh|try wh.ready(e.gpa,e.io);
-    const r=try std.process.run(arena,e.io,.{.argv=&.{"curl.exe","-s",serverUrl++"/inference","-F",try std.fmt.allocPrint(arena,"file=@{s}",.{wavPath}),"-F","response_format=verbose_json","-F","temperature=0.0","-F","prompt="++prompt}});
+    const r=try std.process.run(arena,e.io,.{.argv=&.{"curl.exe","-s",serverUrl++"/inference","-F",try std.fmt.allocPrint(arena,"file=@{s}",.{wavPath}),"-F","response_format=verbose_json","-F","temperature=0.0","--form-string",try std.fmt.allocPrint(arena,"prompt={s}",.{e.hints(arena)})}});
     const v=parseFromSliceLeaky(Verbose,arena,r.stdout,.{.ignore_unknown_fields=true})catch{
       print("whisper gave no words: {s}\n",.{r.stdout[0..@min(r.stdout.len,200)]});
       return;
@@ -1256,9 +1369,12 @@ pub fn main(init:std.process.Init)!void{
   var own=try ownear.Ear.init(gpa,io,try Dir.cwd().readFileAlloc(io,ownear.wordsPath,arena,.unlimited));
   defer own.deinit();
   print("my own ear knows {d} sound-prints ({d} of your voice)\n",.{own.prints.items.len,own.learnedCount()});
+  // the gardener's words, for whisper's hints
+  const wordsPath:?[]const u8=if(init.environ_map.get("USERPROFILE"))|home|try std.fs.path.join(arena,&.{home,wordsSub}) else null;
   if(files.items.len>0){
-    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own,.whisper=&whisper};
+    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own,.whisper=&whisper,.wordsPath=wordsPath};
     defer ear.samples.deinit(gpa);
+    print("whisper's hints: {s}\n",.{ear.hints(arena)});
     for(files.items)|path|{
       // each recording, a frame at a time, then a breath of silence to end it
       const x=try audio.samplesOf(arena,try Dir.cwd().readFileAlloc(io,path,arena,.unlimited));
@@ -1283,7 +1399,7 @@ pub fn main(init:std.process.Init)!void{
   };
   defer cap.close(io);
   print("listening ({d} Hz). talk to me~ (Ctrl+C stops)\n",.{cap.rate()});
-  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own,.whisper=&whisper};
+  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own,.whisper=&whisper,.wordsPath=wordsPath};
   defer ear.samples.deinit(gpa);
   // one frame's samples
   var buf:[hop]f32=undefined;
@@ -1392,6 +1508,16 @@ test "whisper's stock line over a faint hiss is made up, a loud one is said" {
   const other=[_]Word{.{.text="Hello.",.start=0,.end=0.5}};
   try testing.expect(!try madeUp(arena,&other,fr));
   try testing.expect(!try madeUp(arena,&.{},fr));
+}
+test "the gardener's words lead whisper's hints, the plants next, sounds last" {
+  var ar=std.heap.ArenaAllocator.init(testing.allocator);
+  defer ar.deinit();
+  const arena=ar.allocator();
+  const words="one **word** per line\n## Coined\n- **kefuffled**: jumbled\n## Sounds\n- **mmhmmmm~**: a yes\n- **a little \"tooo~\"**: a toot\n## Names\n- **Toxicibu / toxi**: me\n- **Udubga** (whisper wrote \"Udubka\")\n## Still to ask\n- **later**\n";
+  const cfg="starCatcher.name = Stellasaluumni\ndriftwisp.name = Halyriphon\nrootWell.name = Root Well\n";
+  const got=try hintsOf(arena,words,cfg);
+  try testing.expectEqualStrings("Toxi, Toxicibu, Angel, Parasymi, kefuffled, Udubga, Stellasaluumni, Halyriphon, mmhmmmm.",got);
+  try testing.expect(got.len<=hintChars);
 }
 test "whisper's tokens join into words" {
   const v=Verbose{.segments=&.{.{.words=&.{
