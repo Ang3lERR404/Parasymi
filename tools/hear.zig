@@ -64,8 +64,17 @@ const framesPerS:f32=m.ratio(rate,hop);
 const pitchWin:usize=640;
 /// the lowest and highest voice pitch looked for (Hz)
 const minHz:f32=70;
-/// the highest voice pitch looked for (Hz), a squeal included
-const maxHz:f32=800;
+/// the highest voice pitch looked for (Hz), a squeal included (raised to
+/// reach the gardener's own top: an A#5, ~940 Hz)
+const maxHz:f32=1000;
+/// a reading further above the phrase's middle pitch than this (times)
+/// is doubted: likely an octave or more too high
+const strayAbove:f32=1.8;
+/// how far a voice can climb from one frame to the next (times): a real
+/// squeak glides up through the frames, a false reading jumps
+const glideMost:f32=1.4;
+/// the fewest voiced readings a phrase needs before any are doubted
+const mendLeast:usize=8;
 /// above this share of samples crossing zero, a frame is hiss, not voice
 /// (a voice's crossings follow its low resonances; an s rushes past 4 kHz)
 const hissCrossings:f32=0.25;
@@ -288,7 +297,41 @@ const Frames=struct{
       fr.db[i]=dbOf(x[i*hop..][0..hop]);
       fr.hz[i]=if(i*hop+pitchNeeds<=x.len)pitchAt(x[i*hop..])else null;
     }
+    try fr.mend(arena);
     return fr;
+  }
+  /// every reading checked against the phrase's own voice: one far above
+  /// its middle pitch is kept only when the voice glided up to it from the
+  /// frame before (a real squeak or a sung leap); one that jumped there
+  /// (a frame fooled an octave or more too high, as the gardener caught,
+  /// 2026-11-07) is brought down by whole octaves to where the voice is,
+  /// or dropped
+  fn mend(fr:Frames,arena:Allocator)Allocator.Error!void{
+    // the voiced readings, sorted, for the phrase's middle pitch
+    var all:ArrayList(f32)=.empty;
+    for(fr.hz)|h|{
+      if(h)|v|try all.append(arena,v);
+    }
+    if(all.items.len<mendLeast)return;
+    const mid=try median(arena,all.items);
+    // the reading kept in the frame before, if it was voiced
+    var prev:?f32=null;
+    for(fr.hz)|*h|{
+      const v=h.* orelse {
+        prev=null;
+        continue;
+      };
+      if(v>mid*strayAbove){
+        const glided=if(prev)|p|v<=p*glideMost else false;
+        if(!glided){
+          // brought down by octaves to the voice, or dropped
+          var d=v;
+          while(d>mid*strayAbove)d*=0.5;
+          h.*=if(d>=mid/strayAbove)d else null;
+        }
+      }
+      prev=h.*;
+    }
   }
   /// the frames from `a` to `b` seconds, kept inside the phrase
   fn span(fr:Frames,a:f32,b:f32)struct{usize,usize}{
