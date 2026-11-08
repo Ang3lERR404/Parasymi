@@ -306,6 +306,10 @@ carries the game's early days.
   built as settings, Toxi-sized read right, the rest awaiting the
   gardener's verdict.) Still flat at its base: "needs more like..
   octaves?", and "everything needs layers" (the gardener, 2026-11-07).
+  Then: "tones that sound more natural and modulate from the breath":
+  the breath's push built as a setting (`--push=`, lungs filled in each
+  pause and spent through each phrase, lifting pitch, loudness and
+  brightness together), awaiting the gardener's ear.
 - **Two galaxies meeting in the night sky** (the gardener, 2026-11-04).
   A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
   their arms twisted into streamers, new stars blooming pink where their

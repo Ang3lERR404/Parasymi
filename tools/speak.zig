@@ -237,6 +237,41 @@ const roomPreS:f32=0.008;
 const roomDampHz:f32=3500;
 /// the loudest the voice is written (of full scale)
 const peak:f32=0.7;
+/// how long the lungs take to fill in a pause (s): a quick breath in
+const fillS:f32=0.12;
+/// how much of a full breath one second of voice spends: a ~2.5 s
+/// phrase runs from full to near its last
+const spendS:f32=0.28;
+/// the breath's push when the lungs are half spent: the voice's middle,
+/// so the push swings round it (above, louder and higher; below, softer)
+const pushMid:f32=0.7;
+/// how far the push swells and sags on its own as it is spent (share)
+const pushSwell:f32=0.18;
+/// how long one swell takes (s): slower than a syllable
+const pushSwellS:f32=0.6;
+/// the extra push a stressed sound is leaned on with
+const pushStress:f32=0.35;
+/// how long the push takes to follow (s): a body, not a switch
+const pushS:f32=0.05;
+/// how much the push lifts the pitch (share a unit of push): in the
+/// gardener's own voice, louder rides with higher
+const pushPitch:f32=0.14;
+/// how much it raises the voice's loudness (share a unit of push)
+const pushLoud:f32=0.9;
+/// how much brighter it makes the throat (Hz a unit of push): the
+/// harmonics high up opening as the push rises
+const pushBright:f32=2400;
+/// how much it presses the folds shut sooner (share of the open time a
+/// unit of push): a sharper close, richer up high
+const pushPress:f32=0.4;
+/// how much more air leaks through as the push runs out (share a unit
+/// of push spent below the middle)
+const pushAir:f32=1.5;
+/// the most the push presses the folds shut sooner, or lets them stay
+/// open longer (share)
+const pressMost:f32=0.5;
+/// the throat's softening never goes darker than this (Hz)
+const softFloorHz:f32=150;
 /// what kind of sound a phoneme is
 const Kind=enum{
   /// voiced and open: the resonances are the sound
@@ -497,6 +532,8 @@ const Throat=struct{
   odd:bool=false,
   /// the share of this period the throat is open
   open:f32=openShare,
+  /// how much sooner the breath's push presses the folds shut (share)
+  press:f32=0,
   /// what wavers it
   noise:Noise=.{.s=0x2545f491},
   /// one sample of the pulse's flow, and how open the throat is (0..1)
@@ -512,6 +549,8 @@ const Throat=struct{
       const side:f32=if(t.odd)1 else-1;
       t.gain*=1+t.grain*side;
       t.open*=1+t.grain*grainOpen*side;
+      // pressed shut sooner the harder the breath pushes
+      t.open*=1-t.press;
     }
     // opening slowly, closing fast, then shut (Rosenberg's pulse), each
     // period open a little longer or shorter than the last
@@ -538,6 +577,40 @@ pub const Voice=struct{
   /// the body it speaks from, against Claude's own (1): below 1 a bigger
   /// body, a longer throat and a bigger chest, every resonance lower
   tract:f32=1,
+  /// how much the breath drives the voice (0: not at all): the lungs fill
+  /// in each pause and are spent through each phrase, and their push lifts
+  /// the pitch, the loudness and the brightness together, leaking more air
+  /// as it runs out
+  push:f32=0,
+};
+/// which way the air goes through a stretch of the plan
+const Air=enum{
+  /// out: the voice spends it
+  out,
+  /// in: a pause, the lungs fill
+  in,
+};
+/// the lungs: the breath's push under the voice, filled in each pause,
+/// spent while speaking, swelling and sagging a little on its own
+const Lungs=struct{
+  /// how full they are (0..1)
+  full:f32=1,
+  /// the push as the voice feels it, followed smoothly
+  push:f32=1,
+  /// the push's own slow swell
+  swell:Drift=.{.noise=.{.s=0x7f4a7c15},.every=pushSwellS},
+  /// one sample: the air going `air`, the voice sounding at `voicing`
+  /// (0..1) with `lean` more push on a stressed sound; the push about the
+  /// voice's middle (0 at the middle, above it pushing harder)
+  fn step(l:*Lungs,air:Air,voicing:f32,lean:f32)f32{
+    switch(air){
+      .in=>l.full=m.damp(l.full,1,1/fillS,dt),
+      .out=>l.full=@max(0,l.full-spendS*voicing*dt),
+    }
+    const want=l.full*(1+pushSwell*l.swell.step())+pushStress*lean;
+    l.push=m.damp(l.push,want,1/pushS,dt);
+    return l.push-pushMid;
+  }
 };
 /// what one stretch of time asks of the mouth: resonances, loudness of
 /// each source, a hiss's shape, a nasal's dip, and the pitch
@@ -560,6 +633,8 @@ const Target=struct{
   dipHz:f32=1000,
   /// the pitch here (times the voice's own)
   pitch:f32=1,
+  /// how much more the breath leans on it (a stressed sound: 1)
+  lean:f32=0,
 };
 /// one stretch of the plan: how long, and what it asks
 pub const Step=struct{
@@ -569,6 +644,8 @@ pub const Step=struct{
   from:Target,
   /// and at its end (a diphthong moves; most hold)
   to:Target,
+  /// which way the air goes: out while speaking, in through a pause
+  air:Air=.out,
 };
 /// the shape a sound leans toward when it has none of its own: the next
 /// vowel's (for an aspirate's breath), or a neutral one
@@ -598,7 +675,7 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
       drift=if(s.close==.hang)to else 1;
       // the pause: a comma is a little breath, an end a quiet one
       const air=Target{.f=neutralShape,.voice=0,.breath=if(s.close==.hang)commaBreath else 0};
-      try out.append(arena,.{.len=(if(s.close==.hang)commaS else endS)/v.pace,.from=air,.to=.{.f=air.f,.voice=0}});
+      try out.append(arena,.{.len=(if(s.close==.hang)commaS else endS)/v.pace,.from=air,.to=.{.f=air.f,.voice=0},.air=.in});
       phraseAt=out.items.len;
       continue;
     };
@@ -607,8 +684,9 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
     var len=sh.len/v.pace;
     if(s.stressed)len*=stressLong;
     if(s.held)len*=heldLong;
-    // the pitch lifted on a stressed sound
+    // the pitch lifted on a stressed sound, and the breath leaning on it
     const lift:f32=if(s.stressed)stressLift else 1;
+    const lean:f32=if(s.stressed)1 else 0;
     // the voice's own breath on every voiced sound
     const vb=v.breath*voicedBreath;
     switch(sh.kind){
@@ -618,7 +696,7 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
         const into:f32=if(s.stressed)leanIn else 1;
         const outOf:f32=if(s.stressed)leanOut else 1;
         const end=if(sh.kind==.diphthong)sh.to else sh.f;
-        try out.append(arena,.{.len=len,.from=.{.f=sh.f,.voice=1,.breath=vb,.pitch=lift*into},.to=.{.f=end,.voice=vowelFade,.breath=vb,.pitch=lift*outOf}});
+        try out.append(arena,.{.len=len,.from=.{.f=sh.f,.voice=1,.breath=vb,.pitch=lift*into,.lean=lean},.to=.{.f=end,.voice=vowelFade,.breath=vb,.pitch=lift*outOf,.lean=lean}});
       },
       .glide=>{
         const t=Target{.f=sh.f,.voice=glideVoice,.breath=vb,.pitch=lift};
@@ -746,15 +824,20 @@ const Mouth=struct{
   /// the body's size against the voice's own (below 1, bigger: every
   /// resonance lower)
   tract:f32=1,
+  /// how much the breath's push drives the voice (0: not at all)
+  push:f32=0,
+  /// how bright the throat's softening is with the push at its middle (Hz)
+  softAt:f32=softHz,
   /// a mouth at rest for a voice of `breath`: everything that never
   /// changes while it speaks worked out once (the high resonances, the
   /// chest, the head, the nose's hum, how fast things glide), not again
   /// every sample
   fn init(v:Voice)Mouth{
-    var mo=Mouth{.tract=v.tract,.edge=v.edge,.throat=.{.grain=v.grain}};
+    var mo=Mouth{.tract=v.tract,.edge=v.edge,.push=v.push,.throat=.{.grain=v.grain}};
     mo.kf=m.dampBy(1/glideS,dt);
     mo.ka=m.dampBy(1/swellS,dt);
-    mo.kSoft=m.dampBy(m.tau*(softHz+softSpan*(1-v.breath)),dt);
+    mo.softAt=softHz+softSpan*(1-v.breath);
+    mo.kSoft=m.dampBy(m.tau*mo.softAt,dt);
     mo.kAir=m.dampBy(m.tau*airHz,dt);
     mo.kEdge=m.dampBy(1/edgeS,dt);
     mo.res[3].tune(f4*v.tract,b4);
@@ -765,8 +848,21 @@ const Mouth=struct{
     mo.headHigh.tune(headHighHz*v.tract,headHighBw);
     return mo;
   }
-  /// one sample: the plan's target `want` at pitch `hz`
-  fn step(mo:*Mouth,want:Target,hz:f32,breath:f32)f32{
+  /// one sample: the plan's target `want` at pitch `hz`, the breath
+  /// pushing `push` about its middle
+  fn step(mo:*Mouth,want:Target,hz:f32,breath:f32,push:f32)f32{
+    // the breath's push: harder, the folds pressed shut sooner and the
+    // throat brighter (its harmonics opening up high), the voice louder;
+    // spent, softer, darker and leakier (worked out only while it drives)
+    var loud:f32=1;
+    var leak:f32=1;
+    if(mo.push>0){
+      const e=mo.push*push;
+      mo.throat.press=@min(pressMost,@max(-pressMost,pushPress*e));
+      mo.kSoft=m.dampBy(m.tau*@max(softFloorHz,mo.softAt+pushBright*e),dt);
+      loud=@max(0,1+pushLoud*e);
+      leak=1+pushAir*@max(0,-e);
+    }
     // gliding toward what is asked: resonances slowly, loudness quickly
     const kf=mo.kf;
     const ka=mo.ka;
@@ -790,7 +886,7 @@ const Mouth=struct{
     // fades over ~80 ms: a soft puff, never a tap at each start and stop)
     mo.slowVoice=m.lerp(mo.slowVoice,want.voice,mo.kEdge);
     const edgeAir=mo.edge*@abs(want.voice-mo.slowVoice);
-    const src=voiceGain*mo.soft*mo.now.voice*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open+edgeAir);
+    const src=voiceGain*mo.soft*mo.now.voice*loud*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open*leak+edgeAir);
     // through the nose's dip, then the mouth's resonances
     var x=src;
     if(mo.now.nasal>nasalMin){
@@ -817,7 +913,7 @@ const Mouth=struct{
     // felt through the body, not shaped by the mouth), and the head: the
     // nose's hum and the face's ring, always a little, as a real voice
     // hums through the face as well as the mouth (all tuned in `init`)
-    const voiced=mo.soft*mo.now.voice;
+    const voiced=mo.soft*mo.now.voice*loud;
     // (the face rings with what the mouth makes, so it is fed the mouth's
     // own sound: the throat alone is too soft up there to set it ringing)
     const head=mo.headLow.step(voiced)*headLowGain+mo.headHigh.step(out)*headHighGain;
@@ -834,6 +930,8 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   // the pitch, gliding along its own line and wandering a little off it
   var hz=v.pitch;
   var wander=Drift{.noise=.{.s=0x68e31da4},.every=pitchWanderS};
+  // the lungs under it all
+  var lungs=Lungs{};
   var i:usize=0;
   for(steps)|s|{
     const n=m.floorTo(usize,s.len*rate);
@@ -844,12 +942,14 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
       var want=s.from;
       for(0..3)|j|want.f[j]=m.lerp(s.from.f[j],s.to.f[j],t);
       want.pitch=m.lerp(s.from.pitch,s.to.pitch,t);
-      hz=m.damp(hz,v.pitch*want.pitch*(1+pitchWander*wander.step()),1/pitchS,dt);
-      out[i]=mo.step(want,hz,v.breath);
+      // the breath's push (only while it drives the voice: off, nothing moves)
+      const push=if(v.push>0)lungs.step(s.air,mo.now.voice,want.lean)else 0;
+      hz=m.damp(hz,v.pitch*want.pitch*(1+pitchWander*wander.step())*(1+v.push*pushPitch*push),1/pitchS,dt);
+      out[i]=mo.step(want,hz,v.breath,push);
       i+=1;
     }
   }
-  while(i<out.len):(i+=1)out[i]=mo.step(.{.f=neutralShape,.voice=0},hz,v.breath);
+  while(i<out.len):(i+=1)out[i]=mo.step(.{.f=neutralShape,.voice=0},hz,v.breath,0);
   // a room round the voice: a small one, the voice coming back off its
   // walls a little, the dry voice kept
   if(v.room>0){
@@ -945,6 +1045,7 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--edge="))v.edge=try std.fmt.parseFloat(f32,a["--edge=".len..]);
     if(startsWith(u8,a,"--room="))v.room=try std.fmt.parseFloat(f32,a["--room=".len..]);
     if(startsWith(u8,a,"--tract="))v.tract=try std.fmt.parseFloat(f32,a["--tract=".len..]);
+    if(startsWith(u8,a,"--push="))v.push=try std.fmt.parseFloat(f32,a["--push=".len..]);
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
   if(text)|t|say=try spell(arena,try Dir.cwd().readFileAlloc(io,wordsPath,arena,.unlimited),t);
