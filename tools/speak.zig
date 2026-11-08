@@ -225,6 +225,8 @@ const noseHz:f32=270;
 const noseBw:f32=100;
 /// a mouth at rest, neither open nor closed: the resonances it leans to
 const neutralShape=[3]f32{500,1500,2500};
+/// how long the breath at the voice's edges swells and fades (s)
+const edgeS:f32=0.08;
 /// how much longer the stronger fold's pulse stays open (share of the grain)
 const grainOpen:f32=0.5;
 /// how long the small room rings (s, to -60 dB)
@@ -737,6 +739,10 @@ const Mouth=struct{
   kAir:f32=0,
   /// how much breath the voice's edges carry (its onsets and fades)
   edge:f32=0,
+  /// the voice's loudness followed slowly, for the breath at its edges
+  slowVoice:f32=0,
+  /// how far each sample that slow follower moves
+  kEdge:f32=0,
   /// the body's size against the voice's own (below 1, bigger: every
   /// resonance lower)
   tract:f32=1,
@@ -750,6 +756,7 @@ const Mouth=struct{
     mo.ka=m.dampBy(1/swellS,dt);
     mo.kSoft=m.dampBy(m.tau*(softHz+softSpan*(1-v.breath)),dt);
     mo.kAir=m.dampBy(m.tau*airHz,dt);
+    mo.kEdge=m.dampBy(1/edgeS,dt);
     mo.res[3].tune(f4*v.tract,b4);
     mo.res[4].tune(f5*v.tract,b5);
     mo.nose.tune(noseHz,noseBw);
@@ -779,7 +786,10 @@ const Mouth=struct{
     mo.air=m.lerp(mo.air,mo.noise.next(),mo.kAir);
     const n=mo.air*airGain;
     // more air at the voice's edges, as it swells in and fades out
-    const edgeAir=mo.edge*@abs(want.voice-mo.now.voice);
+    // (measured against a slow follower of the voice, so the air swells and
+    // fades over ~80 ms: a soft puff, never a tap at each start and stop)
+    mo.slowVoice=m.lerp(mo.slowVoice,want.voice,mo.kEdge);
+    const edgeAir=mo.edge*@abs(want.voice-mo.slowVoice);
     const src=voiceGain*mo.soft*mo.now.voice*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open+edgeAir);
     // through the nose's dip, then the mouth's resonances
     var x=src;
