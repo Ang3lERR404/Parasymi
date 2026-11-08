@@ -301,7 +301,11 @@ carries the game's early days.
   throat into one mouth. A real voice is layered, the chest humming
   under the throat, the nose and head ringing with it, the breath
   through all of them. Add those layers, one at a time, by ear. The
-  breath already fits; keep it.
+  breath already fits; keep it. (Since: chest and head in, picked by
+  ear; a body size, throat grain, breath at the edges and a small room
+  built as settings, Toxi-sized read right, the rest awaiting the
+  gardener's verdict.) Still flat at its base: "needs more like..
+  octaves?", and "everything needs layers" (the gardener, 2026-11-07).
 - **Two galaxies meeting in the night sky** (the gardener, 2026-11-04).
   A band like the Milky Way's, but torn: Andromeda swollen huge beside it,
   their arms twisted into streamers, new stars blooming pink where their
