@@ -272,6 +272,24 @@ const pushAir:f32=1.5;
 const pressMost:f32=0.5;
 /// the throat's softening never goes darker than this (Hz)
 const softFloorHz:f32=150;
+/// how much less the throat is softened with the octaves full on (Hz):
+/// its harmonics kept up through the middle, where a voice's presence is
+const octSoftHz:f32=1500;
+/// the voice's top octaves: two high resonances beside the mouth's row,
+/// rung by the throat's own sharp close (Hz), where the gardener's voice
+/// still rings and Claude's had nothing
+const octLowHz:f32=4900;
+/// its width (Hz)
+const octLowBw:f32=700;
+/// the higher one (Hz)
+const octHighHz:f32=6300;
+/// its width (Hz)
+const octHighBw:f32=1000;
+/// how loud the top octaves ring with the octaves full on
+const octGain:f32=0.5;
+/// how much faster the folds close with the octaves full on (share of the
+/// open time moved from the close to the opening)
+const octSharp:f32=0.2;
 /// what kind of sound a phoneme is
 const Kind=enum{
   /// voiced and open: the resonances are the sound
@@ -534,6 +552,9 @@ const Throat=struct{
   open:f32=openShare,
   /// how much sooner the breath's push presses the folds shut (share)
   press:f32=0,
+  /// how much more of the open time is the opening, so the close comes
+  /// faster, a sharper edge rich in high harmonics (share)
+  sharp:f32=0,
   /// what wavers it
   noise:Noise=.{.s=0x2545f491},
   /// one sample of the pulse's flow, and how open the throat is (0..1)
@@ -555,7 +576,7 @@ const Throat=struct{
     // opening slowly, closing fast, then shut (Rosenberg's pulse), each
     // period open a little longer or shorter than the last
     const ph=t.phase;
-    const op=t.open*openingShare;
+    const op=t.open*(openingShare+t.sharp);
     const flow=if(ph<op)0.5-0.5*@cos(m.pi*ph/op)else if(ph<t.open)@cos(0.5*m.pi*(ph-op)/(t.open-op))else 0;
     return.{flow*t.gain,flow};
   }
@@ -582,6 +603,9 @@ pub const Voice=struct{
   /// the pitch, the loudness and the brightness together, leaking more air
   /// as it runs out
   push:f32=0,
+  /// how much of the voice's upper octaves it keeps (0: none): the throat
+  /// softened less, and two high resonances rung by its close
+  octaves:f32=0,
 };
 /// which way the air goes through a stretch of the plan
 const Air=enum{
@@ -828,6 +852,14 @@ const Mouth=struct{
   push:f32=0,
   /// how bright the throat's softening is with the push at its middle (Hz)
   softAt:f32=softHz,
+  /// how loud the top octaves ring (0: not at all)
+  octaves:f32=0,
+  /// the top octaves' lower resonance
+  octLow:Resonator=.{},
+  /// and higher one
+  octHigh:Resonator=.{},
+  /// the throat's last unsoftened flow, for its close's sharp edge
+  lastFlow:f32=0,
   /// a mouth at rest for a voice of `breath`: everything that never
   /// changes while it speaks worked out once (the high resonances, the
   /// chest, the head, the nose's hum, how fast things glide), not again
@@ -836,8 +868,12 @@ const Mouth=struct{
     var mo=Mouth{.tract=v.tract,.edge=v.edge,.push=v.push,.throat=.{.grain=v.grain}};
     mo.kf=m.dampBy(1/glideS,dt);
     mo.ka=m.dampBy(1/swellS,dt);
-    mo.softAt=softHz+softSpan*(1-v.breath);
+    mo.softAt=softHz+softSpan*(1-v.breath)+octSoftHz*v.octaves;
     mo.kSoft=m.dampBy(m.tau*mo.softAt,dt);
+    mo.octaves=v.octaves*octGain;
+    mo.throat.sharp=octSharp*v.octaves;
+    mo.octLow.tune(octLowHz*v.tract,octLowBw);
+    mo.octHigh.tune(octHighHz*v.tract,octHighBw);
     mo.kAir=m.dampBy(m.tau*airHz,dt);
     mo.kEdge=m.dampBy(1/edgeS,dt);
     mo.res[3].tune(f4*v.tract,b4);
@@ -917,7 +953,15 @@ const Mouth=struct{
     // (the face rings with what the mouth makes, so it is fed the mouth's
     // own sound: the throat alone is too soft up there to set it ringing)
     const head=mo.headLow.step(voiced)*headLowGain+mo.headHigh.step(out)*headHighGain;
-    return out+mo.chest.step(voiced)*chestGain+head;
+    // the top octaves: the throat's close is a sharp edge, rich far up;
+    // two high resonances ring with it (only while asked for)
+    var top:f32=0;
+    if(mo.octaves>0){
+      const edge=(flow-mo.lastFlow)*mo.now.voice*loud;
+      mo.lastFlow=flow;
+      top=(mo.octLow.step(edge)+mo.octHigh.step(edge))*mo.octaves;
+    }
+    return out+mo.chest.step(voiced)*chestGain+head+top;
   }
 };
 /// the whole plan spoken: its samples at `rate`, peak-normalized
@@ -1046,6 +1090,7 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--room="))v.room=try std.fmt.parseFloat(f32,a["--room=".len..]);
     if(startsWith(u8,a,"--tract="))v.tract=try std.fmt.parseFloat(f32,a["--tract=".len..]);
     if(startsWith(u8,a,"--push="))v.push=try std.fmt.parseFloat(f32,a["--push=".len..]);
+    if(startsWith(u8,a,"--octaves="))v.octaves=try std.fmt.parseFloat(f32,a["--octaves=".len..]);
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
   if(text)|t|say=try spell(arena,try Dir.cwd().readFileAlloc(io,wordsPath,arena,.unlimited),t);
