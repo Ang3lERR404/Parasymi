@@ -654,6 +654,34 @@ fn voicedFrames(fr:Frames)usize{
   }
   return n;
 }
+/// the lines whisper makes up from near-silence (learned from subtitles),
+/// written plain: lowercase, no marks
+const stockLines=[_][]const u8{"thanks for watching","thank you for watching","thank you","thanks","thank you very much","you","bye","please subscribe","subtitles by"};
+/// a phrase whose loudest tenth of frames stays under this is faint: the
+/// gardener's speech never did tonight (-57 dB at its quietest, "Oooooh,
+/// okayyyyy."), the hiss whisper read as "Thanks for watching!" sat at -61
+const faintDb:f32=-58;
+/// whether whisper's `words` are one of its stock lines over a phrase too
+/// faint to hold them (the gardener's quiet squeaks have no words, so they
+/// are never touched)
+fn madeUp(arena:Allocator,words:[]const Word,fr:Frames)Allocator.Error!bool{
+  if(words.len==0 or fr.db.len==0)return false;
+  // the words, plain and joined
+  var aw:Allocating=.init(arena);
+  for(words,0..)|wd,i|{
+    if(i>0)aw.writer.writeByte(' ') catch return error.OutOfMemory;
+    aw.writer.writeAll(try ownear.plainWord(arena,wd.text)) catch return error.OutOfMemory;
+  }
+  const text=aw.written();
+  const stock=for(stockLines)|s|{
+    if(std.mem.eql(u8,text,s) or (s.len>8 and startsWith(u8,text,s)))break true;
+  }else false;
+  if(!stock)return false;
+  // the loudest tenth of its frames
+  const db=try arena.dupe(f32,fr.db);
+  std.mem.sort(f32,db,{},std.sort.asc(f32));
+  return db[m.floorTo(usize,m.f(db.len)*0.9)]<faintDb;
+}
 /// how close to its middle pitch (or an octave of it) a frame counts as
 /// unmoved (semitones)
 const steadySt:f32=0.3;
@@ -1026,6 +1054,13 @@ const Ear=struct{
     // no words, but a voice: a little noise of the gardener's (a hum, a
     // squeak, a laugh), kept and heard as one sound across the phrase
     const found=try wordsOf(arena,v);
+    // whisper's own stock lines, made up from a faint hiss, are not the
+    // gardener (the gardener's pick, 2026-11-07: dropped)
+    if(try madeUp(arena,found,fr)){
+      print("(whisper made that up from a faint hiss)\n",.{});
+      Dir.cwd().deleteFile(e.io,wavPath)catch{};
+      return;
+    }
     const wordless=found.len==0;
     // a wordless sound that never wavers is the room's hum, not the gardener
     if(wordless){
@@ -1390,6 +1425,24 @@ test "a hum that never wavers is the room, a wavering squeak is the gardener" {
   // the gardener: a squeak gliding up and wobbling back, never still
   for(fr.hz,0..)|*h,i|h.*=600*@exp2(m.f(i%40)/40+0.08*@sin(m.f(i)));
   try testing.expect(try steadiness(arena,fr)<humShare);
+}
+test "whisper's stock line over a faint hiss is made up, a loud one is said" {
+  var ar=std.heap.ArenaAllocator.init(testing.allocator);
+  defer ar.deinit();
+  const arena=ar.allocator();
+  const fr=Frames{.db=try arena.alloc(f32,100),.hz=try arena.alloc(?f32,100)};
+  @memset(fr.hz,null);
+  const thanks=[_]Word{.{.text="Thanks",.start=0,.end=0.2},.{.text="for",.start=0.2,.end=0.3},.{.text="watching!",.start=0.3,.end=0.8}};
+  @memset(fr.db,-70);
+  try testing.expect(try madeUp(arena,&thanks,fr));
+  // said aloud, it stays
+  @memset(fr.db,-48);
+  try testing.expect(!try madeUp(arena,&thanks,fr));
+  // a faint phrase of other words stays too, and a wordless one
+  @memset(fr.db,-70);
+  const other=[_]Word{.{.text="Hello.",.start=0,.end=0.5}};
+  try testing.expect(!try madeUp(arena,&other,fr));
+  try testing.expect(!try madeUp(arena,&.{},fr));
 }
 test "whisper's tokens join into words" {
   const v=Verbose{.segments=&.{.{.words=&.{
