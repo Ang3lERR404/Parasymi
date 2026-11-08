@@ -507,6 +507,9 @@ pub const Voice=struct{
   breath:f32=baseBreath,
   /// how fast it speaks (1 = as written)
   pace:f32=basePace,
+  /// the body it speaks from, against Claude's own (1): below 1 a bigger
+  /// body, a longer throat and a bigger chest, every resonance lower
+  tract:f32=1,
 };
 /// what one stretch of time asks of the mouth: resonances, loudness of
 /// each source, a hiss's shape, a nasal's dip, and the pitch
@@ -706,19 +709,25 @@ const Mouth=struct{
   kSoft:f32=0,
   /// how far each sample the darkened breath follows its noise
   kAir:f32=0,
+  /// the body's size against the voice's own (below 1, bigger: every
+  /// resonance lower)
+  tract:f32=1,
   /// a mouth at rest for a voice of `breath`: everything that never
   /// changes while it speaks worked out once (the high resonances, the
   /// chest, the head, the nose's hum, how fast things glide), not again
   /// every sample
-  fn init(breath:f32)Mouth{
-    var mo=Mouth{};
+  fn init(v:Voice)Mouth{
+    var mo=Mouth{.tract=v.tract};
     mo.kf=m.dampBy(1/glideS,dt);
     mo.ka=m.dampBy(1/swellS,dt);
-    mo.kSoft=m.dampBy(m.tau*(softHz+softSpan*(1-breath)),dt);
+    mo.kSoft=m.dampBy(m.tau*(softHz+softSpan*(1-v.breath)),dt);
     mo.kAir=m.dampBy(m.tau*airHz,dt);
-    mo.res[3].tune(f4,b4);
-    mo.res[4].tune(f5,b5);
+    mo.res[3].tune(f4*v.tract,b4);
+    mo.res[4].tune(f5*v.tract,b5);
     mo.nose.tune(noseHz,noseBw);
+    mo.chest.tune(chestHz*v.tract,chestBw);
+    mo.headLow.tune(headLowHz*v.tract,headLowBw);
+    mo.headHigh.tune(headHighHz*v.tract,headHighBw);
     return mo;
   }
   /// one sample: the plan's target `want` at pitch `hz`
@@ -751,7 +760,7 @@ const Mouth=struct{
     const bws=[5]f32{b1Base+mo.now.f[0]*b1Slope,b2,b3,b4,b5};
     // the three lowest wandering a little, a mouth never quite still
     var fs=[5]f32{mo.now.f[0],mo.now.f[1],mo.now.f[2],f4,f5};
-    for(0..3)|i|fs[i]*=1+shapeWander*mo.wander[i].step();
+    for(0..3)|i|fs[i]*=(1+shapeWander*mo.wander[i].step())*mo.tract;
     // (the two highest never move: tuned once, in `init`)
     for(&mo.res,0..)|*r,i|{
       if(i<3)r.tune(fs[i],bws[i]);
@@ -765,12 +774,9 @@ const Mouth=struct{
     const out=y-mo.last;
     mo.last=y;
     // the chest humming with the throat, joined after the lips (it is
-    // felt through the body, not shaped by the mouth)
-    mo.chest.tune(chestHz,chestBw);
-    // the head: the nose's hum and the face's ring, always a little, as a
-    // real voice hums through the face as well as the mouth
-    mo.headLow.tune(headLowHz,headLowBw);
-    mo.headHigh.tune(headHighHz,headHighBw);
+    // felt through the body, not shaped by the mouth), and the head: the
+    // nose's hum and the face's ring, always a little, as a real voice
+    // hums through the face as well as the mouth (all tuned in `init`)
     const voiced=mo.soft*mo.now.voice;
     // (the face rings with what the mouth makes, so it is fed the mouth's
     // own sound: the throat alone is too soft up there to set it ringing)
@@ -784,7 +790,7 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
   var total:f32=tailS;
   for(steps)|s|total+=s.len;
   const out=try arena.alloc(f32,m.floorTo(usize,total*rate));
-  var mo=Mouth.init(v.breath);
+  var mo=Mouth.init(v);
   // the pitch, gliding along its own line and wandering a little off it
   var hz=v.pitch;
   var wander=Drift{.noise=.{.s=0x68e31da4},.every=pitchWanderS};
@@ -885,6 +891,7 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--pitch="))v.pitch=try std.fmt.parseFloat(f32,a["--pitch=".len..]);
     if(startsWith(u8,a,"--breath="))v.breath=try std.fmt.parseFloat(f32,a["--breath=".len..]);
     if(startsWith(u8,a,"--pace="))v.pace=try std.fmt.parseFloat(f32,a["--pace=".len..]);
+    if(startsWith(u8,a,"--tract="))v.tract=try std.fmt.parseFloat(f32,a["--tract=".len..]);
     if(std.mem.eql(u8,a,"--play"))play=true;
   }
   if(text)|t|say=try spell(arena,try Dir.cwd().readFileAlloc(io,wordsPath,arena,.unlimited),t);
