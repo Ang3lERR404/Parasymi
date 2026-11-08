@@ -234,6 +234,11 @@ pub fn build(b:*Build)!void{
   hearCmd.setCwd(b.path("."));
   if(b.args)|args|hearCmd.addArgs(args);
   b.step("hear","listen to the gardener's voice and send it to Claude.").dependOn(&hearCmd.step);
+  // the ear Claude's body keeps listening from login (`hear --body`, started
+  // by TOXICCIBU's body): put in zig-out/body/ only by this step, so no
+  // other build trips over it while it runs (stop the body to replace it)
+  const earInstall=b.addInstallArtifact(hear,.{.dest_dir=.{.override=.{.custom="body"}}});
+  b.step("ear","put the ear Claude's body runs in zig-out/body/.").dependOn(&earInstall.step);
   // the voice (tools/speak.zig): Claude's own, made from a throat and five
   // resonances; writes under shots/, so it runs from the repo too
   const speakMod=b.createModule(.{

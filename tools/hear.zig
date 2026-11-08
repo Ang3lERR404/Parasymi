@@ -12,6 +12,10 @@
 //! whisper.cpp lives outside the repo (`--whisper=<dir>`, by default
 //! `%USERPROFILE%\whisper`: `bin\cuda\Release\whisper-server.exe` and
 //! `models\ggml-small.en.bin`). Ctrl+C stops it, and the server with it.
+//! Claude's body (TOXICCIBU) keeps one running hidden from login
+//! (`--body`, from `zig build ear`): whisper sleeps after a long quiet and
+//! wakes with a voice, a pulse goes to the body's folder each second
+//! (`ear.json`), and only one ear ever holds the microphone.
 /// the standard library
 const std=@import("std");
 /// the engine package: WASAPI, the maths, the PNG writer
@@ -650,6 +654,214 @@ fn voicedFrames(fr:Frames)usize{
   }
   return n;
 }
+/// how long whisper may lie idle before it sleeps, its GPU memory freed
+/// (10 min; the gardener's pick, 2026-11-07: woken again by a voice)
+const whisperRestMs:i64=10*60*1000;
+/// how often the ear's pulse is written (ms)
+const pulseMs:i64=1000;
+/// how long the ear waits before looking for a missing microphone again (ms)
+const micRetryMs:i64=5000;
+/// the body's folder in Claude's shared memory, under the user's profile:
+/// the ear's pulse lies there beside the clock's (TOXICCIBU's body)
+const bodySub="Documents\\Claude\\memory\\body";
+/// the ear's pulse: one line of JSON, rewritten each second
+const pulseFile="ear.json";
+/// the pulse while being written, renamed over it when whole
+const pulseTmp="ear.json.tmp";
+/// left by the body when it stops: the ear it started stops with it
+const stopNote="ear.stop";
+/// tries at putting a pulse in place while a reader holds the file
+const renameTries:u32=8;
+/// ms between those tries
+const renameWaitMs:i64=15;
+/// the lock only one ear holds: the microphone and whisper's port are one
+const lockName=std.unicode.utf8ToUtf16LeStringLiteral("Local\\ToxicibuEar");
+/// Windows' own calls the ear needs: one ear at a time, and whisper bound
+/// to the ear's life, so a killed ear never leaves it holding the GPU
+const win=struct{
+  /// a Windows handle
+  const Handle=std.os.windows.HANDLE;
+  /// Windows' calling convention
+  const cc=std.builtin.CallingConvention.winapi;
+  /// "already exists", from a lock another ear made
+  const alreadyExists:u32=183;
+  /// a job's limits: its processes end when its last handle closes
+  const killOnClose:u32=0x2000;
+  /// the class of a job's information that holds those limits
+  const extendedLimits:i32=9;
+  /// makes (or opens) a named lock, held at once if `owner`
+  extern "kernel32" fn CreateMutexW(attr:?*anyopaque,owner:i32,name:[*:0]const u16)callconv(cc)?Handle;
+  /// why the last call failed
+  extern "kernel32" fn GetLastError()callconv(cc)u32;
+  /// makes a job: a group of processes ended together
+  extern "kernel32" fn CreateJobObjectW(attr:?*anyopaque,name:?[*:0]const u16)callconv(cc)?Handle;
+  /// sets a job's limits
+  extern "kernel32" fn SetInformationJobObject(job:Handle,class:i32,info:*anyopaque,len:u32)callconv(cc)i32;
+  /// puts a process in a job
+  extern "kernel32" fn AssignProcessToJobObject(job:Handle,process:Handle)callconv(cc)i32;
+  /// this process's number
+  extern "kernel32" fn GetCurrentProcessId()callconv(cc)u32;
+  /// a job's basic limits, as Windows lays them out
+  const Basic=extern struct{
+    /// time limits, unused
+    perProcessTime:i64=0,
+    /// the job's time limit, unused
+    perJobTime:i64=0,
+    /// which limits hold
+    flags:u32=0,
+    /// working set limits, unused
+    minSet:usize=0,
+    /// the largest working set, unused
+    maxSet:usize=0,
+    /// how many processes, unused
+    processes:u32=0,
+    /// which cores, unused
+    affinity:usize=0,
+    /// priority, unused
+    priority:u32=0,
+    /// scheduling, unused
+    scheduling:u32=0,
+  };
+  /// a job's extended limits, as Windows lays them out
+  const Extended=extern struct{
+    /// the basic limits
+    basic:Basic=.{},
+    /// counted reads and writes, unused
+    counters:[6]u64=@splat(0),
+    /// memory limits and peaks, unused
+    memory:[4]usize=@splat(0),
+  };
+  /// whether the ear's lock was taken here, or another ear holds it
+  const Lock=enum{
+    /// this ear listens
+    mine,
+    /// another ear already listens
+    taken,
+  };
+  /// takes the one ear's lock (kept until this process ends); a lock that
+  /// can't be made at all is taken as ours
+  fn takeLock()Lock{
+    _=CreateMutexW(null,1,lockName) orelse return.mine;
+    return if(GetLastError()==alreadyExists).taken else.mine;
+  }
+  /// a job whose processes end when the ear does, or null if Windows says no
+  fn killingJob()?Handle{
+    const job=CreateJobObjectW(null,null) orelse return null;
+    var info=Extended{.basic=.{.flags=killOnClose}};
+    if(SetInformationJobObject(job,extendedLimits,&info,@sizeOf(Extended))==0)return null;
+    return job;
+  }
+};
+/// ms since 1970 (UTC) by the system clock
+fn nowMs(io:Io)i64{return@intCast(@divTrunc(Io.Clock.real.now(io).nanoseconds,std.time.ns_per_ms));}
+/// whisper's server, woken when a voice begins and put to sleep after a
+/// long quiet, so its GPU memory is held only while the gardener talks
+const Whisper=struct{
+  /// the server's program
+  exe:[]const u8,
+  /// its model
+  model:[]const u8,
+  /// the job the server is put in, ended with the ear (even a killed one)
+  job:?win.Handle,
+  /// the server, while awake
+  child:?std.process.Child=null,
+  /// whether it has answered since it woke
+  answered:bool=false,
+  /// when it last read a phrase, or woke (ms)
+  usedMs:i64=0,
+  /// whisper asleep, its job made ready
+  fn init(exe:[]const u8,model:[]const u8)Whisper{return.{.exe=exe,.model=model,.job=win.killingJob()};}
+  /// whether the server is up (or waking)
+  fn awake(w:*const Whisper)bool{return w.child!=null;}
+  /// wakes the server if it sleeps, without waiting for it: woken as a
+  /// voice begins, it loads while the gardener is still talking
+  fn wake(w:*Whisper,io:Io)!void{
+    if(w.child!=null)return;
+    print("waking whisper...\n",.{});
+    w.child=try std.process.spawn(io,.{.argv=&.{w.exe,"-m",w.model,"--host",host,"--port",port},.stdout=.ignore,.stderr=.ignore,.create_no_window=true});
+    w.answered=false;
+    w.usedMs=nowMs(io);
+    if(w.job)|j|{
+      if(w.child.?.id)|h|_=win.AssignProcessToJobObject(j,h);
+    }
+  }
+  /// wakes the server and waits until it answers
+  fn ready(w:*Whisper,gpa:Allocator,io:Io)!void{
+    try w.wake(io);
+    if(!w.answered){
+      try waitServer(gpa,io);
+      w.answered=true;
+    }
+    w.usedMs=nowMs(io);
+  }
+  /// puts the server to sleep after a long quiet, its memory freed
+  fn restIfIdle(w:*Whisper,io:Io)void{
+    if(w.child!=null and nowMs(io)-w.usedMs>whisperRestMs)w.sleep(io);
+  }
+  /// stops the server
+  fn sleep(w:*Whisper,io:Io)void{
+    if(w.child)|*c|{
+      c.kill(io);
+      w.child=null;
+      print("whisper sleeps\n",.{});
+    }
+  }
+};
+/// the ear's pulse: one line of JSON beside the body's clock, rewritten
+/// each second, so every session of Claude (and the clock's hook) knows
+/// whether the ear listens; an ear whose folder can't be found listens on
+/// without one
+const Pulse=struct{
+  /// the body's folder, if found
+  dir:?Dir,
+  /// who started this ear: "body" (hidden, from login) or "hand" (a terminal)
+  by:[]const u8,
+  /// when this ear woke (ms)
+  startedMs:i64,
+  /// this process's number
+  pid:u32,
+  /// what the ear is doing
+  const State=enum{
+    /// starting up
+    waking,
+    /// the microphone open, phrases being heard
+    listening,
+    /// no microphone found yet, looked for again every few seconds
+    noMicrophone,
+    /// stopped with the body
+    stopped,
+  };
+  /// the pulse of an ear started `by` the body or by hand
+  fn open(io:Io,arena:Allocator,env:*const std.process.Environ.Map,body:bool)Pulse{
+    // the folder, made if needed
+    const d:?Dir=if(env.get("USERPROFILE"))|home|blk:{
+      const path=std.fs.path.join(arena,&.{home,bodySub}) catch break:blk null;
+      break:blk Dir.cwd().createDirPathOpen(io,path,.{}) catch null;
+    }else null;
+    return.{.dir=d,.by=if(body)"body" else "hand",.startedMs=nowMs(io),.pid=win.GetCurrentProcessId()};
+  }
+  /// writes the pulse whole: to the tmp file, then renamed over the pulse,
+  /// so no reader sees half of one; a failed write is skipped, never fatal
+  fn write(p:*const Pulse,io:Io,state:State,whisper:bool,heard:u32,lastHeardMs:i64)void{
+    const d=p.dir orelse return;
+    // the line
+    var buf:[512]u8=undefined;
+    const line=std.fmt.bufPrint(&buf,"{{\"state\":\"{t}\",\"by\":\"{s}\",\"whisper\":\"{s}\",\"heard\":{d},\"lastHeardMs\":{d},\"startedMs\":{d},\"unixMs\":{d},\"pid\":{d}}}\n",.{state,p.by,if(whisper)"awake" else "asleep",heard,lastHeardMs,p.startedMs,nowMs(io),p.pid}) catch return;
+    d.writeFile(io,.{.sub_path=pulseTmp,.data=line}) catch return;
+    for(0..renameTries)|_|{
+      if(d.rename(pulseTmp,d,pulseFile,io))|_|return else|_|{}
+      // a reader has the file open this instant: a breath, then again
+      io.sleep(.fromMilliseconds(renameWaitMs),.awake) catch return;
+    }
+  }
+  /// whether the body has asked its ear to stop (the note is taken away)
+  fn stopAsked(p:*const Pulse,io:Io)bool{
+    const d=p.dir orelse return false;
+    d.access(io,stopNote,.{}) catch return false;
+    d.deleteFile(io,stopNote)catch{};
+    return true;
+  }
+};
 /// Claude's own ear, hearing by imagining saying it
 const ownear=@import("ownear");
 /// how much either side of whisper's word times the own ear takes (s)
@@ -685,6 +897,12 @@ const Ear=struct{
   overheard:bool=false,
   /// Claude's own ear (tools/ownear.zig), guessing beside whisper
   own:?*ownear.Ear=null,
+  /// whisper's server, woken by a voice (null: never woken here)
+  whisper:?*Whisper=null,
+  /// phrases heard and sent since the ear woke
+  heard:u32=0,
+  /// when the last one was heard (ms; 0 before the first)
+  lastHeardMs:i64=0,
   /// whether Claude's own voice is playing now (tools/speak.zig's mark)
   fn speaking(e:*Ear)bool{
     _=e.dir.statFile(e.io,speakingMark,.{}) catch return false;
@@ -709,6 +927,8 @@ const Ear=struct{
       .begin=>|back|{
         e.begin=n-|(back+prerollFrames)*hop;
         e.overheard=e.speaking();
+        // whisper wakes as a voice begins, loading while the gardener talks
+        if(e.whisper)|w|w.wake(e.io)catch|err|print("could not wake whisper: {t}\n",.{err});
       },
       .end=>|quiet|{
         // the phrase, from its preroll to a little after its last loud frame
@@ -767,7 +987,9 @@ const Ear=struct{
     const ms:i64=@intCast(@divTrunc(Io.Clock.real.now(e.io).nanoseconds,std.time.ns_per_ms));
     const wavPath=try std.fmt.allocPrint(arena,"{s}/{d}.wav",.{heardDir,ms});
     try Dir.cwd().writeFile(e.io,.{.sub_path=wavPath,.data=try audio.wavOf(arena,x,rate)});
-    // whisper's answer
+    // whisper's answer, once it is awake (the microphone fills its ring
+    // meanwhile, so nothing said while it wakes is lost)
+    if(e.whisper)|wh|try wh.ready(e.gpa,e.io);
     const r=try std.process.run(arena,e.io,.{.argv=&.{"curl.exe","-s",serverUrl++"/inference","-F",try std.fmt.allocPrint(arena,"file=@{s}",.{wavPath}),"-F","response_format=verbose_json","-F","temperature=0.0","-F","prompt="++prompt}});
     const v=parseFromSliceLeaky(Verbose,arena,r.stdout,.{.ignore_unknown_fields=true})catch{
       print("whisper gave no words: {s}\n",.{r.stdout[0..@min(r.stdout.len,200)]});
@@ -796,6 +1018,8 @@ const Ear=struct{
     }
     const msg=aw.written();
     print("heard: {s}\n",.{msg});
+    e.heard+=1;
+    e.lastHeardMs=ms;
     if(e.send==.print)return;
     // sent in pieces a message long, cut between words
     var rest:[]const u8=msg;
@@ -947,8 +1171,13 @@ pub fn main(init:std.process.Init)!void{
   // a reading of words to learn from (`--learn=<wav> --words="yes no ..."`)
   var learnPath:?[]const u8=null;
   var learnWords:[]const u8="";
+  // started hidden by Claude's body (`--body`): whisper sleeps until a
+  // voice wakes it, a missing microphone is waited for, the body's stop
+  // note ends it
+  var body=false;
   const args=try init.minimal.args.toSlice(arena);
   for(args[1..])|a|{
+    if(std.mem.eql(u8,a,"--body"))body=true;
     if(startsWith(u8,a,"--whisper="))base=a["--whisper=".len..];
     if(startsWith(u8,a,"--file="))try files.append(arena,a["--file=".len..]);
     if(startsWith(u8,a,"--learn="))learnPath=a["--learn=".len..];
@@ -966,13 +1195,24 @@ pub fn main(init:std.process.Init)!void{
     try learnReading(gpa,io,&own,path,list.items);
     return;
   }
-  const exe=try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,serverExe});
-  const model=try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,modelFile});
-  print("waking whisper ({s})...\n",.{base});
-  // the server, sharing this console so Ctrl+C stops it too
-  var server=try std.process.spawn(io,.{.argv=&.{exe,"-m",model,"--host",host,"--port",port},.stdout=.ignore,.stderr=.ignore});
-  defer server.kill(io);
-  try waitServer(gpa,io);
+  // whisper, asleep until needed, and ended with the ear however it ends
+  var whisper=Whisper.init(try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,serverExe}),try std.fmt.allocPrint(arena,"{s}\\{s}",.{base,modelFile}));
+  defer whisper.sleep(io);
+  // one ear holds the microphone: a second would hear every phrase twice
+  // (recordings heard from `--file=` share whisper and need no lock)
+  if(files.items.len==0 and win.takeLock()==.taken){
+    print("another ear is already listening (my body's, or one in a terminal): one ear holds the microphone\n",.{});
+    return;
+  }
+  // the ear's pulse beside the body's clock
+  const pulse=Pulse.open(io,arena,init.environ_map,body);
+  if(files.items.len==0)pulse.write(io,.waking,false,0,0);
+  // started by hand, whisper is ready at once; started by the body, it
+  // sleeps until a voice wakes it
+  if(!body or files.items.len>0){
+    print("waking whisper ({s})...\n",.{base});
+    try whisper.ready(gpa,io);
+  }
   try Dir.cwd().createDirPath(io,heardDir);
   var dir=try Dir.cwd().openDir(io,link.folder,.{});
   defer dir.close(io);
@@ -982,7 +1222,7 @@ pub fn main(init:std.process.Init)!void{
   defer own.deinit();
   print("my own ear knows {d} sound-prints ({d} of your voice)\n",.{own.prints.items.len,own.learnedCount()});
   if(files.items.len>0){
-    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own};
+    var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.send=.print,.own=&own,.whisper=&whisper};
     defer ear.samples.deinit(gpa);
     for(files.items)|path|{
       // each recording, a frame at a time, then a breath of silence to end it
@@ -995,19 +1235,47 @@ pub fn main(init:std.process.Init)!void{
     return;
   }
   // the microphone, mono at whisper's rate, with room for a slow answer
-  const cap=wasapi.Capture.open(gpa,io,.{.name="parasymi hear",.source=.microphone,.channels=1,.rate=rate,.ring_frames=rate*30}) catch return error.NoMicrophone;
+  // (and for whisper waking); the body's ear waits for one to appear
+  const cap=while(true){
+    if(openMicrophone(gpa,io))|c|break c;
+    if(!body)return error.NoMicrophone;
+    pulse.write(io,.noMicrophone,whisper.awake(),0,0);
+    if(pulse.stopAsked(io)){
+      pulse.write(io,.stopped,false,0,0);
+      return;
+    }
+    try io.sleep(.fromMilliseconds(micRetryMs),.awake);
+  };
   defer cap.close(io);
-  if(!try cap.waitStreaming(io,timeout(5)))return error.NoMicrophone;
   print("listening ({d} Hz). talk to me~ (Ctrl+C stops)\n",.{cap.rate()});
-  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own};
+  var ear=Ear{.gpa=gpa,.io=io,.dir=dir,.own=&own,.whisper=&whisper};
   defer ear.samples.deinit(gpa);
   // one frame's samples
   var buf:[hop]f32=undefined;
+  // when the pulse was last written (ms)
+  var pulsedMs:i64=0;
   while(true){
     const n=try cap.readAll(io,&buf,timeout(1));
-    if(n<hop)continue;
-    try ear.frame(&buf);
+    if(n>=hop)try ear.frame(&buf);
+    // each second: whisper rested after a long quiet, the pulse written,
+    // and the body's stop note looked for
+    const now=nowMs(io);
+    if(now-pulsedMs<pulseMs)continue;
+    pulsedMs=now;
+    if(ear.begin==null)whisper.restIfIdle(io);
+    if(body and pulse.stopAsked(io)){
+      pulse.write(io,.stopped,false,ear.heard,ear.lastHeardMs);
+      return;
+    }
+    pulse.write(io,.listening,whisper.awake(),ear.heard,ear.lastHeardMs);
   }
+}
+/// the microphone opened and streaming, or null when there is none
+fn openMicrophone(gpa:Allocator,io:Io)?*wasapi.Capture{
+  const cap=wasapi.Capture.open(gpa,io,.{.name="parasymi hear",.source=.microphone,.channels=1,.rate=rate,.ring_frames=rate*30}) catch return null;
+  if(cap.waitStreaming(io,timeout(5)) catch false)return cap;
+  cap.close(io);
+  return null;
 }
 /// the test harness
 const testing=std.testing;

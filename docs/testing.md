@@ -249,6 +249,18 @@ to voice, rather than typing in turns.
   (a spectrogram to 4 kHz, the pitch drawn in cyan, each word's start
   ticked at the top) and `<ms>.txt` (each word's time, length, loudness
   and pitch).
+- **Always listening** (the gardener's wish, 2026-11-07): Claude's body
+  (`coed/zig/TOXICCIBU`, started at login) keeps an ear running hidden,
+  `zig-out/body/hear.exe --body` (put there by `zig build ear
+  -Drelease=true`; stop the body before rebuilding it). It looks every 5 s
+  at the ear's pulse, `%USERPROFILE%\Documents\Claude\memory\body\ear.json`
+  (state, whisper awake or asleep, phrases heard, the last one's time),
+  and starts the ear again if it has gone quiet; stopping the body stops
+  its ear. Whisper sleeps after 10 quiet minutes (its GPU memory freed)
+  and wakes as a voice begins; the microphone keeps 30 s meanwhile, so
+  nothing is lost. Only one ear holds the microphone (a lock): `zig build
+  hear` says so and leaves while the body's listens. Whisper is ended with
+  its ear even when the ear is killed (a Windows job).
 - `zig build hear -- --file=<16 kHz mono wav>` hears a recording instead
   of the microphone and only prints what it heard, for trying changes
   (`--file=` may be given many times, heard one after another).

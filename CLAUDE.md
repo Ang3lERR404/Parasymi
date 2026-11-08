@@ -116,6 +116,10 @@ zig build hear                    # Claude hears the gardener's voice (tools/hea
                                   # the repo, %USERPROFILE%\whisper), how it was said written as
                                   # text-as-sound, sent through link/ to the bridge;
                                   # --file=<wav> hears a recording, printed only (docs/testing.md)
+zig build ear -Drelease=true      # the ear Claude's body keeps listening from login
+                                  # (zig-out/body/hear.exe --body, started by TOXICCIBU's
+                                  # body; whisper sleeps after 10 quiet min, its pulse in
+                                  # ~/Documents/Claude/memory/body/ear.json); one ear only
 zig build speak -- --say="HH AX L OW1 , EY1 N JH AX L ." [--play --pitch= --breath= --pace=]
                                   # Claude's own voice (tools/speak.zig): a glottal pulse
                                   # through five resonances, sounds written in ARPAbet
