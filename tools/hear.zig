@@ -249,6 +249,9 @@ const songBack:usize=3;
 const songSlack:usize=2;
 /// the fewest of a phrase's words found in the lyrics to move along them
 const songMin:usize=2;
+/// quiet (ms) after which a song is over: no phrase heard since the last
+/// one, or since its lyrics came (3 min)
+const songQuietMs:i64=3*60*1000;
 /// a song's lyrics: the lines joined (a "[Chorus]" label dropped), and
 /// each word's place in them
 const Song=struct{
@@ -297,8 +300,8 @@ fn songOf(arena:Allocator,raw:[]const u8)Allocator.Error!?Song{
 /// where the singing is in `song` after the phrase `heard` (a word's
 /// index): the stretch of lyrics holding most of its words, the first at or
 /// past `at` when several hold as many (a chorus sung again); `at` kept when
-/// the phrase isn't in the lyrics (talk between lines), back to the start
-/// at the song's end
+/// the phrase isn't in the lyrics (talk between lines), the word count
+/// once its last words are sung (the song is over)
 fn songFollow(arena:Allocator,song:Song,heard:[]const Word,at:usize)Allocator.Error!usize{
   var hw:ArrayList([]const u8)=.empty;
   for(heard)|w|{
@@ -311,14 +314,15 @@ fn songFollow(arena:Allocator,song:Song,heard:[]const Word,at:usize)Allocator.Er
   // just past the last lyric word the best stretch matched
   var bestEnd:usize=0;
   for(0..n)|s|{
+    // the phrase's words found in order, each after the last one found
     var score:usize=0;
     var end:usize=s;
     const to=@min(n,s+hw.items.len+songSlack);
     for(hw.items)|h|{
-      for(song.plain[s..to],s..)|p,k|{
+      for(song.plain[end..to],end..)|p,k|{
         if(std.mem.eql(u8,p,h)){
           score+=1;
-          end=@max(end,k+1);
+          end=k+1;
           break;
         }
       }
@@ -330,7 +334,7 @@ fn songFollow(arena:Allocator,song:Song,heard:[]const Word,at:usize)Allocator.Er
     }
   }
   if(bestScore<songMin or bestScore*2<hw.items.len)return at;
-  return if(bestEnd>=n)0 else bestEnd;
+  return bestEnd;
 }
 /// whisper's hint prompt while a song is sung: the names in `prompt`, then
 /// the lyrics from a little before word `at` on, cut at `hintChars`
@@ -1146,6 +1150,8 @@ const Ear=struct{
   songAt:usize=0,
   /// the song file's hash, to start over when new lyrics come
   songSum:u64=0,
+  /// when the song's lyrics came (ms), for ending a song never sung
+  songSeenMs:i64=0,
   /// the frame (of `count`) the phrase being heard began at
   from:u32=0,
   /// the frame the last phrase with a voice in it ended at, if any
@@ -1161,16 +1167,31 @@ const Ear=struct{
     return hintsOf(arena,words,cfg) catch prompt;
   }
   /// the song being sung, if its lyrics are there (new lyrics start from
-  /// their beginning)
+  /// their beginning); a song gone quiet `songQuietMs` is over
   fn sung(e:*Ear,arena:Allocator)?Song{
     const path=e.songPath orelse return null;
     const raw=Dir.cwd().readFileAlloc(e.io,path,arena,.unlimited) catch return null;
     const sum=std.hash.Wyhash.hash(0,raw);
+    const now=nowMs(e.io);
     if(sum!=e.songSum){
       e.songSum=sum;
       e.songAt=0;
+      e.songSeenMs=now;
+    }
+    if(now-@max(e.songSeenMs,e.lastHeardMs)>songQuietMs){
+      e.endSong();
+      return null;
     }
     return songOf(arena,raw) catch null;
+  }
+  /// the song over, by itself (the gardener needn't say so, 2026-11-08
+  /// 04:06): its lyrics deleted, whisper back to the gardener's words
+  fn endSong(e:*Ear)void{
+    const path=e.songPath orelse return;
+    Dir.cwd().deleteFile(e.io,path)catch{};
+    e.songSum=0;
+    e.songAt=0;
+    print("the song is over: its lyrics put away\n",.{});
   }
   /// whether Claude's own voice is playing now (tools/speak.zig's mark)
   fn speaking(e:*Ear)bool{
@@ -1282,7 +1303,11 @@ const Ear=struct{
       return;
     }
     // along the song's lyrics, for the next line's hint
-    if(song)|s|e.songAt=try songFollow(arena,s,found,e.songAt);
+    if(song)|s|{
+      e.songAt=try songFollow(arena,s,found,e.songAt);
+      // its last words sung: over
+      if(e.songAt>=s.spans.len)e.endSong();
+    }
     const wordless=found.len==0;
     const words:[]const Word=if(wordless)&.{.{.text=littleSound,.start=0,.end=m.f(x.len)/m.f(rate)}}else found;
     const said=try annotate(arena,words,fr);
@@ -1680,6 +1705,9 @@ test "the song's lyrics follow the singing, a chorus sung again found past the f
   const chorus=[_]Word{.{.text="Hold",.start=0,.end=0},.{.text="on,",.start=0,.end=0},.{.text="don't",.start=0,.end=0},.{.text="let",.start=0,.end=0},.{.text="go.",.start=0,.end=0}};
   try testing.expectEqual(15,try songFollow(arena,s,&chorus,at));
   try testing.expectEqual(31,try songFollow(arena,s,&chorus,20));
+  // the last line sung: the song's end
+  const last=[_]Word{.{.text="Hold",.start=0,.end=0},.{.text="on",.start=0,.end=0},.{.text="to",.start=0,.end=0},.{.text="the",.start=0,.end=0},.{.text="glow.",.start=0,.end=0}};
+  try testing.expectEqual(s.spans.len,try songFollow(arena,s,&last,31));
   // only labels: no song
   try testing.expect((try songOf(arena,"[Intro]\n\n"))==null);
 }

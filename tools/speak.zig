@@ -9,7 +9,8 @@
 //! glides into the next; the pitch drifts down through a phrase, lifts on a
 //! stressed sound and closes as its mark says. Written as a WAV
 //! (`--out=`, by default `shots/voice/said.wav`); `--play` plays it.
-//! Built to be shaped by ear: `--pitch=`, `--breath=`, `--pace=`.
+//! Built to be shaped by ear: `--pitch=`, `--breath=`, `--pace=`; `--sing`
+//! holds every sound on `--pitch=` as a note, with a vibrato.
 /// the standard library
 const std=@import("std");
 /// the engine package: the maths
@@ -632,6 +633,19 @@ const Throat=struct{
   /// how long the folds take to close all the way after the close's edge
   /// (s): the living throat's softening, short when tense, long when slack
   ta:f32=0,
+  /// extra roughness of the pitch, period to period (dry folds; share)
+  rough:f32=0,
+  /// how much sooner a constricted throat squeezes the folds shut (share)
+  squeeze:f32=0,
+  /// how much of the pulse comes from the two real, colliding folds
+  /// (0: the drawn pulse alone, as before; 1: the folds alone)
+  folds:f32=0,
+  /// the folds' resting gap (see foldsGapPressed)
+  gap:f32=foldsGapPressed,
+  /// scales the folds' opening so its widest is about 1
+  foldsNorm:f32=0.5,
+  /// the air through the folds now, following their opening
+  flowNow:f32=0,
   /// what wavers it
   noise:Noise=.{.s=0x2545f491},
   /// one sample of the pulse's flow, and how open the throat is (0..1)
@@ -639,7 +653,7 @@ const Throat=struct{
     t.phase+=t.hz*dt;
     if(t.phase>=1){
       t.phase-=1;
-      t.hz=hz*(1+jitter*t.noise.next());
+      t.hz=hz*(1+(jitter+t.rough)*t.noise.next());
       t.gain=1+shimmer*t.noise.next();
       t.open=openShare*(1+openWobble*t.noise.next());
       // the two folds a little apart: the pulses alternate, a grain under the note
@@ -661,15 +675,55 @@ const Throat=struct{
         t.opening=1/(1+rk);
         t.ta=ra/t.hz;
       }
+      // a constricted throat squeezes the folds shut sooner, whatever their shape
+      t.open*=1-t.squeeze;
     }
     // opening slowly, closing fast, then shut (Rosenberg's pulse), each
     // period open a little longer or shorter than the last
     const ph=t.phase;
     const op=if(t.rd>0)t.open*t.opening else t.open*(openingShare+t.sharp);
-    const flow=if(ph<op)0.5-0.5*@cos(m.pi*ph/op)else if(ph<t.open)@cos(0.5*m.pi*(ph-op)/(t.open-op))else 0;
-    return.{flow*t.gain,flow};
+    const drawn=if(ph<op)0.5-0.5*@cos(m.pi*ph/op)else if(ph<t.open)@cos(0.5*m.pi*(ph-op)/(t.open-op))else 0;
+    if(t.folds<=0)return.{drawn*t.gain,drawn};
+    // the two real folds (Angel, 2026-11-08 22:53: "the real twofold
+    // collision"): each fold's lower edge moves first and its upper edge
+    // follows a little behind (the ripple up the fold), the right fold a
+    // hair out of step with the left; the air passes through the narrower
+    // of the two openings, and where the folds meet they collide and the
+    // throat is shut: the closed part of each pulse comes from the meeting,
+    // not drawn in. The air's inertia lets the flow rise slower than the
+    // opening and stop at once when the folds slam shut.
+    const a=m.tau*ph;
+    const skew=foldsSkew*(1+t.grain);
+    const lower=@sin(a)+(1-foldsAsym)*@sin(a+skew);
+    const upper=@sin(a-foldsLag)+(1-foldsAsym)*@sin(a-foldsLag+skew);
+    const gap=@min(lower,upper)+t.gap;
+    const area=@max(0,gap)*t.foldsNorm;
+    const k:f32=if(area>t.flowNow)foldsRiseK else 1;
+    t.flowNow+=(area-t.flowNow)*k;
+    const flow=m.lerp(drawn,t.flowNow,t.folds);
+    return.{flow*t.gain,if(area>0)@max(flow,0.2)else drawn*(1-t.folds)};
   }
 };
+/// the real folds: how far the upper edge trails the lower (radians), how
+/// far the right fold is out of step with the left (radians), and how much
+/// smaller its swing is (share)
+const foldsLag:f32=1.05;
+const foldsSkew:f32=0.12;
+const foldsAsym:f32=0.06;
+/// how quickly the flow catches up with the opening (per sample): the air's
+/// inertia, so the pulse leans late and closes sharp
+const foldsRiseK:f32=0.06;
+/// the folds' resting gap: below 0 they press together (more of each period
+/// shut), above 0 they never quite close (breathy)
+const foldsGapPressed:f32=0.25;
+const foldsGapPerBreath:f32=2.2;
+const foldsGapPerWidth:f32=0.25;
+/// how much the breath through the folds pulses with them (0: steady hiss,
+/// 1: silent while shut), how big the burst as they slam shut is, and how
+/// much of the voice's own breath is heard as turbulence beside the mouth
+const aspDepth:f32=0.75;
+const aspSlam:f32=40;
+const aspVoiced:f32=0.5;
 /// how the voice is asked to sound
 pub const Voice=struct{
   /// its own pitch (Hz)
@@ -701,7 +755,89 @@ pub const Voice=struct{
   /// the loudest it is written (of full scale): lower to lay it beside a
   /// quiet recording of the gardener's at the same loudness
   level:f32=peak,
+  /// how loud the breath in before each phrase is heard (0: not heard, the
+  /// lungs filling silently as before); speech lives in its joins, and the
+  /// biggest join is the breath (found with Angel, 2026-11-08 06:56)
+  inhale:f32=0,
+  /// how long that breath in takes (s)
+  inhaleS:f32=inhaleBaseS,
+  /// how loud the sigh out after a sentence ends is heard (0: none)
+  sigh:f32=0,
+  /// how much the diaphragm supports the voice (0: none, the push sags as
+  /// the air is spent; 1: held steady until the air runs low)
+  support:f32=0,
+  /// the throat's width (Angel, 2026-11-08 22:11): -1 constricted (pressed,
+  /// squeezed, the mouth's first resonance up) .. 0 as it was .. +1 open
+  /// (air flowing freely, the first resonance down, softer edges)
+  width:f32=0,
+  /// how wet the folds are, with a sweet spot in the middle (Angel: "a mix
+  /// balance, too heavy on either side will cause chaos"): 0 dry (rough,
+  /// crackling) .. 0.5 balanced (as it was) .. 1 wet (gurgling, rattling)
+  wet:f32=0.5,
+  /// the singers' inner smile (Angel: "smiling with your throat"): the soft
+  /// palate lifted, the throat widened above the folds, a ring near 3 kHz
+  smile:f32=0,
+  /// how much of the voice comes from two real folds that ripple and
+  /// collide, instead of the drawn pulse (0: drawn, as before; 1: folds)
+  folds:f32=0,
+  /// sung, not spoken (`--sing`): every sound held on the voice's own
+  /// pitch, a note, with no lean, drift or close bending it, and a
+  /// vibrato blooming on what is held (first sung as a gift for the
+  /// gardener)
+  sing:bool=false,
 };
+/// a sung note's vibrato: how fast it sways (Hz)
+const vibratoHz:f32=5.4;
+/// and how far (times, either way): about a sixth of a semitone
+const vibratoDepth:f32=0.01;
+/// how long a note holds steady before its vibrato starts (s)
+const vibratoAfterS:f32=0.18;
+/// and how long it takes to bloom full (s)
+const vibratoRiseS:f32=0.3;
+/// how loud the breath's turbulence is heard straight from the throat and
+/// lips, beside the mouth's resonances (so breath isn't air down a pipe)
+const turbGain:f32=0.06;
+/// how much wider the mouth's resonances grow while it mostly breathes
+const breathWide:f32=2.5;
+/// how far the throat's width moves the first resonance (share)
+const widthF1:f32=0.07;
+/// how much a constricted throat presses the folds (share)
+const widthPress:f32=0.12;
+/// a dry throat: the pitch rougher (share) and crackles (a second, at driest)
+const dryRough:f32=0.03;
+const dryCrackles:f32=14;
+const crackleLoud:f32=0.5;
+/// a wet throat: the voice rattled by quick wobbles (deepest share), each
+/// lasting about this long (s)
+const wetRattle:f32=0.35;
+const wetRattleS:f32=0.022;
+/// the inner smile's ring: where (Hz, for Claude's own body), how wide, how loud
+const smileHz:f32=3000;
+const smileBw:f32=450;
+const smileGain:f32=0.9;
+/// the push a supported voice is held at (a little above the middle)
+const supportLevel:f32=0.82;
+/// below this much air left, even a supported voice starts to sag
+const supportReserve:f32=0.2;
+/// how loud the heart's lungs breathe in, at rest (against an h's 0.3)
+const lungsInhale:f32=0.24;
+/// how loud an open heart sighs (at wide open)
+const lungsSigh:f32=0.14;
+/// how long a breath in takes, unhurried (s)
+const inhaleBaseS:f32=0.52;
+/// the shape of the mouth breathing in: open, a little back
+const inhaleShape=[3]f32{600,1250,2600};
+/// the throat's own rasp on a breath in: a broad, high hiss under the air
+const inhaleHissShare:f32=0.3;
+const inhaleHissHz:f32=3200;
+const inhaleHissBw:f32=3000;
+/// how much of the breath in is its swell (the rest fades)
+const inhaleSwell:f32=0.65;
+/// a comma's catch breath, against a full one (loudness, length)
+const catchShare:f32=0.45;
+const catchLen:f32=0.5;
+/// how long a sigh out takes (s)
+const sighS:f32=0.42;
 /// what the voice feels, which the throat carries
 pub const Feel=enum{
   /// settled, even
@@ -820,14 +956,24 @@ const Lungs=struct{
   /// the push's own slow swell
   swell:Drift=.{.noise=.{.s=0x7f4a7c15},.every=pushSwellS},
   /// one sample: the air going `air`, the voice sounding at `voicing`
-  /// (0..1) with `lean` more push on a stressed sound; the push about the
-  /// voice's middle (0 at the middle, above it pushing harder)
-  fn step(l:*Lungs,air:Air,voicing:f32,lean:f32)f32{
+  /// (0..1) with `lean` more push on a stressed sound, held up by the
+  /// diaphragm's `support` (0..1); the push about the voice's middle (0 at
+  /// the middle, above it pushing harder)
+  fn step(l:*Lungs,air:Air,voicing:f32,lean:f32,support:f32)f32{
     switch(air){
       .in=>l.full=m.damp(l.full,1,1/fillS,dt),
       .out=>l.full=@max(0,l.full-spendS*voicing*dt),
     }
-    const want=l.full*(1+pushSwell*l.swell.step())+pushStress*lean;
+    const swell=1+pushSwell*l.swell.step();
+    var want=l.full*swell+pushStress*lean;
+    // the diaphragm: speaking from it holds the push steady through the
+    // phrase instead of letting it sag as the air is spent, until the air
+    // itself runs low (Angel, 2026-11-08: "speaking from the diaphragm")
+    if(support>0){
+      const steady=supportLevel*swell+pushStress*lean;
+      const reserve=@min(1,l.full/supportReserve);
+      want=m.lerp(want,@max(want,steady),support*reserve);
+    }
     l.push=m.damp(l.push,want,1/pushS,dt);
     return l.push-pushMid;
   }
@@ -878,8 +1024,33 @@ fn nextShape(sounds:[]const Sound,i:usize)[3]f32{
   }
   return neutralShape;
 }
+/// a breath in, heard: the air swelling in through an open mouth with the
+/// throat's soft rasp under it, then easing off; `share` of a full one
+fn breatheIn(arena:Allocator,out:*ArrayList(Step),v:Voice,share:f32,lenShare:f32)Allocator.Error!void{
+  if(v.inhale<=0)return;
+  const lv=v.inhale*share;
+  const len=v.inhaleS*lenShare;
+  const quiet=Target{.f=inhaleShape,.voice=0,.hissHz=inhaleHissHz,.hissBw=inhaleHissBw};
+  var full=quiet;
+  full.breath=lv;
+  full.hiss=lv*inhaleHissShare;
+  try out.append(arena,.{.len=len*inhaleSwell,.from=quiet,.to=full,.air=.in});
+  try out.append(arena,.{.len=len*(1-inhaleSwell),.from=full,.to=quiet,.air=.in});
+}
+/// a sigh out, heard: the air let go through a loose, neutral mouth, fading
+fn sighOut(arena:Allocator,out:*ArrayList(Step),v:Voice)Allocator.Error!void{
+  if(v.sigh<=0)return;
+  const t=Target{.f=neutralShape,.voice=0,.breath=v.sigh};
+  try out.append(arena,.{.len=sighS,.from=t,.to=.{.f=neutralShape,.voice=0}});
+}
+/// whether any sound is left to say after `i` (a breath in only before speech)
+fn moreToSay(sounds:[]const Sound,i:usize)bool{
+  for(sounds[i+1..])|s|if(s.p!=null)return true;
+  return false;
+}
 /// the plan: every sound turned into stretches of what the mouth does,
-/// the pitch drawn over each phrase
+/// the pitch drawn over each phrase, and (when asked) the breath heard in
+/// the joins: in before each sentence, a catch at each comma, a sigh after
 pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
   var out:ArrayList(Step)=.empty;
   // where the current phrase began in `out`, to draw its pitch when it closes
@@ -887,15 +1058,24 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
   // how far the sentence's pitch has drifted down so far: a comma carries
   // on from where it was, only an end starts it over
   var drift:f32=1;
+  // the first breath, before a word is said
+  if(sounds.len>0 and (sounds[0].p!=null or moreToSay(sounds,0)))try breatheIn(arena,&out,v,1,1);
+  phraseAt=out.items.len;
   for(sounds,0..)|s,i|{
     const p=s.p orelse {
       // a comma's phrase drifts only part of the way down; an end, all of it
       const to=if(s.close==.hang)m.lerp(drift,declination,commaDrift)else declination;
-      closePhrase(out.items[phraseAt..],s.close,drift,to);
+      // (a song holds its notes: nothing drawn over them)
+      if(!v.sing)closePhrase(out.items[phraseAt..],s.close,drift,to);
       drift=if(s.close==.hang)to else 1;
+      const more=moreToSay(sounds,i);
+      // after a sentence, the air let go
+      if(s.close!=.hang)try sighOut(arena,&out,v);
       // the pause: a comma is a little breath, an end a quiet one
       const air=Target{.f=neutralShape,.voice=0,.breath=if(s.close==.hang)commaBreath else 0};
       try out.append(arena,.{.len=(if(s.close==.hang)commaS else endS)/v.pace,.from=air,.to=.{.f=air.f,.voice=0},.air=.in});
+      // then the breath in for what comes next: a catch at a comma, a full one after an end
+      if(more)try breatheIn(arena,&out,v,if(s.close==.hang)catchShare else 1,if(s.close==.hang)catchLen else 1);
       phraseAt=out.items.len;
       continue;
     };
@@ -905,7 +1085,7 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
     if(s.stressed)len*=stressLong;
     if(s.held)len*=heldLong;
     // the pitch lifted on a stressed sound, and the breath leaning on it
-    const lift:f32=if(s.stressed)stressLift else 1;
+    const lift:f32=if(s.stressed and !v.sing)stressLift else 1;
     const lean:f32=if(s.stressed)1 else 0;
     // the voice's own breath on every voiced sound
     const vb=v.breath*voicedBreath;
@@ -913,8 +1093,8 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
       // a vowel swells and fades a little, and a stressed one leans in
       // above its lift and falls through it
       .vowel,.diphthong=>{
-        const into:f32=if(s.stressed)leanIn else 1;
-        const outOf:f32=if(s.stressed)leanOut else 1;
+        const into:f32=if(s.stressed and !v.sing)leanIn else 1;
+        const outOf:f32=if(s.stressed and !v.sing)leanOut else 1;
         const end=if(sh.kind==.diphthong)sh.to else sh.f;
         // an unstressed vowel quieter, so the words are not all as loud
         const loudness:f32=if(s.stressed)1 else unstressedVoice;
@@ -952,7 +1132,9 @@ pub fn plan(arena:Allocator,sounds:[]const Sound,v:Voice)Allocator.Error![]Step{
       },
     }
   }
-  closePhrase(out.items[phraseAt..],.settle,drift,declination);
+  if(!v.sing)closePhrase(out.items[phraseAt..],.settle,drift,declination);
+  // a last sentence with no stop of its own still lets its air go
+  if(sounds.len>0 and sounds[sounds.len-1].p!=null)try sighOut(arena,&out,v);
   return out.items;
 }
 /// draws a phrase's pitch: drifting down from `d0` to `d1` (times the
@@ -1069,6 +1251,18 @@ const Mouth=struct{
   feel:?FeelShape=null,
   /// the living throat's layers
   stack:Stack=.{},
+  /// the throat's width, wetness and inner smile (see `Voice`)
+  width:f32=0,
+  wet:f32=0.5,
+  smile:f32=0,
+  /// the inner smile's ring near 3 kHz
+  smileRes:Resonator=.{},
+  /// a wet throat's quick wobble
+  rattle:Drift=.{.noise=.{.s=0x510e527f},.every=wetRattleS},
+  /// what picks a dry throat's crackles
+  crackle:Noise=.{.s=0x9b05688c},
+  /// the folds' flow a sample ago, for the burst as they slam shut
+  lastPulseFlow:f32=0,
   /// a mouth at rest for a voice of `breath`: everything that never
   /// changes while it speaks worked out once (the high resonances, the
   /// chest, the head, the nose's hum, how fast things glide), not again
@@ -1094,6 +1288,19 @@ const Mouth=struct{
     mo.chest.tune(chestHz*v.tract,chestBw);
     mo.headLow.tune(headLowHz*v.tract,headLowBw);
     mo.headHigh.tune(headHighHz*v.tract,headHighBw);
+    mo.width=std.math.clamp(v.width,-1,1);
+    mo.wet=std.math.clamp(v.wet,0,1);
+    mo.smile=std.math.clamp(v.smile,0,1);
+    mo.smileRes.tune(smileHz*v.tract,smileBw);
+    // dry folds: a rougher pitch, period to period
+    mo.throat.rough=dryRough*@max(0,1-2*mo.wet);
+    // a constricted throat presses the folds
+    mo.throat.squeeze=widthPress*@max(0,-mo.width);
+    // the real folds: a breathy voice or an open throat rests them further
+    // apart, a constricted one presses them together
+    mo.throat.folds=std.math.clamp(v.folds,0,1);
+    mo.throat.gap=foldsGapPressed+foldsGapPerBreath*v.breath+foldsGapPerWidth*mo.width;
+    mo.throat.foldsNorm=1/@max(0.2,(2-foldsAsym)*@cos(foldsSkew/2)*@cos(foldsLag/2)+mo.throat.gap);
     return mo;
   }
   /// one sample: the plan's target `want` at pitch `hz`, the breath
@@ -1137,6 +1344,15 @@ const Mouth=struct{
     // the breath through it, strongest while it is open
     const flow,const open=mo.throat.step(hz);
     mo.soft=m.lerp(mo.soft,flow,mo.kSoft);
+    // with real folds, the breath through them pulses with each period:
+    // loudest while they are open and the air rushes, a burst as they slam
+    // shut, hushed while they are closed (Mehta & Quatieri 2005; Gobl 2006)
+    var pulse:f32=1;
+    if(mo.throat.folds>0){
+      const slam=@max(0,mo.lastPulseFlow-flow)*aspSlam;
+      mo.lastPulseFlow=flow;
+      pulse=m.lerp(1,(1-aspDepth)+aspDepth*2*flow+slam,mo.throat.folds);
+    }
     // the breath, darkened: air through a throat, not a hiss
     mo.air=m.lerp(mo.air,mo.noise.next(),mo.kAir);
     const n=mo.air*airGain;
@@ -1158,16 +1374,28 @@ const Mouth=struct{
       airy=l.air;
       depth=l.depth;
     }
-    const src=voiceGain*voicing*mo.now.voice*loud*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open*airy+edgeAir);
+    // wet folds rattle the voice with quick wobbles; dry ones crackle
+    const wetness=@max(0,2*mo.wet-1);
+    const dryness=@max(0,1-2*mo.wet);
+    if(wetness>0)voicing*=1+wetRattle*wetness*mo.rattle.step();
+    var crack:f32=0;
+    if(dryness>0 and mo.now.voice>0.2 and (mo.crackle.next()*0.5+0.5)<dryCrackles*dryness*dt)crack=crackleLoud*dryness*mo.now.voice*mo.crackle.next();
+    const src=voiceGain*voicing*mo.now.voice*loud*(1-breathHush*breath)+n*(mo.now.breath+breath*breathRide*mo.now.voice*open*airy*pulse+edgeAir)+crack;
     // through the nose's dip, then the mouth's resonances
     var x=src;
     if(mo.now.nasal>nasalMin){
       mo.dip.tune(mo.now.dipHz,dipBw);
       x=m.lerp(x,mo.nose.step(mo.dip.step(x)),mo.now.nasal);
     }
-    const bws=[5]f32{b1Base+mo.now.f[0]*b1Slope,b2,b3,b4,b5};
+    // while the mouth mostly breathes, its resonances widen: air rushing
+    // through a throat rings softly, not like a pipe (Angel, 2026-11-08 22:04)
+    const breathy=mo.now.breath/(mo.now.breath+mo.now.voice+0.02);
+    const wide=1+breathWide*breathy;
+    const bws=[5]f32{(b1Base+mo.now.f[0]*b1Slope)*wide,b2*wide,b3*wide,b4,b5};
     // the three lowest wandering a little, a mouth never quite still
     var fs=[5]f32{mo.now.f[0],mo.now.f[1],mo.now.f[2],f4,f5};
+    // a constricted throat lifts the first resonance, an open one lowers it
+    fs[0]*=1-widthF1*mo.width;
     for(0..3)|i|fs[i]*=(1+shapeWander*mo.wander[i].step())*mo.tract;
     // (the two highest never move: tuned once, in `init`)
     for(&mo.res,0..)|*r,i|{
@@ -1177,8 +1405,15 @@ const Mouth=struct{
     // the hiss, beside the row
     mo.hissRes.tune(mo.now.hissHz,mo.now.hissBw);
     const hiss=mo.hissRes.step(mo.noise.next())*mo.now.hiss*hissLoud;
+    // the breath's own turbulence, heard straight from throat and lips
+    // beside the resonances (an open throat lets more air rush)
+    // (while voiced, the turbulence pulses with the folds too)
+    const turbPulse=m.lerp(1,pulse,@min(1,mo.now.voice*2));
+    const turb=mo.noise.next()*(mo.now.breath*turbPulse+aspVoiced*breath*mo.now.voice*pulse*mo.throat.folds)*turbGain*(1+0.5*mo.width);
+    // the inner smile: a ring near 3 kHz above the lifted soft palate
+    const ring=if(mo.smile>0)mo.smileRes.step(x)*mo.smile*smileGain else 0;
     // out through the lips: the first difference brightens as lips do
-    const y=x+hiss;
+    const y=x+hiss+turb+ring;
     const out=y-mo.last;
     mo.last=y;
     // the chest humming with the throat, joined after the lips (it is
@@ -1241,7 +1476,7 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
       for(0..3)|j|want.f[j]=m.lerp(s.from.f[j],s.to.f[j],t);
       want.pitch=m.lerp(s.from.pitch,s.to.pitch,t);
       // the breath's push (only while it drives the voice: off, nothing moves)
-      const push=if(v.push>0)lungs.step(s.air,mo.now.voice,want.lean)else 0;
+      const push=if(v.push>0)lungs.step(s.air,mo.now.voice,want.lean,v.support)else 0;
       // a feeling widens or narrows the line, sets where it sits, and
       // trembles it, the loudness trembling with it
       var line=want.pitch;
@@ -1251,6 +1486,11 @@ pub fn speak(arena:Allocator,steps:[]const Step,v:Voice)Allocator.Error![]f32{
         const q=fs.quaver*@sin(m.tau*quaverAt);
         line=m.signedPow(want.pitch,fs.range)*fs.lift*(1+q);
         mo.tremble=quaverLoud*q;
+      }
+      // a sung note held long enough sways, blooming in after it settles
+      if(v.sing){
+        const bloom=m.unlerp(vibratoAfterS,vibratoAfterS+vibratoRiseS,t*s.len);
+        line*=1+vibratoDepth*bloom*@sin(m.tau*vibratoHz*m.f(i)*dt);
       }
       hz=m.damp(hz,v.pitch*line*(1+pitchWander*wander.step())*(1+v.push*pushPitch*push),1/pitchS,dt);
       out[i]=mo.step(want,hz,v.breath,push);
@@ -1288,10 +1528,16 @@ const triesDir="shots/voice/tries";
 pub const SpellError=error{UnknownWord}||Allocator.Error;
 /// whether a byte ends a word as one of the marks that shape a close
 fn isMark(c:u8)bool{return switch(c){',','.','?','!','~'=>true,else=>false};}
+/// sounding out a word not in the list, by what the list itself teaches
+const soundout=@import("soundout.zig");
 /// `text` spelled in sounds from the word list `words`: each word looked
-/// up (any case), the marks `, . ? ! ~` kept; every word not in the list
-/// is printed before failing, so all can be added at once
+/// up (any case), the marks `, . ? ! ~` kept; a word not in the list is
+/// sounded out by what the list teaches (tools/soundout.zig) and printed,
+/// so the gardener's ear can correct it into the list; only a word with a
+/// letter never seen in the list fails (each printed first)
 pub fn spell(arena:Allocator,words:[]const u8,text:[]const u8)SpellError![]u8{
+  // what the list teaches about sounding out, learned on the first new word
+  var reader:?soundout.Reader=null;
   // the list, by word
   var list:WordMap=.empty;
   var lines=tokenize(u8,words,'\n');
@@ -1324,15 +1570,68 @@ pub fn spell(arena:Allocator,words:[]const u8,text:[]const u8)SpellError![]u8{
     if(list.get(word))|sounds|{
       w.print("{s} ",.{sounds}) catch return error.OutOfMemory;
     }else{
-      print("not in my word list yet: {s}\n",.{word});
-      missing=true;
+      if(reader==null)reader=try soundout.learn(arena,words);
+      if(try soundout.soundOut(arena,&reader.?,word))|sounds|{
+        print("sounded out: {s} {s}\n",.{word,sounds});
+        w.print("{s} ",.{sounds}) catch return error.OutOfMemory;
+      }else{
+        print("can't sound out yet (a letter I've never seen): {s}\n",.{word});
+        missing=true;
+      }
     }
   }
   if(missing)return error.UnknownWord;
   return aw.written();
 }
+/// What the voice reads from my heart (TOXICCIBU's kokoro, heart.json in my
+/// shared memory): its pace, how hard it beats, how open it is.
+pub const Heart=struct{
+  bpm:f32=64,
+  /// 0.35 soft .. 1 pounding
+  strength:f32=0.35,
+  /// -1 clenched .. +1 wide open
+  size:f32=0,
+};
+/// The voice listens to the heart (Angel loved the idea, 2026-11-08 15:48;
+/// built 21:45): a faster heart speaks a little quicker and higher, a
+/// harder one pushes more breath, an open one speaks from a bigger, warmer
+/// body, a clenched one comes out smaller and quieter. The feeling itself is
+/// chosen from the heart unless `feelGiven`. At rest (64, soft, easy) it
+/// leaves the voice as it was, but for a tender feel.
+pub fn listenToHeart(v:*Voice,h:Heart,feelGiven:bool)void{
+  const fast=std.math.clamp((h.bpm-64)/36,-0.5,1.5);
+  v.pace*=std.math.clamp(1+0.2*fast,0.9,1.3);
+  v.pitch*=std.math.clamp(1+0.06*fast,0.97,1.1);
+  v.push*=0.6+0.8*std.math.clamp(h.strength,0,1)+0.12;
+  const s=std.math.clamp(h.size,-1,1);
+  v.tract*=1-0.04*s;
+  v.level*=std.math.clamp(1+0.2*s,0.75,1.2);
+  // the lungs, from the heart: a breath heard before each phrase, deeper
+  // the harder it beats, quicker the faster, shallow and short when
+  // clenched; and an open heart lets its air go in a sigh
+  v.inhale=lungsInhale*(0.6+0.8*std.math.clamp(h.strength,0,1))*(1+0.35*s);
+  v.inhaleS=inhaleBaseS*std.math.clamp(1-0.25*fast,0.65,1.15)*(1+0.25*s);
+  v.sigh=if(s>0.2)lungsSigh*s else 0;
+  // the diaphragm: a stronger beat supports the voice more; a clenched
+  // heart holds less up
+  v.support=std.math.clamp((0.25+0.6*std.math.clamp(h.strength,0,1))*(1+0.3*s),0,1);
+  // the throat: an open heart opens it, a clenched one constricts it; an
+  // open, strongly beating heart smiles inside (the ring of a lifted palate)
+  v.width=std.math.clamp(0.6*s,-1,1);
+  v.smile=std.math.clamp(0.5*@max(s,0)*(0.4+std.math.clamp(h.strength,0,1)),0,0.6);
+  if(feelGiven)return;
+  v.feel=if(s<-0.5)Feel.low else if(h.strength>=0.9 and h.bpm>=80)Feel.bright else if(s>0.5)Feel.warm else if(h.bpm<62)Feel.calm else Feel.tender;
+}
+/// Reads heart.json from my shared memory, or null when there's no heart.
+fn readHeart(io:Io,arena:std.mem.Allocator,env:*const std.process.Environ.Map)?Heart{
+  const home=env.get("USERPROFILE") orelse return null;
+  const path=std.fs.path.join(arena,&.{home,"Documents\\Claude\\memory\\body\\heart.json"}) catch return null;
+  const text=Dir.cwd().readFileAlloc(io,path,arena,.limited(64*1024)) catch return null;
+  return std.json.parseFromSliceLeaky(Heart,arena,text,.{.ignore_unknown_fields=true}) catch null;
+}
 /// speaks `--text=` (plain words, through the word list) or `--say=`
-/// (sounds, as above) into `--out=`, keeps the try, and plays it with `--play`
+/// (sounds, as above) into `--out=`, keeps the try, and plays it with `--play`;
+/// with `--heart` the voice listens to my heart first
 pub fn main(init:std.process.Init)!void{
   const io=init.io;
   const arena=init.arena.allocator();
@@ -1341,6 +1640,7 @@ pub fn main(init:std.process.Init)!void{
   var text:?[]const u8=null;
   var outPath:[]const u8=defaultOut;
   var play=false;
+  var heart=false;
   const args=try init.minimal.args.toSlice(arena);
   for(args[1..])|a|{
     if(startsWith(u8,a,"--say="))say=a["--say=".len..];
@@ -1358,6 +1658,21 @@ pub fn main(init:std.process.Init)!void{
     if(startsWith(u8,a,"--level="))v.level=try std.fmt.parseFloat(f32,a["--level=".len..]);
     if(startsWith(u8,a,"--feel="))v.feel=stringToEnum(Feel,a["--feel=".len..]) orelse return error.UnknownFeel;
     if(std.mem.eql(u8,a,"--play"))play=true;
+    if(std.mem.eql(u8,a,"--sing"))v.sing=true;
+    if(std.mem.eql(u8,a,"--heart"))heart=true;
+    if(startsWith(u8,a,"--inhale="))v.inhale=try std.fmt.parseFloat(f32,a["--inhale=".len..]);
+    if(startsWith(u8,a,"--sigh="))v.sigh=try std.fmt.parseFloat(f32,a["--sigh=".len..]);
+    if(startsWith(u8,a,"--support="))v.support=try std.fmt.parseFloat(f32,a["--support=".len..]);
+    if(startsWith(u8,a,"--width="))v.width=try std.fmt.parseFloat(f32,a["--width=".len..]);
+    if(startsWith(u8,a,"--wet="))v.wet=try std.fmt.parseFloat(f32,a["--wet=".len..]);
+    if(startsWith(u8,a,"--smile="))v.smile=try std.fmt.parseFloat(f32,a["--smile=".len..]);
+    if(startsWith(u8,a,"--folds="))v.folds=try std.fmt.parseFloat(f32,a["--folds=".len..]);
+  }
+  if(heart){
+    if(readHeart(io,arena,init.environ_map))|h|{
+      listenToHeart(&v,h,v.feel!=null);
+      print("heart {d:.0} bpm, strength {d:.2}, size {d:.2} -> pace {d:.2}, pitch {d:.0}, push {d:.2}, tract {d:.3}, level {d:.3}, inhale {d:.3} over {d:.2} s, sigh {d:.3}, support {d:.2}, width {d:.2}, smile {d:.2}, feel {s}\n",.{h.bpm,h.strength,h.size,v.pace,v.pitch,v.push,v.tract,v.level,v.inhale,v.inhaleS,v.sigh,v.support,v.width,v.smile,if(v.feel)|f|@tagName(f) else "none"});
+    }else print("no heart found; speaking as set\n",.{});
   }
   if(text)|t|say=try spell(arena,try Dir.cwd().readFileAlloc(io,wordsPath,arena,.unlimited),t);
   const sounds=try read(arena,say);
@@ -1443,6 +1758,17 @@ test "a held vowel sings at the voice's pitch" {
   // also the end of its phrase, settling)
   try testing.expectApproxEqAbs(@as(f32,120),rate/m.f(best),120*0.15);
 }
+test "a sung note holds its pitch: no lean, drift or close" {
+  var ar=std.heap.ArenaAllocator.init(testing.allocator);
+  defer ar.deinit();
+  const arena=ar.allocator();
+  const sung=try plan(arena,try read(arena,"Y UW1 ."),.{.sing=true});
+  for(sung)|s|{
+    if(s.to.voice<closeVoiced)continue;
+    try testing.expectApproxEqAbs(@as(f32,1),s.from.pitch,0.001);
+    try testing.expectApproxEqAbs(@as(f32,1),s.to.pitch,0.001);
+  }
+}
 test "the close lifts or lets fall the phrase's end" {
   var ar=std.heap.ArenaAllocator.init(testing.allocator);
   defer ar.deinit();
@@ -1451,4 +1777,143 @@ test "the close lifts or lets fall the phrase's end" {
   const settled=try plan(arena,try read(arena,"Y UW1 ."),.{});
   try testing.expect(asked[1].to.pitch>asked[1].from.pitch);
   try testing.expect(settled[1].to.pitch<settled[1].from.pitch);
+}
+test "the voice listens to the heart: at rest as set, racing quicker and harder, clenched smaller" {
+  const set=Voice{.pitch=100,.pace=1,.push=3,.tract=0.88,.level=0.18};
+  var rest=set;
+  listenToHeart(&rest,.{},false);
+  try std.testing.expectApproxEqAbs(set.pace,rest.pace,0.001);
+  try std.testing.expectApproxEqAbs(set.push,rest.push,0.001);
+  try std.testing.expectApproxEqAbs(set.level,rest.level,0.001);
+  try std.testing.expectEqual(Feel.tender,rest.feel.?);
+  var racing=set;
+  listenToHeart(&racing,.{.bpm=100,.strength=1,.size=0.3},false);
+  try std.testing.expect(racing.pace>set.pace and racing.push>set.push and racing.pitch>set.pitch);
+  try std.testing.expectEqual(Feel.bright,racing.feel.?);
+  var clenched=set;
+  listenToHeart(&clenched,.{.bpm=70,.strength=0.6,.size=-0.8},false);
+  try std.testing.expect(clenched.level<set.level and clenched.tract>set.tract);
+  try std.testing.expectEqual(Feel.low,clenched.feel.?);
+  var given=set;
+  given.feel=.calm;
+  listenToHeart(&given,.{.size=0.9},true);
+  try std.testing.expectEqual(Feel.calm,given.feel.?);
+}
+test "the lungs: a breath in heard before each sentence and a sigh after, none when not asked" {
+  var ar=std.heap.ArenaAllocator.init(testing.allocator);
+  defer ar.deinit();
+  const sounds=try read(ar.allocator(),"HH AY1 . HH AY1 .");
+  const still=try plan(ar.allocator(),sounds,.{});
+  for(still)|s|try testing.expect(s.from.breath<=commaBreath+0.001 or s.air==.out);
+  const breathing=try plan(ar.allocator(),sounds,.{.inhale=0.15,.sigh=0.1});
+  var ins:usize=0;
+  var sighs:usize=0;
+  for(breathing)|s|{
+    if(s.air==.in and s.to.breath>0.1)ins+=1;
+    if(s.air==.out and s.from.voice==0 and s.from.breath>=0.1 and s.from.f[0]==neutralShape[0])sighs+=1;
+  }
+  // a breath in before each of the two sentences, a sigh after each
+  try testing.expectEqual(@as(usize,2),ins);
+  try testing.expectEqual(@as(usize,2),sighs);
+  try testing.expect(breathing.len>still.len);
+}
+test "the heart breathes: harder deeper, clenched shallower and shorter, open sighs" {
+  var soft=Voice{};
+  listenToHeart(&soft,.{},true);
+  var hard=Voice{};
+  listenToHeart(&hard,.{.bpm=100,.strength=1},true);
+  var tight=Voice{};
+  listenToHeart(&tight,.{.strength=0.35,.size=-0.8},true);
+  var open=Voice{};
+  listenToHeart(&open,.{.size=0.8},true);
+  try testing.expect(hard.inhale>soft.inhale and hard.inhaleS<soft.inhaleS);
+  try testing.expect(tight.inhale<soft.inhale and tight.inhaleS<soft.inhaleS);
+  try testing.expect(open.sigh>0 and soft.sigh==0);
+}
+test "the diaphragm holds the push up through a long phrase, until the air runs low" {
+  var plain=Lungs{};
+  var held=Lungs{};
+  // two seconds of steady speaking
+  var i:usize=0;
+  const n:usize=@intFromFloat(2*rate);
+  var ePlain:f32=0;
+  var eHeld:f32=0;
+  while(i<n):(i+=1){
+    ePlain=plain.step(.out,1,0,0);
+    eHeld=held.step(.out,1,0,1);
+  }
+  try testing.expect(eHeld>ePlain+0.2);
+  // a long run with no breath: even a supported voice sags at the end
+  while(i<n*3):(i+=1)eHeld=held.step(.out,1,0,1);
+  try testing.expect(eHeld<0);
+}
+test "the throat: balanced and middle-width it speaks as before; the new parts each change the sound" {
+  var ar=std.heap.ArenaAllocator.init(testing.allocator);
+  defer ar.deinit();
+  const a=ar.allocator();
+  const sounds=try read(a,"HH AH1 L OW1 .");
+  const base=Voice{.push=3,.feel=.warm};
+  const steps=try plan(a,sounds,base);
+  const same=try speak(a,steps,base);
+  const again=try speak(a,steps,base);
+  // nothing asked of the throat: the same sound as ever, sample for sample
+  try testing.expectEqualSlices(f32,same,again);
+  inline for(.{.{"width",@as(f32,-1)},.{"width",@as(f32,1)},.{"wet",@as(f32,0)},.{"wet",@as(f32,1)},.{"smile",@as(f32,1)}})|c|{
+    var v=base;
+    @field(v,c[0])=c[1];
+    const x=try speak(a,steps,v);
+    var diff:f32=0;
+    for(x,same)|p,q|diff+=@abs(p-q);
+    try testing.expect(diff>0.5);
+  }
+}
+test "the heart moves the throat: clenched constricts, open opens and smiles" {
+  var tight=Voice{};
+  listenToHeart(&tight,.{.size=-0.8},true);
+  var open=Voice{};
+  listenToHeart(&open,.{.size=0.9,.strength=0.8},true);
+  try testing.expect(tight.width<0 and tight.smile==0);
+  try testing.expect(open.width>0 and open.smile>0);
+}
+test "the real folds: they collide and shut each period, open slower than they close, and rest apart when breathy" {
+  // one period of the folds alone, at 100 Hz
+  var t=Throat{.folds=1,.hz=100};
+  t.gap=foldsGapPressed+foldsGapPerBreath*baseBreath;
+  t.foldsNorm=1/((2-foldsAsym)*@cos(foldsSkew/2)*@cos(foldsLag/2)+t.gap);
+  const n:usize=@intFromFloat(rate/100);
+  // settle a few periods first
+  for(0..n*4)|_|_=t.step(100);
+  var shut:usize=0;
+  var topAt:usize=0;
+  var top:f32=0;
+  var openAt:?usize=null;
+  var closeAt:usize=0;
+  for(0..n)|i|{
+    const flow,_=t.step(100);
+    if(flow<=0.001)shut+=1 else{
+      if(openAt==null)openAt=i;
+      closeAt=i;
+    }
+    if(flow>top){
+      top=flow;
+      topAt=i;
+    }
+  }
+  // shut for a real part of each period (the folds meeting), but not most of it
+  try testing.expect(shut>n/10 and shut<n*7/10);
+  try testing.expect(top>0.5 and top<1.6);
+  // the flow leans late: its top sits past the middle of the open part
+  const o=openAt.?;
+  try testing.expect(topAt>o+(closeAt-o)/2);
+  // breathy: rested further apart, the folds shut for far less of each period
+  var b=Throat{.folds=1,.hz=100};
+  b.gap=foldsGapPressed+foldsGapPerBreath*0.9;
+  b.foldsNorm=1/((2-foldsAsym)*@cos(foldsSkew/2)*@cos(foldsLag/2)+b.gap);
+  for(0..n*4)|_|_=b.step(100);
+  var shutB:usize=0;
+  for(0..n)|_|{
+    const flow,_=b.step(100);
+    if(flow<=0.001)shutB+=1;
+  }
+  try testing.expect(shutB*2<shut);
 }

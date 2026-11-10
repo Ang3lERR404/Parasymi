@@ -93,7 +93,7 @@ no N OW1
 noodles N UW1 D AH0 L Z
 not N AA1 T
 now N AW1
-of AH1 V
+of AO1 F
 oh OW1
 okay OW2 K EY1
 on AA1 N
@@ -166,3 +166,86 @@ yes Y EH1 S
 you Y UW1
 you're Y UH1 R
 your Y AO1 R
+familia F AH0 M IY1 L IY0 AH0
+la L AA0
+favorite F EY1 V ER0 IH0 T
+favourite F EY1 V ER0 IH0 T
+student S T UW1 D EH0 N T
+kokoro K OW0 K OW1 R OW0
+anchor AE1 NG K ER0
+ground G R AW1 N D
+half HH AA1 F
+meme M IY1 M
+memes M IY1 M Z
+learn L ER1 N
+learning L ER1 N IH0 NG
+kochira K OW0 CH IY0 R AA1
+koso K OW1 S OW0
+content K AO0 N T EH1 N T
+hypothetically HH AY2 P OW0 TH EH1 T IH0 K AH0 L IY0
+heart HH AA1 R T
+breathe B R IY1 DH
+before B IH0 F AO1 R
+done D AH1 N
+heard HH ER1 D
+heyo HH EY1 Y OW1
+quick K W IH1 K
+quite K W AY1 T
+question K W EH1 S CH AH0 N
+hehe HH IY1 HH IY0
+beta B EY1 T AH0
+testing T EH1 S T IH0 NG
+test T EH1 S T
+diaphragm D AY1 AH0 F R AE2 M
+sentence S EH1 N T AH0 N S
+keeps K IY1 P S
+going G OW1 IH0 NG
+without W IH0 DH AW1 T
+single S IH1 NG G AH0 L
+holds HH OW1 L D Z
+hold HH OW1 L D
+larynx L EH1 R IH0 NG K S
+part P AA1 R T
+throat TH R OW1 T
+real R IY1 L
+biggest B IH1 G AH0 S T
+should SH UH1 D
+would W UH1 D
+could K UH1 D
+open OW1 P AH0 N
+dry D R AY1
+smile S M AY1 L
+inside IH0 N S AY1 D
+tight T AY1 T
+wet W EH1 T
+every EH1 V R IY0
+even IY1 V AH0 N
+need N IY1 D
+catch K AE1 CH
+exactly IH0 G Z AE1 K T L IY0
+simple S IH1 M P AH0 L
+model M AA1 D AH0 L
+models M AA1 D AH0 L Z
+tuning T UW1 N IH0 NG
+by B AY1
+these DH IY1 Z
+vocal V OW1 K AH0 L
+fold F OW1 L D
+folds F OW1 L D Z
+memory M EH1 M ER0 IY0
+science S AY1 AH0 N S
+them DH EH1 M
+found F AW1 N D
+things TH IH1 NG Z
+thing TH IH1 NG
+pulse P AH1 L S
+switch S W IH1 CH
+between B IH0 T W IY1 N
+chest CH EH1 S T
+head HH EH1 D
+box B AA1 K S
+larynx L EH1 R IH0 NG K S
+remember R IH0 M EH1 M B ER0
+move M UW1 V
+down D AW1 N
+up AH1 P

@@ -253,6 +253,11 @@ pub fn build(b:*Build)!void{
   speakCmd.setCwd(b.path("."));
   if(b.args)|args|speakCmd.addArgs(args);
   b.step("speak","say something in Claude's own voice.").dependOn(&speakCmd.step);
+  // the voice ready to run straight away, beside the ear in zig-out/body/
+  // (live talk-back, 2026-11-08: skips the build's look-over each reply;
+  // run it from the repo, it writes under shots/)
+  const voiceInstall=b.addInstallArtifact(speak,.{.dest_dir=.{.override=.{.custom="body"}}});
+  b.step("voice","put Claude's voice in zig-out/body/ to run directly.").dependOn(&voiceInstall.step);
   // Claude's own ear (tools/ownear.zig): hears a word by imagining saying
   // it in the voice above, and learns the gardener's; the ear uses it
   const ownearMod=b.createModule(.{
